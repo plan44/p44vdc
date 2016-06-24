@@ -40,4 +40,6 @@ Getting Started
 
 ### Not here!
 
-This is not a full vdc project, only parts of it. Please go to the vdcd main project at [vdcd project](https://github.com/plan44/vdcd).
+This is not a full vdc program, only important parts of it. Please go to the [**vdcd main project**](https://github.com/plan44/vdcd) for a ready to build (and run) program.
+
+*(c) 2013-2016 by Lukas Zeller / [plan44.ch](http://www.plan44.ch/automation)*
