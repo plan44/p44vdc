@@ -1,36 +1,7 @@
-docs/DoxygenDocs.docset/
-*~
-
-# DigiESP/Eclipse CDT specifics
-boost_1_53_0/
-Debug/
-Release/
-
-# XCode specifics
-*.xcuserstate
-xcuserdata/
-
 # Autotools specifics
 *.o
 Makefile
 Makefile.in
-autom4te.cache/
-aclocal.m4
-config.h
-config.h.in
-config.log
-config.status
-configure
-configure_aux/
 .dirstamp
 .deps/
 stamp-h1
-
-# built binaries
-vdcd
-olavdcd
-jsonrpctool
-demovdc
-vdcd.xcodeproj/project.xcworkspace/xcshareddata/vdcd.xcscmblueprint
-external_devices_samples/plain C/externalButton.xcodeproj/project.xcworkspace/contents.xcworkspacedata
-external_devices_samples/plain C/externalButton.xcodeproj/project.xcworkspace/xcshareddata/externalButton.xcscmblueprint
