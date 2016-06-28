@@ -227,7 +227,7 @@ void DiscoveryManager::startService()
       if (avahiErr==AVAHI_ERR_NO_NETWORK) {
         // no network to publish to - might be that it is not yet up, try again later
         LOG(LOG_WARNING, "avahi: no network available to publish services now -> retry later");
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startServices, this), STARTUP_RETRY_DELAY);
+        MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
         return;
       }
       else {
@@ -303,7 +303,7 @@ void DiscoveryManager::serviceStarted()
   if (FOCUSLOGENABLED) {
     debugServiceBrowser = avahi_service_browser_new(service, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, HTTP_SERVICE_TYPE, NULL, (AvahiLookupFlags)0, avahi_debug_browse_callback, this);
     if (!debugServiceBrowser) {
-      FOCUSLOG("Failed to create debug service browser: %s", avahi_strerror(avahi_server_errno(service)));
+      FOCUSLOG("Failed to create debug service browser: %s", avahi_strerror(avahi_service_errno(service)));
     }
   }
 }
@@ -440,7 +440,7 @@ bool DiscoveryManager::serviceRunning(AvahiService *aService)
 
 
 
-void DiscoveryManager::startAdvertising(AvahiServer *aService)
+void DiscoveryManager::startAdvertising(AvahiService *aService)
 {
   // try to start advertising DS (if set up but could not be started before)
   startAdvertisingDS(aService);
@@ -513,7 +513,7 @@ void DiscoveryManager::refreshAdvertisingDS()
 
 
 
-void DiscoveryManager::startAdvertisingDS(AvahiServer *aService)
+void DiscoveryManager::startAdvertisingDS(AvahiService *aService)
 {
   if (dmState==dm_requeststart && serviceRunning(aService)) {
     // create entry group now
@@ -946,7 +946,7 @@ ServiceBrowser::ServiceBrowser(const char *aServiceType, ServiceDiscoveryCB aSer
   AvahiService *s = DiscoveryManager::sharedDiscoveryManager().service;
   avahiServiceBrowser = avahi_service_browser_new(s, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, aServiceType, NULL, (AvahiLookupFlags)0, avahi_browse_callback, this);
   if (!avahiServiceBrowser) {
-    LOG(LOG_ERR, "ServiceBrowser: Failed to create browser for type '%s': %s", aServiceType, avahi_strerror(avahi_server_errno(s)));
+    LOG(LOG_ERR, "ServiceBrowser: Failed to create browser for type '%s': %s", aServiceType, avahi_strerror(avahi_service_errno(s)));
   }
 }
 
