@@ -21,8 +21,6 @@
 
 #include "dsbehaviour.hpp"
 
-#include "dsparams.hpp"
-
 #include "device.hpp"
 
 using namespace p44;
