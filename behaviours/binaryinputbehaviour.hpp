@@ -3,24 +3,24 @@
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
-//  This file is part of vdcd.
+//  This file is part of p44vdc.
 //
-//  vdcd is free software: you can redistribute it and/or modify
+//  p44vdc is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  vdcd is distributed in the hope that it will be useful,
+//  p44vdc is distributed in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with vdcd. If not, see <http://www.gnu.org/licenses/>.
+//  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __vdcd__binaryinputbehaviour__
-#define __vdcd__binaryinputbehaviour__
+#ifndef __p44vdc__binaryinputbehaviour__
+#define __p44vdc__binaryinputbehaviour__
 
 #include "device.hpp"
 
@@ -75,7 +75,7 @@ namespace p44 {
     /// @param aInputType the input type (also called sensor function in classic dS)
     /// @param aUsage how this input is normally used (indoor/outdoor etc.)
     /// @param aReportsChanges if set, changes of this input can trigger a push. Inputs that do not have this flag set need
-    ///   to be polled to get the input state. (At this time, this is descriptive only, and has no functionality within vdcd)
+    ///   to be polled to get the input state. (At this time, this is descriptive only, and has no functionality within p44vdc)
     /// @param aUpdateInterval how often an update can be expected from this input. If 0, this means that no minimal
     ///   update interval can be expected.
     /// @note this must be called once before the device gets added to the device container. Implementation might
@@ -146,4 +146,4 @@ namespace p44 {
   
 } // namespace p44
 
-#endif /* defined(__vdcd__binaryinputbehaviour__) */
+#endif /* defined(__p44vdc__binaryinputbehaviour__) */

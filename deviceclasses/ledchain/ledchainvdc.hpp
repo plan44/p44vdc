@@ -3,26 +3,26 @@
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
-//  This file is part of vdcd.
+//  This file is part of p44vdc.
 //
-//  vdcd is free software: you can redistribute it and/or modify
+//  p44vdc is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  vdcd is distributed in the hope that it will be useful,
+//  p44vdc is distributed in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with vdcd. If not, see <http://www.gnu.org/licenses/>.
+//  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __vdcd__ledchainvdc__
-#define __vdcd__ledchainvdc__
+#ifndef __p44vdc__ledchainvdc__
+#define __p44vdc__ledchainvdc__
 
-#include "vdcd_common.hpp"
+#include "p44vdc_common.hpp"
 
 #if ENABLE_LEDCHAIN
 
@@ -126,4 +126,4 @@ namespace p44 {
 } // namespace p44
 
 #endif // ENABLE_LEDCHAIN
-#endif // __vdcd__ledchainvdc__
+#endif // __p44vdc__ledchainvdc__

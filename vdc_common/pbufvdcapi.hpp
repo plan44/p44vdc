@@ -3,26 +3,26 @@
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
-//  This file is part of vdcd.
+//  This file is part of p44vdc.
 //
-//  vdcd is free software: you can redistribute it and/or modify
+//  p44vdc is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  vdcd is distributed in the hope that it will be useful,
+//  p44vdc is distributed in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with vdcd. If not, see <http://www.gnu.org/licenses/>.
+//  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __vdcd__pbufvdcapi__
-#define __vdcd__pbufvdcapi__
+#ifndef __p44vdc__pbufvdcapi__
+#define __p44vdc__pbufvdcapi__
 
-#include "p44_common.hpp"
+#include "p44utils_common.hpp"
 
 #include "vdcapi.hpp"
 
@@ -276,4 +276,4 @@ namespace p44 {
 }
 
 
-#endif /* defined(__vdcd__pbufvdcapi__) */
+#endif /* defined(__p44vdc__pbufvdcapi__) */

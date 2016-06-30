@@ -3,26 +3,26 @@
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
-//  This file is part of vdcd.
+//  This file is part of p44vdc.
 //
-//  vdcd is free software: you can redistribute it and/or modify
+//  p44vdc is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  vdcd is distributed in the hope that it will be useful,
+//  p44vdc is distributed in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with vdcd. If not, see <http://www.gnu.org/licenses/>.
+//  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __vdcd__dsid__
-#define __vdcd__dsid__
+#ifndef __p44vdc__dsid__
+#define __p44vdc__dsid__
 
-#include "vdcd_common.hpp"
+#include "p44vdc_common.hpp"
 
 
 // Name spaces for UUID based dSUIDs
@@ -38,7 +38,7 @@
 // - plan44 vDC implementation namespace (used for generating vDC-implementation specific dsids)
 #define DSUID_P44VDC_NAMESPACE_UUID "441A1FED-F449-4058-BEBA-13B1C4AB6A93"
 
-// - plan44 model ID namespace (used for generating vDCd-implementation specific model IDs)
+// - plan44 model ID namespace (used for generating p44vdc-implementation specific model IDs)
 #define DSUID_P44VDC_MODELUID_UUID "4E2E874A-11E1-4A6D-BDBD-D2556CAE3CE5"
 
 
@@ -201,4 +201,4 @@ namespace p44 {
 
 } // namespace p44
 
-#endif /* defined(__vdcd__dsid__) */
+#endif /* defined(__p44vdc__dsid__) */

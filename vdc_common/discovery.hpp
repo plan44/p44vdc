@@ -3,26 +3,26 @@
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
-//  This file is part of vdcd.
+//  This file is part of p44vdc.
 //
-//  vdcd is free software: you can redistribute it and/or modify
+//  p44vdc is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  vdcd is distributed in the hope that it will be useful,
+//  p44vdc is distributed in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with vdcd. If not, see <http://www.gnu.org/licenses/>.
+//  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __vdcd__discovery__
-#define __vdcd__discovery__
+#ifndef __p44vdc__discovery__
+#define __p44vdc__discovery__
 
-#include "vdcd_common.hpp"
+#include "p44vdc_common.hpp"
 
 #if !DISABLE_DISCOVERY
 
@@ -131,7 +131,7 @@ namespace p44 {
 
   typedef boost::function<void (bool aShouldRun)> AuxVdsmStatusHandler;
 
-  /// Implements service announcement and discovery (via avahi) for vdcd and (if configured) a associated vdsm
+  /// Implements service announcement and discovery (via avahi) for vdc host and (if configured) a associated vdsm
   class DiscoveryManager : public P44Obj
   {
     typedef P44Obj inherited;
@@ -207,7 +207,7 @@ namespace p44 {
     bool serviceRunning();
 
 
-    /// advertise vdcd (or the vdsm, if same platform hosts a auxiliary vdsm and no master vdsm is found)
+    /// advertise p44vdc (or the vdsm, if same platform hosts a auxiliary vdsm and no master vdsm is found)
     /// @note can be called repeatedly to update information
     /// @param aVdcHost the device container to be published
     /// @param aNoAuto if set, the published vdsm or vdc will not be automatically connected (only when explicitly whitelisted)
@@ -287,4 +287,4 @@ namespace p44 {
 } // namespace p44
 
 #endif // !DISABLE_DISCOVERY
-#endif // __vdcd__discovery__
+#endif // __p44vdc__discovery__

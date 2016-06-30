@@ -3,20 +3,20 @@
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
-//  This file is part of vdcd.
+//  This file is part of p44vdc.
 //
-//  vdcd is free software: you can redistribute it and/or modify
+//  p44vdc is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  vdcd is distributed in the hope that it will be useful,
+//  p44vdc is distributed in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with vdcd. If not, see <http://www.gnu.org/licenses/>.
+//  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
 #include "vdchost.hpp"
@@ -29,9 +29,11 @@
 
 #include "macaddress.hpp"
 
+#if ENABLE_LOCAL_BEHAVIOUR
 // for local behaviour
 #include "buttonbehaviour.hpp"
 #include "lightbehaviour.hpp"
+#endif
 
 
 // TODO: move scene processing to output?
@@ -651,6 +653,7 @@ void VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsCl
 
 void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
+  #if ENABLE_LOCAL_BEHAVIOUR
   // TODO: Not really conforming to ds-light yet...
   int scene = -1; // none
   // if button has up/down, direction is derived from button
@@ -730,6 +733,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
       }
     }
   }
+  #endif // ENABLE_LOCAL_BEHAVIOUR
 }
 
 

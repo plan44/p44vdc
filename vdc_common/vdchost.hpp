@@ -3,26 +3,26 @@
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
-//  This file is part of vdcd.
+//  This file is part of p44vdc.
 //
-//  vdcd is free software: you can redistribute it and/or modify
+//  p44vdc is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  vdcd is distributed in the hope that it will be useful,
+//  p44vdc is distributed in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with vdcd. If not, see <http://www.gnu.org/licenses/>.
+//  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __vdcd__vdchost__
-#define __vdcd__vdchost__
+#ifndef __p44vdc__vdchost__
+#define __p44vdc__vdchost__
 
-#include "vdcd_common.hpp"
+#include "p44vdc_common.hpp"
 
 #include "dsdefs.h"
 
@@ -104,12 +104,12 @@ namespace p44 {
     DsParamStore dsParamStore; ///< the database for storing dS device parameters
 
     string iconDir; ///< the directory where to load icons from
-    string persistentDataDir; ///< the directory for the vdcd to store SQLite DBs and possibly other persistent data
+    string persistentDataDir; ///< the directory for the vdc host to store SQLite DBs and possibly other persistent data
 
-    string productName; ///< the name of the vdcd product (model name) as a a whole
-    string productVersion; ///< the version string of the vdcd product as a a whole
-    string deviceHardwareId; ///< the device hardware id (such as a serial number) of the vdcd product as a a whole
-    string descriptionTemplate; ///< how to describe the vdcd (e.g. in service announcements)
+    string productName; ///< the name of the vdc host product (model name) as a a whole
+    string productVersion; ///< the version string of the vdc host product as a a whole
+    string deviceHardwareId; ///< the device hardware id (such as a serial number) of the vdc host product as a a whole
+    string descriptionTemplate; ///< how to describe the vdc host (e.g. in service announcements)
 
     bool collecting;
     long announcementTicket;
@@ -155,19 +155,19 @@ namespace p44 {
     /// @param new name of this instance of the vdc host
     virtual void setName(const string &aName);
 
-    /// set the human readable name of the vdcd product as a a whole
+    /// set the human readable name of the vdc host product as a a whole
     /// @param aProductName product (model) name
     void setProductName(const string &aProductName) { productName = aProductName; }
 
-    /// set the the human readable version string of the vdcd product as a a whole
+    /// set the the human readable version string of the vdc host product as a a whole
     /// @param aProductVersion product version string
     void setProductVersion(const string &aProductVersion) { productVersion = aProductVersion; }
 
-    /// set the the human readable hardware id (such as a serial number) of the vdcd product as a a whole
+    /// set the the human readable hardware id (such as a serial number) of the vdc host product as a a whole
     /// @param aDeviceHardwareId device serial number or similar id
     void setDeviceHardwareId(const string &aDeviceHardwareId) { deviceHardwareId = aDeviceHardwareId; }
 
-    /// set the the human readable hardware id (such as a serial number) of the vdcd product as a a whole
+    /// set the the human readable hardware id (such as a serial number) of the vdc host product as a a whole
     /// @param aDescriptionTemplate template for external device description
     /// @note the following sequences will be substituted
     /// - %V : vendor name
@@ -464,7 +464,7 @@ namespace p44 {
     // getting MAC
     void getMyMac(StatusCB aCompletedCB, bool aFactoryReset);
 
-    /// get all value sources in this vdcd
+    /// get all value sources in this vdc host
     /// @param aApiObjectValue must be an object typed API value, will receive available value sources as valueSourceID/description key/values
     void createValueSourcesList(ApiValuePtr aApiObjectValue);
 
@@ -472,4 +472,4 @@ namespace p44 {
 
 } // namespace p44
 
-#endif /* defined(__vdcd__vdchost__) */
+#endif /* defined(__p44vdc__vdchost__) */
