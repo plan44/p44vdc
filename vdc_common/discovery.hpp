@@ -158,6 +158,7 @@ namespace p44 {
     int auxVdsmPort;
     bool auxVdsmRunning;
     bool vdsmAuxiliary;
+    MLMicroSeconds masterLastSeen;
     AuxVdsmStatusHandler auxVdsmStatusHandler;
     #endif // ENABLE_AUXVDSM
 

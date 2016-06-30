@@ -56,6 +56,7 @@ using namespace p44;
 #define RESCAN_EVALUATION_DELAY (10*Second) // how long to browse until re-evaluating state
 #define INITIAL_EVALUATION_DELAY (30*Second) // how long to browse until evaluating state for the first time (only when no auxvdsm is running)
 #define REEVALUATION_DELAY (30*Second) // how long to browse until reevaluating state (only when no auxvdsm is running)
+#define MIN_SWITCHBACK_TO_AUXVDSM_DELAY (10*Minute) // how long it will take to switch back from using master vdsm to using auxvdsm AGAIN.
 
 #define IPV4_MCAST_MDNS_ADDR "224.0.0.251" // for IGMP snooping support
 #define IGMP_QUERY_MAX_RESPONSE_TIME 50 // 0 to issue IGMPv1 queries, >0: time in 1/10sec
@@ -86,6 +87,7 @@ DiscoveryManager::DiscoveryManager() :
   #if ENABLE_AUXVDSM
   auxVdsmRunning(false),
   vdsmAuxiliary(true),
+  masterLastSeen(Never),
   #endif
   noAuto(false),
   igmpSnoopingHints(false),
@@ -755,7 +757,15 @@ void DiscoveryManager::evaluateState()
       // - only start auxiliary vdsm if our vdc API is not connected
       if (!vdcHost->getSessionConnection()) {
         // no active session
-        if ((dmState!=dm_detected_master && dmState!=dm_previously_detected_master && dmState!=dm_auxvdsm_needs_change) || !vdsmAuxiliary) {
+        if (
+          (
+            dmState!=dm_detected_master &&
+            dmState!=dm_previously_detected_master &&
+            dmState!=dm_auxvdsm_needs_change &&
+            (masterLastSeen==Never || MainLoop::currentMainLoop().now()-masterLastSeen>MIN_SWITCHBACK_TO_AUXVDSM_DELAY)
+          ) ||
+          !vdsmAuxiliary
+        ) {
           // ...and we haven't detected a master vdsm recently or our vdsm is not auxiliary (but meant to run all the time)
           LOG(LOG_WARNING, "***** Detected no master vdsm, and vdc has no connection, or vdsm is not auxiliary -> need local vdsm");
           if (auxVdsmStatusHandler) auxVdsmStatusHandler(true);
@@ -875,6 +885,7 @@ void DiscoveryManager::resolve_callback(AvahiServiceResolver *r, AvahiIfIndex in
           );
           // fresh confirmation of having at least one master vdsm in the network
           dmState = dm_detected_master;
+          masterLastSeen = MainLoop::currentMainLoop().now();
           evaluateState();
         }
       }
