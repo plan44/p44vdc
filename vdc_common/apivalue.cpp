@@ -86,7 +86,7 @@ void ApiValue::clear()
 
 
 
-#pragma mark -  getting and setting as string (for all basic types)
+// MARK: ===== getting and setting as string (for all basic types)
 
 string ApiValue::stringValue()
 {
@@ -216,7 +216,7 @@ string ApiValue::description()
 
 
 
-#pragma mark - factory methods
+// MARK: ===== factory methods
 
 
 ApiValuePtr ApiValue::newInt64(int64_t aInt64)
@@ -294,7 +294,7 @@ ApiValuePtr ApiValue::newNull()
 
 
 
-#pragma mark - get in different int types
+// MARK: ===== get in different int types
 
 uint8_t ApiValue::uint8Value()
 {
@@ -363,7 +363,7 @@ void ApiValue::setInt32Value(int32_t aInt32)
 
 
 
-#pragma mark - convenience utilities
+// MARK: ===== convenience utilities
 
 
 size_t ApiValue::stringLength()

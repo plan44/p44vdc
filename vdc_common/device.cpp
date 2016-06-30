@@ -38,7 +38,7 @@
 using namespace p44;
 
 
-#pragma mark - Device
+// MARK: ===== Device
 
 
 Device::Device(Vdc *aVdcP) :
@@ -210,7 +210,7 @@ void Device::addBehaviour(DsBehaviourPtr aBehaviour)
   }
 }
 
-#pragma mark - model features
+// MARK: ===== model features
 
 static const char *modelFeatureNames[numModelFeatures] = {
   "dontcare",
@@ -316,7 +316,7 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
 }
 
 
-#pragma mark - Channels
+// MARK: ===== Channels
 
 
 int Device::numChannels()
@@ -358,7 +358,7 @@ ChannelBehaviourPtr Device::getChannelByType(DsChannelType aChannelType, bool aP
 
 
 
-#pragma mark - Device level vDC API
+// MARK: ===== Device level vDC API
 
 
 ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
@@ -599,7 +599,7 @@ static SceneNo offSceneForArea(int aArea)
 
 
 
-#pragma mark - dimming
+// MARK: ===== dimming
 
 // dS Dimming rule for Light:
 //  Rule 4 All devices which are turned on and not in local priority state take part in the dimming process.
@@ -756,7 +756,7 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
 }
 
 
-#pragma mark - high level serialized hardware access
+// MARK: ===== high level serialized hardware access
 
 #define SERIALIZER_WATCHDOG 1
 #define SERIALIZER_WATCHDOG_TIMEOUT (20*Second)
@@ -1002,7 +1002,7 @@ void Device::updatingChannelsComplete()
 
 
 
-#pragma mark - scene operations
+// MARK: ===== scene operations
 
 void Device::callScene(SceneNo aSceneNo, bool aForce)
 {
@@ -1319,7 +1319,7 @@ bool Device::processControlValue(const string &aName, double aValue)
 
 
 
-#pragma mark - persistent device params
+// MARK: ===== persistent device params
 
 
 // load device settings - beaviours + scenes
@@ -1421,7 +1421,7 @@ void Device::loadSettingsFromFiles()
 
 
 
-#pragma mark - property access
+// MARK: ===== property access
 
 enum {
   // device level simple parameters
@@ -1741,7 +1741,7 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
 }
 
 
-#pragma mark - Device description/shortDesc
+// MARK: ===== Device description/shortDesc
 
 
 string Device::description()

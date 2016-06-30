@@ -37,7 +37,7 @@ void protobufMessagePrint(FILE *aOutFile, const ProtobufCMessage *aMessageP, int
 #endif // FOCUSLOGGING
 
 
-#pragma mark - PbufApiValue
+// MARK: ===== PbufApiValue
 
 PbufApiValue::PbufApiValue() :
   allocatedType(apivalue_null)
@@ -946,7 +946,7 @@ void PbufApiValue::putValueIntoPropVal(Vdcapi__PropertyValue &aPropVal)
 
 
 
-#pragma mark - VdcPbufApiServer
+// MARK: ===== VdcPbufApiServer
 
 
 VdcApiConnectionPtr VdcPbufApiServer::newConnection()
@@ -957,7 +957,7 @@ VdcApiConnectionPtr VdcPbufApiServer::newConnection()
 
 
 
-#pragma mark - VdcPbufApiRequest
+// MARK: ===== VdcPbufApiRequest
 
 
 VdcPbufApiRequest::VdcPbufApiRequest(VdcPbufApiConnectionPtr aConnection, uint32_t aRequestId)
@@ -1049,7 +1049,7 @@ ErrorPtr VdcPbufApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage,
 
 
 
-#pragma mark - VdcPbufApiConnection
+// MARK: ===== VdcPbufApiConnection
 
 
 VdcPbufApiConnection::VdcPbufApiConnection() :
@@ -1573,7 +1573,7 @@ ErrorPtr VdcPbufApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
 }
 
 
-#pragma mark - generic protobuf-C message printing
+// MARK: ===== generic protobuf-C message printing
 
 #if FOCUSLOGGING
 

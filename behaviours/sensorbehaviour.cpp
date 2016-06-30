@@ -140,7 +140,7 @@ string SensorBehaviour::getSourceName()
 }
 
 
-#pragma mark - persistence implementation
+// MARK: ===== persistence implementation
 
 
 // SQLIte3 table name to store these parameters to
@@ -199,7 +199,7 @@ void SensorBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 
 
 
-#pragma mark - property access
+// MARK: ===== property access
 
 static char sensor_key;
 
@@ -353,7 +353,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 
 
-#pragma mark - description/shortDesc
+// MARK: ===== description/shortDesc
 
 
 string SensorBehaviour::description()

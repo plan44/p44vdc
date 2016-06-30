@@ -29,7 +29,7 @@ using namespace p44;
 
 
 
-#pragma mark - DsBehaviour
+// MARK: ===== DsBehaviour
 
 DsBehaviour::DsBehaviour(Device &aDevice) :
   inheritedParams(aDevice.getVdc().getDsParamStore()),
@@ -103,7 +103,7 @@ ErrorPtr DsBehaviour::forget()
 }
 
 
-#pragma mark - property access
+// MARK: ===== property access
 
 
 const char *DsBehaviour::getTypeName()
@@ -221,7 +221,7 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 
 
 
-#pragma mark - description/shortDesc
+// MARK: ===== description/shortDesc
 
 
 string DsBehaviour::shortDesc()

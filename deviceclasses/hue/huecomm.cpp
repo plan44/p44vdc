@@ -33,7 +33,7 @@
 using namespace p44;
 
 
-#pragma mark - HueApiOperation
+// MARK: ===== HueApiOperation
 
 HueApiOperation::HueApiOperation(HueComm &aHueComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, HueApiResultCB aResultHandler) :
   hueComm(aHueComm),
@@ -161,7 +161,7 @@ void HueApiOperation::abortOperation(ErrorPtr aError)
 
 
 
-#pragma mark - BridgeFinder
+// MARK: ===== BridgeFinder
 
 // string used in place of UUID when using fixed hue API URL
 #define PSEUDO_UUID_FOR_FIXED_API "fixed_api_base_URL"
@@ -444,7 +444,7 @@ public:
 
 
 
-#pragma mark - hueComm
+// MARK: ===== hueComm
 
 
 HueComm::HueComm() :

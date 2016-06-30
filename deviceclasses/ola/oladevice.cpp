@@ -31,7 +31,7 @@
 using namespace p44;
 
 
-#pragma mark - OlaDevice
+// MARK: ===== OlaDevice
 
 
 static bool nextChannelSpec(string &aConfig, size_t &aStartPos, char &aChannelType, DmxChannel &aChannelNo, DmxValue &aDefaultValue)

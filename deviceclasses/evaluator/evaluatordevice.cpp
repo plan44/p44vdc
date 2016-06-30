@@ -613,7 +613,7 @@ string EvaluatorDevice::description()
   return s;
 }
 
-#pragma mark - property access
+// MARK: ===== property access
 
 enum {
   valueDefs_key,
@@ -706,7 +706,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 }
 
 
-#pragma mark - settings
+// MARK: ===== settings
 
 
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(Device &aDevice) :

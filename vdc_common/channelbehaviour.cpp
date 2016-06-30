@@ -25,7 +25,7 @@
 
 using namespace p44;
 
-#pragma mark - channel behaviour
+// MARK: ===== channel behaviour
 
 ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput) :
   output(aOutput),
@@ -64,7 +64,7 @@ string ChannelBehaviour::description()
 
 
 
-#pragma mark - channel value handling
+// MARK: ===== channel value handling
 
 
 bool ChannelBehaviour::transitionStep(double aStepSize)
@@ -273,7 +273,7 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
 
 
 
-#pragma mark - channel property access
+// MARK: ===== channel property access
 
 // Note: this is a simplified single class property access mechanims. ChannelBehaviour is not meant to be derived.
 

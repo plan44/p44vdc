@@ -34,7 +34,7 @@
 using namespace p44;
 
 
-#pragma mark - property access API
+// MARK: ===== property access API
 
 
 ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor)
@@ -319,7 +319,7 @@ PropertyDescriptorPtr PropertyContainer::getDescriptorByNumericName(
 }
 
 
-#pragma mark - reading from CSV
+// MARK: ===== reading from CSV
 
 
 bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverridden, const char *&aCSVCursor, const char *aTextSourceName, int aLineNo)

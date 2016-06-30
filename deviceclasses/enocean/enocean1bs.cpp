@@ -29,7 +29,7 @@
 using namespace p44;
 
 
-#pragma mark - Enocean1BSDevice
+// MARK: ===== Enocean1BSDevice
 
 Enocean1BSDevice::Enocean1BSDevice(EnoceanVdc *aVdcP) :
 inherited(aVdcP)
@@ -97,7 +97,7 @@ const ProfileVariantEntry *Enocean1BSDevice::profileVariantsTable()
 
 
 
-#pragma mark - SingleContactHandler
+// MARK: ===== SingleContactHandler
 
 
 SingleContactHandler::SingleContactHandler(EnoceanDevice &aDevice, bool aActiveState) :

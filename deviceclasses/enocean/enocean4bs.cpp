@@ -33,7 +33,7 @@
 using namespace p44;
 
 
-#pragma mark - special extraction functions
+// MARK: ===== special extraction functions
 
 /// two-range illumination handler, as used in A5-06-01 and A5-06-02
 static void illumHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
@@ -122,7 +122,7 @@ static void fanSpeedHandler(const struct EnoceanSensorDescriptor &aSensorDescrip
 
 
 
-#pragma mark - sensor mapping table for generic EnoceanSensorHandler
+// MARK: ===== sensor mapping table for generic EnoceanSensorHandler
 
 using namespace EnoceanSensors;
 
@@ -339,7 +339,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
 
 
 
-#pragma mark - Enocean4BSDevice
+// MARK: ===== Enocean4BSDevice
 
 
 Enocean4BSDevice::Enocean4BSDevice(EnoceanVdc *aVdcP) :
@@ -450,7 +450,7 @@ void Enocean4BSDevice::prepare4BSpacket(Esp3PacketPtr &aOutgoingPacket, uint32_t
 
 
 
-#pragma mark - EnoceanA52001Handler
+// MARK: ===== EnoceanA52001Handler
 
 
 EnoceanA52001Handler::EnoceanA52001Handler(EnoceanDevice &aDevice) :
@@ -656,7 +656,7 @@ string EnoceanA52001Handler::shortDesc()
 
 
 
-#pragma mark - EnoceanA5130XHandler
+// MARK: ===== EnoceanA5130XHandler
 
 // configuration for A5-13-0X sensor channels
 // - A5-13-01 telegram

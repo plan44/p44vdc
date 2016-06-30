@@ -32,7 +32,7 @@
 using namespace p44;
 
 
-#pragma mark - ShadowScene
+// MARK: ===== ShadowScene
 
 
 ShadowScene::ShadowScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -42,7 +42,7 @@ ShadowScene::ShadowScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSce
 }
 
 
-#pragma mark - shadow scene values/channels
+// MARK: ===== shadow scene values/channels
 
 
 double ShadowScene::sceneValue(size_t aChannelIndex)
@@ -66,7 +66,7 @@ void ShadowScene::setSceneValue(size_t aChannelIndex, double aValue)
 }
 
 
-#pragma mark - shadow scene persistence
+// MARK: ===== shadow scene persistence
 
 const char *ShadowScene::tableName()
 {
@@ -116,7 +116,7 @@ void ShadowScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex,
 
 
 
-#pragma mark - default shadow scene
+// MARK: ===== default shadow scene
 
 void ShadowScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
@@ -165,7 +165,7 @@ void ShadowScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-#pragma mark - ShadowJalousieScene
+// MARK: ===== ShadowJalousieScene
 
 
 ShadowJalousieScene::ShadowJalousieScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -189,7 +189,7 @@ void ShadowJalousieScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-#pragma mark - ShadowJalousieScene
+// MARK: ===== ShadowJalousieScene
 
 
 ShadowAwningScene::ShadowAwningScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -217,7 +217,7 @@ void ShadowAwningScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-#pragma mark - ShadowDeviceSettings with default shadow scenes factory
+// MARK: ===== ShadowDeviceSettings with default shadow scenes factory
 
 
 ShadowDeviceSettings::ShadowDeviceSettings(Device &aDevice) :
@@ -235,7 +235,7 @@ DsScenePtr ShadowDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 }
 
 
-#pragma mark - ShadowJalousieDeviceSetting with default shadow scenes factory
+// MARK: ===== ShadowJalousieDeviceSetting with default shadow scenes factory
 
 
 ShadowJalousieDeviceSetting::ShadowJalousieDeviceSetting(Device &aDevice) :
@@ -253,7 +253,7 @@ DsScenePtr ShadowJalousieDeviceSetting::newDefaultScene(SceneNo aSceneNo)
 }
 
 
-#pragma mark - ShadowJalousieDeviceSetting with default shadow scenes factory
+// MARK: ===== ShadowJalousieDeviceSetting with default shadow scenes factory
 
 
 ShadowAwningDeviceSetting::ShadowAwningDeviceSetting(Device &aDevice) :
@@ -272,7 +272,7 @@ DsScenePtr ShadowAwningDeviceSetting::newDefaultScene(SceneNo aSceneNo)
 
 
 
-#pragma mark - ShadowBehaviour
+// MARK: ===== ShadowBehaviour
 
 #define MIN_INTERRUPTABLE_MOVE_TIME (5*Second)
 #define POSITION_TO_ANGLE_DELAY (1*Second)
@@ -345,7 +345,7 @@ Tristate ShadowBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 
 
 
-#pragma mark - Blind Movement Sequencer
+// MARK: ===== Blind Movement Sequencer
 
 
 
@@ -777,7 +777,7 @@ void ShadowBehaviour::movePaused(MLMicroSeconds aRemainingMoveTime, SimpleCB aAp
 }
 
 
-#pragma mark - behaviour interaction with digitalSTROM system
+// MARK: ===== behaviour interaction with digitalSTROM system
 
 
 void ShadowBehaviour::loadChannelsFromScene(DsScenePtr aScene)
@@ -847,7 +847,7 @@ void ShadowBehaviour::reverseIdentify(DsDimMode aDimMode)
 }
 
 
-#pragma mark - persistence implementation
+// MARK: ===== persistence implementation
 
 
 const char *ShadowBehaviour::tableName()
@@ -908,7 +908,7 @@ void ShadowBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 
 
 
-#pragma mark - property access
+// MARK: ===== property access
 
 
 static char shadow_key;
@@ -972,7 +972,7 @@ bool ShadowBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 }
 
 
-#pragma mark - description/shortDesc
+// MARK: ===== description/shortDesc
 
 
 string ShadowBehaviour::shortDesc()

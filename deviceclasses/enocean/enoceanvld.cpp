@@ -29,7 +29,7 @@
 using namespace p44;
 
 
-#pragma mark - VLD device specifications
+// MARK: ===== VLD device specifications
 
 
 using namespace EnoceanSensors;
@@ -81,7 +81,7 @@ const p44::EnoceanSensorDescriptor enoceanVLDdescriptors[] = {
 
 
 
-#pragma mark - EnoceanVLDDevice
+// MARK: ===== EnoceanVLDDevice
 
 
 EnoceanVLDDevice::EnoceanVLDDevice(EnoceanVdc *aVdcP) :
@@ -124,7 +124,7 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 
 
 
-#pragma mark - EnoceanVLDDevice profile variants
+// MARK: ===== EnoceanVLDDevice profile variants
 
 
 //static const ProfileVariantEntry profileVariantsVLD[] = {

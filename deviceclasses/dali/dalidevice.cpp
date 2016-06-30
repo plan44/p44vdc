@@ -41,7 +41,7 @@
 using namespace p44;
 
 
-#pragma mark - DaliBusDevice
+// MARK: ===== DaliBusDevice
 
 DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   daliVdc(aDaliVdc),
@@ -382,7 +382,7 @@ void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMi
 
 
 
-#pragma mark - DaliBusDeviceGroup (multiple DALI devices, addressed as a group, forming single channel dimmer)
+// MARK: ===== DaliBusDeviceGroup (multiple DALI devices, addressed as a group, forming single channel dimmer)
 
 
 DaliBusDeviceGroup::DaliBusDeviceGroup(DaliVdc &aDaliVdc, uint8_t aGroupNo) :
@@ -470,7 +470,7 @@ void DaliBusDeviceGroup::deriveDsUid()
 }
 
 
-#pragma mark - DaliDevice (base class)
+// MARK: ===== DaliDevice (base class)
 
 
 DaliDevice::DaliDevice(DaliVdc *aVdcP) :
@@ -507,7 +507,7 @@ ErrorPtr DaliDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
 
 
 
-#pragma mark - DaliDimmerDevice (single channel)
+// MARK: ===== DaliDimmerDevice (single channel)
 
 
 DaliDimmerDevice::DaliDimmerDevice(DaliVdc *aVdcP) :
@@ -719,7 +719,7 @@ string DaliDimmerDevice::description()
 }
 
 
-#pragma mark - DaliRGBWDevice (multi-channel color lamp)
+// MARK: ===== DaliRGBWDevice (multi-channel color lamp)
 
 
 DaliRGBWDevice::DaliRGBWDevice(DaliVdc *aVdcP) :

@@ -30,7 +30,7 @@ using namespace p44;
 using namespace EnoceanSensors;
 
 
-#pragma mark - bit field handlers for EnoceanSensorHandler
+// MARK: ===== bit field handlers for EnoceanSensorHandler
 
 /// standard bitfield extractor function for sensor behaviours (read only)
 uint64_t p44::EnoceanSensors::bitsExtractor(const struct EnoceanSensorDescriptor &aSensorDescriptor, uint8_t *aDataP, int aDataSize)
@@ -111,7 +111,7 @@ void p44::EnoceanSensors::handleBitField(const EnoceanSensorDescriptor &aSensorD
 }
 
 
-#pragma mark - Texts
+// MARK: ===== Texts
 
 namespace p44 { namespace EnoceanSensors {
 
@@ -141,7 +141,7 @@ namespace p44 { namespace EnoceanSensors {
 } }
 
 
-#pragma mark - EnoceanSensorHandler
+// MARK: ===== EnoceanSensorHandler
 
 EnoceanSensorHandler::EnoceanSensorHandler(EnoceanDevice &aDevice) :
   inherited(aDevice),

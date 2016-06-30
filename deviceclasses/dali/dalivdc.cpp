@@ -52,7 +52,7 @@ bool DaliVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResoluti
 }
 
 
-#pragma mark - DB and initialisation
+// MARK: ===== DB and initialisation
 
 // Version history
 //  1 : first version
@@ -102,7 +102,7 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-#pragma mark - collect devices
+// MARK: ===== collect devices
 
 
 int DaliVdc::getRescanModes() const
@@ -354,7 +354,7 @@ void DaliVdc::deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDevice
 }
 
 
-#pragma mark - DALI specific methods
+// MARK: ===== DALI specific methods
 
 ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
@@ -378,7 +378,7 @@ ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod,
 }
 
 
-#pragma mark - DALI bus diagnostics
+// MARK: ===== DALI bus diagnostics
 
 
 // scan bus, return status string
@@ -478,7 +478,7 @@ ErrorPtr DaliVdc::daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 
 
 
-#pragma mark - composite device creation
+// MARK: ===== composite device creation
 
 
 ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
@@ -640,7 +640,7 @@ void DaliVdc::groupCollected(VdcApiRequestPtr aRequest)
 
 
 
-#pragma mark - Self test
+// MARK: ===== Self test
 
 void DaliVdc::selfTest(StatusCB aCompletedCB)
 {

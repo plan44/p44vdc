@@ -34,7 +34,7 @@ using namespace p44;
 
 
 
-#pragma mark - StaticDevice
+// MARK: ===== StaticDevice
 
 
 StaticDevice::StaticDevice(Vdc *aVdcP) :
@@ -65,7 +65,7 @@ void StaticDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResult
 }
 
 
-#pragma mark - DB and initialisation
+// MARK: ===== DB and initialisation
 
 
 // Version history

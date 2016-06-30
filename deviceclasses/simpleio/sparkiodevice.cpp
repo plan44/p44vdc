@@ -30,7 +30,7 @@
 using namespace p44;
 
 
-#pragma mark - SparkLightScene
+// MARK: ===== SparkLightScene
 
 SparkLightScene::SparkLightScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo)
@@ -39,7 +39,7 @@ SparkLightScene::SparkLightScene(SceneDeviceSettings &aSceneDeviceSettings, Scen
 }
 
 
-#pragma mark - spark scene values/channels
+// MARK: ===== spark scene values/channels
 
 
 double SparkLightScene::sceneValue(size_t aChannelIndex)
@@ -63,7 +63,7 @@ void SparkLightScene::setSceneValue(size_t aChannelIndex, double aValue)
 }
 
 
-#pragma mark - scene persistence
+// MARK: ===== scene persistence
 
 const char *SparkLightScene::tableName()
 {
@@ -114,7 +114,7 @@ void SparkLightScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 
 
 
-#pragma mark - default scene values
+// MARK: ===== default scene values
 
 
 void SparkLightScene::setDefaultSceneValues(SceneNo aSceneNo)
@@ -130,7 +130,7 @@ void SparkLightScene::setDefaultSceneValues(SceneNo aSceneNo)
 
 
 
-#pragma mark - SparkLightBehaviour
+// MARK: ===== SparkLightBehaviour
 
 
 SparkLightBehaviour::SparkLightBehaviour(Device &aDevice) :
@@ -173,7 +173,7 @@ string SparkLightBehaviour::shortDesc()
 }
 
 
-#pragma mark - SparkDeviceSettings
+// MARK: ===== SparkDeviceSettings
 
 SparkDeviceSettings::SparkDeviceSettings(Device &aDevice) :
   inherited(aDevice)
@@ -191,7 +191,7 @@ DsScenePtr SparkDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 
 
-#pragma mark - SparkIoDevice
+// MARK: ===== SparkIoDevice
 
 SparkIoDevice::SparkIoDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),

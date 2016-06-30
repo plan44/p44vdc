@@ -24,7 +24,7 @@
 using namespace p44;
 
 
-#pragma mark - VdcApiServer
+// MARK: ===== VdcApiServer
 
 VdcApiServer::VdcApiServer() :
   inherited(MainLoop::currentMainLoop())
@@ -81,7 +81,7 @@ void VdcApiServer::connectionStatusHandler(SocketCommPtr aSocketComm, ErrorPtr a
 
 
 
-#pragma mark - VdcApiConnection
+// MARK: ===== VdcApiConnection
 
 
 void VdcApiConnection::setRequestHandler(VdcApiRequestCB aApiRequestHandler)
@@ -99,7 +99,7 @@ void VdcApiConnection::closeConnection()
 }
 
 
-#pragma mark - VdcApiRequest
+// MARK: ===== VdcApiRequest
 
 ErrorPtr VdcApiRequest::sendError(ErrorPtr aErrorToSend)
 {

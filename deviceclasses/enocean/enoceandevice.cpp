@@ -38,7 +38,7 @@
 using namespace p44;
 
 
-#pragma mark - EnoceanChannelHandler
+// MARK: ===== EnoceanChannelHandler
 
 EnoceanChannelHandler::EnoceanChannelHandler(EnoceanDevice &aDevice) :
   device(aDevice),
@@ -47,7 +47,7 @@ EnoceanChannelHandler::EnoceanChannelHandler(EnoceanDevice &aDevice) :
 }
 
 
-#pragma mark - EnoceanDevice
+// MARK: ===== EnoceanDevice
 
 EnoceanDevice::EnoceanDevice(EnoceanVdc *aVdcP) :
   Device(aVdcP),
@@ -321,7 +321,7 @@ string EnoceanDevice::description()
 }
 
 
-#pragma mark - profile variants
+// MARK: ===== profile variants
 
 
 
@@ -432,7 +432,7 @@ void EnoceanDevice::switchProfiles(const ProfileVariantEntry &aFromVariant, cons
 
 
 
-#pragma mark - property access
+// MARK: ===== property access
 
 
 enum {
@@ -529,7 +529,7 @@ bool EnoceanDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
 }
 
 
-#pragma mark - device factory
+// MARK: ===== device factory
 
 
 EnoceanDevicePtr EnoceanDevice::newDevice(

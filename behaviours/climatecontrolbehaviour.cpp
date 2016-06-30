@@ -25,7 +25,7 @@
 using namespace p44;
 
 
-#pragma mark - ClimateControlScene
+// MARK: ===== ClimateControlScene
 
 
 ClimateControlScene::ClimateControlScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -59,7 +59,7 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-#pragma mark - ShadowDeviceSettings with default shadow scenes factory
+// MARK: ===== ShadowDeviceSettings with default shadow scenes factory
 
 
 ClimateDeviceSettings::ClimateDeviceSettings(Device &aDevice) :
@@ -78,7 +78,7 @@ DsScenePtr ClimateDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 
 
-#pragma mark - ClimateControlBehaviour
+// MARK: ===== ClimateControlBehaviour
 
 
 ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice) :
@@ -189,7 +189,7 @@ bool ClimateControlBehaviour::applyScene(DsScenePtr aScene)
 }
 
 
-#pragma mark - persistence
+// MARK: ===== persistence
 
 
 const char *ClimateControlBehaviour::tableName()
@@ -246,7 +246,7 @@ void ClimateControlBehaviour::bindToStatement(sqlite3pp::statement &aStatement, 
 }
 
 
-#pragma mark - property access
+// MARK: ===== property access
 
 
 static char climatecontrol_key;
@@ -300,7 +300,7 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
 
 
 
-#pragma mark - description
+// MARK: ===== description
 
 
 string ClimateControlBehaviour::shortDesc()

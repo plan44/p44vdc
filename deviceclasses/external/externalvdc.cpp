@@ -34,7 +34,7 @@ using namespace p44;
 
 
 
-#pragma mark - External Device
+// MARK: ===== External Device
 
 
 ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag) :
@@ -275,7 +275,7 @@ ErrorPtr ExternalDevice::processInputJson(char aInputType, JsonObjectPtr aParams
 }
 
 
-#pragma mark - process input (or log)
+// MARK: ===== process input (or log)
 
 ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double aValue)
 {
@@ -363,7 +363,7 @@ void ExternalDevice::releaseButton(ButtonBehaviourPtr aButtonBehaviour)
 
 
 
-#pragma mark - output control
+// MARK: ===== output control
 
 
 void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
@@ -470,7 +470,7 @@ void ExternalDevice::syncChannelValues(SimpleCB aDoneCB)
 
 
 
-#pragma mark - external device configuration
+// MARK: ===== external device configuration
 
 
 ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
@@ -713,7 +713,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
 }
 
 
-#pragma mark - external device connector
+// MARK: ===== external device connector
 
 ExternalDeviceConnector::ExternalDeviceConnector(ExternalVdc &aExternalVdc, JsonCommPtr aDeviceConnection) :
   externalVdc(aExternalVdc),
@@ -1032,7 +1032,7 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 
 
-#pragma mark - external device container
+// MARK: ===== external device container
 
 
 

@@ -33,7 +33,7 @@
 using namespace p44;
 
 
-#pragma mark - ESP3 packet object
+// MARK: ===== ESP3 packet object
 
 // enoceansender hex up:
 // 55 00 07 07 01 7A F6 30 00 86 B8 1A 30 03 FF FF FF FF FF 00 C0
@@ -274,7 +274,7 @@ void Esp3Packet::finalize()
 
 
 
-#pragma mark - common commands
+// MARK: ===== common commands
 
 
 ErrorPtr Esp3Packet::responseStatus()
@@ -298,7 +298,7 @@ ErrorPtr Esp3Packet::responseStatus()
 }
 
 
-#pragma mark - radio telegram specifics
+// MARK: ===== radio telegram specifics
 
 
 // Radio telegram optional data
@@ -499,7 +499,7 @@ void Esp3Packet::initForRorg(RadioOrg aRadioOrg, size_t aVLDsize)
 
 
 
-#pragma mark - Enocean Eqipment Profile (EEP) information extraction
+// MARK: ===== Enocean Eqipment Profile (EEP) information extraction
 
 
 // Radio telegram data
@@ -678,7 +678,7 @@ bool Esp3Packet::radioHasTeachInfo(int aMinLearnDBm, bool aMinDBmForAll)
 }
 
 
-#pragma mark - 4BS comminication specifics
+// MARK: ===== 4BS comminication specifics
 
 
 uint32_t Esp3Packet::get4BSdata()
@@ -726,7 +726,7 @@ void Esp3Packet::set4BSTeachInEEP(EnoceanProfile aEEProfile)
 }
 
 
-#pragma mark - packet Factory methods
+// MARK: ===== packet Factory methods
 
 
 Esp3PacketPtr Esp3Packet::newEsp3Message(PacketType aPacketType, uint8_t aCode, uint8_t aNumParamBytes, uint8_t *aParamBytesInitializerP)
@@ -746,7 +746,7 @@ Esp3PacketPtr Esp3Packet::newEsp3Message(PacketType aPacketType, uint8_t aCode, 
 
 
 
-#pragma mark - Description
+// MARK: ===== Description
 
 
 string Esp3Packet::description()
@@ -818,7 +818,7 @@ string Esp3Packet::description()
 
 
 
-#pragma mark - CRC8 calculation
+// MARK: ===== CRC8 calculation
 
 static u_int8_t CRC8Table[256] = {
   0x00, 0x07, 0x0e, 0x09, 0x1c, 0x1b, 0x12, 0x15,
@@ -873,7 +873,7 @@ uint8_t Esp3Packet::crc8(uint8_t *aDataP, size_t aNumBytes, uint8_t aCRCValue)
 
 
 
-#pragma mark - Manufacturer names
+// MARK: ===== Manufacturer names
 
 typedef struct {
   EnoceanManufacturer manufacturerID;
@@ -946,7 +946,7 @@ const char *EnoceanComm::manufacturerName(EnoceanManufacturer aManufacturerCode)
 
 
 
-#pragma mark - EnOcean communication handler
+// MARK: ===== EnOcean communication handler
 
 // baudrate for ESP3 on TCM310
 #define ENOCEAN_ESP3_COMMAPARMS "57600,8,N,1"

@@ -59,7 +59,7 @@ DaliComm::~DaliComm()
 }
 
 
-#pragma mark - procedure management
+// MARK: ===== procedure management
 
 void DaliComm::startProcedure()
 {
@@ -81,7 +81,7 @@ bool DaliComm::isBusy()
 
 
 
-#pragma mark - DALI bridge low level communication
+// MARK: ===== DALI bridge low level communication
 
 // DALI Bridge commands and responses
 // ==================================
@@ -237,7 +237,7 @@ void DaliComm::connectionTimeout()
   serialComm->closeConnection();
 }
 
-#pragma mark - DALI bus communication basics
+// MARK: ===== DALI bus communication basics
 
 
 static ErrorPtr checkBridgeResponse(uint8_t aResp1, uint8_t aResp2, ErrorPtr aError, bool &aNoOrTimeout)
@@ -438,7 +438,7 @@ DaliAddress DaliComm::addressFromDaliResponse(uint8_t aResponse)
 }
 
 
-#pragma mark - DALI bus data R/W test
+// MARK: ===== DALI bus data R/W test
 
 class DaliBusDataTester : public P44Obj
 {
@@ -531,7 +531,7 @@ void DaliComm::daliBusTestData(StatusCB aResultCB, DaliAddress aAddress, uint8_t
 
 
 
-#pragma mark - DALI bus scanning
+// MARK: ===== DALI bus scanning
 
 // Scan bus for active devices (returns list of short addresses)
 
@@ -1030,7 +1030,7 @@ void DaliComm::daliFullBusScan(DaliBusScanCB aResultCB, bool aFullScanOnlyIfNeed
 
 
 
-#pragma mark - DALI memory access / device info reading
+// MARK: ===== DALI memory access / device info reading
 
 class DaliMemoryReader : public P44Obj
 {
@@ -1104,7 +1104,7 @@ void DaliComm::daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, 
 }
 
 
-#pragma mark - DALI device info reading
+// MARK: ===== DALI device info reading
 
 class DaliDeviceInfoReader : public P44Obj
 {
@@ -1378,7 +1378,7 @@ void DaliComm::daliReadDeviceInfo(DaliDeviceInfoCB aResultCB, DaliAddress aAddre
 }
 
 
-#pragma mark - DALI device info
+// MARK: ===== DALI device info
 
 
 DaliDeviceInfo::DaliDeviceInfo()

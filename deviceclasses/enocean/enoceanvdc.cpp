@@ -53,7 +53,7 @@ bool EnoceanVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResol
 
 
 
-#pragma mark - DB and initialisation
+// MARK: ===== DB and initialisation
 
 // Version history
 //  1..3 : development versions
@@ -112,7 +112,7 @@ void EnoceanVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-#pragma mark - collect devices
+// MARK: ===== collect devices
 
 void EnoceanVdc::removeDevices(bool aForget)
 {
@@ -231,7 +231,7 @@ void EnoceanVdc::unpairDevicesByAddress(EnoceanAddress aEnoceanAddress, bool aFo
 }
 
 
-#pragma mark - EnOcean specific methods
+// MARK: ===== EnOcean specific methods
 
 
 ErrorPtr EnoceanVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
@@ -350,7 +350,7 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 
 
 
-#pragma mark - learn and unlearn devices
+// MARK: ===== learn and unlearn devices
 
 #define MIN_LEARN_DBM -50
 // -50 = for experimental luz v1 patched bridge: within approx one meter of the TCM310
@@ -531,7 +531,7 @@ void EnoceanVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck)
 }
 
 
-#pragma mark - Self test
+// MARK: ===== Self test
 
 void EnoceanVdc::selfTest(StatusCB aCompletedCB)
 {

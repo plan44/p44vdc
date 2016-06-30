@@ -101,7 +101,7 @@ void BinaryInputBehaviour::invalidateInputState()
 }
 
 
-#pragma mark - persistence implementation
+// MARK: ===== persistence implementation
 
 
 // SQLIte3 table name to store these parameters to
@@ -163,7 +163,7 @@ void BinaryInputBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int
 
 
 
-#pragma mark - property access
+// MARK: ===== property access
 
 static char binaryInput_key;
 
@@ -325,7 +325,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
 
 
 
-#pragma mark - description/shortDesc
+// MARK: ===== description/shortDesc
 
 
 string BinaryInputBehaviour::description()

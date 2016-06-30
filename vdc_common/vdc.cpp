@@ -229,7 +229,7 @@ void Vdc::removeDevices(bool aForget)
 
 
 
-#pragma mark - persistent vdc level params
+// MARK: ===== persistent vdc level params
 
 
 ErrorPtr Vdc::load()
@@ -280,7 +280,7 @@ void Vdc::loadSettingsFromFiles()
 }
 
 
-#pragma mark - property access
+// MARK: ===== property access
 
 static char deviceclass_key;
 static char device_container_key;
@@ -428,7 +428,7 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
 }
 
 
-#pragma mark - persistence implementation
+// MARK: ===== persistence implementation
 
 // SQLIte3 table name to store these parameters to
 const char *Vdc::tableName()
@@ -484,7 +484,7 @@ void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const c
   aStatement.bind(aIndex++, defaultZoneID);
 }
 
-#pragma mark - description/shortDesc
+// MARK: ===== description/shortDesc
 
 
 string Vdc::description()

@@ -58,7 +58,7 @@ string HueVdc::getExtraInfo()
 
 
 
-#pragma mark - DB and initialisation
+// MARK: ===== DB and initialisation
 
 // Version history
 //  1 : first version
@@ -94,7 +94,7 @@ void HueVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-#pragma mark - collect devices
+// MARK: ===== collect devices
 
 
 int HueVdc::getRescanModes() const

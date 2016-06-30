@@ -30,7 +30,7 @@ using namespace p44;
 
 static char dsscene_key;
 
-#pragma mark - private scene channel access class
+// MARK: ===== private scene channel access class
 
 static char dsscene_channels_key;
 static char scenevalue_key;
@@ -166,7 +166,7 @@ typedef boost::intrusive_ptr<SceneChannels> SceneChannelsPtr;
 
 
 
-#pragma mark - scene base class
+// MARK: ===== scene base class
 
 
 DsScene::DsScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -204,7 +204,7 @@ void DsScene::setDefaultSceneValues(SceneNo aSceneNo)
 
 
 
-#pragma mark - scene persistence
+// MARK: ===== scene persistence
 
 // primary key field definitions
 
@@ -289,7 +289,7 @@ void DsScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 }
 
 
-#pragma mark - scene flags
+// MARK: ===== scene flags
 
 
 void DsScene::setGlobalSceneFlag(uint32_t aMask, bool aNewValue)
@@ -324,7 +324,7 @@ void DsScene::setIgnoreLocalPriority(bool aIgnoreLocalPriority)
 }
 
 
-#pragma mark - scene values/channels
+// MARK: ===== scene values/channels
 
 
 int DsScene::numSceneValues()
@@ -374,7 +374,7 @@ bool DsScene::isSceneValueFlagSet(size_t aOutputIndex, uint32_t aFlagMask)
 
 
 
-#pragma mark - scene property access
+// MARK: ===== scene property access
 
 
 enum {
@@ -450,7 +450,7 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
 
 
 
-#pragma mark - scene device settings base class
+// MARK: ===== scene device settings base class
 
 
 SceneDeviceSettings::SceneDeviceSettings(Device &aDevice) :
@@ -512,7 +512,7 @@ void SceneDeviceSettings::updateScene(DsScenePtr aScene)
 
 
 
-#pragma mark - scene table persistence
+// MARK: ===== scene table persistence
 
 
 // load child parameters (scenes)
@@ -579,7 +579,7 @@ ErrorPtr SceneDeviceSettings::deleteChildren()
 
 
 
-#pragma mark - additional scene defaults from files
+// MARK: ===== additional scene defaults from files
 
 
 void SceneDeviceSettings::loadScenesFromFiles()

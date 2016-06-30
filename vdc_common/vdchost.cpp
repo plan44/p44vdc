@@ -210,7 +210,7 @@ string VdcHost::publishedDescription()
 
 
 
-#pragma mark - initializisation of DB and containers
+// MARK: ===== initializisation of DB and containers
 
 
 class VdcInitializer
@@ -326,7 +326,7 @@ void VdcHost::startRunning()
 
 
 
-#pragma mark - collect devices
+// MARK: ===== collect devices
 
 namespace p44 {
 
@@ -448,7 +448,7 @@ void VdcHost::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExh
 
 
 
-#pragma mark - adding/removing devices
+// MARK: ===== adding/removing devices
 
 
 // add a new device, replaces possibly existing one based on dSUID
@@ -548,7 +548,7 @@ void VdcHost::reportLearnEvent(bool aLearnIn, ErrorPtr aError)
 
 
 
-#pragma mark - activity monitoring
+// MARK: ===== activity monitoring
 
 
 void VdcHost::signalActivity()
@@ -589,7 +589,7 @@ bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
 
 
 
-#pragma mark - periodic activity
+// MARK: ===== periodic activity
 
 
 #define PERIODIC_TASK_INTERVAL (5*Second)
@@ -639,7 +639,7 @@ void VdcHost::periodicTask(MLMicroSeconds aCycleStartTime)
 }
 
 
-#pragma mark - local operation mode
+// MARK: ===== local operation mode
 
 
 void VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
@@ -738,7 +738,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
 
 
 
-#pragma mark - vDC API
+// MARK: ===== vDC API
 
 
 bool VdcHost::sendApiRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
@@ -1010,7 +1010,7 @@ void VdcHost::handleNotificationForDsUid(const string &aMethod, const DsUid &aDs
 
 
 
-#pragma mark - vDC level methods and notifications
+// MARK: ===== vDC level methods and notifications
 
 
 ErrorPtr VdcHost::removeHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
@@ -1036,7 +1036,7 @@ void VdcHost::removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aRequest, 
 
 
 
-#pragma mark - session management
+// MARK: ===== session management
 
 
 
@@ -1149,7 +1149,7 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
 }
 
 
-#pragma mark - DsAddressable API implementation
+// MARK: ===== DsAddressable API implementation
 
 ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
 {
@@ -1164,10 +1164,10 @@ void VdcHost::handleNotification(const string &aMethod, ApiValuePtr aParams)
 
 
 
-#pragma mark - DsAddressable API implementation
+// MARK: ===== DsAddressable API implementation
 
 
-#pragma mark - property access
+// MARK: ===== property access
 
 static char devicecontainer_key;
 static char vdc_container_key;
@@ -1264,7 +1264,7 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
 }
 
 
-#pragma mark - value sources
+// MARK: ===== value sources
 
 void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
 {
@@ -1328,7 +1328,7 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
 
 
 
-#pragma mark - persistent vdc host level parameters
+// MARK: ===== persistent vdc host level parameters
 
 ErrorPtr VdcHost::loadAndFixDsUID()
 {
@@ -1397,7 +1397,7 @@ void VdcHost::loadSettingsFromFiles()
 }
 
 
-#pragma mark - persistence implementation
+// MARK: ===== persistence implementation
 
 // SQLIte3 table name to store these parameters to
 const char *VdcHost::tableName()
@@ -1465,7 +1465,7 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 
 
 
-#pragma mark - description
+// MARK: ===== description
 
 string VdcHost::description()
 {

@@ -10,7 +10,7 @@
 
 #include "outputbehaviour.hpp"
 
-#pragma mark - SimpleScene
+// MARK: ===== SimpleScene
 
 using namespace p44;
 
@@ -23,7 +23,7 @@ SimpleScene::SimpleScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSce
 }
 
 
-#pragma mark - scene values/channels
+// MARK: ===== scene values/channels
 
 
 double SimpleScene::sceneValue(size_t aOutputIndex)
@@ -40,7 +40,7 @@ void SimpleScene::setSceneValue(size_t aOutputIndex, double aValue)
 }
 
 
-#pragma mark - Scene persistence
+// MARK: ===== Scene persistence
 
 const char *SimpleScene::tableName()
 {
@@ -92,7 +92,7 @@ void SimpleScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex,
 }
 
 
-#pragma mark - SimpleScene property access
+// MARK: ===== SimpleScene property access
 
 
 static char lightscene_key;
@@ -146,7 +146,7 @@ bool SimpleScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 }
 
 
-#pragma mark - default scene values
+// MARK: ===== default scene values
 
 typedef struct {
   uint8_t value; ///< output value for this scene, uint_8 to save footprint
@@ -292,7 +292,7 @@ void SimpleScene::setDefaultSceneValues(SceneNo aSceneNo)
 
 
 
-#pragma mark - SimpleCmdScene
+// MARK: ===== SimpleCmdScene
 
 
 SimpleCmdScene::SimpleCmdScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -347,7 +347,7 @@ void SimpleCmdScene::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 }
 
 
-#pragma mark - scene command substitutions
+// MARK: ===== scene command substitutions
 
 
 int SimpleCmdScene::substitutePlaceholders(string &aCommandStr)
@@ -424,7 +424,7 @@ int SimpleCmdScene::substitutePlaceholders(string &aCommandStr)
 
 
 
-#pragma mark - SimpleCmdScene property access
+// MARK: ===== SimpleCmdScene property access
 
 
 static char cmdscene_key;
@@ -479,7 +479,7 @@ bool SimpleCmdScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
 
 
 
-#pragma mark - CmdSceneDeviceSettings
+// MARK: ===== CmdSceneDeviceSettings
 
 
 CmdSceneDeviceSettings::CmdSceneDeviceSettings(Device &aDevice) :
