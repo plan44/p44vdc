@@ -118,7 +118,7 @@ namespace p44 {
     bool isEnabled() { return outputMode!=outputmode_disabled; };
 
     /// set new output mode
-    /// @param aOutputMode, new output mode (including outputmode_disabled, and outputmode_default to generically enable)
+    /// @param aOutputMode new output mode (including outputmode_disabled, and outputmode_default to generically enable)
     /// @note a change in output mode might trigger (re-)applying channel values
     virtual void setOutputMode(DsOutputMode aOutputMode);
 

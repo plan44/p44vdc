@@ -73,8 +73,6 @@ namespace p44 {
   /// callback for announcing new API connection (which may or may not lead to a session) or termination of a connection
   /// @param aApiConnection the VdcApiConnection calling this handler
   /// @param aError set if an error occurred on the connection (including remote having closed the connection)
-  /// @param aResultOrErrorData the result object in case of success, or the "data" member from the JSON-RPC error object
-  ///   in case of an error returned via JSON-RPC from the remote peer.
   typedef boost::function<void (VdcApiConnectionPtr aApiConnection, ErrorPtr &aError)> VdcApiConnectionCB;
 
 
@@ -194,7 +192,6 @@ namespace p44 {
     virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr()) = 0;
 
     /// send p44utils::Error object as vDC API error
-    /// @param aForRequest this must be the VdcApiRequestPtr received in the VdcApiRequestCB handler.
     /// @param aErrorToSend From this error object, getErrorCode() and description() will be used as "code" and "message" members
     ///   of the vDC API error object.
     /// @result empty or Error object in case of error sending error response

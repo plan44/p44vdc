@@ -211,7 +211,7 @@ namespace sqlite3pp
 
   int statement::prepare_impl(char const* stmt)
   {
-    return sqlite3_prepare(db_.db_, stmt, strlen(stmt), &stmt_, &tail_);
+    return sqlite3_prepare(db_.db_, stmt, (int)strlen(stmt), &stmt_, &tail_);
   }
 
   int statement::finish()
@@ -258,7 +258,7 @@ namespace sqlite3pp
 
   int statement::bind(int idx, char const* value, bool fstatic)
   {
-    return sqlite3_bind_text(stmt_, idx, value, strlen(value), fstatic ? SQLITE_STATIC : SQLITE_TRANSIENT);
+    return sqlite3_bind_text(stmt_, idx, value, (int)strlen(value), fstatic ? SQLITE_STATIC : SQLITE_TRANSIENT);
   }
 
   int statement::bind(int idx, void const* value, int n, bool fstatic)

@@ -114,11 +114,11 @@ namespace p44 {
 
     /// add specified field of the protobuf message as a field into this ApiValue (which will be made type object if not already so)
     /// @param aMessage the protobuf-c message to extract the field from
-    /// @param aMessageFieldName the name of the protobuf-c message field
+    /// @param aFieldName the name of the protobuf-c message field
     void addObjectFieldFromMessage(const ProtobufCMessage &aMessage, const char* aFieldName);
 
     /// put all values in this ApiValue into name-matching fields of the passed protobuf message
-    /// @param aFieldName the protobuf-c message to put the fields into
+    /// @param aMessage the protobuf-c message to put the fields into
     void putObjectIntoMessageFields(ProtobufCMessage &aMessage);
 
     /// put specified field of this ApiValue (must be of type object) into the protobuf message as a field

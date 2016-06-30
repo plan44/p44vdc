@@ -84,7 +84,7 @@ namespace p44 {
     ///   of this class container. This is used when generating dsuids for devices that don't have their own
     ///   unique ID, by using a hashOf(DeviceContainer's id, vdcClassIdentifier(), aInstanceNumber)
     /// @param aVdcHostP device container this vDC is contained in
-    /// @param numeric tag for this device container (e.g. for blinking self test error messages)
+    /// @param aTag numeric tag for this device container (e.g. for blinking self test error messages)
     Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
 
     /// add this vDC to vDC host.
@@ -145,7 +145,7 @@ namespace p44 {
     virtual string getName();
 
     /// set user assignable name
-    /// @param new name of the addressable entity
+    /// @param aName name of the addressable entity
     virtual void setName(const string &aName);
 
     /// vdc level methods (p44 specific)

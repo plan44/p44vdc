@@ -76,7 +76,7 @@ namespace p44 {
     ApiValueType getType();
 
     /// set a new type
-    /// @param type to convert object into
+    /// @param aType to convert object into
     /// @note existing data will be discarded (not converted)!
     virtual void setType(ApiValueType aType);
 

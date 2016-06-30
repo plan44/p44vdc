@@ -87,7 +87,7 @@ namespace p44 {
     virtual string getName() { return getAssignedName(); };
 
     /// set user assignable name
-    /// @param new name of the addressable entity
+    /// @param aName name of the addressable entity
     /// @note might prevent truncating names (just shortening an otherwise unchanged name)
     /// @note subclasses might propagate the name into actual device hardware (e.g. hue)
     virtual void setName(const string &aName);
@@ -273,7 +273,7 @@ namespace p44 {
 
     /// log a message, prefixed with addressable's identification
     /// @param aErrLevel error level of the message
-    /// @param aFmt, ... printf style error message
+    /// @param aFmt ... printf style error message
     void logAddressable(int aErrLevel, const char *aFmt, ... ) __printflike(3,4);
 
   protected:

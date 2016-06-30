@@ -200,9 +200,8 @@ namespace p44 {
 
     /// access single field in this behaviour
     /// @param aMode access mode (see PropertyAccessMode: read, write or write preload)
-    /// @param aPropertyDescriptor decriptor for a single value field/array in this behaviour.
     /// @param aPropValue JsonObject with a single value
-    /// @param aIndex in case of array, the index of the element to access
+    /// @param aPropertyDescriptor decriptor for a single value field/array in this behaviour.
     /// @return false if value could not be accessed
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
 

@@ -119,7 +119,7 @@ namespace p44 {
 
     /// send direct action
     /// @param aActionMode the mode how to send the action
-    /// @param aSceneNo the scene number to send
+    /// @param aActionId the scene number to send
     void sendAction(DsButtonActionMode aActionMode, uint8_t aActionId);
 
 

@@ -152,7 +152,7 @@ namespace p44 {
     VdcApiConnectionPtr getSessionConnection() { return activeSessionConnection; };
 
     /// set user assignable name
-    /// @param new name of this instance of the vdc host
+    /// @param aName name of this instance of the vdc host
     virtual void setName(const string &aName);
 
     /// set the human readable name of the vdc host product as a a whole
@@ -221,7 +221,7 @@ namespace p44 {
     void startRunning();
 
     /// activity monitor
-    /// @param aActivityCB will be called for globally relevant events.
+    /// @param aEventCB will be called for globally relevant events.
     void setEventMonitor(VdchostEventCB aEventCB);
 
     /// activity monitor
@@ -251,7 +251,7 @@ namespace p44 {
     void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings);
 
     /// Put vDC controllers into learn-in mode
-    /// @param aCompletedCB handler to call when a learn-in action occurs
+    /// @param aLearnHandler handler to call when a learn-in action occurs
     /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some EnOcean devices)
     void startLearning(LearnCB aLearnHandler, bool aDisableProximityCheck = false);
 

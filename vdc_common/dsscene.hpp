@@ -256,7 +256,7 @@ namespace p44 {
     DsScenePtr getScene(SceneNo aSceneNo);
 
     /// update scene (mark dirty, add to list of non-default scene objects)
-    /// @param aSceneNo the scene to save modified settings for.
+    /// @param aScene the scene to save modified settings for.
     /// @note call updateScene only if scene values are changed from defaults, because
     ///   updating a scene creates DB records and needs more run-time memory.
     /// @note always updates the scene and causes write to DB even if scene was not marked dirty already
