@@ -348,6 +348,7 @@ void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aD
   if (aResult) {
     ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(aLightBehaviour);
     // [{"success":{"\/lights\/1\/state\/transitiontime":1}},{"success":{"\/lights\/1\/state\/on":true}},{"success":{"\/lights\/1\/state\/hue":0}},{"success":{"\/lights\/1\/state\/sat":255}},{"success":{"\/lights\/1\/state\/bri":255}}]
+    bool blockBrightness = false;
     for (int i=0; i<aResult->arrayLength(); i++) {
       JsonObjectPtr staObj = HueComm::getSuccessItem(aResult, i);
       if (staObj) {
@@ -355,7 +356,6 @@ void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aD
         staObj->resetKeyIteration();
         string key;
         JsonObjectPtr val;
-        bool blockBrightness = false;
         if (staObj->nextKeyValue(key, val)) {
           // match path
           string param = key.substr(key.find_last_of('/')+1);
