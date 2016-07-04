@@ -35,7 +35,7 @@ using namespace p44;
 using namespace EnoceanSensors;
 
 
-#warning "%%% no real profiles yet"
+// TODO: %%% no real profiles yet"
 const p44::EnoceanSensorDescriptor enoceanVLDdescriptors[] = {
   // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max,MSB,     LSB,  updateIv,aliveSignIv, handler,     typeText, unitText
   // A5-02-xx: Temperature sensors
@@ -115,7 +115,7 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 //  else
   {
     // check table based sensors, might create more than one device
-#warning "%%% no real profiles yet"
+// TODO: %%% no real profiles yet"
 //    newDev = EnoceanSensorHandler::newDevice(aVdcP, createVLDDeviceFunc, enoceanVLDdescriptors, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
   return newDev;

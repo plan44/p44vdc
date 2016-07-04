@@ -454,8 +454,7 @@ bool AudioBehaviour::applyScene(DsScenePtr aScene)
         volume->setChannelValue(unmuteVolume>0 ? unmuteVolume : 1); // restore value known before last mute, but at least non-zero
         return true; // don't let inherited load channels, just request apply
       case scene_cmd_slow_off:
-        // TODO: implement it
-        #warning "%%% tbd"
+        // TODO: %%% implement it
         break;
       default:
         break;
@@ -554,7 +553,7 @@ void AudioBehaviour::stopSceneActions()
 void AudioBehaviour::identifyToUser()
 {
   // blink effect?
-  #warning "%%% tbd"
+  // TODO: %%% implement it
 }
 
 
