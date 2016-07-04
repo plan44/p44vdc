@@ -512,9 +512,9 @@ struct mg_connection {
   char *buf;                  // Buffer for received data
   char *path_info;            // PATH_INFO part of the URL
   int must_close;             // 1 if connection must be closed
-  int buf_size;               // Buffer size
-  int request_len;            // Size of the request + headers in a buffer
-  int data_len;               // Total size of data in a buffer
+  ssize_t buf_size;           // Buffer size
+  ssize_t request_len;        // Size of the request + headers in a buffer
+  ssize_t data_len;           // Total size of data in a buffer
   int status_code;            // HTTP reply status code, e.g. 200
   int throttle;               // Throttling, bytes/sec. <= 0 means no throttle
   time_t last_throttle_time;  // Last time throttled data was sent
@@ -603,7 +603,7 @@ static void sockaddr_to_string(char *buf, size_t len,
   // Only Windoze Vista (and newer) have inet_ntop()
   strncpy(buf, inet_ntoa(usa->sin.sin_addr), len);
 #else
-  inet_ntop(usa->sa.sa_family, (void *) &usa->sin.sin_addr, buf, len);
+  inet_ntop(usa->sa.sa_family, (void *) &usa->sin.sin_addr, buf, (socklen_t)len);
 #endif
 }
 
@@ -713,7 +713,7 @@ static char * mg_strdup(const char *str) {
 }
 
 static const char *mg_strcasestr(const char *big_str, const char *small_str) {
-  int i, big_len = strlen(big_str), small_len = strlen(small_str);
+  ssize_t i, big_len = strlen(big_str), small_len = strlen(small_str);
 
   for (i = 0; i <= big_len - small_len; i++) {
     if (mg_strncasecmp(big_str + i, small_str, small_len) == 0) {
@@ -874,7 +874,7 @@ static const char *next_option(const char *list, struct vec *val,
   return list;
 }
 
-static int match_prefix(const char *pattern, int pattern_len, const char *str) {
+static int match_prefix(const char *pattern, ssize_t pattern_len, const char *str) {
   const char *or_str;
   int i, j, len, res;
 
@@ -1470,7 +1470,7 @@ static int set_non_blocking_mode(SOCKET sock) {
 static int64_t push(FILE *fp, SOCKET sock, SSL *ssl, const char *buf,
                     int64_t len) {
   int64_t sent;
-  int n, k;
+  ssize_t n, k;
 
   (void) ssl;  // Get rid of warning
   sent = 0;
@@ -1481,7 +1481,7 @@ static int64_t push(FILE *fp, SOCKET sock, SSL *ssl, const char *buf,
 
 #ifndef NO_SSL
     if (ssl != NULL) {
-      n = SSL_write(ssl, buf + sent, k);
+      n = SSL_write(ssl, buf + sent, (int)k);
     } else
 #endif
       if (fp != NULL) {
@@ -1503,8 +1503,8 @@ static int64_t push(FILE *fp, SOCKET sock, SSL *ssl, const char *buf,
 
 // Read from IO channel - opened file descriptor, socket, or SSL descriptor.
 // Return negative value on error, or number of bytes read on success.
-static int pull(FILE *fp, struct mg_connection *conn, char *buf, int len) {
-  int nread;
+static ssize_t pull(FILE *fp, struct mg_connection *conn, char *buf, ssize_t len) {
+  ssize_t nread;
 
   if (fp != NULL) {
     // Use read() instead of fread(), because if we're reading from the CGI
@@ -1513,7 +1513,7 @@ static int pull(FILE *fp, struct mg_connection *conn, char *buf, int len) {
     nread = read(fileno(fp), buf, (size_t) len);
 #ifndef NO_SSL
   } else if (conn->ssl != NULL) {
-    nread = SSL_read(conn->ssl, buf, len);
+    nread = SSL_read(conn->ssl, buf, (int)len);
 #endif
   } else {
     nread = recv(conn->client.sock, buf, (size_t) len, 0);
@@ -1522,8 +1522,8 @@ static int pull(FILE *fp, struct mg_connection *conn, char *buf, int len) {
   return conn->ctx->stop_flag ? -1 : nread;
 }
 
-static int pull_all(FILE *fp, struct mg_connection *conn, char *buf, int len) {
-  int n, nread = 0;
+static ssize_t pull_all(FILE *fp, struct mg_connection *conn, char *buf, int len) {
+  ssize_t n, nread = 0;
 
   while (len > 0) {
     n = pull(fp, conn, buf + nread, len);
@@ -1542,8 +1542,8 @@ static int pull_all(FILE *fp, struct mg_connection *conn, char *buf, int len) {
   return nread;
 }
 
-int mg_read(struct mg_connection *conn, void *buf, size_t len) {
-  int n, buffered_len, nread;
+ssize_t mg_read(struct mg_connection *conn, void *buf, size_t len) {
+  ssize_t n, buffered_len, nread;
   const char *body;
 
   // If Content-Length is not set, read until socket is closed
@@ -1581,7 +1581,7 @@ int mg_read(struct mg_connection *conn, void *buf, size_t len) {
   return nread;
 }
 
-int mg_write(struct mg_connection *conn, const void *buf, size_t len) {
+ssize_t mg_write(struct mg_connection *conn, const void *buf, size_t len) {
   time_t now;
   int64_t n, total, allowed;
 
@@ -1646,9 +1646,9 @@ static int alloc_vprintf(char **buf, size_t size, const char *fmt, va_list ap) {
   return len;
 }
 
-int mg_vprintf(struct mg_connection *conn, const char *fmt, va_list ap) {
+ssize_t mg_vprintf(struct mg_connection *conn, const char *fmt, va_list ap) {
   char mem[MG_BUF_LEN], *buf = mem;
-  int len;
+  ssize_t len;
 
   if ((len = alloc_vprintf(&buf, sizeof(mem), fmt, ap)) > 0) {
     len = mg_write(conn, buf, (size_t) len);
@@ -1660,14 +1660,14 @@ int mg_vprintf(struct mg_connection *conn, const char *fmt, va_list ap) {
   return len;
 }
 
-int mg_printf(struct mg_connection *conn, const char *fmt, ...) {
+ssize_t mg_printf(struct mg_connection *conn, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   return mg_vprintf(conn, fmt, ap);
 }
 
-int mg_url_decode(const char *src, int src_len, char *dst,
-                  int dst_len, int is_form_url_encoded) {
+int mg_url_decode(const char *src, ssize_t src_len, char *dst,
+                  ssize_t dst_len, int is_form_url_encoded) {
   int i, j, a, b;
 #define HEXTOI(x) (isdigit(x) ? x - '0' : x - 'W')
 
@@ -1691,11 +1691,10 @@ int mg_url_decode(const char *src, int src_len, char *dst,
   return i >= src_len ? j : -1;
 }
 
-int mg_get_var(const char *data, size_t data_len, const char *name,
+ssize_t mg_get_var(const char *data, size_t data_len, const char *name,
                char *dst, size_t dst_len) {
   const char *p, *e, *s;
-  size_t name_len;
-  int len;
+  size_t name_len, len;
 
   if (dst == NULL || dst_len == 0) {
     len = -2;
@@ -1738,10 +1737,11 @@ int mg_get_var(const char *data, size_t data_len, const char *name,
   return len;
 }
 
-int mg_get_cookie(const char *cookie_header, const char *var_name,
+ssize_t mg_get_cookie(const char *cookie_header, const char *var_name,
                   char *dst, size_t dst_size) {
   const char *s, *p, *end;
-  int name_len, len = -1;
+  ssize_t name_len;
+  ssize_t len = -1;
 
   if (dst == NULL || dst_size == 0) {
     len = -2;
@@ -1845,9 +1845,9 @@ static void convert_uri_to_file_name(struct mg_connection *conn, char *buf,
 //   -1  if request is malformed
 //    0  if request is not yet fully buffered
 //   >0  actual request length, including last \r\n\r\n
-static int get_request_len(const char *buf, int buflen) {
+static ssize_t get_request_len(const char *buf, ssize_t buflen) {
   const char *s, *e;
-  int len = 0;
+  ssize_t len = 0;
 
   for (s = buf, e = s + buflen - 1; len <= 0 && s < e; s++)
     // Control characters are not allowed but >=128 is.
@@ -2396,7 +2396,7 @@ static char *mg_fgets(char *buf, size_t size, struct file *filep, char **p) {
     *p = eof;
     return eof;
   } else if (filep->fp != NULL) {
-    return fgets(buf, size, filep->fp);
+    return fgets(buf, (int)size, filep->fp);
   } else {
     return NULL;
   }
@@ -2835,7 +2835,7 @@ static void handle_directory_request(struct mg_connection *conn,
 static void send_file_data(struct mg_connection *conn, struct file *filep,
                            int64_t offset, int64_t len) {
   char buf[MG_BUF_LEN];
-  int to_read, num_read, num_written;
+  ssize_t to_read, num_read, num_written;
 
   // Sanity check the offset
   offset = offset < 0 ? 0 : offset > filep->size ? filep->size : offset;
@@ -2987,6 +2987,7 @@ void mg_send_file(struct mg_connection *conn, const char *path) {
 static void parse_http_headers(char **buf, struct mg_request_info *ri) {
   int i;
 
+  ri->num_headers = 0;
   for (i = 0; i < (int) ARRAY_SIZE(ri->http_headers); i++) {
     ri->http_headers[i].name = skip_quoted(buf, ":", " ", 0);
     ri->http_headers[i].value = skip(buf, "\r\n");
@@ -3008,8 +3009,9 @@ static int is_valid_http_method(const char *method) {
 // Parse HTTP request, fill in mg_request_info structure.
 // This function modifies the buffer by NUL-terminating
 // HTTP request components, header names and header values.
-static int parse_http_message(char *buf, int len, struct mg_request_info *ri) {
-  int is_request, request_length = get_request_len(buf, len);
+static ssize_t parse_http_message(char *buf, ssize_t len, struct mg_request_info *ri) {
+  int is_request;
+  ssize_t request_length = get_request_len(buf, len);
   if (request_length > 0) {
     // Reset attributes. DO NOT TOUCH is_ssl, remote_ip, remote_port
     ri->remote_user = ri->request_method = ri->uri = ri->http_version = NULL;
@@ -3043,9 +3045,9 @@ static int parse_http_message(char *buf, int len, struct mg_request_info *ri) {
 // buffer (which marks the end of HTTP request). Buffer buf may already
 // have some data. The length of the data is stored in nread.
 // Upon every read operation, increase nread by the number of bytes read.
-static int read_request(FILE *fp, struct mg_connection *conn,
-                        char *buf, int bufsiz, int *nread) {
-  int request_len, n = 0;
+static ssize_t read_request(FILE *fp, struct mg_connection *conn,
+                        char *buf, ssize_t bufsiz, ssize_t *nread) {
+  ssize_t request_len, n = 0;
 
   request_len = get_request_len(buf, *nread);
   while (*nread < bufsiz && request_len == 0 &&
@@ -3120,7 +3122,8 @@ static int forward_body_data(struct mg_connection *conn, FILE *fp,
                              SOCKET sock, SSL *ssl) {
   const char *expect, *body;
   char buf[MG_BUF_LEN];
-  int to_read, nread, buffered_len, success = 0;
+  ssize_t to_read, nread, buffered_len;
+  int success = 0;
 
   expect = mg_get_header(conn, "Expect");
   assert(fp != NULL);
@@ -3342,7 +3345,8 @@ static void prepare_cgi_environment(struct mg_connection *conn,
 }
 
 static void handle_cgi_request(struct mg_connection *conn, const char *prog) {
-  int headers_len, data_len, i, fd_stdin[2], fd_stdout[2];
+  ssize_t headers_len, data_len;
+  int i, fd_stdin[2], fd_stdout[2];
   const char *status, *status_text;
   char buf[16384], *pbuf, dir[PATH_MAX], *p;
   struct mg_request_info ri;
@@ -3420,7 +3424,7 @@ static void handle_cgi_request(struct mg_connection *conn, const char *prog) {
     send_http_error(conn, 500, http_500_error,
                     "CGI program sent malformed or too big (>%u bytes) "
                     "HTTP headers: [%.*s]",
-                    (unsigned) sizeof(buf), data_len, buf);
+                    (unsigned) sizeof(buf), (int)data_len, buf);
     goto done;
   }
   pbuf = buf;
@@ -3493,7 +3497,8 @@ static int put_dir(struct mg_connection *conn, const char *path) {
   char buf[PATH_MAX];
   const char *s, *p;
   struct file file = STRUCT_FILE_INITIALIZER;
-  int len, res = 1;
+  ssize_t len;
+  int res = 1;
 
   for (s = p = path + 2; (p = strchr(s, '/')) != NULL; s = ++p) {
     len = p - path;
@@ -3521,7 +3526,8 @@ static int put_dir(struct mg_connection *conn, const char *path) {
 }
 
 static void mkcol(struct mg_connection *conn, const char *path) {
-  int rc, body_len;
+  int rc;
+  ssize_t body_len;
   struct de de;
   memset(&de.file, 0, sizeof(de.file));
   mg_stat(conn, path, &de.file);
@@ -4174,8 +4180,8 @@ int mg_upload(struct mg_connection *conn, const char *destination_dir) {
   const char *content_type_header, *boundary_start;
   char buf[MG_BUF_LEN], path[PATH_MAX], fname[1024], boundary[100], *s;
   FILE *fp;
-  int bl, n, i, j, headers_len, boundary_len, eof,
-      len = 0, num_uploaded_files = 0;
+  ssize_t bl, n, i, j, headers_len, boundary_len, eof, len = 0;
+  int num_uploaded_files = 0;
 
   // Request looks like this:
   //
@@ -4912,7 +4918,7 @@ static int getreq(struct mg_connection *conn, char *ebuf, size_t ebuf_len) {
     snprintf(ebuf, ebuf_len, "%s", "Client closed connection");
   } else if (parse_http_message(conn->buf, conn->buf_size,
                                 &conn->request_info) <= 0) {
-    snprintf(ebuf, ebuf_len, "Bad request: [%.*s]", conn->data_len, conn->buf);
+    snprintf(ebuf, ebuf_len, "Bad request: [%.*s]", (int)conn->data_len, conn->buf);
   } else {
     // Request is valid
     if ((cl = get_header(&conn->request_info, "Content-Length")) != NULL) {
@@ -5007,7 +5013,8 @@ struct mg_connection *mg_download_tmo(const char *host, int port, int use_ssl,
 
 static void process_new_connection(struct mg_connection *conn) {
   struct mg_request_info *ri = &conn->request_info;
-  int keep_alive_enabled, keep_alive, discard_len;
+  int keep_alive_enabled, keep_alive;
+  ssize_t discard_len;
   char ebuf[100];
 
   keep_alive_enabled = !strcmp(conn->ctx->config[ENABLE_KEEP_ALIVE], "yes");

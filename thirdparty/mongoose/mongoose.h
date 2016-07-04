@@ -205,7 +205,7 @@ struct mg_request_info *mg_get_request_info(struct mg_connection *);
 //  0   when the connection has been closed
 //  -1  on error
 //  >0  number of bytes written on success
-int mg_write(struct mg_connection *, const void *buf, size_t len);
+ssize_t mg_write(struct mg_connection *, const void *buf, size_t len);
 
 
 // Macros for enabling compiler-specific checks for printf-like arguments.
@@ -230,7 +230,7 @@ int mg_write(struct mg_connection *, const void *buf, size_t len);
 // Send data to the client using printf() semantics.
 //
 // Works exactly like mg_write(), but allows to do message formatting.
-int mg_printf(struct mg_connection *,
+ssize_t mg_printf(struct mg_connection *,
               PRINTF_FORMAT_STRING(const char *fmt), ...) PRINTF_ARGS(2, 3);
 
 
@@ -243,7 +243,7 @@ void mg_send_file(struct mg_connection *conn, const char *path);
 //   0     connection has been closed by peer. No more data could be read.
 //   < 0   read error. No more data could be read from the connection.
 //   > 0   number of bytes read into the buffer.
-int mg_read(struct mg_connection *, void *buf, size_t len);
+ssize_t mg_read(struct mg_connection *, void *buf, size_t len);
 
 
 // Get the value of particular HTTP header.
@@ -273,7 +273,7 @@ const char *mg_get_header(const struct mg_connection *, const char *name);
 //
 // Destination buffer is guaranteed to be '\0' - terminated if it is not
 // NULL or zero length.
-int mg_get_var(const char *data, size_t data_len,
+ssize_t mg_get_var(const char *data, size_t data_len,
                const char *var_name, char *dst, size_t dst_len);
 
 // Fetch value of certain cookie variable into the destination buffer.
@@ -289,7 +289,7 @@ int mg_get_var(const char *data, size_t data_len,
 //          parameter is not found).
 //      -2 (destination buffer is NULL, zero length or too small to hold the
 //          value).
-int mg_get_cookie(const char *cookie, const char *var_name,
+ssize_t mg_get_cookie(const char *cookie, const char *var_name,
                   char *buf, size_t buf_len);
 
 
@@ -351,8 +351,8 @@ const char *mg_version(void);
 // uses '+' as character for space, see RFC 1866 section 8.2.1
 // http://ftp.ics.uci.edu/pub/ietf/html/rfc1866.txt
 // Return: length of the decoded data, or -1 if dst buffer is too small.
-int mg_url_decode(const char *src, int src_len, char *dst,
-                  int dst_len, int is_form_url_encoded);
+int mg_url_decode(const char *src, ssize_t src_len, char *dst,
+                  ssize_t dst_len, int is_form_url_encoded);
 
 // MD5 hash given strings.
 // Buffer 'buf' must be 33 bytes long. Varargs is a NULL terminated list of
