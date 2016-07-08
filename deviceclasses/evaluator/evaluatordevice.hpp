@@ -162,7 +162,8 @@ namespace p44 {
     void parseValueDefs();
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
-    void evaluateConditions();
+    void evaluateConditions(Tristate aRefState);
+    void changedConditions();
 
     /// expression evaluation
     Tristate evaluateBoolean(string aExpression);

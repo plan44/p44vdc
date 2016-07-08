@@ -156,6 +156,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     checkResult->setType(apivalue_object);
     // - value defs
     parseValueDefs(); // reparse
+    ALOG(LOG_INFO, "CheckEvaluator:");
     ApiValuePtr valueDefs = checkResult->newObject();
     for (ValueSourcesMap::iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
       ApiValuePtr val = valueDefs->newObject();
@@ -170,6 +171,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
         val->add("value", val->newDouble(pos->second->getSourceValue()));
       }
       valueDefs->add(pos->first,val); // variable name
+      LOG(LOG_INFO, "- '%s' ('%s') = %f", pos->first.c_str(), pos->second->getSourceName().c_str(), pos->second->getSourceValue());
     }
     checkResult->add("valueDefs", valueDefs);
     // Conditions
@@ -181,6 +183,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     err = evaluateDouble(evaluatorSettings()->onCondition, v);
     if (Error::isOK(err)) {
       cond->add("result", cond->newDouble(v));
+      LOG(LOG_INFO, "- onCondition '%s' -> %f", evaluatorSettings()->onCondition.c_str(), v);
     }
     else {
       cond->add("error", cond->newString(err->getErrorMessage()));
@@ -191,6 +194,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     err = evaluateDouble(evaluatorSettings()->offCondition, v);
     if (Error::isOK(err)) {
       cond->add("result", cond->newDouble(v));
+      LOG(LOG_INFO, "- offCondition '%s' -> %f", evaluatorSettings()->offCondition.c_str(), v);
     }
     else {
       cond->add("error", cond->newString(err->getErrorMessage()));
@@ -245,7 +249,7 @@ void EvaluatorDevice::parseValueDefs()
         vs->addSourceListener(boost::bind(&EvaluatorDevice::dependentValueNotification, this, _1, _2), this);
         // - add source to my map
         valueMap[valuealias] = vs;
-        ALOG(LOG_INFO, "- Variable '%s' connected to source '%s'", valuealias.c_str(), vs->getSourceName().c_str());
+        LOG(LOG_INFO, "- Variable '%s' connected to source '%s'", valuealias.c_str(), vs->getSourceName().c_str());
       }
       else {
         ALOG(LOG_WARNING, "Value source id '%s' not found -> variable '%s' currently undefined", valuesourceid.c_str(), valuealias.c_str());
@@ -275,19 +279,28 @@ void EvaluatorDevice::dependentValueNotification(ValueSource &aValueSource, Valu
   }
   else {
     ALOG(LOG_INFO, "value source '%s' reports value %f", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
-    evaluateConditions();
+    evaluateConditions(currentState);
   }
 }
 
 
-void EvaluatorDevice::evaluateConditions()
+void EvaluatorDevice::changedConditions()
+{
+  conditionMetSince = Never;
+  onConditionMet = false;
+  evaluateConditions(undefined);
+}
+
+
+
+void EvaluatorDevice::evaluateConditions(Tristate aRefState)
 {
   // evaluate state and report it
   Tristate prevState = currentState;
   bool decisionMade = false;
   MLMicroSeconds now = MainLoop::currentMainLoop().now();
   MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
-  if (!decisionMade && currentState!=yes) {
+  if (!decisionMade && aRefState!=yes) {
     // off or unknown: check for switching on
     Tristate on = evaluateBoolean(evaluatorSettings()->onCondition);
     ALOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.c_str(), on==undefined ? "<undefined>" : (on==yes ? "true -> switching ON" : "false"));
@@ -311,12 +324,12 @@ void EvaluatorDevice::evaluateConditions()
       else {
         // condition not met long enough yet, need to re-check later
         ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-        evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this), metAt);
+        evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState), metAt);
         return;
       }
     }
   }
-  if (!decisionMade && currentState!=no) {
+  if (!decisionMade && aRefState!=no) {
     // on or unknown: check for switching off
     Tristate off = evaluateBoolean(evaluatorSettings()->offCondition);
     ALOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.c_str(), off==undefined ? "<undefined>" : (off==yes ? "true -> switching OFF" : "false"));
@@ -340,7 +353,7 @@ void EvaluatorDevice::evaluateConditions()
       else {
         // condition not met long enough yet, need to re-check later
         ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-        evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this), metAt);
+        evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState), metAt);
         return;
       }
     }
@@ -686,17 +699,19 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case onCondition_key:
           if (evaluatorSettings()->setPVar(evaluatorSettings()->onCondition, aPropValue->stringValue()))
-            evaluateConditions();  // changed conditions, re-evaluate output
+            changedConditions();  // changed conditions, re-evaluate output
           return true;
         case offCondition_key:
           if (evaluatorSettings()->setPVar(evaluatorSettings()->offCondition, aPropValue->stringValue()))
-            evaluateConditions();  // changed conditions, re-evaluate output
+            changedConditions();  // changed conditions, re-evaluate output
           return true;
         case minOnTime_key:
-          evaluatorSettings()->setPVar(evaluatorSettings()->minOnTime, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
+          if (evaluatorSettings()->setPVar(evaluatorSettings()->minOnTime, (MLMicroSeconds)(aPropValue->doubleValue()*Second)))
+            changedConditions();  // changed conditions, re-evaluate output
           return true;
         case minOffTime_key:
-          evaluatorSettings()->setPVar(evaluatorSettings()->minOffTime, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
+          if (evaluatorSettings()->setPVar(evaluatorSettings()->minOffTime, (MLMicroSeconds)(aPropValue->doubleValue()*Second)))
+            changedConditions();  // changed conditions, re-evaluate output
           return true;
       }
     }
