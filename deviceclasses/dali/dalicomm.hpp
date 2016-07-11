@@ -173,7 +173,7 @@ namespace p44 {
 
 
     /// callback function for daliSendXXX methods
-    typedef boost::function<void (ErrorPtr aError)> DaliCommandStatusCB;
+    typedef boost::function<void (ErrorPtr aError, bool aRetried)> DaliCommandStatusCB;
 
     /// reset the communication with the bridge
     void reset(DaliCommandStatusCB aStatusCB);
@@ -227,7 +227,7 @@ namespace p44 {
     void daliSendDtrAndConfigCommand(DaliAddress aAddress, uint8_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
 
     /// callback function for daliSendXXX methods returning data
-    typedef boost::function<void (bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)> DaliQueryResultCB;
+    typedef boost::function<void (bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError, bool aRetried)> DaliQueryResultCB;
 
     /// Send DALI command and expect answer byte
     /// @param aDali1 first DALI byte

@@ -102,8 +102,10 @@ bool DaliComm::isBusy()
 #define CMD_CODE_EDGEADJ 0x44 // set DALI sending edge adjustment, DATA1=sending delay for going-inactive edge, DATA2=delay of sampling point, in number of 1/256th periods (with actual resolution of 1/16th bit for now)
 
 // bridge responses
-#define RESP_CODE_ACK 0x2A // reponse for all commands that do not return data, second byte is status
-#define RESP_CODE_DATA 0x3D // response for commands that return data, second byte is data
+#define RESP_CODE_ACK 0x2A // * reponse for all commands that do not return data, second byte is status
+#define RESP_CODE_ACK_RETRIED 0x2B // + command has executed with at least one retry
+#define RESP_CODE_DATA 0x3D // = response for commands that return data, second byte is data
+#define RESP_CODE_DATA_RETRIED 0x3E // > response with data, but has executed with at least one retry
 // - ACK status codes
 #define ACK_OK 0x30 // ok status
 #define ACK_TIMEOUT 0x31 // timeout receiving from DALI
@@ -133,7 +135,7 @@ static const char *bridgeCmdName(uint8_t aBridgeCmd)
 
 static const char *bridgeAckText(uint8_t aResp1, uint8_t aResp2)
 {
-  if (aResp1==RESP_CODE_ACK) {
+  if (aResp1==RESP_CODE_ACK || aResp1==RESP_CODE_ACK_RETRIED) {
     switch (aResp2) {
       case ACK_OK:         return "OK             ";
       case ACK_TIMEOUT:    return "TIMEOUT        ";
@@ -167,11 +169,12 @@ void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, Se
     if (Error::isOK(aError) && ropP->getDataSize()>=2) {
       uint8_t resp1 = ropP->getDataP()[0];
       uint8_t resp2 = ropP->getDataP()[1];
-      if (resp1==RESP_CODE_DATA) {
-        FOCUSLOG("DALI bridge response: DATA            (%02X)      %02X    - %d pending responses", resp1, resp2, expectedBridgeResponses);
+      if (resp1==RESP_CODE_DATA || resp1==RESP_CODE_DATA_RETRIED) {
+        FOCUSLOG("DALI bridge response: DATA            (%02X)      %02X    - %d pending responses%s", resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_DATA_RETRIED ? ", RETRIED" : "");
+
       }
       else {
-        FOCUSLOG("DALI bridge response: %s (%02X %02X)         - %d pending responses", bridgeAckText(resp1, resp2), resp1, resp2, expectedBridgeResponses);
+        FOCUSLOG("DALI bridge response: %s (%02X %02X)         - %d pending responses%s", bridgeAckText(resp1, resp2), resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_ACK_RETRIED ? ", RETRIED" : "");
       }
       if (aBridgeResultHandler)
         aBridgeResultHandler(resp1, resp2, aError);
@@ -240,13 +243,17 @@ void DaliComm::connectionTimeout()
 // MARK: ===== DALI bus communication basics
 
 
-static ErrorPtr checkBridgeResponse(uint8_t aResp1, uint8_t aResp2, ErrorPtr aError, bool &aNoOrTimeout)
+static ErrorPtr checkBridgeResponse(uint8_t aResp1, uint8_t aResp2, ErrorPtr aError, bool &aNoOrTimeout, bool &aRetried)
 {
   aNoOrTimeout = false;
+  aRetried = false;
   if (aError) {
     return aError;
   }
   switch(aResp1) {
+    case RESP_CODE_ACK_RETRIED:
+      // command acknowledged with retry
+      aRetried = true;
     case RESP_CODE_ACK:
       // command acknowledged
       switch (aResp2) {
@@ -263,6 +270,9 @@ static ErrorPtr checkBridgeResponse(uint8_t aResp1, uint8_t aResp2, ErrorPtr aEr
           return ErrorPtr(new DaliCommError(DaliCommErrorBusOverload));
       }
       break;
+    case RESP_CODE_DATA_RETRIED:
+      // data reading acknowledged with retry
+      aRetried = true;
     case RESP_CODE_DATA:
       return ErrorPtr(); // no error
   }
@@ -274,14 +284,15 @@ static ErrorPtr checkBridgeResponse(uint8_t aResp1, uint8_t aResp2, ErrorPtr aEr
 void DaliComm::daliCommandStatusHandler(DaliCommandStatusCB aResultCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)
 {
   bool noOrTimeout;
-  ErrorPtr err = checkBridgeResponse(aResp1, aResp2, aError, noOrTimeout);
+  bool retried;
+  ErrorPtr err = checkBridgeResponse(aResp1, aResp2, aError, noOrTimeout, retried);
   if (!err && noOrTimeout) {
     // timeout for a send-only command -> out of sync, bridge communication error
     err = ErrorPtr(new DaliCommError(DaliCommErrorBridgeComm));
   }
   // execute callback if any
   if (aResultCB)
-    aResultCB(err);
+    aResultCB(err, retried);
 }
 
 
@@ -289,10 +300,11 @@ void DaliComm::daliCommandStatusHandler(DaliCommandStatusCB aResultCB, uint8_t a
 void DaliComm::daliQueryResponseHandler(DaliQueryResultCB aResultCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)
 {
   bool noOrTimeout;
-  ErrorPtr err = checkBridgeResponse(aResp1, aResp2, aError, noOrTimeout);
+  bool retried;
+  ErrorPtr err = checkBridgeResponse(aResp1, aResp2, aError, noOrTimeout, retried);
   // execute callback if any
   if (aResultCB)
-    aResultCB(noOrTimeout, aResp2, err);
+    aResultCB(noOrTimeout, aResp2, err, retried);
 }
 
 
@@ -1039,6 +1051,8 @@ class DaliMemoryReader : public P44Obj
   DaliAddress busAddress;
   DaliComm::MemoryVectorPtr memory;
   int bytesToRead;
+  int retries;
+  uint8_t currentOffset;
   typedef std::vector<uint8_t> MemoryVector;
 public:
   static void readMemory(DaliComm &aDaliComm, DaliComm::DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint8_t aNumBytes)
@@ -1057,19 +1071,44 @@ private:
     LOG(LOG_INFO, "DALI bus address %d - reading %d bytes from bank %d at offset %d:", busAddress, aNumBytes, aBank, aOffset);
     // set DTR1 = bank
     daliComm.daliSend(DALICMD_SET_DTR1, aBank);
-    // set DTR = offset within bank
-    daliComm.daliSend(DALICMD_SET_DTR, aOffset);
-    // start reading
+    // set initial offset and bytes
+    currentOffset = aOffset;
     bytesToRead = aNumBytes;
+    retries = 0;
+    startReading();
+  }
+
+
+  void startReading()
+  {
+    // set DTR = offset within bank
+    daliComm.daliSend(DALICMD_SET_DTR, currentOffset);
+    // start reading
     readNextByte();
   };
 
+
   // handle scan result
-  void handleResponse(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+  void handleResponse(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError, bool aRetried)
   {
-    if (Error::isOK(aError) && !aNoOrTimeout) {
+    if (!Error::isOK(aError) || aNoOrTimeout) {
+      if (retries++<3) {
+        // restart reading explicitly at current offset
+        startReading();
+        return;
+      }
+    }
+    else {
+      // even ok result must be retry-free, otherwise we need to re-set the DTR
+      if (aRetried) {
+        // restart reading explicitly at current offset
+        startReading();
+        return;
+      }
       // byte received, append to vector
+      retries = 0;
       memory->push_back(aResponse);
+      currentOffset++;
       if (--bytesToRead>0) {
         // more bytes to read
         readNextByte();
@@ -1092,7 +1131,7 @@ private:
 
   void readNextByte()
   {
-    daliComm.daliSendQuery(busAddress, DALICMD_READ_MEMORY_LOCATION, boost::bind(&DaliMemoryReader::handleResponse, this, _1, _2, _3));
+    daliComm.daliSendQuery(busAddress, DALICMD_READ_MEMORY_LOCATION, boost::bind(&DaliMemoryReader::handleResponse, this, _1, _2, _3, _4));
   }
 };
 
