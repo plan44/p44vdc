@@ -720,7 +720,7 @@ void DaliComm::daliBusScan(DaliBusScanCB aResultCB)
 // Scan DALI bus by random address
 
 #define MAX_RESTARTS 3
-#define MAX_COMPARE_REPEATS 0
+#define MAX_COMPARE_REPEATS 1
 #define MAX_SHORTADDR_READ_REPEATS 2
 #define RESCAN_RETRY_DELAY (10*Second)
 #define READ_SHORT_ADDR_SEND_DELAY 0
@@ -765,6 +765,7 @@ private:
   void startScan()
   {
     // first scan for used short addresses
+    foundDevicesPtr->clear(); // must be empty in case we do a restart
     DaliBusScanner::scanBus(daliComm,boost::bind(&DaliFullBusScanner::shortAddrListReceived, this, _1, _2, _3));
   }
 
@@ -1044,6 +1045,8 @@ void DaliComm::daliFullBusScan(DaliBusScanCB aResultCB, bool aFullScanOnlyIfNeed
 
 // MARK: ===== DALI memory access / device info reading
 
+#define DALI_MAX_MEMREAD_RETRIES 3
+
 class DaliMemoryReader : public P44Obj
 {
   DaliComm &daliComm;
@@ -1092,7 +1095,7 @@ private:
   void handleResponse(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError, bool aRetried)
   {
     if (!Error::isOK(aError) || aNoOrTimeout) {
-      if (retries++<3) {
+      if (retries++<DALI_MAX_MEMREAD_RETRIES) {
         // restart reading explicitly at current offset
         startReading();
         return;
@@ -1145,6 +1148,9 @@ void DaliComm::daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, 
 
 // MARK: ===== DALI device info reading
 
+#define DALI_MAX_BANKREAD_RETRIES 3 // how many times reading bank will be tried in case of checksum error
+
+
 class DaliDeviceInfoReader : public P44Obj
 {
   DaliComm &daliComm;
@@ -1153,6 +1159,7 @@ class DaliDeviceInfoReader : public P44Obj
   DaliComm::DaliDeviceInfoPtr deviceInfo;
   uint8_t bankChecksum;
   uint8_t maxBank;
+  int retries;
 public:
   static void readDeviceInfo(DaliComm &aDaliComm, DaliComm::DaliDeviceInfoCB aResultCB, DaliAddress aAddress)
   {
@@ -1166,6 +1173,11 @@ private:
     busAddress(aAddress)
   {
     daliComm.startProcedure();
+    retries = 0;
+    readBank0();
+  }
+
+  void readBank0() {
     // read the memory
     maxBank = 0; // all devices must have a bank 0, rest is optional
     // Note: official checksum algorithm is: 0-byte2-byte3...byteLast, check with checksum+byte2+byte3...byteLast==0
@@ -1277,7 +1289,7 @@ private:
       // Note: before 2015-02-27, we had a bug which caused the last extra byte not being read, so the checksum reached zero
       // only if the last byte was 0. We also passed the if checksum was 0xFF, because our reference devices always had 0x01 in
       // the last byte, and I assumed missing by 1 was the result of not precise enough specs or a bug in the device.
-      #ifdef OLD_BUGGY_CHKSUM_COMPATIBLE
+      #if OLD_BUGGY_CHKSUM_COMPATIBLE
       if (bankChecksum==0 && deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
         // by specs, this is a correct checksum, and a seemingly solid device info
         // - now check if the buggy checker would have passed it, too (which is when last byte is 0x01 or 0x00)
@@ -1307,20 +1319,34 @@ private:
       deviceInfo->fw_version_major = 0;
       deviceInfo->fw_version_minor = 0;
       deviceInfo->serialNo = 0;
+      // - check retries
+      if (retries++<DALI_MAX_BANKREAD_RETRIES) {
+        // retry reading bank 0 info
+        LOG(LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank0 info from shortAddress %d -> retrying", bankChecksum, retries, busAddress);
+        readBank0();
+        return;
+      }
       // - report error
       LOG(LOG_ERR, "DALI shortaddress %d Bank 0 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
       return complete(ErrorPtr(new DaliCommError(DaliCommErrorBadChecksum,string_format("bad DALI memory bank 0 checksum at shortAddress %d", busAddress))));
     }
     if (maxBank>0) {
       // now read OEM info from bank1
-      bankChecksum = 0;
-      DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Data, this, _1, _2), busAddress, 1, 0, DALIMEM_BANK1_MINBYTES);
+      retries = 0;
+      readBank1();
     }
     else {
       // device does not have bank1, so we are complete
       return complete(ErrorPtr());
     }
   };
+
+
+  void readBank1()
+  {
+    bankChecksum = 0;
+    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Data, this, _1, _2), busAddress, 1, 0, DALIMEM_BANK1_MINBYTES);
+  }
 
 
   void handleBank1Data(DaliComm::MemoryVectorPtr aBank1Data, ErrorPtr aError)
@@ -1386,6 +1412,13 @@ private:
         // - invalidate OEM gtin and serial
         deviceInfo->oem_gtin = 0;
         deviceInfo->oem_serialNo = 0;
+        // - check retries
+        if (retries++<DALI_MAX_BANKREAD_RETRIES) {
+          // retry reading bank 1 info
+          LOG(LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank1 info from shortAddress %d -> retrying", bankChecksum, retries, busAddress);
+          readBank1();
+          return;
+        }
         // - report error
         LOG(LOG_ERR, "DALI shortaddress %d Bank 1 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
         aError = ErrorPtr(new DaliCommError(DaliCommErrorBadChecksum,string_format("bad DALI memory bank 1 checksum at shortAddress %d", busAddress)));
@@ -1398,6 +1431,15 @@ private:
   void complete(ErrorPtr aError)
   {
     daliComm.endProcedure();
+    if (Error::isOK(aError)) {
+      LOG(LOG_NOTICE,
+        "Successfully read device info from shortAddress %d - %s data: GTIN=%lld, Serial=%lld",
+        busAddress,
+        deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid ? "valid" : "GARBAGE",
+        deviceInfo->gtin,
+        deviceInfo->serialNo
+      );
+    }
     // clean device info in case it has been detected invalid by now
     if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_none) {
       deviceInfo->clear(); // clear everything except shortaddress
