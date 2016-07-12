@@ -38,7 +38,10 @@ using namespace std;
 // the last byte, and I assumed missing by 1 was the result of not precise enough specs or a bug in the device.
 // If OLD_BUGGY_CHKSUM_COMPATIBLE is defined, extra checks will be made to keep already-in-use devices identified by
 // shortaddr to avoid messing up existing installations
-#define OLD_BUGGY_CHKSUM_COMPATIBLE 1
+#if P44_BUILD_DIGI
+  // we need this only for the DIGI based devices as these existed in the field before 2015-02-27
+  #define OLD_BUGGY_CHKSUM_COMPATIBLE 1
+#endif
 
 namespace p44 {
 
@@ -88,9 +91,13 @@ namespace p44 {
   public:
     typedef enum {
       devinf_none,
+      #if OLD_BUGGY_CHKSUM_COMPATIBLE
       devinf_maybe,
+      #endif
       devinf_solid,
+      #if OLD_BUGGY_CHKSUM_COMPATIBLE
       devinf_notForID
+      #endif
     } DaliDevInfStatus;
 
     DaliDeviceInfo();

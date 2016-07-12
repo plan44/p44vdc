@@ -78,7 +78,7 @@ void DaliBusDevice::deriveDsUid()
   // vDC implementation specific UUID:
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s;
-  #ifdef OLD_BUGGY_CHKSUM_COMPATIBLE
+  #if OLD_BUGGY_CHKSUM_COMPATIBLE
   if (deviceInfo.devInfStatus==DaliDeviceInfo::devinf_maybe) {
     // assume we can use devInf to derive dSUID from
     deviceInfo.devInfStatus = DaliDeviceInfo::devinf_solid;
