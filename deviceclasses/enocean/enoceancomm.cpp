@@ -748,6 +748,15 @@ Esp3PacketPtr Esp3Packet::newEsp3Message(PacketType aPacketType, uint8_t aCode, 
 
 // MARK: ===== Description
 
+static const int numRespCodes = 5;
+static const char *respCodeNames[numRespCodes] = {
+  "OK",
+  "ERROR",
+  "NOT SUPPORTED",
+  "WRONG PARAM",
+  "OPERATION DENIED"
+};
+
 
 string Esp3Packet::description()
 {
@@ -782,7 +791,8 @@ string Esp3Packet::description()
     }
     else if (packetType()==pt_response) {
       // ESP3 response packet
-      t = string_format("ESP3 response packet, return code = %d", data()[0]);
+      uint8_t sta = data()[0];
+      t = string_format("ESP3 response packet, return code = %d (%s)", sta, sta<numRespCodes ? respCodeNames[sta] : "<unknown>");
     }
     else if (packetType()==pt_common_cmd) {
       // ESP3 common command packet
