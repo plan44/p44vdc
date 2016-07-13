@@ -85,7 +85,14 @@ void EnoceanRemoteControlDevice::buttonAction(bool aRight, bool aUp, bool aPress
     packet->radioUserData()[0] = 0x00; // release
     packet->setRadioStatus(status_T21); // released
   }
-  packet->setRadioSender(getAddress()); // my own ID base derived address that is learned into this actor
+  EnoceanAddress addr = getAddress(); // my own ID base derived address that is learned into this actor
+  // Note: For migrated settings cases, addr might contain a base address different from this modem's (that of the original EnOcean modem).
+  //   To facilitate migration (keeping the devices with current dSUIDs, derived from the original modem's base address),
+  //   we ignore the base address in addr and always use the actual base address of this modem
+  //   (otherwise the modem will not send any data at all).
+  addr &= 0x7F; // only keep the offset to the base address
+  addr += getEnoceanVdc().enoceanComm.idBase(); // add-in the actual modem base address
+  packet->setRadioSender(addr); // set as sender address
   getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
 }
 
