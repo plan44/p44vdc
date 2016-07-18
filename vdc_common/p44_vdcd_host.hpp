@@ -105,7 +105,7 @@ namespace p44 {
     /// @param aCompletedCB will be called when the entire self test is done
     /// @param aButton button for interacting with tests
     /// @param aRedLED red LED output
-    /// @param aRedLED green LED output
+    /// @param aGreenLED green LED output
     void selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED);
 
     /// @return URL for Web-UI (for access from local LAN)
