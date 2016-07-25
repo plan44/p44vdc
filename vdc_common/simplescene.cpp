@@ -355,7 +355,7 @@ int SimpleCmdScene::substitutePlaceholders(string &aCommandStr)
   size_t p = 0;
   int reps = 0;
   // Syntax of channel placeholders:
-  //   by channel type: @{channel:tt[*ff]}
+  //   by channel type: @{channel:tt[*ff][+|-oo][%frac]}
   //   by channel index: @{channel#:ii[*ff][+|-oo][%frac]}
   //   ff is an optional float factor to scale the channel value
   //   oo is an float offset to apply

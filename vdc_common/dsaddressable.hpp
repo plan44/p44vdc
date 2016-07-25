@@ -196,7 +196,7 @@ namespace p44 {
     /// @note modelUID must be equal between all devices of the same model/class/kind, where "same" means
     ///   the functionality relevant for the dS system. If different connected hardware devices
     ///   (different hardwareModelGuid) provide EXACTLY the same dS functionality, these devices MAY
-    ///   have the same modelUID. Vice versa, two identical hardware devices (two digital input for example)
+    ///   have the same modelUID. Vice versa, two identical hardware devices (two digital inputs for example)
     ///   might have the same hardwareModelGuid, but different modelUID if for example one input is mapped
     ///   as a button, and the other as a binaryInput.
     virtual string modelUID() = 0;
