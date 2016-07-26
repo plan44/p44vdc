@@ -43,6 +43,7 @@ ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceCon
   tag(aTag),
   useMovement(false), // no movement by default
   querySync(false), // no sync query by default
+  controlValues(false), // no control values by default
   configured(false),
   iconBaseName("ext"), // default icon name
   modelNameString("plan44 p44vdc external device")
@@ -469,6 +470,30 @@ void ExternalDevice::syncChannelValues(SimpleCB aDoneCB)
 }
 
 
+bool ExternalDevice::processControlValue(const string &aName, double aValue)
+{
+  if (controlValues) {
+    // forward control messages
+    if (deviceConnector->simpletext) {
+      string m = string_format("CTRL.%s=%lf", aName.c_str(), aValue);
+      sendDeviceApiSimpleMessage(m);
+    }
+    else {
+      JsonObjectPtr message = JsonObject::newObj();
+      message->add("message", JsonObject::newString("control"));
+      message->add("name", JsonObject::newString(aName));
+      message->add("value", JsonObject::newDouble(aValue));
+      sendDeviceApiJsonMessage(message);
+    }
+  }
+  // Note: control values processed directly by the external device might change output values
+  //   but do not need triggering applyChannelValues. In case the device changes
+  //   channel values, it should sync them back normally.
+  // Anyway, let inherited processing run as well (which might do channel changes
+  // and trigger apply)
+  return inherited::processControlValue(aName, aValue);
+}
+
 
 // MARK: ===== external device configuration
 
@@ -566,6 +591,19 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
   }
+  else if (outputType=="fancoilunit") {
+    if (primaryGroup==group_variable) primaryGroup = group_ventilation;
+    controlValues = true; // fan coil unit usually needs control values
+    // - standard device settings with scene table
+    installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
+    // - create climate control fan output
+    OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_fancoilunit));
+    cb->setGroupMembership(group_roomtemperature_control, true); // put into room temperature control group...
+    cb->setGroupMembership(group_ventilation, true); // ..and into ventilation
+    cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
+    cb->setHardwareName(hardwareName);
+    addBehaviour(cb);
+  }
   else if (outputType=="shadow") {
     if (primaryGroup==group_variable) primaryGroup = group_grey_shadow;
     // - use shadow scene settings
@@ -608,6 +646,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     // no output, just install minimal settings without scenes
     installSettings();
   }
+  // set options that might have a default set by the output type
+  if (aInitParams->get("controlvalues", o)) controlValues = o->boolValue();
   // set primary group to black if group is not yet defined so far
   if (primaryGroup==group_variable) primaryGroup = group_black_joker;
   // check for groups definition, will override anything set so far

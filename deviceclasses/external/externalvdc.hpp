@@ -58,6 +58,7 @@ namespace p44 {
 
     bool configured; ///< set when device is configured (init message received and device added to vdc)
     bool useMovement; ///< if set, device communication uses MV/move command for dimming and shadow device operation
+    bool controlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
     bool querySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
 
     SimpleCB syncedCB; ///< will be called when device confirms "SYNC" message with "SYNCED" response
@@ -116,6 +117,16 @@ namespace p44 {
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
     virtual void dimChannel(DsChannelType aChannelType, DsDimMode aDimMode);
+
+    /// Process a named control value. The type, group membership and settings of the device determine if at all,
+    /// and if, how the value affects physical outputs of the device or general device operation
+    /// @note if this method adjusts channel values, it must not directly update the hardware, but just
+    ///   prepare channel values such that these can be applied using requestApplyingChannels().
+    /// @param aName the name of the control value, which describes the purpose
+    /// @param aValue the control value to process
+    /// @note base class by default forwards the control value to all of its output behaviours.
+    /// @return true if value processing caused channel changes so channel values should be applied.
+    virtual bool processControlValue(const string &aName, double aValue);
 
     /// disconnect device. If presence is represented by data stored in the vDC rather than
     /// detection of real physical presence on a bus, this call must clear the data that marks
