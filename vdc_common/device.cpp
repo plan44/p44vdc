@@ -1310,7 +1310,7 @@ void Device::updateSceneIfDirty(DsScenePtr aScene)
 
 bool Device::processControlValue(const string &aName, double aValue)
 {
-  // default base class behaviour is letting know all output behaviours
+  // default base class behaviour is letting know the output behaviour
   if (output) {
     return output->processControlValue(aName, aValue);
   }

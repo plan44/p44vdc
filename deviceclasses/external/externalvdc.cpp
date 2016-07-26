@@ -559,8 +559,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     if (primaryGroup==group_variable) primaryGroup = group_blue_heating;
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
-    // - create climate control outout
-    OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this));
+    // - create climate control valve output
+    OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_heatingvalve));
     cb->setGroupMembership(group_roomtemperature_control, true); // put into room temperature control group by default, NOT into standard blue)
     cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);

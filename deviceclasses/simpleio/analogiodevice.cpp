@@ -112,7 +112,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // - create climate control outout
-    OutputBehaviourPtr ob = OutputBehaviourPtr(new ClimateControlBehaviour(*this));
+    OutputBehaviourPtr ob = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_heatingvalve));
     ob->setGroupMembership(group_roomtemperature_control, true); // put into room temperature control group by default, NOT into standard blue)
     ob->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
     ob->setHardwareName("Valve, 0..100");

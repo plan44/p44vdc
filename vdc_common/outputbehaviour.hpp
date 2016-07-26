@@ -197,12 +197,15 @@ namespace p44 {
     virtual bool canDim(DsChannelType aChannelType) { return true; /* in base class, nothing prevents dimming */ };
 
 
-    /// Process a named control value. The type, color and settings of the output determine if at all,
-    /// and if, how the value affects the output
+    /// Process a named control value. The type, group membership and settings of the device determine if at all,
+    /// and if, how the value affects physical outputs of the device or general device operation
+    /// @note if this method adjusts channel values, it must not directly update the hardware, but just
+    ///   prepare channel values such that these can be applied using requestApplyingChannels().
     /// @param aName the name of the control value, which describes the purpose
     /// @param aValue the control value to process
-    /// @return true if value processed and channel values should be applied
-    virtual bool processControlValue(const string &aName, double aValue) { return false; /* NOP in base class */ };
+    /// @note base class by default forwards the control value to all of its output behaviours.
+    /// @return true if value processing caused channel changes so channel values should be applied.
+    virtual bool processControlValue(const string &aName, double aValue) { return false; /* NOP in base class, no channels changed */ };
 
     /// identify the device to the user in a behaviour-specific way
     /// @note this is usually called by device's identifyToUser(), unless device has hardware (rather than behaviour)

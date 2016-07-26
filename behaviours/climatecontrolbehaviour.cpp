@@ -81,17 +81,27 @@ DsScenePtr ClimateDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 // MARK: ===== ClimateControlBehaviour
 
 
-ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice) :
+ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceKind aKind) :
   inherited(aDevice),
+  climateDeviceKind(aKind),
   heatingSystemCapability(hscapability_heatingAndCooling), // assume valve can handle both negative and positive values (even if only by applying absolute value to valve)
   climateControlIdle(false), // assume valve active
-  runProphylaxis(false) // no run scheduled
+  runProphylaxis(false), // no run scheduled
+  zoneTemperatureUpdated(Never),
+  zoneTemperatureSetPointUpdated(Never)
 {
   // make it member of the room temperature control group by default
   setGroupMembership(group_roomtemperature_control, true);
   // add the output channel
-  // TODO: do we have a proper channel type for this?
-  ChannelBehaviourPtr ch = ChannelBehaviourPtr(new HeatingLevelChannel(*this));
+  ChannelBehaviourPtr ch;
+  if (climateDeviceKind==climatedevice_heatingvalve) {
+    // output channel is a heating valve
+    ch = ChannelBehaviourPtr(new HeatingLevelChannel(*this));
+  }
+  else {
+    // output channel is a fan
+    ch = ChannelBehaviourPtr(new AirflowLevelChannel(*this));
+  }
   addChannel(ch);
 }
 
@@ -101,7 +111,8 @@ bool ClimateControlBehaviour::processControlValue(const string &aName, double aV
 {
   if (aName=="heatingLevel") {
     if (isMember(group_roomtemperature_control) && isEnabled()) {
-      ChannelBehaviourPtr cb = getChannelByType(channeltype_default);
+      // if we have a heating level channel, "heatingLevel" will control it
+      ChannelBehaviourPtr cb = getChannelByType(channeltype_heatingLevel);
       if (cb) {
         // clip to -100..0..100 range
         if (aValue<-100) aValue = -100;
@@ -132,8 +143,29 @@ bool ClimateControlBehaviour::processControlValue(const string &aName, double aV
       }
     }
   }
+  else if (aName=="TemperatureZone") {
+    zoneTemperature = aValue;
+    zoneTemperatureUpdated = MainLoop::currentMainLoop().now();
+  }
+  else if (aName=="TemperatureSetPoint") {
+    zoneTemperatureSetPoint = aValue;
+    zoneTemperatureSetPointUpdated = MainLoop::currentMainLoop().now();
+  }
   return inherited::processControlValue(aName, aValue);
 }
+
+
+bool ClimateControlBehaviour::getZoneTemperatures(double &aCurrentTemperature, double &aTemperatureSetpoint)
+{
+  if (zoneTemperatureUpdated!=Never && zoneTemperatureSetPointUpdated!=Never) {
+    aCurrentTemperature = zoneTemperature;
+    aTemperatureSetpoint = zoneTemperatureSetPoint;
+    return true; // values available
+  }
+  return false; // no values
+}
+
+
 
 
 Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)

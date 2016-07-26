@@ -35,15 +35,33 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    HeatingLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* light defaults to historic dS resolution */ };
+    HeatingLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1% of full scale */ };
 
-    virtual DsChannelType getChannelType() { return channeltype_default; }; ///< TODO: needs proper channel type
+    virtual DsChannelType getChannelType() { return channeltype_heatingLevel; };
     virtual const char *getName() { return "heatingLevel"; };
     virtual double getMin() { return 0; }; // heating is 0..100 (cooling would be -100..0)
     virtual double getMax() { return 100; };
     virtual double getDimPerMS() { return 100/FULL_SCALE_DIM_TIME_MS; }; // 7 seconds full scale
     
   };
+
+
+  class AirflowLevelChannel : public ChannelBehaviour
+  {
+    typedef ChannelBehaviour inherited;
+
+  public:
+    AirflowLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1% of full scale */ };
+
+    virtual DsChannelType getChannelType() { return channeltype_airflowLevel; };
+    virtual const char *getName() { return "airflowLevel"; };
+    virtual double getMin() { return 0; }; // fan level is 0..100 (automatic mode with upper limit is -100..0)
+    virtual double getMax() { return 100; };
+    virtual double getDimPerMS() { return 100/FULL_SCALE_DIM_TIME_MS; }; // 7 seconds full scale
+
+  };
+
+
 
 
 
@@ -80,6 +98,14 @@ namespace p44 {
   };
 
 
+
+
+  typedef enum {
+    climatedevice_heatingvalve,
+    climatedevice_fancoilunit
+  } ClimateDeviceKind;
+
+
   /// Implements the behaviour of climate control outputs, in particular evaluating
   /// control values with processControlValue()
   class ClimateControlBehaviour : public OutputBehaviour
@@ -90,6 +116,10 @@ namespace p44 {
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
+
+    /// kind of climate device
+    ClimateDeviceKind climateDeviceKind;
+
     /// @}
 
 
@@ -113,10 +143,18 @@ namespace p44 {
     /// @note this flag is not exposed as a property, but can be set by callScene(31=prophylaxis)
     bool runProphylaxis;
 
+    MLMicroSeconds zoneTemperatureUpdated; ///< time of when zoneTemperature was last updated from processControlValue
+    double zoneTemperature; ///< current zone (room) temperature
+    MLMicroSeconds zoneTemperatureSetPointUpdated; ///< time of when zoneSetPoint was last updated from processControlValue
+    double zoneTemperatureSetPoint; ///< current zone(room) temperature set point
+
     /// @}
 
+
   public:
-    ClimateControlBehaviour(Device &aDevice);
+
+
+    ClimateControlBehaviour(Device &aDevice, ClimateDeviceKind aKind);
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour
@@ -125,12 +163,19 @@ namespace p44 {
     /// @name interface towards actual device hardware (or simulation)
     /// @{
 
-    /// @return true if device should be in summer mode
+    /// @return true if device should be in idle mode
     bool isClimateControlIdle() { return climateControlIdle; };
 
     /// @return true if device should run a prophylaxis cycle
     /// @note automatically resets the internal flag when queried
     bool shouldRunProphylaxis() { if (runProphylaxis) { runProphylaxis=false; return true; } else return false; };
+
+
+    /// get temperature information needed for regulation
+    /// @param aCurrentTemperature will receive current zone (room) temperature
+    /// @param aTemperatureSetpoint will receive current set point for zone (room) temperature
+    /// @return true if values are available, false if no values could be returned
+    bool getZoneTemperatures(double &aCurrentTemperature, double &aTemperatureSetpoint);
 
     /// @}
 
@@ -143,11 +188,14 @@ namespace p44 {
     /// @return yes if this output behaviour has the feature, no if (explicitly) not, undefined if asked entity does not know
     virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex);
 
-    /// Process a named control value. The type, color and settings of the output determine if at all,
-    /// and if, how the value affects the output
+    /// Process a named control value. The type, group membership and settings of the device determine if at all,
+    /// and if, how the value affects physical outputs of the device or general device operation
+    /// @note if this method adjusts channel values, it must not directly update the hardware, but just
+    ///   prepare channel values such that these can be applied using requestApplyingChannels().
     /// @param aName the name of the control value, which describes the purpose
     /// @param aValue the control value to process
-    /// @return true if value processed and channel values should be applied
+    /// @note base class by default forwards the control value to all of its output behaviours.
+    /// @return true if value processing caused channel changes so channel values should be applied
     virtual bool processControlValue(const string &aName, double aValue);
 
     /// apply scene to output channels
