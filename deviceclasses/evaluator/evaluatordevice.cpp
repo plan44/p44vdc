@@ -46,6 +46,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   currentState(undefined),
   conditionMetSince(Never),
   onConditionMet(false),
+  evaluating(false),
   evaluateTicket(0),
   valueParseTicket(0)
 {
@@ -55,6 +56,8 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     evaluatorType = evaluator_rocker;
   else if (aEvaluatorConfig=="input")
     evaluatorType = evaluator_input;
+  else if (aEvaluatorConfig=="internal")
+    evaluatorType = evaluator_internal;
   else {
     LOG(LOG_ERR, "unknown evaluator type: %s", aEvaluatorConfig.c_str());
   }
@@ -78,8 +81,8 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     b->setGroup(group_black_joker); // pre-configure for app button
     addBehaviour(b);
   }
-  else if (evaluatorType==evaluator_input) {
-    // Standard device settings without scene table
+  else if (evaluatorType==evaluator_input || evaluatorType==evaluator_internal) {
+    // Standard device settings without scene table (internal differs only from not getting announced with vdsm)
     primaryGroup = group_black_joker;
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this));
@@ -88,6 +91,13 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     addBehaviour(b);
   }
   deriveDsUid();
+}
+
+
+bool EvaluatorDevice::isPublicDS()
+{
+  // public if it's not an internal-only evaluator
+  return evaluatorType!=evaluator_internal;
 }
 
 
@@ -279,7 +289,12 @@ void EvaluatorDevice::dependentValueNotification(ValueSource &aValueSource, Valu
   }
   else {
     ALOG(LOG_INFO, "value source '%s' reports value %f", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
-    evaluateConditions(currentState);
+    if (evaluating) {
+      ALOG(LOG_WARNING, "value source '%s' is part of cyclic reference -> not evaluating any further", aValueSource.getSourceName().c_str());
+    }
+    else {
+      evaluateConditions(currentState);
+    }
   }
 }
 
@@ -359,9 +374,13 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState)
     }
   }
   if (decisionMade && currentState!=undefined) {
+    // protect against state updates triggering evaluation again via cyclic references
+    evaluating = true;
     // report it
     switch (evaluatorType) {
-      case evaluator_input : {
+      case evaluator_input :
+      case evaluator_internal :
+      {
         BinaryInputBehaviourPtr b = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
         if (b) {
           b->updateInputState(currentState==yes);
@@ -380,6 +399,8 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState)
       }
       default: break;
     }
+    // done reporting, critical phase is over
+    evaluating = false;
   }
 }
 

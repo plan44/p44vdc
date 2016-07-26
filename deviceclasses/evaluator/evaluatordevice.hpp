@@ -70,8 +70,9 @@ namespace p44 {
     
     typedef enum {
       evaluator_unknown,
-      evaluator_rocker,
-      evaluator_input,
+      evaluator_rocker, ///< output is a simulated two-way rocket button
+      evaluator_input, ///< output is a dS binary input signal
+      evaluator_internal ///< the device is not published to dS, can only be used as input for other evaluators 
     } EvaluatorType;
 
     EvaluatorType evaluatorType;
@@ -87,6 +88,7 @@ namespace p44 {
     MLMicroSeconds conditionMetSince; ///< since when do we see condition permanently met
     bool onConditionMet; ///< true: conditionMetSince relates to ON-condition, false: conditionMetSince relates to OFF-condition
     long evaluateTicket;
+    bool evaluating; ///< protection against cyclic references
 
     EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(deviceSettings); };
 
@@ -95,6 +97,10 @@ namespace p44 {
     EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID, const string &aEvaluatorConfig);
     virtual ~EvaluatorDevice();
     
+    /// check if device is public dS device (which should be registered with vdSM)
+    /// @return true if device is registerable with vdSM
+    virtual bool isPublicDS();
+
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
     virtual const char *deviceTypeIdentifier() { return "evaluator"; };
