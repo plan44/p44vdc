@@ -336,11 +336,15 @@ typedef enum {
   channeltype_position_h = 8, ///< horizontal position
   channeltype_position_angle = 9, ///< opening angle position
   channeltype_permeability = 10, ///< permeability
+  //channeltype_heatingLevel = 11, ///< heatingLevel channel
+  //channeltype_airflowLevel = 12, ///< airflowLevel channel
   channeltype_custom_first = 192, ///< first device-specific channel
-  channeltype_custom_last = 239, ///< first device-specific channel
+  channeltype_custom_last = 239, ///< last device-specific channel
   channeltype_p44_audio_volume = channeltype_custom_first+0, ///< p44-specific channel type for audio volume until dS specifies one
   channeltype_p44_audio_power_state = channeltype_custom_first+1, ///< p44-specific channel type for audio power state until dS specifies one
   channeltype_p44_audio_content_source = channeltype_custom_first+2, ///< p44-specific channel type for audio content source until dS specifies one
+  channeltype_heatingLevel = channeltype_custom_first+3, // TODO: enable real channel numbers as soon as officially defined
+  channeltype_airflowLevel = channeltype_custom_first+4, // TODO: enable real channel numbers as soon as officially defined
   numChannelTypes = 240 // 0..239 are channel types
 } DsChannelTypeEnum;
 typedef uint8_t DsChannelType;
