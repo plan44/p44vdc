@@ -353,6 +353,7 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   { 1, 0x00A52001, 0, "heating valve" },
   { 1, 0x01A52001, 0, "heating valve (with temperature sensor)" },
   { 1, 0x02A52001, 0, "heating valve with binary output adjustment (e.g. MD10-FTL)" },
+  { 1, 0x03A52001, 0, "heating valve in self-regulation mode" },
   { 2, 0x00A51006, 0, "standard profile" },
   { 2, 0x01A51006, 0, "set point interpreted as 0..40°C (e.g. FTR55D)" },
   { 0, 0, 0, NULL } // terminator
@@ -493,15 +494,15 @@ EnoceanDevicePtr EnoceanA52001Handler::newDevice(
     // function
     newDev->setFunctionDesc("heating valve actuator");
     // climate control output, use special behaviour (with has already set its specific default group membership)
-    ClimateControlBehaviourPtr cb = ClimateControlBehaviourPtr(new ClimateControlBehaviour(*newDev.get()));
+    ClimateControlBehaviourPtr cb = ClimateControlBehaviourPtr(new ClimateControlBehaviour(*newDev.get(), climatedevice_heatingvalve));
     cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName("valve");
     // - create A5-20-01 specific handler for output
-    EnoceanChannelHandlerPtr newHandler = EnoceanChannelHandlerPtr(new EnoceanA52001Handler(*newDev.get()));
+    EnoceanA52001HandlerPtr newHandler = EnoceanA52001HandlerPtr(new EnoceanA52001Handler(*newDev.get()));
     newHandler->behaviour = cb;
     newDev->addChannelHandler(newHandler);
     if (EEP_VARIANT(aEEProfile)!=0) {
-      // profile variants with valve sensor enabled - add built-in temp sensor
+      // all non-default profiles have the valve sensor enabled -> add built-in temp sensor
       EnoceanSensorHandler::addSensorChannel(newDev, tempSensor, false);
     }
     // report low bat status as a binary input
@@ -582,7 +583,7 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
       data |= DBMASK(1,0); // service on
       if (serviceState==service_openvalve) {
         // trigger force full open
-        LOG(LOG_NOTICE, "- EnOcean valve prophylaxis operation: fully opening valve");
+        LOG(LOG_NOTICE, "- valve prophylaxis operation: fully opening valve");
         data |= DBMASK(1,5); // service: open
         // next is closing
         serviceState = service_closevalve;
@@ -590,7 +591,7 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
       }
       else if (serviceState==service_closevalve) {
         // trigger force fully closed
-        LOG(LOG_NOTICE, "- EnOcean valve prophylaxis operation: fully closing valve");
+        LOG(LOG_NOTICE, "- valve prophylaxis operation: fully closing valve");
         data |= DBMASK(1,4); // service: close
         // next is normal operation again
         serviceState = service_idle;
@@ -601,40 +602,64 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
       // Normal operation
       // - DB(1,0) left 0 = normal operation (not service)
       // - DB(1,1) left 0 = no inverted set value
-      // - DB(1,2) left 0 = sending valve position
-      // - DB(3,7)..DB(3,0) is valve position 0..100% (0..255 is only for temperature set point mode!)
-      // Note: value is always positive even for cooling, because climateControlBehaviour checks outputfunction and sees this is a unipolar valve
-      int8_t newValue = cb->outputValueAccordingToMode(ch->getChannelValue(), ch->getChannelIndex());
-      // Still: limit to 0..100 to make sure
-      if (newValue<0) newValue = 0;
-      else if (newValue>100) newValue=100;
-      // Special transformation in case valve is binary
-      if (EEP_VARIANT(device.getEEProfile())==2) {
-        // this valve can only adjust output by about 4k around the mechanically preset set point
-        if (newValue>lastRequestedValvePos) {
-          // increase -> open to at least 51%
-          LOG(LOG_NOTICE, "- Binary valve: requested set point has increased from %d%% to %d%% -> open to 51%% or more", lastRequestedValvePos, newValue);
-          lastRequestedValvePos = newValue;
-          if (newValue<=50) newValue = 51;
-        }
-        else if (newValue<lastRequestedValvePos) {
-          // decrease -> close to at least 49%
-          LOG(LOG_NOTICE, "- Binary valve: requested set point has decreased from %d%% to %d%% -> close to 49%% or less", lastRequestedValvePos, newValue);
-          lastRequestedValvePos = newValue;
-          if (newValue>=50) newValue = 49;
+      // - DB(1,2) leave 0 to send send valve position, set 1 to send set point/current temperature and use internal regulator
+      // - DB(3,7)..DB(3,0) is
+      //   - if DB(1,2)==0: valve position 0..100% (0..255 is only for temperature set point mode!)
+      //   - if DB(1,2)==1: set point 0..40 degree Celsius mapped to 0..255
+      // - DB(2,7)..DB(2,0) is current temperature when using built-in regulator (inverse mapping 0..40 -> 255..0)
+      if (EEP_VARIANT(device.getEEProfile())==3) {
+        // use valve's own regulation
+        double currentTemp, setPoint;
+        if (cb->getZoneTemperatures(currentTemp, setPoint)) {
+          data |= DBMASK(1,2); // SPS, set point for DB3
+          // add the set point
+          uint8_t b = setPoint/40*255;
+          data |= b<<DB(3,0);
+          // add the current temperature
+          b = 255-currentTemp/40*255; // inverse mapping
+          data |= b<<DB(2,0);
+          LOG(LOG_NOTICE, "- self regulating mode, current temp = %.1f °C, set point = %.1f °C", currentTemp, setPoint);
         }
         else {
-          // no change, just repeat last valve position
-          LOG(LOG_NOTICE, "- Binary valve: requested set point has not changed (%d%%) -> send last actual value (%d%%) again", lastRequestedValvePos, lastActualValvePos);
-          newValue = lastActualValvePos;
+          // no control values available, use last actual valve position (which is initially 50%)
+          LOG(LOG_NOTICE, "- In self regulating mode, but control values not (yet) available -> use previous valve position=%d%% open", lastActualValvePos);
+          data |= (lastActualValvePos<<DB(3,0)); // insert data into DB(3,0..7)
         }
       }
-      // remember last actually transmitted value
-      lastActualValvePos = newValue;
-      // - DB3 is set point with range 0..100 (0..255 is only for temperature set point)
-      data |= (newValue<<DB(3,0)); // insert data into DB(3,0..7)
-      // - DB(1,3) is summer mode
-      LOG(LOG_NOTICE, "- EnOcean valve, requesting new set point: %d%% open", newValue);
+      else {
+        // Note: value is always positive even for cooling, because climateControlBehaviour checks outputfunction and sees this is a unipolar valve
+        int8_t newValue = cb->outputValueAccordingToMode(ch->getChannelValue(), ch->getChannelIndex());
+        // Still: limit to 0..100 to make sure
+        if (newValue<0) newValue = 0;
+        else if (newValue>100) newValue=100;
+        // Special transformation in case valve is binary
+        if (EEP_VARIANT(device.getEEProfile())==2) {
+          // this valve can only adjust output by about 4k around the mechanically preset set point
+          if (newValue>lastRequestedValvePos) {
+            // increase -> open to at least 51%
+            LOG(LOG_NOTICE, "- Binary valve: requested set point has increased from %d%% to %d%% -> open to 51%% or more", lastRequestedValvePos, newValue);
+            lastRequestedValvePos = newValue;
+            if (newValue<=50) newValue = 51;
+          }
+          else if (newValue<lastRequestedValvePos) {
+            // decrease -> close to at least 49%
+            LOG(LOG_NOTICE, "- Binary valve: requested set point has decreased from %d%% to %d%% -> close to 49%% or less", lastRequestedValvePos, newValue);
+            lastRequestedValvePos = newValue;
+            if (newValue>=50) newValue = 49;
+          }
+          else {
+            // no change, just repeat last valve position
+            LOG(LOG_NOTICE, "- Binary valve: requested set point has not changed (%d%%) -> send last actual value (%d%%) again", lastRequestedValvePos, lastActualValvePos);
+            newValue = lastActualValvePos;
+          }
+        }
+        // remember last actually transmitted value
+        lastActualValvePos = newValue;
+        // - DB3 is set point with range 0..100 (0..255 is only for temperature set point)
+        data |= (newValue<<DB(3,0)); // insert data into DB(3,0..7)
+        // - DB(1,3) is summer mode
+        LOG(LOG_NOTICE, "- requesting new valve position: %d%% open", newValue);
+      }
       if (cb->isClimateControlIdle()) {
         data |= DBMASK(1,3);
         LOG(LOG_NOTICE, "- valve is in IDLE mode (slow updates)");

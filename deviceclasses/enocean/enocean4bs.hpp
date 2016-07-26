@@ -132,6 +132,7 @@ namespace p44 {
     /// @return textual description of object
     virtual string shortDesc();
   };
+  typedef boost::intrusive_ptr<EnoceanA52001Handler> EnoceanA52001HandlerPtr;
 
 
 
