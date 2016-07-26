@@ -145,10 +145,10 @@ namespace p44 {
     virtual string getSourceName();
 
     /// get value
-    virtual double getSourceValue() { return getCurrentValue(); };
+    virtual double getSourceValue();
 
     /// get time of last update
-    virtual MLMicroSeconds getSourceLastUpdate() { return getLastUpdateTimestamp(); };
+    virtual MLMicroSeconds getSourceLastUpdate();
 
     /// @}
 

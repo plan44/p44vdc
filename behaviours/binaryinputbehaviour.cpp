@@ -101,6 +101,36 @@ void BinaryInputBehaviour::invalidateInputState()
 }
 
 
+// MARK: ===== value source implementation
+
+
+string BinaryInputBehaviour::getSourceName()
+{
+  // get device name or dSUID for context
+  string n = device.getAssignedName();
+  if (n.empty()) {
+    // use abbreviated dSUID instead
+    string d = device.getDsUid().getString();
+    n = d.substr(0,8) + "..." + d.substr(d.size()-2,2);
+  }
+  // append behaviour description
+  string_format_append(n, ": %s", getHardwareName().c_str());
+  return n;
+}
+
+
+double BinaryInputBehaviour::getSourceValue()
+{
+  return currentState;
+}
+
+
+MLMicroSeconds BinaryInputBehaviour::getSourceLastUpdate()
+{
+  return lastUpdate;
+}
+
+
 // MARK: ===== persistence implementation
 
 

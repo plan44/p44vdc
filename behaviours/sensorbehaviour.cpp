@@ -125,6 +125,9 @@ void SensorBehaviour::invalidateSensorValue()
 }
 
 
+// MARK: ===== value source implementation
+
+
 string SensorBehaviour::getSourceName()
 {
   // get device name or dSUID for context
@@ -138,6 +141,19 @@ string SensorBehaviour::getSourceName()
   string_format_append(n, ": %s", getHardwareName().c_str());
   return n;
 }
+
+
+double SensorBehaviour::getSourceValue()
+{
+  return getCurrentValue();
+}
+
+
+MLMicroSeconds SensorBehaviour::getSourceLastUpdate()
+{
+  return getLastUpdateTimestamp();
+}
+
 
 
 // MARK: ===== persistence implementation

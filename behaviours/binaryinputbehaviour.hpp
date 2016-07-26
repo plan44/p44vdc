@@ -33,7 +33,7 @@ namespace p44 {
 
   /// Implements the behaviour of a digitalSTROM binary input
   /// This class should be used as-is in virtual devices representing binary inputs
-  class BinaryInputBehaviour : public DsBehaviour
+  class BinaryInputBehaviour : public DsBehaviour,  public ValueSource 
   {
     typedef DsBehaviour inherited;
     friend class Device;
@@ -103,8 +103,24 @@ namespace p44 {
     ///   2 states, binaryInputState.extendedValue is invisible.
     void updateInputState(InputState aNewState);
 
+    /// @}
+
+
+    /// @name ValueSource interface
+    /// @{
+
+    /// get descriptive name identifying the source within the entire vdc host (for using in selection lists)
+    virtual string getSourceName();
+
+    /// get value
+    virtual double getSourceValue();
+
+    /// get time of last update
+    virtual MLMicroSeconds getSourceLastUpdate();
 
     /// @}
+
+
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
