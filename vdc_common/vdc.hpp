@@ -151,6 +151,10 @@ namespace p44 {
     /// vdc level methods (p44 specific)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
 
+    /// vdc level notifications
+    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams);
+
+
     /// @}
 
 

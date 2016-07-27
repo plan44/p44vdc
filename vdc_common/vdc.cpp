@@ -75,6 +75,24 @@ void Vdc::setName(const string &aName)
 }
 
 
+void Vdc::handleNotification(const string &aMethod, ApiValuePtr aParams)
+{
+  if (aMethod=="scanDevices") {
+    // vDC API v2c addition
+    bool incremental = false;
+    bool exhaustive = false;
+    bool clear = false;
+    checkBoolParam(aParams, "incremental", incremental);
+    checkBoolParam(aParams, "exhaustive", exhaustive);
+    checkBoolParam(aParams, "clearconfig", clear);
+    collectDevices(NULL, incremental, exhaustive, clear);
+  }
+  else {
+    inherited::handleNotification(aMethod, aParams);
+  }
+}
+
+
 ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
