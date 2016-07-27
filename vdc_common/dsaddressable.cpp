@@ -269,6 +269,7 @@ enum {
   oemGUID_key,
   oemModelGUID_key,
   vendorId_key,
+  vendorName_key,
   extraInfo_key,
   objectDescription_key,
   deviceIcon16_key,
@@ -300,6 +301,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     { "oemGuid", apivalue_string, oemGUID_key, OKEY(dsAddressable_key) },
     { "oemModelGuid", apivalue_string, oemModelGUID_key, OKEY(dsAddressable_key) },
     { "vendorId", apivalue_string, vendorId_key, OKEY(dsAddressable_key) },
+    { "vendorName", apivalue_string, vendorId_key, OKEY(dsAddressable_key) },
     { "x-p44-extraInfo", apivalue_string, extraInfo_key, OKEY(dsAddressable_key) },
     { "x-p44-description", apivalue_string, objectDescription_key, OKEY(dsAddressable_key) },
     { "deviceIcon16", apivalue_binary, deviceIcon16_key, OKEY(dsAddressable_key) },
@@ -335,6 +337,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case oemGUID_key: if (oemGUID().size()>0) { aPropValue->setStringValue(oemGUID()); return true; } else return false;
         case oemModelGUID_key: if (oemModelGUID().size()>0) { aPropValue->setStringValue(oemModelGUID()); return true; } else return false;
         case vendorId_key: if (vendorId().size()>0) { aPropValue->setStringValue(vendorId()); return true; } else return false;
+        case vendorName_key: if (vendorName().size()>0) { aPropValue->setStringValue(vendorName()); return true; } else return false;
         case extraInfo_key: if (getExtraInfo().size()>0) { aPropValue->setStringValue(getExtraInfo()); return true; } else return false;
         case objectDescription_key: aPropValue->setStringValue(description()); return true;
         case deviceIcon16_key: { string icon; if (getDeviceIcon(icon, true, "icon16")) { aPropValue->setBinaryValue(icon); return true; } else return false; }
