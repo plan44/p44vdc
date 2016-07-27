@@ -145,3 +145,18 @@ message vdsm_NotificationSetOutputChannelValue {
     optional double value = 4;
 }
 
+message vdsm_NotificationCallDeviceAction {
+    repeated string dSUID = 1;
+    optional string name = 2;
+    repeated PropertyElement params = 3;
+    optional int32 group = 4;
+    optional int32 zone_id = 5;
+}
+
+message vdsm_NotificationScanDevices {
+    repeated string dSUID = 1;
+    optional bool incremental = 2;
+    optional bool exhaustive = 3;
+    optional bool clearconfig = 4;
+}
+

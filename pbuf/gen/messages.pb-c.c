@@ -95,7 +95,7 @@ void   vdcapi__generic_response__free_unpacked
 }
 static const Vdcapi__Type vdcapi__message__type__default_value = VDCAPI__TYPE__GENERIC_RESPONSE;
 static const uint32_t vdcapi__message__message_id__default_value = 0u;
-static const ProtobufCFieldDescriptor vdcapi__message__field_descriptors[26] =
+static const ProtobufCFieldDescriptor vdcapi__message__field_descriptors[28] =
 {
   {
     "type",
@@ -409,6 +409,30 @@ static const ProtobufCFieldDescriptor vdcapi__message__field_descriptors[26] =
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "vdsm_send_call_device_action",
+    123,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Vdcapi__Message, vdsm_send_call_device_action),
+    &vdcapi__vdsm__notification_call_device_action__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "vdsm_send_scan_devices",
+    124,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Vdcapi__Message, vdsm_send_scan_devices),
+    &vdcapi__vdsm__notification_scan_devices__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned vdcapi__message__field_indices_by_name[] = {
   2,   /* field[2] = generic_response */
@@ -426,6 +450,7 @@ static const unsigned vdcapi__message__field_indices_by_name[] = {
   3,   /* field[3] = vdsm_request_hello */
   7,   /* field[7] = vdsm_request_set_property */
   14,   /* field[14] = vdsm_send_bye */
+  26,   /* field[26] = vdsm_send_call_device_action */
   19,   /* field[19] = vdsm_send_call_min_scene */
   15,   /* field[15] = vdsm_send_call_scene */
   24,   /* field[24] = vdsm_send_dim_channel */
@@ -434,6 +459,7 @@ static const unsigned vdcapi__message__field_indices_by_name[] = {
   8,   /* field[8] = vdsm_send_ping */
   13,   /* field[13] = vdsm_send_remove */
   16,   /* field[16] = vdsm_send_save_scene */
+  27,   /* field[27] = vdsm_send_scan_devices */
   21,   /* field[21] = vdsm_send_set_control_value */
   18,   /* field[18] = vdsm_send_set_local_prio */
   17,   /* field[17] = vdsm_send_undo_scene */
@@ -442,7 +468,7 @@ static const ProtobufCIntRange vdcapi__message__number_ranges[2 + 1] =
 {
   { 1, 0 },
   { 100, 3 },
-  { 0, 26 }
+  { 0, 28 }
 };
 const ProtobufCMessageDescriptor vdcapi__message__descriptor =
 {
@@ -452,7 +478,7 @@ const ProtobufCMessageDescriptor vdcapi__message__descriptor =
   "Vdcapi__Message",
   "vdcapi",
   sizeof(Vdcapi__Message),
-  26,
+  28,
   vdcapi__message__field_descriptors,
   vdcapi__message__field_indices_by_name,
   2,  vdcapi__message__number_ranges,
@@ -511,7 +537,7 @@ const ProtobufCMessageDescriptor vdcapi__generic_response__descriptor =
   (ProtobufCMessageInit) vdcapi__generic_response__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-const ProtobufCEnumValue vdcapi__type__enum_values_by_number[25] =
+const ProtobufCEnumValue vdcapi__type__enum_values_by_number[27] =
 {
   { "GENERIC_RESPONSE", "VDCAPI__TYPE__GENERIC_RESPONSE", 1 },
   { "VDSM_REQUEST_HELLO", "VDCAPI__TYPE__VDSM_REQUEST_HELLO", 2 },
@@ -538,11 +564,13 @@ const ProtobufCEnumValue vdcapi__type__enum_values_by_number[25] =
   { "VDC_SEND_ANNOUNCE_VDC", "VDCAPI__TYPE__VDC_SEND_ANNOUNCE_VDC", 23 },
   { "VDSM_NOTIFICATION_DIM_CHANNEL", "VDCAPI__TYPE__VDSM_NOTIFICATION_DIM_CHANNEL", 24 },
   { "VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE", "VDCAPI__TYPE__VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE", 25 },
+  { "VDSM_NOTIFICATION_CALL_DEVICE_ACTION", "VDCAPI__TYPE__VDSM_NOTIFICATION_CALL_DEVICE_ACTION", 26 },
+  { "VDSM_NOTIFICATION_SCAN_DEVICES", "VDCAPI__TYPE__VDSM_NOTIFICATION_SCAN_DEVICES", 27 },
 };
 static const ProtobufCIntRange vdcapi__type__value_ranges[] = {
-{1, 0},{0, 25}
+{1, 0},{0, 27}
 };
-const ProtobufCEnumValueIndex vdcapi__type__enum_values_by_name[25] =
+const ProtobufCEnumValueIndex vdcapi__type__enum_values_by_name[27] =
 {
   { "GENERIC_RESPONSE", 0 },
   { "VDC_RESPONSE_GET_PROPERTY", 4 },
@@ -554,11 +582,13 @@ const ProtobufCEnumValueIndex vdcapi__type__enum_values_by_name[25] =
   { "VDC_SEND_PONG", 8 },
   { "VDC_SEND_PUSH_PROPERTY", 11 },
   { "VDC_SEND_VANISH", 10 },
+  { "VDSM_NOTIFICATION_CALL_DEVICE_ACTION", 25 },
   { "VDSM_NOTIFICATION_CALL_MIN_SCENE", 18 },
   { "VDSM_NOTIFICATION_CALL_SCENE", 14 },
   { "VDSM_NOTIFICATION_DIM_CHANNEL", 23 },
   { "VDSM_NOTIFICATION_IDENTIFY", 19 },
   { "VDSM_NOTIFICATION_SAVE_SCENE", 15 },
+  { "VDSM_NOTIFICATION_SCAN_DEVICES", 26 },
   { "VDSM_NOTIFICATION_SET_CONTROL_VALUE", 20 },
   { "VDSM_NOTIFICATION_SET_LOCAL_PRIO", 17 },
   { "VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE", 24 },
@@ -577,9 +607,9 @@ const ProtobufCEnumDescriptor vdcapi__type__descriptor =
   "Type",
   "Vdcapi__Type",
   "vdcapi",
-  25,
+  27,
   vdcapi__type__enum_values_by_number,
-  25,
+  27,
   vdcapi__type__enum_values_by_name,
   1,
   vdcapi__type__value_ranges,

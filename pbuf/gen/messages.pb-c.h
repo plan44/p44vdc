@@ -47,6 +47,8 @@ typedef enum _Vdcapi__Type {
   VDCAPI__TYPE__VDSM_NOTIFICATION_SET_CONTROL_VALUE = 21,
   VDCAPI__TYPE__VDSM_NOTIFICATION_DIM_CHANNEL = 24,
   VDCAPI__TYPE__VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE = 25,
+  VDCAPI__TYPE__VDSM_NOTIFICATION_CALL_DEVICE_ACTION = 26,
+  VDCAPI__TYPE__VDSM_NOTIFICATION_SCAN_DEVICES = 27,
   VDCAPI__TYPE__VDC_SEND_IDENTIFY = 22
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(VDCAPI__TYPE)
 } Vdcapi__Type;
@@ -98,11 +100,13 @@ struct  _Vdcapi__Message
   Vdcapi__VdsmNotificationSetControlValue *vdsm_send_set_control_value;
   Vdcapi__VdsmNotificationDimChannel *vdsm_send_dim_channel;
   Vdcapi__VdsmNotificationSetOutputChannelValue *vdsm_send_output_channel_value;
+  Vdcapi__VdsmNotificationCallDeviceAction *vdsm_send_call_device_action;
+  Vdcapi__VdsmNotificationScanDevices *vdsm_send_scan_devices;
   Vdcapi__VdcSendIdentify *vdc_send_identify;
 };
 #define VDCAPI__MESSAGE__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&vdcapi__message__descriptor) \
-    , VDCAPI__TYPE__GENERIC_RESPONSE, 0,0u, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
+    , VDCAPI__TYPE__GENERIC_RESPONSE, 0,0u, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 
 
 struct  _Vdcapi__GenericResponse

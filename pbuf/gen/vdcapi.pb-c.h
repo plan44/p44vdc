@@ -40,6 +40,8 @@ typedef struct _Vdcapi__VdsmNotificationIdentify Vdcapi__VdsmNotificationIdentif
 typedef struct _Vdcapi__VdsmNotificationSetControlValue Vdcapi__VdsmNotificationSetControlValue;
 typedef struct _Vdcapi__VdsmNotificationDimChannel Vdcapi__VdsmNotificationDimChannel;
 typedef struct _Vdcapi__VdsmNotificationSetOutputChannelValue Vdcapi__VdsmNotificationSetOutputChannelValue;
+typedef struct _Vdcapi__VdsmNotificationCallDeviceAction Vdcapi__VdsmNotificationCallDeviceAction;
+typedef struct _Vdcapi__VdsmNotificationScanDevices Vdcapi__VdsmNotificationScanDevices;
 
 
 /* --- enums --- */
@@ -386,6 +388,41 @@ struct  _Vdcapi__VdsmNotificationSetOutputChannelValue
 #define VDCAPI__VDSM__NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__notification_set_output_channel_value__descriptor) \
     , 0,NULL, 0,1, 0,0, 0,0 }
+
+
+struct  _Vdcapi__VdsmNotificationCallDeviceAction
+{
+  ProtobufCMessage base;
+  size_t n_dsuid;
+  char **dsuid;
+  char *name;
+  size_t n_params;
+  Vdcapi__PropertyElement **params;
+  protobuf_c_boolean has_group;
+  int32_t group;
+  protobuf_c_boolean has_zone_id;
+  int32_t zone_id;
+};
+#define VDCAPI__VDSM__NOTIFICATION_CALL_DEVICE_ACTION__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__notification_call_device_action__descriptor) \
+    , 0,NULL, NULL, 0,NULL, 0,0, 0,0 }
+
+
+struct  _Vdcapi__VdsmNotificationScanDevices
+{
+  ProtobufCMessage base;
+  size_t n_dsuid;
+  char **dsuid;
+  protobuf_c_boolean has_incremental;
+  protobuf_c_boolean incremental;
+  protobuf_c_boolean has_exhaustive;
+  protobuf_c_boolean exhaustive;
+  protobuf_c_boolean has_clearconfig;
+  protobuf_c_boolean clearconfig;
+};
+#define VDCAPI__VDSM__NOTIFICATION_SCAN_DEVICES__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__notification_scan_devices__descriptor) \
+    , 0,NULL, 0,0, 0,0, 0,0 }
 
 
 /* Vdcapi__VdsmRequestHello methods */
@@ -863,6 +900,44 @@ Vdcapi__VdsmNotificationSetOutputChannelValue *
 void   vdcapi__vdsm__notification_set_output_channel_value__free_unpacked
                      (Vdcapi__VdsmNotificationSetOutputChannelValue *message,
                       ProtobufCAllocator *allocator);
+/* Vdcapi__VdsmNotificationCallDeviceAction methods */
+void   vdcapi__vdsm__notification_call_device_action__init
+                     (Vdcapi__VdsmNotificationCallDeviceAction         *message);
+size_t vdcapi__vdsm__notification_call_device_action__get_packed_size
+                     (const Vdcapi__VdsmNotificationCallDeviceAction   *message);
+size_t vdcapi__vdsm__notification_call_device_action__pack
+                     (const Vdcapi__VdsmNotificationCallDeviceAction   *message,
+                      uint8_t             *out);
+size_t vdcapi__vdsm__notification_call_device_action__pack_to_buffer
+                     (const Vdcapi__VdsmNotificationCallDeviceAction   *message,
+                      ProtobufCBuffer     *buffer);
+Vdcapi__VdsmNotificationCallDeviceAction *
+       vdcapi__vdsm__notification_call_device_action__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   vdcapi__vdsm__notification_call_device_action__free_unpacked
+                     (Vdcapi__VdsmNotificationCallDeviceAction *message,
+                      ProtobufCAllocator *allocator);
+/* Vdcapi__VdsmNotificationScanDevices methods */
+void   vdcapi__vdsm__notification_scan_devices__init
+                     (Vdcapi__VdsmNotificationScanDevices         *message);
+size_t vdcapi__vdsm__notification_scan_devices__get_packed_size
+                     (const Vdcapi__VdsmNotificationScanDevices   *message);
+size_t vdcapi__vdsm__notification_scan_devices__pack
+                     (const Vdcapi__VdsmNotificationScanDevices   *message,
+                      uint8_t             *out);
+size_t vdcapi__vdsm__notification_scan_devices__pack_to_buffer
+                     (const Vdcapi__VdsmNotificationScanDevices   *message,
+                      ProtobufCBuffer     *buffer);
+Vdcapi__VdsmNotificationScanDevices *
+       vdcapi__vdsm__notification_scan_devices__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   vdcapi__vdsm__notification_scan_devices__free_unpacked
+                     (Vdcapi__VdsmNotificationScanDevices *message,
+                      ProtobufCAllocator *allocator);
 /* --- per-message closures --- */
 
 typedef void (*Vdcapi__VdsmRequestHello_Closure)
@@ -940,6 +1015,12 @@ typedef void (*Vdcapi__VdsmNotificationDimChannel_Closure)
 typedef void (*Vdcapi__VdsmNotificationSetOutputChannelValue_Closure)
                  (const Vdcapi__VdsmNotificationSetOutputChannelValue *message,
                   void *closure_data);
+typedef void (*Vdcapi__VdsmNotificationCallDeviceAction_Closure)
+                 (const Vdcapi__VdsmNotificationCallDeviceAction *message,
+                  void *closure_data);
+typedef void (*Vdcapi__VdsmNotificationScanDevices_Closure)
+                 (const Vdcapi__VdsmNotificationScanDevices *message,
+                  void *closure_data);
 
 /* --- services --- */
 
@@ -971,6 +1052,8 @@ extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_identify__des
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_set_control_value__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_dim_channel__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_set_output_channel_value__descriptor;
+extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_call_device_action__descriptor;
+extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_scan_devices__descriptor;
 
 PROTOBUF_C__END_DECLS
 

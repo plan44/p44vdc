@@ -1381,6 +1381,18 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         paramsMsg = &(decodedMsg->vdsm_send_output_channel_value->base);
         // pbuf API field names match, we can use generic decoding
         break;
+      case VDCAPI__TYPE__VDSM_NOTIFICATION_CALL_DEVICE_ACTION:
+        if (!decodedMsg->vdsm_send_call_device_action) goto badMessage;
+        method = "callDeviceAction";
+        paramsMsg = &(decodedMsg->vdsm_send_call_device_action->base);
+        // pbuf API field names match, we can use generic decoding
+        break;
+      case VDCAPI__TYPE__VDSM_NOTIFICATION_SCAN_DEVICES:
+        if (!decodedMsg->vdsm_send_scan_devices) goto badMessage;
+        method = "scanDevices";
+        paramsMsg = &(decodedMsg->vdsm_send_scan_devices->base);
+        // pbuf API field names match, we can use generic decoding
+        break;
       // incoming responses
       case VDCAPI__TYPE__GENERIC_RESPONSE: {
         // error or NULL response

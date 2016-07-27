@@ -1082,6 +1082,92 @@ void   vdcapi__vdsm__notification_set_output_channel_value__free_unpacked
   assert(message->base.descriptor == &vdcapi__vdsm__notification_set_output_channel_value__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
+void   vdcapi__vdsm__notification_call_device_action__init
+                     (Vdcapi__VdsmNotificationCallDeviceAction         *message)
+{
+  static Vdcapi__VdsmNotificationCallDeviceAction init_value = VDCAPI__VDSM__NOTIFICATION_CALL_DEVICE_ACTION__INIT;
+  *message = init_value;
+}
+size_t vdcapi__vdsm__notification_call_device_action__get_packed_size
+                     (const Vdcapi__VdsmNotificationCallDeviceAction *message)
+{
+  assert(message->base.descriptor == &vdcapi__vdsm__notification_call_device_action__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t vdcapi__vdsm__notification_call_device_action__pack
+                     (const Vdcapi__VdsmNotificationCallDeviceAction *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &vdcapi__vdsm__notification_call_device_action__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t vdcapi__vdsm__notification_call_device_action__pack_to_buffer
+                     (const Vdcapi__VdsmNotificationCallDeviceAction *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &vdcapi__vdsm__notification_call_device_action__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Vdcapi__VdsmNotificationCallDeviceAction *
+       vdcapi__vdsm__notification_call_device_action__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Vdcapi__VdsmNotificationCallDeviceAction *)
+     protobuf_c_message_unpack (&vdcapi__vdsm__notification_call_device_action__descriptor,
+                                allocator, len, data);
+}
+void   vdcapi__vdsm__notification_call_device_action__free_unpacked
+                     (Vdcapi__VdsmNotificationCallDeviceAction *message,
+                      ProtobufCAllocator *allocator)
+{
+  assert(message->base.descriptor == &vdcapi__vdsm__notification_call_device_action__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   vdcapi__vdsm__notification_scan_devices__init
+                     (Vdcapi__VdsmNotificationScanDevices         *message)
+{
+  static Vdcapi__VdsmNotificationScanDevices init_value = VDCAPI__VDSM__NOTIFICATION_SCAN_DEVICES__INIT;
+  *message = init_value;
+}
+size_t vdcapi__vdsm__notification_scan_devices__get_packed_size
+                     (const Vdcapi__VdsmNotificationScanDevices *message)
+{
+  assert(message->base.descriptor == &vdcapi__vdsm__notification_scan_devices__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t vdcapi__vdsm__notification_scan_devices__pack
+                     (const Vdcapi__VdsmNotificationScanDevices *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &vdcapi__vdsm__notification_scan_devices__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t vdcapi__vdsm__notification_scan_devices__pack_to_buffer
+                     (const Vdcapi__VdsmNotificationScanDevices *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &vdcapi__vdsm__notification_scan_devices__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+Vdcapi__VdsmNotificationScanDevices *
+       vdcapi__vdsm__notification_scan_devices__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (Vdcapi__VdsmNotificationScanDevices *)
+     protobuf_c_message_unpack (&vdcapi__vdsm__notification_scan_devices__descriptor,
+                                allocator, len, data);
+}
+void   vdcapi__vdsm__notification_scan_devices__free_unpacked
+                     (Vdcapi__VdsmNotificationScanDevices *message,
+                      ProtobufCAllocator *allocator)
+{
+  assert(message->base.descriptor == &vdcapi__vdsm__notification_scan_devices__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
 static const ProtobufCFieldDescriptor vdcapi__vdsm__request_hello__field_descriptors[2] =
 {
   {
@@ -2577,5 +2663,172 @@ const ProtobufCMessageDescriptor vdcapi__vdsm__notification_set_output_channel_v
   vdcapi__vdsm__notification_set_output_channel_value__field_indices_by_name,
   1,  vdcapi__vdsm__notification_set_output_channel_value__number_ranges,
   (ProtobufCMessageInit) vdcapi__vdsm__notification_set_output_channel_value__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor vdcapi__vdsm__notification_call_device_action__field_descriptors[5] =
+{
+  {
+    "dSUID",
+    1,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_STRING,
+    offsetof(Vdcapi__VdsmNotificationCallDeviceAction, n_dsuid),
+    offsetof(Vdcapi__VdsmNotificationCallDeviceAction, dsuid),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "name",
+    2,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Vdcapi__VdsmNotificationCallDeviceAction, name),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "params",
+    3,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(Vdcapi__VdsmNotificationCallDeviceAction, n_params),
+    offsetof(Vdcapi__VdsmNotificationCallDeviceAction, params),
+    &vdcapi__property_element__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "group",
+    4,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_INT32,
+    offsetof(Vdcapi__VdsmNotificationCallDeviceAction, has_group),
+    offsetof(Vdcapi__VdsmNotificationCallDeviceAction, group),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "zone_id",
+    5,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_INT32,
+    offsetof(Vdcapi__VdsmNotificationCallDeviceAction, has_zone_id),
+    offsetof(Vdcapi__VdsmNotificationCallDeviceAction, zone_id),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned vdcapi__vdsm__notification_call_device_action__field_indices_by_name[] = {
+  0,   /* field[0] = dSUID */
+  3,   /* field[3] = group */
+  1,   /* field[1] = name */
+  2,   /* field[2] = params */
+  4,   /* field[4] = zone_id */
+};
+static const ProtobufCIntRange vdcapi__vdsm__notification_call_device_action__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 5 }
+};
+const ProtobufCMessageDescriptor vdcapi__vdsm__notification_call_device_action__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "vdcapi.vdsm_NotificationCallDeviceAction",
+  "VdsmNotificationCallDeviceAction",
+  "Vdcapi__VdsmNotificationCallDeviceAction",
+  "vdcapi",
+  sizeof(Vdcapi__VdsmNotificationCallDeviceAction),
+  5,
+  vdcapi__vdsm__notification_call_device_action__field_descriptors,
+  vdcapi__vdsm__notification_call_device_action__field_indices_by_name,
+  1,  vdcapi__vdsm__notification_call_device_action__number_ranges,
+  (ProtobufCMessageInit) vdcapi__vdsm__notification_call_device_action__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor vdcapi__vdsm__notification_scan_devices__field_descriptors[4] =
+{
+  {
+    "dSUID",
+    1,
+    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_TYPE_STRING,
+    offsetof(Vdcapi__VdsmNotificationScanDevices, n_dsuid),
+    offsetof(Vdcapi__VdsmNotificationScanDevices, dsuid),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "incremental",
+    2,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_BOOL,
+    offsetof(Vdcapi__VdsmNotificationScanDevices, has_incremental),
+    offsetof(Vdcapi__VdsmNotificationScanDevices, incremental),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "exhaustive",
+    3,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_BOOL,
+    offsetof(Vdcapi__VdsmNotificationScanDevices, has_exhaustive),
+    offsetof(Vdcapi__VdsmNotificationScanDevices, exhaustive),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "clearconfig",
+    4,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_BOOL,
+    offsetof(Vdcapi__VdsmNotificationScanDevices, has_clearconfig),
+    offsetof(Vdcapi__VdsmNotificationScanDevices, clearconfig),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned vdcapi__vdsm__notification_scan_devices__field_indices_by_name[] = {
+  3,   /* field[3] = clearconfig */
+  0,   /* field[0] = dSUID */
+  2,   /* field[2] = exhaustive */
+  1,   /* field[1] = incremental */
+};
+static const ProtobufCIntRange vdcapi__vdsm__notification_scan_devices__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 4 }
+};
+const ProtobufCMessageDescriptor vdcapi__vdsm__notification_scan_devices__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "vdcapi.vdsm_NotificationScanDevices",
+  "VdsmNotificationScanDevices",
+  "Vdcapi__VdsmNotificationScanDevices",
+  "vdcapi",
+  sizeof(Vdcapi__VdsmNotificationScanDevices),
+  4,
+  vdcapi__vdsm__notification_scan_devices__field_descriptors,
+  vdcapi__vdsm__notification_scan_devices__field_indices_by_name,
+  1,  vdcapi__vdsm__notification_scan_devices__number_ranges,
+  (ProtobufCMessageInit) vdcapi__vdsm__notification_scan_devices__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
