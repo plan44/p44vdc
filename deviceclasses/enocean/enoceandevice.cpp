@@ -152,7 +152,7 @@ string EnoceanDevice::vendorId()
 string EnoceanDevice::vendorName()
 {
   const char *mn = EnoceanComm::manufacturerName(eeManufacturer);
-  return mn ? ":" : "";
+  return mn ? mn : "";
 }
 
 
