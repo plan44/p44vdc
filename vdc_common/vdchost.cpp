@@ -1164,9 +1164,6 @@ void VdcHost::handleNotification(const string &aMethod, ApiValuePtr aParams)
 
 
 
-// MARK: ===== DsAddressable API implementation
-
-
 // MARK: ===== property access
 
 static char devicecontainer_key;
