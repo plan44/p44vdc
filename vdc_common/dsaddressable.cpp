@@ -192,8 +192,10 @@ bool DsAddressable::pushProperty(ApiValuePtr aQuery, int aDomain)
     }
   }
   else {
-    // not announced, suppress pushProperty
-    ALOG(LOG_WARNING, "pushProperty suppressed - is not yet announced");
+    if (isPublicDS()) {
+      // is public, but not yet announced, show warning (non-public devices never push and must not log anything here)
+      ALOG(LOG_WARNING, "pushProperty suppressed - is not yet announced");
+    }
   }
   return false;
 }

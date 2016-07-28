@@ -1079,6 +1079,7 @@ void VdcHost::announceNext()
   for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
     VdcPtr vdc = pos->second;
     if (
+      vdc->isPublicDS() && // only public ones
       vdc->announced==Never &&
       (vdc->announcing==Never || MainLoop::now()>vdc->announcing+ANNOUNCE_RETRY_TIMEOUT) &&
       (!vdc->invisibleWhenEmpty() || vdc->getNumberOfDevices()>0)
