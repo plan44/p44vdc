@@ -284,6 +284,10 @@ namespace p44 {
   protected:
 
     // persistence implementation
+
+    /// @note as scenes are stored related to this table's ROWID, subclasses MUST NOT use other tables  
+    virtual const char *tableName() P44_FINAL { return inherited::tableName(); }
+
     virtual ErrorPtr loadChildren();
     virtual ErrorPtr saveChildren();
     virtual ErrorPtr deleteChildren();
