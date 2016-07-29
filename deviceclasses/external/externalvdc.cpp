@@ -592,14 +592,13 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     addBehaviour(cb);
   }
   else if (outputType=="fancoilunit") {
-    if (primaryGroup==group_variable) primaryGroup = group_ventilation;
+    if (primaryGroup==group_variable) primaryGroup = group_blue_heating;
     controlValues = true; // fan coil unit usually needs control values
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // - create climate control fan output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_fancoilunit));
     cb->setGroupMembership(group_roomtemperature_control, true); // put into room temperature control group...
-    cb->setGroupMembership(group_ventilation, true); // ..and into ventilation
     cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);

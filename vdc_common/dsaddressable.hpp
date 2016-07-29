@@ -71,6 +71,10 @@ namespace p44 {
     DsAddressable(VdcHost *aVdcHostP);
     virtual ~DsAddressable();
 
+    /// check if this is a public dS addressable (usually: device or vdc) - which should be registered with vdSM
+    /// @return true if addressable is public
+    virtual bool isPublicDS() { return true; }; // base class assumes that all devices are public
+
     /// the real (always modern, 34 hex) dSUID
     const DsUid &getDsUid() { return dSUID; };
 

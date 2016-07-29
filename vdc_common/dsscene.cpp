@@ -515,12 +515,30 @@ void SceneDeviceSettings::updateScene(DsScenePtr aScene)
 // MARK: ===== scene table persistence
 
 
+// Note: we explicitly define the table name here, altough at this time it is the same as for
+//   the base class.
+//   Subclasses that define a new tableName must ALSO define parentIdForScenes();
+const char *SceneDeviceSettings::tableName()
+{
+  return inherited::tableName();
+}
+
+
+string SceneDeviceSettings::parentIdForScenes()
+{
+  // base class just uses ROWID of the record in DeviceSettings (base table)
+  // derived classes which define a tableName() will prefix the rowid with an unique identifier
+  return string_format("%llu",rowid);
+}
+
+
+
 // load child parameters (scenes)
 ErrorPtr SceneDeviceSettings::loadChildren()
 {
   ErrorPtr err;
   // my own ROWID is the parent key for the children
-  string parentID = string_format("%llu",rowid);
+  string parentID = parentIdForScenes();
   // create a template
   DsScenePtr scene = newDefaultScene(0);
   // get the query
@@ -556,7 +574,7 @@ ErrorPtr SceneDeviceSettings::saveChildren()
   // Cannot save children before I have my own rowID
   if (rowid!=0) {
     // my own ROWID is the parent key for the children
-    string parentID = string_format("%llu",rowid);
+    string parentID = parentIdForScenes();
     // save all elements of the map (only dirty ones will be actually stored to DB
     for (DsSceneMap::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
       err = pos->second->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed

@@ -82,6 +82,8 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
       }
     }
   }
+  // notify listeners
+  notifyListeners(changedState ? valueevent_changed : valueevent_confirmed);
 }
 
 
@@ -97,6 +99,8 @@ void BinaryInputBehaviour::invalidateInputState()
     if (pushBehaviourState()) {
       lastPush = now;
     }
+    // notify listeners
+    notifyListeners(valueevent_changed);
   }
 }
 

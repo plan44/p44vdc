@@ -131,7 +131,8 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     consoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorHandler, this, 1, _1, _2)); // up
     // - create one sensor input
     SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this));
-    s->setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 50, 1, 30*Second, 300*Second);
+    //s->setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 50, 1, 30*Second, 300*Second);
+    s->setHardwareSensorConfig(sensorType_temperature, usage_room, 0, 50, 1, 30*Second, 300*Second);
     s->setHardwareName("Console simulated Sensor 0..50");
     addBehaviour(s);
   }

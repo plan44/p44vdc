@@ -283,12 +283,26 @@ namespace p44 {
 
   protected:
 
-    // persistence implementation
-    virtual ErrorPtr loadChildren();
-    virtual ErrorPtr saveChildren();
-    virtual ErrorPtr deleteChildren();
+    /// @name Persistence Implementation
+    /// @{
 
-    // additional defaults for scenes from files
+    /// @note Subclasses that define a new tableName must ALSO define parentIdForScenes();
+    virtual const char *tableName();
+
+    /// Unique identifier for locating scene child records belonging to this settings record
+    /// @return parent ID to use in child records
+    /// @note base class just uses ROWID of the record in DeviceSettings (base table).
+    ///    derived classes which define a tableName() MUST also define parentIdForScenes()!
+    virtual string parentIdForScenes();
+
+    /// load stored scenes
+    virtual ErrorPtr loadChildren() P44_FINAL;
+    /// store non-standard scenes
+    virtual ErrorPtr saveChildren() P44_FINAL;
+    /// delete scenes
+    virtual ErrorPtr deleteChildren() P44_FINAL;
+
+    /// load additional defaults for scenes from files
     void loadScenesFromFiles();
     
     /// @}
