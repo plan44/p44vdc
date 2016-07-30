@@ -134,13 +134,13 @@ bool HueApiOperation::hasCompleted()
 
 
 
-OperationPtr HueApiOperation::finalize(p44::OperationQueue *aQueueP)
+OperationPtr HueApiOperation::finalize()
 {
   if (resultHandler) {
     resultHandler(data, error);
     resultHandler = NULL; // call once only
   }
-  return OperationPtr(); // no operation to insert
+  return inherited::finalize();
 }
 
 
@@ -156,6 +156,7 @@ void HueApiOperation::abortOperation(ErrorPtr aError)
       resultHandler = NULL; // call once only
     }
   }
+  inherited::abortOperation(aError);
 }
 
 
