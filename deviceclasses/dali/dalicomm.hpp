@@ -321,7 +321,7 @@ namespace p44 {
 
   private:
 
-    void bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, SerialOperationPtr aOperation, OperationQueuePtr aQueueP, ErrorPtr aError);
+    void bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, SerialOperationReceivePtr aOperation, ErrorPtr aError);
     void daliCommandStatusHandler(DaliCommandStatusCB aResultCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
     void daliQueryResponseHandler(DaliQueryResultCB aResultCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
     void connectionTimeout();

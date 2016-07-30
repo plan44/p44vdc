@@ -157,34 +157,33 @@ void DaliComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t 
 }
 
 
-void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, SerialOperationPtr aOperation, OperationQueuePtr aQueueP, ErrorPtr aError)
+void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, SerialOperationReceivePtr aOperation, ErrorPtr aError)
 {
   if (expectedBridgeResponses>0) expectedBridgeResponses--;
   if (expectedBridgeResponses<BUFFERED_BRIDGE_RESPONSES_LOW) {
     responsesInSequence = false; // allow buffered sends without waiting for answers again
   }
-  SerialOperationReceivePtr ropP = boost::dynamic_pointer_cast<SerialOperationReceive>(aOperation);
-  if (ropP) {
-    // get received data
-    if (Error::isOK(aError) && ropP->getDataSize()>=2) {
-      uint8_t resp1 = ropP->getDataP()[0];
-      uint8_t resp2 = ropP->getDataP()[1];
-      if (resp1==RESP_CODE_DATA || resp1==RESP_CODE_DATA_RETRIED) {
-        FOCUSLOG("DALI bridge response: DATA            (%02X)      %02X    - %d pending responses%s", resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_DATA_RETRIED ? ", RETRIED" : "");
+  // get received data
+  if (Error::isOK(aError) && aOperation && aOperation->getDataSize()>=2) {
+    uint8_t resp1 = aOperation->getDataP()[0];
+    uint8_t resp2 = aOperation->getDataP()[1];
+    if (resp1==RESP_CODE_DATA || resp1==RESP_CODE_DATA_RETRIED) {
+      FOCUSLOG("DALI bridge response: DATA            (%02X)      %02X    - %d pending responses%s", resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_DATA_RETRIED ? ", RETRIED" : "");
 
-      }
-      else {
-        FOCUSLOG("DALI bridge response: %s (%02X %02X)         - %d pending responses%s", bridgeAckText(resp1, resp2), resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_ACK_RETRIED ? ", RETRIED" : "");
-      }
-      if (aBridgeResultHandler)
-        aBridgeResultHandler(resp1, resp2, aError);
     }
     else {
-      // error
-      if (Error::isOK(aError))
-        aError = ErrorPtr(new DaliCommError(DaliCommErrorMissingData));
-      if (aBridgeResultHandler)
-        aBridgeResultHandler(0, 0, aError);
+      FOCUSLOG("DALI bridge response: %s (%02X %02X)         - %d pending responses%s", bridgeAckText(resp1, resp2), resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_ACK_RETRIED ? ", RETRIED" : "");
+    }
+    if (aBridgeResultHandler) {
+      aBridgeResultHandler(resp1, resp2, aError);
+    }
+  }
+  else {
+    // error
+    if (Error::isOK(aError))
+      aError = ErrorPtr(new DaliCommError(DaliCommErrorMissingData));
+    if (aBridgeResultHandler) {
+      aBridgeResultHandler(0, 0, aError);
     }
   }
 }
@@ -197,39 +196,45 @@ void DaliComm::sendBridgeCommand(uint8_t aCmd, uint8_t aDali1, uint8_t aDali2, D
   if (closeAfterIdleTime!=Never) {
     connectionTimeoutTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliComm::connectionTimeout, this), closeAfterIdleTime);
   }
-  // deliver unhandled error
-  SerialOperationSendAndReceive *opP = NULL;
+  // create sending operation
+  SerialOperationSendPtr sendOp = SerialOperationSendPtr(new SerialOperationSend);
   if (aCmd<8) {
     // single byte command
-    opP = new SerialOperationSendAndReceive(1, &aCmd, 2, boost::bind(&DaliComm::bridgeResponseHandler, this, aResultCB, _1, _2, _3));
+    sendOp->setDataSize(1);
+    sendOp->appendByte(aCmd);
   }
   else {
     // 3 byte command
-    uint8_t cmd3[3];
-    cmd3[0] = aCmd;
-    cmd3[1] = aDali1;
-    cmd3[2] = aDali2;
-    opP = new SerialOperationSendAndReceive(3, cmd3, 2, boost::bind(&DaliComm::bridgeResponseHandler, this, aResultCB, _1, _2, _3));
+    sendOp->setDataSize(3);
+    sendOp->appendByte(aCmd);
+    sendOp->appendByte(aDali1);
+    sendOp->appendByte(aDali2);
   }
-  if (opP) {
-    expectedBridgeResponses++;
-    if (aWithDelay>0) {
-      // delayed sends must always be in sequence
-      opP->setInitiationDelay(aWithDelay);
-      FOCUSLOG("DALI bridge command:  %s (%02X)      %02X %02X - %d pending responses - to be sent in %d µS after no response pending", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, expectedBridgeResponses, aWithDelay);
-    }
-    else {
-      // non-delayed sends may be sent before answer of previous commands have arrived as long as Rx buf in bridge does not overflow
-      if (expectedBridgeResponses>BUFFERED_BRIDGE_RESPONSES_HIGH) {
-        responsesInSequence = true; // prevent further sends without answers
-      }
-      opP->answersInSequence = responsesInSequence;
-      FOCUSLOG("DALI bridge command:  %s (%02X)      %02X %02X - %d pending responses - %s", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, expectedBridgeResponses, responsesInSequence ? "sent when no more responses pending" : "sent as soon as possible");
-    }
-    opP->receiveTimeoout = 20*Second; // large timeout, because it can really take time until all expected answers are received
-    SerialOperationPtr op(opP);
-    queueSerialOperation(op);
+  // prepare response reading operation
+  SerialOperationReceivePtr recOp = SerialOperationReceivePtr(new SerialOperationReceive);
+  recOp->setExpectedBytes(2); // expected 2 response bytes
+  expectedBridgeResponses++;
+  if (aWithDelay>0) {
+    // delayed sends must always be in sequence
+    sendOp->setInitiationDelay(aWithDelay);
+    FOCUSLOG("DALI bridge command:  %s (%02X)      %02X %02X - %d pending responses - to be sent in %d µS after no response pending", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, expectedBridgeResponses, aWithDelay);
   }
+  else {
+    // non-delayed sends may be sent before answer of previous commands have arrived as long as Rx buf in bridge does not overflow
+    if (expectedBridgeResponses>BUFFERED_BRIDGE_RESPONSES_HIGH) {
+      responsesInSequence = true; // prevent further sends without answers
+    }
+    recOp->inSequence = responsesInSequence;
+    FOCUSLOG("DALI bridge command:  %s (%02X)      %02X %02X - %d pending responses - %s", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, expectedBridgeResponses, responsesInSequence ? "sent when no more responses pending" : "sent as soon as possible");
+  }
+  recOp->setTimeout(20*Second); // large timeout, because it can really take time until all expected answers are received
+  // set callback
+  // - for recOp to obtain result or get error
+  recOp->setCompletionCallback(boost::bind(&DaliComm::bridgeResponseHandler, this, aResultCB, recOp, _1));
+  // chain response op
+  sendOp->setChainedOperation(recOp);
+  // queue op
+  queueSerialOperation(sendOp);
   // process operations
   processOperations();
 }
