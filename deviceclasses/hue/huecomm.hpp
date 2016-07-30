@@ -104,7 +104,7 @@ namespace p44 {
 
     virtual bool initiate();
     virtual bool hasCompleted();
-    virtual OperationPtr finalize(p44::OperationQueue *aQueueP);
+    virtual OperationPtr finalize();
     virtual void abortOperation(ErrorPtr aError);
 
   };
