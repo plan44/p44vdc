@@ -151,7 +151,7 @@ namespace p44 {
     virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
 
     /// start or stop dimming (optimized blind controller version)
-    virtual void dimChannel(DsChannelType aChannelType, DsDimMode aDimMode);
+    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode);
 
   private:
 

@@ -82,12 +82,12 @@ namespace p44 {
 
     // volatile internal state
     long dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
-    DsDimMode currentDimMode; ///< current dimming in progress
+    VdcDimMode currentDimMode; ///< current dimming in progress
     DsChannelType currentDimChannel; ///< currently dimmed channel (if dimming in progress)
     long dimHandlerTicket; ///< for standard dimming
     bool isDimming; ///< if set, dimming is in progress
     uint8_t areaDimmed; ///< last dimmed area (so continue know which dimming command to re-start in case it comes late)
-    DsDimMode areaDimMode; ///< last area dim mode
+    VdcDimMode areaDimMode; ///< last area dim mode
 
     // hardware access serializer/pacer
     SimpleCB appliedOrSupersededCB; ///< will be called when values are either applied or ignored because a subsequent change is already pending
@@ -249,12 +249,12 @@ namespace p44 {
 
     /// start or stop dimming channel of this device.
     /// @param aChannel the channelType to start or stop dimming for
-    /// @param aDimMode according to DsDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @param aArea the area (1..4, 0=room) to restrict dimming to. Can be -1 to override local priority
     /// @param aAutoStopAfter max dimming time, dimming will stop when this time has passed
     /// @note this method is internally used to implement vDC API dimChannel and dim-related scene calls, but
     ///    it is exposed as directly controlling dimming might be useful for other purposes (e.g. identify)
-    void dimChannelForArea(DsChannelType aChannel, DsDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
+    void dimChannelForArea(DsChannelType aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
 
 
     /// Process a named control value. The type, group membership and settings of the device determine if at all,
@@ -304,7 +304,7 @@ namespace p44 {
 
     /// start or stop dimming channel of this device. Usually implemented in device specific manner in subclasses.
     /// @param aChannelType the channelType to start or stop dimming for
-    /// @param aDimMode according to DsDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @note unlike the vDC API "dimChannel" command, which must be repeated for dimming operations >5sec, this
     ///   method MUST NOT terminate dimming automatically except when reaching the minimum or maximum level
     ///   available for the device. Dimming timeouts are implemented at the device level and cause calling
@@ -312,7 +312,7 @@ namespace p44 {
     /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
-    virtual void dimChannel(DsChannelType aChannelType, DsDimMode aDimMode);
+    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode);
 
     /// identify the device to the user
     /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,

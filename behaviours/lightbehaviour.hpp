@@ -236,7 +236,7 @@ namespace p44 {
     /// get transition time in microseconds from given scene effect
     /// @param aEffect the scene effect
     /// @param aDimUp true when dimming up, false when dimming down
-    MLMicroSeconds transitionTimeFromSceneEffect(DsSceneEffect aEffect, bool aDimUp);
+    MLMicroSeconds transitionTimeFromSceneEffect(VdcSceneEffect aEffect, bool aDimUp);
 
 
     /// get PWM value for brightness (from brightness channel) according to dim curve

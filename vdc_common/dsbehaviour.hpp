@@ -104,7 +104,7 @@ namespace p44 {
 
     /// @name internal volatile state
     /// @{
-    DsHardwareError hardwareError; ///< hardware error
+    VdcHardwareError hardwareError; ///< hardware error
     MLMicroSeconds hardwareErrorUpdated; ///< when was hardware error last updated
     /// @}
 
@@ -127,7 +127,7 @@ namespace p44 {
     string getHardwareName() { return hardwareName; };
 
     /// update of hardware status
-    void setHardwareError(DsHardwareError aHardwareError);
+    void setHardwareError(VdcHardwareError aHardwareError);
 
     /// set group
     virtual void setGroup(DsGroup aGroup) { /* NOP in base class */ };

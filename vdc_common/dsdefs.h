@@ -22,6 +22,11 @@
 #ifndef p44vdc_dsdefs_h
 #define p44vdc_dsdefs_h
 
+/// MARK: ====== generic dS constants in dS global scope
+
+/// Constants which are used in the entire dS system
+/// @{
+
 /// scene numbers
 typedef enum {
   START_ZONE_SCENES = 0,  ///< first zone scene
@@ -133,25 +138,6 @@ typedef enum {
 } DsSceneNumber;
 
 
-/// Scene Effects (transition and alerting)
-typedef enum {
-  scene_effect_none = 0, ///< no effect, immediate transition
-  scene_effect_smooth = 1, ///< smooth normal transition (corresponds with former dimTimeSelector==0)
-  scene_effect_slow = 2, ///< slow transition (corresponds with former dimTimeSelector==1)
-  scene_effect_veryslow = 3, ///< very slow transition (corresponds with former dimTimeSelector==2)
-  scene_effect_alert = 4, ///< blink (for light devices) / alerting (in general: an effect that draws the user’s attention)
-} DsSceneEffect;
-
-
-/// Dim mode
-typedef enum {
-  dimmode_down = -1,
-  dimmode_stop = 0,
-  dimmode_up = 1
-} DsDimMode;
-
-
-
 /// group/color
 typedef enum {
   group_variable = 0,
@@ -223,32 +209,6 @@ typedef enum {
 } DsButtonMode;
 
 
-/// button types (for buttonDescriptions[].buttonType)
-typedef enum {
-  buttonType_undefined = 0, ///< kind of button not defined by device hardware
-  buttonType_single = 1, ///< single pushbutton
-  buttonType_2way = 2, ///< two-way pushbutton or rocker
-  buttonType_4way = 3, ///< 4-way navigation button
-  buttonType_4wayWithCenter = 4, ///< 4-way navigation with center button
-  buttonType_8wayWithCenter = 5, ///< 8-way navigation with center button
-  buttonType_onOffSwitch = 6, ///< On-Off switch
-} DsButtonType;
-
-
-/// button element IDs (for buttonDescriptions[].buttonElementID)
-typedef enum {
-  buttonElement_center = 0, ///< center element / single button
-  buttonElement_down = 1, ///< down, for 2,4,8-way
-  buttonElement_up = 2, ///< up, for 2,4,8-way
-  buttonElement_left = 3, ///< left, for 2,4,8-way
-  buttonElement_right = 4, ///< right, for 2,4,8-way
-  buttonElement_upperLeft = 5, ///< upper left, for 8-way
-  buttonElement_lowerLeft = 6, ///< lower left, for 8-way
-  buttonElement_upperRight = 7, ///< upper right, for 8-way
-  buttonElement_lowerRight = 8, ///< lower right, for 8-way
-} DsButtonElement;
-
-
 /// button function aka "LTNUM" (lower 4 bits in LTNUMGRP0)
 typedef enum {
   // all colored buttons
@@ -274,53 +234,6 @@ typedef enum {
   buttonFunc_apartment = 14, ///< appartment button
   buttonFunc_app = 15, ///< application specific button
 } DsButtonFunc;
-
-
-
-/// direct scene call action mode for buttons
-typedef enum {
-  buttonActionMode_normal = 0, ///< normal scene call
-  buttonActionMode_force = 1, ///< forced scene call
-  buttonActionMode_undo = 2, ///< undo scene
-  buttonActionMode_none = 255, ///< no action
-} DsButtonActionMode;
-
-
-/// output functions (describes capability of output)
-typedef enum {
-  outputFunction_switch = 0, ///< switch output - single channel 0..100
-  outputFunction_dimmer = 1, ///< effective value dimmer - single channel 0..100
-  outputFunction_positional = 2, ///< positional (servo, unipolar valves, blinds - single channel 0..n, usually n=100)
-  outputFunction_ctdimmer = 3, ///< dimmer with color temperature - channels 1 and 4
-  outputFunction_colordimmer = 4, ///< full color dimmer - channels 1..6
-  outputFunction_bipolar_positional = 5, ///< bipolar valves, dual direction fan control etc. - single channel -n...0...n, usually n=100
-  outputFunction_custom = 0x7F ///< custom output/channel configuration, none of the well-known functions above
-} DsOutputFunction;
-
-/// output modes
-typedef enum {
-  outputmode_disabled = 0, ///< disabled
-  outputmode_binary = 1, ///< binary ON/OFF mode
-  outputmode_gradual = 2, ///< gradual output value (dimmer, valve, positional etc.)
-  outputmode_default = 0x7F ///< use device in its default (or only) mode, without further specification
-} DsOutputMode;
-
-
-/// audio power states
-typedef enum {
-  dsAudioPower_deep_off = 0,
-  dsAudioPower_power_save = 1,
-  dsAudioPower_on = 2,
-  numDsAudioPowerStates
-} DsAudioPowerState;
-
-
-/// heatingSystemCapability modes
-typedef enum {
-  hscapability_heatingOnly = 1, ///< only positive "heatingLevel" will be applied to the output
-  hscapability_coolingOnly = 2, ///< only negative "heatingLevel" will be applied as positive values to the output
-  hscapability_heatingAndCooling = 3 ///< absolute value of "heatingLevel" will be applied to the output
-} DsHeatingSystemCapability;
 
 
 /// output channel types
@@ -350,56 +263,6 @@ typedef enum {
 typedef uint8_t DsChannelType;
 
 
-/// hardware error status
-typedef enum {
-  hardwareError_none = 0, ///< hardware is ok
-  hardwareError_openCircuit = 1, ///< input or output open circuit  (eg. bulb burnt)
-  hardwareError_shortCircuit = 2, ///< input or output short circuit
-  hardwareError_overload = 3, ///< output overload, including mechanical overload (e.g. heating valve actuator obstructed)
-  hardwareError_busConnection = 4, ///< third party device bus problem (such as DALI short-circuit)
-  hardwareError_lowBattery = 5, ///< third party device has low battery
-  hardwareError_deviceError = 6, ///< other device error
-} DsHardwareError;
-
-
-/// sensor types (vdc API) - see "ds-basics" for dS sensor types
-typedef enum {
-  sensorType_none = 0,
-  sensorType_temperature = 1, ///< temperature in degrees celsius
-  sensorType_humidity = 2, ///< relative humidity in %
-  sensorType_illumination = 3, ///< illumination in lux
-  sensorType_supplyVoltage = 4, ///< supply voltage level in Volts
-  sensorType_gas_CO = 5, ///< CO (carbon monoxide) concentration in ppm
-  sensorType_gas_radon = 6, ///< Radon activity in Bq/m3
-  sensorType_gas_type = 7, ///< gas type sensor
-  sensorType_dust_PM10 = 8, ///< particles <10µm in μg/m3
-  sensorType_dust_PM2_5 = 9, ///< particles <2.5µm in μg/m3
-  sensorType_dust_PM1 = 10, ///< particles <1µm in μg/m3
-  sensorType_set_point = 11, ///< room operating panel set point, 0..1
-  sensorType_fan_speed = 12, ///< fan speed, 0..1 (0=off, <0=auto)
-  sensorType_wind_speed = 13, ///< wind speed in m/s
-  sensorType_power = 14, ///< Power in W
-  sensorType_current = 15, ///< Electric current in A
-  sensorType_energy = 16, ///< Energy in kWh
-  sensorType_consumption = 17, ///< Electric Consumption in VA
-  sensorType_air_pressure = 18, ///< Air pressure in hPa
-  sensorType_wind_direction = 19, ///< Wind direction in degrees
-  sensorType_sound_volume = 20, ///< Sound pressure level in dB
-  sensorType_precipitation = 21, ///< Precipitation in mm/m2
-  sensorType_gas_CO2 = 22, ///< CO2 (carbon dioxide) concentration in ppm
-} DsSensorType;
-
-
-/// usage hints for inputs and outputs
-typedef enum {
-  usage_undefined = 0, ///< usage not defined
-  usage_room = 1, ///< room related (e.g. indoor sensors and controllers)
-  usage_outdoors = 2, ///< outdoors related (e.g. outdoor sensors)
-  usage_user = 3, ///< user interaction (e.g. indicators, displays, dials, sliders)
-} DsUsageHint;
-
-
-
 /// binary input types (sensor functions)
 typedef enum {
   binInpType_none = 0, ///< no system function
@@ -424,8 +287,18 @@ typedef enum {
 } DsBinaryInputType;
 
 
+/// audio power states
+typedef enum {
+  dsAudioPower_deep_off = 0,
+  dsAudioPower_power_save = 1,
+  dsAudioPower_on = 2,
+  numDsAudioPowerStates
+} DsAudioPowerState;
+
+
 /// model features (column from dSS visibility Matrix)
 /// Full documentation see: http://redmine.digitalstrom.org/projects/dss/wiki/Model_Features
+/// @note while modelfeatures have dS system scope, this enum as such has not, because model features only appear by name in the API. The enum is vDC implementation specific
 typedef enum {
   modelFeature_dontcare, ///< Show "Retain output when calling scene X" check box in scene properties device configuration.
   modelFeature_blink, ///< Show "Blink when calling scene X" check box in scene properties device configuration.
@@ -467,5 +340,157 @@ typedef enum {
   numModelFeatures
 } DsModelFeatures;
 
+/// @}
+
+
+
+/// MARK: ====== vDC API constants - scope is vDC API only
+
+/// Constants which are used in the vDC API and have a direct meaning only for vDC API clients (such as vDSM)
+/// @{
+
+
+/// value types
+/// @note these have been in use for sensorDescriptions[].sensorType since vDC API 1.0
+///   but are now used as a generic value type system (e.g. in actions and states parameters)
+typedef enum {
+  valueType_none = 0,
+  // physical values
+  valueType_temperature = 1, ///< temperature in degrees celsius
+  valueType_humidity = 2, ///< relative humidity in %
+  valueType_illumination = 3, ///< illumination in lux
+  valueType_supplyVoltage = 4, ///< supply voltage level in Volts
+  valueType_gas_CO = 5, ///< CO (carbon monoxide) concentration in ppm
+  valueType_gas_radon = 6, ///< Radon activity in Bq/m3
+  valueType_gas_type = 7, ///< gas type sensor
+  valueType_dust_PM10 = 8, ///< particles <10µm in μg/m3
+  valueType_dust_PM2_5 = 9, ///< particles <2.5µm in μg/m3
+  valueType_dust_PM1 = 10, ///< particles <1µm in μg/m3
+  valueType_set_point = 11, ///< room operating panel set point, 0..1
+  valueType_fan_speed = 12, ///< fan speed, 0..1 (0=off, <0=auto)
+  valueType_wind_speed = 13, ///< wind speed in m/s
+  valueType_power = 14, ///< Power in W
+  valueType_current = 15, ///< Electric current in A
+  valueType_energy = 16, ///< Energy in kWh
+  valueType_consumption = 17, ///< Electric Consumption in VA
+  valueType_air_pressure = 18, ///< Air pressure in hPa
+  valueType_wind_direction = 19, ///< Wind direction in degrees
+  valueType_sound_volume = 20, ///< Sound pressure level in dB
+  valueType_precipitation = 21, ///< Precipitation in mm/m2
+  valueType_gas_CO2 = 22, ///< CO2 (carbon dioxide) concentration in ppm
+  valueType_time = 24, ///< time in seconds
+  // generic and non-numeric types
+  valueType_percentage = 100, ///< percentage 0..100, such as fill level of something
+  valueType_integer = 101, ///< a generic integer (implies resolution==1)
+  valueType_enum = 102, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
+  valueType_float = 103, ///< a generic float
+  valueType_text = 100, ///< text parameters for actions
+} VdcValueType;
+
+
+/// Scene Effects (transition and alerting)
+typedef enum {
+  scene_effect_none = 0, ///< no effect, immediate transition
+  scene_effect_smooth = 1, ///< smooth normal transition (corresponds with former dimTimeSelector==0)
+  scene_effect_slow = 2, ///< slow transition (corresponds with former dimTimeSelector==1)
+  scene_effect_veryslow = 3, ///< very slow transition (corresponds with former dimTimeSelector==2)
+  scene_effect_alert = 4, ///< blink (for light devices) / alerting (in general: an effect that draws the user’s attention)
+} VdcSceneEffect;
+
+
+/// Dim mode
+typedef enum {
+  dimmode_down = -1,
+  dimmode_stop = 0,
+  dimmode_up = 1
+} VdcDimMode;
+
+
+/// button types (for buttonDescriptions[].buttonType)
+typedef enum {
+  buttonType_undefined = 0, ///< kind of button not defined by device hardware
+  buttonType_single = 1, ///< single pushbutton
+  buttonType_2way = 2, ///< two-way pushbutton or rocker
+  buttonType_4way = 3, ///< 4-way navigation button
+  buttonType_4wayWithCenter = 4, ///< 4-way navigation with center button
+  buttonType_8wayWithCenter = 5, ///< 8-way navigation with center button
+  buttonType_onOffSwitch = 6, ///< On-Off switch
+} VdcButtonType;
+
+
+/// button element IDs (for buttonDescriptions[].buttonElementID)
+typedef enum {
+  buttonElement_center = 0, ///< center element / single button
+  buttonElement_down = 1, ///< down, for 2,4,8-way
+  buttonElement_up = 2, ///< up, for 2,4,8-way
+  buttonElement_left = 3, ///< left, for 2,4,8-way
+  buttonElement_right = 4, ///< right, for 2,4,8-way
+  buttonElement_upperLeft = 5, ///< upper left, for 8-way
+  buttonElement_lowerLeft = 6, ///< lower left, for 8-way
+  buttonElement_upperRight = 7, ///< upper right, for 8-way
+  buttonElement_lowerRight = 8, ///< lower right, for 8-way
+} VdcButtonElement;
+
+
+
+/// direct scene call action mode for buttons
+typedef enum {
+  buttonActionMode_normal = 0, ///< normal scene call
+  buttonActionMode_force = 1, ///< forced scene call
+  buttonActionMode_undo = 2, ///< undo scene
+  buttonActionMode_none = 255, ///< no action
+} VdcButtonActionMode;
+
+
+/// output functions (describes capability of output)
+typedef enum {
+  outputFunction_switch = 0, ///< switch output - single channel 0..100
+  outputFunction_dimmer = 1, ///< effective value dimmer - single channel 0..100
+  outputFunction_positional = 2, ///< positional (servo, unipolar valves, blinds - single channel 0..n, usually n=100)
+  outputFunction_ctdimmer = 3, ///< dimmer with color temperature - channels 1 and 4
+  outputFunction_colordimmer = 4, ///< full color dimmer - channels 1..6
+  outputFunction_bipolar_positional = 5, ///< bipolar valves, dual direction fan control etc. - single channel -n...0...n, usually n=100
+  outputFunction_custom = 0x7F ///< custom output/channel configuration, none of the well-known functions above
+} VdcOutputFunction;
+
+/// output modes
+typedef enum {
+  outputmode_disabled = 0, ///< disabled
+  outputmode_binary = 1, ///< binary ON/OFF mode
+  outputmode_gradual = 2, ///< gradual output value (dimmer, valve, positional etc.)
+  outputmode_default = 0x7F ///< use device in its default (or only) mode, without further specification
+} VdcOutputMode;
+
+
+/// heatingSystemCapability modes
+typedef enum {
+  hscapability_heatingOnly = 1, ///< only positive "heatingLevel" will be applied to the output
+  hscapability_coolingOnly = 2, ///< only negative "heatingLevel" will be applied as positive values to the output
+  hscapability_heatingAndCooling = 3 ///< absolute value of "heatingLevel" will be applied to the output
+} VdcHeatingSystemCapability;
+
+
+/// hardware error status
+typedef enum {
+  hardwareError_none = 0, ///< hardware is ok
+  hardwareError_openCircuit = 1, ///< input or output open circuit  (eg. bulb burnt)
+  hardwareError_shortCircuit = 2, ///< input or output short circuit
+  hardwareError_overload = 3, ///< output overload, including mechanical overload (e.g. heating valve actuator obstructed)
+  hardwareError_busConnection = 4, ///< third party device bus problem (such as DALI short-circuit)
+  hardwareError_lowBattery = 5, ///< third party device has low battery
+  hardwareError_deviceError = 6, ///< other device error
+} VdcHardwareError;
+
+
+/// usage hints for inputs and outputs
+typedef enum {
+  usage_undefined = 0, ///< usage not defined
+  usage_room = 1, ///< room related (e.g. indoor sensors and controllers)
+  usage_outdoors = 2, ///< outdoors related (e.g. outdoor sensors)
+  usage_user = 3, ///< user interaction (e.g. indicators, displays, dials, sliders)
+} VdcUsageHint;
+
+
+/// @}
 
 #endif

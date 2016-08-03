@@ -108,7 +108,7 @@ namespace p44 {
 
     /// start or stop dimming channel of this device. Usually implemented in device specific manner in subclasses.
     /// @param aChannel the channelType to start or stop dimming for
-    /// @param aDimMode according to DsDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @note unlike the vDC API "dimChannel" command, which must be repeated for dimming operations >5sec, this
     ///   method MUST NOT terminate dimming automatically except when reaching the minimum or maximum level
     ///   available for the device. Dimming timeouts are implemented at the device level and cause calling
@@ -116,7 +116,7 @@ namespace p44 {
     /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
-    virtual void dimChannel(DsChannelType aChannelType, DsDimMode aDimMode);
+    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode);
 
     /// Process a named control value. The type, group membership and settings of the device determine if at all,
     /// and if, how the value affects physical outputs of the device or general device operation

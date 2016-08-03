@@ -67,7 +67,7 @@ Tristate OutputBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 }
 
 
-void OutputBehaviour::setHardwareOutputConfig(DsOutputFunction aOutputFunction, DsOutputMode aDefaultOutputMode, DsUsageHint aUsage, bool aVariableRamp, double aMaxPower)
+void OutputBehaviour::setHardwareOutputConfig(VdcOutputFunction aOutputFunction, VdcOutputMode aDefaultOutputMode, VdcUsageHint aUsage, bool aVariableRamp, double aMaxPower)
 {
   outputFunction = aOutputFunction;
   outputUsage = aUsage;
@@ -161,7 +161,7 @@ void OutputBehaviour::resetGroupMembership()
 }
 
 
-DsOutputMode OutputBehaviour::actualOutputMode()
+VdcOutputMode OutputBehaviour::actualOutputMode()
 {
   if (outputMode==outputmode_default) {
     return defaultOutputMode; // default mode
@@ -172,7 +172,7 @@ DsOutputMode OutputBehaviour::actualOutputMode()
 }
 
 
-void OutputBehaviour::setOutputMode(DsOutputMode aOutputMode)
+void OutputBehaviour::setOutputMode(VdcOutputMode aOutputMode)
 {
   // base class marks all channels needing re-apply and triggers a apply if mode changes
   if (outputMode!=aOutputMode) {
@@ -359,7 +359,7 @@ void OutputBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
 {
   inherited::loadFromRow(aRow, aIndex, NULL); // common flags are loaded here, not in superclasses
   // get the fields
-  aRow->getCastedIfNotNull<DsOutputMode, int>(aIndex++, outputMode);
+  aRow->getCastedIfNotNull<VdcOutputMode, int>(aIndex++, outputMode);
   uint64_t flags = aRow->getCastedWithDefault<uint64_t, long long int>(aIndex++, 0);
   aRow->getCastedIfNotNull<uint64_t, long long int>(aIndex++, outputGroups);
   // decode my own flags
@@ -560,7 +560,7 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case mode_key+settings_key_offset:
-          setOutputMode((DsOutputMode)aPropValue->int32Value());
+          setOutputMode((VdcOutputMode)aPropValue->int32Value());
           return true;
         case pushChanges_key+settings_key_offset:
           setPVar(pushChanges, aPropValue->boolValue());

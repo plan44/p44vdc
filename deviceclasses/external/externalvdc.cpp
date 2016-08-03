@@ -411,7 +411,7 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 }
 
 
-void ExternalDevice::dimChannel(DsChannelType aChannelType, DsDimMode aDimMode)
+void ExternalDevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
 {
   // start dimming
   ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
@@ -543,7 +543,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     iconBaseName = o->stringValue();
   }
   // - basic output behaviour
-  DsOutputFunction outputFunction = outputFunction_custom; // not defined yet
+  VdcOutputFunction outputFunction = outputFunction_custom; // not defined yet
   if (aInitParams->get("dimmable", o)) {
     outputFunction = o->boolValue() ? outputFunction_dimmer : outputFunction_switch;
   }
@@ -665,16 +665,16 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       JsonObjectPtr o3;
       // set defaults
       int buttonId = 0;
-      DsButtonType buttonType = buttonType_single;
-      DsButtonElement buttonElement = buttonElement_center;
+      VdcButtonType buttonType = buttonType_single;
+      VdcButtonElement buttonElement = buttonElement_center;
       DsGroup group = primaryGroup; // default group is same as primary
       string buttonName;
       bool isLocalButton = false;
       // - optional params
       if (o2->get("id", o3)) buttonId = o3->int32Value();
-      if (o2->get("buttontype", o3)) buttonType = (DsButtonType)o3->int32Value();
+      if (o2->get("buttontype", o3)) buttonType = (VdcButtonType)o3->int32Value();
       if (o2->get("localbutton", o3)) isLocalButton = o3->boolValue();
-      if (o2->get("element", o3)) buttonElement = (DsButtonElement)o3->int32Value();
+      if (o2->get("element", o3)) buttonElement = (VdcButtonElement)o3->int32Value();
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("hardwarename", o3)) buttonName = o3->stringValue(); else buttonName = string_format("button_id%d_el%d", buttonId, buttonElement);
       // - create behaviour
@@ -692,13 +692,13 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       JsonObjectPtr o3;
       // set defaults
       DsBinaryInputType inputType = binInpType_none;
-      DsUsageHint usage = usage_undefined;
+      VdcUsageHint usage = usage_undefined;
       DsGroup group = primaryGroup; // default group is same as primary
       MLMicroSeconds updateInterval = Never; // unknown
       string inputName;
       // - optional params
       if (o2->get("inputtype", o3)) inputType = (DsBinaryInputType)o3->int32Value();
-      if (o2->get("usage", o3)) usage = (DsUsageHint)o3->int32Value();
+      if (o2->get("usage", o3)) usage = (VdcUsageHint)o3->int32Value();
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("updateinterval", o3)) updateInterval = o3->doubleValue()*Second;
       if (o2->get("hardwarename", o3)) inputName = o3->stringValue(); else inputName = string_format("input_ty%d", inputType);
@@ -716,8 +716,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       JsonObjectPtr o2 = o->arrayGet(i);
       JsonObjectPtr o3;
       // set defaults
-      DsSensorType sensorType = sensorType_none;
-      DsUsageHint usage = usage_undefined;
+      VdcValueType sensorType = valueType_none;
+      VdcUsageHint usage = usage_undefined;
       DsGroup group = primaryGroup; // default group is same as primary
       double min = 0;
       double max = 100;
@@ -725,8 +725,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       MLMicroSeconds updateInterval = 5*Second; // assume mostly up-to-date
       string sensorName;
       // - optional params
-      if (o2->get("sensortype", o3)) sensorType = (DsSensorType)o3->int32Value();
-      if (o2->get("usage", o3)) usage = (DsUsageHint)o3->int32Value();
+      if (o2->get("sensortype", o3)) sensorType = (VdcValueType)o3->int32Value();
+      if (o2->get("usage", o3)) usage = (VdcUsageHint)o3->int32Value();
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("updateinterval", o3)) updateInterval = o3->doubleValue()*Second;
       if (o2->get("hardwarename", o3)) sensorName = o3->stringValue(); else sensorName = string_format("sensor_ty%d", sensorType);

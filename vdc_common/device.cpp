@@ -607,7 +607,7 @@ static SceneNo offSceneForArea(int aArea)
 
 // implementation of "dimChannel" vDC API command and legacy dimming
 // Note: ensures dimming only continues for at most aAutoStopAfter
-void Device::dimChannelForArea(DsChannelType aChannel, DsDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
+void Device::dimChannelForArea(DsChannelType aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
 {
   LOG(LOG_DEBUG, "dimChannelForArea: aChannel=%d, aDimMode=%d, aArea=%d", aChannel, aDimMode, aArea);
   // dimming is NOP in devices having no output
@@ -699,7 +699,7 @@ void Device::dimAutostopHandler(DsChannelType aChannel)
 #define DIM_STEP_INTERVAL (DIM_STEP_INTERVAL_MS*MilliSecond)
 
 // actual dimming implementation, usually overridden by subclasses to provide more optimized/precise dimming
-void Device::dimChannel(DsChannelType aChannelType, DsDimMode aDimMode)
+void Device::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
 {
   ALOG(LOG_INFO,
     "dimChannel (generic): channel type %d %s",

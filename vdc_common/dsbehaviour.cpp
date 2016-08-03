@@ -45,7 +45,7 @@ DsBehaviour::~DsBehaviour()
 }
 
 
-void DsBehaviour::setHardwareError(DsHardwareError aHardwareError)
+void DsBehaviour::setHardwareError(VdcHardwareError aHardwareError)
 {
   if (aHardwareError!=hardwareError) {
     // error status has changed

@@ -262,7 +262,7 @@ void ClimateControlBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   // decode the common flags
   if (aCommonFlagsP) climateControlIdle = *aCommonFlagsP & outputflag_climateControlIdle;
   // get the fields
-  aRow->getCastedIfNotNull<DsHeatingSystemCapability, int>(aIndex++, heatingSystemCapability);
+  aRow->getCastedIfNotNull<VdcHeatingSystemCapability, int>(aIndex++, heatingSystemCapability);
 }
 
 
@@ -321,7 +321,7 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
-        case heatingSystemCapability_key+settings_key_offset: setPVar(heatingSystemCapability, (DsHeatingSystemCapability)aPropValue->uint8Value()); return true;
+        case heatingSystemCapability_key+settings_key_offset: setPVar(heatingSystemCapability, (VdcHeatingSystemCapability)aPropValue->uint8Value()); return true;
       }
     }
   }

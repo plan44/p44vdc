@@ -61,7 +61,7 @@ ButtonBehaviour::ButtonBehaviour(Device &aDevice) :
 }
 
 
-void ButtonBehaviour::setHardwareButtonConfig(int aButtonID, DsButtonType aType, DsButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, bool aButtonModeFixed)
+void ButtonBehaviour::setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, bool aButtonModeFixed)
 {
   buttonID = aButtonID;
   buttonType = aType;
@@ -416,7 +416,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
 }
 
 
-DsButtonElement ButtonBehaviour::localFunctionElement()
+VdcButtonElement ButtonBehaviour::localFunctionElement()
 {
   if (buttonType!=buttonType_undefined) {
     // hardware defines the button
@@ -445,7 +445,7 @@ bool ButtonBehaviour::isOutputOn()
 }
 
 
-DsDimMode ButtonBehaviour::twoWayDirection()
+VdcDimMode ButtonBehaviour::twoWayDirection()
 {
   if (buttonMode<buttonMode_rockerDown_pairWith0 || buttonMode>buttonMode_rockerUp_pairWith3) return dimmode_stop; // single button -> no direction
   return buttonMode>=buttonMode_rockerDown_pairWith0 && buttonMode<=buttonMode_rockerDown_pairWith3 ? dimmode_down : dimmode_up; // down = -1, up = 1
@@ -480,7 +480,7 @@ void ButtonBehaviour::localDim(bool aStart)
   if (device.output) {
     if (aStart) {
       // start dimming, determine direction (directly from two-way buttons or via toggling direction for single buttons)
-      DsDimMode dm = twoWayDirection();
+      VdcDimMode dm = twoWayDirection();
       if (dm==dimmode_stop) {
         // not two-way, need to toggle direction
         dimmingUp = !dimmingUp; // change direction
@@ -525,7 +525,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
 }
 
 
-void ButtonBehaviour::sendAction(DsButtonActionMode aActionMode, uint8_t aActionId)
+void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActionId)
 {
   lastAction = MainLoop::now();
   actionMode = aActionMode;
@@ -606,7 +606,7 @@ void ButtonBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
   aRow->getCastedIfNotNull<DsButtonFunc, int>(aIndex++, buttonFunc);
   uint64_t flags = aRow->getWithDefault<int>(aIndex++, 0);
   aRow->getCastedIfNotNull<DsChannelType, int>(aIndex++, buttonChannel);
-  aRow->getCastedIfNotNull<DsButtonActionMode, int>(aIndex++, buttonActionMode);
+  aRow->getCastedIfNotNull<VdcButtonActionMode, int>(aIndex++, buttonActionMode);
   aRow->getCastedIfNotNull<uint8_t, int>(aIndex++, buttonActionId);
   if (!aRow->getCastedIfNotNull<ButtonStateMachineMode, int>(aIndex++, stateMachineMode)) {
     // no value yet for stateMachineMode -> old simpleStateMachine flag is still valid
@@ -837,7 +837,7 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           setPVar(callsPresent, aPropValue->boolValue());
           return true;
         case buttonActionMode_key+settings_key_offset:
-          setPVar(buttonActionMode, (DsButtonActionMode)aPropValue->uint8Value());
+          setPVar(buttonActionMode, (VdcButtonActionMode)aPropValue->uint8Value());
           return true;
         case buttonActionId_key+settings_key_offset:
           setPVar(buttonActionId, aPropValue->uint8Value());

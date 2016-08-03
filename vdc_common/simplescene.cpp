@@ -78,7 +78,7 @@ void SimpleScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uin
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
   value = aRow->get<double>(aIndex++);
-  effect = (DsSceneEffect)aRow->get<int>(aIndex++);
+  effect = (VdcSceneEffect)aRow->get<int>(aIndex++);
 }
 
 
@@ -137,7 +137,7 @@ bool SimpleScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         case effect_key:
-          setPVar(effect, (DsSceneEffect)aPropValue->uint8Value());
+          setPVar(effect, (VdcSceneEffect)aPropValue->uint8Value());
           return true;
       }
     }
@@ -150,7 +150,7 @@ bool SimpleScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 
 typedef struct {
   uint8_t value; ///< output value for this scene, uint_8 to save footprint
-  DsSceneEffect effect;
+  VdcSceneEffect effect;
   bool ignoreLocalPriority; ///< if set, local priority is ignored when calling this scene
   bool dontCare; ///< if set, applying this scene does not change the output value
   SceneCmd sceneCmd; ///< command for this scene

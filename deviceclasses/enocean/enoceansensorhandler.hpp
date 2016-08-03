@@ -55,8 +55,8 @@ namespace p44 {
     DsGroup primaryGroup; ///< the dS group for the entire device
     DsGroup channelGroup; ///< the dS group for this channel
     BehaviourType behaviourType; ///< the behaviour type
-    uint8_t behaviourParam; ///< DsSensorType, DsBinaryInputType or DsOutputFunction resp., depending on behaviourType
-    DsUsageHint usage; ///< usage hint
+    uint8_t behaviourParam; ///< VdcValueType, DsBinaryInputType or VdcOutputFunction resp., depending on behaviourType
+    VdcUsageHint usage; ///< usage hint
     float min; ///< min value
     float max; ///< max value
     uint8_t msBit; ///< most significant bit of sensor value field in data (for 4BS: 31=Bit7 of DB_3, 0=Bit0 of DB_0)

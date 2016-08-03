@@ -40,7 +40,7 @@ namespace p44 {
     /// @{
 
     double value; ///< scene value
-    DsSceneEffect effect; ///< scene effect (transition or alert)
+    VdcSceneEffect effect; ///< scene effect (transition or alert)
 
     /// @}
 

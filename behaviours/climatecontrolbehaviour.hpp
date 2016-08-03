@@ -131,7 +131,7 @@ namespace p44 {
     bool climateControlIdle;
 
     /// defines how "heatingLevel" is applied to the output
-    DsHeatingSystemCapability heatingSystemCapability;
+    VdcHeatingSystemCapability heatingSystemCapability;
 
     /// @}
 

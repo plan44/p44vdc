@@ -42,8 +42,8 @@ namespace p44 {
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
-    DsOutputFunction outputFunction; ///< the function of the output
-    DsUsageHint outputUsage; ///< the input type when device has hardwired functions
+    VdcOutputFunction outputFunction; ///< the function of the output
+    VdcUsageHint outputUsage; ///< the input type when device has hardwired functions
     bool variableRamp; ///< output has variable ramp times
     double maxPower; ///< max power in Watts the output can control
     /// @}
@@ -51,7 +51,7 @@ namespace p44 {
 
     /// @name persistent settings
     /// @{
-    DsOutputMode outputMode; ///< the mode of the output. Can be outputmode_default to have device to use its preferred (or only possible) mode
+    VdcOutputMode outputMode; ///< the mode of the output. Can be outputmode_default to have device to use its preferred (or only possible) mode
     bool pushChanges; ///< if set, local changes to output will be pushed upstreams
     uint64_t outputGroups; ///< mask for group memberships (0..63)
     /// @}
@@ -59,7 +59,7 @@ namespace p44 {
 
     /// @name internal volatile state
     /// @{
-    DsOutputMode defaultOutputMode; ///< the default mode of the output - this mode ist used when outputMode is set to outputmode_default
+    VdcOutputMode defaultOutputMode; ///< the default mode of the output - this mode ist used when outputMode is set to outputmode_default
     bool localPriority; ///< if set device is in local priority mode
     /// @}
 
@@ -97,7 +97,7 @@ namespace p44 {
 
     /// get the actual output mode
     /// @return the actual output mode, never returns outputmode_default
-    DsOutputMode actualOutputMode();
+    VdcOutputMode actualOutputMode();
 
     /// @}
 
@@ -106,7 +106,7 @@ namespace p44 {
     /// @{
 
     /// Configure hardware parameters of the output
-    void setHardwareOutputConfig(DsOutputFunction aOutputFunction, DsOutputMode aDefaultOutputMode, DsUsageHint aUsage, bool aVariableRamp, double aMaxPower);
+    void setHardwareOutputConfig(VdcOutputFunction aOutputFunction, VdcOutputMode aDefaultOutputMode, VdcUsageHint aUsage, bool aVariableRamp, double aMaxPower);
 
     /// @param aLocalPriority true to set local priority mode, false to clear it
     void setLocalPriority(bool aLocalPriority) { localPriority = aLocalPriority; };
@@ -120,10 +120,10 @@ namespace p44 {
     /// set new output mode
     /// @param aOutputMode new output mode (including outputmode_disabled, and outputmode_default to generically enable)
     /// @note a change in output mode might trigger (re-)applying channel values
-    virtual void setOutputMode(DsOutputMode aOutputMode);
+    virtual void setOutputMode(VdcOutputMode aOutputMode);
 
     /// @return output functionality the hardware provides
-    DsOutputFunction getOutputFunction() { return outputFunction; };
+    VdcOutputFunction getOutputFunction() { return outputFunction; };
 
     /// Apply output-mode specific output value transformation
     /// @param aChannelValue channel value

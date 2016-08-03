@@ -200,7 +200,7 @@ void LightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   if (lightScene) {
     // load brightness channel from scene
     Brightness b = lightScene->value;
-    DsSceneEffect e = lightScene->effect;
+    VdcSceneEffect e = lightScene->effect;
     brightness->setChannelValueIfNotDontCare(lightScene, b, transitionTimeFromSceneEffect(e, true), transitionTimeFromSceneEffect(e, false), true);
   }
   else {
@@ -233,7 +233,7 @@ static MLMicroSeconds transitionTimeFromDimTime(uint8_t aDimTime)
 }
 
 
-MLMicroSeconds LightBehaviour::transitionTimeFromSceneEffect(DsSceneEffect aEffect, bool aDimUp)
+MLMicroSeconds LightBehaviour::transitionTimeFromSceneEffect(VdcSceneEffect aEffect, bool aDimUp)
 {
   uint8_t dimTimeIndex;
   switch (aEffect) {

@@ -299,9 +299,9 @@ namespace p44 {
 
     /// initiate dimming (includes stopping movements)
     /// @param aMovementCB will be called (usually multiple times) to perform the needed movement sequence.
-    /// @param aDimMode according to DsDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @note this method is intended to be called from device implementations's dimChannel().
-    void dimBlind(MovementChangeCB aMovementCB, DsDimMode aDimMode);
+    void dimBlind(MovementChangeCB aMovementCB, VdcDimMode aDimMode);
 
     /// device should call this to signal that an end has been reached (end contact got active)
     /// @param aTop if set, the top end (fully rolled in) has been reached, otherwise the bottom end (fully rolled out)
@@ -393,7 +393,7 @@ namespace p44 {
     void endMove(MLMicroSeconds aRemainingMoveTime, SimpleCB aApplyDoneCB);
     void movePaused(MLMicroSeconds aRemainingMoveTime, SimpleCB aApplyDoneCB);
 
-    void reverseIdentify(DsDimMode aDimMode);
+    void reverseIdentify(VdcDimMode aDimMode);
 
   };
 

@@ -293,7 +293,7 @@ void EnoceanBlindControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDi
 
 
 // optimized blinds dimming implementation
-void EnoceanBlindControlDevice::dimChannel(DsChannelType aChannelType, DsDimMode aDimMode)
+void EnoceanBlindControlDevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
 {
   // start dimming
   ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);

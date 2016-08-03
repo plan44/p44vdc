@@ -340,7 +340,7 @@ Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower)
 
 
 // optimized DALI dimming implementation
-void DaliBusDevice::dim(DsDimMode aDimMode, double aDimPerMS)
+void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
 {
   if (isDummy) return;
   MainLoop::currentMainLoop().cancelExecutionTicket(dimRepeaterTicket); // stop any previous dimming activity
@@ -637,7 +637,7 @@ void DaliDimmerDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 
 
 // optimized DALI dimming implementation
-void DaliDimmerDevice::dimChannel(DsChannelType aChannelType, DsDimMode aDimMode)
+void DaliDimmerDevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
 {
   // start dimming
   if (aChannelType==channeltype_brightness) {

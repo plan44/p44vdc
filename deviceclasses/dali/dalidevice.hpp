@@ -130,9 +130,9 @@ namespace p44 {
     void setDefaultBrightness(Brightness aBrightness);
 
     /// start or stop optimized DALI dimming
-    /// @param aDimMode according to DsDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @param aDimPerMS dim speed in brightness value per millsecond
-    void dim(DsDimMode aDimMode, double aDimPerMS);
+    void dim(VdcDimMode aDimMode, double aDimPerMS);
 
     /// DALI address to use for querying brightness etc.
     /// @return DALI address
@@ -306,11 +306,11 @@ namespace p44 {
 
     /// start or stop dimming (optimized DALI version)
     /// @param aChannel the channelType to start or stop dimming for
-    /// @param aDimMode according to DsDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
-    virtual void dimChannel(DsChannelType aChannelType, DsDimMode aDimMode);
+    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode);
 
     /// @}
 

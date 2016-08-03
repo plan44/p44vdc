@@ -202,7 +202,7 @@ void DigitalIODevice::syncChannelValues(SimpleCB aDoneCB)
 }
 
 
-void DigitalIODevice::dimChannel(DsChannelType aChannelType, DsDimMode aDimMode)
+void DigitalIODevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
 {
   // start dimming
   ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);

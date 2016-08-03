@@ -55,8 +55,8 @@ namespace p44 {
     /// @{
     bool supportsLocalKeyMode; ///< set if this button can act as local button
     int buttonID; ///< the ID grouping all inputs of a hardware button (which can have multiple elements)
-    DsButtonType buttonType; ///< type of button
-    DsButtonElement buttonElementID; ///< identifies element of a multi-input button hardware-button
+    VdcButtonType buttonType; ///< type of button
+    VdcButtonElement buttonElementID; ///< identifies element of a multi-input button hardware-button
     DsButtonMode fixedButtonMode; ///< if not buttonMode_inactive, then this is the only mode that can be set
     /// @}
 
@@ -68,7 +68,7 @@ namespace p44 {
     DsChannelType buttonChannel; ///< the channel the button is supposed to control
     bool setsLocalPriority; ///< button should set local priority
     bool callsPresent; ///< button should call "present" scene
-    DsButtonActionMode buttonActionMode; ///< if set, button clicks directly issue action
+    VdcButtonActionMode buttonActionMode; ///< if set, button clicks directly issue action
     uint8_t buttonActionId; ///< action Id (aka scene number) to trigger when button is clicked
     ButtonStateMachineMode stateMachineMode; ///< state machine to use
 
@@ -82,7 +82,7 @@ namespace p44 {
 
     DsClickType clickType; ///< set to last click type of button
 
-    DsButtonActionMode actionMode; ///< last triggered action mode
+    VdcButtonActionMode actionMode; ///< last triggered action mode
     uint8_t actionId; ///< last triggered action Id (aka scene number)
     /// @}
 
@@ -101,7 +101,7 @@ namespace p44 {
     /// @param aButtonModeFixed if set, buttonMode can only be switched between hardware-derived default mode and disabled
     /// @note this must be called once before the device gets added to the device container. Implementation might
     ///   also derive default values for settings from this information.
-    void setHardwareButtonConfig(int aButtonID, DsButtonType aType, DsButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, bool aButtonModeFixed);
+    void setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, bool aButtonModeFixed);
 
     /// set group
     virtual void setGroup(DsGroup aGroup) { setPVar(buttonGroup, aGroup); };
@@ -120,7 +120,7 @@ namespace p44 {
     /// send direct action
     /// @param aActionMode the mode how to send the action
     /// @param aActionId the scene number to send
-    void sendAction(DsButtonActionMode aActionMode, uint8_t aActionId);
+    void sendAction(VdcButtonActionMode aActionMode, uint8_t aActionId);
 
 
     /// send click
@@ -133,7 +133,7 @@ namespace p44 {
 
     
     /// @return button element that defines the function of this button in local operation modes
-    DsButtonElement localFunctionElement();
+    VdcButtonElement localFunctionElement();
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
@@ -212,7 +212,7 @@ namespace p44 {
     // methods
     bool isLocalButtonEnabled();
     bool isOutputOn();
-    DsDimMode twoWayDirection();
+    VdcDimMode twoWayDirection();
     void resetStateMachine();
     void checkStandardStateMachine(bool aStateChanged, MLMicroSeconds aNow);
     void checkCustomStateMachine(bool aStateChanged, MLMicroSeconds aNow);

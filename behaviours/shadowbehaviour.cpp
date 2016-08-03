@@ -437,7 +437,7 @@ void ShadowBehaviour::applyBlindChannels(MovementChangeCB aMovementCB, SimpleCB 
 }
 
 
-void ShadowBehaviour::dimBlind(MovementChangeCB aMovementCB, DsDimMode aDimMode)
+void ShadowBehaviour::dimBlind(MovementChangeCB aMovementCB, VdcDimMode aDimMode)
 {
   BFOCUSLOG("dimBlind called for %s", aDimMode==dimmode_up ? "UP" : (aDimMode==dimmode_down ? "DOWN" : "STOP"));
   if (aDimMode==dimmode_stop) {
@@ -834,14 +834,14 @@ void ShadowBehaviour::stopSceneActions()
 
 void ShadowBehaviour::identifyToUser()
 {
-  DsDimMode dimMode = position->getChannelValue()>50 ? dimmode_down : dimmode_up;
+  VdcDimMode dimMode = position->getChannelValue()>50 ? dimmode_down : dimmode_up;
   // move a little
   device.dimChannelForArea(channeltype_default, dimMode, -1, IDENTITY_MOVE_TIME);
   MainLoop::currentMainLoop().executeOnce(boost::bind(&ShadowBehaviour::reverseIdentify, this, dimMode==dimmode_up ? dimmode_down : dimmode_up), IDENTITY_MOVE_TIME*2);
 }
 
 
-void ShadowBehaviour::reverseIdentify(DsDimMode aDimMode)
+void ShadowBehaviour::reverseIdentify(VdcDimMode aDimMode)
 {
   device.dimChannelForArea(channeltype_default, aDimMode, -1, IDENTITY_MOVE_TIME);
 }

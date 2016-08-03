@@ -40,7 +40,7 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice) :
 }
 
 
-void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, DsUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval)
+void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval)
 {
   hardwareInputType = aInputType;
   inputUsage = aUsage;
