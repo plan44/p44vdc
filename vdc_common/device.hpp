@@ -113,7 +113,21 @@ namespace p44 {
     virtual string modelName() { return "vdSD - virtual device"; }
 
     /// @return unique ID for the functional model of this entity
+    /// @note this is usually created as a hash including the relevant vDC-API visible representation of the device 
     virtual string modelUID();
+
+    /// device class (for grouping functionally equivalent single devices)
+    /// @note usually, only single devices do have a deviceClass
+    /// @return name of the device class, such as "washingmachine" or "kettle" or "oven". Empty string if no device class exists.
+    virtual string deviceClass() { return ""; }
+
+    /// device class version number.
+    /// @note This allows different versions of the functional representation of the device class
+    ///   to coexist in a system.
+    /// @return version or 0 if no version exists
+    virtual uint32_t deviceClassVersion() { return 0; }
+
+
 
     /// @return the entity type (one of dSD|vdSD|vDC|dSM|vdSM|dSS|*)
     virtual const char *entityType() { return "vdSD"; }

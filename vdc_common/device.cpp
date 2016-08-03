@@ -1440,6 +1440,9 @@ enum {
   undoState_key,
   // model features
   modelFeatures_key,
+  // device class
+  deviceClass_key,
+  deviceClassVersion_key,
   numDeviceFieldKeys
 };
 
@@ -1530,7 +1533,10 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     { "scenes", apivalue_object+propflag_container, scenes_key, OKEY(device_scenes_key) },
     { "undoState", apivalue_object, undoState_key, OKEY(device_key) },
     // the modelFeatures (row from former dSS visibility matrix, controlling what is shown in the UI)
-    { "modelFeatures", apivalue_object+propflag_container, modelFeatures_key, OKEY(device_modelFeatures_key) }
+    { "modelFeatures", apivalue_object+propflag_container, modelFeatures_key, OKEY(device_modelFeatures_key) },
+    // device class
+    { "deviceClass", apivalue_string, deviceClass_key, OKEY(device_key) },
+    { "deviceClassVersion", apivalue_uint64, deviceClassVersion_key, OKEY(device_key) }
   };
   // C++ object manages different levels, check aParentDescriptor
   if (!aParentDescriptor) {
@@ -1667,24 +1673,21 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case primaryGroup_key:
-          aPropValue->setUint16Value(primaryGroup);
-          return true;
+          aPropValue->setUint16Value(primaryGroup); return true;
         case zoneID_key:
-          if (deviceSettings)
-            aPropValue->setUint16Value(deviceSettings->zoneID);
-          return true;
+          if (deviceSettings) { aPropValue->setUint16Value(deviceSettings->zoneID); } return true;
         case progMode_key:
-          aPropValue->setBoolValue(progMode);
-          return true;
+          aPropValue->setBoolValue(progMode); return true;
         case deviceType_key:
-          aPropValue->setStringValue(deviceTypeIdentifier());
-          return true;
+          aPropValue->setStringValue(deviceTypeIdentifier()); return true;
+        case deviceClass_key:
+          if (deviceClass().size()>0) { aPropValue->setStringValue(deviceClass()); return true; } else return false;
+        case deviceClassVersion_key:
+          if (deviceClassVersion()>0) { aPropValue->setUint32Value(deviceClassVersion()); return true; } else return false;
         case softwareRemovable_key:
           aPropValue->setBoolValue(isSoftwareDisconnectable()); return true;
-          return true;
         case teachinSignals_key:
           aPropValue->setInt8Value(teachInSignal(-1)); return true; // query number of teach-in signals
-          return true;
       }
     }
     else {
