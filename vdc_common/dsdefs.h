@@ -378,13 +378,15 @@ typedef enum {
   valueType_sound_volume = 20, ///< Sound pressure level in dB
   valueType_precipitation = 21, ///< Precipitation in mm/m2
   valueType_gas_CO2 = 22, ///< CO2 (carbon dioxide) concentration in ppm
-  valueType_time = 24, ///< time in seconds
+  valueType_time = 23, ///< time in seconds
   // generic and non-numeric types
   valueType_percentage = 100, ///< percentage 0..100, such as fill level of something
   valueType_integer = 101, ///< a generic integer (implies resolution==1)
-  valueType_enum = 102, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
-  valueType_float = 103, ///< a generic float
-  valueType_text = 100, ///< text parameters for actions
+  valueType_float = 102, ///< a generic float
+  valueType_bool = 103, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
+  valueType_enum = 110, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
+  valueType_textenum = 111, ///< one item from a list of text. Internally represented as an unsigned integer.
+  valueType_text = 120, ///< text parameters for actions
 } VdcValueType;
 
 
