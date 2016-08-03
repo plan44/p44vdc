@@ -67,7 +67,8 @@ message vdsm_RequestSetProperty {
 
 // expects generic response
 message vdsm_RequestFirmwareUpdate {
-    optional bool checkOnly = 1;
+    optional bool checkonly = 1;
+    optional bool clearsettings = 2;
 }
 
 
@@ -163,7 +164,7 @@ message vdsm_NotificationScanDevices {
     repeated string dSUID = 1;
     optional bool incremental = 2;
     optional bool exhaustive = 3;
-    optional bool clearconfig = 4;
+    optional bool clearsettings = 4;
 }
 
 
