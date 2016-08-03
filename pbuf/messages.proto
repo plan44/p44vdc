@@ -12,7 +12,7 @@ enum Type {
     VDC_RESPONSE_GET_PROPERTY = 5;
 
     VDSM_REQUEST_SET_PROPERTY = 6;
-    VDC_RESPONSE_SET_PROPERTY = 7;
+    VDSM_REQUEST_FIRMWARE_UPDATE = 28;  // new in API v2c
 
     VDSM_SEND_PING = 8;
     VDC_SEND_PONG = 9;
@@ -56,6 +56,7 @@ message Message {
 
     // expects generic response
     optional vdsm_RequestSetProperty vdsm_request_set_property = 104;
+    optional vdsm_RequestFirmwareUpdate vdsm_request_firmware_update = 125; // new in API v2c
 
     // requests that only expect a response in case of error
     optional vdsm_SendPing vdsm_send_ping = 105;
