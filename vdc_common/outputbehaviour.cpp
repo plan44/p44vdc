@@ -393,7 +393,7 @@ static char output_groups_key;
 
 int OutputBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor->hasObjectKey(output_groups_key)) {
+  if (HAS_OKEY(aParentDescriptor, output_groups_key)) {
     return 64; // group mask has 64 bits for now
   }
   return inherited::numProps(aDomain, aParentDescriptor);
@@ -412,7 +412,7 @@ PropertyContainerPtr OutputBehaviour::getContainer(PropertyDescriptorPtr &aPrope
 
 PropertyDescriptorPtr OutputBehaviour::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor && aParentDescriptor->hasObjectKey(output_groups_key)) {
+  if (HAS_OKEY(aParentDescriptor, output_groups_key)) {
     // array-like container
     PropertyDescriptorPtr propDesc;
     bool numericName = getNextPropIndex(aPropMatch, aStartIndex);

@@ -107,6 +107,10 @@ ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr
               if (container) {
                 FOCUSLOG("  - container for '%s' is 0x%p", propDesc->name(), container.get());
                 FOCUSLOG("    >>>> RECURSING into accessProperty()");
+                if (container!=this) {
+                  // actually switching to another object -> consider this root of a new property hierachy
+                  containerPropDesc.reset(); // do not provide a parent descriptor, as it would be one from another class that is meaningless to the new container
+                }
                 if (aMode==access_read) {
                   // read needs a result object
                   ApiValuePtr resultValue = queryValue->newValue(apivalue_object);

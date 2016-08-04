@@ -1182,7 +1182,7 @@ enum {
 
 int VdcHost::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor && aParentDescriptor->hasObjectKey(vdc_container_key)) {
+  if (HAS_OKEY(aParentDescriptor, vdc_container_key)) {
     return (int)vdcs.size();
   }
   return inherited::numProps(aDomain, aParentDescriptor)+numDeviceContainerProperties;
@@ -1207,7 +1207,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
 
 PropertyDescriptorPtr VdcHost::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor && aParentDescriptor->hasObjectKey(vdc_container_key)) {
+  if (HAS_OKEY(aParentDescriptor, vdc_container_key)) {
     // accessing one of the vdcs by numeric index
     return getDescriptorByNumericName(
       aPropMatch, aStartIndex, aDomain, aParentDescriptor,

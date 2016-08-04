@@ -137,15 +137,18 @@ static char dsBehaviour_Key;
 int DsBehaviour::numLocalProps(PropertyDescriptorPtr aParentDescriptor)
 {
   // Note: output does not have an intermediate level as there is only one
-  PropertyDescriptorPtr pdP = aParentDescriptor; // assume output (no intermediate level)
-  if (pdP->parentDescriptor)
-    pdP = pdP->parentDescriptor; // if there is a parent on the level above, check that (buttons, binaryInputs, sensors)
-  switch (pdP->fieldKey()) {
-    case descriptions_key_offset: return numDescProps()+numDsBehaviourDescProperties;
-    case settings_key_offset: return numSettingsProps(); // no settings on the DsBehaviour level
-    case states_key_offset: return numStateProps()+numDsBehaviourStateProperties;
-    default: return 0;
+  if (aParentDescriptor) {
+    PropertyDescriptorPtr pdP = aParentDescriptor; // assume output (no intermediate level)
+    if (pdP->parentDescriptor)
+      pdP = pdP->parentDescriptor; // if there is a parent on the level above, check that (buttons, binaryInputs, sensors)
+    switch (pdP->fieldKey()) {
+      case descriptions_key_offset: return numDescProps()+numDsBehaviourDescProperties;
+      case settings_key_offset: return numSettingsProps(); // no settings on the DsBehaviour level
+      case states_key_offset: return numStateProps()+numDsBehaviourStateProperties;
+      default: break;
+    }
   }
+  return 0;
 }
 
 

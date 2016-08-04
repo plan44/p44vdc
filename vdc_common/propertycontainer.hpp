@@ -34,6 +34,7 @@ namespace p44 {
 
 
   #define OKEY(x) ((intptr_t)&x) ///< macro to define unique object keys by using address of a variable
+  #define HAS_OKEY(pd,x) (pd && pd->hasObjectKey(x)) ///< macro to check if a parent descriptor is available at all and if so, if it has a specific object key
 
   #define PROPINDEX_NONE -1 ///< special value to signal "no next descriptor" for getDescriptorByName
 
@@ -42,7 +43,7 @@ namespace p44 {
     const char *propertyName; ///< name of the property
     uint16_t propertyType; ///< type of the property value
     size_t fieldKey; ///< key for accessing the property within its container. (size_t to allow using offset into struct)
-    intptr_t objectKey; ///< identifier for object this property belongs to (for properties spread over sublcasses)
+    intptr_t objectKey; ///< identifier for object this property belongs to (for properties spread over sublcasses). If propflag_container is set, this specifies the key for the contained objects, not the property itself
   } PropertyDescription;
 
   typedef enum {

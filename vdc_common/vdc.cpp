@@ -326,10 +326,10 @@ enum {
 
 int Vdc::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor && aParentDescriptor->hasObjectKey(device_container_key)) {
+  if (HAS_OKEY(aParentDescriptor, device_container_key)) {
     return (int)devices.size();
   }
-  else if (aParentDescriptor && aParentDescriptor->hasObjectKey(capabilities_container_key)) {
+  else if (HAS_OKEY(aParentDescriptor, capabilities_container_key)) {
     return numCapabilities;
   }
   return inherited::numProps(aDomain, aParentDescriptor)+numClassContainerProperties;
@@ -338,7 +338,7 @@ int Vdc::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 
 PropertyDescriptorPtr Vdc::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor && aParentDescriptor->hasObjectKey(device_container_key)) {
+  if (HAS_OKEY(aParentDescriptor, device_container_key)) {
     // accessing one of the devices by numeric index
     return getDescriptorByNumericName(
       aPropMatch, aStartIndex, aDomain, aParentDescriptor,
@@ -371,7 +371,7 @@ PropertyContainerPtr Vdc::getContainer(PropertyDescriptorPtr &aPropertyDescripto
 // note: is only called when getDescriptorByName does not resolve the name
 PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor && aParentDescriptor->hasObjectKey(capabilities_container_key)) {
+  if (HAS_OKEY(aParentDescriptor, capabilities_container_key)) {
     // capabilities level
     static const PropertyDescription capability_props[numClassContainerProperties] = {
       { "metering", apivalue_bool, capability_metering_key, OKEY(capabilities_container_key) },

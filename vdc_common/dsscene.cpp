@@ -55,7 +55,7 @@ protected:
 
   int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
   {
-    if (!aParentDescriptor->hasObjectKey(scenevalue_key)) {
+    if (!HAS_OKEY(aParentDescriptor, scenevalue_key)) {
       // channels/outputs container
       return scene.numSceneValues();
     }
@@ -79,7 +79,7 @@ protected:
 
   PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
   {
-    if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
+    if (HAS_OKEY(aParentDescriptor, dsscene_channels_key)) {
       // array-like container of channels
       PropertyDescriptorPtr propDesc;
       bool numericName = getNextPropIndex(aPropMatch, aStartIndex);
