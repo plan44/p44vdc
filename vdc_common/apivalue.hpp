@@ -96,8 +96,6 @@ namespace p44 {
     /// get object by key
     /// @param aKey key of object
     /// @return NULL pointer of key does not exists, value otherwise
-    /// @note to distinguish between having no such key and having the key with
-    ///   a NULL object, use get(aKey,aObj) instead
     virtual ApiValuePtr get(const string &aKey) = 0;
 
     /// delete object by key
