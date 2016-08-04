@@ -71,6 +71,14 @@ message vdsm_RequestFirmwareUpdate {
     optional bool clearsettings = 2;
 }
 
+// expects generic response
+message vdsm_RequestCallDeviceAction {
+    repeated string dSUID = 1;
+    optional string name = 2;
+    repeated PropertyElement params = 3;
+}
+
+
 
 message vdsm_SendPing {
     optional string dSUID = 1;
@@ -150,14 +158,6 @@ message vdsm_NotificationSetOutputChannelValue {
     optional bool apply_now = 2 [ default = true ];
     optional int32 channel = 3;
     optional double value = 4;
-}
-
-message vdsm_NotificationCallDeviceAction {
-    repeated string dSUID = 1;
-    optional string name = 2;
-    repeated PropertyElement params = 3;
-    optional int32 group = 4;
-    optional int32 zone_id = 5;
 }
 
 message vdsm_NotificationScanDevices {
