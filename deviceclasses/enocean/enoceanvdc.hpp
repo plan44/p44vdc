@@ -110,7 +110,7 @@ namespace p44 {
     /// collect and add devices to the container
     virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings);
 
-    /// vdc level methods (p44 specific, JSON only, for configuring multichannel RGB(W) devices)
+    /// vdc level methods (p44 specific, JSON only)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
 
     /// @param aForget if set, all parameters stored for the device (if any) will be deleted. Note however that

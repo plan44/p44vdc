@@ -219,7 +219,8 @@ ErrorPtr StaticVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
           r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
           r->add("rowid", r->newUint64(dev->staticDeviceRowID));
           r->add("name", r->newString(dev->getName()));
-          respErr = aRequest->sendResult(r);
+          aRequest->sendResult(r);
+          respErr.reset(); // make sure we don't send an extra ErrorOK
         }
       }
     }

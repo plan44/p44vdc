@@ -150,6 +150,7 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       if (Error::isOK(respErr)) {
         // send back property result
         aRequest->sendResult(result);
+        respErr.reset(); // make sure we don't send an extra ErrorOK
       }
     }
   }
@@ -166,7 +167,7 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       respErr = accessProperty(preload ? access_write_preload : access_write, value, ApiValuePtr(), VDC_API_DOMAIN, PropertyDescriptorPtr());
       if (Error::isOK(respErr)) {
         // send back OK if write was successful
-        aRequest->sendResult(ApiValuePtr());
+        respErr = Error::ok();
       }
     }
   }

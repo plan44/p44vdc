@@ -353,10 +353,8 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
         }
         // have method handled
         err = handleMethodForDsUid(cmd, request, dsuid, params);
-        // methods send results themselves
-        if (Error::isOK(err)) {
-          err.reset(); // even if we get a ErrorOK, make sure we return NULL to the caller, meaning NO answer is needed
-        }
+        // Note: if method returns NULL, it has sent or will send results itself.
+        //   Otherwise, even if Error is ErrorOK we must send a generic response
       }
       else {
         // handle notification

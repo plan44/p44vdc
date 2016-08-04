@@ -98,7 +98,7 @@ namespace p44 {
     /// @return if true, this vDC should not be announced towards the dS system when it has no devices
     virtual bool invisibleWhenEmpty() { return true; }
 
-    /// vdc level methods (p44 specific, JSON only, for configuring static devices)
+    /// vdc level methods (p44 specific, JSON only, for creating LED chain devices)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
 
     /// Get icon data or name

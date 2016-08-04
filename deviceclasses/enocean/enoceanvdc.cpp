@@ -304,7 +304,8 @@ ErrorPtr EnoceanVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
           ApiValuePtr r = aRequest->newApiValue();
           r->setType(apivalue_object);
           r->add("newDevices", r->newUint64(newDevices));
-          respErr = aRequest->sendResult(r);
+          aRequest->sendResult(r);
+          respErr.reset(); // make sure we don't send an extra ErrorOK
         }
       }
     }
@@ -338,7 +339,7 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
           handleEventPacket(simPacket, ErrorPtr());
         }
         // done
-        aRequest->sendResult(ApiValuePtr());
+        respErr = Error::ok();
       }
       else {
         respErr = ErrorPtr(new WebError(400, "invalid simulated ESP3 packet data"));

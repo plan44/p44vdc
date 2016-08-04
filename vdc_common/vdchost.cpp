@@ -838,14 +838,19 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
     }
   }
   // check error
-  if (!Error::isOK(respErr)) {
+  if (respErr) {
     if (aRequest) {
       // report back in case of method call
-      aRequest->sendError(respErr);
+      if (Error::isOK(respErr))
+        aRequest->sendResult(ApiValuePtr()); // OK is returned as empty result
+      else
+        aRequest->sendError(respErr); // non-OK is returned as error
     }
     else {
-      // just log in case of notification
-      LOG(LOG_WARNING, "Notification '%s' processing error: %s", aMethod.c_str(), respErr->description().c_str());
+      // just log in case of error of a notification
+      if (!Error::isOK(respErr)) {
+        LOG(LOG_WARNING, "Notification '%s' processing error: %s", aMethod.c_str(), respErr->description().c_str());
+      }
     }
   }
 }

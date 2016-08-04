@@ -268,7 +268,8 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
             r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
             r->add("rowid", r->newUint64(dev->ledChainDeviceRowID));
             r->add("name", r->newString(dev->getName()));
-            respErr = aRequest->sendResult(r);
+            aRequest->sendResult(r);
+            respErr.reset(); // make sure we don't send an extra ErrorOK
           }
         }
       }

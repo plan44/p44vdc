@@ -232,6 +232,9 @@ namespace p44 {
     /// @param aMethod the method
     /// @param aRequest the request to be passed to answering methods
     /// @param aParams the parameters object
+    /// @return NULL if method implementation has or will take care of sending a reply (but make sure it
+    ///   actually does, otherwise API clients will hang or run into timeouts)
+    ///   Returning any Error object, even if ErrorOK, will cause a generic response to be returned.
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the method call to this device.
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
