@@ -486,22 +486,23 @@ namespace p44 {
     /// @name API implementation
     /// @{
 
-    /*
-    // TODO: decide about method or notification for callDeviceAction, add Error result to all call()s and probably down to conforms() if method 
-
-    /// called to let device handle device-level notification
-    /// @param aMethod the notification
+    /// called by VdcHost to handle methods directed to a dSUID
+    /// @param aRequest this is the request to respond to
+    /// @param aMethod the method
     /// @param aParams the parameters object
+    /// @return NULL if method implementation has or will take care of sending a reply (but make sure it
+    ///   actually does, otherwise API clients will hang or run into timeouts)
+    ///   Returning any Error object, even if ErrorOK, will cause a generic response to be returned.
     /// @note the parameters object always contains the dSUID parameter which has been
-    ///   used already to route the notification to this device.
-    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams);
+    ///   used already to route the method call to this DsAddressable.
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
 
     /// call action on this device
     /// @param aActionName the name of the action to call.
     /// @param aActionParams the action parameters (can be null)
-    void callDeviceAction(const string aActionName, ApiValuePtr aActionParams);
+    /// @return ok or error
+    ErrorPtr callDeviceAction(const string aActionName, ApiValuePtr aActionParams);
     
-    */
 
     /// @}
 

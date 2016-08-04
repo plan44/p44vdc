@@ -398,6 +398,38 @@ void SingleDevice::loadSettingsFromFiles()
 
 // MARK: ===== SingleDevice API calls
 
+ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
+{
+  ErrorPtr respErr;
+  if (aMethod=="callDeviceAction") {
+    string action;
+    respErr = checkStringParam(aParams, "name", action);
+    if (Error::isOK(respErr)) {
+      ApiValuePtr actionParams = aParams->get("params");
+      if (!actionParams) {
+        // always pass params, even if empty
+        actionParams = aParams->newObject();
+      }
+      // now call the action
+      respErr = callDeviceAction(action, actionParams);
+    }
+  }
+  else {
+    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
+  }
+  return respErr;
+}
+
+
+
+ErrorPtr SingleDevice::callDeviceAction(const string aActionName, ApiValuePtr aActionParams)
+{
+  ErrorPtr respErr;
+  // TODO: implement it!
+  respErr =  ErrorPtr(new VdcApiError(404, "unknown device action"));
+  return respErr;
+}
+
 
 
 // MARK: ===== SingleDevice property access
