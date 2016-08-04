@@ -95,7 +95,7 @@ void   vdcapi__generic_response__free_unpacked
 }
 static const Vdcapi__Type vdcapi__message__type__default_value = VDCAPI__TYPE__GENERIC_RESPONSE;
 static const uint32_t vdcapi__message__message_id__default_value = 0u;
-static const ProtobufCFieldDescriptor vdcapi__message__field_descriptors[28] =
+static const ProtobufCFieldDescriptor vdcapi__message__field_descriptors[29] =
 {
   {
     "type",
@@ -410,25 +410,37 @@ static const ProtobufCFieldDescriptor vdcapi__message__field_descriptors[28] =
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "vdsm_send_call_device_action",
-    123,
-    PROTOBUF_C_LABEL_OPTIONAL,
-    PROTOBUF_C_TYPE_MESSAGE,
-    0,   /* quantifier_offset */
-    offsetof(Vdcapi__Message, vdsm_send_call_device_action),
-    &vdcapi__vdsm__notification_call_device_action__descriptor,
-    NULL,
-    0,             /* flags */
-    0,NULL,NULL    /* reserved1,reserved2, etc */
-  },
-  {
     "vdsm_send_scan_devices",
-    124,
+    123,
     PROTOBUF_C_LABEL_OPTIONAL,
     PROTOBUF_C_TYPE_MESSAGE,
     0,   /* quantifier_offset */
     offsetof(Vdcapi__Message, vdsm_send_scan_devices),
     &vdcapi__vdsm__notification_scan_devices__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "vdsm_request_call_device_action",
+    124,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Vdcapi__Message, vdsm_request_call_device_action),
+    &vdcapi__vdsm__request_call_device_action__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "vdsm_request_firmware_update",
+    125,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(Vdcapi__Message, vdsm_request_firmware_update),
+    &vdcapi__vdsm__request_firmware_update__descriptor,
     NULL,
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
@@ -446,11 +458,12 @@ static const unsigned vdcapi__message__field_indices_by_name[] = {
   9,   /* field[9] = vdc_send_pong */
   12,   /* field[12] = vdc_send_push_property */
   11,   /* field[11] = vdc_send_vanish */
+  27,   /* field[27] = vdsm_request_call_device_action */
+  28,   /* field[28] = vdsm_request_firmware_update */
   5,   /* field[5] = vdsm_request_get_property */
   3,   /* field[3] = vdsm_request_hello */
   7,   /* field[7] = vdsm_request_set_property */
   14,   /* field[14] = vdsm_send_bye */
-  26,   /* field[26] = vdsm_send_call_device_action */
   19,   /* field[19] = vdsm_send_call_min_scene */
   15,   /* field[15] = vdsm_send_call_scene */
   24,   /* field[24] = vdsm_send_dim_channel */
@@ -459,7 +472,7 @@ static const unsigned vdcapi__message__field_indices_by_name[] = {
   8,   /* field[8] = vdsm_send_ping */
   13,   /* field[13] = vdsm_send_remove */
   16,   /* field[16] = vdsm_send_save_scene */
-  27,   /* field[27] = vdsm_send_scan_devices */
+  26,   /* field[26] = vdsm_send_scan_devices */
   21,   /* field[21] = vdsm_send_set_control_value */
   18,   /* field[18] = vdsm_send_set_local_prio */
   17,   /* field[17] = vdsm_send_undo_scene */
@@ -468,7 +481,7 @@ static const ProtobufCIntRange vdcapi__message__number_ranges[2 + 1] =
 {
   { 1, 0 },
   { 100, 3 },
-  { 0, 28 }
+  { 0, 29 }
 };
 const ProtobufCMessageDescriptor vdcapi__message__descriptor =
 {
@@ -478,7 +491,7 @@ const ProtobufCMessageDescriptor vdcapi__message__descriptor =
   "Vdcapi__Message",
   "vdcapi",
   sizeof(Vdcapi__Message),
-  28,
+  29,
   vdcapi__message__field_descriptors,
   vdcapi__message__field_indices_by_name,
   2,  vdcapi__message__number_ranges,
@@ -545,7 +558,6 @@ const ProtobufCEnumValue vdcapi__type__enum_values_by_number[27] =
   { "VDSM_REQUEST_GET_PROPERTY", "VDCAPI__TYPE__VDSM_REQUEST_GET_PROPERTY", 4 },
   { "VDC_RESPONSE_GET_PROPERTY", "VDCAPI__TYPE__VDC_RESPONSE_GET_PROPERTY", 5 },
   { "VDSM_REQUEST_SET_PROPERTY", "VDCAPI__TYPE__VDSM_REQUEST_SET_PROPERTY", 6 },
-  { "VDC_RESPONSE_SET_PROPERTY", "VDCAPI__TYPE__VDC_RESPONSE_SET_PROPERTY", 7 },
   { "VDSM_SEND_PING", "VDCAPI__TYPE__VDSM_SEND_PING", 8 },
   { "VDC_SEND_PONG", "VDCAPI__TYPE__VDC_SEND_PONG", 9 },
   { "VDC_SEND_ANNOUNCE_DEVICE", "VDCAPI__TYPE__VDC_SEND_ANNOUNCE_DEVICE", 10 },
@@ -564,41 +576,42 @@ const ProtobufCEnumValue vdcapi__type__enum_values_by_number[27] =
   { "VDC_SEND_ANNOUNCE_VDC", "VDCAPI__TYPE__VDC_SEND_ANNOUNCE_VDC", 23 },
   { "VDSM_NOTIFICATION_DIM_CHANNEL", "VDCAPI__TYPE__VDSM_NOTIFICATION_DIM_CHANNEL", 24 },
   { "VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE", "VDCAPI__TYPE__VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE", 25 },
-  { "VDSM_NOTIFICATION_CALL_DEVICE_ACTION", "VDCAPI__TYPE__VDSM_NOTIFICATION_CALL_DEVICE_ACTION", 26 },
-  { "VDSM_NOTIFICATION_SCAN_DEVICES", "VDCAPI__TYPE__VDSM_NOTIFICATION_SCAN_DEVICES", 27 },
+  { "VDSM_NOTIFICATION_SCAN_DEVICES", "VDCAPI__TYPE__VDSM_NOTIFICATION_SCAN_DEVICES", 26 },
+  { "VDSM_REQUEST_CALL_DEVICE_ACTION", "VDCAPI__TYPE__VDSM_REQUEST_CALL_DEVICE_ACTION", 27 },
+  { "VDSM_REQUEST_FIRMWARE_UPDATE", "VDCAPI__TYPE__VDSM_REQUEST_FIRMWARE_UPDATE", 28 },
 };
 static const ProtobufCIntRange vdcapi__type__value_ranges[] = {
-{1, 0},{0, 27}
+{1, 0},{8, 6},{0, 27}
 };
 const ProtobufCEnumValueIndex vdcapi__type__enum_values_by_name[27] =
 {
   { "GENERIC_RESPONSE", 0 },
   { "VDC_RESPONSE_GET_PROPERTY", 4 },
   { "VDC_RESPONSE_HELLO", 2 },
-  { "VDC_RESPONSE_SET_PROPERTY", 6 },
-  { "VDC_SEND_ANNOUNCE_DEVICE", 9 },
-  { "VDC_SEND_ANNOUNCE_VDC", 22 },
-  { "VDC_SEND_IDENTIFY", 21 },
-  { "VDC_SEND_PONG", 8 },
-  { "VDC_SEND_PUSH_PROPERTY", 11 },
-  { "VDC_SEND_VANISH", 10 },
-  { "VDSM_NOTIFICATION_CALL_DEVICE_ACTION", 25 },
-  { "VDSM_NOTIFICATION_CALL_MIN_SCENE", 18 },
-  { "VDSM_NOTIFICATION_CALL_SCENE", 14 },
-  { "VDSM_NOTIFICATION_DIM_CHANNEL", 23 },
-  { "VDSM_NOTIFICATION_IDENTIFY", 19 },
-  { "VDSM_NOTIFICATION_SAVE_SCENE", 15 },
-  { "VDSM_NOTIFICATION_SCAN_DEVICES", 26 },
-  { "VDSM_NOTIFICATION_SET_CONTROL_VALUE", 20 },
-  { "VDSM_NOTIFICATION_SET_LOCAL_PRIO", 17 },
-  { "VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE", 24 },
-  { "VDSM_NOTIFICATION_UNDO_SCENE", 16 },
+  { "VDC_SEND_ANNOUNCE_DEVICE", 8 },
+  { "VDC_SEND_ANNOUNCE_VDC", 21 },
+  { "VDC_SEND_IDENTIFY", 20 },
+  { "VDC_SEND_PONG", 7 },
+  { "VDC_SEND_PUSH_PROPERTY", 10 },
+  { "VDC_SEND_VANISH", 9 },
+  { "VDSM_NOTIFICATION_CALL_MIN_SCENE", 17 },
+  { "VDSM_NOTIFICATION_CALL_SCENE", 13 },
+  { "VDSM_NOTIFICATION_DIM_CHANNEL", 22 },
+  { "VDSM_NOTIFICATION_IDENTIFY", 18 },
+  { "VDSM_NOTIFICATION_SAVE_SCENE", 14 },
+  { "VDSM_NOTIFICATION_SCAN_DEVICES", 24 },
+  { "VDSM_NOTIFICATION_SET_CONTROL_VALUE", 19 },
+  { "VDSM_NOTIFICATION_SET_LOCAL_PRIO", 16 },
+  { "VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE", 23 },
+  { "VDSM_NOTIFICATION_UNDO_SCENE", 15 },
+  { "VDSM_REQUEST_CALL_DEVICE_ACTION", 25 },
+  { "VDSM_REQUEST_FIRMWARE_UPDATE", 26 },
   { "VDSM_REQUEST_GET_PROPERTY", 3 },
   { "VDSM_REQUEST_HELLO", 1 },
   { "VDSM_REQUEST_SET_PROPERTY", 5 },
-  { "VDSM_SEND_BYE", 13 },
-  { "VDSM_SEND_PING", 7 },
-  { "VDSM_SEND_REMOVE", 12 },
+  { "VDSM_SEND_BYE", 12 },
+  { "VDSM_SEND_PING", 6 },
+  { "VDSM_SEND_REMOVE", 11 },
 };
 const ProtobufCEnumDescriptor vdcapi__type__descriptor =
 {
@@ -611,7 +624,7 @@ const ProtobufCEnumDescriptor vdcapi__type__descriptor =
   vdcapi__type__enum_values_by_number,
   27,
   vdcapi__type__enum_values_by_name,
-  1,
+  2,
   vdcapi__type__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };

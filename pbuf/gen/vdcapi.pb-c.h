@@ -28,6 +28,8 @@ typedef struct _Vdcapi__PropertyElement Vdcapi__PropertyElement;
 typedef struct _Vdcapi__VdsmRequestGetProperty Vdcapi__VdsmRequestGetProperty;
 typedef struct _Vdcapi__VdcResponseGetProperty Vdcapi__VdcResponseGetProperty;
 typedef struct _Vdcapi__VdsmRequestSetProperty Vdcapi__VdsmRequestSetProperty;
+typedef struct _Vdcapi__VdsmRequestFirmwareUpdate Vdcapi__VdsmRequestFirmwareUpdate;
+typedef struct _Vdcapi__VdsmRequestCallDeviceAction Vdcapi__VdsmRequestCallDeviceAction;
 typedef struct _Vdcapi__VdsmSendPing Vdcapi__VdsmSendPing;
 typedef struct _Vdcapi__VdcSendPong Vdcapi__VdcSendPong;
 typedef struct _Vdcapi__VdcSendPushProperty Vdcapi__VdcSendPushProperty;
@@ -40,7 +42,6 @@ typedef struct _Vdcapi__VdsmNotificationIdentify Vdcapi__VdsmNotificationIdentif
 typedef struct _Vdcapi__VdsmNotificationSetControlValue Vdcapi__VdsmNotificationSetControlValue;
 typedef struct _Vdcapi__VdsmNotificationDimChannel Vdcapi__VdsmNotificationDimChannel;
 typedef struct _Vdcapi__VdsmNotificationSetOutputChannelValue Vdcapi__VdsmNotificationSetOutputChannelValue;
-typedef struct _Vdcapi__VdsmNotificationCallDeviceAction Vdcapi__VdsmNotificationCallDeviceAction;
 typedef struct _Vdcapi__VdsmNotificationScanDevices Vdcapi__VdsmNotificationScanDevices;
 
 
@@ -198,6 +199,33 @@ struct  _Vdcapi__VdsmRequestSetProperty
 #define VDCAPI__VDSM__REQUEST_SET_PROPERTY__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__request_set_property__descriptor) \
     , NULL, 0,NULL }
+
+
+struct  _Vdcapi__VdsmRequestFirmwareUpdate
+{
+  ProtobufCMessage base;
+  protobuf_c_boolean has_checkonly;
+  protobuf_c_boolean checkonly;
+  protobuf_c_boolean has_clearsettings;
+  protobuf_c_boolean clearsettings;
+};
+#define VDCAPI__VDSM__REQUEST_FIRMWARE_UPDATE__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__request_firmware_update__descriptor) \
+    , 0,0, 0,0 }
+
+
+struct  _Vdcapi__VdsmRequestCallDeviceAction
+{
+  ProtobufCMessage base;
+  size_t n_dsuid;
+  char **dsuid;
+  char *name;
+  size_t n_params;
+  Vdcapi__PropertyElement **params;
+};
+#define VDCAPI__VDSM__REQUEST_CALL_DEVICE_ACTION__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__request_call_device_action__descriptor) \
+    , 0,NULL, NULL, 0,NULL }
 
 
 struct  _Vdcapi__VdsmSendPing
@@ -390,24 +418,6 @@ struct  _Vdcapi__VdsmNotificationSetOutputChannelValue
     , 0,NULL, 0,1, 0,0, 0,0 }
 
 
-struct  _Vdcapi__VdsmNotificationCallDeviceAction
-{
-  ProtobufCMessage base;
-  size_t n_dsuid;
-  char **dsuid;
-  char *name;
-  size_t n_params;
-  Vdcapi__PropertyElement **params;
-  protobuf_c_boolean has_group;
-  int32_t group;
-  protobuf_c_boolean has_zone_id;
-  int32_t zone_id;
-};
-#define VDCAPI__VDSM__NOTIFICATION_CALL_DEVICE_ACTION__INIT \
- { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__notification_call_device_action__descriptor) \
-    , 0,NULL, NULL, 0,NULL, 0,0, 0,0 }
-
-
 struct  _Vdcapi__VdsmNotificationScanDevices
 {
   ProtobufCMessage base;
@@ -417,8 +427,8 @@ struct  _Vdcapi__VdsmNotificationScanDevices
   protobuf_c_boolean incremental;
   protobuf_c_boolean has_exhaustive;
   protobuf_c_boolean exhaustive;
-  protobuf_c_boolean has_clearconfig;
-  protobuf_c_boolean clearconfig;
+  protobuf_c_boolean has_clearsettings;
+  protobuf_c_boolean clearsettings;
 };
 #define VDCAPI__VDSM__NOTIFICATION_SCAN_DEVICES__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__notification_scan_devices__descriptor) \
@@ -672,6 +682,44 @@ Vdcapi__VdsmRequestSetProperty *
 void   vdcapi__vdsm__request_set_property__free_unpacked
                      (Vdcapi__VdsmRequestSetProperty *message,
                       ProtobufCAllocator *allocator);
+/* Vdcapi__VdsmRequestFirmwareUpdate methods */
+void   vdcapi__vdsm__request_firmware_update__init
+                     (Vdcapi__VdsmRequestFirmwareUpdate         *message);
+size_t vdcapi__vdsm__request_firmware_update__get_packed_size
+                     (const Vdcapi__VdsmRequestFirmwareUpdate   *message);
+size_t vdcapi__vdsm__request_firmware_update__pack
+                     (const Vdcapi__VdsmRequestFirmwareUpdate   *message,
+                      uint8_t             *out);
+size_t vdcapi__vdsm__request_firmware_update__pack_to_buffer
+                     (const Vdcapi__VdsmRequestFirmwareUpdate   *message,
+                      ProtobufCBuffer     *buffer);
+Vdcapi__VdsmRequestFirmwareUpdate *
+       vdcapi__vdsm__request_firmware_update__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   vdcapi__vdsm__request_firmware_update__free_unpacked
+                     (Vdcapi__VdsmRequestFirmwareUpdate *message,
+                      ProtobufCAllocator *allocator);
+/* Vdcapi__VdsmRequestCallDeviceAction methods */
+void   vdcapi__vdsm__request_call_device_action__init
+                     (Vdcapi__VdsmRequestCallDeviceAction         *message);
+size_t vdcapi__vdsm__request_call_device_action__get_packed_size
+                     (const Vdcapi__VdsmRequestCallDeviceAction   *message);
+size_t vdcapi__vdsm__request_call_device_action__pack
+                     (const Vdcapi__VdsmRequestCallDeviceAction   *message,
+                      uint8_t             *out);
+size_t vdcapi__vdsm__request_call_device_action__pack_to_buffer
+                     (const Vdcapi__VdsmRequestCallDeviceAction   *message,
+                      ProtobufCBuffer     *buffer);
+Vdcapi__VdsmRequestCallDeviceAction *
+       vdcapi__vdsm__request_call_device_action__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   vdcapi__vdsm__request_call_device_action__free_unpacked
+                     (Vdcapi__VdsmRequestCallDeviceAction *message,
+                      ProtobufCAllocator *allocator);
 /* Vdcapi__VdsmSendPing methods */
 void   vdcapi__vdsm__send_ping__init
                      (Vdcapi__VdsmSendPing         *message);
@@ -900,25 +948,6 @@ Vdcapi__VdsmNotificationSetOutputChannelValue *
 void   vdcapi__vdsm__notification_set_output_channel_value__free_unpacked
                      (Vdcapi__VdsmNotificationSetOutputChannelValue *message,
                       ProtobufCAllocator *allocator);
-/* Vdcapi__VdsmNotificationCallDeviceAction methods */
-void   vdcapi__vdsm__notification_call_device_action__init
-                     (Vdcapi__VdsmNotificationCallDeviceAction         *message);
-size_t vdcapi__vdsm__notification_call_device_action__get_packed_size
-                     (const Vdcapi__VdsmNotificationCallDeviceAction   *message);
-size_t vdcapi__vdsm__notification_call_device_action__pack
-                     (const Vdcapi__VdsmNotificationCallDeviceAction   *message,
-                      uint8_t             *out);
-size_t vdcapi__vdsm__notification_call_device_action__pack_to_buffer
-                     (const Vdcapi__VdsmNotificationCallDeviceAction   *message,
-                      ProtobufCBuffer     *buffer);
-Vdcapi__VdsmNotificationCallDeviceAction *
-       vdcapi__vdsm__notification_call_device_action__unpack
-                     (ProtobufCAllocator  *allocator,
-                      size_t               len,
-                      const uint8_t       *data);
-void   vdcapi__vdsm__notification_call_device_action__free_unpacked
-                     (Vdcapi__VdsmNotificationCallDeviceAction *message,
-                      ProtobufCAllocator *allocator);
 /* Vdcapi__VdsmNotificationScanDevices methods */
 void   vdcapi__vdsm__notification_scan_devices__init
                      (Vdcapi__VdsmNotificationScanDevices         *message);
@@ -979,6 +1008,12 @@ typedef void (*Vdcapi__VdcResponseGetProperty_Closure)
 typedef void (*Vdcapi__VdsmRequestSetProperty_Closure)
                  (const Vdcapi__VdsmRequestSetProperty *message,
                   void *closure_data);
+typedef void (*Vdcapi__VdsmRequestFirmwareUpdate_Closure)
+                 (const Vdcapi__VdsmRequestFirmwareUpdate *message,
+                  void *closure_data);
+typedef void (*Vdcapi__VdsmRequestCallDeviceAction_Closure)
+                 (const Vdcapi__VdsmRequestCallDeviceAction *message,
+                  void *closure_data);
 typedef void (*Vdcapi__VdsmSendPing_Closure)
                  (const Vdcapi__VdsmSendPing *message,
                   void *closure_data);
@@ -1015,9 +1050,6 @@ typedef void (*Vdcapi__VdsmNotificationDimChannel_Closure)
 typedef void (*Vdcapi__VdsmNotificationSetOutputChannelValue_Closure)
                  (const Vdcapi__VdsmNotificationSetOutputChannelValue *message,
                   void *closure_data);
-typedef void (*Vdcapi__VdsmNotificationCallDeviceAction_Closure)
-                 (const Vdcapi__VdsmNotificationCallDeviceAction *message,
-                  void *closure_data);
 typedef void (*Vdcapi__VdsmNotificationScanDevices_Closure)
                  (const Vdcapi__VdsmNotificationScanDevices *message,
                   void *closure_data);
@@ -1040,6 +1072,8 @@ extern const ProtobufCMessageDescriptor vdcapi__property_element__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__request_get_property__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdc__response_get_property__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__request_set_property__descriptor;
+extern const ProtobufCMessageDescriptor vdcapi__vdsm__request_firmware_update__descriptor;
+extern const ProtobufCMessageDescriptor vdcapi__vdsm__request_call_device_action__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__send_ping__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdc__send_pong__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdc__send_push_property__descriptor;
@@ -1052,7 +1086,6 @@ extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_identify__des
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_set_control_value__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_dim_channel__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_set_output_channel_value__descriptor;
-extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_call_device_action__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__vdsm__notification_scan_devices__descriptor;
 
 PROTOBUF_C__END_DECLS
