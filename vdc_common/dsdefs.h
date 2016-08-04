@@ -355,7 +355,7 @@ typedef enum {
 ///   but are now used as a generic value type system (e.g. in actions and states parameters)
 typedef enum {
   valueType_none = 0,
-  // physical values
+  // physical double values
   valueType_temperature = 1, ///< temperature in degrees celsius
   valueType_humidity = 2, ///< relative humidity in %
   valueType_illumination = 3, ///< illumination in lux
@@ -379,14 +379,19 @@ typedef enum {
   valueType_precipitation = 21, ///< Precipitation in mm/m2
   valueType_gas_CO2 = 22, ///< CO2 (carbon dioxide) concentration in ppm
   valueType_time = 23, ///< time in seconds
-  // generic and non-numeric types
+  // generic but still double numeric types
+  valueType_firstGenericNum = 100, ///< first generic numeric type
   valueType_percentage = 100, ///< percentage 0..100, such as fill level of something
-  valueType_integer = 101, ///< a generic integer (implies resolution==1)
-  valueType_float = 102, ///< a generic float
-  valueType_bool = 103, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
-  valueType_enum = 110, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
-  valueType_textenum = 111, ///< one item from a list of text. Internally represented as an unsigned integer.
-  valueType_text = 120, ///< text parameters for actions
+  valueType_float = 101, ///< a generic float
+  // generic integer types
+  valueType_firstIntNum = 120, ///< first integer numeric type
+  valueType_integer = 120, ///< a generic integer (implies resolution==1)
+  valueType_enum = 121, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
+  valueType_bool = 122, ///< technically an unsigned integer, 0 or 1
+  // non-numeric types
+  valueType_firstNonNumeric = 200, ///< first generic non-numeric type
+  valueType_textenum = 200, ///< one item from a list of text. Internally represented as an unsigned integer or enum
+  valueType_text = 201, ///< text parameters for actions
 } VdcValueType;
 
 
