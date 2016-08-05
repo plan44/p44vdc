@@ -272,9 +272,10 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_pushbutton:
     case modelFeature_pushbarea:
     case modelFeature_pushbadvanced:
-    case modelFeature_pushbsensor:
       // Assumption: any device with a buttonInputBehaviour has these props
       return buttons.size()>0 ? yes : no;
+    case modelFeature_pushbsensor:
+      return no; // we definitely don't have buttons that can be converted to sensors
     case modelFeature_pushbdevice:
       // Check if any of the buttons has localbutton functionality available
       for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) {
