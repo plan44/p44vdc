@@ -57,31 +57,16 @@ namespace p44 {
     /// @{
 
     /// checks if aApiValue conforms to the parameter definition
-    /// @param aApiValue API value containing a value to be used for this parameter
-    /// @return true if the value conforms, false if not
-    /// @note providing no value conforms when the parameter has a default value
-    virtual bool conforms(ApiValuePtr aApiValue) { return false; /* base class does not conform to anything */ };
+    /// @param aApiValue API value containing a value to be used for this parameter. No value at all (NULL) counts as conforming.
+    /// @param aMakeInternal if set, the value is converted to internal format (relevant for enums, to get them as numeric value)
+    /// @return NULL if the value conforms, API error describing what's wrong if not
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) = 0;
 
-    /// checks if aApiValue is a value suitable for this param and return it as double value
-    /// @param aApiValue API value containing a value to be used for this parameter
-    /// @return double value
-    /// @note aApiValue should be checked with conforms() before trying to extract value
-    /// @note if no aApiValue is passed, and there is a default value, the default value is returned
-    virtual double doubleValue(ApiValuePtr aApiValue) { return 0; /* dummy result */ };
-
-    /// checks if aApiValue is a value suitable for this param and return it as int value
-    /// @param aApiValue API value containing a value to be used for this parameter
-    /// @return int value
-    /// @note aApiValue should be checked with conforms() before trying to extract value
-    /// @note if no aApiValue is passed, and there is a default value, the default value is returned
-    virtual int intValue(ApiValuePtr aApiValue) { return 0; /* dummy result */ };
-
-    /// checks if aApiValue is a value suitable for this param and return it as string value
-    /// @param aApiValue API value containing a value to be used for this parameter
-    /// @return string value
-    /// @note aApiValue should be checked with conforms() before trying to extract value
-    /// @note if no aApiValue is passed, and there is a default value, the default value is returned
-    virtual string stringValue(ApiValuePtr aApiValue) { return ""; /* dummy result */ };
+    /// get the (default) value into an ApiValue
+    /// @param aApiValue the API value to write the value to
+    /// @param aAsInternal if set, the value is returned in internal format (relevant for enums, to get them as numeric value)
+    /// @return true if there is a (default) value that could be assigned to aApiValue, false otherwise (aApiValue will be untouched)
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) = 0;
 
     /// @}
 
@@ -110,9 +95,9 @@ namespace p44 {
     VdcValueType valueType; ///< the type of the parameter
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
   };
   typedef boost::intrusive_ptr<ValueDescriptor> ValueDescriptorPtr;
 
@@ -133,18 +118,15 @@ namespace p44 {
     NumericValueDescriptor(VdcValueType aValueType, double aMin, double aMax, double aResolution, bool aHasDefault, double aDefaultValue = 0) :
       inherited(aValueType, aHasDefault), min(aMin), max(aMax), resolution(aResolution), value(aDefaultValue) {};
 
-    // check and return values for this parameter
-    virtual bool conforms(ApiValuePtr aApiValue);
-    virtual double doubleValue(ApiValuePtr aApiValue);
-    virtual int intValue(ApiValuePtr aApiValue);
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
 
-    // set the value (for updating states)
-    virtual void setDoubleValue(double aValue) { value = aValue; };
-    virtual void setIntValue(int aValue) { value = aValue; };
+    virtual void setDoubleValue(double aValue) P44_OVERRIDE { value = aValue; };
+    virtual void setIntValue(int aValue) P44_OVERRIDE { value = aValue; };
 
   protected:
 
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   };
 
@@ -162,16 +144,14 @@ namespace p44 {
     TextValueDescriptor(bool aHasDefault, const string aDefaultValue = "") :
       inherited(valueType_text, aHasDefault), value(aDefaultValue) {};
 
-    // check and return values for this parameter
-    virtual bool conforms(ApiValuePtr aApiValue);
-    virtual string stringValue(ApiValuePtr aApiValue);
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
 
-    // set the value (for updating states)
-    virtual void setStringValue(const string aValue) { value = aValue; };
+    virtual void setStringValue(const string aValue) P44_OVERRIDE { value = aValue; };
 
   protected:
 
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     
   };
 
@@ -198,33 +178,31 @@ namespace p44 {
     /// @param aIsDefault if set, this is considered the default value
     void addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault = false);
 
-    // check and return values for this parameter
-    virtual bool conforms(ApiValuePtr aApiValue);
-    virtual int intValue(ApiValuePtr aApiValue);
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
 
-    // set the value (for updating states)
-    virtual void setIntValue(int aValue) { value = aValue; };
+    virtual void setIntValue(int aValue) P44_OVERRIDE { value = aValue; };
 
   protected:
 
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     
   };
 
 
-  class ValueList P44_FINAL : public PropertyContainer
+  class ValueList : public PropertyContainer
   {
     typedef PropertyContainer inherited;
+
+  public:
 
     typedef pair<string, ValueDescriptorPtr> ValueEntry;
     typedef vector<ValueEntry> ValuesVector;
 
     ValuesVector values;
-
-  public:
 
     /// add a value (descriptor)
     /// @param aValueDesc a value descriptor object.
@@ -232,9 +210,9 @@ namespace p44 {
 
   protected:
 
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<ValueList> ValueListPtr;
@@ -245,11 +223,12 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
+    string actionDescription; ///< a descriptive string for the action (for logs and debugging)
+    ValueListPtr actionParams; ///< the parameter descriptions of this action
 
-    /// a descriptive string for the action (for logs and debugging)
-    string actionDescription;
-    /// the parameter descriptions of this action
-    ValueListPtr actionParams;
+  protected:
+
+    SingleDevice *singleDeviceP; ///< the single device this action belongs to
 
   public:
 
@@ -258,26 +237,35 @@ namespace p44 {
     /// @param aDescription a description string for the action.
     DeviceAction(SingleDevice &aSingleDevice, const string aDescription);
 
+    /// add parameter
+    /// @param aValueDesc a value descriptor object.
+    void addParameter(const string aParameterName, ValueDescriptorPtr aValueDesc);
+
+
     /// call the action
     /// @param aParams an ApiValue of type apivalue_object, expected to
     ///   contain parameters matching the actual parameters available in the action
+    /// @param aCompletedCB must be called when call has completed
     /// @note this public method will verify that the parameter name and values match the action's parameter description
     ///   and prevent calling subclass' performCall() when parameters are not ok.
-    void call(ApiValuePtr aParams);
+    void call(ApiValuePtr aParams, StatusCB aCompletedCB);
 
   protected:
 
     /// action implementation.
-    /// @param aParams an ApiValue of type apivalue_object, containing ALL parameters in the description, either from defaults
+    /// @param aParams an ApiValue of type apivalue_object, containing ALL parameters in the description (in internal
+    ///   format, which means enums as unsigned ints, not text). These are obtained either from defaults
     ///   or from overriding values specified to the call() method.
+    /// @param aCompletedCB must be called when call has completed
     /// @note this method is usually overridden by specific device subclasses actually implementing functionality
-    virtual void performCall(ApiValuePtr aParams) { /* NOP in base class */ };
+    /// @note base class just returns 
+    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB);
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
   };
   typedef boost::intrusive_ptr<DeviceAction> DeviceActionPtr;
 
@@ -288,27 +276,41 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
-    typedef map<string, DeviceActionPtr> DeviceActionMap;
+    typedef pair<string, DeviceActionPtr> ActionEntry;
+    typedef vector<ActionEntry> ActionsVector;
 
-    DeviceActionMap deviceActions;
+    ActionsVector deviceActions;
 
   public:
+
+    /// call an action
+    /// @param aAction name of the action to call
+    /// @param aParams an ApiValue of type apivalue_object, expected to
+    ///   contain parameters matching the actual parameters available in the action
+    /// @param aCompletedCB must be called when call has completed
+    /// @note this public method will verify that the parameter name and values match the action's parameter description
+    ///   and prevent calling subclass' performCall() when parameters are not ok.
+    void call(const string aAction, ApiValuePtr aParams, StatusCB aCompletedCB);
+
+    /// add an action (at device setup time only)
+    /// @param aName name of the action to add
+    /// @param aAction the action
+    void addAction(const string aName, DeviceActionPtr aAction);
 
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    
   };
   typedef boost::intrusive_ptr<DeviceActions> DeviceActionsPtr;
 
 
 
 
-  class CustomAction : public PropertyContainer
+  class CustomAction P44_FINAL : public PropertyContainer, public PersistentParams
   {
     typedef PropertyContainer inherited;
 
@@ -327,24 +329,25 @@ namespace p44 {
 
     /// call the custom action
     /// @param aParams an ApiValue of type apivalue_object, may be used to override stored parameters
-    void call(ApiValuePtr aParams);
+    /// @param aCompletedCB must be called when call has completed
+    void call(ApiValuePtr aParams, StatusCB aCompletedCB);
 
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numKeyDefs();
-    virtual const FieldDefinition *getKeyDef(size_t aIndex);
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE P44_FINAL;
+    virtual size_t numKeyDefs() P44_OVERRIDE P44_FINAL;
+    virtual const FieldDefinition *getKeyDef(size_t aIndex) P44_OVERRIDE P44_FINAL;
+    virtual size_t numFieldDefs() P44_OVERRIDE P44_FINAL;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE P44_FINAL;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE P44_FINAL;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE P44_FINAL;
 
   };
   typedef boost::intrusive_ptr<CustomAction> CustomActionPtr;
@@ -355,9 +358,10 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
-    typedef map<string, CustomActionPtr> CustomActionMap;
+    typedef pair<string, CustomActionPtr> CustomActionEntry;
+    typedef vector<CustomActionEntry> CustomActionsVector;
 
-    CustomActionMap customActions;
+    CustomActionsVector customActions;
 
   public:
 
@@ -410,8 +414,10 @@ namespace p44 {
     typedef PropertyContainer inherited;
 
     typedef map<string, DeviceStatePtr> DeviceStateMap;
+    typedef pair<string, DeviceStatePtr> DeviceStateEntry;
+    typedef vector<DeviceStateEntry> DeviceStatesVector;
 
-    DeviceStateMap deviceStates;
+    DeviceStatesVector deviceStates;
 
   public:
 
@@ -428,6 +434,21 @@ namespace p44 {
   typedef boost::intrusive_ptr<DeviceStates> DeviceStatesPtr;
 
 
+
+  /// class representing the device-specific properties
+  class DeviceProperties P44_FINAL : public ValueList
+  {
+    typedef ValueList inherited;
+
+  public:
+
+    /// add a property (at device setup time only)
+    /// @param aName name of the property to add
+    /// @param aPropertyDesc value descriptor describing the property
+    void addProperty(const string aName, ValueDescriptorPtr aPropertyDesc);
+
+  };
+  typedef boost::intrusive_ptr<DeviceProperties> DevicePropertiesPtr;
 
 
 
@@ -449,7 +470,7 @@ namespace p44 {
     DeviceActionsPtr customActions; /// the device's custom actions
     DeviceStatesPtr deviceStates; /// the device's states
 
-    ValueListPtr deviceProperties; /// the device's specific properties
+    DevicePropertiesPtr deviceProperties; /// the device's specific properties
 
 
   public:
@@ -497,13 +518,6 @@ namespace p44 {
     ///   used already to route the method call to this DsAddressable.
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
 
-    /// call action on this device
-    /// @param aActionName the name of the action to call.
-    /// @param aActionParams the action parameters (can be null)
-    /// @return ok or error
-    ErrorPtr callDeviceAction(const string aActionName, ApiValuePtr aActionParams);
-    
-
     /// @}
 
   protected:
@@ -515,6 +529,7 @@ namespace p44 {
 
   private:
 
+    void actionCallComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
 
   };
 

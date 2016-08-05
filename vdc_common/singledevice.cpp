@@ -62,8 +62,8 @@ PropertyDescriptorPtr ValueDescriptor::getDescriptorByIndex(int aPropIndex, int 
     { "type", apivalue_uint64, type_key, OKEY(param_key) },
     { "min", apivalue_double, min_key, OKEY(param_key) },
     { "max", apivalue_double, max_key, OKEY(param_key) },
-    { "resolution", apivalue_double, max_key, OKEY(param_key) },
-    { "default", apivalue_null, max_key, OKEY(param_key) },
+    { "resolution", apivalue_double, resolution_key, OKEY(param_key) },
+    { "default", apivalue_null, default_key, OKEY(param_key) },
     { "values", apivalue_object+propflag_container, enumvalues_key, OKEY(param_enumvalues_key) }
   };
   if (!aParentDescriptor) {
@@ -88,43 +88,58 @@ bool ValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 // MARK: ===== NumericValueDescriptor
 
-bool NumericValueDescriptor::conforms(ApiValuePtr aApiValue)
+ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
 {
-  if (!aApiValue && hasValue) return true; // no value provided, but there is a default value -> conforms
+  ErrorPtr err;
   // check if value conforms
   ApiValueType vt = aApiValue->getType();
   if (valueType==valueType_bool) {
     // bool parameter, valuetype should be int or bool
-    return
-      vt==apivalue_bool ||
-      vt==apivalue_int64 ||
-      vt==apivalue_uint64;
+    if (
+      vt!=apivalue_bool &&
+      vt!=apivalue_int64 &&
+      vt!=apivalue_uint64
+    ) {
+      err = ErrorPtr(new VdcApiError(415, "invalid boolean"));
+    }
   }
   else if (valueType<valueType_firstNonNumeric) {
     // check bounds
     double v = aApiValue->doubleValue();
-    return v>=min && v<=max;
+    if (v<min || v>max) {
+      err = ErrorPtr(new VdcApiError(415, "number out of range"));
+    }
+  }
+  else {
+    err = ErrorPtr(new VdcApiError(415, "invalid number"));
   }
   // everything else is not valid for numeric parameter
-  return false;
+  return err;
 }
 
 
-double NumericValueDescriptor::doubleValue(ApiValuePtr aApiValue)
+bool NumericValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal)
 {
-  if (!aApiValue) return value;
-  return aApiValue->doubleValue();
+  if (!hasValue || !aApiValue) return false;
+  if (valueType==valueType_bool) {
+    aApiValue->setType(apivalue_bool);
+    aApiValue->setBoolValue(value);
+  }
+  else if (valueType==valueType_enum) {
+    aApiValue->setType(apivalue_int64);
+    aApiValue->setUint64Value(value);
+  }
+  else if (valueType>=valueType_firstIntNum) {
+    aApiValue->setType(apivalue_int64);
+    aApiValue->setInt64Value(value);
+  }
+  else {
+    aApiValue->setType(apivalue_double);
+    aApiValue->setDoubleValue(value);
+  }
+  return true;
 }
 
-
-int NumericValueDescriptor::intValue(ApiValuePtr aApiValue)
-{
-  if (!aApiValue) return value;
-  if (valueType==valueType_bool)
-    return aApiValue->boolValue(); // needed to catch real bools
-  // all other numerics 
-  return aApiValue->doubleValue(); // most generic, will catch ints and uints as well
-}
 
 
 bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
@@ -136,21 +151,7 @@ bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr a
         case min_key: aPropValue->setDoubleValue(min); return true;
         case max_key: aPropValue->setDoubleValue(max); return true;
         case resolution_key: aPropValue->setDoubleValue(resolution); return true;
-        case default_key: {
-          if (!hasValue) return false; // no (default) value, don't show it
-          if (valueType<valueType_firstIntNum) {
-            aPropValue->setType(apivalue_double);
-            aPropValue->setDoubleValue(value);
-          }
-          else if (valueType==valueType_bool) {
-            aPropValue->setType(apivalue_bool);
-            aPropValue->setBoolValue(value);
-          }
-          else {
-            aPropValue->setType(apivalue_int64);
-            aPropValue->setInt64Value(value);
-          }
-        }
+        case default_key: return getValue(aPropValue);
       }
     }
   }
@@ -160,19 +161,26 @@ bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr a
 
 // MARK: ===== TextValueDescriptor
 
-bool TextValueDescriptor::conforms(ApiValuePtr aApiValue)
+ErrorPtr TextValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
 {
-  if (!aApiValue && hasValue)
-    return true; // no value provided, but there is a default value -> conforms
-  // check if value conforms
-  return aApiValue->getType()==apivalue_string;
+  ErrorPtr err;
+  if (aApiValue) {
+    // check if value conforms
+    if (aApiValue->getType()!=apivalue_string) {
+      err = ErrorPtr(new VdcApiError(415, "invalid string"));
+    }
+  }
+  return err;
 }
 
 
-string TextValueDescriptor::stringValue(ApiValuePtr aApiValue)
+
+bool TextValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal)
 {
-  if (!aApiValue) return value;
-  return aApiValue->stringValue();
+  if (!hasValue || !aApiValue) return false;
+  aApiValue->setType(apivalue_string);
+  aApiValue->setStringValue(value);
+  return true;
 }
 
 
@@ -180,12 +188,7 @@ bool TextValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPro
 {
   if (aPropertyDescriptor->hasObjectKey(param_key) && aMode==access_read) {
     switch (aPropertyDescriptor->fieldKey()) {
-      case default_key: {
-        if (!hasValue) return false; // no (default) value, don't show it
-        aPropValue->setType(apivalue_string);
-        aPropValue->setStringValue(value);
-        return true;
-      }
+      case default_key: return getValue(aPropValue);
     }
   }
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
@@ -202,29 +205,52 @@ void EnumValueDescriptor::addEnum(const char *aEnumText, int aEnumValue, bool aI
 }
 
 
-bool EnumValueDescriptor::conforms(ApiValuePtr aApiValue)
+ErrorPtr EnumValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
 {
-  if (!aApiValue && hasValue) return true; // no value provided, but there is a default value -> conforms
-  // check if value conforms
-  if (aApiValue->getType()!=apivalue_string) return false; // must be string
-  // must be one of the texts in the enum list
-  string s = aApiValue->stringValue();
-  for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
-    if (pos->first==s) return true;
+  ErrorPtr err;
+  if (aApiValue) {
+    // check if value conforms
+    if (aApiValue->getType()!=apivalue_string) {
+      err = ErrorPtr(new VdcApiError(415, "enum label must be string"));
+    }
+    else {
+      // must be one of the texts in the enum list
+      string s = aApiValue->stringValue();
+      for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
+        if (pos->first==s) {
+          // found
+          if (aMakeInternal) {
+            aApiValue->setType(apivalue_uint64);
+            aApiValue->setUint32Value(pos->second);
+          }
+          return err;
+        }
+      }
+      err = ErrorPtr(new VdcApiError(415, "invalid enum label"));
+    }
   }
-  return false;
+  return err;
 }
 
 
-int EnumValueDescriptor::intValue(ApiValuePtr aApiValue)
+bool EnumValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal)
 {
-  if (!aApiValue) return value;
-  // look up enum value
-  string s = aApiValue->stringValue();
-  for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
-    if (pos->first==s) return pos->second;
+  if (!hasValue || !aApiValue) return false;
+  if (aAsInternal) {
+    aApiValue->setType(apivalue_uint64);
+    aApiValue->setUint32Value(value);
+    return true;
   }
-  return 0;
+  else {
+    aApiValue->setType(apivalue_string);
+    for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
+      if (pos->second==value) {
+        aApiValue->setStringValue(pos->first);
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 
@@ -328,23 +354,206 @@ PropertyContainerPtr ValueList::getContainer(PropertyDescriptorPtr &aPropertyDes
 }
 
 
+// MARK: ===== DeviceAction
+
+DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aDescription) :
+  singleDeviceP(&aSingleDevice),
+  actionDescription(aDescription)
+{
+  // install value list for parameters
+  actionParams = ValueListPtr(new ValueList);
+}
+
+
+void DeviceAction::addParameter(const string aParameterName, ValueDescriptorPtr aValueDesc)
+{
+  actionParams->addValueDescriptor(aParameterName, aValueDesc);
+}
+
+
+void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
+{
+  ErrorPtr err;
+
+  // for each parameter of the action, we either need a value in aParams or a default value
+  ValueList::ValuesVector::iterator pos = actionParams->values.begin();
+  while (pos!=actionParams->values.end()) {
+    // check for override from passed params
+    ApiValuePtr o = aParams->get(pos->first);
+    if (o) {
+      // caller did supply this parameter
+      err = pos->second->conforms(o, true); // check and convert to internal (for text enums)
+      if (!Error::isOK(err))
+        break; // error
+    }
+    else {
+      // called did not supply this parameter, get default value
+      o = aParams->newNull();
+      if (!pos->second->getValue(o)) {
+        err = ErrorPtr(new VdcApiError(415, "missing value for non-optional parameter"));
+        break;
+      }
+      // add the default to the passed params
+      aParams->add(pos->first, o);
+    }
+    ++pos;
+  }
+  if (!Error::isOK(err)) {
+    // rewrite error to include param name
+    if (pos!=actionParams->values.end() && err->isDomain(VdcApiError::domain())) {
+      err = ErrorPtr(new VdcApiError(err->getErrorCode(), string_format("parameter '%s': %s", pos->first.c_str(), err->description().c_str())));
+    }
+    // parameter error, not executing action, call back with error
+    if (aCompletedCB) aCompletedCB(err);
+    return; // done
+  }
+  // parameters are ok, now invoking action implementation
+  LOG(LOG_INFO, "- calling with expanded params: %s", aParams->description().c_str());
+  performCall(aParams, aCompletedCB);
+}
+
+
+
+void DeviceAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
+{
+  if (aCompletedCB) aCompletedCB(ErrorPtr(new VdcApiError(501, "dummy action - not implemented")));
+}
+
+
+// MARK: ===== DeviceAction property access
+
+enum {
+  description_key,
+  params_key,
+  numActionProperties
+};
+
+static char deviceaction_key;
+
+
+int DeviceAction::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return numActionProperties;
+}
+
+
+PropertyDescriptorPtr DeviceAction::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  // device level properties
+  static const PropertyDescription properties[numActionProperties] = {
+    { "description", apivalue_string, description_key, OKEY(deviceaction_key) },
+    { "params", apivalue_object, params_key, OKEY(deviceaction_key) }
+  };
+  if (!aParentDescriptor) {
+    // root level property of this object hierarchy
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+PropertyContainerPtr DeviceAction::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->hasObjectKey(deviceaction_key)) {
+    if (aPropertyDescriptor->fieldKey()==params_key) {
+      return actionParams;
+    }
+  }
+  return NULL;
+}
+
+
+bool DeviceAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(deviceaction_key) && aMode==access_read) {
+    switch (aPropertyDescriptor->fieldKey()) {
+      case description_key: aPropValue->setStringValue(actionDescription); return true;
+    }
+  }
+  return false;
+}
+
+
+// MARK: ===== DeviceActions container
+
+
+int DeviceActions::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return (int)deviceActions.size();
+}
+
+
+static char actions_key;
+
+PropertyDescriptorPtr DeviceActions::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  // enumvalues - distinct set of NULL values (only names count)
+  if (aPropIndex<deviceActions.size()) {
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = deviceActions[aPropIndex].first;
+    descP->propertyType = apivalue_object;
+    descP->propertyFieldKey = aPropIndex;
+    descP->propertyObjectKey = OKEY(actions_key);
+    return descP;
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+PropertyContainerPtr DeviceActions::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->hasObjectKey(actions_key)) {
+    return deviceActions[aPropertyDescriptor->fieldKey()].second;
+  }
+  return NULL;
+}
+
+
+void DeviceActions::call(const string aAction, ApiValuePtr aParams, StatusCB aCompletedCB)
+{
+  for (ActionsVector::iterator pos = deviceActions.begin(); pos!=deviceActions.end(); ++pos) {
+    if (pos->first==aAction) {
+      // call it
+      pos->second->call(aParams, aCompletedCB);
+      return; // done, callback will finish it
+    }
+  }
+  // action does not exist
+  if (aCompletedCB) {
+    aCompletedCB(ErrorPtr(new VdcApiError(501, string_format("standard action '%s' not implemented", aAction.c_str()))));
+  }
+}
+
+
+void DeviceActions::addAction(const string aName, DeviceActionPtr aAction)
+{
+  deviceActions.push_back(ActionEntry(aName, aAction));
+}
+
+
+// MARK: ===== DeviceProperties
+
+
+void DeviceProperties::addProperty(const string aName, ValueDescriptorPtr aPropertyDesc)
+{
+  values.push_back(ValueEntry(aName, aPropertyDesc));
+}
+
+
+
+
 
 // MARK: ===== SingleDevice
+
 
 SingleDevice::SingleDevice(Vdc *aVdcP) :
   inherited(aVdcP)
 {
-  // TODO: create actions & states
+  // create actions
+  deviceActions = DeviceActionsPtr(new DeviceActions);
   // create device properties
-  // FIXME: %%% test only, later this will be a more specific object
-  deviceProperties = ValueListPtr(new ValueList);
-  deviceProperties->addValueDescriptor("testDbl", ValueDescriptorPtr(new NumericValueDescriptor(valueType_temperature, -10, 40, 0.5, true, 21)));
-  deviceProperties->addValueDescriptor("testText", ValueDescriptorPtr(new TextValueDescriptor(false)));
-  EnumValueDescriptor *ev = new EnumValueDescriptor(true);
-  ev->addEnum("piff", 1);
-  ev->addEnum("paff", 2);
-  ev->addEnum("puff", 42, true);
-  deviceProperties->addValueDescriptor("testEnum", ev);
+  deviceProperties = DevicePropertiesPtr(new DeviceProperties);
+  // TODO: create custome actions & states
 }
 
 
@@ -411,23 +620,21 @@ ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
         actionParams = aParams->newObject();
       }
       // now call the action
-      respErr = callDeviceAction(action, actionParams);
+      ALOG(LOG_NOTICE, "callDeviceAction: %s:%s", action.c_str(), actionParams->description().c_str());
+      // TODO: check custom actions first
+      deviceActions->call(action, actionParams, boost::bind(&SingleDevice::actionCallComplete, this, aRequest, _1));
+      // callback will create the response
+      return ErrorPtr(); // do not return anything now
     }
   }
-  else {
-    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
-  }
-  return respErr;
+  return inherited::handleMethod(aRequest, aMethod, aParams);
 }
 
 
-
-ErrorPtr SingleDevice::callDeviceAction(const string aActionName, ApiValuePtr aActionParams)
+void SingleDevice::actionCallComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
 {
-  ErrorPtr respErr;
-  // TODO: implement it!
-  respErr =  ErrorPtr(new VdcApiError(404, "unknown device action"));
-  return respErr;
+  ALOG(LOG_NOTICE, "- call completed with status %s", Error::isOK(aError) ? "OK" : aError->description().c_str());
+  aRequest->sendStatus(aError);
 }
 
 
@@ -437,6 +644,7 @@ ErrorPtr SingleDevice::callDeviceAction(const string aActionName, ApiValuePtr aA
 
 enum {
   // singledevice level properties
+  deviceActions_key,
   devicePropertyDescriptions_key,
   numSimpleDeviceProperties
 };
@@ -459,6 +667,7 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
   // device level properties
   static const PropertyDescription properties[numSimpleDeviceProperties] = {
     // common device properties
+    { "deviceActions", apivalue_object, deviceActions_key, OKEY(singledevice_key) },
     { "devicePropertyDescriptions", apivalue_object, devicePropertyDescriptions_key, OKEY(singledevice_key) }
   };
   // C++ object manages different levels, check aParentDescriptor
@@ -478,8 +687,12 @@ PropertyContainerPtr SingleDevice::getContainer(PropertyDescriptorPtr &aProperty
 {
   // containers are elements from the behaviour arrays
   if (aPropertyDescriptor->hasObjectKey(singledevice_key)) {
-    if (aPropertyDescriptor->fieldKey()==devicePropertyDescriptions_key)
-      return deviceProperties;
+    switch (aPropertyDescriptor->fieldKey()) {
+      case deviceActions_key:
+        return deviceActions;
+      case devicePropertyDescriptions_key:
+        return deviceProperties;
+    }
   }
   // unknown here
   return inherited::getContainer(aPropertyDescriptor, aDomain);
