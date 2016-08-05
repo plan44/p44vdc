@@ -379,6 +379,7 @@ typedef enum {
   valueType_precipitation = 21, ///< Precipitation in mm/m2
   valueType_gas_CO2 = 22, ///< CO2 (carbon dioxide) concentration in ppm
   valueType_time = 23, ///< time in seconds
+  valueType_molarconcentration = 24, ///< molar concentration in mol/m3
   // generic but still double numeric types
   valueType_firstGenericNum = 100, ///< first generic numeric type
   valueType_percentage = 100, ///< percentage 0..100, such as fill level of something
