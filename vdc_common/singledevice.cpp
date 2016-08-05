@@ -697,3 +697,74 @@ PropertyContainerPtr SingleDevice::getContainer(PropertyDescriptorPtr &aProperty
   // unknown here
   return inherited::getContainer(aPropertyDescriptor, aDomain);
 }
+
+
+
+// MARK: ======= misc utils
+
+ErrorPtr p44::substitutePlaceholders(string &aString, ValueLookupCB aValueLookupCB)
+{
+  ErrorPtr err;
+  size_t p = 0;
+  // Syntax of placeholders:
+  //   @{var[*ff][+|-oo][%frac]}
+  //   ff is an optional float factor to scale the channel value
+  //   oo is an float offset to apply
+  //   frac are number of fractional digits to use in output
+  while ((p = aString.find("@{",p))!=string::npos) {
+    size_t e = aString.find("}",p+2);
+    if (e==string::npos) {
+      // syntactically incorrect, no closing "}"
+      err = TextError::err("unterminated placeholder: %s", aString.c_str()+p);
+      break;
+    }
+    string v = aString.substr(p+2,e-2-p);
+    // process operations
+    double chfactor = 1;
+    double choffset = 0;
+    int numFracDigits = 0;
+    bool calc = false;
+    size_t varend = string::npos;
+    size_t i = 0;
+    while (true) {
+      i = v.find_first_of("*+-%",i);
+      if (varend==string::npos) {
+        varend = i==string::npos ? v.size() : i;
+      }
+      if (i==string::npos) break; // no more factors, offsets or format specs
+      // factor and/or offset
+      calc = true;
+      double dd;
+      if (sscanf(v.c_str()+i+1, "%lf", &dd)==1) {
+        switch (v[i]) {
+          case '*' : chfactor *= dd; break;
+          case '+' : choffset += dd; break;
+          case '-' : choffset -= dd; break;
+          case '%' : numFracDigits = dd; break;
+        }
+      }
+      i++;
+    }
+    // process variable
+    string rep = v.substr(0, varend);
+    if (aValueLookupCB) {
+      aValueLookupCB(rep);
+    }
+    // apply calculations if any
+    if (calc) {
+      // parse as double
+      double dv;
+      if (sscanf(rep.c_str(), "%lf", &dv)==1) {
+        // got double value, apply calculations
+        dv = dv * chfactor + choffset;
+        // render back to string
+        rep = string_format("%.*lf", numFracDigits, dv);
+      }
+    }
+    // replace, even if rep is empty
+    aString.replace(p, e-p+1, rep);
+    p+=rep.size();
+  }
+  return err;
+}
+

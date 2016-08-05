@@ -535,6 +535,21 @@ namespace p44 {
 
 
 
+  // MARK: ======= misc utils
+
+
+  /// callback function for substitutePlaceholders()
+  /// @param aValue the contents of this is looked up and possibly replaced
+  /// @return ok or error
+  typedef boost::function<ErrorPtr (string &aValue)> ValueLookupCB;
+
+  /// substitute "@{xxx}" type placeholders in string
+  /// @param aString string to replace placeholders in
+  /// @param aValueLookupCB this will be called to have variable names looked up
+  ErrorPtr substitutePlaceholders(string &aString, ValueLookupCB aValueLookupCB);
+
+
+
 
 } // namespace p44
 
