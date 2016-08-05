@@ -197,6 +197,11 @@ namespace p44 {
     /// @result empty or Error object in case of error sending error response
     ErrorPtr sendError(ErrorPtr aErrorToSend);
 
+    /// send p44utils::Error object as vDC API OK or error status
+    /// @param aStatusToSend if Error::isOK(), a OK status (NULL result) will be returned, otherwise error will be returned
+    /// @result empty or Error object in case of error sending error response
+    ErrorPtr sendStatus(ErrorPtr aStatusToSend);
+
   };
 
 }

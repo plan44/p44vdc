@@ -110,6 +110,19 @@ ErrorPtr VdcApiRequest::sendError(ErrorPtr aErrorToSend)
 }
 
 
+ErrorPtr VdcApiRequest::sendStatus(ErrorPtr aStatusToSend)
+{
+  if (Error::isOK(aStatusToSend)) {
+    // OK status -> return empty result
+    return sendResult(ApiValuePtr());
+  }
+  else {
+    // error status -> return error
+    return sendError(aStatusToSend);
+  }
+}
+
+
 
 
 
