@@ -326,10 +326,10 @@ enum {
 
 int Vdc::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (HAS_OKEY(aParentDescriptor, device_container_key)) {
+  if (aParentDescriptor->hasObjectKey(device_container_key)) {
     return (int)devices.size();
   }
-  else if (HAS_OKEY(aParentDescriptor, capabilities_container_key)) {
+  else if (aParentDescriptor->hasObjectKey(capabilities_container_key)) {
     return numCapabilities;
   }
   return inherited::numProps(aDomain, aParentDescriptor)+numClassContainerProperties;
@@ -338,7 +338,7 @@ int Vdc::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 
 PropertyDescriptorPtr Vdc::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (HAS_OKEY(aParentDescriptor, device_container_key)) {
+  if (aParentDescriptor->hasObjectKey(device_container_key)) {
     // accessing one of the devices by numeric index
     return getDescriptorByNumericName(
       aPropMatch, aStartIndex, aDomain, aParentDescriptor,
@@ -350,7 +350,7 @@ PropertyDescriptorPtr Vdc::getDescriptorByName(string aPropMatch, int &aStartInd
 }
 
 
-PropertyContainerPtr Vdc::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr Vdc::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->isArrayContainer()) {
     // local container
@@ -359,7 +359,6 @@ PropertyContainerPtr Vdc::getContainer(PropertyDescriptorPtr &aPropertyDescripto
   else if (aPropertyDescriptor->hasObjectKey(device_key)) {
     // - get device
     PropertyContainerPtr container = devices[aPropertyDescriptor->fieldKey()];
-    aPropertyDescriptor.reset(); // next level is "root" again (is a DsAddressable)
     return container;
   }
   // unknown here
@@ -371,7 +370,7 @@ PropertyContainerPtr Vdc::getContainer(PropertyDescriptorPtr &aPropertyDescripto
 // note: is only called when getDescriptorByName does not resolve the name
 PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (HAS_OKEY(aParentDescriptor, capabilities_container_key)) {
+  if (aParentDescriptor->hasObjectKey(capabilities_container_key)) {
     // capabilities level
     static const PropertyDescription capability_props[numClassContainerProperties] = {
       { "metering", apivalue_bool, capability_metering_key, OKEY(capabilities_container_key) },

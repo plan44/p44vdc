@@ -664,7 +664,7 @@ static char evaluatorDevice_key;
 int EvaluatorDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   // Note: only add my own count when accessing root level properties!!
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // Accessing properties at the Device (root) level, add mine
     return inherited::numProps(aDomain, aParentDescriptor)+numProperties;
   }
@@ -682,7 +682,7 @@ PropertyDescriptorPtr EvaluatorDevice::getDescriptorByIndex(int aPropIndex, int 
     { "x-p44-minOnTime", apivalue_double, minOnTime_key, OKEY(evaluatorDevice_key) },
     { "x-p44-minOffTime", apivalue_double, minOffTime_key, OKEY(evaluatorDevice_key) },
   };
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // root level - accessing properties on the Device level
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)

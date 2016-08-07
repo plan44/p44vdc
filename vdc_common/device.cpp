@@ -1468,7 +1468,7 @@ static char device_modelFeatures_key;
 
 int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // Accessing properties at the Device (root) level
     return inherited::numProps(aDomain, aParentDescriptor)+numDeviceProperties;
   }
@@ -1540,7 +1540,7 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     { "deviceClassVersion", apivalue_uint64, deviceClassVersion_key, OKEY(device_key) }
   };
   // C++ object manages different levels, check aParentDescriptor
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // root level - accessing properties on the Device level
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)
@@ -1624,7 +1624,7 @@ PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStart
 
 
 
-PropertyContainerPtr Device::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   // might be virtual container
   if (aPropertyDescriptor->isArrayContainer()) {

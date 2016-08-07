@@ -450,7 +450,7 @@ static char enoceanDevice_key;
 int EnoceanDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   // Note: only add my own count when accessing root level properties!!
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // Accessing properties at the Device (root) level, add mine
     return inherited::numProps(aDomain, aParentDescriptor)+numProperties;
   }
@@ -468,7 +468,7 @@ PropertyDescriptorPtr EnoceanDevice::getDescriptorByIndex(int aPropIndex, int aD
     { "x-p44-rssi", apivalue_int64, rssi_key, OKEY(enoceanDevice_key) },
     { "x-p44-repeaterCount", apivalue_int64, repeaterCount_key, OKEY(enoceanDevice_key) },
   };
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // root level - accessing properties on the Device level
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)

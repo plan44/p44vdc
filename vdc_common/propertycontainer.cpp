@@ -40,12 +40,18 @@ using namespace p44;
 ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   ErrorPtr err;
-  #if DEBUGFOCUSLOGGING
   FOCUSLOG("\naccessProperty: entered with query = %s", aQueryObject->description().c_str());
-  if (aParentDescriptor) {
-    FOCUSLOG("- parentDescriptor '%s' (%s), fieldKey=%u, objectKey=%u", aParentDescriptor->name(), aParentDescriptor->isStructured() ? "structured" : "scalar", aParentDescriptor->fieldKey(), aParentDescriptor->objectKey());
+  // make sure we always have a parent - in case none provided, the parent is "root".
+  if (!aParentDescriptor) {
+    aParentDescriptor = PropertyDescriptorPtr(new RootPropertyDescriptor());
   }
-  #endif
+  FOCUSLOG("- parentDescriptor '%s' (%s, %s), fieldKey=%zu, objectKey=%ld",
+    aParentDescriptor->name(),
+    aParentDescriptor->isStructured() ? "structured" : "scalar",
+    aParentDescriptor->isRootOfObject() ? "rootOfObject" : "sublevel",
+    aParentDescriptor->fieldKey(),
+    aParentDescriptor->objectKey()
+  );
   // for reading, NULL query is like query { "":NULL }
   if (aQueryObject->isNull() && aMode==access_read) {
     aQueryObject->setType(apivalue_object);
@@ -108,8 +114,8 @@ ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr
                 FOCUSLOG("  - container for '%s' is 0x%p", propDesc->name(), container.get());
                 FOCUSLOG("    >>>> RECURSING into accessProperty()");
                 if (container!=this) {
-                  // actually switching to another object -> consider this root of a new property hierachy
-                  containerPropDesc.reset(); // do not provide a parent descriptor, as it would be one from another class that is meaningless to the new container
+                  // switching to another C++ object -> starting at root level in that object
+                  containerPropDesc->rootOfObject = true;
                 }
                 if (aMode==access_read) {
                   // read needs a result object

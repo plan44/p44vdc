@@ -253,7 +253,7 @@ namespace p44 {
     // for groups property
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
 
     // property access implementation for descriptor/settings/states
     virtual int numDescProps();

@@ -55,7 +55,7 @@ protected:
 
   int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
   {
-    if (!HAS_OKEY(aParentDescriptor, scenevalue_key)) {
+    if (!aParentDescriptor->hasObjectKey(scenevalue_key)) {
       // channels/outputs container
       return scene.numSceneValues();
     }
@@ -79,7 +79,7 @@ protected:
 
   PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
   {
-    if (HAS_OKEY(aParentDescriptor, dsscene_channels_key)) {
+    if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
       // array-like container of channels
       PropertyDescriptorPtr propDesc;
       bool numericName = getNextPropIndex(aPropMatch, aStartIndex);
@@ -122,7 +122,7 @@ protected:
   }
 
 
-  PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+  PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
   {
     // the only subcontainer are the fields, handled by myself
     return PropertyContainerPtr(this);
@@ -410,7 +410,7 @@ PropertyDescriptorPtr DsScene::getDescriptorByIndex(int aPropIndex, int aDomain,
 }
 
 
-PropertyContainerPtr DsScene::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DsScene::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   // the only container is sceneChannels
   return sceneChannels;

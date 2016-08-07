@@ -1187,7 +1187,7 @@ enum {
 
 int VdcHost::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (HAS_OKEY(aParentDescriptor, vdc_container_key)) {
+  if (aParentDescriptor->hasObjectKey(vdc_container_key)) {
     return (int)vdcs.size();
   }
   return inherited::numProps(aDomain, aParentDescriptor)+numDeviceContainerProperties;
@@ -1212,7 +1212,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
 
 PropertyDescriptorPtr VdcHost::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (HAS_OKEY(aParentDescriptor, vdc_container_key)) {
+  if (aParentDescriptor->hasObjectKey(vdc_container_key)) {
     // accessing one of the vdcs by numeric index
     return getDescriptorByNumericName(
       aPropMatch, aStartIndex, aDomain, aParentDescriptor,
@@ -1224,7 +1224,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByName(string aPropMatch, int &aStar
 }
 
 
-PropertyContainerPtr VdcHost::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr VdcHost::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->isArrayContainer()) {
     // local container
@@ -1236,7 +1236,6 @@ PropertyContainerPtr VdcHost::getContainer(PropertyDescriptorPtr &aPropertyDescr
     for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
       if (i==aPropertyDescriptor->fieldKey()) {
         // found
-        aPropertyDescriptor.reset(); // next level is "root" again (is a DsAddressable)
         return pos->second;
       }
       i++;

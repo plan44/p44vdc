@@ -34,7 +34,6 @@ namespace p44 {
 
 
   #define OKEY(x) ((intptr_t)&x) ///< macro to define unique object keys by using address of a variable
-  #define HAS_OKEY(pd,x) (pd && pd->hasObjectKey(x)) ///< macro to check if a parent descriptor is available at all and if so, if it has a specific object key
 
   #define PROPINDEX_NONE -1 ///< special value to signal "no next descriptor" for getDescriptorByName
 
@@ -65,26 +64,48 @@ namespace p44 {
   class PropertyDescriptor : public P44Obj
   {
   public:
+    bool rootOfObject;
+
     /// constructor
-    PropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) : parentDescriptor(aParentDescriptor) {};
+    PropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) : parentDescriptor(aParentDescriptor), rootOfObject(false) {};
     /// the parent descriptor (NULL at root level of DsAdressables)
     PropertyDescriptorPtr parentDescriptor;
     /// name of the property
     virtual const char *name() const = 0;
     /// type of the property
     virtual ApiValueType type() const = 0;
-    /// access index/key of the property
+    /// access index/key of the property  (size_t to allow using offset into struct)
     virtual size_t fieldKey() const = 0;
-    /// extra identification for the object from the API perspective (allows having more than one API object within one C++ object
+    /// identifies the container (form an API perspective, not C++ class as returned by getContainer())
+    /// - in case the property is a container itself, the objectkey identifies that container
+    /// - in case the property is a leaf value, the objectkey identifies the container of the property
+    /// @note the mechanism allows having more than one single API object within one C++ object
+    /// @note the type is a intptr_t to allow memory addresses to be used as object identifiers
     virtual intptr_t objectKey() const = 0;
     /// is array container
     virtual bool isArrayContainer() const = 0;
     /// will be shown in wildcard queries
     virtual bool isWildcardAddressable() const { return true; };
+    /// acts as root of a C++ class hierarchy
+    bool isRootOfObject() const { return rootOfObject; };
     /// checks
     bool hasObjectKey(char &aMemAddrObjectKey) { return (objectKey()==(intptr_t)&aMemAddrObjectKey); };
     bool hasObjectKey(intptr_t aIntObjectKey) { return (objectKey()==aIntObjectKey); };
     bool isStructured() { return type()==apivalue_object || isArrayContainer(); };
+  };
+
+
+  /// description of the root of any property access
+  class RootPropertyDescriptor : public PropertyDescriptor
+  {
+    typedef PropertyDescriptor inherited;
+  public:
+    RootPropertyDescriptor() : inherited(PropertyDescriptorPtr()) { rootOfObject = true; };
+    virtual const char *name() const { return "<root>"; };
+    virtual ApiValueType type() const { return apivalue_object; };
+    virtual size_t fieldKey() const { return 0; };
+    virtual intptr_t objectKey() const { return NULL; };
+    virtual bool isArrayContainer() const { return false; };
   };
 
 
@@ -95,6 +116,7 @@ namespace p44 {
     const PropertyDescription *descP;
 
   public:
+
     /// create from const table entry
     StaticPropertyDescriptor(const PropertyDescription *aDescP, PropertyDescriptorPtr aParentDescriptor) :
       inherited(aParentDescriptor),
@@ -114,6 +136,7 @@ namespace p44 {
   class DynamicPropertyDescriptor : public PropertyDescriptor
   {
     typedef PropertyDescriptor inherited;
+
   public:
     DynamicPropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) :
       inherited(aParentDescriptor),
@@ -121,8 +144,8 @@ namespace p44 {
     {};
     string propertyName; ///< name of the property
     ApiValueType propertyType; ///< type of the property value
-    size_t propertyFieldKey; ///< key for accessing the property within its container. (size_t to allow using offset into struct)
-    intptr_t propertyObjectKey; ///< identifier for object this property belongs to (for properties spread over sublcasses)
+    size_t propertyFieldKey; ///< key for accessing the property within its container
+    intptr_t propertyObjectKey; ///< identifier for container
     bool arrayContainer;
 
     virtual const char *name() const { return propertyName.c_str(); }
@@ -155,7 +178,8 @@ namespace p44 {
     /// @param aMode access mode (see PropertyAccessMode: read, write or write preload)
     /// @param aQueryObject the object defining the read or write query
     /// @param aResultObject for read, must be an object
-    /// @param aParentDescriptor the descriptor of the parent property, can be NULL at root level
+    /// @param aParentDescriptor the descriptor of the parent property, can be passed NULL at root level
+    ///   (but will internally be repaced by a RootPropertyDescriptor)
     /// @return Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
     ErrorPtr accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor);
 
@@ -177,14 +201,14 @@ namespace p44 {
 
     /// @return the number of properties in this container
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
-    /// @param aParentDescriptor the descriptor of the parent property, is NULL at root level of a DsAdressable
+    /// @param aParentDescriptor the descriptor of the parent property, never NULL
     ///   Allows single C++ class to handle multiple levels of nested property tree objects
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) { return 0; }
 
     /// get property descriptor by index.
     /// @param aPropIndex property index, 0..numProps()-1
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
-    /// @param aParentDescriptor the descriptor of the parent property, is NULL at root level of a DsAdressable
+    /// @param aParentDescriptor the descriptor of the parent property, never NULL
     /// @return pointer to property descriptor or NULL if aPropIndex is out of range
     /// @note base class always returns NULL, which means no properties
     /// @note implementation does not need to check aPropIndex, it will always be within the range set by numProps()
@@ -195,7 +219,7 @@ namespace p44 {
     /// @param aStartIndex on input: the property index to start searching, on exit: the next PropertyDescriptor to check.
     ///   When the search is exhausted, aStartIndex is set to PROPINDEX_NONE to signal there is no next property to check
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
-    /// @param aParentDescriptor the descriptor of the parent property, is NULL at root level of a DsAdressable
+    /// @param aParentDescriptor the descriptor of the parent property, never NULL
     /// @return pointer to property descriptor or NULL if aPropIndex is out of range
     /// @note base class provides a default implementation which uses numProps/getDescriptorByIndex and compares names.
     ///   Subclasses may override this to more efficiently access array-like containers where aPropMatch can directly be used
@@ -211,7 +235,7 @@ namespace p44 {
     ///   (like description/settings/states for DsBehaviours)
     /// @return PropertyContainer representing the property or property array element
     /// @note base class always returns NULL, which means no structured or proxy properties
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) { return NULL; };
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) { return NULL; };
 
     /// access single field in this container
     /// @param aMode access mode (see PropertyAccessMode: read, write or write preload)
@@ -256,7 +280,7 @@ namespace p44 {
     /// @param aStartIndex on input: the property index to start searching, on exit: the next PropertyDescriptor to check.
     ///   When the search is exhausted, aStartIndex is set to PROPINDEX_NONE to signal there is no next property to check
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
-    /// @param aParentDescriptor the descriptor of the parent property, can be NULL at root level
+    /// @param aParentDescriptor the descriptor of the parent property, never NULL
     /// @param aObjectKey the object key the resulting descriptor should have
     /// @return pointer to property descriptor or NULL if aPropIndex is out of range
     /// @note the returned descriptor will have its fieldKey set to the index position of the to-be-accessed element,
