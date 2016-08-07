@@ -56,7 +56,7 @@ void ValueDescriptor::setLastUpdate(MLMicroSeconds aLastUpdate)
 
 
 enum {
-  type_key,
+  valuetype_key,
   min_key,
   max_key,
   resolution_key,
@@ -79,7 +79,7 @@ PropertyDescriptorPtr ValueDescriptor::getDescriptorByIndex(int aPropIndex, int 
 {
   // device level properties
   static const PropertyDescription properties[numParamProperties] = {
-    { "type", apivalue_uint64, type_key, OKEY(param_key) },
+    { "valuetype", apivalue_uint64, valuetype_key, OKEY(param_key) },
     { "min", apivalue_double, min_key, OKEY(param_key) },
     { "max", apivalue_double, max_key, OKEY(param_key) },
     { "resolution", apivalue_double, resolution_key, OKEY(param_key) },
@@ -98,7 +98,7 @@ bool ValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 {
   if (aPropertyDescriptor->hasObjectKey(param_key) && aMode==access_read) {
     switch (aPropertyDescriptor->fieldKey()) {
-      case type_key: aPropValue->setUint16Value(valueType); return true;
+      case valuetype_key: aPropValue->setUint16Value(valueType); return true;
       case default_key: return (isDefault ?  getValue(aPropValue, false) : false);
     }
   }
@@ -169,9 +169,15 @@ bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr a
     // everything is read only
     if (aPropertyDescriptor->hasObjectKey(param_key)) {
       switch (aPropertyDescriptor->fieldKey()) {
-        case min_key: aPropValue->setDoubleValue(min); return true;
-        case max_key: aPropValue->setDoubleValue(max); return true;
-        case resolution_key: aPropValue->setDoubleValue(resolution); return true;
+        case min_key:
+          if (valueType==valueType_bool) return false;
+          aPropValue->setDoubleValue(min); return true;
+        case max_key:
+          if (valueType==valueType_bool) return false;
+          aPropValue->setDoubleValue(max); return true;
+        case resolution_key:
+          if (valueType==valueType_bool) return false;
+          aPropValue->setDoubleValue(resolution); return true;
       }
     }
   }
