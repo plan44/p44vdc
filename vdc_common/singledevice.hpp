@@ -41,15 +41,15 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
-    friend class DeviceAction;
-    friend class DeviceState;
+    friend class ValueList;
 
   protected:
 
     /// base class constructor for subclasses
+    /// @param aName the name of this value
     /// @param aValueType the value type of this value (descibing computing and physical value type)
     /// @param aHasDefault true if the parameter has a default value (meaning it can be omitted in calls)
-    ValueDescriptor(VdcValueType aValueType, bool aHasDefault) : valueType(aValueType), hasValue(aHasDefault) {};
+    ValueDescriptor(const string aName, VdcValueType aValueType, bool aHasDefault);
 
   public:
 
@@ -61,6 +61,14 @@ namespace p44 {
     /// @param aMakeInternal if set, the value is converted to internal format (relevant for enums, to get them as numeric value)
     /// @return NULL if the value conforms, API error describing what's wrong if not
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) = 0;
+
+    /// get the name
+    /// @return name of this value
+    string getName() const { return valueName; }
+
+    /// get the time of last update
+    /// @return the time of last update or Never if value has never been set so far
+    MLMicroSeconds getLastUpdate() { return lastUpdate; };
 
     /// get the (default) value into an ApiValue
     /// @param aApiValue the API value to write the value to
@@ -91,8 +99,15 @@ namespace p44 {
 
   protected:
 
+    string valueName; ///< the name of the value
     bool hasValue; ///< set if the parameter has a value. For action params, this is the default value. For state/states params this is the actual value
+    bool isDefault; ///< set if the value is the default value
     VdcValueType valueType; ///< the type of the parameter
+    MLMicroSeconds lastUpdate; ///< when the value was last updated
+
+    /// set last update
+    /// @param aLastUpdate time of last update, can be Never (or Infinite to use current now())
+    void setLastUpdate(MLMicroSeconds aLastUpdate=Infinite);
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
@@ -115,14 +130,14 @@ namespace p44 {
   public:
 
     /// constructor for a numeric parameter, which can be any of the physical unit types, bool, int, numeric enum or generic double
-    NumericValueDescriptor(VdcValueType aValueType, double aMin, double aMax, double aResolution, bool aHasDefault, double aDefaultValue = 0) :
-      inherited(aValueType, aHasDefault), min(aMin), max(aMax), resolution(aResolution), value(aDefaultValue) {};
+    NumericValueDescriptor(const string aName, VdcValueType aValueType, double aMin, double aMax, double aResolution, bool aHasDefault = false, double aDefaultValue = 0) :
+      inherited(aName, aValueType, aHasDefault), min(aMin), max(aMax), resolution(aResolution), value(aDefaultValue) {};
 
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
 
-    virtual void setDoubleValue(double aValue) P44_OVERRIDE { value = aValue; };
-    virtual void setIntValue(int aValue) P44_OVERRIDE { value = aValue; };
+    virtual void setDoubleValue(double aValue) P44_OVERRIDE { value = aValue; setLastUpdate(); };
+    virtual void setIntValue(int aValue) P44_OVERRIDE { value = aValue; setLastUpdate(); };
 
   protected:
 
@@ -141,17 +156,13 @@ namespace p44 {
   public:
 
     /// constructor for a text string parameter
-    TextValueDescriptor(bool aHasDefault, const string aDefaultValue = "") :
-      inherited(valueType_text, aHasDefault), value(aDefaultValue) {};
+    TextValueDescriptor(const string aName, bool aHasDefault = false, const string aDefaultValue = "") :
+      inherited(aName, valueType_text, aHasDefault), value(aDefaultValue) {};
 
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
 
-    virtual void setStringValue(const string aValue) P44_OVERRIDE { value = aValue; };
-
-  protected:
-
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual void setStringValue(const string aValue) P44_OVERRIDE { value = aValue; setLastUpdate(); };
     
   };
 
@@ -170,7 +181,7 @@ namespace p44 {
   public:
 
     /// constructor for a text enumeration parameter
-    EnumValueDescriptor(bool aHasDefault) : inherited(valueType_textenum, aHasDefault) {};
+    EnumValueDescriptor(const string aName) : inherited(aName, valueType_textenum, false) {};
 
     /// add a enum value
     /// @param aEnumText the text
@@ -181,12 +192,12 @@ namespace p44 {
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
 
-    virtual void setIntValue(int aValue) P44_OVERRIDE { value = aValue; };
+    virtual void setIntValue(int aValue) P44_OVERRIDE { value = aValue; setLastUpdate(); };
 
   protected:
 
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     
@@ -199,20 +210,24 @@ namespace p44 {
 
   public:
 
-    typedef pair<string, ValueDescriptorPtr> ValueEntry;
-    typedef vector<ValueEntry> ValuesVector;
+    typedef vector<ValueDescriptorPtr> ValuesVector;
 
     ValuesVector values;
 
     /// add a value (descriptor)
     /// @param aValueDesc a value descriptor object.
-    void addValueDescriptor(const string aValueName, ValueDescriptorPtr aValueDesc);
+    void addValue(ValueDescriptorPtr aValueDesc);
+
+    /// get value (for applying updates)
+    /// @param aName name of the value(descriptor) to get
+    ValueDescriptorPtr getValue(const string aName);
+
 
   protected:
 
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<ValueList> ValueListPtr;
@@ -223,6 +238,9 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
+    friend class DeviceActions;
+
+    string actionName; ///< name of the actuon
     string actionDescription; ///< a descriptive string for the action (for logs and debugging)
     ValueListPtr actionParams; ///< the parameter descriptions of this action
 
@@ -234,13 +252,13 @@ namespace p44 {
 
     /// create the action
     /// @param aSingleDevice the single device this action belongs to
+    /// @param aName the name of the action.
     /// @param aDescription a description string for the action.
-    DeviceAction(SingleDevice &aSingleDevice, const string aDescription);
+    DeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription);
 
     /// add parameter
     /// @param aValueDesc a value descriptor object.
-    void addParameter(const string aParameterName, ValueDescriptorPtr aValueDesc);
-
+    void addParameter(ValueDescriptorPtr aValueDesc);
 
     /// call the action
     /// @param aParams an ApiValue of type apivalue_object, expected to
@@ -264,7 +282,7 @@ namespace p44 {
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
   };
   typedef boost::intrusive_ptr<DeviceAction> DeviceActionPtr;
@@ -276,8 +294,7 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
-    typedef pair<string, DeviceActionPtr> ActionEntry;
-    typedef vector<ActionEntry> ActionsVector;
+    typedef vector<DeviceActionPtr> ActionsVector;
 
     ActionsVector deviceActions;
 
@@ -293,15 +310,14 @@ namespace p44 {
     void call(const string aAction, ApiValuePtr aParams, StatusCB aCompletedCB);
 
     /// add an action (at device setup time only)
-    /// @param aName name of the action to add
     /// @param aAction the action
-    void addAction(const string aName, DeviceActionPtr aAction);
+    void addAction(DeviceActionPtr aAction);
 
   protected:
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     
   };
@@ -313,6 +329,10 @@ namespace p44 {
   class CustomAction P44_FINAL : public PropertyContainer, public PersistentParams
   {
     typedef PropertyContainer inherited;
+
+    friend class CustomActions;
+
+    string actionName; ///< name of the actuon
 
     /// references the standard action on which this custom action is based
     DeviceActionPtr action;
@@ -337,7 +357,7 @@ namespace p44 {
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
@@ -358,8 +378,7 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
-    typedef pair<string, CustomActionPtr> CustomActionEntry;
-    typedef vector<CustomActionEntry> CustomActionsVector;
+    typedef vector<CustomActionPtr> CustomActionsVector;
 
     CustomActionsVector customActions;
 
@@ -368,11 +387,11 @@ namespace p44 {
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     /// load custom actions
     virtual ErrorPtr loadChildren() P44_FINAL;
@@ -389,20 +408,66 @@ namespace p44 {
 
 
 
+  class DeviceStateParams : public ValueList
+  {
+    typedef ValueList inherited;
+
+  protected:
+
+    // overrides to present param values directly instead of delegating to ValueDescriptor
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_FINAL P44_OVERRIDE;
+
+  };
+
+
 
   class DeviceState : public PropertyContainer
   {
     typedef PropertyContainer inherited;
 
-    ValueDescriptorPtr stateDescriptor;
-    ValueListPtr stateParams;
+    friend class DeviceStates;
 
+    string stateName; ///< the name of this state
+    ValueDescriptorPtr stateDescriptor; ///< the value (descriptor) for the state itself
+    ValueListPtr stateParams; ///< the valuedescriptors for the parameters
+    string stateDescription; ///< a text description for the state, for logs and simple UI purposes
+    MLMicroSeconds lastPush; ///< when the state was last pushed ("age" for ephemeral states which are only pushed)
+
+  protected:
+
+    SingleDevice *singleDeviceP; ///< the single device this state belongs to
+
+  public:
+
+    /// create the state
+    /// @param aSingleDevice the single device this state belongs to
+    /// @param aName the name of the state.
+    /// @param aDescription a description string for the state.
+    /// @param aStateDescriptor value descriptor for the state, can be NULL for ephemeral states
+    DeviceState(SingleDevice &aSingleDevice, const string aName, const string aDescription, ValueDescriptorPtr aStateDescriptor);
+
+    /// add parameter
+    /// @param aValueDesc a value descriptor object.
+    void addParameter(ValueDescriptorPtr aValueDesc);
+
+    /// access value
+    ValueDescriptorPtr value() { return stateDescriptor; };
+
+    /// access a parameter
+    ValueDescriptorPtr param(const string aName) { return stateParams->getValue(aName); }
+
+    /// push the state via pushProperty
+    bool push();
+
+
+  protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<DeviceState> DeviceStatePtr;
@@ -413,22 +478,27 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
-    typedef map<string, DeviceStatePtr> DeviceStateMap;
-    typedef pair<string, DeviceStatePtr> DeviceStateEntry;
-    typedef vector<DeviceStateEntry> DeviceStatesVector;
+    typedef vector<DeviceStatePtr> StatesVector;
 
-    DeviceStatesVector deviceStates;
+    StatesVector deviceStates;
 
   public:
+
+    /// add a state (at device setup time only)
+    /// @param aState the action
+    void addState(DeviceStatePtr aState);
+
+    /// get state (for applying updates)
+    /// @param aName name of the state to get
+    DeviceStatePtr getState(const string aName);
+
 
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<DeviceStates> DeviceStatesPtr;
@@ -443,9 +513,8 @@ namespace p44 {
   public:
 
     /// add a property (at device setup time only)
-    /// @param aName name of the property to add
     /// @param aPropertyDesc value descriptor describing the property
-    void addProperty(const string aName, ValueDescriptorPtr aPropertyDesc);
+    void addProperty(ValueDescriptorPtr aPropertyDesc);
 
   };
   typedef boost::intrusive_ptr<DeviceProperties> DevicePropertiesPtr;
@@ -483,20 +552,20 @@ namespace p44 {
 
     /// load parameters from persistent DB
     /// @note this is usually called from the device container when device is added (detected)
-    virtual ErrorPtr load();
+    virtual ErrorPtr load() P44_OVERRIDE;
 
     /// save unsaved parameters to persistent DB
     /// @note this is usually called from the device container in regular intervals
-    virtual ErrorPtr save();
+    virtual ErrorPtr save() P44_OVERRIDE;
 
     /// forget any parameters stored in persistent DB
-    virtual ErrorPtr forget();
+    virtual ErrorPtr forget() P44_OVERRIDE;
 
     // check if any settings are dirty
-    virtual bool isDirty();
+    virtual bool isDirty() P44_OVERRIDE;
 
     // make all settings clean (not to be saved to DB)
-    virtual void markClean();
+    virtual void markClean() P44_OVERRIDE;
 
     // load additional settings from files
     void loadSettingsFromFiles();
@@ -516,16 +585,16 @@ namespace p44 {
     ///   Returning any Error object, even if ErrorOK, will cause a generic response to be returned.
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the method call to this DsAddressable.
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @}
 
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
 
   private:
 

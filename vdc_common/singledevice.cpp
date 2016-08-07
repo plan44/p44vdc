@@ -35,6 +35,26 @@ using namespace p44;
 
 // MARK: ===== ValueDescriptor
 
+
+ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, bool aHasDefault) :
+  valueName(aName),
+  valueType(aValueType),
+  hasValue(aHasDefault),
+  isDefault(aHasDefault)
+{
+}
+
+
+void ValueDescriptor::setLastUpdate(MLMicroSeconds aLastUpdate)
+{
+  if (aLastUpdate==Infinite)
+    aLastUpdate = MainLoop::currentMainLoop().now();
+  lastUpdate = aLastUpdate;
+  hasValue = true;
+  isDefault = false;
+}
+
+
 enum {
   type_key,
   min_key,
@@ -66,7 +86,7 @@ PropertyDescriptorPtr ValueDescriptor::getDescriptorByIndex(int aPropIndex, int 
     { "default", apivalue_null, default_key, OKEY(param_key) },
     { "values", apivalue_object+propflag_container, enumvalues_key, OKEY(param_enumvalues_key) }
   };
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
   }
@@ -79,6 +99,7 @@ bool ValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
   if (aPropertyDescriptor->hasObjectKey(param_key) && aMode==access_read) {
     switch (aPropertyDescriptor->fieldKey()) {
       case type_key: aPropValue->setUint16Value(valueType); return true;
+      case default_key: return (isDefault ?  getValue(aPropValue, false) : false);
     }
   }
   return false;
@@ -151,7 +172,6 @@ bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr a
         case min_key: aPropValue->setDoubleValue(min); return true;
         case max_key: aPropValue->setDoubleValue(max); return true;
         case resolution_key: aPropValue->setDoubleValue(resolution); return true;
-        case default_key: return getValue(aPropValue);
       }
     }
   }
@@ -184,24 +204,17 @@ bool TextValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal)
 }
 
 
-bool TextValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
-{
-  if (aPropertyDescriptor->hasObjectKey(param_key) && aMode==access_read) {
-    switch (aPropertyDescriptor->fieldKey()) {
-      case default_key: return getValue(aPropValue);
-    }
-  }
-  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
-}
-
-
 // MARK: ===== EnumValueDescriptor
 
 
 void EnumValueDescriptor::addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault)
 {
   enumDescs.push_back(EnumDesc(aEnumText, aEnumValue));
-  if (aIsDefault) value = aEnumValue; // also assign as default
+  if (aIsDefault) {
+    value = aEnumValue; // also assign as default
+    hasValue = true;
+    isDefault = true;
+  }
 }
 
 
@@ -258,17 +271,7 @@ bool EnumValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPro
 {
   if (aMode==access_read) {
     // everything is read only
-    if (aPropertyDescriptor->hasObjectKey(param_key)) {
-      switch (aPropertyDescriptor->fieldKey()) {
-        case default_key: {
-          if (!hasValue) return false; // no (default) value, don't show it
-          aPropValue->setType(apivalue_uint64);
-          aPropValue->setUint32Value(value);
-          return true;
-        }
-      }
-    }
-    else if (aPropertyDescriptor->hasObjectKey(param_enumvalues_key)) {
+    if (aPropertyDescriptor->hasObjectKey(param_enumvalues_key)) {
       // all enum list properties are NULL values...
       return true; // ...but they exist!
     }
@@ -277,7 +280,7 @@ bool EnumValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPro
 }
 
 
-PropertyContainerPtr EnumValueDescriptor::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr EnumValueDescriptor::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(param_enumvalues_key)) {
     return PropertyContainerPtr(this); // handle enum values array myself
@@ -289,7 +292,7 @@ PropertyContainerPtr EnumValueDescriptor::getContainer(PropertyDescriptorPtr &aP
 
 int EnumValueDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (HAS_OKEY(aParentDescriptor, param_enumvalues_key)) {
+  if (aParentDescriptor->hasObjectKey(param_enumvalues_key)) {
     // number of enum values
     return (int)enumDescs.size();
   }
@@ -299,7 +302,7 @@ int EnumValueDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDesc
 
 PropertyDescriptorPtr EnumValueDescriptor::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (HAS_OKEY(aParentDescriptor, param_enumvalues_key)) {
+  if (aParentDescriptor->hasObjectKey(param_enumvalues_key)) {
     // enumvalues - distinct set of NULL values (only names count)
     if (aPropIndex<enumDescs.size()) {
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
@@ -316,10 +319,26 @@ PropertyDescriptorPtr EnumValueDescriptor::getDescriptorByIndex(int aPropIndex, 
 
 // MARK: ===== ValueList
 
-void ValueList::addValueDescriptor(const string aValueName, ValueDescriptorPtr aValueDesc)
+void ValueList::addValue(ValueDescriptorPtr aValueDesc)
 {
-  values.push_back(ValueEntry(aValueName, aValueDesc));
+  values.push_back(aValueDesc);
 }
+
+
+ValueDescriptorPtr ValueList::getValue(const string aName)
+{
+  for (ValuesVector::iterator pos = values.begin(); pos!=values.end(); ++pos) {
+    if ((*pos)->valueName==aName) {
+      // found
+      return *pos;
+    }
+  }
+  // not found
+  return ValueDescriptorPtr();
+}
+
+
+
 
 
 int ValueList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
@@ -332,10 +351,9 @@ static char values_key;
 
 PropertyDescriptorPtr ValueList::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  // enumvalues - distinct set of NULL values (only names count)
   if (aPropIndex<values.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = values[aPropIndex].first;
+    descP->propertyName = values[aPropIndex]->valueName;
     descP->propertyType = apivalue_object;
     descP->propertyFieldKey = aPropIndex;
     descP->propertyObjectKey = OKEY(values_key);
@@ -345,10 +363,10 @@ PropertyDescriptorPtr ValueList::getDescriptorByIndex(int aPropIndex, int aDomai
 }
 
 
-PropertyContainerPtr ValueList::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr ValueList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(values_key)) {
-    return values[aPropertyDescriptor->fieldKey()].second;
+    return values[aPropertyDescriptor->fieldKey()];
   }
   return NULL;
 }
@@ -356,8 +374,9 @@ PropertyContainerPtr ValueList::getContainer(PropertyDescriptorPtr &aPropertyDes
 
 // MARK: ===== DeviceAction
 
-DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aDescription) :
+DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription) :
   singleDeviceP(&aSingleDevice),
+  actionName(aName),
   actionDescription(aDescription)
 {
   // install value list for parameters
@@ -365,9 +384,9 @@ DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aDescriptio
 }
 
 
-void DeviceAction::addParameter(const string aParameterName, ValueDescriptorPtr aValueDesc)
+void DeviceAction::addParameter(ValueDescriptorPtr aValueDesc)
 {
-  actionParams->addValueDescriptor(aParameterName, aValueDesc);
+  actionParams->addValue(aValueDesc);
 }
 
 
@@ -379,29 +398,29 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
   ValueList::ValuesVector::iterator pos = actionParams->values.begin();
   while (pos!=actionParams->values.end()) {
     // check for override from passed params
-    ApiValuePtr o = aParams->get(pos->first);
+    ApiValuePtr o = aParams->get((*pos)->getName());
     if (o) {
       // caller did supply this parameter
-      err = pos->second->conforms(o, true); // check and convert to internal (for text enums)
+      err = (*pos)->conforms(o, true); // check and convert to internal (for text enums)
       if (!Error::isOK(err))
         break; // error
     }
     else {
       // called did not supply this parameter, get default value
       o = aParams->newNull();
-      if (!pos->second->getValue(o)) {
+      if (!(*pos)->getValue(o)) {
         err = ErrorPtr(new VdcApiError(415, "missing value for non-optional parameter"));
         break;
       }
       // add the default to the passed params
-      aParams->add(pos->first, o);
+      aParams->add((*pos)->getName(), o);
     }
     ++pos;
   }
   if (!Error::isOK(err)) {
     // rewrite error to include param name
     if (pos!=actionParams->values.end() && err->isDomain(VdcApiError::domain())) {
-      err = ErrorPtr(new VdcApiError(err->getErrorCode(), string_format("parameter '%s': %s", pos->first.c_str(), err->description().c_str())));
+      err = ErrorPtr(new VdcApiError(err->getErrorCode(), string_format("parameter '%s': %s", (*pos)->getName().c_str(), err->description().c_str())));
     }
     // parameter error, not executing action, call back with error
     if (aCompletedCB) aCompletedCB(err);
@@ -423,8 +442,8 @@ void DeviceAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 // MARK: ===== DeviceAction property access
 
 enum {
-  description_key,
-  params_key,
+  actiondescription_key,
+  actionparams_key,
   numActionProperties
 };
 
@@ -441,10 +460,10 @@ PropertyDescriptorPtr DeviceAction::getDescriptorByIndex(int aPropIndex, int aDo
 {
   // device level properties
   static const PropertyDescription properties[numActionProperties] = {
-    { "description", apivalue_string, description_key, OKEY(deviceaction_key) },
-    { "params", apivalue_object, params_key, OKEY(deviceaction_key) }
+    { "description", apivalue_string, actiondescription_key, OKEY(deviceaction_key) },
+    { "params", apivalue_object, actionparams_key, OKEY(deviceaction_key) }
   };
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
   }
@@ -452,10 +471,10 @@ PropertyDescriptorPtr DeviceAction::getDescriptorByIndex(int aPropIndex, int aDo
 }
 
 
-PropertyContainerPtr DeviceAction::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DeviceAction::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(deviceaction_key)) {
-    if (aPropertyDescriptor->fieldKey()==params_key) {
+    if (aPropertyDescriptor->fieldKey()==actionparams_key) {
       return actionParams;
     }
   }
@@ -467,7 +486,7 @@ bool DeviceAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
 {
   if (aPropertyDescriptor->hasObjectKey(deviceaction_key) && aMode==access_read) {
     switch (aPropertyDescriptor->fieldKey()) {
-      case description_key: aPropValue->setStringValue(actionDescription); return true;
+      case actiondescription_key: aPropValue->setStringValue(actionDescription); return true;
     }
   }
   return false;
@@ -487,10 +506,9 @@ static char actions_key;
 
 PropertyDescriptorPtr DeviceActions::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  // enumvalues - distinct set of NULL values (only names count)
   if (aPropIndex<deviceActions.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = deviceActions[aPropIndex].first;
+    descP->propertyName = deviceActions[aPropIndex]->actionName;
     descP->propertyType = apivalue_object;
     descP->propertyFieldKey = aPropIndex;
     descP->propertyObjectKey = OKEY(actions_key);
@@ -500,10 +518,10 @@ PropertyDescriptorPtr DeviceActions::getDescriptorByIndex(int aPropIndex, int aD
 }
 
 
-PropertyContainerPtr DeviceActions::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DeviceActions::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(actions_key)) {
-    return deviceActions[aPropertyDescriptor->fieldKey()].second;
+    return deviceActions[aPropertyDescriptor->fieldKey()];
   }
   return NULL;
 }
@@ -512,9 +530,9 @@ PropertyContainerPtr DeviceActions::getContainer(PropertyDescriptorPtr &aPropert
 void DeviceActions::call(const string aAction, ApiValuePtr aParams, StatusCB aCompletedCB)
 {
   for (ActionsVector::iterator pos = deviceActions.begin(); pos!=deviceActions.end(); ++pos) {
-    if (pos->first==aAction) {
+    if ((*pos)->actionName==aAction) {
       // call it
-      pos->second->call(aParams, aCompletedCB);
+      (*pos)->call(aParams, aCompletedCB);
       return; // done, callback will finish it
     }
   }
@@ -525,18 +543,244 @@ void DeviceActions::call(const string aAction, ApiValuePtr aParams, StatusCB aCo
 }
 
 
-void DeviceActions::addAction(const string aName, DeviceActionPtr aAction)
+void DeviceActions::addAction(DeviceActionPtr aAction)
 {
-  deviceActions.push_back(ActionEntry(aName, aAction));
+  deviceActions.push_back(aAction);
+}
+
+
+// MARK: ===== DeviceStateParams
+
+static char devicestatedesc_key;
+static char devicestate_key;
+
+
+PropertyDescriptorPtr DeviceStateParams::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  PropertyDescriptorPtr p = inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor);
+  if (aParentDescriptor->hasObjectKey(devicestate_key)) {
+    // access via deviceStates, we directly want to see the values
+    static_cast<DynamicPropertyDescriptor *>(p.get())->propertyType = apivalue_null; // switch to leaf (of variable type)
+  }
+  return p;
+}
+
+
+bool DeviceStateParams::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->parentDescriptor->hasObjectKey(devicestate_key) && aMode==access_read) {
+    // fieldkey is the param index, just get that param's value
+    return values[aPropertyDescriptor->fieldKey()]->getValue(aPropValue);
+  }
+  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
+}
+
+
+
+
+
+// MARK: ===== DeviceState
+
+DeviceState::DeviceState(SingleDevice &aSingleDevice, const string aName, const string aDescription, ValueDescriptorPtr aStateDescriptor) :
+  singleDeviceP(&aSingleDevice),
+  stateName(aName),
+  stateDescriptor(aStateDescriptor),
+  stateDescription(aDescription)
+{
+  // install empty subclass of value list for (optional) parameters
+  // (subclass checks access path to just deliver values when accessing via devicestate_key)
+  stateParams = ValueListPtr(new DeviceStateParams);
+}
+
+
+void DeviceState::addParameter(ValueDescriptorPtr aValueDesc)
+{
+  stateParams->addValue(aValueDesc);
+}
+
+
+bool DeviceState::push()
+{
+  // update for every push attempt, as this are "events"
+  lastPush = MainLoop::currentMainLoop().now();
+  // try to push to connected vDC API client
+  VdcApiConnectionPtr api = singleDeviceP->getVdc().getSessionConnection();
+  if (api) {
+    ApiValuePtr query = api->newApiValue();
+    query->setType(apivalue_object);
+    ApiValuePtr subQuery = query->newValue(apivalue_object);
+    subQuery->add(stateName, subQuery->newValue(apivalue_null));
+    query->add(string("deviceStates"), subQuery);
+    return singleDeviceP->pushProperty(query, VDC_API_DOMAIN);
+  }
+  // no API, cannot not push
+  return false;
+}
+
+
+// MARK: ===== DeviceState property access
+
+enum {
+  statedescription_key,
+  statetype_key,
+  stateparamdescs_key,
+  numStatesDescProperties
+};
+
+enum {
+  state_key,
+  age_key,
+  stateparams_key,
+  numStatesProperties
+};
+
+
+int DeviceState::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  // check access path, depends on how we access the state (description or actual state)
+  if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestatedesc_key))
+    return numStatesDescProperties;
+  else if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestate_key))
+    return numStatesProperties;
+  return 0;
+}
+
+
+PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  static const PropertyDescription descproperties[numStatesDescProperties] = {
+    { "description", apivalue_string, statedescription_key, OKEY(devicestatedesc_key) },
+    { "state", apivalue_object, statetype_key, OKEY(devicestatedesc_key) },
+    { "params", apivalue_object, stateparamdescs_key, OKEY(devicestatedesc_key) }
+  };
+  static const PropertyDescription properties[numStatesProperties] = {
+    { "state", apivalue_null, state_key, OKEY(devicestate_key) },
+    { "age", apivalue_double, age_key, OKEY(devicestate_key) },
+    { "params", apivalue_object, stateparams_key, OKEY(devicestate_key) }
+  };
+  // check access path, depends on how we access the state (description or actual state)
+  if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestatedesc_key)) {
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&descproperties[aPropIndex], aParentDescriptor));
+  }
+  else if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestate_key)) {
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+PropertyContainerPtr DeviceState::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->hasObjectKey(devicestatedesc_key)) {
+    if (aPropertyDescriptor->fieldKey()==stateparamdescs_key) {
+      return stateParams;
+    }
+    else if (aPropertyDescriptor->fieldKey()==statetype_key) {
+      return stateDescriptor; // can be NULL for ephemeral states
+    }
+  }
+  else if (aPropertyDescriptor->hasObjectKey(devicestate_key)) {
+    if (aPropertyDescriptor->fieldKey()==stateparams_key) {
+      return stateParams;
+    }
+  }
+  return NULL;
+}
+
+
+bool DeviceState::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aMode==access_read) {
+    if (aPropertyDescriptor->hasObjectKey(devicestatedesc_key)) {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case statedescription_key: aPropValue->setStringValue(stateDescription); return true;
+      }
+    }
+    else if (aPropertyDescriptor->hasObjectKey(devicestate_key)) {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case state_key:
+          if (!stateDescriptor) return false; // no state
+          if (!stateDescriptor->getValue(aPropValue))
+            aPropValue->setNull();
+          return true;
+        case age_key: {
+          // for ephemeral states, return time of last push as "age"
+          MLMicroSeconds lu = stateDescriptor ? stateDescriptor->getLastUpdate() : lastPush;
+          if (lu==Never)
+            aPropValue->setNull();
+          else
+            aPropValue->setDoubleValue((double)(MainLoop::now()-lu)/Second);
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+
+
+
+// MARK: ===== DeviceStates container
+
+
+int DeviceStates::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return (int)deviceStates.size();
+}
+
+
+static char states_key;
+
+PropertyDescriptorPtr DeviceStates::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  if (aPropIndex<deviceStates.size()) {
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = deviceStates[aPropIndex]->stateName;
+    descP->propertyType = apivalue_object;
+    descP->propertyFieldKey = aPropIndex;
+    descP->propertyObjectKey = OKEY(states_key);
+    return descP;
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+PropertyContainerPtr DeviceStates::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->hasObjectKey(states_key)) {
+    return deviceStates[aPropertyDescriptor->fieldKey()];
+  }
+  return NULL;
+}
+
+
+void DeviceStates::addState(DeviceStatePtr aState)
+{
+  deviceStates.push_back(aState);
+}
+
+
+
+DeviceStatePtr DeviceStates::getState(const string aName)
+{
+  for (StatesVector::iterator pos = deviceStates.begin(); pos!=deviceStates.end(); ++pos) {
+    if ((*pos)->stateName==aName) {
+      // found
+      return *pos;
+    }
+  }
+  // not found
+  return DeviceStatePtr();
 }
 
 
 // MARK: ===== DeviceProperties
 
 
-void DeviceProperties::addProperty(const string aName, ValueDescriptorPtr aPropertyDesc)
+void DeviceProperties::addProperty(ValueDescriptorPtr aPropertyDesc)
 {
-  values.push_back(ValueEntry(aName, aPropertyDesc));
+  values.push_back(aPropertyDesc);
 }
 
 
@@ -551,6 +795,8 @@ SingleDevice::SingleDevice(Vdc *aVdcP) :
 {
   // create actions
   deviceActions = DeviceActionsPtr(new DeviceActions);
+  // create states
+  deviceStates = DeviceStatesPtr(new DeviceStates);
   // create device properties
   deviceProperties = DevicePropertiesPtr(new DeviceProperties);
   // TODO: create custome actions & states
@@ -645,6 +891,8 @@ void SingleDevice::actionCallComplete(VdcApiRequestPtr aRequest, ErrorPtr aError
 enum {
   // singledevice level properties
   deviceActions_key,
+  deviceStateDescriptions_key,
+  deviceStates_key,
   devicePropertyDescriptions_key,
   numSimpleDeviceProperties
 };
@@ -654,7 +902,7 @@ static char singledevice_key;
 
 int SingleDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // Accessing properties at the Device (root) level
     return inherited::numProps(aDomain, aParentDescriptor)+numSimpleDeviceProperties;
   }
@@ -668,10 +916,12 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
   static const PropertyDescription properties[numSimpleDeviceProperties] = {
     // common device properties
     { "deviceActions", apivalue_object, deviceActions_key, OKEY(singledevice_key) },
+    { "deviceStateDescriptions", apivalue_object, deviceStateDescriptions_key, OKEY(devicestatedesc_key) },
+    { "deviceStates", apivalue_object, deviceStates_key, OKEY(devicestate_key) },
     { "devicePropertyDescriptions", apivalue_object, devicePropertyDescriptions_key, OKEY(singledevice_key) }
   };
   // C++ object manages different levels, check aParentDescriptor
-  if (!aParentDescriptor) {
+  if (aParentDescriptor->isRootOfObject()) {
     // root level - accessing properties on the Device level
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)
@@ -683,13 +933,15 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
 }
 
 
-PropertyContainerPtr SingleDevice::getContainer(PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
-  // containers are elements from the behaviour arrays
-  if (aPropertyDescriptor->hasObjectKey(singledevice_key)) {
+  if (aPropertyDescriptor->parentDescriptor->isRootOfObject()) {
     switch (aPropertyDescriptor->fieldKey()) {
       case deviceActions_key:
         return deviceActions;
+      case deviceStateDescriptions_key:
+      case deviceStates_key:
+        return deviceStates;
       case devicePropertyDescriptions_key:
         return deviceProperties;
     }
