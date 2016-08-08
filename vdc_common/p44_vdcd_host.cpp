@@ -26,6 +26,7 @@
 
 #include "jsonvdcapi.hpp"
 
+
 using namespace p44;
 
 
@@ -72,6 +73,7 @@ ApiValuePtr P44JsonApiRequest::newApiValue()
 
 // MARK: ===== perform self test
 
+#if SELFTESTING_ENABLED
 
 class SelfTestRunner
 {
@@ -91,12 +93,12 @@ public:
   };
 private:
   SelfTestRunner(VdcHost &aVdcHost, StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED) :
-  completedCB(aCompletedCB),
-  vdcHost(aVdcHost),
-  button(aButton),
-  redLED(aRedLED),
-  greenLED(aGreenLED),
-  errorReportTicket(0)
+    completedCB(aCompletedCB),
+    vdcHost(aVdcHost),
+    button(aButton),
+    redLED(aRedLED),
+    greenLED(aGreenLED),
+    errorReportTicket(0)
   {
     // start testing
     nextVdc = vdcHost.vdcs.begin();
@@ -178,10 +180,17 @@ private:
 
 };
 
+#endif
+
+
 
 void P44VdcHost::selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED)
 {
+  #if SELFTESTING_ENABLED
   SelfTestRunner::initialize(*this, aCompletedCB, aButton, aRedLED, aGreenLED);
+  #else
+  aCompletedCB(TextError::err("Fatal: Testing is not included in this build"));
+  #endif
 }
 
 
