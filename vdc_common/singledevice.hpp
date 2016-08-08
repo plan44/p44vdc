@@ -94,14 +94,18 @@ namespace p44 {
     /// @param aValue the string value to set
     virtual void setStringValue(const string aValue) { /* NOP in base class */ };
 
+    /// set "defaultvalue" flag
+    void setIsDefault(bool aIsDefault) { isDefault = aIsDefault; };
+
+
     /// @}
 
 
   protected:
 
     string valueName; ///< the name of the value
-    bool hasValue; ///< set if the parameter has a value. For action params, this is the default value. For state/states params this is the actual value
-    bool isDefault; ///< set if the value is the default value
+    bool hasValue; ///< set if there is a stored value. For action params, this is the default value. For state/states params this is the actual value
+    bool isDefault; ///< set if the value stored is the default value
     VdcValueType valueType; ///< the type of the parameter
     MLMicroSeconds lastUpdate; ///< when the value was last updated
 
@@ -422,6 +426,8 @@ namespace p44 {
 
 
 
+  #define STATES_WITH_PARAMETERS 0
+
   class DeviceState : public PropertyContainer
   {
     typedef PropertyContainer inherited;
@@ -430,9 +436,12 @@ namespace p44 {
 
     string stateName; ///< the name of this state
     ValueDescriptorPtr stateDescriptor; ///< the value (descriptor) for the state itself
-    ValueListPtr stateParams; ///< the valuedescriptors for the parameters
     string stateDescription; ///< a text description for the state, for logs and simple UI purposes
     MLMicroSeconds lastPush; ///< when the state was last pushed ("age" for ephemeral states which are only pushed)
+
+    #if STATES_WITH_PARAMETERS
+    ValueListPtr stateParams; ///< the valuedescriptors for the parameters
+    #endif
 
   protected:
 
@@ -447,15 +456,15 @@ namespace p44 {
     /// @param aStateDescriptor value descriptor for the state, can be NULL for ephemeral states
     DeviceState(SingleDevice &aSingleDevice, const string aName, const string aDescription, ValueDescriptorPtr aStateDescriptor);
 
+    /// access value
+    ValueDescriptorPtr value() { return stateDescriptor; };
+
     /// add parameter
     /// @param aValueDesc a value descriptor object.
     void addParameter(ValueDescriptorPtr aValueDesc);
 
-    /// access value
-    ValueDescriptorPtr value() { return stateDescriptor; };
-
     /// access a parameter
-    ValueDescriptorPtr param(const string aName) { return stateParams->getValue(aName); }
+    ValueDescriptorPtr param(const string aName);
 
     /// push the state via pushProperty
     bool push();

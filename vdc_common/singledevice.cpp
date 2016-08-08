@@ -591,18 +591,36 @@ DeviceState::DeviceState(SingleDevice &aSingleDevice, const string aName, const 
   singleDeviceP(&aSingleDevice),
   stateName(aName),
   stateDescriptor(aStateDescriptor),
-  stateDescription(aDescription)
+  stateDescription(aDescription),
+  lastPush(Never)
 {
+  #if STATES_WITH_PARAMETERS
   // install empty subclass of value list for (optional) parameters
   // (subclass checks access path to just deliver values when accessing via devicestate_key)
   stateParams = ValueListPtr(new DeviceStateParams);
+  #endif
 }
 
 
 void DeviceState::addParameter(ValueDescriptorPtr aValueDesc)
 {
+  #if STATES_WITH_PARAMETERS
+  aValueDesc->setIsDefault(false); // a state parameter does not have default (but state value might still be initialized)
   stateParams->addValue(aValueDesc);
+  #endif
 }
+
+
+ValueDescriptorPtr DeviceState::param(const string aName)
+{
+  #if STATES_WITH_PARAMETERS
+  return stateParams->getValue(aName);
+  #else
+  // just return something so implementations can act like there were state params and use setXXXX to set them
+  return ValueDescriptorPtr(new NumericValueDescriptor("universal_dummy", valueType_float, -42, 42, 0.42));
+  #endif
+}
+
 
 
 bool DeviceState::push()
@@ -628,12 +646,14 @@ bool DeviceState::push()
 
 enum {
   statedescription_key,
+  eventonlydesc_key,
   statetype_key,
   stateparamdescs_key,
   numStatesDescProperties
 };
 
 enum {
+  eventonly_key,
   state_key,
   age_key,
   stateparams_key,
@@ -656,10 +676,12 @@ PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDom
 {
   static const PropertyDescription descproperties[numStatesDescProperties] = {
     { "description", apivalue_string, statedescription_key, OKEY(devicestatedesc_key) },
+    { "eventonly", apivalue_bool, eventonlydesc_key, OKEY(devicestatedesc_key) },
     { "state", apivalue_object, statetype_key, OKEY(devicestatedesc_key) },
     { "params", apivalue_object, stateparamdescs_key, OKEY(devicestatedesc_key) }
   };
   static const PropertyDescription properties[numStatesProperties] = {
+    { "eventonly", apivalue_bool, eventonly_key, OKEY(devicestate_key) },
     { "state", apivalue_null, state_key, OKEY(devicestate_key) },
     { "age", apivalue_double, age_key, OKEY(devicestate_key) },
     { "params", apivalue_object, stateparams_key, OKEY(devicestate_key) }
@@ -678,17 +700,21 @@ PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDom
 PropertyContainerPtr DeviceState::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(devicestatedesc_key)) {
-    if (aPropertyDescriptor->fieldKey()==stateparamdescs_key) {
-      return stateParams;
-    }
-    else if (aPropertyDescriptor->fieldKey()==statetype_key) {
+    if (aPropertyDescriptor->fieldKey()==statetype_key) {
       return stateDescriptor; // can be NULL for ephemeral states
     }
+    #if STATES_WITH_PARAMETERS
+    else if (aPropertyDescriptor->fieldKey()==stateparamdescs_key) {
+      return stateParams;
+    }
+    #endif
   }
   else if (aPropertyDescriptor->hasObjectKey(devicestate_key)) {
+    #if STATES_WITH_PARAMETERS
     if (aPropertyDescriptor->fieldKey()==stateparams_key) {
       return stateParams;
     }
+    #endif
   }
   return NULL;
 }
@@ -700,6 +726,10 @@ bool DeviceState::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
     if (aPropertyDescriptor->hasObjectKey(devicestatedesc_key)) {
       switch (aPropertyDescriptor->fieldKey()) {
         case statedescription_key: aPropValue->setStringValue(stateDescription); return true;
+        case eventonlydesc_key:
+          if (stateDescriptor) return false; // is a state, does not have eventonly
+          aPropValue->setBoolValue(true);
+          return true;
       }
     }
     else if (aPropertyDescriptor->hasObjectKey(devicestate_key)) {
@@ -708,6 +738,10 @@ bool DeviceState::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
           if (!stateDescriptor) return false; // no state
           if (!stateDescriptor->getValue(aPropValue))
             aPropValue->setNull();
+          return true;
+        case eventonly_key:
+          if (stateDescriptor) return false; // is a state, does not have eventonly
+          aPropValue->setBoolValue(true);
           return true;
         case age_key: {
           // for ephemeral states, return time of last push as "age"
