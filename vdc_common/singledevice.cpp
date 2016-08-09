@@ -687,6 +687,7 @@ ValueDescriptorPtr DeviceState::param(const string aName)
 
 bool DeviceState::push()
 {
+  SALOG((*singleDeviceP), LOG_NOTICE, "push: state '%s' changed to %s", stateName.c_str(), stateDescriptor->getStringValue().c_str());
   // update for every push attempt, as this are "events"
   lastPush = MainLoop::currentMainLoop().now();
   // try to push to connected vDC API client
@@ -739,12 +740,12 @@ PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDom
   static const PropertyDescription descproperties[numStatesDescProperties] = {
     { "description", apivalue_string, statedescription_key, OKEY(devicestatedesc_key) },
     { "eventonly", apivalue_bool, eventonlydesc_key, OKEY(devicestatedesc_key) },
-    { "state", apivalue_object, statetype_key, OKEY(devicestatedesc_key) },
+    { "value", apivalue_object, statetype_key, OKEY(devicestatedesc_key) },
     { "params", apivalue_object, stateparamdescs_key, OKEY(devicestatedesc_key) }
   };
   static const PropertyDescription properties[numStatesProperties] = {
     { "eventonly", apivalue_bool, eventonly_key, OKEY(devicestate_key) },
-    { "state", apivalue_null, state_key, OKEY(devicestate_key) },
+    { "value", apivalue_null, state_key, OKEY(devicestate_key) },
     { "age", apivalue_double, age_key, OKEY(devicestate_key) },
     { "params", apivalue_object, stateparams_key, OKEY(devicestate_key) }
   };
@@ -992,7 +993,7 @@ void SingleDevice::actionCallComplete(VdcApiRequestPtr aRequest, ErrorPtr aError
 
 enum {
   // singledevice level properties
-  deviceActions_key,
+  deviceActionDescriptions_key,
   deviceStateDescriptions_key,
   deviceStates_key,
   devicePropertyDescriptions_key,
@@ -1017,7 +1018,7 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
   // device level properties
   static const PropertyDescription properties[numSimpleDeviceProperties] = {
     // common device properties
-    { "deviceActions", apivalue_object, deviceActions_key, OKEY(singledevice_key) },
+    { "deviceActionDescriptions", apivalue_object, deviceActionDescriptions_key, OKEY(singledevice_key) },
     { "deviceStateDescriptions", apivalue_object, deviceStateDescriptions_key, OKEY(devicestatedesc_key) },
     { "deviceStates", apivalue_object, deviceStates_key, OKEY(devicestate_key) },
     { "devicePropertyDescriptions", apivalue_object, devicePropertyDescriptions_key, OKEY(singledevice_key) }
@@ -1039,7 +1040,7 @@ PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPr
 {
   if (aPropertyDescriptor->parentDescriptor->isRootOfObject()) {
     switch (aPropertyDescriptor->fieldKey()) {
-      case deviceActions_key:
+      case deviceActionDescriptions_key:
         return deviceActions;
       case deviceStateDescriptions_key:
       case deviceStates_key:
