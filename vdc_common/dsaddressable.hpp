@@ -214,7 +214,7 @@ namespace p44 {
     /// - enoceanaddress:XXXXXXXX = 8 hex digits enOcean device address
     /// - gs1:(01)ggggg = GS1 formatted GTIN
     /// - uuid:UUUUUUU = UUID
-    /// - macaddress:MMMMM = MAC Address
+    /// - macaddress:MM:MM:MM:MM:MM:MM = MAC Address in hex
     /// - sparkcoreid:ssssss = spark core ID
     virtual string hardwareGUID() { return ""; };
 

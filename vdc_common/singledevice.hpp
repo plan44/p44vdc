@@ -76,6 +76,10 @@ namespace p44 {
     /// @return true if there is a (default) value that could be assigned to aApiValue, false otherwise (aApiValue will be untouched)
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) = 0;
 
+    /// get the value as string
+    /// @return string representation of the current value
+    string getStringValue(bool aAsInternal = false);
+
     /// @}
 
     /// Setting state and state parameter value to allow query via API and property pushing
@@ -83,20 +87,24 @@ namespace p44 {
 
     /// set double value
     /// @param aValue the double value to set
-    virtual void setDoubleValue(double aValue) { /* NOP in base class */ };
-
+    /// @return true if set value differs from previous value
+    virtual bool setDoubleValue(double aValue) { return false; /* NOP in base class */ };
 
     /// set int value
     /// @param aValue the int value to set
-    virtual void setIntValue(int aValue) { /* NOP in base class */ };
+    /// @return true if set value differs from previous value
+    virtual bool setIntValue(int aValue) { return false; /* NOP in base class */ };
 
     /// set string value
     /// @param aValue the string value to set
-    virtual void setStringValue(const string aValue) { /* NOP in base class */ };
+    /// @return true if set value differs from previous value
+    virtual bool setStringValue(const string aValue) { return false; /* NOP in base class */ };
+
+    /// make value invalid, reported as NULL when accessed via properties
+    void invalidate();
 
     /// set "defaultvalue" flag
     void setIsDefault(bool aIsDefault) { isDefault = aIsDefault; };
-
 
     /// @}
 
@@ -111,7 +119,8 @@ namespace p44 {
 
     /// set last update
     /// @param aLastUpdate time of last update, can be Never (or Infinite to use current now())
-    void setLastUpdate(MLMicroSeconds aLastUpdate=Infinite);
+    /// @return true if this update caused hasValue to be changed from false to true
+    bool setLastUpdate(MLMicroSeconds aLastUpdate=Infinite);
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
@@ -140,8 +149,8 @@ namespace p44 {
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
 
-    virtual void setDoubleValue(double aValue) P44_OVERRIDE { value = aValue; setLastUpdate(); };
-    virtual void setIntValue(int aValue) P44_OVERRIDE { value = aValue; setLastUpdate(); };
+    virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
+    virtual bool setIntValue(int aValue) P44_OVERRIDE;
 
   protected:
 
@@ -166,7 +175,7 @@ namespace p44 {
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
 
-    virtual void setStringValue(const string aValue) P44_OVERRIDE { value = aValue; setLastUpdate(); };
+    virtual bool setStringValue(const string aValue) P44_OVERRIDE;
     
   };
 
@@ -196,7 +205,7 @@ namespace p44 {
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
 
-    virtual void setIntValue(int aValue) P44_OVERRIDE { value = aValue; setLastUpdate(); };
+    virtual bool setIntValue(int aValue) P44_OVERRIDE;
 
   protected:
 

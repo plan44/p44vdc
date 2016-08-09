@@ -45,14 +45,31 @@ ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, bo
 }
 
 
-void ValueDescriptor::setLastUpdate(MLMicroSeconds aLastUpdate)
+bool ValueDescriptor::setLastUpdate(MLMicroSeconds aLastUpdate)
 {
   if (aLastUpdate==Infinite)
     aLastUpdate = MainLoop::currentMainLoop().now();
   lastUpdate = aLastUpdate;
+  bool gotValue = !hasValue; // if this is the first value update, consider value changed
   hasValue = true;
   isDefault = false;
+  return gotValue;
 }
+
+
+void ValueDescriptor::invalidate()
+{
+  hasValue = false;
+}
+
+
+string ValueDescriptor::getStringValue(bool aAsInternal)
+{
+  ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
+  getValue(v, aAsInternal);
+  return v->stringValue();
+}
+
 
 
 enum {
@@ -106,8 +123,26 @@ bool ValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 }
 
 
-
 // MARK: ===== NumericValueDescriptor
+
+
+bool NumericValueDescriptor::setDoubleValue(double aValue)
+{
+  bool didChange = setLastUpdate(); // anyway, mark as update
+  if (value != aValue) {
+    // new value
+    value = aValue;
+    didChange = true;
+  }
+  return didChange;
+}
+
+
+bool NumericValueDescriptor::setIntValue(int aValue)
+{
+  return setDoubleValue(aValue);
+}
+
 
 ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
 {
@@ -187,6 +222,18 @@ bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr a
 
 // MARK: ===== TextValueDescriptor
 
+bool TextValueDescriptor::setStringValue(const string aValue)
+{
+  bool didChange = setLastUpdate(); // anyway, mark as update
+  if (!(value==aValue)) {
+    // new value
+    value = aValue;
+    didChange = true;
+  }
+  return didChange;
+}
+
+
 ErrorPtr TextValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
 {
   ErrorPtr err;
@@ -211,6 +258,19 @@ bool TextValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal)
 
 
 // MARK: ===== EnumValueDescriptor
+
+
+bool EnumValueDescriptor::setIntValue(int aValue)
+{
+  bool didChange = setLastUpdate(); // anyway, mark as update
+  if (value != aValue) {
+    // new value
+    value = aValue;
+    didChange = true;
+  }
+  return didChange;
+}
+
 
 
 void EnumValueDescriptor::addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault)
@@ -576,7 +636,9 @@ bool DeviceStateParams::accessField(PropertyAccessMode aMode, ApiValuePtr aPropV
 {
   if (aPropertyDescriptor->parentDescriptor->hasObjectKey(devicestate_key) && aMode==access_read) {
     // fieldkey is the param index, just get that param's value
-    return values[aPropertyDescriptor->fieldKey()]->getValue(aPropValue);
+    if (!values[aPropertyDescriptor->fieldKey()]->getValue(aPropValue))
+      aPropValue->setNull(); // unset param will just report NULL
+    return true; // param values are always reported
   }
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
