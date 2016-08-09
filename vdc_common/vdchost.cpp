@@ -62,6 +62,8 @@ using namespace p44;
 #define DEFAULT_DESCRIPTION_TEMPLATE "%V %M%N #%S"
 
 
+static VdcHost *sharedVdcHostP = NULL;
+
 VdcHost::VdcHost() :
   inheritedParams(dsParamStore),
   mac(0),
@@ -79,8 +81,16 @@ VdcHost::VdcHost() :
   mainLoopStatsCounter(0),
   productName(DEFAULT_PRODUCT_NAME)
 {
+  // remember singleton's address
+  sharedVdcHostP = this;
   // obtain MAC address
   mac = macAddress();
+}
+
+
+VdcHostPtr VdcHost::sharedVdcHost()
+{
+  return VdcHostPtr(sharedVdcHostP);
 }
 
 
@@ -122,9 +132,7 @@ string VdcHost::macAddressString()
 
 string VdcHost::ipv4AddressString()
 {
-  uint32_t ip = ipv4Address();
-  string ipStr = string_format("%d.%d.%d.%d", (ip>>24) & 0xFF, (ip>>16) & 0xFF, (ip>>8) & 0xFF, ip & 0xFF);
-  return ipStr;
+  return ipv4ToString(ipv4Address());
 }
 
 

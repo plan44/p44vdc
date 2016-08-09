@@ -170,6 +170,10 @@ namespace p44 {
     /// @return API connection
     virtual VdcApiConnectionPtr newConnection();
 
+    /// get a new API value suitable for this connection
+    /// @return new API value of suitable internal implementation to be used on this API connection
+    virtual ApiValuePtr newApiValue();
+
   };
 
 
@@ -245,10 +249,6 @@ namespace p44 {
 
     /// request closing connection after last message has been sent
     virtual void closeAfterSend();
-
-    /// get a new API value suitable for this connection
-    /// @return new API value of suitable internal implementation to be used on this API connection
-    virtual ApiValuePtr newApiValue();
 
     /// send a API request
     /// @param aMethod the vDC API method or notification name to be sent

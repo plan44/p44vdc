@@ -54,27 +54,27 @@ namespace p44 {
 
     /// return the request ID as a string
     /// @return request ID as string
-    virtual string requestId() { return ""; }
+    virtual string requestId()  P44_OVERRIDE { return ""; }
 
     /// get the API connection this request originates from
     /// @return API connection
-    virtual VdcApiConnectionPtr connection() { return VdcApiConnectionPtr(); } // is not really a regular VDC API call, so there's no connection
+    virtual VdcApiConnectionPtr connection()  P44_OVERRIDE { return VdcApiConnectionPtr(); } // is not really a regular VDC API call, so there's no connection
 
     /// get a new API value suitable for answering this request connection
     /// @return new API value of suitable internal implementation to be used on this API connection
-    virtual ApiValuePtr newApiValue();
+    virtual ApiValuePtr newApiValue() P44_OVERRIDE;
 
     /// send a vDC API result (answer for successful method call)
     /// @param aResult the result as a ApiValue. Can be NULL for procedure calls without return value
     /// @result empty or Error object in case of error sending result response
-    virtual ErrorPtr sendResult(ApiValuePtr aResult);
+    virtual ErrorPtr sendResult(ApiValuePtr aResult) P44_OVERRIDE;
 
     /// send a vDC API error (answer for unsuccesful method call)
     /// @param aErrorCode the error code
     /// @param aErrorMessage the error message or NULL to generate a standard text
     /// @param aErrorData the optional "data" member for the vDC API error object
     /// @result empty or Error object in case of error sending error response
-    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr());
+    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr()) P44_OVERRIDE;
     
   };
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;

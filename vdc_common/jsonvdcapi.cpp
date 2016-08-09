@@ -141,6 +141,13 @@ VdcApiConnectionPtr VdcJsonApiServer::newConnection()
 }
 
 
+ApiValuePtr VdcJsonApiServer::newApiValue()
+{
+  return ApiValuePtr(new JsonApiValue);
+}
+
+
+
 
 // MARK: ===== VdcJsonApiRequest
 
@@ -216,12 +223,6 @@ void VdcJsonApiConnection::jsonRequestHandler(const char *aMethod, const char *a
 void VdcJsonApiConnection::closeAfterSend()
 {
   jsonRpcComm->closeAfterSend();
-}
-
-
-ApiValuePtr VdcJsonApiConnection::newApiValue()
-{
-  return ApiValuePtr(new JsonApiValue);
 }
 
 

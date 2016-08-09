@@ -142,6 +142,10 @@ namespace p44 {
 
     VdcHost();
 
+    /// VdcHost is a singleton, get access to it
+    /// @return vdc host
+    static VdcHostPtr sharedVdcHost();
+
     /// the list of containers by API-exposed ID (dSUID or derived dsid)
     VdcMap vdcs;
 
@@ -150,6 +154,10 @@ namespace p44 {
 
     /// active session
     VdcApiConnectionPtr getSessionConnection() { return activeSessionConnection; };
+
+    /// get an API value that would work for the session connection if we had one
+    /// @return an API value of the same type as session connection will use
+    ApiValuePtr newApiValue() { return vdcApiServer ? vdcApiServer->newApiValue() : ApiValuePtr(); };
 
     /// set user assignable name
     /// @param aName name of this instance of the vdc host

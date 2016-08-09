@@ -80,7 +80,6 @@ void VdcApiServer::connectionStatusHandler(SocketCommPtr aSocketComm, ErrorPtr a
 }
 
 
-
 // MARK: ===== VdcApiConnection
 
 
@@ -96,6 +95,16 @@ void VdcApiConnection::closeConnection()
     socketConnection()->closeConnection();
     socketConnection()->clearCallbacks();
   }
+}
+
+
+ApiValuePtr VdcApiConnection::newApiValue()
+{
+  // ask the server
+  VdcApiServerPtr srv = boost::dynamic_pointer_cast<VdcApiServer>(socketConnection()->getServerConnection());
+  if (srv)
+    return srv->newApiValue();
+  return ApiValuePtr(); // none
 }
 
 
@@ -121,8 +130,4 @@ ErrorPtr VdcApiRequest::sendStatus(ErrorPtr aStatusToSend)
     return sendError(aStatusToSend);
   }
 }
-
-
-
-
 

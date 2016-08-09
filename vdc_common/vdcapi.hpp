@@ -96,14 +96,9 @@ namespace p44 {
     /// end connection
     void closeConnection();
 
-    /// get a new API value suitable for this connection
-    /// @return new API value of suitable internal implementation to be used on this API connection
-    virtual ApiValuePtr newApiValue() = 0;
-
     /// The underlying socket connection
     /// @return socket connection
     virtual SocketCommPtr socketConnection() = 0;
-
 
     /// send a API request
     /// @param aMethod the vDC API method or notification name to be sent
@@ -116,6 +111,11 @@ namespace p44 {
 
     /// request closing connection after last message has been sent
     virtual void closeAfterSend() = 0;
+
+    /// get a new API value suitable for this connection
+    /// @return new API value of suitable internal implementation to be used on this API connection
+    ApiValuePtr newApiValue();
+
   };
 
 
@@ -144,6 +144,10 @@ namespace p44 {
     /// clear all callbacks
     /// @note this is important because handlers might cause retain cycles when they have smart ptr arguments
     virtual void clearCallbacks() { apiConnectionStatusHandler = NULL; inherited::clearCallbacks(); }
+
+    /// get a new API value suitable for connections on this server
+    /// @return new API value of suitable internal implementation to be with connections on this server
+    virtual ApiValuePtr newApiValue() = 0;
 
   protected:
 
@@ -175,10 +179,6 @@ namespace p44 {
     /// @return API connection
     virtual VdcApiConnectionPtr connection() = 0;
 
-    /// get a new API value suitable for answering this request connection
-    /// @return new API value of suitable internal implementation to be used on this API connection
-    virtual ApiValuePtr newApiValue() { return connection()->newApiValue(); }; // default is asking connection
-
     /// send a vDC API result (answer for successful method call)
     /// @param aResult the result as a ApiValue. Can be NULL for procedure calls without return value
     /// @result empty or object in case of error sending result response
@@ -201,6 +201,12 @@ namespace p44 {
     /// @param aStatusToSend if Error::isOK(), a OK status (NULL result) will be returned, otherwise error will be returned
     /// @result empty or Error object in case of error sending error response
     ErrorPtr sendStatus(ErrorPtr aStatusToSend);
+
+    /// get a new API value suitable for answering this request connection
+    /// @return new API value of suitable internal implementation to be used on this API connection
+    /// @note default is asking the connection, but for special cases (e.g. vDC API requests via config API)
+    ///   this might be overridden.
+    virtual ApiValuePtr newApiValue() { return connection()->newApiValue(); }; // default is asking connection
 
   };
 

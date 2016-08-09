@@ -956,6 +956,12 @@ VdcApiConnectionPtr VdcPbufApiServer::newConnection()
 }
 
 
+ApiValuePtr VdcPbufApiServer::newApiValue()
+{
+  return ApiValuePtr(new PbufApiValue);
+}
+
+
 
 // MARK: ===== VdcPbufApiRequest
 
@@ -1503,12 +1509,6 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
 void VdcPbufApiConnection::closeAfterSend()
 {
   closeWhenSent = true;
-}
-
-
-ApiValuePtr VdcPbufApiConnection::newApiValue()
-{
-  return ApiValuePtr(new PbufApiValue);
 }
 
 
