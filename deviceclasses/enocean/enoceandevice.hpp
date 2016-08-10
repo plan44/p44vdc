@@ -141,7 +141,7 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return "enocean"; };
+    virtual string deviceTypeIdentifier() const { return "enocean"; };
 
     /// check if device can be disconnected by software (i.e. Web-UI)
     /// @return true if device might be disconnectable by the user via software (i.e. web UI)

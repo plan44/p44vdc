@@ -267,7 +267,7 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return daliTechnicalType()==dalidevice_group ? "dali_group" : "dali_single"; };
+    virtual string deviceTypeIdentifier() const { return daliTechnicalType()==dalidevice_group ? "dali_group" : "dali_single"; };
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
@@ -397,7 +397,7 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return "dali_rgbw"; };
+    virtual string deviceTypeIdentifier() const { return "dali_rgbw"; };
 
     /// get typed container reference
     DaliVdc &daliVdc();

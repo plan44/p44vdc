@@ -56,7 +56,7 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return "spark_io"; };
+    virtual string deviceTypeIdentifier() const { return "spark_io"; };
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object

@@ -60,7 +60,7 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return "hue"; };
+    virtual string deviceTypeIdentifier() const { return "hue"; };
 
     HueVdc &hueVdc();
     HueComm &hueComm();

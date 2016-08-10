@@ -54,7 +54,7 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return "enocean_remotecontrol"; };
+    virtual string deviceTypeIdentifier() const { return "enocean_remotecontrol"; };
 
     /// @param aVariant -1 to just get number of available teach-in variants. 0..n to send teach-in signal;
     ///   some devices may have different teach-in signals (like: one for ON, one for OFF).
@@ -114,7 +114,7 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return "enocean_relay"; };
+    virtual string deviceTypeIdentifier() const { return "enocean_relay"; };
 
     /// apply channel values
     virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
@@ -142,7 +142,7 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return "enocean_blind"; };
+    virtual string deviceTypeIdentifier() const { return "enocean_blind"; };
 
     /// sync channel values (with time-derived estimates of current blind position
     virtual void syncChannelValues(SimpleCB aDoneCB);

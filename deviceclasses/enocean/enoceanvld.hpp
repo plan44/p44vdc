@@ -45,7 +45,7 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return "enocean_vld"; };
+    virtual string deviceTypeIdentifier() const { return "enocean_vld"; };
 
     /// get table of profile variants
     /// @return NULL or pointer to a list of profile variants

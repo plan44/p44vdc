@@ -107,7 +107,7 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual const char *deviceTypeIdentifier() { return "unspecified"; };
+    virtual string deviceTypeIdentifier() const { return "unspecified"; };
 
     /// @return human readable model name/short description
     virtual string modelName() { return "vdSD - virtual device"; }
