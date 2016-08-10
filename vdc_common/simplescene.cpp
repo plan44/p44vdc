@@ -350,6 +350,8 @@ void SimpleCmdScene::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 // MARK: ===== scene command substitutions
 
 
+// TODO: later use more generic replacer from simpledevice
+
 int SimpleCmdScene::substitutePlaceholders(string &aCommandStr)
 {
   size_t p = 0;
