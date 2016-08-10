@@ -104,7 +104,7 @@ namespace p44 {
     virtual const char *name() const { return "<root>"; };
     virtual ApiValueType type() const { return apivalue_object; };
     virtual size_t fieldKey() const { return 0; };
-    virtual intptr_t objectKey() const { return NULL; };
+    virtual intptr_t objectKey() const { return 0; };
     virtual bool isArrayContainer() const { return false; };
   };
 
