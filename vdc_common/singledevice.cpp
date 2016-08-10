@@ -29,6 +29,9 @@
 
 
 #include "singledevice.hpp"
+#include "simplescene.hpp"
+
+#include "jsonvdcapi.hpp"
 
 using namespace p44;
 
@@ -493,7 +496,7 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
     return; // done
   }
   // parameters are ok, now invoking action implementation
-  LOG(LOG_INFO, "- calling with expanded params: %s", aParams->description().c_str());
+  LOG(LOG_INFO, "- calling with expanded params: %s:%s", actionName.c_str(), aParams->description().c_str());
   performCall(aParams, aCompletedCB);
 }
 
@@ -560,6 +563,16 @@ bool DeviceAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
 
 
 // MARK: ===== DeviceActions container
+
+
+
+void DeviceActions::addToModelUIDHash(string &aHashedString)
+{
+  for (ActionsVector::iterator pos = deviceActions.begin(); pos!=deviceActions.end(); ++pos) {
+    aHashedString += ':';
+    aHashedString += (*pos)->actionName;
+  }
+}
 
 
 int DeviceActions::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
@@ -827,6 +840,16 @@ bool DeviceState::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 // MARK: ===== DeviceStates container
 
 
+
+void DeviceStates::addToModelUIDHash(string &aHashedString)
+{
+  for (StatesVector::iterator pos = deviceStates.begin(); pos!=deviceStates.end(); ++pos) {
+    aHashedString += ':';
+    aHashedString += (*pos)->stateName;
+  }
+}
+
+
 int DeviceStates::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   return (int)deviceStates.size();
@@ -887,6 +910,14 @@ void DeviceProperties::addProperty(ValueDescriptorPtr aPropertyDesc)
 }
 
 
+void DeviceProperties::addToModelUIDHash(string &aHashedString)
+{
+  for (ValuesVector::iterator pos = values.begin(); pos!=values.end(); ++pos) {
+    aHashedString += ':';
+    aHashedString += (*pos)->getName();
+  }
+}
+
 
 
 
@@ -909,6 +940,19 @@ SingleDevice::SingleDevice(Vdc *aVdcP) :
 SingleDevice::~SingleDevice()
 {
 }
+
+
+void SingleDevice::addToModelUIDHash(string &aHashedString)
+{
+  // action names
+  inherited::addToModelUIDHash(aHashedString);
+  deviceActions->addToModelUIDHash(aHashedString);
+  deviceStates->addToModelUIDHash(aHashedString);
+  deviceProperties->addToModelUIDHash(aHashedString);
+}
+
+
+
 
 
 // MARK: ===== SingleDevice persistence
@@ -959,32 +1003,93 @@ void SingleDevice::loadSettingsFromFiles()
 ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
-  if (aMethod=="callDeviceAction") {
-    string action;
-    respErr = checkStringParam(aParams, "name", action);
-    if (Error::isOK(respErr)) {
-      ApiValuePtr actionParams = aParams->get("params");
-      if (!actionParams) {
-        // always pass params, even if empty
-        actionParams = aParams->newObject();
-      }
-      // now call the action
-      ALOG(LOG_NOTICE, "callDeviceAction: %s:%s", action.c_str(), actionParams->description().c_str());
-      // TODO: check custom actions first
-      deviceActions->call(action, actionParams, boost::bind(&SingleDevice::actionCallComplete, this, aRequest, _1));
-      // callback will create the response
-      return ErrorPtr(); // do not return anything now
+  if (aMethod=="invokeDeviceAction") {
+    string actionid;
+    respErr = checkStringParam(aParams, "id", actionid);
+    if (!Error::isOK(respErr))
+      return respErr;
+    ApiValuePtr actionParams = aParams->get("params");
+    if (!actionParams) {
+      // always pass params, even if empty
+      actionParams = aParams->newObject();
     }
+    // now call the action
+    ALOG(LOG_NOTICE, "invokeDeviceAction: %s:%s", actionid.c_str(), actionParams->description().c_str());
+    // TODO: check custom actions first
+    deviceActions->call(actionid, actionParams, boost::bind(&SingleDevice::invokeDeviceActionComplete, this, aRequest, _1));
+    // callback will create the response
+    return ErrorPtr(); // do not return anything now
   }
   return inherited::handleMethod(aRequest, aMethod, aParams);
 }
 
 
-void SingleDevice::actionCallComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
+void SingleDevice::invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
 {
   ALOG(LOG_NOTICE, "- call completed with status %s", Error::isOK(aError) ? "OK" : aError->description().c_str());
   aRequest->sendStatus(aError);
 }
+
+
+// MARK: ===== Singledevice scene command handling
+
+bool SingleDevice::prepareSceneCall(DsScenePtr aScene)
+{
+  SimpleCmdScenePtr cs = boost::dynamic_pointer_cast<SimpleCmdScene>(aScene);
+  bool continueApply = true;
+  if (cs) {
+    // execute custom scene commands
+    if (!cs->command.empty()) {
+      string cmd, cmdargs;
+      if (keyAndValue(cs->command, cmd, cmdargs, ':')) {
+        if (cmd==SCENECMD_DEVICE_ACTION) {
+          // Syntax: deviceaction:actionid[:<JSON object with params>]
+          ApiValuePtr actionParams;
+          string actionid;
+          string jsonparams;
+          JsonObjectPtr j;
+          if (keyAndValue(cmdargs, actionid, jsonparams)) {
+            // substitute placeholders that might be in the JSON
+            cs->substitutePlaceholders(jsonparams);
+            // make Json object of it
+            j = JsonObject::objFromText(jsonparams.c_str());
+          }
+          else {
+            // no params, just actions
+            actionid = cmdargs;
+          }
+          if (!j) {
+            // make an API value out of it
+            j = JsonObject::newObj();
+          }
+          actionParams = JsonApiValue::newValueFromJson(j);
+          ALOG(LOG_NOTICE, "invoking action via scene %d command: %s:%s", aScene->sceneNo, actionid.c_str(), actionParams->description().c_str());
+          // TODO: check custom actions first
+          deviceActions->call(actionid, actionParams, boost::bind(&SingleDevice::sceneInvokedActionComplete, this, _1));
+          return false; // do not continue applying
+        }
+        else {
+          ALOG(LOG_ERR, "Unknown scene command: %s", cs->command.c_str());
+        }
+      }
+    }
+  }
+  // prepared ok
+  return continueApply;
+}
+
+
+void SingleDevice::sceneInvokedActionComplete(ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    ALOG(LOG_INFO, "scene invoked command complete");
+  }
+  else {
+    ALOG(LOG_ERR, "scene invoked command returned error: %s", aError->description().c_str());
+  }
+}
+
+
 
 
 

@@ -65,20 +65,27 @@ string Device::modelUID()
 {
   // combine basic device type identifier, primary group, behaviours and model features and make UUID based dSUID of it
   DsUid vdcNamespace(DSUID_P44VDC_MODELUID_UUID);
-  string s = string_format("%s:%d:", deviceTypeIdentifier(), primaryGroup);
-  // behaviours
-  for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) s += (*pos)->behaviourTypeIdentifier();
-  for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) s += (*pos)->behaviourTypeIdentifier();
-  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) s += (*pos)->behaviourTypeIdentifier();
-  if (output) s += output->behaviourTypeIdentifier();
-  // model features
-  for (int f=0; f<numModelFeatures; f++) {
-    s += hasModelFeature((DsModelFeatures)f)==yes ? 'T' : 'F';
-  }
+  string s;
+  addToModelUIDHash(s);
   // now make UUIDv5 type dSUID out of it
   DsUid modelUID;
   modelUID.setNameInSpace(s, vdcNamespace);
   return modelUID.getString();
+}
+
+
+void Device::addToModelUIDHash(string &aHashedString)
+{
+  string_format_append(aHashedString, "%s:%d:", deviceTypeIdentifier().c_str(), primaryGroup);
+  // behaviours
+  for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
+  for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
+  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
+  if (output) aHashedString += output->behaviourTypeIdentifier();
+  // model features
+  for (int f=0; f<numModelFeatures; f++) {
+    aHashedString += hasModelFeature((DsModelFeatures)f)==yes ? 'T' : 'F';
+  }
 }
 
 

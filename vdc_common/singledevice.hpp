@@ -80,6 +80,10 @@ namespace p44 {
     /// @return string representation of the current value
     string getStringValue(bool aAsInternal = false);
 
+    /// get the name
+    /// @return the name
+    string getName() { return valueName; };
+
     /// @}
 
     /// Setting state and state parameter value to allow query via API and property pushing
@@ -326,6 +330,9 @@ namespace p44 {
     /// @param aAction the action
     void addAction(DeviceActionPtr aAction);
 
+    /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
+    void addToModelUIDHash(string &aHashedString);
+
   protected:
 
     // property access implementation
@@ -435,7 +442,7 @@ namespace p44 {
 
 
 
-  #define STATES_WITH_PARAMETERS 0
+  #define STATES_WITH_PARAMETERS 1
 
   class DeviceState : public PropertyContainer
   {
@@ -510,6 +517,8 @@ namespace p44 {
     /// @param aName name of the state to get
     DeviceStatePtr getState(const string aName);
 
+    /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
+    void addToModelUIDHash(string &aHashedString);
 
   protected:
 
@@ -534,10 +543,15 @@ namespace p44 {
     /// @param aPropertyDesc value descriptor describing the property
     void addProperty(ValueDescriptorPtr aPropertyDesc);
 
+    /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
+    void addToModelUIDHash(string &aHashedString);
+
   };
   typedef boost::intrusive_ptr<DeviceProperties> DevicePropertiesPtr;
 
 
+
+  #define SCENECMD_DEVICE_ACTION "deviceaction" ///< name of the device action scene command
 
   /// class representing a digitalSTROM "single" device.
   /// This is a device which is normally not used in zone/group context and thus
@@ -563,6 +577,18 @@ namespace p44 {
   public:
     SingleDevice(Vdc *aVdcP);
     virtual ~SingleDevice();
+
+    /// @name interaction with subclasses, actually representing physical I/O
+    /// @{
+
+    /// prepare for calling a scene on the device level
+    /// @param aScene the scene that is to be called
+    /// @return true if scene preparation is ok and call can continue. If false, no further action will be taken
+    /// @note this is called BEFORE scene values are recalled
+    virtual bool prepareSceneCall(DsScenePtr aScene) P44_OVERRIDE;
+
+    /// @}
+
 
 
     /// @name persistence
@@ -609,6 +635,9 @@ namespace p44 {
 
   protected:
 
+    /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
+    virtual void addToModelUIDHash(string &aHashedString) P44_OVERRIDE;
+
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
@@ -616,7 +645,8 @@ namespace p44 {
 
   private:
 
-    void actionCallComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
+    void invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
+    void sceneInvokedActionComplete(ErrorPtr aError);
 
   };
 

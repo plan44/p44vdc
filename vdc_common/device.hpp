@@ -416,6 +416,9 @@ namespace p44 {
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
     virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) { aCompletedCB(ErrorPtr()); /* NOP in base class */ };
 
+    /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
+    virtual void addToModelUIDHash(string &aHashedString);
+
     /// prepare for calling a scene on the device level
     /// @param aScene the scene that is to be called
     /// @return true if scene preparation is ok and call can continue. If false, no further action will be taken
