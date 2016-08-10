@@ -117,26 +117,6 @@ void VdcHost::setName(const string &aName)
 
 
 
-string VdcHost::macAddressString()
-{
-  string macStr;
-  if (mac!=0) {
-    macStr = macAddressToString(mac);
-  }
-  else {
-    macStr = "UnknownMACAddress";
-  }
-  return macStr;
-}
-
-
-string VdcHost::ipv4AddressString()
-{
-  return ipv4ToString(ipv4Address());
-}
-
-
-
 void VdcHost::setIdMode(DsUidPtr aExternalDsUid)
 {
   if (aExternalDsUid) {
@@ -313,8 +293,8 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     publishedDescription().c_str(),
     externalDsuid ? "external" : "MAC-derived",
     shortDesc().c_str(),
-    macAddressString().c_str(),
-    ipv4AddressString().c_str()
+    macAddressToString(mac, ':').c_str(),
+    ipv4ToString(ipv4Address()).c_str()
   );
   // start the API server
   if (vdcApiServer) {
@@ -1349,7 +1329,7 @@ ErrorPtr VdcHost::loadAndFixDsUID()
     // single vDC per MAC-Adress scenario: generate UUIDv5 with name = macaddress
     // - calculate UUIDv5 based dSUID
     DsUid vdcNamespace(DSUID_VDC_NAMESPACE_UUID);
-    dSUID.setNameInSpace(macAddressString(), vdcNamespace);
+    dSUID.setNameInSpace(mac ? macAddressToString(mac,0) : "UnknownMACAddress", vdcNamespace);
   }
   DsUid originalDsUid = dSUID;
   // load the vdc host settings, which might override the default dSUID

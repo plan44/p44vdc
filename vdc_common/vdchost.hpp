@@ -205,12 +205,6 @@ namespace p44 {
     /// @param aInterval 0=none, N=every PERIODIC_TASK_INTERVAL*N seconds
     void setMainloopStatsInterval(int aInterval) { mainloopStatsInterval = aInterval; };
 
-    /// @return MAC address as 12 char hex string (6 bytes)
-    string macAddressString();
-
-    /// @return IPv4 address as string
-    string ipv4AddressString();
-
     /// @return URL for Web-UI (for access from local LAN)
     virtual string webuiURLString() { return ""; /* none by default */ }
 

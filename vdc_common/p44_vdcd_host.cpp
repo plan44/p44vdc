@@ -26,6 +26,8 @@
 
 #include "jsonvdcapi.hpp"
 
+#include "macaddress.hpp"
+
 
 using namespace p44;
 
@@ -198,7 +200,7 @@ void P44VdcHost::selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, Indicat
 string P44VdcHost::webuiURLString()
 {
   if (webUiPort)
-    return string_format("http://%s:%d", ipv4AddressString().c_str(), webUiPort);
+    return string_format("http://%s:%d", ipv4ToString(ipv4Address()).c_str(), webUiPort);
   else
     return ""; // none
 }
