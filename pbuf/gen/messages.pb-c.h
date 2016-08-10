@@ -29,8 +29,7 @@ typedef enum _Vdcapi__Type {
   VDCAPI__TYPE__VDSM_REQUEST_GET_PROPERTY = 4,
   VDCAPI__TYPE__VDC_RESPONSE_GET_PROPERTY = 5,
   VDCAPI__TYPE__VDSM_REQUEST_SET_PROPERTY = 6,
-  VDCAPI__TYPE__VDSM_REQUEST_CALL_DEVICE_ACTION = 27,
-  VDCAPI__TYPE__VDSM_REQUEST_FIRMWARE_UPDATE = 28,
+  VDCAPI__TYPE__VDSM_REQUEST_GENERIC_REQUEST = 26,
   VDCAPI__TYPE__VDSM_SEND_PING = 8,
   VDCAPI__TYPE__VDC_SEND_PONG = 9,
   VDCAPI__TYPE__VDC_SEND_ANNOUNCE_DEVICE = 10,
@@ -48,7 +47,6 @@ typedef enum _Vdcapi__Type {
   VDCAPI__TYPE__VDSM_NOTIFICATION_SET_CONTROL_VALUE = 21,
   VDCAPI__TYPE__VDSM_NOTIFICATION_DIM_CHANNEL = 24,
   VDCAPI__TYPE__VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE = 25,
-  VDCAPI__TYPE__VDSM_NOTIFICATION_SCAN_DEVICES = 26,
   VDCAPI__TYPE__VDC_SEND_IDENTIFY = 22
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(VDCAPI__TYPE)
 } Vdcapi__Type;
@@ -83,8 +81,7 @@ struct  _Vdcapi__Message
   Vdcapi__VdsmRequestGetProperty *vdsm_request_get_property;
   Vdcapi__VdcResponseGetProperty *vdc_response_get_property;
   Vdcapi__VdsmRequestSetProperty *vdsm_request_set_property;
-  Vdcapi__VdsmRequestCallDeviceAction *vdsm_request_call_device_action;
-  Vdcapi__VdsmRequestFirmwareUpdate *vdsm_request_firmware_update;
+  Vdcapi__VdsmRequestGenericRequest *vdsm_request_generic_request;
   Vdcapi__VdsmSendPing *vdsm_send_ping;
   Vdcapi__VdcSendPong *vdc_send_pong;
   Vdcapi__VdcSendAnnounceDevice *vdc_send_announce_device;
@@ -102,12 +99,11 @@ struct  _Vdcapi__Message
   Vdcapi__VdsmNotificationSetControlValue *vdsm_send_set_control_value;
   Vdcapi__VdsmNotificationDimChannel *vdsm_send_dim_channel;
   Vdcapi__VdsmNotificationSetOutputChannelValue *vdsm_send_output_channel_value;
-  Vdcapi__VdsmNotificationScanDevices *vdsm_send_scan_devices;
   Vdcapi__VdcSendIdentify *vdc_send_identify;
 };
 #define VDCAPI__MESSAGE__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&vdcapi__message__descriptor) \
-    , VDCAPI__TYPE__GENERIC_RESPONSE, 0,0u, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
+    , VDCAPI__TYPE__GENERIC_RESPONSE, 0,0u, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 
 
 struct  _Vdcapi__GenericResponse

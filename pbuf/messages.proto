@@ -12,8 +12,7 @@ enum Type {
     VDC_RESPONSE_GET_PROPERTY = 5;
 
     VDSM_REQUEST_SET_PROPERTY = 6;
-    VDSM_REQUEST_CALL_DEVICE_ACTION = 27;  // new in API v2c
-    VDSM_REQUEST_FIRMWARE_UPDATE = 28;  // new in API v2c
+    VDSM_REQUEST_GENERIC_REQUEST = 26;  // new in API v2c
 
     VDSM_SEND_PING = 8;
     VDC_SEND_PONG = 9;
@@ -34,7 +33,6 @@ enum Type {
     VDSM_NOTIFICATION_SET_CONTROL_VALUE = 21;
     VDSM_NOTIFICATION_DIM_CHANNEL = 24; // new in API v2
     VDSM_NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE = 25;  // new in API v2b
-    VDSM_NOTIFICATION_SCAN_DEVICES = 26;  // new in API v2c
 
     VDC_SEND_IDENTIFY = 22;
 }
@@ -56,8 +54,7 @@ message Message {
 
     // expects generic response
     optional vdsm_RequestSetProperty vdsm_request_set_property = 104;
-    optional vdsm_RequestCallDeviceAction vdsm_request_call_device_action = 124; // new in API v2c
-    optional vdsm_RequestFirmwareUpdate vdsm_request_firmware_update = 125; // new in API v2c
+    optional vdsm_RequestGenericRequest vdsm_request_generic_request = 123; // new in API v2c
 
     // requests that only expect a response in case of error
     optional vdsm_SendPing vdsm_send_ping = 105;
@@ -79,7 +76,6 @@ message Message {
     optional vdsm_NotificationSetControlValue vdsm_send_set_control_value = 118;
     optional vdsm_NotificationDimChannel vdsm_send_dim_channel = 121; // new in API v2
     optional vdsm_NotificationSetOutputChannelValue vdsm_send_output_channel_value = 122; // new in API v2b
-    optional vdsm_NotificationScanDevices vdsm_send_scan_devices = 123; // new in API v2c
     optional vdc_SendIdentify vdc_send_identify = 119;
 }
 

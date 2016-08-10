@@ -65,19 +65,12 @@ message vdsm_RequestSetProperty {
     repeated PropertyElement properties = 2;
 }
 
-// expects generic response
-message vdsm_RequestFirmwareUpdate {
-    optional bool checkonly = 1;
-    optional bool clearsettings = 2;
-}
-
-// expects generic response
-message vdsm_RequestCallDeviceAction {
+// expects generic response, new in API v2c
+message vdsm_RequestGenericRequest {
     repeated string dSUID = 1;
-    optional string name = 2;
+    optional string methodname = 2;
     repeated PropertyElement params = 3;
 }
-
 
 
 message vdsm_SendPing {
@@ -159,12 +152,3 @@ message vdsm_NotificationSetOutputChannelValue {
     optional int32 channel = 3;
     optional double value = 4;
 }
-
-message vdsm_NotificationScanDevices {
-    repeated string dSUID = 1;
-    optional bool incremental = 2;
-    optional bool exhaustive = 3;
-    optional bool clearsettings = 4;
-}
-
-

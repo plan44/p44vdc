@@ -171,6 +171,21 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       }
     }
   }
+  else if (aMethod=="genericRequest") {
+    // the generic wrapper for calling methods from protobuf (allows new methods without expanding protobuf definitions)
+    // method name must be present
+    string methodName;
+    if (Error::isOK(respErr = checkStringParam(aParams, "methodname", methodName))) {
+      ApiValuePtr params = aParams->get("params");
+      if (!params || !params->isType(apivalue_object)) {
+        // no params or not object -> default to empty parameter list
+        params = aRequest->newApiValue();
+        params->setType(apivalue_object);
+      }
+      // recursively call method handler with unpacked params
+      return handleMethod(aRequest, methodName, params);
+    }
+  }
   else {
     respErr = ErrorPtr(new VdcApiError(405, "unknown method"));
   }

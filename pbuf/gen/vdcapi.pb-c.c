@@ -566,90 +566,47 @@ void   vdcapi__vdsm__request_set_property__free_unpacked
   assert(message->base.descriptor == &vdcapi__vdsm__request_set_property__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
-void   vdcapi__vdsm__request_firmware_update__init
-                     (Vdcapi__VdsmRequestFirmwareUpdate         *message)
+void   vdcapi__vdsm__request_generic_request__init
+                     (Vdcapi__VdsmRequestGenericRequest         *message)
 {
-  static Vdcapi__VdsmRequestFirmwareUpdate init_value = VDCAPI__VDSM__REQUEST_FIRMWARE_UPDATE__INIT;
+  static Vdcapi__VdsmRequestGenericRequest init_value = VDCAPI__VDSM__REQUEST_GENERIC_REQUEST__INIT;
   *message = init_value;
 }
-size_t vdcapi__vdsm__request_firmware_update__get_packed_size
-                     (const Vdcapi__VdsmRequestFirmwareUpdate *message)
+size_t vdcapi__vdsm__request_generic_request__get_packed_size
+                     (const Vdcapi__VdsmRequestGenericRequest *message)
 {
-  assert(message->base.descriptor == &vdcapi__vdsm__request_firmware_update__descriptor);
+  assert(message->base.descriptor == &vdcapi__vdsm__request_generic_request__descriptor);
   return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
 }
-size_t vdcapi__vdsm__request_firmware_update__pack
-                     (const Vdcapi__VdsmRequestFirmwareUpdate *message,
+size_t vdcapi__vdsm__request_generic_request__pack
+                     (const Vdcapi__VdsmRequestGenericRequest *message,
                       uint8_t       *out)
 {
-  assert(message->base.descriptor == &vdcapi__vdsm__request_firmware_update__descriptor);
+  assert(message->base.descriptor == &vdcapi__vdsm__request_generic_request__descriptor);
   return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
 }
-size_t vdcapi__vdsm__request_firmware_update__pack_to_buffer
-                     (const Vdcapi__VdsmRequestFirmwareUpdate *message,
+size_t vdcapi__vdsm__request_generic_request__pack_to_buffer
+                     (const Vdcapi__VdsmRequestGenericRequest *message,
                       ProtobufCBuffer *buffer)
 {
-  assert(message->base.descriptor == &vdcapi__vdsm__request_firmware_update__descriptor);
+  assert(message->base.descriptor == &vdcapi__vdsm__request_generic_request__descriptor);
   return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
 }
-Vdcapi__VdsmRequestFirmwareUpdate *
-       vdcapi__vdsm__request_firmware_update__unpack
+Vdcapi__VdsmRequestGenericRequest *
+       vdcapi__vdsm__request_generic_request__unpack
                      (ProtobufCAllocator  *allocator,
                       size_t               len,
                       const uint8_t       *data)
 {
-  return (Vdcapi__VdsmRequestFirmwareUpdate *)
-     protobuf_c_message_unpack (&vdcapi__vdsm__request_firmware_update__descriptor,
+  return (Vdcapi__VdsmRequestGenericRequest *)
+     protobuf_c_message_unpack (&vdcapi__vdsm__request_generic_request__descriptor,
                                 allocator, len, data);
 }
-void   vdcapi__vdsm__request_firmware_update__free_unpacked
-                     (Vdcapi__VdsmRequestFirmwareUpdate *message,
+void   vdcapi__vdsm__request_generic_request__free_unpacked
+                     (Vdcapi__VdsmRequestGenericRequest *message,
                       ProtobufCAllocator *allocator)
 {
-  assert(message->base.descriptor == &vdcapi__vdsm__request_firmware_update__descriptor);
-  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
-}
-void   vdcapi__vdsm__request_call_device_action__init
-                     (Vdcapi__VdsmRequestCallDeviceAction         *message)
-{
-  static Vdcapi__VdsmRequestCallDeviceAction init_value = VDCAPI__VDSM__REQUEST_CALL_DEVICE_ACTION__INIT;
-  *message = init_value;
-}
-size_t vdcapi__vdsm__request_call_device_action__get_packed_size
-                     (const Vdcapi__VdsmRequestCallDeviceAction *message)
-{
-  assert(message->base.descriptor == &vdcapi__vdsm__request_call_device_action__descriptor);
-  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
-}
-size_t vdcapi__vdsm__request_call_device_action__pack
-                     (const Vdcapi__VdsmRequestCallDeviceAction *message,
-                      uint8_t       *out)
-{
-  assert(message->base.descriptor == &vdcapi__vdsm__request_call_device_action__descriptor);
-  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
-}
-size_t vdcapi__vdsm__request_call_device_action__pack_to_buffer
-                     (const Vdcapi__VdsmRequestCallDeviceAction *message,
-                      ProtobufCBuffer *buffer)
-{
-  assert(message->base.descriptor == &vdcapi__vdsm__request_call_device_action__descriptor);
-  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
-}
-Vdcapi__VdsmRequestCallDeviceAction *
-       vdcapi__vdsm__request_call_device_action__unpack
-                     (ProtobufCAllocator  *allocator,
-                      size_t               len,
-                      const uint8_t       *data)
-{
-  return (Vdcapi__VdsmRequestCallDeviceAction *)
-     protobuf_c_message_unpack (&vdcapi__vdsm__request_call_device_action__descriptor,
-                                allocator, len, data);
-}
-void   vdcapi__vdsm__request_call_device_action__free_unpacked
-                     (Vdcapi__VdsmRequestCallDeviceAction *message,
-                      ProtobufCAllocator *allocator)
-{
-  assert(message->base.descriptor == &vdcapi__vdsm__request_call_device_action__descriptor);
+  assert(message->base.descriptor == &vdcapi__vdsm__request_generic_request__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__send_ping__init
@@ -1166,49 +1123,6 @@ void   vdcapi__vdsm__notification_set_output_channel_value__free_unpacked
                       ProtobufCAllocator *allocator)
 {
   assert(message->base.descriptor == &vdcapi__vdsm__notification_set_output_channel_value__descriptor);
-  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
-}
-void   vdcapi__vdsm__notification_scan_devices__init
-                     (Vdcapi__VdsmNotificationScanDevices         *message)
-{
-  static Vdcapi__VdsmNotificationScanDevices init_value = VDCAPI__VDSM__NOTIFICATION_SCAN_DEVICES__INIT;
-  *message = init_value;
-}
-size_t vdcapi__vdsm__notification_scan_devices__get_packed_size
-                     (const Vdcapi__VdsmNotificationScanDevices *message)
-{
-  assert(message->base.descriptor == &vdcapi__vdsm__notification_scan_devices__descriptor);
-  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
-}
-size_t vdcapi__vdsm__notification_scan_devices__pack
-                     (const Vdcapi__VdsmNotificationScanDevices *message,
-                      uint8_t       *out)
-{
-  assert(message->base.descriptor == &vdcapi__vdsm__notification_scan_devices__descriptor);
-  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
-}
-size_t vdcapi__vdsm__notification_scan_devices__pack_to_buffer
-                     (const Vdcapi__VdsmNotificationScanDevices *message,
-                      ProtobufCBuffer *buffer)
-{
-  assert(message->base.descriptor == &vdcapi__vdsm__notification_scan_devices__descriptor);
-  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
-}
-Vdcapi__VdsmNotificationScanDevices *
-       vdcapi__vdsm__notification_scan_devices__unpack
-                     (ProtobufCAllocator  *allocator,
-                      size_t               len,
-                      const uint8_t       *data)
-{
-  return (Vdcapi__VdsmNotificationScanDevices *)
-     protobuf_c_message_unpack (&vdcapi__vdsm__notification_scan_devices__descriptor,
-                                allocator, len, data);
-}
-void   vdcapi__vdsm__notification_scan_devices__free_unpacked
-                     (Vdcapi__VdsmNotificationScanDevices *message,
-                      ProtobufCAllocator *allocator)
-{
-  assert(message->base.descriptor == &vdcapi__vdsm__notification_scan_devices__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 static const ProtobufCFieldDescriptor vdcapi__vdsm__request_hello__field_descriptors[2] =
@@ -1848,78 +1762,27 @@ const ProtobufCMessageDescriptor vdcapi__vdsm__request_set_property__descriptor 
   (ProtobufCMessageInit) vdcapi__vdsm__request_set_property__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor vdcapi__vdsm__request_firmware_update__field_descriptors[2] =
-{
-  {
-    "checkonly",
-    1,
-    PROTOBUF_C_LABEL_OPTIONAL,
-    PROTOBUF_C_TYPE_BOOL,
-    offsetof(Vdcapi__VdsmRequestFirmwareUpdate, has_checkonly),
-    offsetof(Vdcapi__VdsmRequestFirmwareUpdate, checkonly),
-    NULL,
-    NULL,
-    0,             /* flags */
-    0,NULL,NULL    /* reserved1,reserved2, etc */
-  },
-  {
-    "clearsettings",
-    2,
-    PROTOBUF_C_LABEL_OPTIONAL,
-    PROTOBUF_C_TYPE_BOOL,
-    offsetof(Vdcapi__VdsmRequestFirmwareUpdate, has_clearsettings),
-    offsetof(Vdcapi__VdsmRequestFirmwareUpdate, clearsettings),
-    NULL,
-    NULL,
-    0,             /* flags */
-    0,NULL,NULL    /* reserved1,reserved2, etc */
-  },
-};
-static const unsigned vdcapi__vdsm__request_firmware_update__field_indices_by_name[] = {
-  0,   /* field[0] = checkonly */
-  1,   /* field[1] = clearsettings */
-};
-static const ProtobufCIntRange vdcapi__vdsm__request_firmware_update__number_ranges[1 + 1] =
-{
-  { 1, 0 },
-  { 0, 2 }
-};
-const ProtobufCMessageDescriptor vdcapi__vdsm__request_firmware_update__descriptor =
-{
-  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
-  "vdcapi.vdsm_RequestFirmwareUpdate",
-  "VdsmRequestFirmwareUpdate",
-  "Vdcapi__VdsmRequestFirmwareUpdate",
-  "vdcapi",
-  sizeof(Vdcapi__VdsmRequestFirmwareUpdate),
-  2,
-  vdcapi__vdsm__request_firmware_update__field_descriptors,
-  vdcapi__vdsm__request_firmware_update__field_indices_by_name,
-  1,  vdcapi__vdsm__request_firmware_update__number_ranges,
-  (ProtobufCMessageInit) vdcapi__vdsm__request_firmware_update__init,
-  NULL,NULL,NULL    /* reserved[123] */
-};
-static const ProtobufCFieldDescriptor vdcapi__vdsm__request_call_device_action__field_descriptors[3] =
+static const ProtobufCFieldDescriptor vdcapi__vdsm__request_generic_request__field_descriptors[3] =
 {
   {
     "dSUID",
     1,
     PROTOBUF_C_LABEL_REPEATED,
     PROTOBUF_C_TYPE_STRING,
-    offsetof(Vdcapi__VdsmRequestCallDeviceAction, n_dsuid),
-    offsetof(Vdcapi__VdsmRequestCallDeviceAction, dsuid),
+    offsetof(Vdcapi__VdsmRequestGenericRequest, n_dsuid),
+    offsetof(Vdcapi__VdsmRequestGenericRequest, dsuid),
     NULL,
     NULL,
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "name",
+    "methodname",
     2,
     PROTOBUF_C_LABEL_OPTIONAL,
     PROTOBUF_C_TYPE_STRING,
     0,   /* quantifier_offset */
-    offsetof(Vdcapi__VdsmRequestCallDeviceAction, name),
+    offsetof(Vdcapi__VdsmRequestGenericRequest, methodname),
     NULL,
     NULL,
     0,             /* flags */
@@ -1930,37 +1793,37 @@ static const ProtobufCFieldDescriptor vdcapi__vdsm__request_call_device_action__
     3,
     PROTOBUF_C_LABEL_REPEATED,
     PROTOBUF_C_TYPE_MESSAGE,
-    offsetof(Vdcapi__VdsmRequestCallDeviceAction, n_params),
-    offsetof(Vdcapi__VdsmRequestCallDeviceAction, params),
+    offsetof(Vdcapi__VdsmRequestGenericRequest, n_params),
+    offsetof(Vdcapi__VdsmRequestGenericRequest, params),
     &vdcapi__property_element__descriptor,
     NULL,
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
 };
-static const unsigned vdcapi__vdsm__request_call_device_action__field_indices_by_name[] = {
+static const unsigned vdcapi__vdsm__request_generic_request__field_indices_by_name[] = {
   0,   /* field[0] = dSUID */
-  1,   /* field[1] = name */
+  1,   /* field[1] = methodname */
   2,   /* field[2] = params */
 };
-static const ProtobufCIntRange vdcapi__vdsm__request_call_device_action__number_ranges[1 + 1] =
+static const ProtobufCIntRange vdcapi__vdsm__request_generic_request__number_ranges[1 + 1] =
 {
   { 1, 0 },
   { 0, 3 }
 };
-const ProtobufCMessageDescriptor vdcapi__vdsm__request_call_device_action__descriptor =
+const ProtobufCMessageDescriptor vdcapi__vdsm__request_generic_request__descriptor =
 {
   PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
-  "vdcapi.vdsm_RequestCallDeviceAction",
-  "VdsmRequestCallDeviceAction",
-  "Vdcapi__VdsmRequestCallDeviceAction",
+  "vdcapi.vdsm_RequestGenericRequest",
+  "VdsmRequestGenericRequest",
+  "Vdcapi__VdsmRequestGenericRequest",
   "vdcapi",
-  sizeof(Vdcapi__VdsmRequestCallDeviceAction),
+  sizeof(Vdcapi__VdsmRequestGenericRequest),
   3,
-  vdcapi__vdsm__request_call_device_action__field_descriptors,
-  vdcapi__vdsm__request_call_device_action__field_indices_by_name,
-  1,  vdcapi__vdsm__request_call_device_action__number_ranges,
-  (ProtobufCMessageInit) vdcapi__vdsm__request_call_device_action__init,
+  vdcapi__vdsm__request_generic_request__field_descriptors,
+  vdcapi__vdsm__request_generic_request__field_indices_by_name,
+  1,  vdcapi__vdsm__request_generic_request__number_ranges,
+  (ProtobufCMessageInit) vdcapi__vdsm__request_generic_request__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
 static const ProtobufCFieldDescriptor vdcapi__vdsm__send_ping__field_descriptors[1] =
@@ -2821,82 +2684,5 @@ const ProtobufCMessageDescriptor vdcapi__vdsm__notification_set_output_channel_v
   vdcapi__vdsm__notification_set_output_channel_value__field_indices_by_name,
   1,  vdcapi__vdsm__notification_set_output_channel_value__number_ranges,
   (ProtobufCMessageInit) vdcapi__vdsm__notification_set_output_channel_value__init,
-  NULL,NULL,NULL    /* reserved[123] */
-};
-static const ProtobufCFieldDescriptor vdcapi__vdsm__notification_scan_devices__field_descriptors[4] =
-{
-  {
-    "dSUID",
-    1,
-    PROTOBUF_C_LABEL_REPEATED,
-    PROTOBUF_C_TYPE_STRING,
-    offsetof(Vdcapi__VdsmNotificationScanDevices, n_dsuid),
-    offsetof(Vdcapi__VdsmNotificationScanDevices, dsuid),
-    NULL,
-    NULL,
-    0,             /* flags */
-    0,NULL,NULL    /* reserved1,reserved2, etc */
-  },
-  {
-    "incremental",
-    2,
-    PROTOBUF_C_LABEL_OPTIONAL,
-    PROTOBUF_C_TYPE_BOOL,
-    offsetof(Vdcapi__VdsmNotificationScanDevices, has_incremental),
-    offsetof(Vdcapi__VdsmNotificationScanDevices, incremental),
-    NULL,
-    NULL,
-    0,             /* flags */
-    0,NULL,NULL    /* reserved1,reserved2, etc */
-  },
-  {
-    "exhaustive",
-    3,
-    PROTOBUF_C_LABEL_OPTIONAL,
-    PROTOBUF_C_TYPE_BOOL,
-    offsetof(Vdcapi__VdsmNotificationScanDevices, has_exhaustive),
-    offsetof(Vdcapi__VdsmNotificationScanDevices, exhaustive),
-    NULL,
-    NULL,
-    0,             /* flags */
-    0,NULL,NULL    /* reserved1,reserved2, etc */
-  },
-  {
-    "clearsettings",
-    4,
-    PROTOBUF_C_LABEL_OPTIONAL,
-    PROTOBUF_C_TYPE_BOOL,
-    offsetof(Vdcapi__VdsmNotificationScanDevices, has_clearsettings),
-    offsetof(Vdcapi__VdsmNotificationScanDevices, clearsettings),
-    NULL,
-    NULL,
-    0,             /* flags */
-    0,NULL,NULL    /* reserved1,reserved2, etc */
-  },
-};
-static const unsigned vdcapi__vdsm__notification_scan_devices__field_indices_by_name[] = {
-  3,   /* field[3] = clearsettings */
-  0,   /* field[0] = dSUID */
-  2,   /* field[2] = exhaustive */
-  1,   /* field[1] = incremental */
-};
-static const ProtobufCIntRange vdcapi__vdsm__notification_scan_devices__number_ranges[1 + 1] =
-{
-  { 1, 0 },
-  { 0, 4 }
-};
-const ProtobufCMessageDescriptor vdcapi__vdsm__notification_scan_devices__descriptor =
-{
-  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
-  "vdcapi.vdsm_NotificationScanDevices",
-  "VdsmNotificationScanDevices",
-  "Vdcapi__VdsmNotificationScanDevices",
-  "vdcapi",
-  sizeof(Vdcapi__VdsmNotificationScanDevices),
-  4,
-  vdcapi__vdsm__notification_scan_devices__field_descriptors,
-  vdcapi__vdsm__notification_scan_devices__field_indices_by_name,
-  1,  vdcapi__vdsm__notification_scan_devices__number_ranges,
-  (ProtobufCMessageInit) vdcapi__vdsm__notification_scan_devices__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
