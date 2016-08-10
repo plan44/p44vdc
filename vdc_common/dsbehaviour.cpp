@@ -137,16 +137,17 @@ static char dsBehaviour_Key;
 int DsBehaviour::numLocalProps(PropertyDescriptorPtr aParentDescriptor)
 {
   // Note: output does not have an intermediate level as there is only one
-  if (aParentDescriptor) {
-    PropertyDescriptorPtr pdP = aParentDescriptor; // assume output (no intermediate level)
-    if (pdP->parentDescriptor)
-      pdP = pdP->parentDescriptor; // if there is a parent on the level above, check that (buttons, binaryInputs, sensors)
-    switch (pdP->fieldKey()) {
-      case descriptions_key_offset: return numDescProps()+numDsBehaviourDescProperties;
-      case settings_key_offset: return numSettingsProps(); // no settings on the DsBehaviour level
-      case states_key_offset: return numStateProps()+numDsBehaviourStateProperties;
-      default: break;
-    }
+  // we need to get the fieldkey of the device level behaviour property of which this behaviour is a child or grandchild
+  PropertyDescriptorPtr pdP = aParentDescriptor->parentDescriptor; // check parent of parent
+  if (!pdP || pdP->objectKey()!=aParentDescriptor->objectKey()) {
+    // if parent's parent is another object, there is no intermediate enumeration level (for buttons, binaryInputs, sensors), but field directly
+    pdP = aParentDescriptor;
+  }
+  switch (pdP->fieldKey()) {
+    case descriptions_key_offset: return numDescProps()+numDsBehaviourDescProperties;
+    case settings_key_offset: return numSettingsProps(); // no settings on the DsBehaviour level
+    case states_key_offset: return numStateProps()+numDsBehaviourStateProperties;
+    default: break;
   }
   return 0;
 }
@@ -174,9 +175,12 @@ PropertyDescriptorPtr DsBehaviour::getDescriptorByIndex(int aPropIndex, int aDom
   aPropIndex -= n; // rebase to 0 for my own first property
   if (aPropIndex>=numLocalProps(aParentDescriptor))
     return NULL;
-  PropertyDescriptorPtr pdP = aParentDescriptor; // assume output (no intermediate level)
-  if (pdP->parentDescriptor)
-    pdP = pdP->parentDescriptor; // if there is a parent on the level above, check that (buttons, binaryInputs, sensors)
+  // we need to get the fieldkey of the device level behaviour property of which this behaviour is a child or grandchild
+  PropertyDescriptorPtr pdP = aParentDescriptor->parentDescriptor; // check parent of parent
+  if (!pdP || pdP->objectKey()!=aParentDescriptor->objectKey()) {
+    // if parent's parent is another object, there is no intermediate enumeration level (for buttons, binaryInputs, sensors), but field directly
+    pdP = aParentDescriptor;
+  }
   switch (pdP->fieldKey()) {
     case descriptions_key_offset:
       // check for generic description properties

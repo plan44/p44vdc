@@ -1009,7 +1009,7 @@ int SingleDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
     // Accessing properties at the Device (root) level
     return inherited::numProps(aDomain, aParentDescriptor)+numSimpleDeviceProperties;
   }
-  return 0; // none
+  return inherited::numProps(aDomain, aParentDescriptor); // only the inherited ones
 }
 
 
@@ -1032,7 +1032,7 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
     aPropIndex -= n; // rebase to 0 for my own first property
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
   }
-  return PropertyDescriptorPtr();
+  return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor);
 }
 
 
