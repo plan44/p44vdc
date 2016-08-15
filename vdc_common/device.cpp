@@ -1409,16 +1409,18 @@ ErrorPtr Device::forget()
 void Device::loadSettingsFromFiles()
 {
   string dir = getVdc().getPersistentDataDir();
-  const int numLevels = 3;
+  const int numLevels = 4;
   string levelids[numLevels];
   // Level strategy: most specialized will be active, unless lower levels specify explicit override
   // - Baselines are hardcoded defaults plus settings (already) loaded from persistent store
   // - Level 0 are settings related to the device instance (dSUID)
-  // - Level 1 are settings related to the device type (deviceTypeIdentifier())
-  // - Level 2 are settings related to the vDC (vdcClassIdentifier())
-  levelids[0] = getDsUid().getString();
-  levelids[1] = string(deviceTypeIdentifier());
-  levelids[2] = vdcP->vdcClassIdentifier();
+  // - Level 1 are settings related to the device class/version (deviceClass()_deviceClassVersion())
+  // - Level 2 are settings related to the device type (deviceTypeIdentifier())
+  // - Level 3 are settings related to the vDC (vdcClassIdentifier())
+  levelids[0] = "vdsd_" + getDsUid().getString();
+  levelids[1] = string_format("%s_%d_class", deviceClass().c_str(), deviceClassVersion());
+  levelids[2] = string_format("%s_device", deviceTypeIdentifier().c_str());
+  levelids[3] = vdcP->vdcClassIdentifier();
   for(int i=0; i<numLevels; ++i) {
     // try to open config file
     string fn = dir+"devicesettings_"+levelids[i]+".csv";
