@@ -55,6 +55,47 @@ void ApiValue::setType(ApiValueType aType)
 }
 
 
+void ApiValue::operator=(ApiValue &aApiValue)
+{
+  // generic assignment, allows cross assignments between different API value types
+  // - first: set myself to the right type
+  setType(aApiValue.getType());
+  // - now fill in value
+  switch (aApiValue.getType()) {
+    case apivalue_null : break; // nothing to assign
+    case apivalue_bool : setBoolValue(aApiValue.boolValue()); break;
+    case apivalue_int64 : setInt64Value(aApiValue.int64Value()); break;
+    case apivalue_uint64 : setUint64Value(aApiValue.uint64Value()); break;
+    case apivalue_double : setDoubleValue(aApiValue.doubleValue()); break;
+    case apivalue_string : setStringValue(aApiValue.stringValue()); break;
+    case apivalue_binary : setBinaryValue(aApiValue.binaryValue()); break;
+    case apivalue_object : {
+      aApiValue.resetKeyIteration();
+      string key;
+      ApiValuePtr val;
+      while(aApiValue.nextKeyValue(key, val)) {
+        ApiValuePtr myVal = newNull(); // create value of my own
+        *myVal = *val; // assign
+        add(key, myVal); // put into object
+      }
+      break;
+    }
+    case apivalue_array : {
+      int i = 0;
+      ApiValuePtr val;
+      while ((val = aApiValue.arrayGet(i++))) {
+        ApiValuePtr myVal = newNull(); // create value of my own
+        *myVal = *val; // assign
+        arrayAppend(val);
+      }
+      break;
+    }
+  }
+}
+
+
+
+
 int ApiValue::arrayLength()
 {
   return 0;

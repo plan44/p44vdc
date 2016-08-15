@@ -82,7 +82,7 @@ namespace p44 {
 
     /// set API value to value of another API value
     /// @param aApiValue to get value of
-    virtual void operator=(ApiValue &aApiValue) = 0;
+    virtual void operator=(ApiValue &aApiValue);
 
     /// clear object to "empty" or "zero" value of its type
     /// @note does not change the type (unlike setNull)

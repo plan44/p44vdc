@@ -117,7 +117,7 @@ void JsonApiValue::operator=(ApiValue &aApiValue)
   if (javP)
     setJsonObject(javP->jsonObj);
   else
-    setNull(); // not assignable
+    inherited::operator=(aApiValue); // cross-type assignment, needs more expensive generic assignment
 }
 
 
