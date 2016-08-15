@@ -48,13 +48,15 @@ namespace p44 {
   typedef enum {
     access_read,
     access_write,
-    access_write_preload
+    access_write_preload,
+    access_delete // only for accessField of isDeleteable() properties
   } PropertyAccessMode;
 
   typedef enum {
     proptype_mask = 0x3F,
     propflag_container = 0x80, ///< is a container
-    propflag_nowildcard = 0x40 ///< don't recurse into this container when addressed via wildcard
+    propflag_nowildcard = 0x40, ///< don't recurse into this container when addressed via wildcard
+    propflag_deletable = 0x100 ///< can be deleted by writing NULL to it
   } PropertyFlags;
 
 
@@ -84,6 +86,8 @@ namespace p44 {
     virtual intptr_t objectKey() const = 0;
     /// is array container
     virtual bool isArrayContainer() const = 0;
+    /// is deletable
+    virtual bool isDeletable() const { return false; /* usually not */ };
     /// will be shown in wildcard queries
     virtual bool isWildcardAddressable() const { return true; };
     /// acts as root of a C++ class hierarchy
@@ -101,11 +105,11 @@ namespace p44 {
     typedef PropertyDescriptor inherited;
   public:
     RootPropertyDescriptor() : inherited(PropertyDescriptorPtr()) { rootOfObject = true; };
-    virtual const char *name() const { return "<root>"; };
-    virtual ApiValueType type() const { return apivalue_object; };
-    virtual size_t fieldKey() const { return 0; };
-    virtual intptr_t objectKey() const { return 0; };
-    virtual bool isArrayContainer() const { return false; };
+    virtual const char *name() const P44_OVERRIDE { return "<root>"; };
+    virtual ApiValueType type() const P44_OVERRIDE { return apivalue_object; };
+    virtual size_t fieldKey() const P44_OVERRIDE { return 0; };
+    virtual intptr_t objectKey() const P44_OVERRIDE { return 0; };
+    virtual bool isArrayContainer() const P44_OVERRIDE { return false; };
   };
 
 
@@ -123,12 +127,12 @@ namespace p44 {
       descP(aDescP)
     {};
 
-    virtual const char *name() const { return descP->propertyName; }
-    virtual ApiValueType type() const { return (ApiValueType)((descP->propertyType) & proptype_mask); }
-    virtual size_t fieldKey() const { return descP->fieldKey; }
-    virtual intptr_t objectKey() const { return descP->objectKey; }
-    virtual bool isArrayContainer() const { return descP->propertyType & propflag_container; };
-    virtual bool isWildcardAddressable() const { return (descP->propertyType & propflag_nowildcard)==0; };
+    virtual const char *name() const P44_OVERRIDE { return descP->propertyName; }
+    virtual ApiValueType type() const P44_OVERRIDE { return (ApiValueType)((descP->propertyType) & proptype_mask); }
+    virtual size_t fieldKey() const P44_OVERRIDE { return descP->fieldKey; }
+    virtual intptr_t objectKey() const P44_OVERRIDE { return descP->objectKey; }
+    virtual bool isArrayContainer() const P44_OVERRIDE { return descP->propertyType & propflag_container; };
+    virtual bool isWildcardAddressable() const P44_OVERRIDE { return (descP->propertyType & propflag_nowildcard)==0; };
   };
 
 
@@ -147,12 +151,14 @@ namespace p44 {
     size_t propertyFieldKey; ///< key for accessing the property within its container
     intptr_t propertyObjectKey; ///< identifier for container
     bool arrayContainer;
+    bool deletable;
 
-    virtual const char *name() const { return propertyName.c_str(); }
-    virtual ApiValueType type() const { return propertyType; }
-    virtual size_t fieldKey() const { return propertyFieldKey; }
-    virtual intptr_t objectKey() const { return propertyObjectKey; }
-    virtual bool isArrayContainer() const { return arrayContainer; };
+    virtual const char *name() const P44_OVERRIDE { return propertyName.c_str(); }
+    virtual ApiValueType type() const P44_OVERRIDE { return propertyType; }
+    virtual size_t fieldKey() const P44_OVERRIDE { return propertyFieldKey; }
+    virtual intptr_t objectKey() const P44_OVERRIDE { return propertyObjectKey; }
+    virtual bool isArrayContainer() const P44_OVERRIDE { return arrayContainer; };
+    virtual bool isDeletable() const P44_OVERRIDE { return deletable; };
   };
 
 
@@ -219,12 +225,13 @@ namespace p44 {
     /// @param aStartIndex on input: the property index to start searching, on exit: the next PropertyDescriptor to check.
     ///   When the search is exhausted, aStartIndex is set to PROPINDEX_NONE to signal there is no next property to check
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
+    /// @param aMode access mode (containers that allow inserting will allow write-access to not-yet-existing container elements)
     /// @param aParentDescriptor the descriptor of the parent property, never NULL
     /// @return pointer to property descriptor or NULL if aPropIndex is out of range
     /// @note base class provides a default implementation which uses numProps/getDescriptorByIndex and compares names.
     ///   Subclasses may override this to more efficiently access array-like containers where aPropMatch can directly be used
     ///   to find an element (without iterating through all indices).
-    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
+    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor);
 
     /// get subcontainer for a apivalue_object property
     /// @param aPropertyDescriptor descriptor for a structured (object) property. Call might modify this pointer such as setting it to
@@ -238,7 +245,7 @@ namespace p44 {
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) { return NULL; };
 
     /// access single field in this container
-    /// @param aMode access mode (see PropertyAccessMode: read, write or write preload)
+    /// @param aMode access mode (see PropertyAccessMode: read, write, write preload or delete)
     /// @param aPropValue JsonObject with a single value
     /// @param aPropertyDescriptor decriptor for a single value field in this container
     /// @return false if value could not be accessed

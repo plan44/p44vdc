@@ -161,7 +161,7 @@ namespace p44 {
 
     /// set user assignable name
     /// @param aName name of this instance of the vdc host
-    virtual void setName(const string &aName);
+    virtual void setName(const string &aName) P44_OVERRIDE;
 
     /// set the human readable name of the vdc host product as a a whole
     /// @param aProductName product (model) name
@@ -286,8 +286,8 @@ namespace p44 {
     /// @name DsAddressable API implementation
     /// @{
 
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
-    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @}
 
@@ -296,7 +296,7 @@ namespace p44 {
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
 
     /// @name methods for DeviceClassContainers
@@ -333,29 +333,29 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() { return productName.size()>0 ? productName : "vDC host"; }
+    virtual string modelName() P44_OVERRIDE { return productName.size()>0 ? productName : "vDC host"; }
 
     /// @return human readable product version string
-    virtual string modelVersion() { return productVersion; }
+    virtual string modelVersion() P44_OVERRIDE { return productVersion; }
 
     /// @return unique ID for the functional model of this entity
-    virtual string modelUID() { return DSUID_P44VDC_MODELUID_UUID; /* using the p44 modelUID namespace UUID itself */ }
+    virtual string modelUID() P44_OVERRIDE { return DSUID_P44VDC_MODELUID_UUID; /* using the p44 modelUID namespace UUID itself */ }
 
     /// @return the entity type (one of dSD|vdSD|vDChost|vDC|dSM|vdSM|dSS|*)
-    virtual const char *entityType() { return "vDChost"; }
+    virtual const char *entityType() P44_OVERRIDE { return "vDChost"; }
 
     /// @return hardware version string or NULL if none
-    virtual string hardwareVersion() { return ""; }
+    virtual string hardwareVersion() P44_OVERRIDE { return ""; }
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID() { return ""; }
+    virtual string hardwareGUID() P44_OVERRIDE { return ""; }
 
     /// @return OEM GUID in URN format to identify hardware as uniquely as possible
-    virtual string oemGUID() { return ""; }
+    virtual string oemGUID() P44_OVERRIDE { return ""; }
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
     /// @note class containers and devices will inherit this (vdc host's) vendor name if not overridden
-    virtual string vendorName() { return "plan44.ch"; };
+    virtual string vendorName() P44_OVERRIDE { return "plan44.ch"; };
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
     string getDeviceHardwareId() { return deviceHardwareId; };
@@ -411,18 +411,18 @@ namespace p44 {
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
     // method and notification dispatching
     ErrorPtr handleMethodForDsUid(const string &aMethod, VdcApiRequestPtr aRequest, const DsUid &aDsUid, ApiValuePtr aParams);

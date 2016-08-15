@@ -77,7 +77,7 @@ protected:
   }
 
 
-  PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+  PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
   {
     if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
       // array-like container of channels
@@ -118,7 +118,7 @@ protected:
       return propDesc;
     }
     // actual fields of a single channel
-    return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aParentDescriptor);
+    return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
   }
 
 
@@ -533,11 +533,10 @@ string SceneDeviceSettings::parentIdForScenes()
 
 
 
-// load child parameters (scenes)
 ErrorPtr SceneDeviceSettings::loadChildren()
 {
   ErrorPtr err;
-  // my own ROWID is the parent key for the children
+  // get the parent key for the children (which might be the ROWID alone, but derived deviceSettings might need extra prefix)
   string parentID = parentIdForScenes();
   // create a template
   DsScenePtr scene = newDefaultScene(0);
@@ -567,7 +566,6 @@ ErrorPtr SceneDeviceSettings::loadChildren()
 }
 
 
-// save child parameters (scenes)
 ErrorPtr SceneDeviceSettings::saveChildren()
 {
   ErrorPtr err;
@@ -578,14 +576,13 @@ ErrorPtr SceneDeviceSettings::saveChildren()
     // save all elements of the map (only dirty ones will be actually stored to DB
     for (DsSceneMap::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
       err = pos->second->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed
-      if (!Error::isOK(err)) LOG(LOG_ERR,"vdSD %s: Error saving scene %d: %s", device.shortDesc().c_str(), pos->second->sceneNo, err->description().c_str());
+      if (!Error::isOK(err)) SALOG(device, LOG_ERR,"Error saving scene %d: %s", pos->second->sceneNo, err->description().c_str());
     }
   }
   return err;
 }
 
 
-// save child parameters (scenes)
 ErrorPtr SceneDeviceSettings::deleteChildren()
 {
   ErrorPtr err;
@@ -603,18 +600,20 @@ ErrorPtr SceneDeviceSettings::deleteChildren()
 void SceneDeviceSettings::loadScenesFromFiles()
 {
   string dir = device.getVdc().getPersistentDataDir();
-  const int numLevels = 4;
+  const int numLevels = 5;
   string levelids[numLevels];
   // Level strategy: most specialized will be active, unless lower levels specify explicit override
   // - Baselines are hardcoded defaults plus settings (already) loaded from persistent store
-  // - Level 0 are settings related to the device instance (dSUID)
-  // - Level 1 are settings related to the device type (deviceTypeIdentifier())
-  // - Level 2 are settings related to the behaviour (behaviourTypeIdentifier())
-  // - Level 3 are settings related to the vDC (vdcClassIdentifier())
+  // - Level 0 are scenes related to the device instance (dSUID)
+  // - Level 1 are scenes related to the device type (deviceTypeIdentifier())
+  // - Level 2 are scenes related to the device class/version (deviceClass()_deviceClassVersion())
+  // - Level 3 are scenes related to the behaviour (behaviourTypeIdentifier())
+  // - Level 4 are scenes related to the vDC (vdcClassIdentifier())
   levelids[0] = "vdsd_" + device.getDsUid().getString();
   levelids[1] = string(device.deviceTypeIdentifier()) + "_device";
-  levelids[2] = string(device.output->behaviourTypeIdentifier()) + "_behaviour";
-  levelids[3] = device.vdcP->vdcClassIdentifier();
+  levelids[2] = string_format("%s_%d_class", device.deviceClass().c_str(), device.deviceClassVersion());
+  levelids[3] = string(device.output->behaviourTypeIdentifier()) + "_behaviour";
+  levelids[4] = device.vdcP->vdcClassIdentifier();
   for(int i=0; i<numLevels; ++i) {
     // try to open config file
     string fn = dir+"scenes_"+levelids[i]+".csv";
@@ -655,8 +654,8 @@ void SceneDeviceSettings::loadScenesFromFiles()
           // read scene number
           int sceneNo;
           if (sscanf(fp, "%d", &sceneNo)!=1) {
-            continue; // no valid scene number -> invalid line
             SALOG(device, LOG_ERR, "%s:%d - no or invalid scene number", fn.c_str(), lineNo);
+            continue; // no valid scene number -> invalid line
           }
           // check if this scene is already in the list (i.e. already has non-hardwired settings)
           DsSceneMap::iterator pos = scenes.find(sceneNo);

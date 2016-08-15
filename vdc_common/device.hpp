@@ -110,11 +110,11 @@ namespace p44 {
     virtual string deviceTypeIdentifier() const { return "unspecified"; };
 
     /// @return human readable model name/short description
-    virtual string modelName() { return "vdSD - virtual device"; }
+    virtual string modelName() P44_OVERRIDE { return "vdSD - virtual device"; }
 
     /// @return unique ID for the functional model of this entity
     /// @note this is usually created as a hash including the relevant vDC-API visible representation of the device 
-    virtual string modelUID();
+    virtual string modelUID() P44_OVERRIDE;
 
     /// device class (for grouping functionally equivalent single devices)
     /// @note usually, only single devices do have a deviceClass
@@ -130,11 +130,11 @@ namespace p44 {
 
 
     /// @return the entity type (one of dSD|vdSD|vDC|dSM|vdSM|dSS|*)
-    virtual const char *entityType() { return "vdSD"; }
+    virtual const char *entityType() P44_OVERRIDE { return "vdSD"; }
 
     /// @return Vendor name for display purposes
     /// @note if not empty, value will be used by vendorId() default implementation to create vendorname:xxx URN schema id
-    virtual string vendorName();
+    virtual string vendorName() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -142,7 +142,7 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// check for presence of model feature (flag in dSS visibility matrix)
     /// @param aFeatureIndex the feature to check for
@@ -179,7 +179,7 @@ namespace p44 {
 
     /// set user assignable name
     /// @param aName name of the addressable entity
-    virtual void setName(const string &aName);
+    virtual void setName(const string &aName) P44_OVERRIDE;
 
     /// get reference to device container
     VdcHost &getVdc() { return vdcP->getVdc(); };
@@ -237,14 +237,14 @@ namespace p44 {
     ///   Returning any Error object, even if ErrorOK, will cause a generic response to be returned.
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the method call to this device.
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// called to let device handle device-level notification
     /// @param aMethod the notification
     /// @param aParams the parameters object
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this device.
-    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams);
+    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// call scene on this device
     /// @param aSceneNo the scene to call.
@@ -398,7 +398,7 @@ namespace p44 {
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
   protected:
 
@@ -469,12 +469,12 @@ namespace p44 {
 
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
-    virtual ErrorPtr writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, int aDomain, PropertyContainerPtr aContainer);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual ErrorPtr writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, int aDomain, PropertyContainerPtr aContainer) P44_OVERRIDE;
 
     /// set local priority of the device if specified scene does not have dontCare set.
     /// @param aSceneNo the scene to check don't care for

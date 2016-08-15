@@ -142,17 +142,17 @@ namespace p44 {
 
     /// get user assigned name of the vDC container, or if there is none, a synthesized default name
     /// @return name string
-    virtual string getName();
+    virtual string getName() P44_OVERRIDE;
 
     /// set user assignable name
     /// @param aName name of the addressable entity
-    virtual void setName(const string &aName);
+    virtual void setName(const string &aName) P44_OVERRIDE;
 
     /// vdc level methods (p44 specific)
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// vdc level notifications
-    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams);
+    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
 
     /// @}
@@ -255,32 +255,32 @@ namespace p44 {
 
     /// @return human readable, language independent model name/short description
     /// @note base class will construct this from global product name and vdcModelSuffix()
-    virtual string modelName() { return string_format("%s %s", getVdc().productName.c_str(), vdcModelSuffix().c_str()); }
+    virtual string modelName() P44_OVERRIDE { return string_format("%s %s", getVdc().productName.c_str(), vdcModelSuffix().c_str()); }
 
     /// @return human readable model name/short description
     virtual string vdcModelSuffix() = 0;
 
     /// @return human readable product version string
-    virtual string modelVersion() { return getVdc().modelVersion(); /* same as entire vdc host */ }
+    virtual string modelVersion() P44_OVERRIDE { return getVdc().modelVersion(); /* same as entire vdc host */ }
 
     /// @return unique ID for the functional model of this entity
-    virtual string modelUID();
+    virtual string modelUID() P44_OVERRIDE;
 
     /// @return the entity type (one of dSD|vdSD|vDChost|vDC|dSM|vdSM|dSS|*)
-    virtual const char *entityType() { return "vDC"; }
+    virtual const char *entityType() P44_OVERRIDE { return "vDC"; }
 
     /// @return hardware version string or NULL if none
-    virtual string hardwareVersion() { return ""; }
+    virtual string hardwareVersion() P44_OVERRIDE { return ""; }
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID() { return ""; }
+    virtual string hardwareGUID() P44_OVERRIDE { return ""; }
 
     /// @return OEM GUID in URN format to identify hardware as uniquely as possible
-    virtual string oemGUID() { return ""; }
+    virtual string oemGUID() P44_OVERRIDE { return ""; }
 
     /// @return Vendor name for display purposes
     /// @note if not empty, value will be used by vendorId() default implementation to create vendorname:xxx URN schema id
-    virtual string vendorName();
+    virtual string vendorName() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -288,30 +288,30 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// @}
 
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
     // derive dSUID
     void deriveDsUid();

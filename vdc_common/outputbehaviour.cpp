@@ -410,7 +410,7 @@ PropertyContainerPtr OutputBehaviour::getContainer(const PropertyDescriptorPtr &
 }
 
 
-PropertyDescriptorPtr OutputBehaviour::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+PropertyDescriptorPtr OutputBehaviour::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
 {
   if (aParentDescriptor->hasObjectKey(output_groups_key)) {
     // array-like container
@@ -435,7 +435,7 @@ PropertyDescriptorPtr OutputBehaviour::getDescriptorByName(string aPropMatch, in
     return propDesc;
   }
   // None of the containers within Device - let base class handle Device-Level properties
-  return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aParentDescriptor);
+  return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
 }
 
 

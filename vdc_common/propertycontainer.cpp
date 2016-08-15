@@ -86,12 +86,18 @@ ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr
       int propIndex = 0;
       bool foundone = false;
       do {
-        propDesc = getDescriptorByName(queryName, propIndex, aDomain, aParentDescriptor);
+        propDesc = getDescriptorByName(queryName, propIndex, aDomain, aMode, aParentDescriptor);
         if (propDesc) {
           foundone = true; // found at least one descriptor for this query element
-          FOCUSLOG("  - processing descriptor '%s' (%s), fieldKey=%u, objectKey=%u", propDesc->name(), propDesc->isStructured() ? "structured" : "scalar", propDesc->fieldKey(), propDesc->objectKey());
+          FOCUSLOG("  - processing descriptor '%s' (%s), fieldKey=%zu, objectKey=%lu", propDesc->name(), propDesc->isStructured() ? "structured" : "scalar", propDesc->fieldKey(), propDesc->objectKey());
           // actually access by descriptor
-          if (propDesc->isStructured()) {
+          if (aMode==access_write && propDesc->isDeletable() && queryValue->isNull()) {
+            // assigning NULL means deleting (possibly entire substructure)
+            if (!accessField(access_delete, queryValue, propDesc)) { // delete
+              err = ErrorPtr(new VdcApiError(403, string_format("Cannot delete '%s'", propDesc->name())));
+            }
+          }
+          else if (propDesc->isStructured()) {
             ApiValuePtr subQuery;
             // property is a container. Now check the value
             if (queryValue->isType(apivalue_object)) {
@@ -163,7 +169,7 @@ ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr
             else {
               // write access: just pass the value
               if (!accessField(aMode, queryValue, propDesc)) { // write
-                err = ErrorPtr(new VdcApiError(403,string_format("Write access to '%s' denied", propDesc->name())));
+                err = ErrorPtr(new VdcApiError(403, string_format("Write access to '%s' denied", propDesc->name())));
               }
             }
           }
@@ -241,7 +247,7 @@ bool PropertyContainer::getNextPropIndex(string aPropMatch, int &aStartIndex)
 
 // default implementation based on numProps/getDescriptorByIndex
 // Derived classes with array-like container may directly override this method for more efficient access
-PropertyDescriptorPtr PropertyContainer::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+PropertyDescriptorPtr PropertyContainer::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
 {
   int n = numProps(aDomain, aParentDescriptor);
   if (aStartIndex<n && aStartIndex!=PROPINDEX_NONE) {
@@ -393,7 +399,13 @@ bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverri
             val = proplvl->newInt64(nv);
           }
         }
+        else if (v.size()>0 && v[0]=='{') {
+          // structured JSON object
+          JsonObjectPtr j = JsonObject::objFromText(v.c_str());
+          val = JsonApiValue::newValueFromJson(j);
+        }
         else {
+          // just string
           val = proplvl->newString(v);
         }
         proplvl->add(part, val);
