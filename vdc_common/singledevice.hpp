@@ -256,8 +256,9 @@ namespace p44 {
     typedef PropertyContainer inherited;
 
     friend class DeviceActions;
+    friend class CustomAction;
 
-    string actionName; ///< name of the actuon
+    string actionId; ///< id of the action (key in the container object)
     string actionDescription; ///< a descriptive string for the action (for logs and debugging)
     ValueListPtr actionParams; ///< the parameter descriptions of this action
 
@@ -269,9 +270,9 @@ namespace p44 {
 
     /// create the action
     /// @param aSingleDevice the single device this action belongs to
-    /// @param aName the name of the action.
+    /// @param aId the ID of the action (key in the container)
     /// @param aDescription a description string for the action.
-    DeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription);
+    DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription);
 
     /// add parameter
     /// @param aValueDesc a value descriptor object.
@@ -318,13 +319,18 @@ namespace p44 {
   public:
 
     /// call an action
-    /// @param aAction name of the action to call
+    /// @param aActionId name of the action to call
     /// @param aParams an ApiValue of type apivalue_object, expected to
     ///   contain parameters matching the actual parameters available in the action
-    /// @param aCompletedCB must be called when call has completed
+    /// @param aCompletedCB will be called when call has completed
+    /// @return true if action exists and was executed (or failed with action-level error), false if this action does not exist
     /// @note this public method will verify that the parameter name and values match the action's parameter description
     ///   and prevent calling subclass' performCall() when parameters are not ok.
-    void call(const string aAction, ApiValuePtr aParams, StatusCB aCompletedCB);
+    bool call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB);
+
+    /// get state (for applying updates)
+    /// @param aActionId id of the state to get
+    DeviceActionPtr getAction(const string aActionId);
 
     /// add an action (at device setup time only)
     /// @param aAction the action
@@ -348,11 +354,16 @@ namespace p44 {
 
   class CustomAction P44_FINAL : public PropertyContainer, public PersistentParams
   {
-    typedef PropertyContainer inherited;
+    typedef PersistentParams inheritedParams;
+    typedef PropertyContainer inheritedProps;
 
     friend class CustomActions;
 
-    string actionName; ///< name of the actuon
+    SingleDevice &singleDevice; ///< the single device this custom action belongs to
+
+    string actionId; ///< the ID of the action (key in the container)
+    string actionTitle; ///< the user-faced name of the action
+    uint32_t flags; ///< flags
 
     /// references the standard action on which this custom action is based
     DeviceActionPtr action;
@@ -367,6 +378,10 @@ namespace p44 {
 
   public:
 
+    /// create the custom action
+    /// @param aSingleDevice the single device this custom action belongs to
+    CustomAction(SingleDevice &aSingleDevice);
+
     /// call the custom action
     /// @param aParams an ApiValue of type apivalue_object, may be used to override stored parameters
     /// @param aCompletedCB must be called when call has completed
@@ -377,17 +392,20 @@ namespace p44 {
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
-    virtual const char *tableName() P44_OVERRIDE P44_FINAL;
-    virtual size_t numKeyDefs() P44_OVERRIDE P44_FINAL;
-    virtual const FieldDefinition *getKeyDef(size_t aIndex) P44_OVERRIDE P44_FINAL;
-    virtual size_t numFieldDefs() P44_OVERRIDE P44_FINAL;
-    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE P44_FINAL;
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE P44_FINAL;
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE P44_FINAL;
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numKeyDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getKeyDef(size_t aIndex) P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+  private:
+
+    ErrorPtr validateParams(ApiValuePtr aParams, ApiValuePtr aValidatedParams, bool aSkipInvalid);
 
   };
   typedef boost::intrusive_ptr<CustomAction> CustomActionPtr;
@@ -402,26 +420,42 @@ namespace p44 {
 
     CustomActionsVector customActions;
 
+    SingleDevice &singleDevice; ///< the single device this custom action belongs to
+
   public:
+
+    CustomActions(SingleDevice &aSingleDevice) : singleDevice(aSingleDevice) { };
+
+
+    /// call a custom action
+    /// @param aActionId name of the action to call
+    /// @param aParams an ApiValue of type apivalue_object, can be empty or
+    ///   contain parameters overriding those stored in the custom action
+    /// @param aCompletedCB will be called when call has completed
+    /// @return true if action exists and was executed (or failed with action-level error), false if this action does not exist
+    bool call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB);
+
+    /// load custom actions
+    ErrorPtr load();
+    /// save custom actions
+    ErrorPtr save();
+    /// delete custom actions
+    ErrorPtr forget();
+    /// check if any settings are dirty
+    bool isDirty();
+    /// make all settings clean (not to be saved to DB)
+    void markClean();
+    /// load default set or overriding custom actions from files
+    void loadActionsFromFiles();
 
   protected:
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
-
-    /// load custom actions
-    virtual ErrorPtr loadChildren() P44_FINAL;
-    /// save custom actions
-    virtual ErrorPtr saveChildren() P44_FINAL;
-    /// delete custom actions
-    virtual ErrorPtr deleteChildren() P44_FINAL;
-
-    /// load default set or overriding custom actions from files
-    void loadActionsFromFiles();
 
   };
   typedef boost::intrusive_ptr<CustomActions> CustomActionsPtr;
@@ -450,7 +484,7 @@ namespace p44 {
 
     friend class DeviceStates;
 
-    string stateName; ///< the name of this state
+    string stateId; ///< the id (key in the container) of this state
     ValueDescriptorPtr stateDescriptor; ///< the value (descriptor) for the state itself
     string stateDescription; ///< a text description for the state, for logs and simple UI purposes
     MLMicroSeconds lastPush; ///< when the state was last pushed ("age" for ephemeral states which are only pushed)
@@ -467,10 +501,10 @@ namespace p44 {
 
     /// create the state
     /// @param aSingleDevice the single device this state belongs to
-    /// @param aName the name of the state.
+    /// @param aStateId the id (key in the container) of the state.
     /// @param aDescription a description string for the state.
     /// @param aStateDescriptor value descriptor for the state, can be NULL for ephemeral states
-    DeviceState(SingleDevice &aSingleDevice, const string aName, const string aDescription, ValueDescriptorPtr aStateDescriptor);
+    DeviceState(SingleDevice &aSingleDevice, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor);
 
     /// access value
     ValueDescriptorPtr value() { return stateDescriptor; };
@@ -514,8 +548,8 @@ namespace p44 {
     void addState(DeviceStatePtr aState);
 
     /// get state (for applying updates)
-    /// @param aName name of the state to get
-    DeviceStatePtr getState(const string aName);
+    /// @param aStateId id of the state to get
+    DeviceStatePtr getState(const string aStateId);
 
     /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
     void addToModelUIDHash(string &aHashedString);
@@ -563,12 +597,13 @@ namespace p44 {
 
     friend class DeviceActions;
     friend class CustomActions;
+    friend class CustomAction;
     friend class DeviceStates;
 
   protected:
 
     DeviceActionsPtr deviceActions; /// the device's standard actions
-    DeviceActionsPtr customActions; /// the device's custom actions
+    CustomActionsPtr customActions; /// the device's custom actions
     DeviceStatesPtr deviceStates; /// the device's states
 
     DevicePropertiesPtr deviceProperties; /// the device's specific properties
@@ -605,13 +640,13 @@ namespace p44 {
     /// forget any parameters stored in persistent DB
     virtual ErrorPtr forget() P44_OVERRIDE;
 
-    // check if any settings are dirty
+    /// check if any settings are dirty
     virtual bool isDirty() P44_OVERRIDE;
 
-    // make all settings clean (not to be saved to DB)
+    /// make all settings clean (not to be saved to DB)
     virtual void markClean() P44_OVERRIDE;
 
-    // load additional settings from files
+    /// load additional settings from files
     void loadSettingsFromFiles();
 
     /// @}
@@ -637,6 +672,13 @@ namespace p44 {
 
     /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
     virtual void addToModelUIDHash(string &aHashedString) P44_OVERRIDE;
+
+    /// call a action
+    /// @param aActionId name of the custom or device action to call
+    /// @param aParams an ApiValue of type apivalue_object, can be empty or
+    ///   contain parameters overriding defaults for the called action
+    /// @param aCompletedCB will be called when call has completed or failed
+    void call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB);
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
