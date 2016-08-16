@@ -911,7 +911,7 @@ void CustomAction::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex
     // - the device action this custom action refers to
     aStatement.bind(aIndex++, action->actionId.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
     // - the parameters
-    JsonObjectPtr j = dynamic_pointer_cast<JsonApiValue>(storedParams)->jsonObject();
+    JsonObjectPtr j = boost::dynamic_pointer_cast<JsonApiValue>(storedParams)->jsonObject();
     aStatement.bind(aIndex++, j->c_strValue(), false); // not static!
   }
   else {
