@@ -74,11 +74,18 @@ namespace p44 {
     /// @param aApiValue the API value to write the value to
     /// @param aAsInternal if set, the value is returned in internal format (relevant for enums, to get them as numeric value)
     /// @return true if there is a (default) value that could be assigned to aApiValue, false otherwise (aApiValue will be untouched)
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) = 0;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) = 0;
 
     /// get the value as string
     /// @return string representation of the current value
-    string getStringValue(bool aAsInternal = false);
+    string getStringValue(bool aAsInternal = false, bool aPrevious = false);
+
+    /// get a double value
+    double getDoubleValue(bool aAsInternal = false, bool aPrevious = false);
+
+    /// get a double value
+    int32_t getInt32Value(bool aAsInternal = false, bool aPrevious = false);
+
 
     /// get the name
     /// @return the name
@@ -97,7 +104,7 @@ namespace p44 {
     /// set int value
     /// @param aValue the int value to set
     /// @return true if set value differs from previous value
-    virtual bool setIntValue(int aValue) { return false; /* NOP in base class */ };
+    virtual bool setInt32Value(int32_t aValue) { return false; /* NOP in base class */ };
 
     /// set string value
     /// @param aValue the string value to set
@@ -143,6 +150,7 @@ namespace p44 {
     double max; ///< minimum allowed value
     double resolution; ///< resolution
     double value; ///< the (default) value
+    double previousValue; ///< the previous value
 
   public:
 
@@ -151,10 +159,10 @@ namespace p44 {
       inherited(aName, aValueType, aHasDefault), min(aMin), max(aMax), resolution(aResolution), value(aDefaultValue) {};
 
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
 
     virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
-    virtual bool setIntValue(int aValue) P44_OVERRIDE;
+    virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
 
   protected:
 
@@ -169,6 +177,7 @@ namespace p44 {
     typedef ValueDescriptor inherited;
 
     string value; ///< the (default) value
+    string previousValue; ///< the previous value
 
   public:
 
@@ -177,7 +186,7 @@ namespace p44 {
       inherited(aName, valueType_text, aHasDefault), value(aDefaultValue) {};
 
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
 
     virtual bool setStringValue(const string aValue) P44_OVERRIDE;
     
@@ -194,6 +203,7 @@ namespace p44 {
 
     EnumVector enumDescs; ///< text to enum value mapping pairs
     uint32_t value; ///< the (default) enum value
+    uint32_t previousValue; ///< the previous value
 
   public:
 
@@ -207,9 +217,9 @@ namespace p44 {
     void addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault = false);
 
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false) P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
 
-    virtual bool setIntValue(int aValue) P44_OVERRIDE;
+    virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
 
   protected:
 
@@ -476,7 +486,7 @@ namespace p44 {
 
 
 
-  #define STATES_WITH_PARAMETERS 1
+  #define STATES_WITH_PARAMETERS 0
 
   class DeviceState : public PropertyContainer
   {

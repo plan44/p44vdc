@@ -66,12 +66,29 @@ void ValueDescriptor::invalidate()
 }
 
 
-string ValueDescriptor::getStringValue(bool aAsInternal)
+string ValueDescriptor::getStringValue(bool aAsInternal, bool aPrevious)
 {
   ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
-  getValue(v, aAsInternal);
+  getValue(v, aAsInternal, aPrevious);
   return v->stringValue();
 }
+
+
+double ValueDescriptor::getDoubleValue(bool aAsInternal, bool aPrevious)
+{
+  ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
+  getValue(v, aAsInternal, aPrevious);
+  return v->doubleValue();
+}
+
+
+int32_t ValueDescriptor::getInt32Value(bool aAsInternal, bool aPrevious)
+{
+  ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
+  getValue(v, aAsInternal, aPrevious);
+  return v->int32Value();
+}
+
 
 
 
@@ -131,9 +148,16 @@ bool ValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 bool NumericValueDescriptor::setDoubleValue(double aValue)
 {
-  bool didChange = setLastUpdate(); // anyway, mark as update
-  if (value != aValue) {
-    // new value
+  bool didChange = false; // assume no change
+  if (setLastUpdate()) {
+    // first time value is set - set both values and consider it a change
+    previousValue = aValue;
+    value = aValue;
+    didChange = true;
+  }
+  if (value!=aValue) {
+    // only changed values are considered a change
+    previousValue = value;
     value = aValue;
     didChange = true;
   }
@@ -141,7 +165,7 @@ bool NumericValueDescriptor::setDoubleValue(double aValue)
 }
 
 
-bool NumericValueDescriptor::setIntValue(int aValue)
+bool NumericValueDescriptor::setInt32Value(int32_t aValue)
 {
   return setDoubleValue(aValue);
 }
@@ -177,24 +201,25 @@ ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInter
 }
 
 
-bool NumericValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal)
+bool NumericValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool aPrevious)
 {
   if (!hasValue || !aApiValue) return false;
+  double v = aPrevious ? previousValue : value;
   if (valueType==valueType_bool) {
     aApiValue->setType(apivalue_bool);
-    aApiValue->setBoolValue(value);
+    aApiValue->setBoolValue(v);
   }
   else if (valueType==valueType_enum) {
     aApiValue->setType(apivalue_int64);
-    aApiValue->setUint64Value(value);
+    aApiValue->setUint64Value(v);
   }
   else if (valueType>=valueType_firstIntNum) {
     aApiValue->setType(apivalue_int64);
-    aApiValue->setInt64Value(value);
+    aApiValue->setInt64Value(v);
   }
   else {
     aApiValue->setType(apivalue_double);
-    aApiValue->setDoubleValue(value);
+    aApiValue->setDoubleValue(v);
   }
   return true;
 }
@@ -227,9 +252,16 @@ bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr a
 
 bool TextValueDescriptor::setStringValue(const string aValue)
 {
-  bool didChange = setLastUpdate(); // anyway, mark as update
+  bool didChange = false; // assume no change
+  if (setLastUpdate()) {
+    // first time value is set - set both values and consider it a change
+    previousValue = aValue;
+    value = aValue;
+    didChange = true;
+  }
   if (!(value==aValue)) {
-    // new value
+    // only changed values are considered a change
+    previousValue = value;
     value = aValue;
     didChange = true;
   }
@@ -251,7 +283,7 @@ ErrorPtr TextValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal
 
 
 
-bool TextValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal)
+bool TextValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool aPrevious)
 {
   if (!hasValue || !aApiValue) return false;
   aApiValue->setType(apivalue_string);
@@ -263,11 +295,18 @@ bool TextValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal)
 // MARK: ===== EnumValueDescriptor
 
 
-bool EnumValueDescriptor::setIntValue(int aValue)
+bool EnumValueDescriptor::setInt32Value(int32_t aValue)
 {
-  bool didChange = setLastUpdate(); // anyway, mark as update
-  if (value != aValue) {
-    // new value
+  bool didChange = false; // assume no change
+  if (setLastUpdate()) {
+    // first time value is set - set both values and consider it a change
+    previousValue = aValue;
+    value = aValue;
+    didChange = true;
+  }
+  if (value!=aValue) {
+    // only changed values are considered a change
+    previousValue = value;
     value = aValue;
     didChange = true;
   }
@@ -315,18 +354,19 @@ ErrorPtr EnumValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal
 }
 
 
-bool EnumValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal)
+bool EnumValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool aPrevious)
 {
   if (!hasValue || !aApiValue) return false;
+  uint32_t v = aPrevious ? previousValue : value;
   if (aAsInternal) {
     aApiValue->setType(apivalue_uint64);
-    aApiValue->setUint32Value(value);
+    aApiValue->setUint32Value(v);
     return true;
   }
   else {
     aApiValue->setType(apivalue_string);
     for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
-      if (pos->second==value) {
+      if (pos->second==v) {
         aApiValue->setStringValue(pos->first);
         return true;
       }
