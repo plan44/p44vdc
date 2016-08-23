@@ -1303,14 +1303,12 @@ bool DeviceState::push()
 
 enum {
   statedescription_key,
-  eventonlydesc_key,
   statetype_key,
   stateparamdescs_key,
   numStatesDescProperties
 };
 
 enum {
-  eventonly_key,
   state_key,
   age_key,
   stateparams_key,
@@ -1333,12 +1331,10 @@ PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDom
 {
   static const PropertyDescription descproperties[numStatesDescProperties] = {
     { "description", apivalue_string, statedescription_key, OKEY(devicestatedesc_key) },
-    { "eventonly", apivalue_bool, eventonlydesc_key, OKEY(devicestatedesc_key) },
     { "value", apivalue_object, statetype_key, OKEY(devicestatedesc_key) },
     { "params", apivalue_object, stateparamdescs_key, OKEY(devicestatedesc_key) }
   };
   static const PropertyDescription properties[numStatesProperties] = {
-    { "eventonly", apivalue_bool, eventonly_key, OKEY(devicestate_key) },
     { "value", apivalue_null, state_key, OKEY(devicestate_key) },
     { "age", apivalue_double, age_key, OKEY(devicestate_key) },
     { "params", apivalue_object, stateparams_key, OKEY(devicestate_key) }
@@ -1383,10 +1379,6 @@ bool DeviceState::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
     if (aPropertyDescriptor->hasObjectKey(devicestatedesc_key)) {
       switch (aPropertyDescriptor->fieldKey()) {
         case statedescription_key: aPropValue->setStringValue(stateDescription); return true;
-        case eventonlydesc_key:
-          if (stateDescriptor) return false; // is a state, does not have eventonly
-          aPropValue->setBoolValue(true);
-          return true;
       }
     }
     else if (aPropertyDescriptor->hasObjectKey(devicestate_key)) {
@@ -1395,10 +1387,6 @@ bool DeviceState::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
           if (!stateDescriptor) return false; // no state
           if (!stateDescriptor->getValue(aPropValue))
             aPropValue->setNull();
-          return true;
-        case eventonly_key:
-          if (stateDescriptor) return false; // is a state, does not have eventonly
-          aPropValue->setBoolValue(true);
           return true;
         case age_key: {
           // for ephemeral states, return time of last push as "age"
