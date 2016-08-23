@@ -260,6 +260,10 @@ uint64_t PbufApiValue::uint64Value()
   else if (allocatedType==apivalue_int64 && objectValue.int64Val>=0) {
     return objectValue.int64Val; // only return positive values
   }
+  else if (allocatedType==apivalue_double) {
+    // we can get a double as uint (for JSON compatibility needed in upper dSS levels (VDCE, August 2016)
+    return objectValue.doubleVal;
+  }
   return 0;
 }
 
@@ -272,6 +276,10 @@ int64_t PbufApiValue::int64Value()
   }
   else if (allocatedType==apivalue_uint64) {
     return objectValue.uint64Val & 0x7FFFFFFFFFFFFFFFll; // prevent returning sign
+  }
+  else if (allocatedType==apivalue_double) {
+    // we can get a double as int (for JSON compatibility needed in upper dSS levels (VDCE, August 2016)
+    return objectValue.doubleVal;
   }
   return 0;
 }
