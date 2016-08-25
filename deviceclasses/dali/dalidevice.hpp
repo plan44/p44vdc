@@ -234,7 +234,7 @@ namespace p44 {
     DaliDevice(DaliVdc *aVdcP);
 
     /// @return type of DALI device
-    virtual DaliDeviceTypes daliTechnicalType() = 0;
+    virtual DaliDeviceTypes daliTechnicalType() const = 0;
 
     /// get typed container reference
     DaliVdc &daliVdc();
@@ -263,15 +263,15 @@ namespace p44 {
     DaliDimmerDevice(DaliVdc *aVdcP);
 
     /// @return technical type of DALI device
-    virtual DaliDeviceTypes daliTechnicalType() { return brightnessDimmer && brightnessDimmer->isGrouped() ? dalidevice_group : dalidevice_single; }
+    virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return brightnessDimmer && brightnessDimmer->isGrouped() ? dalidevice_group : dalidevice_single; }
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return daliTechnicalType()==dalidevice_group ? "dali_group" : "dali_single"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return daliTechnicalType()==dalidevice_group ? "dali_group" : "dali_single"; };
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
 
     /// @name interaction with subclasses, actually representing physical I/O
@@ -281,11 +281,11 @@ namespace p44 {
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
     /// @note this is called before interaction with dS system starts (usually just after collecting devices)
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
-    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset);
+    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     /// check presence of this addressable
     /// @param aPresenceResultHandler will be called to report presence status
-    virtual void checkPresence(PresenceCB aPresenceResultHandler);
+    virtual void checkPresence(PresenceCB aPresenceResultHandler) P44_OVERRIDE;
 
     /// disconnect device. For DALI, we'll check if the device is still present on the bus, and only if not
     /// we allow disconnection
@@ -293,7 +293,7 @@ namespace p44 {
     ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
     /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
     ///   false in case it is certain that the device is still connected to this and only this vDC
-    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
     /// apply all pending channel value updates to the device's hardware
     /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
@@ -302,7 +302,7 @@ namespace p44 {
     /// @param aCompletedCB if not NULL, must be called when values are applied
     /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
     ///   in a single channel (and not switching between color modes etc.)
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
 
     /// start or stop dimming (optimized DALI version)
     /// @param aChannel the channelType to start or stop dimming for
@@ -310,7 +310,7 @@ namespace p44 {
     /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
-    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode);
+    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode) P44_OVERRIDE;
 
     /// @}
 
@@ -318,19 +318,19 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() { return daliTechnicalType()==dalidevice_group ? "DALI dimmer group" : "DALI dimmer"; }
+    virtual string modelName() P44_OVERRIDE { return daliTechnicalType()==dalidevice_group ? "DALI dimmer group" : "DALI dimmer"; }
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID();
+    virtual string hardwareGUID() P44_OVERRIDE;
 
     /// @return model GUID in URN format to identify hardware model of device as uniquely as possible
-    virtual string hardwareModelGUID();
+    virtual string hardwareModelGUID() P44_OVERRIDE;
 
     /// @return OEM GUID in URN format to identify OEM hardware INSTANCE as uniquely as possible
-    virtual string oemGUID();
+    virtual string oemGUID() P44_OVERRIDE;
 
     /// @return OEM GUID in URN format to identify OEM hardware MODEL as uniquely as possible
-    virtual string oemModelGUID();
+    virtual string oemModelGUID() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -338,18 +338,18 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// Get extra info (plan44 specific) to describe the addressable in more detail
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
-    virtual string getExtraInfo();
+    virtual string getExtraInfo() P44_OVERRIDE;
 
     /// @}
 
     /// this will be called just before a device is added to the vdc, and thus needs to be fully constructed
     /// (settings, scenes, behaviours) and MUST have determined the henceforth invariable dSUID.
     /// After having received this call, the device must also be ready to load persistent settings.
-    virtual void willBeAdded();
+    virtual void willBeAdded() P44_OVERRIDE;
 
     /// derive the dSUID from collected device info
     void deriveDsUid();
@@ -357,7 +357,7 @@ namespace p44 {
   protected:
 
     /// save current brightness as default for DALI dimmer to use after powerup and at failure
-    virtual void saveAsDefaultBrightness();
+    virtual void saveAsDefaultBrightness() P44_OVERRIDE;
 
   private:
 
@@ -393,18 +393,18 @@ namespace p44 {
     DaliRGBWDevice(DaliVdc *aVdcP);
 
     /// @return type of DALI device
-    virtual DaliDeviceTypes daliTechnicalType() { return dalidevice_composite; }
+    virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return dalidevice_composite; }
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "dali_rgbw"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "dali_rgbw"; };
 
     /// get typed container reference
     DaliVdc &daliVdc();
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
 
     /// @name interaction with subclasses, actually representing physical I/O
@@ -414,7 +414,7 @@ namespace p44 {
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
     /// @note this is called before interaction with dS system starts (usually just after collecting devices)
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
-    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset);
+    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     /// add a dimmer
     /// @param aDimmerBusDevice the DALI dimmer to add
@@ -425,7 +425,7 @@ namespace p44 {
 
     /// check presence of this addressable
     /// @param aPresenceResultHandler will be called to report presence status
-    virtual void checkPresence(PresenceCB aPresenceResultHandler);
+    virtual void checkPresence(PresenceCB aPresenceResultHandler) P44_OVERRIDE;
 
     /// disconnect device. For DALI, we'll check if the device is still present on the bus, and only if not
     /// we allow disconnection
@@ -433,7 +433,7 @@ namespace p44 {
     ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
     /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
     ///   false in case it is certain that the device is still connected to this and only this vDC
-    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
     /// apply all pending channel value updates to the device's hardware
     /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
@@ -442,7 +442,7 @@ namespace p44 {
     /// @param aCompletedCB if not NULL, must be called when values are applied
     /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
     ///   in a single channel (and not switching between color modes etc.)
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
 
     /// @}
 
@@ -450,19 +450,19 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() { return "DALI composite color light"; }
+    virtual string modelName() P44_OVERRIDE { return "DALI composite color light"; }
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID();
+    virtual string hardwareGUID() P44_OVERRIDE;
 
     /// @return model GUID in URN format to identify model of device as uniquely as possible
-    virtual string hardwareModelGUID();
+    virtual string hardwareModelGUID() P44_OVERRIDE;
 
     /// @return OEM GUID in URN format to identify OEM hardware INSTANCE as uniquely as possible
-    virtual string oemGUID();
+    virtual string oemGUID() P44_OVERRIDE;
 
     /// @return OEM GUID in URN format to identify OEM hardware MODEL as uniquely as possible
-    virtual string oemModelGUID();
+    virtual string oemModelGUID() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -470,18 +470,18 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// Get extra info (plan44 specific) to describe the addressable in more detail
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
-    virtual string getExtraInfo();
+    virtual string getExtraInfo() P44_OVERRIDE;
 
     /// @}
 
     /// this will be called just before a device is added to the vdc, and thus needs to be fully constructed
     /// (settings, scenes, behaviours) and MUST have determined the henceforth invariable dSUID.
     /// After having received this call, the device must also be ready to load persistent settings.
-    virtual void willBeAdded();
+    virtual void willBeAdded() P44_OVERRIDE;
 
     /// derive the dSUID from collected device info
     void deriveDsUid();
@@ -489,7 +489,7 @@ namespace p44 {
   protected:
 
     /// save current brightness as default for DALI dimmer to use after powerup and at failure
-    virtual void saveAsDefaultBrightness();
+    virtual void saveAsDefaultBrightness() P44_OVERRIDE;
 
   private:
 
