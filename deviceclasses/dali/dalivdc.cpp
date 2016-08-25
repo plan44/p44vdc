@@ -116,9 +116,30 @@ void DaliVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExh
 {
   if (!aIncremental) {
     removeDevices(aClearSettings);
+    // clear the cache, we want fresh info from the devices!
+    deviceInfoCache.clear();
   }
   // start collecting, allow quick scan when not exhaustively collecting (will still use full scan when bus collisions are detected)
   daliComm->daliFullBusScan(boost::bind(&DaliVdc::deviceListReceived, this, aCompletedCB, _1, _2, _3), !aExhaustive);
+}
+
+
+// recollect devices after grouping change without scanning bus again
+void DaliVdc::recollectDevices(StatusCB aCompletedCB)
+{
+  removeDevices(false);
+  // no scan used, just use the cache
+  // - create a Dali bus device for every cached devInf
+  DaliBusDeviceListPtr busDevices(new DaliBusDeviceList);
+  for (DaliDeviceInfoMap::iterator pos = deviceInfoCache.begin(); pos!=deviceInfoCache.end(); ++pos) {
+    // create bus device
+    DaliBusDevicePtr busDevice(new DaliBusDevice(*this));
+    busDevice->setDeviceInfo(pos->second); // use cached device info
+    // - add bus device to list
+    busDevices->push_back(busDevice);
+  }
+  // now start processing full device info for each device (no actual query will happen, it's already in the cache)
+  queryNextDev(busDevices, busDevices->begin(), aCompletedCB, ErrorPtr());
 }
 
 
@@ -130,11 +151,13 @@ void DaliVdc::deviceListReceived(StatusCB aCompletedCB, DaliComm::ShortAddressLi
   // create a Dali bus device for every detected device
   DaliBusDeviceListPtr busDevices(new DaliBusDeviceList);
   for (DaliComm::ShortAddressList::iterator pos = aDeviceListPtr->begin(); pos!=aDeviceListPtr->end(); ++pos) {
+    // create simple device info containing only short address
+    DaliDeviceInfoPtr info = DaliDeviceInfoPtr(new DaliDeviceInfo);
+    info->shortAddress = *pos; // assign short address
+    info->devInfStatus = DaliDeviceInfo::devinf_needsquery;
+    deviceInfoCache[*pos] = info; // put it into the cache to represent the device
     // create bus device
     DaliBusDevicePtr busDevice(new DaliBusDevice(*this));
-    // - create simple device info containing only short address
-    DaliDeviceInfo info;
-    info.shortAddress = *pos; // assign short address
     busDevice->setDeviceInfo(info); // assign info to bus device
     // - add bus device to list
     busDevices->push_back(busDevice);
@@ -148,9 +171,21 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
 {
   if (Error::isOK(aError)) {
     if (aNextDev != aBusDevices->end()) {
-      DaliAddress addr = (*aNextDev)->deviceInfo.shortAddress;
-      daliComm->daliReadDeviceInfo(boost::bind(&DaliVdc::deviceInfoReceived, this, aBusDevices, aNextDev, aCompletedCB, _1, _2), addr);
-      return;
+      DaliAddress addr = (*aNextDev)->deviceInfo->shortAddress;
+      // check device info cache
+      DaliDeviceInfoMap::iterator pos = deviceInfoCache.find(addr);
+      if (pos!=deviceInfoCache.end() && pos->second->devInfStatus!=DaliDeviceInfo::devinf_needsquery) {
+        // we already have real device info for this device, or know the device does not have any
+        // -> have it processed (but via mainloop to avoid stacking up recursions here
+        LOG(LOG_INFO, "Using cached device info for device at shortAddress %d", addr);
+        MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::deviceInfoValid, this, aBusDevices, aNextDev, aCompletedCB, pos->second));
+        return;
+      }
+      else {
+        // we need to fetch it from device
+        daliComm->daliReadDeviceInfo(boost::bind(&DaliVdc::deviceInfoReceived, this, aBusDevices, aNextDev, aCompletedCB, _1, _2), addr);
+        return;
+      }
     }
     // all done successfully, complete bus info now available in aBusDevices
     // - look for dimmers that are to be addressed as a group
@@ -164,7 +199,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
       for (DaliBusDeviceList::iterator refpos = ++aBusDevices->begin(); refpos!=aBusDevices->end(); ++refpos) {
         if (busDevice->dSUID==(*refpos)->dSUID) {
           // duplicate dSUID, indicates DALI devices with invalid device info that slipped all heuristics
-          LOG(LOG_ERR, "Bus devices #%d and #%d have same dSUID -> assuming invalid device info, reverting both to short address based dSUID", busDevice->deviceInfo.shortAddress, (*refpos)->deviceInfo.shortAddress);
+          LOG(LOG_ERR, "Bus devices #%d and #%d have same dSUID -> assuming invalid device info, reverting both to short address based dSUID", busDevice->deviceInfo->shortAddress, (*refpos)->deviceInfo->shortAddress);
           // - clear all device info except short address and revert to short address derived dSUID
           (*refpos)->clearDeviceInfo();
           anyDuplicates = true; // at least one found
@@ -331,23 +366,33 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
 }
 
 
-void DaliVdc::deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliComm::DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError)
+void DaliVdc::deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError)
 {
   bool missingData = aError && aError->isError(DaliCommError::domain(), DaliCommErrorMissingData);
   bool badData =
     aError &&
     (aError->isError(DaliCommError::domain(), DaliCommErrorBadChecksum) || aError->isError(DaliCommError::domain(), DaliCommErrorBadDeviceInfo));
-  if (Error::isOK(aError) || missingData || badData) {
-    // no error, or error but due to missing or bad data -> device exists
-    if (missingData) { LOG(LOG_INFO, "Device at shortAddress %d does not have device info",aDaliDeviceInfoPtr->shortAddress); }
-    if (badData) { LOG(LOG_INFO, "Device at shortAddress %d does not have valid device info",aDaliDeviceInfoPtr->shortAddress); }
-    // update device info entry in dali bus device
-    (*aNextDev)->setDeviceInfo(*aDaliDeviceInfoPtr);
-  }
-  else {
+  if (!Error::isOK(aError) && !missingData && !badData) {
+    // real fatal error, can't continue
     LOG(LOG_ERR, "Error reading device info: %s",aError->description().c_str());
     return aCompletedCB(aError);
   }
+  // no error, or error but due to missing or bad data -> device exists
+  if (missingData) { LOG(LOG_INFO, "Device at shortAddress %d does not have device info",aDaliDeviceInfoPtr->shortAddress); }
+  if (badData) { LOG(LOG_INFO, "Device at shortAddress %d does not have valid device info",aDaliDeviceInfoPtr->shortAddress); }
+  // update entry in the cache
+  // Note: callback always gets a deviceInfo back, possibly with devinf_none if device does not have devInf at all (or garbage)
+  //   So, assigning this here will make sure no entries with devinf_needsquery will remain.
+  deviceInfoCache[aDaliDeviceInfoPtr->shortAddress] = aDaliDeviceInfoPtr;
+  // use device info and continue
+  deviceInfoValid(aBusDevices, aNextDev, aCompletedCB, aDaliDeviceInfoPtr);
+}
+
+
+void DaliVdc::deviceInfoValid(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliDeviceInfoPtr aDaliDeviceInfoPtr)
+{
+  // update device info entry in dali bus device
+  (*aNextDev)->setDeviceInfo(aDaliDeviceInfoPtr);
   // check next
   ++aNextDev;
   queryNextDev(aBusDevices, aNextDev, aCompletedCB, ErrorPtr());
@@ -580,7 +625,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         }
         // - re-collect devices to find groups and composites now, but only after a second, starting from main loop, not from here
         StatusCB cb = boost::bind(&DaliVdc::groupCollected, this, aRequest);
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::collectDevices, this, cb, false, false, false), 1*Second);
+        MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
       }
     }
   }
@@ -600,16 +645,12 @@ ErrorPtr DaliVdc::ungroupDevice(DaliDevicePtr aDevice, VdcApiRequestPtr aRequest
         (long)dev->collectionID
       );
     }
-    // delete grouped device
-    aDevice->hasVanished(true); // delete parameters
-    // cause recollect
-    collectDevices(boost::bind(&DaliVdc::groupCollected, this, aRequest), false, false, false);
   }
   else if (aDevice->daliTechnicalType()==dalidevice_group) {
     // composite device, delete grouping
     DaliDimmerDevicePtr dev = boost::dynamic_pointer_cast<DaliDimmerDevice>(aDevice);
     if (dev) {
-      int groupNo = dev->brightnessDimmer->deviceInfo.shortAddress & DaliGroupMask;
+      int groupNo = dev->brightnessDimmer->deviceInfo->shortAddress & DaliGroupMask;
       db.executef(
         "DELETE FROM compositeDevices WHERE dimmerType='GRP' AND groupNo=%d",
         groupNo
@@ -625,7 +666,7 @@ ErrorPtr DaliVdc::ungroupDevice(DaliDevicePtr aDevice, VdcApiRequestPtr aRequest
   aDevice->hasVanished(true); // delete parameters
   // - re-collect devices to find groups and composites now, but only after a second, starting from main loop, not from here
   StatusCB cb = boost::bind(&DaliVdc::groupCollected, this, aRequest);
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::collectDevices, this, cb, false, false, false), 1*Second);
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
   return respErr;
 }
 

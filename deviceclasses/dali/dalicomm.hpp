@@ -90,7 +90,8 @@ namespace p44 {
   {
   public:
     typedef enum {
-      devinf_none,
+      devinf_needsquery, // only address for NOW, but we should try to load devinf
+      devinf_none, // only address, we KNOW there's no devinf for this device
       #if OLD_BUGGY_CHKSUM_COMPATIBLE
       devinf_maybe,
       #endif
@@ -118,7 +119,7 @@ namespace p44 {
     /// status of device info
     DaliDevInfStatus devInfStatus;
   };
-
+  typedef boost::intrusive_ptr<DaliDeviceInfo> DaliDeviceInfoPtr;
 
 
   typedef boost::intrusive_ptr<DaliComm> DaliCommPtr;
@@ -305,9 +306,6 @@ namespace p44 {
     /// @note reading none or less data than requested is not considered an error - aMemoryVectorPtr param in callback will
     ///   just return the number of bytes that could be read; check its size to make sure expected result was returned
     void daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint8_t aNumBytes);
-
-
-    typedef boost::intrusive_ptr<DaliDeviceInfo> DaliDeviceInfoPtr;
 
     /// callback function for daliReadDeviceInfo
     typedef boost::function<void (DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError)> DaliDeviceInfoCB;

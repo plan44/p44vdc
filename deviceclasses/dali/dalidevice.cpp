@@ -53,21 +53,25 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   currentDimPerMS(0), // none
   currentFadeRate(0xFF), currentFadeTime(0xFF) // unlikely values
 {
+  // make sure we always have at least a dummy device info
+  deviceInfo = DaliDeviceInfoPtr(new DaliDeviceInfo);
 }
 
 
 
-void DaliBusDevice::setDeviceInfo(DaliDeviceInfo aDeviceInfo)
+void DaliBusDevice::setDeviceInfo(DaliDeviceInfoPtr aDeviceInfo)
 {
   // store the info record
-  deviceInfo = aDeviceInfo; // copy
+  if (!aDeviceInfo)
+    aDeviceInfo = DaliDeviceInfoPtr(new DaliDeviceInfo); // always have one, even if it's only a dummy!
+  deviceInfo = aDeviceInfo; // assign
   deriveDsUid(); // derive dSUID from it
 }
 
 
 void DaliBusDevice::clearDeviceInfo()
 {
-  deviceInfo.clear();
+  deviceInfo->clear();
   deriveDsUid();
 }
 
@@ -108,21 +112,21 @@ void DaliBusDevice::deriveDsUid()
     }
   }
   #endif // OLD_BUGGY_CHKSUM_COMPATIBLE
-  if (deviceInfo.devInfStatus==DaliDeviceInfo::devinf_solid) {
+  if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
     // uniquely identified by GTIN+Serial, but unknown partition value:
     // - Proceed according to dS rule 2:
     //   "vDC can determine GTIN and serial number of Device → combine GTIN and
     //    serial number to form a GS1-128 with Application Identifier 21:
     //    "(01)<GTIN>(21)<serial number>" and use the resulting string to
     //    generate a UUIDv5 in the GS1-128 name space"
-    s = string_format("(01)%llu(21)%llu", deviceInfo.gtin, deviceInfo.serialNo);
+    s = string_format("(01)%llu(21)%llu", deviceInfo->gtin, deviceInfo->serialNo);
   }
   else {
     // not uniquely identified by devInf (or shortaddr based version already in use):
     // - generate id in vDC namespace
     //   UUIDv5 with name = classcontainerinstanceid::daliShortAddrDecimal
     s = daliVdc.vdcInstanceIdentifier();
-    string_format_append(s, "::%d", deviceInfo.shortAddress);
+    string_format_append(s, "::%d", deviceInfo->shortAddress);
   }
   dSUID.setNameInSpace(s, vdcNamespace);
 }
@@ -177,7 +181,7 @@ void DaliBusDevice::initialize(StatusCB aCompletedCB, uint16_t aUsedGroupsMask)
     return;
   }
   // need to query current groups
-  getGroupMemberShip(boost::bind(&DaliBusDevice::groupMembershipResponse, this, aCompletedCB, aUsedGroupsMask, deviceInfo.shortAddress, _1, _2), deviceInfo.shortAddress);
+  getGroupMemberShip(boost::bind(&DaliBusDevice::groupMembershipResponse, this, aCompletedCB, aUsedGroupsMask, deviceInfo->shortAddress, _1, _2), deviceInfo->shortAddress);
 }
 
 
@@ -289,7 +293,7 @@ void DaliBusDevice::setTransitionTime(MLMicroSeconds aTransitionTime)
     }
     if (tr!=currentFadeTime || currentTransitionTime==Infinite) {
       LOG(LOG_DEBUG, "DaliDevice: setting DALI FADE_TIME to %d", (int)tr);
-      daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo.shortAddress, DALICMD_STORE_DTR_AS_FADE_TIME, tr);
+      daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_TIME, tr);
       currentFadeTime = tr;
     }
     currentTransitionTime = aTransitionTime;
@@ -303,8 +307,8 @@ void DaliBusDevice::setBrightness(Brightness aBrightness)
   if (currentBrightness!=aBrightness) {
     currentBrightness = aBrightness;
     uint8_t power = brightnessToArcpower(aBrightness);
-    LOG(LOG_INFO, "Dali dimmer at shortaddr=%d: setting new brightness = %0.2f, arc power = %d", (int)deviceInfo.shortAddress, aBrightness, (int)power);
-    daliVdc.daliComm->daliSendDirectPower(deviceInfo.shortAddress, power);
+    LOG(LOG_INFO, "Dali dimmer at shortaddr=%d: setting new brightness = %0.2f, arc power = %d", (int)deviceInfo->shortAddress, aBrightness, (int)power);
+    daliVdc.daliComm->daliSendDirectPower(deviceInfo->shortAddress, power);
   }
 }
 
@@ -314,9 +318,9 @@ void DaliBusDevice::setDefaultBrightness(Brightness aBrightness)
   if (isDummy) return;
   if (aBrightness<0) aBrightness = currentBrightness; // use current brightness
   uint8_t power = brightnessToArcpower(aBrightness);
-  LOG(LOG_INFO, "Dali dimmer at shortaddr=%d: setting default/failure brightness = %0.2f, arc power = %d", (int)deviceInfo.shortAddress, aBrightness, (int)power);
-  daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo.shortAddress, DALICMD_STORE_DTR_AS_POWER_ON_LEVEL, power);
-  daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo.shortAddress, DALICMD_STORE_DTR_AS_FAILURE_LEVEL, power);
+  LOG(LOG_INFO, "Dali dimmer at shortaddr=%d: setting default/failure brightness = %0.2f, arc power = %d", (int)deviceInfo->shortAddress, aBrightness, (int)power);
+  daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_POWER_ON_LEVEL, power);
+  daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FAILURE_LEVEL, power);
 }
 
 
@@ -347,7 +351,7 @@ void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
   // Use DALI UP/DOWN dimming commands
   if (aDimMode==dimmode_stop) {
     // stop dimming - send MASK
-    daliVdc.daliComm->daliSendDirectPower(deviceInfo.shortAddress, DALIVALUE_MASK);
+    daliVdc.daliComm->daliSendDirectPower(deviceInfo->shortAddress, DALIVALUE_MASK);
   }
   else {
     // start dimming
@@ -361,12 +365,12 @@ void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
       LOG(LOG_DEBUG, "DaliDevice: new dimming rate = %f Steps/second, calculated FADE_RATE setting = %f (rounded %d)", currentDimPerMS*1000, h, fr);
       if (fr!=currentFadeRate) {
         LOG(LOG_DEBUG, "DaliDevice: setting DALI FADE_RATE to %d", fr);
-        daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo.shortAddress, DALICMD_STORE_DTR_AS_FADE_RATE, fr);
+        daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_RATE, fr);
         currentFadeRate = fr;
       }
     }
     // - use repeated UP and DOWN commands
-    dimRepeater(deviceInfo.shortAddress, aDimMode==dimmode_up ? DALICMD_UP : DALICMD_DOWN, MainLoop::now());
+    dimRepeater(deviceInfo->shortAddress, aDimMode==dimmode_up ? DALICMD_UP : DALICMD_DOWN, MainLoop::now());
   }
 }
 
@@ -391,23 +395,23 @@ DaliBusDeviceGroup::DaliBusDeviceGroup(DaliVdc &aDaliVdc, uint8_t aGroupNo) :
 {
   mixID.erase(); // no members yet
   // set the group address to use
-  deviceInfo.shortAddress = aGroupNo|DaliGroup;
+  deviceInfo->shortAddress = aGroupNo|DaliGroup;
 }
 
 
 void DaliBusDeviceGroup::addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice)
 {
   // add the ID to the mix
-  LOG(LOG_NOTICE, "- DALI bus device with shortaddr %d is grouped in DALI group %d", aDaliBusDevice->deviceInfo.shortAddress, deviceInfo.shortAddress & DaliGroupMask);
+  LOG(LOG_NOTICE, "- DALI bus device with shortaddr %d is grouped in DALI group %d", aDaliBusDevice->deviceInfo->shortAddress, deviceInfo->shortAddress & DaliGroupMask);
   aDaliBusDevice->dSUID.xorDsUidIntoMix(mixID);
   // if this is the first valid device, use it as master
   if (groupMaster==DaliBroadcast && !aDaliBusDevice->isDummy) {
     // this is the master device
-    LOG(LOG_INFO, "- DALI bus device with shortaddr %d is master of the group (queried for brightness, mindim)", aDaliBusDevice->deviceInfo.shortAddress);
-    groupMaster = aDaliBusDevice->deviceInfo.shortAddress;
+    LOG(LOG_INFO, "- DALI bus device with shortaddr %d is master of the group (queried for brightness, mindim)", aDaliBusDevice->deviceInfo->shortAddress);
+    groupMaster = aDaliBusDevice->deviceInfo->shortAddress;
   }
   // add member
-  groupMembers.push_back(aDaliBusDevice->deviceInfo.shortAddress);
+  groupMembers.push_back(aDaliBusDevice->deviceInfo->shortAddress);
 }
 
 
@@ -436,7 +440,7 @@ void DaliBusDeviceGroup::initNextGroupMember(StatusCB aCompletedCB, DaliComm::Sh
 
 void DaliBusDeviceGroup::groupMembershipResponse(StatusCB aCompletedCB, DaliComm::ShortAddressList::iterator aNextMember, uint16_t aGroups, ErrorPtr aError)
 {
-  uint8_t groupNo = deviceInfo.shortAddress & DaliGroupMask;
+  uint8_t groupNo = deviceInfo->shortAddress & DaliGroupMask;
   // make sure device is member of the group
   if ((aGroups & (1<<groupNo))==0) {
     // is not yet member of this group -> add it
@@ -526,9 +530,9 @@ void DaliDimmerDevice::willBeAdded()
   LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
   l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 160); // DALI ballasts are always dimmable, // TODO: %%% somewhat arbitrary 2*80W max wattage
   if (daliTechnicalType()==dalidevice_group)
-    l->setHardwareName(string_format("DALI dimmer group # %d",brightnessDimmer->deviceInfo.shortAddress & DaliGroupMask));
+    l->setHardwareName(string_format("DALI dimmer group # %d",brightnessDimmer->deviceInfo->shortAddress & DaliGroupMask));
   else
-    l->setHardwareName(string_format("DALI dimmer @ %d",brightnessDimmer->deviceInfo.shortAddress));
+    l->setHardwareName(string_format("DALI dimmer @ %d",brightnessDimmer->deviceInfo->shortAddress));
   addBehaviour(l);
   // - derive the DsUid
   deriveDsUid();
@@ -549,13 +553,13 @@ string DaliDimmerDevice::getExtraInfo()
   if (daliTechnicalType()==dalidevice_group) {
     return string_format(
       "DALI group address: %d",
-      brightnessDimmer->deviceInfo.shortAddress & DaliGroupMask
+      brightnessDimmer->deviceInfo->shortAddress & DaliGroupMask
     );
   }
   else {
     return string_format(
       "DALI short address: %d",
-      brightnessDimmer->deviceInfo.shortAddress
+      brightnessDimmer->deviceInfo->shortAddress
     );
   }
 }
@@ -676,45 +680,45 @@ void DaliDimmerDevice::deriveDsUid()
 
 string DaliDimmerDevice::hardwareGUID()
 {
-  if (brightnessDimmer->deviceInfo.devInfStatus==DaliDeviceInfo::devinf_none)
+  if (brightnessDimmer->deviceInfo->devInfStatus==DaliDeviceInfo::devinf_none)
     return ""; // none
   // return as GS1 element strings
   // Note: GTIN/Serial will be reported even if it could not be used for deriving dSUID (e.g. devinf_maybe/devinf_notForID cases)
-  return string_format("gs1:(01)%llu(21)%llu", brightnessDimmer->deviceInfo.gtin, brightnessDimmer->deviceInfo.serialNo);
+  return string_format("gs1:(01)%llu(21)%llu", brightnessDimmer->deviceInfo->gtin, brightnessDimmer->deviceInfo->serialNo);
 }
 
 
 string DaliDimmerDevice::hardwareModelGUID()
 {
-  if (brightnessDimmer->deviceInfo.gtin==0)
+  if (brightnessDimmer->deviceInfo->gtin==0)
     return ""; // none
   // return as GS1 element strings with Application Identifier 01=GTIN
-  return string_format("gs1:(01)%llu", brightnessDimmer->deviceInfo.gtin);
+  return string_format("gs1:(01)%llu", brightnessDimmer->deviceInfo->gtin);
 }
 
 
 string DaliDimmerDevice::oemGUID()
 {
-  if (brightnessDimmer->deviceInfo.oem_gtin==0)
+  if (brightnessDimmer->deviceInfo->oem_gtin==0)
     return ""; // none
   // return as GS1 element strings with Application Identifiers 01=GTIN and 21=Serial
-  return string_format("gs1:(01)%llu(21)%llu", brightnessDimmer->deviceInfo.oem_gtin, brightnessDimmer->deviceInfo.oem_serialNo);
+  return string_format("gs1:(01)%llu(21)%llu", brightnessDimmer->deviceInfo->oem_gtin, brightnessDimmer->deviceInfo->oem_serialNo);
 }
 
 
 string DaliDimmerDevice::oemModelGUID()
 {
-  if (brightnessDimmer->deviceInfo.oem_gtin==0)
+  if (brightnessDimmer->deviceInfo->oem_gtin==0)
     return ""; // none
   // return as GS1 element strings with Application Identifier 01=GTIN
-  return string_format("gs1:(01)%llu", brightnessDimmer->deviceInfo.oem_gtin);
+  return string_format("gs1:(01)%llu", brightnessDimmer->deviceInfo->oem_gtin);
 }
 
 
 string DaliDimmerDevice::description()
 {
   string s = inherited::description();
-  s.append(brightnessDimmer->deviceInfo.description());
+  s.append(brightnessDimmer->deviceInfo->description());
   return s;
 }
 
@@ -757,12 +761,12 @@ string DaliRGBWDevice::getExtraInfo()
 {
   string s = string_format(
     "DALI short addresses: Red:%d, Green:%d, Blue:%d",
-    dimmers[dimmer_red]->deviceInfo.shortAddress,
-    dimmers[dimmer_green]->deviceInfo.shortAddress,
-    dimmers[dimmer_blue]->deviceInfo.shortAddress
+    dimmers[dimmer_red]->deviceInfo->shortAddress,
+    dimmers[dimmer_green]->deviceInfo->shortAddress,
+    dimmers[dimmer_blue]->deviceInfo->shortAddress
   );
   if (dimmers[dimmer_white]) {
-    string_format_append(s, ", White:%d", dimmers[dimmer_white]->deviceInfo.shortAddress);
+    string_format_append(s, ", White:%d", dimmers[dimmer_white]->deviceInfo->shortAddress);
   }
   return s;
 }
@@ -960,40 +964,40 @@ void DaliRGBWDevice::deriveDsUid()
 string DaliRGBWDevice::hardwareGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
-  if (!dimmer || dimmer->deviceInfo.gtin==0)
+  if (!dimmer || dimmer->deviceInfo->gtin==0)
     return ""; // none
   // return as GS1 element strings
-  return string_format("gs1:(01)%llu(21)%llu", dimmer->deviceInfo.gtin, dimmer->deviceInfo.serialNo);
+  return string_format("gs1:(01)%llu(21)%llu", dimmer->deviceInfo->gtin, dimmer->deviceInfo->serialNo);
 }
 
 
 string DaliRGBWDevice::hardwareModelGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
-  if (!dimmer || dimmer->deviceInfo.gtin==0)
+  if (!dimmer || dimmer->deviceInfo->gtin==0)
     return ""; // none
   // return as GS1 element strings with Application Identifier 01=GTIN
-  return string_format("gs1:(01)%llu", dimmer->deviceInfo.gtin);
+  return string_format("gs1:(01)%llu", dimmer->deviceInfo->gtin);
 }
 
 
 string DaliRGBWDevice::oemGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
-  if (!dimmer || dimmer->deviceInfo.oem_gtin==0)
+  if (!dimmer || dimmer->deviceInfo->oem_gtin==0)
     return ""; // none
   // return as GS1 element strings with Application Identifiers 01=GTIN and 21=Serial
-  return string_format("gs1:(01)%llu(21)%llu", dimmer->deviceInfo.oem_gtin, dimmer->deviceInfo.oem_serialNo);
+  return string_format("gs1:(01)%llu(21)%llu", dimmer->deviceInfo->oem_gtin, dimmer->deviceInfo->oem_serialNo);
 }
 
 
 string DaliRGBWDevice::oemModelGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
-  if (!dimmer || dimmer->deviceInfo.oem_gtin==0)
+  if (!dimmer || dimmer->deviceInfo->oem_gtin==0)
     return ""; // none
   // return as GS1 element strings with Application Identifier 01=GTIN
-  return string_format("gs1:(01)%llu", dimmer->deviceInfo.oem_gtin);
+  return string_format("gs1:(01)%llu", dimmer->deviceInfo->oem_gtin);
 }
 
 
@@ -1002,7 +1006,7 @@ string DaliRGBWDevice::description()
 {
   string s = inherited::description();
   DaliBusDevicePtr dimmer = firstBusDevice();
-  if (dimmer) s.append(dimmer->deviceInfo.description());
+  if (dimmer) s.append(dimmer->deviceInfo->description());
   return s;
 }
 

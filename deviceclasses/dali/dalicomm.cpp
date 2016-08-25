@@ -1161,7 +1161,7 @@ class DaliDeviceInfoReader : public P44Obj
   DaliComm &daliComm;
   DaliComm::DaliDeviceInfoCB callback;
   DaliAddress busAddress;
-  DaliComm::DaliDeviceInfoPtr deviceInfo;
+  DaliDeviceInfoPtr deviceInfo;
   uint8_t bankChecksum;
   uint8_t maxBank;
   int retries;

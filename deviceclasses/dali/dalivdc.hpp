@@ -36,9 +36,13 @@ using namespace std;
 namespace p44 {
 
   class DaliVdc;
+
+  
   typedef boost::intrusive_ptr<DaliVdc> DaliVdcPtr;
 
   typedef std::list<DaliBusDevicePtr> DaliBusDeviceList;
+  typedef std::map<uint8_t, DaliDeviceInfoPtr> DaliDeviceInfoMap;
+
   typedef boost::shared_ptr<DaliBusDeviceList> DaliBusDeviceListPtr;
 
 
@@ -57,6 +61,7 @@ namespace p44 {
     typedef Vdc inherited;
 
 		DaliPersistence db;
+    DaliDeviceInfoMap deviceInfoCache;
 
   public:
     DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
@@ -106,7 +111,10 @@ namespace p44 {
     void queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, ErrorPtr aError);
     void initializeNextDimmer(DaliBusDeviceListPtr aDimmerDevices, uint16_t aGroupsInUse, DaliBusDeviceList::iterator aNextDimmer, StatusCB aCompletedCB, ErrorPtr aError);
     void createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCompletedCB);
-    void deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliComm::DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError);
+    void deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError);
+    void deviceInfoValid(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliDeviceInfoPtr aDaliDeviceInfoPtr);
+    void recollectDevices(StatusCB aCompletedCB);
+
     void groupCollected(VdcApiRequestPtr aRequest);
 
     ErrorPtr groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams);

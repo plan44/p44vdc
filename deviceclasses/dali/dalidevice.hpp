@@ -55,7 +55,7 @@ namespace p44 {
     friend class DaliDimmerDevice;
     friend class DaliVdc;
 
-    DaliDeviceInfo deviceInfo; ///< the device info of the bus device (ballast)
+    DaliDeviceInfoPtr deviceInfo; ///< the device info of the bus device (ballast)
 
     DsUid dSUID; ///< the dSUID of the bus device (if single device, this will become the dS device's dSUID)
 
@@ -81,7 +81,7 @@ namespace p44 {
     DaliBusDevice(DaliVdc &aDaliVdc);
 
     /// use passed device info and derive dSUID from it
-    void setDeviceInfo(DaliDeviceInfo aDeviceInfo);
+    void setDeviceInfo(DaliDeviceInfoPtr aDeviceInfo);
 
     /// clear all device info except short address and revert to short address derived dSUID
     void clearDeviceInfo();
@@ -137,7 +137,7 @@ namespace p44 {
     /// DALI address to use for querying brightness etc.
     /// @return DALI address
     /// @note this will be overridden in DaliBusDeviceGroup to read info from single master dimmer, not group
-    virtual uint8_t addressForQuery() { return deviceInfo.shortAddress; };
+    virtual uint8_t addressForQuery() { return deviceInfo->shortAddress; };
 
 
     typedef boost::function<void (uint16_t aGroupBitMask, ErrorPtr aError)> DaliGroupsCB;
