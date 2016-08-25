@@ -35,7 +35,7 @@ using namespace p44;
 
 // MARK: ===== special extraction functions
 
-/// two-range illumination handler, as used in A5-06-01 and A5-06-02
+// two-range illumination handler, as used in A5-06-01 and A5-06-02
 static void illumHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
 {
   double value;
@@ -59,7 +59,7 @@ static void illumHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor
 }
 
 
-/// power meter data extraction handler
+// power meter data extraction handler
 static void powerMeterHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
 {
   // raw value is in DB3.7..DB1.0 (upper 24 bits)
@@ -94,12 +94,12 @@ static void powerMeterHandler(const struct EnoceanSensorDescriptor &aSensorDescr
 }
 
 
-/// strange irregular fan speed scale as used in A5-10-01,02,04,07,08 and 09
+// strange irregular fan speed scale as used in A5-10-01,02,04,07,08 and 09
 static void fanSpeedHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
 {
   // extract 8-bit value
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
-    uint8_t value = EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+    uint8_t value = (uint8_t)EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
     // 255..210 = Auto
     // 209..190 = Speed 0 / OFF
     // 189..165 = Speed 1
@@ -119,6 +119,34 @@ static void fanSpeedHandler(const struct EnoceanSensorDescriptor &aSensorDescrip
     sb->updateSensorValue(fanSpeed);
   }
 }
+
+
+// two-range illumination sensor in A5-06-05
+static void illumA50605Handler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  bool lowrange = aDataP[3-0] & 0x01; // DB0.0 selects range: 0=high range data in DB1, 1=low range data in DB2
+  uint16_t raw = lowrange ? aDataP[3-2] : (uint16_t)aDataP[3-1]*2; // raw value in low range scaling = 0..510 = 0..10200 lx
+  if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
+    // 10200/510 = 20
+    sb->updateSensorValue(raw*20);
+  }
+}
+
+
+// 0..360 angle handler (makes sure results is always 0..<360
+static void angleHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  uint32_t value = (uint32_t)EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  // convert range to degrees
+  if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
+    double degrees = sb->getMin()+(sb->getResolution()*value);
+    // limit to 0..360
+    while (degrees<0) degrees+=360;
+    while (degrees>=360) degrees-=360;
+    sb->updateSensorValue(degrees);
+  }
+}
+
 
 
 
@@ -166,10 +194,14 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x04, 0x02, 0, group_blue_heating, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_outdoors,    -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText, tempUnit },
   { 0, 0x04, 0x02, 0, group_blue_heating, group_roomtemperature_control, behaviour_sensor,      valueType_humidity,    usage_outdoors,      0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText,  humUnit  },
 
-  // A5-06-xx: Light Sensor
-  { 0, 0x06, 0x01, 0, group_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_outdoors,    300,60000, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,     illumText, illumUnit },
-  { 0, 0x06, 0x02, 0, group_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_room,          0, 1020, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,     illumText, illumUnit },
-  { 0, 0x06, 0x03, 0, group_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_room,          0, 1024, DB(2,7), DB(1,6), 100, 40*60, &stdSensorHandler, illumText, illumUnit },
+  // A5-06-xx: Light Sensors
+  { 0, 0x06, 0x01, 0, group_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_outdoors,    300,60000, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,      illumText, illumUnit },
+  { 0, 0x06, 0x02, 0, group_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_room,          0, 1020, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,      illumText, illumUnit },
+  { 0, 0x06, 0x03, 0, group_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_room,          0, 1024, DB(2,7), DB(1,6), 100, 40*60, &stdSensorHandler,  illumText, illumUnit },
+  { 0, 0x06, 0x04, 0, group_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_outdoors,      0,65535, DB(2,7), DB(1,0), 100, 40*60, &stdSensorHandler,  illumText, illumUnit },
+  { 0, 0x06, 0x04, 0, group_blue_heating, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_outdoors,    -20,   60, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler,  tempText, tempUnit },
+  { 0, 0x06, 0x05, 0, group_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_room,          0,10200, DB(1,7), DB(1,0), 100, 40*60, &illumA50605Handler,illumText, illumUnit },
+
 
   // A5-07-xx: Occupancy Sensor
   // - two slightly different occupancy sensors
@@ -332,6 +364,13 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // - e.g. Eltako FWZ12-16A
   { 0, 0x12, 0x01, 0, group_black_joker,  group_black_joker,             behaviour_sensor,      valueType_power,       usage_room,          0, 2500, DB(3,7), DB(1,0), 600, 40*60, &powerMeterHandler, "Power", "W" },
   { 0, 0x12, 0x01, 0, group_black_joker,  group_black_joker,             behaviour_sensor,      valueType_energy,      usage_room,          0, 16e9, DB(3,7), DB(1,0), 600, 40*60, &powerMeterHandler, "Energy", "kWh" },
+
+
+  // A5-13-07: Wind Sensor
+  { 0, 0x13, 0x07, 0, group_black_joker,  group_black_joker,             behaviour_sensor,      valueType_wind_direction, usage_outdoors,22.5,   360, DB(3,3), DB(3,0), 100, 40*60, &angleHandler, "wind direction", "degrees" },
+  { 0, 0x13, 0x07, 0, group_black_joker,  group_black_joker,             behaviour_sensor,      valueType_wind_speed,     usage_outdoors,0.45, 89.36, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, "wind speed", "m/s" }, // 1..199.9 mph = 0.45..89.36 m/S
+  { 0, 0x13, 0x07, 0, group_black_joker,  group_black_joker,             behaviour_sensor,      valueType_wind_speed,     usage_outdoors,0.45, 89.36, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, "max wind speed", "m/s" }, // 1..199.9 mph = 0.45..89.36 m/S
+  { 0, 0x13, 0x07, 0, group_black_joker,  group_black_joker,             behaviour_binaryinput, binInpType_lowBattery,    usage_outdoors,   0,     1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  "Low Battery", binaryUnit },
 
   // terminator
   { 0, 0,    0,    0, group_black_joker,  group_black_joker,             behaviour_undefined, 0, usage_undefined, 0, 0, 0, 0, 0, 0, NULL /* NULL for extractor function terminates list */, NULL, NULL },
