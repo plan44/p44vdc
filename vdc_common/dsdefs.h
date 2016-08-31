@@ -378,17 +378,20 @@ typedef enum {
   valueType_sound_volume = 20, ///< Sound pressure level in dB
   valueType_precipitation = 21, ///< Precipitation in mm/m2
   valueType_gas_CO2 = 22, ///< CO2 (carbon dioxide) concentration in ppm
-  valueType_time = 23, ///< time in seconds
-  valueType_molarconcentration = 24, ///< molar concentration in mol/m3
+  valueType_gust_speed = 23, ///< gust speed in m/S
+  valueType_gust_direction = 24, ///< gust direction in degrees
+  // p44 not-yet-approved types
+  valueType_time = 100, ///< time in seconds
+  valueType_molarconcentration = 101, ///< molar concentration in mol/m3
   // generic but still double numeric types
-  valueType_firstGenericNum = 100, ///< first generic numeric type
-  valueType_percentage = 100, ///< percentage 0..100, such as fill level of something
-  valueType_float = 101, ///< a generic float
+  valueType_firstGenericNum = 150, ///< first generic numeric type
+  valueType_percentage = 150, ///< percentage 0..100, such as fill level of something
+  valueType_float = 151, ///< a generic float
   // generic integer types
-  valueType_firstIntNum = 120, ///< first integer numeric type
-  valueType_integer = 120, ///< a generic integer (implies resolution==1)
-  valueType_enum = 121, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
-  valueType_bool = 122, ///< technically an unsigned integer, 0 or 1
+  valueType_firstIntNum = 170, ///< first integer numeric type
+  valueType_integer = 170, ///< a generic integer (implies resolution==1)
+  valueType_enum = 171, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
+  valueType_bool = 172, ///< technically an unsigned integer, 0 or 1
   // non-numeric types
   valueType_firstNonNumeric = 200, ///< first generic non-numeric type
   valueType_textenum = 200, ///< one item from a list of text. Internally represented as an unsigned integer or enum
