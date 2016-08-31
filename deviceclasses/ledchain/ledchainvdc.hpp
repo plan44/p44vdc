@@ -76,13 +76,13 @@ namespace p44 {
   
     LedChainVdc(int aInstanceNumber, int aNumLedsInChain, VdcHost *aVdcHostP, int aTag);
 
-    void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+    void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
-    virtual const char *vdcClassIdentifier() const;
+    virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings);
+    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
 
-    void removeDevice(DevicePtr aDevice, bool aForget);
+    void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;
 
     /// set max output value to send to WS2812 LEDs. This is like a global brightness limit, to prevent LED chain
     /// power supply overload
@@ -96,10 +96,10 @@ namespace p44 {
     /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
     /// devices.
     /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() { return true; }
+    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return true; }
 
     /// vdc level methods (p44 specific, JSON only, for creating LED chain devices)
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -107,11 +107,11 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() { return "WS281x LED Chains"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "WS281x LED Chains"; }
 
   private:
 

@@ -96,23 +96,23 @@ namespace p44 {
   public:
     StaticVdc(int aInstanceNumber, DeviceConfigMap aDeviceConfigs, VdcHost *aVdcHostP, int aTag);
 
-    void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+    void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
-    virtual const char *vdcClassIdentifier() const;
+    virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings);
+    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
 
     /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
     /// devices.
     /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() { return true; }
+    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return true; }
 
     /// vdc level methods (p44 specific, JSON only, for configuring static devices)
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() { return "GPIO,I2C,console"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "GPIO,I2C,console"; }
 
   private:
 

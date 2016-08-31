@@ -258,7 +258,7 @@ namespace p44 {
     virtual string modelName() P44_OVERRIDE { return string_format("%s %s", getVdc().productName.c_str(), vdcModelSuffix().c_str()); }
 
     /// @return human readable model name/short description
-    virtual string vdcModelSuffix() = 0;
+    virtual string vdcModelSuffix() const = 0;
 
     /// @return human readable product version string
     virtual string modelVersion() P44_OVERRIDE { return getVdc().modelVersion(); /* same as entire vdc host */ }

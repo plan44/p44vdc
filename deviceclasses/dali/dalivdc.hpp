@@ -89,7 +89,7 @@ namespace p44 {
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() { return "DALI"; }
+    virtual string vdcModelSuffix() const { return "DALI"; }
 
     /// ungroup a previously grouped device
     /// @param aDevice the device to ungroup

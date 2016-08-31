@@ -131,7 +131,7 @@ void EnoceanVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool a
   if (!aIncremental) {
     // start with zero
     removeDevices(aClearSettings);
-    // - read learned-in EnOcean button IDs from DB
+    // - read learned-in EnOcean device IDs from DB
     sqlite3pp::query qry(db);
     if (qry.prepare("SELECT enoceanAddress, subdevice, eeProfile, eeManufacturer FROM knownDevices")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {

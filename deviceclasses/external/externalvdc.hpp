@@ -211,26 +211,26 @@ namespace p44 {
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
 
-    void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+    void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
-    virtual const char *vdcClassIdentifier() const;
+    virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
     /// collect devices from this vDC
     /// @param aCompletedCB will be called when device scan for this vDC has been completed
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings);
+    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() { return "external"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "external"; }
 
     /// External device container should not be announced when it has no devices
     /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() { return true; }
+    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return true; }
 
     /// get supported rescan modes for this vDC. This indicates (usually to a web-UI) which
     /// of the flags to collectDevices() make sense for this vDC.
     /// @return a combination of rescanmode_xxx bits
-    virtual int getRescanModes() const { return rescanmode_exhaustive; }; // only exhaustive makes sense
+    virtual int getRescanModes() const P44_OVERRIDE { return rescanmode_exhaustive; }; // only exhaustive makes sense
 
   private:
 

@@ -74,30 +74,30 @@ namespace p44 {
 
     HueComm hueComm;
 
-		void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
-    virtual const char *vdcClassIdentifier() const;
+    virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
     /// get supported rescan modes for this vDC
     /// @return a combination of rescanmode_xxx bits
-    virtual int getRescanModes() const;
+    virtual int getRescanModes() const P44_OVERRIDE;
 
     /// collect and add devices to the container
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings);
+    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
 
     /// set container learn mode
     /// @param aEnableLearning true to enable learning mode
     /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some EnOcean devices)
     /// @note learn events (new devices found or devices removed) must be reported by calling reportLearnEvent() on VdcHost.
-    void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck);
+    void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck) P44_OVERRIDE;
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() { return "hue"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "hue"; }
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - uuid:UUUUUUU = UUID
-    virtual string hardwareGUID() { return string_format("uuid:%s", bridgeUuid.c_str()); };
+    virtual string hardwareGUID() P44_OVERRIDE { return string_format("uuid:%s", bridgeUuid.c_str()); };
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -105,11 +105,11 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// Get extra info (plan44 specific) to describe the addressable in more detail
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
-    virtual string getExtraInfo();
+    virtual string getExtraInfo() P44_OVERRIDE;
 
   private:
 

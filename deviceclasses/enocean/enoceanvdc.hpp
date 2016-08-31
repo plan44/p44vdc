@@ -59,11 +59,6 @@ namespace p44 {
 
   typedef std::multimap<EnoceanAddress, EnoceanDevicePtr> EnoceanDeviceMap;
 
-  /// @param aEnoceanDevicePtr the EnOcean device the key event originates from
-  /// @param aSubDeviceIndex subdevice, can be -1 if subdevice cannot be determined (multiple rockers released)
-  /// @return true if locally handled such that no further operation is needed, false otherwise
-  typedef boost::function<bool (EnoceanDevicePtr aEnoceanDevicePtr, int aSubDeviceIndex, uint8_t aAction)> KeyEventHandlerCB;
-
 
   /// persistence for enocean device container
   class EnoceanPersistence : public SQLite3Persistence
@@ -86,8 +81,6 @@ namespace p44 {
     bool disableProximityCheck;
     bool selfTesting;
 
-    KeyEventHandlerCB keyEventHandler;
-
     EnoceanDeviceMap enoceanDevices; ///< local map linking EnoceanDeviceID to devices
 
 		EnoceanPersistence db;
@@ -96,34 +89,34 @@ namespace p44 {
 
     EnoceanVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
 		
-		void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     // the Enocean communication object
     EnoceanComm enoceanComm;
 
-    virtual const char *vdcClassIdentifier() const;
+    virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error
-    virtual void selfTest(StatusCB aCompletedCB);
+    virtual void selfTest(StatusCB aCompletedCB) P44_OVERRIDE;
 
     /// collect and add devices to the container
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings);
+    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
 
     /// vdc level methods (p44 specific, JSON only)
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @param aForget if set, all parameters stored for the device (if any) will be deleted. Note however that
     ///   the devices are not disconnected (=unlearned) by this.
-    virtual void removeDevices(bool aForget);
+    virtual void removeDevices(bool aForget) P44_OVERRIDE;
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() { return "EnOcean"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "EnOcean"; }
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - enoceanaddress:XXXXXXXX = 8 hex digits enOcean device address
-    virtual string hardwareGUID() { return string_format("enoceanaddress:%08X", enoceanComm.modemAddress()); };
+    virtual string hardwareGUID() P44_OVERRIDE { return string_format("enoceanaddress:%08X", enoceanComm.modemAddress()); };
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -131,17 +124,17 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
   protected:
 
     /// add device to container (already known device, already stored in DB)
     /// @return false if aEnoceanDevice dSUID is already known and thus was *not* added
-    virtual bool addKnownDevice(EnoceanDevicePtr aEnoceanDevice);
+    bool addKnownDevice(EnoceanDevicePtr aEnoceanDevice);
 
     /// add newly learned device to EnOcean container (and remember it in DB)
     /// @return false if aEnoceanDevice dSUID is already known and thus was *not* added
-    virtual bool addAndRememberDevice(EnoceanDevicePtr aEnoceanDevice);
+    bool addAndRememberDevice(EnoceanDevicePtr aEnoceanDevice);
 
     /// un-pair devices by physical device address
     /// @param aEnoceanAddress address for which to disconnect and forget all physical devices
@@ -155,13 +148,13 @@ namespace p44 {
     /// @param aEnableLearning true to enable learning mode
     /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some EnOcean devices)
     /// @note learn events (new devices found or devices removed) must be reported by calling reportLearnEvent() on VdcHost.
-    virtual void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck);
+    virtual void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck) P44_OVERRIDE;
 
   protected:
 
     /// remove device
     /// @param aDevice device to remove (possibly only part of a multi-function physical device)
-    virtual void removeDevice(DevicePtr aDevice, bool aForget);
+    virtual void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;
 
   private:
 
