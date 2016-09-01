@@ -67,7 +67,7 @@ message vdsm_RequestSetProperty {
 
 // expects generic response, new in API v2c
 message vdsm_RequestGenericRequest {
-    repeated string dSUID = 1;
+    optional string dSUID = 1;
     optional string methodname = 2;
     repeated PropertyElement params = 3;
 }

@@ -202,15 +202,14 @@ struct  _Vdcapi__VdsmRequestSetProperty
 struct  _Vdcapi__VdsmRequestGenericRequest
 {
   ProtobufCMessage base;
-  size_t n_dsuid;
-  char **dsuid;
+  char *dsuid;
   char *methodname;
   size_t n_params;
   Vdcapi__PropertyElement **params;
 };
 #define VDCAPI__VDSM__REQUEST_GENERIC_REQUEST__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__request_generic_request__descriptor) \
-    , 0,NULL, NULL, 0,NULL }
+    , NULL, NULL, 0,NULL }
 
 
 struct  _Vdcapi__VdsmSendPing

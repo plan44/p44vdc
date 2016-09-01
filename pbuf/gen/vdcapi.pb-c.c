@@ -1767,9 +1767,9 @@ static const ProtobufCFieldDescriptor vdcapi__vdsm__request_generic_request__fie
   {
     "dSUID",
     1,
-    PROTOBUF_C_LABEL_REPEATED,
+    PROTOBUF_C_LABEL_OPTIONAL,
     PROTOBUF_C_TYPE_STRING,
-    offsetof(Vdcapi__VdsmRequestGenericRequest, n_dsuid),
+    0,   /* quantifier_offset */
     offsetof(Vdcapi__VdsmRequestGenericRequest, dsuid),
     NULL,
     NULL,
