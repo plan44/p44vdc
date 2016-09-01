@@ -280,18 +280,18 @@ void Esp3Packet::finalize()
 ErrorPtr Esp3Packet::responseStatus()
 {
   if (packetType()!=pt_response || dataLength()<1) {
-    return ErrorPtr(new EnoceanCommError(EnoceanCommErrorWrongPacket));
+    return ErrorPtr(new EnoceanCommError(EnoceanCommError::WrongPacket));
   }
   else {
     // is response, check
     uint8_t respCode = data()[0];
-    EnoceanCommErrors errorCode;
+    EnoceanCommError::ErrorCodes errorCode;
     switch (respCode) {
       case RET_OK: return (ErrorPtr()); // is ok
-      case RET_NOT_SUPPORTED: errorCode = EnoceanCommErrorUnsupported; break;
-      case RET_WRONG_PARAM: errorCode = EnoceanCommErrorBadParam; break;
-      case RET_OPERATION_DENIED: errorCode = EnoceanCommErrorDenied; break;
-      default: errorCode = EnoceanCommErrorCmdError; break;
+      case RET_NOT_SUPPORTED: errorCode = EnoceanCommError::Unsupported; break;
+      case RET_WRONG_PARAM: errorCode = EnoceanCommError::BadParam; break;
+      case RET_OPERATION_DENIED: errorCode = EnoceanCommError::Denied; break;
+      default: errorCode = EnoceanCommError::CmdError; break;
     }
     return ErrorPtr(new EnoceanCommError(errorCode));
   }
@@ -1324,7 +1324,7 @@ void EnoceanComm::cmdTimeout()
     cmdQueue.pop_front();
     // - now call handler with error
     if (cmd.responseCB) {
-      cmd.responseCB(Esp3PacketPtr(), ErrorPtr(new EnoceanCommError(EnoceanCommErrorCmdTimeout)));
+      cmd.responseCB(Esp3PacketPtr(), ErrorPtr(new EnoceanCommError(EnoceanCommError::CmdTimeout)));
     }
   }
   // check if more commands in queue to be sent

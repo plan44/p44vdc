@@ -1028,7 +1028,7 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
         break;
       default:
         LOG(LOG_INFO, "vdSM <- vDC (pbuf) response '%s' cannot be sent because no message is implemented for it at the pbuf level", aResult->description().c_str());
-        return ErrorPtr(new VdcApiError(500,"Error: Method is not implemented in the pbuf API"));
+        return Error::err<VdcApiError>(500,"Error: Method is not implemented in the pbuf API");
     }
     // send
     err = pbufConnection->sendMessage(&msg);
@@ -1055,7 +1055,7 @@ ErrorPtr VdcPbufApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage,
   resp.description = (char *)(aErrorMessage.size()>0 ? aErrorMessage.c_str() : NULL);
   err = pbufConnection->sendMessage(&msg);
   // log (if not just OK)
-  if (aErrorCode!=ErrorOK)
+  if (aErrorCode!=Error::OK)
     LOG(LOG_INFO, "vdSM <- vDC (pbuf) error sent: requestid='%d', error=%d (%s)", reqId, aErrorCode, aErrorMessage.c_str());
   // done
   return err;
@@ -1112,7 +1112,7 @@ void VdcPbufApiConnection::gotData(ErrorPtr aError)
             FOCUSLOG("gotData: parsed new header, now expectedMsgBytes=%d", expectedMsgBytes);
             DBGFOCUSLOG("gotData: after removing header: receivedMessage.size()=%d", receivedMessage.size());
             if (expectedMsgBytes>MAX_DATA_SIZE) {
-              aError = ErrorPtr(new VdcApiError(413, "message exceeds maximum length of 16kB"));
+              aError = Error::err<VdcApiError>(413, "message exceeds maximum length of 16kB");
               break;
             }
           }
@@ -1281,7 +1281,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
 
   decodedMsg = vdcapi__message__unpack(NULL, aPackedMessageSize, aPackedMessageP); // Deserialize the serialized input
   if (decodedMsg == NULL) {
-    err = ErrorPtr(new VdcApiError(400,"error unpacking incoming message"));
+    err = Error::err<VdcApiError>(400,"error unpacking incoming message");
   }
   else {
     // print it
@@ -1409,7 +1409,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         if (decodedMsg->generic_response->code!=VDCAPI__RESULT_CODE__ERR_OK) {
           // convert to HTTP-style internal codes
           ErrorCode errorCode = pbufToInternalError(decodedMsg->generic_response->code);
-          err = ErrorPtr(new VdcApiError(errorCode, nonNullCStr(decodedMsg->generic_response->description)));
+          err = Error::err_cstr<VdcApiError>(errorCode, decodedMsg->generic_response->description);
         }
         responseForId = decodedMsg->message_id;
         emptyResult = true; // do not convert message fields to result
@@ -1422,7 +1422,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         break;
       // invalid message, type does not correspond with actual message
       badMessage:
-        err = ErrorPtr(new VdcApiError(400,"message type and contents do not match"));
+        err = Error::err<VdcApiError>(400,"message type and contents do not match");
         break;
       // unknown message type
       default:
@@ -1557,7 +1557,7 @@ ErrorPtr VdcPbufApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
   else {
     // no suitable submessage, cannot send
     LOG(LOG_INFO, "vdSM <- vDC (pbuf) method '%s' cannot be sent because no message is implemented for it at the pbuf level", aMethod.c_str());
-    return ErrorPtr(new VdcApiError(500,"Error: Method is not implemented in the pbuf API"));
+    return Error::err<VdcApiError>(500, "Error: Method is not implemented in the pbuf API");
   }
   if (Error::isOK(err)) {
     if (aResponseHandler) {

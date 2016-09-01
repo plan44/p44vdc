@@ -164,6 +164,7 @@ void WS281xComm::show()
   #endif
 }
 
+#if P44_BUILD_RPI || P44_BUILD_OW
 
 // brightness to PWM value conversion
 static const uint8_t pwmtable[256] = {
@@ -182,6 +183,9 @@ static const uint8_t pwmtable[256] = {
   221, 224, 228, 232, 235, 239, 243, 247, 251, 255
 };
 
+#endif
+
+
 const uint8_t brightnesstable[256] = {
   0, 7, 18, 27, 36, 43, 49, 55, 61, 66, 70, 75, 79, 83, 86, 90, 93, 96, 99, 102, 104,
   107, 109, 112, 114, 116, 118, 121, 123, 124, 126, 128, 130, 132, 133, 135, 137, 138,
@@ -199,6 +203,7 @@ const uint8_t brightnesstable[256] = {
   248, 248, 248, 248, 249, 249, 249, 249, 250, 250, 250, 251, 251, 251, 251, 252, 252,
   252, 252, 253, 253, 253, 253, 254, 254, 254, 254, 255, 255, 255, 255
 };
+
 
 
 uint8_t WS281xComm::getMinVisibleColorIntensity()

@@ -83,7 +83,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
       //  [{"error":{"type":xxx,"address":"yyy","description":"zzz"}}]
       // or
       //  [{"success": { "xxx": "xxxxxxxx" }]
-      int errCode = HueCommErrorInvalidResponse;
+      int errCode = HueCommError::InvalidResponse;
       string errMessage = "invalid response";
       for (int i=0; i<aJsonResponse->arrayLength(); i++) {
         JsonObjectPtr responseItem = aJsonResponse->arrayGet(i);
@@ -95,7 +95,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
             // apparently successful, return entire response
             // Note: use getSuccessItem() to get success details
             data = aJsonResponse;
-            errCode = HueCommErrorOK; // ok
+            errCode = HueCommError::OK; // ok
             break;
           }
           else if (statusToken=="error" && responseParams) {
@@ -110,8 +110,8 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
           }
         }
       } // for
-      if (errCode!=HueCommErrorOK) {
-        error = ErrorPtr(new HueCommError(errCode, errMessage));
+      if (errCode!=HueCommError::OK) {
+        error = Error::err_str<HueCommError>(errCode, errMessage);
       }
     }
     else {
@@ -257,7 +257,7 @@ public:
   {
     if (!Error::isOK(aError)) {
       // could not find bridge, return error
-      callback(ErrorPtr(new HueCommError(HueCommErrorUuidNotFound)));
+      callback(ErrorPtr(new HueCommError(HueCommError::UuidNotFound)));
       keepAlive.reset(); // will delete object if nobody else keeps it
       return; // done
     }
@@ -307,7 +307,7 @@ public:
       // done with all candidates
       if (refind) {
         // failed getting description, return error
-        callback(ErrorPtr(new HueCommError(HueCommErrorDescription)));
+        callback(ErrorPtr(new HueCommError(HueCommError::Description)));
         keepAlive.reset(); // will delete object if nobody else keeps it
         return; // done
       }
@@ -402,7 +402,7 @@ public:
         // all candidates tried, nothing found in given time
         LOG(LOG_NOTICE, "Could not register with a hue bridge");
         hueComm.findInProgress = false;
-        callback(ErrorPtr(new HueCommError(HueCommErrorNoRegistration, "No hue bridge found ready to register")));
+        callback(Error::err<HueCommError>(HueCommError::NoRegistration, "No hue bridge found ready to register"));
         // done!
         keepAlive.reset(); // will delete object if nobody else keeps it
         return;
@@ -471,7 +471,7 @@ void HueComm::apiQuery(const char* aUrlSuffix, HueApiResultCB aResultHandler)
 void HueComm::apiAction(HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, HueApiResultCB aResultHandler, bool aNoAutoURL)
 {
   if (!apiReady && !aNoAutoURL) {
-    if (aResultHandler) aResultHandler(JsonObjectPtr(), ErrorPtr(new HueCommError(HueCommErrorApiNotReady)));
+    if (aResultHandler) aResultHandler(JsonObjectPtr(), ErrorPtr(new HueCommError(HueCommError::ApiNotReady)));
   }
   string url;
   if (aNoAutoURL) {

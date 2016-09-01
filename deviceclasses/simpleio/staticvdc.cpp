@@ -202,7 +202,7 @@ ErrorPtr StaticVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
         // try to create device
         StaticDevicePtr dev = addStaticDevice(deviceType, deviceConfig);
         if (!dev) {
-          respErr = ErrorPtr(new WebError(500, "invalid configuration for static device -> none created"));
+          respErr = WebError::webErr(500, "invalid configuration for static device -> none created");
         }
         else {
           // set name

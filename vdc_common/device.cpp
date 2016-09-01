@@ -381,7 +381,7 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       // now device does not exist any more, so only thing that may happen is return
     }
     else {
-      respErr = ErrorPtr(new WebError(403, "device cannot be removed with this method"));
+      respErr = WebError::webErr(403, "device cannot be removed with this method");
     }
   }
   else if (aMethod=="x-p44-teachInSignal") {
@@ -395,7 +395,7 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       aRequest->sendResult(ApiValuePtr());
     }
     else {
-      respErr = ErrorPtr(new WebError(400, "device cannot send teach in signal of requested variant"));
+      respErr = WebError::webErr(400, "device cannot send teach in signal of requested variant");
     }
   }
   else {
@@ -1337,7 +1337,7 @@ ErrorPtr Device::load()
   // if we don't have device settings at this point (created by subclass), this is a misconfigured device!
   if (!deviceSettings) {
     ALOG(LOG_ERR, "***** no settings at load() time! -> probably misconfigured");
-    return ErrorPtr(new WebError(500,"missing settings"));
+    return WebError::webErr(500,"missing settings");
   }
   // load the device settings
   if (deviceSettings) {

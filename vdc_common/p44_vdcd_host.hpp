@@ -33,10 +33,11 @@ namespace p44 {
   class P44VdcError : public Error
   {
   public:
+    typedef ErrorCode ErrorCodes;
+
     static const char *domain() { return "p44vdc"; }
     virtual const char *getErrorDomain() const { return P44VdcError::domain(); };
     P44VdcError(ErrorCode aError) : Error(aError) {};
-    P44VdcError(ErrorCode aError, const std::string &aErrorMessage) : Error(aError, aErrorMessage) {};
   };
 
 

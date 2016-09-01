@@ -45,32 +45,31 @@ using namespace std;
 
 namespace p44 {
 
-  // Errors
-  typedef enum {
-    DaliCommErrorOK,
-    DaliCommErrorBusy,
-    DaliCommErrorBridgeComm,
-    DaliCommErrorBridgeCmd,
-    DaliCommErrorBridgeUnknown,
-    DaliCommErrorDALIFrame,
-    DaliCommErrorMissingData,
-    DaliCommErrorBadChecksum,
-    DaliCommErrorBadDeviceInfo,
-    DaliCommErrorInvalidAnswer,
-    DaliCommErrorNeedFullScan,
-    DaliCommErrorDeviceSearch,
-    DaliCommErrorSetShortAddress,
-    DaliCommErrorBusOverload,
-    DaliCommErrorDataUnreliable
-  } DaliCommErrors;
-
   class DaliCommError : public Error
   {
   public:
+    // Errors
+    typedef enum {
+      OK,
+      Busy,
+      BridgeComm,
+      BridgeCmd,
+      BridgeUnknown,
+      DALIFrame,
+      MissingData,
+      BadChecksum,
+      BadDeviceInfo,
+      InvalidAnswer,
+      NeedFullScan,
+      DeviceSearch,
+      SetShortAddress,
+      BusOverload,
+      DataUnreliable
+    } ErrorCodes;
+
     static const char *domain() { return "DaliComm"; }
     virtual const char *getErrorDomain() const { return DaliCommError::domain(); };
-    DaliCommError(DaliCommErrors aError) : Error(ErrorCode(aError)) {};
-    DaliCommError(DaliCommErrors aError, std::string aErrorMessage) : Error(ErrorCode(aError), aErrorMessage) {};
+    DaliCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
   };
 
 
@@ -132,7 +131,7 @@ namespace p44 {
     int runningProcedures;
 
     bool isBusy();
-    static ErrorPtr busyError() { return ErrorPtr(new DaliCommError(DaliCommErrorBusy)); };
+    static ErrorPtr busyError() { return ErrorPtr(new DaliCommError(DaliCommError::Busy)); };
 
     MLMicroSeconds closeAfterIdleTime;
     long connectionTimeoutTicket;

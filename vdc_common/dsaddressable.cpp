@@ -93,7 +93,7 @@ ErrorPtr DsAddressable::checkParam(ApiValuePtr aParams, const char *aParamName, 
   else
     aParam.reset();
   if (!aParam)
-    err = ErrorPtr(new VdcApiError(400, string_format("Invalid Parameters - missing '%s'",aParamName)));
+    err = Error::err<VdcApiError>(400, "Invalid Parameters - missing '%s'",aParamName);
   return err;
 }
 
@@ -187,7 +187,7 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
     }
   }
   else {
-    respErr = ErrorPtr(new VdcApiError(405, "unknown method"));
+    respErr = Error::err<VdcApiError>(405, "unknown method '%s'", aMethod.c_str());
   }
   return respErr;
 }

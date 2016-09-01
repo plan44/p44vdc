@@ -181,7 +181,7 @@ void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, Se
   else {
     // error
     if (Error::isOK(aError))
-      aError = ErrorPtr(new DaliCommError(DaliCommErrorMissingData));
+      aError = ErrorPtr(new DaliCommError(DaliCommError::MissingData));
     if (aBridgeResultHandler) {
       aBridgeResultHandler(0, 0, aError);
     }
@@ -268,11 +268,11 @@ static ErrorPtr checkBridgeResponse(uint8_t aResp1, uint8_t aResp2, ErrorPtr aEr
         case ACK_OK:
           return ErrorPtr(); // no error
         case ACK_FRAME_ERR:
-          return ErrorPtr(new DaliCommError(DaliCommErrorDALIFrame));
+          return ErrorPtr(new DaliCommError(DaliCommError::DALIFrame));
         case ACK_INVALIDCMD:
-          return ErrorPtr(new DaliCommError(DaliCommErrorBridgeCmd));
+          return ErrorPtr(new DaliCommError(DaliCommError::BridgeCmd));
         case ACK_OVERLOAD:
-          return ErrorPtr(new DaliCommError(DaliCommErrorBusOverload));
+          return ErrorPtr(new DaliCommError(DaliCommError::BusOverload));
       }
       break;
     case RESP_CODE_DATA_RETRIED:
@@ -282,7 +282,7 @@ static ErrorPtr checkBridgeResponse(uint8_t aResp1, uint8_t aResp2, ErrorPtr aEr
       return ErrorPtr(); // no error
   }
   // other, uncatched error
-  return ErrorPtr(new DaliCommError(DaliCommErrorBridgeUnknown));
+  return ErrorPtr(new DaliCommError(DaliCommError::BridgeUnknown));
 }
 
 
@@ -293,7 +293,7 @@ void DaliComm::daliCommandStatusHandler(DaliCommandStatusCB aResultCB, uint8_t a
   ErrorPtr err = checkBridgeResponse(aResp1, aResp2, aError, noOrTimeout, retried);
   if (!err && noOrTimeout) {
     // timeout for a send-only command -> out of sync, bridge communication error
-    err = ErrorPtr(new DaliCommError(DaliCommErrorBridgeComm));
+    err = ErrorPtr(new DaliCommError(DaliCommError::BridgeComm));
   }
   // execute callback if any
   if (aResultCB)
@@ -400,7 +400,7 @@ void DaliComm::daliSendQuery(DaliAddress aAddress, uint8_t aQueryCommand, DaliQu
 bool DaliComm::isYes(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr &aError, bool aCollisionIsYes)
 {
   bool isYes = !aNoOrTimeout;
-  if (aError && aCollisionIsYes && aError->isError(DaliCommError::domain(), DaliCommErrorDALIFrame)) {
+  if (aError && aCollisionIsYes && aError->isError(DaliCommError::domain(), DaliCommError::DALIFrame)) {
     // framing error -> consider this a YES
     isYes = true;
     aError.reset(); // not considered an error when aCollisionIsYes is set
@@ -409,7 +409,7 @@ bool DaliComm::isYes(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr &aError, boo
     // regular answer, must be DALIANSWER_YES to be a regular YES
     if (aResponse!=DALIANSWER_YES) {
       // invalid YES response
-      aError.reset(new DaliCommError(DaliCommErrorInvalidAnswer));
+      aError.reset(new DaliCommError(DaliCommError::InvalidAnswer));
     }
   }
   if (aError)
@@ -520,7 +520,7 @@ private:
     daliComm.endProcedure();
     if (numErrors>0) {
       LOG(LOG_ERR, "Unreliable data access for DALI bus address %d - %d of %d R/W tests have failed!", busAddress, numErrors, numCycles);
-      if (callback) callback(ErrorPtr(new DaliCommError(DaliCommErrorDataUnreliable, string_format("DALI R/W tests: %d of %d failed", numErrors, numCycles))));
+      if (callback) callback(Error::err<DaliCommError>(DaliCommError::DataUnreliable, "DALI R/W tests: %d of %d failed", numErrors, numCycles));
     }
     else {
       // everything is fine
@@ -585,7 +585,7 @@ private:
   void resetComplete(ErrorPtr aError)
   {
     // check for overload condition
-    if (Error::isError(aError, DaliCommError::domain(), DaliCommErrorBusOverload)) {
+    if (Error::isError(aError, DaliCommError::domain(), DaliCommError::BusOverload)) {
       LOG(LOG_ERR, "DALI bus has overload - possibly due to short circuit, defective ballasts or more than 64 devices connected");
       LOG(LOG_ERR, "-> Please power down installation, check DALI bus and try again");
     }
@@ -621,7 +621,7 @@ private:
   void handleScanResponse(DeviceQueryState aQueryState, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
   {
     bool isYes = false;
-    if (Error::isError(aError, DaliCommError::domain(), DaliCommErrorDALIFrame)) {
+    if (Error::isError(aError, DaliCommError::domain(), DaliCommError::DALIFrame)) {
       // framing error, indicates that we might have duplicates
       LOG(LOG_NOTICE, "Detected framing error for %d-th response from short address %d - probably short address collision", (int)aQueryState, shortAddress);
       probablyCollision = true;
@@ -702,7 +702,7 @@ private:
       if (!Error::isOK(aError)) {
         LOG(LOG_WARNING, "Error (%s) in quick scan ignored because we need to do a full scan anyway", aError->description().c_str());
       }
-      aError = ErrorPtr(new DaliCommError(DaliCommErrorNeedFullScan,"Need full bus scan"));
+      aError = Error::err<DaliCommError>(DaliCommError::NeedFullScan, "Need full bus scan");
     }
     daliComm.endProcedure();
     callback(activeDevicesPtr, unreliableDevicesPtr, aError);
@@ -777,7 +777,7 @@ private:
 
   void shortAddrListReceived(DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError)
   {
-    bool fullScanNeeded = aError && aError->isError(DaliCommError::domain(), DaliCommErrorNeedFullScan);
+    bool fullScanNeeded = aError && aError->isError(DaliCommError::domain(), DaliCommError::NeedFullScan);
     if (aError && !fullScanNeeded)
       return completed(aError);
     // exit now if no full scan needed and short address scan is ok
@@ -924,7 +924,7 @@ private:
           return;
         }
         else {
-          return completed(ErrorPtr(new DaliCommError(DaliCommErrorDeviceSearch, "Binary search got out of range")));
+          return completed(Error::err<DaliCommError>(DaliCommError::DeviceSearch, "Binary search got out of range"));
         }
       }
       // issue next address' compare
@@ -954,7 +954,7 @@ private:
         return;
       }
       else {
-        return completed(ErrorPtr(new DaliCommError(DaliCommErrorDeviceSearch, "Detected device does not respond to QUERY_SHORT_ADDRESS")));
+        return completed(Error::err<DaliCommError>(DaliCommError::DeviceSearch,  "Detected device does not respond to QUERY_SHORT_ADDRESS"));
       }
     }
     else {
@@ -1277,7 +1277,7 @@ private:
     }
     else {
       // not enough bytes
-      return complete(ErrorPtr(new DaliCommError(DaliCommErrorMissingData,string_format("Not enough bytes read from bank0 at shortAddress %d", busAddress))));
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "Not enough bytes read from bank0 at shortAddress %d", busAddress));
     }
   };
 
@@ -1333,7 +1333,7 @@ private:
       }
       // - report error
       LOG(LOG_ERR, "DALI shortaddress %d Bank 0 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
-      return complete(ErrorPtr(new DaliCommError(DaliCommErrorBadChecksum,string_format("bad DALI memory bank 0 checksum at shortAddress %d", busAddress))));
+      return complete(Error::err<DaliCommError>(DaliCommError::BadChecksum, "bad DALI memory bank 0 checksum at shortAddress %d", busAddress));
     }
     if (maxBank>0) {
       // now read OEM info from bank1
@@ -1426,7 +1426,7 @@ private:
         }
         // - report error
         LOG(LOG_ERR, "DALI shortaddress %d Bank 1 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
-        aError = ErrorPtr(new DaliCommError(DaliCommErrorBadChecksum,string_format("bad DALI memory bank 1 checksum at shortAddress %d", busAddress)));
+        aError = Error::err<DaliCommError>(DaliCommError::BadChecksum, "bad DALI memory bank 1 checksum at shortAddress %d", busAddress);
       }
     }
     complete(aError);

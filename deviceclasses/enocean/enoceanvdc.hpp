@@ -37,26 +37,6 @@ using namespace std;
 
 namespace p44 {
 
-  // Errors
-  typedef enum {
-    EnoceanErrorOK,
-    EnoceanDeviceLearned,
-    EnoceanDeviceUnlearned,
-    EnoceanNoKnownProfile,
-    EnoceanLearnTimeout,
-    EnoceanLearnAborted,
-  } EnoceanErrors;
-
-  class EnoceanError : public Error
-  {
-  public:
-    static const char *domain() { return "Enocean"; }
-    virtual const char *getErrorDomain() const { return EnoceanError::domain(); };
-    EnoceanError(EnoceanErrors aError) : Error(ErrorCode(aError)) {};
-    EnoceanError(EnoceanErrors aError, std::string aErrorMessage) : Error(ErrorCode(aError), aErrorMessage) {};
-  };
-
-
   typedef std::multimap<EnoceanAddress, EnoceanDevicePtr> EnoceanDeviceMap;
 
 

@@ -59,10 +59,10 @@ ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr
   }
   // aApiObject must be of type apivalue_object
   if (!aQueryObject->isType(apivalue_object))
-    return ErrorPtr(new VdcApiError(415, "Query or Value written must be object"));
+    return Error::err<VdcApiError>(415, "Query or Value written must be object");
   if (aMode==access_read) {
     if (!aResultObject)
-      return ErrorPtr(new VdcApiError(415, "accessing property for read must provide result object"));
+      return Error::err<VdcApiError>(415, "accessing property for read must provide result object");
     aResultObject->setType(apivalue_object); // must be object
   }
   // Iterate trough elements of query object
@@ -94,7 +94,7 @@ ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr
           if (aMode==access_write && propDesc->isDeletable() && queryValue->isNull()) {
             // assigning NULL means deleting (possibly entire substructure)
             if (!accessField(access_delete, queryValue, propDesc)) { // delete
-              err = ErrorPtr(new VdcApiError(403, string_format("Cannot delete '%s'", propDesc->name())));
+              err = Error::err<VdcApiError>(403, "Cannot delete '%s'", propDesc->name());
             }
           }
           else if (propDesc->isStructured()) {
@@ -169,7 +169,7 @@ ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr
             else {
               // write access: just pass the value
               if (!accessField(aMode, queryValue, propDesc)) { // write
-                err = ErrorPtr(new VdcApiError(403, string_format("Write access to '%s' denied", propDesc->name())));
+                err = Error::err<VdcApiError>(403, "Write access to '%s' denied", propDesc->name());
               }
             }
           }
@@ -194,7 +194,7 @@ ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr
     }
     // now generate error if we have collected a non-empty error message
     if (!errorMsg.empty()) {
-      err = ErrorPtr(new VdcApiError(404,errorMsg));
+      err = Error::err_str<VdcApiError>(404, errorMsg);
     }
     #if DEBUGLOGGING
     if (aMode==access_read) {

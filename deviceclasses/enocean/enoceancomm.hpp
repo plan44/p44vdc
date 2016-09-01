@@ -33,24 +33,23 @@ using namespace std;
 
 namespace p44 {
 
-  // Errors
-  typedef enum {
-    EnoceanCommErrorOK,
-    EnoceanCommErrorCmdTimeout,
-    EnoceanCommErrorWrongPacket,
-    EnoceanCommErrorCmdError,
-    EnoceanCommErrorUnsupported,
-    EnoceanCommErrorBadParam,
-    EnoceanCommErrorDenied
-  } EnoceanCommErrors;
-
   class EnoceanCommError : public Error
   {
   public:
+    // Errors
+    typedef enum {
+      OK,
+      CmdTimeout,
+      WrongPacket,
+      CmdError,
+      Unsupported,
+      BadParam,
+      Denied
+    } ErrorCodes;
+
     static const char *domain() { return "EnoceanComm"; }
     virtual const char *getErrorDomain() const { return EnoceanCommError::domain(); };
-    EnoceanCommError(EnoceanCommErrors aError) : Error(ErrorCode(aError)) {};
-    EnoceanCommError(EnoceanCommErrors aError, std::string aErrorMessage) : Error(ErrorCode(aError), aErrorMessage) {};
+    EnoceanCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
   };
 
 

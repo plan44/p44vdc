@@ -183,18 +183,18 @@ ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInter
       vt!=apivalue_int64 &&
       vt!=apivalue_uint64
     ) {
-      err = ErrorPtr(new VdcApiError(415, "invalid boolean"));
+      err = Error::err<VdcApiError>(415, "invalid boolean");
     }
   }
   else if (valueType<valueType_firstNonNumeric) {
     // check bounds
     double v = aApiValue->doubleValue();
     if (v<min || v>max) {
-      err = ErrorPtr(new VdcApiError(415, "number out of range"));
+      err = Error::err<VdcApiError>(415, "number out of range");
     }
   }
   else {
-    err = ErrorPtr(new VdcApiError(415, "invalid number"));
+    err = Error::err<VdcApiError>(415, "invalid number");
   }
   // everything else is not valid for numeric parameter
   return err;
@@ -275,7 +275,7 @@ ErrorPtr TextValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal
   if (aApiValue) {
     // check if value conforms
     if (aApiValue->getType()!=apivalue_string) {
-      err = ErrorPtr(new VdcApiError(415, "invalid string"));
+      err = Error::err<VdcApiError>(415, "invalid string");
     }
   }
   return err;
@@ -332,7 +332,7 @@ ErrorPtr EnumValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal
   if (aApiValue) {
     // check if value conforms
     if (aApiValue->getType()!=apivalue_string) {
-      err = ErrorPtr(new VdcApiError(415, "enum label must be string"));
+      err = Error::err<VdcApiError>(415, "enum label must be string");
     }
     else {
       // must be one of the texts in the enum list
@@ -347,7 +347,7 @@ ErrorPtr EnumValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal
           return err;
         }
       }
-      err = ErrorPtr(new VdcApiError(415, "invalid enum label"));
+      err = Error::err<VdcApiError>(415, "invalid enum label");
     }
   }
   return err;
@@ -518,7 +518,7 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
       // called did not supply this parameter, get default value
       o = aParams->newNull();
       if (!(*pos)->getValue(o)) {
-        err = ErrorPtr(new VdcApiError(415, "missing value for non-optional parameter"));
+        err = Error::err<VdcApiError>(415, "missing value for non-optional parameter");
         break;
       }
       // add the default to the passed params
@@ -529,7 +529,7 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
   if (!Error::isOK(err)) {
     // rewrite error to include param name
     if (pos!=actionParams->values.end() && err->isDomain(VdcApiError::domain())) {
-      err = ErrorPtr(new VdcApiError(err->getErrorCode(), string_format("parameter '%s': %s", (*pos)->getName().c_str(), err->description().c_str())));
+      err = Error::err<VdcApiError>(err->getErrorCode(), "parameter '%s': %s", (*pos)->getName().c_str(), err->description().c_str());
     }
     // parameter error, not executing action, call back with error
     if (aCompletedCB) aCompletedCB(err);
@@ -544,7 +544,7 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
 
 void DeviceAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
-  if (aCompletedCB) aCompletedCB(ErrorPtr(new VdcApiError(501, "dummy action - not implemented")));
+  if (aCompletedCB) aCompletedCB(Error::err<VdcApiError>(501, "dummy action - not implemented"));
 }
 
 
@@ -1584,7 +1584,7 @@ void SingleDevice::call(const string aActionId, ApiValuePtr aParams, StatusCB aC
     if (!deviceActions->call(aActionId, aParams, aCompletedCB)) {
       // action does not exist, call back with error
       if (aCompletedCB) {
-        aCompletedCB(ErrorPtr(new VdcApiError(501, string_format("action '%s' does not exist", aActionId.c_str()))));
+        aCompletedCB(Error::err<VdcApiError>(501, "action '%s' does not exist", aActionId.c_str()));
       }
     }
   }

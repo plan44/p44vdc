@@ -251,7 +251,7 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
           // try to create device
           LedChainDevicePtr dev = addLedChainDevice(firstLED, numLEDs, deviceConfig);
           if (!dev) {
-            respErr = ErrorPtr(new WebError(500, "invalid configuration for LedChain device -> none created"));
+            respErr = WebError::webErr(500, "invalid configuration for LedChain device -> none created");
           }
           else {
             // set name

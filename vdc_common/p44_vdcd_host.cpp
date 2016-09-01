@@ -261,7 +261,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
     }
     if (!request) {
       // empty query, that's an error
-      aError = ErrorPtr(new P44VdcError(415, "empty request"));
+      aError = Error::err<P44VdcError>(415, "empty request");
     }
     else {
       // have the request processed
@@ -283,7 +283,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
       }
       else {
         // unknown API selector
-        aError = ErrorPtr(new P44VdcError(400, "invalid URI, unknown API"));
+        aError = Error::err<P44VdcError>(400, "invalid URI, unknown API");
       }
     }
   }
@@ -330,7 +330,7 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
     m = aRequest->get("notification");
   }
   if (!m) {
-    err = ErrorPtr(new P44VdcError(400, "invalid request, must specify 'method' or 'notification'"));
+    err = Error::err<P44VdcError>(400, "invalid request, must specify 'method' or 'notification'");
   }
   else {
     // get method/notification name
@@ -384,7 +384,7 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
           handleNotificationForDsUid(cmd, dsuid, params);
         }
         // notifications are always successful
-        err = ErrorPtr(new Error(ErrorOK));
+        err = ErrorPtr(new Error(Error::OK));
       }
     }
   }
@@ -400,7 +400,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
   ErrorPtr err;
   JsonObjectPtr m = aRequest->get("method");
   if (!m) {
-    err = ErrorPtr(new P44VdcError(400, "missing 'method'"));
+    err = Error::err<P44VdcError>(400, "missing 'method'");
   }
   else {
     string method = m->stringValue();
@@ -431,7 +431,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
         // start learning
         learnIdentifyRequest = aJsonComm; // remember so we can cancel it when we receive a separate cancel request
         startLearning(boost::bind(&P44VdcHost::learnHandler, this, aJsonComm, _1, _2), disableProximity);
-        learnIdentifyTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&P44VdcHost::learnHandler, this, aJsonComm, false, ErrorPtr(new P44VdcError(408, "learn timeout"))), seconds*Second);
+        learnIdentifyTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&P44VdcHost::learnHandler, this, aJsonComm, false, Error::err<P44VdcError>(408, "learn timeout")), seconds*Second);
       }
     }
     else if (method=="identify") {
@@ -472,7 +472,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
       sendCfgApiResponse(aJsonComm, JsonObject::newInt32(LOGLEVEL), ErrorPtr());
     }
     else {
-      err = ErrorPtr(new P44VdcError(400, "unknown method"));
+      err = Error::err<P44VdcError>(400, "unknown method");
     }
   }
   return err;
@@ -497,7 +497,7 @@ void P44VdcHost::identifyHandler(JsonCommPtr aJsonComm, DevicePtr aDevice)
     setUserActionMonitor(NULL);
   }
   else {
-    sendCfgApiResponse(aJsonComm, JsonObjectPtr(), ErrorPtr(new P44VdcError(408, "identify timeout")));
+    sendCfgApiResponse(aJsonComm, JsonObjectPtr(), Error::err<P44VdcError>(408, "identify timeout"));
     setUserActionMonitor(NULL);
   }
   learnIdentifyRequest.reset();

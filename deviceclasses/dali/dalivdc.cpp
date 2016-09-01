@@ -368,10 +368,10 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
 
 void DaliVdc::deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError)
 {
-  bool missingData = aError && aError->isError(DaliCommError::domain(), DaliCommErrorMissingData);
+  bool missingData = aError && aError->isError(DaliCommError::domain(), DaliCommError::MissingData);
   bool badData =
     aError &&
-    (aError->isError(DaliCommError::domain(), DaliCommErrorBadChecksum) || aError->isError(DaliCommError::domain(), DaliCommErrorBadDeviceInfo));
+    (aError->isError(DaliCommError::domain(), DaliCommError::BadChecksum) || aError->isError(DaliCommError::domain(), DaliCommError::BadDeviceInfo));
   if (!Error::isOK(aError) && !missingData && !badData) {
     // real fatal error, can't continue
     LOG(LOG_ERR, "Error reading device info: %s",aError->description().c_str());
@@ -468,7 +468,7 @@ void DaliVdc::handleDaliScanResult(VdcApiRequestPtr aRequest, DaliAddress aShort
         statusChar = 'C'; // possibly conflict
     }
   }
-  else if (Error::isError(aError, DaliCommError::domain(), DaliCommErrorDALIFrame)) {
+  else if (Error::isError(aError, DaliCommError::domain(), DaliCommError::DALIFrame)) {
     statusChar = 'C'; // possibly conflict
   }
   else {
@@ -509,7 +509,7 @@ ErrorPtr DaliVdc::daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         daliComm->daliSendDirectPower(shortAddress, 0x01, NULL, 1200*MilliSecond);
       }
       else {
-        respErr = ErrorPtr(new WebError(500, "unknown cmd"));
+        respErr = WebError::webErr(500, "unknown cmd");
       }
       if (Error::isOK(respErr)) {
         // send ok
@@ -573,7 +573,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                   }
                   if (groupNo>=16) {
                     // no more unused DALI groups, cannot group at all
-                    respErr = ErrorPtr(new WebError(500, "16 groups already exist, cannot create additional group"));
+                    respErr = WebError::webErr(500, "16 groups already exist, cannot create additional group");
                     goto error;
                   }
                 }
@@ -612,7 +612,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
           }
         }
         if (!deviceFound) {
-          respErr = ErrorPtr(new WebError(404, "some devices of the group could not be found"));
+          respErr = WebError::webErr(404, "some devices of the group could not be found");
           break;
         }
       }
@@ -659,7 +659,7 @@ ErrorPtr DaliVdc::ungroupDevice(DaliDevicePtr aDevice, VdcApiRequestPtr aRequest
   }
   else {
     // error, nothing done, just return error immediately
-    return ErrorPtr(new WebError(500, "device is not grouped, cannot be ungrouped"));
+    return WebError::webErr(500, "device is not grouped, cannot be ungrouped");
   }
   // ungrouped a device
   // - delete the previously grouped dS device
@@ -702,7 +702,7 @@ void DaliVdc::testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr 
   }
   else {
     // return error
-    if (Error::isOK(aError)) aError = ErrorPtr(new DaliCommError(DaliCommErrorDeviceSearch)); // no devices is also an error
+    if (Error::isOK(aError)) aError = ErrorPtr(new DaliCommError(DaliCommError::DeviceSearch)); // no devices is also an error
     aCompletedCB(aError);
   }
 }
@@ -741,7 +741,7 @@ void DaliVdc::testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint
   }
   else {
     // not ok
-    if (Error::isOK(aError) && aNoOrTimeout) aError = ErrorPtr(new DaliCommError(DaliCommErrorMissingData));
+    if (Error::isOK(aError) && aNoOrTimeout) aError = ErrorPtr(new DaliCommError(DaliCommError::MissingData));
     // report
     LOG(LOG_ERR, "DALI self test error: sent 0x%02X, error: %s",aTestByte, aError->description().c_str());
     aCompletedCB(aError);

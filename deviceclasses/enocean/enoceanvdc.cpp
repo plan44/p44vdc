@@ -282,12 +282,12 @@ ErrorPtr EnoceanVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
             if (usedOffsetMap[addr]=='0') break; // free offset here
           }
           if (addr>128) {
-            respErr = ErrorPtr(new WebError(400, "no more free base ID offsets"));
+            respErr = WebError::webErr(400, "no more free base ID offsets");
           }
         }
         else {
           if (usedOffsetMap[addr]!='0') {
-            respErr = ErrorPtr(new WebError(400, "invalid or already used base ID offset specifier"));
+            respErr = WebError::webErr(400, "invalid or already used base ID offset specifier");
           }
         }
         // add-in my own ID base
@@ -298,7 +298,7 @@ ErrorPtr EnoceanVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         // create devices as if this was a learn-in
         int newDevices = EnoceanDevice::createDevicesFromEEP(this, addr, eep, manufacturer_unknown);
         if (newDevices<1) {
-          respErr = ErrorPtr(new WebError(400, "Unknown EEP specification, no device(s) created"));
+          respErr = WebError::webErr(400, "Unknown EEP specification, no device(s) created");
         }
         else {
           ApiValuePtr r = aRequest->newApiValue();
@@ -326,7 +326,7 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
     string bs = hexToBinaryString(dataStr.c_str(), true);
     // process with no CRC checks
     if (simPacket->acceptBytes(bs.size(), (const uint8_t *)bs.c_str(), true)!=bs.size()) {
-      respErr = ErrorPtr(new WebError(400, "Wrong number of bytes in simulated ESP3 packet data"));
+      respErr = WebError::webErr(400, "Wrong number of bytes in simulated ESP3 packet data");
     }
     else {
       // process if complete
@@ -342,7 +342,7 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
         respErr = Error::ok();
       }
       else {
-        respErr = ErrorPtr(new WebError(400, "invalid simulated ESP3 packet data"));
+        respErr = WebError::webErr(400, "invalid simulated ESP3 packet data");
       }
     }
   }

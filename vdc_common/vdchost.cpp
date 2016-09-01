@@ -781,7 +781,7 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
     else {
       if (!activeSessionConnection) {
         // all following methods must have an active session
-        respErr = ErrorPtr(new VdcApiError(401,"no vDC session - cannot call method"));
+        respErr = Error::err<VdcApiError>(401, "no vDC session - cannot call method");
       }
       else {
         // session active - all commands need dSUID parameter
@@ -857,7 +857,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
   // check API version
   if (Error::isOK(respErr = checkParam(aParams, "api_version", v))) {
     if (v->int32Value()!=VDC_API_VERSION)
-      respErr = ErrorPtr(new VdcApiError(505, string_format("Incompatible vDC API version - found %d, expected %d", v->int32Value(), VDC_API_VERSION)));
+      respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d", v->int32Value(), VDC_API_VERSION);
     else {
       // API version ok, check dSUID
       DsUid vdsmDsUid;
@@ -883,7 +883,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         }
         else {
           // not ok to start new session, reject
-          respErr = ErrorPtr(new VdcApiError(503, string_format("this vDC already has an active session with vdSM %s",connectedVdsm.getString().c_str())));
+          respErr = Error::err<VdcApiError>(503, "this vDC already has an active session with vdSM %s",connectedVdsm.getString().c_str());
           aRequest->sendError(respErr);
           // close after send
           aRequest->connection()->closeAfterSend();
@@ -984,7 +984,7 @@ ErrorPtr VdcHost::handleMethodForDsUid(const string &aMethod, VdcApiRequestPtr a
   }
   else {
     LOG(LOG_WARNING, "Target entity %s not found for method '%s'", aDsUid.getString().c_str(), aMethod.c_str());
-    return ErrorPtr(new VdcApiError(404, "unknown dSUID"));
+    return Error::err<VdcApiError>(404, "unknown dSUID");
   }
 }
 
@@ -1021,7 +1021,7 @@ void VdcHost::removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aRequest, 
   if (aDisconnected)
     aRequest->sendResult(ApiValuePtr()); // disconnected successfully
   else
-    aRequest->sendError(ErrorPtr(new VdcApiError(403, "Device cannot be removed, is still connected")));
+    aRequest->sendError(Error::err<VdcApiError>(403, "Device cannot be removed, is still connected"));
 }
 
 

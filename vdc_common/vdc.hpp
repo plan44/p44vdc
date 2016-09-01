@@ -32,19 +32,18 @@ using namespace std;
 
 namespace p44 {
 
-  // Errors
-  typedef enum {
-    VdcErrorOK,
-    VdcErrorInitialize,
-  } VdcErrors;
-	
   class VdcError : public Error
   {
   public:
+    // Errors
+    typedef enum {
+      OK,
+      Initialize,
+    } ErrorCodes;
+    
     static const char *domain() { return "DeviceClass"; }
     virtual const char *getErrorDomain() const { return VdcError::domain(); };
-    VdcError(VdcErrors aError) : Error(ErrorCode(aError)) {};
-    VdcError(VdcErrors aError, std::string aErrorMessage) : Error(ErrorCode(aError), aErrorMessage) {};
+    VdcError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
   };
 	
 	

@@ -35,27 +35,25 @@ using namespace std;
 namespace p44 {
 
 
-  // Errors
-  enum {
-    HueCommErrorOK,
-    HueCommErrorReservedForBridge = 1, ///< 1..999 are native bridge error codes
-    HueCommErrorUuidNotFound = 1000, ///< bridge specified by uuid was not found
-    HueCommErrorApiNotReady, ///< API not ready (bridge not yet found, no bridge paired)
-    HueCommErrorDescription, ///< SSDP by uuid did find a device, but XML description was inaccessible or invalid
-    HueCommErrorInvalidUser, ///< bridge did not allow accessing the API with the username
-    HueCommErrorNoRegistration, ///< could not register with a bridge
-    HueCommErrorInvalidResponse, ///< invalid response from bridge (malformed JSON)
-  };
-
-  typedef int HueCommErrors;
-
   class HueCommError : public Error
   {
   public:
+    // Errors
+    enum {
+      OK,
+      ReservedForBridge = 1, ///< 1..999 are native bridge error codes
+      UuidNotFound = 1000, ///< bridge specified by uuid was not found
+      ApiNotReady, ///< API not ready (bridge not yet found, no bridge paired)
+      Description, ///< SSDP by uuid did find a device, but XML description was inaccessible or invalid
+      InvalidUser, ///< bridge did not allow accessing the API with the username
+      NoRegistration, ///< could not register with a bridge
+      InvalidResponse, ///< invalid response from bridge (malformed JSON)
+    };
+    typedef int ErrorCodes;
+
     static const char *domain() { return "HueComm"; }
     virtual const char *getErrorDomain() const { return HueCommError::domain(); };
-    HueCommError(HueCommErrors aError) : Error(ErrorCode(aError)) {};
-    HueCommError(HueCommErrors aError, std::string aErrorMessage) : Error(ErrorCode(aError), aErrorMessage) {};
+    HueCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
   };
 
 

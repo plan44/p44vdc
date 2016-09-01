@@ -206,7 +206,7 @@ ErrorPtr OlaVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
         // try to create device
         OlaDevicePtr dev = addOlaDevice(deviceType, deviceConfig);
         if (!dev) {
-          respErr = ErrorPtr(new WebError(500, "invalid configuration for OLA device -> none created"));
+          respErr = WebError::webErr(500, "invalid configuration for OLA device -> none created");
         }
         else {
           // set name

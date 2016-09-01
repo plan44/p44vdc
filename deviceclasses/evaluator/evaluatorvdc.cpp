@@ -131,7 +131,7 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
       // try to create device
       EvaluatorDevicePtr dev = EvaluatorDevicePtr(new EvaluatorDevice(this, evaluatorId, evaluatorType));
       if (!dev) {
-        respErr = ErrorPtr(new WebError(500, "invalid configuration for evaluator -> none created"));
+        respErr = WebError::webErr(500, "invalid configuration for evaluator -> none created");
       }
       else {
         // set name

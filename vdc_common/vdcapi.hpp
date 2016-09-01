@@ -36,10 +36,11 @@ namespace p44 {
   class VdcApiError : public Error
   {
   public:
+    typedef ErrorCode ErrorCodes;
+
     static const char *domain() { return "VdcApi"; }
     virtual const char *getErrorDomain() const { return VdcApiError::domain(); };
     VdcApiError(ErrorCode aError) : Error(aError) {};
-    VdcApiError(ErrorCode aError, const std::string &aErrorMessage) : Error(aError, aErrorMessage) {};
   };
 
 
