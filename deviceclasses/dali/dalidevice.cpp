@@ -83,14 +83,14 @@ void DaliBusDevice::deriveDsUid()
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s;
   #if OLD_BUGGY_CHKSUM_COMPATIBLE
-  if (deviceInfo.devInfStatus==DaliDeviceInfo::devinf_maybe) {
+  if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_maybe) {
     // assume we can use devInf to derive dSUID from
-    deviceInfo.devInfStatus = DaliDeviceInfo::devinf_solid;
+    deviceInfo->devInfStatus = DaliDeviceInfo::devinf_solid;
     // but only actually use it if there is no device entry for the shortaddress-based dSUID with a non-zero name
     // (as this means the device has been already actively used/configured with the shortaddr-dSUID)
     // - calculate the short address based dSUID
     s = daliVdc.vdcInstanceIdentifier();
-    string_format_append(s, "::%d", deviceInfo.shortAddress);
+    string_format_append(s, "::%d", deviceInfo->shortAddress);
     DsUid shortAddrBasedDsUid;
     shortAddrBasedDsUid.setNameInSpace(s, vdcNamespace);
     // - check for named device in database consisting of this dimmer with shortaddr based dSUID
@@ -105,8 +105,8 @@ void DaliBusDevice::deriveDsUid()
         string n = nonNullCStr(i->get<const char *>(0));
         if (n.length()>0) {
           // shortAddr based device has already been named. So keep that, and don't generate a devInf based dSUID
-          deviceInfo.devInfStatus = DaliDeviceInfo::devinf_notForID;
-          LOG(LOG_WARNING, "DaliBusDevice shortaddr %d kept with shortaddr-based dSUID because it is already named: '%s'", deviceInfo.shortAddress, n.c_str());
+          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_notForID;
+          LOG(LOG_WARNING, "DaliBusDevice shortaddr %d kept with shortaddr-based dSUID because it is already named: '%s'", deviceInfo->shortAddress, n.c_str());
         }
       }
     }
