@@ -486,15 +486,17 @@ void DiscoveryManager::stopAdvertisingDS()
   if (dSEntryGroup) {
     avahi_entry_group_free(dSEntryGroup);
     dSEntryGroup = NULL;
+    #if ENABLE_AUXVDSM
+    LOG(LOG_NOTICE, "discovery: unpublished %s service.", auxVdsmRunning ? "vdSM" : "vDC");
+    #else
+    LOG(LOG_NOTICE, "discovery: unpublished vDC service.");
+    #endif
   }
   #if ENABLE_AUXVDSM
-  LOG(LOG_NOTICE, "discovery: unpublished %s service.", auxVdsmRunning ? "vdSM" : "vDC");
   if (serviceBrowser) {
     avahi_service_browser_free(serviceBrowser);
     serviceBrowser = NULL;
   }
-  #else
-  LOG(LOG_NOTICE, "discovery: unpublished vDC service.");
   #endif // ENABLE_AUXVDSM
   if (dmState>dm_setup)
     dmState = dm_setup;
