@@ -435,8 +435,10 @@ ErrorPtr EvaluatorDevice::evaluateDouble(string &aExpression, double &aResult)
 ErrorPtr EvaluatorDevice::evaluateTerm(const char * &aText, double &aValue)
 {
   const char *a = aText;
-  // a term can be
-  // - a variable reference, a literal number or a parantesis containing an expression
+  // a simple term can be
+  // - a variable reference or
+  // - a literal number
+  // Note: a parantesized expression can also be a term, but this is parsed by the caller, not here
   while (*aText==' ' || *aText=='\t') aText++; // skip whitespace
   // extract var name or number
   double v = 0;
@@ -562,12 +564,11 @@ ErrorPtr EvaluatorDevice::evaluateExpression(const char * &aText, double &aValue
     // term is expression in paranthesis
     aText++;
     ErrorPtr err = evaluateExpression(aText, result, 0);
-    if (Error::isOK(err)) {
-      if (*aText!=')') {
-        return TextError::err("Missing ')'");
-      }
-      aText++;
+    if (!Error::isOK(err)) return err;
+    if (*aText!=')') {
+      return TextError::err("Missing ')'");
     }
+    aText++;
   }
   else {
     // must be simple term
