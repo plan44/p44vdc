@@ -543,8 +543,8 @@ EldatDevicePtr EldatDevice::newDevice(
     }
   }
   else if (aEldatDeviceType==eldat_button) {
-    // single button
-    if (aSubDeviceIndex==aFirstSubDevice) {
+    // single buttons, created in pairs when learned in
+    if (aSubDeviceIndex<=aFirstSubDevice+1) {
       // Create a ELDAT single button device
       newDev = EldatDevicePtr(new EldatButtonDevice(aVdcP, aEldatDeviceType));
       // standard device settings without scene table
@@ -605,7 +605,7 @@ int EldatDevice::createDevicesFromType(
   EldatSubDevice aFirstSubDevice
 )
 {
-  EldatSubDevice subDeviceIndex = aFirstSubDevice; // start at index zero
+  EldatSubDevice subDeviceIndex = aFirstSubDevice; // start at given index
   int numDevices = 0; // number of devices
   while (true) {
     // create devices until done
