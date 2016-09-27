@@ -138,7 +138,21 @@ typedef enum {
 } DsSceneNumber;
 
 
-/// group/color
+/// color/class
+typedef enum {
+  class_yellow_light = 1,
+  class_grey_shadow = 2,
+  class_blue_climate = 3,
+  class_cyan_audio = 4,
+  class_magenta_video = 5,
+  class_red_security = 6,
+  class_green_access = 7,
+  class_black_joker = 8,
+  class_white_singledevices = 9,
+  class_id_max = 9,
+} DsClass;
+
+/// color/group
 typedef enum {
   group_variable = 0,
   group_yellow_light = 1,
@@ -146,12 +160,13 @@ typedef enum {
   group_blue_heating = 3, ///< heating - formerly "climate"
   group_cyan_audio = 4,
   group_magenta_video = 5,
-  group_red_security = 6,
-  group_green_access = 7,
-  group_black_joker = 8,
-  group_white_cooling = 9, ///< cooling - formerly just "white" (is it still white? snow?)
-  group_ventilation = 10, ///< ventilation - formerly "display"?!
-  group_windows = 11, ///< windows (not the OS, holes in the wall..)
+  group_red_security = 6,  ///< no group!
+  group_green_access = 7,  ///< no group!
+  group_black_variable = 8,
+  group_blue_cooling = 9, ///< cooling - formerly just "white" (is it still white? snow?)
+  group_blue_ventilation = 10, ///< ventilation - formerly "display"?!
+  group_blue_windows = 11, ///< windows (not the OS, holes in the wall..)
+  group_id_max = 11,
   group_roomtemperature_control = 48, ///< room temperature control
 } DsGroup;
 

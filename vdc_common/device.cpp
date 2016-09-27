@@ -52,7 +52,7 @@ Device::Device(Vdc *aVdcP) :
   areaDimMode(dimmode_stop),
   vdcP(aVdcP),
   DsAddressable(&aVdcP->getVdc()),
-  primaryGroup(group_black_joker),
+  primaryGroup(class_black_joker),
   applyInProgress(false),
   missedApplyAttempts(0),
   updateInProgress(false),
@@ -118,7 +118,7 @@ void Device::setName(const string &aName)
 }
 
 
-void Device::setPrimaryGroup(DsGroup aColorGroup)
+void Device::setPrimaryGroup(DsClass aColorGroup)
 {
   primaryGroup = aColorGroup;
 }
@@ -129,7 +129,7 @@ DsGroup Device::getDominantGroup()
   DsGroup group = group_variable;
   if (output) {
     // lowest group of output determines dominant color
-    for (int i = group_yellow_light; i<=group_windows; i++) {
+    for (int i = group_yellow_light; i<=group_id_max; i++) {
       if (output->isMember((DsGroup)i)) {
         group = (DsGroup)i;
         break;
@@ -154,7 +154,22 @@ DsGroup Device::getDominantGroup()
   }
   if (group==group_variable) {
     // still undefined -> use primary color
-    group = primaryGroup;
+    switch(primaryGroup) {
+      case class_yellow_light:
+        group = group_yellow_light;
+        break;
+      case class_grey_shadow:
+        group = group_grey_shadow;
+        break;
+      case class_cyan_audio:
+        group = group_cyan_audio;
+        break;
+      case class_magenta_video:
+        group = group_magenta_video;
+        break;
+      default:
+        break;
+    }
   }
   // map some secondary output groups to base colors
   if (group==group_roomtemperature_control)
@@ -298,11 +313,11 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       return buttons.size()>1 ? yes : no;
     case modelFeature_highlevel:
       // Assumption: only black joker devices can have a high-level (app) functionality
-      return primaryGroup==group_black_joker ? yes : no;
+      return primaryGroup==group_black_variable ? yes : no;
     case modelFeature_jokerconfig:
       // Assumption: black joker devices need joker config (setting color) only if there are buttons or an output.
       // Pure sensors or binary inputs don't need color config
-      return primaryGroup==group_black_joker && (output || buttons.size()>0) ? yes : no;
+      return primaryGroup==group_black_variable && (output || buttons.size()>0) ? yes : no;
     case modelFeature_akmsensor:
       // Assumption: only devices with binaryinputs that do not have a predefined type need akmsensor
       for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) {

@@ -26,7 +26,7 @@ using namespace p44;
 SensorBehaviour::SensorBehaviour(Device &aDevice) :
   inherited(aDevice),
   // persistent settings
-  sensorGroup(group_black_joker), // default to joker
+  sensorGroup(group_black_variable), // default to joker
   minPushInterval(2*Second), // do not push more often than every 2 seconds
   changesOnlyInterval(0), // report every sensor update (even if value unchanged)
   // state
@@ -81,7 +81,7 @@ void SensorBehaviour::updateSensorValue(double aValue)
   // always update age, even if value itself may not have changed
   MLMicroSeconds now = MainLoop::now();
   lastUpdate = now;
-  bool changedValue = aValue!=currentValue;
+  bool changedValue = abs(aValue - currentValue) > 2.0;
   BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] '%s' reports %s value = %0.3f", index, hardwareName.c_str(), changedValue ? "NEW" : "same", aValue);
   if (changedValue || now>lastPush+changesOnlyInterval) {
     // changed value or last push with same value long enough ago

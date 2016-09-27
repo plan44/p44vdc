@@ -78,7 +78,7 @@ namespace p44 {
     DsScenePtr previousState; ///< a pseudo scene which holds the device state before the last applyScene() call, used to do undoScene()
 
     // variables set by concrete devices (=hardware dependent)
-    DsGroup primaryGroup; ///< basic color of the device (can be black)
+    DsClass primaryGroup; ///< basic color of the device (can be black)
 
     // volatile internal state
     long dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
@@ -158,11 +158,11 @@ namespace p44 {
 
     /// set basic device color
     /// @param aColorGroup color group number
-    void setPrimaryGroup(DsGroup aColorGroup);
+    void setPrimaryGroup(DsClass aColorGroup);
 
     /// get basic device color group
     /// @return color group number
-    DsGroup getPrimaryGroup() { return primaryGroup; };
+    DsClass getPrimaryGroup() { return primaryGroup; };
 
     /// get dominant group (i.e. the group that should color the icon)
     DsGroup getDominantGroup();
