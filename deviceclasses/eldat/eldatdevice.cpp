@@ -118,7 +118,7 @@ bool EldatDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aReso
   bool iconFound = false;
   if (iconBaseName) {
     if (groupColoredIcon)
-      iconFound = getGroupColoredIcon(iconBaseName, getDominantGroup(), aIcon, aWithData, aResolutionPrefix);
+      iconFound = getClassColoredIcon(iconBaseName, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix);
     else
       iconFound = getIcon(iconBaseName, aIcon, aWithData, aResolutionPrefix);
   }
@@ -523,7 +523,7 @@ EldatDevicePtr EldatDevice::newDevice(
       // set icon name
       newDev->setIconInfo("eldat_button", true);
       // Buttons can be used for anything
-      newDev->setPrimaryGroup(group_black_joker);
+      newDev->setColorClass(class_black_joker);
       // Create two behaviours, one for the up button, one for the down button
       // - create button input 0 for what dS will handle as "down key" (actual button depends on rocker type - reversed or normal)
       ButtonBehaviourPtr downBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get()));
@@ -555,7 +555,7 @@ EldatDevicePtr EldatDevice::newDevice(
       // set icon name
       newDev->setIconInfo("eldat_button", true);
       // Buttons can be used for anything
-      newDev->setPrimaryGroup(group_black_joker);
+      newDev->setColorClass(class_black_joker);
       // Create one button behaviour
       ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get()));
       bb->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, true); // fixed mode
@@ -580,7 +580,7 @@ EldatDevicePtr EldatDevice::newDevice(
       // set icon name
       newDev->setIconInfo("eldat", true);
       // Buttons can be used for anything
-      newDev->setPrimaryGroup(group_black_joker);
+      newDev->setColorClass(class_black_joker);
       // Create one input behaviour
       BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       ib->setHardwareInputConfig(binInpType_motion, usage_room, true, 0);
