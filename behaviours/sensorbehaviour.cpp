@@ -76,12 +76,13 @@ void SensorBehaviour::updateEngineeringValue(long aEngineeringValue)
 }
 
 
-void SensorBehaviour::updateSensorValue(double aValue)
+void SensorBehaviour::updateSensorValue(double aValue, double aMinChange)
 {
   // always update age, even if value itself may not have changed
   MLMicroSeconds now = MainLoop::now();
   lastUpdate = now;
-  bool changedValue = abs(aValue - currentValue) > 2.0;
+  if (aMinChange<0) aMinChange = resolution/2;
+  bool changedValue = fabs(aValue - currentValue) > aMinChange;
   BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] '%s' reports %s value = %0.3f", index, hardwareName.c_str(), changedValue ? "NEW" : "same", aValue);
   if (changedValue || now>lastPush+changesOnlyInterval) {
     // changed value or last push with same value long enough ago
