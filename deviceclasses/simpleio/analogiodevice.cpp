@@ -56,12 +56,12 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     LOG(LOG_ERR, "unknown analog IO type: %s", mode.c_str());
   }
   // by default, act as black device so we can configure colors
-  primaryGroup = group_black_joker;
+  colorClass = class_black_joker;
   if (analogIOType==analogio_dimmer) {
     // Analog output as dimmer
     analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
     // - is light
-    primaryGroup = group_yellow_light;
+    colorClass = class_yellow_light;
     // - use light settings, which include a scene table
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
     // - add simple single-channel light behaviour
@@ -71,7 +71,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   }
   else if (analogIOType==analogio_rgbdimmer) {
     // - is light
-    primaryGroup = group_yellow_light;
+    colorClass = class_yellow_light;
     // - need 3 IO names for R,G,B, optional fourth for W
     size_t p;
     p = ioname.find("|");
@@ -108,7 +108,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     // Analog output as valve controlling output
     analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
     // - is heating
-    primaryGroup = group_blue_heating;
+    colorClass = class_blue_climate;
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // - create climate control outout

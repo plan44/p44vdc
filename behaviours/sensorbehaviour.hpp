@@ -126,7 +126,9 @@ namespace p44 {
 
     /// update sensor value (when new value received from hardware)
     /// @param aValue the new value from the sensor, in physical units according to sensorType (VdcValueType)
-    void updateSensorValue(double aValue);
+    /// @param aMinChange what minimum change the new value must have compared to last reported value
+    ///   to be treated as a change. Default is -1, which means half the declared resolution.
+    void updateSensorValue(double aValue, double aMinChange = -1);
 
     /// sensor value change occurred
     /// @param aEngineeringValue the engineering value from the sensor.

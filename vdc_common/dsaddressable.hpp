@@ -297,15 +297,15 @@ namespace p44 {
     ///   and return aIconName in aIcon.
     bool getIcon(const char *aIconName, string &aIcon, bool aWithData, const char *aResolutionPrefix);
 
-    /// get icon colored according to aGroup
+    /// get icon colored according to aClass
     /// @param aIconName basic name of the icon to load (no color suffix nor filename extension!)
-    /// @param aGroup the dS group/color. The color will be appended as suffix to aIconName to build the
+    /// @param aClass the dS class color. The color will be appended as suffix to aIconName to build the
     ///   final icon name. If no specific icon exists for the group, the suffix "_other" will be tried before
     ///   returning false.
     /// @param aWithData if set, aIcon will be set to the icon's PNG data, otherwise aIcon will be set to the icon name
     /// @param aResolutionPrefix subfolder within icondir to look for files. Usually "icon16".
     /// @return true if icon data or name could be obtained, false otherwise
-    bool getGroupColoredIcon(const char *aIconName, DsGroup aGroup, string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    bool getClassColoredIcon(const char *aIconName, DsClass aClass, string &aIcon, bool aWithData, const char *aResolutionPrefix);
 
     /// @}
 

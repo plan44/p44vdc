@@ -62,13 +62,13 @@ EnoceanDevicePtr Enocean1BSDevice::newDevice(
       newDev->setEEPInfo(aEEProfile, aEEManufacturer);
       newDev->setFunctionDesc("single contact");
       // joker by default, we don't know what kind of contact this is
-      newDev->setPrimaryGroup(group_black_joker);
+      newDev->setColorClass(class_black_joker);
       // create channel handler, EEP variant 1 means inverted state interpretation
       SingleContactHandlerPtr newHandler = SingleContactHandlerPtr(new SingleContactHandler(*newDev.get(), !(EEP_VARIANT(aEEProfile)==1)));
       // create the behaviour
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, 15*Minute);
-      bb->setGroup(group_black_joker); // joker by default
+      bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName(newHandler->shortDesc());
       newHandler->behaviour = bb;
       // add channel to device

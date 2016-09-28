@@ -162,7 +162,7 @@ bool EnoceanDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aRe
   bool iconFound = false;
   if (iconBaseName) {
     if (groupColoredIcon)
-      iconFound = getGroupColoredIcon(iconBaseName, getDominantGroup(), aIcon, aWithData, aResolutionPrefix);
+      iconFound = getClassColoredIcon(iconBaseName, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix);
     else
       iconFound = getIcon(iconBaseName, aIcon, aWithData, aResolutionPrefix);
   }

@@ -481,7 +481,7 @@ DaliDevice::DaliDevice(DaliVdc *aVdcP) :
   Device((Vdc *)aVdcP)
 {
   // DALI devices are always light (in this implementation, at least)
-  setPrimaryGroup(group_yellow_light);
+  setColorClass(class_yellow_light);
 }
 
 

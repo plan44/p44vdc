@@ -78,7 +78,7 @@ void ExternalDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
 
 bool ExternalDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getGroupColoredIcon(iconBaseName.c_str(), getDominantGroup(), aIcon, aWithData, aResolutionPrefix))
+  if (getClassColoredIcon(iconBaseName.c_str(), getDominantColorClass(), aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
@@ -520,9 +520,13 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   }
   // Output
   // - get group (overridden for some output types)
-  primaryGroup = group_variable; // none set so far
+  colorClass = class_undefined; // none set so far
+  DsGroup defaultGroup = group_undefined; // none set so far
   if (aInitParams->get("group", o)) {
-    primaryGroup = (DsGroup)o->int32Value(); // custom primary group
+    defaultGroup = (DsGroup)o->int32Value(); // custom output color
+  }
+  if (aInitParams->get("colorclass", o)) {
+    colorClass = (DsClass)o->int32Value(); // custom color class
   }
   // - get output type
   string outputType;
@@ -552,7 +556,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   }
   // - create appropriate output behaviour
   if (outputType=="light") {
-    if (primaryGroup==group_variable) primaryGroup = group_yellow_light;
+    if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
     if (outputFunction==outputFunction_custom) outputFunction = outputFunction_dimmer;
     // - use light settings, which include a scene table
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
@@ -563,7 +567,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     addBehaviour(l);
   }
   else if (outputType=="colorlight") {
-    if (primaryGroup==group_variable) primaryGroup = group_yellow_light;
+    if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
     // - use color light settings, which include a color scene table
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
@@ -572,7 +576,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     addBehaviour(l);
   }
   else if (outputType=="movinglight") {
-    if (primaryGroup==group_variable) primaryGroup = group_yellow_light;
+    if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
     // - use moving light settings, which include a color+position scene table
     installSettings(DeviceSettingsPtr(new MovingLightDeviceSettings(*this)));
     // - add moving color light behaviour
@@ -581,7 +585,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     addBehaviour(ml);
   }
   else if (outputType=="heatingvalve") {
-    if (primaryGroup==group_variable) primaryGroup = group_blue_heating;
+    if (defaultGroup==group_undefined) defaultGroup = group_blue_heating;
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // - create climate control valve output
@@ -592,7 +596,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     addBehaviour(cb);
   }
   else if (outputType=="fancoilunit") {
-    if (primaryGroup==group_variable) primaryGroup = group_blue_heating;
+    if (defaultGroup==group_undefined) defaultGroup = group_blue_heating;
     controlValues = true; // fan coil unit usually needs control values
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
@@ -604,7 +608,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     addBehaviour(cb);
   }
   else if (outputType=="shadow") {
-    if (primaryGroup==group_variable) primaryGroup = group_grey_shadow;
+    if (defaultGroup==group_undefined) defaultGroup = group_grey_shadow;
     // - use shadow scene settings
     installSettings(DeviceSettingsPtr(new ShadowDeviceSettings(*this)));
     // - add shadow behaviour
@@ -629,7 +633,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     addBehaviour(sb);
   }
   else if (outputType=="basic") {
-    if (primaryGroup==group_variable) primaryGroup = group_black_joker;
+    if (defaultGroup==group_undefined) defaultGroup = group_black_variable;
     if (outputFunction==outputFunction_custom) outputFunction = outputFunction_switch;
     // - use simple scene settings
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
@@ -637,7 +641,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
     o->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_undefined, false, -1);
     o->setHardwareName(hardwareName);
-    o->setGroupMembership(primaryGroup, true); // put into primary group
+    o->setGroupMembership(defaultGroup, true); // put into primary group
     o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o)));
     addBehaviour(o);
   }
@@ -648,7 +652,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   // set options that might have a default set by the output type
   if (aInitParams->get("controlvalues", o)) controlValues = o->boolValue();
   // set primary group to black if group is not yet defined so far
-  if (primaryGroup==group_variable) primaryGroup = group_black_joker;
+  if (defaultGroup==group_undefined) defaultGroup = group_black_variable;
+  if (colorClass==class_undefined) colorClass = colorClassFromGroup(defaultGroup);
   // check for groups definition, will override anything set so far
   if (aInitParams->get("groups", o) && output) {
     output->resetGroupMembership(); // clear all
@@ -667,7 +672,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       int buttonId = 0;
       VdcButtonType buttonType = buttonType_single;
       VdcButtonElement buttonElement = buttonElement_center;
-      DsGroup group = primaryGroup; // default group is same as primary
+      DsGroup group = defaultGroup; // default group for button is same as primary default
       string buttonName;
       bool isLocalButton = false;
       // - optional params
@@ -693,7 +698,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       // set defaults
       DsBinaryInputType inputType = binInpType_none;
       VdcUsageHint usage = usage_undefined;
-      DsGroup group = primaryGroup; // default group is same as primary
+      DsGroup group = defaultGroup; // default group for input is same as primary default
       MLMicroSeconds updateInterval = Never; // unknown
       string inputName;
       // - optional params
@@ -718,7 +723,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       // set defaults
       VdcValueType sensorType = valueType_none;
       VdcUsageHint usage = usage_undefined;
-      DsGroup group = primaryGroup; // default group is same as primary
+      DsGroup group = defaultGroup; // default group for sensor is same as primary default
       double min = 0;
       double max = 100;
       double resolution = 1;

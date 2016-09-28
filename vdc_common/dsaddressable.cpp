@@ -428,37 +428,36 @@ bool DsAddressable::getIcon(const char *aIconName, string &aIcon, bool aWithData
 }
 
 
-static const char *groupColors[] = {
-  "white", // variable/undefined are shown as white
+static const char *classColors[] = {
+  "white", // undefined are shown as white
   "yellow", // Light
   "grey", // shadow
-  "blue", // heating = 3, ///< heating - formerly "climate"
+  "blue", // climate
   "cyan", // audio
   "magenta", // video
   "red", // security
-  "green", // green
+  "green", // access
   "black", // joker
-  "white", // cooling
-  "blue", // ventilation
-  "blue" // windows
+  "white" // singledevices
 };
-const int numGroupColors = sizeof(groupColors)/sizeof(const char *);
+
+const int numKnownColors = sizeof(classColors)/sizeof(const char *);
 
 
-bool DsAddressable::getGroupColoredIcon(const char *aIconName, DsGroup aGroup, string &aIcon, bool aWithData, const char *aResolutionPrefix)
+bool DsAddressable::getClassColoredIcon(const char *aIconName, DsClass aClass, string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   string  iconName;
   bool found = false;
-  if (aGroup<numGroupColors) {
+  if (aClass<numKnownColors) {
     // try first with color name
-    found = getIcon(string_format("%s_%s", aIconName, groupColors[aGroup]).c_str(), aIcon, aWithData, aResolutionPrefix);
+    found = getIcon(string_format("%s_%s", aIconName, classColors[aClass]).c_str(), aIcon, aWithData, aResolutionPrefix);
   }
   else {
-    // for groups without a basic color, use _n suffix (n=group no)
-    found = getIcon(string_format("%s_%d", aIconName, (int)aGroup).c_str(), aIcon, aWithData, aResolutionPrefix);
+    // for groups without known class color, use _n suffix (n=class no)
+    found = getIcon(string_format("%s_%d", aIconName, (int)aClass).c_str(), aIcon, aWithData, aResolutionPrefix);
   }
   if (!found) {
-    // no group-specific icon found, try with "other"
+    // no class-specific icon found, try with "other"
     found = getIcon(string_format("%s_other", aIconName).c_str(), aIcon, aWithData, aResolutionPrefix);
   }
   return found;

@@ -52,7 +52,7 @@ Device::Device(Vdc *aVdcP) :
   areaDimMode(dimmode_stop),
   vdcP(aVdcP),
   DsAddressable(&aVdcP->getVdc()),
-  primaryGroup(group_black_joker),
+  colorClass(class_black_joker),
   applyInProgress(false),
   missedApplyAttempts(0),
   updateInProgress(false),
@@ -76,7 +76,7 @@ string Device::modelUID()
 
 void Device::addToModelUIDHash(string &aHashedString)
 {
-  string_format_append(aHashedString, "%s:%d:", deviceTypeIdentifier().c_str(), primaryGroup);
+  string_format_append(aHashedString, "%s:%d:", deviceTypeIdentifier().c_str(), colorClass);
   // behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
   for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
@@ -118,18 +118,48 @@ void Device::setName(const string &aName)
 }
 
 
-void Device::setPrimaryGroup(DsGroup aColorGroup)
+void Device::setColorClass(DsClass aColorGroup)
 {
-  primaryGroup = aColorGroup;
+  colorClass = aColorGroup;
 }
 
 
-DsGroup Device::getDominantGroup()
+DsClass Device::colorClassFromGroup(DsGroup aGroup)
 {
-  DsGroup group = group_variable;
+  switch (aGroup) {
+    case group_yellow_light:
+      return class_yellow_light;
+    case group_grey_shadow:
+      return class_grey_shadow;
+    case group_blue_heating:
+    case group_blue_cooling:
+    case group_blue_ventilation:
+    case group_blue_windows:
+    case group_roomtemperature_control:
+      return class_blue_climate;
+    case group_cyan_audio:
+      return class_cyan_audio;
+    case group_magenta_video:
+      return class_magenta_video;
+    case group_red_security:
+      return class_red_security;
+    case group_green_access:
+      return class_green_access;
+    case group_black_variable:
+      return class_black_joker;
+    default:
+      return class_undefined;
+  }
+}
+
+
+DsClass Device::getDominantColorClass()
+{
+  // check if group determines apparent (icon color) class
+  DsGroup group = group_undefined;
   if (output) {
     // lowest group of output determines dominant color
-    for (int i = group_yellow_light; i<=group_windows; i++) {
+    for (int i = group_yellow_light; i<numColorClasses; i++) {
       if (output->isMember((DsGroup)i)) {
         group = (DsGroup)i;
         break;
@@ -137,35 +167,30 @@ DsGroup Device::getDominantGroup()
     }
   }
   // if no or undefined output, check input colors
-  if (group==group_variable && buttons.size()>0) {
+  if (group==group_undefined && buttons.size()>0) {
     // second priority: color of first button
     ButtonBehaviourPtr btn = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[0]);
     group =  btn->buttonGroup;
   }
-  if (group==group_variable && sensors.size()>0) {
+  if (group==group_undefined && sensors.size()>0) {
     // third priority: color of first sensor
     SensorBehaviourPtr sns = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
     group =  sns->sensorGroup;
   }
-  if (group==group_variable && binaryInputs.size()>0) {
+  if (group==group_undefined && binaryInputs.size()>0) {
     // fourth priority: color of first binary input
     BinaryInputBehaviourPtr bin = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
     group =  bin->binInputGroup;
   }
-  if (group==group_variable) {
-    // still undefined -> use primary color
-    group = primaryGroup;
-  }
-  // map some secondary output groups to base colors
-  if (group==group_roomtemperature_control)
-    group = group_blue_heating; // roomtemperature is blue
-  return group;
+  // Return color class the dominant group belongs to
+  DsClass cl = colorClassFromGroup(group);
+  return cl!=class_undefined ? cl : colorClass;
 }
 
 
 bool Device::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getGroupColoredIcon("vdsd", getDominantGroup(), aIcon, aWithData, aResolutionPrefix))
+  if (getClassColoredIcon("vdsd", getDominantColorClass(), aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
@@ -298,11 +323,11 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       return buttons.size()>1 ? yes : no;
     case modelFeature_highlevel:
       // Assumption: only black joker devices can have a high-level (app) functionality
-      return primaryGroup==group_black_joker ? yes : no;
+      return colorClass==group_black_variable ? yes : no;
     case modelFeature_jokerconfig:
       // Assumption: black joker devices need joker config (setting color) only if there are buttons or an output.
       // Pure sensors or binary inputs don't need color config
-      return primaryGroup==group_black_joker && (output || buttons.size()>0) ? yes : no;
+      return colorClass==group_black_variable && (output || buttons.size()>0) ? yes : no;
     case modelFeature_akmsensor:
       // Assumption: only devices with binaryinputs that do not have a predefined type need akmsensor
       for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) {
@@ -1435,7 +1460,7 @@ void Device::loadSettingsFromFiles()
 
 enum {
   // device level simple parameters
-  primaryGroup_key,
+  colorClass_key,
   zoneID_key,
   progMode_key,
   deviceType_key,
@@ -1514,7 +1539,7 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
   // device level properties
   static const PropertyDescription properties[numDeviceProperties] = {
     // common device properties
-    { "primaryGroup", apivalue_uint64, primaryGroup_key, OKEY(device_key) },
+    { "primaryGroup", apivalue_uint64, colorClass_key, OKEY(device_key) },
     { "zoneID", apivalue_uint64, zoneID_key, OKEY(device_key) },
     { "progMode", apivalue_bool, progMode_key, OKEY(device_key) },
     { "x-p44-deviceType", apivalue_string, deviceType_key, OKEY(device_key) },
@@ -1682,8 +1707,8 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
-        case primaryGroup_key:
-          aPropValue->setUint16Value(primaryGroup); return true;
+        case colorClass_key:
+          aPropValue->setUint16Value(colorClass); return true;
         case zoneID_key:
           if (deviceSettings) { aPropValue->setUint16Value(deviceSettings->zoneID); } return true;
         case progMode_key:

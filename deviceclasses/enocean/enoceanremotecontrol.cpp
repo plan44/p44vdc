@@ -146,7 +146,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         // assign EPP information
         newDev->setEEPInfo(aEEProfile, aEEManufacturer);
         // is joker
-        newDev->setPrimaryGroup(group_black_joker);
+        newDev->setColorClass(class_black_joker);
         // function
         newDev->setFunctionDesc("on/off relay");
         // is always updateable (no need to wait for incoming data)
@@ -154,7 +154,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         // - add standard output behaviour
         OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*newDev.get()));
         o->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
-        o->setGroupMembership(group_black_joker, true); // put into joker group by default
+        o->setGroupMembership(group_black_variable, true); // put into joker group by default
         o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o)));
         // does not need a channel handler at all, just add behaviour
         newDev->addBehaviour(o);
@@ -171,7 +171,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         // assign EPP information
         newDev->setEEPInfo(aEEProfile, aEEManufacturer);
         // is light
-        newDev->setPrimaryGroup(group_yellow_light);
+        newDev->setColorClass(class_yellow_light);
         // function
         newDev->setFunctionDesc("on/off light");
         // is always updateable (no need to wait for incoming data)
@@ -194,7 +194,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         // assign EPP information
         newDev->setEEPInfo(aEEProfile, aEEManufacturer);
         // is shadow
-        newDev->setPrimaryGroup(group_grey_shadow);
+        newDev->setColorClass(class_grey_shadow);
         // function
         newDev->setFunctionDesc("blind control");
         // is always updateable (no need to wait for incoming data)

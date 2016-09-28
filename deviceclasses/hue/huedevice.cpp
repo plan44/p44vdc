@@ -63,7 +63,7 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const
   repeatApplyAtEnd(false)
 {
   // hue devices are lights
-  setPrimaryGroup(group_yellow_light);
+  setColorClass(class_yellow_light);
   if (aIsColor) {
     // color lamp
     // - use color light settings, which include a color scene table

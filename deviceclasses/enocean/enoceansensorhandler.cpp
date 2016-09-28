@@ -210,7 +210,7 @@ EnoceanDevicePtr EnoceanSensorHandler::newDevice(
       // assign EPP information
       newDev->setEEPInfo(aEEProfile, aEEManufacturer);
       // first descriptor defines device primary color
-      newDev->setPrimaryGroup(subdeviceDescP->primaryGroup);
+      newDev->setColorClass(subdeviceDescP->colorClass);
       // count it
       aSubDeviceIndex++;
     }

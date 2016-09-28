@@ -39,7 +39,7 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   // volatile state
   localPriority(false) // no local priority
 {
-  // set default group membership (which is group_variable)
+  // set default group membership (which is group_undefined)
   resetGroupMembership();
   // set default hardware default configuration
   setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
@@ -156,8 +156,8 @@ void OutputBehaviour::setGroupMembership(DsGroup aGroup, bool aIsMember)
 
 void OutputBehaviour::resetGroupMembership()
 {
-  // group_variable must always be set
-  setPVar(outputGroups, (DsGroupMask)(1<<group_variable));
+  // group_undefined (aka "variable" in old defs) must always be set
+  setPVar(outputGroups, (DsGroupMask)(1<<group_undefined));
 }
 
 

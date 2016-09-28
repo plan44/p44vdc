@@ -77,7 +77,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
   }
   // basically act as black device so we can configure colors
   if (digitalIoType==digitalio_button) {
-    primaryGroup = group_black_joker;
+    colorClass = class_black_joker;
     // Standard device settings without scene table
     installSettings();
     // Digital input as button
@@ -91,7 +91,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     addBehaviour(b);
   }
   else if (digitalIoType==digitalio_input) {
-    primaryGroup = group_black_joker;
+    colorClass = class_black_joker;
     // Standard device settings without scene table
     installSettings();
     // Digital input as binary input (AKM, automation block type)
@@ -105,7 +105,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
   }
   else if (digitalIoType==digitalio_light) {
     // Digital output as light on/off switch
-    primaryGroup = group_yellow_light;
+    colorClass = class_yellow_light;
     indicatorOutput = IndicatorOutputPtr(new IndicatorOutput(ioname.c_str(), false));
     // - use light settings, which include a scene table
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
@@ -116,7 +116,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     addBehaviour(l);
   }
   else if (digitalIoType==digitalio_relay) {
-    primaryGroup = group_black_joker;
+    colorClass = class_black_joker;
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // Digital output
@@ -125,12 +125,12 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
     o->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
     o->setHardwareName("digitalout");
-    o->setGroupMembership(group_black_joker, true); // put into joker group by default
+    o->setGroupMembership(group_black_variable, true); // put into joker group by default
     o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o)));
     addBehaviour(o);
   }
   else if (digitalIoType==digitalio_blind) {
-    primaryGroup = group_grey_shadow;
+    colorClass = class_grey_shadow;
     installSettings(DeviceSettingsPtr(new ShadowDeviceSettings(*this)));
     blindsOutputUp = DigitalIoPtr(new DigitalIo(upName.c_str(), true, false));
     blindsOutputDown = DigitalIoPtr(new DigitalIo(downName.c_str(), true, false));

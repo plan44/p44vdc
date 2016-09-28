@@ -26,7 +26,7 @@ using namespace p44;
 BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice) :
   inherited(aDevice),
   // persistent settings
-  binInputGroup(group_black_joker),
+  binInputGroup(group_black_variable),
   configuredInputType(binInpType_none),
   minPushInterval(200*MilliSecond),
   changesOnlyInterval(15*Minute), // report unchanged state updates max once every 15 minutes
