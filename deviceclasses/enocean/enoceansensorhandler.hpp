@@ -52,7 +52,7 @@ namespace p44 {
     uint8_t func; ///< the function code from the EPP signature
     uint8_t type; ///< the type code from the EPP signature
     uint8_t subDevice; ///< subdevice index, in case EnOcean device needs to be split into multiple logical vdSDs
-    DsGroup primaryGroup; ///< the dS group for the entire device
+    DsClass colorClass; ///< the dS group for the entire device
     DsGroup channelGroup; ///< the dS group for this channel
     BehaviourType behaviourType; ///< the behaviour type
     uint8_t behaviourParam; ///< VdcValueType, DsBinaryInputType or VdcOutputFunction resp., depending on behaviourType

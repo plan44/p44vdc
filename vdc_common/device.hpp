@@ -78,7 +78,7 @@ namespace p44 {
     DsScenePtr previousState; ///< a pseudo scene which holds the device state before the last applyScene() call, used to do undoScene()
 
     // variables set by concrete devices (=hardware dependent)
-    DsClass primaryGroup; ///< basic color of the device (can be black)
+    DsClass colorClass; ///< basic color of the device (can be black)
 
     // volatile internal state
     long dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
@@ -157,15 +157,22 @@ namespace p44 {
     /// @{
 
     /// set basic device color
-    /// @param aColorGroup color group number
-    void setPrimaryGroup(DsClass aColorGroup);
+    /// @param aColorClass color group number
+    void setColorClass(DsClass aColorClass);
 
     /// get basic device color group
-    /// @return color group number
-    DsClass getPrimaryGroup() { return primaryGroup; };
+    /// @return color class number
+    DsClass getColorClass() { return colorClass; };
 
-    /// get dominant group (i.e. the group that should color the icon)
-    DsGroup getDominantGroup();
+    /// get default class for given group
+    /// @param aGroup group number
+    /// @return color class number
+    static DsClass colorClassFromGroup(DsGroup aGroup);
+
+    /// get dominant class (i.e. the class that should color the icon)
+    /// @return color class number
+    DsClass getDominantColorClass();
+
 
     /// report that device has vanished (disconnected without being told so via vDC API)
     /// This will call disconnect() on the device, and remove it from all vDC container lists

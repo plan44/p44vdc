@@ -63,7 +63,7 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   // configure device now
   if (isLight) {
     // light device
-    primaryGroup = group_yellow_light;
+    colorClass = class_yellow_light;
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
     LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
     l->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
@@ -72,12 +72,12 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   }
   else {
     // general purpose relay
-    primaryGroup = group_black_joker;
+    colorClass = class_black_joker;
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
     o->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
     o->setHardwareName("on/off switch");
-    o->setGroupMembership(group_black_joker, true); // put into joker group by default
+    o->setGroupMembership(group_black_variable, true); // put into joker group by default
     o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o)));
     addBehaviour(o);
   }

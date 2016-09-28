@@ -67,23 +67,23 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   if (evaluatorType==evaluator_rocker) {
     // Simulate Two-way Rocker Button device
     // - defaults to black (generic button)
-    primaryGroup = group_black_joker;
+    colorClass = class_black_joker;
     // - create down button (index 0)
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this));
     b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
     b->setHardwareName("off condition met");
-    b->setGroup(group_black_joker); // pre-configure for app button
+    b->setGroup(group_black_variable); // pre-configure for app button
     addBehaviour(b);
     // - create up button (index 1)
     b = ButtonBehaviourPtr(new ButtonBehaviour(*this));
     b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
     b->setHardwareName("on condition met");
-    b->setGroup(group_black_joker); // pre-configure for app button
+    b->setGroup(group_black_variable); // pre-configure for app button
     addBehaviour(b);
   }
   else if (evaluatorType==evaluator_input || evaluatorType==evaluator_internal) {
     // Standard device settings without scene table (internal differs only from not getting announced with vdsm)
-    primaryGroup = group_black_joker;
+    colorClass = class_black_joker;
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this));
     b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);

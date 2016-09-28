@@ -93,7 +93,7 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
     LOG(LOG_ERR, "unknown OLA device type: %s", mode.c_str());
   }
   // by default, act as black device so we can configure colors
-  primaryGroup = group_black_joker;
+  colorClass = group_black_joker;
   // get DMX channels specifications
   char channelType;
   DmxChannel channelNo;
@@ -117,7 +117,7 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
   if (olaType==ola_dimmer) {
     // Single channel DMX512 dimmer, only use white channel
     // - is light
-    primaryGroup = group_yellow_light;
+    colorClass = group_yellow_light;
     // - use light settings, which include a scene table
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
     // - add simple single-channel light behaviour
@@ -127,7 +127,7 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
   }
   else if (olaType==ola_fullcolordimmer) {
     // - is RGB
-    primaryGroup = group_yellow_light;
+    colorClass = group_yellow_light;
     if (redChannel!=dmxNone && greenChannel!=dmxNone && blueChannel!=dmxNone) {
       // Complete set of outputs to create RGB light
       if (hPosChannel!=dmxNone || vPosChannel!=dmxNone) {

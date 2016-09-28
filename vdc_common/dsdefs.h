@@ -140,6 +140,7 @@ typedef enum {
 
 /// color/class
 typedef enum {
+  class_undefined = 0,
   class_yellow_light = 1,
   class_grey_shadow = 2,
   class_blue_climate = 3,
@@ -149,12 +150,12 @@ typedef enum {
   class_green_access = 7,
   class_black_joker = 8,
   class_white_singledevices = 9,
-  class_id_max = 9,
+  numColorClasses = 10,
 } DsClass;
 
 /// color/group
 typedef enum {
-  group_variable = 0,
+  group_undefined = 0, ///< formerly "variable", but now 8 is called "variable"
   group_yellow_light = 1,
   group_grey_shadow = 2,
   group_blue_heating = 3, ///< heating - formerly "climate"
@@ -166,7 +167,6 @@ typedef enum {
   group_blue_cooling = 9, ///< cooling - formerly just "white" (is it still white? snow?)
   group_blue_ventilation = 10, ///< ventilation - formerly "display"?!
   group_blue_windows = 11, ///< windows (not the OS, holes in the wall..)
-  group_id_max = 11,
   group_roomtemperature_control = 48, ///< room temperature control
 } DsGroup;
 

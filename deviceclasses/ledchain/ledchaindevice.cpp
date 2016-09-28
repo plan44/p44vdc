@@ -80,7 +80,7 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, uint16_t aFirstLED, uint16_t 
     LOG(LOG_ERR, "invalid LedChain device config: %s", aDeviceConfig.c_str());
   }
   // - is RGB
-  primaryGroup = group_yellow_light;
+  colorClass = class_yellow_light;
   // just color light settings, which include a color scene table
   installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
   // - add multi-channel color light behaviour (which adds a number of auxiliary channels)

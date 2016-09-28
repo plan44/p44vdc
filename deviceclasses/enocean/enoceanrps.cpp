@@ -100,7 +100,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         // set icon name: 4-rocker have a generic icon, 2-rocker have the 4btn icon in separated mode
         newDev->setIconInfo(functionProfile==0xF60300 ? "enocean_4rkr" : "enocean_4btn", true);
         // RPS switches can be used for anything
-        newDev->setPrimaryGroup(group_black_joker);
+        newDev->setColorClass(class_black_joker);
         // Create single handler, up button for even aSubDevice, down button for odd aSubDevice
         bool isUp = (aSubDeviceIndex & 0x01)==0;
         EnoceanRpsButtonHandlerPtr buttonHandler = EnoceanRpsButtonHandlerPtr(new EnoceanRpsButtonHandler(*newDev.get()));
@@ -134,7 +134,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         // set icon name: generic 4-rocker or for 2-rocker: even-numbered subdevice is left, odd is right
         newDev->setIconInfo(functionProfile==0xF60300 ? "enocean_4rkr" : (aSubDeviceIndex & 0x02 ? "enocean_br" : "enocean_bl"), true);
         // RPS switches can be used for anything
-        newDev->setPrimaryGroup(group_black_joker);
+        newDev->setColorClass(class_black_joker);
         // Create two handlers, one for the up button, one for the down button
         // - create button input for what dS will handle as "down key" (actual button depends on "reversed")
         EnoceanRpsButtonHandlerPtr downHandler = EnoceanRpsButtonHandlerPtr(new EnoceanRpsButtonHandler(*newDev.get()));
@@ -175,7 +175,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newDev->setEEPInfo(aEEProfile, aEEManufacturer);
       newDev->setFunctionDesc("window handle");
       // Window handle switches can be used for anything
-      newDev->setPrimaryGroup(group_black_joker);
+      newDev->setColorClass(class_black_joker);
       #if PRELIMINARY_WINDOWHANDLE_MAPPING
       // Current simple dS mapping: two binary inputs
       // - Input0: 0: Window closed (Handle down position), 1: Window open (all other handle positions)
@@ -204,7 +204,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       EnoceanRpsWindowHandleHandlerPtr newHandler = EnoceanRpsWindowHandleHandlerPtr(new EnoceanRpsWindowHandleHandler(*newDev.get()));
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_windowHandle, usage_undefined, true, Never);
-      bb->setGroup(group_black_joker); // joker by default
+      bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("window open");
       newHandler->isERP2 = EEP_TYPE(functionProfile)==0x01;
       newHandler->behaviour = bb;
@@ -228,13 +228,13 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newDev->setEEPInfo(aEEProfile, aEEManufacturer);
       newDev->setFunctionDesc("key card switch");
       // key card switches can be used for anything
-      newDev->setPrimaryGroup(group_black_joker);
+      newDev->setColorClass(class_black_joker);
       // Current simple dS mapping: one binary input
       // - Input0: 1: card inserted, 0: card extracted
       EnoceanRpsCardKeyHandlerPtr newHandler = EnoceanRpsCardKeyHandlerPtr(new EnoceanRpsCardKeyHandler(*newDev.get()));
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
-      bb->setGroup(group_black_joker); // joker by default
+      bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("card inserted");
       newHandler->isServiceCardDetector = false;
       newHandler->behaviour = bb;
@@ -245,7 +245,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         EnoceanRpsCardKeyHandlerPtr newHandler = EnoceanRpsCardKeyHandlerPtr(new EnoceanRpsCardKeyHandler(*newDev.get()));
         BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
         bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
-        bb->setGroup(group_black_joker); // joker by default
+        bb->setGroup(group_black_variable); // joker by default
         bb->setHardwareName("service card");
         newHandler->isServiceCardDetector = true;
         newHandler->behaviour = bb;
@@ -268,7 +268,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newDev->setEEPInfo(aEEProfile, aEEManufacturer);
       newDev->setFunctionDesc("leakage detector");
       // leakage detectors can be used for anything
-      newDev->setPrimaryGroup(group_black_joker);
+      newDev->setColorClass(class_black_joker);
       // Current simple dS mapping: one binary input for leakage status
       EnoceanRpsLeakageDetectorHandlerPtr newHandler;
       BinaryInputBehaviourPtr bb;
@@ -276,7 +276,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newHandler = EnoceanRpsLeakageDetectorHandlerPtr(new EnoceanRpsLeakageDetectorHandler(*newDev.get()));
       bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never); // generic because dS does not have a binary sensor function for leakage yet
-      bb->setGroup(group_black_joker); // joker by default
+      bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("leakage detector");
       newHandler->behaviour = bb;
       newDev->addChannelHandler(newHandler);
@@ -298,7 +298,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newDev->setEEPInfo(aEEProfile, aEEManufacturer);
       newDev->setFunctionDesc("smoke detector");
       // smoke detectors can be used for anything
-      newDev->setPrimaryGroup(group_black_joker);
+      newDev->setColorClass(class_black_joker);
       // Current simple dS mapping: one binary input for smoke alarm status, one for low bat status
       EnoceanRpsSmokeDetectorHandlerPtr newHandler;
       BinaryInputBehaviourPtr bb;
@@ -306,7 +306,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newHandler = EnoceanRpsSmokeDetectorHandlerPtr(new EnoceanRpsSmokeDetectorHandler(*newDev.get()));
       bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_smoke, usage_room, true, Never);
-      bb->setGroup(group_black_joker); // joker by default
+      bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("smoke alarm");
       newHandler->behaviour = bb;
       newHandler->isBatteryStatus = false;
@@ -315,7 +315,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newHandler = EnoceanRpsSmokeDetectorHandlerPtr(new EnoceanRpsSmokeDetectorHandler(*newDev.get()));
       bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_lowBattery, usage_room, true, Never);
-      bb->setGroup(group_black_joker); // joker by default
+      bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("low battery");
       newHandler->behaviour = bb;
       newHandler->isBatteryStatus = true;
