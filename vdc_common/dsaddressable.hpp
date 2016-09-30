@@ -162,11 +162,12 @@ namespace p44 {
     /// @note the dSUID will be automatically added to aParams (generating a params object if none was passed)
     bool sendRequest(const char *aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB());
 
-    /// push property value
-    /// @param aQuery description of what should be pushed (same syntax as in getProperty API)
+    /// push notification (changed property value and/or events)
+    /// @param aPropertyQuery description of what property change should be pushed (same syntax as in getProperty API), can be NULL
+    /// @param aEvents list of events to be pushed, can be NULL
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
     /// @return true if push could be sent, false otherwise (e.g. no vdSM connection, or device not yet announced)
-    bool pushProperty(ApiValuePtr aQuery, int aDomain);
+    bool pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain);
 
     /// @}
 

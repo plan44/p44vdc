@@ -18,7 +18,7 @@ enum Type {
     VDC_SEND_PONG = 9;
     VDC_SEND_ANNOUNCE_DEVICE = 10;
     VDC_SEND_VANISH = 11;
-    VDC_SEND_PUSH_PROPERTY = 12;
+    VDC_SEND_PUSH_NOTIFICATION = 12;
     VDSM_SEND_REMOVE = 13;
     VDSM_SEND_BYE = 14;
     VDC_SEND_ANNOUNCE_VDC = 23; // new in API v2
@@ -61,7 +61,7 @@ message Message {
     optional vdc_SendPong vdc_send_pong = 106;
     optional vdc_SendAnnounceDevice vdc_send_announce_device = 107;
     optional vdc_SendVanish vdc_send_vanish = 108;
-    optional vdc_SendPushProperty vdc_send_push_property = 109;
+    optional vdc_SendPushNotification vdc_send_push_notification = 109;
     optional vdsm_SendRemove vdsm_send_remove = 110;
     optional vdsm_SendBye vdsm_send_bye = 111;
     optional vdc_SendAnnounceVdc vdc_send_announce_vdc = 120; // new in API v2

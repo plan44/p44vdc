@@ -34,7 +34,7 @@ typedef enum _Vdcapi__Type {
   VDCAPI__TYPE__VDC_SEND_PONG = 9,
   VDCAPI__TYPE__VDC_SEND_ANNOUNCE_DEVICE = 10,
   VDCAPI__TYPE__VDC_SEND_VANISH = 11,
-  VDCAPI__TYPE__VDC_SEND_PUSH_PROPERTY = 12,
+  VDCAPI__TYPE__VDC_SEND_PUSH_NOTIFICATION = 12,
   VDCAPI__TYPE__VDSM_SEND_REMOVE = 13,
   VDCAPI__TYPE__VDSM_SEND_BYE = 14,
   VDCAPI__TYPE__VDC_SEND_ANNOUNCE_VDC = 23,
@@ -86,7 +86,7 @@ struct  _Vdcapi__Message
   Vdcapi__VdcSendPong *vdc_send_pong;
   Vdcapi__VdcSendAnnounceDevice *vdc_send_announce_device;
   Vdcapi__VdcSendVanish *vdc_send_vanish;
-  Vdcapi__VdcSendPushProperty *vdc_send_push_property;
+  Vdcapi__VdcSendPushNotification *vdc_send_push_notification;
   Vdcapi__VdsmSendRemove *vdsm_send_remove;
   Vdcapi__VdsmSendBye *vdsm_send_bye;
   Vdcapi__VdcSendAnnounceVdc *vdc_send_announce_vdc;

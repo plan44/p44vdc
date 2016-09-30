@@ -1243,60 +1243,68 @@ bool DeviceStateParams::accessField(PropertyAccessMode aMode, ApiValuePtr aPropV
 
 // MARK: ===== DeviceState
 
-DeviceState::DeviceState(SingleDevice &aSingleDevice, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor) :
+DeviceState::DeviceState(SingleDevice &aSingleDevice, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor, DeviceStateWillPushCB aWillPushHandler) :
   singleDeviceP(&aSingleDevice),
   stateId(aStateId),
   stateDescriptor(aStateDescriptor),
   stateDescription(aDescription),
+  willPushHandler(aWillPushHandler),
   lastPush(Never)
 {
-  #if STATES_WITH_PARAMETERS
-  // install empty subclass of value list for (optional) parameters
-  // (subclass checks access path to just deliver values when accessing via devicestate_key)
-  stateParams = ValueListPtr(new DeviceStateParams);
-  #endif
 }
-
-
-void DeviceState::addParameter(ValueDescriptorPtr aValueDesc)
-{
-  #if STATES_WITH_PARAMETERS
-  aValueDesc->setIsDefault(false); // a state parameter does not have default (but state value might still be initialized)
-  stateParams->addValue(aValueDesc);
-  #endif
-}
-
-
-ValueDescriptorPtr DeviceState::param(const string aName)
-{
-  #if STATES_WITH_PARAMETERS
-  return stateParams->getValue(aName);
-  #else
-  // just return something so implementations can act like there were state params and use setXXXX to set them
-  return ValueDescriptorPtr(new NumericValueDescriptor("universal_dummy", valueType_float, -42, 42, 0.42));
-  #endif
-}
-
 
 
 bool DeviceState::push()
 {
+  DeviceEventsList emptyList;
+  return pushWithEvents(emptyList);
+}
+
+
+bool DeviceState::pushWithEvent(DeviceEventPtr aEvent)
+{
+  DeviceEventsList eventList;
+  eventList.push_back(aEvent);
+  return pushWithEvents(eventList);
+}
+
+
+bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
+{
   SALOG((*singleDeviceP), LOG_NOTICE, "push: state '%s' changed to %s", stateId.c_str(), stateDescriptor->getStringValue().c_str());
   // update for every push attempt, as this are "events"
   lastPush = MainLoop::currentMainLoop().now();
+  // collect additional events to push
+  if (willPushHandler) {
+    willPushHandler(DeviceStatePtr(this), aEventList);
+  }
   // try to push to connected vDC API client
   VdcApiConnectionPtr api = singleDeviceP->getVdc().getSessionConnection();
   if (api) {
+    // create query for state property to get pushed
     ApiValuePtr query = api->newApiValue();
     query->setType(apivalue_object);
     ApiValuePtr subQuery = query->newValue(apivalue_object);
     subQuery->add(stateId, subQuery->newValue(apivalue_null));
     query->add(string("deviceStates"), subQuery);
-    return singleDeviceP->pushProperty(query, VDC_API_DOMAIN);
+    // add events, if any
+    ApiValuePtr events;
+    for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
+      if (!events) {
+        events = api->newApiValue();
+        events->setType(apivalue_object);
+      }
+      ApiValuePtr event = api->newApiValue();
+      event->setType(apivalue_null); // for now, events don't have any properties, so it's just named NULL values
+      events->add((*pos)->eventId, event);
+    }
+    return singleDeviceP->pushNotification(query, events, VDC_API_DOMAIN);
   }
   // no API, cannot not push
   return false;
 }
+
+
 
 
 // MARK: ===== DeviceState property access
@@ -1304,14 +1312,12 @@ bool DeviceState::push()
 enum {
   statedescription_key,
   statetype_key,
-  stateparamdescs_key,
   numStatesDescProperties
 };
 
 enum {
   state_key,
   age_key,
-  stateparams_key,
   numStatesProperties
 };
 
@@ -1332,12 +1338,10 @@ PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDom
   static const PropertyDescription descproperties[numStatesDescProperties] = {
     { "description", apivalue_string, statedescription_key, OKEY(devicestatedesc_key) },
     { "value", apivalue_object, statetype_key, OKEY(devicestatedesc_key) },
-    { "params", apivalue_object, stateparamdescs_key, OKEY(devicestatedesc_key) }
   };
   static const PropertyDescription properties[numStatesProperties] = {
     { "value", apivalue_null, state_key, OKEY(devicestate_key) },
     { "age", apivalue_double, age_key, OKEY(devicestate_key) },
-    { "params", apivalue_object, stateparams_key, OKEY(devicestate_key) }
   };
   // check access path, depends on how we access the state (description or actual state)
   if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestatedesc_key)) {
@@ -1354,20 +1358,8 @@ PropertyContainerPtr DeviceState::getContainer(const PropertyDescriptorPtr &aPro
 {
   if (aPropertyDescriptor->hasObjectKey(devicestatedesc_key)) {
     if (aPropertyDescriptor->fieldKey()==statetype_key) {
-      return stateDescriptor; // can be NULL for ephemeral states
+      return stateDescriptor;
     }
-    #if STATES_WITH_PARAMETERS
-    else if (aPropertyDescriptor->fieldKey()==stateparamdescs_key) {
-      return stateParams;
-    }
-    #endif
-  }
-  else if (aPropertyDescriptor->hasObjectKey(devicestate_key)) {
-    #if STATES_WITH_PARAMETERS
-    if (aPropertyDescriptor->fieldKey()==stateparams_key) {
-      return stateParams;
-    }
-    #endif
   }
   return NULL;
 }
@@ -1470,6 +1462,142 @@ DeviceStatePtr DeviceStates::getState(const string aStateId)
 }
 
 
+
+// MARK: ===== DeviceEvent
+
+
+DeviceEvent::DeviceEvent(SingleDevice &aSingleDevice, const string aEventId, const string aDescription) :
+  singleDeviceP(&aSingleDevice),
+  eventId(aEventId),
+  eventDescription(aDescription)
+{
+}
+
+
+// MARK: ===== DeviceEvent property access
+
+enum {
+  eventdescription_key,
+  numEventDescProperties
+};
+
+static char deviceeventdesc_key;
+
+
+int DeviceEvent::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  // check access path, depends on how we access the state (description or actual state)
+  if (aParentDescriptor->parentDescriptor->hasObjectKey(deviceeventdesc_key))
+    return numStatesDescProperties;
+  return 0;
+}
+
+
+PropertyDescriptorPtr DeviceEvent::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  static const PropertyDescription descproperties[numStatesDescProperties] = {
+    { "description", apivalue_string, eventdescription_key, OKEY(deviceeventdesc_key) },
+  };
+  // check access path, depends on how we access the event (Note: for now we only have description, so it's not strictly needed yet here)
+  if (aParentDescriptor->parentDescriptor->hasObjectKey(deviceeventdesc_key)) {
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&descproperties[aPropIndex], aParentDescriptor));
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+PropertyContainerPtr DeviceEvent::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->hasObjectKey(deviceeventdesc_key)) {
+    // TODO: here we would add descriptions of event params once we introduce them
+//    if (aPropertyDescriptor->fieldKey()==eventparams_key) {
+//      return eventDescriptors;
+//    }
+  }
+  return NULL;
+}
+
+
+bool DeviceEvent::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aMode==access_read) {
+    if (aPropertyDescriptor->hasObjectKey(deviceeventdesc_key)) {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case eventdescription_key: aPropValue->setStringValue(eventDescription); return true;
+      }
+    }
+  }
+  return false;
+}
+
+
+
+
+// MARK: ===== DeviceEvents container
+
+
+void DeviceEvents::addToModelUIDHash(string &aHashedString)
+{
+  for (EventsVector::iterator pos = deviceEvents.begin(); pos!=deviceEvents.end(); ++pos) {
+    aHashedString += ':';
+    aHashedString += (*pos)->eventId;
+  }
+}
+
+
+int DeviceEvents::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return (int)deviceEvents.size();
+}
+
+
+static char events_key;
+
+PropertyDescriptorPtr DeviceEvents::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  if (aPropIndex<deviceEvents.size()) {
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = deviceEvents[aPropIndex]->eventId;
+    descP->propertyType = apivalue_object;
+    descP->propertyFieldKey = aPropIndex;
+    descP->propertyObjectKey = OKEY(events_key);
+    return descP;
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+PropertyContainerPtr DeviceEvents::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->hasObjectKey(events_key)) {
+    return deviceEvents[aPropertyDescriptor->fieldKey()];
+  }
+  return NULL;
+}
+
+
+void DeviceEvents::addEvent(DeviceEventPtr aEvent)
+{
+  deviceEvents.push_back(aEvent);
+}
+
+
+
+DeviceEventPtr DeviceEvents::getEvent(const string aEventId)
+{
+  for (EventsVector::iterator pos = deviceEvents.begin(); pos!=deviceEvents.end(); ++pos) {
+    if ((*pos)->eventId==aEventId) {
+      // found
+      return *pos;
+    }
+  }
+  // not found
+  return DeviceEventPtr();
+}
+
+
+
+
 // MARK: ===== DeviceProperties
 
 
@@ -1502,6 +1630,8 @@ SingleDevice::SingleDevice(Vdc *aVdcP) :
   customActions = CustomActionsPtr(new CustomActions(*this));
   // create states
   deviceStates = DeviceStatesPtr(new DeviceStates);
+  // create events
+  deviceEvents = DeviceEventsPtr(new DeviceEvents);
   // create device properties
   deviceProperties = DevicePropertiesPtr(new DeviceProperties);
 }
@@ -1691,6 +1821,7 @@ enum {
   customActions_key,
   deviceStateDescriptions_key,
   deviceStates_key,
+  deviceEventDescriptions_key,
   devicePropertyDescriptions_key,
   numSimpleDeviceProperties
 };
@@ -1717,6 +1848,7 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
     { "customActions", apivalue_object, customActions_key, OKEY(singledevice_key) },
     { "deviceStateDescriptions", apivalue_object, deviceStateDescriptions_key, OKEY(devicestatedesc_key) },
     { "deviceStates", apivalue_object, deviceStates_key, OKEY(devicestate_key) },
+    { "deviceEventDescriptions", apivalue_object, deviceEventDescriptions_key, OKEY(deviceeventdesc_key) },
     { "devicePropertyDescriptions", apivalue_object, devicePropertyDescriptions_key, OKEY(singledevice_key) }
   };
   // C++ object manages different levels, check aParentDescriptor
@@ -1743,6 +1875,8 @@ PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPr
       case deviceStateDescriptions_key:
       case deviceStates_key:
         return deviceStates;
+      case deviceEventDescriptions_key:
+        return deviceEvents;
       case devicePropertyDescriptions_key:
         return deviceProperties;
     }
