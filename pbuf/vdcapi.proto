@@ -46,7 +46,7 @@ message PropertyValue {
 message PropertyElement {
     optional string name  = 1;
     optional PropertyValue value = 2;
-    repeated PropertyElement elements = 3; // <- NEW: allow nesting
+    repeated PropertyElement elements = 3;
 }
 
 
@@ -81,9 +81,10 @@ message vdc_SendPong {
     optional string dSUID = 1;
 }
 
-message vdc_SendPushProperty {
+message vdc_SendPushNotification { // formerly named "pushProperty"
     optional string dSUID = 1;
-    repeated PropertyElement properties = 2;
+    repeated PropertyElement changedproperties = 2;
+    repeated PropertyElement deviceevents = 3; // new in API v2c
 }
 
 

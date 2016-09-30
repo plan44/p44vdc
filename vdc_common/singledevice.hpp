@@ -32,6 +32,7 @@ namespace p44 {
   class SingleDevice;
   class DeviceAction;
   class DeviceState;
+  class DeviceEvent;
 
   /// value descriptor / validator / value extractor
   /// The value descriptor can describe a parameter via read-only properties,
@@ -73,17 +74,24 @@ namespace p44 {
     /// get the (default) value into an ApiValue
     /// @param aApiValue the API value to write the value to
     /// @param aAsInternal if set, the value is returned in internal format (relevant for enums, to get them as numeric value)
+    /// @param aPrevious if set, the previous value is returned
     /// @return true if there is a (default) value that could be assigned to aApiValue, false otherwise (aApiValue will be untouched)
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) = 0;
 
     /// get the value as string
+    /// @param aAsInternal if set, the value is returned in internal format (relevant for enums, to get them as numeric value)
+    /// @param aPrevious if set, the previous value is returned
     /// @return string representation of the current value
     string getStringValue(bool aAsInternal = false, bool aPrevious = false);
 
     /// get a double value
+    /// @param aAsInternal if set, the value is returned in internal format (relevant for enums, to get them as numeric value)
+    /// @param aPrevious if set, the previous value is returned
     double getDoubleValue(bool aAsInternal = false, bool aPrevious = false);
 
     /// get a double value
+    /// @param aAsInternal if set, the value is returned in internal format (relevant for enums, to get them as numeric value)
+    /// @param aPrevious if set, the previous value is returned
     int32_t getInt32Value(bool aAsInternal = false, bool aPrevious = false);
 
 
@@ -132,6 +140,11 @@ namespace p44 {
     /// @param aLastUpdate time of last update, can be Never (or Infinite to use current now())
     /// @return true if this update caused hasValue to be changed from false to true
     bool setLastUpdate(MLMicroSeconds aLastUpdate=Infinite);
+
+    /// notify that this value has just updated
+    /// @note this must be called by setters just after updating update time, current and previous values.
+    ///   it is used to possibly trigger events and property pushes
+    void notifyUpdate();
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
@@ -486,7 +499,13 @@ namespace p44 {
 
 
 
-  #define STATES_WITH_PARAMETERS 0
+  typedef boost::intrusive_ptr<DeviceState> DeviceStatePtr;
+  typedef boost::intrusive_ptr<DeviceEvent> DeviceEventPtr;
+  typedef list<DeviceEventPtr> DeviceEventsList;
+
+  /// handler that will be called before pushing a state change, allows adding events to the push message
+  /// @param aChangedState the DeviceState which has changed.
+  typedef boost::function<void (DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)> DeviceStateWillPushCB;
 
   class DeviceState : public PropertyContainer
   {
@@ -496,12 +515,9 @@ namespace p44 {
 
     string stateId; ///< the id (key in the container) of this state
     ValueDescriptorPtr stateDescriptor; ///< the value (descriptor) for the state itself
+    DeviceStateWillPushCB willPushHandler; ///< called when state is about to get pushed to get associated events
     string stateDescription; ///< a text description for the state, for logs and simple UI purposes
-    MLMicroSeconds lastPush; ///< when the state was last pushed ("age" for ephemeral states which are only pushed)
-
-    #if STATES_WITH_PARAMETERS
-    ValueListPtr stateParams; ///< the valuedescriptors for the parameters
-    #endif
+    MLMicroSeconds lastPush; ///< when the state was last pushed
 
   protected:
 
@@ -513,22 +529,29 @@ namespace p44 {
     /// @param aSingleDevice the single device this state belongs to
     /// @param aStateId the id (key in the container) of the state.
     /// @param aDescription a description string for the state.
-    /// @param aStateDescriptor value descriptor for the state, can be NULL for ephemeral states
-    DeviceState(SingleDevice &aSingleDevice, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor);
+    /// @param aStateDescriptor value descriptor for the state
+    /// @param aChangeHandler will be called
+    DeviceState(SingleDevice &aSingleDevice, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor, DeviceStateWillPushCB aWillPushHandler);
 
     /// access value
     ValueDescriptorPtr value() { return stateDescriptor; };
 
-    /// add parameter
-    /// @param aValueDesc a value descriptor object.
-    void addParameter(ValueDescriptorPtr aValueDesc);
-
-    /// access a parameter
-    ValueDescriptorPtr param(const string aName);
-
     /// push the state via pushProperty
+    /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
+    /// @note will call the willPushHandler to collect possibly associated events
     bool push();
 
+    /// push the state via pushProperty along with an event
+    /// @param aEvent a single event to push along with the state
+    /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
+    /// @note will also call the willPushHandler to collect possibly more associated events
+    bool pushWithEvent(DeviceEventPtr aEvent);
+
+    /// push the state via pushProperty along with multiple events
+    /// @param aEventList a list of events to send along with the pushed state
+    /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
+    /// @note will also call the willPushHandler to collect possibly more associated events
+    bool pushWithEvents(DeviceEventsList aEventList);
 
   protected:
 
@@ -539,7 +562,6 @@ namespace p44 {
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   };
-  typedef boost::intrusive_ptr<DeviceState> DeviceStatePtr;
 
 
 
@@ -576,6 +598,77 @@ namespace p44 {
 
 
 
+  class DeviceEvent : public PropertyContainer
+  {
+    typedef PropertyContainer inherited;
+
+    friend class DeviceState;
+    friend class DeviceEvents;
+
+    string eventId; ///< the id (key in the container) of this event
+    string eventDescription; ///< a text description for the event, for logs and simple UI purposes
+
+  protected:
+
+    SingleDevice *singleDeviceP; ///< the single device this event belongs to
+
+  public:
+
+    /// create the event
+    /// @param aSingleDevice the single device this event belongs to
+    /// @param aEventId the id (key in the container) of the event.
+    /// @param aDescription a description string for the event.
+    DeviceEvent(SingleDevice &aSingleDevice, const string aEventId, const string aDescription);
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+
+  };
+
+
+
+  class DeviceEvents P44_FINAL : public PropertyContainer
+  {
+    typedef PropertyContainer inherited;
+
+    typedef vector<DeviceEventPtr> EventsVector;
+
+    EventsVector deviceEvents;
+
+  public:
+
+    /// add a event (at device setup time only)
+    /// @param aEvent the event
+    void addEvent(DeviceEventPtr aEvent);
+
+    /// get event (for triggering/sending it via push)
+    /// @param aStateId id of the state to get
+    DeviceEventPtr getEvent(const string aEventId);
+
+    /// TODO: add method to push pure events
+
+    /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
+    void addToModelUIDHash(string &aHashedString);
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    
+  };
+  typedef boost::intrusive_ptr<DeviceEvents> DeviceEventsPtr;
+
+
+
+
+
   /// class representing the device-specific properties
   class DeviceProperties P44_FINAL : public ValueList
   {
@@ -609,12 +702,14 @@ namespace p44 {
     friend class CustomActions;
     friend class CustomAction;
     friend class DeviceStates;
+    friend class DeviceEvents;
 
   protected:
 
     DeviceActionsPtr deviceActions; /// the device's standard actions
     CustomActionsPtr customActions; /// the device's custom actions
     DeviceStatesPtr deviceStates; /// the device's states
+    DeviceEventsPtr deviceEvents; /// the device's events
 
     DevicePropertiesPtr deviceProperties; /// the device's specific properties
 

@@ -193,24 +193,34 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
 }
 
 
-bool DsAddressable::pushProperty(ApiValuePtr aQuery, int aDomain)
+bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain)
 {
   if (announced!=Never) {
-    // device is announced: push value changes
-    // - get the value
-    ApiValuePtr value = aQuery->newValue(apivalue_object);
-    ErrorPtr err = accessProperty(access_read, aQuery, value, aDomain, PropertyDescriptorPtr());
+    // device is announced: push can take place
+    ErrorPtr err;
+    ApiValuePtr value;
+    if (aPropertyQuery) {
+      // a property change is to be notified
+      // - get the value by issuing the query
+      value = aPropertyQuery->newValue(apivalue_object);
+      err = accessProperty(access_read, aPropertyQuery, value, aDomain, PropertyDescriptorPtr());
+    }
     if (Error::isOK(err)) {
-      // - send pushProperty
-      ApiValuePtr pushParams = aQuery->newValue(apivalue_object);
-      pushParams->add("properties", value);
-      return sendRequest("pushProperty", pushParams);
+      // - send pushNotification
+      ApiValuePtr pushParams = aPropertyQuery->newValue(apivalue_object);
+      if (value) {
+        pushParams->add("changedproperties", value);
+      }
+      if (aEvents) {
+        pushParams->add("deviceevents", aEvents);
+      }
+      return sendRequest("pushNotification", pushParams);
     }
   }
   else {
     if (isPublicDS()) {
       // is public, but not yet announced, show warning (non-public devices never push and must not log anything here)
-      ALOG(LOG_WARNING, "pushProperty suppressed - is not yet announced");
+      ALOG(LOG_WARNING, "pushNotification suppressed - is not yet announced");
     }
   }
   return false;

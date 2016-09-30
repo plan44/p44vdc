@@ -242,13 +242,13 @@ static const ProtobufCFieldDescriptor vdcapi__message__field_descriptors[27] =
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "vdc_send_push_property",
+    "vdc_send_push_notification",
     109,
     PROTOBUF_C_LABEL_OPTIONAL,
     PROTOBUF_C_TYPE_MESSAGE,
     0,   /* quantifier_offset */
-    offsetof(Vdcapi__Message, vdc_send_push_property),
-    &vdcapi__vdc__send_push_property__descriptor,
+    offsetof(Vdcapi__Message, vdc_send_push_notification),
+    &vdcapi__vdc__send_push_notification__descriptor,
     NULL,
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
@@ -432,7 +432,7 @@ static const unsigned vdcapi__message__field_indices_by_name[] = {
   23,   /* field[23] = vdc_send_announce_vdc */
   22,   /* field[22] = vdc_send_identify */
   9,   /* field[9] = vdc_send_pong */
-  12,   /* field[12] = vdc_send_push_property */
+  12,   /* field[12] = vdc_send_push_notification */
   11,   /* field[11] = vdc_send_vanish */
   26,   /* field[26] = vdsm_request_generic_request */
   5,   /* field[5] = vdsm_request_get_property */
@@ -536,7 +536,7 @@ const ProtobufCEnumValue vdcapi__type__enum_values_by_number[25] =
   { "VDC_SEND_PONG", "VDCAPI__TYPE__VDC_SEND_PONG", 9 },
   { "VDC_SEND_ANNOUNCE_DEVICE", "VDCAPI__TYPE__VDC_SEND_ANNOUNCE_DEVICE", 10 },
   { "VDC_SEND_VANISH", "VDCAPI__TYPE__VDC_SEND_VANISH", 11 },
-  { "VDC_SEND_PUSH_PROPERTY", "VDCAPI__TYPE__VDC_SEND_PUSH_PROPERTY", 12 },
+  { "VDC_SEND_PUSH_NOTIFICATION", "VDCAPI__TYPE__VDC_SEND_PUSH_NOTIFICATION", 12 },
   { "VDSM_SEND_REMOVE", "VDCAPI__TYPE__VDSM_SEND_REMOVE", 13 },
   { "VDSM_SEND_BYE", "VDCAPI__TYPE__VDSM_SEND_BYE", 14 },
   { "VDSM_NOTIFICATION_CALL_SCENE", "VDCAPI__TYPE__VDSM_NOTIFICATION_CALL_SCENE", 15 },
@@ -564,7 +564,7 @@ const ProtobufCEnumValueIndex vdcapi__type__enum_values_by_name[25] =
   { "VDC_SEND_ANNOUNCE_VDC", 21 },
   { "VDC_SEND_IDENTIFY", 20 },
   { "VDC_SEND_PONG", 7 },
-  { "VDC_SEND_PUSH_PROPERTY", 10 },
+  { "VDC_SEND_PUSH_NOTIFICATION", 10 },
   { "VDC_SEND_VANISH", 9 },
   { "VDSM_NOTIFICATION_CALL_MIN_SCENE", 17 },
   { "VDSM_NOTIFICATION_CALL_SCENE", 13 },

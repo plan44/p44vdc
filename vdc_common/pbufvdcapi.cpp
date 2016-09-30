@@ -1540,11 +1540,11 @@ ErrorPtr VdcPbufApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
     vdcapi__vdc__send_vanish__init(msg.vdc_send_vanish);
     subMessageP = &(msg.vdc_send_vanish->base);
   }
-  else if (aMethod=="pushProperty") {
-    msg.type = VDCAPI__TYPE__VDC_SEND_PUSH_PROPERTY;
-    msg.vdc_send_push_property = new Vdcapi__VdcSendPushProperty;
-    vdcapi__vdc__send_push_property__init(msg.vdc_send_push_property);
-    subMessageP = &(msg.vdc_send_push_property->base);
+  else if (aMethod=="pushNotification") {
+    msg.type = VDCAPI__TYPE__VDC_SEND_PUSH_NOTIFICATION;
+    msg.vdc_send_push_notification = new Vdcapi__VdcSendPushNotification;
+    vdcapi__vdc__send_push_notification__init(msg.vdc_send_push_notification);
+    subMessageP = &(msg.vdc_send_push_notification->base);
   }
   else if (aMethod=="identify") {
     // Note: this method has the same (JSON) name as the method from the vdsm used to identify (blink) a device.
