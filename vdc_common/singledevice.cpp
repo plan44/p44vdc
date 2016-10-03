@@ -43,7 +43,9 @@ ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, bo
   valueName(aName),
   valueType(aValueType),
   hasValue(aHasDefault),
-  isDefault(aHasDefault)
+  isDefault(aHasDefault),
+  lastUpdate(Never),
+  lastChange(Never)
 {
 }
 
@@ -58,6 +60,17 @@ bool ValueDescriptor::setLastUpdate(MLMicroSeconds aLastUpdate)
   isDefault = false;
   return gotValue;
 }
+
+
+
+bool ValueDescriptor::setChanged(bool aChanged)
+{
+  if (aChanged) {
+    lastChange = MainLoop::currentMainLoop().now();
+  }
+  return (aChanged);
+}
+
 
 
 void ValueDescriptor::invalidate()
@@ -161,7 +174,7 @@ bool NumericValueDescriptor::setDoubleValue(double aValue)
     value = aValue;
     didChange = true;
   }
-  return didChange;
+  return setChanged(didChange);
 }
 
 
@@ -265,7 +278,7 @@ bool TextValueDescriptor::setStringValue(const string aValue)
     value = aValue;
     didChange = true;
   }
-  return didChange;
+  return setChanged(didChange);
 }
 
 
@@ -310,7 +323,7 @@ bool EnumValueDescriptor::setInt32Value(int32_t aValue)
     value = aValue;
     didChange = true;
   }
-  return didChange;
+  return setChanged(didChange);
 }
 
 
@@ -1271,7 +1284,7 @@ bool DeviceState::pushWithEvent(DeviceEventPtr aEvent)
 
 bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
 {
-  SALOG((*singleDeviceP), LOG_NOTICE, "push: state '%s' changed to %s", stateId.c_str(), stateDescriptor->getStringValue().c_str());
+  SALOG((*singleDeviceP), LOG_NOTICE, "pushing: state '%s' changed to %s", stateId.c_str(), stateDescriptor->getStringValue().c_str());
   // update for every push attempt, as this are "events"
   lastPush = MainLoop::currentMainLoop().now();
   // collect additional events to push
@@ -1297,6 +1310,7 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
       ApiValuePtr event = api->newApiValue();
       event->setType(apivalue_null); // for now, events don't have any properties, so it's just named NULL values
       events->add((*pos)->eventId, event);
+      SALOG((*singleDeviceP), LOG_NOTICE, "- pushing event '%s' along with state change", (*pos)->eventId.c_str());
     }
     return singleDeviceP->pushNotification(query, events, VDC_API_DOMAIN);
   }
@@ -1318,6 +1332,7 @@ enum {
 enum {
   state_key,
   age_key,
+  changed_key,
   numStatesProperties
 };
 
@@ -1342,6 +1357,7 @@ PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDom
   static const PropertyDescription properties[numStatesProperties] = {
     { "value", apivalue_null, state_key, OKEY(devicestate_key) },
     { "age", apivalue_double, age_key, OKEY(devicestate_key) },
+    { "changed", apivalue_double, changed_key, OKEY(devicestate_key) },
   };
   // check access path, depends on how we access the state (description or actual state)
   if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestatedesc_key)) {
@@ -1381,12 +1397,19 @@ bool DeviceState::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
             aPropValue->setNull();
           return true;
         case age_key: {
-          // for ephemeral states, return time of last push as "age"
-          MLMicroSeconds lu = stateDescriptor ? stateDescriptor->getLastUpdate() : lastPush;
+          MLMicroSeconds lu = stateDescriptor->getLastUpdate();
           if (lu==Never)
             aPropValue->setNull();
           else
             aPropValue->setDoubleValue((double)(MainLoop::now()-lu)/Second);
+          return true;
+        }
+        case changed_key: {
+          MLMicroSeconds lc = stateDescriptor->getLastChange();
+          if (lc==Never)
+            aPropValue->setNull();
+          else
+            aPropValue->setDoubleValue((double)(MainLoop::now()-lc)/Second);
           return true;
         }
       }
@@ -1596,6 +1619,49 @@ DeviceEventPtr DeviceEvents::getEvent(const string aEventId)
 }
 
 
+bool DeviceEvents::pushEvent(const string aEventId)
+{
+  DeviceEventPtr ev = getEvent(aEventId);
+  if (ev) {
+    // push it
+    return pushEvent(ev);
+  }
+  return false; // no event, nothing pushed
+}
+
+
+bool DeviceEvents::pushEvent(DeviceEventPtr aEvent)
+{
+  DeviceEventsList events;
+  events.push_back(aEvent);
+  return pushEvents(events);
+}
+
+
+bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
+{
+  // try to push to connected vDC API client
+  VdcApiConnectionPtr api = singleDeviceP->getVdc().getSessionConnection();
+  if (api && !aEventList.empty()) {
+    // add events
+    SALOG((*singleDeviceP), LOG_NOTICE, "pushing: independent event(s):");
+    ApiValuePtr events;
+    for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
+      if (!events) {
+        events = api->newApiValue();
+        events->setType(apivalue_object);
+      }
+      ApiValuePtr event = api->newApiValue();
+      event->setType(apivalue_null); // for now, events don't have any properties, so it's just named NULL values
+      events->add((*pos)->eventId, event);
+      SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s'", (*pos)->eventId.c_str());
+    }
+    return singleDeviceP->pushNotification(ApiValuePtr(), events, VDC_API_DOMAIN);
+  }
+  return false; // no events to push
+}
+
+
 
 
 // MARK: ===== DeviceProperties
@@ -1631,7 +1697,7 @@ SingleDevice::SingleDevice(Vdc *aVdcP) :
   // create states
   deviceStates = DeviceStatesPtr(new DeviceStates);
   // create events
-  deviceEvents = DeviceEventsPtr(new DeviceEvents);
+  deviceEvents = DeviceEventsPtr(new DeviceEvents(*this));
   // create device properties
   deviceProperties = DevicePropertiesPtr(new DeviceProperties);
 }
