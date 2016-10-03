@@ -67,9 +67,14 @@ namespace p44 {
     /// @return name of this value
     string getName() const { return valueName; }
 
-    /// get the time of last update
+    /// get the time of last update (even if no change)
     /// @return the time of last update or Never if value has never been set so far
     MLMicroSeconds getLastUpdate() { return lastUpdate; };
+
+    /// get the time of last change
+    /// @return the time of last change or Never if value has never been set so far
+    MLMicroSeconds getLastChange() { return lastChange; };
+
 
     /// get the (default) value into an ApiValue
     /// @param aApiValue the API value to write the value to
@@ -135,11 +140,18 @@ namespace p44 {
     bool isDefault; ///< set if the value stored is the default value
     VdcValueType valueType; ///< the type of the parameter
     MLMicroSeconds lastUpdate; ///< when the value was last updated
+    MLMicroSeconds lastChange; ///< when the value was last changed
 
     /// set last update
     /// @param aLastUpdate time of last update, can be Never (or Infinite to use current now())
     /// @return true if this update caused hasValue to be changed from false to true
     bool setLastUpdate(MLMicroSeconds aLastUpdate=Infinite);
+
+    /// report if changed
+    /// @param aChanged true if value has changed
+    /// @return just returns aChanged
+    bool setChanged(bool aChanged);
+
 
     /// notify that this value has just updated
     /// @note this must be called by setters just after updating update time, current and previous values.
@@ -443,7 +455,7 @@ namespace p44 {
 
     CustomActionsVector customActions;
 
-    SingleDevice &singleDevice; ///< the single device this custom action belongs to
+    SingleDevice &singleDevice; ///< the single device the custom actions belong to
 
   public:
 
@@ -530,24 +542,24 @@ namespace p44 {
     /// @param aStateId the id (key in the container) of the state.
     /// @param aDescription a description string for the state.
     /// @param aStateDescriptor value descriptor for the state
-    /// @param aChangeHandler will be called
+    /// @param aWillPushHandler will be called just before pushing the state, allows handler to add events
     DeviceState(SingleDevice &aSingleDevice, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor, DeviceStateWillPushCB aWillPushHandler);
 
     /// access value
     ValueDescriptorPtr value() { return stateDescriptor; };
 
-    /// push the state via pushProperty
+    /// push the state via pushNotification
     /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
     /// @note will call the willPushHandler to collect possibly associated events
     bool push();
 
-    /// push the state via pushProperty along with an event
+    /// push the state via pushNotification along with an event
     /// @param aEvent a single event to push along with the state
     /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
     /// @note will also call the willPushHandler to collect possibly more associated events
     bool pushWithEvent(DeviceEventPtr aEvent);
 
-    /// push the state via pushProperty along with multiple events
+    /// push the state via pushNotification along with multiple events
     /// @param aEventList a list of events to send along with the pushed state
     /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
     /// @note will also call the willPushHandler to collect possibly more associated events
@@ -640,17 +652,37 @@ namespace p44 {
 
     EventsVector deviceEvents;
 
+  protected:
+
+    SingleDevice *singleDeviceP; ///< the single device the events belong to
+
   public:
+
+    DeviceEvents(SingleDevice &aSingleDevice) : singleDeviceP(&aSingleDevice) { };
 
     /// add a event (at device setup time only)
     /// @param aEvent the event
     void addEvent(DeviceEventPtr aEvent);
 
     /// get event (for triggering/sending it via push)
-    /// @param aStateId id of the state to get
+    /// @param aEventId id of the state to get
     DeviceEventPtr getEvent(const string aEventId);
 
-    /// TODO: add method to push pure events
+    /// push the event via pushNotification
+    /// @param aEventId the ID of the event to push
+    /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
+    bool pushEvent(const string aEventId);
+
+    /// push the event via pushNotification
+    /// @param aEvent a single event to push along with the state
+    /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
+    bool pushEvent(DeviceEventPtr aEvent);
+
+    /// push the event via pushNotification
+    /// @param aEventList a list of events to send along with the pushed state
+    /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
+    bool pushEvents(DeviceEventsList aEventList);
+
 
     /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
     void addToModelUIDHash(string &aHashedString);
