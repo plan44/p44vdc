@@ -148,7 +148,13 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   // RGB, RGBW or RGBWA dimmer
   RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
   // RGB lamp, get components for rendering loop
-  cl->getRGB(r, g, b, 255); // get brightness per R,G,B channel
+  if (getLedChainVdc().hasWhite()) {
+    cl->getRGBW(r, g, b, w, 255); // get brightness per R,G,B,W channel
+  }
+  else {
+    cl->getRGB(r, g, b, 255); // get brightness per R,G,B channel
+    w = 0;
+  }
   // trigger rendering the LEDs soon
   getLedChainVdc().triggerRenderingRange(firstLED, numLEDs);
   // next step
@@ -167,14 +173,14 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
 }
 
 
-double LedChainDevice::getLEDColor(uint16_t aLedNumber, uint8_t &aRed, uint8_t &aGreen, uint8_t &aBlue)
+double LedChainDevice::getLEDColor(uint16_t aLedNumber, uint8_t &aRed, uint8_t &aGreen, uint8_t &aBlue, uint8_t &aWhite)
 {
   // index relative to beginning of my segment
   uint16_t i = aLedNumber-firstLED;
   if (i<0 || i>=numLEDs)
     return 0; // no color at this point
   // color at this point
-  aRed = r; aGreen = g; aBlue = b;
+  aRed = r; aGreen = g; aBlue = b; aWhite = w;
   // for soft edges
   if (i>=startSoftEdge && i<=numLEDs-endSoftEdge) {
     // not withing soft edge range, full opacity

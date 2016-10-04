@@ -61,6 +61,7 @@ namespace p44 {
 
     LedChainDevicePersistence db;
 
+    WS281xComm::LedType ledType;
     int numLedsInChain;
     uint8_t maxOutValue;
     WS281xCommPtr ws281xcomm;
@@ -74,7 +75,7 @@ namespace p44 {
 
   public:
   
-    LedChainVdc(int aInstanceNumber, int aNumLedsInChain, VdcHost *aVdcHostP, int aTag);
+    LedChainVdc(int aInstanceNumber, const string aChainSpec, VdcHost *aVdcHostP, int aTag);
 
     void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
@@ -92,6 +93,10 @@ namespace p44 {
     /// get minimum brigthness for dimming
     /// @return minimum brightness that will just barely keep the LEDs on
     Brightness getMinBrightness();
+
+    /// get minimum brigthness for dimming
+    /// @return true if LEDs have a separate white channel
+    bool hasWhite();
 
     /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
     /// devices.
