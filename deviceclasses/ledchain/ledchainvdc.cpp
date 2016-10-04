@@ -60,14 +60,29 @@ string LedChainDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToV
 
 
 
-LedChainVdc::LedChainVdc(int aInstanceNumber, int aNumLedsInChain, VdcHost *aVdcHostP, int aTag) :
+LedChainVdc::LedChainVdc(int aInstanceNumber, const string aChainSpec, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  numLedsInChain(aNumLedsInChain),
   renderStart(0),
   renderEnd(0),
   renderTicket(0),
   maxOutValue(128) // by default, allow only half of max intensity (for full intensity a ~200 LED chain needs 70W power supply!)
 {
+  // parse chain specification
+  // Syntax: [chaintype:]numberOfLeds
+  ledType = WS281xComm::ledtype_ws2812; // assume WS2812
+  string chaintype;
+  string rest;
+  if (keyAndValue(aChainSpec, chaintype, rest, ':')) {
+    if (chaintype=="SK6812") {
+      ledType = WS281xComm::ledtype_sk6812;
+    }
+  }
+  else {
+    rest = aChainSpec;
+  }
+  if (sscanf(rest.c_str(), "%d", &numLedsInChain)!=1) {
+    numLedsInChain = 200; // default
+  }
 }
 
 
@@ -79,7 +94,7 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   err = db.connectAndInitialize(databaseName.c_str(), LEDCHAINDEVICES_SCHEMA_VERSION, LEDCHAINDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
   // Initialize chain driver
-  ws281xcomm = WS281xCommPtr(new WS281xComm(numLedsInChain));
+  ws281xcomm = WS281xCommPtr(new WS281xComm(ledType, numLedsInChain));
   ws281xcomm->begin();
   // trigger a full chain rendering
   triggerRenderingRange(0, numLedsInChain);
@@ -115,6 +130,14 @@ Brightness LedChainVdc::getMinBrightness()
 }
 
 
+bool LedChainVdc::hasWhite()
+{
+  // so far, only SK6812 have white
+  return ledType==WS281xComm::ledtype_sk6812;
+}
+
+
+
 static inline void increase(uint8_t &aByte, uint8_t aAmount, uint8_t aMax = 255)
 {
   uint16_t r = aByte+aAmount;
@@ -131,17 +154,18 @@ void LedChainVdc::render()
   for (uint16_t i=renderStart; i<renderEnd; i++) {
     // TODO: optimize asking only devices active in this range
     // for now, just ask all
-    uint8_t r,g,b;
-    uint8_t rv=0,gv=0,bv=0; // composed
+    uint8_t r, g, b, w;
+    uint8_t rv=0, gv=0, bv=0, wv=0; // composed
     for (LedChainDeviceList::iterator pos = sortedSegments.begin(); pos!=sortedSegments.end(); ++pos) {
-      double opacity = (*pos)->getLEDColor(i, r, g, b);
+      double opacity = (*pos)->getLEDColor(i, r, g, b, w);
       if (opacity>0) {
         increase(rv, opacity*r);
         increase(gv, opacity*g);
         increase(bv, opacity*b);
+        increase(wv, opacity*w);
       }
     }
-    ws281xcomm->setColorDimmed(i, rv, gv, bv, maxOutValue); // not more than maximum brightness allowed
+    ws281xcomm->setColorDimmed(i, rv, gv, bv, wv, maxOutValue); // not more than maximum brightness allowed
   }
   // transfer to hardware
   ws281xcomm->show();
