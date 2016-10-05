@@ -64,9 +64,9 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
   // always update age, even if value itself may not have changed
   MLMicroSeconds now = MainLoop::now();
   lastUpdate = now;
-  // input state change is considered a (regular!) user action, have it checked globally first
   bool changedState = aNewState!=currentState;
   if (changedState) {
+    // input state change is considered a (regular!) user action, have it checked globally first
     device.getVdc().signalDeviceUserAction(device, true);
     // Note: even if global identify handler processes this, still report state changes (otherwise upstream could get out of sync)
   }

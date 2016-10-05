@@ -215,6 +215,17 @@ namespace p44 {
     /// @param aChannel channel number (multiple logical EnoceanDevices might exists for the same EnoceanAddress)
     virtual void setAddressingInfo(EnoceanAddress aAddress, EnoceanChannel aChannel);
 
+    /// set EEP information
+    /// @param aEEProfile VARIANT/RORG/FUNC/TYPE EEP profile number
+    /// @param aEEManufacturer manufacturer number (or manufacturer_unknown)
+    virtual void setEEPInfo(EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer);
+
+    /// set the icon info for the enocean device
+    void setIconInfo(const char *aIconBaseName, bool aGroupColored) { iconBaseName = aIconBaseName; groupColoredIcon = aGroupColored; };
+
+    /// set short functional description for this device (explaining the EEP in short, like "button", "sensor", "window handle")
+    /// @param aString the description string
+    void setFunctionDesc(string aString) { eeFunctionDesc = aString; };
 
     /// device and channel handler implementations can call this to enable immediate sending of output changes for the device
     /// (otherwise, output changes are sent only withing 1sec after receiving a message from the device)
@@ -225,8 +236,7 @@ namespace p44 {
     void setUpdateAtEveryReceive(bool aUpdateAtEveryReceive = true) { updateAtEveryReceive = aUpdateAtEveryReceive; };
 
 
-    /// set the icon info for the enocean device
-    void setIconInfo(const char *aIconBaseName, bool aGroupColored) { iconBaseName = aIconBaseName; groupColoredIcon = aGroupColored; };
+
 
     /// get the enocean address identifying the hardware that contains this logical device
     /// @return EnOcean device ID/address
@@ -237,17 +247,6 @@ namespace p44 {
     ///   physical EnOcean device (having the same EnOcean deviceID/address)
     /// @return EnOcean device ID/address
     EnoceanSubDevice getSubDevice();
-
-    /// set EEP information
-    /// @param aEEProfile VARIANT/RORG/FUNC/TYPE EEP profile number
-    /// @param aEEManufacturer manufacturer number (or manufacturer_unknown)
-    virtual void setEEPInfo(EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer);
-
-
-    /// set short functional description for this device (explaining the EEP in short, like "button", "sensor", "window handle")
-    /// @param aString the description string
-    void setFunctionDesc(string aString) { eeFunctionDesc = aString; };
-
 
     /// @return VARIANT/RORG/FUNC/TYPE EEP profile number with optional variant (MSB of 32bit value)
     EnoceanProfile getEEProfile();

@@ -1826,36 +1826,53 @@ bool SingleDevice::prepareSceneCall(DsScenePtr aScene)
   if (cs) {
     // execute custom scene commands
     if (!cs->command.empty()) {
+      // special case: singledevice also directly executes non-prefixed commands,
       string cmd, cmdargs;
+      bool isDeviceAction = false;
       if (keyAndValue(cs->command, cmd, cmdargs, ':')) {
         if (cmd==SCENECMD_DEVICE_ACTION) {
-          // Syntax: deviceaction:actionid[:<JSON object with params>]
-          ApiValuePtr actionParams;
-          string actionid;
-          string jsonparams;
-          JsonObjectPtr j;
-          if (keyAndValue(cmdargs, actionid, jsonparams)) {
-            // substitute placeholders that might be in the JSON
-            cs->substitutePlaceholders(jsonparams);
-            // make Json object of it
-            j = JsonObject::objFromText(jsonparams.c_str());
-          }
-          else {
-            // no params, just actions
-            actionid = cmdargs;
-          }
-          if (!j) {
-            // make an API value out of it
-            j = JsonObject::newObj();
-          }
-          actionParams = JsonApiValue::newValueFromJson(j);
-          ALOG(LOG_NOTICE, "invoking action via scene %d command: %s:%s", aScene->sceneNo, actionid.c_str(), actionParams->description().c_str());
-          call(actionid, actionParams, boost::bind(&SingleDevice::sceneInvokedActionComplete, this, _1));
-          return false; // do not continue applying
+          // prefixed
+          isDeviceAction = true;
         }
         else {
-          ALOG(LOG_ERR, "Unknown scene command: %s", cs->command.c_str());
+          // has a xxxx: prefix, but not "deviceaction"
+          if (cmd.find_first_of(".-_")!=string::npos) {
+            // prefix contains things that can't be a prefix -> assume entire string is a deviceAction
+            // Note: dS internally used actions are prefixed with "std." or "cust.", so these always work as direct deviceActions
+            isDeviceAction = true;
+            cmdargs = cs->command; // entire string as device action
+          }
         }
+      }
+      else {
+        // no prefix at all -> default to deviceaction anyway
+        isDeviceAction = true;
+        cmdargs = cs->command; // entire string as device action
+      }
+      if (isDeviceAction) {
+        // Syntax: actionid[:<JSON object with params>]
+        ApiValuePtr actionParams;
+        string actionid;
+        string jsonparams;
+        JsonObjectPtr j;
+        if (keyAndValue(cmdargs, actionid, jsonparams)) {
+          // substitute placeholders that might be in the JSON
+          cs->substitutePlaceholders(jsonparams);
+          // make Json object of it
+          j = JsonObject::objFromText(jsonparams.c_str());
+        }
+        else {
+          // no params, just actions
+          actionid = cmdargs;
+        }
+        if (!j) {
+          // make an API value out of it
+          j = JsonObject::newObj();
+        }
+        actionParams = JsonApiValue::newValueFromJson(j);
+        ALOG(LOG_NOTICE, "invoking action via scene %d command: %s:%s", aScene->sceneNo, actionid.c_str(), actionParams->description().c_str());
+        call(actionid, actionParams, boost::bind(&SingleDevice::sceneInvokedActionComplete, this, _1));
+        return false; // do not continue applying
       }
     }
   }

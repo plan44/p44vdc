@@ -44,11 +44,11 @@ namespace p44 {
 
     typedef enum {
       ledchain_unknown,
-      ledchain_softsegment,
-      ledchain_
+      ledchain_softsegment
     } LedChainType;
 
     LedChainType ledchainType;
+    bool hasWhite;
 
     uint16_t startSoftEdge;
     uint16_t endSoftEdge;
@@ -58,7 +58,7 @@ namespace p44 {
     long transitionTicket;
 
     /// current color values
-    double r,g,b;
+    double r, g, b, w;
 
   public:
 
@@ -85,8 +85,9 @@ namespace p44 {
     /// @param aRed will receive red intensity
     /// @param aGreen will receive green intensity
     /// @param aBlue will receive blue intensity
+    /// @param aWhite will receive white intensity for LED chains that have a separate white component
     /// @return opacity of light (0=no light, 1=only this light source, between: weight in mix with other sources)
-    double getLEDColor(uint16_t aLedNumber, uint8_t &aRed, uint8_t &aGreen, uint8_t &aBlue);
+    double getLEDColor(uint16_t aLedNumber, uint8_t &aRed, uint8_t &aGreen, uint8_t &aBlue, uint8_t &aWhite);
 
     /// @}
 
