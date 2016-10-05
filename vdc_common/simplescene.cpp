@@ -446,7 +446,7 @@ int SimpleCmdScene::numProps(int aDomain, PropertyDescriptorPtr aParentDescripto
 PropertyDescriptorPtr SimpleCmdScene::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numCmdSceneProperties] = {
-    { "x-p44-command", apivalue_string, command_key, OKEY(cmdscene_key) },
+    { "command", apivalue_string, command_key, OKEY(cmdscene_key) },
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
