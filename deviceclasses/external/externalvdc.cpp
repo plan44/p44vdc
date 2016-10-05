@@ -224,7 +224,7 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
       }
     }
     else {
-      err = TextError::err("Device must be sent 'init' message first", aMessageType.c_str());
+      err = TextError::err("Device must be sent 'init' message first");
     }
   }
   return err;

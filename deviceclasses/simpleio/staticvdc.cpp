@@ -56,9 +56,10 @@ StaticVdc &StaticDevice::getStaticVdc()
 
 void StaticDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
+  ALOG(LOG_DEBUG, "disconnecting static device with rowid=%lld", staticDeviceRowID);
   // clear learn-in data from DB
   if (staticDeviceRowID) {
-    getStaticVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%d", staticDeviceRowID);
+    getStaticVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", staticDeviceRowID);
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);

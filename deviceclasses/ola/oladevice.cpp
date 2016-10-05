@@ -166,7 +166,7 @@ void OlaDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHan
 {
   // clear learn-in data from DB
   if (olaDeviceRowID) {
-    getOlaVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%d", olaDeviceRowID);
+    getOlaVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", olaDeviceRowID);
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);

@@ -109,7 +109,7 @@ void LedChainDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
 {
   // clear learn-in data from DB
   if (ledChainDeviceRowID) {
-    getLedChainVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%d", ledChainDeviceRowID);
+    getLedChainVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", ledChainDeviceRowID);
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);
