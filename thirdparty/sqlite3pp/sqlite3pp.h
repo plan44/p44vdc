@@ -33,6 +33,10 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/function.hpp>
 
+#ifndef __printflike
+#define __printflike(...)
+#endif
+
 namespace sqlite3pp
 {
   namespace ext
@@ -74,7 +78,7 @@ namespace sqlite3pp
     char const* error_msg() const;
 
     int execute(char const* sql);
-    int executef(char const* sql, ...);
+    int executef(char const* sql, ...) __printflike(2,3);
 
     int set_busy_timeout(int ms);
 
