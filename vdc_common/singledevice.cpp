@@ -1284,7 +1284,7 @@ bool DeviceState::pushWithEvent(DeviceEventPtr aEvent)
 
 bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
 {
-  SALOG((*singleDeviceP), LOG_NOTICE, "pushing: state '%s' changed to %s", stateId.c_str(), stateDescriptor->getStringValue().c_str());
+  SALOG((*singleDeviceP), LOG_NOTICE, "pushing: state '%s' changed to '%s'", stateId.c_str(), stateDescriptor->getStringValue().c_str());
   // update for every push attempt, as this are "events"
   lastPush = MainLoop::currentMainLoop().now();
   // collect additional events to push
