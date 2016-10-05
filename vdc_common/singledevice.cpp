@@ -1511,14 +1511,14 @@ int DeviceEvent::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   // check access path, depends on how we access the state (description or actual state)
   if (aParentDescriptor->parentDescriptor->hasObjectKey(deviceeventdesc_key))
-    return numStatesDescProperties;
+    return numEventDescProperties;
   return 0;
 }
 
 
 PropertyDescriptorPtr DeviceEvent::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  static const PropertyDescription descproperties[numStatesDescProperties] = {
+  static const PropertyDescription descproperties[numEventDescProperties] = {
     { "description", apivalue_string, eventdescription_key, OKEY(deviceeventdesc_key) },
   };
   // check access path, depends on how we access the event (Note: for now we only have description, so it's not strictly needed yet here)
