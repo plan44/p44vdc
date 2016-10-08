@@ -128,7 +128,6 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 
 
 //static const ProfileVariantEntry profileVariantsVLD[] = {
-//  // dual rocker RPS button alternatives
 //  { 1, 0x00A52001, 0, "heating valve" },
 //  { 1, 0x01A52001, 0, "heating valve (with temperature sensor)" },
 //  { 1, 0x02A52001, 0, "heating valve with binary output adjustment (e.g. MD10-FTL)" },

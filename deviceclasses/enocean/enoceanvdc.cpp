@@ -238,7 +238,7 @@ ErrorPtr EnoceanVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
 {
   ErrorPtr respErr;
   if (aMethod=="x-p44-addProfile") {
-    // create a composite device out of existing single-channel ones
+    // add new device (without learn-in, usually for remotecontrol-type devices or debugging)
     respErr = addProfile(aRequest, aParams);
   }
   else if (aMethod=="x-p44-simulatePacket") {

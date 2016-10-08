@@ -388,11 +388,12 @@ Enocean4BSDevice::Enocean4BSDevice(EnoceanVdc *aVdcP) :
 
 
 static const ProfileVariantEntry profileVariants4BS[] = {
-  // dual rocker RPS button alternatives
+  // heating valve alternatives
   { 1, 0x00A52001, 0, "heating valve" },
   { 1, 0x01A52001, 0, "heating valve (with temperature sensor)" },
   { 1, 0x02A52001, 0, "heating valve with binary output adjustment (e.g. MD10-FTL)" },
   { 1, 0x03A52001, 0, "heating valve in self-regulation mode" },
+  // room panel alternatives for set point
   { 2, 0x00A51006, 0, "standard profile" },
   { 2, 0x01A51006, 0, "set point interpreted as 0..40°C (e.g. FTR55D)" },
   { 0, 0, 0, NULL } // terminator
