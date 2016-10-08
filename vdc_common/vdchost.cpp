@@ -309,7 +309,7 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 void VdcHost::startRunning()
 {
   // start periodic tasks needed during normal running like announcement checking and saving parameters
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, deviceContainerP, _1), 1*Second);
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, vdcHostP, _1), 1*Second);
 }
 
 
@@ -941,7 +941,7 @@ DsAddressablePtr VdcHost::addressableForParams(const DsUid &aDsUid, ApiValuePtr 
       // x-p44-query specified, but nothing found
       return DsAddressablePtr();
     }
-    // empty dSUID but no special query: default to vdc-host itself (root object)
+    // empty dSUID but no special query: default to vdchost itself (root object)
     return DsAddressablePtr(this);
   }
   // not special query, not empty dSUID
@@ -950,14 +950,14 @@ DsAddressablePtr VdcHost::addressableForParams(const DsUid &aDsUid, ApiValuePtr 
     return DsAddressablePtr(this);
   }
   else {
-    // Must be device or deviceClassContainer level method
+    // Must be device or vdc level
     // - find device to handle it (more probable case)
     DsDeviceMap::iterator pos = dSDevices.find(aDsUid);
     if (pos!=dSDevices.end()) {
       return pos->second;
     }
     else {
-      // is not a device, try deviceClassContainer
+      // is not a device, try vdcs
       VdcMap::iterator pos = vdcs.find(aDsUid);
       if (pos!=vdcs.end()) {
         return pos->second;
@@ -979,7 +979,7 @@ ErrorPtr VdcHost::handleMethodForDsUid(const string &aMethod, VdcApiRequestPtr a
     if (dev && aMethod=="remove") {
       return removeHandler(aRequest, dev);
     }
-    // normal addressable or not remove -> just let addressable handle the method itself
+    // non-device addressable or not remove -> just let addressable handle the method itself
     return addressable->handleMethod(aRequest, aMethod, aParams);
   }
   else {

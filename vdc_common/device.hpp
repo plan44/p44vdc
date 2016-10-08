@@ -188,8 +188,8 @@ namespace p44 {
     /// @param aName name of the addressable entity
     virtual void setName(const string &aName) P44_OVERRIDE;
 
-    /// get reference to device container
-    VdcHost &getVdc() { return vdcP->getVdc(); };
+    /// get reference to vDC host
+    VdcHost &getVdcHost() const { return vdcP->getVdcHost(); };
 
     /// install specific or standard device settings
     /// @param aDeviceSettings specific device settings, if NULL, standard minimal settings will be used

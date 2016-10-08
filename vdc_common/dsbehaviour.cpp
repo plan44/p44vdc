@@ -30,7 +30,7 @@ using namespace p44;
 // MARK: ===== DsBehaviour
 
 DsBehaviour::DsBehaviour(Device &aDevice) :
-  inheritedParams(aDevice.getVdc().getDsParamStore()),
+  inheritedParams(aDevice.getVdcHost().getDsParamStore()),
   index(0),
   device(aDevice),
   hardwareName("<undefined>"),
@@ -59,7 +59,7 @@ void DsBehaviour::setHardwareError(VdcHardwareError aHardwareError)
 
 bool DsBehaviour::pushBehaviourState()
 {
-  VdcApiConnectionPtr api = device.getVdc().getSessionConnection();
+  VdcApiConnectionPtr api = device.getVdcHost().getSessionConnection();
   if (api) {
     ApiValuePtr query = api->newApiValue();
     query->setType(apivalue_object);

@@ -54,9 +54,9 @@ string Vdc::getName()
   if (inherited::getName().empty()) {
     // no name set for this vdc
     // - check if vdc host has a name
-    if (!getVdc().getName().empty()) {
+    if (!getVdcHost().getName().empty()) {
       // there is a custom name set for the entire vdc host, use it as base for default names
-      return string_format("%s %s", getVdc().getName().c_str(), vdcModelSuffix().c_str());
+      return string_format("%s %s", getVdcHost().getName().c_str(), vdcModelSuffix().c_str());
     }
   }
   // just use assigned name
@@ -133,7 +133,7 @@ void Vdc::addVdcToVdcHost()
   // derive dSUID first, as it will be mapped by dSUID in the device container 
   deriveDsUid();
   // add to container
-  getVdc().addVdc(VdcPtr(this));
+  getVdcHost().addVdc(VdcPtr(this));
 }
 
 
@@ -155,7 +155,7 @@ void Vdc::selfTest(StatusCB aCompletedCB)
 
 const char *Vdc::getPersistentDataDir()
 {
-	return deviceContainerP->getPersistentDataDir();
+	return getVdcHost().getPersistentDataDir();
 }
 
 
@@ -169,7 +169,7 @@ void Vdc::deriveDsUid()
 {
   // class containers have v5 UUIDs based on the device container's master UUID as namespace
   string name = string_format("%s.%d", vdcClassIdentifier(), getInstanceNumber()); // name is class identifier plus instance number: classID.instNo
-  dSUID.setNameInSpace(name, getVdc().dSUID); // domain is dSUID of device container
+  dSUID.setNameInSpace(name, getVdcHost().dSUID); // domain is dSUID of device container
 }
 
 
@@ -177,7 +177,7 @@ string Vdc::vdcInstanceIdentifier() const
 {
   string s(vdcClassIdentifier());
   string_format_append(s, ".%d@", getInstanceNumber());
-  s.append(deviceContainerP->dSUID.getString());
+  s.append(getVdcHost().dSUID.getString());
   return s;
 }
 
@@ -194,7 +194,7 @@ bool Vdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPr
 string Vdc::vendorName()
 {
   // default to same vendor as vdc host (device container)
-  return deviceContainerP->vendorName();
+  return getVdcHost().vendorName();
 }
 
 
@@ -205,7 +205,7 @@ bool Vdc::addDevice(DevicePtr aDevice)
   // let device consider its internal structure and dSUID for the last time
   aDevice->willBeAdded();
   // announce to global device container
-  if (deviceContainerP->addDevice(aDevice)) {
+  if (getVdcHost().addDevice(aDevice)) {
     // not a duplicate
     // - save in my own list
     devices.push_back(aDevice);
@@ -228,7 +228,7 @@ void Vdc::removeDevice(DevicePtr aDevice, bool aForget)
 		}
 	}
   // remove from global device container
-  deviceContainerP->removeDevice(aDevice, aForget);
+  getVdcHost().removeDevice(aDevice, aForget);
 }
 
 
@@ -239,7 +239,7 @@ void Vdc::removeDevices(bool aForget)
     // inform upstream about these devices going offline now (if API connection is up at all at this time)
     dev->reportVanished();
     // now actually remove
-    deviceContainerP->removeDevice(dev, aForget);
+    getVdcHost().removeDevice(dev, aForget);
   }
   // clear my own list
   devices.clear();
@@ -280,7 +280,7 @@ ErrorPtr Vdc::forget()
 
 void Vdc::loadSettingsFromFiles()
 {
-  string dir = getVdc().getPersistentDataDir();
+  string dir = getVdcHost().getPersistentDataDir();
   const int numLevels = 2;
   string levelids[numLevels];
   // Level strategy: most specialized will be active, unless lower levels specify explicit override

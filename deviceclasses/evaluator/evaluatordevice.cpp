@@ -252,7 +252,7 @@ void EvaluatorDevice::parseValueDefs()
       if (e2==string::npos) e2 = valueDefs.size();
       string valuesourceid = valueDefs.substr(i,e2-i);
       // search source
-      ValueSource *vs = getVdc().getValueSourceById(valuesourceid);
+      ValueSource *vs = getVdcHost().getValueSourceById(valuesourceid);
       if (vs) {
         // value source exists
         // - add myself as listener

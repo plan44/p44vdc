@@ -369,7 +369,7 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
     if (numNewDevices>0) {
       // successfully learned at least one device
       // - update learn status (device learned)
-      getVdc().reportLearnEvent(true, ErrorPtr());
+      getVdcHost().reportLearnEvent(true, ErrorPtr());
       return yes; // learned in
     }
     return undefined; // failure - could not learn a device with this profile
@@ -378,7 +378,7 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
     // device learned out, un-pair all logical dS devices it has represented
     // but keep dS level config in case it is reconnected
     unpairDevicesByAddress(aDeviceAddress, false);
-    getVdc().reportLearnEvent(false, ErrorPtr());
+    getVdcHost().reportLearnEvent(false, ErrorPtr());
     return no; // always successful learn out
   }
 }
@@ -419,7 +419,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
         // learning packet in non-learn mode -> report as non-regular user action, might be attempt to identify a device
         // Note: RPS devices are excluded because for these all telegrams are regular user actions.
         // signalDeviceUserAction() will be called from button and binary input behaviours
-        if (getVdc().signalDeviceUserAction(*(pos->second), false)) {
+        if (getVdcHost().signalDeviceUserAction(*(pos->second), false)) {
           // consumed for device identification purposes, suppress further processing
           break;
         }

@@ -51,7 +51,7 @@ Device::Device(Vdc *aVdcP) :
   areaDimmed(0),
   areaDimMode(dimmode_stop),
   vdcP(aVdcP),
-  DsAddressable(&aVdcP->getVdc()),
+  DsAddressable(&aVdcP->getVdcHost()),
   colorClass(class_black_joker),
   applyInProgress(false),
   missedApplyAttempts(0),
@@ -1433,7 +1433,7 @@ ErrorPtr Device::forget()
 
 void Device::loadSettingsFromFiles()
 {
-  string dir = getVdc().getPersistentDataDir();
+  string dir = getVdcHost().getPersistentDataDir();
   const int numLevels = 4;
   string levelids[numLevels];
   // Level strategy: most specialized will be active, unless lower levels specify explicit override

@@ -695,7 +695,7 @@ void DeviceActions::addAction(DeviceActionPtr aAction)
 
 CustomAction::CustomAction(SingleDevice &aSingleDevice) :
   singleDevice(aSingleDevice),
-  inheritedParams(aSingleDevice.getVdc().getDsParamStore()),
+  inheritedParams(aSingleDevice.getVdcHost().getDsParamStore()),
   flags(0)
 {
   storedParams = ApiValuePtr(new JsonApiValue()); // must be JSON as we store params as JSON
@@ -1137,7 +1137,7 @@ void CustomActions::markClean()
 
 void CustomActions::loadActionsFromFiles()
 {
-  string dir = singleDevice.getVdc().getPersistentDataDir();
+  string dir = singleDevice.getVdcHost().getPersistentDataDir();
   const int numLevels = 4;
   string levelids[numLevels];
   // Level strategy: most specialized will be active, unless lower levels specify explicit override
@@ -1292,7 +1292,7 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
     willPushHandler(DeviceStatePtr(this), aEventList);
   }
   // try to push to connected vDC API client
-  VdcApiConnectionPtr api = singleDeviceP->getVdc().getSessionConnection();
+  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
   if (api) {
     // create query for state property to get pushed
     ApiValuePtr query = api->newApiValue();
@@ -1641,7 +1641,7 @@ bool DeviceEvents::pushEvent(DeviceEventPtr aEvent)
 bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
 {
   // try to push to connected vDC API client
-  VdcApiConnectionPtr api = singleDeviceP->getVdc().getSessionConnection();
+  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
   if (api && !aEventList.empty()) {
     // add events
     SALOG((*singleDeviceP), LOG_NOTICE, "pushing: independent event(s):");

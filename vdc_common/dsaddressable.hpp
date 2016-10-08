@@ -62,7 +62,7 @@ namespace p44 {
     MLMicroSeconds announcing; ///< set when announcement has been started (but not yet confirmed)
 
   protected:
-    VdcHost *deviceContainerP;
+    VdcHost *vdcHostP;
 
     /// the actual (modern) dSUID
     DsUid dSUID;
@@ -79,7 +79,7 @@ namespace p44 {
     const DsUid &getDsUid() { return dSUID; };
 
     /// get reference to device container
-    VdcHost &getVdc() { return *deviceContainerP; };
+    VdcHost &getVdcHost() const { return *vdcHostP; };
 
     /// get user assigned name of the addressable
     /// @return name string

@@ -95,7 +95,7 @@ void DaliBusDevice::deriveDsUid()
     shortAddrBasedDsUid.setNameInSpace(s, vdcNamespace);
     // - check for named device in database consisting of this dimmer with shortaddr based dSUID
     //   Note that only single dimmer device are checked for, composite devices will not have this compatibility mechanism
-    sqlite3pp::query qry(daliVdc.getVdc().getDsParamStore());
+    sqlite3pp::query qry(daliVdc.getVdcHost().getDsParamStore());
     // Note: this is a bit ugly, as it has the device settings table name hard coded
     string sql = string_format("SELECT deviceName FROM DeviceSettings WHERE parentID='%s'", shortAddrBasedDsUid.getString().c_str());
     if (qry.prepare(sql.c_str())==SQLITE_OK) {

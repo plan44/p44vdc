@@ -123,7 +123,7 @@ namespace p44 {
 		int getInstanceNumber() const;
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() { return deviceContainerP->webuiURLString(); /* by default, return vDC host's config URL */ };
+    virtual string webuiURLString() { return getVdcHost().webuiURLString(); /* by default, return vDC host's config URL */ };
 
     /// get a sufficiently unique identifier for this class container
     /// @return ID that identifies this container running on a specific hardware
@@ -254,13 +254,13 @@ namespace p44 {
 
     /// @return human readable, language independent model name/short description
     /// @note base class will construct this from global product name and vdcModelSuffix()
-    virtual string modelName() P44_OVERRIDE { return string_format("%s %s", getVdc().productName.c_str(), vdcModelSuffix().c_str()); }
+    virtual string modelName() P44_OVERRIDE { return string_format("%s %s", getVdcHost().productName.c_str(), vdcModelSuffix().c_str()); }
 
     /// @return human readable model name/short description
     virtual string vdcModelSuffix() const = 0;
 
     /// @return human readable product version string
-    virtual string modelVersion() P44_OVERRIDE { return getVdc().modelVersion(); /* same as entire vdc host */ }
+    virtual string modelVersion() P44_OVERRIDE { return getVdcHost().modelVersion(); /* same as entire vdc host */ }
 
     /// @return unique ID for the functional model of this entity
     virtual string modelUID() P44_OVERRIDE;

@@ -164,7 +164,7 @@ void HueVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck)
 {
   if (aEnableLearning) {
     hueComm.findNewBridge(
-      string_format("%s#%s", getVdc().modelName().c_str(), getVdc().getDeviceHardwareId().c_str()).c_str(),
+      string_format("%s#%s", getVdcHost().modelName().c_str(), getVdcHost().getDeviceHardwareId().c_str()).c_str(),
       15*Second, // try to login for 15 secs
       boost::bind(&HueVdc::searchResultHandler, this, _1)
     );
@@ -222,7 +222,7 @@ void HueVdc::searchResultHandler(ErrorPtr aError)
       collectLights();
     }
     // report successful learn event
-    getVdc().reportLearnEvent(learnIn, ErrorPtr());
+    getVdcHost().reportLearnEvent(learnIn, ErrorPtr());
   }
   else {
     // not found (usually timeout)

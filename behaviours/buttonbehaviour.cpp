@@ -510,7 +510,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
   clickType = aClickType;
   actionMode = buttonActionMode_none;
   // button press is considered a (regular!) user action, have it checked globally first
-  if (!device.getVdc().signalDeviceUserAction(device, true)) {
+  if (!device.getVdcHost().signalDeviceUserAction(device, true)) {
     // button press not consumed on global level, forward to upstream dS
     BLOG(LOG_NOTICE,
       "Button[%zu] '%s' pushes value = %d, clickType %d",
@@ -520,7 +520,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     pushBehaviourState();
     // also let device container know for local click handling
     // TODO: more elegant solution for this
-    device.getVdc().checkForLocalClickHandling(*this, aClickType);
+    device.getVdcHost().checkForLocalClickHandling(*this, aClickType);
   }
 }
 
