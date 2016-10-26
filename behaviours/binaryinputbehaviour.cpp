@@ -89,7 +89,7 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
 
 void BinaryInputBehaviour::invalidateInputState()
 {
-  if (lastUpdate!=Never) {
+  if (hasDefinedState()) {
     // currently valid -> invalidate
     lastUpdate = Never;
     currentState = false;
@@ -102,6 +102,12 @@ void BinaryInputBehaviour::invalidateInputState()
     // notify listeners
     notifyListeners(valueevent_changed);
   }
+}
+
+
+bool BinaryInputBehaviour::hasDefinedState()
+{
+  return lastUpdate!=Never;
 }
 
 
@@ -306,7 +312,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
         // States properties
         case value_key+states_key_offset:
           // value
-          if (lastUpdate==Never)
+          if (!hasDefinedState())
             aPropValue->setNull();
           else
             aPropValue->setBoolValue(currentState>=1); // all states > 0 are considered "true" for the basic state
@@ -315,7 +321,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
           // extended value
           if (maxExtendedValue()>1) {
             // this is a multi-state input, show the actual state as "extendedValue"
-            if (lastUpdate==Never)
+            if (!hasDefinedState())
               aPropValue->setNull();
             else
               aPropValue->setUint8Value(currentState);
@@ -327,7 +333,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
           return true;
         case age_key+states_key_offset:
           // age
-          if (lastUpdate==Never)
+          if (!hasDefinedState())
             aPropValue->setNull();
           else
             aPropValue->setDoubleValue((double)(MainLoop::now()-lastUpdate)/Second);

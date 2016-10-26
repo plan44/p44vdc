@@ -136,6 +136,10 @@ namespace p44 {
     /// @return true if API was connected and push could be sent
     bool pushBehaviourState();
 
+    /// check for defined state
+    /// @return true if behaviour has a defined (non-NULL) state
+    virtual bool hasDefinedState() { return false; };
+
 
     /// @name persistent settings management
     /// @{

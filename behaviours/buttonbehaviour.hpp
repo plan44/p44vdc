@@ -128,8 +128,12 @@ namespace p44 {
     /// @note Normally this is not directly used, but automatically called by the button state machine
     void sendClick(DsClickType aClickType);
 
-
     /// @}
+
+
+    /// check for defined state
+    /// @return true if behaviour has a defined (non-NULL) state
+    virtual bool hasDefinedState();
 
     
     /// @return button element that defines the function of this button in local operation modes

@@ -99,15 +99,6 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange)
 }
 
 
-bool SensorBehaviour::hasCurrentValue(MLMicroSeconds aMaxAge)
-{
-  if (lastUpdate==Never) return false; // no value at all
-  MLMicroSeconds now = MainLoop::now();
-  return now < lastUpdate+aMaxAge;
-}
-
-
-
 void SensorBehaviour::invalidateSensorValue()
 {
   if (lastUpdate!=Never) {
@@ -124,6 +115,23 @@ void SensorBehaviour::invalidateSensorValue()
     notifyListeners(valueevent_changed);
   }
 }
+
+
+bool SensorBehaviour::hasCurrentValue(MLMicroSeconds aMaxAge)
+{
+  if (lastUpdate==Never) return false; // no value at all
+  MLMicroSeconds now = MainLoop::now();
+  return now < lastUpdate+aMaxAge;
+}
+
+
+bool SensorBehaviour::hasDefinedState()
+{
+  return lastUpdate!=Never;
+}
+
+
+
 
 
 // MARK: ===== value source implementation
@@ -334,14 +342,14 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         // States properties
         case value_key+states_key_offset:
           // value
-          if (lastUpdate==Never)
+          if (!hasDefinedState())
             aPropValue->setNull();
           else
             aPropValue->setDoubleValue(currentValue);
           return true;
         case age_key+states_key_offset:
           // age
-          if (lastUpdate==Never)
+          if (!hasDefinedState())
             aPropValue->setNull();
           else
             aPropValue->setDoubleValue((double)(MainLoop::now()-lastUpdate)/Second);

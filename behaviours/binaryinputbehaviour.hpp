@@ -105,6 +105,10 @@ namespace p44 {
 
     /// @}
 
+    /// check for defined state
+    /// @return true if behaviour has a defined (non-NULL) state
+    virtual bool hasDefinedState();
+
 
     /// @name ValueSource interface
     /// @{

@@ -525,6 +525,12 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
 }
 
 
+bool ButtonBehaviour::hasDefinedState()
+{
+  return false; // buttons don't have a defined state, only actions are of interest (no delayed reporting of button states)
+}
+
+
 void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActionId)
 {
   lastAction = MainLoop::now();

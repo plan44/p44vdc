@@ -116,11 +116,6 @@ namespace p44 {
     /// @return the sensor type
     VdcValueType getSensorType() { return sensorType; };
 
-    /// check if we have a recent value
-    /// @param aMaxAge how old a value we consider still "valid"
-    /// @return true if the sensor has a value not older than aMaxAge
-    bool hasCurrentValue(MLMicroSeconds aMaxAge);
-
     /// invalidate sensor value, i.e. indicate that current value is not known
     void invalidateSensorValue();
 
@@ -138,6 +133,15 @@ namespace p44 {
     void updateEngineeringValue(long aEngineeringValue);
 
     /// @}
+
+    /// check if we have a recent value
+    /// @param aMaxAge how old a value we consider still "valid"
+    /// @return true if the sensor has a value not older than aMaxAge
+    bool hasCurrentValue(MLMicroSeconds aMaxAge);
+
+    /// check for defined state
+    /// @return true if behaviour has a defined (non-NULL) state
+    virtual bool hasDefinedState();
 
 
     /// @name ValueSource interface
