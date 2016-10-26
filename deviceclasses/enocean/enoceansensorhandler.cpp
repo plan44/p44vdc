@@ -122,6 +122,10 @@ namespace p44 { namespace EnoceanSensors {
   const char *humText = "Humidity";
   const char *humUnit = "%";
 
+  const char *coText = "CO";
+  const char *co2Text = "CO2";
+  const char *gasUnit = "ppm";
+
   const char *illumText = "Illumination";
   const char *illumUnit = "lx";
 

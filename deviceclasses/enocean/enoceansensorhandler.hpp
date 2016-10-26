@@ -88,6 +88,9 @@ namespace p44 {
     extern const char *tempUnit;
     extern const char *humText;
     extern const char *humUnit;
+    extern const char *coText;
+    extern const char *co2Text;
+    extern const char *gasUnit;
     extern const char *illumText;
     extern const char *illumUnit;
     extern const char *occupText;

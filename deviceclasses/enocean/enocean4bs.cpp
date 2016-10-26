@@ -148,6 +148,25 @@ static void angleHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor
 }
 
 
+// only update sensor when DB0 Bit1 is set
+static void condDB0Bit1Handler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  // DB0.1 must be set, otherwise this sensor is not available and value must not be updated
+  if (aDataP[3-0] & 0x02) {
+    EnoceanSensors::stdSensorHandler(aSensorDescriptor, aBehaviour, aDataP, aDataSize);
+  }
+}
+
+
+// only update sensor when DB0 Bit2 is set
+static void condDB0Bit2Handler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  // DB0.2 must be set, otherwise this sensor is not available and value must not be updated
+  if (aDataP[3-0] & 0x04) {
+    EnoceanSensors::stdSensorHandler(aSensorDescriptor, aBehaviour, aDataP, aDataSize);
+  }
+}
+
 
 
 // MARK: ===== sensor mapping table for generic EnoceanSensorHandler
@@ -205,19 +224,31 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
 
   // A5-07-xx: Occupancy Sensor
   // - two slightly different occupancy sensors
-  { 0, 0x07, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          0,    1, DB(1,7), DB(1,7), 100, 40*60, &stdInputHandler,  motionText, binaryUnit },
-  { 0, 0x07, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          0,    1, DB(0,7), DB(0,7), 100, 40*60, &stdInputHandler,  motionText, binaryUnit },
+  { 0, 0x07, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,         0,    1, DB(1,7), DB(1,7), 100, 40*60, &stdInputHandler,  motionText, binaryUnit },
+  { 0, 0x07, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,         0,    1, DB(0,7), DB(0,7), 100, 40*60, &stdInputHandler,  motionText, binaryUnit },
   // - occupancy sensor with illumination sensor
-  { 0, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          0,    1, DB(0,7), DB(0,7), 100, 40*60, &stdInputHandler,  motionText, binaryUnit },
-  { 0, 0x07, 0x03, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_room,          0, 1024, DB(2,7), DB(1,6), 100, 40*60, &stdSensorHandler, illumText, illumUnit },
+  { 0, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,         0,    1, DB(0,7), DB(0,7), 100, 40*60, &stdInputHandler,  motionText, binaryUnit },
+  { 0, 0x07, 0x03, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination, usage_room,         0, 1024, DB(2,7), DB(1,6), 100, 40*60, &stdSensorHandler, illumText, illumUnit },
 
   // A5-08-01: Light, Temperature and Occupancy sensor
   // - e.g. Eltako FBH
-  { 0, 0x08, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination,usage_room,          0,  510, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, illumText, illumUnit },
-  { 0, 0x08, 0x01, 0, class_black_joker,  group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   51, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText, tempUnit },
-  { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          1,    0, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  motionText, binaryUnit },
-  { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x08, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      valueType_illumination, usage_room,         0,  510, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, illumText, illumUnit },
+  { 0, 0x08, 0x01, 0, class_black_joker,  group_roomtemperature_control, behaviour_sensor,      valueType_temperature,  usage_room,         0,   51, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText, tempUnit },
+  { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,         1,    0, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  motionText, binaryUnit },
+  { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,         1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
+
+  // A5-09-02: CO concentration, Temperature
+  // - e.g. enoluz.com
+  // TODO: also use supply voltage to detect low bat?
+  { 0, 0x09, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_gas_CO,     usage_room,           0, 1020, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,   coText,  gasUnit },
+  { 0, 0x09, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   51, DB(1,7), DB(1,0), 100, 40*60, &condDB0Bit1Handler, tempText, tempUnit },
+
+  // A5-09-04: Humidity, CO2 concentration, Temperature
+  // - e.g. enoluz.com
+  { 0, 0x09, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_humidity,    usage_room,          0,127.5, DB(3,7), DB(3,0), 100, 40*60, &condDB0Bit2Handler, humText,  humUnit },
+  { 0, 0x09, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_gas_CO2,     usage_room,          0, 2550, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,   co2Text,  gasUnit },
+  { 0, 0x09, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   51, DB(1,7), DB(1,0), 100, 40*60, &condDB0Bit1Handler, tempText, tempUnit },
 
   // A5-10-01: Room Control Panel with Temperature Sensor, Set Point, Fan Speed and Occupancy button
   // Note: fan speed negative range denotes "automatic" (210..255 -> -0.215311..-0)
@@ -225,14 +256,14 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x10, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_set_point,   usage_user,          0,    1, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, setPointText, unityUnit },
   { 0, 0x10, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_fan_speed,   usage_room,         -1,    1, DB(3,7), DB(3,0), 100, 40*60, &fanSpeedHandler,  fanSpeedText, unityUnit },
-  { 0, 0x10, 0x01, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x10, 0x01, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
   // A5-10-02: Room Control Panel with Temperature Sensor, Set Point, Fan Speed and Day/Night Control
   // - e.g. Thermokon Thanos
   { 0, 0x10, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_set_point,   usage_user,          0,    1, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, setPointText, unityUnit },
   { 0, 0x10, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_fan_speed,   usage_room,         -1,    1, DB(3,7), DB(3,0), 100, 40*60, &fanSpeedHandler, fanSpeedText, unityUnit },
-  { 0, 0x10, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,        usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
+  { 0, 0x10, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,       usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
 
   // A5-10-03: Room Control Panel with Temperature Sensor and Set Point Control
   // - e.g. Eltako FTR78S, Thermokon SR06 LCD 2T
@@ -249,17 +280,17 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // - e.g. Siemens QAX95.4..98.4, Thermokon SR06 LCD 4T type 3
   { 0, 0x10, 0x05, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x05, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_set_point,   usage_user,          0,    1, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, setPointText, unityUnit },
-  { 0, 0x10, 0x05, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x10, 0x05, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
   // A5-10-06: Room Panel with Temperature Sensor, Set Point Control, Day/Night Control
   { 0, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_set_point,   usage_user,          0,    1, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, setPointText, unityUnit },
-  { 0, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,        usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
+  { 0, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,       usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
   // A5-10-06: Variant with Set Point Control as temperature scaled 0..40 degrees
   // - e.g. Eltako FTR55D
   { 1, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 1, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_user,          0,   40, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, tempSetPt, tempUnit },
-  { 1, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,        usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
+  { 1, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,       usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
 
   // A5-10-07: Room Control Panel with Temperature Sensor, Fan Speed
   { 0, 0x10, 0x07, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
@@ -268,29 +299,29 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // A5-10-08: Room Control Panel with Temperature Sensor, Fan Speed and Occupancy button
   { 0, 0x10, 0x08, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x08, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_fan_speed,   usage_room,         -1,    1, DB(3,7), DB(3,0), 100, 40*60, &fanSpeedHandler,  fanSpeedText, unityUnit },
-  { 0, 0x10, 0x08, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x10, 0x08, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
   // A5-10-09: Room Control Panel with Temperature Sensor, Fan Speed and day/night control
   { 0, 0x10, 0x09, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x09, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_fan_speed,   usage_room,         -1,    1, DB(3,7), DB(3,0), 100, 40*60, &fanSpeedHandler,  fanSpeedText, unityUnit },
-  { 0, 0x10, 0x09, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,        usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
+  { 0, 0x10, 0x09, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,       usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
 
   // A5-10-0A: Room Control Panel with Temperature Sensor, Set Point and single contact
   { 0, 0x10, 0x0A, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x0A, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_set_point,   usage_user,          0,    1, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, setPointText, unityUnit },
-  { 0, 0x10, 0x0A, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_none,        usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  contactText, binaryUnit },
+  { 0, 0x10, 0x0A, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_none,       usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  contactText, binaryUnit },
 
   // A5-10-0B: Temperature Sensor and single contact
   { 0, 0x10, 0x0B, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
-  { 0, 0x10, 0x0B, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_none,        usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  contactText, binaryUnit },
+  { 0, 0x10, 0x0B, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_none,       usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  contactText, binaryUnit },
 
   // A5-10-0C: Temperature Sensor and Occupancy button
   { 0, 0x10, 0x0C, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
-  { 0, 0x10, 0x0C, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x10, 0x0C, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
   // A5-10-0D: Temperature Sensor and day/night control
   { 0, 0x10, 0x0D, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
-  { 0, 0x10, 0x0D, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,        usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
+  { 0, 0x10, 0x0D, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,       usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
 
 
   // A5-10-10: Room Control Panel with Temperature Sensor, Set Point, Humidity and Occupancy button
@@ -298,14 +329,14 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x10, 0x10, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_set_point,   usage_user,          0,    1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, setPointText, unityUnit },
   { 0, 0x10, 0x10, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_humidity,    usage_room,          0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, humText,  humUnit },
   { 0, 0x10, 0x10, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0, 40.8, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText, tempUnit },
-  { 0, 0x10, 0x10, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x10, 0x10, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
   // A5-10-11: Room Panel with Temperature Sensor, Set Point Control, Humidity and day/night control
   // - e.g. Thermokon Thanos
   { 0, 0x10, 0x11, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_set_point,   usage_user,          0,    1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, setPointText, unityUnit },
   { 0, 0x10, 0x11, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_humidity,    usage_room,          0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, humText,  humUnit },
   { 0, 0x10, 0x11, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0, 40.8, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText, tempUnit },
-  { 0, 0x10, 0x11, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,        usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
+  { 0, 0x10, 0x11, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,       usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
 
   // A5-10-12: Room Panel with Temperature Sensor, Set Point Control, Humidity
   // - e.g. Thermokon SR06 LCD 2T rh
@@ -316,12 +347,12 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // A5-10-13: Room Panel with Temperature Sensor, Humidity and day/night control
   { 0, 0x10, 0x13, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_humidity,    usage_room,          0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, humText,  humUnit },
   { 0, 0x10, 0x13, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0, 40.8, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText, tempUnit },
-  { 0, 0x10, 0x13, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x10, 0x13, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
   // A5-10-14: Room Panel with Temperature Sensor, Humidity and day/night control
   { 0, 0x10, 0x14, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_humidity,    usage_room,          0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, humText,  humUnit },
   { 0, 0x10, 0x14, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0, 40.8, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText, tempUnit },
-  { 0, 0x10, 0x14, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,        usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
+  { 0, 0x10, 0x14, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,       usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
 
   // A5-10-15: Room Panel with 10 bit Temperature Sensor, 6 bit set point
   { 0, 0x10, 0x15, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,        -10, 41.2, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
@@ -330,11 +361,11 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // A5-10-16: Room Panel with 10 bit Temperature Sensor, 6 bit set point and Occupancy button
   { 0, 0x10, 0x16, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,        -10, 41.2, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x16, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_set_point,   usage_user,          0,    1, DB(2,7), DB(2,2), 100, 40*60, &stdSensorHandler, setPointText, unityUnit },
-  { 0, 0x10, 0x16, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x10, 0x16, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
   // A5-10-17: Room Panel with 10 bit Temperature Sensor and Occupancy button
   { 0, 0x10, 0x17, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,        -10, 41.2, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
-  { 0, 0x10, 0x17, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x10, 0x17, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
   // A5-10-18..1F seem quite exotic, and Occupancy enable/button bits are curiously swapped in A5-10-19 compared to all other similar profiles (typo or real?)
   //  // INCOMPLETE: A5-10-18: Room Panel with Temperature Sensor, Temperature set point, fan speed and Occupancy button and disable
@@ -357,7 +388,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x10, 0x23, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_humidity,    usage_room,          0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, humText,  humUnit },
   { 0, 0x10, 0x23, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_temperature, usage_room,          0, 40.8, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x23, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      valueType_fan_speed,   usage_room,  -0.333333,    2, DB(0,7), DB(0,5), 100, 40*60, &stdSensorHandler, fanSpeedText, unityUnit },
-  { 0, 0x10, 0x23, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
+  { 0, 0x10, 0x23, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText, binaryUnit },
 
 
   // A5-12-01: Energy meter
