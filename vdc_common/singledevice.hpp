@@ -58,7 +58,7 @@ namespace p44 {
     /// @{
 
     /// checks if aApiValue conforms to the parameter definition
-    /// @param aApiValue API value containing a value to be used for this parameter. No value at all (NULL) counts as conforming.
+    /// @param aApiValue API value containing a value to be used for this value. No value at all (NULL) counts as conforming.
     /// @param aMakeInternal if set, the value is converted to internal format (relevant for enums, to get them as numeric value)
     /// @return NULL if the value conforms, API error describing what's wrong if not
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) = 0;
@@ -114,6 +114,13 @@ namespace p44 {
     /// @return true if set value differs from previous value
     virtual bool setDoubleValue(double aValue) { return false; /* NOP in base class */ };
 
+    /// update double value for significant changes only
+    /// @param aValue the new value from the sensor, in physical units according to sensorType (VdcValueType)
+    /// @param aMinChange what minimum change the new value must have compared to last reported value
+    ///   to be treated as a change. Default is -1, which means half the declared resolution.
+    /// @return true if set value differs enough from previous value and was actually updated
+    virtual bool updateDoubleValue(double aValue, double aMinChange = -1)  { return false; /* NOP in base class */ };
+
     /// set int value
     /// @param aValue the int value to set
     /// @return true if set value differs from previous value
@@ -124,11 +131,23 @@ namespace p44 {
     /// @return true if set value differs from previous value
     virtual bool setStringValue(const string aValue) { return false; /* NOP in base class */ };
 
+    /// set API value
+    /// @param aValue the value to set, already converted to internal format (for text enums)
+    /// @return true if set value differs from previous value
+    /// @note conforms() should be applied to aValue first to make sure value is ok to set and is converted to internal value
+    bool setValue(ApiValuePtr aValue);
+
     /// make value invalid, reported as NULL when accessed via properties
     void invalidate();
 
     /// set "defaultvalue" flag
     void setIsDefault(bool aIsDefault) { isDefault = aIsDefault; };
+
+    /// set "readonly" flag
+    void setReadOnly(bool aReadOnly) { readOnly = aReadOnly; };
+
+    /// check readonly flag
+    bool isReadOnly() { return readOnly; }
 
     /// @}
 
@@ -138,6 +157,7 @@ namespace p44 {
     string valueName; ///< the name of the value
     bool hasValue; ///< set if there is a stored value. For action params, this is the default value. For state/states params this is the actual value
     bool isDefault; ///< set if the value stored is the default value
+    bool readOnly; ///< set if the value cannot be written
     VdcValueType valueType; ///< the type of the parameter
     MLMicroSeconds lastUpdate; ///< when the value was last updated
     MLMicroSeconds lastChange; ///< when the value was last changed
@@ -187,6 +207,8 @@ namespace p44 {
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
 
     virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
+    virtual bool updateDoubleValue(double aValue, double aMinChange = -1) P44_OVERRIDE;
+
     virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
 
   protected:
@@ -701,19 +723,50 @@ namespace p44 {
 
 
 
+  /// handler that will be called when writing a property values via the API causes its value to change
+  /// @param aChangedProperty the ValueDescriptor which has changed.
+  typedef boost::function<void (ValueDescriptorPtr aChangedProperty)> PropertyChangedCB;
+
   /// class representing the device-specific properties
   class DeviceProperties P44_FINAL : public ValueList
   {
     typedef ValueList inherited;
 
+    PropertyChangedCB propertyChangeHandler; ///< called when property has been changed via the API
+
+  protected:
+
+    SingleDevice *singleDeviceP; ///< the single device the events belong to
+
   public:
+
+    DeviceProperties(SingleDevice &aSingleDevice) : singleDeviceP(&aSingleDevice), propertyChangeHandler(NULL) {};
+
+    /// set a property change handler
+    void setPropertyChangedHandler(PropertyChangedCB aPropertyChangedHandler) { propertyChangeHandler = aPropertyChangedHandler; };
 
     /// add a property (at device setup time only)
     /// @param aPropertyDesc value descriptor describing the property
-    void addProperty(ValueDescriptorPtr aPropertyDesc);
+    /// @param aReadOnly if set, the property cannot be written from the API and will report a "readonly:true" field in the description
+    void addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly = false);
+
+    /// get property (for internally accessing/changing it)
+    /// @param aPropertyId name of the property to get
+    ValueDescriptorPtr getProperty(const string aPropertyId);
+
+    /// push the event via pushNotification
+    /// @param aPropertyDesc the property to push
+    /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
+    bool pushProperty(ValueDescriptorPtr aPropertyDesc);
 
     /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
     void addToModelUIDHash(string &aHashedString);
+
+  protected:
+
+    // overrides to present property values directly instead of delegating to ValueDescriptor
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<DeviceProperties> DevicePropertiesPtr;
