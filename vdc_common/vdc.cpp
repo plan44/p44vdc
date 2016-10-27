@@ -75,36 +75,19 @@ void Vdc::setName(const string &aName)
 }
 
 
-void Vdc::handleNotification(const string &aMethod, ApiValuePtr aParams)
-{
-  if (aMethod=="scanDevices") {
-    // vDC API v2c addition
-    bool incremental = false;
-    bool exhaustive = false;
-    bool clear = false;
-    checkBoolParam(aParams, "incremental", incremental);
-    checkBoolParam(aParams, "exhaustive", exhaustive);
-    checkBoolParam(aParams, "clearconfig", clear);
-    collectDevices(NULL, incremental, exhaustive, clear);
-  }
-  else {
-    inherited::handleNotification(aMethod, aParams);
-  }
-}
-
-
 ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
-  if (aMethod=="x-p44-collectDevices") {
+  if (aMethod=="scanDevices") {
+    // vDC API v2c addition, only via genericRequest
     // (re)collect devices of this particular vDC
     bool incremental = true;
     bool exhaustive = false;
     bool clear = false;
     checkBoolParam(aParams, "incremental", incremental);
     checkBoolParam(aParams, "exhaustive", exhaustive);
-    checkBoolParam(aParams, "clear", clear);
-    collectDevices(boost::bind(&Vdc::collectDevicesMethodComplete, this, aRequest, _1), incremental, exhaustive, clear);
+    checkBoolParam(aParams, "clearconfig", clear);
+    collectDevices(boost::bind(&Vdc::scanDevicesMethodComplete, this, aRequest, _1), incremental, exhaustive, clear);
   }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
@@ -113,7 +96,7 @@ ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, Api
 }
 
 
-void Vdc::collectDevicesMethodComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
+void Vdc::scanDevicesMethodComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
 {
   // devices re-collected, return ok (empty response)
   if (Error::isOK(aError)) {
