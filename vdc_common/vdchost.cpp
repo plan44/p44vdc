@@ -825,8 +825,11 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
       LOG(LOG_DEBUG, "Received notification '%s' out of session -> ignored", aMethod.c_str());
     }
   }
-  // check error
+  // check status
+  // Note: in case method call triggers an action that does not immediately complete,
+  //   we'll get NULL for respErr here, and method handler must take care of acknowledging the method call!
   if (respErr) {
+    // method call immediately returned a status (might be explicit OK error object)
     if (aRequest) {
       // report back in case of method call
       if (Error::isOK(respErr))

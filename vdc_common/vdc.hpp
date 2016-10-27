@@ -147,11 +147,8 @@ namespace p44 {
     /// @param aName name of the addressable entity
     virtual void setName(const string &aName) P44_OVERRIDE;
 
-    /// vdc level methods (p44 specific)
+    /// vdc level methods
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-
-    /// vdc level notifications
-    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
 
     /// @}
@@ -317,7 +314,7 @@ namespace p44 {
 
   private:
 
-    void collectDevicesMethodComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
+    void scanDevicesMethodComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
 
   };
 
