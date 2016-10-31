@@ -193,6 +193,14 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
 }
 
 
+void DsAddressable::methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError)
+{
+  // devices re-collected, return status
+  aRequest->sendStatus(aError);
+}
+
+
+
 bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain)
 {
   if (announced!=Never) {

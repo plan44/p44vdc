@@ -147,6 +147,12 @@ namespace p44 {
     ///   used already to route the method call to this DsAddressable.
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
 
+    /// utility function that can be passed as callback for simple OK/Error type method completion handlers
+    /// @param aRequest the request which invoked the method
+    /// @param aError method return status - if NULL or OK, a empty response will be returned to the caller signalling OK,
+    ///   otherwise, a error response will be returned
+    void methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError);
+
     /// called by VdcHost to handle notifications directed to a dSUID
     /// @param aMethod the notification
     /// @param aParams the parameters object
@@ -318,7 +324,6 @@ namespace p44 {
     /// @return true if some settings were applied
     bool loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExplicitlyOverridden);
 
-    
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);

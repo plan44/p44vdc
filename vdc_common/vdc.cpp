@@ -87,26 +87,12 @@ ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, Api
     checkBoolParam(aParams, "incremental", incremental);
     checkBoolParam(aParams, "exhaustive", exhaustive);
     checkBoolParam(aParams, "clearconfig", clear);
-    collectDevices(boost::bind(&Vdc::scanDevicesMethodComplete, this, aRequest, _1), incremental, exhaustive, clear);
+    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), incremental, exhaustive, clear);
   }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
   return respErr;
-}
-
-
-void Vdc::scanDevicesMethodComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
-{
-  // devices re-collected, return ok (empty response)
-  if (Error::isOK(aError)) {
-    // collected ok
-    aRequest->sendResult(ApiValuePtr());
-  }
-  else {
-    // collected with error, report it
-    aRequest->sendError(aError);
-  }
 }
 
 

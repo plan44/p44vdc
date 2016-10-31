@@ -832,10 +832,7 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
     // method call immediately returned a status (might be explicit OK error object)
     if (aRequest) {
       // report back in case of method call
-      if (Error::isOK(respErr))
-        aRequest->sendResult(ApiValuePtr()); // OK is returned as empty result
-      else
-        aRequest->sendError(respErr); // non-OK is returned as error
+      aRequest->sendStatus(respErr);
     }
     else {
       // just log in case of error of a notification
@@ -1026,9 +1023,6 @@ void VdcHost::removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aRequest, 
   else
     aRequest->sendError(Error::err<VdcApiError>(403, "Device cannot be removed, is still connected"));
 }
-
-
-
 
 
 
