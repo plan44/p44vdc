@@ -1726,7 +1726,7 @@ ValueDescriptorPtr DeviceProperties::getProperty(const string aPropertyId)
 bool DeviceProperties::pushProperty(ValueDescriptorPtr aPropertyDesc)
 {
   // try to push to connected vDC API client
-  VdcApiConnectionPtr api = singleDeviceP->getVdc().getSessionConnection();
+  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
   if (api) {
     // create query for device property to get pushed
     ApiValuePtr query = api->newApiValue();
@@ -1920,7 +1920,7 @@ ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
 void SingleDevice::invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
 {
   ALOG(LOG_NOTICE, "- call completed with status %s", Error::isOK(aError) ? "OK" : aError->description().c_str());
-  aRequest->sendStatus(aError);
+  methodCompleted(aRequest, aError);
 }
 
 
