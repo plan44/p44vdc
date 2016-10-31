@@ -134,7 +134,6 @@ void HueVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExha
 
 
 
-
 void HueVdc::refindResultHandler(ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
@@ -157,6 +156,31 @@ void HueVdc::refindResultHandler(ErrorPtr aError)
     LOG(LOG_NOTICE, "Error refinding hue bridge with uuid %s, error = %s", hueComm.uuid.c_str(), aError->description().c_str());
     collectedHandler(ErrorPtr()); // no hue bridge to collect lights from (but this is not a collect error)
   }
+}
+
+
+ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
+{
+  ErrorPtr respErr;
+  if (aMethod=="registerHueBridge") {
+    // hue specific addition, only via genericRequest
+    respErr = checkStringParam(aParams, "bridgeUuid", bridgeUuid);
+    if (!Error::isOK(respErr)) return respErr;
+    respErr = checkStringParam(aParams, "bridgeUsername", bridgeUserName);
+    if (!Error::isOK(respErr)) return respErr;
+    // save the bridge parameters
+    db.executef(
+      "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s'",
+      bridgeUuid.c_str(),
+      bridgeUserName.c_str()
+    );
+    // now collect the lights from the new bridge, remove all settings from previous bridge
+    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), false, false, true);
+  }
+  else {
+    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
+  }
+  return respErr;
 }
 
 

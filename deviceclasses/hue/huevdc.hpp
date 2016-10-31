@@ -85,6 +85,9 @@ namespace p44 {
     /// collect and add devices to the container
     virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
 
+    /// vdc level methods
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+
     /// set container learn mode
     /// @param aEnableLearning true to enable learning mode
     /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some EnOcean devices)
