@@ -50,10 +50,16 @@ namespace p44 {
     // information from the device itself
     string hueModel;
 
-    // applyChannel repetition management
-    StatusCB pendingApplyCB;
-    bool applyInProgress;
-    bool repeatApplyAtEnd;
+    // reapply mechanism for difficult situations
+    typedef enum {
+      reapply_none, ///< do not re-apply
+      reapply_once, ///< re-apply once shortly after initial apply
+      reapply_periodic ///< alse re-apply periodically later (for broken bulbs that go white after a while)
+    } ReapplyMode;
+    ReapplyMode reapplyMode;
+    int reapplyCount;
+    long reapplyTicket;
+
 
   public:
     HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const string &aUniqueID);
@@ -150,6 +156,8 @@ namespace p44 {
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
     void channelValuesSent(LightBehaviourPtr aColorLightBehaviour, SimpleCB aDoneCB, JsonObjectPtr aResult, ErrorPtr aError);
     void channelValuesReceived(SimpleCB aDoneCB, JsonObjectPtr aDeviceInfo, ErrorPtr aError);
+    bool applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway);
+    void reapplyTimerHandler();
     void parseLightState(JsonObjectPtr aDeviceInfo);
 
   };
