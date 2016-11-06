@@ -323,11 +323,11 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       return buttons.size()>1 ? yes : no;
     case modelFeature_highlevel:
       // Assumption: only black joker devices can have a high-level (app) functionality
-      return colorClass==group_black_variable ? yes : no;
+      return colorClass==class_black_joker ? yes : no;
     case modelFeature_jokerconfig:
       // Assumption: black joker devices need joker config (setting color) only if there are buttons or an output.
       // Pure sensors or binary inputs don't need color config
-      return colorClass==group_black_variable && (output || buttons.size()>0) ? yes : no;
+      return colorClass==class_black_joker && (output || buttons.size()>0) ? yes : no;
     case modelFeature_akmsensor:
       // Assumption: only devices with binaryinputs that do not have a predefined type need akmsensor
       for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) {
