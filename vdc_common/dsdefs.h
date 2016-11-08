@@ -398,6 +398,7 @@ typedef enum {
   // p44 not-yet-approved types
   valueType_time = 100, ///< time in seconds
   valueType_molarconcentration = 101, ///< molar concentration in mol/m3
+  valueType_volume = 102, ///< volume in liters
   // generic but still double numeric types
   valueType_firstGenericNum = 150, ///< first generic numeric type
   valueType_percentage = 150, ///< percentage 0..100, such as fill level of something
