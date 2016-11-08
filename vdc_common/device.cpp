@@ -228,7 +228,9 @@ void Device::addBehaviour(DsBehaviourPtr aBehaviour)
         aBehaviour->index = sensors.size();
         sensors.push_back(aBehaviour);
         break;
-      case behaviour_output: {
+      case behaviour_output:
+      case behaviour_actionOutput:
+      {
         aBehaviour->index = 0;
         output = boost::dynamic_pointer_cast<OutputBehaviour>(aBehaviour);
         break;
@@ -1686,7 +1688,10 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aProperty
     }
   }
   else if (aPropertyDescriptor->hasObjectKey(device_output_key)) {
-    return output; // only single output or none
+    if (output && output->numDescProps()>0) {
+      return output;
+    }
+    return NULL; // no output or special output with no standard properties (e.g. actionOutput)
   }
   else if (aPropertyDescriptor->hasObjectKey(device_key)) {
     // device level object properties

@@ -1791,6 +1791,35 @@ bool DeviceProperties::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
 
 
 
+// MARK: ===== ActionOutputBehaviour
+
+ActionOutputBehaviour::ActionOutputBehaviour(Device &aDevice) :
+  inherited(aDevice)
+{
+  // does not have a classic output with channels, so configure it as custom/disabled
+  setHardwareOutputConfig(outputFunction_custom, outputmode_disabled, usage_undefined, false, -1);
+}
+
+
+Tristate ActionOutputBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
+{
+  // now check for light behaviour level features
+  switch (aFeatureIndex) {
+    case modelFeature_outmodegeneric:
+    case modelFeature_outvalue8:
+    case modelFeature_blink:
+      // suppress classic output mode features
+      return no;
+    default:
+      // not available at output level
+      return undefined;
+  }
+}
+
+
+
+
+
 // MARK: ===== SingleDevice
 
 

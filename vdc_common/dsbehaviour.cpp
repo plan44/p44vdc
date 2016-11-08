@@ -112,6 +112,7 @@ const char *DsBehaviour::getTypeName()
     case behaviour_binaryinput : return "binaryInput";
     case behaviour_output : return "output";
     case behaviour_sensor : return "sensor";
+    case behaviour_actionOutput : return "actionOutput"; // probably will never have actionOutputDescription/Settings/State
     default: return "<undefined>";
   }
 }

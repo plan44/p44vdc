@@ -280,15 +280,18 @@ PropertyDescriptorPtr PropertyContainer::getDescriptorByName(string aPropMatch, 
     }
     while (aStartIndex<n) {
       propDesc = getDescriptorByIndex(aStartIndex, aDomain, aParentDescriptor);
-      // check for match
-      if (wildcard && aPropMatch.size()==0)
-        break; // shortcut for "match all" case
-      // match beginning
-      if (
-        (!wildcard && aPropMatch==propDesc->name()) || // complete match
-        (wildcard && (strncmp(aPropMatch.c_str(),propDesc->name(),aPropMatch.size())==0)) // match of name's beginning
-      ) {
-        break; // this entry matches
+      // skip non-existent ones (might happen if subclass suppresses some properties)
+      if (propDesc) {
+        // check for match
+        if (wildcard && aPropMatch.size()==0)
+          break; // shortcut for "match all" case
+        // match beginning
+        if (
+          (!wildcard && aPropMatch==propDesc->name()) || // complete match
+          (wildcard && (strncmp(aPropMatch.c_str(),propDesc->name(),aPropMatch.size())==0)) // match of name's beginning
+        ) {
+          break; // this entry matches
+        }
       }
       // next
       aStartIndex++;

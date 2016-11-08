@@ -23,6 +23,7 @@
 #define __p44vdc__singledevice__
 
 #include "device.hpp"
+#include "outputbehaviour.hpp"
 
 using namespace std;
 
@@ -774,6 +775,37 @@ namespace p44 {
 
 
   #define SCENECMD_DEVICE_ACTION "deviceaction" ///< name of the device action scene command
+
+
+  class ActionOutputBehaviour : public OutputBehaviour
+  {
+    typedef OutputBehaviour inherited;
+
+  public:
+
+    ActionOutputBehaviour(Device &aDevice);
+
+    /// check for presence of model feature (flag in dSS visibility matrix)
+    /// @param aFeatureIndex the feature to check for
+    /// @return yes if this output behaviour has the feature, no if (explicitly) not, undefined if asked entity does not know
+    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex) P44_OVERRIDE;
+
+  protected:
+
+    // the behaviour type
+    virtual BehaviourType getType() P44_OVERRIDE { return behaviour_actionOutput; };
+
+    // suppress standard behaviour properties of outputBehaviour
+    virtual int numDescProps() P44_OVERRIDE { return 0; };
+    virtual int numSettingsProps() P44_OVERRIDE { return 0; };
+    virtual int numStateProps() P44_OVERRIDE { return 0; };
+
+  };
+  typedef boost::intrusive_ptr<ActionOutputBehaviour> ActionOutputBehaviourPtr;
+
+
+
+
 
   /// class representing a digitalSTROM "single" device.
   /// This is a device which is normally not used in zone/group context and thus

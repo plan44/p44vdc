@@ -46,8 +46,9 @@ namespace p44 {
     behaviour_undefined,
     behaviour_button,
     behaviour_binaryinput,
+    behaviour_sensor,
     behaviour_output,
-    behaviour_sensor
+    behaviour_actionOutput,
   } BehaviourType;
 
 

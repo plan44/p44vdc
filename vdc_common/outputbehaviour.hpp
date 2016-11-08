@@ -34,6 +34,7 @@ namespace p44 {
   {
     typedef DsBehaviour inherited;
     friend class ChannelBehaviour;
+    friend class Device;
 
     /// channels
     ChannelBehaviourVector channels;
