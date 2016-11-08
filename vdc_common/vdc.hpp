@@ -256,9 +256,6 @@ namespace p44 {
     /// @return human readable model name/short description
     virtual string vdcModelSuffix() const = 0;
 
-    /// @return human readable product version string
-    virtual string modelVersion() P44_OVERRIDE { return getVdcHost().modelVersion(); /* same as entire vdc host */ }
-
     /// @return unique ID for the functional model of this entity
     virtual string modelUID() P44_OVERRIDE;
 

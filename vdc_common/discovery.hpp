@@ -217,7 +217,6 @@ namespace p44 {
     /// @param aAuxVdsmRunning must be true if the auxiliary vdsm is running right now, false if not.
     /// @param aAuxVdsmStatusHandler will be called when discovery detects or looses master vdsm
     /// @param aNotAuxiliary if set, vdsm will always run and will not include the "auxiliary" TXT record in the advertisement
-    /// @return error in case discovery manager could not be started
     void advertiseDS(
       VdcHostPtr aVdcHost,
       bool aNoAuto,
