@@ -337,7 +337,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     { "oemGuid", apivalue_string, oemGUID_key, OKEY(dsAddressable_key) },
     { "oemModelGuid", apivalue_string, oemModelGUID_key, OKEY(dsAddressable_key) },
     { "vendorId", apivalue_string, vendorId_key, OKEY(dsAddressable_key) },
-    { "vendorName", apivalue_string, vendorId_key, OKEY(dsAddressable_key) },
+    { "vendorName", apivalue_string, vendorName_key, OKEY(dsAddressable_key) },
     { "x-p44-extraInfo", apivalue_string, extraInfo_key, OKEY(dsAddressable_key) },
     { "x-p44-description", apivalue_string, objectDescription_key, OKEY(dsAddressable_key) },
     { "deviceIcon16", apivalue_binary, deviceIcon16_key, OKEY(dsAddressable_key) },
