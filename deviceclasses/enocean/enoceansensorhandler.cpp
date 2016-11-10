@@ -279,7 +279,7 @@ DsBehaviourPtr EnoceanSensorHandler::newSensorBehaviour(const EnoceanSensorDescr
       SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*aDevice.get()));
       int numBits = (aSensorDescriptor.msBit-aSensorDescriptor.lsBit)+1; // number of bits
       double resolution = (aSensorDescriptor.max-aSensorDescriptor.min) / ((1<<numBits)-1); // units per LSB
-      sb->setHardwareSensorConfig((VdcValueType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, aSensorDescriptor.min, aSensorDescriptor.max, resolution, aSensorDescriptor.updateInterval*Second, aSensorDescriptor.aliveSignInterval*Second);
+      sb->setHardwareSensorConfig((VdcSensorType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, aSensorDescriptor.min, aSensorDescriptor.max, resolution, aSensorDescriptor.updateInterval*Second, aSensorDescriptor.aliveSignInterval*Second);
       sb->setGroup(aSensorDescriptor.channelGroup);
       sb->setHardwareName(EnoceanSensorHandler::sensorDesc(aSensorDescriptor));
       return sb;

@@ -35,11 +35,11 @@ SensorBehaviour::SensorBehaviour(Device &aDevice) :
   currentValue(0)
 {
   // set dummy default hardware default configuration
-  setHardwareSensorConfig(valueType_none, usage_undefined, 0, 100, 1, 15*Second, 20*Minute);
+  setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 100, 1, 15*Second, 20*Minute);
 }
 
 
-void SensorBehaviour::setHardwareSensorConfig(VdcValueType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval)
+void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval)
 {
   sensorType = aType;
   sensorUsage = aUsage;
@@ -231,7 +231,7 @@ static char sensor_key;
 // description properties
 
 enum {
-  valueType_key,
+  sensorType_key,
   sensorUsage_key,
   min_key,
   max_key,
@@ -246,7 +246,7 @@ int SensorBehaviour::numDescProps() { return numDescProperties; }
 const PropertyDescriptorPtr SensorBehaviour::getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numDescProperties] = {
-    { "sensorType", apivalue_uint64, valueType_key+descriptions_key_offset, OKEY(sensor_key) },
+    { "sensorType", apivalue_uint64, sensorType_key+descriptions_key_offset, OKEY(sensor_key) },
     { "sensorUsage", apivalue_uint64, sensorUsage_key+descriptions_key_offset, OKEY(sensor_key) },
     { "min", apivalue_double, min_key+descriptions_key_offset, OKEY(sensor_key) },
     { "max", apivalue_double, max_key+descriptions_key_offset, OKEY(sensor_key) },
@@ -308,7 +308,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         // Description properties
-        case valueType_key+descriptions_key_offset:
+        case sensorType_key+descriptions_key_offset:
           aPropValue->setUint16Value(sensorType);
           return true;
         case sensorUsage_key+descriptions_key_offset:

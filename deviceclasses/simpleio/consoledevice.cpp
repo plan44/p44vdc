@@ -131,8 +131,8 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     consoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorHandler, this, 1, _1, _2)); // up
     // - create one sensor input
     SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this));
-    //s->setHardwareSensorConfig(valueType_none, usage_undefined, 0, 50, 1, 30*Second, 300*Second);
-    s->setHardwareSensorConfig(valueType_temperature, usage_room, 0, 50, 1, 30*Second, 300*Second);
+    //s->setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 50, 1, 30*Second, 300*Second);
+    s->setHardwareSensorConfig(sensorType_temperature, usage_room, 0, 50, 1, 30*Second, 300*Second);
     s->setHardwareName("Console simulated Sensor 0..50");
     addBehaviour(s);
   }
@@ -150,7 +150,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     addBehaviour(ob);
     // - create feedback sensor input
     SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this));
-    sb->setHardwareSensorConfig(valueType_temperature, usage_room, 0, 40, 40.0/255, 100*Second, 5*Minute);
+    sb->setHardwareSensorConfig(sensorType_temperature, usage_room, 0, 40, 40.0/255, 100*Second, 5*Minute);
     sb->setGroup(group_blue_heating);
     sb->setHardwareName("Simulated Temperature 0..40 °C");
     sb->updateSensorValue(21); // default to 21 degrees

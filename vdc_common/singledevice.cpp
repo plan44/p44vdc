@@ -40,11 +40,13 @@ using namespace p44;
 // MARK: ===== ValueDescriptor
 
 
-ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, bool aHasDefault) :
+ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, VdcValueUnit aValueUnit, bool aHasDefault) :
   valueName(aName),
   valueType(aValueType),
+  valueUnit(aValueUnit),
   hasValue(aHasDefault),
-  isDefault(aHasDefault),
+  readOnly(false),
+  isDefaultValue(aHasDefault), // note that this is only most common case, but setIsDefault can be used to make even a null value default
   lastUpdate(Never),
   lastChange(Never)
 {
@@ -58,7 +60,7 @@ bool ValueDescriptor::setLastUpdate(MLMicroSeconds aLastUpdate)
   lastUpdate = aLastUpdate;
   bool gotValue = !hasValue; // if this is the first value update, consider value changed
   hasValue = true;
-  isDefault = false;
+  isDefaultValue = false;
   return gotValue;
 }
 
@@ -106,12 +108,12 @@ int32_t ValueDescriptor::getInt32Value(bool aAsInternal, bool aPrevious)
 
 bool ValueDescriptor::setValue(ApiValuePtr aValue)
 {
-  if (valueType<valueType_firstIntNum) {
+  if (valueType==valueType_numeric) {
     // numeric float type, set as double
     return setDoubleValue(aValue->doubleValue());
   }
-  else if (valueType<valueType_firstNonNumeric || valueType==valueType_textenum) {
-    // numeric integer type or textenum (internally integer), set as integer
+  else if (valueType<valueType_integer || valueType==valueType_enumeration) {
+    // numeric integer type or text enumeration (internally integer), set as integer
     return setInt32Value(aValue->int32Value());
   }
   else {
@@ -123,7 +125,9 @@ bool ValueDescriptor::setValue(ApiValuePtr aValue)
 
 
 enum {
-  valuetype_key,
+  type_key,
+  unit_key,
+  symbol_key,
   min_key,
   max_key,
   resolution_key,
@@ -147,7 +151,9 @@ PropertyDescriptorPtr ValueDescriptor::getDescriptorByIndex(int aPropIndex, int 
 {
   // device level properties
   static const PropertyDescription properties[numValueProperties] = {
-    { "valuetype", apivalue_uint64, valuetype_key, OKEY(value_key) },
+    { "type", apivalue_string, type_key, OKEY(value_key) },
+    { "siunit", apivalue_string, unit_key, OKEY(value_key) },
+    { "symbol", apivalue_string, symbol_key, OKEY(value_key) },
     { "min", apivalue_double, min_key, OKEY(value_key) },
     { "max", apivalue_double, max_key, OKEY(value_key) },
     { "resolution", apivalue_double, resolution_key, OKEY(value_key) },
@@ -167,13 +173,99 @@ bool ValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 {
   if (aPropertyDescriptor->hasObjectKey(value_key) && aMode==access_read) {
     switch (aPropertyDescriptor->fieldKey()) {
-      case valuetype_key: aPropValue->setUint16Value(valueType); return true;
+      case type_key: aPropValue->setStringValue(valueTypeName(valueType)); return true;
+      case unit_key: if (valueUnit!=valueUnit_none) { aPropValue->setStringValue(valueUnitName(valueUnit, false)); return true; } else return false;
+      case symbol_key: if (valueUnit!=valueUnit_none) { aPropValue->setStringValue(valueUnitName(valueUnit, true)); return true; } else return false;
       case readonly_key: if (readOnly) { aPropValue->setBoolValue(readOnly); return true; } else return false; // show only when set (only for deviceProperties)
-      case default_key: return (isDefault ?  getValue(aPropValue, false) : false);
+      case default_key: return (isDefaultValue ?  getValue(aPropValue, false) : false);
     }
   }
   return false;
 }
+
+
+string ValueDescriptor::valueTypeName(VdcValueType aValueType)
+{
+  const char *valueTypeNames[numValueTypes] = {
+    "unknown",
+    "numeric",
+    "integer",
+    "boolean",
+    "enumeration",
+    "string",
+  };
+  if (aValueType>=numValueTypes) aValueType = valueType_unknown;
+  return valueTypeNames[aValueType];
+}
+
+
+string ValueDescriptor::valueUnitName(VdcValueUnit aValueUnit, bool aAsSymbol)
+{
+  typedef struct {
+    const char *name;
+    const char *symbol;
+  } ValueUnitDescriptor;
+  static const ValueUnitDescriptor valueUnitNames[numValueUnits] = {
+    { "unknown", "?" },
+    { "none", "" },
+    { "meter", "m" },
+    { "gram", "g" },
+    { "second", "S" },
+    { "ampere", "A" },
+    { "kelvin", "K" },
+    { "mole", "mol" },
+    { "candle", "cd" },
+    { "watt", "W" },
+    { "celsius", "°C" },
+    { "volt", "V" },
+    { "lux", "lx" },
+    { "liter", "l" },
+    { "molpercubicmeter", "mol/m3" },
+    { "minute", "min" },
+    { "hour", "h" },
+    { "day", "d" }
+  };
+  typedef struct {
+    const char *name;
+    const char *symbol;
+    int8_t exponent;
+  } ValueScalingDescriptor;
+  static const ValueScalingDescriptor valueScalingNames[numUnitScalings] = {
+    { "Yotta", "Y", 24 },
+    { "Zetta", "Z", 21 },
+    { "Exa", "E", 18 },
+    { "Peta", "P", 15 },
+    { "Tera", "T", 12 },
+    { "Giga", "G", 9 },
+    { "Mega", "M", 6 },
+    { "Kilo", "k", 3 },
+    { "hecto", "h", 2 },
+    { "deca", "da", 1 },
+    { "", "", 0 },
+    { "deci", "d", -1 },
+    { "centi", "c", -2 },
+    { "milli", "m", -3 },
+    { "micro", "µ", -6 },
+    { "nano", "n", -9 },
+    { "pico", "p", -12 },
+    { "femto", "f", -15 },
+    { "atto", "a", -18 },
+    { "zepto", "z", -21 },
+    { "yocto", "y", -24 }
+  };
+  VdcValueBaseUnit u = VDC_UNIT_ONLY(aValueUnit);
+  if (u>=numValueUnits) u=valueUnit_none;
+  VdcUnitScale s = VDC_SCALING_ONLY(aValueUnit);
+  if (s>numUnitScalings) s=unitScaling_1;
+  return string_format("%s%s",
+    aAsSymbol ?  valueScalingNames[s].symbol : valueScalingNames[s].name,
+    aAsSymbol ? valueUnitNames[u].symbol : valueUnitNames[u].name
+  );
+}
+
+
+
+
 
 
 // MARK: ===== NumericValueDescriptor
@@ -222,7 +314,7 @@ ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInter
   ErrorPtr err;
   // check if value conforms
   ApiValueType vt = aApiValue->getType();
-  if (valueType==valueType_bool) {
+  if (valueType==valueType_boolean) {
     // bool parameter, valuetype should be int or bool
     if (
       vt!=apivalue_bool &&
@@ -232,7 +324,7 @@ ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInter
       err = Error::err<VdcApiError>(415, "invalid boolean");
     }
   }
-  else if (valueType<valueType_firstNonNumeric) {
+  else if (valueType==valueType_numeric) {
     // check bounds
     double v = aApiValue->doubleValue();
     if (v<min || v>max) {
@@ -251,15 +343,11 @@ bool NumericValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, b
 {
   if (!hasValue || !aApiValue) return false;
   double v = aPrevious ? previousValue : value;
-  if (valueType==valueType_bool) {
+  if (valueType==valueType_boolean) {
     aApiValue->setType(apivalue_bool);
     aApiValue->setBoolValue(v);
   }
-  else if (valueType==valueType_enum) {
-    aApiValue->setType(apivalue_int64);
-    aApiValue->setUint64Value(v);
-  }
-  else if (valueType>=valueType_firstIntNum) {
+  else if (valueType==valueType_integer) {
     aApiValue->setType(apivalue_int64);
     aApiValue->setInt64Value(v);
   }
@@ -279,13 +367,13 @@ bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr a
     if (aPropertyDescriptor->hasObjectKey(value_key)) {
       switch (aPropertyDescriptor->fieldKey()) {
         case min_key:
-          if (valueType==valueType_bool) return false;
+          if (valueType==valueType_boolean) return false;
           aPropValue->setDoubleValue(min); return true;
         case max_key:
-          if (valueType==valueType_bool) return false;
+          if (valueType==valueType_boolean) return false;
           aPropValue->setDoubleValue(max); return true;
         case resolution_key:
-          if (valueType==valueType_bool) return false;
+          if (valueType==valueType_boolean) return false;
           aPropValue->setDoubleValue(resolution); return true;
       }
     }
@@ -367,7 +455,7 @@ void EnumValueDescriptor::addEnum(const char *aEnumText, int aEnumValue, bool aI
   if (aIsDefault) {
     value = aEnumValue; // also assign as default
     hasValue = true;
-    isDefault = true;
+    isDefaultValue = true;
   }
 }
 
@@ -539,8 +627,9 @@ DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const 
 }
 
 
-void DeviceAction::addParameter(ValueDescriptorPtr aValueDesc)
+void DeviceAction::addParameter(ValueDescriptorPtr aValueDesc, bool aMandatory)
 {
+  aValueDesc->setIsDefault(!aMandatory); // even a null value is a default value except if parameter is mandatory
   actionParams->addValue(aValueDesc);
 }
 
@@ -561,12 +650,14 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
         break; // error
     }
     else {
-      // caller did not supply this parameter, get default value
+      // caller did not supply this parameter, get default value (which might be NULL)
       o = aParams->newNull();
-      if (!(*pos)->getValue(o)) {
+      if (!(*pos)->isDefault()) {
         err = Error::err<VdcApiError>(415, "missing value for non-optional parameter");
         break;
       }
+      // get value. Note that this might not change o in case the default value is NULL
+      (*pos)->getValue(o);
       // add the default to the passed params
       aParams->add((*pos)->getName(), o);
     }

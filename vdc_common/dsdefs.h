@@ -365,54 +365,114 @@ typedef enum {
 /// @{
 
 
-/// value types
-/// @note these have been in use for sensorDescriptions[].sensorType since vDC API 1.0
-///   but are now used as a generic value type system (e.g. in actions and states parameters)
+/// sensor types
+/// @note these are used in numeric enum form in sensorDescriptions[].sensorType since vDC API 1.0
+///   but are not 1:1 mapped to dS sensor types (dS sensor types are constructed from these + VdcUsageHint)
 typedef enum {
-  valueType_none = 0,
+  sensorType_none = 0,
   // physical double values
-  valueType_temperature = 1, ///< temperature in degrees celsius
-  valueType_humidity = 2, ///< relative humidity in %
-  valueType_illumination = 3, ///< illumination in lux
-  valueType_supplyVoltage = 4, ///< supply voltage level in Volts
-  valueType_gas_CO = 5, ///< CO (carbon monoxide) concentration in ppm
-  valueType_gas_radon = 6, ///< Radon activity in Bq/m3
-  valueType_gas_type = 7, ///< gas type sensor
-  valueType_dust_PM10 = 8, ///< particles <10µm in μg/m3
-  valueType_dust_PM2_5 = 9, ///< particles <2.5µm in μg/m3
-  valueType_dust_PM1 = 10, ///< particles <1µm in μg/m3
-  valueType_set_point = 11, ///< room operating panel set point, 0..1
-  valueType_fan_speed = 12, ///< fan speed, 0..1 (0=off, <0=auto)
-  valueType_wind_speed = 13, ///< wind speed in m/s
-  valueType_power = 14, ///< Power in W
-  valueType_current = 15, ///< Electric current in A
-  valueType_energy = 16, ///< Energy in kWh
-  valueType_consumption = 17, ///< Electric Consumption in VA
-  valueType_air_pressure = 18, ///< Air pressure in hPa
-  valueType_wind_direction = 19, ///< Wind direction in degrees
-  valueType_sound_volume = 20, ///< Sound pressure level in dB
-  valueType_precipitation = 21, ///< Precipitation in mm/m2
-  valueType_gas_CO2 = 22, ///< CO2 (carbon dioxide) concentration in ppm
-  valueType_gust_speed = 23, ///< gust speed in m/S
-  valueType_gust_direction = 24, ///< gust direction in degrees
-  // p44 not-yet-approved types
-  valueType_time = 100, ///< time in seconds
-  valueType_molarconcentration = 101, ///< molar concentration in mol/m3
-  valueType_volume = 102, ///< volume in liters
-  // generic but still double numeric types
-  valueType_firstGenericNum = 150, ///< first generic numeric type
-  valueType_percentage = 150, ///< percentage 0..100, such as fill level of something
-  valueType_float = 151, ///< a generic float
-  // generic integer types
-  valueType_firstIntNum = 170, ///< first integer numeric type
-  valueType_integer = 170, ///< a generic integer (implies resolution==1)
-  valueType_enum = 171, ///< technically an unsigned integer, but with a distict meaning for each number (such as a operation mode, etc.)
-  valueType_bool = 172, ///< technically an unsigned integer, 0 or 1
-  // non-numeric types
-  valueType_firstNonNumeric = 200, ///< first generic non-numeric type
-  valueType_textenum = 200, ///< one item from a list of text. Internally represented as an unsigned integer or enum
-  valueType_text = 201, ///< text parameters for actions
+  sensorType_temperature = 1, ///< temperature in degrees celsius
+  sensorType_humidity = 2, ///< relative humidity in %
+  sensorType_illumination = 3, ///< illumination in lux
+  sensorType_supplyVoltage = 4, ///< supply voltage level in Volts
+  sensorType_gas_CO = 5, ///< CO (carbon monoxide) concentration in ppm
+  sensorType_gas_radon = 6, ///< Radon activity in Bq/m3
+  sensorType_gas_type = 7, ///< gas type sensor
+  sensorType_dust_PM10 = 8, ///< particles <10µm in μg/m3
+  sensorType_dust_PM2_5 = 9, ///< particles <2.5µm in μg/m3
+  sensorType_dust_PM1 = 10, ///< particles <1µm in μg/m3
+  sensorType_set_point = 11, ///< room operating panel set point, 0..1
+  sensorType_fan_speed = 12, ///< fan speed, 0..1 (0=off, <0=auto)
+  sensorType_wind_speed = 13, ///< wind speed in m/s
+  sensorType_power = 14, ///< Power in W
+  sensorType_current = 15, ///< Electric current in A
+  sensorType_energy = 16, ///< Energy in kWh
+  sensorType_consumption = 17, ///< Electric Consumption in VA
+  sensorType_air_pressure = 18, ///< Air pressure in hPa
+  sensorType_wind_direction = 19, ///< Wind direction in degrees
+  sensorType_sound_volume = 20, ///< Sound pressure level in dB
+  sensorType_precipitation = 21, ///< Precipitation in mm/m2
+  sensorType_gas_CO2 = 22, ///< CO2 (carbon dioxide) concentration in ppm
+  sensorType_gust_speed = 23, ///< gust speed in m/S
+  sensorType_gust_direction = 24, ///< gust direction in degrees
+} VdcSensorType;
+
+
+/// technical value types
+/// @note these are used to describe single device properties and parameter values, along with VdcSiUnit
+typedef enum {
+  valueType_unknown,
+  valueType_numeric,
+  valueType_integer,
+  valueType_boolean,
+  valueType_enumeration,
+  valueType_string,
+  numValueTypes
 } VdcValueType;
+
+
+/// value (physical) units
+/// @note these are used to describe single device properties and parameter values, along with VdcValueType
+#define VDC_UNIT(u, s) ((((uint16_t)((uint8_t)s)&0xFF)<<8)+u)
+#define VDC_UNIT_ONLY(u) ((VdcValueBaseUnit)(u & 0xFF))
+#define VDC_SCALING_ONLY(u) ((VdcUnitScale)((u>>8) & 0xFF))
+typedef enum {
+  unit_unknown = 0,
+  valueUnit_none = 1, ///< no unit
+  // basic SI units
+  valueUnit_meter,
+  valueUnit_gram, ///< we use gram to make it work
+  valueUnit_second,
+  valueUnit_ampere,
+  valueUnit_kelvin,
+  valueUnit_mole,
+  valueUnit_candle,
+  // derived units
+  valueUnit_watt,
+  valueUnit_celsius,
+  valueUnit_volt,
+  valueUnit_lux,
+  valueUnit_liter,
+  // combined units
+  valueUnit_molpercubicmeter,
+  // non-SI scaled units
+  valueUnit_minute,
+  valueUnit_hour,
+  valueUnit_day,
+  numValueUnits,
+} VdcValueBaseUnit;
+
+
+/// scaling factors
+/// @note these are combined into
+typedef enum {
+  unitScaling_yotta,
+  unitScaling_zetta,
+  unitScaling_exa,
+  unitScaling_peta,
+  unitScaling_tera,
+  unitScaling_giga,
+  unitScaling_mega,
+  unitScaling_kilo,
+  unitScaling_hecto,
+  unitScaling_deca,
+  unitScaling_1,
+  unitScaling_deci,
+  unitScaling_centi,
+  unitScaling_milli,
+  unitScaling_micro,
+  unitScaling_nano,
+  unitScaling_pico,
+  unitScaling_femto,
+  unitScaling_atto,
+  unitScaling_zepto,
+  unitScaling_yocto,
+  numUnitScalings
+} VdcUnitScale;
+
+/// unit description
+/// @note combination of VdcValueBaseUnit and VdcUnitScale
+typedef uint16_t VdcValueUnit;
 
 
 /// Scene Effects (transition and alerting)

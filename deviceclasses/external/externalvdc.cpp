@@ -721,7 +721,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       JsonObjectPtr o2 = o->arrayGet(i);
       JsonObjectPtr o3;
       // set defaults
-      VdcValueType sensorType = valueType_none;
+      VdcSensorType sensorType = sensorType_none;
       VdcUsageHint usage = usage_undefined;
       DsGroup group = defaultGroup; // default group for sensor is same as primary default
       double min = 0;
@@ -730,7 +730,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       MLMicroSeconds updateInterval = 5*Second; // assume mostly up-to-date
       string sensorName;
       // - optional params
-      if (o2->get("sensortype", o3)) sensorType = (VdcValueType)o3->int32Value();
+      if (o2->get("sensortype", o3)) sensorType = (VdcSensorType)o3->int32Value();
       if (o2->get("usage", o3)) usage = (VdcUsageHint)o3->int32Value();
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("updateinterval", o3)) updateInterval = o3->doubleValue()*Second;

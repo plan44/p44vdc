@@ -44,7 +44,7 @@ namespace p44 {
     /// @name behaviour description, constants or variables
     ///   set by device implementations when adding a Behaviour.
     /// @{
-    VdcValueType sensorType; ///< type and physical unit of sensor
+    VdcSensorType sensorType; ///< type and physical unit of sensor
     VdcUsageHint sensorUsage; ///< usage for sensor (if known)
     double min; ///< minimum value (corresponding to aEngineeringValue==0)
     double max; ///< max value
@@ -88,7 +88,7 @@ namespace p44 {
     ///   sends updates more frequently, these are only pushed when the value has actually changed.
     /// @note this must be called once before the device gets added to the device container. Implementation might
     ///   also derive default values for settings from this information.
-    void setHardwareSensorConfig(VdcValueType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval=0);
+    void setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval=0);
 
     /// create a hardware name including a sensor type text, the range (max/min/resolution) and the physical unit text
     /// @param aTypeText the sensor type (like "temperature", "humidity")
@@ -114,13 +114,13 @@ namespace p44 {
 
     /// get sensor type
     /// @return the sensor type
-    VdcValueType getSensorType() { return sensorType; };
+    VdcSensorType getSensorType() { return sensorType; };
 
     /// invalidate sensor value, i.e. indicate that current value is not known
     void invalidateSensorValue();
 
     /// update sensor value (when new value received from hardware)
-    /// @param aValue the new value from the sensor, in physical units according to sensorType (VdcValueType)
+    /// @param aValue the new value from the sensor, in physical units according to sensorType (VdcSensorType)
     /// @param aMinChange what minimum change the new value must have compared to last reported value
     ///   to be treated as a change. Default is -1, which means half the declared resolution.
     void updateSensorValue(double aValue, double aMinChange = -1);

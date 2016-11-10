@@ -49,9 +49,10 @@ namespace p44 {
 
     /// base class constructor for subclasses
     /// @param aName the name of this value
-    /// @param aValueType the value type of this value (descibing computing and physical value type)
-    /// @param aHasDefault true if the parameter has a default value (meaning it can be omitted in calls)
-    ValueDescriptor(const string aName, VdcValueType aValueType, bool aHasDefault);
+    /// @param aValueType the value type of this value (describing computing type)
+    /// @param aValueUnit the value unit if this value (describing physical unit type and scaling)
+    /// @param aHasDefault true if the parameter has a non-null default value
+    ValueDescriptor(const string aName, VdcValueType aValueType, VdcValueUnit aValueUnit, bool aHasDefault);
 
   public:
 
@@ -116,7 +117,7 @@ namespace p44 {
     virtual bool setDoubleValue(double aValue) { return false; /* NOP in base class */ };
 
     /// update double value for significant changes only
-    /// @param aValue the new value from the sensor, in physical units according to sensorType (VdcValueType)
+    /// @param aValue the new value from the sensor, in physical units according to siUnit
     /// @param aMinChange what minimum change the new value must have compared to last reported value
     ///   to be treated as a change. Default is -1, which means half the declared resolution.
     /// @return true if set value differs enough from previous value and was actually updated
@@ -142,13 +143,33 @@ namespace p44 {
     void invalidate();
 
     /// set "defaultvalue" flag
-    void setIsDefault(bool aIsDefault) { isDefault = aIsDefault; };
+    void setIsDefault(bool aIsDefault) { isDefaultValue = aIsDefault; };
 
     /// set "readonly" flag
     void setReadOnly(bool aReadOnly) { readOnly = aReadOnly; };
 
     /// check readonly flag
     bool isReadOnly() { return readOnly; }
+
+    /// check default value flag (value itself can still be NULL)
+    bool isDefault() { return isDefaultValue; }
+
+
+    /// @}
+
+    /// Utilities
+    /// @{
+
+    /// get name of a given VdcValueType
+    /// @param aValueType the value type to get the name for
+    /// @return value type name
+    static string valueTypeName(VdcValueType aValueType);
+
+    /// get unit name or symbol for a given VdcValueUnit
+    /// @param aValueUnit the value unit to get the name for
+    /// @param aAsSymbol if set, the name is returned as symbol (m), otherwise as full text (meter)
+    /// @return unit name or symbol including scaling
+    static string valueUnitName(VdcValueUnit aValueUnit, bool aAsSymbol);
 
     /// @}
 
@@ -157,9 +178,10 @@ namespace p44 {
 
     string valueName; ///< the name of the value
     bool hasValue; ///< set if there is a stored value. For action params, this is the default value. For state/states params this is the actual value
-    bool isDefault; ///< set if the value stored is the default value
+    bool isDefaultValue; ///< set if the value stored is the default value
     bool readOnly; ///< set if the value cannot be written
-    VdcValueType valueType; ///< the type of the parameter
+    VdcValueType valueType; ///< the technical type of the value
+    VdcValueUnit valueUnit; ///< the unit+scaling of the value
     MLMicroSeconds lastUpdate; ///< when the value was last updated
     MLMicroSeconds lastChange; ///< when the value was last changed
 
@@ -201,8 +223,8 @@ namespace p44 {
   public:
 
     /// constructor for a numeric parameter, which can be any of the physical unit types, bool, int, numeric enum or generic double
-    NumericValueDescriptor(const string aName, VdcValueType aValueType, double aMin, double aMax, double aResolution, bool aHasDefault = false, double aDefaultValue = 0) :
-      inherited(aName, aValueType, aHasDefault), min(aMin), max(aMax), resolution(aResolution), value(aDefaultValue) {};
+    NumericValueDescriptor(const string aName, VdcValueType aValueType, VdcValueUnit aValueUnit, double aMin, double aMax, double aResolution, bool aHasDefault = false, double aDefaultValue = 0) :
+      inherited(aName, aValueType, aValueUnit, aHasDefault), min(aMin), max(aMax), resolution(aResolution), value(aDefaultValue) {};
 
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
@@ -231,7 +253,7 @@ namespace p44 {
 
     /// constructor for a text string parameter
     TextValueDescriptor(const string aName, bool aHasDefault = false, const string aDefaultValue = "") :
-      inherited(aName, valueType_text, aHasDefault), value(aDefaultValue) {};
+      inherited(aName, valueType_string, valueUnit_none, aHasDefault), value(aDefaultValue) {};
 
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
@@ -256,7 +278,7 @@ namespace p44 {
   public:
 
     /// constructor for a text enumeration parameter
-    EnumValueDescriptor(const string aName) : inherited(aName, valueType_textenum, false) {};
+    EnumValueDescriptor(const string aName) : inherited(aName, valueType_enumeration, valueUnit_none, false) {};
 
     /// add a enum value
     /// @param aEnumText the text
@@ -334,7 +356,8 @@ namespace p44 {
 
     /// add parameter
     /// @param aValueDesc a value descriptor object.
-    void addParameter(ValueDescriptorPtr aValueDesc);
+    /// @param aMandatory if set, parameter must be explicitly specified and does not have an implicit default (not even NULL)
+    void addParameter(ValueDescriptorPtr aValueDesc, bool aMandatory = false);
 
     /// call the action
     /// @param aParams an ApiValue of type apivalue_object, expected to

@@ -55,7 +55,7 @@ namespace p44 {
     DsClass colorClass; ///< the dS group for the entire device
     DsGroup channelGroup; ///< the dS group for this channel
     BehaviourType behaviourType; ///< the behaviour type
-    uint8_t behaviourParam; ///< VdcValueType, DsBinaryInputType or VdcOutputFunction resp., depending on behaviourType
+    uint8_t behaviourParam; ///< VdcSensorType, DsBinaryInputType or VdcOutputFunction resp., depending on behaviourType
     VdcUsageHint usage; ///< usage hint
     float min; ///< min value
     float max; ///< max value
