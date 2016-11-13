@@ -275,7 +275,7 @@ Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, in
     }
   }
   if (learnIn) {
-    if (type!=eldat_unknown) {
+    if (onlyEstablish!=no && type!=eldat_unknown) {
       int numNewDevices = EldatDevice::createDevicesFromType(this, aSenderAddress, type, subdevice);
       if (numNewDevices>0) {
         // successfully learned at least one device
@@ -284,15 +284,17 @@ Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, in
         return yes; // learned in
       }
     }
-    return undefined; // failure - could not learn a device with this profile
   }
   else {
-    // device learned out, un-pair all logical dS devices it has represented
-    // but keep dS level config in case it is reconnected
-    unpairDevicesByAddress(aSenderAddress, false, subdevice, numSubDevices);
-    getVdcHost().reportLearnEvent(false, ErrorPtr());
-    return no; // always successful learn out
+    if (onlyEstablish!=yes) {
+      // device learned out, un-pair all logical dS devices it has represented
+      // but keep dS level config in case it is reconnected
+      unpairDevicesByAddress(aSenderAddress, false, subdevice, numSubDevices);
+      getVdcHost().reportLearnEvent(false, ErrorPtr());
+      return no; // always successful learn out
+    }
   }
+  return undefined; // nothing learned in, nothing learned out
 }
 
 
@@ -408,10 +410,11 @@ ErrorPtr EldatVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod
 // MARK: ===== learn and unlearn devices
 
 
-void EldatVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck)
+void EldatVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
 {
   // put normal radio packet evaluator into learn mode
   learningMode = aEnableLearning;
+  onlyEstablish = aOnlyEstablish;
   // TODO: do we need that?
   // disableProximityCheck = aDisableProximityCheck;
 }

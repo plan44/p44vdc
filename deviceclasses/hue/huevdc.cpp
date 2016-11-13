@@ -184,13 +184,14 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
 }
 
 
-void HueVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck)
+void HueVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
 {
   if (aEnableLearning) {
+    
     hueComm.findNewBridge(
       string_format("%s#%s", getVdcHost().modelName().c_str(), getVdcHost().getDeviceHardwareId().c_str()).c_str(),
       15*Second, // try to login for 15 secs
-      boost::bind(&HueVdc::searchResultHandler, this, _1)
+      boost::bind(&HueVdc::searchResultHandler, this, aOnlyEstablish, _1)
     );
   }
   else {
@@ -200,7 +201,7 @@ void HueVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck)
 }
 
 
-void HueVdc::searchResultHandler(ErrorPtr aError)
+void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
     // found and authenticated bridge
@@ -213,40 +214,48 @@ void HueVdc::searchResultHandler(ErrorPtr aError)
       hueComm.userName.c_str(),
       hueComm.baseURL.c_str()
     );
-    // learning in or out requires all devices to be removed first
-    // (on learn-in, the bridge's devices will be added afterwards)
-    removeDevices(false);
     // check if we found the already learned-in bridge
-    bool learnIn = false;
+    Tristate learnedIn = undefined;
     if (hueComm.uuid==bridgeUuid) {
       // this is the bridge that was learned in previously. Learn it out
-      // - delete it from the whitelist
-      string url = "/config/whitelist/" + hueComm.userName;
-      hueComm.apiAction(httpMethodDELETE, url.c_str(), JsonObjectPtr(), NULL);
-      // - forget uuid + user name
-      bridgeUuid.clear();
-      bridgeUserName.clear();
+      if (aOnlyEstablish!=yes) {
+        learnedIn = no;
+        // - delete it from the whitelist
+        string url = "/config/whitelist/" + hueComm.userName;
+        hueComm.apiAction(httpMethodDELETE, url.c_str(), JsonObjectPtr(), NULL);
+        // - forget uuid + user name
+        bridgeUuid.clear();
+        bridgeUserName.clear();
+      }
     }
     else {
       // new bridge found
-      learnIn = true;
-      bridgeUuid = hueComm.uuid;
-      bridgeUserName = hueComm.userName;
+      if (aOnlyEstablish!=no) {
+        learnedIn = yes;
+        bridgeUuid = hueComm.uuid;
+        bridgeUserName = hueComm.userName;
+      }
     }
-    // save the bridge parameters
-    db.executef(
-      "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s'",
-      bridgeUuid.c_str(),
-      bridgeUserName.c_str()
-    );
-    // now process the learn in/out
-    if (learnIn) {
-      // TODO: now get lights
-      collectedHandler = NULL; // we are not collecting, this is adding new lights while in operation already
-      collectLights();
+    if (learnedIn!=undefined) {
+      // learning in or out requires all devices to be removed first
+      // (on learn-in, the bridge's devices will be added afterwards)
+      removeDevices(false);
+      // actual learn-in or -out has happened
+      // save the bridge parameters
+      db.executef(
+        "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s'",
+        bridgeUuid.c_str(),
+        bridgeUserName.c_str()
+      );
+      // now process the learn in/out
+      if (learnedIn==yes) {
+        // TODO: now get lights
+        collectedHandler = NULL; // we are not collecting, this is adding new lights while in operation already
+        collectLights();
+      }
+      // report successful learn event
+      getVdcHost().reportLearnEvent(learnedIn==yes, ErrorPtr());
     }
-    // report successful learn event
-    getVdcHost().reportLearnEvent(learnIn, ErrorPtr());
   }
   else {
     // not found (usually timeout)

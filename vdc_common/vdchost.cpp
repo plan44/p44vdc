@@ -498,7 +498,7 @@ void VdcHost::startLearning(LearnCB aLearnHandler, bool aDisableProximityCheck)
   learningMode = true;
   LOG(LOG_NOTICE, "=== start learning%s", aDisableProximityCheck ? " with proximity check disabled" : "");
   for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
-    pos->second->setLearnMode(true, aDisableProximityCheck);
+    pos->second->setLearnMode(true, aDisableProximityCheck, undefined);
   }
 }
 
@@ -507,7 +507,7 @@ void VdcHost::stopLearning()
 {
   // disable learning in all class containers
   for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
-    pos->second->setLearnMode(false, false);
+    pos->second->setLearnMode(false, false, undefined);
   }
   LOG(LOG_NOTICE, "=== stopped learning");
   learningMode = false;

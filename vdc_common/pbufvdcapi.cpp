@@ -1240,7 +1240,8 @@ ErrorCode VdcPbufApiConnection::pbufToInternalError(Vdcapi__ResultCode aVdcApiRe
     case VDCAPI__RESULT_CODE__ERR_FORBIDDEN: errorCode = 403; break;
     case VDCAPI__RESULT_CODE__ERR_NOT_AUTHORIZED: errorCode = 401; break;
     case VDCAPI__RESULT_CODE__ERR_NOT_IMPLEMENTED: errorCode = 501; break;
-    case VDCAPI__RESULT_CODE__ERR_NO_CONTENT_FOR_ARRAY: errorCode = 204; break;
+    case VDCAPI__RESULT_CODE__ERR_NO_CONTENT_FOR_ARRAY: errorCode = 204; break; // no content
+    case VDCAPI__RESULT_CODE__ERR_MISSING_DATA: errorCode = 410; break; // gone
     case VDCAPI__RESULT_CODE__ERR_INVALID_VALUE_TYPE: errorCode = 415; break;
     default: errorCode = 500; break; // general error
   }
@@ -1262,7 +1263,8 @@ Vdcapi__ResultCode VdcPbufApiConnection::internalToPbufError(ErrorCode aErrorCod
     case 403: res = VDCAPI__RESULT_CODE__ERR_FORBIDDEN; break;
     case 401: res = VDCAPI__RESULT_CODE__ERR_NOT_AUTHORIZED; break;
     case 501: res = VDCAPI__RESULT_CODE__ERR_NOT_IMPLEMENTED; break;
-    case 204: res = VDCAPI__RESULT_CODE__ERR_NO_CONTENT_FOR_ARRAY; break;
+    case 204: res = VDCAPI__RESULT_CODE__ERR_NO_CONTENT_FOR_ARRAY; break; // no content
+    case 410: res = VDCAPI__RESULT_CODE__ERR_MISSING_DATA; break; // gone
     case 415: res = VDCAPI__RESULT_CODE__ERR_INVALID_VALUE_TYPE; break;
     default: res = VDCAPI__RESULT_CODE__ERR_NOT_IMPLEMENTED; break; // something is obviously not implemented...
   }

@@ -67,6 +67,7 @@ namespace p44 {
 
     int instanceNumber; ///< the instance number identifying this instance among other instances of this class
     int tag; ///< tag used to in self test failures for showing on LEDs
+    long pairTicket; ///< used for pairing
 
     /// generic vdc flag word
     int vdcFlags;
@@ -197,9 +198,10 @@ namespace p44 {
 
     /// set container learn mode
     /// @param aEnableLearning true to enable learning mode
-    /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some EnOcean devices)
+    /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some radio devices)
+    /// @param aOnlyEstablish set this to yes to only learn in, to no to only learn out or to undefined to allow both learn-in and out.
     /// @note learn events (new devices found or devices removed) must be reported by calling reportLearnEvent() on VdcHost.
-    virtual void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck) { /* NOP in base class */ }
+    virtual void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish) { /* NOP in base class */ }
 
     /// @}
 
@@ -311,7 +313,9 @@ namespace p44 {
 
   private:
 
-    void scanDevicesMethodComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
+    void performPair(VdcApiRequestPtr aRequest, Tristate aEstablish, bool aDisableProximityCheck, MLMicroSeconds aTimeout);
+    void pairingEvent(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError);
+    void pairingTimeout(VdcApiRequestPtr aRequest);
 
   };
 

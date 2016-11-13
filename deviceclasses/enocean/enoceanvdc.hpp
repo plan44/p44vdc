@@ -59,6 +59,7 @@ namespace p44 {
 
     bool learningMode;
     bool disableProximityCheck;
+    Tristate onlyEstablish;
     bool selfTesting;
 
     EnoceanDeviceMap enoceanDevices; ///< local map linking EnoceanDeviceID to devices
@@ -126,9 +127,10 @@ namespace p44 {
 
     /// set container learn mode
     /// @param aEnableLearning true to enable learning mode
-    /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some EnOcean devices)
+    /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some radio devices)
+    /// @param aOnlyEstablish set this to yes to only learn in, to no to only learn out or to undefined to allow both learn-in and out.
     /// @note learn events (new devices found or devices removed) must be reported by calling reportLearnEvent() on VdcHost.
-    virtual void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck) P44_OVERRIDE;
+    virtual void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish) P44_OVERRIDE;
 
   protected:
 

@@ -365,22 +365,26 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
   bool learnIn = enoceanDevices.find(aDeviceAddress)==enoceanDevices.end();
   if (learnIn) {
     // new device learned in, add logical devices for it
-    int numNewDevices = EnoceanDevice::createDevicesFromEEP(this, aDeviceAddress, aEEProfile, aManufacturer);
-    if (numNewDevices>0) {
-      // successfully learned at least one device
-      // - update learn status (device learned)
-      getVdcHost().reportLearnEvent(true, ErrorPtr());
-      return yes; // learned in
+    if  (onlyEstablish!=no) {
+      int numNewDevices = EnoceanDevice::createDevicesFromEEP(this, aDeviceAddress, aEEProfile, aManufacturer);
+      if (numNewDevices>0) {
+        // successfully learned at least one device
+        // - update learn status (device learned)
+        getVdcHost().reportLearnEvent(true, ErrorPtr());
+        return yes; // learned in
+      }
     }
-    return undefined; // failure - could not learn a device with this profile
   }
   else {
-    // device learned out, un-pair all logical dS devices it has represented
-    // but keep dS level config in case it is reconnected
-    unpairDevicesByAddress(aDeviceAddress, false);
-    getVdcHost().reportLearnEvent(false, ErrorPtr());
-    return no; // always successful learn out
+    if (onlyEstablish!=yes) {
+      // device learned out, un-pair all logical dS devices it has represented
+      // but keep dS level config in case it is reconnected
+      unpairDevicesByAddress(aDeviceAddress, false);
+      getVdcHost().reportLearnEvent(false, ErrorPtr());
+      return no; // always successful learn out
+    }
   }
+  return undefined; // nothing learned in, nothing learned out
 }
 
 
@@ -402,10 +406,11 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     // explicit ones are always recognized
     if (aEsp3PacketPtr->radioHasTeachInfo(disableProximityCheck ? 0 : MIN_LEARN_DBM, false)) {
       LOG(LOG_NOTICE, "Learn mode enabled: processing EnOcean learn packet: %s", aEsp3PacketPtr->description().c_str());
-      processLearn(aEsp3PacketPtr->radioSender(), aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer());
-      // - only allow one learn action (to prevent learning out device when
-      //   button is released or other repetition of radio packet)
-      learningMode = false;
+      if (processLearn(aEsp3PacketPtr->radioSender(), aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer())!=undefined) {
+        // - only allow one learn action (to prevent learning out device when
+        //   button is released or other repetition of radio packet)
+        learningMode = false;
+      }
     } // learn action
     else {
       LOG(LOG_INFO, "Learn mode enabled: Received non-learn EnOcean packet -> ignored: %s", aEsp3PacketPtr->description().c_str());
@@ -522,11 +527,12 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
 
 
 
-void EnoceanVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck)
+void EnoceanVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
 {
   // put normal radio packet evaluator into learn mode
   learningMode = aEnableLearning;
   disableProximityCheck = aDisableProximityCheck;
+  onlyEstablish = aOnlyEstablish;
   // also enable smartAck learn mode in the EnOcean module
   enoceanComm.smartAckLearnMode(aEnableLearning, 60*Second); // actual timeout of learn is usually smaller
 }
