@@ -639,9 +639,11 @@ private:
       }
     }
     if (aQueryState==dqs_random_l || aNoOrTimeout) {
-      // collision already detected, or last byte of existing device checked, or timeout -> query complete for this short address
-      if (isYes) {
-        // do a data reliability test now (quick 3 byte 0,0x55,0xAA only unless loglevel>=6)
+      // - collision already detected (dqs_random_l set above) -> query complete for this short address
+      // - or last byte of existing device checked (dqs_random_l reached sequentially) -> do data test when this check was ok (isYes)
+      // - or timeout -> could be device without random address support, do data test unless collision detected
+      if (aQueryState!=dqs_controlgear && (isYes || !probablyCollision)) {
+        // do a data reliability test now (quick 3 byte 0,0x55,0xAA only, unless loglevel>=6)
         DaliBusDataTester::daliBusTestData(daliComm, boost::bind(&DaliBusScanner::nextDevice ,this, true, _1), shortAddress, LOGLEVEL>=LOG_INFO ? 9 : 3);
         return;
       }
