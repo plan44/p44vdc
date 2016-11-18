@@ -118,6 +118,7 @@ namespace p44 {
 
     bool findInProgress;
     bool apiReady;
+    MLMicroSeconds lastApiAction;
 
   public:
 

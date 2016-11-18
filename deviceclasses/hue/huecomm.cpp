@@ -452,7 +452,8 @@ HueComm::HueComm() :
   inherited(MainLoop::currentMainLoop()),
   bridgeAPIComm(MainLoop::currentMainLoop()),
   findInProgress(false),
-  apiReady(false)
+  apiReady(false),
+  lastApiAction(Never)
 {
 }
 
@@ -484,6 +485,13 @@ void HueComm::apiAction(HttpMethods aMethod, const char* aUrlSuffix, JsonObjectP
     url += nonNullCStr(aUrlSuffix);
   }
   HueApiOperationPtr op = HueApiOperationPtr(new HueApiOperation(*this, aMethod, url.c_str(), aData, aResultHandler));
+  // Philips says: no more than 10 API calls per second
+  // see http://www.developers.meethue.com/faq-page
+  // Q: How many commands you can send per second?
+  // A: You can send commands to the lights too fast. If you stay roughly around 10 commands per
+  //    second to the /lights resource as maximum you should be fine.
+  op->setInitiatesAt(lastApiAction+100*MilliSecond); // do not start next command earlier than 100mS after the previous one
+  lastApiAction = MainLoop::currentMainLoop().now(); // remember this operation
   queueOperation(op);
   // process operations
   processOperations();
