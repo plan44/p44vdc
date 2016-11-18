@@ -286,6 +286,7 @@ ShadowBehaviour::ShadowBehaviour(Device &aDevice) :
   minMoveTime(200*MilliSecond),
   maxShortMoveTime(0),
   minLongMoveTime(0),
+  stopDelayTime(0),
   hasEndContacts(false),
   // persistent settings (defaults are MixWerk's)
   openTime(54),
@@ -485,7 +486,7 @@ void ShadowBehaviour::stop(SimpleCB aApplyDoneCB)
     }
     BLOG(LOG_INFO, "Stopping all movement%s", blindState==blind_stopping_before_apply ? " before applying" : "");
     MainLoop::currentMainLoop().cancelExecutionTicket(movingTicket);
-    movementCB(boost::bind(&ShadowBehaviour::stopped, this, aApplyDoneCB), 0);
+    movementCB(boost::bind(&ShadowBehaviour::stopped, this, aApplyDoneCB, true), 0);
   }
   else {
     // no movement sequence in progress
@@ -533,13 +534,22 @@ void ShadowBehaviour::endReached(bool aTop)
 }
 
 
-
-
-void ShadowBehaviour::stopped(SimpleCB aApplyDoneCB)
+void ShadowBehaviour::stopped(SimpleCB aApplyDoneCB, bool delay)
 {
   updateMoveTimeAtEndReached = false; // stopping cancels full range timing update (if stop is due to end contact, measurement will be already done now)
   moveTimerStop();
   FOCUSLOG("- calculated current blind position=%.1f%%, angle=%.1f", referencePosition, referenceAngle);
+
+  if (delay) {
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&ShadowBehaviour::processStopped, this, aApplyDoneCB), stopDelayTime*Second);
+  }
+  else {
+    processStopped(aApplyDoneCB);
+  }
+}
+
+void ShadowBehaviour::processStopped(SimpleCB aApplyDoneCB)
+{
   // next step depends on state
   switch (blindState) {
     case blind_stopping_before_apply:
@@ -858,7 +868,7 @@ const char *ShadowBehaviour::tableName()
 
 // data field definitions
 
-static const size_t numFields = 4;
+static const size_t numFields = 5;
 
 size_t ShadowBehaviour::numFieldDefs()
 {
@@ -873,6 +883,7 @@ const FieldDefinition *ShadowBehaviour::getFieldDef(size_t aIndex)
     { "closeTime", SQLITE_FLOAT },
     { "angleOpenTime", SQLITE_FLOAT },
     { "angleCloseTime", SQLITE_FLOAT },
+    { "stopDelayTime", SQLITE_FLOAT },
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
@@ -892,6 +903,7 @@ void ShadowBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
   aRow->getIfNotNull<double>(aIndex++, closeTime);
   aRow->getIfNotNull<double>(aIndex++, angleOpenTime);
   aRow->getIfNotNull<double>(aIndex++, angleCloseTime);
+  aRow->getIfNotNull<double>(aIndex++, stopDelayTime);
 }
 
 
@@ -904,6 +916,7 @@ void ShadowBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
   aStatement.bind(aIndex++, closeTime);
   aStatement.bind(aIndex++, angleOpenTime);
   aStatement.bind(aIndex++, angleCloseTime);
+  aStatement.bind(aIndex++, stopDelayTime);
 }
 
 
@@ -920,6 +933,7 @@ enum {
   closeTime_key,
   angleOpenTime_key,
   angleCloseTime_key,
+  stopDelayTime_key,
   numSettingsProperties
 };
 
@@ -932,6 +946,7 @@ const PropertyDescriptorPtr ShadowBehaviour::getSettingsDescriptorByIndex(int aP
     { "closeTime", apivalue_double, closeTime_key+settings_key_offset, OKEY(shadow_key) },
     { "angleOpenTime", apivalue_double, angleOpenTime_key+settings_key_offset, OKEY(shadow_key) },
     { "angleCloseTime", apivalue_double, angleCloseTime_key+settings_key_offset, OKEY(shadow_key) },
+    { "stopDelayTime", apivalue_double, stopDelayTime_key+settings_key_offset, OKEY(shadow_key) },
   };
   int n = inherited::numSettingsProps();
   if (aPropIndex<n)
@@ -954,6 +969,7 @@ bool ShadowBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case closeTime_key+settings_key_offset: aPropValue->setDoubleValue(closeTime); return true;
         case angleOpenTime_key+settings_key_offset: aPropValue->setDoubleValue(angleOpenTime); return true;
         case angleCloseTime_key+settings_key_offset: aPropValue->setDoubleValue(angleCloseTime); return true;
+        case stopDelayTime_key+settings_key_offset: aPropValue->setDoubleValue(stopDelayTime); return true;
       }
     }
     else {
@@ -964,6 +980,7 @@ bool ShadowBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case closeTime_key+settings_key_offset: setPVar(closeTime, aPropValue->doubleValue()); return true;
         case angleOpenTime_key+settings_key_offset: setPVar(angleOpenTime, aPropValue->doubleValue()); return true;
         case angleCloseTime_key+settings_key_offset: setPVar(angleCloseTime, aPropValue->doubleValue()); return true;
+        case stopDelayTime_key+settings_key_offset: setPVar(stopDelayTime, aPropValue->doubleValue()); return true;
       }
     }
   }
