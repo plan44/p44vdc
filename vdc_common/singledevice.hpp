@@ -165,11 +165,22 @@ namespace p44 {
     /// @return value type name
     static string valueTypeName(VdcValueType aValueType);
 
+    /// get value type from a given string
+    /// @param aValueTypeName a value type name string
+    /// @return value type (valueType_unknown when string does not match)
+    static VdcValueType stringToValueType(const string aValueTypeName);
+
+
     /// get unit name or symbol for a given VdcValueUnit
     /// @param aValueUnit the value unit to get the name for
     /// @param aAsSymbol if set, the name is returned as symbol (m), otherwise as full text (meter)
     /// @return unit name or symbol including scaling
     static string valueUnitName(VdcValueUnit aValueUnit, bool aAsSymbol);
+
+    /// get value unit from a given string
+    /// @param aValueUnitName a value unit specification string (consisting of unit and optional scaling prefix)
+    /// @return value unit (unit_unknown when string does not match)
+    static VdcValueUnit stringToValueUnit(const string aValueUnitName);
 
     /// @}
 

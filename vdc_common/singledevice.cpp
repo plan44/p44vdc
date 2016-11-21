@@ -184,75 +184,92 @@ bool ValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 }
 
 
+const char *valueTypeNames[numValueTypes] = {
+  "unknown",
+  "numeric",
+  "integer",
+  "boolean",
+  "enumeration",
+  "string",
+};
+
+
 string ValueDescriptor::valueTypeName(VdcValueType aValueType)
 {
-  const char *valueTypeNames[numValueTypes] = {
-    "unknown",
-    "numeric",
-    "integer",
-    "boolean",
-    "enumeration",
-    "string",
-  };
   if (aValueType>=numValueTypes) aValueType = valueType_unknown;
   return valueTypeNames[aValueType];
 }
 
 
+VdcValueType ValueDescriptor::stringToValueType(const string aValueTypeName)
+{
+  for (int i=0; i<numValueTypes; i++) {
+    if (aValueTypeName == valueTypeNames[i]) {
+      return (VdcValueType)i;
+    }
+  }
+  return valueType_unknown;
+}
+
+
+
+
+typedef struct {
+  const char *name;
+  const char *symbol;
+} ValueUnitDescriptor;
+static const ValueUnitDescriptor valueUnitNames[numValueUnits] = {
+  { "unknown", "?" },
+  { "none", "" },
+  { "meter", "m" },
+  { "gram", "g" },
+  { "second", "S" },
+  { "ampere", "A" },
+  { "kelvin", "K" },
+  { "mole", "mol" },
+  { "candle", "cd" },
+  { "watt", "W" },
+  { "celsius", "°C" },
+  { "volt", "V" },
+  { "lux", "lx" },
+  { "liter", "l" },
+  { "molpercubicmeter", "mol/m3" },
+  { "minute", "min" },
+  { "hour", "h" },
+  { "day", "d" }
+};
+typedef struct {
+  const char *name;
+  const char *symbol;
+  int8_t exponent;
+} ValueScalingDescriptor;
+static const ValueScalingDescriptor valueScalingNames[numUnitScalings] = {
+  { "Yotta", "Y", 24 },
+  { "Zetta", "Z", 21 },
+  { "Exa", "E", 18 },
+  { "Peta", "P", 15 },
+  { "Tera", "T", 12 },
+  { "Giga", "G", 9 },
+  { "Mega", "M", 6 },
+  { "Kilo", "k", 3 },
+  { "hecto", "h", 2 },
+  { "deca", "da", 1 },
+  { "", "", 0 },
+  { "deci", "d", -1 },
+  { "centi", "c", -2 },
+  { "milli", "m", -3 },
+  { "micro", "µ", -6 },
+  { "nano", "n", -9 },
+  { "pico", "p", -12 },
+  { "femto", "f", -15 },
+  { "atto", "a", -18 },
+  { "zepto", "z", -21 },
+  { "yocto", "y", -24 }
+};
+
+
 string ValueDescriptor::valueUnitName(VdcValueUnit aValueUnit, bool aAsSymbol)
 {
-  typedef struct {
-    const char *name;
-    const char *symbol;
-  } ValueUnitDescriptor;
-  static const ValueUnitDescriptor valueUnitNames[numValueUnits] = {
-    { "unknown", "?" },
-    { "none", "" },
-    { "meter", "m" },
-    { "gram", "g" },
-    { "second", "S" },
-    { "ampere", "A" },
-    { "kelvin", "K" },
-    { "mole", "mol" },
-    { "candle", "cd" },
-    { "watt", "W" },
-    { "celsius", "°C" },
-    { "volt", "V" },
-    { "lux", "lx" },
-    { "liter", "l" },
-    { "molpercubicmeter", "mol/m3" },
-    { "minute", "min" },
-    { "hour", "h" },
-    { "day", "d" }
-  };
-  typedef struct {
-    const char *name;
-    const char *symbol;
-    int8_t exponent;
-  } ValueScalingDescriptor;
-  static const ValueScalingDescriptor valueScalingNames[numUnitScalings] = {
-    { "Yotta", "Y", 24 },
-    { "Zetta", "Z", 21 },
-    { "Exa", "E", 18 },
-    { "Peta", "P", 15 },
-    { "Tera", "T", 12 },
-    { "Giga", "G", 9 },
-    { "Mega", "M", 6 },
-    { "Kilo", "k", 3 },
-    { "hecto", "h", 2 },
-    { "deca", "da", 1 },
-    { "", "", 0 },
-    { "deci", "d", -1 },
-    { "centi", "c", -2 },
-    { "milli", "m", -3 },
-    { "micro", "µ", -6 },
-    { "nano", "n", -9 },
-    { "pico", "p", -12 },
-    { "femto", "f", -15 },
-    { "atto", "a", -18 },
-    { "zepto", "z", -21 },
-    { "yocto", "y", -24 }
-  };
   VdcValueBaseUnit u = VDC_UNIT_ONLY(aValueUnit);
   if (u>=numValueUnits) u=valueUnit_none;
   VdcUnitScale s = VDC_SCALING_ONLY(aValueUnit);
@@ -264,7 +281,28 @@ string ValueDescriptor::valueUnitName(VdcValueUnit aValueUnit, bool aAsSymbol)
 }
 
 
-
+VdcValueUnit ValueDescriptor::stringToValueUnit(const string aValueUnitName)
+{
+  // check for prefix
+  VdcUnitScale s = unitScaling_1;
+  size_t n = 0;
+  for (int i=0; i<numUnitScalings; i++) {
+    n = strlen(valueScalingNames[i].name);
+    if (n>0 && aValueUnitName.substr(0,n)==valueScalingNames[i].name) {
+      s = (VdcUnitScale)i;
+      break;
+    }
+  }
+  // s = scale
+  // n = size of prefix
+  // now determine unit
+  for (int i=0; i<numValueUnits; i++) {
+    if (aValueUnitName.substr(n)==valueUnitNames[i].name) {
+      return VDC_UNIT(i, s);
+    }
+  }
+  return unit_unknown;
+}
 
 
 

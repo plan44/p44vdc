@@ -413,7 +413,7 @@ typedef enum {
 
 /// value (physical) units
 /// @note these are used to describe single device properties and parameter values, along with VdcValueType
-#define VDC_UNIT(u, s) ((((uint16_t)((uint8_t)s)&0xFF)<<8)+u)
+#define VDC_UNIT(u, s) ((((uint16_t)((uint8_t)s)&0xFF)<<8)+(uint8_t)u)
 #define VDC_UNIT_ONLY(u) ((VdcValueBaseUnit)(u & 0xFF))
 #define VDC_SCALING_ONLY(u) ((VdcUnitScale)((u>>8) & 0xFF))
 typedef enum {
