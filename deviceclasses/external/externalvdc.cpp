@@ -29,16 +29,100 @@
 #include "binaryinputbehaviour.hpp"
 #include "sensorbehaviour.hpp"
 
+#if ENABLE_EXTERNAL_SINGLEDEVICE
+  #include "jsonvdcapi.hpp"
+#endif
 
 using namespace p44;
 
 
+#if ENABLE_EXTERNAL_SINGLEDEVICE
 
-// MARK: ===== External Device
+// MARK: ===== ExternalDeviceAction
+
+ExternalDeviceAction::ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription) :
+  inherited(aSingleDevice, aName, aDescription),
+  callback(NULL)
+{
+}
+
+
+ExternalDeviceAction::~ExternalDeviceAction()
+{
+  // execute callback if still pending
+  if (callback) callback(WebError::webErr(410, "device gone"));
+}
+
+
+ExternalDevice &ExternalDeviceAction::getExternalDevice()
+{
+  return *(static_cast<ExternalDevice *>(singleDeviceP));
+}
+
+
+void ExternalDeviceAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
+{
+  if (!getExternalDevice().noConfirmAction) {
+    // remember callback
+    callback = aCompletedCB;
+  }
+  // create JSON response
+  JsonObjectPtr message = JsonObject::newObj();
+  message->add("message", JsonObject::newString("invokeAction"));
+  message->add("action", JsonObject::newString(actionId));
+  // convert params
+  if (aParams) {
+    JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue()); // must be JSON so we can pass it as part of the message
+    *params = *aParams; // copy to convert to JSON in all cases
+    message->add("params", params->jsonObject());
+  }
+  // send it
+  getExternalDevice().sendDeviceApiJsonMessage(message);
+  if (getExternalDevice().noConfirmAction) {
+    // immediately confirm
+    if (aCompletedCB) aCompletedCB(ErrorPtr());
+  }
+}
+
+
+void ExternalDeviceAction::callPerformed(JsonObjectPtr aStatusInfo)
+{
+  ErrorPtr err;
+  if (aStatusInfo) {
+    JsonObjectPtr o;
+    ErrorCode ec = Error::OK;
+    if (aStatusInfo->get("errorcode", o)) {
+      ec = o->int32Value();
+    }
+    if (ec!=Error::OK) {
+      string et;
+      if (aStatusInfo->get("errortext", o)) {
+        et = o->stringValue();
+      }
+      err = WebError::webErr(ec,"%s: %s", actionId.c_str(), et.c_str());
+    }
+  }
+  if (callback) {
+    callback(err); // will return status to caller of action
+    callback = NULL;
+  }
+}
+
+
+
+#endif // ENABLE_EXTERNAL_SINGLEDEVICE
+
+
+// MARK: ===== ExternalDevice
 
 
 ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag) :
-  Device(aVdcP),
+  #if ENABLE_EXTERNAL_SINGLEDEVICE
+  inherited(aVdcP, false), // do not enable single device mechanisms by default
+  noConfirmAction(false),
+  #else
+  inherited(aVdcP),
+  #endif
   deviceConnector(aDeviceConnector),
   tag(aTag),
   useMovement(false), // no movement by default
@@ -219,6 +303,82 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
       else if (aMessageType=="channel") {
         err = processInputJson('C', aMessage);
       }
+      #if ENABLE_EXTERNAL_SINGLEDEVICE
+      else if (aMessageType=="confirmAction") {
+        JsonObjectPtr o;
+        if (aMessage->get("action", o)) {
+          ExternalDeviceActionPtr a = boost::dynamic_pointer_cast<ExternalDeviceAction>(deviceActions->getAction(o->stringValue()));
+          if (a) a->callPerformed(aMessage);
+        }
+        else {
+          err = TextError::err("confirmAction must identify 'action'");
+        }
+      }
+      else if (aMessageType=="updateProperty") {
+        JsonObjectPtr o;
+        if (aMessage->get("property", o)) {
+          ValueDescriptorPtr prop = deviceProperties->getProperty(o->stringValue());
+          if (prop) {
+            if (aMessage->get("value", o)) {
+              ApiValuePtr v = ApiValuePtr(JsonApiValue::newValueFromJson(o));
+              ErrorPtr err = prop->conforms(v, true); // check and make internal
+              if (!Error::isOK(err)) return err;
+              prop->setValue(v);
+            }
+            if (aMessage->get("push", o)) {
+              if (o->boolValue()) {
+                deviceProperties->pushProperty(prop);
+              }
+            }
+          }
+        }
+      }
+      else if (aMessageType=="pushNotification") {
+        JsonObjectPtr o;
+        // collect list of events
+        DeviceEventsList evs;
+        if (aMessage->get("events", o)) {
+          for (int i=0; i<o->arrayLength(); i++) {
+            string evname = o->arrayGet(i)->stringValue();
+            DeviceEventPtr ev = deviceEvents->getEvent(evname);
+            if (ev) {
+              evs.push_back(ev);
+            }
+            else {
+              return TextError::err("unknown event '%s'", evname.c_str());
+            }
+          }
+        }
+        // check for state change to be pushed
+        if (aMessage->get("statechange", o)) {
+          string key;
+          JsonObjectPtr val;
+          o->resetKeyIteration();
+          if (o->nextKeyValue(key, val)) {
+            DeviceStatePtr s = deviceStates->getState(key);
+            if (s) {
+              // set new value for state
+              ApiValuePtr v = ApiValuePtr(JsonApiValue::newValueFromJson(val));
+              ErrorPtr err = s->value()->conforms(v, true); // check and make internal
+              if (!Error::isOK(err)) return err;
+              s->value()->setValue(v);
+              // push state along with events
+              s->pushWithEvents(evs);
+            }
+            else {
+              return TextError::err("unknown state '%s'", key.c_str());
+            }
+          }
+          else {
+            return TextError::err("need to specify a state name in statechange field");
+          }
+        }
+        else {
+          // only push events without a state change
+          deviceEvents->pushEvents(evs);
+        }
+      }
+      #endif
       else {
         err = TextError::err("Unknown message '%s'", aMessageType.c_str());
       }
@@ -555,7 +715,18 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     if (o->boolValue()) outputFunction = outputFunction_positional;
   }
   // - create appropriate output behaviour
-  if (outputType=="light") {
+  if (outputType=="action") {
+    enableAsSingleDevice(); // even without actions defines, this makes the device a single device
+    if (colorClass==class_undefined) colorClass = class_white_singledevices;
+    if (defaultGroup==group_undefined) defaultGroup = group_black_variable;
+    // - use command scene device settings
+    installSettings(DeviceSettingsPtr(new CmdSceneDeviceSettings(*this)));
+    OutputBehaviourPtr o = OutputBehaviourPtr(new ActionOutputBehaviour(*this));
+    o->setGroupMembership(defaultGroup, true);
+    o->setHardwareName(hardwareName);
+    addBehaviour(o);
+  }
+  else if (outputType=="light") {
     if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
     if (outputFunction==outputFunction_custom) outputFunction = outputFunction_dimmer;
     // - use light settings, which include a scene table
@@ -641,7 +812,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
     o->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_undefined, false, -1);
     o->setHardwareName(hardwareName);
-    o->setGroupMembership(defaultGroup, true); // put into primary group
+    o->setGroupMembership(defaultGroup, true); // put into default group
     o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o)));
     addBehaviour(o);
   }
@@ -746,6 +917,102 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       addBehaviour(sb);
     }
   }
+  #if ENABLE_EXTERNAL_SINGLEDEVICE
+  // check for single device actions
+  if (aInitParams->get("actions", o)) {
+    enableAsSingleDevice(); // must behave as a single device
+    string name;
+    JsonObjectPtr action;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(name, action)) {
+      JsonObjectPtr o2;
+      string desc = name; // default to name
+      if (action && action->get("description", o2)) desc = o2->stringValue();
+      // create the action
+      DeviceActionPtr a = DeviceActionPtr(new ExternalDeviceAction(*this, name, desc));
+      // check for params
+      if (action && action->get("params", o2)) {
+        string pname;
+        JsonObjectPtr param;
+        o2->resetKeyIteration();
+        while (o2->nextKeyValue(pname, param)) {
+          ValueDescriptorPtr p;
+          ErrorPtr err = parseParam(pname, param, p);
+          if (!Error::isOK(err)) {
+            return err;
+          }
+          a->addParameter(p);
+        }
+      }
+      deviceActions->addAction(a);
+    }
+  }
+  if (aInitParams->get("noconfirmaction", o)) {
+    noConfirmAction = o->boolValue();
+  }
+  // check for single device states
+  if (aInitParams->get("states", o)) {
+    enableAsSingleDevice(); // must behave as a single device
+    string name;
+    JsonObjectPtr state;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(name, state)) {
+      if (!state) return TextError::err("state must specify type");
+      JsonObjectPtr o2;
+      string desc = name; // default to name
+      if (state->get("description", o2)) desc = o2->stringValue();
+      ValueDescriptorPtr v;
+      ErrorPtr err = parseParam("state", state, v);
+      if (!Error::isOK(err)) {
+        return err;
+      }
+      // create the state
+      DeviceStatePtr s = DeviceStatePtr(new DeviceState(*this, name, desc, v, NULL));
+      deviceStates->addState(s);
+    }
+  }
+  // check for single device events
+  if (aInitParams->get("events", o)) {
+    enableAsSingleDevice(); // must behave as a single device
+    string name;
+    JsonObjectPtr event;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(name, event)) {
+      // create the event
+      JsonObjectPtr o2;
+      string desc = name; // default to name
+      if (event && event->get("description", o2)) desc = o2->stringValue();
+      DeviceEventPtr e = DeviceEventPtr(new DeviceEvent(*this, name, desc));
+      deviceEvents->addEvent(e);
+    }
+  }
+  // check for single device properties
+  if (aInitParams->get("properties", o)) {
+    enableAsSingleDevice(); // must behave as a single device
+    deviceProperties->setPropertyChangedHandler(boost::bind(&ExternalDevice::propertyChanged, this, _1));
+    string name;
+    JsonObjectPtr prop;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(name, prop)) {
+      if (!prop) return TextError::err("property must specify type");
+      // create the property (is represented by a ValueDescriptor)
+      bool readonly = false;
+      JsonObjectPtr o2;
+      if (prop->get("readonly", o2))
+        readonly = o2->boolValue();
+      ValueDescriptorPtr p;
+      ErrorPtr err = parseParam(name, prop, p);
+      if (!Error::isOK(err)) {
+        return err;
+      }
+      deviceProperties->addProperty(p, readonly);
+    }
+  }
+  // if any of the singledevice features are selected, protocol must be JSON
+  if (deviceActions && deviceConnector->simpletext) {
+    return TextError::err("Single devices must use JSON protocol");
+  }
+  #endif // ENABLE_EXTERNAL_SINGLEDEVICE
   // check for default name
   if (aInitParams->get("name", o)) {
     initializeName(o->stringValue());
@@ -755,6 +1022,89 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   // explicit ok
   return Error::ok();
 }
+
+
+void ExternalDevice::propertyChanged(ValueDescriptorPtr aChangedProperty)
+{
+  // create JSON response
+  JsonObjectPtr message = JsonObject::newObj();
+  message->add("message", JsonObject::newString("setProperty"));
+  message->add("property", JsonObject::newString(aChangedProperty->getName()));
+  JsonApiValuePtr v = JsonApiValuePtr(new JsonApiValue());
+  if (!aChangedProperty->getValue(v)) {
+    v->setNull();
+  }
+  message->add("value", v->jsonObject());
+  // send it
+  sendDeviceApiJsonMessage(message);
+}
+
+
+
+ErrorPtr ExternalDevice::parseParam(const string aParamName, JsonObjectPtr aParamDetails, ValueDescriptorPtr &aParam)
+{
+  JsonObjectPtr o;
+  if (!aParamDetails || !aParamDetails->get("type", o))
+    return TextError::err("Need to specify value 'type'");
+  VdcValueType vt = ValueDescriptor::stringToValueType(o->stringValue());
+  if (vt==valueType_unknown)
+    return TextError::err("Unknown value type '%s'", o->stringValue().c_str());
+  JsonObjectPtr def = aParamDetails->get("default");
+  // value type is defined
+  switch (vt) {
+    default:
+    case valueType_string:
+      aParam = ValueDescriptorPtr(new TextValueDescriptor(aParamName, (bool)def, def ? def->stringValue() : ""));
+      break;
+    case valueType_boolean:
+      aParam = ValueDescriptorPtr(new NumericValueDescriptor(aParamName, valueType_boolean, valueUnit_none, 0, 1, 1, (bool)def, def ? def->boolValue() : false));
+      break;
+    case valueType_numeric:
+    case valueType_integer: {
+      // can have an unit optionally
+      VdcValueUnit u = valueUnit_none;
+      if (aParamDetails->get("siunit", o)) {
+        u = ValueDescriptor::stringToValueUnit(o->stringValue());
+        if (u==unit_unknown)
+          return TextError::err("Unknown siunit '%s'", o->stringValue().c_str());
+      }
+      // must have min, max
+      double min,max;
+      double resolution = 1;
+      if (!aParamDetails->get("min", o))
+        return TextError::err("Numeric values need to have 'min'");
+      min = o->doubleValue();
+      if (!aParamDetails->get("max", o))
+        return TextError::err("Numeric values need to have 'max'");
+      max = o->doubleValue();
+      if (aParamDetails->get("resolution", o)) {
+        resolution = o->doubleValue();
+      }
+      else if (vt!=valueType_integer)
+        return TextError::err("Numeric values need to have 'resolution'");
+      aParam = ValueDescriptorPtr(new NumericValueDescriptor(aParamName, vt, u, min, max, resolution, (bool)def, def ? def->doubleValue() : false));
+      break;
+    }
+    case valueType_enumeration: {
+      EnumValueDescriptor *en = new EnumValueDescriptor(aParamName);
+      if (!aParamDetails->get("values", o) || !o->isType(json_type_array))
+        return TextError::err("Need to specify enumeration 'values' array");
+      for (int i=0; i<o->arrayLength(); i++) {
+        string e = o->arrayGet(i)->stringValue();
+        bool isdefault = false;
+        if (e.size()>0 && e[0]=='!') {
+          isdefault = true;
+          e.erase(0,1);
+        }
+        en->addEnum(e.c_str(), i, isdefault);
+      }
+      aParam = ValueDescriptorPtr(en);
+      break;
+    }
+  }
+  return ErrorPtr();
+}
+
 
 
 // MARK: ===== external device connector

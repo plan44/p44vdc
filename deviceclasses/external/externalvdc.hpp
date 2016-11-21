@@ -26,11 +26,18 @@
 
 #if ENABLE_EXTERNAL
 
+#ifndef ENABLE_EXTERNAL_SINGLEDEVICE
+  #define ENABLE_EXTERNAL_SINGLEDEVICE 1
+#endif
+
 #include "vdc.hpp"
 #include "device.hpp"
 #include "jsoncomm.hpp"
 
 #include "buttonbehaviour.hpp"
+#if ENABLE_EXTERNAL_SINGLEDEVICE
+#include "singledevice.hpp"
+#endif
 
 using namespace std;
 
@@ -40,13 +47,57 @@ namespace p44 {
   class ExternalVdc;
   class ExternalDevice;
 
+  #if ENABLE_EXTERNAL_SINGLEDEVICE
+
+  class ExternalDeviceAction : public DeviceAction
+  {
+    typedef DeviceAction inherited;
+
+    StatusCB callback;
+
+  public:
+
+    /// create the action
+    /// @param aSingleDevice the single device this action belongs to
+    /// @param aName the name of the action.
+    /// @param aDescription a description string for the action.
+    ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription);
+
+    virtual ~ExternalDeviceAction();
+
+    ExternalDevice &getExternalDevice();
+
+    /// implementation of action
+    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
+
+    /// process action call confirmation message from external device
+    void callPerformed(JsonObjectPtr aStatusInfo);
+
+  private:
+
+  };
+  typedef boost::intrusive_ptr<ExternalDeviceAction> ExternalDeviceActionPtr;
+
+  #endif // ENABLE_EXTERNAL_SINGLEDEVICE
+
+
 
   typedef boost::intrusive_ptr<ExternalDeviceConnector> ExternalDeviceConnectorPtr;
 
   typedef boost::intrusive_ptr<ExternalDevice> ExternalDevicePtr;
-  class ExternalDevice : public Device
+  class ExternalDevice :
+    #if ENABLE_EXTERNAL_SINGLEDEVICE
+    public SingleDevice
+    #else
+    public Device
+    #endif
   {
+    #if ENABLE_EXTERNAL_SINGLEDEVICE
+    typedef SingleDevice inherited;
+    friend class ExternalDeviceAction;
+    #else
     typedef Device inherited;
+    #endif
     friend class ExternalVdc;
     friend class ExternalDeviceConnector;
 
@@ -61,6 +112,11 @@ namespace p44 {
     bool controlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
     bool querySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
 
+    #if ENABLE_EXTERNAL_SINGLEDEVICE
+    bool noConfirmAction; ///< if set, device implementation is not expected to use
+    #endif
+
+
     SimpleCB syncedCB; ///< will be called when device confirms "SYNC" message with "SYNCED" response
 
   public:
@@ -72,10 +128,10 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "external"; };
+    virtual string deviceTypeIdentifier() const  P44_OVERRIDE { return "external"; };
 
     /// @return human readable model name/short description
-    virtual string modelName();
+    virtual string modelName() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -83,7 +139,7 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// apply all pending channel value updates to the device's hardware
     /// @param aDoneCB will called when values are actually applied, or hardware reports an error/timeout
@@ -97,14 +153,14 @@ namespace p44 {
     ///   because channel values might change again before a delayed apply mechanism calls aDoneCB.
     /// @note this method will NOT be called again until aCompletedCB is called, even if that takes a long time.
     ///   Device::requestApplyingChannels() provides an implementation that serializes calls to applyChannelValues and syncChannelValues
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
 
     /// synchronize channel values by reading them back from the device's hardware (if possible)
     /// @param aDoneCB will be called when values are updated with actual hardware values
     /// @note this method is only called at startup and before saving scenes to make sure changes done to the outputs directly (e.g. using
     ///   a direct remote control for a lamp) are included. Just reading a channel state does not call this method.
     /// @note implementation must use channel's syncChannelValue() method
-    virtual void syncChannelValues(SimpleCB aDoneCB);
+    virtual void syncChannelValues(SimpleCB aDoneCB) P44_OVERRIDE;
 
     /// start or stop dimming channel of this device. Usually implemented in device specific manner in subclasses.
     /// @param aChannel the channelType to start or stop dimming for
@@ -116,7 +172,7 @@ namespace p44 {
     /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
-    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode);
+    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode) P44_OVERRIDE;
 
     /// Process a named control value. The type, group membership and settings of the device determine if at all,
     /// and if, how the value affects physical outputs of the device or general device operation
@@ -126,7 +182,7 @@ namespace p44 {
     /// @param aValue the control value to process
     /// @note base class by default forwards the control value to all of its output behaviours.
     /// @return true if value processing caused channel changes so channel values should be applied.
-    virtual bool processControlValue(const string &aName, double aValue);
+    virtual bool processControlValue(const string &aName, double aValue) P44_OVERRIDE;
 
     /// disconnect device. If presence is represented by data stored in the vDC rather than
     /// detection of real physical presence on a bus, this call must clear the data that marks
@@ -140,7 +196,7 @@ namespace p44 {
     ///   false in case it is certain that the device is still connected to this and only this vDC
     /// @note at the time aDisconnectResultHandler is called, the only owner left for the device object might be the
     ///   aDevice argument to the DisconnectCB handler.
-    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
 
   private:
@@ -156,6 +212,11 @@ namespace p44 {
     ErrorPtr processSimpleMessage(string aMessageType, string aValue);
     ErrorPtr processInputJson(char aInputType, JsonObjectPtr aParams);
     ErrorPtr processInput(char aInputType, uint32_t aIndex, double aValue);
+
+    #if ENABLE_EXTERNAL_SINGLEDEVICE
+    ErrorPtr parseParam(const string aParamName, JsonObjectPtr aParamDetails, ValueDescriptorPtr &aParam);
+    void propertyChanged(ValueDescriptorPtr aChangedProperty);
+    #endif
 
     void changeChannelMovement(size_t aChannelIndex, SimpleCB aDoneCB, int aNewDirection);
     void releaseButton(ButtonBehaviourPtr aButtonBehaviour);

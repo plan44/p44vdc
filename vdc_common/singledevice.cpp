@@ -293,11 +293,12 @@ VdcValueUnit ValueDescriptor::stringToValueUnit(const string aValueUnitName)
   VdcUnitScale s = unitScaling_1;
   size_t n = 0;
   for (int i=0; i<numUnitScalings; i++) {
-    n = strlen(valueScalingNames[i].name);
+    size_t n = strlen(valueScalingNames[i].name);
     if (n>0 && aValueUnitName.substr(0,n)==valueScalingNames[i].name) {
       s = (VdcUnitScale)i;
       break;
     }
+    n = 0;
   }
   // s = scale
   // n = size of prefix
@@ -1975,15 +1976,15 @@ SingleDevice::SingleDevice(Vdc *aVdcP, bool aEnableAsSingleDevice) :
 void SingleDevice::enableAsSingleDevice()
 {
   // create actions
-  deviceActions = DeviceActionsPtr(new DeviceActions);
+  if (!deviceActions) deviceActions = DeviceActionsPtr(new DeviceActions);
   // create custom actions
-  customActions = CustomActionsPtr(new CustomActions(*this));
+  if (!customActions) customActions = CustomActionsPtr(new CustomActions(*this));
   // create states
-  deviceStates = DeviceStatesPtr(new DeviceStates);
+  if (!deviceStates) deviceStates = DeviceStatesPtr(new DeviceStates);
   // create events
-  deviceEvents = DeviceEventsPtr(new DeviceEvents(*this));
+  if (!deviceEvents) deviceEvents = DeviceEventsPtr(new DeviceEvents(*this));
   // create device properties
-  deviceProperties = DevicePropertiesPtr(new DeviceProperties(*this));
+  if (!deviceProperties) deviceProperties = DevicePropertiesPtr(new DeviceProperties(*this));
 }
 
 

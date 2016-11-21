@@ -350,11 +350,11 @@ namespace p44 {
     friend class DeviceActions;
     friend class CustomAction;
 
+  protected:
+
     string actionId; ///< id of the action (key in the container object)
     string actionDescription; ///< a descriptive string for the action (for logs and debugging)
     ValueListPtr actionParams; ///< the parameter descriptions of this action
-
-  protected:
 
     SingleDevice *singleDeviceP; ///< the single device this action belongs to
 
@@ -873,6 +873,7 @@ namespace p44 {
     /// can be called later in the device construction process for devices that may not always need single device behaviour,
     /// when constructor was called with aEnableAsSingleDevice==false.
     /// This using SingleDevice as a base class without always introducing the overhead of the single device mechanisms
+    /// Note: this can be called multiple times (but will not have any further effect after the first time)
     void enableAsSingleDevice();
 
     /// @name interaction with subclasses, actually representing physical I/O
