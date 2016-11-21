@@ -1914,8 +1914,16 @@ Tristate ActionOutputBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 // MARK: ===== SingleDevice
 
 
-SingleDevice::SingleDevice(Vdc *aVdcP) :
+SingleDevice::SingleDevice(Vdc *aVdcP, bool aEnableAsSingleDevice) :
   inherited(aVdcP)
+{
+  if (aEnableAsSingleDevice) {
+    enableAsSingleDevice();
+  }
+}
+
+
+void SingleDevice::enableAsSingleDevice()
 {
   // create actions
   deviceActions = DeviceActionsPtr(new DeviceActions);
@@ -1930,6 +1938,7 @@ SingleDevice::SingleDevice(Vdc *aVdcP) :
 }
 
 
+
 SingleDevice::~SingleDevice()
 {
 }
@@ -1939,9 +1948,10 @@ void SingleDevice::addToModelUIDHash(string &aHashedString)
 {
   // action names
   inherited::addToModelUIDHash(aHashedString);
-  deviceActions->addToModelUIDHash(aHashedString);
-  deviceStates->addToModelUIDHash(aHashedString);
-  deviceProperties->addToModelUIDHash(aHashedString);
+  if (deviceActions) deviceActions->addToModelUIDHash(aHashedString);
+  if (deviceStates) deviceStates->addToModelUIDHash(aHashedString);
+  if (deviceEvents) deviceEvents->addToModelUIDHash(aHashedString);
+  if (deviceProperties) deviceProperties->addToModelUIDHash(aHashedString);
 }
 
 
@@ -1952,8 +1962,9 @@ void SingleDevice::addToModelUIDHash(string &aHashedString)
 
 ErrorPtr SingleDevice::load()
 {
-  // load the custom actions first (so saved ones will be there when loadFromFiles occurs at inherited::load()
-  ErrorPtr err = customActions->load();
+  // NOTE: load the custom actions first (so saved ones will be there when loadFromFiles occurs at inherited::load()
+  ErrorPtr err;
+  if (customActions) customActions->load();
   if (Error::isOK(err)) {
     err = inherited::load();
   }
@@ -1964,7 +1975,7 @@ ErrorPtr SingleDevice::load()
 ErrorPtr SingleDevice::save()
 {
   ErrorPtr err = inherited::save();
-  if (Error::isOK(err)) {
+  if (customActions && Error::isOK(err)) {
     err = customActions->save();
   }
   return err;
@@ -1973,28 +1984,29 @@ ErrorPtr SingleDevice::save()
 
 ErrorPtr SingleDevice::forget()
 {
-  inherited::forget();
-  return customActions->forget();
+  ErrorPtr err = inherited::forget();
+  if (customActions) err = customActions->forget();
+  return err;
 }
 
 
 bool SingleDevice::isDirty()
 {
-  return inherited::isDirty() || customActions->isDirty();
+  return inherited::isDirty() || (customActions && customActions->isDirty());
 }
 
 
 void SingleDevice::markClean()
 {
   inherited::markClean();
-  customActions->markClean();
+  if (customActions) customActions->markClean();
 }
 
 
 void SingleDevice::loadSettingsFromFiles()
 {
   inherited::loadSettingsFromFiles();
-  customActions->loadActionsFromFiles();
+  if (customActions) customActions->loadActionsFromFiles();
 }
 
 
@@ -2017,7 +2029,8 @@ void SingleDevice::call(const string aActionId, ApiValuePtr aParams, StatusCB aC
 ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
-  if (aMethod=="invokeDeviceAction") {
+  if (deviceActions && aMethod=="invokeDeviceAction") {
+    // recognizes method only if there are any actions
     string actionid;
     respErr = checkStringParam(aParams, "id", actionid);
     if (!Error::isOK(respErr))
@@ -2134,7 +2147,7 @@ enum {
   deviceEventDescriptions_key,
   devicePropertyDescriptions_key,
   deviceProperties_key,
-  numSimpleDeviceProperties
+  numSingleDeviceProperties
 };
 
 static char singledevice_key;
@@ -2142,9 +2155,10 @@ static char singledevice_key;
 
 int SingleDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor->isRootOfObject()) {
+  // properties are only visible when single device is enabled (i.e. deviceActions exist)
+  if (aParentDescriptor->isRootOfObject() && deviceActions) {
     // Accessing properties at the Device (root) level
-    return inherited::numProps(aDomain, aParentDescriptor)+numSimpleDeviceProperties;
+    return inherited::numProps(aDomain, aParentDescriptor)+numSingleDeviceProperties;
   }
   return inherited::numProps(aDomain, aParentDescriptor); // only the inherited ones
 }
@@ -2153,7 +2167,7 @@ int SingleDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   // device level properties
-  static const PropertyDescription properties[numSimpleDeviceProperties] = {
+  static const PropertyDescription properties[numSingleDeviceProperties] = {
     // common device properties
     { "deviceActionDescriptions", apivalue_object, deviceActionDescriptions_key, OKEY(singledevice_key) },
     { "customActions", apivalue_object, customActions_key, OKEY(singledevice_key) },

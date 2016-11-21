@@ -846,17 +846,22 @@ namespace p44 {
 
   protected:
 
-    DeviceActionsPtr deviceActions; /// the device's standard actions
-    CustomActionsPtr customActions; /// the device's custom actions
-    DeviceStatesPtr deviceStates; /// the device's states
-    DeviceEventsPtr deviceEvents; /// the device's events
+    DeviceActionsPtr deviceActions; ///< the device's standard actions
+    CustomActionsPtr customActions; ///< the device's custom actions
+    DeviceStatesPtr deviceStates; ///< the device's states
+    DeviceEventsPtr deviceEvents; ///< the device's events
 
-    DevicePropertiesPtr deviceProperties; /// the device's specific properties
+    DevicePropertiesPtr deviceProperties; ///< the device's specific properties
 
 
   public:
-    SingleDevice(Vdc *aVdcP);
+    SingleDevice(Vdc *aVdcP, bool aEnableAsSingleDevice = true);
     virtual ~SingleDevice();
+
+    /// can be called later in the device construction process for devices that may not always need single device behaviour,
+    /// when constructor was called with aEnableAsSingleDevice==false.
+    /// This using SingleDevice as a base class without always introducing the overhead of the single device mechanisms
+    void enableAsSingleDevice();
 
     /// @name interaction with subclasses, actually representing physical I/O
     /// @{
