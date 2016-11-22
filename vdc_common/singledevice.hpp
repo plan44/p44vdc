@@ -140,7 +140,8 @@ namespace p44 {
     bool setValue(ApiValuePtr aValue);
 
     /// make value invalid, reported as NULL when accessed via properties
-    void invalidate();
+    /// @return true if value was valid before (i.e. became invalid now)
+    bool invalidate();
 
     /// set "defaultvalue" flag
     void setIsDefault(bool aIsDefault) { isDefaultValue = aIsDefault; };

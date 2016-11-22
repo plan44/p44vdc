@@ -76,9 +76,11 @@ bool ValueDescriptor::setChanged(bool aChanged)
 
 
 
-void ValueDescriptor::invalidate()
+bool ValueDescriptor::invalidate()
 {
+  bool hadValue = hasValue;
   hasValue = false;
+  return hadValue;
 }
 
 
@@ -108,7 +110,11 @@ int32_t ValueDescriptor::getInt32Value(bool aAsInternal, bool aPrevious)
 
 bool ValueDescriptor::setValue(ApiValuePtr aValue)
 {
-  if (valueType==valueType_numeric) {
+  if (!aValue || aValue->isNull()) {
+    // setting NULL means invalidating
+    return invalidate();
+  }
+  else if (valueType==valueType_numeric) {
     // numeric float type, set as double
     return setDoubleValue(aValue->doubleValue());
   }
@@ -1446,7 +1452,8 @@ bool DeviceState::pushWithEvent(DeviceEventPtr aEvent)
 
 bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
 {
-  SALOG((*singleDeviceP), LOG_NOTICE, "pushing: state '%s' changed to '%s'", stateId.c_str(), stateDescriptor->getStringValue().c_str());
+  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
+  SALOG((*singleDeviceP), LOG_NOTICE, "%spushing: state '%s' changed to '%s'", api ? "" : "Not announced, not ", stateId.c_str(), stateDescriptor->getStringValue().c_str());
   // update for every push attempt, as this are "events"
   lastPush = MainLoop::currentMainLoop().now();
   // collect additional events to push
@@ -1454,7 +1461,6 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
     willPushHandler(DeviceStatePtr(this), aEventList);
   }
   // try to push to connected vDC API client
-  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
   if (api) {
     // create query for state property to get pushed
     ApiValuePtr query = api->newApiValue();
@@ -1475,6 +1481,11 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
       SALOG((*singleDeviceP), LOG_NOTICE, "- pushing event '%s' along with state change", (*pos)->eventId.c_str());
     }
     return singleDeviceP->pushNotification(query, events, VDC_API_DOMAIN);
+  }
+  else {
+    for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
+      SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s' would have pushed along with state change", (*pos)->eventId.c_str());
+    }
   }
   // no API, cannot not push
   return false;
