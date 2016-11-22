@@ -106,6 +106,8 @@ namespace p44 {
 
     string iconBaseName; ///< the base icon name
     string modelNameString; ///< the string to be returned by modelName()
+    string vendorNameString; ///< the vendor name
+    string oemModelGUIDString; ///< the OEM model GUID, which is used to match devices with dS database
 
     bool configured; ///< set when device is configured (init message received and device added to vdc)
     bool useMovement; ///< if set, device communication uses MV/move command for dimming and shadow device operation
@@ -132,6 +134,13 @@ namespace p44 {
 
     /// @return human readable model name/short description
     virtual string modelName() P44_OVERRIDE;
+
+    /// @return Vendor name if known
+    virtual string vendorName() P44_OVERRIDE;
+
+    /// @return OEM model GUID in URN format to identify the OEM product MODEL hardware as uniquely as possible
+    virtual string oemModelGUID() P44_OVERRIDE;
+
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

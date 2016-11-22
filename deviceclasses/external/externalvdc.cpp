@@ -130,7 +130,8 @@ ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceCon
   controlValues(false), // no control values by default
   configured(false),
   iconBaseName("ext"), // default icon name
-  modelNameString("plan44 p44vdc external device")
+  modelNameString("plan44 p44vdc external device"),
+  vendorNameString("plan44.ch")
 {
 }
 
@@ -141,10 +142,21 @@ ExternalDevice::~ExternalDevice()
 }
 
 
-/// @return human readable model name/short description
 string ExternalDevice::modelName()
 {
   return modelNameString;
+}
+
+
+string ExternalDevice::vendorName()
+{
+  return vendorNameString;
+}
+
+
+string ExternalDevice::oemModelGUID()
+{
+  return oemModelGUIDString;
 }
 
 
@@ -701,6 +713,14 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   // - get model name
   if (aInitParams->get("modelname", o)) {
     modelNameString = o->stringValue();
+  }
+  // - get vendor name
+  if (aInitParams->get("vendorname", o)) {
+    vendorNameString = o->stringValue();
+  }
+  // - get OEM model guid
+  if (aInitParams->get("oemmodelguid", o)) {
+    oemModelGUIDString = o->stringValue();
   }
   // - get icon base name
   if (aInitParams->get("iconname", o)) {
