@@ -226,6 +226,8 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
         // - forget uuid + user name
         bridgeUuid.clear();
         bridgeUserName.clear();
+        // - also clear base URL
+        hueComm.baseURL.clear();
       }
     }
     else {
