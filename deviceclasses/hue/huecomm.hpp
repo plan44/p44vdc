@@ -187,6 +187,8 @@ namespace p44 {
     /// @note ssdpUuid and apiToken member variables must be set to the pre-know bridge's parameters before calling this
     void refindBridge(HueBridgeFindCB aFindHandler);
 
+    /// @}
+
   };
   
 } // namespace p44

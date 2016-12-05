@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2016 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2016 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -19,17 +19,14 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __p44vdc__huevdc__
-#define __p44vdc__huevdc__
+#ifndef __p44vdc__homeconnectvdc__
+#define __p44vdc__homeconnectvdc__
 
 #include "p44vdc_common.hpp"
 
-#if ENABLE_HUE
+#if ENABLE_HOMECONNECT
 
-#include "ssdpsearch.hpp"
-#include "jsonwebclient.hpp"
-
-#include "huecomm.hpp"
+#include "homeconnectcomm.hpp"
 #include "vdc.hpp"
 
 using namespace std;
@@ -37,26 +34,24 @@ using namespace std;
 namespace p44 {
 
 
-  class HueVdc;
-  class HueDevice;
+  class HomeConnectVdc;
+  class HomeConnectDevice;
 
-  /// persistence for hue device container
-  class HuePersistence : public SQLite3Persistence
-  {
-    typedef SQLite3Persistence inherited;
-  protected:
-    /// Get DB Schema creation/upgrade SQL statements
-    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
-  };
+//  /// persistence for home connect device container
+//  class HomeConnectPersistence : public SQLite3Persistence
+//  {
+//    typedef SQLite3Persistence inherited;
+//  protected:
+//    /// Get DB Schema creation/upgrade SQL statements
+//    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+//  };
 
 
-  typedef boost::intrusive_ptr<HueVdc> HueVdcPtr;
-  class HueVdc : public Vdc
+  typedef boost::intrusive_ptr<HomeConnectVdc> HomeConnectVdcPtr;
+  class HomeConnectVdc : public Vdc
   {
     typedef Vdc inherited;
-    friend class HueDevice;
-
-    HuePersistence db;
+    friend class HomeConnectDevice;
 
     StatusCB collectedHandler;
 
@@ -70,9 +65,9 @@ namespace p44 {
 
   public:
 
-    HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
+    HomeConnectVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
 
-    HueComm hueComm;
+    HomeConnectComm homeConnectComm;
 
 		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
@@ -88,20 +83,13 @@ namespace p44 {
     /// vdc level methods
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
-    /// set container learn mode
-    /// @param aEnableLearning true to enable learning mode
-    /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some radio devices)
-    /// @param aOnlyEstablish set this to yes to only learn in, to no to only learn out or to undefined to allow both learn-in and out.
-    /// @note learn events (new devices found or devices removed) must be reported by calling reportLearnEvent() on VdcHost.
-    virtual void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish) P44_OVERRIDE;
-
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() const P44_OVERRIDE { return "hue"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "HomeConnect"; }
 
-    /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    /// - uuid:UUUUUUU = UUID
-    virtual string hardwareGUID() P44_OVERRIDE { return string_format("uuid:%s", bridgeUuid.c_str()); };
+//    /// @return hardware GUID in URN format to identify hardware as uniquely as possible
+//    /// - uuid:UUUUUUU = UUID
+//    virtual string hardwareGUID() P44_OVERRIDE { return string_format("uuid:%s", bridgeUuid.c_str()); };
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -113,18 +101,15 @@ namespace p44 {
 
     /// Get extra info (plan44 specific) to describe the addressable in more detail
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
-    virtual string getExtraInfo() P44_OVERRIDE;
+//    virtual string getExtraInfo() P44_OVERRIDE;
 
   private:
 
-    void refindResultHandler(ErrorPtr aError);
-    void searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError);
-    void collectLights();
-    void collectedLightsHandler(JsonObjectPtr aResult, ErrorPtr aError);
+    void deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError);
 
   };
 
 } // namespace p44
 
-#endif // ENABLE_HUE
-#endif // __p44vdc__huevdc__
+#endif // ENABLE_HOMECONNECT
+#endif // __p44vdc__homeconnectvdc__
