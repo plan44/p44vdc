@@ -369,7 +369,7 @@ ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInter
       err = Error::err<VdcApiError>(415, "invalid boolean");
     }
   }
-  else if (valueType==valueType_numeric) {
+  else if (valueType==valueType_numeric || valueType==valueType_integer) {
     // check bounds
     double v = aApiValue->doubleValue();
     if (v<min || v>max) {
