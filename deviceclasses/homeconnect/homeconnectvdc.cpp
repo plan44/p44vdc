@@ -58,11 +58,6 @@ bool HomeConnectVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aR
 }
 
 
-//string HomeConnectVdc::getExtraInfo()
-//{
-//  return string_format("hue api: %s", homeConnectComm.baseURL.c_str());
-//}
-
 
 void HomeConnectVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
@@ -88,10 +83,10 @@ void HomeConnectVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bo
     // full collect, remove all devices
     removeDevices(aClearSettings);
   }
-  // FIXME: fixed access token for first tests
-  homeConnectComm.accessToken = "CF73126C795320E1FF2A67048CCB4504569001367584A1F92DE1967BDA04657A";
-  // query all home connect devices
-  homeConnectComm.apiQuery("", boost::bind(&HomeConnectVdc::deviceListReceived, this, aCompletedCB, _1, _2));
+  // FIXME: fixed refresh token for first tests
+  homeConnectComm.refreshToken = "332844DC91BD353E056D7C9334B9B6BCF64475A713E1BF628DD58F32278901C0-D3E84B8D371D8E45286C07414145C8E758689C5B2EFA6BBC16146508F757A328";
+  // query all home connect appliances
+  homeConnectComm.apiQuery("/api/homeappliances", boost::bind(&HomeConnectVdc::deviceListReceived, this, aCompletedCB, _1, _2));
 }
 
 

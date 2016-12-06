@@ -107,20 +107,19 @@ void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
   if (Error::isOK(err)) {
     string path;
     string body;
-    if (!keyAndValue(apiCommandTemplate, path, body)) {
-      path = apiCommandTemplate;
+    if (!keyAndValue(cmd, path, body)) {
+      path = cmd;
     }
     else {
       // make JSON from text
       jsonBody = JsonObject::objFromText(body.c_str());
     }
     // complete path
-    string urlpath = "/" + getHomeConnectDevice().haId + "/" + path;
+    string urlpath = "/api/homeappliances/" + getHomeConnectDevice().haId + "/" + path;
     getHomeConnectDevice().homeConnectComm().apiAction("PUT", urlpath, jsonBody, boost::bind(&HomeConnectAction::apiCommandSent, this, aCompletedCB, _1, _2));
   }
   if (aCompletedCB) aCompletedCB(err);
 }
-
 
 
 ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, string &aValue)

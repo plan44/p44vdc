@@ -70,17 +70,20 @@ namespace p44 {
 
     HomeConnectComm &homeConnectComm;
     string method;
-    string url;
+    string urlPath;
     JsonObjectPtr data;
     bool completed;
     ErrorPtr error;
     HomeConnectApiResultCB resultHandler;
 
+    void sendRequest();
     void processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError);
+    void refreshAccessToken();
+    void processRefreshAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError);
 
   public:
 
-    HomeConnectApiOperation(HomeConnectComm &aHomeConnectComm, const string aMethod, const string aUrl, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler);
+    HomeConnectApiOperation(HomeConnectComm &aHomeConnectComm, const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler);
     virtual ~HomeConnectApiOperation();
 
     virtual bool initiate();
@@ -100,6 +103,8 @@ namespace p44 {
     bool findInProgress;
     bool apiReady;
 
+    string accessToken; ///< the access token for issuing requests (obtained via OAuth)
+
   public:
 
     HomeConnectComm();
@@ -111,7 +116,8 @@ namespace p44 {
     /// @name settings
     /// @{
 
-    string accessToken; ///< the access token for issuing requests (obtained via OAuth)
+    string baseUrl; ///< the API base URL
+    string refreshToken; ///< the Oauth refresh token that can be used to obtain access tokens
 
     /// @}
 

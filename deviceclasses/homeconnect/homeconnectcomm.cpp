@@ -35,10 +35,10 @@ using namespace p44;
 
 // MARK: ===== HomeConnectApiOperation
 
-HomeConnectApiOperation::HomeConnectApiOperation(HomeConnectComm &aHomeConnectComm, const string aMethod, const string aUrl, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler) :
+HomeConnectApiOperation::HomeConnectApiOperation(HomeConnectComm &aHomeConnectComm, const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler) :
   homeConnectComm(aHomeConnectComm),
   method(aMethod),
-  url(aUrl),
+  urlPath(aUrlPath),
   data(aData),
   resultHandler(aResultHandler),
   completed(false)
@@ -58,6 +58,22 @@ bool HomeConnectApiOperation::initiate()
 {
   if (!canInitiate())
     return false;
+  // send request
+  if (homeConnectComm.accessToken.size()==0) {
+    // no token, don't even try to connect, need to get access token via refresh first
+    refreshAccessToken();
+  }
+  else {
+    // we have a token, try to send request (we might get an expired error which will cause a re-run)
+    sendRequest();
+  }
+  // mark operation as initiated
+  return inherited::initiate();
+}
+
+
+void HomeConnectApiOperation::sendRequest()
+{
   // initiate the web request
   // - set up the extra auth headers
   homeConnectComm.httpAPIComm.clearRequestHeaders();
@@ -65,9 +81,46 @@ bool HomeConnectApiOperation::initiate()
   homeConnectComm.httpAPIComm.addRequestHeader("Accept", "application/vnd.bsh.sdk.v1+json");
   homeConnectComm.httpAPIComm.addRequestHeader("Cache-Control", "no-cache");
   // - issue the request
-  homeConnectComm.httpAPIComm.jsonRequest(url.c_str(), boost::bind(&HomeConnectApiOperation::processAnswer, this, _1, _2), method.c_str(), data);
-  // executed
-  return inherited::initiate();
+  homeConnectComm.httpAPIComm.jsonRequest((homeConnectComm.baseUrl+urlPath).c_str(), boost::bind(&HomeConnectApiOperation::processAnswer, this, _1, _2), method.c_str(), data, "application/vnd.bsh.sdk.v1+json");
+}
+
+
+
+void HomeConnectApiOperation::refreshAccessToken()
+{
+  // initiate the web request
+  // - set up the extra auth headers
+  homeConnectComm.httpAPIComm.clearRequestHeaders();
+  homeConnectComm.httpAPIComm.addRequestHeader("Cache-Control", "no-cache");
+  string postdata = "grant_type=refresh_token&refresh_token=" + homeConnectComm.refreshToken;
+  // - issue the request
+  homeConnectComm.httpAPIComm.jsonReturningRequest(
+    (homeConnectComm.baseUrl+"/security/oauth/token").c_str(),
+    boost::bind(&HomeConnectApiOperation::processRefreshAnswer, this, _1, _2),
+    "POST",
+    postdata,
+    "application/x-www-form-urlencoded"
+  );
+}
+
+
+void HomeConnectApiOperation::processRefreshAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError)
+{
+  error = aError;
+  if (Error::isOK(error)) {
+    // check for errors
+    JsonObjectPtr a;
+    if (aJsonResponse->get("access_token", a)) {
+      // here's a new access token
+      homeConnectComm.accessToken = a->stringValue();
+      // now re-run the original request
+      sendRequest();
+      return;
+    }
+  }
+  // if refresh fails, treat it as a normal response
+  LOG(LOG_WARNING, "HomeConnect: token refresh has failed");
+  processAnswer(aJsonResponse, aError);
 }
 
 
@@ -76,9 +129,30 @@ void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPt
 {
   error = aError;
   if (Error::isOK(error)) {
-    // GET, just return entire data
-    data = aJsonResponse;
+    // check for application level errors
+    JsonObjectPtr e;
+    if (aJsonResponse && aJsonResponse->get("error", e)) {
+      // there is an error
+      JsonObjectPtr o;
+      string errorkey;
+      if (e->get("key", o)) {
+        errorkey = o->stringValue();
+        if (errorkey=="invalid_token") {
+          // the access token has expired, we need to do a refresh operation
+          refreshAccessToken();
+          return;
+        }
+        string errordesc;
+        if (e->get("description", o)) {
+          errordesc = o->stringValue();
+        }
+        // other application level error, create text error from it
+        error = TextError::err("%s: %s", errorkey.c_str(), errordesc.c_str());
+      }
+    }
   }
+  // now save return data (but not above, because we might need reqest "data" to re-run the request after a token refresh
+  data = aJsonResponse;
   // done
   completed = true;
   // have queue reprocessed
@@ -125,9 +199,13 @@ void HomeConnectApiOperation::abortOperation(ErrorPtr aError)
 // MARK: ===== homeConnectComm
 
 
+#define BASE_URL "https://developer.home-connect.com"
+
+
 HomeConnectComm::HomeConnectComm() :
   inherited(MainLoop::currentMainLoop()),
-  httpAPIComm(MainLoop::currentMainLoop())
+  httpAPIComm(MainLoop::currentMainLoop()),
+  baseUrl(BASE_URL)
 {
 }
 
@@ -143,14 +221,9 @@ void HomeConnectComm::apiQuery(const char* aUrlSuffix, HomeConnectApiResultCB aR
 }
 
 
-#define BASE_URL "https://developer.home-connect.com/api/homeappliances"
-
 void HomeConnectComm::apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler, bool aNoAutoURL)
 {
-  string url;
-  url = BASE_URL;
-  url += aUrlPath;
-  HomeConnectApiOperationPtr op = HomeConnectApiOperationPtr(new HomeConnectApiOperation(*this, aMethod, url, aData, aResultHandler));
+  HomeConnectApiOperationPtr op = HomeConnectApiOperationPtr(new HomeConnectApiOperation(*this, aMethod, aUrlPath, aData, aResultHandler));
   queueOperation(op);
   // process operations
   processOperations();

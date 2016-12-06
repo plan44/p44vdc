@@ -55,14 +55,6 @@ namespace p44 {
 
     StatusCB collectedHandler;
 
-    /// @name persistent parameters
-    /// @{
-
-    string bridgeUuid; ///< the UUID for searching the hue bridge via SSDP
-    string bridgeUserName; ///< the user name registered with the bridge
-
-    /// @}
-
   public:
 
     HomeConnectVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
@@ -98,10 +90,6 @@ namespace p44 {
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
-
-    /// Get extra info (plan44 specific) to describe the addressable in more detail
-    /// @return string, single line extra info describing aspects of the device not visible elsewhere
-//    virtual string getExtraInfo() P44_OVERRIDE;
 
   private:
 
