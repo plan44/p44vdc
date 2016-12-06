@@ -184,10 +184,63 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
   // FIXME: set up device details
   // create standard actions
   HomeConnectActionPtr a;
+  // - enums that can be shared between actions
+  EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("temperatureLevel", true));
+  tempLevel->addEnum("Normal", 0, true); // default
+  tempLevel->addEnum("High", 1);
+  tempLevel->addEnum("VeryHigh", 2);
+  EnumValueDescriptorPtr beanAmount = EnumValueDescriptorPtr(new EnumValueDescriptor("beanAmount", true));
+  beanAmount->addEnum("VeryMild", 0);
+  beanAmount->addEnum("Mild", 1);
+  beanAmount->addEnum("Normal", 2, true); // default
+  beanAmount->addEnum("Strong", 3);
+  beanAmount->addEnum("VeryStrong", 4);
+  beanAmount->addEnum("DoubleShot", 5);
+  beanAmount->addEnum("DoubleShotPlus", 6);
+  beanAmount->addEnum("DoubleShotPlusPlus", 7);
+  // - command template
+  string cmdTemplate =
+    "programs/active:{\"data\":{\"key\":\"ConsumerProducts.CoffeeMaker.Program.Beverage.%s\","
+    "\"options\":["
+      "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{temperatureLevel}\"},"
+      "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.BeanAmount\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{beanAmount}\"},"
+      "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.FillQuantity\",\"value\":@{fillQuantity%%0}}"
+    "]}}";
+  // - espresso
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "espresso", "Espresso", string_format(cmdTemplate.c_str(),"Espresso")));
+  a->addParameter(tempLevel);
+  a->addParameter(beanAmount);
+  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 35, 60, 5, true, 42)));
+  deviceActions->addAction(a);
+  // - espresso macciato
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "espressoMacchiato", "Espresso Macchiato", string_format(cmdTemplate.c_str(),"EspressoMacchiato")));
+  a->addParameter(tempLevel);
+  a->addParameter(beanAmount);
+  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 40, 60, 10, true, 50)));
+  deviceActions->addAction(a);
+  // - (plain) coffee
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "coffee", "Coffee", string_format(cmdTemplate.c_str(),"Coffee")));
+  a->addParameter(tempLevel);
+  a->addParameter(beanAmount);
+  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 60, 250, 10, true, 120)));
+  deviceActions->addAction(a);
+  // - Cappuccino
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "cappuccino", "Cappuccino", string_format(cmdTemplate.c_str(),"Cappuccino")));
+  a->addParameter(tempLevel);
+  a->addParameter(beanAmount);
+  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 100, 250, 10, true, 180)));
+  deviceActions->addAction(a);
   // - latte macchiato
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "lattemacchiato", "Latte Macchiato", ":{\"data\":{\"key\":\"ConsumerProducts.CoffeeMaker.Program.Beverage.LatteMacchiato\",\"options\":[{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.Normal\"}]}}"));
-  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("duration", valueType_numeric, VDC_UNIT(valueUnit_second, unitScaling_1), 10, 1800, 1, true, 60)));
-  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("power", valueType_numeric, VDC_UNIT(valueUnit_watt, unitScaling_1), 50, 700, 50, true, 500)));
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "latteMacchiato", "Latte Macchiato", string_format(cmdTemplate.c_str(),"LatteMacchiato")));
+  a->addParameter(tempLevel);
+  a->addParameter(beanAmount);
+  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 200, 400, 20, true, 300)));
+  deviceActions->addAction(a);
+  // - latte macchiato
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "caffeLatte", "Caffe Latte", string_format(cmdTemplate.c_str(),"CaffeLatte")));
+  a->addParameter(tempLevel);
+  a->addParameter(beanAmount);
+  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 100, 400, 20, true, 250)));
   deviceActions->addAction(a);
   // - stop
 //  a = HomeConnectActionPtr(new HomeConnectAction(*this, "stop", "stop", "hh:doTurnOff"));
@@ -223,7 +276,7 @@ void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryRes
 
 bool HomeConnectDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getIcon("homeconnect", aIcon, aWithData, aResolutionPrefix))
+  if (getIcon("homeconnect_coffee", aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
