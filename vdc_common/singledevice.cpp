@@ -519,7 +519,7 @@ ErrorPtr EnumValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal
       for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
         if (pos->first==s) {
           // found
-          if (aMakeInternal) {
+          if (aMakeInternal && !noInternalValue) {
             aApiValue->setType(apivalue_uint64);
             aApiValue->setUint32Value(pos->second);
           }
@@ -537,7 +537,7 @@ bool EnumValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool
 {
   if (!hasValue || !aApiValue) return false;
   uint32_t v = aPrevious ? previousValue : value;
-  if (aAsInternal) {
+  if (aAsInternal && !noInternalValue) {
     aApiValue->setType(apivalue_uint64);
     aApiValue->setUint32Value(v);
     return true;

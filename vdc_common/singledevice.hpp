@@ -286,11 +286,12 @@ namespace p44 {
     EnumVector enumDescs; ///< text to enum value mapping pairs
     uint32_t value; ///< the (default) enum value
     uint32_t previousValue; ///< the previous value
+    bool noInternalValue; ///< the internal value is not exposed, getValue() always returns external (text) value
 
   public:
 
     /// constructor for a text enumeration parameter
-    EnumValueDescriptor(const string aName) : inherited(aName, valueType_enumeration, valueUnit_none, false) {};
+    EnumValueDescriptor(const string aName, bool aNoInternalValue=false) : inherited(aName, valueType_enumeration, valueUnit_none, false), noInternalValue(aNoInternalValue) {};
 
     /// add a enum value
     /// @param aEnumText the text
@@ -311,6 +312,7 @@ namespace p44 {
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     
   };
+  typedef boost::intrusive_ptr<EnumValueDescriptor> EnumValueDescriptorPtr;
 
 
   class ValueList : public PropertyContainer
