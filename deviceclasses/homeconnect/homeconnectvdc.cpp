@@ -32,6 +32,8 @@
 
 #include "homeconnectdevice.hpp"
 
+#include "utils.hpp"
+
 using namespace p44;
 
 
@@ -59,11 +61,53 @@ bool HomeConnectVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aR
 
 
 
+// MARK: ===== DB and initialisation
+
+// Version history
+//  1 : first version
+#define HOMECONNECT_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
+#define HOMECONNECT_SCHEMA_VERSION 1 // current version
+
+string HomeConnectPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+{
+  string sql;
+  if (aFromVersion==0) {
+    // create DB from scratch
+    // - use standard globs table for schema version
+    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    // - add fields to globs table
+    sql.append(
+      "ALTER TABLE globs ADD refreshToken TEXT;"
+      "ALTER TABLE globs ADD developerApi INTEGER;"
+    );
+    // reached final version in one step
+    aToVersion = HOMECONNECT_SCHEMA_VERSION;
+  }
+  return sql;
+}
+
+
 void HomeConnectVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
-  // FIXME: implement
-  aCompletedCB(ErrorPtr());
+  string databaseName = getPersistentDataDir();
+  string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
+  ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), HOMECONNECT_SCHEMA_VERSION, HOMECONNECT_SCHEMA_MIN_VERSION, aFactoryReset);
+  if (Error::isOK(error)) {
+    // load account parameters
+    sqlite3pp::query qry(db);
+    if (qry.prepare("SELECT refreshToken, developerApi FROM globs")==SQLITE_OK) {
+      sqlite3pp::query::iterator i = qry.begin();
+      if (i!=qry.end()) {
+        // set new account
+        string refreshToken = nonNullCStr(i->get<const char *>(0));
+        bool developerApi = i->get<bool>(1);
+        homeConnectComm.setAccount(refreshToken, developerApi);
+      }
+    }
+  }
+  aCompletedCB(error); // return status of DB init
 }
+
 
 
 // MARK: ===== collect devices
@@ -83,10 +127,10 @@ void HomeConnectVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bo
     // full collect, remove all devices
     removeDevices(aClearSettings);
   }
-  // FIXME: fixed refresh token for first tests
-  homeConnectComm.refreshToken = "332844DC91BD353E056D7C9334B9B6BCF64475A713E1BF628DD58F32278901C0-D3E84B8D371D8E45286C07414145C8E758689C5B2EFA6BBC16146508F757A328";
-  // query all home connect appliances
-  homeConnectComm.apiQuery("/api/homeappliances", boost::bind(&HomeConnectVdc::deviceListReceived, this, aCompletedCB, _1, _2));
+  if (homeConnectComm.isConfigured()) {
+    // query all home connect appliances
+    homeConnectComm.apiQuery("/api/homeappliances", boost::bind(&HomeConnectVdc::deviceListReceived, this, aCompletedCB, _1, _2));
+  }
 }
 
 
@@ -143,22 +187,25 @@ void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aRe
 ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
-//  if (aMethod=="registerHueBridge") {
-//    // hue specific addition, only via genericRequest
-//    respErr = checkStringParam(aParams, "bridgeUuid", bridgeUuid);
-//    if (!Error::isOK(respErr)) return respErr;
-//    respErr = checkStringParam(aParams, "bridgeUsername", bridgeUserName);
-//    if (!Error::isOK(respErr)) return respErr;
-//    // save the bridge parameters
-//    db.executef(
-//      "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s'",
-//      bridgeUuid.c_str(),
-//      bridgeUserName.c_str()
-//    );
-//    // now collect the lights from the new bridge, remove all settings from previous bridge
-//    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), false, false, true);
-//  }
-//  else
+  if (aMethod=="registerAccount") {
+    // hue specific addition, only via genericRequest
+    string refreshToken;
+    bool developerApi = false;
+    respErr = checkStringParam(aParams, "refreshToken", refreshToken);
+    if (!Error::isOK(respErr)) return respErr;
+    checkBoolParam(aParams, "developerApi", developerApi);
+    // activate the parameters
+    homeConnectComm.setAccount(refreshToken, developerApi);
+    // save the account parameters
+    db.executef(
+      "UPDATE globs SET refreshToken='%s', developerApi=%d",
+      refreshToken.c_str(),
+      developerApi
+    );
+    // now collect the devices from the new account
+    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), false, false, true);
+  }
+  else
   {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }

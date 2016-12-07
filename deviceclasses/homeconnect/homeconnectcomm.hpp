@@ -105,6 +105,9 @@ namespace p44 {
 
     string accessToken; ///< the access token for issuing requests (obtained via OAuth)
 
+    string refreshToken; ///< the Oauth refresh token that can be used to obtain access tokens
+    bool developerApi; ///< if set, developer (simulator) API is used
+
   public:
 
     HomeConnectComm();
@@ -113,13 +116,16 @@ namespace p44 {
     // HTTP communication object
     JsonWebClient httpAPIComm;
 
-    /// @name settings
-    /// @{
+    // set the account to use
+    // @param aRefreshToken the (long-lived) OAuth refresh token that can be used to obtain access tokens
+    // @param aDeveloperApi if set, the developer (simulator) API is used
+    void setAccount(string aRefreshToken, bool aDeveloperApi);
 
-    string baseUrl; ///< the API base URL
-    string refreshToken; ///< the Oauth refresh token that can be used to obtain access tokens
+    /// @return true if API is configured
+    bool isConfigured() { return !refreshToken.empty(); };
 
-    /// @}
+    /// the API base URL (depends on developerApi setting)
+    string baseUrl();
 
     /// @name executing regular API calls
     /// @{

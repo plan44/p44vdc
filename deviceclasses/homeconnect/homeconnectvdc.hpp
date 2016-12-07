@@ -37,14 +37,14 @@ namespace p44 {
   class HomeConnectVdc;
   class HomeConnectDevice;
 
-//  /// persistence for home connect device container
-//  class HomeConnectPersistence : public SQLite3Persistence
-//  {
-//    typedef SQLite3Persistence inherited;
-//  protected:
-//    /// Get DB Schema creation/upgrade SQL statements
-//    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
-//  };
+  /// persistence for home connect device container
+  class HomeConnectPersistence : public SQLite3Persistence
+  {
+    typedef SQLite3Persistence inherited;
+  protected:
+    /// Get DB Schema creation/upgrade SQL statements
+    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+  };
 
 
   typedef boost::intrusive_ptr<HomeConnectVdc> HomeConnectVdcPtr;
@@ -54,6 +54,8 @@ namespace p44 {
     friend class HomeConnectDevice;
 
     StatusCB collectedHandler;
+
+    HomeConnectPersistence db;
 
   public:
 

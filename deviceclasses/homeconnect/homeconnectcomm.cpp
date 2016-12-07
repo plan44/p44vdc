@@ -81,7 +81,7 @@ void HomeConnectApiOperation::sendRequest()
   homeConnectComm.httpAPIComm.addRequestHeader("Accept", "application/vnd.bsh.sdk.v1+json");
   homeConnectComm.httpAPIComm.addRequestHeader("Cache-Control", "no-cache");
   // - issue the request
-  homeConnectComm.httpAPIComm.jsonRequest((homeConnectComm.baseUrl+urlPath).c_str(), boost::bind(&HomeConnectApiOperation::processAnswer, this, _1, _2), method.c_str(), data, "application/vnd.bsh.sdk.v1+json");
+  homeConnectComm.httpAPIComm.jsonRequest((homeConnectComm.baseUrl()+urlPath).c_str(), boost::bind(&HomeConnectApiOperation::processAnswer, this, _1, _2), method.c_str(), data, "application/vnd.bsh.sdk.v1+json");
 }
 
 
@@ -95,7 +95,7 @@ void HomeConnectApiOperation::refreshAccessToken()
   string postdata = "grant_type=refresh_token&refresh_token=" + homeConnectComm.refreshToken;
   // - issue the request
   homeConnectComm.httpAPIComm.jsonReturningRequest(
-    (homeConnectComm.baseUrl+"/security/oauth/token").c_str(),
+    (homeConnectComm.baseUrl()+"/security/oauth/token").c_str(),
     boost::bind(&HomeConnectApiOperation::processRefreshAnswer, this, _1, _2),
     "POST",
     postdata,
@@ -199,15 +199,33 @@ void HomeConnectApiOperation::abortOperation(ErrorPtr aError)
 // MARK: ===== homeConnectComm
 
 
-#define BASE_URL "https://developer.home-connect.com"
 
 
 HomeConnectComm::HomeConnectComm() :
   inherited(MainLoop::currentMainLoop()),
   httpAPIComm(MainLoop::currentMainLoop()),
-  baseUrl(BASE_URL)
+  developerApi(false)
 {
 }
+
+
+void HomeConnectComm::setAccount(string aRefreshToken, bool aDeveloperApi)
+{
+  refreshToken = aRefreshToken;
+  accessToken.clear();
+  developerApi = aDeveloperApi;
+}
+
+
+
+#define DEVELOPER_BASE_URL "https://developer.home-connect.com"
+#define PRODUCTION_BASE_URL "https://api.home-connect.com"
+
+string HomeConnectComm::baseUrl()
+{
+  return developerApi ? DEVELOPER_BASE_URL : PRODUCTION_BASE_URL;
+}
+
 
 
 HomeConnectComm::~HomeConnectComm()
