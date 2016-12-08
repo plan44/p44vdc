@@ -24,7 +24,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 6
+#define FOCUSLOGLEVEL 7
 
 #include "homeconnectcomm.hpp"
 
@@ -195,11 +195,103 @@ void HomeConnectApiOperation::abortOperation(ErrorPtr aError)
 
 
 
-
-// MARK: ===== homeConnectComm
-
+// MARK: ===== HomeConnectEventMonitor
 
 
+HomeConnectEventMonitor::HomeConnectEventMonitor(HomeConnectComm &aHomeConnectComm, const char *aUrlPath, HomeConnectEventResultCB aEventCB) :
+  inherited(MainLoop::currentMainLoop()),
+  homeConnectComm(aHomeConnectComm),
+  urlPath(aUrlPath),
+  eventCB(aEventCB)
+{
+  sendGetEventRequest();
+}
+
+
+HomeConnectEventMonitor::~HomeConnectEventMonitor()
+{
+  
+}
+
+
+void HomeConnectEventMonitor::sendGetEventRequest()
+{
+  // - set up the extra auth headers
+  eventBuffer.clear();
+  clearRequestHeaders();
+  addRequestHeader("Authorization", string_format("Bearer %s", homeConnectComm.accessToken.c_str()));
+  addRequestHeader("Accept", "text/event-stream");
+  addRequestHeader("Cache-Control", "no-cache");
+  // - make the call
+  FOCUSLOG(">>> Sending event stream GET request to '%s'", urlPath.c_str());
+  httpRequest(
+    (homeConnectComm.baseUrl()+urlPath).c_str(),
+    boost::bind(&HomeConnectEventMonitor::processEventData, this, _1, _2),
+    "GET",
+    NULL, // no request body
+    NULL, // no body content type
+    -1, // not saving into file descriptor
+    false, // no need to save headers
+    true // stream result
+  );
+}
+
+
+#define EVENT_STREAM_RESTART_DELAY (15*Second)
+
+void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    if (aResponse.empty()) {
+      // end of stream - schedule restart
+      MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
+      return;
+    }
+    eventBuffer += aResponse;
+    FOCUSLOG(">>> Accumulated Event data: %s", aResponse.c_str());
+    // process
+    const char *cu = eventBuffer.c_str();
+    string line;
+    while (nextLine(cu, line)) {
+      // process line
+      string field;
+      string data;
+      if (keyAndValue(line, field, data, ':')) {
+        if (field=="event") {
+          eventType = data;
+          FOCUSLOG(">>> Got event type: %s", eventType.c_str());
+        }
+        else if (field=="data") {
+          eventData = data;
+          FOCUSLOG(">>> Got event data: %s", eventData.c_str());
+        }
+      }
+      else {
+        if (line.empty()) {
+          // empty line signals complete event
+          FOCUSLOG(">>> Event is complete, dispatch now");
+          if (eventType!="KEEP-ALIVE") {
+            // convert data to JSON
+            JsonObjectPtr jsondata = JsonObject::objFromText(eventData.c_str());
+            // deliver
+            if (eventCB) eventCB(eventType, jsondata, ErrorPtr());
+          }
+        }
+      }
+    }
+    // remove processed data
+    eventBuffer.erase(0,cu-eventBuffer.c_str());
+  }
+  else {
+    LOG(LOG_WARNING, "HomeConnect Event stream '%s' error: %s", urlPath.c_str(), aError->description().c_str());
+  }
+}
+
+
+
+
+
+// MARK: ===== HomeConnectComm
 
 HomeConnectComm::HomeConnectComm() :
   inherited(MainLoop::currentMainLoop()),
@@ -233,13 +325,13 @@ HomeConnectComm::~HomeConnectComm()
 }
 
 
-void HomeConnectComm::apiQuery(const char* aUrlSuffix, HomeConnectApiResultCB aResultHandler)
+void HomeConnectComm::apiQuery(const char* aUrlPath, HomeConnectApiResultCB aResultHandler)
 {
-  apiAction("GET", aUrlSuffix, JsonObjectPtr(), aResultHandler);
+  apiAction("GET", aUrlPath, JsonObjectPtr(), aResultHandler);
 }
 
 
-void HomeConnectComm::apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler, bool aNoAutoURL)
+void HomeConnectComm::apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler)
 {
   HomeConnectApiOperationPtr op = HomeConnectApiOperationPtr(new HomeConnectApiOperation(*this, aMethod, aUrlPath, aData, aResultHandler));
   queueOperation(op);

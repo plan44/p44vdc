@@ -28,6 +28,7 @@
 
 #include "jsonobject.hpp"
 #include "simplescene.hpp"
+#include "homeconnectcomm.hpp"
 
 using namespace std;
 
@@ -116,6 +117,9 @@ namespace p44 {
     string modelGuid; ///< the model guid for the device
     string vendor; ///< the vendor of this device
 
+    HomeConnectEventMonitorPtr eventMonitor; ///< event monitor
+
+
   public:
     HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
 
@@ -180,11 +184,9 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// @}
-
-
 
   protected:
 
@@ -192,6 +194,7 @@ namespace p44 {
 
   private:
 
+    void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError);
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
 
   };

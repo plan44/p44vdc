@@ -60,7 +60,7 @@ namespace p44 {
   /// - In case of PUT, POST and DELETE requests, it is the entire response object, but only if it is a success. Otherwise, aError will return an error.
   /// - In case of GET requests, it is the entire answer object
   /// @param aError error in case of failure, error code is either a HomeConnectCommErrors enum or the error code as
-  ///   delivered by the hue brigde itself.
+  ///   delivered by the API itself.
   typedef boost::function<void (JsonObjectPtr aResult, ErrorPtr aError)> HomeConnectApiResultCB;
 
 
@@ -95,10 +95,50 @@ namespace p44 {
   typedef boost::intrusive_ptr<HomeConnectApiOperation> HomeConnectApiOperationPtr;
 
 
+  /// will be called to deliver events
+  /// @param aEventType the type of event
+  /// @param aEventData the event data.
+  /// @param aError error in case of failure, error code is either a HomeConnectCommErrors enum or the error code as
+  ///   delivered by the API itself.
+  typedef boost::function<void (string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)> HomeConnectEventResultCB;
+
+
+  class HomeConnectEventMonitor: public JsonWebClient
+  {
+    typedef JsonWebClient inherited;
+
+    HomeConnectComm &homeConnectComm;
+    string urlPath;
+    HomeConnectEventResultCB eventCB;
+
+    string eventBuffer; ///< accumulating event data
+    string eventType;
+    string eventData;
+
+  public:
+
+    /// Create event monitor
+    /// @param aHomeConnectComm a authorized homeconnect API communication object
+    /// @param aUrlPath the path to append to the baseURL (including leading slash)
+    /// @param aEventCB will be called when a event is received
+    HomeConnectEventMonitor(HomeConnectComm &aHomeConnectComm, const char *aUrlPath, HomeConnectEventResultCB aEventCB);
+
+    virtual ~HomeConnectEventMonitor();
+
+  private:
+
+    void sendGetEventRequest();
+    void processEventData(const string &aResponse, ErrorPtr aError);
+
+  };
+  typedef boost::intrusive_ptr<HomeConnectEventMonitor> HomeConnectEventMonitorPtr;
+
+
   class HomeConnectComm : public OperationQueue
   {
     typedef OperationQueue inherited;
     friend class HomeConnectApiOperation;
+    friend class HomeConnectEventMonitor;
 
     bool findInProgress;
     bool apiReady;
@@ -113,7 +153,7 @@ namespace p44 {
     HomeConnectComm();
     virtual ~HomeConnectComm();
 
-    // HTTP communication object
+    // HTTP communication object for serialized requests
     JsonWebClient httpAPIComm;
 
     // set the account to use
@@ -131,17 +171,17 @@ namespace p44 {
     /// @{
 
     /// Query information from the API
-    /// @param aUrlSuffix the suffix to append to the baseURL+userName (including leading slash)
+    /// @param aUrlPath the path to append to the baseURL (including leading slash)
     /// @param aResultHandler will be called with the result
-    void apiQuery(const char* aUrlSuffix, HomeConnectApiResultCB aResultHandler);
+    void apiQuery(const char* aUrlPath, HomeConnectApiResultCB aResultHandler);
 
     /// Send information to the API
     /// @param aMethod the HTTP method to use
     /// @param aUrlPath the path to append to the API base URL (including leading slash if not empty)
     /// @param aData the data for the action to perform (JSON body of the request)
     /// @param aResultHandler will be called with the result
-    /// @param aNoAutoURL if set, aUrlSuffix must be the complete URL (baseURL and userName will not be used automatically)
-    void apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler, bool aNoAutoURL = false);
+    void apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler);
+
 
     /// @}
 

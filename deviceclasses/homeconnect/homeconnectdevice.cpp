@@ -267,8 +267,21 @@ HomeConnectComm &HomeConnectDevice::homeConnectComm()
 
 void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  // create event stream monitor
+  eventMonitor = HomeConnectEventMonitorPtr(new HomeConnectEventMonitor(
+    homeConnectComm(),
+    string_format("/api/homeappliances/%s/events",haId.c_str()).c_str(),
+    boost::bind(&HomeConnectDevice::handleEvent, this, _1, _2, _3))
+  );
   // FIXME: implement
   if (aCompletedCB) aCompletedCB(ErrorPtr());
+}
+
+
+void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+{
+  // FIXME: tbd
+  LOG(LOG_INFO, "Event '%s': %s", aEventType.c_str(), aEventData->c_strValue());
 }
 
 
