@@ -244,6 +244,8 @@ void mg_send_file(struct mg_connection *conn, const char *path);
 //   < 0   read error. No more data could be read from the connection.
 //   > 0   number of bytes read into the buffer.
 ssize_t mg_read(struct mg_connection *, void *buf, size_t len);
+// if stream flag is set, read does not block until end of data or buffer full, but delivers what is available
+ssize_t mg_read_ex(struct mg_connection *conn, void *buf, size_t len, int stream);
 
 
 // Get the value of particular HTTP header.

@@ -1503,7 +1503,7 @@ static int64_t push(FILE *fp, SOCKET sock, SSL *ssl, const char *buf,
 
 // Read from IO channel - opened file descriptor, socket, or SSL descriptor.
 // Return negative value on error, or number of bytes read on success.
-static ssize_t pull(FILE *fp, struct mg_connection *conn, char *buf, ssize_t len) {
+static ssize_t pull(FILE *fp, struct mg_connection *conn, char *buf, ssize_t len, int stream) {
   ssize_t nread;
 
   if (fp != NULL) {
@@ -1513,7 +1513,29 @@ static ssize_t pull(FILE *fp, struct mg_connection *conn, char *buf, ssize_t len
     nread = read(fileno(fp), buf, (size_t) len);
 #ifndef NO_SSL
   } else if (conn->ssl != NULL) {
-    nread = SSL_read(conn->ssl, buf, (int)len);
+    ssize_t nsslread = 0;
+    nread = 0;
+    int maxread = (int)len;
+    if (stream) {
+      // only read what is available
+      // Note: SSL_pending only indicates how many bytes are available from the current SSL block
+      //   SSL_read must be used first to actually get data from socket
+      maxread = SSL_pending(conn->ssl);
+      if (maxread==0) {
+        // nothing in the current block, trigger reading something
+        nsslread = SSL_read(conn->ssl, buf, 1);
+        if (nsslread>0) {
+          // got something, check again for pending bytes now
+          len -= nsslread;
+          buf++;
+          nread++;
+          maxread = SSL_pending(conn->ssl);
+        }
+      }
+      if (maxread>len) maxread = (int)len;
+    }
+    nsslread = SSL_read(conn->ssl, buf, maxread);
+    nread = nsslread>=0 ? nread+nsslread : nsslread;
 #endif
   } else {
     nread = recv(conn->client.sock, buf, (size_t) len, 0);
@@ -1522,11 +1544,11 @@ static ssize_t pull(FILE *fp, struct mg_connection *conn, char *buf, ssize_t len
   return conn->ctx->stop_flag ? -1 : nread;
 }
 
-static ssize_t pull_all(FILE *fp, struct mg_connection *conn, char *buf, int len) {
+static ssize_t pull_all(FILE *fp, struct mg_connection *conn, char *buf, int len, int stream) {
   ssize_t n, nread = 0;
 
   while (len > 0) {
-    n = pull(fp, conn, buf + nread, len);
+    n = pull(fp, conn, buf + nread, len, stream);
     if (n < 0) {
       nread = n;  // Propagate the error
       break;
@@ -1537,12 +1559,18 @@ static ssize_t pull_all(FILE *fp, struct mg_connection *conn, char *buf, int len
       nread += n;
       len -= n;
     }
+    if (stream) break; // do not repeatedly pull in stream mode
   }
 
   return nread;
 }
 
 ssize_t mg_read(struct mg_connection *conn, void *buf, size_t len) {
+  return mg_read_ex(conn, buf, len, 0);
+}
+
+
+ssize_t mg_read_ex(struct mg_connection *conn, void *buf, size_t len, int stream) {
   ssize_t n, buffered_len, nread;
   const char *body;
 
@@ -1575,7 +1603,7 @@ ssize_t mg_read(struct mg_connection *conn, void *buf, size_t len) {
     }
 
     // We have returned all buffered data. Read new data from the remote socket.
-    n = pull_all(NULL, conn, (char *) buf, (int) len);
+    n = pull_all(NULL, conn, (char *) buf, (int) len, stream);
     nread = n >= 0 ? nread + n : n;
   }
   return nread;
@@ -3051,7 +3079,7 @@ static ssize_t read_request(FILE *fp, struct mg_connection *conn,
 
   request_len = get_request_len(buf, *nread);
   while (*nread < bufsiz && request_len == 0 &&
-         (n = pull(fp, conn, buf + *nread, bufsiz - *nread)) > 0) {
+         (n = pull(fp, conn, buf + *nread, bufsiz - *nread, 0)) > 0) {
     *nread += n;
     assert(*nread <= bufsiz);
     request_len = get_request_len(buf, *nread);
@@ -3156,7 +3184,7 @@ static int forward_body_data(struct mg_connection *conn, FILE *fp,
       if ((int64_t) to_read > conn->content_len - conn->consumed_content) {
         to_read = (int) (conn->content_len - conn->consumed_content);
       }
-      nread = pull(NULL, conn, buf, to_read);
+      nread = pull(NULL, conn, buf, to_read, 0);
       if (nread <= 0 || push(fp, sock, ssl, buf, nread) != nread) {
         break;
       }
@@ -4050,7 +4078,7 @@ static void read_websocket(struct mg_connection *conn) {
         len = body_len - header_len;
         memcpy(data, buf + header_len, len);
         // TODO: handle pull error
-        pull_all(NULL, conn, data + len, data_len - len);
+        pull_all(NULL, conn, data + len, data_len - len, 0);
         conn->data_len = conn->request_len;
       } else {
         len = data_len + header_len;
