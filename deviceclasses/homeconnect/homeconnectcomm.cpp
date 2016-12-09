@@ -33,6 +33,11 @@
 using namespace p44;
 
 
+#define DEVELOPER_BASE_URL "https://developer.home-connect.com"
+#define PRODUCTION_BASE_URL "https://api.home-connect.com"
+
+#define OAUTH_TOKEN_PATH "/security/oauth/token"
+
 // MARK: ===== HomeConnectApiOperation
 
 HomeConnectApiOperation::HomeConnectApiOperation(HomeConnectComm &aHomeConnectComm, const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler) :
@@ -103,7 +108,7 @@ void HomeConnectApiOperation::refreshAccessToken()
   string postdata = "grant_type=refresh_token&refresh_token=" + homeConnectComm.refreshToken;
   // - issue the request
   homeConnectComm.httpAPIComm.jsonReturningRequest(
-    (homeConnectComm.baseUrl()+"/security/oauth/token").c_str(),
+    (homeConnectComm.baseUrl()+OAUTH_TOKEN_PATH).c_str(),
     boost::bind(&HomeConnectApiOperation::processRefreshAnswer, this, _1, _2),
     "POST",
     postdata,
@@ -339,9 +344,6 @@ void HomeConnectComm::setAccount(string aRefreshToken, bool aDeveloperApi)
 }
 
 
-
-#define DEVELOPER_BASE_URL "https://developer.home-connect.com"
-#define PRODUCTION_BASE_URL "https://api.home-connect.com"
 
 string HomeConnectComm::baseUrl()
 {
