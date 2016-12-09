@@ -153,13 +153,18 @@ namespace p44 {
     HomeConnectComm();
     virtual ~HomeConnectComm();
 
-    // HTTP communication object for serialized requests
+    /// HTTP communication object for serialized requests
     JsonWebClient httpAPIComm;
 
-    // set the account to use
-    // @param aRefreshToken the (long-lived) OAuth refresh token that can be used to obtain access tokens
-    // @param aDeveloperApi if set, the developer (simulator) API is used
+    /// set the account to use
+    /// @param aRefreshToken the (long-lived) OAuth refresh token that can be used to obtain access tokens
+    /// @param aDeveloperApi if set, the developer (simulator) API is used
     void setAccount(string aRefreshToken, bool aDeveloperApi);
+
+    /// directly set access token to use (usually for experiments/debugging only)
+    /// @param aAccessToken the access token to use
+    void setAccessToken(string aAccessToken) { accessToken = aAccessToken; };
+
 
     /// @return true if API is configured
     bool isConfigured() { return !refreshToken.empty(); };

@@ -119,6 +119,7 @@ namespace p44 {
 
     HomeConnectEventMonitorPtr eventMonitor; ///< event monitor
 
+    DeviceStatePtr operationState;
 
   public:
     HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
@@ -194,6 +195,7 @@ namespace p44 {
 
   private:
 
+    void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
     void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError);
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
 

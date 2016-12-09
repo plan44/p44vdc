@@ -100,23 +100,27 @@ void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
   ErrorPtr err;
   // direct execution of home connect API commands
   // Syntax:
-  //   resturlpath[:jsonBody]
+  //   method:resturlpath[:jsonBody]
   string cmd = apiCommandTemplate;
   err = substitutePlaceholders(cmd, boost::bind(&HomeConnectAction::valueLookup, this, aParams, _1));
   JsonObjectPtr jsonBody;
   if (Error::isOK(err)) {
-    string path;
-    string body;
-    if (!keyAndValue(cmd, path, body)) {
-      path = cmd;
+    string method;
+    string r;
+    if (keyAndValue(cmd, method, r)) {
+      string path;
+      string body;
+      if (!keyAndValue(r, path, body)) {
+        path = cmd;
+      }
+      else {
+        // make JSON from text
+        jsonBody = JsonObject::objFromText(body.c_str());
+      }
+      // complete path
+      string urlpath = "/api/homeappliances/" + getHomeConnectDevice().haId + "/" + path;
+      getHomeConnectDevice().homeConnectComm().apiAction(method, urlpath, jsonBody, boost::bind(&HomeConnectAction::apiCommandSent, this, aCompletedCB, _1, _2));
     }
-    else {
-      // make JSON from text
-      jsonBody = JsonObject::objFromText(body.c_str());
-    }
-    // complete path
-    string urlpath = "/api/homeappliances/" + getHomeConnectDevice().haId + "/" + path;
-    getHomeConnectDevice().homeConnectComm().apiAction("PUT", urlpath, jsonBody, boost::bind(&HomeConnectAction::apiCommandSent, this, aCompletedCB, _1, _2));
   }
   if (aCompletedCB) aCompletedCB(err);
 }
@@ -200,54 +204,81 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
   beanAmount->addEnum("DoubleShotPlusPlus", 7);
   // - command template
   string cmdTemplate =
-    "programs/active:{\"data\":{\"key\":\"ConsumerProducts.CoffeeMaker.Program.Beverage.%s\","
+    "PUT:programs/active:{\"data\":{\"key\":\"ConsumerProducts.CoffeeMaker.Program.Beverage.%s\","
     "\"options\":["
       "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{temperatureLevel}\"},"
       "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.BeanAmount\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{beanAmount}\"},"
       "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.FillQuantity\",\"value\":@{fillQuantity%%0}}"
     "]}}";
   // - espresso
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "espresso", "Espresso", string_format(cmdTemplate.c_str(),"Espresso")));
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.espresso", "Espresso", string_format(cmdTemplate.c_str(),"Espresso")));
   a->addParameter(tempLevel);
   a->addParameter(beanAmount);
-  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 35, 60, 5, true, 42)));
+  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 35, 60, 5, true, 40)));
   deviceActions->addAction(a);
   // - espresso macciato
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "espressoMacchiato", "Espresso Macchiato", string_format(cmdTemplate.c_str(),"EspressoMacchiato")));
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.espressoMacchiato", "Espresso Macchiato", string_format(cmdTemplate.c_str(),"EspressoMacchiato")));
   a->addParameter(tempLevel);
   a->addParameter(beanAmount);
   a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 40, 60, 10, true, 50)));
   deviceActions->addAction(a);
   // - (plain) coffee
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "coffee", "Coffee", string_format(cmdTemplate.c_str(),"Coffee")));
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.coffee", "Coffee", string_format(cmdTemplate.c_str(),"Coffee")));
   a->addParameter(tempLevel);
   a->addParameter(beanAmount);
   a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 60, 250, 10, true, 120)));
   deviceActions->addAction(a);
   // - Cappuccino
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "cappuccino", "Cappuccino", string_format(cmdTemplate.c_str(),"Cappuccino")));
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.cappuccino", "Cappuccino", string_format(cmdTemplate.c_str(),"Cappuccino")));
   a->addParameter(tempLevel);
   a->addParameter(beanAmount);
   a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 100, 250, 10, true, 180)));
   deviceActions->addAction(a);
   // - latte macchiato
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "latteMacchiato", "Latte Macchiato", string_format(cmdTemplate.c_str(),"LatteMacchiato")));
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.latteMacchiato", "Latte Macchiato", string_format(cmdTemplate.c_str(),"LatteMacchiato")));
   a->addParameter(tempLevel);
   a->addParameter(beanAmount);
   a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 200, 400, 20, true, 300)));
   deviceActions->addAction(a);
   // - latte macchiato
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "caffeLatte", "Caffe Latte", string_format(cmdTemplate.c_str(),"CaffeLatte")));
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.caffeLatte", "Caffe Latte", string_format(cmdTemplate.c_str(),"CaffeLatte")));
   a->addParameter(tempLevel);
   a->addParameter(beanAmount);
   a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 100, 400, 20, true, 250)));
   deviceActions->addAction(a);
   // - stop
-//  a = HomeConnectActionPtr(new HomeConnectAction(*this, "stop", "stop", "hh:doTurnOff"));
-//  deviceActions->addAction(a);
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.stop", "stop current program", "DELETE:programs/active"));
+  deviceActions->addAction(a);
+  // create states
+  // - operation
+  EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
+  es->addEnum("Inactive", 0, true); // init state with this value
+  es->addEnum("Ready", 1);
+  es->addEnum("Run", 3);
+  es->addEnum("ActionRequired", 5);
+  es->addEnum("Finished", 6);
+  es->addEnum("Error", 7);
+  es->addEnum("Aborting", 8);
+  operationState = DeviceStatePtr(new DeviceState(
+    *this, "operation", "Operation", ValueDescriptorPtr(es),
+    boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)
+  ));
+  deviceStates->addState(operationState);
   // derive the dSUID
   deriveDsUid();
 }
+
+
+void HomeConnectDevice::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
+{
+  // nop for now
+  AFOCUSLOG("- stateChanged: changed from '%s' to '%s'",
+    aChangedState->value()->getStringValue(false, true).c_str(),
+    aChangedState->value()->getStringValue(false, false).c_str()
+  );
+}
+
+
 
 
 
@@ -281,7 +312,26 @@ void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryRes
 void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
   // FIXME: tbd
-  LOG(LOG_INFO, "Event '%s': %s", aEventType.c_str(), aEventData->c_strValue());
+  ALOG(LOG_INFO, "Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  if (aEventType=="STATUS") {
+    JsonObjectPtr o;
+    if (aEventData && aEventData->get("key", o)) {
+      if (o->stringValue()=="BSH.Common.Status.OperationState") {
+        // get value
+        if (aEventData->get("value", o)) {
+          string os = o->stringValue();
+          ssize_t sp = os.rfind('.');
+          if (sp!=string::npos) {
+            string ostate = os.substr(sp+1);
+            if (operationState->value()->setStringValue(ostate)) {
+              ALOG(LOG_NOTICE, "New Operation State: %s", ostate.c_str());
+              operationState->push();
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 

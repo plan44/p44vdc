@@ -202,6 +202,11 @@ ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &a
       refreshToken.c_str(),
       developerApi
     );
+    // for debugging purposes, also allow directly specifying a access token
+    ApiValuePtr ac = aParams->get("accessToken");
+    if (ac) {
+      homeConnectComm.setAccessToken(ac->stringValue());
+    }
     // now collect the devices from the new account
     collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), false, false, true);
   }
