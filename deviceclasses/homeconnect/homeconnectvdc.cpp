@@ -79,6 +79,7 @@ string HomeConnectPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVers
     sql.append(
       "ALTER TABLE globs ADD refreshToken TEXT;"
       "ALTER TABLE globs ADD developerApi INTEGER;"
+      "ALTER TABLE globs ADD accessToken TEXT;"
     );
     // reached final version in one step
     aToVersion = HOMECONNECT_SCHEMA_VERSION;
@@ -95,13 +96,15 @@ void HomeConnectVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   if (Error::isOK(error)) {
     // load account parameters
     sqlite3pp::query qry(db);
-    if (qry.prepare("SELECT refreshToken, developerApi FROM globs")==SQLITE_OK) {
+    if (qry.prepare("SELECT refreshToken, developerApi, accessToken FROM globs")==SQLITE_OK) {
       sqlite3pp::query::iterator i = qry.begin();
       if (i!=qry.end()) {
         // set new account
         string refreshToken = nonNullCStr(i->get<const char *>(0));
         bool developerApi = i->get<bool>(1);
+        string accessToken = nonNullCStr(i->get<const char *>(2));
         homeConnectComm.setAccount(refreshToken, developerApi);
+        homeConnectComm.setAccessToken(accessToken);
       }
     }
   }
@@ -205,7 +208,12 @@ ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &a
     // for debugging purposes, also allow directly specifying a access token
     ApiValuePtr ac = aParams->get("accessToken");
     if (ac) {
-      homeConnectComm.setAccessToken(ac->stringValue());
+      string accessCode = ac->stringValue();
+      db.executef(
+        "UPDATE globs SET accessToken='%s'",
+        accessCode.c_str()
+      );
+      homeConnectComm.setAccessToken(accessCode);
     }
     // now collect the devices from the new account
     collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), false, false, true);

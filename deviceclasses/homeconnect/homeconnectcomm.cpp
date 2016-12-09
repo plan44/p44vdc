@@ -338,8 +338,8 @@ HomeConnectComm::HomeConnectComm() :
 
 void HomeConnectComm::setAccount(string aRefreshToken, bool aDeveloperApi)
 {
-  refreshToken = aRefreshToken;
   accessToken.clear();
+  refreshToken = aRefreshToken;
   developerApi = aDeveloperApi;
 }
 
