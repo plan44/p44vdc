@@ -303,6 +303,7 @@ namespace p44 {
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
 
     virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
+    virtual bool setStringValue(const string aValue) P44_OVERRIDE;
 
   protected:
 
@@ -310,7 +311,7 @@ namespace p44 {
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
-    
+
   };
   typedef boost::intrusive_ptr<EnumValueDescriptor> EnumValueDescriptorPtr;
 

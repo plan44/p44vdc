@@ -493,6 +493,18 @@ bool EnumValueDescriptor::setInt32Value(int32_t aValue)
 }
 
 
+bool EnumValueDescriptor::setStringValue(const string aEnumText)
+{
+  for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
+    if (pos->first==aEnumText) {
+      // found
+      return setInt32Value(pos->second);
+    }
+  }
+  return false; // no change
+}
+
+
 
 void EnumValueDescriptor::addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault)
 {
@@ -531,6 +543,7 @@ ErrorPtr EnumValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal
   }
   return err;
 }
+
 
 
 bool EnumValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool aPrevious)
