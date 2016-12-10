@@ -68,18 +68,19 @@ LedChainVdc::LedChainVdc(int aInstanceNumber, const string aChainSpec, VdcHost *
   maxOutValue(128) // by default, allow only half of max intensity (for full intensity a ~200 LED chain needs 70W power supply!)
 {
   // parse chain specification
-  // Syntax: [chaintype:]numberOfLeds
-  ledType = WS281xComm::ledtype_ws2812; // assume WS2812
+  // Syntax: [chaintype:[leddevicename:]]numberOfLeds
+  ledType = LEDChainComm::ledtype_ws281x; // assume WS2812/13
   string chaintype;
-  string rest;
-  if (keyAndValue(aChainSpec, chaintype, rest, ':')) {
+  string rest = aChainSpec;
+  if (keyAndValue(rest, chaintype, rest, ':')) {
+    // chain type specified
     if (chaintype=="SK6812") {
-      ledType = WS281xComm::ledtype_sk6812;
+      ledType = LEDChainComm::ledtype_sk6812;
     }
+    // there might be a LED device name
+    keyAndValue(rest, ledChainDevice, rest, ':');
   }
-  else {
-    rest = aChainSpec;
-  }
+  // now there should be a number of LEDs
   if (sscanf(rest.c_str(), "%d", &numLedsInChain)!=1) {
     numLedsInChain = 200; // default
   }
@@ -94,7 +95,7 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   err = db.connectAndInitialize(databaseName.c_str(), LEDCHAINDEVICES_SCHEMA_VERSION, LEDCHAINDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
   // Initialize chain driver
-  ws281xcomm = WS281xCommPtr(new WS281xComm(ledType, numLedsInChain));
+  ws281xcomm = LEDChainCommPtr(new LEDChainComm(ledType, ledChainDevice, numLedsInChain));
   ws281xcomm->begin();
   // trigger a full chain rendering
   triggerRenderingRange(0, numLedsInChain);
@@ -133,7 +134,7 @@ Brightness LedChainVdc::getMinBrightness()
 bool LedChainVdc::hasWhite()
 {
   // so far, only SK6812 have white
-  return ledType==WS281xComm::ledtype_sk6812;
+  return ledType==LEDChainComm::ledtype_sk6812;
 }
 
 

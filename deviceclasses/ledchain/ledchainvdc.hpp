@@ -30,7 +30,7 @@
 #include "device.hpp"
 #include "colorlightbehaviour.hpp"
 
-#include "ws281xcomm.hpp"
+#include "ledchaincomm.hpp"
 
 
 using namespace std;
@@ -61,10 +61,11 @@ namespace p44 {
 
     LedChainDevicePersistence db;
 
-    WS281xComm::LedType ledType;
+    LEDChainComm::LedType ledType;
+    string ledChainDevice;
     int numLedsInChain;
     uint8_t maxOutValue;
-    WS281xCommPtr ws281xcomm;
+    LEDChainCommPtr ws281xcomm;
 
     typedef std::list<LedChainDevicePtr> LedChainDeviceList;
 
@@ -116,7 +117,7 @@ namespace p44 {
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() const P44_OVERRIDE { return "WS281x LED Chains"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "Smart LED Chains"; }
 
   private:
 
