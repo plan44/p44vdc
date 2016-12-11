@@ -373,7 +373,9 @@ string HomeConnectDevice::vendorName()
 
 string HomeConnectDevice::oemModelGUID()
 {
-  return "gs1:(01)7640156799999"; // FIXME: add number from aizo/dS numberspace, as defined in Aug 2016
+  return "gs1:(01)7640156792096"; // Einbaumodell - from aizo/dS number space, as defined 2016-12-11
+  // FIXME: differentiate Einbaumodell from Tischmodell
+  // return "gs1:(01)7640156792102"; // Tischmodell - from aizo/dS number space, as defined 2016-12-11
 }
 
 
