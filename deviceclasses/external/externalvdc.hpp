@@ -113,6 +113,7 @@ namespace p44 {
     bool useMovement; ///< if set, device communication uses MV/move command for dimming and shadow device operation
     bool controlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
     bool querySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
+    bool sceneCommands; ///< if set, scene commands are forwarded to the external device
 
     #if ENABLE_EXTERNAL_SINGLEDEVICE
     bool noConfirmAction; ///< if set, device implementation is not expected to use
@@ -149,6 +150,14 @@ namespace p44 {
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+  protected:
+
+    /// prepare for calling a scene on the device level
+    /// @param aScene the scene that is to be called
+    /// @return true if scene preparation is ok and call can continue. If false, no further action will be taken
+    /// @note this is called BEFORE scene values are recalled
+    virtual bool prepareSceneCall(DsScenePtr aScene) P44_OVERRIDE;
 
     /// apply all pending channel value updates to the device's hardware
     /// @param aDoneCB will called when values are actually applied, or hardware reports an error/timeout
