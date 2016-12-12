@@ -97,7 +97,7 @@ void HomeConnectVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   if (Error::isOK(error)) {
     // load account parameters
     sqlite3pp::query qry(db);
-    if (qry.prepare("SELECT authData")==SQLITE_OK) {
+    if (qry.prepare("SELECT authData FROM globs")==SQLITE_OK) {
       sqlite3pp::query::iterator i = qry.begin();
       if (i!=qry.end()) {
         // authorize
