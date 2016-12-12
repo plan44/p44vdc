@@ -539,6 +539,45 @@ void ExternalDevice::releaseButton(ButtonBehaviourPtr aButtonBehaviour)
 // MARK: ===== output control
 
 
+bool ExternalDevice::prepareSceneCall(DsScenePtr aScene)
+{
+  if (sceneCommands) {
+    // forward (built-in, behaviour-defined) scene commands to external device
+    const char *sceneCommandStr = NULL;
+    switch (aScene->sceneCmd) {
+      case scene_cmd_none: break; // explicit NOP
+      case scene_cmd_invoke: break; // no need to forward, the semantics are fully covered by applying channels
+      case scene_cmd_off: sceneCommandStr = "OFF";
+      case scene_cmd_slow_off: sceneCommandStr = "SLOW_OFF";
+      case scene_cmd_min: sceneCommandStr = "MIN";
+      case scene_cmd_max: sceneCommandStr = "MAX";
+      case scene_cmd_increment: sceneCommandStr = "INC";
+      case scene_cmd_decrement: sceneCommandStr = "DEC";
+      case scene_cmd_stop: sceneCommandStr = "STOP";
+      case scene_cmd_climatecontrol_enable: sceneCommandStr = "CLIMATE_ENABLE";
+      case scene_cmd_climatecontrol_disable: sceneCommandStr = "CLIMATE_DISABLE";
+      default: break; // not implemented, ignore for now
+    }
+    // send scene command message
+    if (sceneCommandStr) {
+      if (deviceConnector->simpletext) {
+        string m = string_format("SCMD=%s", sceneCommandStr);
+        sendDeviceApiSimpleMessage(m);
+      }
+      else {
+        JsonObjectPtr message = JsonObject::newObj();
+        message->add("message", JsonObject::newString("scenecommand"));
+        message->add("cmd", JsonObject::newString(sceneCommandStr));
+        sendDeviceApiJsonMessage(message);
+      }
+    }
+  }
+  // done
+  return inherited::prepareSceneCall(aScene);
+}
+
+
+
 void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // special behaviour for shadow behaviour
@@ -676,6 +715,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   // options
   if (aInitParams->get("sync", o)) querySync = o->boolValue();
   if (aInitParams->get("move", o)) useMovement = o->boolValue();
+  if (aInitParams->get("scenecommands", o)) sceneCommands = o->boolValue();
   // get unique ID
   if (!aInitParams->get("uniqueid", o)) {
     return TextError::err("missing 'uniqueid'");
