@@ -181,7 +181,7 @@ namespace p44 {
     virtual void syncChannelValues(SimpleCB aDoneCB) P44_OVERRIDE;
 
     /// start or stop dimming channel of this device. Usually implemented in device specific manner in subclasses.
-    /// @param aChannel the channelType to start or stop dimming for
+    /// @param aChannelType the channelType to start or stop dimming for
     /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @note unlike the vDC API "dimChannel" command, which must be repeated for dimming operations >5sec, this
     ///   method MUST NOT terminate dimming automatically except when reaching the minimum or maximum level
