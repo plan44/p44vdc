@@ -37,10 +37,11 @@
 using namespace p44;
 
 
-HomeConnectVdc::HomeConnectVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
+HomeConnectVdc::HomeConnectVdc(int aInstanceNumber, bool aDeveloperApi, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag),
   homeConnectComm()
 {
+  homeConnectComm.setDeveloperApi(aDeveloperApi);
 }
 
 
@@ -65,8 +66,9 @@ bool HomeConnectVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aR
 
 // Version history
 //  1 : first version
-#define HOMECONNECT_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
-#define HOMECONNECT_SCHEMA_VERSION 1 // current version
+//  2 : second, completely incompatible version
+#define HOMECONNECT_SCHEMA_MIN_VERSION 2 // minimally supported version, anything older will be deleted
+#define HOMECONNECT_SCHEMA_VERSION 2 // current version
 
 string HomeConnectPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
@@ -77,9 +79,8 @@ string HomeConnectPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVers
     sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
     // - add fields to globs table
     sql.append(
-      "ALTER TABLE globs ADD refreshToken TEXT;"
-      "ALTER TABLE globs ADD developerApi INTEGER;"
-      "ALTER TABLE globs ADD accessToken TEXT;"
+      "ALTER TABLE globs ADD authData TEXT;"
+      "ALTER TABLE globs ADD authScope TEXT;"
     );
     // reached final version in one step
     aToVersion = HOMECONNECT_SCHEMA_VERSION;
@@ -96,15 +97,12 @@ void HomeConnectVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   if (Error::isOK(error)) {
     // load account parameters
     sqlite3pp::query qry(db);
-    if (qry.prepare("SELECT refreshToken, developerApi, accessToken FROM globs")==SQLITE_OK) {
+    if (qry.prepare("SELECT authData FROM globs")==SQLITE_OK) {
       sqlite3pp::query::iterator i = qry.begin();
       if (i!=qry.end()) {
-        // set new account
-        string refreshToken = nonNullCStr(i->get<const char *>(0));
-        bool developerApi = i->get<bool>(1);
-        string accessToken = nonNullCStr(i->get<const char *>(2));
-        homeConnectComm.setAccount(refreshToken, developerApi);
-        homeConnectComm.setAccessToken(accessToken);
+        // authorize
+        string authData = nonNullCStr(i->get<const char *>(0));
+        homeConnectComm.setAuthentication(authData);
       }
     }
   }
@@ -190,31 +188,20 @@ void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aRe
 ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
-  if (aMethod=="registerAccount") {
-    // hue specific addition, only via genericRequest
-    string refreshToken;
-    bool developerApi = false;
-    respErr = checkStringParam(aParams, "refreshToken", refreshToken);
+  if (aMethod=="authenticate") {
+    // oauth API specific addition, only via genericRequest
+    string authData;
+    string authScope;
+    respErr = checkStringParam(aParams, "authData", authData);
     if (!Error::isOK(respErr)) return respErr;
-    checkBoolParam(aParams, "developerApi", developerApi);
-    // activate the parameters
-    homeConnectComm.setAccount(refreshToken, developerApi);
+    checkStringParam(aParams, "authScope", authScope);
+    homeConnectComm.setAuthentication(authData);
     // save the account parameters
     db.executef(
-      "UPDATE globs SET refreshToken='%s', developerApi=%d",
-      refreshToken.c_str(),
-      developerApi
+      "UPDATE globs SET authData='%s', authScope='%s'",
+      authData.c_str(),
+      authScope.c_str()
     );
-    // for debugging purposes, also allow directly specifying a access token
-    ApiValuePtr ac = aParams->get("accessToken");
-    if (ac) {
-      string accessCode = ac->stringValue();
-      db.executef(
-        "UPDATE globs SET accessToken='%s'",
-        accessCode.c_str()
-      );
-      homeConnectComm.setAccessToken(accessCode);
-    }
     // now collect the devices from the new account
     collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), false, false, true);
   }

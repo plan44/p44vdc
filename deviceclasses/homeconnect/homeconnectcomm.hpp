@@ -144,8 +144,8 @@ namespace p44 {
     bool apiReady;
 
     string accessToken; ///< the access token for issuing requests (obtained via OAuth)
-
     string refreshToken; ///< the Oauth refresh token that can be used to obtain access tokens
+
     bool developerApi; ///< if set, developer (simulator) API is used
 
   public:
@@ -156,15 +156,13 @@ namespace p44 {
     /// HTTP communication object for serialized requests
     JsonWebClient httpAPIComm;
 
-    /// set the account to use
-    /// @param aRefreshToken the (long-lived) OAuth refresh token that can be used to obtain access tokens
-    /// @param aDeveloperApi if set, the developer (simulator) API is used
-    void setAccount(string aRefreshToken, bool aDeveloperApi);
+    /// set the authentication data to use
+    /// @param aAuthData string containing authentication data
+    ///  (usually a JSON object with an access_token and possibly a refresh_token)
+    void setAuthentication(string aAuthData);
 
-    /// directly set access token to use (usually for experiments/debugging only)
-    /// @param aAccessToken the access token to use
-    void setAccessToken(string aAccessToken) { accessToken = aAccessToken; };
-
+    /// set API mode
+    void setDeveloperApi(bool aEnabled) { developerApi = aEnabled; };
 
     /// @return true if API is configured
     bool isConfigured() { return !refreshToken.empty(); };

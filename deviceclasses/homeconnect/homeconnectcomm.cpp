@@ -336,11 +336,15 @@ HomeConnectComm::HomeConnectComm() :
 }
 
 
-void HomeConnectComm::setAccount(string aRefreshToken, bool aDeveloperApi)
+void HomeConnectComm::setAuthentication(string aAuthData)
 {
   accessToken.clear();
-  refreshToken = aRefreshToken;
-  developerApi = aDeveloperApi;
+  JsonObjectPtr auth = JsonObject::objFromText(aAuthData.c_str());
+  if (auth) {
+    JsonObjectPtr o;
+    if (auth->get("access_token", o)) accessToken = o->stringValue();
+    if (auth->get("refresh_token", o)) refreshToken = o->stringValue();
+  }
 }
 
 

@@ -59,7 +59,7 @@ namespace p44 {
 
   public:
 
-    HomeConnectVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
+    HomeConnectVdc(int aInstanceNumber, bool aDeveloperApi, VdcHost *aVdcHostP, int aTag);
 
     HomeConnectComm homeConnectComm;
 
