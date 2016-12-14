@@ -246,8 +246,8 @@ namespace p44 {
     void periodicIgmpQuery();
     void startAdvertising(AvahiService *aService);
 
-
     void startAdvertisingDS(AvahiService *aService);
+    void restartAdvertising();
 
     #if ENABLE_AUXVDSM
     void startBrowsingVdms(AvahiService *aService);
