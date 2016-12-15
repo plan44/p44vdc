@@ -227,6 +227,7 @@ typedef struct {
 static const ValueUnitDescriptor valueUnitNames[numValueUnits] = {
   { "unknown", "?" },
   { "none", "" },
+  { "percent", "%" },
   { "meter", "m" },
   { "gram", "g" },
   { "second", "S" },
@@ -240,6 +241,7 @@ static const ValueUnitDescriptor valueUnitNames[numValueUnits] = {
   { "lux", "lx" },
   { "liter", "l" },
   { "molpercubicmeter", "mol/m3" },
+  { "literperminute", "l/min" },
   { "minute", "min" },
   { "hour", "h" },
   { "day", "d" }

@@ -419,6 +419,7 @@ typedef enum {
 typedef enum {
   unit_unknown = 0,
   valueUnit_none = 1, ///< no unit
+  valueUnit_percent,
   // basic SI units
   valueUnit_meter,
   valueUnit_gram, ///< we use gram to make it work
@@ -435,6 +436,7 @@ typedef enum {
   valueUnit_liter,
   // combined units
   valueUnit_molpercubicmeter,
+  valueUnit_literpermin,
   // non-SI scaled units
   valueUnit_minute,
   valueUnit_hour,
