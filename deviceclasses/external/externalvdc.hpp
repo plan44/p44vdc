@@ -108,6 +108,10 @@ namespace p44 {
     string modelNameString; ///< the string to be returned by modelName()
     string vendorNameString; ///< the vendor name
     string oemModelGUIDString; ///< the OEM model GUID, which is used to match devices with dS database
+    string typeIdentifier; ///< the type identifier
+    string devClass; ///< device class
+    uint32_t devClassVersion; ///< device class version
+
 
     bool configured; ///< set when device is configured (init message received and device added to vdc)
     bool useMovement; ///< if set, device communication uses MV/move command for dimming and shadow device operation
@@ -131,7 +135,7 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const  P44_OVERRIDE { return "external"; };
+    virtual string deviceTypeIdentifier() const  P44_OVERRIDE { return typeIdentifier; };
 
     /// @return human readable model name/short description
     virtual string modelName() P44_OVERRIDE;
@@ -142,6 +146,16 @@ namespace p44 {
     /// @return OEM model GUID in URN format to identify the OEM product MODEL hardware as uniquely as possible
     virtual string oemModelGUID() P44_OVERRIDE;
 
+    /// device class (for grouping functionally equivalent single devices)
+    /// @note usually, only single devices do have a deviceClass
+    /// @return name of the device class, such as "washingmachine" or "kettle" or "oven". Empty string if no device class exists.
+    virtual string deviceClass() P44_OVERRIDE { return devClass; }
+
+    /// device class version number.
+    /// @note This allows different versions of the functional representation of the device class
+    ///   to coexist in a system.
+    /// @return version or 0 if no version exists
+    virtual uint32_t deviceClassVersion() P44_OVERRIDE { return devClassVersion; }
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

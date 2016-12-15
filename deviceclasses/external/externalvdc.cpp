@@ -124,6 +124,7 @@ ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceCon
   inherited(aVdcP),
   #endif
   deviceConnector(aDeviceConnector),
+  typeIdentifier("external"),
   tag(aTag),
   useMovement(false), // no movement by default
   querySync(false), // no sync query by default
@@ -131,7 +132,8 @@ ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceCon
   configured(false),
   iconBaseName("ext"), // default icon name
   modelNameString("plan44 p44vdc external device"),
-  vendorNameString("plan44.ch")
+  vendorNameString("plan44.ch"),
+  devClassVersion(0)
 {
 }
 
@@ -765,6 +767,18 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   // - get icon base name
   if (aInitParams->get("iconname", o)) {
     iconBaseName = o->stringValue();
+  }
+  // - get type identifier
+  if (aInitParams->get("typeidentifier", o)) {
+    typeIdentifier = o->stringValue();
+  }
+  // - get device class
+  if (aInitParams->get("deviceclass", o)) {
+    devClass = o->stringValue();
+  }
+  // - get device class version
+  if (aInitParams->get("deviceclassversion", o)) {
+    devClassVersion = o->int32Value();
   }
   // - basic output behaviour
   VdcOutputFunction outputFunction = outputFunction_custom; // not defined yet
