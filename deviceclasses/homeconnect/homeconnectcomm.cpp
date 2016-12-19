@@ -133,7 +133,8 @@ void HomeConnectApiOperation::processRefreshAnswer(JsonObjectPtr aJsonResponse, 
   }
   // if refresh fails, treat it as a normal response
   LOG(LOG_WARNING, "HomeConnect: token refresh has failed");
-  processAnswer(aJsonResponse, aError);
+  aError = WebError::webErr(401, "Not authorized - requesting access token using refresh token has failed");
+  processAnswer(JsonObjectPtr(), aError);
 }
 
 
