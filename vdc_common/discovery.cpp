@@ -477,7 +477,16 @@ void DiscoveryManager::advertiseDS(
   vdsmAuxiliary = !aNotAuxiliary;
   #endif // ENABLE_AUXVDSM
   dmState = dm_setup; // set up for advertising
-  refreshAdvertisingDS();
+  restartAdvertising();
+}
+
+
+void DiscoveryManager::refreshAdvertisingDS()
+{
+  // only valid if service actually started
+  if (serviceRunning()) {
+    restartAdvertising();
+  }
 }
 
 
@@ -503,7 +512,7 @@ void DiscoveryManager::stopAdvertisingDS()
 }
 
 
-void DiscoveryManager::refreshAdvertisingDS()
+void DiscoveryManager::restartAdvertising()
 {
   // stop advertising current information
   stopAdvertisingDS();
@@ -514,6 +523,7 @@ void DiscoveryManager::refreshAdvertisingDS()
     startAdvertisingDS(service);
   }
 }
+
 
 
 

@@ -1064,14 +1064,17 @@ void Device::callScene(SceneNo aSceneNo, bool aForce)
     }
     // first check legacy (inc/dec scene) dimming
     if (cmd==scene_cmd_increment) {
+      if (!prepareSceneCall(scene)) return;
       dimChannelForArea(channeltype_default, dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT);
       return;
     }
     else if (cmd==scene_cmd_decrement) {
+      if (!prepareSceneCall(scene)) return;
       dimChannelForArea(channeltype_default, dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT);
       return;
     }
     else if (cmd==scene_cmd_stop) {
+      if (!prepareSceneCall(scene)) return;
       dimChannelForArea(channeltype_default, dimmode_stop, area, 0);
       return;
     }
@@ -1161,7 +1164,7 @@ void Device::stopSceneActions()
 
 bool Device::prepareSceneCall(DsScenePtr aScene)
 {
-  // base class - just complete
+  // base class - just let device process the scene normally
   return true;
 }
 
