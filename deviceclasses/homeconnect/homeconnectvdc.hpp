@@ -26,8 +26,10 @@
 
 #if ENABLE_HOMECONNECT
 
-#include "homeconnectcomm.hpp"
 #include "vdc.hpp"
+#include "device.hpp"
+
+#include "homeconnectcomm.hpp"
 
 using namespace std;
 

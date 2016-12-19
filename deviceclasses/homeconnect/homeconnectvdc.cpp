@@ -131,7 +131,10 @@ void HomeConnectVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bo
   if (homeConnectComm.isConfigured()) {
     // query all home connect appliances
     homeConnectComm.apiQuery("/api/homeappliances", boost::bind(&HomeConnectVdc::deviceListReceived, this, aCompletedCB, _1, _2));
+    return;
   }
+  // can't query now, must wait for authentication
+  if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
 
 
