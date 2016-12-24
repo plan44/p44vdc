@@ -249,6 +249,16 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
   // - stop
   a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.stop", "stop current program", "DELETE:programs/active"));
   deviceActions->addAction(a);
+  // - power state
+  EnumValueDescriptorPtr powerState = EnumValueDescriptorPtr(new EnumValueDescriptor("powerState", true));
+  powerState->addEnum("On", 0, true); // default
+  powerState->addEnum("Standby", 1);
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.power", "switch power state",
+    "PUT:settings/BSH.Common.Setting.PowerState:"
+    "{\"data\":{\"key\":\"BSH.Common.Setting.PowerState\",\"value\":\"BSH.Common.EnumType.PowerState.@{powerState}\"}}"
+  ));
+  a->addParameter(powerState);
+  deviceActions->addAction(a);
   // create states
   // - operation
   EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
