@@ -510,10 +510,10 @@ void ShadowBehaviour::endReached(bool aTop)
       MLMicroSeconds fullRangeTime = MainLoop::now()-referenceTime;
       LOG(LOG_INFO, "- is end of a full range movement : measured move time %.1f -> updating settings", (double)fullRangeTime/Second);
       if (aTop) {
-        openTime = fullRangeTime; // update opening time
+        openTime = fullRangeTime/Second; // update opening time
       }
       else {
-        closeTime = fullRangeTime; // update closing time
+        closeTime = fullRangeTime/Second; // update closing time
       }
     }
     // update positions
@@ -622,6 +622,7 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
     // calculate moving time
     if (dist>0) {
       // we'll move up
+      FOCUSLOG("- currently saved open time: %.1f, angle open time: %.2f", openTime, angleOpenTime);
       movingUp = true;
       stopIn = openTime*Second/100.0*dist;
       // we only want moves which result in a defined angle -> stretch when needed
@@ -630,6 +631,7 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
     }
     else if (dist<0) {
       // we'll move down
+      FOCUSLOG("- currently saved close time: %.1f, angle close time: %.2f", closeTime, angleCloseTime);
       movingUp = false;
       stopIn = closeTime*Second/100.0*-dist;
       // we only want moves which result in a defined angle -> stretch when needed

@@ -231,11 +231,11 @@ namespace p44 {
 
     /// @name persistent settings
     /// @{
-    double openTime;
-    double closeTime;
-    double angleOpenTime;
-    double angleCloseTime;
-    double stopDelayTime;
+    double openTime; // in seconds!
+    double closeTime; // in seconds!
+    double angleOpenTime; // in seconds!
+    double angleCloseTime; // in seconds!
+    double stopDelayTime; // in seconds!
     /// @}
 
 
