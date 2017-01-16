@@ -28,6 +28,7 @@
 
 #include "discovery.hpp"
 
+#include "macaddress.hpp"
 #include "igmp.hpp"
 
 #if !DISABLE_DISCOVERY
@@ -50,7 +51,7 @@ using namespace p44;
 
 #define INITIAL_STARTUP_DELAY (8*Second) // how long to wait before trying to start avahi server for the first time
 #define STARTUP_RETRY_DELAY (30*Second) // how long to wait before retrying to start avahi server when failed because of missing network
-#define SERVICES_RESTART_DELAY (5*Minute) // how long to wait before restarting the server (after a problem that caused calling restartServer())
+#define SERVICES_RESTART_DELAY (2*Minute) // how long to wait before restarting the server (after a problem that caused calling restartServer())
 #define VDSM_RESCAN_DELAY (20*Minute) // how often to start a complete rescan anyway (even if no vdsm is lost)
 #define VDSM_LOST_RESCAN_DELAY (10*Second) // how fast to start a rescan after a vdsm has been lost
 #define RESCAN_EVALUATION_DELAY (10*Second) // how long to browse until re-evaluating state
@@ -177,6 +178,13 @@ void DiscoveryManager::startService()
 {
   // only start if not already started
   if (!service) {
+    // if device has no IP yet, starting avahi makes no sense - delay it
+    if (ipv4Address()==0) {
+      // TODO: checking IPv4 only at this time, need to add IPv6 later
+      LOG(LOG_WARNING, "discovery: device has no IP address -> retry later");
+      MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
+      return;
+    }
     #if USE_AVAHI_CORE
     // single avahi instance for embedded use, no other process uses avahi
     LOG(LOG_NOTICE, "avahi: starting service");
@@ -190,7 +198,7 @@ void DiscoveryManager::startService()
     #else
     config.disallow_other_stacks = 1; // we wants to be the only mdNS (also avoids problems with SO_REUSEPORT on older Linux kernels)
     #endif
-    // IPv4 only at this time!
+    // TODO: IPv4 only at this time!
     config.use_ipv4 = 1;
     config.use_ipv6 = 0; // NONE
     // publishing options
@@ -212,7 +220,7 @@ void DiscoveryManager::startService()
       }
       else {
         // other problem, report it
-        LOG(LOG_ERR, "Failed to create server: %s (%d)", avahi_strerror(avahiErr), avahiErr);
+        LOG(LOG_ERR, "avahi: failed to create server: %s (%d)", avahi_strerror(avahiErr), avahiErr);
       }
     }
     else {
@@ -234,7 +242,7 @@ void DiscoveryManager::startService()
       }
       else {
         // other problem, report it
-        LOG(LOG_ERR, "Failed to create client: %s (%d)", avahi_strerror(avahiErr), avahiErr);
+        LOG(LOG_ERR, "avahi: failed to create client: %s (%d)", avahi_strerror(avahiErr), avahiErr);
       }
     }
     else {
@@ -305,7 +313,7 @@ void DiscoveryManager::serviceStarted()
   if (FOCUSLOGENABLED) {
     debugServiceBrowser = avahi_service_browser_new(service, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, HTTP_SERVICE_TYPE, NULL, (AvahiLookupFlags)0, avahi_debug_browse_callback, this);
     if (!debugServiceBrowser) {
-      FOCUSLOG("Failed to create debug service browser: %s", avahi_strerror(avahi_service_errno(service)));
+      FOCUSLOG("avahi: failed to create debug service browser: %s", avahi_strerror(avahi_service_errno(service)));
     }
   }
 }
@@ -314,7 +322,7 @@ void DiscoveryManager::serviceStarted()
 void DiscoveryManager::restartService()
 {
   stopService();
-  LOG(LOG_WARNING, "discovery: stopped avahi service - restarting in %lld Seconds", SERVICES_RESTART_DELAY/Minute);
+  LOG(LOG_WARNING, "discovery: stopped avahi service - restarting in %lld Seconds", SERVICES_RESTART_DELAY/Second);
   MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), SERVICES_RESTART_DELAY);
 }
 
