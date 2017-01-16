@@ -24,6 +24,7 @@
 #if ENABLE_HUE
 
 #include "huedevice.hpp"
+#include "macaddress.hpp"
 
 using namespace p44;
 
@@ -122,14 +123,29 @@ void HueVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExha
   }
   if (bridgeUuid.length()>0) {
     // we know a bridge by UUID, try to refind it
-    hueComm.uuid = bridgeUuid;
-    hueComm.userName = bridgeUserName;
-    hueComm.refindBridge(boost::bind(&HueVdc::refindResultHandler, this, _1));
+    refindBridge();
   }
   else {
     // no bridge known, can't collect anything at this time
     collectedHandler(ErrorPtr());
   }
+}
+
+
+#define REFIND_RETRY_DELAY (30*Second)
+
+void HueVdc::refindBridge()
+{
+  if (ipv4Address()==0) {
+    // TODO: checking IPv4 only at this time, need to add IPv6 later
+    LOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&HueVdc::refindBridge, this), REFIND_RETRY_DELAY);
+    return;
+  }
+  // actually refind
+  hueComm.uuid = bridgeUuid;
+  hueComm.userName = bridgeUserName;
+  hueComm.refindBridge(boost::bind(&HueVdc::refindResultHandler, this, _1));
 }
 
 

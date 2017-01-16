@@ -117,6 +117,7 @@ namespace p44 {
 
   private:
 
+    void refindBridge();
     void refindResultHandler(ErrorPtr aError);
     void searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError);
     void collectLights();
