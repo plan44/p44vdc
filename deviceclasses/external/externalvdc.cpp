@@ -789,6 +789,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     if (o->boolValue()) outputFunction = outputFunction_positional;
   }
   // - create appropriate output behaviour
+  #if ENABLE_EXTERNAL_SINGLEDEVICE
   if (outputType=="action") {
     enableAsSingleDevice(); // even without actions defines, this makes the device a single device
     if (colorClass==class_undefined) colorClass = class_white_singledevices;
@@ -800,7 +801,9 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     o->setHardwareName(hardwareName);
     addBehaviour(o);
   }
-  else if (outputType=="light") {
+  else
+  #endif
+  if (outputType=="light") {
     if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
     if (outputFunction==outputFunction_custom) outputFunction = outputFunction_dimmer;
     // - use light settings, which include a scene table
@@ -1098,6 +1101,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
 }
 
 
+#if ENABLE_EXTERNAL_SINGLEDEVICE
+
 void ExternalDevice::propertyChanged(ValueDescriptorPtr aChangedProperty)
 {
   // create JSON response
@@ -1179,6 +1184,7 @@ ErrorPtr ExternalDevice::parseParam(const string aParamName, JsonObjectPtr aPara
   return ErrorPtr();
 }
 
+#endif // ENABLE_EXTERNAL_SINGLEDEVICE
 
 
 // MARK: ===== external device connector
