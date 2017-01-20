@@ -680,7 +680,7 @@ void DaliDimmerDevice::deriveDsUid()
 
 string DaliDimmerDevice::hardwareGUID()
 {
-  if (brightnessDimmer->deviceInfo->devInfStatus==DaliDeviceInfo::devinf_none)
+  if (brightnessDimmer->deviceInfo->devInfStatus<=DaliDeviceInfo::devinf_only_gtin)
     return ""; // none
   // return as GS1 element strings
   // Note: GTIN/Serial will be reported even if it could not be used for deriving dSUID (e.g. devinf_maybe/devinf_notForID cases)
@@ -699,7 +699,7 @@ string DaliDimmerDevice::hardwareModelGUID()
 
 string DaliDimmerDevice::oemGUID()
 {
-  if (brightnessDimmer->deviceInfo->oem_gtin==0)
+  if (brightnessDimmer->deviceInfo->oem_gtin==0 || brightnessDimmer->deviceInfo->oem_serialNo==0)
     return ""; // none
   // return as GS1 element strings with Application Identifiers 01=GTIN and 21=Serial
   return string_format("gs1:(01)%llu(21)%llu", brightnessDimmer->deviceInfo->oem_gtin, brightnessDimmer->deviceInfo->oem_serialNo);
@@ -964,7 +964,7 @@ void DaliRGBWDevice::deriveDsUid()
 string DaliRGBWDevice::hardwareGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
-  if (!dimmer || dimmer->deviceInfo->gtin==0)
+  if (!dimmer || dimmer->deviceInfo->gtin==0 || dimmer->deviceInfo->serialNo==0)
     return ""; // none
   // return as GS1 element strings
   return string_format("gs1:(01)%llu(21)%llu", dimmer->deviceInfo->gtin, dimmer->deviceInfo->serialNo);
@@ -984,7 +984,7 @@ string DaliRGBWDevice::hardwareModelGUID()
 string DaliRGBWDevice::oemGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
-  if (!dimmer || dimmer->deviceInfo->oem_gtin==0)
+  if (!dimmer || dimmer->deviceInfo->oem_gtin==0|| dimmer->deviceInfo->oem_serialNo==0)
     return ""; // none
   // return as GS1 element strings with Application Identifiers 01=GTIN and 21=Serial
   return string_format("gs1:(01)%llu(21)%llu", dimmer->deviceInfo->oem_gtin, dimmer->deviceInfo->oem_serialNo);

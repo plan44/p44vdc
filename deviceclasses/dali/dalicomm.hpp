@@ -91,6 +91,7 @@ namespace p44 {
     typedef enum {
       devinf_needsquery, // only address for NOW, but we should try to load devinf
       devinf_none, // only address, we KNOW there's no devinf for this device
+      devinf_only_gtin, // only GTIN is known, but serial number is invalid
       #if OLD_BUGGY_CHKSUM_COMPATIBLE
       devinf_maybe,
       #endif

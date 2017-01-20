@@ -1263,7 +1263,14 @@ private:
         // all bits zero or all bits one is considered invalid serial,
         // as well as 2-byte and 3-byte all-one serials are
         LOG(LOG_ERR, "DALI shortaddress %d has suspect S/N=%lld/0x%llX -> ignoring", busAddress, deviceInfo->serialNo, deviceInfo->serialNo);
-        deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+        if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
+          // if everything else is ok, except for a all zero or all 1 serial number, consider GTIN valid
+          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_only_gtin;
+        }
+        else {
+          // was not solid before, consider completely invalid
+          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none;
+        }
       }
       // check for extra data device may have
       // Note: aBank0Data[0] is address of highest byte, so NUMBER of bytes is one more!
@@ -1450,6 +1457,11 @@ private:
     // clean device info in case it has been detected invalid by now
     if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_none) {
       deviceInfo->clear(); // clear everything except shortaddress
+    }
+    else if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_only_gtin) {
+      // consider serial numbers invalid, but GTIN and version ok
+      deviceInfo->serialNo = 0;
+      deviceInfo->oem_serialNo = 0;
     }
     // report
     callback(deviceInfo, aError);
