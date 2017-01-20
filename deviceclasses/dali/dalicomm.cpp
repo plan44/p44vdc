@@ -358,7 +358,10 @@ void DaliComm::daliSendDtrAndCommand(DaliAddress aAddress, uint8_t aCommand, uin
 }
 
 
-
+void DaliComm::daliEnableDeviceType(uint8_t aDeviceType)
+{
+  daliSend(DALICMD_ENABLE_DEVICE_TYPE, aDeviceType);
+}
 
 
 // DALI config commands (send twice within 100ms)

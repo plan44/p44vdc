@@ -63,6 +63,10 @@ namespace p44 {
 
     long dimRepeaterTicket; ///< DALI dimming repeater ticket
 
+    /// features
+    bool supportsLED; // supports device type 6/LED features
+    bool supportsColor; // supports device type 8/color features
+
     /// cached status (call updateStatus() to update these)
     bool isDummy; ///< set if dummy (not found on bus, but known to be part of a composite device)
     bool isPresent; ///< set if present
@@ -149,8 +153,13 @@ namespace p44 {
 
   private:
 
+    void registerDeviceType(uint8_t aDeviceType);
     void queryGroup0to7Response(DaliGroupsCB aDaliGroupsCB, DaliAddress aShortAddress, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
     void queryGroup8to15Response(DaliGroupsCB aDaliGroupsCB, DaliAddress aShortAddress, uint16_t aGroupBitMask, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    void deviceTypeResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    void probeDeviceType(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, uint8_t aNextDT);
+    void probeDeviceTypeResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, uint8_t aNextDT, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    void checkGroupMembership(StatusCB aCompletedCB, uint16_t aUsedGroupsMask);
     void groupMembershipResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, DaliAddress aShortAddress, uint16_t aGroups, ErrorPtr aError);
 
     void queryActualLevelResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);

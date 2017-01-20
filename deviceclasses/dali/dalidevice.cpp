@@ -138,7 +138,7 @@ void DaliBusDevice::getGroupMemberShip(DaliGroupsCB aDaliGroupsCB, DaliAddress a
   daliVdc.daliComm->daliSendQuery(
     aShortAddress,
     DALICMD_QUERY_GROUPS_0_TO_7,
-    boost::bind(&DaliBusDevice::queryGroup0to7Response,this, aDaliGroupsCB, aShortAddress, _1, _2, _3)
+    boost::bind(&DaliBusDevice::queryGroup0to7Response, this, aDaliGroupsCB, aShortAddress, _1, _2, _3)
   );
 }
 
@@ -153,7 +153,7 @@ void DaliBusDevice::queryGroup0to7Response(DaliGroupsCB aDaliGroupsCB, DaliAddre
   daliVdc.daliComm->daliSendQuery(
     aShortAddress,
     DALICMD_QUERY_GROUPS_8_TO_15,
-    boost::bind(&DaliBusDevice::queryGroup8to15Response,this, aDaliGroupsCB, aShortAddress, groupBitMask, _1, _2, _3)
+    boost::bind(&DaliBusDevice::queryGroup8to15Response, this, aDaliGroupsCB, aShortAddress, groupBitMask, _1, _2, _3)
   );
 }
 
@@ -169,10 +169,84 @@ void DaliBusDevice::queryGroup8to15Response(DaliGroupsCB aDaliGroupsCB, DaliAddr
 
 
 
+void DaliBusDevice::registerDeviceType(uint8_t aDeviceType)
+{
+  LOG(LOG_INFO, "DALI bus device with shortaddr %d supports device type %d", deviceInfo->shortAddress, aDeviceType);
+  switch (aDeviceType) {
+    case 6: // DALI DT6 is LED support
+      supportsLED = true;
+      break;
+    case 8: // DALI DT8 is color support
+      supportsColor = true;
+      break;
+  }
+}
 
 
 
 void DaliBusDevice::initialize(StatusCB aCompletedCB, uint16_t aUsedGroupsMask)
+{
+  // query device type(s) - i.e. availability of extended command sets
+  daliVdc.daliComm->daliSendQuery(
+    deviceInfo->shortAddress,
+    DALICMD_QUERY_DEVICE_TYPE,
+    boost::bind(&DaliBusDevice::deviceTypeResponse, this, aCompletedCB, aUsedGroupsMask, _1, _2, _3)
+  );
+}
+
+
+void DaliBusDevice::deviceTypeResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+{
+  // device type query response.
+  if (Error::isOK(aError) && !aNoOrTimeout) {
+    // special case is 0xFF, which means device supports multiple types
+    if (aResponse==0xFF) {
+      // need to query all possible types
+      probeDeviceType(aCompletedCB, aUsedGroupsMask, 0); // start with 0
+      return;
+    }
+    // check device type
+    registerDeviceType(aResponse);
+  }
+  // done with device type, check groups now
+  checkGroupMembership(aCompletedCB, aUsedGroupsMask);
+}
+
+
+void DaliBusDevice::probeDeviceType(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, uint8_t aNextDT)
+{
+  if (aNextDT>10) {
+    // all device types checked
+    // done with device type, check groups now
+    checkGroupMembership(aCompletedCB, aUsedGroupsMask);
+    return;
+  }
+  // query next device type
+  // - extended command
+  daliVdc.daliComm->daliEnableDeviceType(aNextDT);
+  daliVdc.daliComm->daliSendQuery(
+    deviceInfo->shortAddress,
+    DALICMD_QUERY_EXTENDED_VERSION,
+    boost::bind(&DaliBusDevice::probeDeviceTypeResponse, this, aCompletedCB, aUsedGroupsMask, aNextDT, _1, _2, _3)
+  );
+}
+
+
+void DaliBusDevice::probeDeviceTypeResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, uint8_t aNextDT, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+{
+  // extended version type query response.
+  if (Error::isOK(aError) && !aNoOrTimeout) {
+    // extended version response
+    // check device type
+    registerDeviceType(aNextDT);
+  }
+  // query next device type
+  aNextDT++;
+  probeDeviceType(aCompletedCB, aUsedGroupsMask, aNextDT);
+}
+
+
+void DaliBusDevice::checkGroupMembership(StatusCB aCompletedCB, uint16_t aUsedGroupsMask)
 {
   // make sure device is in none of the used groups
   if (aUsedGroupsMask==0) {

@@ -212,6 +212,9 @@ namespace p44 {
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
     void daliSendDtrAndCommand(DaliAddress aAddress, uint8_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
 
+    /// enable extended command set for specified device type
+    /// @param aDeviceType the device type to be enabled for the next extended (type specific) command
+    void daliEnableDeviceType(uint8_t aDeviceType);
 
     /// Send two byte DALI bus command twice within 100ms
     /// @param aDali1 first DALI byte
