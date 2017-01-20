@@ -151,7 +151,7 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
 
 
 //  {
-//    "haId": "BOSCH-HCS06COM1-CBF9981D149632",
+//    "haId": "BOSCH-HCS06COM1-xxxxxxxxx",
 //    "vib": "HCS06COM1",
 //    "brand": "BOSCH",
 //    "type": "CoffeeMaker",
@@ -159,6 +159,20 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
 //    "enumber": "HCS06COM1\/01",
 //    "connected": true
 //  }
+
+// Standalone device
+// Note: This one does NOT support the ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature option,
+//  at least not with the enums as described in the API specs
+//  {
+//    "name": "Kaffeevollautomat",
+//    "brand": "Siemens",
+//    "vib": "TI909701HC",
+//    "connected": true,
+//    "type": "CoffeeMaker",
+//    "enumber": "TI909701HC\/03",
+//    "haId": "SIEMENS-TI909701HC-xxxxxxxx"
+//  }
+
 
 
 HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
@@ -185,8 +199,9 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
     modelGuid = o->stringValue();
   if (aHomeApplicanceInfoRecord->get("brand", o))
     vendor = o->stringValue();
-  // FIXME: set up device details
-  // create standard actions
+  // FIXME: ugly direct model match
+  standalone = modelGuid=="TI909701HC/03";
+  // Create standard actions
   HomeConnectActionPtr a;
   // - enums that can be shared between actions
   EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("temperatureLevel", true));
@@ -205,8 +220,12 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
   // - command template
   string cmdTemplate =
     "PUT:programs/active:{\"data\":{\"key\":\"ConsumerProducts.CoffeeMaker.Program.Beverage.%s\","
-    "\"options\":["
-      "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{temperatureLevel}\"},"
+    "\"options\":[";
+  if (!standalone) {
+    cmdTemplate +=
+      "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{temperatureLevel}\"},";
+  }
+  cmdTemplate +=
       "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.BeanAmount\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{beanAmount}\"},"
       "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.FillQuantity\",\"value\":@{fillQuantity%%0}}"
     "]}}";
@@ -383,9 +402,10 @@ string HomeConnectDevice::vendorName()
 
 string HomeConnectDevice::oemModelGUID()
 {
-  return "gs1:(01)7640156792096"; // Einbaumodell - from aizo/dS number space, as defined 2016-12-11
-  // FIXME: differentiate Einbaumodell from Tischmodell
-  // return "gs1:(01)7640156792102"; // Tischmodell - from aizo/dS number space, as defined 2016-12-11
+  if (standalone)
+    return "gs1:(01)7640156792102"; // Tischmodell - from aizo/dS number space, as defined 2016-12-11
+  else
+    return "gs1:(01)7640156792096"; // Einbaumodell - from aizo/dS number space, as defined 2016-12-11
 }
 
 

@@ -116,6 +116,7 @@ namespace p44 {
     string model; ///< the model name for the device
     string modelGuid; ///< the model guid for the device
     string vendor; ///< the vendor of this device
+    bool standalone; ///< set if this is the standalone model (which does not understand ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature)
 
     HomeConnectEventMonitorPtr eventMonitor; ///< event monitor
 
