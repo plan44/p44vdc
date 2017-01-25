@@ -69,9 +69,9 @@ EldatSubDevice EldatDevice::getSubDevice()
 void EldatDevice::deriveDsUid()
 {
   // vDC implementation specific UUID:
-  //   UUIDv5 with name = classcontainerinstanceid::evaluatorID
+  //   UUIDv5 with name = vdcClassIdentifier::unique_eldat_address
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s = vdcP->vdcInstanceIdentifier();
+  string s = vdcP->vdcClassIdentifier();
   string_format_append(s, "%08X", getAddress()); // hashed part of dSUID comes from unique Eldat address
   dSUID.setNameInSpace(s, vdcNamespace);
   dSUID.setSubdeviceIndex(getSubDevice()); // subdevice index is represented in the dSUID subdevice index byte
@@ -416,7 +416,6 @@ EldatButtonDevice::EldatButtonDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceTyp
 
 string EldatButtonDevice::modelName()
 {
-  // base class "model", derived classes might have nicer model names
   if (eldatDeviceType==eldat_rocker)
     return "ELDAT two-way button";
   else
@@ -473,7 +472,7 @@ void EldatButtonDevice::buttonReleased(int aButtonNo)
 
 
 
-// MARK: ===== Eldat buttons
+// MARK: ===== Eldat motion detector
 
 
 EldatMotionDetector::EldatMotionDetector(EldatVdc *aVdcP) :
@@ -579,7 +578,7 @@ EldatDevicePtr EldatDevice::newDevice(
       newDev->setFunctionDesc("motion detector");
       // set icon name
       newDev->setIconInfo("eldat", true);
-      // Buttons can be used for anything
+      // motion detectors can be used for anything
       newDev->setColorClass(class_black_joker);
       // Create one input behaviour
       BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));

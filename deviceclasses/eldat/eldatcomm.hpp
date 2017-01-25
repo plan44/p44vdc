@@ -59,7 +59,7 @@ namespace p44 {
   typedef boost::function<void (string aEldatAnswer, ErrorPtr aError)> EldatMessageCB;
 
   typedef boost::intrusive_ptr<EldatComm> EldatCommPtr;
-	// Enocean communication
+	// Eldat communication
 	class EldatComm : public SerialOperationQueue
 	{
 		typedef SerialOperationQueue inherited;

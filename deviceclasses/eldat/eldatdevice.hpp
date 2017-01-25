@@ -36,7 +36,7 @@ namespace p44 {
   class EldatVdc;
   class EldatDevice;
 
-  /// EnOcean subdevice
+  /// Eldat subdevice
   typedef uint8_t EldatSubDevice;
 
 
@@ -46,7 +46,6 @@ namespace p44 {
     eldat_button, // single A,B,C or D button
     eldat_motiondetector, // A=motion detected, B=motion no longer detected
     eldat_unknown
-    // TODO: add real ones
   } EldatDeviceType;
 
 
@@ -62,7 +61,7 @@ namespace p44 {
 
 
 
-  /// digitalstrom device representing one or multiple EnOcean device channels
+  /// digitalstrom device representing one or multiple Eldat device channels
   class EldatDevice : public Device
   {
     typedef Device inherited;
@@ -72,7 +71,7 @@ namespace p44 {
 
   protected:
 
-    EldatAddress eldatAddress; ///< the enocean device address
+    EldatAddress eldatAddress; ///< the eldat device address
     EldatDeviceType eldatDeviceType; ///< the type of device
     EldatSubDevice subDevice; ///< the subdevice number (relevant when one physical Eldat device is represented as multiple vdSDs)
 
@@ -143,7 +142,7 @@ namespace p44 {
     /// @param aSubDeviceIndex subdevice number (multiple logical devices might exists for the same device address)
     virtual void setAddressingInfo(EldatAddress aAddress, EldatSubDevice aSubDeviceIndex);
 
-    /// set the icon info for the enocean device
+    /// set the icon info for the eldat device
     void setIconInfo(const char *aIconBaseName, bool aGroupColored) { iconBaseName = aIconBaseName; groupColoredIcon = aGroupColored; };
 
     /// set short functional description for this device (explaining the EEP in short, like "button", "sensor", "window handle")
@@ -151,7 +150,7 @@ namespace p44 {
     void setFunctionDesc(string aString) { functionDesc = aString; };
 
 
-    /// disconnect device. For EnOcean, this means breaking the pairing (learn-in) with the device
+    /// disconnect device. For Eldat, this means breaking the pairing (learn-in) with the device
     /// @param aForgetParams if set, not only the connection to the device is removed, but also all parameters related to it
     ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
     /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
@@ -238,7 +237,7 @@ namespace p44 {
     void deriveDsUid();
 
     /// switch device type
-    /// @param aProfile enocean profile to switch this device to
+    /// @param aProfile eldat profile to switch this device to
     /// @note aProfile is not checked for being suitable for this type of device, this is done in setProfileVariant()
     void switchTypes(const EldatTypeVariantEntry &aFromVariant, const EldatTypeVariantEntry &aToVariant);
 
@@ -290,10 +289,6 @@ namespace p44 {
 
     /// device specific function handling
     virtual void handleFunction(EldatFunction aFunction) P44_OVERRIDE;
-
-  private:
-
-    void buttonReleased(int aButtonNo);
     
   };
 
