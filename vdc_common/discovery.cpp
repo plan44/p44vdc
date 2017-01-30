@@ -234,9 +234,9 @@ void DiscoveryManager::startService()
     // create client
     service = avahi_client_new(avahi_simple_poll_get(simple_poll), (AvahiClientFlags)0, avahi_client_callback, this, &avahiErr);
     if (!service) {
-      if (avahiErr==AVAHI_ERR_NO_NETWORK) {
-        // no network to publish to - might be that it is not yet up, try again later
-        LOG(LOG_WARNING, "avahi: no network available to publish services now -> retry later");
+      if (avahiErr==AVAHI_ERR_NO_NETWORK || avahiErr==AVAHI_ERR_NO_DAEMON) {
+        // no network or no daemon to publish to - might be that it is not yet up, try again later
+        LOG(LOG_WARNING, "avahi: daemon or network not available to publish services now -> retry later");
         MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
         return;
       }
