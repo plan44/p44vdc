@@ -227,6 +227,9 @@ namespace p44 {
     /// @name color services for implementing color lights
     /// @{
 
+    /// @return true if light is not full color, but color temperature only
+    bool isCtOnly() { return false; }
+
     /// derives the color mode from channel values that need to be applied to hardware
     /// @return true if mode could be found
     bool deriveColorMode();

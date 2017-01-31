@@ -51,10 +51,51 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   lampFailure(false),
   currentTransitionTime(Infinite), // invalid
   currentDimPerMS(0), // none
-  currentFadeRate(0xFF), currentFadeTime(0xFF) // unlikely values
+  currentFadeRate(0xFF), currentFadeTime(0xFF), // unlikely values
+  supportsLED(false),
+  supportsDT8(false),
+  dt8Color(false),
+  dt8CT(false),
+  currentColorMode(colorLightModeNone),
+  currentXorCT(0),
+  currentY(0)
 {
   // make sure we always have at least a dummy device info
   deviceInfo = DaliDeviceInfoPtr(new DaliDeviceInfo);
+}
+
+
+/* Snippet to show brightness/DALI arcpower conversion tables in both directions
+
+  supportsLED = false;
+  printf("\n\n===== Arcpower 0..254 -> brightness\n");
+  for (int a=0; a<255; a++) {
+    double b = arcpowerToBrightness(a);
+    printf("arcpower = %3d/0x%02X  -> brightness = %3d/0x%02X = dS-Brightness = %7.3f%%\n", a, a, (int)(b*2.54), (int)(b*2.54), b);
+  }
+  printf("\n\n===== Brightness byte 0..254 -> arcpower 0..254\n");
+  for (int k=0; k<255; k++) {
+    double b = (double)k/2.54;
+    uint8_t a = brightnessToArcpower(b);
+    printf("dS-Brightness = %7.3f%% == brightness = %3d/0x%02X -> arcpower = %3d/0x%02X\n", b, k, k, a, a);
+  }
+
+  printf("\n\n---- for Numbers\n");
+  for (int a=0; a<255; a++) {
+    double b = arcpowerToBrightness(a);
+    int a2 = brightnessToArcpower(b);
+    printf("%d\t%f\t%d\n", a, b, a2);
+  }
+
+*/
+
+
+string DaliBusDevice::description()
+{
+  string s = deviceInfo->description();
+  if (supportsLED) s += "\n- supports device type 6 (LED) -> linear dimming curve";
+  if (supportsDT8) string_format_append(s, "\n- supports device type 8 (color), features:%s%s", dt8CT ? " [Tunable white]" : "", dt8Color ? " [CIE x/y]" : "");
+  return s;
 }
 
 
@@ -133,6 +174,111 @@ void DaliBusDevice::deriveDsUid()
 
 
 
+void DaliBusDevice::registerDeviceType(uint8_t aDeviceType)
+{
+  LOG(LOG_INFO, "DALI bus device with shortaddr %d supports device type %d", deviceInfo->shortAddress, aDeviceType);
+  switch (aDeviceType) {
+    case 6: // DALI DT6 is LED support
+      supportsLED = true;
+      break;
+    case 8: // DALI DT8 is color support
+      supportsDT8 = true;
+      break;
+  }
+}
+
+
+
+void DaliBusDevice::queryFeatureSet(StatusCB aCompletedCB)
+{
+  // query device type(s) - i.e. availability of extended command sets
+  daliVdc.daliComm->daliSendQuery(
+    deviceInfo->shortAddress,
+    DALICMD_QUERY_DEVICE_TYPE,
+    boost::bind(&DaliBusDevice::deviceTypeResponse, this, aCompletedCB, _1, _2, _3)
+  );
+}
+
+
+void DaliBusDevice::deviceTypeResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+{
+  // device type query response.
+  if (Error::isOK(aError) && !aNoOrTimeout) {
+    // special case is 0xFF, which means device supports multiple types
+    if (aResponse==0xFF) {
+      // need to query all possible types
+      probeDeviceType(aCompletedCB, 0); // start with 0
+      return;
+    }
+    // check device type
+    registerDeviceType(aResponse);
+  }
+  // done with device type, check groups now
+  queryDTFeatures(aCompletedCB);
+}
+
+
+void DaliBusDevice::probeDeviceType(StatusCB aCompletedCB, uint8_t aNextDT)
+{
+  if (aNextDT>10) {
+    // all device types checked
+    // done with device type, check groups now
+    queryDTFeatures(aCompletedCB);
+    return;
+  }
+  // query next device type
+  daliVdc.daliComm->daliSend(DALICMD_ENABLE_DEVICE_TYPE, aNextDT);
+  daliVdc.daliComm->daliSendQuery(
+    deviceInfo->shortAddress,
+    DALICMD_QUERY_EXTENDED_VERSION,
+    boost::bind(&DaliBusDevice::probeDeviceTypeResponse, this, aCompletedCB, aNextDT, _1, _2, _3)
+  );
+}
+
+
+void DaliBusDevice::probeDeviceTypeResponse(StatusCB aCompletedCB, uint8_t aNextDT, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+{
+  // extended version type query response.
+  if (Error::isOK(aError) && !aNoOrTimeout) {
+    // extended version response
+    // check device type
+    registerDeviceType(aNextDT);
+  }
+  // query next device type
+  aNextDT++;
+  probeDeviceType(aCompletedCB, aNextDT);
+}
+
+
+void DaliBusDevice::queryDTFeatures(StatusCB aCompletedCB)
+{
+  if (supportsDT8) {
+    daliVdc.daliComm->daliSendQuery(
+      deviceInfo->shortAddress,
+      DALICMD_DT8_QUERY_COLOR_FEATURES,
+      boost::bind(&DaliBusDevice::dt8FeaturesResponse, this, aCompletedCB, _1, _2, _3)
+    );
+    return;
+  }
+  if (aCompletedCB) aCompletedCB(ErrorPtr());
+}
+
+
+void DaliBusDevice::dt8FeaturesResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+{
+  // extended version type query response.
+  if (Error::isOK(aError) && !aNoOrTimeout) {
+    // DT8 features response
+    dt8Color = (aResponse & 0x01)!=0; // x/y color model capable
+    dt8CT = (aResponse & 0x02)!=0; // mired color temperature capable
+    LOG(LOG_INFO, "- DALI DT8 bus device with shortaddr %d: features byte = 0x%02X", deviceInfo->shortAddress, aResponse);
+  }
+  if (aCompletedCB) aCompletedCB(ErrorPtr());
+}
+
+
+
+
 void DaliBusDevice::getGroupMemberShip(DaliGroupsCB aDaliGroupsCB, DaliAddress aShortAddress)
 {
   daliVdc.daliComm->daliSendQuery(
@@ -169,80 +315,16 @@ void DaliBusDevice::queryGroup8to15Response(DaliGroupsCB aDaliGroupsCB, DaliAddr
 
 
 
-void DaliBusDevice::registerDeviceType(uint8_t aDeviceType)
-{
-  LOG(LOG_INFO, "DALI bus device with shortaddr %d supports device type %d", deviceInfo->shortAddress, aDeviceType);
-  switch (aDeviceType) {
-    case 6: // DALI DT6 is LED support
-      supportsLED = true;
-      break;
-    case 8: // DALI DT8 is color support
-      supportsColor = true;
-      break;
-  }
-}
-
-
-
 void DaliBusDevice::initialize(StatusCB aCompletedCB, uint16_t aUsedGroupsMask)
 {
-  // query device type(s) - i.e. availability of extended command sets
-  daliVdc.daliComm->daliSendQuery(
-    deviceInfo->shortAddress,
-    DALICMD_QUERY_DEVICE_TYPE,
-    boost::bind(&DaliBusDevice::deviceTypeResponse, this, aCompletedCB, aUsedGroupsMask, _1, _2, _3)
-  );
-}
-
-
-void DaliBusDevice::deviceTypeResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
-{
-  // device type query response.
-  if (Error::isOK(aError) && !aNoOrTimeout) {
-    // special case is 0xFF, which means device supports multiple types
-    if (aResponse==0xFF) {
-      // need to query all possible types
-      probeDeviceType(aCompletedCB, aUsedGroupsMask, 0); // start with 0
-      return;
-    }
-    // check device type
-    registerDeviceType(aResponse);
-  }
-  // done with device type, check groups now
-  checkGroupMembership(aCompletedCB, aUsedGroupsMask);
-}
-
-
-void DaliBusDevice::probeDeviceType(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, uint8_t aNextDT)
-{
-  if (aNextDT>10) {
-    // all device types checked
-    // done with device type, check groups now
-    checkGroupMembership(aCompletedCB, aUsedGroupsMask);
+  // make sure device is in none of the used groups
+  if (aUsedGroupsMask==0) {
+    // no groups in use at all, continue to initializing features
+    initializeFeatures(aCompletedCB);
     return;
   }
-  // query next device type
-  // - extended command
-  daliVdc.daliComm->daliEnableDeviceType(aNextDT);
-  daliVdc.daliComm->daliSendQuery(
-    deviceInfo->shortAddress,
-    DALICMD_QUERY_EXTENDED_VERSION,
-    boost::bind(&DaliBusDevice::probeDeviceTypeResponse, this, aCompletedCB, aUsedGroupsMask, aNextDT, _1, _2, _3)
-  );
-}
-
-
-void DaliBusDevice::probeDeviceTypeResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, uint8_t aNextDT, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
-{
-  // extended version type query response.
-  if (Error::isOK(aError) && !aNoOrTimeout) {
-    // extended version response
-    // check device type
-    registerDeviceType(aNextDT);
-  }
-  // query next device type
-  aNextDT++;
-  probeDeviceType(aCompletedCB, aUsedGroupsMask, aNextDT);
+  // need to query current groups
+  getGroupMemberShip(boost::bind(&DaliBusDevice::groupMembershipResponse, this, aCompletedCB, aUsedGroupsMask, deviceInfo->shortAddress, _1, _2), deviceInfo->shortAddress);
 }
 
 
@@ -271,14 +353,42 @@ void DaliBusDevice::groupMembershipResponse(StatusCB aCompletedCB, uint16_t aUse
       }
     }
   }
-  if (aCompletedCB) aCompletedCB(aError);
+  // initialize features now
+  initializeFeatures(aCompletedCB);
 }
+
+
+
+void DaliBusDevice::initializeFeatures(StatusCB aCompletedCB)
+{
+  if (isDummy) {
+    if (aCompletedCB) aCompletedCB(ErrorPtr());
+    return;
+  }
+  // initialize DT6 linear dimming curve if available
+  if (supportsLED) {
+    // single device or group supports DT6 -> use linear dimming curve
+    daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 1); // linear dimming curve
+  }
+  else {
+    if (isGrouped()) {
+      // not all (or maybe none) of the devices in the group support DT6 -> make sure all other devices use standard dimming curve even if they know DT6
+      // Note: non DT6-devices will just ignore the following command
+      daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 0); // standard logarithmic dimming curve
+    }
+  }
+  if (aCompletedCB) aCompletedCB(ErrorPtr());
+}
+
 
 
 
 void DaliBusDevice::updateParams(StatusCB aCompletedCB)
 {
-  if (isDummy) aCompletedCB(ErrorPtr());
+  if (isDummy) {
+    aCompletedCB(ErrorPtr());
+    return;
+  }
   // query actual arc power level
   daliVdc.daliComm->daliSendQuery(
     addressForQuery(),
@@ -295,12 +405,12 @@ void DaliBusDevice::queryActualLevelResponse(StatusCB aCompletedCB, bool aNoOrTi
     isPresent = true; // answering a query means presence
     // this is my current arc power, save it as brightness for dS system side queries
     currentBrightness = arcpowerToBrightness(aResponse);
-    LOG(LOG_DEBUG, "DaliBusDevice: retrieved current dimming level: arc power = %d, brightness = %0.1f", aResponse, currentBrightness);
+    LOG(LOG_INFO, "DaliBusDevice: retrieved current dimming level: arc power = %d, brightness = %0.1f", aResponse, currentBrightness);
   }
   // next: query the minimum dimming level
   daliVdc.daliComm->daliSendQuery(
     addressForQuery(),
-    DALICMD_QUERY_MIN_LEVEL,
+    DALICMD_QUERY_PHYSICAL_MINIMUM_LEVEL,
     boost::bind(&DaliBusDevice::queryMinLevelResponse,this, aCompletedCB, _1, _2, _3)
   );
 }
@@ -312,12 +422,100 @@ void DaliBusDevice::queryMinLevelResponse(StatusCB aCompletedCB, bool aNoOrTimeo
   if (Error::isOK(aError) && !aNoOrTimeout) {
     isPresent = true; // answering a query means presence
     // this is my current arc power, save it as brightness for dS system side queries
-    minBrightness = arcpowerToBrightness(aResponse);
-    LOG(LOG_DEBUG, "DaliBusDevice: retrieved minimum dimming level: arc power = %d, brightness = %0.1f", aResponse, minBrightness);
+    minBrightness = arcpowerToBrightness(aResponse, true);
+    LOG(LOG_INFO, "DaliBusDevice: retrieved minimum dimming level: arc power = %d, brightness = %0.1f", aResponse, minBrightness);
   }
-  // done updating parameters
+  if (supportsDT8) {
+    // more queries on DT8 devices:
+    // - color status
+    daliVdc.daliComm->daliSendQuery(
+      addressForQuery(),
+      DALICMD_DT8_QUERY_COLOR_STATUS,
+      boost::bind(&DaliBusDevice::queryColorStatusResponse,this, aCompletedCB, _1, _2, _3)
+    );
+    return;
+  }
   aCompletedCB(aError);
 }
+
+
+void DaliBusDevice::queryColorStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+{
+  if (Error::isOK(aError) && !aNoOrTimeout) {
+    // current mode
+    if (aResponse & 0x10) {
+      // CIE x/y is active
+      currentColorMode = colorLightModeXY;
+      // - query X
+      daliVdc.daliComm->daliSendDtrAnd16BitQuery(
+        addressForQuery(),
+        DALICMD_DT8_QUERY_COLOR_VALUE, 0, // DTR==0 -> X coordinate
+        boost::bind(&DaliBusDevice::queryXCoordResponse,this, aCompletedCB, _1, _2)
+      );
+      return;
+    }
+    else if (aResponse & 0x20) {
+      // CT is active
+      currentColorMode = colorLightModeCt;
+      // - query CT
+      daliVdc.daliComm->daliSendDtrAnd16BitQuery(
+        addressForQuery(),
+        DALICMD_DT8_QUERY_COLOR_VALUE, 2, // DTR==2 -> CT value
+        boost::bind(&DaliBusDevice::queryCTResponse,this, aCompletedCB, _1, _2)
+      );
+      return;
+    }
+  }
+  // no more queries
+  aCompletedCB(aError);
+}
+
+
+void DaliBusDevice::queryXCoordResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    if (aResponse16==0xFFFF) {
+      currentColorMode = colorLightModeNone;
+    }
+    else {
+      currentXorCT = aResponse16;
+      // also query Y
+      daliVdc.daliComm->daliSendDtrAnd16BitQuery(
+        addressForQuery(),
+        DALICMD_DT8_QUERY_COLOR_VALUE, 1, // DTR==0 -> Y coordinate
+        boost::bind(&DaliBusDevice::queryYCoordResponse,this, aCompletedCB, _1, _2)
+      );
+      return;
+    }
+  }
+  aCompletedCB(aError);
+}
+
+
+void DaliBusDevice::queryYCoordResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    currentY = aResponse16;
+    LOG(LOG_INFO, "DaliBusDevice: DT8 - is in CIE X/Y color mode, X=%.3f, Y=%.3f", (double)currentXorCT/65536, (double)currentY/65536);
+  }
+  aCompletedCB(aError);
+}
+
+
+void DaliBusDevice::queryCTResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    if (aResponse16==0xFFFF) {
+      currentColorMode = colorLightModeNone;
+    }
+    else {
+      currentXorCT = aResponse16;
+      LOG(LOG_INFO, "DaliBusDevice: DT8 - is in Tunable White mode, CT=%d mired", currentXorCT);
+    }
+  }
+  aCompletedCB(aError);
+}
+
 
 
 void DaliBusDevice::updateStatus(StatusCB aCompletedCB)
@@ -399,21 +597,73 @@ void DaliBusDevice::setDefaultBrightness(Brightness aBrightness)
 
 
 
-
-uint8_t DaliBusDevice::brightnessToArcpower(Brightness aBrightness)
+bool DaliBusDevice::setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY)
 {
-  double intensity = (double)aBrightness/100;
-  if (intensity<0) intensity = 0;
-  if (intensity>1) intensity = 1;
-  return log10((intensity*9)+1)*254; // 0..254, 255 is MASK and is reserved to stop fading
+  bool changed = false;
+  if (supportsDT8) {
+    if (currentColorMode!=aMode) {
+      changed = true; // change in mode always means change in parameter
+      currentColorMode = aMode;
+    }
+    if (currentColorMode==colorLightModeCt) {
+      if (changed || currentXorCT!=aCieXorCT) {
+        currentXorCT = aCieXorCT; // 1:1 in mired
+        changed = true;
+        currentY = 0;
+        if (dt8CT) {
+          daliVdc.daliComm->daliSend16BitValueAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_CT, currentXorCT);
+        }
+      }
+    }
+    else {
+      uint16_t x = aCieXorCT*65536;
+      uint16_t y = aCieY*65536;
+      if (changed || currentXorCT!=x || currentY!=y) {
+        currentXorCT = x;
+        currentY = y;
+        changed = true;
+        if (dt8Color) {
+          daliVdc.daliComm->daliSend16BitValueAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_XCOORD, currentXorCT);
+          daliVdc.daliComm->daliSend16BitValueAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_YCOORD, currentY);
+        }
+      }
+    }
+  }
+  return changed;
+}
+
+
+void DaliBusDevice::activateColorParams()
+{
+  if (supportsDT8) {
+    daliVdc.daliComm->daliSendCommand(deviceInfo->shortAddress, DALICMD_DT8_ACTIVATE);
+  }
 }
 
 
 
-Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower)
+
+uint8_t DaliBusDevice::brightnessToArcpower(Brightness aBrightness)
 {
-  double intensity = (pow(10, aArcpower/254.0)-1)/9;
-  return intensity*100;
+  if (aBrightness<0) aBrightness = 0;
+  if (aBrightness>100) aBrightness = 100;
+  // 0..254, 255 is MASK and is reserved to stop fading
+  if (aBrightness==0) return 0; // special case
+  if (supportsLED)
+    return aBrightness*2.54; // linear 0..254
+  else
+    return (uint8_t)((double)(log10(aBrightness)+1.0)*(253.0/3)+1); // logarithmic
+}
+
+
+
+Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower, bool aIsMinDim)
+{
+  if (aArcpower==0) return 0; // special off case
+  if (supportsLED && !(aIsMinDim && aArcpower>128))
+    return (double)aArcpower/2.54; // linear 1..254
+  else
+    return pow(10, ((double)aArcpower-1)/(253.0/3)-1); // logarithmic
 }
 
 
@@ -468,6 +718,11 @@ DaliBusDeviceGroup::DaliBusDeviceGroup(DaliVdc &aDaliVdc, uint8_t aGroupNo) :
   groupMaster(DaliBroadcast)
 {
   mixID.erase(); // no members yet
+  // assume max features, will be reduced to what all group members are capable in addDaliBusDevice()
+  supportsLED = true;
+  supportsDT8 = true;
+  dt8Color = true;
+  dt8CT = true;
   // set the group address to use
   deviceInfo->shortAddress = aGroupNo|DaliGroup;
 }
@@ -484,9 +739,28 @@ void DaliBusDeviceGroup::addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice)
     LOG(LOG_INFO, "- DALI bus device with shortaddr %d is master of the group (queried for brightness, mindim)", aDaliBusDevice->deviceInfo->shortAddress);
     groupMaster = aDaliBusDevice->deviceInfo->shortAddress;
   }
+  // reduce features to common denominator for all group members
+  if (!aDaliBusDevice->supportsLED) supportsLED = false;
+  if (!aDaliBusDevice->supportsDT8) supportsDT8 = false;
+  if (!aDaliBusDevice->dt8Color) supportsDT8 = false;
+  if (!aDaliBusDevice->dt8CT) dt8CT = false;
   // add member
   groupMembers.push_back(aDaliBusDevice->deviceInfo->shortAddress);
 }
+
+
+string DaliBusDeviceGroup::description()
+{
+  string g;
+  for (DaliComm::ShortAddressList::iterator pos = groupMembers.begin(); pos!=groupMembers.end(); ++pos) {
+    if (!g.empty()) g +=", ";
+    string_format_append(g, "%02d", *pos);
+  }
+  string s = "\n- DALI group - device bus addresses: " + g;
+  s + inherited::description();
+  return s;
+}
+
 
 
 void DaliBusDeviceGroup::initialize(StatusCB aCompletedCB, uint16_t aUsedGroupsMask)
@@ -507,10 +781,12 @@ void DaliBusDeviceGroup::initNextGroupMember(StatusCB aCompletedCB, DaliComm::Sh
     );
   }
   else {
-    // all done
-    if (aCompletedCB) aCompletedCB(ErrorPtr());
+    // group membership is now configured correctly
+    // Now we can initialize the features for the entire group
+    initializeFeatures(aCompletedCB);
   }
 }
+
 
 void DaliBusDeviceGroup::groupMembershipResponse(StatusCB aCompletedCB, DaliComm::ShortAddressList::iterator aNextMember, uint16_t aGroups, ErrorPtr aError)
 {
@@ -585,75 +861,107 @@ ErrorPtr DaliDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
 
 
 
-// MARK: ===== DaliDimmerDevice (single channel)
+// MARK: ===== DaliSingleControllerDevice (single channel)
 
 
-DaliDimmerDevice::DaliDimmerDevice(DaliVdc *aVdcP) :
+DaliSingleControllerDevice::DaliSingleControllerDevice(DaliVdc *aVdcP) :
   DaliDevice(aVdcP)
 {
 }
 
 
-void DaliDimmerDevice::willBeAdded()
+void DaliSingleControllerDevice::willBeAdded()
 {
   // Note: setting up behaviours late, because we want the brightness dimmer already assigned for the hardware name
-  // set up dS behaviour for simple single DALI channel dimmer
-  // - use light settings, which include a scene table
-  installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
-  // - set the behaviour
-  LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
-  l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 160); // DALI ballasts are always dimmable, // TODO: %%% somewhat arbitrary 2*80W max wattage
-  if (daliTechnicalType()==dalidevice_group)
-    l->setHardwareName(string_format("DALI dimmer group # %d",brightnessDimmer->deviceInfo->shortAddress & DaliGroupMask));
-  else
-    l->setHardwareName(string_format("DALI dimmer @ %d",brightnessDimmer->deviceInfo->shortAddress));
-  addBehaviour(l);
+  if (daliController->supportsDT8) {
+    // set up dS behaviour for color light
+    installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
+    // set the behaviour
+    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this));
+    cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 0); // DALI lights are always dimmable, no power known
+    cl->setHardwareName(string_format("DALI DT8 color light"));
+    cl->initMinBrightness(0.4); // min brightness is 0.4 (~= 1/256)
+    addBehaviour(cl);
+  }
+  else {
+    // set up dS behaviour for simple channel DALI dimmer
+    // - use light settings, which include a scene table
+    installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
+    // - set the behaviour
+    LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
+    l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 160); // DALI ballasts are always dimmable, // TODO: %%% somewhat arbitrary 2*80W max wattage
+    if (daliTechnicalType()==dalidevice_group)
+      l->setHardwareName(string_format("DALI dimmer group # %d",daliController->deviceInfo->shortAddress & DaliGroupMask));
+    else
+      l->setHardwareName(string_format("DALI dimmer @ %d",daliController->deviceInfo->shortAddress));
+    addBehaviour(l);
+  }
   // - derive the DsUid
   deriveDsUid();
 }
 
 
-bool DaliDimmerDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
+bool DaliSingleControllerDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getIcon("dali_dimmer", aIcon, aWithData, aResolutionPrefix))
-    return true;
-  else
-    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+  if (daliController->supportsDT8) {
+    if (getIcon("dali_color", aIcon, aWithData, aResolutionPrefix))
+      return true;
+  }
+  else {
+    if (getIcon("dali_dimmer", aIcon, aWithData, aResolutionPrefix))
+      return true;
+  }
+  // no specific icon found
+  return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
 }
 
 
-string DaliDimmerDevice::getExtraInfo()
+string DaliSingleControllerDevice::getExtraInfo()
 {
   if (daliTechnicalType()==dalidevice_group) {
     return string_format(
       "DALI group address: %d",
-      brightnessDimmer->deviceInfo->shortAddress & DaliGroupMask
+      daliController->deviceInfo->shortAddress & DaliGroupMask
     );
   }
   else {
     return string_format(
       "DALI short address: %d",
-      brightnessDimmer->deviceInfo->shortAddress
+      daliController->deviceInfo->shortAddress
     );
   }
 }
 
 
-void DaliDimmerDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
+void DaliSingleControllerDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // - sync cached channel values from actual device
-  brightnessDimmer->updateParams(boost::bind(&DaliDimmerDevice::brightnessDimmerSynced, this, aCompletedCB, aFactoryReset, _1));
+  daliController->updateParams(boost::bind(&DaliSingleControllerDevice::daliControllerSynced, this, aCompletedCB, aFactoryReset, _1));
 }
 
 
-void DaliDimmerDevice::brightnessDimmerSynced(StatusCB aCompletedCB, bool aFactoryReset, ErrorPtr aError)
+void DaliSingleControllerDevice::daliControllerSynced(StatusCB aCompletedCB, bool aFactoryReset, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
     // save brightness now
-    output->getChannelByIndex(0)->syncChannelValue(brightnessDimmer->currentBrightness);
+    output->getChannelByIndex(0)->syncChannelValue(daliController->currentBrightness);
     // initialize the light behaviour with the minimal dimming level
     LightBehaviourPtr l = boost::static_pointer_cast<LightBehaviour>(output);
-    l->initMinBrightness(brightnessDimmer->minBrightness);
+    l->initMinBrightness(daliController->minBrightness);
+    ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(output);
+    if (cl) {
+      // also synchronize color information
+      cl->colorMode = daliController->currentColorMode;
+      if (daliController->currentColorMode==colorLightModeCt) {
+        // - tunable white mode
+        cl->ct->syncChannelValue(daliController->currentXorCT);
+      }
+      else if (daliController->currentColorMode==colorLightModeXY) {
+        // - X/Y color mode
+        cl->cieX->syncChannelValue((double)daliController->currentXorCT/65536);
+        cl->cieY->syncChannelValue((double)daliController->currentY/65536);
+      }
+    }
   }
   else {
     LOG(LOG_ERR, "DaliDevice: error getting state/params from dimmer: %s", aError->description().c_str());
@@ -666,27 +974,27 @@ void DaliDimmerDevice::brightnessDimmerSynced(StatusCB aCompletedCB, bool aFacto
 
 
 
-void DaliDimmerDevice::checkPresence(PresenceCB aPresenceResultHandler)
+void DaliSingleControllerDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
   // query the device
-  brightnessDimmer->updateStatus(boost::bind(&DaliDimmerDevice::checkPresenceResponse, this, aPresenceResultHandler));
+  daliController->updateStatus(boost::bind(&DaliSingleControllerDevice::checkPresenceResponse, this, aPresenceResultHandler));
 }
 
 
-void DaliDimmerDevice::checkPresenceResponse(PresenceCB aPresenceResultHandler)
+void DaliSingleControllerDevice::checkPresenceResponse(PresenceCB aPresenceResultHandler)
 {
   // present if a proper YES (without collision) received
-  aPresenceResultHandler(brightnessDimmer->isPresent);
+  aPresenceResultHandler(daliController->isPresent);
 }
 
 
 
-void DaliDimmerDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
+void DaliSingleControllerDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
-  checkPresence(boost::bind(&DaliDimmerDevice::disconnectableHandler, this, aForgetParams, aDisconnectResultHandler, _1));
+  checkPresence(boost::bind(&DaliSingleControllerDevice::disconnectableHandler, this, aForgetParams, aDisconnectResultHandler, _1));
 }
 
-void DaliDimmerDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent)
+void DaliSingleControllerDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent)
 {
   if (!aPresent) {
     // call inherited disconnect
@@ -701,21 +1009,72 @@ void DaliDimmerDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aD
 }
 
 
-void DaliDimmerDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
+void DaliSingleControllerDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  LightBehaviourPtr lightBehaviour = boost::dynamic_pointer_cast<LightBehaviour>(output);
-  if (lightBehaviour && lightBehaviour->brightnessNeedsApplying()) {
-    brightnessDimmer->setTransitionTime(lightBehaviour->transitionTimeToNewBrightness());
-    // update actual dimmer value
-    brightnessDimmer->setBrightness(lightBehaviour->brightnessForHardware());
-    lightBehaviour->brightnessApplied(); // confirm having applied the value
+  LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+  if (l && needsToApplyChannels()) {
+    bool needactivation = false;
+    bool neednewbrightness = l->brightnessNeedsApplying(); // sample here because deriving color might
+    // update color params for color capable devices
+    ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(output);
+    if (cl) {
+      // color/tunable white lamp, set color parameters first
+      cl->deriveColorMode();
+      // now apply to light according to mode
+      switch (cl->colorMode) {
+        case colorLightModeHueSaturation: {
+          if (cl->hue->needsApplying() || cl->saturation->needsApplying()) {
+            // - calculate xy and CT on the fly, but DO NOT change color mode
+            cl->deriveMissingColorChannels();
+            // - apply result of HSB calculation as XY or CT (in case of tunable white only light)
+            if (cl->isCtOnly()) {
+              // device has CT only, apply that
+              needactivation = daliController->setColorParams(colorLightModeCt, cl->ct->getChannelValue());
+            }
+            else {
+              // device has full color, apply (calculated) XY
+              needactivation = daliController->setColorParams(colorLightModeXY, cl->cieX->getChannelValue(), cl->cieY->getChannelValue());
+            }
+          }
+        }
+        case colorLightModeXY: {
+          if (cl->cieX->needsApplying() || cl->cieY->needsApplying()) {
+            // set X,Y temporaries
+            needactivation = daliController->setColorParams(colorLightModeXY, cl->cieX->getChannelValue(), cl->cieY->getChannelValue());
+          }
+          break;
+        }
+        case colorLightModeCt: {
+          if (cl->ct->needsApplying()) {
+            // set CT temporary
+            needactivation = daliController->setColorParams(colorLightModeCt, cl->ct->getChannelValue());
+          }
+          break;
+        }
+        default:
+          break;
+      }
+      cl->appliedColorValues();
+    }
+    // handle brightness
+    if (neednewbrightness || needactivation) {
+      daliController->setTransitionTime(l->transitionTimeToNewBrightness());
+      // update actual dimmer value
+      daliController->setBrightness(l->brightnessForHardware());
+      l->brightnessApplied(); // confirm having applied the value
+    }
+    // activate color params in case brightness has not changed or device is not in auto-activation mode (we don't set this)
+    if (needactivation) {
+      daliController->activateColorParams();
+    }
   }
+  // confirm done
   inherited::applyChannelValues(aDoneCB, aForDimming);
 }
 
 
 // optimized DALI dimming implementation
-void DaliDimmerDevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
+void DaliSingleControllerDevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
 {
   // start dimming
   if (aChannelType==channeltype_brightness) {
@@ -726,7 +1085,7 @@ void DaliDimmerDevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMod
       aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
     );
     ChannelBehaviourPtr ch = getChannelByType(aChannelType);
-    brightnessDimmer->dim(aDimMode, ch->getDimPerMS());
+    daliController->dim(aDimMode, ch->getDimPerMS());
   }
   else {
     // not my channel, use generic implementation
@@ -737,76 +1096,92 @@ void DaliDimmerDevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMod
 
 
 /// save brightness as default for DALI dimmer to use after powerup and at failure
-void DaliDimmerDevice::saveAsDefaultBrightness()
+void DaliSingleControllerDevice::saveAsDefaultBrightness()
 {
-  brightnessDimmer->setDefaultBrightness(-1);
+  daliController->setDefaultBrightness(-1);
 }
 
 
 
 
-void DaliDimmerDevice::deriveDsUid()
+void DaliSingleControllerDevice::deriveDsUid()
 {
   // single channel dimmer just uses dSUID derived from single DALI bus device
-  dSUID = brightnessDimmer->dSUID;
+  dSUID = daliController->dSUID;
 }
 
 
-string DaliDimmerDevice::hardwareGUID()
+string DaliSingleControllerDevice::modelName()
 {
-  if (brightnessDimmer->deviceInfo->devInfStatus<=DaliDeviceInfo::devinf_only_gtin)
-    return ""; // none
-  // return as GS1 element strings
-  // Note: GTIN/Serial will be reported even if it could not be used for deriving dSUID (e.g. devinf_maybe/devinf_notForID cases)
-  return string_format("gs1:(01)%llu(21)%llu", brightnessDimmer->deviceInfo->gtin, brightnessDimmer->deviceInfo->serialNo);
-}
-
-
-string DaliDimmerDevice::hardwareModelGUID()
-{
-  if (brightnessDimmer->deviceInfo->gtin==0)
-    return ""; // none
-  // return as GS1 element strings with Application Identifier 01=GTIN
-  return string_format("gs1:(01)%llu", brightnessDimmer->deviceInfo->gtin);
-}
-
-
-string DaliDimmerDevice::oemGUID()
-{
-  if (brightnessDimmer->deviceInfo->oem_gtin==0 || brightnessDimmer->deviceInfo->oem_serialNo==0)
-    return ""; // none
-  // return as GS1 element strings with Application Identifiers 01=GTIN and 21=Serial
-  return string_format("gs1:(01)%llu(21)%llu", brightnessDimmer->deviceInfo->oem_gtin, brightnessDimmer->deviceInfo->oem_serialNo);
-}
-
-
-string DaliDimmerDevice::oemModelGUID()
-{
-  if (brightnessDimmer->deviceInfo->oem_gtin==0)
-    return ""; // none
-  // return as GS1 element strings with Application Identifier 01=GTIN
-  return string_format("gs1:(01)%llu", brightnessDimmer->deviceInfo->oem_gtin);
-}
-
-
-string DaliDimmerDevice::description()
-{
-  string s = inherited::description();
-  s.append(brightnessDimmer->deviceInfo->description());
+  string s = "DALI";
+  if (daliController->supportsDT8) {
+    if (daliController->dt8Color) s += " color";
+    if (daliController->dt8CT) s += " tunable white";
+  }
+  else if (daliController->supportsLED) {
+    s += " LED";
+  }
+  s += " dimmer";
+  if (daliTechnicalType()==dalidevice_group) s+= " group";
   return s;
 }
 
 
-// MARK: ===== DaliRGBWDevice (multi-channel color lamp)
+string DaliSingleControllerDevice::hardwareGUID()
+{
+  if (daliController->deviceInfo->devInfStatus<=DaliDeviceInfo::devinf_only_gtin)
+    return ""; // none
+  // return as GS1 element strings
+  // Note: GTIN/Serial will be reported even if it could not be used for deriving dSUID (e.g. devinf_maybe/devinf_notForID cases)
+  return string_format("gs1:(01)%llu(21)%llu", daliController->deviceInfo->gtin, daliController->deviceInfo->serialNo);
+}
 
 
-DaliRGBWDevice::DaliRGBWDevice(DaliVdc *aVdcP) :
+string DaliSingleControllerDevice::hardwareModelGUID()
+{
+  if (daliController->deviceInfo->gtin==0)
+    return ""; // none
+  // return as GS1 element strings with Application Identifier 01=GTIN
+  return string_format("gs1:(01)%llu", daliController->deviceInfo->gtin);
+}
+
+
+string DaliSingleControllerDevice::oemGUID()
+{
+  if (daliController->deviceInfo->oem_gtin==0 || daliController->deviceInfo->oem_serialNo==0)
+    return ""; // none
+  // return as GS1 element strings with Application Identifiers 01=GTIN and 21=Serial
+  return string_format("gs1:(01)%llu(21)%llu", daliController->deviceInfo->oem_gtin, daliController->deviceInfo->oem_serialNo);
+}
+
+
+string DaliSingleControllerDevice::oemModelGUID()
+{
+  if (daliController->deviceInfo->oem_gtin==0)
+    return ""; // none
+  // return as GS1 element strings with Application Identifier 01=GTIN
+  return string_format("gs1:(01)%llu", daliController->deviceInfo->oem_gtin);
+}
+
+
+string DaliSingleControllerDevice::description()
+{
+  string s = inherited::description();
+  s.append(daliController->description());
+  return s;
+}
+
+
+// MARK: ===== DaliCompositeDevice (multi-channel color lamp)
+
+
+DaliCompositeDevice::DaliCompositeDevice(DaliVdc *aVdcP) :
   DaliDevice(aVdcP)
 {
 }
 
 
-void DaliRGBWDevice::willBeAdded()
+void DaliCompositeDevice::willBeAdded()
 {
   // Note: setting up behaviours late, because we want the brightness dimmer already assigned for the hardware name
   // set up dS behaviour for color lights, which include a color scene table
@@ -814,7 +1189,7 @@ void DaliRGBWDevice::willBeAdded()
   // set the behaviour
   RGBColorLightBehaviourPtr cl = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this));
   cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 0); // DALI lights are always dimmable, no power known
-  cl->setHardwareName(string_format("DALI color light"));
+  cl->setHardwareName(string_format("DALI composite color light"));
   cl->initMinBrightness(0.4); // min brightness is 0.4 (~= 1/256)
   addBehaviour(cl);
   // now derive dSUID
@@ -822,7 +1197,7 @@ void DaliRGBWDevice::willBeAdded()
 }
 
 
-bool DaliRGBWDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
+bool DaliCompositeDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   if (getIcon("dali_color", aIcon, aWithData, aResolutionPrefix))
     return true;
@@ -831,7 +1206,7 @@ bool DaliRGBWDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aR
 }
 
 
-string DaliRGBWDevice::getExtraInfo()
+string DaliCompositeDevice::getExtraInfo()
 {
   string s = string_format(
     "DALI short addresses: Red:%d, Green:%d, Blue:%d",
@@ -846,7 +1221,7 @@ string DaliRGBWDevice::getExtraInfo()
 }
 
 
-bool DaliRGBWDevice::addDimmer(DaliBusDevicePtr aDimmerBusDevice, string aDimmerType)
+bool DaliCompositeDevice::addDimmer(DaliBusDevicePtr aDimmerBusDevice, string aDimmerType)
 {
   if (aDimmerType=="R")
     dimmers[dimmer_red] = aDimmerBusDevice;
@@ -863,23 +1238,23 @@ bool DaliRGBWDevice::addDimmer(DaliBusDevicePtr aDimmerBusDevice, string aDimmer
 
 
 
-void DaliRGBWDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
+void DaliCompositeDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // - sync cached channel values from actual devices
   updateNextDimmer(aCompletedCB, aFactoryReset, dimmer_red, ErrorPtr());
 }
 
 
-void DaliRGBWDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryReset, DimmerIndex aDimmerIndex, ErrorPtr aError)
+void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryReset, DimmerIndex aDimmerIndex, ErrorPtr aError)
 {
   if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "DaliRGBWDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->description().c_str());
+    LOG(LOG_ERR, "DaliCompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->description().c_str());
   }
   while (aDimmerIndex<numDimmers) {
     DaliBusDevicePtr di = dimmers[aDimmerIndex];
     // process this dimmer if it exists
     if (di) {
-      di->updateParams(boost::bind(&DaliRGBWDevice::updateNextDimmer, this, aCompletedCB, aFactoryReset, aDimmerIndex+1, _1));
+      di->updateParams(boost::bind(&DaliCompositeDevice::updateNextDimmer, this, aCompletedCB, aFactoryReset, aDimmerIndex+1, _1));
       return; // return now, will be called again when update is complete
     }
     aDimmerIndex++; // next
@@ -902,7 +1277,7 @@ void DaliRGBWDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryReset,
 
 
 
-DaliBusDevicePtr DaliRGBWDevice::firstBusDevice()
+DaliBusDevicePtr DaliCompositeDevice::firstBusDevice()
 {
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (dimmers[idx]) {
@@ -914,12 +1289,12 @@ DaliBusDevicePtr DaliRGBWDevice::firstBusDevice()
 
 
 
-void DaliRGBWDevice::checkPresence(PresenceCB aPresenceResultHandler)
+void DaliCompositeDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
   // assuming all channels in the same physical device, check only first one
   DaliBusDevicePtr dimmer = firstBusDevice();
   if (dimmer) {
-    dimmer->updateStatus(boost::bind(&DaliRGBWDevice::checkPresenceResponse, this, aPresenceResultHandler, dimmer));
+    dimmer->updateStatus(boost::bind(&DaliCompositeDevice::checkPresenceResponse, this, aPresenceResultHandler, dimmer));
     return;
   }
   // no dimmer -> not present
@@ -927,7 +1302,7 @@ void DaliRGBWDevice::checkPresence(PresenceCB aPresenceResultHandler)
 }
 
 
-void DaliRGBWDevice::checkPresenceResponse(PresenceCB aPresenceResultHandler, DaliBusDevicePtr aDimmer)
+void DaliCompositeDevice::checkPresenceResponse(PresenceCB aPresenceResultHandler, DaliBusDevicePtr aDimmer)
 {
   // present if a proper YES (without collision) received
   aPresenceResultHandler(aDimmer->isPresent);
@@ -935,12 +1310,12 @@ void DaliRGBWDevice::checkPresenceResponse(PresenceCB aPresenceResultHandler, Da
 
 
 
-void DaliRGBWDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
+void DaliCompositeDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
-  checkPresence(boost::bind(&DaliRGBWDevice::disconnectableHandler, this, aForgetParams, aDisconnectResultHandler, _1));
+  checkPresence(boost::bind(&DaliCompositeDevice::disconnectableHandler, this, aForgetParams, aDisconnectResultHandler, _1));
 }
 
-void DaliRGBWDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent)
+void DaliCompositeDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent)
 {
   if (!aPresent) {
     // call inherited disconnect
@@ -955,7 +1330,7 @@ void DaliRGBWDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aDis
 }
 
 
-void DaliRGBWDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
+void DaliCompositeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
   if (cl) {
@@ -1008,7 +1383,7 @@ void DaliRGBWDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 
 /// save brightness as default for DALI dimmer to use after powerup and at failure
 /// @param aBrightness new brightness to set
-void DaliRGBWDevice::saveAsDefaultBrightness()
+void DaliCompositeDevice::saveAsDefaultBrightness()
 {
   dimmers[dimmer_red]->setDefaultBrightness(-1);
   dimmers[dimmer_green]->setDefaultBrightness(-1);
@@ -1018,7 +1393,7 @@ void DaliRGBWDevice::saveAsDefaultBrightness()
 
 
 
-void DaliRGBWDevice::deriveDsUid()
+void DaliCompositeDevice::deriveDsUid()
 {
   // Multi-channel DALI devices construct their ID from UUIDs of the DALI devices involved,
   // but in a way that allows re-assignment of R/G/B without changing the dSUID
@@ -1035,7 +1410,7 @@ void DaliRGBWDevice::deriveDsUid()
 }
 
 
-string DaliRGBWDevice::hardwareGUID()
+string DaliCompositeDevice::hardwareGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
   if (!dimmer || dimmer->deviceInfo->gtin==0 || dimmer->deviceInfo->serialNo==0)
@@ -1045,7 +1420,7 @@ string DaliRGBWDevice::hardwareGUID()
 }
 
 
-string DaliRGBWDevice::hardwareModelGUID()
+string DaliCompositeDevice::hardwareModelGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
   if (!dimmer || dimmer->deviceInfo->gtin==0)
@@ -1055,7 +1430,7 @@ string DaliRGBWDevice::hardwareModelGUID()
 }
 
 
-string DaliRGBWDevice::oemGUID()
+string DaliCompositeDevice::oemGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
   if (!dimmer || dimmer->deviceInfo->oem_gtin==0|| dimmer->deviceInfo->oem_serialNo==0)
@@ -1065,7 +1440,7 @@ string DaliRGBWDevice::oemGUID()
 }
 
 
-string DaliRGBWDevice::oemModelGUID()
+string DaliCompositeDevice::oemModelGUID()
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
   if (!dimmer || dimmer->deviceInfo->oem_gtin==0)
@@ -1076,11 +1451,11 @@ string DaliRGBWDevice::oemModelGUID()
 
 
 
-string DaliRGBWDevice::description()
+string DaliCompositeDevice::description()
 {
   string s = inherited::description();
   DaliBusDevicePtr dimmer = firstBusDevice();
-  if (dimmer) s.append(dimmer->deviceInfo->description());
+  if (dimmer) s.append(dimmer->description());
   return s;
 }
 

@@ -312,7 +312,7 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
         if (qry.prepare(sql.c_str())==SQLITE_OK) {
           // we know that we found at least one dimmer of this composite on the bus, so we'll instantiate
           // a composite (even if some dimmers might be missing)
-          DaliRGBWDevicePtr daliDevice = DaliRGBWDevicePtr(new DaliRGBWDevice(this));
+          DaliCompositeDevicePtr daliDevice = DaliCompositeDevicePtr(new DaliCompositeDevice(this));
           daliDevice->collectionID = collectionID; // remember from what collection this was created
           for (sqlite3pp::query::iterator j = qry.begin(); j != qry.end(); ++j) {
             string dimmerType = nonNullCStr(i->get<const char *>(0));
@@ -351,15 +351,15 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
       }
     }
   }
-  // remaining devices are single channel dimmer devices
+  // remaining devices are single channel or DT8 dimmer devices
   for (DaliBusDeviceList::iterator pos = singleDevices.begin(); pos!=singleDevices.end(); ++pos) {
     DaliBusDevicePtr daliBusDevice = *pos;
     // simple single-dimmer device
-    DaliDimmerDevicePtr daliDimmerDevice(new DaliDimmerDevice(this));
+    DaliSingleControllerDevicePtr daliSingleControllerDevice(new DaliSingleControllerDevice(this));
     // - set whiteDimmer (gives device info to calculate dSUID)
-    daliDimmerDevice->brightnessDimmer = daliBusDevice;
+    daliSingleControllerDevice->daliController = daliBusDevice;
     // - add it to our collection (if not already there)
-    addDevice(daliDimmerDevice);
+    addDevice(daliSingleControllerDevice);
   }
   // collecting complete
   aCompletedCB(ErrorPtr());
@@ -393,6 +393,13 @@ void DaliVdc::deviceInfoValid(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceLis
 {
   // update device info entry in dali bus device
   (*aNextDev)->setDeviceInfo(aDaliDeviceInfoPtr);
+  // query hardware features
+  (*aNextDev)->queryFeatureSet(boost::bind(&DaliVdc::deviceFeaturesQueried, this, aBusDevices, aNextDev, aCompletedCB));
+}
+
+
+void DaliVdc::deviceFeaturesQueried(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB)
+{
   // check next
   ++aNextDev;
   queryNextDev(aBusDevices, aNextDev, aCompletedCB, ErrorPtr());
@@ -638,7 +645,7 @@ ErrorPtr DaliVdc::ungroupDevice(DaliDevicePtr aDevice, VdcApiRequestPtr aRequest
   ErrorPtr respErr;
   if (aDevice->daliTechnicalType()==dalidevice_composite) {
     // composite device, delete grouping
-    DaliRGBWDevicePtr dev = boost::dynamic_pointer_cast<DaliRGBWDevice>(aDevice);
+    DaliCompositeDevicePtr dev = boost::dynamic_pointer_cast<DaliCompositeDevice>(aDevice);
     if (dev) {
       db.executef(
         "DELETE FROM compositeDevices WHERE dimmerType!='GRP' AND collectionID=%ld",
@@ -648,9 +655,9 @@ ErrorPtr DaliVdc::ungroupDevice(DaliDevicePtr aDevice, VdcApiRequestPtr aRequest
   }
   else if (aDevice->daliTechnicalType()==dalidevice_group) {
     // composite device, delete grouping
-    DaliDimmerDevicePtr dev = boost::dynamic_pointer_cast<DaliDimmerDevice>(aDevice);
+    DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(aDevice);
     if (dev) {
-      int groupNo = dev->brightnessDimmer->deviceInfo->shortAddress & DaliGroupMask;
+      int groupNo = dev->daliController->deviceInfo->shortAddress & DaliGroupMask;
       db.executef(
         "DELETE FROM compositeDevices WHERE dimmerType='GRP' AND groupNo=%d",
         groupNo

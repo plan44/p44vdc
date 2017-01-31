@@ -27,7 +27,7 @@
 #if ENABLE_DALI
 
 #include "dalicomm.hpp"
-#include "lightbehaviour.hpp"
+#include "colorlightbehaviour.hpp"
 
 using namespace std;
 
@@ -37,22 +37,22 @@ namespace p44 {
   class DaliBusDevice;
   class DaliBusDeviceGroup;
   class DaliDevice;
-  class DaliDimmerDevice;
-  class DaliRGBWDevice;
+  class DaliSingleControllerDevice;
+  class DaliCompositeDevice;
 
   typedef boost::intrusive_ptr<DaliBusDevice> DaliBusDevicePtr;
   typedef boost::intrusive_ptr<DaliBusDeviceGroup> DaliBusDeviceGroupPtr;
   typedef boost::intrusive_ptr<DaliDevice> DaliDevicePtr;
-  typedef boost::intrusive_ptr<DaliDimmerDevice> DaliDimmerDevicePtr;
-  typedef boost::intrusive_ptr<DaliRGBWDevice> DaliRGBWDevicePtr;
+  typedef boost::intrusive_ptr<DaliSingleControllerDevice> DaliSingleControllerDevicePtr;
+  typedef boost::intrusive_ptr<DaliCompositeDevice> DaliCompositeDevicePtr;
 
   class DaliBusDevice : public P44Obj
   {
     typedef P44Obj inherited;
     friend class DaliBusDeviceGroup;
     friend class DaliDevice;
-    friend class DaliRGBWDevice;
-    friend class DaliDimmerDevice;
+    friend class DaliCompositeDevice;
+    friend class DaliSingleControllerDevice;
     friend class DaliVdc;
 
     DaliDeviceInfoPtr deviceInfo; ///< the device info of the bus device (ballast)
@@ -63,9 +63,11 @@ namespace p44 {
 
     long dimRepeaterTicket; ///< DALI dimming repeater ticket
 
-    /// features
+    /// feature set
     bool supportsLED; // supports device type 6/LED features
-    bool supportsColor; // supports device type 8/color features
+    bool supportsDT8; // supports device type 8 features
+    bool dt8Color; // supports DT 8 color features
+    bool dt8CT; // supports DT 8 color temperature features
 
     /// cached status (call updateStatus() to update these)
     bool isDummy; ///< set if dummy (not found on bus, but known to be part of a composite device)
@@ -79,6 +81,10 @@ namespace p44 {
     uint8_t currentFadeTime; ///< currently set DALI fade time
     double currentDimPerMS; ///< current dim steps per second
     uint8_t currentFadeRate; ///< currently set DALI fade rate
+    // - DT8 params
+    ColorLightMode currentColorMode; ///< current color mode
+    uint16_t currentXorCT; ///< current CIE X or CT
+    uint16_t currentY; ///< current CIE Y
 
   public:
 
@@ -97,12 +103,23 @@ namespace p44 {
     /// @return true if group
     virtual bool isGrouped() { return false; }
 
+    /// show description
+    virtual string description();
+
   protected:
+
+    /// called to query feature set, BEFORE initialize() and BEFORE any grouping occurs
+    /// @param aCompletedCB will be called when initialisation is complete
+    void queryFeatureSet(StatusCB aCompletedCB);
 
     /// initialize device for first use
     /// @param aCompletedCB will be called when initialisation is complete
     /// @param aUsedGroupsMask groups that are in use. Single devices should not be in any of these groups
     virtual void initialize(StatusCB aCompletedCB, uint16_t aUsedGroupsMask);
+
+    /// initializes usage of extra features (such as linear dimming curve for DT6 devices)
+    /// @note this should work equally for single devices and groups.
+    void initializeFeatures(StatusCB aCompletedCB);
 
     /// update parameters from device to local vars
     void updateParams(StatusCB aCompletedCB);
@@ -111,23 +128,35 @@ namespace p44 {
     void updateStatus(StatusCB aCompletedCB);
 
 
-    /// convert dS brightness value to DALI arc power
+    /// convert dS brightness value to DALI arc power (linear for DT6 LEDs, logarithmic otherwise)
     /// @param aBrightness 0..100%
     /// @return arcpower 0..254
     uint8_t brightnessToArcpower(Brightness aBrightness);
 
-    /// convert DALI arc power to dS brightness value
+    /// convert DALI arc power to dS brightness value (linear for DT6 LEDs, logarithmic otherwise)
     /// @param aArcpower 0..254
+    /// @param aIsMinDim if set, improbable values are corrected
+    ///   (reported by flawed DT6 devices which report physical min dim in logarithmic scale even when dim curve is set to linear)
     /// @return brightness 0..100%
-    Brightness arcpowerToBrightness(int aArcpower);
+    Brightness arcpowerToBrightness(int aArcpower, bool aIsMinDim = false);
 
     /// set transition time for subsequent brightness changes
     /// @param aTransitionTime time for transition
     void setTransitionTime(MLMicroSeconds aTransitionTime);
 
-    /// set transition time for subsequent brightness changes
+    /// set new brightness
     /// @param aBrightness new brightness to set
     void setBrightness(Brightness aBrightness);
+
+    /// set new color parameters
+    /// @param aMode new color mode
+    /// @param aCieXorCT CIE X coordinate (0..1) or CT in mired
+    /// @param aCieY CIE Y coordinate (0..1)
+    /// @return true if parameters have changed
+    bool setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY = 0);
+
+    /// activate new color parameters
+    void activateColorParams();
 
     /// save brightness as default for DALI dimmer to use after powerup and at failure
     /// @param aBrightness new brightness to set, <0 to save current brightness
@@ -154,16 +183,23 @@ namespace p44 {
   private:
 
     void registerDeviceType(uint8_t aDeviceType);
+    void deviceTypeResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    void probeDeviceType(StatusCB aCompletedCB, uint8_t aNextDT);
+    void probeDeviceTypeResponse(StatusCB aCompletedCB, uint8_t aNextDT, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    void queryDTFeatures(StatusCB aCompletedCB);
+    void dt8FeaturesResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+
     void queryGroup0to7Response(DaliGroupsCB aDaliGroupsCB, DaliAddress aShortAddress, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
     void queryGroup8to15Response(DaliGroupsCB aDaliGroupsCB, DaliAddress aShortAddress, uint16_t aGroupBitMask, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
-    void deviceTypeResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
-    void probeDeviceType(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, uint8_t aNextDT);
-    void probeDeviceTypeResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, uint8_t aNextDT, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
     void checkGroupMembership(StatusCB aCompletedCB, uint16_t aUsedGroupsMask);
     void groupMembershipResponse(StatusCB aCompletedCB, uint16_t aUsedGroupsMask, DaliAddress aShortAddress, uint16_t aGroups, ErrorPtr aError);
 
     void queryActualLevelResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
     void queryMinLevelResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    void queryColorStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    void queryXCoordResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
+    void queryYCoordResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
+    void queryCTResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
 
     void dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aCycleStartTime);
 
@@ -176,7 +212,7 @@ namespace p44 {
   {
     typedef DaliBusDevice inherited;
     friend class DaliDevice;
-    friend class DaliRGBWDevice;
+    friend class DaliCompositeDevice;
     friend class DaliVdc;
 
     string mixID; ///< dSUIDs of all members, XOR mixed
@@ -188,7 +224,7 @@ namespace p44 {
     /// initialize device for first use
     /// @param aCompletedCB will be called when initialisation is complete
     /// @param aUsedGroupsMask groups that are in use. grouped devices should not be in any of these groups except their own group
-    virtual void initialize(StatusCB aCompletedCB, uint16_t aUsedGroupsMask);
+    virtual void initialize(StatusCB aCompletedCB, uint16_t aUsedGroupsMask) P44_OVERRIDE;
 
     /// creates a dimmer group, addressed via a group address rather than single bus address
     /// @note initially, the group is empty. addDaliBusDevice must be used to add devices
@@ -202,18 +238,21 @@ namespace p44 {
     void addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice);
 
     /// derive the dSUID from mix of dSUIDs of single bus devices
-    virtual void deriveDsUid();
+    virtual void deriveDsUid() P44_OVERRIDE;
 
     /// check if bus device represents a DALI group
     /// @return true if group
-    virtual bool isGrouped() { return true; }
+    virtual bool isGrouped() P44_OVERRIDE { return true; }
+
+    /// show description
+    virtual string description() P44_OVERRIDE;
 
   protected:
 
     /// DALI address to use for querying brightness etc.
     /// @return DALI address
     /// @note reading info from single master dimmer, not group
-    virtual uint8_t addressForQuery() { return groupMaster; };
+    virtual uint8_t addressForQuery() P44_OVERRIDE { return groupMaster; };
 
   private:
 
@@ -227,7 +266,7 @@ namespace p44 {
   /// types of DALI dS devices
   typedef enum {
     dalidevice_single, ///< single DALI dimmer, single channel
-    dalidevice_group, ///< group of DALI dimmers, single channel
+    dalidevice_group, ///< group of DALI dimmers, single channel (or DT8)
     dalidevice_composite ///< multichannel color/tunable white device consisting of multiple dimmers or groups
   } DaliDeviceTypes;
 
@@ -249,7 +288,7 @@ namespace p44 {
     DaliVdc &daliVdc();
 
     /// device level API methods (p44 specific, JSON only, for configuring grouped devices)
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
   protected:
 
@@ -260,19 +299,19 @@ namespace p44 {
 
 
 
-  class DaliDimmerDevice : public DaliDevice
+  class DaliSingleControllerDevice : public DaliDevice
   {
     typedef DaliDevice inherited;
     friend class DaliDeviceCollector;
 
   public:
 
-    DaliBusDevicePtr brightnessDimmer; ///< the actual DALI device controlling brightness
+    DaliBusDevicePtr daliController; ///< the actual DALI bus device controlling the entire device
 
-    DaliDimmerDevice(DaliVdc *aVdcP);
+    DaliSingleControllerDevice(DaliVdc *aVdcP);
 
     /// @return technical type of DALI device
-    virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return brightnessDimmer && brightnessDimmer->isGrouped() ? dalidevice_group : dalidevice_single; }
+    virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return daliController && daliController->isGrouped() ? dalidevice_group : dalidevice_single; }
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
@@ -327,7 +366,7 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE { return daliTechnicalType()==dalidevice_group ? "DALI dimmer group" : "DALI dimmer"; }
+    virtual string modelName() P44_OVERRIDE;
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     virtual string hardwareGUID() P44_OVERRIDE;
@@ -370,14 +409,14 @@ namespace p44 {
 
   private:
 
-    void brightnessDimmerSynced(StatusCB aCompletedCB, bool aFactoryReset, ErrorPtr aError);
+    void daliControllerSynced(StatusCB aCompletedCB, bool aFactoryReset, ErrorPtr aError);
     void checkPresenceResponse(PresenceCB aPresenceResultHandler);
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
 
   };
 
 
-  class DaliRGBWDevice : public DaliDevice
+  class DaliCompositeDevice : public DaliDevice
   {
     typedef DaliDevice inherited;
     friend class DaliDeviceCollector;
@@ -399,7 +438,7 @@ namespace p44 {
 
     DaliBusDevicePtr dimmers[numDimmers];
 
-    DaliRGBWDevice(DaliVdc *aVdcP);
+    DaliCompositeDevice(DaliVdc *aVdcP);
 
     /// @return type of DALI device
     virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return dalidevice_composite; }

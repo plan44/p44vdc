@@ -345,23 +345,36 @@ void DaliComm::daliSendDirectPower(DaliAddress aAddress, uint8_t aPower, DaliCom
   daliSend(dali1FromAddress(aAddress), aPower, aStatusCB, aWithDelay);
 }
 
-void DaliComm::daliSendCommand(DaliAddress aAddress, uint8_t aCommand, DaliCommandStatusCB aStatusCB, int aWithDelay)
+
+void DaliComm::daliPrepareForCommand(uint16_t &aCommand, int &aWithDelay)
 {
+  if (aCommand & 0xFF00) {
+    // command has a device type
+    uint8_t dt = aCommand>>8;
+    if (dt==0xFF) dt=0; // 0xFF is used to code DT0, to allow 0 meaning "no DT prefix" (DT0 is not in frequent use anyway)
+    daliSend(DALICMD_ENABLE_DEVICE_TYPE, dt, NULL, aWithDelay); // apply delay to prefix command!
+    aWithDelay = 0; // no further delay for actual command after prefix
+    aCommand &= 0xFF; // mask out device type, is now consumed
+  }
+}
+
+
+
+void DaliComm::daliSendCommand(DaliAddress aAddress, uint16_t aCommand, DaliCommandStatusCB aStatusCB, int aWithDelay)
+{
+  daliPrepareForCommand(aCommand, aWithDelay);
   daliSend(dali1FromAddress(aAddress)+1, aCommand, aStatusCB, aWithDelay);
 }
 
 
-void DaliComm::daliSendDtrAndCommand(DaliAddress aAddress, uint8_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
+void DaliComm::daliSendDtrAndCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
-  daliSend(DALICMD_SET_DTR, aDTRValue);
-  daliSendCommand(aAddress, aCommand, aStatusCB, aWithDelay);
+  daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay); // apply delay to DTR setting command
+  aWithDelay = 0; // delay already consumed for setting DTR
+  daliPrepareForCommand(aCommand, aWithDelay);
+  daliSendCommand(aAddress, aCommand, aStatusCB);
 }
 
-
-void DaliComm::daliEnableDeviceType(uint8_t aDeviceType)
-{
-  daliSend(DALICMD_ENABLE_DEVICE_TYPE, aDeviceType);
-}
 
 
 // DALI config commands (send twice within 100ms)
@@ -371,16 +384,29 @@ void DaliComm::daliSendTwice(uint8_t aDali1, uint8_t aDali2, DaliCommandStatusCB
   sendBridgeCommand(CMD_CODE_2SEND16, aDali1, aDali2, boost::bind(&DaliComm::daliCommandStatusHandler, this, aStatusCB, _1, _2, _3), aWithDelay);
 }
 
-void DaliComm::daliSendConfigCommand(DaliAddress aAddress, uint8_t aCommand, DaliCommandStatusCB aStatusCB, int aWithDelay)
+void DaliComm::daliSendConfigCommand(DaliAddress aAddress, uint16_t aCommand, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
+  daliPrepareForCommand(aCommand, aWithDelay);
   daliSendTwice(dali1FromAddress(aAddress)+1, aCommand, aStatusCB, aWithDelay);
 }
 
 
-void DaliComm::daliSendDtrAndConfigCommand(DaliAddress aAddress, uint8_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
+void DaliComm::daliSendDtrAndConfigCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
-  daliSend(DALICMD_SET_DTR, aDTRValue);
+  daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay);
+  aWithDelay = 0; // delay already consumed for setting DTR
+  daliPrepareForCommand(aCommand, aWithDelay);
   daliSendConfigCommand(aAddress, aCommand, aStatusCB, aWithDelay);
+}
+
+
+void DaliComm::daliSend16BitValueAndCommand(DaliAddress aAddress, uint16_t aCommand, uint16_t aValue16, DaliCommandStatusCB aStatusCB, int aWithDelay)
+{
+  daliSend(DALICMD_SET_DTR1, aValue16>>8, NULL, aWithDelay); // MSB->DTR1 - apply delay to DTR1 setting command
+  daliSend(DALICMD_SET_DTR, aValue16&0xFF); // LSB->DTR
+  aWithDelay = 0; // delay already consumed for setting DTR1
+  daliPrepareForCommand(aCommand, aWithDelay);
+  daliSendCommand(aAddress, aCommand, aStatusCB);
 }
 
 
@@ -393,10 +419,58 @@ void DaliComm::daliSendAndReceive(uint8_t aDali1, uint8_t aDali2, DaliQueryResul
 }
 
 
-void DaliComm::daliSendQuery(DaliAddress aAddress, uint8_t aQueryCommand, DaliQueryResultCB aResultCB, int aWithDelay)
+void DaliComm::daliSendQuery(DaliAddress aAddress, uint16_t aQueryCommand, DaliQueryResultCB aResultCB, int aWithDelay)
 {
+  daliPrepareForCommand(aQueryCommand, aWithDelay);
   daliSendAndReceive(dali1FromAddress(aAddress)+1, aQueryCommand, aResultCB, aWithDelay);
 }
+
+
+void DaliComm::daliSend16BitQuery(DaliAddress aAddress, uint16_t aQueryCommand, Dali16BitValueQueryResultCB aResult16CB, int aWithDelay)
+{
+  daliPrepareForCommand(aQueryCommand, aWithDelay);
+  daliSendQuery(aAddress, aQueryCommand, boost::bind(&DaliComm::msbOf16BitQueryReceived, this, aAddress, aResult16CB, _1, _2, _3), aWithDelay);
+}
+
+
+void DaliComm::msbOf16BitQueryReceived(DaliAddress aAddress, Dali16BitValueQueryResultCB aResult16CB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    if (aNoOrTimeout) {
+      aError = ErrorPtr(new DaliCommError(DaliCommError::MissingData));
+    }
+    else {
+      // this is the MSB, now query the DTR to get the LSB
+      uint16_t result16 = aResponse<<8;
+      daliSendQuery(aAddress, DALICMD_QUERY_CONTENT_DTR, boost::bind(&DaliComm::lsbOf16BitQueryReceived, this, result16, aResult16CB, _1, _2, _3));
+      return;
+    }
+  }
+  if (aResult16CB) aResult16CB(0, aError);
+}
+
+
+void DaliComm::lsbOf16BitQueryReceived(uint16_t aResult16, Dali16BitValueQueryResultCB aResult16CB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    if (aNoOrTimeout) {
+      aError = ErrorPtr(new DaliCommError(DaliCommError::MissingData));
+    }
+    else {
+      // this is the LSB, combine with MSB and return
+      aResult16 |= aResponse;
+    }
+  }
+  if (aResult16CB) aResult16CB(aResult16, aError);
+}
+
+
+void DaliComm::daliSendDtrAnd16BitQuery(DaliAddress aAddress, uint16_t aQueryCommand, uint8_t aDTRValue, Dali16BitValueQueryResultCB aResultCB, int aWithDelay)
+{
+  daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay);
+  daliSend16BitQuery(aAddress, aQueryCommand, aResultCB, 0); // delay already consumed for setting DTR
+}
+
 
 
 

@@ -113,6 +113,7 @@ namespace p44 {
     void createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCompletedCB);
     void deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError);
     void deviceInfoValid(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliDeviceInfoPtr aDaliDeviceInfoPtr);
+    void deviceFeaturesQueried(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB);
     void recollectDevices(StatusCB aCompletedCB);
 
     void groupCollected(VdcApiRequestPtr aRequest);
