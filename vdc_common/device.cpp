@@ -369,7 +369,7 @@ bool Device::needsToApplyChannels()
     ChannelBehaviourPtr ch = getChannelByIndex(i, true);
     if (ch) {
       // at least this channel needs update
-      LOG(LOG_DEBUG, "needsToApplyChannels() returns true because of channel '%s'", ch->description().c_str());
+      LOG(LOG_DEBUG, "needsToApplyChannels() returns true because of %s", ch->description().c_str());
       return true;
     }
   }

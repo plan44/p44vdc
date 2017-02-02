@@ -266,7 +266,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x10, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,       usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText, binaryUnit },
 
   // A5-10-03: Room Control Panel with Temperature Sensor and Set Point Control
-  // - e.g. Eltako FTR78S, Thermokon SR06 LCD 2T
+  // - e.g. Eltako FTR78S, Thermokon SR06 LCD 2T, SR07 P
   { 0, 0x10, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText, tempUnit },
   { 0, 0x10, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_set_point,   usage_user,          0,    1, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, setPointText, unityUnit },
 
