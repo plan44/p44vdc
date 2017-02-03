@@ -222,7 +222,7 @@ void EldatComm::aliveCheck()
 void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
 {
   if (!Error::isOK(aError)) {
-    // alive check failed, try to recover EnOcean interface
+    // alive check failed, try to recover ELDAT interface
     LOG(LOG_ERR, "EldatComm: alive check of ELDAT module failed -> restarting module");
     // - cancel alive checks for now
     MainLoop::currentMainLoop().cancelExecutionTicket(aliveCheckTicket);

@@ -29,7 +29,8 @@ using namespace p44;
 EldatVdc::EldatVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
 	eldatComm(MainLoop::currentMainLoop()),
-  learningMode(false)
+  learningMode(false),
+  disableProximityCheck(false)
 {
 }
 
@@ -117,7 +118,7 @@ void EldatVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aEx
   if (!aIncremental) {
     // start with zero
     removeDevices(aClearSettings);
-    // - read learned-in EnOcean button IDs from DB
+    // - read learned-in ELDAT devices from DB
     sqlite3pp::query qry(db);
     if (qry.prepare("SELECT eldatAddress, subdevice, deviceType FROM knownDevices")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
@@ -228,11 +229,11 @@ void EldatVdc::handleMessage(string aEldatMessage, ErrorPtr aError)
     EldatAddress senderAddress;
     char data[100];
     // try to scan Mode 0
-    // TODO: scan RSSI next version of rx10 will have!
     int rssi;
     int mode;
     if (sscanf(aEldatMessage.c_str(),"REC%2d,-%X,%X,%99s", &mode, &rssi, &senderAddress, data)==4) {
       rssi = -rssi;
+      LOG(LOG_NOTICE, "processing REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
       if (learningMode) {
         processLearn(senderAddress, (EldatMode)mode, rssi, data);
       }
@@ -240,14 +241,26 @@ void EldatVdc::handleMessage(string aEldatMessage, ErrorPtr aError)
         dispatchMessage(senderAddress, (EldatMode)mode, rssi, data);
       }
     }
+    else {
+      LOG(LOG_NOTICE, "received unknown ELDAT message: %s", aEldatMessage.c_str());
+    }
   }
 }
 
+
+#define MIN_LEARN_DBM -65
+// -65 = with RX10 R01 stick, about 20-30cm from device
+// -75 = with RX10 R01 stick, about 1m from device
 
 Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, int aRSSI, string aData)
 {
   if (aMode!=0 || aData.size()!=1)
     return undefined; // invalid data
+  // check RSSI
+  if (!disableProximityCheck && aRSSI<MIN_LEARN_DBM) {
+    // not close enough
+    return undefined; // signal too weak for learn-in, treat as invalid data
+  }
   char function = aData[0];
   // Unlike enocean, we only learn in/out one pair per learning action: A-B or C-D
   EldatDeviceType type = eldat_unknown;
@@ -303,16 +316,6 @@ void EldatVdc::dispatchMessage(EldatAddress aSenderAddress, EldatMode aMode, int
 {
   bool reachedDevice = false;
   for (EldatDeviceMap::iterator pos = eldatDevices.lower_bound(aSenderAddress); pos!=eldatDevices.upper_bound(aSenderAddress); ++pos) {
-    // TODO: maybe check for learning packet in non-learning mode?
-//    if (aEsp3PacketPtr->radioHasTeachInfo(MIN_LEARN_DBM, false) && aEsp3PacketPtr->eepRorg()!=rorg_RPS) {
-//      // learning packet in non-learn mode -> report as non-regular user action, might be attempt to identify a device
-//      // Note: RPS devices are excluded because for these all telegrams are regular user actions.
-//      // signalDeviceUserAction() will be called from button and binary input behaviours
-//      if (getVdcHost().signalDeviceUserAction(*(pos->second), false)) {
-//        // consumed for device identification purposes, suppress further processing
-//        break;
-//      }
-//    }
     // handle regularily (might be RPS switch which does not have separate learn/action packets
     pos->second->handleMessage(aMode, aRSSI, aData);
     reachedDevice = true;
@@ -324,89 +327,19 @@ void EldatVdc::dispatchMessage(EldatAddress aSenderAddress, EldatMode aMode, int
 
 
 
-// MARK: ===== EnOcean specific methods
+// MARK: ===== ELDAT specific methods
 
 
 ErrorPtr EldatVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
-//  if (aMethod=="x-p44-addProfile") {
-//    // create a composite device out of existing single-channel ones
-//    respErr = addProfile(aRequest, aParams);
-//  }
-//  else if (aMethod=="x-p44-simulatePacket") {
-//    // simulate reception of a ESP packet
-//    respErr = simulatePacket(aRequest, aParams);
-//  }
-//  else
-  {
-    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
-  }
+  // for now: NOP, let inherited handle it
+  respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   return respErr;
 }
 
 
 
-//  ErrorPtr EldatVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
-//  {
-//    // add an EnOcean profile
-//    ErrorPtr respErr;
-//    ApiValuePtr o;
-//    respErr = checkParam(aParams, "eep", o); // EEP with variant in MSB
-//    if (Error::isOK(respErr)) {
-//      EnoceanProfile eep = o->uint32Value();
-//      respErr = checkParam(aParams, "address", o);
-//      if (Error::isOK(respErr)) {
-//        // remote device address
-//        // if 0xFF800000..0xFF80007F : bit0..6 = ID base offset to ID base of modem
-//        // if 0xFF8000FF : automatically take next unused ID base offset
-//        EnoceanAddress addr = o->uint32Value();
-//        if ((addr & 0xFFFFFF00)==0xFF800000) {
-//          // relative to ID base
-//          // - get map of already used offsets
-//          string usedOffsetMap;
-//          usedOffsetMap.assign(128,'0');
-//          for (EnoceanDeviceMap::iterator pos = enoceanDevices.begin(); pos!=enoceanDevices.end(); ++pos) {
-//            pos->second->markUsedBaseOffsets(usedOffsetMap);
-//          }
-//          addr &= 0xFF; // extract offset
-//          if (addr==0xFF) {
-//            // auto-determine offset
-//            for (addr=0; addr<128; addr++) {
-//              if (usedOffsetMap[addr]=='0') break; // free offset here
-//            }
-//            if (addr>128) {
-//              respErr = ErrorPtr(new WebError(400, "no more free base ID offsets"));
-//            }
-//          }
-//          else {
-//            if (usedOffsetMap[addr]!='0') {
-//              respErr = ErrorPtr(new WebError(400, "invalid or already used base ID offset specifier"));
-//            }
-//          }
-//          // add-in my own ID base
-//          addr += enoceanComm.idBase();
-//        }
-//        // now create device(s)
-//        if (Error::isOK(respErr)) {
-//          // create devices as if this was a learn-in
-//          int newDevices = EnoceanDevice::createDevicesFromEEP(this, addr, eep, manufacturer_unknown);
-//          if (newDevices<1) {
-//            respErr = ErrorPtr(new WebError(400, "Unknown EEP specification, no device(s) created"));
-//          }
-//          else {
-//            ApiValuePtr r = aRequest->newApiValue();
-//            r->setType(apivalue_object);
-//            r->add("newDevices", r->newUint64(newDevices));
-//            aRequest->sendResult(r);
-//            respErr.reset(); // make sure we don't send an extra ErrorOK
-//          }
-//        }
-//      }
-//    }
-//    return respErr;
-//  }
-//
 
 // MARK: ===== learn and unlearn devices
 
@@ -416,44 +349,10 @@ void EldatVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, T
   // put normal radio packet evaluator into learn mode
   learningMode = aEnableLearning;
   onlyEstablish = aOnlyEstablish;
-  // TODO: do we need that?
-  // disableProximityCheck = aDisableProximityCheck;
+  disableProximityCheck = aDisableProximityCheck;
 }
 
 
-
-
-//  // MARK: ===== Self test
-//
-//  void EldatVdc::selfTest(StatusCB aCompletedCB)
-//  {
-//    // install test packet handler
-//    eldatComm.setRadioPacketHandler(boost::bind(&EldatVdc::handleTestRadioPacket, this, aCompletedCB, _1, _2));
-//    // start watchdog
-//    enoceanComm.initialize(NULL);
-//  }
-//
-//
-//  void EldatVdc::handleTestRadioPacket(StatusCB aCompletedCB, Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)
-//  {
-//    // ignore packets with error
-//    if (Error::isOK(aError)) {
-//      if (aEsp3PacketPtr->eepRorg()==rorg_RPS && aEsp3PacketPtr->radioDBm()>MIN_LEARN_DBM && enoceanComm.modemAppVersion()>0) {
-//        // uninstall handler
-//        enoceanComm.setRadioPacketHandler(NULL);
-//        // seen both watchdog response (modem works) and independent RPS telegram (RF is ok)
-//        LOG(LOG_NOTICE,
-//          "- enocean modem info: appVersion=0x%08X, apiVersion=0x%08X, modemAddress=0x%08X, idBase=0x%08X",
-//          enoceanComm.modemAppVersion(), enoceanComm.modemApiVersion(), enoceanComm.modemAddress(), enoceanComm.idBase()
-//        );
-//        aCompletedCB(ErrorPtr());
-//        // done
-//        return;
-//      }
-//    }
-//    // - still waiting
-//    LOG(LOG_NOTICE, "- enocean test: still waiting for RPS telegram in learn distance");
-//  }
 
 #endif // ENABLE_ELDAT
 

@@ -87,7 +87,7 @@ namespace p44 {
     ///   which is not an expected response to a command sent
     void setReceivedMessageHandler(EldatMessageCB aMessageHandler);
 
-    /// start the EnOcean modem watchdog (regular version commands, hard reset if no answer in time)
+    /// start the ELDAT modem watchdog (regular version commands, hard reset if no answer in time)
     void initialize(StatusCB aCompletedCB);
 
     /// called to process extra bytes after all pending operations have processed their bytes

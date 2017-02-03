@@ -78,6 +78,7 @@ namespace p44 {
     typedef Vdc inherited;
     bool learningMode;
     Tristate onlyEstablish;
+    bool disableProximityCheck;
 
     EldatDeviceMap eldatDevices; ///< local map linking EldatDeviceID to devices
 

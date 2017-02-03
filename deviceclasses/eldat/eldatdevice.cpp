@@ -141,18 +141,7 @@ void EldatDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultH
 
 void EldatDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-//  // trigger updating all device outputs
-//  for (int i=0; i<numChannels(); i++) {
-//    if (getChannelByIndex(i, true)) {
-//      // channel needs update
-//      pendingDeviceUpdate = true;
-//      break; // no more checking needed, need device level update anyway
-//    }
-//  }
-//  if (pendingDeviceUpdate) {
-//    // we need to apply data
-//    needOutgoingUpdate();
-//  }
+  // NOP for now
   inherited::applyChannelValues(aDoneCB, aForDimming);
 }
 
