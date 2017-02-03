@@ -820,6 +820,17 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         // Settings properties
         case group_key+settings_key_offset:
           setGroup((DsGroup)aPropValue->int32Value());
+          // for unchangeably paired (rocker) buttons, automatically change group on counterpart
+          if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
+            // also change group in button1
+            BLOG(LOG_NOTICE,"paired button group changed in button0 -> also changed in button1");
+            if (device.buttons.size()>1) device.buttons[1]->setGroup((DsGroup)aPropValue->int32Value());
+          }
+          else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
+            // also change group in button0
+            BLOG(LOG_NOTICE,"paired button group changed in button1 -> also changed in button0");
+            if (device.buttons.size()>0) device.buttons[0]->setGroup((DsGroup)aPropValue->int32Value());
+          }
           return true;
         case mode_key+settings_key_offset: {
           DsButtonMode m = (DsButtonMode)aPropValue->int32Value();
