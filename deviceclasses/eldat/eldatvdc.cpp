@@ -229,9 +229,10 @@ void EldatVdc::handleMessage(string aEldatMessage, ErrorPtr aError)
     char data[100];
     // try to scan Mode 0
     // TODO: scan RSSI next version of rx10 will have!
-    int rssi = -42;
+    int rssi;
     int mode;
-    if (sscanf(aEldatMessage.c_str(),"REC%2d,%X,%99s", &mode, &senderAddress, data)==3) {
+    if (sscanf(aEldatMessage.c_str(),"REC%2d,-%X,%X,%99s", &mode, &rssi, &senderAddress, data)==4) {
+      rssi = -rssi;
       if (learningMode) {
         processLearn(senderAddress, (EldatMode)mode, rssi, data);
       }
