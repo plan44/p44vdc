@@ -378,18 +378,22 @@ void DaliBusDevice::initializeFeatures(StatusCB aCompletedCB)
   if (supportsLED) {
     // single device or group supports DT6 -> use linear dimming curve
     daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 1); // linear dimming curve
+    dt6LinearDim = true;
   }
   else {
     if (isGrouped()) {
       // not all (or maybe none) of the devices in the group support DT6 -> make sure all other devices use standard dimming curve even if they know DT6
       // Note: non DT6-devices will just ignore the following command
       daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 0); // standard logarithmic dimming curve
+      dt6LinearDim = false;
     }
   }
   */
-  // TODO: for now, make sure we use the standard dimming curve
-  daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 0); // standard logarithmic dimming curve
-  dt6LinearDim = false;
+  if (supportsLED) {
+    // TODO: for now, make sure we use the standard dimming curve
+    daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 0); // standard logarithmic dimming curve
+    dt6LinearDim = false;
+  }
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
 
