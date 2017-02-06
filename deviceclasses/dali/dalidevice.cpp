@@ -53,6 +53,7 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   currentDimPerMS(0), // none
   currentFadeRate(0xFF), currentFadeTime(0xFF), // unlikely values
   supportsLED(false),
+  dt6LinearDim(false),
   supportsDT8(false),
   dt8Color(false),
   dt8CT(false),
@@ -67,7 +68,7 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
 
 /* Snippet to show brightness/DALI arcpower conversion tables in both directions
 
-  supportsLED = false;
+  dt6LinearDim = false;
   printf("\n\n===== Arcpower 0..254 -> brightness\n");
   for (int a=0; a<255; a++) {
     double b = arcpowerToBrightness(a);
@@ -93,7 +94,12 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
 string DaliBusDevice::description()
 {
   string s = deviceInfo->description();
-  if (supportsLED) s += "\n- supports device type 6 (LED) -> linear dimming curve";
+  if (supportsLED) {
+    s += "\n- supports device type 6 (LED)";
+    if (dt6LinearDim) {
+      s += " -> using linear dimming curve";
+    }
+  }
   if (supportsDT8) string_format_append(s, "\n- supports device type 8 (color), features:%s%s", dt8CT ? " [Tunable white]" : "", dt8Color ? " [CIE x/y]" : "");
   return s;
 }
@@ -365,6 +371,9 @@ void DaliBusDevice::initializeFeatures(StatusCB aCompletedCB)
     if (aCompletedCB) aCompletedCB(ErrorPtr());
     return;
   }
+  /* TODO: For now, we don't use linear dimming curve because the only unit we've seen with DT6 support is flawed,
+     (standard dimming up/down commands no longer work when linear dimming is enabled, and minimum/current arcpower readout is wrong).
+     On the other side, there's not much benefit from linear dimming curve (now our log dimming curve is finally correct...).
   // initialize DT6 linear dimming curve if available
   if (supportsLED) {
     // single device or group supports DT6 -> use linear dimming curve
@@ -377,6 +386,10 @@ void DaliBusDevice::initializeFeatures(StatusCB aCompletedCB)
       daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 0); // standard logarithmic dimming curve
     }
   }
+  */
+  // TODO: for now, make sure we use the standard dimming curve
+  daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 0); // standard logarithmic dimming curve
+  dt6LinearDim = false;
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
 
@@ -422,7 +435,7 @@ void DaliBusDevice::queryMinLevelResponse(StatusCB aCompletedCB, bool aNoOrTimeo
   if (Error::isOK(aError) && !aNoOrTimeout) {
     isPresent = true; // answering a query means presence
     // this is my current arc power, save it as brightness for dS system side queries
-    minBrightness = arcpowerToBrightness(aResponse, true);
+    minBrightness = arcpowerToBrightness(aResponse);
     LOG(LOG_INFO, "DaliBusDevice: retrieved minimum dimming level: arc power = %d, brightness = %0.1f", aResponse, minBrightness);
   }
   if (supportsDT8) {
@@ -649,7 +662,7 @@ uint8_t DaliBusDevice::brightnessToArcpower(Brightness aBrightness)
   if (aBrightness>100) aBrightness = 100;
   // 0..254, 255 is MASK and is reserved to stop fading
   if (aBrightness==0) return 0; // special case
-  if (supportsLED)
+  if (dt6LinearDim)
     return aBrightness*2.54; // linear 0..254
   else
     return (uint8_t)((double)(log10(aBrightness)+1.0)*(253.0/3)+1); // logarithmic
@@ -657,10 +670,10 @@ uint8_t DaliBusDevice::brightnessToArcpower(Brightness aBrightness)
 
 
 
-Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower, bool aIsMinDim)
+Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower)
 {
   if (aArcpower==0) return 0; // special off case
-  if (supportsLED && !(aIsMinDim && aArcpower>128))
+  if (dt6LinearDim)
     return (double)aArcpower/2.54; // linear 1..254
   else
     return pow(10, ((double)aArcpower-1)/(253.0/3)-1); // logarithmic

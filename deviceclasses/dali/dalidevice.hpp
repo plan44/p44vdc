@@ -65,6 +65,7 @@ namespace p44 {
 
     /// feature set
     bool supportsLED; // supports device type 6/LED features
+    bool dt6LinearDim; // linear dimming curve enabled
     bool supportsDT8; // supports device type 8 features
     bool dt8Color; // supports DT 8 color features
     bool dt8CT; // supports DT 8 color temperature features
@@ -128,17 +129,15 @@ namespace p44 {
     void updateStatus(StatusCB aCompletedCB);
 
 
-    /// convert dS brightness value to DALI arc power (linear for DT6 LEDs, logarithmic otherwise)
+    /// convert DALI arc power to dS brightness value (linear for DT6 LEDs with dt6LinearDim enabled, logarithmic otherwise)
     /// @param aBrightness 0..100%
     /// @return arcpower 0..254
     uint8_t brightnessToArcpower(Brightness aBrightness);
 
-    /// convert DALI arc power to dS brightness value (linear for DT6 LEDs, logarithmic otherwise)
+    /// convert DALI arc power to dS brightness value (linear for DT6 LEDs with dt6LinearDim enabled, logarithmic otherwise)
     /// @param aArcpower 0..254
-    /// @param aIsMinDim if set, improbable values are corrected
-    ///   (reported by flawed DT6 devices which report physical min dim in logarithmic scale even when dim curve is set to linear)
     /// @return brightness 0..100%
-    Brightness arcpowerToBrightness(int aArcpower, bool aIsMinDim = false);
+    Brightness arcpowerToBrightness(int aArcpower);
 
     /// set transition time for subsequent brightness changes
     /// @param aTransitionTime time for transition
