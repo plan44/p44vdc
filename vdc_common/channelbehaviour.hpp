@@ -84,7 +84,7 @@ namespace p44 {
     virtual const char *getName() = 0; ///< descriptive channel name
     virtual double getMin() = 0; ///< min value
     virtual double getMax() = 0; ///< max value
-    virtual double getDimPerMS() { return (getMax()-getMin())/7000; }; ///< value to step up or down per Millisecond when dimming (default = 7sec for full scale)
+    virtual double getDimPerMS() { return (getMax()-getMin())/FULL_SCALE_DIM_TIME_MS; }; ///< value to step up or down per Millisecond when dimming, or 0 for non-dimmable channels (default = 7sec for full scale)
     virtual double getMinDim() { return getMin(); }; ///< dimming min value defaults to same value as min
     virtual bool wrapsAround() { return false; }; ///< if true, dimming is wrap around i.e. dimming below getMin()->getMax() and vice versa. Off by default
 

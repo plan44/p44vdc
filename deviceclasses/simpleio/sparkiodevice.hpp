@@ -53,7 +53,6 @@ namespace p44 {
     virtual double getMin() { return 0; }; // mode goes from 0..3
     virtual double getMax() { return 3; };
     virtual bool wrapsAround() { return true; }; ///< mode wraps around
-    virtual double getDimPerMS() { return 4/FULL_SCALE_DIM_TIME_MS; }; // dimming through full scale should be FULL_SCALE_DIM_TIME_MS
   };
 
 

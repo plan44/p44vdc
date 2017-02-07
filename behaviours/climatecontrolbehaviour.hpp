@@ -41,7 +41,6 @@ namespace p44 {
     virtual const char *getName() { return "heatingLevel"; };
     virtual double getMin() { return 0; }; // heating is 0..100 (cooling would be -100..0)
     virtual double getMax() { return 100; };
-    virtual double getDimPerMS() { return 100/FULL_SCALE_DIM_TIME_MS; }; // 7 seconds full scale
     
   };
 

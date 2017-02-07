@@ -42,7 +42,6 @@ namespace p44 {
     virtual const char *getName() { return "vertical position"; };
     virtual double getMin() { return 0; }; // position goes from 0 to 100%
     virtual double getMax() { return 100; };
-    virtual double getDimPerMS() { return 100/FULL_SCALE_DIM_TIME_MS; }; // dimming through full scale should be FULL_SCALE_DIM_TIME_MS
   };
 
 
@@ -57,7 +56,6 @@ namespace p44 {
     virtual const char *getName() { return "horizontal position"; };
     virtual double getMin() { return 0; }; // position goes from 0 to 100%
     virtual double getMax() { return 100; };
-    virtual double getDimPerMS() { return 100/FULL_SCALE_DIM_TIME_MS; }; // dimming through full scale should be FULL_SCALE_DIM_TIME_MS
   };
 
 
