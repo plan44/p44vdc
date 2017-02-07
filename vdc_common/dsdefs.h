@@ -264,18 +264,44 @@ typedef enum {
   channeltype_position_h = 8, ///< horizontal position
   channeltype_position_angle = 9, ///< opening angle position
   channeltype_permeability = 10, ///< permeability
-  //channeltype_heatingLevel = 11, ///< heatingLevel channel
-  //channeltype_airflowLevel = 12, ///< airflowLevel channel
+  // FIXME: check definitive enum!
+  channeltype_heatingLevel = 11, ///< heatingLevel channel
+  // FIXME: check definitive enum!
+  channeltype_airflow_intensity = 12, ///< airflow intensity channel
+  // FIXME: check definitive enum!
+  channeltype_airflow_direction = 13, ///< airflow direction (DsVentilationDirectionState)
+  // FIXME: check definitive enum!
+  channeltype_airflow_louver_position = 14, ///< louver position, 0..100 of device's available range
+
   channeltype_custom_first = 192, ///< first device-specific channel
   channeltype_custom_last = 239, ///< last device-specific channel
-  channeltype_p44_audio_volume = channeltype_custom_first+0, ///< p44-specific channel type for audio volume until dS specifies one
-  channeltype_p44_audio_power_state = channeltype_custom_first+1, ///< p44-specific channel type for audio power state until dS specifies one
-  channeltype_p44_audio_content_source = channeltype_custom_first+2, ///< p44-specific channel type for audio content source until dS specifies one
-  channeltype_heatingLevel = channeltype_custom_first+3, // TODO: enable real channel numbers as soon as officially defined
-  channeltype_airflowLevel = channeltype_custom_first+4, // TODO: enable real channel numbers as soon as officially defined
+
+  channeltype_p44_audio_volume = channeltype_custom_first+0, ///< // FIXME: p44-specific channel type for audio volume until dS specifies one
+  channeltype_p44_audio_power_state = channeltype_custom_first+1, ///< audio power state (DsAudioPowerState) // FIXME: p44-specific channel type for audio power state until dS specifies one
+  channeltype_p44_audio_content_source = channeltype_custom_first+2, ///< audio content source // FIXME: p44-specific channel type for audio content source until dS specifies one
+
   numChannelTypes = 240 // 0..239 are channel types
 } DsChannelTypeEnum;
 typedef uint8_t DsChannelType;
+
+
+/// audio channel power states
+typedef enum {
+  dsAudioPower_deep_off = 0,
+  dsAudioPower_power_save = 1,
+  dsAudioPower_on = 2,
+  numDsAudioPowerStates
+} DsAudioPowerState;
+
+/// ventilation airflow direction channel states
+typedef enum {
+  dsVentilationDirection_undefined = 0,
+  dsVentilationDirection_supply_or_down = 1,
+  dsVentilationDirection_exhaust_or_up = 2,
+  numDsVentilationDirectionStates
+} DsVentilationAirflowDirection;
+
+
 
 
 /// binary input types (sensor functions)
@@ -300,15 +326,6 @@ typedef enum {
   binInpType_sunProtection = 17, ///< protect against too much sunlight
   binInpType_frost = 18, ///< frost detector
 } DsBinaryInputType;
-
-
-/// audio power states
-typedef enum {
-  dsAudioPower_deep_off = 0,
-  dsAudioPower_power_save = 1,
-  dsAudioPower_on = 2,
-  numDsAudioPowerStates
-} DsAudioPowerState;
 
 
 /// model features (column from dSS visibility Matrix)

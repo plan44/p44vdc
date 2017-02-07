@@ -68,6 +68,8 @@ namespace p44 {
     scene_cmd_climatecontrol_disable, ///< climate control: switch to system disabled (summer mode)
     scene_cmd_climatecontrol_enable, ///< climate control: switch to system enabled (winter mode)
     scene_cmd_climatecontrol_valve_prophylaxis, ///< climate control: Valve prophylaxis
+    scene_cmd_ventilation_airflow_automatic, ///< ventilation control: automatic airflow intensity
+    scene_cmd_ventilation_louver_automatic, ///< ventilation control: automatic louver position
   } SceneCmd;
   
 

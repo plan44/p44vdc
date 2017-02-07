@@ -247,6 +247,7 @@ namespace p44 {
     virtual double getMin() { return 0; }; // 0..numIndices-1
     virtual double getMax() { return numIndices>0 ? numIndices-1 : 0; };
     int getIndex() { return getChannelValue(); }; // return as int for convenience
+    virtual double getDimPerMS() { return 0; }; // not dimmable
 
     void setNumIndices(uint32_t aNumIndices) { numIndices = aNumIndices; };
 
@@ -265,6 +266,8 @@ namespace p44 {
     virtual const char *getName() { return "switch"; };
     virtual double getMin() { return 0; }; // compatible with brightness: 0 to 100%
     virtual double getMax() { return 100; };
+    virtual double getDimPerMS() { return 0; }; // not dimmable
+
   };
   typedef boost::intrusive_ptr<DigitalChannel> DigitalChannelPtr;
 

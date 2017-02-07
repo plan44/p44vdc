@@ -59,7 +59,7 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-// MARK: ===== ShadowDeviceSettings with default shadow scenes factory
+// MARK: ===== ClimateDeviceSettings with default climate scenes factory
 
 
 ClimateDeviceSettings::ClimateDeviceSettings(Device &aDevice) :
@@ -98,9 +98,14 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
     // output channel is a heating valve
     ch = ChannelBehaviourPtr(new HeatingLevelChannel(*this));
   }
+  else if (climateDeviceKind==climatedevice_fancoilunit) {
+    // power state is the main channel
+    // TODO: fan coil unit main channel will have a specific channel type later 
+    ch = ChannelBehaviourPtr(new DigitalChannel(*this));
+  }
   else {
-    // output channel is a fan
-    ch = ChannelBehaviourPtr(new AirflowLevelChannel(*this));
+    // output channel is an unspecified 0..100 dial, probably dummy
+    ch = ChannelBehaviourPtr(new DialChannel(*this));
   }
   addChannel(ch);
 }

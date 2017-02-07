@@ -45,24 +45,6 @@ namespace p44 {
   };
 
 
-  class AirflowLevelChannel : public ChannelBehaviour
-  {
-    typedef ChannelBehaviour inherited;
-
-  public:
-    AirflowLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1% of full scale */ };
-
-    virtual DsChannelType getChannelType() { return channeltype_airflowLevel; };
-    virtual const char *getName() { return "airflowLevel"; };
-    virtual double getMin() { return 0; }; // fan level is 0..100 (automatic mode with upper limit is -100..0)
-    virtual double getMax() { return 100; };
-    virtual double getDimPerMS() { return 100/FULL_SCALE_DIM_TIME_MS; }; // 7 seconds full scale
-
-  };
-
-
-
-
 
   /// A climate scene
   class ClimateControlScene : public SimpleScene
