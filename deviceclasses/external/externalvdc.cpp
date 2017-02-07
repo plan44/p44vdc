@@ -26,6 +26,7 @@
 #include "movinglightbehaviour.hpp"
 #include "shadowbehaviour.hpp"
 #include "climatecontrolbehaviour.hpp"
+#include "ventilationbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
 #include "sensorbehaviour.hpp"
 
@@ -558,6 +559,8 @@ bool ExternalDevice::prepareSceneCall(DsScenePtr aScene)
       case scene_cmd_stop: sceneCommandStr = "STOP"; break;
       case scene_cmd_climatecontrol_enable: sceneCommandStr = "CLIMATE_ENABLE"; break;
       case scene_cmd_climatecontrol_disable: sceneCommandStr = "CLIMATE_DISABLE"; break;
+      case scene_cmd_ventilation_airflow_automatic: sceneCommandStr = "AIRFLOW_AUTO"; break;
+      case scene_cmd_ventilation_louver_automatic: sceneCommandStr = "LOUVER_AUTO"; break;
       default: break; // not implemented, ignore for now
     }
     // send scene command message
@@ -848,12 +851,30 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     controlValues = true; // fan coil unit usually needs control values
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
-    // - create climate control fan output
+    // - create climate control fan coil unit output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_fancoilunit));
     cb->setGroupMembership(group_roomtemperature_control, true); // put into room temperature control group...
     cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
+  }
+  else if (outputType=="ventilation") {
+    if (defaultGroup==group_undefined) defaultGroup = group_blue_ventilation;
+    // - use ventilation scene settings
+    installSettings(DeviceSettingsPtr(new VentilationDeviceSettings(*this)));
+    VentilationDeviceKind vk = ventilationdevice_recirculation;
+    if (aInitParams->get("kind", o)) {
+      string k = o->stringValue();
+      if (k=="ventilation")
+        vk = ventilationdevice_ventilation;
+      else if (k=="recirculation")
+        vk = ventilationdevice_recirculation;
+    }
+    // - add ventilation behaviour
+    VentilationBehaviourPtr vb = VentilationBehaviourPtr(new VentilationBehaviour(*this, vk));
+    vb->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_room, false, -1);
+    vb->setHardwareName(hardwareName);
+    addBehaviour(vb);
   }
   else if (outputType=="shadow") {
     if (defaultGroup==group_undefined) defaultGroup = group_grey_shadow;
