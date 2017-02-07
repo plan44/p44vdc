@@ -298,8 +298,12 @@ namespace p44 {
   {
     typedef Vdc inherited;
     friend class ExternalDevice;
+    friend class ExternalDeviceConnector;
 
     SocketCommPtr externalDeviceApiServer;
+
+    string iconBaseName; ///< the base icon name
+    string modelNameString; ///< the string to be returned by modelName()
 
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
@@ -324,6 +328,25 @@ namespace p44 {
     /// of the flags to collectDevices() make sense for this vDC.
     /// @return a combination of rescanmode_xxx bits
     virtual int getRescanModes() const P44_OVERRIDE { return rescanmode_exhaustive; }; // only exhaustive makes sense
+
+
+    /// Custom identification for external vDCs
+    /// @{
+
+    /// @return human readable, language independent model name/short description
+    /// @note base class will construct this from global product name and vdcModelSuffix()
+    virtual string modelName() P44_OVERRIDE;
+
+    /// Get icon data or name
+    /// @param aIcon string to put result into (when method returns true)
+    /// - if aWithData is set, binary PNG icon data for given resolution prefix is returned
+    /// - if aWithData is not set, only the icon name (without file extension) is returned
+    /// @param aWithData if set, PNG data is returned, otherwise only name
+    /// @return true if there is an icon, false if not
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+    /// @}
+
 
   private:
 

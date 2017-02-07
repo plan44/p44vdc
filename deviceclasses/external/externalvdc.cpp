@@ -1401,7 +1401,7 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
     // check for init message
     string msg = o->stringValue();
     if (msg=="init") {
-      // only first device can set protocol type
+      // only first device can set protocol type or vDC model
       if (externalDevices.size()==0) {
         if (aMessage->get("protocol", o)) {
           string p = o->stringValue();
@@ -1442,6 +1442,17 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
           // added ok, also add to my own list
           externalDevices[tag] = extDev;
         }
+      }
+    }
+    else if (msg=="initvdc") {
+      // vdc-level information
+      // - model name
+      if (aMessage->get("modelname", o)) {
+        externalVdc.modelNameString = o->stringValue();
+      }
+      // - get icon base name
+      if (aMessage->get("iconname", o)) {
+        externalVdc.iconBaseName = o->stringValue();
       }
     }
     else if (msg=="log") {
@@ -1532,7 +1543,8 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 
 ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
-  Vdc(aInstanceNumber, aVdcHostP, aTag)
+  Vdc(aInstanceNumber, aVdcHostP, aTag),
+  iconBaseName("vdc_ext") // default icon name
 {
   // create device API server and set connection specifications
   externalDeviceApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
@@ -1558,8 +1570,24 @@ SocketCommPtr ExternalVdc::deviceApiConnectionHandler(SocketCommPtr aServerSocke
 }
 
 
+string ExternalVdc::modelName()
+{
+  if (!modelNameString.empty())
+    return modelNameString;
+  return inherited::modelName();
+}
 
-// vDC name
+
+bool ExternalVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
+{
+  if (getIcon(iconBaseName.c_str(), aIcon, aWithData, aResolutionPrefix))
+    return true;
+  else
+    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+}
+
+
+
 const char *ExternalVdc::vdcClassIdentifier() const
 {
   return "External_Device_Container";
