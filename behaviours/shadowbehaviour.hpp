@@ -46,7 +46,7 @@ namespace p44 {
     /// Set time it takes to run trough a full range (0..100%), approximately
     void setFullRangeTime(MLMicroSeconds aFullRangeTime) { fullRangeTime = aFullRangeTime; };
 
-    virtual DsChannelType getChannelType() { return channeltype_position_v; }; ///< the dS channel type
+    virtual DsChannelType getChannelType() { return channeltype_shade_position_outside; }; ///< the dS channel type
     virtual const char *getName() { return "position"; };
     virtual double getMin() { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() { return 100; };
@@ -72,7 +72,7 @@ namespace p44 {
     /// Set time it takes to run trough a full range (0..100%), approximately
     void setFullRangeTime(MLMicroSeconds aFullRangeTime) { fullRangeTime = aFullRangeTime; };
 
-    virtual DsChannelType getChannelType() { return channeltype_position_angle; }; ///< the dS channel type
+    virtual DsChannelType getChannelType() { return channeltype_shade_angle_outside; }; ///< the dS channel type
     virtual const char *getName() { return "angle"; };
     virtual double getMin() { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() { return 100; };

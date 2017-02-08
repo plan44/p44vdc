@@ -43,8 +43,8 @@ double MovingLightScene::sceneValue(size_t aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
-    case channeltype_position_h : return hPos;
-    case channeltype_position_v : return vPos;
+    case channeltype_p44_position_h : return hPos;
+    case channeltype_p44_position_v : return vPos;
     default: return inherited::sceneValue(aChannelIndex);
   }
   return 0;
@@ -55,8 +55,8 @@ void MovingLightScene::setSceneValue(size_t aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
-    case channeltype_position_h : setPVar(hPos, aValue);
-    case channeltype_position_v : setPVar(vPos, aValue);
+    case channeltype_p44_position_h : setPVar(hPos, aValue);
+    case channeltype_p44_position_v : setPVar(vPos, aValue);
     default: inherited::setSceneValue(aChannelIndex, aValue); break;
   }
 }

@@ -48,7 +48,7 @@ ShadowScene::ShadowScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSce
 double ShadowScene::sceneValue(size_t aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
-  if (cb->getChannelType()==channeltype_position_angle) {
+  if (cb->getChannelType()==channeltype_shade_angle_outside) {
     return angle;
   }
   return inherited::sceneValue(aChannelIndex);
@@ -58,7 +58,7 @@ double ShadowScene::sceneValue(size_t aChannelIndex)
 void ShadowScene::setSceneValue(size_t aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
-  if (cb->getChannelType()==channeltype_position_angle) {
+  if (cb->getChannelType()==channeltype_shade_angle_outside) {
     setPVar(angle, aValue);
     return;
   }

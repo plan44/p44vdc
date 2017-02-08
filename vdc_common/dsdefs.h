@@ -260,25 +260,26 @@ typedef enum {
   channeltype_colortemp = 4, ///< color temperature for lights with variable white point
   channeltype_cie_x = 5, ///< X in CIE Color Model for color lights
   channeltype_cie_y = 6, ///< Y in CIE Color Model for color lights
-  channeltype_position_v = 7, ///< vertical position
-  channeltype_position_h = 8, ///< horizontal position
-  channeltype_position_angle = 9, ///< opening angle position
-  channeltype_permeability = 10, ///< permeability
-  // FIXME: check definitive enum!
-  channeltype_heatingLevel = 11, ///< heatingLevel channel
-  // FIXME: check definitive enum!
+  channeltype_shade_position_outside = 7, ///< shade position outside (blinds)
+  channeltype_shade_position_inside = 8, ///< shade position inside (curtains)
+  channeltype_shade_angle_outside = 9, ///< shade opening angle outside (blinds)
+  channeltype_shade_angle_inside = 10, ///< shade opening angle inside (curtains)
+  channeltype_permeability = 11, ///< permeability (smart glass)
   channeltype_airflow_intensity = 12, ///< airflow intensity channel
-  // FIXME: check definitive enum!
   channeltype_airflow_direction = 13, ///< airflow direction (DsVentilationDirectionState)
-  // FIXME: check definitive enum!
-  channeltype_airflow_louver_position = 14, ///< louver position, 0..100 of device's available range
+  channeltype_airflow_flap_position = 14, ///< airflow flap position (angle), 0..100 of device's available range
+  channeltype_airflow_louver_position = 15, ///< louver position (angle), 0..100 of device's available range
 
   channeltype_custom_first = 192, ///< first device-specific channel
   channeltype_custom_last = 239, ///< last device-specific channel
 
-  channeltype_p44_audio_volume = channeltype_custom_first+0, ///< // FIXME: p44-specific channel type for audio volume until dS specifies one
-  channeltype_p44_audio_power_state = channeltype_custom_first+1, ///< audio power state (DsAudioPowerState) // FIXME: p44-specific channel type for audio power state until dS specifies one
-  channeltype_p44_audio_content_source = channeltype_custom_first+2, ///< audio content source // FIXME: p44-specific channel type for audio content source until dS specifies one
+  channeltype_p44_position_v = channeltype_custom_first+0, ///< vertical position (e.g for moving lights)
+  channeltype_p44_position_h = channeltype_custom_first+1, ///< horizontal position (e.g for moving lights)
+
+  channeltype_p44_audio_volume = channeltype_custom_first+20, ///< // FIXME: p44-specific channel type for audio volume until dS specifies one
+  channeltype_p44_audio_power_state = channeltype_custom_first+21, ///< audio power state (DsAudioPowerState) // FIXME: p44-specific channel type for audio power state until dS specifies one
+  channeltype_p44_audio_content_source = channeltype_custom_first+22, ///< audio content source // FIXME: p44-specific channel type for audio content source until dS specifies one
+  channeltype_heatingLevel = channeltype_custom_first+23, ///< heatingLevel channel // FIXME: p44-specific channel type for heating level until dS specifies one
 
   numChannelTypes = 240 // 0..239 are channel types
 } DsChannelTypeEnum;

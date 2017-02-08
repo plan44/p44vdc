@@ -38,7 +38,7 @@ namespace p44 {
   public:
     VPosChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.01; /* arbitrary */ };
 
-    virtual DsChannelType getChannelType() { return channeltype_position_v; }; ///< the dS channel type
+    virtual DsChannelType getChannelType() { return channeltype_p44_position_v; }; ///< the dS channel type
     virtual const char *getName() { return "vertical position"; };
     virtual double getMin() { return 0; }; // position goes from 0 to 100%
     virtual double getMax() { return 100; };
@@ -52,7 +52,7 @@ namespace p44 {
   public:
     HPosChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.01; /* arbitrary */ };
 
-    virtual DsChannelType getChannelType() { return channeltype_position_h; }; ///< the dS channel type
+    virtual DsChannelType getChannelType() { return channeltype_p44_position_h; }; ///< the dS channel type
     virtual const char *getName() { return "horizontal position"; };
     virtual double getMin() { return 0; }; // position goes from 0 to 100%
     virtual double getMax() { return 100; };
