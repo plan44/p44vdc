@@ -438,7 +438,15 @@ ErrorPtr ExternalDevice::processInputJson(char aInputType, JsonObjectPtr aParams
 {
   uint32_t index = 0;
   JsonObjectPtr o = aParams->get("index");
-  if (o) index = o->int32Value();
+  if (o) {
+    index = o->int32Value();
+  }
+  else if (aInputType=='C' && aParams->get("type", o)) {
+    // channel specified by type, not index
+    DsChannelType ty = (DsChannelType)o->int32Value();
+    ChannelBehaviourPtr cb = getChannelByType(ty);
+    if (cb) index = (uint32_t)cb->getChannelIndex();
+  }
   o = aParams->get("value");
   if (o) {
     double value = o->doubleValue();
