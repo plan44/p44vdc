@@ -61,6 +61,20 @@ Device::Device(Vdc *aVdcP) :
 }
 
 
+void Device::identificationFailed(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError)
+{
+  if (aIdentifyCB) aIdentifyCB(aError, NULL);
+}
+
+
+void Device::identificationOK(IdentifyDeviceCB aIdentifyCB, Device *aActualDevice)
+{
+  if (!aActualDevice) aActualDevice = this;
+  if (aIdentifyCB) aIdentifyCB(ErrorPtr(), aActualDevice);
+}
+
+
+
 string Device::modelUID()
 {
   // combine basic device type identifier, primary group, behaviours and model features and make UUID based dSUID of it

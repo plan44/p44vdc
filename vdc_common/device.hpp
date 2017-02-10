@@ -99,8 +99,92 @@ namespace p44 {
     long serializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
 
   public:
+
+
+    /// @name Device lifecycle management
+    /// @{
+
+    /// constructor
+    /// @note the constructor only needs to do very basic initialisation. The process of querying device details up to the
+    ///   point where it knows its own dSUID is handled in identifyDevice(), which can also swap a placeholder base class device
+    ///   by a more specialized subclass if needed, AFTER accessing some device APIs etc. So the constructor must make the
+    ///   device ready for identifyDevice(), but nothing else.
     Device(Vdc *aVdcP);
+
+    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    /// @param aIdentifyCB must be called when the setup is complete, which is when the device has all information
+    ///   (which might have required API calls to determine device models, serial numbers etc.) ready to know its own
+    ///   dSUID.
+    /// @note identifyDevice() will only be called on a new Device object during the process of adding a device to a vDC.
+    /// @note identifyDevice() MAY NOT perform any action on the (hardware) device that would modify its state. When re-scanning
+    ///   for hardware devices, identifyDevice() will often target already known and registered devices. identifyDevice()'s only
+    ///   allowed interaction with the hardware device is to query enough information to derive a henceforth invariable dSUID and
+    ///   and to construct a suitable Device object, including all contained settings, scene and behaviour objects.
+    ///   This object is then *possibly* used to operate the device later (in this case it will receive load() and initializeDevice() calls),
+    //    but also might get discarded without further calls when it turns out there already is a Device with the same dSUID.
+    /// @note When idenify finishes, the device must be ready to load persistent settings (which means all behaviours and settings objects
+    ///   need to be in place, as these define the device structure to load settings for), and then for being initialized for operation.
+    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) = 0;
+
+    /// utility: return from identification with error
+    void identificationFailed(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError);
+
+    /// confirm identification
+    void identificationOK(IdentifyDeviceCB aIdentifyCB, Device *aActualDevice = NULL);
+
+
+
+    /// load parameters from persistent DB
+    /// @note this is usually called from the device container when device is added (detected), before initializeDevice() and after identifyDevice()
+    virtual ErrorPtr load();
+
+    // load additional settings from files
+    void loadSettingsFromFiles();
+
+    /// initializes the physical device for being used
+    /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
+    /// @note this is called after persistent settings have been loaded
+    /// @note this is called before interaction with dS system starts
+    /// @note implementation should call inherited when complete, so superclasses could chain further activity
+    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) { aCompletedCB(ErrorPtr()); /* NOP in base class */ };
+
+    /// save unsaved parameters to persistent DB
+    /// @note this is usually called from the device container in regular intervals
+    virtual ErrorPtr save();
+
+    /// forget any parameters stored in persistent DB
+    virtual ErrorPtr forget();
+
+    // check if any settings are dirty
+    virtual bool isDirty();
+
+    // make all settings clean (not to be saved to DB)
+    virtual void markClean();
+
+    /// callback for disconnect()
+    /// @param aDisconnected returns true if device could be disconnected, false if disconnection by software is not possible
+    ///   in general or could not be performed in the current operational state of the device
+    typedef boost::function<void (bool aDisconnected)> DisconnectCB;
+
+    /// disconnect device. If presence is represented by data stored in the vDC rather than
+    /// detection of real physical presence on a bus, this call must clear the data that marks
+    /// the device as connected to this vDC (such as a learned-in EnOcean button).
+    /// For devices where the vDC can be *absolutely certain* that they are still connected
+    /// to the vDC AND cannot possibly be connected to another vDC as well, this call should
+    /// return false.
+    /// @param aForgetParams if set, not only the connection to the device is removed, but also all parameters related to it
+    ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
+    /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
+    ///   false in case it is certain that the device is still connected to this and only this vDC
+    /// @note at the time aDisconnectResultHandler is called, the only owner left for the device object might be the
+    ///   aDevice argument to the DisconnectCB handler.
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
+
+    /// destructor
     virtual ~Device();
+
+    /// @}
+
 
     /// @name identification and invariable properties of the device (can be overriden in subclasses)
     /// @{
@@ -128,7 +212,6 @@ namespace p44 {
     virtual uint32_t deviceClassVersion() { return 0; }
 
 
-
     /// @return the entity type (one of dSD|vdSD|vDC|dSM|vdSM|dSS|*)
     virtual const char *entityType() P44_OVERRIDE { return "vdSD"; }
 
@@ -153,7 +236,7 @@ namespace p44 {
 
 
 
-    /// @name general device level methods
+    /// @name other device level methods
     /// @{
 
     /// set basic device color
@@ -172,17 +255,6 @@ namespace p44 {
     /// get dominant class (i.e. the class that should color the icon)
     /// @return color class number
     DsClass getDominantColorClass();
-
-
-    /// report that device has vanished (disconnected without being told so via vDC API)
-    /// This will call disconnect() on the device, and remove it from all vDC container lists
-    /// @param aForgetParams if set, not only the connection to the device is removed, but also all parameters related to it
-    ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
-    /// @note this method should be called when bus scanning or other HW-side events detect disconnection
-    ///   of a device, such that it can be reported to the dS system.
-    /// @note calling hasVanished() might delete the object, so don't rely on 'this' after calling it unless you
-    ///   still hold a DevicePtr to it
-    void hasVanished(bool aForgetParams);
 
     /// set user assignable name
     /// @param aName name of the addressable entity
@@ -204,30 +276,29 @@ namespace p44 {
     /// @return NULL if device has no scenes, scene device settings otherwise 
     SceneDeviceSettingsPtr getScenes() { return boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings); };
 
-    /// this will be called just before a device is added to the vdc, and thus needs to be fully constructed
-    /// (settings, scenes, behaviours) and MUST have determined the henceforth invariable dSUID.
-    /// After having received this call, the device must also be ready to load persistent settings.
-    virtual void willBeAdded() { /* NOP in base class */};
+    /// send a signal needed for some devices to get learned into other devices, or query availability of teach-in signals
+    /// @param aVariant -1 to just get number of available teach-in variants. 0..n to send teach-in signal;
+    ///   some devices may have different teach-in signals (like: one for ON, one for OFF).
+    /// @return number of teach-in signal variants the device can send
+    virtual uint8_t teachInSignal(int8_t aVariant) { return 0; /* has no teach-in signals */ };
 
-    /// load parameters from persistent DB
-    /// @note this is usually called from the device container when device is added (detected)
-    virtual ErrorPtr load();
+    /// check if device can be disconnected by software (i.e. Web-UI)
+    /// @return true if device might be disconnectable by the user via software (i.e. web UI)
+    /// @note devices returning true here might still refuse disconnection on a case by case basis when
+    ///   operational state does not allow disconnection.
+    /// @note devices returning false here might still be disconnectable using disconnect() triggered
+    ///   by vDC API "remove" method.
+    virtual bool isSoftwareDisconnectable() { return false; }; // by default, devices cannot be removed via Web-UI
 
-    /// save unsaved parameters to persistent DB
-    /// @note this is usually called from the device container in regular intervals
-    virtual ErrorPtr save();
-
-    /// forget any parameters stored in persistent DB
-    virtual ErrorPtr forget();
-
-    // check if any settings are dirty
-    virtual bool isDirty();
-
-    // make all settings clean (not to be saved to DB)
-    virtual void markClean();
-
-    // load additional settings from files
-    void loadSettingsFromFiles();
+    /// report that device has vanished (disconnected without being told so via vDC API)
+    /// This will call disconnect() on the device, and remove it from all vDC container lists
+    /// @param aForgetParams if set, not only the connection to the device is removed, but also all parameters related to it
+    ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
+    /// @note this method should be called when bus scanning or other HW-side events detect disconnection
+    ///   of a device, such that it can be reported to the dS system.
+    /// @note calling hasVanished() might delete the object, so don't rely on 'this' after calling it unless you
+    ///   still hold a DevicePtr to it
+    void hasVanished(bool aForgetParams);
 
     /// @}
 
@@ -344,40 +415,6 @@ namespace p44 {
     /// @note base class delegates this to the output behaviour (if any)
     virtual void identifyToUser();
 
-    /// send a signal needed for some devices to get learned into other devices, or query availability of teach-in signals
-    /// @param aVariant -1 to just get number of available teach-in variants. 0..n to send teach-in signal;
-    ///   some devices may have different teach-in signals (like: one for ON, one for OFF).
-    /// @return number of teach-in signal variants the device can send
-    virtual uint8_t teachInSignal(int8_t aVariant) { return 0; /* has no teach-in signals */ };
-
-
-    /// check if device can be disconnected by software (i.e. Web-UI)
-    /// @return true if device might be disconnectable by the user via software (i.e. web UI)
-    /// @note devices returning true here might still refuse disconnection on a case by case basis when
-    ///   operational state does not allow disconnection.
-    /// @note devices returning false here might still be disconnectable using disconnect() triggered
-    ///   by vDC API "remove" method.
-    virtual bool isSoftwareDisconnectable() { return false; }; // by default, devices cannot be removed via Web-UI
-
-    /// callback for disconnect()
-    /// @param aDisconnected returns true if device could be disconnected, false if disconnection by software is not possible
-    ///   in general or could not be performed in the current operational state of the device
-    typedef boost::function<void (bool aDisconnected)> DisconnectCB;
-
-    /// disconnect device. If presence is represented by data stored in the vDC rather than
-    /// detection of real physical presence on a bus, this call must clear the data that marks
-    /// the device as connected to this vDC (such as a learned-in EnOcean button).
-    /// For devices where the vDC can be *absolutely certain* that they are still connected
-    /// to the vDC AND cannot possibly be connected to another vDC as well, this call should
-    /// return false.
-    /// @param aForgetParams if set, not only the connection to the device is removed, but also all parameters related to it
-    ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
-    /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
-    ///   false in case it is certain that the device is still connected to this and only this vDC
-    /// @note at the time aDisconnectResultHandler is called, the only owner left for the device object might be the
-    ///   aDevice argument to the DisconnectCB handler.
-    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
-
     /// @}
 
 
@@ -416,12 +453,6 @@ namespace p44 {
     ///   These methods should never be called directly!
     /// @note base class implementations are NOP
     /// @{
-
-    /// initializes the physical device for being used
-    /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
-    /// @note this is called before interaction with dS system starts
-    /// @note implementation should call inherited when complete, so superclasses could chain further activity
-    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) { aCompletedCB(ErrorPtr()); /* NOP in base class */ };
 
     /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
     virtual void addToModelUIDHash(string &aHashedString);

@@ -19,9 +19,9 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "vdc.hpp"
-
 #include "device.hpp"
+
+#include "vdc.hpp"
 
 using namespace p44;
 
@@ -233,12 +233,11 @@ string Vdc::vendorName()
 }
 
 
+// MARK: ===== Managing devices
 
-// add a device
+
 bool Vdc::addDevice(DevicePtr aDevice)
 {
-  // let device consider its internal structure and dSUID for the last time
-  aDevice->willBeAdded();
   // announce to global device container
   if (getVdcHost().addDevice(aDevice)) {
     // not a duplicate
@@ -252,7 +251,6 @@ bool Vdc::addDevice(DevicePtr aDevice)
 
 
 
-// remove a device
 void Vdc::removeDevice(DevicePtr aDevice, bool aForget)
 {
 	// find and remove from my list.
@@ -267,6 +265,7 @@ void Vdc::removeDevice(DevicePtr aDevice, bool aForget)
 }
 
 
+
 void Vdc::removeDevices(bool aForget)
 {
 	for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
@@ -278,6 +277,91 @@ void Vdc::removeDevices(bool aForget)
   }
   // clear my own list
   devices.clear();
+}
+
+
+
+void Vdc::identifyDevice(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int aMaxRetries, MLMicroSeconds aRetryDelay)
+{
+  // Note: aNewDevice bound to the callback prevents it from being deleted during identification
+  aNewDevice->identifyDevice(boost::bind(&Vdc::identifyDeviceCB, this, aNewDevice, aIdentifyCB, aMaxRetries, aRetryDelay, _1, _2));
+}
+
+void Vdc::identifyDeviceCB(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int aMaxRetries, MLMicroSeconds aRetryDelay, ErrorPtr aError, Device *aIdentifiedDevice)
+{
+  if (Error::isOK(aError)) {
+    if (aIdentifiedDevice) {
+      // success
+      DevicePtr dev = DevicePtr(aIdentifiedDevice); // keep alive during callback
+      // aNewDevice keeps original device alive, dev keeps identified device alive (might be the same)
+      if (aIdentifyCB) aIdentifyCB(aError, aIdentifiedDevice);
+      // now dev and aNewDevice go out of scope -> objects will be deleted when no longer used anywhere else. 
+      return;
+    }
+    // no device
+    aError = Error::err<VdcError>(VdcError::NoDevice, "identifyDevice returned no device");
+  }
+  // failed, check for retries
+  if (aMaxRetries>0) {
+    // report this error into the log
+    LOG(LOG_WARNING, "device identification failed: %s -> retrying %d times", aError->description().c_str(), aMaxRetries);
+    aMaxRetries--;
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::identifyDevice, this, aNewDevice, aIdentifyCB, aMaxRetries, aRetryDelay), aRetryDelay);
+    return;
+  }
+  // no retries left, give up
+  if (aIdentifyCB) aIdentifyCB(aError, NULL);
+}
+
+
+
+void Vdc::identifyAndAddDevice(DevicePtr aNewDevice, StatusCB aCompletedCB, int aMaxRetries, MLMicroSeconds aRetryDelay)
+{
+  identifyDevice(aNewDevice, boost::bind(&Vdc::identifyAndAddDeviceCB, this, aCompletedCB, _1, _2), aMaxRetries, aRetryDelay);
+}
+
+
+void Vdc::identifyAndAddDeviceCB(StatusCB aCompletedCB, ErrorPtr aError, Device *aIdentifiedDevice)
+{
+  // Note: to keep aIdentifiedDevice alive, it must be wrapped into a DevicePtr now. Otherwise, it will be deleted
+  if (Error::isOK(aError)) {
+    if (addDevice(DevicePtr(aIdentifiedDevice))) {
+      // actually added, no duplicate
+    }
+  }
+  else {
+    LOG(LOG_ERR, "Could not get device identification: %s", aError->description().c_str());
+    // we can't add this device, continue to next without adding
+  }
+  if (aCompletedCB) aCompletedCB(aError);
+}
+
+
+void Vdc::identifyAndAddDevices(DeviceList aToBeAddedDevices, StatusCB aCompletedCB, int aMaxRetries, MLMicroSeconds aRetryDelay, MLMicroSeconds aAddDelay)
+{
+  if (aToBeAddedDevices.size()>0) {
+    // more devices to add
+    DevicePtr dev = aToBeAddedDevices.front();
+    aToBeAddedDevices.pop_front();
+    identifyAndAddDevice(
+      dev,
+      boost::bind(&Vdc::identifyAndAddDevicesCB, this, aToBeAddedDevices, aCompletedCB, aMaxRetries, aRetryDelay, aAddDelay),
+      aMaxRetries, aRetryDelay
+    );
+    return;
+  }
+  // done
+  if (aCompletedCB) aCompletedCB(ErrorPtr());
+}
+
+
+void Vdc::identifyAndAddDevicesCB(DeviceList aToBeAddedDevices, StatusCB aCompletedCB, int aMaxRetries, MLMicroSeconds aRetryDelay, MLMicroSeconds aAddDelay)
+{
+  // even without add delay, it's important to defer this call to avoid stacking up calls along aToBeAddedDevices
+  MainLoop::currentMainLoop().executeOnce(
+    boost::bind(&Vdc::identifyAndAddDevices, this, aToBeAddedDevices, aCompletedCB, aMaxRetries, aRetryDelay, aAddDelay),
+    aAddDelay
+  );
 }
 
 

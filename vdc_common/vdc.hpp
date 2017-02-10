@@ -38,7 +38,8 @@ namespace p44 {
     // Errors
     typedef enum {
       OK,
-      Initialize,
+      NoDevice, ///< no device could be identified
+      Initialize, ///< initialisation failed
     } ErrorCodes;
     
     static const char *domain() { return "DeviceClass"; }
@@ -49,13 +50,23 @@ namespace p44 {
 	
 	
   class Device;
-
   typedef boost::intrusive_ptr<Device> DevicePtr;
+
+  /// callback from identifyDevice()
+  /// @param aError error in case setup has failed
+  /// @param aIdentifiedDevice will be assigned the identified device, which *might* be another object than
+  ///   the one identifyDevice() was called on, in cases where the identify process implemented in a base class placeholder
+  ///   device figures out a more specialized subclass that will actually handle the device. In simpler
+  ///   cases, aIdentifiedDevice will return *this*.
+  /// @note aIdentifiedDevice can't be a DevicePtr but needs to be a plain Device* because boost::bind can't work with
+  ///   forward declaration. 
+  typedef boost::function<void (ErrorPtr aError, Device *aIdentifiedDevice)> IdentifyDeviceCB;
 
 
   class Vdc;
   typedef boost::intrusive_ptr<Vdc> VdcPtr;
   typedef std::vector<DevicePtr> DeviceVector;
+  typedef std::list<DevicePtr> DeviceList;
 
 
   /// This is the base class for a "class" (usually: type of hardware) of virtual devices.
@@ -225,6 +236,23 @@ namespace p44 {
     ///   the device is not disconnected (=unlearned) by this.
     virtual void removeDevice(DevicePtr aDevice, bool aForget = false);
 
+    /// utility method for collectDevices: identify device with retries
+    /// @param aNewDevice the device to be identified and added
+    /// @param aCompletedCB will be called when device has been added or had error
+    /// @param aMaxRetries how many retries (excluding the first try) should be attempted
+    /// @param aRetryDelay how long to wait between retries
+    void identifyAndAddDevice(DevicePtr aNewDevice, StatusCB aCompletedCB, int aMaxRetries = 0, MLMicroSeconds aRetryDelay = 0);
+
+    /// utility method for collectDevices: identify and add a list of devices
+    /// @param aToBeAddedDevices a list of devices to be identified and added
+    /// @param aCompletedCB will be called when all devices have been added
+    /// @param aMaxRetries how many retries (excluding the first try) should be attempted
+    /// @param aRetryDelay how long to wait between retries
+    /// @param aAddDelay how long to wait between adding devices
+    void identifyAndAddDevices(DeviceList aToBeAddedDevices, StatusCB aCompletedCB, int aMaxRetries = 0, MLMicroSeconds aRetryDelay = 0, MLMicroSeconds aAddDelay = 0);
+
+
+
 		/// @}
 
 
@@ -313,9 +341,22 @@ namespace p44 {
 
   private:
 
+    /// utility method for identifyAndAddDevice(s): identify device with retries
+    /// @param aNewDevice the device to be identified
+    /// @param aIdentifyCB will be called with the identified device object or an error
+    /// @param aMaxRetries how many retries (excluding the first try) should be attempted
+    /// @param aRetryDelay how long to wait between retries
+    void identifyDevice(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int aMaxRetries, MLMicroSeconds aRetryDelay);
+
+
+    void identifyDeviceCB(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int aMaxRetries, MLMicroSeconds aRetryDelay, ErrorPtr aError, Device *aIdentifiedDevice);
+    void identifyAndAddDeviceCB(StatusCB aCompletedCB, ErrorPtr aError, Device *aIdentifiedDevice);
+    void identifyAndAddDevicesCB(DeviceList aToBeAddedDevices, StatusCB aCompletedCB, int aMaxRetries, MLMicroSeconds aRetryDelay, MLMicroSeconds aAddDelay);
+
     void performPair(VdcApiRequestPtr aRequest, Tristate aEstablish, bool aDisableProximityCheck, MLMicroSeconds aTimeout);
     void pairingEvent(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError);
     void pairingTimeout(VdcApiRequestPtr aRequest);
+
 
   };
 
