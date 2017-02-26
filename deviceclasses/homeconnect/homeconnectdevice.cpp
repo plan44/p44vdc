@@ -200,7 +200,7 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
   if (aHomeApplicanceInfoRecord->get("brand", o))
     vendor = o->stringValue();
   // FIXME: ugly direct model match
-  standalone = modelGuid=="TI909701HC/03";
+  standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
   // Create standard actions
   HomeConnectActionPtr a;
   // - enums that can be shared between actions
