@@ -58,10 +58,26 @@ namespace p44 {
   /// Callback for other global device activity
   typedef enum {
     vdchost_activitysignal, ///< user-relevant activity, can be used to trigger flashing an activity LED.
-    vdchost_descriptionchanged ///< user-visible description of the device (such as vdchost name) has changed.
+    vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
+    vdchost_network_reconnected, ///< network connection established again
+    vdchost_network_lost, ///< network connection was lost
+    vdchost_vdcapi_connected, ///< the VDC API is connected (to a vdsm using it)
+    vdchost_vdcapi_disconnected, ///< the VDC API was disconnected
+    vdchost_vdcs_initialized, ///< all vdcs are initialized now
+    vdchost_devices_collected, ///< initial device collection run is complete
+    vdchost_devices_initialized, ///< initial device initialisation run is complete
   } VdchostEvent;
   typedef boost::function<void (VdchostEvent aActivity)> VdchostEventCB;
 
+  /// Rescan modes
+  enum {
+    rescanmode_none = 0, ///< for reporting supported modes, if no rescan (from UI) is supported
+    rescanmode_incremental = 0x01, ///< incremental rescan
+    rescanmode_normal = 0x02, ///< normal rescan
+    rescanmode_exhaustive = 0x04, ///< exhaustive rescan
+    rescanmode_clearsettings = 0x08 ///< exhaustive rescan
+  };
+  typedef uint8_t RescanMode;
 
 
   /// persistence for digitalSTROM paramters
@@ -122,6 +138,9 @@ namespace p44 {
     // learning
     bool learningMode;
     LearnCB learnHandler;
+
+    // global status
+    bool networkConnected;
 
     // user action monitor (learn)buttons
     DeviceUserActionCB deviceUserActionHandler;
@@ -222,7 +241,7 @@ namespace p44 {
     /// start running normally
     void startRunning();
 
-    /// activity monitor
+    /// activity monitor (e.g. for main program to trigger re-advertising or LED activity)
     /// @param aEventCB will be called for globally relevant events.
     void setEventMonitor(VdchostEventCB aEventCB);
 
@@ -234,23 +253,36 @@ namespace p44 {
     /// @param aValueSourceID internal, persistent ID of the value source
     ValueSource *getValueSourceById(string aValueSourceID);
 
+    /// @name global status
+    /// @{
+
+    /// check if API is connected
+    /// @return true if vDC API has a connection from a vdSM right now
+    bool isApiConnected();
+
+    /// check if we have network (IP) connection
+    /// @return true if device this vdchost is running on has a usable IP address
+    bool isNetworkConnected();
+
+    /// @}
 
 
 		/// @name device detection and registration
     /// @{
 
     /// collect devices from all vDCs, and have each of them initialized
-    /// @param aCompletedCB will be called when all device scans have completed
-    /// @param aIncremental if set, search is only made for additional new devices. Disappeared devices
-    ///   might not get detected this way
-    /// @param aExhaustive if set, device search is made exhaustive (may include longer lasting procedures to
+    /// @param aCompletedCB will be called when device scan for this vDC has been completed
+    /// @param aRescanFlags selects mode of rescan:
+    /// - if rescanmode_incremental is set, search is only made for additional new devices. Disappeared devices
+    ///   might not get detected this way.
+    /// - if rescanmode_exhaustive is set, device search is made exhaustive (may include longer lasting procedures to
     ///   recollect lost devices, assign bus addresses etc.). Without this flag set, device search should
     ///   still be complete under normal conditions, but might sacrifice corner case detection for speed.
-    /// @param aClearSettings if set, persistent settings of currently known devices will be deleted before
+    /// - if rescanmode_clearsettings is set, persistent settings of currently known devices will be deleted before
     ///   re-scanning for devices, which means devices will have default settings after collecting.
-    ///   Note that this is mutually exclusive with aIncremental (incremental scan does not remove any devices,
+    ///   Note that this is mutually exclusive with aIncremental (as incremental scan does not remove any devices,
     ///   and thus cannot remove any settings, either)
-    void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings);
+    void collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags);
 
     /// Put vDC controllers into learn-in mode
     /// @param aLearnHandler handler to call when a learn-in action occurs
@@ -434,6 +466,14 @@ namespace p44 {
     // derive dSUID
     void deriveDsUid();
 
+    // initializing and collecting
+    void initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc);
+    void vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc, ErrorPtr aError);
+    void collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc);
+    void vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc, ErrorPtr aError);
+    void initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice);
+    void deviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice, ErrorPtr aError);
+
     // local operation mode
     void handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
     void localDimHandler();
@@ -456,6 +496,9 @@ namespace p44 {
     void startAnnouncing();
     void announceNext();
     void announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequestPtr aRequest, ErrorPtr &aError, ApiValuePtr aResultOrErrorData);
+
+    // post a vdchost (global) event to all vdcs and via event monitor callback
+    void postEvent(VdchostEvent aEvent);
 
     // activity monitor
     void signalActivity();

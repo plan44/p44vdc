@@ -33,8 +33,19 @@ Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   defaultZoneID(0),
   vdcFlags(0),
   tag(aTag),
-  pairTicket(0)
+  pairTicket(0),
+  rescanInterval(Never),
+  rescanMode(rescanmode_incremental),
+  rescanTicket(0),
+  collecting(false)
 {
+}
+
+
+Vdc::~Vdc()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(rescanTicket);
+  MainLoop::currentMainLoop().cancelExecutionTicket(pairTicket);
 }
 
 
@@ -85,10 +96,18 @@ ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, Api
     bool incremental = true;
     bool exhaustive = false;
     bool clear = false;
+    RescanMode mode = rescanmode_none;
     checkBoolParam(aParams, "incremental", incremental);
     checkBoolParam(aParams, "exhaustive", exhaustive);
     checkBoolParam(aParams, "clearconfig", clear);
-    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), incremental, exhaustive, clear);
+    if (exhaustive)
+      mode |= rescanmode_exhaustive;
+    else if (incremental)
+      mode |= rescanmode_incremental;
+    else
+      mode |= rescanmode_normal;
+    if (clear) mode |= rescanmode_clearsettings;
+    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), mode);
   }
   else if (aMethod=="pair") {
     // only via genericRequest
@@ -231,6 +250,70 @@ string Vdc::vendorName()
   // default to same vendor as vdc host (device container)
   return getVdcHost().vendorName();
 }
+
+
+// MARK: ===== Collecting devices
+
+void Vdc::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
+{
+  // prevent collecting while already collecting
+  if (collecting) {
+    // already collecting - don't collect again
+    ALOG(LOG_WARNING,"requested collecting while already collecting");
+    if (aCompletedCB) aCompletedCB(Error::err<VdcError>(VdcError::Collecting, "already collecting"));
+    return;
+  }
+  collecting = true;
+  // call actual vdc's implementation
+  scanForDevices(
+    boost::bind(&Vdc::collectedDevices, this, aCompletedCB, _1),
+    aRescanFlags
+  );
+}
+
+
+void Vdc::collectedDevices(StatusCB aCompletedCB, ErrorPtr aError)
+{
+  if (aCompletedCB) aCompletedCB(aError);
+  collecting = false;
+  // now schedule
+  scheduleRecollecting();
+}
+
+
+void Vdc::scheduleRecollecting()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(rescanTicket);
+  if (rescanInterval!=Never) {
+    rescanTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::periodicRecollect, this), rescanInterval);
+  }
+}
+
+
+void Vdc::periodicRecollect()
+{
+  ALOG(LOG_NOTICE, "starting periodic recollect");
+  collectDevices(boost::bind(&Vdc::periodicRecollectDone, this), rescanMode);
+}
+
+
+void Vdc::periodicRecollectDone()
+{
+  ALOG(LOG_NOTICE, "periodic recollect done");
+}
+
+
+
+void Vdc::setPeriodicRecollection(MLMicroSeconds aRecollectInterval, RescanMode aRescanFlags)
+{
+  rescanInterval = aRecollectInterval;
+  rescanMode = aRescanFlags;
+  if (!isCollecting()) {
+    // not already collecting, start schedule now (otherwise, end of collecting will schedule next recollect
+    scheduleRecollecting();
+  }
+}
+
 
 
 // MARK: ===== Managing devices

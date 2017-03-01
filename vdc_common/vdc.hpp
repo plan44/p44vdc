@@ -40,6 +40,7 @@ namespace p44 {
       OK,
       NoDevice, ///< no device could be identified
       Initialize, ///< initialisation failed
+      Collecting, ///< is busy collecting devices already, new collection request irgnored
     } ErrorCodes;
     
     static const char *domain() { return "DeviceClass"; }
@@ -68,7 +69,6 @@ namespace p44 {
   typedef std::vector<DevicePtr> DeviceVector;
   typedef std::list<DevicePtr> DeviceList;
 
-
   /// This is the base class for a "class" (usually: type of hardware) of virtual devices.
   /// In dS terminology, this object represents a vDC (virtual device connector).
   class Vdc : public PersistentParams, public DsAddressable
@@ -85,6 +85,12 @@ namespace p44 {
     /// default dS zone ID
     int defaultZoneID;
 
+    /// periodic rescan, collecting
+    MLMicroSeconds rescanInterval; ///< rescan interval, 0 if none
+    RescanMode rescanMode; ///< mode to use for periodic rescan
+    long rescanTicket; ///< rescan ticket
+    bool collecting; ///< currently collecting
+
   protected:
   
     DeviceVector devices; ///< the devices of this class
@@ -97,6 +103,9 @@ namespace p44 {
     /// @param aVdcHostP device container this vDC is contained in
     /// @param aTag numeric tag for this device container (e.g. for blinking self test error messages)
     Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
+
+    /// destructor
+    virtual ~Vdc();
 
     /// add this vDC to vDC host.
     void addVdcToVdcHost();
@@ -169,30 +178,41 @@ namespace p44 {
     /// @name device collection, learning/pairing, self test
     /// @{
 
-    /// Rescan modes
-    enum {
-      rescanmode_none = 0, ///< no mode bits set -> no rescan supported at all
-      rescanmode_incremental = 0x01, ///< incremental rescan supported
-      rescanmode_normal = 0x02, ///< normal rescan supported
-      rescanmode_exhaustive = 0x04 ///< exhaustive rescan supported
-    };
     /// get supported rescan modes for this vDC. This indicates (usually to a web-UI) which
     /// of the flags to collectDevices() make sense for this vDC.
     /// @return a combination of rescanmode_xxx bits
     virtual int getRescanModes() const { return rescanmode_none; }; // by default, assume not rescannable
 
-    /// collect devices from this vDCs for normal operation
+    /// (re)collect devices from this vDCs for normal operation
     /// @param aCompletedCB will be called when device scan for this vDC has been completed
-    /// @param aIncremental if set, search is only made for additional new devices. Disappeared devices
-    ///   might not get detected this way
-    /// @param aExhaustive if set, device search is made exhaustive (may include longer lasting procedures to
+    /// @param aRescanFlags selects mode of rescan:
+    /// - if rescanmode_incremental is set, search is only made for additional new devices. Disappeared devices
+    ///   might not get detected this way.
+    /// - if rescanmode_exhaustive is set, device search is made exhaustive (may include longer lasting procedures to
     ///   recollect lost devices, assign bus addresses etc.). Without this flag set, device search should
     ///   still be complete under normal conditions, but might sacrifice corner case detection for speed.
-    /// @param aClearSettings if set, persistent settings of currently known devices will be deleted before
+    /// - if rescanmode_clearsettings is set, persistent settings of currently known devices will be deleted before
     ///   re-scanning for devices, which means devices will have default settings after collecting.
-    ///   Note that this is mutually exclusive with aIncremental (incremental scan does not remove any devices,
+    ///   Note that this is mutually exclusive with aIncremental (as incremental scan does not remove any devices,
     ///   and thus cannot remove any settings, either)
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) = 0;
+    /// @note this public method is protected against getting called again when already collecting, and
+    ///   handles re-scheduling periodic recollects.
+    ///   Actual vdc-specific implementation is in protected scanForDevices()
+    void collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags);
+
+    /// request regular recollects of devices in this vdc
+    /// @note this is for vDC implementations to allow them to define a rescan mode/interval appropriate for the vdc's/device's needs
+    /// @param aRecollectInterval how long to wait until re-collecting devices
+    /// @param aRescanFlags rescan mode to use for collecting
+    void setPeriodicRecollection(MLMicroSeconds aRecollectInterval, RescanMode aRescanFlags);
+
+    /// @return true if vdc is currently collecting (scanning for) devices
+    bool isCollecting() { return collecting; };
+
+
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) { /* NOP in base class */ };
 
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error
@@ -339,7 +359,26 @@ namespace p44 {
     // derive dSUID
     void deriveDsUid();
 
+    /// actual implementation of scanning for devices from this vDC
+    /// @param aRescanFlags selects mode of rescan:
+    /// - if rescanmode_incremental is set, search is only made for additional new devices. Disappeared devices
+    ///   might not get detected this way.
+    /// - if rescanmode_exhaustive is set, device search is made exhaustive (may include longer lasting procedures to
+    ///   recollect lost devices, assign bus addresses etc.). Without this flag set, device search should
+    ///   still be complete under normal conditions, but might sacrifice corner case detection for speed.
+    /// - if rescanmode_clearsettings is set, persistent settings of currently known devices will be deleted before
+    ///   re-scanning for devices, which means devices will have default settings after collecting.
+    ///   Note that this is mutually exclusive with aIncremental (as incremental scan does not remove any devices,
+    ///   and thus cannot remove any settings, either)
+    virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) = 0;
+
+
   private:
+
+    void collectedDevices(StatusCB aCompletedCB, ErrorPtr aError);
+    void scheduleRecollecting();
+    void periodicRecollect();
+    void periodicRecollectDone();
 
     /// utility method for identifyAndAddDevice(s): identify device with retries
     /// @param aNewDevice the device to be identified

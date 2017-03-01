@@ -67,6 +67,7 @@ static VdcHost *sharedVdcHostP = NULL;
 VdcHost::VdcHost() :
   inheritedParams(dsParamStore),
   mac(0),
+  networkConnected(true), // start with the assumption of a connected network
   externalDsuid(false),
   storedDsuid(false),
   DsAddressable(this),
@@ -100,6 +101,18 @@ void VdcHost::setEventMonitor(VdchostEventCB aEventCB)
 }
 
 
+void VdcHost::postEvent(VdchostEvent aEvent)
+{
+  // let all vdcs know
+  for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
+    pos->second->handleGlobalEvent(aEvent);
+  }
+  // also let app-level event monitor know
+  if (eventMonitorHandler) {
+    eventMonitorHandler(aEvent);
+  }
+}
+
 
 void VdcHost::setName(const string &aName)
 {
@@ -109,9 +122,7 @@ void VdcHost::setName(const string &aName)
     // make sure it will be saved
     markDirty();
     // is a global event - might need re-advertising services
-    if (eventMonitorHandler) {
-      eventMonitorHandler(vdchost_descriptionchanged);
-    }
+    postEvent(vdchost_descriptionchanged);
   }
 }
 
@@ -197,57 +208,33 @@ string VdcHost::publishedDescription()
 }
 
 
+// MARK: ===== global status
+
+bool VdcHost::isApiConnected()
+{
+  return getSessionConnection()!=NULL;
+}
+
+
+bool VdcHost::isNetworkConnected()
+{
+  uint32_t ipv4 = ipv4Address();
+  // Only consider connected if we have a IP address, and none from the 169.254.0.0/16
+  // link-local autoconfigured ones (RFC 3927/APIPA).
+  bool nowConnected = (ipv4!=0) && ((ipv4 & 0xFFFF0000)!=0xA9FE0000);
+  if (nowConnected!=networkConnected) {
+    // change in connection status - post it
+    networkConnected = nowConnected;
+    LOG(LOG_NOTICE, "*** Network connection %s", networkConnected ? "re-established" : "lost");
+    postEvent(networkConnected ? vdchost_network_reconnected : vdchost_network_lost);
+  }
+  return networkConnected;
+}
+
+
+
 
 // MARK: ===== initializisation of DB and containers
-
-
-class VdcInitializer
-{
-  StatusCB callback;
-  VdcMap::iterator nextVdc;
-  VdcHost &vdcHost;
-  bool factoryReset;
-public:
-  static void initialize(VdcHost &aVdcHost, StatusCB aCallback, bool aFactoryReset)
-  {
-    // create new instance, deletes itself when finished
-    new VdcInitializer(aVdcHost, aCallback, aFactoryReset);
-  };
-private:
-  VdcInitializer(VdcHost &aVdcHost, StatusCB aCallback, bool aFactoryReset) :
-		callback(aCallback),
-		vdcHost(aVdcHost),
-    factoryReset(aFactoryReset)
-  {
-    nextVdc = vdcHost.vdcs.begin();
-    initNextVdc(ErrorPtr());
-  }
-
-
-  void initNextVdc(ErrorPtr aError)
-  {
-    if ((!aError || factoryReset) && nextVdc!=vdcHost.vdcs.end())
-      nextVdc->second->initialize(boost::bind(&VdcInitializer::vdcInitialized, this, _1), factoryReset);
-    else
-      completed(aError);
-  }
-
-  void vdcInitialized(ErrorPtr aError)
-  {
-    // check next
-    ++nextVdc;
-    initNextVdc(aError);
-  }
-
-  void completed(ErrorPtr aError)
-  {
-    // callback
-    callback(aError);
-    // done, delete myself
-    delete this;
-  }
-
-};
 
 
 // Version history
@@ -302,12 +289,42 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     vdcApiServer->start();
   }
   // start initialisation of class containers
-  VdcInitializer::initialize(*this, aCompletedCB, aFactoryReset);
+  initializeNextVdc(aCompletedCB, aFactoryReset, vdcs.begin());
 }
+
+
+
+void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc)
+{
+  // initialize all vDCs, even when some
+  if (aNextVdc!=vdcs.end()) {
+    aNextVdc->second->initialize(boost::bind(&VdcHost::vdcInitialized, this, aCompletedCB, aFactoryReset, aNextVdc, _1), aFactoryReset);
+    return;
+  }
+  // successfully done
+  postEvent(vdchost_vdcs_initialized);
+  aCompletedCB(ErrorPtr());
+}
+
+
+void VdcHost::vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    LOG(LOG_ERR, "vDC %s: failed to initialize: %s", aNextVdc->second->shortDesc().c_str(), aError->description().c_str());
+  }
+  // anyway, initialize next
+  aNextVdc++;
+  initializeNextVdc(aCompletedCB, aFactoryReset, aNextVdc);
+}
+
 
 
 void VdcHost::startRunning()
 {
+  // force initial network connection check
+  // Note: will NOT post re-connected message if we're initializing normally with network up,
+  //   but will post network lost event if we do NOT have a connection now.
+  isNetworkConnected();
   // start periodic tasks needed during normal running like announcement checking and saving parameters
   MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, vdcHostP, _1), 1*Second);
 }
@@ -316,123 +333,87 @@ void VdcHost::startRunning()
 
 // MARK: ===== collect devices
 
-namespace p44 {
 
-/// collects and initializes all devices
-class VdcCollector
-{
-  StatusCB callback;
-  bool exhaustive;
-  bool incremental;
-  bool clear;
-  VdcMap::iterator nextVdc;
-  VdcHost *deviceContainerP;
-  DsDeviceMap::iterator nextDevice;
-public:
-  static void collectDevices(VdcHost *aVdcHostP, StatusCB aCallback, bool aIncremental, bool aExhaustive, bool aClearSettings)
-  {
-    // create new instance, deletes itself when finished
-    new VdcCollector(aVdcHostP, aCallback, aIncremental, aExhaustive, aClearSettings);
-  };
-private:
-  VdcCollector(VdcHost *aVdcHostP, StatusCB aCallback, bool aIncremental, bool aExhaustive, bool aClearSettings) :
-    callback(aCallback),
-    deviceContainerP(aVdcHostP),
-    incremental(aIncremental),
-    exhaustive(aExhaustive),
-    clear(aClearSettings)
-  {
-    nextVdc = deviceContainerP->vdcs.begin();
-    queryNextVdc(ErrorPtr());
-  }
-
-
-  void queryNextVdc(ErrorPtr aError)
-  {
-    if (!aError && nextVdc!=deviceContainerP->vdcs.end()) {
-      VdcPtr vdc = nextVdc->second;
-      LOG(LOG_NOTICE,
-        "=== collecting devices from vdc %s (%s #%d)",
-        vdc->shortDesc().c_str(),
-        vdc->vdcClassIdentifier(),
-        vdc->getInstanceNumber()
-      );
-      nextVdc->second->collectDevices(boost::bind(&VdcCollector::vdcQueried, this, _1), incremental, exhaustive, clear);
-    }
-    else
-      collectedAllVdcs(aError);
-  }
-
-  void vdcQueried(ErrorPtr aError)
-  {
-    // load persistent params
-    nextVdc->second->load();
-    LOG(LOG_NOTICE, "=== done collecting from %s\n", nextVdc->second->shortDesc().c_str());
-    // check next
-    ++nextVdc;
-    queryNextVdc(aError);
-  }
-
-
-  void collectedAllVdcs(ErrorPtr aError)
-  {
-    // now have each of them initialized
-    nextDevice = deviceContainerP->dSDevices.begin();
-    initializeNextDevice(ErrorPtr());
-  }
-
-
-  void initializeNextDevice(ErrorPtr aError)
-  {
-    if (!aError && nextDevice!=deviceContainerP->dSDevices.end())
-      // TODO: now never doing factory reset init, maybe parametrize later
-      nextDevice->second->initializeDevice(boost::bind(&VdcCollector::deviceInitialized, this, _1), false);
-    else
-      completed(aError);
-  }
-
-
-  void deviceInitialized(ErrorPtr aError)
-  {
-    LOG(LOG_NOTICE, "--- initialized device: %s",nextDevice->second->description().c_str());
-    // check next
-    ++nextDevice;
-    initializeNextDevice(aError);
-  }
-
-
-  void completed(ErrorPtr aError)
-  {
-    callback(aError);
-    deviceContainerP->collecting = false;
-    // done, delete myself
-    delete this;
-  }
-
-};
-
-
-
-void VdcHost::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void VdcHost::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   if (!collecting) {
     collecting = true;
-    if (!aIncremental) {
+    if ((aRescanFlags & rescanmode_incremental)==0) {
       // only for non-incremental collect, close vdsm connection
       if (activeSessionConnection) {
         LOG(LOG_NOTICE, "requested to re-collect devices -> closing vDC API connection");
         activeSessionConnection->closeConnection(); // close the API connection
         resetAnnouncing();
         activeSessionConnection.reset(); // forget connection
+        postEvent(vdchost_vdcapi_disconnected);
       }
       dSDevices.clear(); // forget existing ones
     }
-    VdcCollector::collectDevices(this, aCompletedCB, aIncremental, aExhaustive, aClearSettings);
+    collectFromNextVdc(aCompletedCB, aRescanFlags, vdcs.begin());
   }
 }
 
-} // namespace
 
+void VdcHost::collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc)
+{
+  if (aNextVdc!=vdcs.end()) {
+    VdcPtr vdc = aNextVdc->second;
+    LOG(LOG_NOTICE,
+      "=== collecting devices from vdc %s (%s #%d)",
+      vdc->shortDesc().c_str(),
+      vdc->vdcClassIdentifier(),
+      vdc->getInstanceNumber()
+    );
+    vdc->collectDevices(boost::bind(&VdcHost::vdcCollected, this, aCompletedCB, aRescanFlags, aNextVdc, _1), aRescanFlags);
+    return;
+  }
+  // all devices collected, but not yet initialized
+  postEvent(vdchost_devices_collected);
+  // now initialize devices (which are already identified by now!)
+  initializeNextDevice(aCompletedCB, dSDevices.begin());
+}
+
+
+void VdcHost::vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    LOG(LOG_ERR, "vDC %s: error collecting devices: %s", aNextVdc->second->shortDesc().c_str(), aError->description().c_str());
+  }
+  // load persistent params for vdc
+  aNextVdc->second->load();
+  LOG(LOG_NOTICE, "=== done collecting from %s\n", aNextVdc->second->shortDesc().c_str());
+  // next
+  aNextVdc++;
+  collectFromNextVdc(aCompletedCB, aRescanFlags, aNextVdc);
+}
+
+
+void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice)
+{
+  if (aNextDevice!=dSDevices.end()) {
+    // TODO: now never doing factory reset init, maybe parametrize later
+    aNextDevice->second->initializeDevice(boost::bind(&VdcHost::deviceInitialized, this, aCompletedCB, aNextDevice, _1), false);
+    return;
+  }
+  // all devices initialized
+  postEvent(vdchost_devices_initialized);
+  aCompletedCB(ErrorPtr());
+  collecting = false;
+}
+
+
+void VdcHost::deviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    LOG(LOG_ERR, "*** error initializing device %s: %s", aNextDevice->second->shortDesc().c_str(), aError->description().c_str());
+  }
+  else {
+    LOG(LOG_NOTICE, "--- initialized device: %s",aNextDevice->second->description().c_str());
+  }
+  // check next
+  ++aNextDevice;
+  initializeNextDevice(aCompletedCB, aNextDevice);
+}
 
 
 
@@ -533,18 +514,13 @@ void VdcHost::reportLearnEvent(bool aLearnIn, ErrorPtr aError)
 
 
 
-
-
-
 // MARK: ===== activity monitoring
 
 
 void VdcHost::signalActivity()
 {
   lastActivity = MainLoop::now();
-  if (eventMonitorHandler) {
-    eventMonitorHandler(vdchost_activitysignal);
-  }
+  postEvent(vdchost_activitysignal);
 }
 
 
@@ -596,6 +572,8 @@ void VdcHost::periodicTask(MLMicroSeconds aCycleStartTime)
   ) {
     lastPeriodicRun = aCycleStartTime;
     if (!collecting) {
+      // re-check network connection, might cause re-collection in some vdcs
+      isNetworkConnected();
       // check again for devices that need to be announced
       startAnnouncing();
       // do a save run as well
@@ -755,6 +733,7 @@ void VdcHost::vdcApiConnectionStatusHandler(VdcApiConnectionPtr aApiConnection, 
       // this is the active session connection
       resetAnnouncing(); // stop possibly ongoing announcing
       activeSessionConnection.reset();
+      postEvent(vdchost_vdcapi_disconnected);
       LOG(LOG_NOTICE, "vDC API session ends because connection closed ");
     }
     else {
@@ -873,6 +852,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
           connectedVdsm = vdsmDsUid;
           // - remember the session's connection
           activeSessionConnection = aRequest->connection();
+          postEvent(vdchost_vdcapi_connected);
           // - create answer
           ApiValuePtr result = activeSessionConnection->newApiValue();
           result->setType(apivalue_object);
@@ -1027,7 +1007,6 @@ void VdcHost::removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aRequest, 
 
 
 // MARK: ===== session management
-
 
 
 /// reset announcing devices (next startAnnouncing will restart from beginning)
