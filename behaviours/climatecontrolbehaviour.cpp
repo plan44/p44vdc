@@ -90,8 +90,7 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
   zoneTemperatureUpdated(Never),
   zoneTemperatureSetPointUpdated(Never)
 {
-  // make it member of the room temperature control group by default
-  setGroupMembership(group_roomtemperature_control, true);
+  // Note: there is no default group for climate, depends on application and must be set when instantiating the behaviour
   // add the output channel
   ChannelBehaviourPtr ch;
   if (climateDeviceKind==climatedevice_heatingvalve) {

@@ -251,8 +251,7 @@ VentilationBehaviour::VentilationBehaviour(Device &aDevice, VentilationDeviceKin
   inherited(aDevice),
   ventilationDeviceKind(aKind)
 {
-  // make it member of the ventilation group by default
-  setGroupMembership(group_blue_ventilation, true);
+  // Note: there is no default group for ventilation, depends on application and must be set when instantiating the behaviour
   // add the output channels
   // - air flow intensity
   airflowIntensity = AirflowIntensityChannelPtr(new AirflowIntensityChannel(*this));

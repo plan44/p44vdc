@@ -167,7 +167,9 @@ typedef enum {
   group_blue_cooling = 9, ///< cooling - formerly just "white" (is it still white? snow?)
   group_blue_ventilation = 10, ///< ventilation - formerly "display"?!
   group_blue_windows = 11, ///< windows (not the OS, holes in the wall..)
+  group_blue_air_recirculation = 12, ///< air recirculation for fan coil units
   group_roomtemperature_control = 48, ///< room temperature control
+  group_ventilation_control = 49, ///< room ventilation control
 } DsGroup;
 
 typedef uint64_t DsGroupMask; ///< 64 bit mask, Bit0 = group 0, Bit63 = group 63

@@ -844,30 +844,29 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     addBehaviour(ml);
   }
   else if (outputType=="heatingvalve") {
-    if (defaultGroup==group_undefined) defaultGroup = group_blue_heating;
+    if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // - create climate control valve output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_heatingvalve));
-    cb->setGroupMembership(group_roomtemperature_control, true); // put into room temperature control group by default, NOT into standard blue)
+    cb->setGroupMembership(defaultGroup, true); // put into room temperature control group by default, NOT into standard blue)
     cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
   }
   else if (outputType=="fancoilunit") {
-    if (defaultGroup==group_undefined) defaultGroup = group_blue_heating;
+    if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
     controlValues = true; // fan coil unit usually needs control values
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // - create climate control fan coil unit output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_fancoilunit));
-    cb->setGroupMembership(group_roomtemperature_control, true); // put into room temperature control group...
+    cb->setGroupMembership(defaultGroup, true); // put into room temperature control group...
     cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
   }
   else if (outputType=="ventilation") {
-    if (defaultGroup==group_undefined) defaultGroup = group_blue_ventilation;
     // - use ventilation scene settings
     installSettings(DeviceSettingsPtr(new VentilationDeviceSettings(*this)));
     VentilationDeviceKind vk = ventilationdevice_recirculation;
@@ -878,8 +877,13 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       else if (k=="recirculation")
         vk = ventilationdevice_recirculation;
     }
+    // default group according to ventilation kind
+    if (defaultGroup==group_undefined) {
+      defaultGroup = (vk==ventilationdevice_recirculation) ? group_blue_air_recirculation : group_ventilation_control;
+    }
     // - add ventilation behaviour
     VentilationBehaviourPtr vb = VentilationBehaviourPtr(new VentilationBehaviour(*this, vk));
+    vb->setGroupMembership(defaultGroup, true); // use the default group
     vb->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_room, false, -1);
     vb->setHardwareName(hardwareName);
     addBehaviour(vb);
