@@ -434,7 +434,7 @@ public:
       }
     }
     else {
-      LOG(LOG_ERR, "hue Bridge: Error creating user: %s", aError->description().c_str());
+      LOG(LOG_INFO, "hue Bridge: Cannot create user: %s", aError->description().c_str());
     }
     // try next
     ++currentAuthCandidate;
