@@ -197,8 +197,10 @@ void EnoceanDevice::addChannelHandler(EnoceanChannelHandlerPtr aChannelHandler)
   aChannelHandler->channel = channels.size();
   // add to my local list
   channels.push_back(aChannelHandler);
-  // register behaviour of the channel with the device
-  addBehaviour(aChannelHandler->behaviour);
+  // register behaviour of the channel (if it has a default behaviour at all) with the device
+  if (aChannelHandler->behaviour) {
+    addBehaviour(aChannelHandler->behaviour);
+  }
 }
 
 

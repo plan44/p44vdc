@@ -427,6 +427,9 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   // room panel alternatives for set point
   { 2, 0x00A51006, 0, "standard profile" },
   { 2, 0x01A51006, 0, "set point interpreted as 0..40°C (e.g. FTR55D)" },
+  // weather station alternatives for separated sun sensors
+  { 3, 0x01A51301, 0, "weather station device + 3 separate sun sensor devices" },
+  { 3, 0x00A51301, 0, "weather station with all sensors in single device" },
   { 0, 0, 0, NULL } // terminator
 };
 
@@ -491,7 +494,8 @@ EnoceanDevicePtr Enocean4BSDevice::newDevice(
     // use specialized handler for output functions of heating valve (valve value, summer/winter, prophylaxis)
     newDev = EnoceanA52001Handler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
-  else if (aEEProfile==0xA51301) {
+  else if (EEP_PURE(aEEProfile)==0xA51301) {
+    // Note: Profile has variants (single device or with separate light sensors for sun directions)
     // use specialized handler for multi-telegram sensor
     newDev = EnoceanA5130XHandler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
@@ -793,7 +797,9 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
   // - e.g. Eltako Multisensor MS with FWS61
   // create device
   EnoceanDevicePtr newDev; // none so far
-  if (aSubDeviceIndex<1) {
+  bool separateSunSensors = EEP_VARIANT(aEEProfile)==1;
+  int numdevices = separateSunSensors ? 4 : 1;
+  if (aSubDeviceIndex<numdevices) {
     // only one device
     newDev = EnoceanDevicePtr(new Enocean4BSDevice(aVdcP));
     // sensor only, standard settings without scene table
@@ -804,30 +810,57 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
     newDev->setEEPInfo(aEEProfile, aEEManufacturer);
     // is joker (AKM type)
     newDev->setColorClass(class_black_joker);
-    // function
-    newDev->setFunctionDesc("environmental multisensor");
     // - create A5-13-0X specific handler (which handles all sensors)
     EnoceanA5130XHandlerPtr newHandler = EnoceanA5130XHandlerPtr(new EnoceanA5130XHandler(*newDev.get()));
-    // - Add channel-built-in behaviour
-    newHandler->behaviour = EnoceanSensorHandler::newSensorBehaviour(A513dawnSensor, newDev);
-    // - register the handler and the default behaviour
-    newDev->addChannelHandler(newHandler);
-    // - Add extra behaviours for A5-13-01
-    newHandler->outdoorTemp = EnoceanSensorHandler::newSensorBehaviour(A513outdoorTemp, newDev);
-    newDev->addBehaviour(newHandler->outdoorTemp);
-    newHandler->windSpeed = EnoceanSensorHandler::newSensorBehaviour(A513windSpeed, newDev);
-    newDev->addBehaviour(newHandler->windSpeed);
-    newHandler->dayIndicator = EnoceanSensorHandler::newSensorBehaviour(A513dayIndicator, newDev);
-    newDev->addBehaviour(newHandler->dayIndicator);
-    newHandler->rainIndicator = EnoceanSensorHandler::newSensorBehaviour(A513rainIndicator, newDev);
-    newDev->addBehaviour(newHandler->rainIndicator);
-    // - Add extra behaviours for A5-13-02
-    newHandler->sunWest = EnoceanSensorHandler::newSensorBehaviour(A513sunWest, newDev);
-    newDev->addBehaviour(newHandler->sunWest);
-    newHandler->sunSouth = EnoceanSensorHandler::newSensorBehaviour(A513sunSouth, newDev);
-    newDev->addBehaviour(newHandler->sunSouth);
-    newHandler->sunEast = EnoceanSensorHandler::newSensorBehaviour(A513sunEast, newDev);
-    newDev->addBehaviour(newHandler->sunEast);
+    // Now add functionality depending on subdevice index
+    if (aSubDeviceIndex==0) {
+      // this is the main device
+      newDev->setFunctionDesc("environmental multisensor");
+      // - Add channel-built-in behaviour
+      newHandler->behaviour = EnoceanSensorHandler::newSensorBehaviour(A513dawnSensor, newDev);
+      // - register the handler and the default behaviour
+      newDev->addChannelHandler(newHandler);
+      // - Add extra behaviours for A5-13-01
+      newHandler->outdoorTemp = EnoceanSensorHandler::newSensorBehaviour(A513outdoorTemp, newDev);
+      newDev->addBehaviour(newHandler->outdoorTemp);
+      newHandler->windSpeed = EnoceanSensorHandler::newSensorBehaviour(A513windSpeed, newDev);
+      newDev->addBehaviour(newHandler->windSpeed);
+      newHandler->dayIndicator = EnoceanSensorHandler::newSensorBehaviour(A513dayIndicator, newDev);
+      newDev->addBehaviour(newHandler->dayIndicator);
+      newHandler->rainIndicator = EnoceanSensorHandler::newSensorBehaviour(A513rainIndicator, newDev);
+      newDev->addBehaviour(newHandler->rainIndicator);
+      // sub sensors in same device?
+      if (!separateSunSensors) {
+        // - Add extra behaviours for A5-13-02
+        newHandler->sunWest = EnoceanSensorHandler::newSensorBehaviour(A513sunWest, newDev);
+        newDev->addBehaviour(newHandler->sunWest);
+        newHandler->sunSouth = EnoceanSensorHandler::newSensorBehaviour(A513sunSouth, newDev);
+        newDev->addBehaviour(newHandler->sunSouth);
+        newHandler->sunEast = EnoceanSensorHandler::newSensorBehaviour(A513sunEast, newDev);
+        newDev->addBehaviour(newHandler->sunEast);
+      }
+    }
+    else if (aSubDeviceIndex==1) {
+      // this is a sun direction sensor
+      newDev->setFunctionDesc("sun west sensor");
+      newHandler->sunWest = EnoceanSensorHandler::newSensorBehaviour(A513sunWest, newDev);
+      newDev->addChannelHandler(newHandler);
+      newDev->addBehaviour(newHandler->sunWest);
+    }
+    else if (aSubDeviceIndex==2) {
+      // this is a sun direction sensor
+      newDev->setFunctionDesc("sun south sensor");
+      newHandler->sunSouth = EnoceanSensorHandler::newSensorBehaviour(A513sunSouth, newDev);
+      newDev->addChannelHandler(newHandler);
+      newDev->addBehaviour(newHandler->sunSouth);
+    }
+    else if (aSubDeviceIndex==3) {
+      // this is a sun direction sensor
+      newDev->setFunctionDesc("sun east sensor");
+      newHandler->sunEast = EnoceanSensorHandler::newSensorBehaviour(A513sunEast, newDev);
+      newDev->addChannelHandler(newHandler);
+      newDev->addBehaviour(newHandler->sunEast);
+    }
     // count it
     aSubDeviceIndex++;
   }
@@ -850,17 +883,17 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     switch (identifier) {
       case 1:
         // A5-13-01
-        handleBitField(A513dawnSensor, behaviour, dataP, datasize);
-        handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize);
-        handleBitField(A513windSpeed, windSpeed, dataP, datasize);
-        handleBitField(A513dayIndicator, dayIndicator, dataP, datasize);
-        handleBitField(A513rainIndicator, rainIndicator, dataP, datasize);
+        if (behaviour) handleBitField(A513dawnSensor, behaviour, dataP, datasize);
+        if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize);
+        if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize);
+        if (dayIndicator) handleBitField(A513dayIndicator, dayIndicator, dataP, datasize);
+        if (rainIndicator) handleBitField(A513rainIndicator, rainIndicator, dataP, datasize);
         break;
       case 2:
         // A5-13-02
-        handleBitField(A513sunWest, sunWest, dataP, datasize);
-        handleBitField(A513sunSouth, sunSouth, dataP, datasize);
-        handleBitField(A513sunEast, sunEast, dataP, datasize);
+        if (sunWest) handleBitField(A513sunWest, sunWest, dataP, datasize);
+        if (sunSouth) handleBitField(A513sunSouth, sunSouth, dataP, datasize);
+        if (sunEast) handleBitField(A513sunEast, sunEast, dataP, datasize);
         break;
       default:
         // A5-13-03..06 are not supported
