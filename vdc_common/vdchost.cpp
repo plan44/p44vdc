@@ -84,7 +84,7 @@ VdcHost::VdcHost() :
 {
   // remember singleton's address
   sharedVdcHostP = this;
-  // obtain MAC address
+  // obtain default MAC address (might be changed by setIdMode())
   mac = macAddress();
 }
 
@@ -128,8 +128,12 @@ void VdcHost::setName(const string &aName)
 
 
 
-void VdcHost::setIdMode(DsUidPtr aExternalDsUid)
+void VdcHost::setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC)
 {
+  if (!aIfNameForMAC.empty()) {
+    // use MAC from specific interface
+    mac = macAddress(aIfNameForMAC.c_str());
+  }
   if (aExternalDsUid) {
     externalDsuid = true;
     dSUID = *aExternalDsUid;
@@ -216,9 +220,15 @@ bool VdcHost::isApiConnected()
 }
 
 
+uint32_t VdcHost::getIpV4Address()
+{
+  return ipv4Address(ifNameForConn.c_str());
+}
+
+
 bool VdcHost::isNetworkConnected()
 {
-  uint32_t ipv4 = ipv4Address();
+  uint32_t ipv4 = getIpV4Address();
   // Only consider connected if we have a IP address, and none from the 169.254.0.0/16
   // link-local autoconfigured ones (RFC 3927/APIPA).
   bool nowConnected = (ipv4!=0) && ((ipv4 & 0xFFFF0000)!=0xA9FE0000);
@@ -281,7 +291,7 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     externalDsuid ? "external" : "MAC-derived",
     shortDesc().c_str(),
     macAddressToString(mac, ':').c_str(),
-    ipv4ToString(ipv4Address()).c_str()
+    ipv4ToString(getIpV4Address()).c_str()
   );
   // start the API server
   if (vdcApiServer) {

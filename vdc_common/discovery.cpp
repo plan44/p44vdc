@@ -178,8 +178,8 @@ void DiscoveryManager::startService()
 {
   // only start if not already started
   if (!service) {
-    // if device has no IP yet, starting avahi makes no sense - delay it
-    if (ipv4Address()==0) {
+    // if device has no network connection (no IP) yet, starting avahi makes no sense - delay it
+    if (!vdcHost->isNetworkConnected()) {
       // TODO: checking IPv4 only at this time, need to add IPv6 later
       LOG(LOG_WARNING, "discovery: device has no IP address -> retry later");
       MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);

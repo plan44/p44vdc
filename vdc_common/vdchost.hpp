@@ -116,6 +116,8 @@ namespace p44 {
     bool storedDsuid; ///< set when using stored (DB persisted) dSUID that is not equal to default dSUID 
     uint64_t mac; ///< MAC address as found at startup
 
+    string ifNameForConn; ///< the name of the network interface to use for getting IP and connectivity status
+
     DsDeviceMap dSDevices; ///< available devices by API-exposed ID (dSUID or derived dsid)
     DsParamStore dsParamStore; ///< the database for storing dS device parameters
 
@@ -205,9 +207,14 @@ namespace p44 {
 
     /// Set how dSUIDs are generated
     /// @param aExternalDsUid if specified, this is used directly as dSUID for the device container
+    /// @param aIfNameForMAC if specified, this network interface is used to obtain the MAC address for creating the dSUID from
     /// @note Must be set before any other activity in the device container, in particular before
     ///   any class containers are added to the device container
-    void setIdMode(DsUidPtr aExternalDsUid);
+    void setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC);
+
+    /// Set network interface to use for determining IP address and checking for being available for network connections
+    /// @param aIfNameForConnections name of the network device, empty string to use default interface
+    void setNetworkIf(const string aIfNameForConnections) { ifNameForConn = aIfNameForConnections; };
 
     /// Set directory for loading device icons
     /// @param aIconDir  full path to directory to load device icons from. Empty string or NULL means "no icons"
@@ -263,6 +270,12 @@ namespace p44 {
     /// check if we have network (IP) connection
     /// @return true if device this vdchost is running on has a usable IP address
     bool isNetworkConnected();
+
+
+    /// get IPv4 address relevant for connection status
+    /// @return IPv4 as a 32-bit int, or 0 if none found
+    uint32_t getIpV4Address();
+
 
     /// @}
 

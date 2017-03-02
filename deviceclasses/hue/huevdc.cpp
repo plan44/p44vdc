@@ -136,7 +136,7 @@ void HueVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExha
 
 void HueVdc::refindBridge()
 {
-  if (ipv4Address()==0) {
+  if (!getVdcHost().isNetworkConnected()) {
     // TODO: checking IPv4 only at this time, need to add IPv6 later
     LOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
     MainLoop::currentMainLoop().executeOnce(boost::bind(&HueVdc::refindBridge, this), REFIND_RETRY_DELAY);
