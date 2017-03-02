@@ -112,15 +112,15 @@ int DaliVdc::getRescanModes() const
 }
 
 
-void DaliVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
-  if (!aIncremental) {
-    removeDevices(aClearSettings);
+  if (!(aRescanFlags & rescanmode_incremental)) {
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
     // clear the cache, we want fresh info from the devices!
     deviceInfoCache.clear();
   }
   // start collecting, allow quick scan when not exhaustively collecting (will still use full scan when bus collisions are detected)
-  daliComm->daliFullBusScan(boost::bind(&DaliVdc::deviceListReceived, this, aCompletedCB, _1, _2, _3), !aExhaustive);
+  daliComm->daliFullBusScan(boost::bind(&DaliVdc::deviceListReceived, this, aCompletedCB, _1, _2, _3), !(aRescanFlags & rescanmode_exhaustive));
 }
 
 

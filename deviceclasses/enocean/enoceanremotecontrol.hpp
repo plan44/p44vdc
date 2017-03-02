@@ -54,17 +54,17 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "enocean_remotecontrol"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_remotecontrol"; };
 
     /// @param aVariant -1 to just get number of available teach-in variants. 0..n to send teach-in signal;
     ///   some devices may have different teach-in signals (like: one for ON, one for OFF).
     /// @return number of teach-in signal variants the device can send
     /// @note will be called via UI for devices that need to be learned into remote actors
-    virtual uint8_t teachInSignal(int8_t aVariant);
+    virtual uint8_t teachInSignal(int8_t aVariant) P44_OVERRIDE;
 
     /// mark base offsets in use by this device
     /// @param aUsedOffsetsMap must be passed a string with 128 chars of '0' or '1'.
-    virtual void markUsedBaseOffsets(string &aUsedOffsetsMap);
+    virtual void markUsedBaseOffsets(string &aUsedOffsetsMap) P44_OVERRIDE;
 
     /// factory: (re-)create logical device from address|channel|profile|manufacturer tuple
     /// @param aVdcP the class container

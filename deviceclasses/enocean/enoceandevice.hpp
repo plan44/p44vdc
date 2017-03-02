@@ -139,14 +139,17 @@ namespace p44 {
     /// constructor, create device in container
     EnoceanDevice(EnoceanVdc *aVdcP);
 
+    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "enocean"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean"; };
 
     /// check if device can be disconnected by software (i.e. Web-UI)
     /// @return true if device might be disconnectable by the user via software (i.e. web UI)
     /// @note EnOcean devices can be removed not only via unlearning, but also via Web-UI if needed
-    virtual bool isSoftwareDisconnectable() { return true; };
+    virtual bool isSoftwareDisconnectable() P44_OVERRIDE { return true; };
 
     /// return time when last packet was received for this device
     /// @return time when last packet was received or Never
@@ -154,7 +157,7 @@ namespace p44 {
 
     /// check presence of this addressable
     /// @param aPresenceResultHandler will be called to report presence status
-    virtual void checkPresence(PresenceCB aPresenceResultHandler);
+    virtual void checkPresence(PresenceCB aPresenceResultHandler) P44_OVERRIDE;
 
     /// get typed container reference
     EnoceanVdc &getEnoceanVdc();
@@ -185,7 +188,7 @@ namespace p44 {
     ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
     /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
     ///   false in case it is certain that the device is still connected to this and only this vDC
-    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
     /// apply all pending channel value updates to the device's hardware
     /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
@@ -194,7 +197,7 @@ namespace p44 {
     /// @param aDoneCB if not NULL, must be called when values are applied
     /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
     ///   in a single channel (and not switching between color modes etc.)
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
 
     /// factory: create appropriate logical devices for a given EEP
     /// @param aVdcP the EnoceanVdc to create the devices in
@@ -278,7 +281,7 @@ namespace p44 {
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
     /// get profile variants this device can have
     /// @param aApiObjectValue must be an object typed API value, will receive profile variants as EEP/description key/values
@@ -294,19 +297,19 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName();
+    virtual string modelName() P44_OVERRIDE;
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID();
+    virtual string hardwareGUID() P44_OVERRIDE;
 
     /// @return model GUID in URN format to identify model of hardware device as uniquely as possible
-    virtual string hardwareModelGUID();
+    virtual string hardwareModelGUID() P44_OVERRIDE;
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
-    virtual string vendorId();
+    virtual string vendorId() P44_OVERRIDE;
 
     /// @return Vendor name if known
-    virtual string vendorName();
+    virtual string vendorName() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -314,7 +317,7 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// @}
 
@@ -322,9 +325,9 @@ namespace p44 {
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     /// derive dSUID from hardware address
     void deriveDsUid();

@@ -131,6 +131,9 @@ namespace p44 {
     ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag);
     virtual ~ExternalDevice();
 
+    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+
     ExternalVdc &getExternalVdc();
 
     /// device type identifier
@@ -312,9 +315,8 @@ namespace p44 {
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
-    /// collect devices from this vDC
-    /// @param aCompletedCB will be called when device scan for this vDC has been completed
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
+    /// scan for (collect) devices and add them to the vdc
+    virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs

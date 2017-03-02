@@ -82,7 +82,8 @@ namespace p44 {
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
+    /// scan for (collect) devices and add them to the vdc
+    virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
 
     void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;
 

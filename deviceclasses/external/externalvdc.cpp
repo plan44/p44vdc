@@ -145,6 +145,13 @@ ExternalDevice::~ExternalDevice()
 }
 
 
+void ExternalDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // Nothing to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
+
 string ExternalDevice::modelName()
 {
   return modelNameString;
@@ -1606,13 +1613,13 @@ const char *ExternalVdc::vdcClassIdentifier() const
 }
 
 
-void ExternalVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void ExternalVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // we have no real collecting process (devices just connect when possibl),
   // but we force all devices to re-connect when a exhaustive collect is requested (mainly for debug purposes)
-  if (aExhaustive) {
+  if (aRescanFlags && rescanmode_exhaustive) {
     // remove all, so they will need to reconnect
-    removeDevices(aClearSettings);
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
   // assume ok
   aCompletedCB(ErrorPtr());

@@ -109,14 +109,14 @@ void ZfVdc::removeDevices(bool aForget)
 
 
 
-void ZfVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void ZfVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // install standard message handler
   zfComm.setReceivedPacketHandler(boost::bind(&ZfVdc::handlePacket, this, _1, _2));
   // incrementally collecting ZF devices makes no sense as the set of devices is defined by learn-in (DB state)
-  if (!aIncremental) {
+  if (!(aRescanFlags & rescanmode_incremental)) {
     // start with zero
-    removeDevices(aClearSettings);
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in EnOcean button IDs from DB
     sqlite3pp::query qry(db);
     if (qry.prepare("SELECT zfAddress, subdevice, deviceType FROM knownDevices")==SQLITE_OK) {

@@ -55,9 +55,12 @@ namespace p44 {
 
     StaticDevice(Vdc *aVdcP);
 
+    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "static"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "static"; };
 
     StaticVdc &getStaticVdc();
 
@@ -67,7 +70,7 @@ namespace p44 {
     ///   operational state does not allow disconnection.
     /// @note devices returning false here might still be disconnectable using disconnect() triggered
     ///   by vDC API "remove" method.
-    virtual bool isSoftwareDisconnectable();
+    virtual bool isSoftwareDisconnectable() P44_OVERRIDE;
 
     /// disconnect device. For static device, this means removing the config from the container's DB. Note that command line
     /// static devices cannot be disconnected.
@@ -75,7 +78,7 @@ namespace p44 {
     ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
     /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
     ///   false in case it is certain that the device is still connected to this and only this vDC
-    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<StaticDevice> StaticDevicePtr;
@@ -100,7 +103,8 @@ namespace p44 {
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
+    /// scan for (collect) devices and add them to the vdc
+    virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
 
     /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
     /// devices.

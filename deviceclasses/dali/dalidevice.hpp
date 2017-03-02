@@ -309,6 +309,9 @@ namespace p44 {
 
     DaliSingleControllerDevice(DaliVdc *aVdcP);
 
+    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+
     /// @return technical type of DALI device
     virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return daliController && daliController->isGrouped() ? dalidevice_group : dalidevice_single; }
 
@@ -393,11 +396,6 @@ namespace p44 {
 
     /// @}
 
-    /// this will be called just before a device is added to the vdc, and thus needs to be fully constructed
-    /// (settings, scenes, behaviours) and MUST have determined the henceforth invariable dSUID.
-    /// After having received this call, the device must also be ready to load persistent settings.
-    virtual void willBeAdded() P44_OVERRIDE;
-
     /// derive the dSUID from collected device info
     void deriveDsUid();
 
@@ -438,6 +436,9 @@ namespace p44 {
     DaliBusDevicePtr dimmers[numDimmers];
 
     DaliCompositeDevice(DaliVdc *aVdcP);
+
+    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
     /// @return type of DALI device
     virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return dalidevice_composite; }
@@ -524,11 +525,6 @@ namespace p44 {
     virtual string getExtraInfo() P44_OVERRIDE;
 
     /// @}
-
-    /// this will be called just before a device is added to the vdc, and thus needs to be fully constructed
-    /// (settings, scenes, behaviours) and MUST have determined the henceforth invariable dSUID.
-    /// After having received this call, the device must also be ready to load persistent settings.
-    virtual void willBeAdded() P44_OVERRIDE;
 
     /// derive the dSUID from collected device info
     void deriveDsUid();

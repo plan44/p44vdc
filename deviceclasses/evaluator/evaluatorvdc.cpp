@@ -92,12 +92,12 @@ bool EvaluatorVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aRes
 
 /// collect devices from this vDC
 /// @param aCompletedCB will be called when device scan for this vDC has been completed
-void EvaluatorVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void EvaluatorVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // incrementally collecting configured devices makes no sense. The devices are "static"!
-  if (!aIncremental) {
+  if (!(aRescanFlags & rescanmode_incremental)) {
     // non-incremental, re-collect all devices
-    removeDevices(aClearSettings);
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
     // add from the DB
     sqlite3pp::query qry(db);
     if (qry.prepare("SELECT evaluatorid, config, rowid FROM evaluators")==SQLITE_OK) {

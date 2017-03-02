@@ -43,6 +43,13 @@ StaticDevice::StaticDevice(Vdc *aVdcP) :
 }
 
 
+void StaticDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // Nothing to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
+
 bool StaticDevice::isSoftwareDisconnectable()
 {
   return staticDeviceRowID>0; // disconnectable by software if it was created from DB entry (and not on the command line)
@@ -156,12 +163,12 @@ StaticDevicePtr StaticVdc::addStaticDevice(string aDeviceType, string aDeviceCon
 
 /// collect devices from this vDC
 /// @param aCompletedCB will be called when device scan for this vDC has been completed
-void StaticVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void StaticVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // incrementally collecting static devices makes no sense. The devices are "static"!
-  if (!aIncremental) {
+  if (!(aRescanFlags & rescanmode_incremental)) {
     // non-incremental, re-collect all devices
-    removeDevices(aClearSettings);
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
     // create devices from command line config
     for (DeviceConfigMap::iterator pos = deviceConfigs.begin(); pos!=deviceConfigs.end(); ++pos) {
       // create device of appropriate class

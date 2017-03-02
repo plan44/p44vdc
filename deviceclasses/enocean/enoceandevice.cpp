@@ -67,6 +67,14 @@ EnoceanDevice::EnoceanDevice(EnoceanVdc *aVdcP) :
 }
 
 
+void EnoceanDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // Nothing to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
+
+
 EnoceanVdc &EnoceanDevice::getEnoceanVdc()
 {
   return *(static_cast<EnoceanVdc *>(vdcP));

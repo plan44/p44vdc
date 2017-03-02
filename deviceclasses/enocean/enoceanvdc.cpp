@@ -122,15 +122,15 @@ void EnoceanVdc::removeDevices(bool aForget)
 
 
 
-void EnoceanVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void EnoceanVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // install standard packet handler
   enoceanComm.setRadioPacketHandler(boost::bind(&EnoceanVdc::handleRadioPacket, this, _1, _2));
   enoceanComm.setEventPacketHandler(boost::bind(&EnoceanVdc::handleEventPacket, this, _1, _2));
   // incrementally collecting EnOcean devices makes no sense as the set of devices is defined by learn-in (DB state)
-  if (!aIncremental) {
+  if (!(aRescanFlags & rescanmode_incremental)) {
     // start with zero
-    removeDevices(aClearSettings);
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in EnOcean device IDs from DB
     sqlite3pp::query qry(db);
     if (qry.prepare("SELECT enoceanAddress, subdevice, eeProfile, eeManufacturer FROM knownDevices")==SQLITE_OK) {

@@ -59,21 +59,22 @@ namespace p44 {
     DigitalIoType digitalIoType;
 
   public:
+
     DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig);
-    
+
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "digitalio"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "digitalio"; };
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
     /// Get extra info (plan44 specific) to describe the addressable in more detail
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
-    virtual string getExtraInfo();
+    virtual string getExtraInfo() P44_OVERRIDE;
       
-    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode);
+    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode) P44_OVERRIDE;
 
     /// @name interaction with subclasses, actually representing physical I/O
     /// @{
@@ -85,14 +86,14 @@ namespace p44 {
     /// @param aCompletedCB if not NULL, must be called when values are applied
     /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
     ///   in a single channel (and not switching between color modes etc.)
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
       
     /// synchronize channel values by reading them back from the device's hardware (if possible)
     /// @param aDoneCB will be called when values are updated with actual hardware values
     /// @note this method is only called at startup and before saving scenes to make sure changes done to the outputs directly (e.g. using
     ///   a direct remote control for a lamp) are included. Just reading a channel state does not call this method.
     /// @note implementation must use channel's syncChannelValue() method
-    virtual void syncChannelValues(SimpleCB aDoneCB);
+    virtual void syncChannelValues(SimpleCB aDoneCB) P44_OVERRIDE;
     
     void changeMovement(SimpleCB aDoneCB, int aNewDirection);
 
@@ -103,7 +104,7 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName();
+    virtual string modelName() P44_OVERRIDE;
 
     /// @}
 

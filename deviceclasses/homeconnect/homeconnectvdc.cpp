@@ -121,12 +121,12 @@ int HomeConnectVdc::getRescanModes() const
 }
 
 
-void HomeConnectVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void HomeConnectVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   collectedHandler = aCompletedCB;
-  if (!aIncremental) {
+  if (!(aRescanFlags & rescanmode_incremental)) {
     // full collect, remove all devices
-    removeDevices(aClearSettings);
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
   if (homeConnectComm.isConfigured()) {
     // query all home connect appliances
@@ -206,7 +206,7 @@ ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &a
       authScope.c_str()
     );
     // now collect the devices from the new account
-    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), false, false, true);
+    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), rescanmode_clearsettings);
   }
   else
   {

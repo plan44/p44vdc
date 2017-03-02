@@ -98,8 +98,8 @@ namespace p44 {
 //    /// @param aCompletedCB will be called when self test is done, returning ok or error
 //    virtual void selfTest(StatusCB aCompletedCB) P44_OVERRIDE;
 
-    /// collect and add devices to the container
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
+    /// scan for (collect) devices and add them to the vdc
+    virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
 
     /// vdc level methods (p44 specific, JSON only)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;

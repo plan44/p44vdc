@@ -82,8 +82,8 @@ namespace p44 {
     /// @return a combination of rescanmode_xxx bits
     virtual int getRescanModes() const P44_OVERRIDE;
 
-    /// collect and add devices to the container
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings) P44_OVERRIDE;
+    /// scan for (collect) devices and add them to the vdc
+    virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
 
     /// vdc level methods
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
@@ -114,6 +114,12 @@ namespace p44 {
     /// Get extra info (plan44 specific) to describe the addressable in more detail
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
     virtual string getExtraInfo() P44_OVERRIDE;
+
+  protected:
+
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
 
   private:
 

@@ -66,30 +66,30 @@ namespace p44 {
   public:
     DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
 
-		void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     // the DALI communication object
     DaliCommPtr daliComm;
 
-    virtual const char *vdcClassIdentifier() const;
+    virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error
-    virtual void selfTest(StatusCB aCompletedCB);
+    virtual void selfTest(StatusCB aCompletedCB) P44_OVERRIDE;
 
     /// get supported rescan modes for this vDC
     /// @return a combination of rescanmode_xxx bits
-    virtual int getRescanModes() const;
+    virtual int getRescanModes() const P44_OVERRIDE;
 
-    /// collect and add devices to the container
-    virtual void collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings);
+    /// scan for (collect) devices and add them to the vdc
+    virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
 
     /// vdc level methods (p44 specific, JSON only, for configuring multichannel RGB(W) devices)
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() const { return "DALI"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "DALI"; }
 
     /// ungroup a previously grouped device
     /// @param aDevice the device to ungroup
@@ -103,7 +103,7 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
   private:
 

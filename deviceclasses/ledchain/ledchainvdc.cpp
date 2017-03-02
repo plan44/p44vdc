@@ -234,12 +234,12 @@ void LedChainVdc::removeDevice(DevicePtr aDevice, bool aForget)
 }
 
 
-void LedChainVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void LedChainVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // incrementally collecting static devices makes no sense. The devices are "static"!
-  if (!aIncremental) {
+  if (!(aRescanFlags & rescanmode_incremental)) {
     // non-incremental, re-collect all devices
-    removeDevices(aClearSettings);
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
     // then add those from the DB
     sqlite3pp::query qry(db);
     if (qry.prepare("SELECT firstLED, numLEDs, deviceconfig, rowid FROM devConfigs ORDER BY firstLED")==SQLITE_OK) {

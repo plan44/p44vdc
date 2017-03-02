@@ -96,14 +96,17 @@ namespace p44 {
 
     EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID, const string &aEvaluatorConfig);
     virtual ~EvaluatorDevice();
-    
+
+    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+
     /// check if device is public dS device (which should be registered with vdSM)
     /// @return true if device is registerable with vdSM
-    virtual bool isPublicDS();
+    virtual bool isPublicDS() P44_OVERRIDE;
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "evaluator"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "evaluator"; };
 
     EvaluatorVdc &getEvaluatorVdc();
 
@@ -113,7 +116,7 @@ namespace p44 {
     ///   operational state does not allow disconnection.
     /// @note devices returning false here might still be disconnectable using disconnect() triggered
     ///   by vDC API "remove" method.
-    virtual bool isSoftwareDisconnectable() { return true; };
+    virtual bool isSoftwareDisconnectable() P44_OVERRIDE { return true; };
 
     /// disconnect device. For static device, this means removing the config from the container's DB. Note that command line
     /// static devices cannot be disconnected.
@@ -121,18 +124,18 @@ namespace p44 {
     ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
     /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
     ///   false in case it is certain that the device is still connected to this and only this vDC
-    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
 
     /// @name identification of the addressable entity
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName();
+    virtual string modelName() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -140,7 +143,7 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// @}
 
@@ -148,19 +151,19 @@ namespace p44 {
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
     /// @note this is called before interaction with dS system starts
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
-    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset);
+    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     /// device level API methods (p44 specific, JSON only, for debugging evaluators)
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
   protected:
 
     void deriveDsUid();
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   private:
 

@@ -64,9 +64,12 @@ namespace p44 {
 
     LedChainDevice(LedChainVdc *aVdcP, uint16_t aFirstLED, uint16_t aNumLEDs, const string &aDeviceConfig);
 
+    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "ledchain"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "ledchain"; };
 
     /// @name interaction with subclasses, actually representing physical I/O
     /// @{
@@ -78,7 +81,7 @@ namespace p44 {
     /// @param aCompletedCB if not NULL, must be called when values are applied
     /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
     ///   in a single channel (and not switching between color modes etc.)
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
 
     /// Get color and opacity of light for a specific LED position
     /// @param aLedNumber LED position
@@ -95,7 +98,7 @@ namespace p44 {
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -103,11 +106,11 @@ namespace p44 {
     /// - if aWithData is not set, only the icon name (without file extension) is returned
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix);
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// Get extra info (plan44 specific) to describe the addressable in more detail
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
-    virtual string getExtraInfo();
+    virtual string getExtraInfo() P44_OVERRIDE;
 
     /// check if device can be disconnected by software (i.e. Web-UI)
     /// @return true if device might be disconnectable by the user via software (i.e. web UI)
@@ -115,7 +118,7 @@ namespace p44 {
     ///   operational state does not allow disconnection.
     /// @note devices returning false here might still be disconnectable using disconnect() triggered
     ///   by vDC API "remove" method.
-    virtual bool isSoftwareDisconnectable();
+    virtual bool isSoftwareDisconnectable() P44_OVERRIDE;
 
     /// disconnect device. For static device, this means removing the config from the container's DB. Note that command line
     /// static devices cannot be disconnected.
@@ -123,13 +126,13 @@ namespace p44 {
     ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
     /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
     ///   false in case it is certain that the device is still connected to this and only this vDC
-    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
     /// @name identification of the addressable entity
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName();
+    virtual string modelName() P44_OVERRIDE;
 
     /// @}
 

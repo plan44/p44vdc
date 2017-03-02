@@ -85,12 +85,16 @@ string HuePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 }
 
 
+#define HUE_RECOLLECT_INTERVAL (30*Minute)
+
 void HueVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
 	string databaseName = getPersistentDataDir();
 	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), HUE_SCHEMA_VERSION, HUE_SCHEMA_MIN_VERSION, aFactoryReset);
 	aCompletedCB(error); // return status of DB init
+  // schedule rescans
+  setPeriodicRecollection(HUE_RECOLLECT_INTERVAL, rescanmode_incremental);
 }
 
 
@@ -105,12 +109,12 @@ int HueVdc::getRescanModes() const
 }
 
 
-void HueVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void HueVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   collectedHandler = aCompletedCB;
-  if (!aIncremental) {
+  if (!(aRescanFlags & rescanmode_incremental)) {
     // full collect, remove all devices
-    removeDevices(aClearSettings);
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
   // load hue bridge uuid and token
   sqlite3pp::query qry(db);
@@ -130,6 +134,16 @@ void HueVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExha
     collectedHandler(ErrorPtr());
   }
 }
+
+
+void HueVdc::handleGlobalEvent(VdchostEvent aEvent)
+{
+  if (aEvent==vdchost_network_reconnected) {
+    // re-connecting to network should re-scan for hue bridge
+    collectDevices(NULL, rescanmode_incremental);
+  }
+}
+
 
 
 #define REFIND_RETRY_DELAY (30*Second)
@@ -191,7 +205,7 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       bridgeUserName.c_str()
     );
     // now collect the lights from the new bridge, remove all settings from previous bridge
-    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), false, false, true);
+    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), rescanmode_clearsettings);
   }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);

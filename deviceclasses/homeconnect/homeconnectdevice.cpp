@@ -199,6 +199,22 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
     modelGuid = o->stringValue();
   if (aHomeApplicanceInfoRecord->get("brand", o))
     vendor = o->stringValue();
+}
+
+
+void HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  configureDevice();
+  // derive the dSUID
+  deriveDsUid();
+  // Nothing more to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
+
+
+void HomeConnectDevice::configureDevice()
+{
   // FIXME: ugly direct model match
   standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
   // Create standard actions
@@ -293,9 +309,9 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
     boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)
   ));
   deviceStates->addState(operationState);
-  // derive the dSUID
-  deriveDsUid();
 }
+
+
 
 
 void HomeConnectDevice::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)

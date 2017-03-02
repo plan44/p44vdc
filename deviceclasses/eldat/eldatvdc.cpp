@@ -110,14 +110,14 @@ void EldatVdc::removeDevices(bool aForget)
 
 
 
-void EldatVdc::collectDevices(StatusCB aCompletedCB, bool aIncremental, bool aExhaustive, bool aClearSettings)
+void EldatVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // install standard message handler
   eldatComm.setReceivedMessageHandler(boost::bind(&EldatVdc::handleMessage, this, _1, _2));
   // incrementally collecting Eldat devices makes no sense as the set of devices is defined by learn-in (DB state)
-  if (!aIncremental) {
+  if (!(aRescanFlags & rescanmode_incremental)) {
     // start with zero
-    removeDevices(aClearSettings);
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in ELDAT devices from DB
     sqlite3pp::query qry(db);
     if (qry.prepare("SELECT eldatAddress, subdevice, deviceType FROM knownDevices")==SQLITE_OK) {

@@ -94,6 +94,15 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
 }
 
 
+void EvaluatorDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // Nothing to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
+
+
+
 bool EvaluatorDevice::isPublicDS()
 {
   // public if it's not an internal-only evaluator

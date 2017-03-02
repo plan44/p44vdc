@@ -91,6 +91,13 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const
 }
 
 
+void HueDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // Nothing to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
+
 string HueDevice::getExtraInfo()
 {
   return string_format("Light #%s", lightID.c_str());
@@ -504,9 +511,6 @@ void HueDevice::channelValuesReceived(SimpleCB aDoneCB, JsonObjectPtr aDeviceInf
   // done
   if (aDoneCB) aDoneCB();
 }
-
-
-
 
 
 

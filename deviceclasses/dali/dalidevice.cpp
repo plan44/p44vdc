@@ -887,7 +887,7 @@ DaliSingleControllerDevice::DaliSingleControllerDevice(DaliVdc *aVdcP) :
 }
 
 
-void DaliSingleControllerDevice::willBeAdded()
+void DaliSingleControllerDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Note: setting up behaviours late, because we want the brightness dimmer already assigned for the hardware name
   if (daliController->supportsDT8) {
@@ -915,6 +915,8 @@ void DaliSingleControllerDevice::willBeAdded()
   }
   // - derive the DsUid
   deriveDsUid();
+  // done
+  identificationOK(aIdentifyCB);
 }
 
 
@@ -1198,7 +1200,7 @@ DaliCompositeDevice::DaliCompositeDevice(DaliVdc *aVdcP) :
 }
 
 
-void DaliCompositeDevice::willBeAdded()
+void DaliCompositeDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Note: setting up behaviours late, because we want the brightness dimmer already assigned for the hardware name
   // set up dS behaviour for color lights, which include a color scene table
@@ -1211,6 +1213,8 @@ void DaliCompositeDevice::willBeAdded()
   addBehaviour(cl);
   // now derive dSUID
   deriveDsUid();
+  // done
+  identificationOK(aIdentifyCB);
 }
 
 

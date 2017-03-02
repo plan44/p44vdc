@@ -47,6 +47,14 @@ EldatDevice::EldatDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType) :
 }
 
 
+void EldatDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // Nothing to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
+
+
 EldatVdc &EldatDevice::getEldatVdc()
 {
   return *(static_cast<EldatVdc *>(vdcP));

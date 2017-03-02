@@ -53,6 +53,13 @@ ZfVdc &ZfDevice::getZfVdc()
 }
 
 
+void ZfDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // Nothing to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
+
 
 ZfAddress ZfDevice::getAddress()
 {

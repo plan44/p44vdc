@@ -93,6 +93,12 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, uint16_t aFirstLED, uint16_t 
 }
 
 
+void LedChainDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // Nothing to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
 
 bool LedChainDevice::isSoftwareDisconnectable()
 {
