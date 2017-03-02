@@ -150,6 +150,13 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
 }
 
 
+void OlaDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // Nothing to do to identify for now
+  identificationOK(aIdentifyCB);
+}
+
+
 
 bool OlaDevice::isSoftwareDisconnectable()
 {
