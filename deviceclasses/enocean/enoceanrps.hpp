@@ -112,10 +112,6 @@ namespace p44 {
 
     bool isERP2; ///< set if protocol is ERP2
 
-    #if PRELIMINARY_WINDOWHANDLE_MAPPING
-    bool isTiltedStatus; ///< set if this represents the tilted status (otherwise, it's the open status)
-    #endif
-
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
     virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
