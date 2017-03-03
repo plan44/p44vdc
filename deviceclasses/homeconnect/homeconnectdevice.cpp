@@ -202,13 +202,12 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
 }
 
 
-void HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+bool HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   configureDevice();
   // derive the dSUID
   deriveDsUid();
-  // Nothing more to do to identify for now
-  identificationOK(aIdentifyCB);
+  return true; // simple identification, callback will not be called
 }
 
 

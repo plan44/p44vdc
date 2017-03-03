@@ -165,7 +165,7 @@ void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aRe
           if (ty=="CoffeeMaker") {
             // create device now
             HomeConnectDevicePtr newDev = HomeConnectDevicePtr(new HomeConnectDevice(this, ha));
-            if (addDevice(newDev)) {
+            if (simpleIdentifyAndAddDevice(newDev)) {
               // actually added, no duplicate, set the name
               // (otherwise, this is an incremental collect and we knew this light already)
               JsonObjectPtr n = ha->get("name");
