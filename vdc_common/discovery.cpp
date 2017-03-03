@@ -176,10 +176,11 @@ bool DiscoveryManager::avahi_poll()
 
 void DiscoveryManager::startService()
 {
-  // only start if not already started
+  // only start if not already started, and only if vdc host has been set
   if (!service) {
-    // if device has no network connection (no IP) yet, starting avahi makes no sense - delay it
-    if (!vdcHost->isNetworkConnected()) {
+    // if device has no network connection (no IP) yet, starting avahi makes no sense - delay it (again)
+    // Note: network connection cannot be checked if vdchost has not yet been set at this point
+    if (vdcHost && !vdcHost->isNetworkConnected()) {
       // TODO: checking IPv4 only at this time, need to add IPv6 later
       LOG(LOG_WARNING, "discovery: device has no IP address -> retry later");
       MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
@@ -484,6 +485,7 @@ void DiscoveryManager::advertiseDS(
   auxVdsmStatusHandler = aAuxVdsmStatusHandler;
   vdsmAuxiliary = !aNotAuxiliary;
   #endif // ENABLE_AUXVDSM
+  // start advertising now
   dmState = dm_setup; // set up for advertising
   restartAdvertising();
 }
