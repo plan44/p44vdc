@@ -256,6 +256,11 @@ string Vdc::vendorName()
 
 void Vdc::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
+  // prevent collecting from vdc which has global error
+  if (!Error::isOK(vdcErr)) {
+    if (aCompletedCB) aCompletedCB(vdcErr);
+    return;
+  }
   // prevent collecting while already collecting
   if (collecting) {
     // already collecting - don't collect again
@@ -722,7 +727,14 @@ void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const c
 
 string Vdc::description()
 {
-  string d = string_format("%s #%d: %s (%ld devices)", vdcClassIdentifier(), getInstanceNumber(), shortDesc().c_str(), (long)devices.size());
+  string d = string_format(
+    "%s #%d: %s (%ld devices), status %s",
+    vdcClassIdentifier(),
+    getInstanceNumber(),
+    shortDesc().c_str(),
+    (long)devices.size(),
+    Error::isOK(vdcErr) ? "OK" : vdcErr->description().c_str()
+  );
   return d;
 }
 

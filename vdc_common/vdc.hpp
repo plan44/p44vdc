@@ -91,6 +91,8 @@ namespace p44 {
     long rescanTicket; ///< rescan ticket
     bool collecting; ///< currently collecting
 
+    ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all
+
   protected:
   
     DeviceVector devices; ///< the devices of this class
@@ -128,7 +130,10 @@ namespace p44 {
 
     /// get number of devices
     size_t getNumberOfDevices() const { return devices.size(); };
-		
+
+    /// get vDC status or error
+    ErrorPtr getVdcStatus() { return vdcErr; }
+
     /// @}
 		
 		
@@ -209,10 +214,13 @@ namespace p44 {
     /// @return true if vdc is currently collecting (scanning for) devices
     bool isCollecting() { return collecting; };
 
-
     /// handle global events
     /// @param aEvent the event to handle
     virtual void handleGlobalEvent(VdchostEvent aEvent) { /* NOP in base class */ };
+
+    /// set vdc-global error
+    /// @param aVdcError if NotOK, vdc cannot collect devices any more (or at all)
+    void setVdcError(ErrorPtr aVdcError) { vdcErr = aVdcError; };
 
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error

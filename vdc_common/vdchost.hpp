@@ -107,8 +107,6 @@ namespace p44 {
     typedef DsAddressable inherited;
     typedef PersistentParams inheritedParams;
 
-    friend class VdcCollector;
-    friend class VdcInitializer;
     friend class Vdc;
     friend class DsAddressable;
 

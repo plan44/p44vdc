@@ -321,6 +321,7 @@ void VdcHost::vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::
 {
   if (!Error::isOK(aError)) {
     LOG(LOG_ERR, "vDC %s: failed to initialize: %s", aNextVdc->second->shortDesc().c_str(), aError->description().c_str());
+    aNextVdc->second->setVdcError(aError);
   }
   // anyway, initialize next
   aNextVdc++;
@@ -407,7 +408,16 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
   }
   // all devices initialized
   postEvent(vdchost_devices_initialized);
-  aCompletedCB(ErrorPtr());
+  // check for global vdc errors now
+  ErrorPtr vdcInitErr;
+  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); pos++) {
+    if (!Error::isOK(pos->second->getVdcStatus())) {
+      vdcInitErr = pos->second->getVdcStatus();
+      LOG(LOG_ERR, "*** initial device collecting incomplete because of error: %s", vdcInitErr->description().c_str());
+      break;
+    }
+  }
+  aCompletedCB(vdcInitErr);
   collecting = false;
 }
 
