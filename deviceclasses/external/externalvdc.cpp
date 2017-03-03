@@ -145,10 +145,10 @@ ExternalDevice::~ExternalDevice()
 }
 
 
-void ExternalDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+bool ExternalDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Nothing to do to identify for now
-  identificationOK(aIdentifyCB);
+  return true; // simple identification, callback will not be called
 }
 
 
@@ -1453,7 +1453,7 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       }
       if (Error::isOK(err)) {
         // device configured, add it now
-        if (!externalVdc.addDevice(extDev)) {
+        if (!externalVdc.simpleIdentifyAndAddDevice(extDev)) {
           err = TextError::err("device could not be added (duplicate uniqueid could be a reason, see p44vdc log)");
           extDev.reset(); // forget it
         }

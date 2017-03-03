@@ -159,7 +159,7 @@ OlaDevicePtr OlaVdc::addOlaDevice(string aDeviceType, string aDeviceConfig)
   // add to container if device was created
   if (newDev) {
     // add to container
-    addDevice(newDev);
+    simpleIdentifyAndAddDevice(newDev);
     return boost::dynamic_pointer_cast<OlaDevice>(newDev);
   }
   // none added

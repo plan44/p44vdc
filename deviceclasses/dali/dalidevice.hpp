@@ -310,7 +310,7 @@ namespace p44 {
     DaliSingleControllerDevice(DaliVdc *aVdcP);
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
-    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+    virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
     /// @return technical type of DALI device
     virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return daliController && daliController->isGrouped() ? dalidevice_group : dalidevice_single; }
@@ -438,7 +438,7 @@ namespace p44 {
     DaliCompositeDevice(DaliVdc *aVdcP);
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
-    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+    virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
     /// @return type of DALI device
     virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return dalidevice_composite; }

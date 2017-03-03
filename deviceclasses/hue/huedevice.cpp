@@ -91,10 +91,10 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const
 }
 
 
-void HueDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+bool HueDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Nothing to do to identify for now
-  identificationOK(aIdentifyCB);
+  return true; // simple identification, callback will not be called
 }
 
 

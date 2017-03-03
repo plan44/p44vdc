@@ -152,7 +152,7 @@ void ZfVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 
 bool ZfVdc::addKnownDevice(ZfDevicePtr aZfDevice)
 {
-  if (inherited::addDevice(aZfDevice)) {
+  if (simpleIdentifyAndAddDevice(aZfDevice)) {
     // not a duplicate, actually added - add to my own list
     zfDevices.insert(make_pair(aZfDevice->getAddress(), aZfDevice));
     return true;

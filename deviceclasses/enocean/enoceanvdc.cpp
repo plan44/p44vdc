@@ -163,7 +163,7 @@ void EnoceanVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 
 bool EnoceanVdc::addKnownDevice(EnoceanDevicePtr aEnoceanDevice)
 {
-  if (inherited::addDevice(aEnoceanDevice)) {
+  if (simpleIdentifyAndAddDevice(aEnoceanDevice)) {
     // not a duplicate, actually added - add to my own list
     enoceanDevices.insert(make_pair(aEnoceanDevice->getAddress(), aEnoceanDevice));
     return true;

@@ -112,19 +112,22 @@ namespace p44 {
     Device(Vdc *aVdcP);
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
-    /// @param aIdentifyCB must be called when the setup is complete, which is when the device has all information
-    ///   (which might have required API calls to determine device models, serial numbers etc.) ready to know its own
-    ///   dSUID.
+    /// @param aIdentifyCB must be called when the identification or setup is not instant, but can only be confirmed later. In this
+    ///   case, identifyDevice() must return false, indicating the identification is not yet complete.
+    ///   This is useful for devices that require API calls to determine device models, serial numbers etc.)
+    ///   At the time when the callback is called, the device must have a stable dSUID and internal setup.
+    /// @return true can be returned when the device identification/setup is instant. This means that aIdentifyCB is not called, and
+    ///   the device is immediately used. When returning true, the device must already have a stable dSUID and internal setup.
     /// @note identifyDevice() will only be called on a new Device object during the process of adding a device to a vDC.
     /// @note identifyDevice() MAY NOT perform any action on the (hardware) device that would modify its state. When re-scanning
     ///   for hardware devices, identifyDevice() will often target already known and registered devices. identifyDevice()'s only
     ///   allowed interaction with the hardware device is to query enough information to derive a henceforth invariable dSUID and
     ///   and to construct a suitable Device object, including all contained settings, scene and behaviour objects.
     ///   This object is then *possibly* used to operate the device later (in this case it will receive load() and initializeDevice() calls),
-    //    but also might get discarded without further calls when it turns out there already is a Device with the same dSUID.
+    //    but also might get discarded without further calls when it turns out there is already a Device with the same dSUID.
     /// @note When idenify finishes, the device must be ready to load persistent settings (which means all behaviours and settings objects
     ///   need to be in place, as these define the device structure to load settings for), and then for being initialized for operation.
-    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) = 0;
+    virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) = 0;
 
     /// utility: return from identification with error
     void identificationFailed(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError);

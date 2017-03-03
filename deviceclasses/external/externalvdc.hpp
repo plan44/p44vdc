@@ -132,7 +132,7 @@ namespace p44 {
     virtual ~ExternalDevice();
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
-    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+    virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
     ExternalVdc &getExternalVdc();
 

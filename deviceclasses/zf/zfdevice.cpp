@@ -53,10 +53,10 @@ ZfVdc &ZfDevice::getZfVdc()
 }
 
 
-void ZfDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+bool ZfDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Nothing to do to identify for now
-  identificationOK(aIdentifyCB);
+  return true; // simple identification, callback will not be called
 }
 
 

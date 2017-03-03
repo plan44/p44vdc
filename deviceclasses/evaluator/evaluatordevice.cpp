@@ -94,10 +94,10 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
 }
 
 
-void EvaluatorDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+bool EvaluatorDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Nothing to do to identify for now
-  identificationOK(aIdentifyCB);
+  return true; // simple identification, callback will not be called
 }
 
 

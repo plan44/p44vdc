@@ -240,30 +240,29 @@ namespace p44 {
     /// @name services for actual vDC controller implementations
     /// @{
 
-    /// Add device collected from hardware side (bus scan, etc.)
-    /// @param aDevice a device object which has a valid dSUID
-    /// @return false if aDevice's dSUID is already known.
-    /// @note if aDevice's dSUID is already known, it will *not* be added again. This facilitates
-    ///   implementation of incremental collection of newly appeared devices (scanning entire bus,
-    ///   known ones will just be ignored when encountered again)
-    /// @note this can be called as part of a collectDevices scan, or when a new device is detected
-    ///   by other means than a scan/collect operation
-    virtual bool addDevice(DevicePtr aDevice);
-
     /// Remove device known no longer connected to the system (for example: explicitly unlearned EnOcean switch)
     /// @param aDevice a device object which has a valid dSUID
     /// @param aForget if set, all parameters stored for the device will be deleted. Note however that
     ///   the device is not disconnected (=unlearned) by this.
     virtual void removeDevice(DevicePtr aDevice, bool aForget = false);
 
-    /// utility method for collectDevices: identify device with retries
+    /// utility to identify and add devices with simple identification (not requiring callback)
+    /// @param aNewDevice the device to be identified and added.
+    ///   Must support instant identifyDevice() returning true.
+    /// @return false if aDevice was not added (due to duplicate dSUID or because it does not support simpleIdentify)
+    /// @note if aDevice's dSUID is already known, it will *not* be added again. This facilitates
+    ///   implementation of incremental collection of newly appeared devices (scanning entire bus,
+    ///   known ones will just be ignored when encountered again)
+    bool simpleIdentifyAndAddDevice(DevicePtr aNewDevice);
+
+    /// utility method for implementation of scanForDevices in Vdc subclasses: identify device with retries
     /// @param aNewDevice the device to be identified and added
     /// @param aCompletedCB will be called when device has been added or had error
     /// @param aMaxRetries how many retries (excluding the first try) should be attempted
     /// @param aRetryDelay how long to wait between retries
     void identifyAndAddDevice(DevicePtr aNewDevice, StatusCB aCompletedCB, int aMaxRetries = 0, MLMicroSeconds aRetryDelay = 0);
 
-    /// utility method for collectDevices: identify and add a list of devices
+    /// utility method for implementation of scanForDevices in Vdc subclasses: identify and add a list of devices
     /// @param aToBeAddedDevices a list of devices to be identified and added
     /// @param aCompletedCB will be called when all devices have been added
     /// @param aMaxRetries how many retries (excluding the first try) should be attempted
@@ -382,7 +381,7 @@ namespace p44 {
 
     /// utility method for identifyAndAddDevice(s): identify device with retries
     /// @param aNewDevice the device to be identified
-    /// @param aIdentifyCB will be called with the identified device object or an error
+    /// @param aIdentifyCB will be called with the identified device object or an error (unless return value is true for instantly identifying devices)
     /// @param aMaxRetries how many retries (excluding the first try) should be attempted
     /// @param aRetryDelay how long to wait between retries
     void identifyDevice(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int aMaxRetries, MLMicroSeconds aRetryDelay);

@@ -319,21 +319,6 @@ void Vdc::setPeriodicRecollection(MLMicroSeconds aRecollectInterval, RescanMode 
 // MARK: ===== Managing devices
 
 
-bool Vdc::addDevice(DevicePtr aDevice)
-{
-  // announce to global device container
-  if (getVdcHost().addDevice(aDevice)) {
-    // not a duplicate
-    // - save in my own list
-    devices.push_back(aDevice);
-    // added
-    return true;
-  }
-  return false;
-}
-
-
-
 void Vdc::removeDevice(DevicePtr aDevice, bool aForget)
 {
 	// find and remove from my list.
@@ -367,7 +352,11 @@ void Vdc::removeDevices(bool aForget)
 void Vdc::identifyDevice(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int aMaxRetries, MLMicroSeconds aRetryDelay)
 {
   // Note: aNewDevice bound to the callback prevents it from being deleted during identification
-  aNewDevice->identifyDevice(boost::bind(&Vdc::identifyDeviceCB, this, aNewDevice, aIdentifyCB, aMaxRetries, aRetryDelay, _1, _2));
+  if (aNewDevice->identifyDevice(boost::bind(&Vdc::identifyDeviceCB, this, aNewDevice, aIdentifyCB, aMaxRetries, aRetryDelay, _1, _2))) {
+    // instant identify, callback is not called by device -> simulate it at this level
+    ALOG(LOG_WARNING, "has instant identification, but vdc seems to expect it to be non-instant!");
+    identifyDeviceCB(aNewDevice, aIdentifyCB, 0, 0, ErrorPtr(), aNewDevice.get());
+  }
 }
 
 void Vdc::identifyDeviceCB(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int aMaxRetries, MLMicroSeconds aRetryDelay, ErrorPtr aError, Device *aIdentifiedDevice)
@@ -397,6 +386,26 @@ void Vdc::identifyDeviceCB(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, i
 }
 
 
+bool Vdc::simpleIdentifyAndAddDevice(DevicePtr aNewDevice)
+{
+  if (!aNewDevice->identifyDevice(NULL)) {
+    // error: device does not support simple identification
+    ALOG(LOG_CRIT, "implementation error: device does not support simple identification! Cannot be added.")
+    return false;
+  }
+  // simple identification successful
+  if (getVdcHost().addDevice(aNewDevice)) {
+    // not a duplicate
+    // - save in my own list
+    devices.push_back(aNewDevice);
+    // added
+    return true;
+  }
+  // was a duplicate or could not be added for another reason
+  return false;
+}
+
+
 
 void Vdc::identifyAndAddDevice(DevicePtr aNewDevice, StatusCB aCompletedCB, int aMaxRetries, MLMicroSeconds aRetryDelay)
 {
@@ -408,8 +417,12 @@ void Vdc::identifyAndAddDeviceCB(StatusCB aCompletedCB, ErrorPtr aError, Device 
 {
   // Note: to keep aIdentifiedDevice alive, it must be wrapped into a DevicePtr now. Otherwise, it will be deleted
   if (Error::isOK(aError)) {
-    if (addDevice(DevicePtr(aIdentifiedDevice))) {
-      // actually added, no duplicate
+    // announce to global device container
+    DevicePtr newDev(aIdentifiedDevice);
+    if (getVdcHost().addDevice(newDev)) {
+      // not a duplicate
+      // - save in my own list
+      devices.push_back(newDev);
     }
   }
   else {
@@ -418,6 +431,7 @@ void Vdc::identifyAndAddDeviceCB(StatusCB aCompletedCB, ErrorPtr aError, Device 
   }
   if (aCompletedCB) aCompletedCB(aError);
 }
+
 
 
 void Vdc::identifyAndAddDevices(DeviceList aToBeAddedDevices, StatusCB aCompletedCB, int aMaxRetries, MLMicroSeconds aRetryDelay, MLMicroSeconds aAddDelay)

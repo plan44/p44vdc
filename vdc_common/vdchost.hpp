@@ -364,6 +364,8 @@ namespace p44 {
     /// @note aDevice is added *only if no device is already known with this dSUID*
     /// @note this can be called as part of a collectDevices scan, or when a new device is detected
     ///   by other means than a scan/collect operation
+    /// @note this should NOT be called directly from vdc implementations. Use
+    ///   simpleIdentifyAndAddDevice() or identifyAndAddDevice()
     bool addDevice(DevicePtr aDevice);
 
     /// called by vDC containers to remove devices from the container-wide list

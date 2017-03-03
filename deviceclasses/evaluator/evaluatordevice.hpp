@@ -98,7 +98,7 @@ namespace p44 {
     virtual ~EvaluatorDevice();
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
-    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+    virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
     /// check if device is public dS device (which should be registered with vdSM)
     /// @return true if device is registerable with vdSM

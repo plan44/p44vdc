@@ -341,7 +341,7 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
             daliDevice->addDimmer(dimmer, dimmerType);
           } // for all needed dimmers
           // - add it to our collection (if not already there)
-          addDevice(daliDevice);
+          simpleIdentifyAndAddDevice(daliDevice);
         }
       } // part of composite multichannel device
       else {
@@ -359,7 +359,7 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
     // - set whiteDimmer (gives device info to calculate dSUID)
     daliSingleControllerDevice->daliController = daliBusDevice;
     // - add it to our collection (if not already there)
-    addDevice(daliSingleControllerDevice);
+    simpleIdentifyAndAddDevice(daliSingleControllerDevice);
   }
   // collecting complete
   aCompletedCB(ErrorPtr());

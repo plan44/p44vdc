@@ -205,7 +205,7 @@ LedChainDevicePtr LedChainVdc::addLedChainDevice(uint16_t aFirstLED, uint16_t aN
   // add to container if device was created
   if (newDev) {
     // add to container
-    addDevice(newDev);
+    simpleIdentifyAndAddDevice(newDev);
     // add to my list and sort
     sortedSegments.push_back(newDev);
     sortedSegments.sort(segmentCompare);

@@ -43,10 +43,10 @@ StaticDevice::StaticDevice(Vdc *aVdcP) :
 }
 
 
-void StaticDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+bool StaticDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Nothing to do to identify for now
-  identificationOK(aIdentifyCB);
+  return true; // simple identification, callback will not be called
 }
 
 
@@ -153,7 +153,7 @@ StaticDevicePtr StaticVdc::addStaticDevice(string aDeviceType, string aDeviceCon
   // add to container if device was created
   if (newDev) {
     // add to container
-    addDevice(newDev);
+    simpleIdentifyAndAddDevice(newDev);
     return boost::dynamic_pointer_cast<StaticDevice>(newDev);
   }
   // none added

@@ -105,7 +105,7 @@ void EvaluatorVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags
         EvaluatorDevicePtr dev = EvaluatorDevicePtr(new EvaluatorDevice(this, i->get<string>(0), i->get<string>(1)));
         if (dev) {
           dev->evaluatorDeviceRowID = i->get<int>(2);
-          addDevice(dev);
+          simpleIdentifyAndAddDevice(dev);
         }
       }
     }
@@ -142,7 +142,7 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
           evaluatorId.c_str(), evaluatorType.c_str()
         );
         dev->evaluatorDeviceRowID = db.last_insert_rowid();
-        addDevice(dev);
+        simpleIdentifyAndAddDevice(dev);
         // confirm
         ApiValuePtr r = aRequest->newApiValue();
         r->setType(apivalue_object);

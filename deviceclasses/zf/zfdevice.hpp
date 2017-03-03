@@ -86,7 +86,7 @@ namespace p44 {
     ZfDevice(ZfVdc *aVdcP, ZfDeviceType aDeviceType);
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
-    virtual void identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+    virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)

@@ -332,7 +332,7 @@ void HueVdc::collectedLightsHandler(JsonObjectPtr aResult, ErrorPtr aError)
         if (o) uniqueID = o->stringValue();
         // create device now
         HueDevicePtr newDev = HueDevicePtr(new HueDevice(this, lightID, hasColor, uniqueID));
-        if (addDevice(newDev)) {
+        if (simpleIdentifyAndAddDevice(newDev)) {
           // actually added, no duplicate, set the name
           // (otherwise, this is an incremental collect and we knew this light already)
           JsonObjectPtr n = lightInfo->get("name");

@@ -47,10 +47,10 @@ EldatDevice::EldatDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType) :
 }
 
 
-void EldatDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+bool EldatDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Nothing to do to identify for now
-  identificationOK(aIdentifyCB);
+  return true; // simple identification, callback will not be called
 }
 
 

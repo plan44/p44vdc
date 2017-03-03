@@ -153,7 +153,7 @@ void EldatVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 
 bool EldatVdc::addKnownDevice(EldatDevicePtr aEldatDevice)
 {
-  if (inherited::addDevice(aEldatDevice)) {
+  if (simpleIdentifyAndAddDevice(aEldatDevice)) {
     // not a duplicate, actually added - add to my own list
     eldatDevices.insert(make_pair(aEldatDevice->getAddress(), aEldatDevice));
     return true;
