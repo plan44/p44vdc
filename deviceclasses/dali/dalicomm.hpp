@@ -160,6 +160,9 @@ namespace p44 {
     /// @param aCloseAfterIdleTime if not Never, serial port will be closed after being idle for the specified time
     void setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, MLMicroSeconds aCloseAfterIdleTime);
 
+    /// accept extra bytes to resynchronize bridge
+    virtual ssize_t acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes);
+
     /// set DALI edge adjustment
     /// @param how much (in 1/256th DALI bit time units) to delay the going inactive edge of the sending signal, to compensate for slow falling (going active) edge on the bus
     void setDaliSendAdj(uint8_t aSendEdgeDelay) { sendEdgeAdj = aSendEdgeDelay; };
@@ -343,6 +346,8 @@ namespace p44 {
     /// @}
 
   private:
+
+    void resetIssued(DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
 
     void daliPrepareForCommand(uint16_t &aCommand, int &aWithDelay);
     void msbOf16BitQueryReceived(DaliAddress aAddress, Dali16BitValueQueryResultCB aResult16CB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);

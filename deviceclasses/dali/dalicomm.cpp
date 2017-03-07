@@ -215,12 +215,12 @@ void DaliComm::sendBridgeCommand(uint8_t aCmd, uint8_t aDali1, uint8_t aDali2, D
   recOp->setExpectedBytes(2); // expected 2 response bytes
   expectedBridgeResponses++;
   if (aWithDelay>0) {
-    // delayed sends must always be in sequence
+    // delayed sends must always be in sequence (always leave recOp->inSequence at its default, true)
     sendOp->setInitiationDelay(aWithDelay);
     FOCUSLOG("DALI bridge command:  %s (%02X)      %02X %02X - %d pending responses - to be sent in %d µS after no response pending", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, expectedBridgeResponses, aWithDelay);
   }
   else {
-    // non-delayed sends may be sent before answer of previous commands have arrived as long as Rx buf in bridge does not overflow
+    // non-delayed sends may be sent before answer of previous commands have arrived as long as Rx (9210) or Tx (p44dbr) buf in bridge does not overflow
     if (expectedBridgeResponses>BUFFERED_BRIDGE_RESPONSES_HIGH) {
       responsesInSequence = true; // prevent further sends without answers
     }
@@ -313,16 +313,50 @@ void DaliComm::daliQueryResponseHandler(DaliQueryResultCB aResultCB, uint8_t aRe
 }
 
 
+ssize_t DaliComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
+{
+  // no bridge answers expected -> consume any extra bytes.
+  // DALI bridge protocol NEVER sends data on its own, so
+  // extra bytes while no response expected are always sign of desynchronisation
+  if (FOCUSLOGENABLED) {
+    string b;
+    b.assign((char *)aBytes, aNumBytes);
+    FOCUSLOG("DALI bridge: received extra bytes (%s) -> bridge was apparently out of sync", binaryToHexString(b, ' ').c_str());
+  }
+  else {
+    LOG(LOG_WARNING,"DALI bridge: received %zu extra bytes -> bridge was apparently out of sync", aNumBytes);
+  }
+  return aNumBytes;
+}
+
+
+
 
 
 // reset the bridge
 
 void DaliComm::reset(DaliCommandStatusCB aStatusCB)
 {
-  // 3 reset commands in row will terminate any out-of-sync commands
-  sendBridgeCommand(CMD_CODE_RESET, 0, 0, NULL);
-  sendBridgeCommand(CMD_CODE_RESET, 0, 0, NULL);
-  sendBridgeCommand(CMD_CODE_RESET, 0, 0, NULL);
+  // this first reset command should also consume extra bytes left over from previous use use delay to make sure commands are NOT buffered and extra bytes from unsynced bridge will be catched here
+  sendBridgeCommand(CMD_CODE_RESET, 0, 0, boost::bind(&DaliComm::resetIssued, this, aStatusCB, _1, _2, _3), 100*MilliSecond);
+}
+
+
+
+void DaliComm::resetIssued(DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)
+{
+  // repeat resets until we get a correct answer
+  if (!Error::isOK(aError) || aResp1!=RESP_CODE_ACK || aResp2!=ACK_OK) {
+    LOG(LOG_WARNING, "DALI bridge: Incorrect answer (%02X %02X) or error (%s) from reset command -> repeating", aResp1, aResp2, aError ? aError->description().c_str() : "none");
+    // issue another reset
+    reset(aStatusCB);
+    return;
+  }
+  // send next reset command with a longer delay, to give bridge time to process possibly buffered commands
+  // (p44dbr does not execute next command until return code for previous command has been read from /dev/daliX)
+  sendBridgeCommand(CMD_CODE_RESET, 0, 0, NULL, 1*Second);
+  // another reset to make sure
+  sendBridgeCommand(CMD_CODE_RESET, 0, 0, NULL, 100*MilliSecond);
   // make sure bus overload protection is active, autoreset enabled, reset to operating
   sendBridgeCommand(CMD_CODE_OVLRESET, 0, 0, NULL);
   // set DALI signal edge adjustments (available from fim_dali v3 onwards)
