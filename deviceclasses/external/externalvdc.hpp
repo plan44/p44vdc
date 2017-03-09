@@ -234,6 +234,14 @@ namespace p44 {
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
 
+    /// @name factory methods for elements configured via dynamic JSON config
+    /// @{
+
+    virtual ErrorPtr actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription) P44_OVERRIDE;
+    
+    /// @}
+
+
   private:
 
     void handleDeviceApiJsonMessage(JsonObjectPtr aMessage);

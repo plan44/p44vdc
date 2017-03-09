@@ -2278,8 +2278,199 @@ PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPr
 }
 
 
+// MARK: ===== dynamic configuration of single devices via JSON
 
-// MARK: ======= misc utils
+ErrorPtr SingleDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription)
+{
+  // base class just creates a unspecific action
+  aAction = DeviceActionPtr(new DeviceAction(*this, aActionId, aDescription));
+  return ErrorPtr();
+}
+
+
+ErrorPtr SingleDevice::stateFromJSON(DeviceStatePtr &aState, JsonObjectPtr aJSONConfig, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor)
+{
+  // base class just creates a unspecific state without push handler
+  aState = DeviceStatePtr(new DeviceState(*this, aStateId, aDescription, aStateDescriptor, NULL));
+  return ErrorPtr();
+}
+
+
+ErrorPtr SingleDevice::eventFromJSON(DeviceEventPtr &aEvent, JsonObjectPtr aJSONConfig, const string aEventId, const string aDescription)
+{
+  // base class just creates a unspecific event
+  aEvent = DeviceEventPtr(new DeviceEvent(*this, aEventId, aDescription));
+  return ErrorPtr();
+}
+
+
+ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
+{
+  JsonObjectPtr o;
+  ErrorPtr err;
+
+  // check for single device actions
+  if (aJSONConfig->get("actions", o)) {
+    enableAsSingleDevice(); // must behave as a single device
+    string name;
+    JsonObjectPtr action;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(name, action)) {
+      JsonObjectPtr o2;
+      string desc = name; // default to name
+      if (action && action->get("description", o2)) desc = o2->stringValue();
+        // create the action
+        DeviceActionPtr a;
+        err = actionFromJSON(a, aJSONConfig, name, desc);
+        if (!Error::isOK(err)) return err;
+        // check for params
+        if (action && action->get("params", o2)) {
+          string pname;
+          JsonObjectPtr param;
+          o2->resetKeyIteration();
+          while (o2->nextKeyValue(pname, param)) {
+            ValueDescriptorPtr p;
+            ErrorPtr err = parseValueDesc(p, param, pname);
+            if (!Error::isOK(err)) return err;
+            a->addParameter(p);
+          }
+        }
+      deviceActions->addAction(a);
+    }
+  }
+  // check for single device states
+  if (aJSONConfig->get("states", o)) {
+    enableAsSingleDevice(); // must behave as a single device
+    string name;
+    JsonObjectPtr state;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(name, state)) {
+      if (!state) return TextError::err("state must specify type");
+      JsonObjectPtr o2;
+      string desc = name; // default to name
+      if (state->get("description", o2)) desc = o2->stringValue();
+        ValueDescriptorPtr v;
+      ErrorPtr err = parseValueDesc(v, state, "state");
+      if (!Error::isOK(err)) return err;
+      // create the state
+      DeviceStatePtr s;
+      err = stateFromJSON(s, aJSONConfig, name, desc, v);
+      if (!Error::isOK(err)) return err;
+      deviceStates->addState(s);
+    }
+  }
+  // check for single device events
+  if (aJSONConfig->get("events", o)) {
+    enableAsSingleDevice(); // must behave as a single device
+    string name;
+    JsonObjectPtr event;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(name, event)) {
+      // create the event
+      JsonObjectPtr o2;
+      string desc = name; // default to name
+      if (event && event->get("description", o2)) desc = o2->stringValue();
+      DeviceEventPtr e;
+      err = eventFromJSON(e, aJSONConfig, name, desc);
+      if (!Error::isOK(err)) return err;
+      deviceEvents->addEvent(e);
+    }
+  }
+  // check for single device properties
+  if (aJSONConfig->get("properties", o)) {
+    enableAsSingleDevice(); // must behave as a single device
+    string name;
+    JsonObjectPtr prop;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(name, prop)) {
+      if (!prop) return TextError::err("property must specify type");
+      // create the property (is represented by a ValueDescriptor)
+      bool readonly = false;
+      JsonObjectPtr o2;
+      if (prop->get("readonly", o2))
+        readonly = o2->boolValue();
+      ValueDescriptorPtr p;
+      ErrorPtr err = parseValueDesc(p, prop, name);
+      if (!Error::isOK(err)) {
+        return err;
+      }
+      deviceProperties->addProperty(p, readonly);
+    }
+  }
+  // successful
+  return ErrorPtr();
+}
+
+
+
+// MARK: ===== misc utils
+
+ErrorPtr p44::parseValueDesc(ValueDescriptorPtr &aValueDesc, JsonObjectPtr aJSONConfig, const string aParamName)
+{
+  JsonObjectPtr o;
+  if (!aJSONConfig || !aJSONConfig->get("type", o))
+    return TextError::err("Need to specify value 'type'");
+  VdcValueType vt = ValueDescriptor::stringToValueType(o->stringValue());
+  if (vt==valueType_unknown)
+    return TextError::err("Unknown value type '%s'", o->stringValue().c_str());
+  JsonObjectPtr def = aJSONConfig->get("default");
+  // value type is defined
+  switch (vt) {
+    default:
+    case valueType_string:
+      aValueDesc = ValueDescriptorPtr(new TextValueDescriptor(aParamName, (bool)def, def ? def->stringValue() : ""));
+      break;
+    case valueType_boolean:
+      aValueDesc = ValueDescriptorPtr(new NumericValueDescriptor(aParamName, valueType_boolean, valueUnit_none, 0, 1, 1, (bool)def, def ? def->boolValue() : false));
+      break;
+    case valueType_numeric:
+    case valueType_integer: {
+      // can have an unit optionally
+      VdcValueUnit u = valueUnit_none;
+      if (aJSONConfig->get("siunit", o)) {
+        u = ValueDescriptor::stringToValueUnit(o->stringValue());
+        if (u==unit_unknown)
+          return TextError::err("Unknown siunit '%s'", o->stringValue().c_str());
+      }
+      // must have min, max
+      double min,max;
+      double resolution = 1;
+      if (!aJSONConfig->get("min", o))
+        return TextError::err("Numeric values need to have 'min'");
+      min = o->doubleValue();
+      if (!aJSONConfig->get("max", o))
+        return TextError::err("Numeric values need to have 'max'");
+      max = o->doubleValue();
+      if (aJSONConfig->get("resolution", o)) {
+        resolution = o->doubleValue();
+      }
+      else if (vt!=valueType_integer)
+        return TextError::err("Numeric values need to have 'resolution'");
+      aValueDesc = ValueDescriptorPtr(new NumericValueDescriptor(aParamName, vt, u, min, max, resolution, (bool)def, def ? def->doubleValue() : false));
+      break;
+    }
+    case valueType_enumeration: {
+      EnumValueDescriptor *en = new EnumValueDescriptor(aParamName);
+      if (!aJSONConfig->get("values", o) || !o->isType(json_type_array))
+        return TextError::err("Need to specify enumeration 'values' array");
+      for (int i=0; i<o->arrayLength(); i++) {
+        string e = o->arrayGet(i)->stringValue();
+        bool isdefault = false;
+        if (e.size()>0 && e[0]=='!') {
+          isdefault = true;
+          e.erase(0,1);
+        }
+        en->addEnum(e.c_str(), i, isdefault);
+      }
+      aValueDesc = ValueDescriptorPtr(en);
+      break;
+    }
+  }
+  return ErrorPtr();
+}
+
+
+
 
 ErrorPtr p44::substitutePlaceholders(string &aString, ValueLookupCB aValueLookupCB)
 {

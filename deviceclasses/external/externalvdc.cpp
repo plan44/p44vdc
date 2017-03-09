@@ -729,9 +729,19 @@ bool ExternalDevice::processControlValue(const string &aName, double aValue)
 // MARK: ===== external device configuration
 
 
+ErrorPtr ExternalDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription)
+{
+  // base class just creates a unspecific action
+  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription));
+  return ErrorPtr();
+}
+
+
 ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
 {
   JsonObjectPtr o;
+  ErrorPtr err;
+
   // options
   if (aInitParams->get("sync", o)) querySync = o->boolValue();
   if (aInitParams->get("move", o)) useMovement = o->boolValue();
@@ -1035,96 +1045,10 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     }
   }
   #if ENABLE_EXTERNAL_SINGLEDEVICE
-  // check for single device actions
-  if (aInitParams->get("actions", o)) {
-    enableAsSingleDevice(); // must behave as a single device
-    string name;
-    JsonObjectPtr action;
-    o->resetKeyIteration();
-    while (o->nextKeyValue(name, action)) {
-      JsonObjectPtr o2;
-      string desc = name; // default to name
-      if (action && action->get("description", o2)) desc = o2->stringValue();
-      // create the action
-      DeviceActionPtr a = DeviceActionPtr(new ExternalDeviceAction(*this, name, desc));
-      // check for params
-      if (action && action->get("params", o2)) {
-        string pname;
-        JsonObjectPtr param;
-        o2->resetKeyIteration();
-        while (o2->nextKeyValue(pname, param)) {
-          ValueDescriptorPtr p;
-          ErrorPtr err = parseParam(pname, param, p);
-          if (!Error::isOK(err)) {
-            return err;
-          }
-          a->addParameter(p);
-        }
-      }
-      deviceActions->addAction(a);
-    }
-  }
-  if (aInitParams->get("noconfirmaction", o)) {
-    noConfirmAction = o->boolValue();
-  }
-  // check for single device states
-  if (aInitParams->get("states", o)) {
-    enableAsSingleDevice(); // must behave as a single device
-    string name;
-    JsonObjectPtr state;
-    o->resetKeyIteration();
-    while (o->nextKeyValue(name, state)) {
-      if (!state) return TextError::err("state must specify type");
-      JsonObjectPtr o2;
-      string desc = name; // default to name
-      if (state->get("description", o2)) desc = o2->stringValue();
-      ValueDescriptorPtr v;
-      ErrorPtr err = parseParam("state", state, v);
-      if (!Error::isOK(err)) {
-        return err;
-      }
-      // create the state
-      DeviceStatePtr s = DeviceStatePtr(new DeviceState(*this, name, desc, v, NULL));
-      deviceStates->addState(s);
-    }
-  }
-  // check for single device events
-  if (aInitParams->get("events", o)) {
-    enableAsSingleDevice(); // must behave as a single device
-    string name;
-    JsonObjectPtr event;
-    o->resetKeyIteration();
-    while (o->nextKeyValue(name, event)) {
-      // create the event
-      JsonObjectPtr o2;
-      string desc = name; // default to name
-      if (event && event->get("description", o2)) desc = o2->stringValue();
-      DeviceEventPtr e = DeviceEventPtr(new DeviceEvent(*this, name, desc));
-      deviceEvents->addEvent(e);
-    }
-  }
-  // check for single device properties
-  if (aInitParams->get("properties", o)) {
-    enableAsSingleDevice(); // must behave as a single device
-    deviceProperties->setPropertyChangedHandler(boost::bind(&ExternalDevice::propertyChanged, this, _1));
-    string name;
-    JsonObjectPtr prop;
-    o->resetKeyIteration();
-    while (o->nextKeyValue(name, prop)) {
-      if (!prop) return TextError::err("property must specify type");
-      // create the property (is represented by a ValueDescriptor)
-      bool readonly = false;
-      JsonObjectPtr o2;
-      if (prop->get("readonly", o2))
-        readonly = o2->boolValue();
-      ValueDescriptorPtr p;
-      ErrorPtr err = parseParam(name, prop, p);
-      if (!Error::isOK(err)) {
-        return err;
-      }
-      deviceProperties->addProperty(p, readonly);
-    }
-  }
+  // create actions/states/events and properties from JSON
+  err = configureFromJSON(aInitParams);
+  if (!Error::isOK(err)) return err;
+  if (deviceProperties) deviceProperties->setPropertyChangedHandler(boost::bind(&ExternalDevice::propertyChanged, this, _1));
   // if any of the singledevice features are selected, protocol must be JSON
   if (deviceActions && deviceConnector->simpletext) {
     return TextError::err("Single devices must use JSON protocol");
@@ -1160,69 +1084,6 @@ void ExternalDevice::propertyChanged(ValueDescriptorPtr aChangedProperty)
 
 
 
-ErrorPtr ExternalDevice::parseParam(const string aParamName, JsonObjectPtr aParamDetails, ValueDescriptorPtr &aParam)
-{
-  JsonObjectPtr o;
-  if (!aParamDetails || !aParamDetails->get("type", o))
-    return TextError::err("Need to specify value 'type'");
-  VdcValueType vt = ValueDescriptor::stringToValueType(o->stringValue());
-  if (vt==valueType_unknown)
-    return TextError::err("Unknown value type '%s'", o->stringValue().c_str());
-  JsonObjectPtr def = aParamDetails->get("default");
-  // value type is defined
-  switch (vt) {
-    default:
-    case valueType_string:
-      aParam = ValueDescriptorPtr(new TextValueDescriptor(aParamName, (bool)def, def ? def->stringValue() : ""));
-      break;
-    case valueType_boolean:
-      aParam = ValueDescriptorPtr(new NumericValueDescriptor(aParamName, valueType_boolean, valueUnit_none, 0, 1, 1, (bool)def, def ? def->boolValue() : false));
-      break;
-    case valueType_numeric:
-    case valueType_integer: {
-      // can have an unit optionally
-      VdcValueUnit u = valueUnit_none;
-      if (aParamDetails->get("siunit", o)) {
-        u = ValueDescriptor::stringToValueUnit(o->stringValue());
-        if (u==unit_unknown)
-          return TextError::err("Unknown siunit '%s'", o->stringValue().c_str());
-      }
-      // must have min, max
-      double min,max;
-      double resolution = 1;
-      if (!aParamDetails->get("min", o))
-        return TextError::err("Numeric values need to have 'min'");
-      min = o->doubleValue();
-      if (!aParamDetails->get("max", o))
-        return TextError::err("Numeric values need to have 'max'");
-      max = o->doubleValue();
-      if (aParamDetails->get("resolution", o)) {
-        resolution = o->doubleValue();
-      }
-      else if (vt!=valueType_integer)
-        return TextError::err("Numeric values need to have 'resolution'");
-      aParam = ValueDescriptorPtr(new NumericValueDescriptor(aParamName, vt, u, min, max, resolution, (bool)def, def ? def->doubleValue() : false));
-      break;
-    }
-    case valueType_enumeration: {
-      EnumValueDescriptor *en = new EnumValueDescriptor(aParamName);
-      if (!aParamDetails->get("values", o) || !o->isType(json_type_array))
-        return TextError::err("Need to specify enumeration 'values' array");
-      for (int i=0; i<o->arrayLength(); i++) {
-        string e = o->arrayGet(i)->stringValue();
-        bool isdefault = false;
-        if (e.size()>0 && e[0]=='!') {
-          isdefault = true;
-          e.erase(0,1);
-        }
-        en->addEnum(e.c_str(), i, isdefault);
-      }
-      aParam = ValueDescriptorPtr(en);
-      break;
-    }
-  }
-  return ErrorPtr();
-}
 
 #endif // ENABLE_EXTERNAL_SINGLEDEVICE
 

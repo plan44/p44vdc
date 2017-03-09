@@ -25,6 +25,8 @@
 #include "device.hpp"
 #include "outputbehaviour.hpp"
 
+#include "jsonobject.hpp"
+
 using namespace std;
 
 namespace p44 {
@@ -844,7 +846,6 @@ namespace p44 {
 
 
 
-
   /// class representing a digitalSTROM "single" device.
   /// This is a device which is normally not used in zone/group context and thus
   /// usually not (very much) using scenes. It provides "actions" and "states"
@@ -918,6 +919,12 @@ namespace p44 {
     /// @}
 
 
+    /// dynamically configure actions, states, events and properties from JSON
+    /// @param aJSONConfig a JSON object containing the configuration
+    /// @return ok or parsing error
+    ErrorPtr configureFromJSON(JsonObjectPtr aJSONConfig);
+
+
     /// @name API implementation
     /// @{
 
@@ -946,6 +953,32 @@ namespace p44 {
     /// @param aCompletedCB will be called when call has completed or failed
     void call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB);
 
+    /// @name factory methods for elements configured via dynamic JSON config
+    /// @{
+
+    /// creates a device action
+    /// @param aAction will be assigned the new action
+    /// @param aJSONConfig JSON config object for an action. Implementation can fetch specific params from it
+    /// @note other params see DeviceAction constructor
+    /// @return ok or parsing error
+    virtual ErrorPtr actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription);
+
+    /// creates a device state
+    /// @param aState will be assigned the new state
+    /// @param aJSONConfig JSON config object for a state. Implementation can fetch specific params from it
+    /// @note other params see DeviceState constructor
+    /// @return ok or parsing error
+    virtual ErrorPtr stateFromJSON(DeviceStatePtr &aState, JsonObjectPtr aJSONConfig, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor);
+
+    /// creates a device event
+    /// @param aJSONConfig JSON config object for a event. Implementation can fetch specific params from it
+    /// @note other params see DeviceEvent constructor
+    /// @return ok or parsing error
+    virtual ErrorPtr eventFromJSON(DeviceEventPtr &aEvent, JsonObjectPtr aJSONConfig, const string aEventId, const string aDescription);
+
+    /// @}
+
+
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
@@ -972,6 +1005,10 @@ namespace p44 {
   /// @param aString string to replace placeholders in
   /// @param aValueLookupCB this will be called to have variable names looked up
   ErrorPtr substitutePlaceholders(string &aString, ValueLookupCB aValueLookupCB);
+
+  /// factory method to create value descriptor from JSON descriptor
+  /// @param aJSONConfig JSON config object for a value descriptor (used as parameter)
+  ErrorPtr parseValueDesc(ValueDescriptorPtr &aValueDesc, JsonObjectPtr aJSONConfig, const string aParamName);
 
 
 
