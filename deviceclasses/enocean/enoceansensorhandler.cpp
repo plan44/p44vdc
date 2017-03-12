@@ -75,7 +75,7 @@ void p44::EnoceanSensors::stdSensorHandler(const struct EnoceanSensorDescriptor 
 /// inverted bitfield extractor function (for various temperature sensors)
 void p44::EnoceanSensors::invSensorHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
 {
-  uint64_t value = (uint8_t)bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  uint64_t value = bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
   value ^= (1ll<<(aSensorDescriptor.msBit-aSensorDescriptor.lsBit+1))-1; // invert all bits
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
     sb->updateEngineeringValue(value);
