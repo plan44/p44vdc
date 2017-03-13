@@ -149,7 +149,9 @@ DsClass Device::colorClassFromGroup(DsGroup aGroup)
     case group_blue_cooling:
     case group_blue_ventilation:
     case group_blue_windows:
+    case group_blue_air_recirculation:
     case group_roomtemperature_control:
+    case group_ventilation_control:
       return class_blue_climate;
     case group_cyan_audio:
       return class_cyan_audio;
@@ -1482,6 +1484,7 @@ enum {
   colorClass_key,
   zoneID_key,
   progMode_key,
+  implementationId_key,
   deviceType_key,
   softwareRemovable_key,
   teachinSignals_key,
@@ -1561,6 +1564,7 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     { "primaryGroup", apivalue_uint64, colorClass_key, OKEY(device_key) },
     { "zoneID", apivalue_uint64, zoneID_key, OKEY(device_key) },
     { "progMode", apivalue_bool, progMode_key, OKEY(device_key) },
+    { "implementationId", apivalue_string, implementationId_key, OKEY(device_key) },
     { "x-p44-deviceType", apivalue_string, deviceType_key, OKEY(device_key) },
     { "x-p44-softwareRemovable", apivalue_bool, softwareRemovable_key, OKEY(device_key) },
     { "x-p44-teachInSignals", apivalue_int64, teachinSignals_key, OKEY(device_key) },
@@ -1736,6 +1740,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
         case progMode_key:
           aPropValue->setBoolValue(progMode); return true;
         case deviceType_key:
+        case implementationId_key:
           aPropValue->setStringValue(deviceTypeIdentifier()); return true;
         case deviceClass_key:
           if (deviceClass().size()>0) { aPropValue->setStringValue(deviceClass()); return true; } else return false;

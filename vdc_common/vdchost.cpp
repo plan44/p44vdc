@@ -917,7 +917,7 @@ DsAddressablePtr VdcHost::addressableForParams(const DsUid &aDsUid, ApiValuePtr 
     if (o) {
       string query = o->stringValue();
       if(query.find("vdc:")==0) {
-        // starts with "vdc:" -> look for vdc by class identifier and instance no
+        // starts with "vdc:" -> look for vdc by implementationId (vdcClassIdentifier()) and instance no
         query.erase(0, 4); // remove "vdc:" prefix
         // ccccccc[:ii] cccc=vdcClassIdentifier(), ii=instance
         size_t i=query.find(':');
