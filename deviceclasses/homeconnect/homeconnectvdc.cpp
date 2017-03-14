@@ -89,6 +89,8 @@ string HomeConnectPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVers
 }
 
 
+#define HOMECONNECT_RECOLLECT_INTERVAL (30*Minute)
+
 void HomeConnectVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   string databaseName = getPersistentDataDir();
@@ -106,6 +108,8 @@ void HomeConnectVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
       }
     }
   }
+  // schedule incremental re-collect from time to time
+  setPeriodicRecollection(HOMECONNECT_RECOLLECT_INTERVAL, rescanmode_incremental);
   aCompletedCB(error); // return status of DB init
 }
 
