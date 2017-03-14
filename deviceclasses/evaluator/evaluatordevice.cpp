@@ -35,6 +35,8 @@
 #include "buttonbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
 
+#include "expressions.hpp"
+
 using namespace p44;
 
 
@@ -433,204 +435,24 @@ Tristate EvaluatorDevice::evaluateBoolean(string aExpression)
 
 ErrorPtr EvaluatorDevice::evaluateDouble(string &aExpression, double &aResult)
 {
-  const char *p = aExpression.c_str();
-  return evaluateExpression(p, aResult, 0);
+  return evaluateExpression(aExpression, aResult, boost::bind(&EvaluatorDevice::valueLookup, this, _1, _2));
 }
 
 
-
-
-
-ErrorPtr EvaluatorDevice::evaluateTerm(const char * &aText, double &aValue)
+ErrorPtr EvaluatorDevice::valueLookup(const string aName, double &aValue)
 {
-  const char *a = aText;
-  // a simple term can be
-  // - a variable reference or
-  // - a literal number
-  // Note: a parantesized expression can also be a term, but this is parsed by the caller, not here
-  while (*aText==' ' || *aText=='\t') aText++; // skip whitespace
-  // extract var name or number
-  double v = 0;
-  const char *e = aText;
-  while (*e && (isalnum(*e) || *e=='.' || *e=='_')) e++;
-  if (e==aText) return TextError::err("missing term");
-  // must be simple term
-  string term;
-  term.assign(aText, e-aText);
-  aText = e; // advance cursor
-  // skip trailing whitespace
-  while (*aText==' ' || *aText=='\t') aText++; // skip whitespace
-  // decode term
-  if (isalpha(term[0])) {
-    // must be a variable
-    ValueSourcesMap::iterator pos = valueMap.find(term);
-    if (pos==valueMap.end()) {
-      return TextError::err("Undefined variable '%s'", term.c_str());
-    }
-    // value found, get it
-    if (pos->second->getSourceLastUpdate()==Never) {
-      // no value known yet
-      return TextError::err("Variable '%s' has no known value yet", term.c_str());
-    }
-    else {
-      v = pos->second->getSourceValue();
-    }
+  ValueSourcesMap::iterator pos = valueMap.find(aName);
+  if (pos==valueMap.end()) {
+    return TextError::err("Undefined variable '%s'", aName.c_str());
+  }
+  // value found, get it
+  if (pos->second->getSourceLastUpdate()==Never) {
+    // no value known yet
+    return TextError::err("Variable '%s' has no known value yet", aName.c_str());
   }
   else {
-    // must be a numeric literal
-    if (sscanf(term.c_str(), "%lf", &v)!=1) {
-      return TextError::err("'%s' is not a valid number", term.c_str());
-    }
+    aValue = pos->second->getSourceValue();
   }
-  // valid term
-  AFOCUSLOG("Term '%.*s' evaluation result: %lf", (int)(aText-a), a, v);
-  aValue = v;
-  return ErrorPtr();
-}
-
-
-// operations with precedence
-typedef enum {
-  op_none     = 0x06,
-  op_not      = 0x16,
-  op_multiply = 0x25,
-  op_divide   = 0x35,
-  op_add      = 0x44,
-  op_subtract = 0x54,
-  op_equal    = 0x63,
-  op_notequal = 0x73,
-  op_less     = 0x83,
-  op_greater  = 0x93,
-  op_leq      = 0xA3,
-  op_geq      = 0xB3,
-  op_and      = 0xC2,
-  op_or       = 0xD2,
-  opmask_precedence = 0x0F
-} Operations;
-
-
-// a + 3 * 4
-
-static Operations parseOperator(const char * &aText)
-{
-  while (*aText==' ' || *aText=='\t') aText++; // skip whitespace
-  // check for operator
-  Operations op = op_none;
-  switch (*aText++) {
-    case '*': op = op_multiply; break;
-    case '/': op = op_divide; break;
-    case '+': op = op_add; break;
-    case '-': op = op_subtract; break;
-    case '&': op = op_and; break;
-    case '|': op = op_or; break;
-    case '=': op = op_equal; break;
-    case '<': {
-      if (*aText=='=') {
-        aText++; op = op_leq; break;
-      }
-      else if (*aText=='>') {
-        aText++; op = op_notequal; break;
-      }
-      op = op_less; break;
-    }
-    case '>': {
-      if (*aText=='=') {
-        aText++; op = op_geq; break;
-      }
-      op = op_greater; break;
-    }
-    case '!': {
-      if (*aText=='=') {
-        aText++; op = op_notequal; break;
-      }
-      op = op_not; break;
-      break;
-    }
-    default: --aText; // no expression char
-  }
-  while (*aText==' ' || *aText=='\t') aText++; // skip whitespace
-  return op;
-}
-
-
-
-
-ErrorPtr EvaluatorDevice::evaluateExpression(const char * &aText, double &aValue, int aPrecedence)
-{
-  const char *a = aText;
-  ErrorPtr err;
-  double result = 0;
-  // check for optional unary op
-  Operations unaryop = parseOperator(aText);
-  if (unaryop!=op_none) {
-    if (unaryop!=op_subtract && unaryop!=op_not) {
-      return TextError::err("invalid unary operator");
-    }
-  }
-  // evaluate term
-  // - check for paranthesis term
-  if (*aText=='(') {
-    // term is expression in paranthesis
-    aText++;
-    ErrorPtr err = evaluateExpression(aText, result, 0);
-    if (!Error::isOK(err)) return err;
-    if (*aText!=')') {
-      return TextError::err("Missing ')'");
-    }
-    aText++;
-  }
-  else {
-    // must be simple term
-    err = evaluateTerm(aText, result);
-    if (!Error::isOK(err)) return err;
-  }
-  // apply unary ops if any
-  switch (unaryop) {
-    case op_not : result = result > 0 ? 0 : 1; break;
-    case op_subtract : result = -result; break;
-    default: break;
-  }
-  while (*aText) {
-    // now check for operator and precedence
-    const char *optext = aText;
-    Operations binaryop = parseOperator(optext);
-    int precedence = binaryop & opmask_precedence;
-    // end parsing here if end of text reached or operator has a lower or same precedence as the passed in precedence
-    if (*optext==0 || *optext==')' || precedence<=aPrecedence) {
-      // what we have so far is the result
-      break;
-    }
-    // must parse right side of operator as subexpression
-    aText = optext; // advance past operator
-    double rightside;
-    err = evaluateExpression(aText, rightside, precedence);
-    if (!Error::isOK(err)) return err;
-    // apply the operation between leftside and rightside
-    switch (binaryop) {
-      case op_not: {
-        return TextError::err("NOT operator not allowed here");
-      }
-      case op_divide:
-        if (rightside==0) return TextError::err("division by zero");
-        result = result/rightside;
-        break;
-      case op_multiply: result = result*rightside; break;
-      case op_add: result = result+rightside; break;
-      case op_subtract: result = result-rightside; break;
-      case op_equal: result = result==rightside; break;
-      case op_notequal: result = result!=rightside; break;
-      case op_less: result = result < rightside; break;
-      case op_greater: result = result > rightside; break;
-      case op_leq: result = result <= rightside; break;
-      case op_geq: result = result >= rightside; break;
-      case op_and: result = result && rightside; break;
-      case op_or: result = result || rightside; break;
-      default: break;
-    }
-    AFOCUSLOG("Intermediate expression '%.*s' evaluation result: %lf", (int)(aText-a), a, result);
-  }
-  // done
-  aValue = result;
   return ErrorPtr();
 }
 

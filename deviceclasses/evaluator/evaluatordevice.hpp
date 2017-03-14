@@ -175,10 +175,10 @@ namespace p44 {
     void changedConditions();
 
     /// expression evaluation
+
     Tristate evaluateBoolean(string aExpression);
     ErrorPtr evaluateDouble(string &aExpression, double &aResult);
-    ErrorPtr evaluateExpression(const char * &aText, double &aValue, int aPrecedence);
-    ErrorPtr evaluateTerm(const char * &aText, double &aValue);
+    ErrorPtr valueLookup(const string aName, double &aValue);
 
   };
   typedef boost::intrusive_ptr<EvaluatorDevice> EvaluatorDevicePtr;
