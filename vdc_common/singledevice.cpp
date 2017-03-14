@@ -240,11 +240,13 @@ static const ValueUnitDescriptor valueUnitNames[numValueUnits] = {
   { "volt", "V" },
   { "lux", "lx" },
   { "liter", "l" },
+  { "joule", "J" },
   { "molpercubicmeter", "mol/m3" },
   { "literperminute", "l/min" },
   { "minute", "min" },
   { "hour", "h" },
-  { "day", "d" }
+  { "day", "d" },
+  { "watthour", "Wh" }
 };
 typedef struct {
   const char *name;
@@ -252,14 +254,14 @@ typedef struct {
   int8_t exponent;
 } ValueScalingDescriptor;
 static const ValueScalingDescriptor valueScalingNames[numUnitScalings] = {
-  { "Yotta", "Y", 24 },
-  { "Zetta", "Z", 21 },
-  { "Exa", "E", 18 },
-  { "Peta", "P", 15 },
-  { "Tera", "T", 12 },
-  { "Giga", "G", 9 },
-  { "Mega", "M", 6 },
-  { "Kilo", "k", 3 },
+  { "yotta", "Y", 24 },
+  { "zetta", "Z", 21 },
+  { "exa", "E", 18 },
+  { "peta", "P", 15 },
+  { "tera", "T", 12 },
+  { "giga", "G", 9 },
+  { "mega", "M", 6 },
+  { "kilo", "k", 3 },
   { "hecto", "h", 2 },
   { "deca", "da", 1 },
   { "", "", 0 },
@@ -474,6 +476,14 @@ bool TextValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool
 
 
 // MARK: ===== EnumValueDescriptor
+
+
+
+bool EnumValueDescriptor::setDoubleValue(double aValue)
+{
+  // double can also be used to set enum by integer
+  return setInt32Value((int32_t)aValue);
+}
 
 
 bool EnumValueDescriptor::setInt32Value(int32_t aValue)
@@ -1500,7 +1510,7 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
   }
   else {
     for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
-      SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s' would have pushed along with state change", (*pos)->eventId.c_str());
+      SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s' not pushed", (*pos)->eventId.c_str());
     }
   }
   // no API, cannot not push
@@ -1831,21 +1841,29 @@ bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
 {
   // try to push to connected vDC API client
   VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
-  if (api && !aEventList.empty()) {
+  if (!aEventList.empty()) {
     // add events
-    SALOG((*singleDeviceP), LOG_NOTICE, "pushing: independent event(s):");
-    ApiValuePtr events;
-    for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
-      if (!events) {
-        events = api->newApiValue();
-        events->setType(apivalue_object);
+    SALOG((*singleDeviceP), LOG_NOTICE, "%spushing: independent event(s):", api ? "" : "Not announced, not ");
+    if (api) {
+      ApiValuePtr events;
+      for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
+        if (!events) {
+          events = api->newApiValue();
+          events->setType(apivalue_object);
+        }
+        ApiValuePtr event = api->newApiValue();
+        event->setType(apivalue_null); // for now, events don't have any properties, so it's just named NULL values
+        events->add((*pos)->eventId, event);
+        SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s'", (*pos)->eventId.c_str());
       }
-      ApiValuePtr event = api->newApiValue();
-      event->setType(apivalue_null); // for now, events don't have any properties, so it's just named NULL values
-      events->add((*pos)->eventId, event);
-      SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s'", (*pos)->eventId.c_str());
+      return singleDeviceP->pushNotification(ApiValuePtr(), events, VDC_API_DOMAIN);
     }
-    return singleDeviceP->pushNotification(ApiValuePtr(), events, VDC_API_DOMAIN);
+    else {
+      for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
+        SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s' not pushed", (*pos)->eventId.c_str());
+      }
+
+    }
   }
   return false; // no events to push
 }
@@ -2304,6 +2322,14 @@ ErrorPtr SingleDevice::eventFromJSON(DeviceEventPtr &aEvent, JsonObjectPtr aJSON
 }
 
 
+ErrorPtr SingleDevice::propertyFromJSON(ValueDescriptorPtr &aProperty, JsonObjectPtr aJSONConfig, const string aPropName)
+{
+  return parseValueDesc(aProperty, aJSONConfig, aPropName);
+}
+
+
+
+
 ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
 {
   JsonObjectPtr o;
@@ -2321,7 +2347,7 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
       if (action && action->get("description", o2)) desc = o2->stringValue();
         // create the action
         DeviceActionPtr a;
-        err = actionFromJSON(a, aJSONConfig, name, desc);
+        err = actionFromJSON(a, action, name, desc);
         if (!Error::isOK(err)) return err;
         // check for params
         if (action && action->get("params", o2)) {
@@ -2345,16 +2371,15 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
     JsonObjectPtr state;
     o->resetKeyIteration();
     while (o->nextKeyValue(name, state)) {
-      if (!state) return TextError::err("state must specify type");
       JsonObjectPtr o2;
       string desc = name; // default to name
       if (state->get("description", o2)) desc = o2->stringValue();
-        ValueDescriptorPtr v;
+      ValueDescriptorPtr v;
       ErrorPtr err = parseValueDesc(v, state, "state");
       if (!Error::isOK(err)) return err;
       // create the state
       DeviceStatePtr s;
-      err = stateFromJSON(s, aJSONConfig, name, desc, v);
+      err = stateFromJSON(s, state, name, desc, v);
       if (!Error::isOK(err)) return err;
       deviceStates->addState(s);
     }
@@ -2371,7 +2396,7 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
       string desc = name; // default to name
       if (event && event->get("description", o2)) desc = o2->stringValue();
       DeviceEventPtr e;
-      err = eventFromJSON(e, aJSONConfig, name, desc);
+      err = eventFromJSON(e, event, name, desc);
       if (!Error::isOK(err)) return err;
       deviceEvents->addEvent(e);
     }
@@ -2390,7 +2415,7 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
       if (prop->get("readonly", o2))
         readonly = o2->boolValue();
       ValueDescriptorPtr p;
-      ErrorPtr err = parseValueDesc(p, prop, name);
+      err = propertyFromJSON(p, prop, name);
       if (!Error::isOK(err)) {
         return err;
       }
@@ -2469,72 +2494,4 @@ ErrorPtr p44::parseValueDesc(ValueDescriptorPtr &aValueDesc, JsonObjectPtr aJSON
   return ErrorPtr();
 }
 
-
-
-
-ErrorPtr p44::substitutePlaceholders(string &aString, ValueLookupCB aValueLookupCB)
-{
-  ErrorPtr err;
-  size_t p = 0;
-  // Syntax of placeholders:
-  //   @{var[*ff][+|-oo][%frac]}
-  //   ff is an optional float factor to scale the channel value
-  //   oo is an float offset to apply
-  //   frac are number of fractional digits to use in output
-  while ((p = aString.find("@{",p))!=string::npos) {
-    size_t e = aString.find("}",p+2);
-    if (e==string::npos) {
-      // syntactically incorrect, no closing "}"
-      err = TextError::err("unterminated placeholder: %s", aString.c_str()+p);
-      break;
-    }
-    string v = aString.substr(p+2,e-2-p);
-    // process operations
-    double chfactor = 1;
-    double choffset = 0;
-    int numFracDigits = 0;
-    bool calc = false;
-    size_t varend = string::npos;
-    size_t i = 0;
-    while (true) {
-      i = v.find_first_of("*+-%",i);
-      if (varend==string::npos) {
-        varend = i==string::npos ? v.size() : i;
-      }
-      if (i==string::npos) break; // no more factors, offsets or format specs
-      // factor and/or offset
-      calc = true;
-      double dd;
-      if (sscanf(v.c_str()+i+1, "%lf", &dd)==1) {
-        switch (v[i]) {
-          case '*' : chfactor *= dd; break;
-          case '+' : choffset += dd; break;
-          case '-' : choffset -= dd; break;
-          case '%' : numFracDigits = dd; break;
-        }
-      }
-      i++;
-    }
-    // process variable
-    string rep = v.substr(0, varend);
-    if (aValueLookupCB) {
-      aValueLookupCB(rep);
-    }
-    // apply calculations if any
-    if (calc) {
-      // parse as double
-      double dv;
-      if (sscanf(rep.c_str(), "%lf", &dv)==1) {
-        // got double value, apply calculations
-        dv = dv * chfactor + choffset;
-        // render back to string
-        rep = string_format("%.*lf", numFracDigits, dv);
-      }
-    }
-    // replace, even if rep is empty
-    aString.replace(p, e-p+1, rep);
-    p+=rep.size();
-  }
-  return err;
-}
 

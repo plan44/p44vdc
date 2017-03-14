@@ -26,6 +26,7 @@
 #include "outputbehaviour.hpp"
 
 #include "jsonobject.hpp"
+#include "expressions.hpp"
 
 using namespace std;
 
@@ -305,6 +306,7 @@ namespace p44 {
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
 
     virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
+    virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
     virtual bool setStringValue(const string aValue) P44_OVERRIDE;
 
   protected:
@@ -611,6 +613,9 @@ namespace p44 {
     /// access value
     ValueDescriptorPtr value() { return stateDescriptor; };
 
+    /// get id
+    string getId() { return stateId; };
+
     /// push the state via pushNotification
     /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
     /// @note will call the willPushHandler to collect possibly associated events
@@ -694,6 +699,9 @@ namespace p44 {
     /// @param aEventId the id (key in the container) of the event.
     /// @param aDescription a description string for the event.
     DeviceEvent(SingleDevice &aSingleDevice, const string aEventId, const string aDescription);
+
+    /// get id
+    string getId() { return eventId; };
 
   protected:
 
@@ -976,6 +984,12 @@ namespace p44 {
     /// @return ok or parsing error
     virtual ErrorPtr eventFromJSON(DeviceEventPtr &aEvent, JsonObjectPtr aJSONConfig, const string aEventId, const string aDescription);
 
+    /// creates a device property
+    /// @param aJSONConfig JSON config object for a event. Implementation can fetch specific params from it
+    /// @return ok or parsing error
+    virtual ErrorPtr propertyFromJSON(ValueDescriptorPtr &aProperty, JsonObjectPtr aJSONConfig, const string aPropName);
+
+
     /// @}
 
 
@@ -992,24 +1006,11 @@ namespace p44 {
   };
 
 
-
   // MARK: ======= misc utils
-
-
-  /// callback function for substitutePlaceholders()
-  /// @param aValue the contents of this is looked up and possibly replaced
-  /// @return ok or error
-  typedef boost::function<ErrorPtr (string &aValue)> ValueLookupCB;
-
-  /// substitute "@{xxx}" type placeholders in string
-  /// @param aString string to replace placeholders in
-  /// @param aValueLookupCB this will be called to have variable names looked up
-  ErrorPtr substitutePlaceholders(string &aString, ValueLookupCB aValueLookupCB);
 
   /// factory method to create value descriptor from JSON descriptor
   /// @param aJSONConfig JSON config object for a value descriptor (used as parameter)
   ErrorPtr parseValueDesc(ValueDescriptorPtr &aValueDesc, JsonObjectPtr aJSONConfig, const string aParamName);
-
 
 
 

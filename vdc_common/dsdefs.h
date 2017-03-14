@@ -454,6 +454,7 @@ typedef enum {
   valueUnit_volt,
   valueUnit_lux,
   valueUnit_liter,
+  valueUnit_joule, ///< or watt-second
   // combined units
   valueUnit_molpercubicmeter,
   valueUnit_literpermin,
@@ -461,6 +462,7 @@ typedef enum {
   valueUnit_minute,
   valueUnit_hour,
   valueUnit_day,
+  valueUnit_watthour,
   numValueUnits,
 } VdcValueBaseUnit;
 
