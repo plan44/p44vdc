@@ -102,7 +102,7 @@ void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
   // Syntax:
   //   method:resturlpath[:jsonBody]
   string cmd = apiCommandTemplate;
-  err = substitutePlaceholders(cmd, boost::bind(&HomeConnectAction::valueLookup, this, aParams, _1));
+  err = substitutePlaceholders(cmd, boost::bind(&HomeConnectAction::valueLookup, this, aParams, _1, _2));
   JsonObjectPtr jsonBody;
   if (Error::isOK(err)) {
     string method;
@@ -126,14 +126,14 @@ void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 }
 
 
-ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, string &aValue)
+ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, const string aName, string &aValue)
 {
-  ApiValuePtr v = aParams->get(aValue);
+  ApiValuePtr v = aParams->get(aName);
   if (v) {
     aValue = v->stringValue();
     return ErrorPtr();
   }
-  return ErrorPtr(TextError::err("no substitution found for '%s'", aValue.c_str()));
+  return ErrorPtr(TextError::err("no substitution found for '%s'", aName.c_str()));
 }
 
 
