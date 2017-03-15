@@ -815,7 +815,12 @@ private:
       if (!Error::isOK(aError)) {
         LOG(LOG_WARNING, "Error (%s) in quick scan ignored because we need to do a full scan anyway", aError->description().c_str());
       }
-      aError = Error::err<DaliCommError>(DaliCommError::NeedFullScan, "Need full bus scan");
+      if (probablyCollision) {
+        aError = Error::err<DaliCommError>(DaliCommError::AddressCollisions, "Address collision -> need full bus scan");
+      }
+      else {
+        aError = Error::err<DaliCommError>(DaliCommError::AddressesMissing, "Devices with no short address -> need scan for those");
+      }
     }
     daliComm.endProcedure();
     callback(activeDevicesPtr, unreliableDevicesPtr, aError);
@@ -890,11 +895,16 @@ private:
 
   void shortAddrListReceived(DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError)
   {
-    bool fullScanNeeded = aError && aError->isError(DaliCommError::domain(), DaliCommError::NeedFullScan);
-    if (aError && !fullScanNeeded)
+    bool missingAddrs = aError && aError->isError(DaliCommError::domain(), DaliCommError::AddressesMissing);
+    // Strategy:
+    // - when short scan reports devices with no short address, trigger a random binary serach FOR THOSE ONLY (case: new devices)
+    // - when short scan reports another error: just report back, UNLESS unconditional full scan is requested
+    if (aError && !missingAddrs && fullScanOnlyIfNeeded) {
+      // not enough reason for triggering a random search
       return completed(aError);
-    // exit now if no full scan needed and short address scan is ok
-    if (!fullScanNeeded && fullScanOnlyIfNeeded) {
+    }
+    // exit now if full binary search is not explicitly requested (!fullScanOnlyIfNeeded) and no new devices to be given address
+    if (!missingAddrs && fullScanOnlyIfNeeded) {
       // just use the short address scan result
       foundDevicesPtr = aShortAddressListPtr;
       completed(ErrorPtr()); return;
@@ -902,11 +912,17 @@ private:
     // save the short address list
     usedShortAddrsPtr = aShortAddressListPtr;
     conflictedShortAddrsPtr = aUnreliableShortAddressListPtr;
-    LOG(LOG_NOTICE, "DaliComm: starting full bus scan (random address binary search)");
+    if (!fullScanOnlyIfNeeded) {
+      LOG(LOG_WARNING, "DaliComm: unconditional full bus scan (random address binary search) for ALL devices requested, will reassign conflicting short addresses.");
+    }
+    else {
+      foundDevicesPtr = aShortAddressListPtr; // use the already addressed devices 
+      LOG(LOG_WARNING, "DaliComm: bus scan (random address binary search) for devices without shortaddr - NO existing addresses will be reassigned.");
+    }
     // Terminate any special modes first
     daliComm.daliSend(DALICMD_TERMINATE, 0x00);
-    // initialize entire system for random address selection process
-    daliComm.daliSendTwice(DALICMD_INITIALISE, 0x00, NULL, 100*MilliSecond);
+    // initialize entire system for random address selection process. Unless full scan explicitly requested, only unaddressed devices will be included
+    daliComm.daliSendTwice(DALICMD_INITIALISE, fullScanOnlyIfNeeded ? 0xFF : 0x00, NULL, 100*MilliSecond); // 0xFF = only those w/o short address
     daliComm.daliSendTwice(DALICMD_RANDOMISE, 0x00, NULL, 100*MilliSecond);
     // start search at lowest address
     restarts = 0;
