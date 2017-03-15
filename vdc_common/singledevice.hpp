@@ -373,6 +373,9 @@ namespace p44 {
     /// @param aDescription a description string for the action.
     DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription);
 
+    /// get id
+    string getId() { return actionId; };
+
     /// add parameter
     /// @param aValueDesc a value descriptor object.
     /// @param aMandatory if set, parameter must be explicitly specified and does not have an implicit default (not even NULL)
