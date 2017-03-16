@@ -58,13 +58,23 @@ string HueVdc::getExtraInfo()
 }
 
 
+string HueVdc::hardwareGUID()
+{
+  if (bridgeUuid!=PSEUDO_UUID_FOR_FIXED_API)
+    return string_format("uuid:%s", bridgeUuid.c_str());
+  else
+    return bridgeApiURL;
+}
+
+
 
 // MARK: ===== DB and initialisation
 
 // Version history
 //  1 : first version
+//  2 : added hueApiURL and fixedURL
 #define HUE_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
-#define HUE_SCHEMA_VERSION 1 // current version
+#define HUE_SCHEMA_VERSION 2 // current version
 
 string HuePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
@@ -77,9 +87,19 @@ string HuePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
     sql.append(
       "ALTER TABLE globs ADD hueBridgeUUID TEXT;"
       "ALTER TABLE globs ADD hueBridgeUser TEXT;"
+      "ALTER TABLE globs ADD hueApiURL TEXT;"
+      "ALTER TABLE globs ADD fixedURL INTEGER;"
     );
     // reached final version in one step
     aToVersion = HUE_SCHEMA_VERSION;
+  }
+  else if (aFromVersion==1) {
+    // V1->V2: stored API url added
+    sql =
+      "ALTER TABLE globs ADD hueApiURL TEXT;"
+      "ALTER TABLE globs ADD fixedURL INTEGER;";
+    // reached version 2
+    aToVersion = 2;
   }
   return sql;
 }
@@ -118,14 +138,16 @@ void HueVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
   }
   // load hue bridge uuid and token
   sqlite3pp::query qry(db);
-  if (qry.prepare("SELECT hueBridgeUUID, hueBridgeUser FROM globs")==SQLITE_OK) {
+  if (qry.prepare("SELECT hueBridgeUUID, hueBridgeUser, hueApiURL, fixedURL FROM globs")==SQLITE_OK) {
     sqlite3pp::query::iterator i = qry.begin();
     if (i!=qry.end()) {
       bridgeUuid = nonNullCStr(i->get<const char *>(0));
       bridgeUserName = nonNullCStr(i->get<const char *>(1));
+      bridgeApiURL = nonNullCStr(i->get<const char *>(2));
+      fixedURL = i->get<bool>(3);
     }
   }
-  if (bridgeUuid.length()>0) {
+  if (bridgeUuid.length()>0 || bridgeApiURL.length()>0) {
     // we know a bridge by UUID, try to refind it
     refindBridge();
   }
@@ -152,13 +174,14 @@ void HueVdc::refindBridge()
 {
   if (!getVdcHost().isNetworkConnected()) {
     // TODO: checking IPv4 only at this time, need to add IPv6 later
-    LOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
+    ALOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
     MainLoop::currentMainLoop().executeOnce(boost::bind(&HueVdc::refindBridge, this), REFIND_RETRY_DELAY);
     return;
   }
   // actually refind
   hueComm.uuid = bridgeUuid;
   hueComm.userName = bridgeUserName;
+  hueComm.fixedBaseURL = bridgeApiURL;
   hueComm.refindBridge(boost::bind(&HueVdc::refindResultHandler, this, _1));
 }
 
@@ -168,7 +191,7 @@ void HueVdc::refindResultHandler(ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
     // found already registered bridge again
-    LOG(LOG_NOTICE,
+    ALOG(LOG_NOTICE,
       "Hue bridge %s found again:\n"
       "- userName = %s\n"
       "- API base URL = %s",
@@ -176,6 +199,16 @@ void HueVdc::refindResultHandler(ErrorPtr aError)
       hueComm.userName.c_str(),
       hueComm.baseURL.c_str()
     );
+    // save the current URL
+    if (!fixedURL && hueComm.baseURL!=bridgeApiURL) {
+      bridgeApiURL = hueComm.baseURL;
+      // save back into database
+      db.executef(
+        "UPDATE globs SET hueBridgeUUID='%s', hueApiURL='%s', fixedURL=0",
+        bridgeUuid.c_str(),
+        bridgeApiURL.c_str()
+      );
+    }
     // collect existing lights
     // Note: for now we don't search for new lights, this is left to the Hue App, so users have control
     //   if they want new lights added or not
@@ -183,7 +216,18 @@ void HueVdc::refindResultHandler(ErrorPtr aError)
   }
   else {
     // not found (usually timeout)
-    LOG(LOG_NOTICE, "Error refinding hue bridge with uuid %s, error = %s", hueComm.uuid.c_str(), aError->description().c_str());
+    // - if URL does not work, clear cached IP and try again (unless IP is user-provided)
+    if (!bridgeApiURL.empty() && !fixedURL) {
+      // forget the cached IP
+      ALOG(LOG_NOTICE, "Could not access bridge API at %s - revert to finding bridge by UUID", bridgeApiURL.c_str());
+      bridgeApiURL.clear();
+      // retry searching by uuid
+      MainLoop::currentMainLoop().executeOnce(boost::bind(&HueVdc::refindBridge, this), 500*MilliSecond);
+      return;
+    }
+    else {
+      ALOG(LOG_NOTICE, "Error refinding hue bridge uuid %s, error = %s", hueComm.uuid.c_str(), aError->description().c_str());
+    }
     collectedHandler(ErrorPtr()); // no hue bridge to collect lights from (but this is not a collect error)
   }
 }
@@ -194,18 +238,52 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
   ErrorPtr respErr;
   if (aMethod=="registerHueBridge") {
     // hue specific addition, only via genericRequest
-    respErr = checkStringParam(aParams, "bridgeUuid", bridgeUuid);
-    if (!Error::isOK(respErr)) return respErr;
-    respErr = checkStringParam(aParams, "bridgeUsername", bridgeUserName);
-    if (!Error::isOK(respErr)) return respErr;
-    // save the bridge parameters
-    db.executef(
-      "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s'",
-      bridgeUuid.c_str(),
-      bridgeUserName.c_str()
-    );
-    // now collect the lights from the new bridge, remove all settings from previous bridge
-    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), rescanmode_clearsettings);
+    ApiValuePtr a = aParams->get("bridgeApiURL");
+    if (a) {
+      // needs new pairing, forget current devices
+      removeDevices(false);
+      // register by bridge API URL (or remove with empty string)
+      bridgeUserName.clear();
+      bridgeUuid.clear();
+      bridgeApiURL = a->stringValue();
+      fixedURL = false;
+      if (!bridgeApiURL.empty()) {
+        // make full API URL if it's just a IP or host name
+        if (bridgeApiURL.substr(0,4)!="http") {
+          bridgeApiURL = "http://" + bridgeApiURL + ":80/api";
+        }
+        // register
+        bridgeUuid = PSEUDO_UUID_FOR_FIXED_API;
+        fixedURL = true;
+        // save the bridge parameters
+        db.executef(
+          "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='', hueApiURL='%s', fixedURL=1",
+          bridgeUuid.c_str(),
+          bridgeApiURL.c_str()
+        );
+      }
+      else {
+        // unregister
+        db.executef("UPDATE globs SET hueBridgeUUID='', hueBridgeUser='', hueApiURL='', fixedURL=0");
+      }
+      // done
+      respErr = Error::ok();
+    }
+    else {
+      // register by uuid/username (for migration)
+      respErr = checkStringParam(aParams, "bridgeUuid", bridgeUuid);
+      if (!Error::isOK(respErr)) return respErr;
+      respErr = checkStringParam(aParams, "bridgeUsername", bridgeUserName);
+      if (!Error::isOK(respErr)) return respErr;
+      // save the bridge parameters
+      db.executef(
+        "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s', hueApiURL='', fixedURL=0",
+        bridgeUuid.c_str(),
+        bridgeUserName.c_str()
+      );
+      // now collect the lights from the new bridge, remove all settings from previous bridge
+      collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), rescanmode_clearsettings);
+    }
   }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
@@ -217,12 +295,13 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
 void HueVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
 {
   if (aEnableLearning) {
-    
-    hueComm.findNewBridge(
-      string_format("%s#%s", getVdcHost().modelName().c_str(), getVdcHost().getDeviceHardwareId().c_str()).c_str(),
-      15*Second, // try to login for 15 secs
-      boost::bind(&HueVdc::searchResultHandler, this, aOnlyEstablish, _1)
-    );
+    if (!fixedURL || bridgeUserName.empty()) {
+      hueComm.findNewBridge(
+        string_format("%s#%s", getVdcHost().modelName().c_str(), getVdcHost().getDeviceHardwareId().c_str()).c_str(),
+        15*Second, // try to login for 15 secs
+        boost::bind(&HueVdc::searchResultHandler, this, aOnlyEstablish, _1)
+      );
+    }
   }
   else {
     // stop learning
@@ -235,7 +314,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
     // found and authenticated bridge
-    LOG(LOG_NOTICE,
+    ALOG(LOG_NOTICE,
       "Hue bridge found and logged in:\n"
       "- uuid = %s\n"
       "- userName = %s\n"
@@ -246,7 +325,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
     );
     // check if we found the already learned-in bridge
     Tristate learnedIn = undefined;
-    if (hueComm.uuid==bridgeUuid) {
+    if (hueComm.uuid==bridgeUuid && !fixedURL) {
       // this is the bridge that was learned in previously. Learn it out
       if (aOnlyEstablish!=yes) {
         learnedIn = no;
@@ -266,6 +345,9 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
         learnedIn = yes;
         bridgeUuid = hueComm.uuid;
         bridgeUserName = hueComm.userName;
+        if (!fixedURL) {
+          bridgeApiURL = hueComm.baseURL;
+        }
       }
     }
     if (learnedIn!=undefined) {
@@ -275,9 +357,10 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
       // actual learn-in or -out has happened
       // save the bridge parameters
       db.executef(
-        "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s'",
+        "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s', hueApiURL='%s', fixedURL=0",
         bridgeUuid.c_str(),
-        bridgeUserName.c_str()
+        bridgeUserName.c_str(),
+        bridgeApiURL.c_str()
       );
       // now process the learn in/out
       if (learnedIn==yes) {
@@ -291,7 +374,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
   }
   else {
     // not found (usually timeout)
-    LOG(LOG_NOTICE, "No hue bridge found to register, error = %s", aError->description().c_str());
+    ALOG(LOG_NOTICE, "No hue bridge found to register, error = %s", aError->description().c_str());
   }
 }
 
@@ -300,14 +383,14 @@ void HueVdc::collectLights()
 {
   // Note: can be used to incrementally search additional lights
   // issue lights query
-  LOG(LOG_INFO, "Querying hue bridge for available lights...");
+  ALOG(LOG_INFO, "Querying hue bridge for available lights...");
   hueComm.apiQuery("/lights", boost::bind(&HueVdc::collectedLightsHandler, this, _1, _2));
 }
 
 
 void HueVdc::collectedLightsHandler(JsonObjectPtr aResult, ErrorPtr aError)
 {
-  LOG(LOG_INFO, "hue bridge reports lights = \n%s", aResult ? aResult->c_strValue() : "<none>");
+  ALOG(LOG_INFO, "hue bridge reports lights = \n%s", aResult ? aResult->c_strValue() : "<none>");
   if (aResult) {
     // pre-v1.3 bridges: { "1": { "name": "Bedroom" }, "2": .... }
     // v1.3 and later bridges: { "1": { "name": "Bedroom", "state": {...}, "modelid":"LCT001", ... }, "2": .... }

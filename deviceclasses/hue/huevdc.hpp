@@ -65,6 +65,8 @@ namespace p44 {
 
     string bridgeUuid; ///< the UUID for searching the hue bridge via SSDP
     string bridgeUserName; ///< the user name registered with the bridge
+    string bridgeApiURL; ///< URL for the hue bridge (cache or user provided)
+    bool fixedURL; ///< if set, bridgeApiURL is user provided and must not be updated
 
     /// @}
 
@@ -101,7 +103,8 @@ namespace p44 {
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - uuid:UUUUUUU = UUID
-    virtual string hardwareGUID() P44_OVERRIDE { return string_format("uuid:%s", bridgeUuid.c_str()); };
+    /// - http:xxxx = API
+    virtual string hardwareGUID() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

@@ -164,9 +164,6 @@ void HueApiOperation::abortOperation(ErrorPtr aError)
 
 // MARK: ===== BridgeFinder
 
-// string used in place of UUID when using fixed hue API URL
-#define PSEUDO_UUID_FOR_FIXED_API "fixed_api_base_URL"
-
 class p44::BridgeFinder : public P44Obj
 {
   HueComm &hueComm;
@@ -245,12 +242,28 @@ public:
     }
     else {
       // we have a pre-known base URL for the hue API, use this without any find operation
-      hueComm.baseURL = hueComm.fixedBaseURL; // use it
-      hueComm.apiReady = true; // can use API now
-      FOCUSLOG("Using fixed API URL to access hue Bridge %s: %s", hueComm.uuid.c_str(), hueComm.baseURL.c_str());
-      callback(ErrorPtr()); // success
+      // - do a check
+      FOCUSLOG("Using fixed hue API URL %s: %s -> testing if accessible...", hueComm.uuid.c_str(), hueComm.fixedBaseURL.c_str());
+      keepAlive = BridgeFinderPtr(this);
+      hueComm.apiAction(httpMethodGET, hueComm.fixedBaseURL.c_str(), JsonObjectPtr(), boost::bind(&BridgeFinder::apiTested, this, _2), true); // no auto url = works w/o API ready
     }
   };
+
+
+  void apiTested(ErrorPtr aError)
+  {
+    if (Error::isOK(aError)) {
+      FOCUSLOG("hue API URL %s tested accessible ok", hueComm.baseURL.c_str());
+      hueComm.baseURL = hueComm.fixedBaseURL; // use it
+      hueComm.apiReady = true; // can use API now
+    }
+    else {
+      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.baseURL.c_str(), aError->description().c_str());
+    }
+    callback(aError); // success
+    keepAlive.reset(); // will delete object if nobody else keeps it
+  };
+
 
 
   void bridgeRefindHandler(SsdpSearchPtr aSsdpSearch, ErrorPtr aError)
