@@ -121,6 +121,7 @@ namespace p44 {
 
     string iconDir; ///< the directory where to load icons from
     string persistentDataDir; ///< the directory for the vdc host to store SQLite DBs and possibly other persistent data
+    string configDir; ///< the directory to load config files (scene definitions, machine configurations etc.) from
 
     string productName; ///< the name of the vdc host product (model name) as a a whole
     string productVersion; ///< the version string of the vdc host product as a a whole
@@ -224,6 +225,14 @@ namespace p44 {
     /// Get directory for loading device icons from
     /// @return the path to the icon dir, always with a trailing path separator, ready to append subpaths and filenames
     const char *getIconDir();
+
+    /// set the directory where to find configuration files (scene definitions, machine configs etc.)
+    /// @param aConfigDir full path to config directory
+    void setConfigDir(const char *aConfigDir);
+
+    /// get the config dir path
+    /// @return full path to config directory
+    const char *getConfigDir();
 
     /// Set how often mainloop statistics are printed out log (LOG_INFO)
     /// @param aInterval 0=none, N=every PERIODIC_TASK_INTERVAL*N seconds

@@ -183,6 +183,23 @@ const char *VdcHost::getPersistentDataDir()
 
 
 
+void VdcHost::setConfigDir(const char *aConfigDir)
+{
+  configDir = nonNullCStr(aConfigDir);
+  if (!configDir.empty() && configDir[configDir.length()-1]!='/') {
+    configDir.append("/");
+  }
+}
+
+
+const char *VdcHost::getConfigDir()
+{
+  return configDir.c_str();
+}
+
+
+
+
 string VdcHost::publishedDescription()
 {
   // derive the descriptive name
@@ -1376,7 +1393,7 @@ ErrorPtr VdcHost::forget()
 void VdcHost::loadSettingsFromFiles()
 {
   // try to open config file
-  string fn = getPersistentDataDir();
+  string fn = getConfigDir();
   fn += "vdchostsettings.csv";
   // if vdc has already stored properties, only explicitly marked properties will be applied
   if (loadSettingsFromFile(fn.c_str(), rowid!=0)) markClean();

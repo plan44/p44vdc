@@ -599,7 +599,7 @@ ErrorPtr SceneDeviceSettings::deleteChildren()
 
 void SceneDeviceSettings::loadScenesFromFiles()
 {
-  string dir = device.getVdcHost().getPersistentDataDir();
+  string dir = device.getVdcHost().getConfigDir();
   const int numLevels = 5;
   string levelids[numLevels];
   // Level strategy: most specialized will be active, unless lower levels specify explicit override

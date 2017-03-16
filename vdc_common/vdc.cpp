@@ -501,7 +501,7 @@ ErrorPtr Vdc::forget()
 
 void Vdc::loadSettingsFromFiles()
 {
-  string dir = getVdcHost().getPersistentDataDir();
+  string dir = getVdcHost().getConfigDir();
   const int numLevels = 2;
   string levelids[numLevels];
   // Level strategy: most specialized will be active, unless lower levels specify explicit override
