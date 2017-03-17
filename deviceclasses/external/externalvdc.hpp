@@ -234,12 +234,16 @@ namespace p44 {
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
 
+    #if ENABLE_EXTERNAL_SINGLEDEVICE
+
     /// @name factory methods for elements configured via dynamic JSON config
     /// @{
 
     virtual ErrorPtr actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription) P44_OVERRIDE;
-    
+
     /// @}
+
+    #endif
 
 
   private:
@@ -300,8 +304,8 @@ namespace p44 {
     void sendDeviceApiStatusMessage(ErrorPtr aError, const char *aTag = NULL);
 
   };
-  
-  
+
+
 
 
   typedef boost::intrusive_ptr<ExternalVdc> ExternalVdcPtr;

@@ -728,6 +728,7 @@ bool ExternalDevice::processControlValue(const string &aName, double aValue)
 
 // MARK: ===== external device configuration
 
+#if ENABLE_EXTERNAL_SINGLEDEVICE
 
 ErrorPtr ExternalDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription)
 {
@@ -735,6 +736,8 @@ ErrorPtr ExternalDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr 
   aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription));
   return ErrorPtr();
 }
+
+#endif
 
 
 ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
