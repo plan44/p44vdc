@@ -44,7 +44,8 @@
 using namespace p44;
 
 // how often to write mainloop statistics into log output
-#define DEFAULT_MAINLOOP_STATS_INTERVAL (60) // every 5 min (with periodic activity every 5 seconds: 60*5 = 300 = 5min)
+//#define DEFAULT_MAINLOOP_STATS_INTERVAL (60) // every 5 min (with periodic activity every 5 seconds: 60*5 = 300 = 5min)
+#define DEFAULT_MAINLOOP_STATS_INTERVAL (0) // not by default. We can use setMainLoopStatsInterval() to enable
 
 // how long vDC waits after receiving ok from one announce until it fires the next
 #define ANNOUNCE_PAUSE (10*MilliSecond)
