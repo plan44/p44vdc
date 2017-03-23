@@ -127,6 +127,7 @@ namespace p44 {
     string productVersion; ///< the version string of the vdc host product as a a whole
     string deviceHardwareId; ///< the device hardware id (such as a serial number) of the vdc host product as a a whole
     string descriptionTemplate; ///< how to describe the vdc host (e.g. in service announcements)
+    string vdcModelNameTemplate; ///< how to generate vdc model names (that's what shows up in HW-Info in dS)
 
     bool collecting;
     long announcementTicket;
@@ -195,14 +196,23 @@ namespace p44 {
     /// @param aDeviceHardwareId device serial number or similar id
     void setDeviceHardwareId(const string &aDeviceHardwareId) { deviceHardwareId = aDeviceHardwareId; }
 
-    /// set the the human readable hardware id (such as a serial number) of the vdc host product as a a whole
-    /// @param aDescriptionTemplate template for external device description
+    /// set the template (or fixed string) for describing the vdc host product as a a whole (e.g. in network advertisements)
+    /// @param aTemplate template how to create the description
     /// @note the following sequences will be substituted
     /// - %V : vendor name
-    /// - %V : product model (name)
+    /// - %M : product model (name)
     /// - %N : user-assigned name, if any, preceeded by a space and in double quotes
     /// - %S : device hardware id (if set specifically, otherwise the dSUID is used)
-    void setDescriptionTemplate(const string &aDescriptionTemplate) { descriptionTemplate = aDescriptionTemplate; }
+    void setDescriptionTemplate(const string &aTemplate) { descriptionTemplate = aTemplate; }
+
+    /// set the template (or fixed string) for describing a vdc within this vdchost in vdc's modelName property (which is used in dSS as HW-Info)
+    /// @param aTemplate template how to create vdc modelName
+    /// @note the following sequences will be substituted
+    /// - %V : vendor name (of the vdc, which defaults to the vendor of the vdchost)
+    /// - %M : product model (name) of the vdchost
+    /// - %m : vdcModelSuffix (short suffix describing vdc's functionality, such as "hue" or "DALI")
+    /// - %S : device hardware id (if set specifically, otherwise the dSUID is used)
+    void setVdcModelNameTemplate(const string &aTemplate) { vdcModelNameTemplate = aTemplate; }
 
     /// Set how dSUIDs are generated
     /// @param aExternalDsUid if specified, this is used directly as dSUID for the device container

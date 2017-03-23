@@ -308,7 +308,7 @@ namespace p44 {
 
     /// @return human readable, language independent model name/short description
     /// @note base class will construct this from global product name and vdcModelSuffix()
-    virtual string modelName() P44_OVERRIDE { return string_format("%s %s", getVdcHost().productName.c_str(), vdcModelSuffix().c_str()); }
+    virtual string modelName() P44_OVERRIDE;
 
     /// @return human readable model name/short description
     virtual string vdcModelSuffix() const = 0;

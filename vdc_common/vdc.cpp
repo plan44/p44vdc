@@ -26,6 +26,10 @@
 using namespace p44;
 
 
+// default vdc modelname template
+#define DEFAULT_MODELNAME_TEMPLATE "%M %m"
+
+
 Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aVdcHostP),
   inheritedParams(aVdcHostP->getDsParamStore()),
@@ -249,6 +253,31 @@ string Vdc::vendorName()
 {
   // default to same vendor as vdc host (device container)
   return getVdcHost().vendorName();
+}
+
+
+string Vdc::modelName()
+{
+  // derive the descriptive name
+  // "%M %m"
+  string n = getVdcHost().vdcModelNameTemplate;
+  if (n.empty()) n = DEFAULT_MODELNAME_TEMPLATE;
+  string s;
+  size_t i;
+  // Vendor (of the vdc, defaults to vendor of the vdchost unless vdc has its own vendor)
+  while ((i = n.find("%V"))!=string::npos) { n.replace(i, 2, vendorName()); }
+  // Model of the vdchost
+  while ((i = n.find("%M"))!=string::npos) { n.replace(i, 2, getVdcHost().modelName()); }
+  // vdc model suffix
+  while ((i = n.find("%m"))!=string::npos) { n.replace(i, 2, vdcModelSuffix()); }
+  // Serial/hardware ID
+  s = getVdcHost().getDeviceHardwareId();
+  if (s.empty()) {
+    // use dSUID if no other ID is specified
+    s = getVdcHost().getDsUid().getString();
+  }
+  while ((i = n.find("%S"))!=string::npos) { n.replace(i, 2, s); }
+  return n;
 }
 
 

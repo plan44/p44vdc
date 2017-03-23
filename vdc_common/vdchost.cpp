@@ -36,11 +36,6 @@
 #endif
 
 
-// TODO: move scene processing to output?
-// TODO: enocean outputs need to have a channel, too - which one? For now: always channel 0
-// TODO: review output value updating mechanisms, especially in light of MOC transactions
-
-
 using namespace p44;
 
 // how often to write mainloop statistics into log output
