@@ -2135,7 +2135,7 @@ ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
 
 void SingleDevice::invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
 {
-  ALOG(LOG_NOTICE, "- call completed with status %s", Error::isOK(aError) ? "OK" : aError->description().c_str());
+  ALOG(LOG_NOTICE, "- call completed with status: %s", Error::isOK(aError) ? "OK" : aError->description().c_str());
   methodCompleted(aRequest, aError);
 }
 
