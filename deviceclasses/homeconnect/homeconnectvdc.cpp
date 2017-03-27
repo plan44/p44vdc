@@ -164,20 +164,13 @@ void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aRe
       if (has) {
         for (int i=0; i<has->arrayLength(); i++) {
           JsonObjectPtr ha = has->arrayGet(i);
-          // check type
-          string ty = ha->get("type")->stringValue();
-          if (ty=="CoffeeMaker") {
-            // create device now
-            HomeConnectDevicePtr newDev = HomeConnectDevicePtr(new HomeConnectDevice(this, ha));
-            if (simpleIdentifyAndAddDevice(newDev)) {
-              // actually added, no duplicate, set the name
-              // (otherwise, this is an incremental collect and we knew this light already)
-              JsonObjectPtr n = ha->get("name");
-              if (n) newDev->initializeName(n->stringValue());
-            }
-          }
-          else {
-            ALOG(LOG_WARNING, "Not implemented home appliance type '%s' -> ignored", ty.c_str());
+          // create device (might be a dummy if ha.type is not yet supported)
+          HomeConnectDevicePtr newDev = HomeConnectDevicePtr(new HomeConnectDevice(this, ha));
+          if (simpleIdentifyAndAddDevice(newDev)) {
+            // actually added, no duplicate, set the name
+            // (otherwise, this is an incremental collect and we knew this light already)
+            JsonObjectPtr n = ha->get("name");
+            if (n) newDev->initializeName(n->stringValue());
           }
         }
       }

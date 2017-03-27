@@ -65,14 +65,6 @@ bool HomeConnectApiOperation::initiate()
     return false;
   // send request
   if (homeConnectComm.accessToken.size()==0) {
-    // FIXME: remove!
-//    #warning "%%% Fixed token for now"
-//    if (!homeConnectComm.developerApi) {
-//      homeConnectComm.accessToken="eyJjdHkiOiJKV1QiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2IiwiYWxnIjoiZGlyIn0..gqrxQXJub7bw0FVr9DCECw.BTsENqG88JzPThtxpoOR77pyW9D0KeCl2ne-iKnimtPxDSO0Zka3rCk5rUz0y1V_BEC4mjNwpp42fdnSX0bYiIqGabyA1isKYXTt89kJhwhnLwcq6OYD1TC7MqkynOqLn5QzNezB_ZJzwU9NFGIraQqz29_XX0iocnPa6ZYumChlE5SaHQdhnMPSlqSRQ7wgQ-RqJ_I_geD4kruvA4zE8PkrTsAcwdPauqTo2YiuO8jzbIGTEmkrmciRXz9znWQLZAUJNu4rUPb7rS9s9XD4hE0raDJo3W-_CyRNO3efSOpxPINOTdBH_8Mfu8yEF9J0M5QcEdGb_ZnvvDCI60AHxSwcSOskSJJkfe0_7X-L_UM3I4N3BLynl-nBKVBKTriXYwOkDiDDhZcBJ5wkY3VfBNJgZJwzwnOhGkSOdlBHWKuFlQzBMpjviS05Luwumep0qMnKhx1ORN-j05_5STG_qfS_Jo_1e-bk0z_Jss02z9w518dnrXOGmhNKo9NaDeSjy1_ByYkdLVqRxfzW2EzPpJ_OnxSIsdp1PVb6OpmllJH9iWo52iL4idghNEyPykxSbLsX03SpA3aTPuW2S1PJlUkeZOKtL86uxk4s70KCuuoEyNffGOBfyb2pmXPW5KcYm0Z9GJ7EjJjFMtDT5FSq2KtjjwT8I1ml8boj5jrbpxc7M5ydodyLn2CEa0OUJlIOn2OX_xI77Cdq54I-njfoh5NMati1vKrFH8VQWc2vYPEkXdwzOxAxwxKe_2D2mi-Ot2MFuP8_H1YRxrP2J0koHWpWP7rvQ2RkkLYXmvtwPYNqPl6nQVRd1JNZ4GD4ot1vy84mak8Yx6quCfK5oL9UpbaxEZzubo2j-0eh_LPcG5L2vOxwmvnxXo9y3u2KsUAMrzma27EJBE8FV9z8Mh8m6IgFpO2f2MHdbbLZiXEDAtnvKapDlpgNHYGc4IB6ld_G-sZ5QVhNHXwSUcrIMcANlBlmGhREC9ngdQRFWyc9oGHS9s8kHlDWe6pnLzfhYiEYibrKnydwXM8SbcJZpRtluvZ8u5pD_8yia2vENwU-1F_x1OWCXIfS1pgMF1MLQvQfvrp7JU8qEiHEnSozmbE6eSJFRtgRS8tTBkqldWiQKXR_lS6e9X8rQpf4in3nbCn5vHBoiif6bLvcnYjDmT3rAJ6e7DiH-HR6HhzkV-qNemIdI4dzKxEZtuH1PhVU249TdNgU0sZxbOviuSgaNfn8vEIpMl-hdAq7yX5DdNbQyxblP-rUHTi0l9v0gNXiOt2egh1_w6-pPlWJnrpUlkZuKg8sgTBdo0BB6R8wj1sOhjuBNKO7jO51Rg-Ev4b21SkTBsd7Fhb6FMPH45YyEyWUNnwr5aSU1OTQT00ucn-CIH0u2NpZBpt4toLIOcYN2-VITheDw-D1iMrFmmusmm2c9XUruLzwuLxvQ98tuQZo9jTwChoxNOPv1VuI_Jcx4SBMcxSNa59NtKGw1b2DnSN2j9g2t89tcQpQ3_cuXACDwIKACfBCnbO3cdvBVfiH6HeayrY6WT9juDRt9B4RbAiNGTIzBxxXvmk1J-xUnZX02GA.KPhpOOQAuxry4UUBg9JNdg";
-//      sendRequest();
-//      return inherited::initiate();
-//    }
-//    #warning "%%% End hacking code"
     // no token, don't even try to connect, need to get access token via refresh first
     refreshAccessToken();
   }

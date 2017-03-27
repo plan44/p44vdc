@@ -105,13 +105,20 @@ namespace p44 {
   
 
 
-
   typedef boost::intrusive_ptr<HomeConnectDevice> HomeConnectDevicePtr;
   class HomeConnectDevice : public SingleDevice
   {
     typedef SingleDevice inherited;
     friend class HomeConnectAction;
 
+
+    typedef enum {
+      homeconnect_unknown,
+      homeconnect_coffeemaker,
+      homeconnect_oven,
+    } HomeConnectDeviceType;
+
+    HomeConnectDeviceType hcDevType; ///< home connect device type
     string haId; ///< the home appliance ID
     string model; ///< the model name for the device
     string modelGuid; ///< the model guid for the device
@@ -195,7 +202,7 @@ namespace p44 {
 
   protected:
 
-    void configureDevice();
+    bool configureDevice();
     void deriveDsUid();
 
   private:
