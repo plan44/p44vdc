@@ -424,7 +424,7 @@ bool Vdc::simpleIdentifyAndAddDevice(DevicePtr aNewDevice)
 {
   if (!aNewDevice->identifyDevice(NULL)) {
     // error: device does not support simple identification
-    ALOG(LOG_CRIT, "implementation error: device does not support simple identification! Cannot be added.")
+    LOG(LOG_WARNING, "Could not identify device or device not supported -> ignored");
     return false;
   }
   // simple identification successful
@@ -460,7 +460,7 @@ void Vdc::identifyAndAddDeviceCB(StatusCB aCompletedCB, ErrorPtr aError, Device 
     }
   }
   else {
-    LOG(LOG_ERR, "Could not get device identification: %s", aError->description().c_str());
+    LOG(LOG_ERR, "Could not get device identification: %s -> ignored", aError->description().c_str());
     // we can't add this device, continue to next without adding
   }
   if (aCompletedCB) aCompletedCB(aError);

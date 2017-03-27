@@ -118,6 +118,7 @@ namespace p44 {
     ///   At the time when the callback is called, the device must have a stable dSUID and internal setup.
     /// @return true can be returned when the device identification/setup is instant. This means that aIdentifyCB is not called, and
     ///   the device is immediately used. When returning true, the device must already have a stable dSUID and internal setup.
+    ///   In a vdc which uses simpleIdentifyAndAddDevice(), returning false will cause the device not be added but immediately deleted. 
     /// @note identifyDevice() will only be called on a new Device object during the process of adding a device to a vDC.
     /// @note identifyDevice() MAY NOT perform any action on the (hardware) device that would modify its state. When re-scanning
     ///   for hardware devices, identifyDevice() will often target already known and registered devices. identifyDevice()'s only
