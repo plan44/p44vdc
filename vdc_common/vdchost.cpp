@@ -393,6 +393,7 @@ void VdcHost::collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags,
   }
   // all devices collected, but not yet initialized
   postEvent(vdchost_devices_collected);
+  LOG(LOG_NOTICE, "=== collected devices from all vdcs -> initializing devices now\n");
   // now initialize devices (which are already identified by now!)
   initializeNextDevice(aCompletedCB, dSDevices.begin());
 }
@@ -431,6 +432,7 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
     }
   }
   aCompletedCB(vdcInitErr);
+  LOG(LOG_NOTICE, "=== initialized all collected devices\n");
   collecting = false;
 }
 
