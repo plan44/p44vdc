@@ -134,7 +134,7 @@ void HomeConnectApiOperation::processRefreshAnswer(JsonObjectPtr aJsonResponse, 
 void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError)
 {
   error = aError;
-  if (Error::isOK(error)) {
+  if (Error::isOK(error) || error->isDomain(WebError::domain())) {
     // check for application level errors
     JsonObjectPtr e;
     if (aJsonResponse && aJsonResponse->get("error", e)) {

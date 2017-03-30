@@ -352,7 +352,9 @@ bool HomeConnectDevice::configureDevice()
   EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
   es->addEnum("Inactive", 0, true); // init state with this value
   es->addEnum("Ready", 1);
+  es->addEnum("DelayedStart", 2); // oven only
   es->addEnum("Run", 3);
+  es->addEnum("Pause", 4); // oven only
   es->addEnum("ActionRequired", 5);
   es->addEnum("Finished", 6);
   es->addEnum("Error", 7);
