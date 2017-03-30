@@ -902,7 +902,7 @@ void CustomAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
   ErrorPtr err;
 
   // copy each of the stored params, unless same param is alreday in aParams (which means overridden)
-  if (storedParams->resetKeyIteration()) {
+  if (storedParams && storedParams->resetKeyIteration()) {
     string key;
     ApiValuePtr val;
     while (storedParams->nextKeyValue(key, val)) {
