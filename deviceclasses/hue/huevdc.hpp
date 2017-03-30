@@ -58,8 +58,6 @@ namespace p44 {
 
     HuePersistence db;
 
-    StatusCB collectedHandler;
-
     /// @name persistent parameters
     /// @{
 
@@ -69,6 +67,14 @@ namespace p44 {
     bool fixedURL; ///< if set, bridgeApiURL is user provided and must not be updated
 
     /// @}
+
+    /// @name other info retrieved from bridge
+    /// @{
+
+    uint64_t bridgeMacAddress; ///< the mac address of this hue bridge
+
+    /// @}
+
 
   public:
 
@@ -126,11 +132,12 @@ namespace p44 {
 
   private:
 
-    void refindBridge();
-    void refindResultHandler(ErrorPtr aError);
+    void refindBridge(StatusCB aCompletedCB);
+    void refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError);
     void searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError);
-    void collectLights();
-    void collectedLightsHandler(JsonObjectPtr aResult, ErrorPtr aError);
+    void queryBridgeAndLights(StatusCB aCollectedHandler);
+    void gotBridgeConfig(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError);
+    void collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError);
 
   };
 

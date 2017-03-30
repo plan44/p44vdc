@@ -253,7 +253,7 @@ public:
   void apiTested(ErrorPtr aError)
   {
     if (Error::isOK(aError)) {
-      FOCUSLOG("hue API URL %s tested accessible ok", hueComm.baseURL.c_str());
+      FOCUSLOG("hue API URL %s tested accessible ok", hueComm.fixedBaseURL.c_str());
       hueComm.baseURL = hueComm.fixedBaseURL; // use it
       hueComm.apiReady = true; // can use API now
     }
