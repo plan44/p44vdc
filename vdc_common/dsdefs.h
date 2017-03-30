@@ -502,9 +502,9 @@ typedef uint16_t VdcValueUnit;
 /// Scene Effects (transition and alerting)
 typedef enum {
   scene_effect_none = 0, ///< no effect, immediate transition
-  scene_effect_smooth = 1, ///< smooth normal transition (corresponds with former dimTimeSelector==0)
-  scene_effect_slow = 2, ///< slow transition (corresponds with former dimTimeSelector==1)
-  scene_effect_veryslow = 3, ///< very slow transition (corresponds with former dimTimeSelector==2)
+  scene_effect_smooth = 1, ///< smooth (default: 100mS) normal transition
+  scene_effect_slow = 2, ///< slow (default: 1min) transition
+  scene_effect_custom = 3, ///< custom (default: 5sec) transition
   scene_effect_alert = 4, ///< blink (for light devices) / alerting (in general: an effect that draws the user’s attention)
 } VdcSceneEffect;
 

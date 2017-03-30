@@ -240,13 +240,15 @@ namespace p44 {
 
 
     /// get PWM value for brightness (from brightness channel) according to dim curve
-    /// @param aPWM will receive the PWM value corresponding to current brightness from 0..aMax
-    /// @param aMax max PWM duty cycle value
+    /// @param aBrightness brightness to convert to PWM value
+    /// @param aMaxPWM max PWM duty cycle value
+    /// @return the PWM value (from 0..aMaxPWM) corresponding to aBrightness
     double brightnessToPWM(Brightness aBrightness, double aMaxPWM);
 
     /// set PWM value from lamp (to update brightness channel) according to dim curve
     /// @param aPWM PWM value to be converted back to brightness
-    /// @param aMax max PWM duty cycle value
+    /// @param aMaxPWM max PWM duty cycle value
+    /// @return the brightness value corresponding to aPWM (which must be 0..aMaxPWM)
     Brightness PWMToBrightness(double aPWM, double aMaxPWM);
 
 
@@ -298,7 +300,6 @@ namespace p44 {
 
     void beforeBlinkStateSavedHandler(MLMicroSeconds aDuration, LightScenePtr aParamScene, MLMicroSeconds aBlinkPeriod, int aOnRatioPercent);
     void blinkHandler(MLMicroSeconds aEndTime, bool aState, MLMicroSeconds aOnTime, MLMicroSeconds aOffTime);
-    void fadeDownHandler(MLMicroSeconds aFadeStepTime);
 
   };
 

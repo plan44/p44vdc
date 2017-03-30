@@ -66,12 +66,12 @@ LightBehaviour::LightBehaviour(Device &aDevice) :
   // primary output controls brightness
   setHardwareName("brightness");
   // persistent settings
-  dimTimeUp[0] = 0x0F; // 100mS
-  dimTimeUp[1] = 0x3F; // 800mS
-  dimTimeUp[2] = 0x2F; // 400mS
-  dimTimeDown[0] = 0x0F; // 100mS
-  dimTimeDown[1] = 0x3F; // 800mS
-  dimTimeDown[2] = 0x2F; // 400mS
+  dimTimeUp[0] = 0x0F; // 100mS // smooth
+  dimTimeUp[1] = 0xA2; // 1min (60800mS) // slow
+  dimTimeUp[2] = 0x68; // 5sec // custom
+  dimTimeDown[0] = 0x0F; // 100mS // smooth
+  dimTimeDown[1] = 0xA2; // 1min (60800mS) // slow
+  dimTimeDown[2] = 0x68; // 5sec // custom
   // add the brightness channel (every light has brightness)
   brightness = BrightnessChannelPtr(new BrightnessChannel(*this));
   addChannel(brightness);
@@ -153,44 +153,9 @@ bool LightBehaviour::applyScene(DsScenePtr aScene)
   if (lightScene) {
     // any scene call cancels actions (and fade down)
     stopSceneActions();
-    SceneCmd sceneCmd = lightScene->sceneCmd;
-    // now check for special hard-wired scenes
-    if (sceneCmd==scene_cmd_slow_off) {
-      // slow fade down
-      Brightness b = brightness->getChannelValue();
-      if (b>0) {
-        Brightness mb = b - brightness->getMinDim();
-        MLMicroSeconds fadeStepTime;
-        if (mb>AUTO_OFF_FADE_STEPSIZE)
-          fadeStepTime = AUTO_OFF_FADE_TIME / mb * AUTO_OFF_FADE_STEPSIZE; // more than one step
-        else
-          fadeStepTime = AUTO_OFF_FADE_TIME; // single step, to be executed after fade time
-        fadeDownTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&LightBehaviour::fadeDownHandler, this, fadeStepTime), fadeStepTime);
-        LOG(LOG_NOTICE, "- ApplyScene(AUTO_OFF): starting slow fade down from %d to %d (and then OFF) in steps of %d, stepTime = %dmS", (int)b, (int)brightness->getMinDim(), AUTO_OFF_FADE_STEPSIZE, (int)(fadeStepTime/MilliSecond));
-        return false; // fade down process will take care of output updates
-      }
-    }
   } // if lightScene
   // other type of scene, let base class handle it
   return inherited::applyScene(aScene);
-}
-
-
-// TODO: for later: consider if fadeDown is not an action like blink...
-void LightBehaviour::fadeDownHandler(MLMicroSeconds aFadeStepTime)
-{
-  Brightness b = brightness->dimChannelValue(-AUTO_OFF_FADE_STEPSIZE, aFadeStepTime);
-  bool isAtMin = b<=brightness->getMinDim();
-  if (isAtMin) {
-    LOG(LOG_INFO, "- ApplyScene(AUTO_OFF): reached minDim, now turning off lamp");
-    brightness->setChannelValue(0); // off
-  }
-  // Note: device.requestApplyingChannels paces requests to hardware, so we can just call it here without special precautions
-  device.requestApplyingChannels(NULL, true); // dimming mode
-  if (!isAtMin) {
-    // continue
-    fadeDownTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&LightBehaviour::fadeDownHandler, this, aFadeStepTime), aFadeStepTime);
-  }
 }
 
 
@@ -226,10 +191,25 @@ void LightBehaviour::saveChannelsToScene(DsScenePtr aScene)
 
 
 
-/// @param aDimTime : dimming time specification in dS format (Bit 7..4 = exponent, Bit 3..0 = 1/150 seconds, i.e. 0x0F = 100mS)
+// aDimTime : transition time specification in dS format
+//   T = 100ms*2^exp - (100ms*2^exp)* (15-lin)/32
+//     = 100ms*2^exp * (1-(15-lin)/32)
+//     = 100ms/32*2^exp * (1-(15-lin)/32)*32
+//     = 100ms/32*2^exp * (32-(15-lin))
+//     = 100ms/32*2^exp * (17+lin)
+// Examples:
+//   0x0F: 100 ms
+//   0x1F: 200 ms
+//   0x27: 300 ms
+//   0x2F: 400 ms
+//   0x37: 600 ms
+//   0x68: 5000 ms
+//   0xA2: 60800 ms
 static MLMicroSeconds transitionTimeFromDimTime(uint8_t aDimTime)
 {
-  return ((MLMicroSeconds)(aDimTime & 0xF)*100*MilliSecond/15)<<((aDimTime>>4) & 0xF);
+  return
+    (((100*MilliSecond)/32)<<((aDimTime>>4) & 0xF)) * // 100ms/32*2^exp *
+    (17+(aDimTime & 0xF)); // (17+lin)
 }
 
 
@@ -239,7 +219,7 @@ MLMicroSeconds LightBehaviour::transitionTimeFromSceneEffect(VdcSceneEffect aEff
   switch (aEffect) {
     case scene_effect_smooth : dimTimeIndex = 0; break;
     case scene_effect_slow : dimTimeIndex = 1; break;
-    case scene_effect_veryslow : dimTimeIndex = 2; break;
+    case scene_effect_custom : dimTimeIndex = 2; break;
     default: return 0; // no known effect -> just return 0 for transition time
   }
   // dimTimeIndex found, look up actual time

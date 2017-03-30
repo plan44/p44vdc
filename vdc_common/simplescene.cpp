@@ -222,7 +222,7 @@ static const DefaultSceneParams defaultScenes[NUMDEFAULTSCENES+1] = {
   { 100, scene_effect_smooth, false, false, scene_cmd_invoke,        0 }, // 37 : Preset 31 - T3E_S1
   {   0, scene_effect_smooth, false, false, scene_cmd_off,           0 }, // 38 : Preset 40 - T4E_S0
   { 100, scene_effect_smooth, false, false, scene_cmd_invoke,        0 }, // 39 : Preset 41 - T4E_S1
-  {   0, scene_effect_smooth, false, false, scene_cmd_slow_off,      0 }, // 40 : Fade down to 0 in 1min - AUTO_OFF
+  {   0, scene_effect_slow,   false, false, scene_cmd_slow_off,      0 }, // 40 : Fade down to 0 in 1min - AUTO_OFF
   {   0, scene_effect_alert,  false, true , scene_cmd_invoke,        0 }, // 41 : Alert by blinking, but no output change - ALERT_S
   {   0, scene_effect_smooth, true,  false, scene_cmd_decrement,     1 }, // 42 : Area 1 Decrement - T1_DEC
   {   0, scene_effect_smooth, true,  false, scene_cmd_increment,     1 }, // 43 : Area 1 Increment - T1_INC
@@ -247,7 +247,7 @@ static const DefaultSceneParams defaultScenes[NUMDEFAULTSCENES+1] = {
   {   0, scene_effect_smooth, false, true , scene_cmd_none,          0 }, // 62 : Reserved
   {   0, scene_effect_smooth, false, true , scene_cmd_none,          0 }, // 63 : Reserved
   // global, appartment-wide, group independent scenes
-  {   0, scene_effect_slow,   true,  false, scene_cmd_invoke,        0 }, //  +0 = 64 : Auto Standby - AUTO_STANDBY
+  {   0, scene_effect_slow,   true,  false, scene_cmd_invoke,        0 }, //  +0 = 64 : Reserved (AUTO_STANDBY)
   { 100, scene_effect_none,   true,  false, scene_cmd_invoke,        0 }, //  +1 = 65 : Panic - SIG_PANIC
   {   0, scene_effect_smooth, false, true , scene_cmd_invoke,        0 }, //  +2 = 66 : Reserved (ENERGY_OL)
   {   0, scene_effect_smooth, true,  false, scene_cmd_invoke,        0 }, //  +3 = 67 : Standby - STANDBY

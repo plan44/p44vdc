@@ -274,6 +274,7 @@ bool OutputBehaviour::applyScene(DsScenePtr aScene)
   if (
     cmd==scene_cmd_invoke ||
     cmd==scene_cmd_off ||
+    cmd==scene_cmd_slow_off ||
     cmd==scene_cmd_min ||
     cmd==scene_cmd_max
   ) {
@@ -284,7 +285,7 @@ bool OutputBehaviour::applyScene(DsScenePtr aScene)
   }
   else {
     // no channel changes
-    LOG(LOG_INFO, "- Scene(%d): no invoke/off/min/max (but cmd=%d) -> no channels loaded", aScene->sceneCmd, aScene->sceneNo);
+    LOG(LOG_INFO, "- Scene(%d): no invoke/off/min/max (but cmd=%d) -> no channels loaded", aScene->sceneNo, aScene->sceneCmd);
     return false;
   }
 }
