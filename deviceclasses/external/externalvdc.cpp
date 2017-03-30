@@ -763,6 +763,10 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     s += o->stringValue();
     dSUID.setNameInSpace(s, vdcNamespace);
   }
+  // - subdevice index can be set separately
+  if (aInitParams->get("subdeviceindex", o)) {
+    dSUID.setSubdeviceIndex(o->int32Value());
+  }
   // Output
   // - get group (overridden for some output types)
   colorClass = class_undefined; // none set so far
