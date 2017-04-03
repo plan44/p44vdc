@@ -61,8 +61,11 @@ string HueVdc::getExtraInfo()
 
 string HueVdc::hardwareGUID()
 {
-  string s = "macaddress:";
-  s += macAddressToString(bridgeMacAddress,':');
+  string s;
+  if (bridgeMacAddress) {
+    s = "macaddress:";
+    s += macAddressToString(bridgeMacAddress,':');
+  }
   return s;
 };
 
