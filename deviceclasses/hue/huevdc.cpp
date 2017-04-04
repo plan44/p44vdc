@@ -273,7 +273,7 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
         fixedURL = false;
         db.executef("UPDATE globs SET hueBridgeUUID='', hueBridgeUser='', hueApiURL='', fixedURL=0");
       }
-      // done
+      // done (separate learn-in required, because button press at the bridge is required)
       respErr = Error::ok();
     }
     else {
@@ -362,6 +362,10 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
       // (on learn-in, the bridge's devices will be added afterwards)
       removeDevices(false);
       // actual learn-in or -out has happened
+      if (learnedIn==no && !fixedURL) {
+        // forget cached URL (but keep fixed ones!)
+        bridgeApiURL.clear();
+      }
       // save the bridge parameters
       db.executef(
         "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s', hueApiURL='%s', fixedURL=0",
@@ -371,8 +375,13 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
       );
       // now process the learn in/out
       if (learnedIn==yes) {
-        // TODO: now get lights
-        queryBridgeAndLights(NULL);
+        // now get lights
+        queryBridgeAndLights(boost::bind(&HueVdc::learnedInComplete, this, _1));
+        return;
+      }
+      if (learnedIn!=undefined) {
+        // learn out clears MAC
+        bridgeMacAddress = 0;
       }
       // report successful learn event
       getVdcHost().reportLearnEvent(learnedIn==yes, ErrorPtr());
@@ -383,6 +392,14 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
     ALOG(LOG_NOTICE, "No hue bridge found to register, error = %s", aError->description().c_str());
   }
 }
+
+
+void HueVdc::learnedInComplete(ErrorPtr aError)
+{
+  getVdcHost().reportLearnEvent(true, aError);
+}
+
+
 
 
 void HueVdc::queryBridgeAndLights(StatusCB aCollectedHandler)

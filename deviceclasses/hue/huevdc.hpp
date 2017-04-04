@@ -135,6 +135,7 @@ namespace p44 {
     void refindBridge(StatusCB aCompletedCB);
     void refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError);
     void searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError);
+    void learnedInComplete(ErrorPtr aError);
     void queryBridgeAndLights(StatusCB aCollectedHandler);
     void gotBridgeConfig(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError);
     void collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError);
