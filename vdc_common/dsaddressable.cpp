@@ -215,11 +215,13 @@ bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEv
     }
     if (Error::isOK(err)) {
       // - send pushNotification
-      ApiValuePtr pushParams = aPropertyQuery->newValue(apivalue_object);
+      ApiValuePtr pushParams;
       if (value) {
+        pushParams = value->newValue(apivalue_object);
         pushParams->add("changedproperties", value);
       }
       if (aEvents) {
+        if (!pushParams) pushParams = aEvents->newValue(apivalue_object);
         pushParams->add("deviceevents", aEvents);
       }
       return sendRequest("pushNotification", pushParams);
