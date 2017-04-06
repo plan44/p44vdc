@@ -561,6 +561,7 @@ typedef enum {
   outputFunction_ctdimmer = 3, ///< dimmer with color temperature - channels 1 and 4
   outputFunction_colordimmer = 4, ///< full color dimmer - channels 1..6
   outputFunction_bipolar_positional = 5, ///< bipolar valves, dual direction fan control etc. - single channel -n...0...n, usually n=100
+  outputFunction_internallyControlled = 6, ///< output values(s) mostly internally controlled, e.g. FCU
   outputFunction_custom = 0x7F ///< custom output/channel configuration, none of the well-known functions above
 } VdcOutputFunction;
 

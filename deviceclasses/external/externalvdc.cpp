@@ -886,7 +886,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     // - create climate control fan coil unit output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_fancoilunit));
     cb->setGroupMembership(defaultGroup, true); // put into room temperature control group...
-    cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
+    cb->setHardwareOutputConfig(outputFunction_internallyControlled, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
   }
