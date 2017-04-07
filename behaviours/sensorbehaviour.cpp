@@ -32,7 +32,8 @@ SensorBehaviour::SensorBehaviour(Device &aDevice) :
   // state
   lastUpdate(Never),
   lastPush(Never),
-  currentValue(0)
+  currentValue(0),
+  contextId(-1)
 {
   // set dummy default hardware default configuration
   setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 100, 1, 15*Second, 20*Minute);
@@ -54,62 +55,139 @@ void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint 
 
 
 
+// The value units corresponding with the sensor type
+const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
+  VALUE_UNIT(valueUnit_none, unitScaling_1), ///< none
+  VALUE_UNIT(valueUnit_celsius, unitScaling_1), ///< temperature in degrees celsius
+  VALUE_UNIT(valueUnit_percent, unitScaling_1), ///< relative humidity in %
+  VALUE_UNIT(valueUnit_lux, unitScaling_1), ///< illumination in lux
+  VALUE_UNIT(valueUnit_volt, unitScaling_1), ///< supply voltage level in Volts
+  VALUE_UNIT(valueUnit_ppm, unitScaling_1), ///< CO (carbon monoxide) concentration in ppm
+  VALUE_UNIT(valueUnit_bequerelperm3, unitScaling_1), ///< Radon activity in Bq/m3
+  VALUE_UNIT(valueUnit_none, unitScaling_1), ///< gas type sensor
+  VALUE_UNIT(valueUnit_gramperm3, unitScaling_micro), ///< particles <10µm in μg/m3
+  VALUE_UNIT(valueUnit_gramperm3, unitScaling_micro), ///< particles <2.5µm in μg/m3
+  VALUE_UNIT(valueUnit_gramperm3, unitScaling_micro), ///< particles <1µm in μg/m3
+  VALUE_UNIT(valueUnit_none, unitScaling_1), ///< room operating panel set point, 0..1
+  VALUE_UNIT(valueUnit_none, unitScaling_1), ///< fan speed, 0..1 (0=off, <0=auto)
+  VALUE_UNIT(valueUnit_meterpersecond, unitScaling_1), ///< wind speed in m/s
+  VALUE_UNIT(valueUnit_watt, unitScaling_1), ///< Power in W
+  VALUE_UNIT(valueUnit_ampere, unitScaling_1), ///< Electric current in A
+  VALUE_UNIT(valueUnit_watthour, unitScaling_kilo), ///< Energy in kWh
+  VALUE_UNIT(valueUnit_voltampere, unitScaling_1), ///< Electric Consumption in VA
+  VALUE_UNIT(valueUnit_pascal, unitScaling_hecto), ///< Air pressure in hPa
+  VALUE_UNIT(valueUnit_degree, unitScaling_1), ///< Wind direction in degrees
+  VALUE_UNIT(valueUnit_bel, unitScaling_deci), ///< Sound pressure level in dB
+  VALUE_UNIT(valueUnit_meterperm2, unitScaling_milli), ///< Precipitation in mm/m2
+  VALUE_UNIT(valueUnit_ppm, unitScaling_1), ///< CO2 (carbon dioxide) concentration in ppm
+  VALUE_UNIT(valueUnit_meterpersecond, unitScaling_1), ///< gust speed in m/S
+  VALUE_UNIT(valueUnit_degree, unitScaling_1), ///< gust direction in degrees
+  VALUE_UNIT(valueUnit_watt, unitScaling_1), ///< Generated power in W
+  VALUE_UNIT(valueUnit_watthour, unitScaling_kilo), ///< Generated energy in kWh
+  VALUE_UNIT(valueUnit_liter, unitScaling_1), ///< Water quantity in liters
+  VALUE_UNIT(valueUnit_literpersecond, unitScaling_1), ///< Water flow rate in liters/second
+};
+
+
+ValueUnit SensorBehaviour::getSensorUnit()
+{
+  if (sensorType>=numVdcSensorTypes) return VALUE_UNIT(valueUnit_none, unitScaling_1);
+  return sensorTypeUnits[sensorType];
+}
+
+
+
 string SensorBehaviour::sensorDescriptionFrom(const char *aTypeText, const char *aUnitText, double aMin, double aMax, double aResolution)
 {
   int fracDigits = (int)(-log(aResolution)/log(10)+0.99);
   if (fracDigits<0) fracDigits=0;
-  return string_format("%s, %0.*f..%0.*f %s", aTypeText, fracDigits, aMin, fracDigits, aMax, aUnitText);
+  string u;
+  return string_format("%s, %0.*f..%0.*f %s", aTypeText, fracDigits, aMin, fracDigits, aMax, u.c_str());
 }
 
 
 void SensorBehaviour::setSensorNameFrom(const char *aTypeText, const char *aUnitText)
 {
-  setHardwareName(sensorDescriptionFrom(aTypeText, aUnitText, min, max, resolution));
+  string u;
+  if (aUnitText) u = aUnitText;
+  else u = valueUnitName(getSensorUnit(), true);
+  setHardwareName(sensorDescriptionFrom(aTypeText, u.c_str(), min, max, resolution));
 }
 
 
 
-void SensorBehaviour::updateEngineeringValue(long aEngineeringValue)
+void SensorBehaviour::updateEngineeringValue(long aEngineeringValue, bool aPush, int32_t aContextId, const char *aContextMsg)
 {
   double newCurrentValue = min+(aEngineeringValue*resolution);
-  updateSensorValue(newCurrentValue);
+  updateSensorValue(newCurrentValue, -1, aPush, aContextId, aContextMsg);
 }
 
 
-void SensorBehaviour::updateSensorValue(double aValue, double aMinChange)
+void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool aPush, int32_t aContextId, const char *aContextMsg)
 {
-  // always update age, even if value itself may not have changed
   MLMicroSeconds now = MainLoop::now();
+  bool changedValue = false;
+  // always update age, even if value itself may not have changed
   lastUpdate = now;
+  // update context
+  if (contextId!=aContextId) {
+    contextId = aContextId;
+    changedValue = true;
+  };
+  if (contextMsg!=nonNullCStr(aContextMsg)) {
+    contextMsg = nonNullCStr(aContextMsg);
+    changedValue = true;
+  };
+  // update value
   if (aMinChange<0) aMinChange = resolution/2;
-  bool changedValue = fabs(aValue - currentValue) > aMinChange;
+  if (fabs(aValue - currentValue) > aMinChange) changedValue = true;
   BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] '%s' reports %s value = %0.3f", index, hardwareName.c_str(), changedValue ? "NEW" : "same", aValue);
-  if (changedValue || now>lastPush+changesOnlyInterval) {
-    // changed value or last push with same value long enough ago
+  if (contextId>=0 || !contextMsg.empty()) {
+    LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", contextId, contextMsg.c_str());
+  }
+  if (changedValue) {
     currentValue = aValue;
-    if (lastPush==Never || now>lastPush+minPushInterval) {
-      // push the new value
-      if (pushBehaviourState()) {
-        lastPush = now;
-      }
-    }
+  }
+  // possibly push
+  if (aPush) {
+    pushSensor(changedValue);
   }
   // notify listeners
   notifyListeners(changedValue ? valueevent_changed : valueevent_confirmed);
 }
 
 
-void SensorBehaviour::invalidateSensorValue()
+
+bool SensorBehaviour::pushSensor(bool aChanged, bool aAlways)
+{
+  MLMicroSeconds now = MainLoop::now();
+  if (aChanged || now>lastPush+changesOnlyInterval) {
+    // changed value or last push with same value long enough ago
+    if (aAlways || lastPush==Never || now>lastPush+minPushInterval) {
+      // push the new value
+      if (pushBehaviourState()) {
+        lastPush = now;
+        return true;
+      }
+      else {
+        BLOG(LOG_NOTICE, "Sensor[%zu] '%s' could not be pushed", index, hardwareName.c_str());
+      }
+    }
+  }
+  return false;
+}
+
+
+
+void SensorBehaviour::invalidateSensorValue(bool aPush)
 {
   if (lastUpdate!=Never) {
     // currently valid -> invalidate
     lastUpdate = Never;
     currentValue = 0;
-    // push invalidation (primitive clients not capable of NULL will at least see value==0)
-    MLMicroSeconds now = MainLoop::now();
-    // push the invalid state
-    if (pushBehaviourState()) {
-      lastPush = now;
+    if (aPush) {
+      // push invalidation (primitive clients not capable of NULL will at least see value==0)
+      pushSensor(true, true);
     }
     // notify listeners
     notifyListeners(valueevent_changed);
@@ -233,6 +311,8 @@ static char sensor_key;
 enum {
   sensorType_key,
   sensorUsage_key,
+  siunit_key,
+  unitsymbol_key,
   min_key,
   max_key,
   resolution_key,
@@ -248,6 +328,8 @@ const PropertyDescriptorPtr SensorBehaviour::getDescDescriptorByIndex(int aPropI
   static const PropertyDescription properties[numDescProperties] = {
     { "sensorType", apivalue_uint64, sensorType_key+descriptions_key_offset, OKEY(sensor_key) },
     { "sensorUsage", apivalue_uint64, sensorUsage_key+descriptions_key_offset, OKEY(sensor_key) },
+    { "siunit", apivalue_string, siunit_key+descriptions_key_offset, OKEY(sensor_key) },
+    { "symbol", apivalue_string, unitsymbol_key+descriptions_key_offset, OKEY(sensor_key) },
     { "min", apivalue_double, min_key+descriptions_key_offset, OKEY(sensor_key) },
     { "max", apivalue_double, max_key+descriptions_key_offset, OKEY(sensor_key) },
     { "resolution", apivalue_double, resolution_key+descriptions_key_offset, OKEY(sensor_key) },
@@ -284,6 +366,8 @@ const PropertyDescriptorPtr SensorBehaviour::getSettingsDescriptorByIndex(int aP
 enum {
   value_key,
   age_key,
+  contextid_key,
+  contextmsg_key,
   numStateProperties
 };
 
@@ -294,6 +378,8 @@ const PropertyDescriptorPtr SensorBehaviour::getStateDescriptorByIndex(int aProp
   static const PropertyDescription properties[numStateProperties] = {
     { "value", apivalue_double, value_key+states_key_offset, OKEY(sensor_key) },
     { "age", apivalue_double, age_key+states_key_offset, OKEY(sensor_key) },
+    { "contextid", apivalue_uint64, contextid_key+states_key_offset, OKEY(sensor_key) },
+    { "contextmsg", apivalue_string, contextmsg_key+states_key_offset, OKEY(sensor_key) },
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -313,6 +399,12 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case sensorUsage_key+descriptions_key_offset:
           aPropValue->setUint16Value(sensorUsage);
+          return true;
+        case siunit_key+descriptions_key_offset:
+          aPropValue->setStringValue(valueUnitName(getSensorUnit(), false));
+          return true;
+        case unitsymbol_key+descriptions_key_offset:
+          aPropValue->setStringValue(valueUnitName(getSensorUnit(), true));
           return true;
         case min_key+descriptions_key_offset:
           aPropValue->setDoubleValue(min);
@@ -353,6 +445,16 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
             aPropValue->setNull();
           else
             aPropValue->setDoubleValue((double)(MainLoop::now()-lastUpdate)/Second);
+          return true;
+        case contextid_key+states_key_offset:
+          // context ID
+          if (!hasDefinedState() || contextId<0) return false; // not available
+          aPropValue->setUint32Value((int32_t)contextId);
+          return true;
+        case contextmsg_key+states_key_offset:
+          // context message
+          if (!hasDefinedState() || contextMsg.empty()) return false; // not available
+          aPropValue->setStringValue(contextMsg);
           return true;
       }
     }

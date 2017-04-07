@@ -23,6 +23,7 @@
 #define __p44vdc__sensorbehaviour__
 
 #include "device.hpp"
+#include "valueunits.hpp"
 
 #include <math.h>
 
@@ -66,6 +67,8 @@ namespace p44 {
     double currentValue; ///< current sensor value
     MLMicroSeconds lastUpdate; ///< time of last update from hardware
     MLMicroSeconds lastPush; ///< time of last push
+    int32_t contextId; ///< context ID for the value - <0 = none
+    string contextMsg; ///< context message for the value - empty=none
     /// @}
 
 
@@ -92,8 +95,8 @@ namespace p44 {
 
     /// create a hardware name including a sensor type text, the range (max/min/resolution) and the physical unit text
     /// @param aTypeText the sensor type (like "temperature", "humidity")
-    /// @param aUnitText the physical unit (like "°C", "%")
-    void setSensorNameFrom(const char *aTypeText, const char *aUnitText);
+    /// @param aUnitText optionally the physical unit (like "°C", "%"). If NULL, default SI-Unit associated with sensor type will be used
+    void setSensorNameFrom(const char *aTypeText, const char *aUnitText = NULL);
 
     /// Utility function for getting sensor description text (as used in setSensorNameFrom()) from out of sensorbehaviour context
     static string sensorDescriptionFrom(const char *aTypeText, const char *aUnitText, double aMin, double aMax, double aResolution);
@@ -116,21 +119,38 @@ namespace p44 {
     /// @return the sensor type
     VdcSensorType getSensorType() { return sensorType; };
 
+    /// get sensor type
+    /// @return the value unit of the sensor
+    ValueUnit getSensorUnit();
+
+
     /// invalidate sensor value, i.e. indicate that current value is not known
-    void invalidateSensorValue();
+    /// @param aPush set when change should be pushed. Can be set to false to use manual pushSensor() later
+    void invalidateSensorValue(bool aPush = true);
 
     /// update sensor value (when new value received from hardware)
     /// @param aValue the new value from the sensor, in physical units according to sensorType (VdcSensorType)
     /// @param aMinChange what minimum change the new value must have compared to last reported value
+    /// @param aPush set when change should be pushed. Can be set to false to use manual pushSensor() later
+    /// @param aContextId -1 for none, or positive integer identifying a context
+    /// @param aContextMsg empty for none, or string describing a context
     ///   to be treated as a change. Default is -1, which means half the declared resolution.
-    void updateSensorValue(double aValue, double aMinChange = -1);
+    void updateSensorValue(double aValue, double aMinChange = -1, bool aPush = true, int32_t aContextId = -1, const char *aContextMsg = NULL);
 
     /// sensor value change occurred
     /// @param aEngineeringValue the engineering value from the sensor.
     ///   The state value will be adjusted and scaled according to min/resolution
     /// @note this call only works correctly if resolution relates to 1 LSB of aEngineeringValue
     ///   Use updateSensorValue if relation between engineering value and physical unit value is more complicated
-    void updateEngineeringValue(long aEngineeringValue);
+    void updateEngineeringValue(long aEngineeringValue, bool aPush = true, int32_t aContextId = -1, const char *aContextMsg = NULL);
+
+    /// pushes the current sensor state
+    /// @param aChanged if set, the state is considered changed, which means it is always pushed, unless last push was less than minPushInterval ago
+    /// @param aAlways if set, the state even pushed when last push is more recent than minPushInterval
+    /// @note this can be used for sensor values that are more often updated than is of interest for upstream,
+    ///   to only occasionally push an update. For that, use updateSensorValue() with aPush==false
+    /// @return true if state was actually pushed (all conditions met and vDC API connected)
+    bool pushSensor(bool aChanged, bool aAlways = false);
 
     /// @}
 
