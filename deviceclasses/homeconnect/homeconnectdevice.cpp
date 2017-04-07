@@ -261,37 +261,37 @@ bool HomeConnectDevice::configureDevice()
     a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.espresso", "Espresso", string_format(cmdTemplate.c_str(),"Espresso")));
     a->addParameter(tempLevel);
     a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 35, 60, 5, true, 40)));
+    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 35, 60, 5, true, 40)));
     deviceActions->addAction(a);
     // - espresso macciato
     a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.espressoMacchiato", "Espresso Macchiato", string_format(cmdTemplate.c_str(),"EspressoMacchiato")));
     a->addParameter(tempLevel);
     a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 40, 60, 10, true, 50)));
+    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 40, 60, 10, true, 50)));
     deviceActions->addAction(a);
     // - (plain) coffee
     a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.coffee", "Coffee", string_format(cmdTemplate.c_str(),"Coffee")));
     a->addParameter(tempLevel);
     a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 60, 250, 10, true, 120)));
+    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 60, 250, 10, true, 120)));
     deviceActions->addAction(a);
     // - Cappuccino
     a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.cappuccino", "Cappuccino", string_format(cmdTemplate.c_str(),"Cappuccino")));
     a->addParameter(tempLevel);
     a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 100, 250, 10, true, 180)));
+    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 100, 250, 10, true, 180)));
     deviceActions->addAction(a);
     // - latte macchiato
     a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.latteMacchiato", "Latte Macchiato", string_format(cmdTemplate.c_str(),"LatteMacchiato")));
     a->addParameter(tempLevel);
     a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 200, 400, 20, true, 300)));
+    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 200, 400, 20, true, 300)));
     deviceActions->addAction(a);
     // - latte macchiato
     a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.caffeLatte", "Caffe Latte", string_format(cmdTemplate.c_str(),"CaffeLatte")));
     a->addParameter(tempLevel);
     a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VDC_UNIT(valueUnit_liter, unitScaling_milli), 100, 400, 20, true, 250)));
+    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 100, 400, 20, true, 250)));
     deviceActions->addAction(a);
   }
   else if (hcDevType==homeconnect_oven) {
@@ -305,8 +305,8 @@ bool HomeConnectDevice::configureDevice()
       "{ \"key\":\"BSH.Common.Option.Duration\",\"value\":@{Duration%%0}}"
       "]}}";
     // - common params
-    ValueDescriptorPtr temp = ValueDescriptorPtr(new NumericValueDescriptor("Temperature", valueType_numeric, VDC_UNIT(valueUnit_celsius, unitScaling_1), 30, 250, 1, true, 180));
-    ValueDescriptorPtr duration = ValueDescriptorPtr(new NumericValueDescriptor("Duration", valueType_numeric, VDC_UNIT(valueUnit_second, unitScaling_1), 1, 86340, 1, true, 600));
+    ValueDescriptorPtr temp = ValueDescriptorPtr(new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30, 250, 1, true, 180));
+    ValueDescriptorPtr duration = ValueDescriptorPtr(new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340, 1, true, 600));
     // - preheating
     a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Preheating", "Pre-heating", string_format(cmdTemplate.c_str(),"PreHeating")));
     a->addParameter(temp);
