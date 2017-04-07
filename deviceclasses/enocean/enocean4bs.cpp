@@ -400,7 +400,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // A5-13-07: Wind Sensor
   { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_wind_direction, usage_outdoors,22.5,   360, DB(3,3), DB(3,0), 100, 40*60, &angleHandler, "wind direction", "degrees" },
   { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_wind_speed,     usage_outdoors,0.45, 89.36, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, "wind speed", "m/s" }, // 1..199.9 mph = 0.45..89.36 m/S
-  { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_wind_speed,     usage_outdoors,0.45, 89.36, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, "max wind speed", "m/s" }, // 1..199.9 mph = 0.45..89.36 m/S
+  { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_gust_speed,     usage_outdoors,0.45, 89.36, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, "max wind (gust) speed", "m/s" }, // 1..199.9 mph = 0.45..89.36 m/S
   { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_lowBattery,    usage_outdoors,   0,     1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  "Low Battery", binaryUnit },
 
   // terminator
