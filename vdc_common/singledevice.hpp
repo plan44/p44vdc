@@ -27,6 +27,7 @@
 
 #include "jsonobject.hpp"
 #include "expressions.hpp"
+#include "valueunits.hpp"
 
 using namespace std;
 
@@ -55,7 +56,7 @@ namespace p44 {
     /// @param aValueType the value type of this value (describing computing type)
     /// @param aValueUnit the value unit if this value (describing physical unit type and scaling)
     /// @param aHasDefault true if the parameter has a non-null default value
-    ValueDescriptor(const string aName, VdcValueType aValueType, VdcValueUnit aValueUnit, bool aHasDefault);
+    ValueDescriptor(const string aName, VdcValueType aValueType, ValueUnit aValueUnit, bool aHasDefault);
 
   public:
 
@@ -174,29 +175,16 @@ namespace p44 {
     /// @return value type (valueType_unknown when string does not match)
     static VdcValueType stringToValueType(const string aValueTypeName);
 
-
-    /// get unit name or symbol for a given VdcValueUnit
-    /// @param aValueUnit the value unit to get the name for
-    /// @param aAsSymbol if set, the name is returned as symbol (m), otherwise as full text (meter)
-    /// @return unit name or symbol including scaling
-    static string valueUnitName(VdcValueUnit aValueUnit, bool aAsSymbol);
-
-    /// get value unit from a given string
-    /// @param aValueUnitName a value unit specification string (consisting of unit and optional scaling prefix)
-    /// @return value unit (unit_unknown when string does not match)
-    static VdcValueUnit stringToValueUnit(const string aValueUnitName);
-
     /// @}
 
-
-  protected:
+protected:
 
     string valueName; ///< the name of the value
     bool hasValue; ///< set if there is a stored value. For action params, this is the default value. For state/states params this is the actual value
     bool isDefaultValue; ///< set if the value stored is the default value
     bool readOnly; ///< set if the value cannot be written
     VdcValueType valueType; ///< the technical type of the value
-    VdcValueUnit valueUnit; ///< the unit+scaling of the value
+    ValueUnit valueUnit; ///< the unit+scaling of the value
     MLMicroSeconds lastUpdate; ///< when the value was last updated
     MLMicroSeconds lastChange; ///< when the value was last changed
 
@@ -238,7 +226,7 @@ namespace p44 {
   public:
 
     /// constructor for a numeric parameter, which can be any of the physical unit types, bool, int, numeric enum or generic double
-    NumericValueDescriptor(const string aName, VdcValueType aValueType, VdcValueUnit aValueUnit, double aMin, double aMax, double aResolution, bool aHasDefault = false, double aDefaultValue = 0) :
+    NumericValueDescriptor(const string aName, VdcValueType aValueType, ValueUnit aValueUnit, double aMin, double aMax, double aResolution, bool aHasDefault = false, double aDefaultValue = 0) :
       inherited(aName, aValueType, aValueUnit, aHasDefault), min(aMin), max(aMax), resolution(aResolution), value(aDefaultValue) {};
 
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;

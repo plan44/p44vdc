@@ -40,7 +40,7 @@ using namespace p44;
 // MARK: ===== ValueDescriptor
 
 
-ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, VdcValueUnit aValueUnit, bool aHasDefault) :
+ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, ValueUnit aValueUnit, bool aHasDefault) :
   valueName(aName),
   valueType(aValueType),
   valueUnit(aValueUnit),
@@ -215,104 +215,6 @@ VdcValueType ValueDescriptor::stringToValueType(const string aValueTypeName)
     }
   }
   return valueType_unknown;
-}
-
-
-
-
-typedef struct {
-  const char *name;
-  const char *symbol;
-} ValueUnitDescriptor;
-static const ValueUnitDescriptor valueUnitNames[numValueUnits] = {
-  { "unknown", "?" },
-  { "none", "" },
-  { "percent", "%" },
-  { "meter", "m" },
-  { "gram", "g" },
-  { "second", "S" },
-  { "ampere", "A" },
-  { "kelvin", "K" },
-  { "mole", "mol" },
-  { "candle", "cd" },
-  { "watt", "W" },
-  { "celsius", "°C" },
-  { "volt", "V" },
-  { "lux", "lx" },
-  { "liter", "l" },
-  { "joule", "J" },
-  { "molpercubicmeter", "mol/m3" },
-  { "literperminute", "l/min" },
-  { "minute", "min" },
-  { "hour", "h" },
-  { "day", "d" },
-  { "watthour", "Wh" }
-};
-typedef struct {
-  const char *name;
-  const char *symbol;
-  int8_t exponent;
-} ValueScalingDescriptor;
-static const ValueScalingDescriptor valueScalingNames[numUnitScalings] = {
-  { "yotta", "Y", 24 },
-  { "zetta", "Z", 21 },
-  { "exa", "E", 18 },
-  { "peta", "P", 15 },
-  { "tera", "T", 12 },
-  { "giga", "G", 9 },
-  { "mega", "M", 6 },
-  { "kilo", "k", 3 },
-  { "hecto", "h", 2 },
-  { "deca", "da", 1 },
-  { "", "", 0 },
-  { "deci", "d", -1 },
-  { "centi", "c", -2 },
-  { "milli", "m", -3 },
-  { "micro", "µ", -6 },
-  { "nano", "n", -9 },
-  { "pico", "p", -12 },
-  { "femto", "f", -15 },
-  { "atto", "a", -18 },
-  { "zepto", "z", -21 },
-  { "yocto", "y", -24 }
-};
-
-
-string ValueDescriptor::valueUnitName(VdcValueUnit aValueUnit, bool aAsSymbol)
-{
-  VdcValueBaseUnit u = VDC_UNIT_ONLY(aValueUnit);
-  if (u>=numValueUnits) u=valueUnit_none;
-  VdcUnitScale s = VDC_SCALING_ONLY(aValueUnit);
-  if (s>numUnitScalings) s=unitScaling_1;
-  return string_format("%s%s",
-    aAsSymbol ?  valueScalingNames[s].symbol : valueScalingNames[s].name,
-    aAsSymbol ? valueUnitNames[u].symbol : valueUnitNames[u].name
-  );
-}
-
-
-VdcValueUnit ValueDescriptor::stringToValueUnit(const string aValueUnitName)
-{
-  // check for prefix
-  VdcUnitScale s = unitScaling_1;
-  size_t n = 0;
-  for (int i=0; i<numUnitScalings; i++) {
-    size_t n = strlen(valueScalingNames[i].name);
-    if (n>0 && aValueUnitName.substr(0,n)==valueScalingNames[i].name) {
-      s = (VdcUnitScale)i;
-      break;
-    }
-    n = 0;
-  }
-  // s = scale
-  // n = size of prefix
-  // now determine unit
-  for (int i=0; i<numValueUnits; i++) {
-    if (aValueUnitName.substr(n)==valueUnitNames[i].name) {
-      return VDC_UNIT(i, s);
-    }
-  }
-  return unit_unknown;
 }
 
 
@@ -2451,9 +2353,9 @@ ErrorPtr p44::parseValueDesc(ValueDescriptorPtr &aValueDesc, JsonObjectPtr aJSON
     case valueType_numeric:
     case valueType_integer: {
       // can have an unit optionally
-      VdcValueUnit u = valueUnit_none;
+      ValueUnit u = valueUnit_none;
       if (aJSONConfig->get("siunit", o)) {
-        u = ValueDescriptor::stringToValueUnit(o->stringValue());
+        u = stringToValueUnit(o->stringValue());
         if (u==unit_unknown)
           return TextError::err("Unknown siunit '%s'", o->stringValue().c_str());
       }

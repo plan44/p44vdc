@@ -415,6 +415,11 @@ typedef enum {
   sensorType_gas_CO2 = 22, ///< CO2 (carbon dioxide) concentration in ppm
   sensorType_gust_speed = 23, ///< gust speed in m/S
   sensorType_gust_direction = 24, ///< gust direction in degrees
+  sensorType_generated_power = 25, ///< Generated power in W
+  sensorType_generated_energy = 26, ///< Generated energy in kWh
+  sensorType_water_quantity = 27, ///< Water quantity in liters
+  sensorType_water_flowrate = 28, ///< Water flow rate in liters/second
+  numVdcSensorTypes
 } VdcSensorType;
 
 
@@ -429,74 +434,6 @@ typedef enum {
   valueType_string,
   numValueTypes
 } VdcValueType;
-
-
-/// value (physical) units
-/// @note these are used to describe single device properties and parameter values, along with VdcValueType
-#define VDC_UNIT(u, s) ((((uint16_t)((uint8_t)s)&0xFF)<<8)+(uint8_t)u)
-#define VDC_UNIT_ONLY(u) ((VdcValueBaseUnit)(u & 0xFF))
-#define VDC_SCALING_ONLY(u) ((VdcUnitScale)((u>>8) & 0xFF))
-typedef enum {
-  unit_unknown = 0,
-  valueUnit_none = 1, ///< no unit
-  valueUnit_percent,
-  // basic SI units
-  valueUnit_meter,
-  valueUnit_gram, ///< we use gram to make it work
-  valueUnit_second,
-  valueUnit_ampere,
-  valueUnit_kelvin,
-  valueUnit_mole,
-  valueUnit_candle,
-  // derived units
-  valueUnit_watt,
-  valueUnit_celsius,
-  valueUnit_volt,
-  valueUnit_lux,
-  valueUnit_liter,
-  valueUnit_joule, ///< or watt-second
-  // combined units
-  valueUnit_molpercubicmeter,
-  valueUnit_literpermin,
-  // non-SI scaled units
-  valueUnit_minute,
-  valueUnit_hour,
-  valueUnit_day,
-  valueUnit_watthour,
-  numValueUnits,
-} VdcValueBaseUnit;
-
-
-/// scaling factors
-/// @note these are combined into
-typedef enum {
-  unitScaling_yotta,
-  unitScaling_zetta,
-  unitScaling_exa,
-  unitScaling_peta,
-  unitScaling_tera,
-  unitScaling_giga,
-  unitScaling_mega,
-  unitScaling_kilo,
-  unitScaling_hecto,
-  unitScaling_deca,
-  unitScaling_1,
-  unitScaling_deci,
-  unitScaling_centi,
-  unitScaling_milli,
-  unitScaling_micro,
-  unitScaling_nano,
-  unitScaling_pico,
-  unitScaling_femto,
-  unitScaling_atto,
-  unitScaling_zepto,
-  unitScaling_yocto,
-  numUnitScalings
-} VdcUnitScale;
-
-/// unit description
-/// @note combination of VdcValueBaseUnit and VdcUnitScale
-typedef uint16_t VdcValueUnit;
 
 
 /// Scene Effects (transition and alerting)
@@ -600,6 +537,9 @@ typedef enum {
   usage_room = 1, ///< room related (e.g. indoor sensors and controllers)
   usage_outdoors = 2, ///< outdoors related (e.g. outdoor sensors)
   usage_user = 3, ///< user interaction (e.g. indicators, displays, dials, sliders)
+  usage_total = 4, ///< total
+  usage_lastrun = 5, ///< last run (of an activity like a washing machine program)
+  usage_average = 6, ///< average (per run activity)
 } VdcUsageHint;
 
 
