@@ -194,10 +194,8 @@ namespace p44 {
 
     /// start discovery/advertising service
     /// @param aHostname unique hostname to be published
-    /// @param aIgmpSnoopingHints if set, some extra IGMP packets will be sent to help IGMP snooping in broken networks
     ErrorPtr start(
-      const char *aHostname,
-      bool aIgmpSnoopingHints
+      const char *aHostname
     );
 
     /// stop advertising and scanning service
@@ -243,7 +241,6 @@ namespace p44 {
     void serviceStarted();
     void restartService();
     bool serviceRunning(AvahiService *aService);
-    void periodicIgmpQuery();
     void startAdvertising(AvahiService *aService);
 
     void startAdvertisingDS(AvahiService *aService);

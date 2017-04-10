@@ -91,7 +91,6 @@ DiscoveryManager::DiscoveryManager() :
   masterLastSeen(Never),
   #endif
   noAuto(false),
-  igmpSnoopingHints(false),
   publishWebPort(0),
   publishSshPort(0),
   rescanTicket(0),
@@ -137,15 +136,13 @@ void DiscoveryManager::stop()
 
 
 ErrorPtr DiscoveryManager::start(
-  const char *aHostname,
-  bool aIgmpSnoopingHints
+  const char *aHostname
 ) {
   ErrorPtr err;
 
   // stop current operation
   stop();
   // set the hostname
-  igmpSnoopingHints = aIgmpSnoopingHints;
   hostname = aHostname;
   // allocate the simple-poll object
   if (!(simple_poll = avahi_simple_poll_new())) {
@@ -255,31 +252,7 @@ void DiscoveryManager::startService()
   else {
     LOG(LOG_WARNING, "avahi: startService called while service already running");
   }
-  if (igmpSnoopingHints) {
-    // trigger IGMP reports from all hosts to make IGMP snooping switch more likely to pass our advertisement to other hosts
-    sendIGMP(IGMP_MEMBERSHIP_QUERY, IGMP_QUERY_MAX_RESPONSE_TIME, NULL, NULL);
-    // repeat it once in a while
-    MainLoop::currentMainLoop().executeTicketOnce(igmpQueryTicket, boost::bind(&DiscoveryManager::periodicIgmpQuery, this), IGMP_QUERY_REFRESH_INTERVAL);
-  }
 }
-
-
-
-void DiscoveryManager::periodicIgmpQuery()
-{
-  if (
-    #if ENABLE_AUXVDSM
-    auxVdsmRunning || // with auxvdsm, we don't know when the vdsm is connected, so just repeat the query
-    #endif
-    !vdcHost->getSessionConnection() // otherwise, query if we don't have a connection
-  ) {
-    sendIGMP(IGMP_MEMBERSHIP_QUERY, IGMP_QUERY_MAX_RESPONSE_TIME, NULL, NULL);
-  }
-  // reschedule
-  MainLoop::currentMainLoop().executeTicketOnce(igmpQueryTicket, boost::bind(&DiscoveryManager::periodicIgmpQuery, this), IGMP_QUERY_REFRESH_INTERVAL);
-}
-
-
 
 
 
@@ -716,12 +689,6 @@ void DiscoveryManager::avahi_ds_entry_group_callback(AvahiService *aService, Ava
 
 void DiscoveryManager::startBrowsingVdms(AvahiService *aService)
 {
-  if (igmpSnoopingHints) {
-    // make sure we're still recognized as member of the group, so IGMP snooping switches will pass other node's advertisements trough
-    sendIGMP(IGMP_V2_MEMBERSHIP_REPORT, 0, IPV4_MCAST_MDNS_ADDR, NULL);
-    // also trigger IGMP reports to make IGMP snooping switch more likely to pass our advertisement to other hosts
-    sendIGMP(IGMP_MEMBERSHIP_QUERY, IGMP_QUERY_MAX_RESPONSE_TIME, IPV4_MCAST_MDNS_ADDR, NULL);
-  }
   // Note: may NOT use global "service" var, because this can be called from within server callback, which might be called before avahi_server_new() returns
   // stop previous, if any
   if (serviceBrowser) {
