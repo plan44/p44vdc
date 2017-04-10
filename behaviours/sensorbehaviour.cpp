@@ -86,6 +86,9 @@ const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
   VALUE_UNIT(valueUnit_watthour, unitScaling_kilo), ///< Generated energy in kWh
   VALUE_UNIT(valueUnit_liter, unitScaling_1), ///< Water quantity in liters
   VALUE_UNIT(valueUnit_literpersecond, unitScaling_1), ///< Water flow rate in liters/second
+  VALUE_UNIT(valueUnit_meter, unitScaling_1), ///< Length in meters
+  VALUE_UNIT(valueUnit_gram, unitScaling_1), ///< mass in grams
+  VALUE_UNIT(valueUnit_second, unitScaling_1), ///< duration in seconds
 };
 
 
