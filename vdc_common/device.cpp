@@ -61,16 +61,22 @@ Device::Device(Vdc *aVdcP) :
 }
 
 
+void Device::identificationDone(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError, Device *aActualDevice)
+{
+  if (Error::isOK(aError) && !aActualDevice) aActualDevice = this;
+  if (aIdentifyCB) aIdentifyCB(ErrorPtr(), aActualDevice);
+}
+
+
 void Device::identificationFailed(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError)
 {
-  if (aIdentifyCB) aIdentifyCB(aError, NULL);
+  identificationDone(aIdentifyCB, aError, NULL);
 }
 
 
 void Device::identificationOK(IdentifyDeviceCB aIdentifyCB, Device *aActualDevice)
 {
-  if (!aActualDevice) aActualDevice = this;
-  if (aIdentifyCB) aIdentifyCB(ErrorPtr(), aActualDevice);
+  identificationDone(aIdentifyCB, ErrorPtr(), aActualDevice);
 }
 
 

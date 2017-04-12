@@ -130,10 +130,13 @@ namespace p44 {
     ///   need to be in place, as these define the device structure to load settings for), and then for being initialized for operation.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) = 0;
 
+    /// utility: report identification status
+    void identificationDone(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError, Device *aActualDevice = NULL);
+
     /// utility: return from identification with error
     void identificationFailed(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError);
 
-    /// confirm identification
+    /// utility: confirm identification
     void identificationOK(IdentifyDeviceCB aIdentifyCB, Device *aActualDevice = NULL);
 
 
