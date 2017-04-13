@@ -93,17 +93,12 @@ namespace p44 {
     ///   also derive default values for settings from this information.
     void setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval=0);
 
-    /// create a hardware name including a sensor type text, the range (max/min/resolution) and the physical unit text
-    /// @param aTypeText the sensor type (like "temperature", "humidity")
-    /// @param aUnitText optionally the physical unit (like "°C", "%"). If NULL, default SI-Unit associated with sensor type will be used
-    void setSensorNameFrom(const char *aTypeText, const char *aUnitText = NULL);
-
-    /// Utility function for getting sensor description text (as used in setSensorNameFrom()) from out of sensorbehaviour context
-    static string sensorDescriptionFrom(const char *aTypeText, const char *aUnitText, double aMin, double aMax, double aResolution);
-
-
     /// set group
     virtual void setGroup(DsGroup aGroup) { sensorGroup = aGroup; };
+
+    /// creates a name of the form "<name>, <range><unit>"
+    /// @param aName the name (function)
+    void setSensorNameWithRange(const char *aName);
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{
@@ -122,6 +117,12 @@ namespace p44 {
     /// get sensor type
     /// @return the value unit of the sensor
     ValueUnit getSensorUnit();
+
+    /// @return sensor unit as text (symbol)
+    string getSensorUnitText();
+
+    /// @return formatted sensor value range as string
+    string getSensorRange();
 
 
     /// invalidate sensor value, i.e. indicate that current value is not known

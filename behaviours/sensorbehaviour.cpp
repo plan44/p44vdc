@@ -99,23 +99,25 @@ ValueUnit SensorBehaviour::getSensorUnit()
 }
 
 
-
-string SensorBehaviour::sensorDescriptionFrom(const char *aTypeText, const char *aUnitText, double aMin, double aMax, double aResolution)
+string SensorBehaviour::getSensorUnitText()
 {
-  int fracDigits = (int)(-log(aResolution)/log(10)+0.99);
+  return valueUnitName(getSensorUnit(), true);
+}
+
+
+string SensorBehaviour::getSensorRange()
+{
+  int fracDigits = (int)(-log(resolution)/log(10)+0.99);
   if (fracDigits<0) fracDigits=0;
-  string u;
-  return string_format("%s, %0.*f..%0.*f %s", aTypeText, fracDigits, aMin, fracDigits, aMax, u.c_str());
+  return string_format("%0.*f..%0.*f", fracDigits, min, fracDigits, max);
 }
 
 
-void SensorBehaviour::setSensorNameFrom(const char *aTypeText, const char *aUnitText)
+void SensorBehaviour::setSensorNameWithRange(const char *aName)
 {
-  string u;
-  if (aUnitText) u = aUnitText;
-  else u = valueUnitName(getSensorUnit(), true);
-  setHardwareName(sensorDescriptionFrom(aTypeText, u.c_str(), min, max, resolution));
+  setHardwareName(string_format("%s, %s %s", aName, getSensorRange().c_str(), getSensorUnitText().c_str()));
 }
+
 
 
 
@@ -144,7 +146,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   // update value
   if (aMinChange<0) aMinChange = resolution/2;
   if (fabs(aValue - currentValue) > aMinChange) changedValue = true;
-  BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] '%s' reports %s value = %0.3f", index, hardwareName.c_str(), changedValue ? "NEW" : "same", aValue);
+  BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] '%s' reports %s value = %0.3f %s", index, hardwareName.c_str(), changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
   if (contextId>=0 || !contextMsg.empty()) {
     LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", contextId, contextMsg.c_str());
   }

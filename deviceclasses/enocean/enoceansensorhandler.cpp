@@ -117,25 +117,17 @@ namespace p44 { namespace EnoceanSensors {
 
   const char *tempText = "Temperature";
   const char *tempSetPt = "Temperature Set Point";
-  const char *tempUnit = "°C";
 
   const char *humText = "Humidity";
-  const char *humUnit = "%";
 
   const char *coText = "CO";
   const char *co2Text = "CO2";
-  const char *gasUnit = "ppm";
 
   const char *illumText = "Illumination";
-  const char *illumUnit = "lx";
 
   const char *occupText = "Occupancy";
 
   const char *motionText = "Motion";
-
-  const char *unityUnit = "units"; // undefined unit, but not just 0/1 (binary)
-
-  const char *binaryUnit = ""; // binary, only 0 or 1
 
   const char *setPointText = "Set Point";
   const char *fanSpeedText = "Fan Speed";
@@ -281,14 +273,14 @@ DsBehaviourPtr EnoceanSensorHandler::newSensorBehaviour(const EnoceanSensorDescr
       double resolution = (aSensorDescriptor.max-aSensorDescriptor.min) / ((1<<numBits)-1); // units per LSB
       sb->setHardwareSensorConfig((VdcSensorType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, aSensorDescriptor.min, aSensorDescriptor.max, resolution, aSensorDescriptor.updateInterval*Second, aSensorDescriptor.aliveSignInterval*Second);
       sb->setGroup(aSensorDescriptor.channelGroup);
-      sb->setHardwareName(EnoceanSensorHandler::sensorDesc(aSensorDescriptor));
+      sb->setSensorNameWithRange(aSensorDescriptor.typeText);
       return sb;
     }
     case behaviour_binaryinput: {
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*aDevice.get()));
       bb->setHardwareInputConfig((DsBinaryInputType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, true, aSensorDescriptor.updateInterval*Second);
       bb->setGroup(aSensorDescriptor.channelGroup);
-      bb->setHardwareName(EnoceanSensorHandler::sensorDesc(aSensorDescriptor));
+      bb->setHardwareName(aSensorDescriptor.typeText);
       return bb;
     }
     default: {
@@ -323,16 +315,9 @@ string EnoceanSensorHandler::shortDesc()
 
 string EnoceanSensorHandler::sensorDesc(const EnoceanSensorDescriptor &aSensorDescriptor)
 {
-  if (aSensorDescriptor.behaviourType==behaviour_binaryinput) {
-    // binary input
-    return string_format("%s", aSensorDescriptor.typeText);
-  }
-  else {
-    // sensor with a value
-    int numBits = (aSensorDescriptor.msBit-aSensorDescriptor.lsBit)+1; // number of bits
-    double resolution = (aSensorDescriptor.max-aSensorDescriptor.min) / ((1<<numBits)-1); // units per LSB
-    return SensorBehaviour::sensorDescriptionFrom(aSensorDescriptor.typeText, aSensorDescriptor.unitText, aSensorDescriptor.min, aSensorDescriptor.max, resolution);
-  }
+  if (aSensorDescriptor.typeText)
+    return aSensorDescriptor.typeText;
+  return "";
 }
 
 

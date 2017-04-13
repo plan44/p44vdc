@@ -65,7 +65,6 @@ namespace p44 {
     double aliveSignInterval; ///< maximum interval between two reports of a sensor. If sensor does not push a value for longer than that, it should be considered out-of-order
     BitFieldHandlerFunc bitFieldHandler; ///< function used to convert between bit field in telegram and engineering value for the behaviour
     const char *typeText;
-    const char *unitText;
   } EnoceanSensorDescriptor;
 
 
@@ -85,18 +84,12 @@ namespace p44 {
     // texts
     extern const char *tempText;
     extern const char *tempSetPt;
-    extern const char *tempUnit;
     extern const char *humText;
-    extern const char *humUnit;
     extern const char *coText;
     extern const char *co2Text;
-    extern const char *gasUnit;
     extern const char *illumText;
-    extern const char *illumUnit;
     extern const char *occupText;
     extern const char *motionText;
-    extern const char *unityUnit;
-    extern const char *binaryUnit;
     extern const char *setPointText;
     extern const char *fanSpeedText;
     extern const char *dayNightText;
