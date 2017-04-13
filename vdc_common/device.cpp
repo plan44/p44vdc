@@ -64,12 +64,13 @@ Device::Device(Vdc *aVdcP) :
 void Device::identificationDone(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError, Device *aActualDevice)
 {
   if (Error::isOK(aError) && !aActualDevice) aActualDevice = this;
-  if (aIdentifyCB) aIdentifyCB(ErrorPtr(), aActualDevice);
+  if (aIdentifyCB) aIdentifyCB(aError, aActualDevice);
 }
 
 
 void Device::identificationFailed(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError)
 {
+  if (Error::isOK(aError)) aError = TextError::err("identificationFailed called with no error reason");
   identificationDone(aIdentifyCB, aError, NULL);
 }
 
