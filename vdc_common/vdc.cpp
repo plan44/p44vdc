@@ -416,7 +416,18 @@ void Vdc::identifyDeviceCB(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, i
     return;
   }
   // no retries left, give up
+  // Note: break handler chain to make sure initial trigger (such as http request callback) terminates BEFORE device gets deleted
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::identifyDeviceFailed, this, aNewDevice, aError, aIdentifyCB));
+}
+
+
+void Vdc::identifyDeviceFailed(DevicePtr aNewDevice, ErrorPtr aError, IdentifyDeviceCB aIdentifyCB)
+{
+  // this code will be called from mainloop, after handler chain that led to trigger for
+  // identification failure has been unwound already.
   if (aIdentifyCB) aIdentifyCB(aError, NULL);
+  // aNewDevice goes out of scope here, and somewhere up the caller chain all callbacks that still hold a reference
+  // will get unwound so device will finally get deleted.
 }
 
 
@@ -489,6 +500,7 @@ void Vdc::identifyAndAddDevices(DeviceList aToBeAddedDevices, StatusCB aComplete
 void Vdc::identifyAndAddDevicesCB(DeviceList aToBeAddedDevices, StatusCB aCompletedCB, int aMaxRetries, MLMicroSeconds aRetryDelay, MLMicroSeconds aAddDelay)
 {
   // even without add delay, it's important to defer this call to avoid stacking up calls along aToBeAddedDevices
+  // Note: only now, remove the device from the list, which should deallocate it if it has not been added to the vdc(host) by now.
   MainLoop::currentMainLoop().executeOnce(
     boost::bind(&Vdc::identifyAndAddDevices, this, aToBeAddedDevices, aCompletedCB, aMaxRetries, aRetryDelay, aAddDelay),
     aAddDelay
