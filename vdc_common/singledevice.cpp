@@ -2377,9 +2377,9 @@ ErrorPtr p44::parseValueDesc(ValueDescriptorPtr &aValueDesc, JsonObjectPtr aJSON
       break;
     }
     case valueType_enumeration: {
-      EnumValueDescriptor *en = new EnumValueDescriptor(aParamName);
       if (!aJSONConfig->get("values", o) || !o->isType(json_type_array))
         return TextError::err("Need to specify enumeration 'values' array");
+      EnumValueDescriptor *en = new EnumValueDescriptor(aParamName);
       for (int i=0; i<o->arrayLength(); i++) {
         string e = o->arrayGet(i)->stringValue();
         bool isdefault = false;
