@@ -248,9 +248,6 @@ namespace p44 {
     /// @param aInterval 0=none, N=every PERIODIC_TASK_INTERVAL*N seconds
     void setMainloopStatsInterval(int aInterval) { mainloopStatsInterval = aInterval; };
 
-    /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() { return ""; /* none by default */ }
-
     /// prepare device container internals for creating and adding vDCs
     /// In particular, this triggers creating/loading the vdc host dSUID, which serves as a base ID
     /// for most class containers and many devices.
@@ -400,6 +397,7 @@ namespace p44 {
     virtual string modelName() P44_OVERRIDE { return productName.size()>0 ? productName : "vDC host"; }
 
     /// @return human readable product version string
+    /// @note it is important to override this here in vdchost, because would loop otherwise when base class calls vdchost's implementation
     virtual string modelVersion() P44_OVERRIDE { return productVersion; }
 
     /// @return unique ID for the functional model of this entity
@@ -427,6 +425,9 @@ namespace p44 {
     /// @return text describing the vdc host device, suitable for publishing via Avahi etc.
     string publishedDescription();
 
+    /// @return URL for Web-UI (for access from local LAN)
+    /// @note it is important to override this here in vdchost, because would loop otherwise when base class calls vdchost's implementation
+    virtual string webuiURLString() P44_OVERRIDE { return ""; }
 
     /// @}
 

@@ -1178,7 +1178,6 @@ static char vdc_key;
 enum {
   vdcs_key,
   valueSources_key,
-  webui_url_key,
   numDeviceContainerProperties
 };
 
@@ -1199,7 +1198,6 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
   static const PropertyDescription properties[numDeviceContainerProperties] = {
     { "x-p44-vdcs", apivalue_object+propflag_container, vdcs_key, OKEY(vdc_container_key) },
     { "x-p44-valueSources", apivalue_null, valueSources_key, OKEY(devicecontainer_key) },
-    { "configURL", apivalue_string, webui_url_key, OKEY(devicecontainer_key) }
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -1253,9 +1251,6 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case valueSources_key:
           aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
           createValueSourcesList(aPropValue);
-          return true;
-        case webui_url_key:
-          aPropValue->setStringValue(webuiURLString());
           return true;
       }
     }

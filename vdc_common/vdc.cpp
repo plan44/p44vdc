@@ -568,7 +568,6 @@ static char capabilities_container_key;
 static char device_key;
 
 enum {
-  webui_url_key,
   defaultzone_key,
   capabilities_key,
   implementationId_key,
@@ -644,7 +643,6 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
   else {
     // vdc level
     static const PropertyDescription properties[numClassContainerProperties] = {
-      { "configURL", apivalue_string, webui_url_key, OKEY(deviceclass_key) },
       { "zoneID", apivalue_uint64, defaultzone_key, OKEY(deviceclass_key) },
       { "capabilities", apivalue_object+propflag_container, capabilities_key, OKEY(capabilities_container_key) },
       { "implementationId", apivalue_string, implementationId_key, OKEY(deviceclass_key) },
@@ -670,9 +668,6 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
     if (aMode==access_read) {
       // read
       switch (aPropertyDescriptor->fieldKey()) {
-        case webui_url_key:
-          aPropValue->setStringValue(webuiURLString());
-          return true;
         case defaultzone_key:
           aPropValue->setUint16Value(defaultZoneID);
           return true;

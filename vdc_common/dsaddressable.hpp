@@ -256,6 +256,9 @@ namespace p44 {
     /// @note if not empty, value will be used by vendorId() default implementation to create vendorname:xxx URN schema id
     virtual string vendorName() { return ""; };
 
+    /// @return URL for Web-UI (for access from local LAN)
+    virtual string webuiURLString();
+
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
     /// - if aWithData is set, binary PNG icon data for given resolution prefix is returned

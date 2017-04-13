@@ -51,6 +51,7 @@ DsAddressable::~DsAddressable()
 
 string DsAddressable::modelVersion()
 {
+  // Note: it is important to override this at vdchost level, because would loop otherwise
   return getVdcHost().modelVersion();
 }
 
@@ -308,6 +309,7 @@ enum {
   oemModelGUID_key,
   vendorId_key,
   vendorName_key,
+  webui_url_key,
   extraInfo_key,
   objectDescription_key,
   deviceIcon16_key,
@@ -340,6 +342,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     { "oemModelGuid", apivalue_string, oemModelGUID_key, OKEY(dsAddressable_key) },
     { "vendorId", apivalue_string, vendorId_key, OKEY(dsAddressable_key) },
     { "vendorName", apivalue_string, vendorName_key, OKEY(dsAddressable_key) },
+    { "configURL", apivalue_string, webui_url_key, OKEY(dsAddressable_key) },
     { "x-p44-extraInfo", apivalue_string, extraInfo_key, OKEY(dsAddressable_key) },
     { "x-p44-description", apivalue_string, objectDescription_key, OKEY(dsAddressable_key) },
     { "deviceIcon16", apivalue_binary, deviceIcon16_key, OKEY(dsAddressable_key) },
@@ -376,6 +379,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case oemModelGUID_key: if (oemModelGUID().size()>0) { aPropValue->setStringValue(oemModelGUID()); return true; } else return false;
         case vendorId_key: if (vendorId().size()>0) { aPropValue->setStringValue(vendorId()); return true; } else return false;
         case vendorName_key: if (vendorName().size()>0) { aPropValue->setStringValue(vendorName()); return true; } else return false;
+        case webui_url_key: if (webuiURLString().size()>0) { aPropValue->setStringValue(webuiURLString()); return true; } else return false;
         case extraInfo_key: if (getExtraInfo().size()>0) { aPropValue->setStringValue(getExtraInfo()); return true; } else return false;
         case objectDescription_key: aPropValue->setStringValue(description()); return true;
         case deviceIcon16_key: { string icon; if (getDeviceIcon(icon, true, "icon16")) { aPropValue->setBinaryValue(icon); return true; } else return false; }
@@ -502,6 +506,13 @@ string DsAddressable::vendorId()
     return "";
 }
 
+
+
+string DsAddressable::webuiURLString()
+{
+  // Note: it is important to override this at vdchost level, because would loop otherwise
+  return getVdcHost().webuiURLString(); // by default, return vDC host's config URL
+}
 
 
 // MARK: ===== load addressable settings from files

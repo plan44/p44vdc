@@ -202,7 +202,7 @@ string P44VdcHost::webuiURLString()
   if (webUiPort)
     return string_format("http://%s:%d", ipv4ToString(getIpV4Address()).c_str(), webUiPort);
   else
-    return ""; // none
+    return inherited::webuiURLString();
 }
 
 

@@ -148,9 +148,6 @@ namespace p44 {
 		/// @return instance index number
 		int getInstanceNumber() const;
 
-    /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() { return getVdcHost().webuiURLString(); /* by default, return vDC host's config URL */ };
-
     /// get a sufficiently unique identifier for this class container
     /// @return ID that identifies this container running on a specific hardware
     ///   the ID should not be dependent on the software version
