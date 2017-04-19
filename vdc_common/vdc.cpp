@@ -310,30 +310,38 @@ void Vdc::collectedDevices(StatusCB aCompletedCB, ErrorPtr aError)
 {
   if (aCompletedCB) aCompletedCB(aError);
   collecting = false;
-  // now schedule
-  scheduleRecollecting();
+  // now schedule periodic recollect
+  schedulePeriodicRecollecting();
 }
 
 
-void Vdc::scheduleRecollecting()
+void Vdc::scheduleRecollect(RescanMode aRescanMode, MLMicroSeconds aDelay)
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(rescanTicket);
+  rescanTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::initiateRecollect, this, aRescanMode), aDelay);
+}
+
+
+
+void Vdc::schedulePeriodicRecollecting()
 {
   MainLoop::currentMainLoop().cancelExecutionTicket(rescanTicket);
   if (rescanInterval!=Never) {
-    rescanTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::periodicRecollect, this), rescanInterval);
+    rescanTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::initiateRecollect, this, rescanMode), rescanInterval);
   }
 }
 
 
-void Vdc::periodicRecollect()
+void Vdc::initiateRecollect(RescanMode aRescanMode)
 {
-  ALOG(LOG_NOTICE, "starting periodic recollect");
-  collectDevices(boost::bind(&Vdc::periodicRecollectDone, this), rescanMode);
+  ALOG(LOG_NOTICE, "starting in-operation recollect");
+  collectDevices(boost::bind(&Vdc::recollectDone, this), aRescanMode);
 }
 
 
-void Vdc::periodicRecollectDone()
+void Vdc::recollectDone()
 {
-  ALOG(LOG_NOTICE, "periodic recollect done");
+  ALOG(LOG_NOTICE, "in-operation recollect done");
 }
 
 
@@ -344,7 +352,7 @@ void Vdc::setPeriodicRecollection(MLMicroSeconds aRecollectInterval, RescanMode 
   rescanMode = aRescanFlags;
   if (!isCollecting()) {
     // not already collecting, start schedule now (otherwise, end of collecting will schedule next recollect
-    scheduleRecollecting();
+    schedulePeriodicRecollecting();
   }
 }
 

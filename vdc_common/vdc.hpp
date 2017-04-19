@@ -208,6 +208,12 @@ namespace p44 {
     /// @param aRescanFlags rescan mode to use for collecting
     void setPeriodicRecollection(MLMicroSeconds aRecollectInterval, RescanMode aRescanFlags);
 
+    /// schedule recollecting
+    /// @param aRescanMode rescan mode to use
+    /// @param aDelay when to trigger the rescan from now
+    /// @note this will cancel the current periodic recollect, but re-schedule it again after this rescan is done
+    void scheduleRecollect(RescanMode aRescanMode, MLMicroSeconds aDelay);
+
     /// @return true if vdc is currently collecting (scanning for) devices
     bool isCollecting() { return collecting; };
 
@@ -380,9 +386,9 @@ namespace p44 {
   private:
 
     void collectedDevices(StatusCB aCompletedCB, ErrorPtr aError);
-    void scheduleRecollecting();
-    void periodicRecollect();
-    void periodicRecollectDone();
+    void schedulePeriodicRecollecting();
+    void initiateRecollect(RescanMode aRescanMode);
+    void recollectDone();
 
     /// utility method for identifyAndAddDevice(s): identify device with retries
     /// @param aNewDevice the device to be identified
