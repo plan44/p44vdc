@@ -803,6 +803,12 @@ void CustomAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
   ErrorPtr err;
 
+  // custom actions might exist that do not have a valid action (any more)
+  if (!action) {
+    LOG(LOG_ERR, "- custom action %s cannot be invoked because it is not based on a valid standard action", actionId.c_str());
+    aCompletedCB(Error::err<VdcApiError>(500, "custom action has no valid standard action to call"));
+    return;
+  }
   // copy each of the stored params, unless same param is alreday in aParams (which means overridden)
   if (storedParams && storedParams->resetKeyIteration()) {
     string key;
