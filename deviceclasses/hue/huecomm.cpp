@@ -151,7 +151,7 @@ void HueApiOperation::abortOperation(ErrorPtr aError)
     if (!completed) {
       hueComm.bridgeAPIComm.cancelRequest();
     }
-    if (resultHandler) {
+    if (resultHandler && aError) {
       resultHandler(JsonObjectPtr(), aError);
       resultHandler = NULL; // call once only
     }
