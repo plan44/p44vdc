@@ -522,6 +522,7 @@ namespace p44 {
     ErrorPtr byeHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr removeHandler(VdcApiRequestPtr aForRequest, DevicePtr aDevice);
     void removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aForRequest, bool aDisconnected);
+    void duplicateIgnored(DevicePtr aDevice);
     void deviceInitialized(DevicePtr aDevice);
 
     // announcing dSUID addressable entities within the device container (vdc host)

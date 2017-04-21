@@ -464,6 +464,8 @@ bool VdcHost::addDevice(DevicePtr aDevice)
   DsDeviceMap::iterator pos = dSDevices.find(aDevice->getDsUid());
   if (pos!=dSDevices.end()) {
     LOG(LOG_INFO, "- device %s already registered, not added again",aDevice->shortDesc().c_str());
+    // first break call chain that triggered deletion, keep aDevice living until then
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::duplicateIgnored, this, aDevice));
     return false; // duplicate dSUID, not added
   }
   // set for given dSUID in the container-wide map of devices
@@ -478,6 +480,15 @@ bool VdcHost::addDevice(DevicePtr aDevice)
   }
   return true;
 }
+
+
+void VdcHost::duplicateIgnored(DevicePtr aDevice)
+{
+  LOG(LOG_NOTICE, "--- ignored duplicate device: %s",aDevice->shortDesc().c_str());
+  // aDevice will go out of scope here and possibly delete device now
+}
+
+
 
 void VdcHost::deviceInitialized(DevicePtr aDevice)
 {
