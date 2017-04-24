@@ -229,7 +229,9 @@ bool HomeConnectDevice::configureDevice()
   HomeConnectActionPtr a;
   if (hcDevType==homeconnect_coffeemaker) {
     // FIXME: ugly direct model match
-    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
+//    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
+    // FIXME: got even uglier:
+    standalone = (modelGuid.substr(0,10)=="TI909701HC");
     // Create standard actions
     // - enums that can be shared between actions
     EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("temperatureLevel", true));
