@@ -468,6 +468,7 @@ HueComm::HueComm() :
   apiReady(false),
   lastApiAction(Never)
 {
+  bridgeAPIComm.isMemberVariable();
   // do not wait too long for API responses, but long enough to tolerate some lag in slow bridge or wifi network
   bridgeAPIComm.setTimeout(10*Second);
 }
