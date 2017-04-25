@@ -900,7 +900,7 @@ ErrorPtr CustomAction::validateParams(ApiValuePtr aParams, ApiValuePtr aValidate
     }
     else {
       if (aSkipInvalid) continue; // just ignore, but continue checking others
-      return TextError::err("invalid parameter '%s': %s", key.c_str(), err->description().c_str());
+      return TextError::err("invalid parameter '%s' for custom action '%s': %s", key.c_str(), actionId.c_str(), err->description().c_str());
     }
   }
   SALOG(singleDevice, LOG_DEBUG, "validated params: %s", aValidatedParams ? aValidatedParams->description().c_str() : "<none>");
@@ -1049,7 +1049,7 @@ void CustomAction::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, ui
   }
   else {
     // this is an invalid custom action
-    SALOG(singleDevice, LOG_ERR, "invalid custom action - refers to non-existing action '%s'", baseAction.c_str())
+    SALOG(singleDevice, LOG_ERR, "invalid custom action '%s' - refers to non-existing action '%s'", actionId.c_str(), baseAction.c_str())
   }
 }
 
