@@ -60,7 +60,7 @@ string DsAddressable::displayId()
 {
   string schema, id;
   if (!keyAndValue(hardwareGUID(), schema, id, ':')) {
-    id = dSUID.getString();
+    id = hardwareGUID();
   }
   return id;
 }
