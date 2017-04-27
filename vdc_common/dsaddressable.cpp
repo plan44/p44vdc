@@ -56,6 +56,16 @@ string DsAddressable::modelVersion()
 }
 
 
+string DsAddressable::displayId()
+{
+  string schema, id;
+  if (!keyAndValue(hardwareGUID(), schema, id, ':')) {
+    id = dSUID.getString();
+  }
+  return id;
+}
+
+
 void DsAddressable::setName(const string &aName)
 {
   // TODO: for now dsm API truncates names to 20 bytes. Therefore,
@@ -300,6 +310,7 @@ enum {
   type_key,
   dSUID_key,
   model_key,
+  displayId_key,
   modelUID_key,
   modelVersion_key,
   hardwareVersion_key,
@@ -333,6 +344,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     { "type", apivalue_string, type_key, OKEY(dsAddressable_key) },
     { "dSUID", apivalue_binary, dSUID_key, OKEY(dsAddressable_key) },
     { "model", apivalue_string, model_key, OKEY(dsAddressable_key) },
+    { "displayId", apivalue_string, displayId_key, OKEY(dsAddressable_key) },
     { "modelUID", apivalue_string, modelUID_key, OKEY(dsAddressable_key) },
     { "modelVersion", apivalue_string, modelVersion_key, OKEY(dsAddressable_key) },
     { "hardwareVersion", apivalue_string, hardwareVersion_key, OKEY(dsAddressable_key) },
@@ -370,6 +382,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case type_key: aPropValue->setStringValue(entityType()); return true; // the entity type
         case dSUID_key: aPropValue->setStringValue(dSUID.getString()); return true; // always the real dSUID
         case model_key: aPropValue->setStringValue(modelName()); return true; // human readable model identification
+        case displayId_key: aPropValue->setStringValue(displayId()); return true; // human readable device instance identification
         case modelUID_key: aPropValue->setStringValue(modelUID()); return true; // unique model identification, same features = same model
         case modelVersion_key: if (modelVersion().size()>0) { aPropValue->setStringValue(modelVersion()); return true; } else return false;
         case hardwareVersion_key: if (hardwareVersion().size()>0) { aPropValue->setStringValue(hardwareVersion()); return true; } else return false;

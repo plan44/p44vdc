@@ -200,6 +200,13 @@ namespace p44 {
     /// @note base class implementation returns version string of vdc host by default
     virtual string modelVersion();
 
+    /// @return human readable display Id (such as serial number or similar, device instance identifying string)
+    /// @note this is intended as a way to show the user the hardwareGUID in a more readable, possibly beautified manner.
+    ///   Base class implementation returns hardwareGUID with the schema identifier removed. If there
+    ///   is no hardwareGUID, the dSUID is returned.
+    ///   Derived classes might have a more elaborate way to present a user facing device ID
+    virtual string displayId();
+
 
     /// @return unique ID for the functional model of this entity
     /// @note modelUID must be equal between all devices of the same model/class/kind, where "same" means
