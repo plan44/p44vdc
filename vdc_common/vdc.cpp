@@ -580,7 +580,6 @@ enum {
   capabilities_key,
   implementationId_key,
   devices_key,
-  deviceclassidentifier_key,
   instancenumber_key,
   rescanModes_key,
   numClassContainerProperties
@@ -655,7 +654,6 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
       { "capabilities", apivalue_object+propflag_container, capabilities_key, OKEY(capabilities_container_key) },
       { "implementationId", apivalue_string, implementationId_key, OKEY(deviceclass_key) },
       { "x-p44-devices", apivalue_object+propflag_container+propflag_nowildcard, devices_key, OKEY(device_container_key) },
-      { "x-p44-deviceClass", apivalue_string, deviceclassidentifier_key, OKEY(deviceclass_key) },
       { "x-p44-instanceNo", apivalue_uint64, instancenumber_key, OKEY(deviceclass_key) },
       { "x-p44-rescanModes", apivalue_uint64, rescanModes_key, OKEY(deviceclass_key) }
     };
@@ -679,7 +677,6 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
         case defaultzone_key:
           aPropValue->setUint16Value(defaultZoneID);
           return true;
-        case deviceclassidentifier_key:
         case implementationId_key:
           aPropValue->setStringValue(vdcClassIdentifier());
           return true;

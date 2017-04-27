@@ -1492,7 +1492,6 @@ enum {
   zoneID_key,
   progMode_key,
   implementationId_key,
-  deviceType_key,
   softwareRemovable_key,
   teachinSignals_key,
   // output
@@ -1572,7 +1571,6 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     { "zoneID", apivalue_uint64, zoneID_key, OKEY(device_key) },
     { "progMode", apivalue_bool, progMode_key, OKEY(device_key) },
     { "implementationId", apivalue_string, implementationId_key, OKEY(device_key) },
-    { "x-p44-deviceType", apivalue_string, deviceType_key, OKEY(device_key) },
     { "x-p44-softwareRemovable", apivalue_bool, softwareRemovable_key, OKEY(device_key) },
     { "x-p44-teachInSignals", apivalue_int64, teachinSignals_key, OKEY(device_key) },
     // the behaviour arrays
@@ -1746,7 +1744,6 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           if (deviceSettings) { aPropValue->setUint16Value(deviceSettings->zoneID); } return true;
         case progMode_key:
           aPropValue->setBoolValue(progMode); return true;
-        case deviceType_key:
         case implementationId_key:
           aPropValue->setStringValue(deviceTypeIdentifier()); return true;
         case deviceClass_key:
