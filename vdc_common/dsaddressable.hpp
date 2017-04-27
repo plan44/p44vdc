@@ -341,6 +341,8 @@ namespace p44 {
 
   private:
 
+    void propertyAccessed(VdcApiRequestPtr aRequest, ApiValuePtr aResultObject, ErrorPtr aError);
+    void pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultObject, ErrorPtr aError);
     void presenceResultHandler(bool aIsPresent);
 
   };

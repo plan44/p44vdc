@@ -34,10 +34,62 @@
 using namespace p44;
 
 
-// MARK: ===== property access API
+
+void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB)
+{
+  // create a list for possibly needed preparations
+  PropertyPrepListPtr prepList = PropertyPrepListPtr(new PropertyPrepList);
+  // first attempt to access
+  // - create result object of same API type as query
+  ApiValuePtr result;
+  if (aMode==access_read) result = aQueryObject->newObject();
+  ErrorPtr err = accessPropertyInternal(aMode, aQueryObject, result, aDomain, aParentDescriptor, prepList);
+  if (prepList->empty()) {
+    // no need for preparation, immediately call back
+    if (aAccessCompleteCB) aAccessCompleteCB(result, err);
+    // done
+    return;
+  }
+  // need preparation
+  prepareNext(prepList, aMode, aQueryObject, aDomain, aParentDescriptor, aAccessCompleteCB, ErrorPtr());
+}
 
 
-ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+void PropertyContainer::prepareNext(PropertyPrepListPtr aPrepList, PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    LOG(LOG_WARNING, "- prepraration of property failed with error: %s", aError->description().c_str());
+  }
+  if (aPrepList->empty()) {
+    // all prepared, access again
+    // - create result object of same API type as query
+    ApiValuePtr result;
+    if (aMode==access_read) result = aQueryObject->newObject();
+    ErrorPtr err = accessPropertyInternal(aMode, aQueryObject, result, aDomain, aParentDescriptor, PropertyPrepListPtr());
+    // call back
+    if (aAccessCompleteCB) aAccessCompleteCB(result, err);
+    // done
+    return;
+  }
+  // prepare next item on the list
+  PropertyPrep prep = aPrepList->front();
+  aPrepList->pop_front();
+  prep.target->prepareAccess(aMode, prep.propertyDescriptor,
+    boost::bind(&PropertyContainer::prepareNext, this, aPrepList, aMode, aQueryObject, aDomain, aParentDescriptor, aAccessCompleteCB, _1)
+  );
+}
+
+
+
+void PropertyContainer::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+{
+  // nothing to prepare in base class
+  if (aPreparedCB) aPreparedCB(ErrorPtr());
+}
+
+
+
+ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList)
 {
   ErrorPtr err;
   FOCUSLOG("\naccessProperty: entered with query = %s", aQueryObject->description().c_str());
@@ -90,86 +142,98 @@ ErrorPtr PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr
         if (propDesc) {
           foundone = true; // found at least one descriptor for this query element
           FOCUSLOG("  - processing descriptor '%s' (%s), fieldKey=%zu, objectKey=%lu", propDesc->name(), propDesc->isStructured() ? "structured" : "scalar", propDesc->fieldKey(), propDesc->objectKey());
-          // actually access by descriptor
-          if (aMode==access_write && propDesc->isDeletable() && queryValue->isNull()) {
-            // assigning NULL means deleting (possibly entire substructure)
-            if (!accessField(access_delete, queryValue, propDesc)) { // delete
-              err = Error::err<VdcApiError>(403, "Cannot delete '%s'", propDesc->name());
-            }
-          }
-          else if (propDesc->isStructured()) {
-            ApiValuePtr subQuery;
-            // property is a container. Now check the value
-            if (queryValue->isType(apivalue_object)) {
-              subQuery = queryValue; // query specifies next level, just use it
-            }
-            else if (queryName!="*" && (!wildcard || propDesc->isWildcardAddressable())) {
-              // don't recurse deeper when query name is "*" or property is not wildcard-adressable
-              // special case is "*" as leaf in query - only recurse if it is not present
-              // - autocreate subquery
-              subQuery = queryValue->newValue(apivalue_object);
-              subQuery->add("", queryValue->newValue(apivalue_null));
-            }
-            if (subQuery) {
-              // addressed property is a container by itself -> recurse
-              // - get the PropertyContainer
-              int containerDomain = aDomain; // default to same, but getContainer may modify it
-              PropertyDescriptorPtr containerPropDesc = propDesc;
-              PropertyContainerPtr container = getContainer(containerPropDesc, containerDomain);
-              if (container) {
-                FOCUSLOG("  - container for '%s' is 0x%p", propDesc->name(), container.get());
-                FOCUSLOG("    >>>> RECURSING into accessProperty()");
-                if (container!=this) {
-                  // switching to another C++ object -> starting at root level in that object
-                  containerPropDesc->rootOfObject = true;
-                }
-                if (aMode==access_read) {
-                  // read needs a result object
-                  ApiValuePtr resultValue = queryValue->newValue(apivalue_object);
-                  err = container->accessProperty(aMode, subQuery, resultValue, containerDomain, containerPropDesc);
-                  if (Error::isOK(err)) {
-                    // add to result with actual name (from descriptor)
-                    FOCUSLOG("\n  <<<< RETURNED from accessProperty() recursion");
-                    FOCUSLOG("  - accessProperty of container for '%s' returns %s", propDesc->name(), resultValue->description().c_str());
-                    aResultObject->add(propDesc->name(), resultValue);
-                  }
-                }
-                else {
-                  // for write, just pass the query value
-                  err = container->accessProperty(aMode, subQuery, ApiValuePtr(), containerDomain, containerPropDesc);
-                  FOCUSLOG("    <<<< RETURNED from accessProperty() recursion", propDesc->name(), container.get());
-                }
-                if ((aMode!=access_read) && Error::isOK(err)) {
-                  // give this container a chance to post-process write access
-                  err = writtenProperty(aMode, propDesc, aDomain, container);
-                }
-                // 404 errors are collected, but dont abort the query
-                if (Error::isError(err, VdcApiError::domain(), 404)) {
-                  if (!errorMsg.empty()) errorMsg += "; ";
-                  errorMsg += string_format("Error(s) accessing subproperties of '%s' : { %s }", queryName.c_str(), err->description().c_str());
-                  err.reset(); // forget the error on this level
-                }
-              }
+          // check if property needs preparation before being accessed
+          if (aPreparationList && propDesc->needsPreparation(aMode)) {
+            // collecting list of to-be-prepared properties, and this one needs prep -> add it
+            aPreparationList->push_back(PropertyPrep(this, propDesc));
+            FOCUSLOG("- property '%s' needs preparation -> added to preparation list (%d items now)", propDesc->name(), aPreparationList->size());
+            if (aMode==access_read) {
+              // read access: return NULL for to-be-prepared properties
+              aResultObject->add(propDesc->name(), queryValue->newNull());
             }
           }
           else {
-            // addressed (and known by descriptor!) property is a simple value field -> access it
-            if (aMode==access_read) {
-              // read access: create a new apiValue and have it filled
-              ApiValuePtr fieldValue = queryValue->newValue(propDesc->type()); // create a value of correct type to get filled
-              bool accessOk = accessField(aMode, fieldValue, propDesc); // read
-              // for read, not getting an OK from accessField means: property does not exist (even if known per descriptor),
-              // so it will not be added to the result
-              if (accessOk) {
-                // add to result with actual name (from descriptor)
-                aResultObject->add(propDesc->name(), fieldValue);
+            // actually access by descriptor
+            if (aMode==access_write && propDesc->isDeletable() && queryValue->isNull()) {
+              // assigning NULL means deleting (possibly entire substructure)
+              if (!accessField(access_delete, queryValue, propDesc)) { // delete
+                err = Error::err<VdcApiError>(403, "Cannot delete '%s'", propDesc->name());
               }
-              FOCUSLOG("    - accessField for '%s' returns %s", propDesc->name(), fieldValue->description().c_str());
+            }
+            else if (propDesc->isStructured()) {
+              ApiValuePtr subQuery;
+              // property is a container. Now check the value
+              if (queryValue->isType(apivalue_object)) {
+                subQuery = queryValue; // query specifies next level, just use it
+              }
+              else if (queryName!="*" && (!wildcard || propDesc->isWildcardAddressable())) {
+                // don't recurse deeper when query name is "*" or property is not wildcard-addressable
+                // special case is "*" as leaf in query - only recurse if it is not present
+                // - autocreate subquery
+                subQuery = queryValue->newValue(apivalue_object);
+                subQuery->add("", queryValue->newValue(apivalue_null));
+              }
+              if (subQuery) {
+                // addressed property is a container by itself -> recurse
+                // - get the PropertyContainer
+                int containerDomain = aDomain; // default to same, but getContainer may modify it
+                PropertyDescriptorPtr containerPropDesc = propDesc;
+                PropertyContainerPtr container = getContainer(containerPropDesc, containerDomain);
+                if (container) {
+                  FOCUSLOG("  - container for '%s' is 0x%p", propDesc->name(), container.get());
+                  FOCUSLOG("    >>>> RECURSING into accessProperty()");
+                  if (container!=this) {
+                    // switching to another C++ object -> starting at root level in that object
+                    containerPropDesc->rootOfObject = true;
+                  }
+                  if (aMode==access_read) {
+                    // read needs a result object
+                    ApiValuePtr resultValue = queryValue->newValue(apivalue_object);
+                    err = container->accessPropertyInternal(aMode, subQuery, resultValue, containerDomain, containerPropDesc, aPreparationList);
+                    if (Error::isOK(err)) {
+                      // add to result with actual name (from descriptor)
+                      FOCUSLOG("\n  <<<< RETURNED from accessProperty() recursion");
+                      FOCUSLOG("  - accessProperty of container for '%s' returns %s", propDesc->name(), resultValue->description().c_str());
+                      aResultObject->add(propDesc->name(), resultValue);
+                    }
+                  }
+                  else {
+                    // for write, just pass the query value
+                    err = container->accessPropertyInternal(aMode, subQuery, ApiValuePtr(), containerDomain, containerPropDesc, aPreparationList);
+                    FOCUSLOG("    <<<< RETURNED from accessProperty() recursion", propDesc->name(), container.get());
+                  }
+                  if ((aMode!=access_read) && Error::isOK(err)) {
+                    // give this container a chance to post-process write access
+                    err = writtenProperty(aMode, propDesc, aDomain, container);
+                  }
+                  // 404 errors are collected, but dont abort the query
+                  if (Error::isError(err, VdcApiError::domain(), 404)) {
+                    if (!errorMsg.empty()) errorMsg += "; ";
+                    errorMsg += string_format("Error(s) accessing subproperties of '%s' : { %s }", queryName.c_str(), err->description().c_str());
+                    err.reset(); // forget the error on this level
+                  }
+                }
+              }
             }
             else {
-              // write access: just pass the value
-              if (!accessField(aMode, queryValue, propDesc)) { // write
-                err = Error::err<VdcApiError>(403, "Write access to '%s' denied", propDesc->name());
+              // addressed (and known by descriptor!) property is a simple value field -> access it
+              if (aMode==access_read) {
+                // read access: create a new apiValue and have it filled
+                ApiValuePtr fieldValue = queryValue->newValue(propDesc->type()); // create a value of correct type to get filled
+                bool accessOk = accessField(aMode, fieldValue, propDesc); // read
+                // for read, not getting an OK from accessField means: property does not exist (even if known per descriptor),
+                // so it will not be added to the result
+                if (accessOk) {
+                  // add to result with actual name (from descriptor)
+                  aResultObject->add(propDesc->name(), fieldValue);
+                }
+                FOCUSLOG("    - accessField for '%s' returns %s", propDesc->name(), fieldValue->description().c_str());
+              }
+              else {
+                // write access: just pass the value
+                if (!accessField(aMode, queryValue, propDesc)) { // write
+                  err = Error::err<VdcApiError>(403, "Write access to '%s' denied", propDesc->name());
+                }
               }
             }
           }
@@ -415,8 +479,8 @@ bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverri
         break;
       }
     }
-    // now access that property
-    ErrorPtr err = accessProperty(access_write, property, ApiValuePtr(), aDomain, PropertyDescriptorPtr());
+    // now access that property (note: preparation is not checked so properties must be writable without preparation)
+    ErrorPtr err = accessPropertyInternal(access_write, property, ApiValuePtr(), aDomain, PropertyDescriptorPtr(), PropertyPrepListPtr());
     if (!Error::isOK(err)) {
       LOG(LOG_ERR, "%s:%d - error writing property '%s': %s", aTextSourceName, aLineNo, f.c_str(), err->description().c_str());
     }

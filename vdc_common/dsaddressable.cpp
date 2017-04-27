@@ -156,13 +156,10 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
     ApiValuePtr query;
     if (Error::isOK(respErr = checkParam(aParams, "query", query))) {
       // now read
-      ApiValuePtr result = aRequest->newApiValue();
-      respErr = accessProperty(access_read, query, result, VDC_API_DOMAIN, PropertyDescriptorPtr());
-      if (Error::isOK(respErr)) {
-        // send back property result
-        aRequest->sendResult(result);
-        respErr.reset(); // make sure we don't send an extra ErrorOK
-      }
+      accessProperty(
+        access_read, query, VDC_API_DOMAIN, PropertyDescriptorPtr(),
+        boost::bind(&DsAddressable::propertyAccessed, this, aRequest, _1, _2)
+      );
     }
   }
   else if (aMethod=="setProperty") {
@@ -175,11 +172,10 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       if (o) {
         preload = o->boolValue();
       }
-      respErr = accessProperty(preload ? access_write_preload : access_write, value, ApiValuePtr(), VDC_API_DOMAIN, PropertyDescriptorPtr());
-      if (Error::isOK(respErr)) {
-        // send back OK if write was successful
-        respErr = Error::ok();
-      }
+      accessProperty(
+        preload ? access_write_preload : access_write, value, VDC_API_DOMAIN, PropertyDescriptorPtr(),
+        boost::bind(&DsAddressable::propertyAccessed, this, aRequest, _1, _2)
+      );
     }
   }
   else if (aMethod=="genericRequest") {
@@ -204,9 +200,24 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
 }
 
 
+void DsAddressable::propertyAccessed(VdcApiRequestPtr aRequest, ApiValuePtr aResultObject, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    // read - send back property result
+    aRequest->sendResult(aResultObject);
+  }
+  else {
+    // just return status or error
+    aRequest->sendStatus(aError);
+  }
+}
+
+
+
+
 void DsAddressable::methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError)
 {
-  // devices re-collected, return status
+  // method completed, return status
   aRequest->sendStatus(aError);
 }
 
@@ -220,23 +231,12 @@ bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEv
     ApiValuePtr value;
     if (aPropertyQuery) {
       // a property change is to be notified
-      // - get the value by issuing the query
-      value = aPropertyQuery->newValue(apivalue_object);
-      err = accessProperty(access_read, aPropertyQuery, value, aDomain, PropertyDescriptorPtr());
+      accessProperty(
+        access_read, aPropertyQuery, aDomain, PropertyDescriptorPtr(),
+        boost::bind(&DsAddressable::pushPropertyReady, this, aEvents, _1, _2)
+      );
     }
-    if (Error::isOK(err)) {
-      // - send pushNotification
-      ApiValuePtr pushParams;
-      if (value) {
-        pushParams = value->newValue(apivalue_object);
-        pushParams->add("changedproperties", value);
-      }
-      if (aEvents) {
-        if (!pushParams) pushParams = aEvents->newValue(apivalue_object);
-        pushParams->add("deviceevents", aEvents);
-      }
-      return sendRequest("pushNotification", pushParams);
-    }
+    return true; // although not yet sent, assume push will be ok
   }
   else {
     if (isPublicDS()) {
@@ -244,8 +244,30 @@ bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEv
       ALOG(LOG_WARNING, "pushNotification suppressed - is not yet announced");
     }
   }
-  return false;
+  return false; // push not possible now
 }
+
+
+void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultObject, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    // - send pushNotification
+    ApiValuePtr pushParams;
+    if (aResultObject) {
+      pushParams = aResultObject->newValue(apivalue_object);
+      pushParams->add("changedproperties", aResultObject);
+    }
+    if (aEvents) {
+      if (!pushParams) pushParams = aEvents->newValue(apivalue_object);
+      pushParams->add("deviceevents", aEvents);
+    }
+    sendRequest("pushNotification", pushParams);
+  }
+  else {
+    ALOG(LOG_WARNING, "push failed because to-be-pushed property could not be accessed: %s", aError->description().c_str());
+  }
+}
+
 
 
 

@@ -46,6 +46,7 @@ ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, Va
   valueUnit(aValueUnit),
   hasValue(aHasDefault),
   readOnly(false),
+  needsFetch(false),
   isDefaultValue(aHasDefault), // note that this is only most common case, but setIsDefault can be used to make even a null value default
   lastUpdate(Never),
   lastChange(Never)
@@ -1782,9 +1783,10 @@ bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
 // MARK: ===== DeviceProperties container
 
 
-void DeviceProperties::addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly)
+void DeviceProperties::addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly, bool aNeedsFetch)
 {
   aPropertyDesc->setReadOnly(aReadOnly);
+  aPropertyDesc->setNeedsFetch(aNeedsFetch);
   values.push_back(aPropertyDesc);
 }
 
@@ -1833,10 +1835,26 @@ PropertyDescriptorPtr DeviceProperties::getDescriptorByIndex(int aPropIndex, int
 {
   PropertyDescriptorPtr p = inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor);
   if (aParentDescriptor->hasObjectKey(deviceproperty_key)) {
+    DynamicPropertyDescriptor *dp = static_cast<DynamicPropertyDescriptor *>(p.get());
     // access via deviceProperties, we directly want to see the values
-    static_cast<DynamicPropertyDescriptor *>(p.get())->propertyType = apivalue_null; // switch to leaf (of variable type)
+    dp->propertyType = apivalue_null; // switch to leaf (of variable type)
+    dp->needsReadPrep = values[aPropIndex]->doesNeedFetch(); // for values, we might need a fetch
   }
   return p;
+}
+
+
+void DeviceProperties::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+{
+  if (aMode==access_read) {
+    ValueDescriptorPtr val = values[aPropertyDescriptor->fieldKey()];
+    if (propertyFetchHandler) {
+      propertyFetchHandler(val, aPreparedCB);
+      return;
+    }
+  }
+  // nothing to do here, let inherited handle it
+  inherited::prepareAccess(aMode, aPropertyDescriptor, aPreparedCB);
 }
 
 

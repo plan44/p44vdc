@@ -56,7 +56,9 @@ namespace p44 {
     proptype_mask = 0x3F,
     propflag_container = 0x80, ///< is a container
     propflag_nowildcard = 0x40, ///< don't recurse into this container when addressed via wildcard
-    propflag_deletable = 0x100 ///< can be deleted by writing NULL to it
+    propflag_deletable = 0x100, ///< can be deleted by writing NULL to it
+    propflag_needsreadprep = 0x200, ///< needs to be prepared before reading
+    propflag_needswriteprep = 0x400, ///< needs to be prepared before writing
   } PropertyFlags;
 
 
@@ -88,6 +90,8 @@ namespace p44 {
     virtual bool isArrayContainer() const = 0;
     /// is deletable
     virtual bool isDeletable() const { return false; /* usually not */ };
+    /// needs preparation before accessing
+    virtual bool needsPreparation(PropertyAccessMode aMode) const { return false; /* usually not */ };
     /// will be shown in wildcard queries
     virtual bool isWildcardAddressable() const { return true; };
     /// acts as root of a C++ class hierarchy
@@ -133,6 +137,7 @@ namespace p44 {
     virtual intptr_t objectKey() const P44_OVERRIDE { return descP->objectKey; }
     virtual bool isArrayContainer() const P44_OVERRIDE { return descP->propertyType & propflag_container; };
     virtual bool isWildcardAddressable() const P44_OVERRIDE { return (descP->propertyType & propflag_nowildcard)==0; };
+    virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return (descP->propertyType & (aMode==access_read ? propflag_needsreadprep : propflag_needswriteprep))!=0; };
   };
 
 
@@ -144,7 +149,10 @@ namespace p44 {
   public:
     DynamicPropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) :
       inherited(aParentDescriptor),
-      arrayContainer(false)
+      arrayContainer(false),
+      deletable(false),
+      needsReadPrep(false),
+      needsWritePrep(false)
     {};
     string propertyName; ///< name of the property
     ApiValueType propertyType; ///< type of the property value
@@ -152,6 +160,8 @@ namespace p44 {
     intptr_t propertyObjectKey; ///< identifier for container
     bool arrayContainer;
     bool deletable;
+    bool needsReadPrep;
+    bool needsWritePrep;
 
     virtual const char *name() const P44_OVERRIDE { return propertyName.c_str(); }
     virtual ApiValueType type() const P44_OVERRIDE { return propertyType; }
@@ -159,12 +169,30 @@ namespace p44 {
     virtual intptr_t objectKey() const P44_OVERRIDE { return propertyObjectKey; }
     virtual bool isArrayContainer() const P44_OVERRIDE { return arrayContainer; };
     virtual bool isDeletable() const P44_OVERRIDE { return deletable; };
+    virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return aMode==access_read ? needsReadPrep : needsWritePrep; };
   };
 
 
 
 
   typedef boost::intrusive_ptr<PropertyContainer> PropertyContainerPtr;
+
+  typedef boost::function<void (ApiValuePtr aResultObject, ErrorPtr aError)> PropertyAccessCB;
+
+  class PropertyPrep
+  {
+    friend class PropertyContainer;
+
+    PropertyContainerPtr target;
+    PropertyDescriptorPtr propertyDescriptor;
+
+    PropertyPrep(PropertyContainerPtr aTarget, PropertyDescriptorPtr aDescriptor) : target(aTarget), propertyDescriptor(aDescriptor) {};
+  };
+
+  typedef list<PropertyPrep> PropertyPrepList;
+  typedef boost::shared_ptr<PropertyPrepList> PropertyPrepListPtr;
+
+
 
   /// Base class for objects providing API properties
   /// Implements generic mechanisms to handle accessing elements and subtrees of named propeties.
@@ -183,11 +211,11 @@ namespace p44 {
     /// read or write property
     /// @param aMode access mode (see PropertyAccessMode: read, write or write preload)
     /// @param aQueryObject the object defining the read or write query
-    /// @param aResultObject for read, must be an object
     /// @param aParentDescriptor the descriptor of the parent property, can be passed NULL at root level
     ///   (but will internally be repaced by a RootPropertyDescriptor)
-    /// @return Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
-    ErrorPtr accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor);
+    /// @param aAccessCompleteCB will be called when property access is complete. Callback's aError
+    ///   returns Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
+    void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB);
 
     /// @}
 
@@ -244,6 +272,12 @@ namespace p44 {
     /// @note base class always returns NULL, which means no structured or proxy properties
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) { return NULL; };
 
+    /// prepare access to a property (for example if the property needs I/O to update its value before being read).
+    /// @param aMode access mode (see PropertyAccessMode: read, write, write preload or delete)
+    /// @param aPropertyDescriptor decriptor that signalled a need for preparation
+    /// @note this base class just calls aPreparedCB with success status.
+    virtual void prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB);
+
     /// access single field in this container
     /// @param aMode access mode (see PropertyAccessMode: read, write, write preload or delete)
     /// @param aPropValue JsonObject with a single value
@@ -251,6 +285,7 @@ namespace p44 {
     /// @return false if value could not be accessed
     /// @note this base class always returns false, as it does not have any properties implemented
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) { return false; };
+
 
     /// post-process written properties in subcontainers. This is called after a property write access has
     /// compleded successfully in a subcontainer (as returned by this object's getContainer()), and can be used to commit container
@@ -265,6 +300,18 @@ namespace p44 {
 
     /// @name utility methods
     /// @{
+
+    /// internally read or write property
+    /// @param aMode access mode (see PropertyAccessMode: read, write or write preload)
+    /// @param aQueryObject the object defining the read or write query
+    /// @param aResultObject for read, must be an object
+    /// @param aParentDescriptor the descriptor of the parent property, can be passed NULL at root level
+    ///   (but will internally be repaced by a RootPropertyDescriptor)
+    /// @param aPreparationList if not NULL, this list will be filled with property descriptors that need preparation before accessing.
+    ///   Otherwise, properties are assumed to be prepared already and will be accessed directly
+    /// @return Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
+    ErrorPtr accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList);
+
 
     /// parse aPropmatch for numeric index (both plain number and #n are allowed, plus empty and "*" wildcards)
     /// @param aPropMatch property name to match
@@ -298,6 +345,12 @@ namespace p44 {
     );
 
     /// @}
+
+  private:
+
+    void prepareNext(PropertyPrepListPtr aPrepList, PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB, ErrorPtr aError);
+
+
 
   };
   

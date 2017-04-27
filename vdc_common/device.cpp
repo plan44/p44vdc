@@ -592,8 +592,8 @@ void Device::handleNotification(const string &aMethod, ApiValuePtr aParams)
         // - channelStates
         ApiValuePtr propValue = ch->newObject();
         propValue->add("channelStates", ch);
-        // now access the property
-        err = accessProperty(apply_now ? access_write : access_write_preload, propValue, ApiValuePtr(), VDC_API_DOMAIN, PropertyDescriptorPtr());
+        // now access the property for write
+        accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, PropertyDescriptorPtr(), NULL); // no callback
       }
     }
     if (!Error::isOK(err)) {

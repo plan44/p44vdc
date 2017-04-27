@@ -153,11 +153,17 @@ namespace p44 {
     /// set "readonly" flag
     void setReadOnly(bool aReadOnly) { readOnly = aReadOnly; };
 
+    /// set "needsFetch" flag
+    void setNeedsFetch(bool aNeedsFetch) { needsFetch = aNeedsFetch; };
+
     /// check readonly flag
     bool isReadOnly() { return readOnly; }
 
     /// check default value flag (value itself can still be NULL)
     bool isDefault() { return isDefaultValue; }
+
+    /// check readonly flag
+    bool doesNeedFetch() { return needsFetch; }
 
 
     /// @}
@@ -177,12 +183,13 @@ namespace p44 {
 
     /// @}
 
-protected:
+  protected:
 
     string valueName; ///< the name of the value
     bool hasValue; ///< set if there is a stored value. For action params, this is the default value. For state/states params this is the actual value
     bool isDefaultValue; ///< set if the value stored is the default value
     bool readOnly; ///< set if the value cannot be written
+    bool needsFetch; ///< set if property needs a fetch callback before it can be read
     VdcValueType valueType; ///< the technical type of the value
     ValueUnit valueUnit; ///< the unit+scaling of the value
     MLMicroSeconds lastUpdate; ///< when the value was last updated
@@ -767,12 +774,19 @@ protected:
   /// @param aChangedProperty the ValueDescriptor which has changed.
   typedef boost::function<void (ValueDescriptorPtr aChangedProperty)> PropertyChangedCB;
 
+
+  /// handler that will be called when writing a property values via the API causes its value to change
+  /// @param aChangedProperty the ValueDescriptor which has changed.
+  typedef boost::function<void (ValueDescriptorPtr aChangedProperty, StatusCB aFetchDoneCB)> PropertyFetchedCB;
+
+
   /// class representing the device-specific properties
   class DeviceProperties P44_FINAL : public ValueList
   {
     typedef ValueList inherited;
 
     PropertyChangedCB propertyChangeHandler; ///< called when property has been changed via the API
+    PropertyFetchedCB propertyFetchHandler; ///< called when property is requested via API that has the needsFetch flag set
 
   protected:
 
@@ -785,10 +799,14 @@ protected:
     /// set a property change handler
     void setPropertyChangedHandler(PropertyChangedCB aPropertyChangedHandler) { propertyChangeHandler = aPropertyChangedHandler; };
 
+    /// set a property prepare handler
+    void setPropertyFetchHandler(PropertyFetchedCB aPropertyFetchHandler) { propertyFetchHandler = aPropertyFetchHandler; };
+
     /// add a property (at device setup time only)
     /// @param aPropertyDesc value descriptor describing the property
     /// @param aReadOnly if set, the property cannot be written from the API and will report a "readonly:true" field in the description
-    void addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly = false);
+    /// @param aNeedsFetch if set, a fetch operation must occor before the property can be read
+    void addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly = false, bool aNeedsFetch = false);
 
     /// get property (for internally accessing/changing it)
     /// @param aPropertyId name of the property to get
@@ -806,6 +824,7 @@ protected:
 
     // overrides to present property values directly instead of delegating to ValueDescriptor
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual void prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   };
