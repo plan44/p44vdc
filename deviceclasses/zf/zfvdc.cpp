@@ -31,6 +31,7 @@ ZfVdc::ZfVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 	zfComm(MainLoop::currentMainLoop()),
   learningMode(false)
 {
+  zfComm.isMemberVariable();
 }
 
 

@@ -33,6 +33,7 @@ EnoceanVdc::EnoceanVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   disableProximityCheck(false),
 	enoceanComm(MainLoop::currentMainLoop())
 {
+  enoceanComm.isMemberVariable();
 }
 
 

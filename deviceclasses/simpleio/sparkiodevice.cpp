@@ -198,6 +198,7 @@ SparkIoDevice::SparkIoDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   sparkCloudComm(MainLoop::currentMainLoop()),
   apiVersion(0)
 {
+  sparkCloudComm.isMemberVariable();
   // config must be: sparkCoreId:accessToken
   size_t i = aDeviceConfig.find(":");
   if (i!=string::npos) {

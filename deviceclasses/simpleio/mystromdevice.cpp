@@ -42,6 +42,7 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   myStromComm(MainLoop::currentMainLoop()),
   powerPollTicket(0)
 {
+  myStromComm.isMemberVariable();
   // config must be: mystromdevicehost[:token]:(light|relay)
   size_t i = aDeviceConfig.rfind(":");
   bool isLight = false;

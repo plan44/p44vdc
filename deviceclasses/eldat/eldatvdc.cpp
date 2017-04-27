@@ -32,6 +32,7 @@ EldatVdc::EldatVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   learningMode(false),
   disableProximityCheck(false)
 {
+  eldatComm.isMemberVariable();
 }
 
 

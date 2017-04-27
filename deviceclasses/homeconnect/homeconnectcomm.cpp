@@ -326,6 +326,7 @@ HomeConnectComm::HomeConnectComm() :
   httpAPIComm(MainLoop::currentMainLoop()),
   developerApi(false)
 {
+  httpAPIComm.isMemberVariable();
 }
 
 

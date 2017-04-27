@@ -41,6 +41,7 @@ HomeConnectVdc::HomeConnectVdc(int aInstanceNumber, bool aDeveloperApi, VdcHost 
   inherited(aInstanceNumber, aVdcHostP, aTag),
   homeConnectComm()
 {
+  homeConnectComm.isMemberVariable();
   homeConnectComm.setDeveloperApi(aDeveloperApi);
 }
 

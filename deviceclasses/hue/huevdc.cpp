@@ -34,6 +34,7 @@ HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   hueComm(),
   bridgeMacAddress(0)
 {
+  hueComm.isMemberVariable();
 }
 
 
