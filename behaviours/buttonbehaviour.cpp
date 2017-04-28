@@ -843,6 +843,17 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         }
         case function_key+settings_key_offset:
           setFunction((DsButtonFunc)aPropValue->int32Value());
+          // for unchangeably paired (rocker) buttons, automatically change function on counterpart
+          if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
+            // also change function in button1
+            BLOG(LOG_NOTICE,"paired button function changed in button0 -> also changed in button1");
+            if (device.buttons.size()>1) boost::static_pointer_cast<ButtonBehaviour>(device.buttons[1])->setFunction((DsButtonFunc)aPropValue->int32Value());
+          }
+          else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
+            // also change function in button0
+            BLOG(LOG_NOTICE,"paired button function changed in button1 -> also changed in button0");
+            if (device.buttons.size()>0) boost::static_pointer_cast<ButtonBehaviour>(device.buttons[0])->setFunction((DsButtonFunc)aPropValue->int32Value());
+          }
           return true;
         case channel_key+settings_key_offset:
           setPVar(buttonChannel, (DsChannelType)aPropValue->int32Value());
