@@ -180,7 +180,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_windowHandle, usage_undefined, true, Never);
       bb->setGroup(group_black_variable); // joker by default
-      bb->setHardwareName("window open");
+      bb->setHardwareName("Window open/tilted");
       newHandler->isERP2 = EEP_TYPE(functionProfile)==0x01;
       newHandler->behaviour = bb;
       newDev->addChannelHandler(newHandler);
@@ -200,7 +200,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
       // assign EPP information
       newDev->setEEPInfo(aEEProfile, aEEManufacturer);
-      newDev->setFunctionDesc("key card switch");
+      newDev->setFunctionDesc("Key card switch");
       // key card switches can be used for anything
       newDev->setColorClass(class_black_joker);
       // Current simple dS mapping: one binary input
@@ -209,7 +209,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
       bb->setGroup(group_black_variable); // joker by default
-      bb->setHardwareName("card inserted");
+      bb->setHardwareName("Card inserted");
       newHandler->isServiceCardDetector = false;
       newHandler->behaviour = bb;
       newDev->addChannelHandler(newHandler);
@@ -220,7 +220,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
         bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
         bb->setGroup(group_black_variable); // joker by default
-        bb->setHardwareName("service card");
+        bb->setHardwareName("Service card");
         newHandler->isServiceCardDetector = true;
         newHandler->behaviour = bb;
         newDev->addChannelHandler(newHandler);
@@ -240,7 +240,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
       // assign EPP information
       newDev->setEEPInfo(aEEProfile, aEEManufacturer);
-      newDev->setFunctionDesc("leakage detector");
+      newDev->setFunctionDesc("Leakage detector");
       // leakage detectors can be used for anything
       newDev->setColorClass(class_black_joker);
       // Current simple dS mapping: one binary input for leakage status
@@ -251,7 +251,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never); // generic because dS does not have a binary sensor function for leakage yet
       bb->setGroup(group_black_variable); // joker by default
-      bb->setHardwareName("leakage detector");
+      bb->setHardwareName("Leakage detector");
       newHandler->behaviour = bb;
       newDev->addChannelHandler(newHandler);
       // count it
@@ -270,7 +270,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
       // assign EPP information
       newDev->setEEPInfo(aEEProfile, aEEManufacturer);
-      newDev->setFunctionDesc("smoke detector");
+      newDev->setFunctionDesc("Smoke detector");
       // smoke detectors can be used for anything
       newDev->setColorClass(class_black_joker);
       // Current simple dS mapping: one binary input for smoke alarm status, one for low bat status
@@ -281,7 +281,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_smoke, usage_room, true, Never);
       bb->setGroup(group_black_variable); // joker by default
-      bb->setHardwareName("smoke alarm");
+      bb->setHardwareName("Smoke alarm");
       newHandler->behaviour = bb;
       newHandler->isBatteryStatus = false;
       newDev->addChannelHandler(newHandler);
@@ -290,7 +290,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
       bb->setHardwareInputConfig(binInpType_lowBattery, usage_room, true, Never);
       bb->setGroup(group_black_variable); // joker by default
-      bb->setHardwareName("low battery");
+      bb->setHardwareName("Low battery");
       newHandler->behaviour = bb;
       newHandler->isBatteryStatus = true;
       newDev->addChannelHandler(newHandler);

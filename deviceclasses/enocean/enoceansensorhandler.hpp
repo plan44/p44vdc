@@ -83,7 +83,6 @@ namespace p44 {
 
     // texts
     extern const char *tempText;
-    extern const char *tempSetPt;
     extern const char *humText;
     extern const char *coText;
     extern const char *co2Text;
@@ -94,6 +93,7 @@ namespace p44 {
     extern const char *fanSpeedText;
     extern const char *dayNightText;
     extern const char *contactText;
+    extern const char *supplyText;
 
   }
 

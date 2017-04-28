@@ -116,7 +116,6 @@ void p44::EnoceanSensors::handleBitField(const EnoceanSensorDescriptor &aSensorD
 namespace p44 { namespace EnoceanSensors {
 
   const char *tempText = "Temperature";
-  const char *tempSetPt = "Temperature Set Point";
 
   const char *humText = "Humidity";
 
@@ -132,7 +131,10 @@ namespace p44 { namespace EnoceanSensors {
   const char *setPointText = "Set Point";
   const char *fanSpeedText = "Fan Speed";
   const char *dayNightText = "Day/Night";
+
   const char *contactText = "Contact";
+
+  const char *supplyText = "Power supply";
 
 } }
 
