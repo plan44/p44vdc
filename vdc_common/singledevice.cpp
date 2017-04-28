@@ -1365,6 +1365,7 @@ DeviceState::DeviceState(SingleDevice &aSingleDevice, const string aStateId, con
   stateDescriptor(aStateDescriptor),
   stateDescription(aDescription),
   willPushHandler(aWillPushHandler),
+  updateInterval(0),
   lastPush(Never)
 {
 }
@@ -1433,6 +1434,7 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
 
 enum {
   statedescription_key,
+  updateInterval_key,
   statetype_key,
   numStatesDescProperties
 };
@@ -1460,6 +1462,7 @@ PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDom
 {
   static const PropertyDescription descproperties[numStatesDescProperties] = {
     { "description", apivalue_string, statedescription_key, OKEY(devicestatedesc_key) },
+    { "updateInterval", apivalue_double, updateInterval_key, OKEY(devicestatedesc_key) },
     { "value", apivalue_object, statetype_key, OKEY(devicestatedesc_key) },
   };
   static const PropertyDescription properties[numStatesProperties] = {
@@ -1494,7 +1497,12 @@ bool DeviceState::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
   if (aMode==access_read) {
     if (aPropertyDescriptor->hasObjectKey(devicestatedesc_key)) {
       switch (aPropertyDescriptor->fieldKey()) {
-        case statedescription_key: aPropValue->setStringValue(stateDescription); return true;
+        case statedescription_key:
+          aPropValue->setStringValue(stateDescription);
+          return true;
+        case updateInterval_key:
+          aPropValue->setDoubleValue((double)updateInterval/Second);
+          return true;
       }
     }
     else if (aPropertyDescriptor->hasObjectKey(devicestate_key)) {

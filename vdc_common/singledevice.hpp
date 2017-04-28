@@ -592,6 +592,7 @@ namespace p44 {
     ValueDescriptorPtr stateDescriptor; ///< the value (descriptor) for the state itself
     DeviceStateWillPushCB willPushHandler; ///< called when state is about to get pushed to get associated events
     string stateDescription; ///< a text description for the state, for logs and simple UI purposes
+    MLMicroSeconds updateInterval; ///< approximate time interval for state updates
     MLMicroSeconds lastPush; ///< when the state was last pushed
 
   protected:
@@ -630,6 +631,10 @@ namespace p44 {
     /// @return true if push could actually be delivered (i.e. a vDC API client is connected and receiving pushes)
     /// @note will also call the willPushHandler to collect possibly more associated events
     bool pushWithEvents(DeviceEventsList aEventList);
+
+    /// set update interval (descriptive, no functionality at the DeviceState level)
+    /// @aUpdateInterval how often the state is updated (approximately)
+    void setUpdateInterval(MLMicroSeconds aUpdateInterval) { updateInterval = aUpdateInterval; };
 
   protected:
 
