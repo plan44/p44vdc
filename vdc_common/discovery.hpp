@@ -146,7 +146,6 @@ namespace p44 {
     // publishing information
     // - common for all services
     string hostname;
-    bool igmpSnoopingHints;
     // - for dS service advertising
     VdcHostPtr vdcHost;
     bool noAuto;
@@ -179,7 +178,6 @@ namespace p44 {
 
     long rescanTicket;
     long evaluateTicket;
-    long igmpQueryTicket;
 
 
     // private constructor, use sharedDiscoveryManager() to obtain singleton

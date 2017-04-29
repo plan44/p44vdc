@@ -29,7 +29,6 @@
 #include "discovery.hpp"
 
 #include "macaddress.hpp"
-#include "igmp.hpp"
 
 #if !DISABLE_DISCOVERY
 
@@ -58,12 +57,6 @@ using namespace p44;
 #define INITIAL_EVALUATION_DELAY (30*Second) // how long to browse until evaluating state for the first time (only when no auxvdsm is running)
 #define REEVALUATION_DELAY (30*Second) // how long to browse until reevaluating state (only when no auxvdsm is running)
 #define MIN_SWITCHBACK_TO_AUXVDSM_DELAY (10*Minute) // how long it will take to switch back from using master vdsm to using auxvdsm AGAIN.
-
-#define IPV4_MCAST_MDNS_ADDR "224.0.0.251" // for IGMP snooping support
-#define IGMP_QUERY_MAX_RESPONSE_TIME 50 // 0 to issue IGMPv1 queries, >0: time in 1/10sec
-#define IGMP_QUERY_REFRESH_INTERVAL (180*Second) // send a IGMP query once every 3 minutes
-
-
 
 // MARK: ===== DiscoveryManager
 
@@ -94,8 +87,7 @@ DiscoveryManager::DiscoveryManager() :
   publishWebPort(0),
   publishSshPort(0),
   rescanTicket(0),
-  evaluateTicket(0),
-  igmpQueryTicket(0)
+  evaluateTicket(0)
 {
   // register a cleanup handler
   MainLoop::currentMainLoop().registerCleanupHandler(boost::bind(&DiscoveryManager::stop, this));
