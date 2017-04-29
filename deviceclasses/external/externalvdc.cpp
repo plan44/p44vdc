@@ -1485,7 +1485,7 @@ void ExternalVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // we have no real collecting process (devices just connect when possibl),
   // but we force all devices to re-connect when a exhaustive collect is requested (mainly for debug purposes)
-  if (aRescanFlags && rescanmode_exhaustive) {
+  if (aRescanFlags & rescanmode_exhaustive) {
     // remove all, so they will need to reconnect
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
