@@ -56,7 +56,7 @@ uint64_t p44::EnoceanSensors::bitsExtractor(const struct EnoceanSensorDescriptor
   // - bits from last byte
   uint8_t lastBitNo = aSensorDescriptor.lsBit & 0x07;
   uint8_t numBits = firstBitNo+1-lastBitNo;
-  uint8_t mask = ((uint16_t)1<<(numBits+1))-1;
+  uint8_t mask = ((uint16_t)1<<(numBits))-1;
   value = (value<<numBits) | ((aDataP[lsByteIndex]>>lastBitNo) & mask);
   return value;
 }
