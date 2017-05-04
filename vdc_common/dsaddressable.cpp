@@ -227,8 +227,6 @@ bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEv
 {
   if (announced!=Never) {
     // device is announced: push can take place
-    ErrorPtr err;
-    ApiValuePtr value;
     if (aPropertyQuery) {
       // a property change is to be notified
       accessProperty(
@@ -236,7 +234,11 @@ bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEv
         boost::bind(&DsAddressable::pushPropertyReady, this, aEvents, _1, _2)
       );
     }
-    return true; // although not yet sent, assume push will be ok
+    else {
+      // no property query, event-only -> send events right away
+      pushPropertyReady(aEvents, ApiValuePtr(), ErrorPtr());
+    }
+    return true; // although possibly (when we have properties to push) not yet sent now, assume push will be ok
   }
   else {
     if (isPublicDS()) {
