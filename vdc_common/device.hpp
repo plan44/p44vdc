@@ -303,9 +303,17 @@ namespace p44 {
     ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
     /// @note this method should be called when bus scanning or other HW-side events detect disconnection
     ///   of a device, such that it can be reported to the dS system.
+    /// @note use scheduleVanish() when the current calling chain might rely on the device to still exist.
     /// @note calling hasVanished() might delete the object, so don't rely on 'this' after calling it unless you
     ///   still hold a DevicePtr to it
     void hasVanished(bool aForgetParams);
+
+    /// same as hasVanished, but will break caller chain first by queueing actual vanish into mainloop
+    /// @param aForgetParams if set, not only the connection to the device is removed, but also all parameters related to it
+    ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
+    /// @param aDelay how long to wait until deleting the device
+    void scheduleVanish(bool aForgetParams, MLMicroSeconds aDelay = 0);
+
 
     /// @}
 

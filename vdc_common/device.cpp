@@ -632,6 +632,14 @@ void Device::hasVanished(bool aForgetParams)
 }
 
 
+void Device::scheduleVanish(bool aForgetParams, MLMicroSeconds aDelay)
+{
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&Device::hasVanished, this, aForgetParams), aDelay);
+}
+
+
+
+
 static SceneNo mainSceneForArea(int aArea)
 {
   switch (aArea) {
