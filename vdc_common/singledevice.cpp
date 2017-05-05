@@ -69,10 +69,11 @@ bool ValueDescriptor::setLastUpdate(MLMicroSeconds aLastUpdate)
 
 bool ValueDescriptor::setChanged(bool aChanged)
 {
-  if (aChanged) {
+  // update lastChange even if not technically changed, but only updated the first time apart from having a default value
+  if (aChanged || lastChange==Never) {
     lastChange = MainLoop::currentMainLoop().now();
   }
-  return (aChanged);
+  return aChanged;
 }
 
 
