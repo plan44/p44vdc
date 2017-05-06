@@ -1576,7 +1576,11 @@ private:
       LOG(LOG_NOTICE,
         "Successfully read device info from shortAddress %d - %s data: GTIN=%lld, Serial=%lld",
         busAddress,
-        deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid ? "valid" : "GARBAGE",
+        deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid
+        #if OLD_BUGGY_CHKSUM_COMPATIBLE
+        || deviceInfo->devInfStatus==DaliDeviceInfo::devinf_maybe
+        #endif
+        ? "valid" : "GARBAGE",
         deviceInfo->gtin,
         deviceInfo->serialNo
       );
