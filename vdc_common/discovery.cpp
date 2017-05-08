@@ -798,6 +798,13 @@ void DiscoveryManager::browse_callback(AvahiServiceBrowser *b, AvahiIfIndex inte
       if (strcmp(type, VDSM_SERVICE_TYPE)==0) {
         // a vdsm has disappeared
         LOG(dmState==dm_lost_vdsm ? LOG_INFO : LOG_NOTICE, "discovery: vdsm '%s' no longer online", name);
+        // loosing a vdsm does not necessarily mean we have lost the MASTER vdsm, but
+        // - if we've lost the master now, this is also the time we've last seen it (or at least only a short time after that)
+        // - if what we've lost here is not the master, this implies the master is still present and we've "seen" it now
+        // We don't know which is the case at this point, but either way, if we had a master detected before, updating masterLastSeen is correct
+        if (dmState==dm_detected_master) {
+          masterLastSeen = MainLoop::currentMainLoop().now();
+        }
         // we have lost a vdsm (but we don't know if it's master) -> we need to rescan in a while (unless another master appears in the meantime)
         dmState = dm_lost_vdsm;
         MainLoop::currentMainLoop().executeTicketOnce(rescanTicket, boost::bind(&DiscoveryManager::rescanVdsms, this, service), VDSM_LOST_RESCAN_DELAY);
