@@ -45,6 +45,7 @@ ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, Va
   valueType(aValueType),
   valueUnit(aValueUnit),
   hasValue(aHasDefault),
+  isOptionalValue(!aHasDefault), // note that this is only the most common case, but setIsOptional make null values acceptable even when there is a default value
   readOnly(false),
   needsFetch(false),
   isDefaultValue(aHasDefault), // note that this is only most common case, but setIsDefault can be used to make even a null value default
@@ -74,6 +75,25 @@ bool ValueDescriptor::setChanged(bool aChanged)
     lastChange = MainLoop::currentMainLoop().now();
   }
   return aChanged;
+}
+
+
+
+bool ValueDescriptor::needsConformanceCheck(ApiValuePtr aApiValue, ErrorPtr &aError)
+{
+  if (!aApiValue) return false; // no value always conforms
+  if (aApiValue->isNull()) {
+    // check NULL value here, same for all types
+    if (!isOptionalValue) {
+      aError = Error::err<VdcApiError>(415, "Non-optional parameter, null not allowed");
+      return false; // Error -> no type specific check needed any more
+    }
+    else {
+      return false; // null value is ok -> no type specific check needed any more
+    }
+  }
+  // not null, allow type specific check
+  return true;
 }
 
 
@@ -141,6 +161,7 @@ enum {
   resolution_key,
   default_key,
   readonly_key,
+  optional_key,
   enumvalues_key,
   numValueProperties
 };
@@ -167,6 +188,7 @@ PropertyDescriptorPtr ValueDescriptor::getDescriptorByIndex(int aPropIndex, int 
     { "resolution", apivalue_double, resolution_key, OKEY(value_key) },
     { "default", apivalue_null, default_key, OKEY(value_key) },
     { "readonly", apivalue_bool, readonly_key, OKEY(value_key) },
+    { "optional", apivalue_bool, optional_key, OKEY(value_key) },
     { "values", apivalue_object+propflag_container, enumvalues_key, OKEY(value_enumvalues_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
@@ -185,6 +207,7 @@ bool ValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       case unit_key: if (valueUnit!=valueUnit_none) { aPropValue->setStringValue(valueUnitName(valueUnit, false)); return true; } else return false;
       case symbol_key: if (valueUnit!=valueUnit_none) { aPropValue->setStringValue(valueUnitName(valueUnit, true)); return true; } else return false;
       case readonly_key: if (readOnly) { aPropValue->setBoolValue(readOnly); return true; } else return false; // show only when set (only for deviceProperties)
+      case optional_key: if (!readOnly && isOptionalValue) { aPropValue->setBoolValue(isOptionalValue); return true; } else return false; // show only when writable AND optional
       case default_key: return (isDefaultValue ?  getValue(aPropValue, false) : false);
     }
   }
@@ -266,26 +289,28 @@ ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInter
 {
   ErrorPtr err;
   // check if value conforms
-  ApiValueType vt = aApiValue->getType();
-  if (valueType==valueType_boolean) {
-    // bool parameter, valuetype should be int or bool
-    if (
-      vt!=apivalue_bool &&
-      vt!=apivalue_int64 &&
-      vt!=apivalue_uint64
-    ) {
-      err = Error::err<VdcApiError>(415, "invalid boolean");
+  if (needsConformanceCheck(aApiValue, err)) {
+    ApiValueType vt = aApiValue->getType();
+    if (valueType==valueType_boolean) {
+      // bool parameter, valuetype should be int or bool
+      if (
+        vt!=apivalue_bool &&
+        vt!=apivalue_int64 &&
+        vt!=apivalue_uint64
+      ) {
+        err = Error::err<VdcApiError>(415, "invalid boolean");
+      }
     }
-  }
-  else if (valueType==valueType_numeric || valueType==valueType_integer) {
-    // check bounds
-    double v = aApiValue->doubleValue();
-    if (v<min || v>max) {
-      err = Error::err<VdcApiError>(415, "number out of range");
+    else if (valueType==valueType_numeric || valueType==valueType_integer) {
+      // check bounds
+      double v = aApiValue->doubleValue();
+      if (v<min || v>max) {
+        err = Error::err<VdcApiError>(415, "number out of range");
+      }
     }
-  }
-  else {
-    err = Error::err<VdcApiError>(415, "invalid number");
+    else {
+      err = Error::err<VdcApiError>(415, "invalid number");
+    }
   }
   // everything else is not valid for numeric parameter
   return err;
@@ -359,7 +384,7 @@ bool TextValueDescriptor::setStringValue(const string aValue)
 ErrorPtr TextValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
 {
   ErrorPtr err;
-  if (aApiValue) {
+  if (needsConformanceCheck(aApiValue, err)) {
     // check if value conforms
     if (aApiValue->getType()!=apivalue_string) {
       err = Error::err<VdcApiError>(415, "invalid string");
@@ -436,7 +461,7 @@ void EnumValueDescriptor::addEnum(const char *aEnumText, int aEnumValue, bool aI
 ErrorPtr EnumValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
 {
   ErrorPtr err;
-  if (aApiValue) {
+  if (needsConformanceCheck(aApiValue, err)) {
     // check if value conforms
     if (aApiValue->getType()!=apivalue_string) {
       err = Error::err<VdcApiError>(415, "enum label must be string");
@@ -603,7 +628,7 @@ DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const 
 
 void DeviceAction::addParameter(ValueDescriptorPtr aValueDesc, bool aMandatory)
 {
-  aValueDesc->setIsDefault(!aMandatory); // even a null value is a default value except if parameter is mandatory
+  aValueDesc->setIsOptional(!aMandatory); // even a null value is a default value except if parameter is mandatory
   actionParams->addValue(aValueDesc);
 }
 
@@ -626,12 +651,14 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
     else {
       // caller did not supply this parameter, get default value (which might be NULL)
       o = aParams->newNull();
-      if (!(*pos)->isDefault()) {
-        err = Error::err<VdcApiError>(415, "missing value for non-optional parameter");
-        break;
+      if (!(*pos)->getValue(o)) {
+        // there is no default value
+        if (!(*pos)->isOptional()) {
+          // a non-optional value can only be omitted in a call when there is a default value
+          err = Error::err<VdcApiError>(415, "missing value for non-optional parameter");
+          break;
+        }
       }
-      // get value. Note that this might not change o in case the default value is NULL
-      (*pos)->getValue(o);
       // add the default to the passed params
       aParams->add((*pos)->getName(), o);
     }
@@ -1369,6 +1396,7 @@ DeviceState::DeviceState(SingleDevice &aSingleDevice, const string aStateId, con
   updateInterval(0),
   lastPush(Never)
 {
+  stateDescriptor->setIsOptional(false); // never "optional" (NULL exists as state value in general, but means: not known)
 }
 
 
@@ -1792,10 +1820,11 @@ bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
 // MARK: ===== DeviceProperties container
 
 
-void DeviceProperties::addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly, bool aNeedsFetch)
+void DeviceProperties::addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly, bool aNeedsFetch, bool aNullAllowed)
 {
   aPropertyDesc->setReadOnly(aReadOnly);
   aPropertyDesc->setNeedsFetch(aNeedsFetch);
+  aPropertyDesc->setIsOptional(aNullAllowed); // properties are never "optional"
   values.push_back(aPropertyDesc);
 }
 
@@ -1870,15 +1899,16 @@ void DeviceProperties::prepareAccess(PropertyAccessMode aMode, PropertyDescripto
 bool DeviceProperties::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
   if (aPropertyDescriptor->parentDescriptor->hasObjectKey(deviceproperty_key)) {
+    // fieldkey is the property index, just get that property's value
     ValueDescriptorPtr val = values[aPropertyDescriptor->fieldKey()];
     if (aMode==access_read) {
-      // read: fieldkey is the property index, just get that property's value
+      // read
       if (!val->getValue(aPropValue))
         aPropValue->setNull(); // unset param will just report NULL
       return true; // property values are always reported
     }
     else if (!val->isReadOnly()) {
-      // write: fieldkey is the property index, write that property's value
+      // write
       ErrorPtr err = val->conforms(aPropValue, true);
       if (!Error::isOK(err)) {
         SALOG((*singleDeviceP), LOG_ERR, "Cannot set property '%s': %s", val->getName().c_str(), err->description().c_str());
@@ -2293,7 +2323,12 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
             ValueDescriptorPtr p;
             ErrorPtr err = parseValueDesc(p, param, pname);
             if (!Error::isOK(err)) return err;
-            a->addParameter(p);
+            bool optional = !(p->isDefault()); // by default, no default value means the value is optional
+            JsonObjectPtr o3;
+            if (param->get("optional", o3)) {
+              optional = o3->boolValue();
+            }
+            a->addParameter(p, !optional);
           }
         }
       deviceActions->addAction(a);

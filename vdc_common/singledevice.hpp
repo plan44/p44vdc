@@ -64,7 +64,7 @@ namespace p44 {
     /// @{
 
     /// checks if aApiValue conforms to the parameter definition
-    /// @param aApiValue API value containing a value to be used for this value. No value at all (NULL) counts as conforming.
+    /// @param aApiValue API value containing a value to be used for this value. Passing no value (not a NULL-value-object!) is always conformant
     /// @param aMakeInternal if set, the value is converted to internal format (relevant for enums, to get them as numeric value)
     /// @return NULL if the value conforms, API error describing what's wrong if not
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) = 0;
@@ -150,6 +150,9 @@ namespace p44 {
     /// set "defaultvalue" flag
     void setIsDefault(bool aIsDefault) { isDefaultValue = aIsDefault; };
 
+    /// set "defaultvalue" flag
+    void setIsOptional(bool aIsOptional) { isOptionalValue = aIsOptional; };
+
     /// set "readonly" flag
     void setReadOnly(bool aReadOnly) { readOnly = aReadOnly; };
 
@@ -161,6 +164,9 @@ namespace p44 {
 
     /// check default value flag (value itself can still be NULL)
     bool isDefault() { return isDefaultValue; }
+
+    /// check optional value flag (value itself can still be non-NULL)
+    bool isOptional() { return isOptionalValue; }
 
     /// check readonly flag
     bool doesNeedFetch() { return needsFetch; }
@@ -188,6 +194,7 @@ namespace p44 {
     string valueName; ///< the name of the value
     bool hasValue; ///< set if there is a stored value. For action params, this is the default value. For state/states params this is the actual value
     bool isDefaultValue; ///< set if the value stored is the default value
+    bool isOptionalValue; ///< set if "null" is a conformant value
     bool readOnly; ///< set if the value cannot be written
     bool needsFetch; ///< set if property needs a fetch callback before it can be read
     VdcValueType valueType; ///< the technical type of the value
@@ -205,6 +212,10 @@ namespace p44 {
     /// @return just returns aChanged
     bool setChanged(bool aChanged);
 
+    /// checks if aApiValue needs further conformance check
+    /// @param aApiValue API value containing a value to be used for this value. Passing no value (not a NULL-value-object!) is always conformant
+    /// @return true if type specific conformance check is needed and can be done
+    bool needsConformanceCheck(ApiValuePtr aApiValue, ErrorPtr &aError);
 
     /// notify that this value has just updated
     /// @note this must be called by setters just after updating update time, current and previous values.
@@ -373,7 +384,7 @@ namespace p44 {
 
     /// add parameter
     /// @param aValueDesc a value descriptor object.
-    /// @param aMandatory if set, parameter must be explicitly specified and does not have an implicit default (not even NULL)
+    /// @param aMandatory if set, parameter must be explicitly specified
     void addParameter(ValueDescriptorPtr aValueDesc, bool aMandatory = false);
 
     /// call the action
@@ -811,7 +822,8 @@ namespace p44 {
     /// @param aPropertyDesc value descriptor describing the property
     /// @param aReadOnly if set, the property cannot be written from the API and will report a "readonly:true" field in the description
     /// @param aNeedsFetch if set, a fetch operation must occor before the property can be read
-    void addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly = false, bool aNeedsFetch = false);
+    /// @param aNullAllowed if set, null can be written to the property 
+    void addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly = false, bool aNeedsFetch = false, bool aNullAllowed = false);
 
     /// get property (for internally accessing/changing it)
     /// @param aPropertyId name of the property to get
