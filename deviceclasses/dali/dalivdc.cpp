@@ -586,7 +586,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                 }
                 // - create DB entry for DALI group member
                 db.executef(
-                  "INSERT OR REPLACE INTO compositeDevices (dimmerUID, dimmerType, groupNo) VALUES ('%s','GRP',%d)",
+                  "INSERT OR REPLACE INTO compositeDevices (dimmerUID, dimmerType, groupNo) VALUES ('%q','GRP',%d)",
                   memberUID.getString().c_str(),
                   groupNo
                 );
@@ -596,7 +596,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
               deviceFound = true;
               // - create DB entry for member of composite device
               db.executef(
-                "INSERT OR REPLACE INTO compositeDevices (dimmerUID, dimmerType, collectionID) VALUES ('%s','%s',%lld)",
+                "INSERT OR REPLACE INTO compositeDevices (dimmerUID, dimmerType, collectionID) VALUES ('%q','%q',%lld)",
                 memberUID.getString().c_str(),
                 dimmerType.c_str(),
                 collectionID

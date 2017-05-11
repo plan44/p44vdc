@@ -138,7 +138,7 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
         if (name.size()>0) dev->setName(name);
         // insert into database
         db.executef(
-          "INSERT OR REPLACE INTO evaluators (evaluatorId, config) VALUES ('%s','%s')",
+          "INSERT OR REPLACE INTO evaluators (evaluatorId, config) VALUES ('%q','%q')",
           evaluatorId.c_str(), evaluatorType.c_str()
         );
         dev->evaluatorDeviceRowID = db.last_insert_rowid();

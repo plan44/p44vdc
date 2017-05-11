@@ -211,7 +211,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
       bridgeApiURL = hueComm.baseURL;
       // save back into database
       db.executef(
-        "UPDATE globs SET hueBridgeUUID='%s', hueApiURL='%s', fixedURL=0",
+        "UPDATE globs SET hueBridgeUUID='%q', hueApiURL='%q', fixedURL=0",
         bridgeUuid.c_str(),
         bridgeApiURL.c_str()
       );
@@ -264,7 +264,7 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
         fixedURL = true;
         // save the bridge parameters
         db.executef(
-          "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='', hueApiURL='%s', fixedURL=1",
+          "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='', hueApiURL='%q', fixedURL=1",
           bridgeUuid.c_str(),
           bridgeApiURL.c_str()
         );
@@ -285,7 +285,7 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       if (!Error::isOK(respErr)) return respErr;
       // save the bridge parameters
       db.executef(
-        "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s', hueApiURL='', fixedURL=0",
+        "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='', fixedURL=0",
         bridgeUuid.c_str(),
         bridgeUserName.c_str()
       );
@@ -369,7 +369,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
       }
       // save the bridge parameters
       db.executef(
-        "UPDATE globs SET hueBridgeUUID='%s', hueBridgeUser='%s', hueApiURL='%s', fixedURL=0",
+        "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='%q', fixedURL=0",
         bridgeUuid.c_str(),
         bridgeUserName.c_str(),
         bridgeApiURL.c_str()

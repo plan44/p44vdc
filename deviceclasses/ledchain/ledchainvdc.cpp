@@ -283,7 +283,7 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
             if (name.size()>0) dev->setName(name);
             // insert into database
             db.executef(
-              "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, deviceconfig) VALUES (%d, %d,'%s')",
+              "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, deviceconfig) VALUES (%d, %d,'%q')",
               firstLED, numLEDs, deviceConfig.c_str()
             );
             dev->ledChainDeviceRowID = db.last_insert_rowid();

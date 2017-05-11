@@ -199,7 +199,7 @@ ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &a
     homeConnectComm.setAuthentication(authData);
     // save the account parameters
     db.executef(
-      "UPDATE globs SET authData='%s', authScope='%s'",
+      "UPDATE globs SET authData='%q', authScope='%q'",
       authData.c_str(),
       authScope.c_str()
     );

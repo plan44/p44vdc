@@ -213,7 +213,7 @@ ErrorPtr OlaVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
           if (name.size()>0) dev->setName(name);
           // insert into database
           db.executef(
-            "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%s','%s')",
+            "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
             deviceType.c_str(), deviceConfig.c_str()
           );
           dev->olaDeviceRowID = db.last_insert_rowid();

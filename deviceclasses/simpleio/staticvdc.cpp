@@ -217,7 +217,7 @@ ErrorPtr StaticVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
           if (name.size()>0) dev->setName(name);
           // insert into database
           db.executef(
-            "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%s','%s')",
+            "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
             deviceType.c_str(), deviceConfig.c_str()
           );
           dev->staticDeviceRowID = db.last_insert_rowid();
