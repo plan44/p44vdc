@@ -115,7 +115,9 @@ void LedChainDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
 {
   // clear learn-in data from DB
   if (ledChainDeviceRowID) {
-    getLedChainVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", ledChainDeviceRowID);
+    if(getLedChainVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", ledChainDeviceRowID)!=SQLITE_OK) {
+      ALOG(LOG_ERR, "Error deleting led chain device: %s", getLedChainVdc().db.error()->description().c_str());
+    }
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);

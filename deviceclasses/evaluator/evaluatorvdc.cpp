@@ -137,20 +137,24 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
         // set name
         if (name.size()>0) dev->setName(name);
         // insert into database
-        db.executef(
+        if (db.executef(
           "INSERT OR REPLACE INTO evaluators (evaluatorId, config) VALUES ('%q','%q')",
           evaluatorId.c_str(), evaluatorType.c_str()
-        );
-        dev->evaluatorDeviceRowID = db.last_insert_rowid();
-        simpleIdentifyAndAddDevice(dev);
-        // confirm
-        ApiValuePtr r = aRequest->newApiValue();
-        r->setType(apivalue_object);
-        r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
-        r->add("rowid", r->newUint64(dev->evaluatorDeviceRowID));
-        r->add("name", r->newString(dev->getName()));
-        aRequest->sendResult(r);
-        respErr.reset(); // make sure we don't send an extra ErrorOK
+        )!=SQLITE_OK) {
+          respErr = db.error("saving evaluator");
+        }
+        else {
+          dev->evaluatorDeviceRowID = db.last_insert_rowid();
+          simpleIdentifyAndAddDevice(dev);
+          // confirm
+          ApiValuePtr r = aRequest->newApiValue();
+          r->setType(apivalue_object);
+          r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
+          r->add("rowid", r->newUint64(dev->evaluatorDeviceRowID));
+          r->add("name", r->newString(dev->getName()));
+          aRequest->sendResult(r);
+          respErr.reset(); // make sure we don't send an extra ErrorOK
+        }
       }
     }
   }

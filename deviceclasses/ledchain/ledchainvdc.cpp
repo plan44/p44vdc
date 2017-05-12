@@ -282,19 +282,23 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
             // set name
             if (name.size()>0) dev->setName(name);
             // insert into database
-            db.executef(
+            if(db.executef(
               "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, deviceconfig) VALUES (%d, %d,'%q')",
               firstLED, numLEDs, deviceConfig.c_str()
-            );
-            dev->ledChainDeviceRowID = db.last_insert_rowid();
-            // confirm
-            ApiValuePtr r = aRequest->newApiValue();
-            r->setType(apivalue_object);
-            r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
-            r->add("rowid", r->newUint64(dev->ledChainDeviceRowID));
-            r->add("name", r->newString(dev->getName()));
-            aRequest->sendResult(r);
-            respErr.reset(); // make sure we don't send an extra ErrorOK
+            )!=SQLITE_OK) {
+              respErr = db.error("saving LED chain segment params");
+            }
+            else {
+              dev->ledChainDeviceRowID = db.last_insert_rowid();
+              // confirm
+              ApiValuePtr r = aRequest->newApiValue();
+              r->setType(apivalue_object);
+              r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
+              r->add("rowid", r->newUint64(dev->ledChainDeviceRowID));
+              r->add("name", r->newString(dev->getName()));
+              aRequest->sendResult(r);
+              respErr.reset(); // make sure we don't send an extra ErrorOK
+            }
           }
         }
       }

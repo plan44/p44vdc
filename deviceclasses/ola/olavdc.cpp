@@ -212,19 +212,23 @@ ErrorPtr OlaVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
           // set name
           if (name.size()>0) dev->setName(name);
           // insert into database
-          db.executef(
+          if(db.executef(
             "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
             deviceType.c_str(), deviceConfig.c_str()
-          );
-          dev->olaDeviceRowID = db.last_insert_rowid();
-          // confirm
-          ApiValuePtr r = aRequest->newApiValue();
-          r->setType(apivalue_object);
-          r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
-          r->add("rowid", r->newUint64(dev->olaDeviceRowID));
-          r->add("name", r->newString(dev->getName()));
-          aRequest->sendResult(r);
-          respErr.reset(); // make sure we don't send an extra ErrorOK
+          )!=SQLITE_OK) {
+            respErr = db.error("saving OLA params");
+          }
+          else {
+            dev->olaDeviceRowID = db.last_insert_rowid();
+            // confirm
+            ApiValuePtr r = aRequest->newApiValue();
+            r->setType(apivalue_object);
+            r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
+            r->add("rowid", r->newUint64(dev->olaDeviceRowID));
+            r->add("name", r->newString(dev->getName()));
+            aRequest->sendResult(r);
+            respErr.reset(); // make sure we don't send an extra ErrorOK
+          }
         }
       }
     }

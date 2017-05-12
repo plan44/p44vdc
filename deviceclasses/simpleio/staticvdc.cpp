@@ -66,7 +66,9 @@ void StaticDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResult
   ALOG(LOG_DEBUG, "disconnecting static device with rowid=%lld", staticDeviceRowID);
   // clear learn-in data from DB
   if (staticDeviceRowID) {
-    getStaticVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", staticDeviceRowID);
+    if(getStaticVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", staticDeviceRowID)!=SQLITE_OK) {
+      ALOG(LOG_ERR, "Edeleting static device: %s", getStaticVdc().db.error()->description().c_str());
+    }
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);
@@ -216,19 +218,23 @@ ErrorPtr StaticVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
           // set name
           if (name.size()>0) dev->setName(name);
           // insert into database
-          db.executef(
+          if(db.executef(
             "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
             deviceType.c_str(), deviceConfig.c_str()
-          );
-          dev->staticDeviceRowID = db.last_insert_rowid();
-          // confirm
-          ApiValuePtr r = aRequest->newApiValue();
-          r->setType(apivalue_object);
-          r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
-          r->add("rowid", r->newUint64(dev->staticDeviceRowID));
-          r->add("name", r->newString(dev->getName()));
-          aRequest->sendResult(r);
-          respErr.reset(); // make sure we don't send an extra ErrorOK
+          )!=SQLITE_OK) {
+            respErr = db.error("saving static device params");
+          }
+          else {
+            dev->staticDeviceRowID = db.last_insert_rowid();
+            // confirm
+            ApiValuePtr r = aRequest->newApiValue();
+            r->setType(apivalue_object);
+            r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
+            r->add("rowid", r->newUint64(dev->staticDeviceRowID));
+            r->add("name", r->newString(dev->getName()));
+            aRequest->sendResult(r);
+            respErr.reset(); // make sure we don't send an extra ErrorOK
+          }
         }
       }
     }

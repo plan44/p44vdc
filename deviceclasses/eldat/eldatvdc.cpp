@@ -169,12 +169,14 @@ bool EldatVdc::addAndRememberDevice(EldatDevicePtr aEldatDevice)
   if (addKnownDevice(aEldatDevice)) {
     // save Eldat ID to DB
     // - check if this subdevice is already stored
-    db.executef(
+    if(db.executef(
       "INSERT OR REPLACE INTO knownDevices (eldatAddress, subdevice, deviceType) VALUES (%d,%d,%d)",
       aEldatDevice->getAddress(),
       aEldatDevice->getSubDevice(),
       aEldatDevice->getEldatDeviceType()
-    );
+    )!=SQLITE_OK) {
+      ALOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
+    }
     return true;
   }
   return false;

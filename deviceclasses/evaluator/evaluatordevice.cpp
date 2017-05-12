@@ -128,7 +128,9 @@ void EvaluatorDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
 {
   // clear learn-in data from DB
   if (evaluatorDeviceRowID) {
-    getEvaluatorVdc().db.executef("DELETE FROM evaluators WHERE rowid=%lld", evaluatorDeviceRowID);
+    if(getEvaluatorVdc().db.executef("DELETE FROM evaluators WHERE rowid=%lld", evaluatorDeviceRowID)!=SQLITE_OK) {
+      ALOG(LOG_ERR, "Error deleting evaluator: %s", getEvaluatorVdc().db.error()->description().c_str());
+    }
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);

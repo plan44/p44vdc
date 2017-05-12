@@ -198,16 +198,19 @@ ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &a
     checkStringParam(aParams, "authScope", authScope);
     homeConnectComm.setAuthentication(authData);
     // save the account parameters
-    db.executef(
+    if (db.executef(
       "UPDATE globs SET authData='%q', authScope='%q'",
       authData.c_str(),
       authScope.c_str()
-    );
-    // now collect the devices from the new account
-    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), rescanmode_clearsettings);
+    )!=SQLITE_OK) {
+      respErr = db.error("saving authentication info");
+    }
+    else {
+      // now collect the devices from the new account
+      collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), rescanmode_clearsettings);
+    }
   }
-  else
-  {
+  else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
   return respErr;

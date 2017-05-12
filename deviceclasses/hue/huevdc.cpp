@@ -210,11 +210,13 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
     if (!fixedURL && hueComm.baseURL!=bridgeApiURL) {
       bridgeApiURL = hueComm.baseURL;
       // save back into database
-      db.executef(
+      if(db.executef(
         "UPDATE globs SET hueBridgeUUID='%q', hueApiURL='%q', fixedURL=0",
         bridgeUuid.c_str(),
         bridgeApiURL.c_str()
-      );
+      )!=SQLITE_OK) {
+        ALOG(LOG_ERR, "Error saving hue bridge url: %s", db.error()->description().c_str());
+      }
     }
     // collect existing lights
     // Note: for now we don't search for new lights, this is left to the Hue App, so users have control
@@ -263,19 +265,29 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
         bridgeUuid = PSEUDO_UUID_FOR_FIXED_API;
         fixedURL = true;
         // save the bridge parameters
-        db.executef(
+        if(db.executef(
           "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='', hueApiURL='%q', fixedURL=1",
           bridgeUuid.c_str(),
           bridgeApiURL.c_str()
-        );
+        )!=SQLITE_OK) {
+          respErr = db.error("saving hue bridge params");
+        }
+        else {
+          // done (separate learn-in required, because button press at the bridge is required)
+          respErr = Error::ok();
+        }
       }
       else {
         // unregister
         fixedURL = false;
-        db.executef("UPDATE globs SET hueBridgeUUID='', hueBridgeUser='', hueApiURL='', fixedURL=0");
+        if(db.executef("UPDATE globs SET hueBridgeUUID='', hueBridgeUser='', hueApiURL='', fixedURL=0")!=SQLITE_OK) {
+          respErr = db.error("clearing hue bridge params");
+        }
+        else {
+          // done (separate learn-in required, because button press at the bridge is required)
+          respErr = Error::ok();
+        }
       }
-      // done (separate learn-in required, because button press at the bridge is required)
-      respErr = Error::ok();
     }
     else {
       // register by uuid/username (for migration)
@@ -284,13 +296,17 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       respErr = checkStringParam(aParams, "bridgeUsername", bridgeUserName);
       if (!Error::isOK(respErr)) return respErr;
       // save the bridge parameters
-      db.executef(
+      if(db.executef(
         "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='', fixedURL=0",
         bridgeUuid.c_str(),
         bridgeUserName.c_str()
-      );
-      // now collect the lights from the new bridge, remove all settings from previous bridge
-      collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), rescanmode_clearsettings);
+      )!=SQLITE_OK) {
+        respErr = db.error("saving hue bridge migration params");
+      }
+      else {
+        // now collect the lights from the new bridge, remove all settings from previous bridge
+        collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), rescanmode_clearsettings);
+      }
     }
   }
   else {
@@ -368,12 +384,14 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
         bridgeApiURL.clear();
       }
       // save the bridge parameters
-      db.executef(
+      if(db.executef(
         "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='%q', fixedURL=0",
         bridgeUuid.c_str(),
         bridgeUserName.c_str(),
         bridgeApiURL.c_str()
-      );
+      )!=SQLITE_OK) {
+        ALOG(LOG_ERR, "Error saving hue bridge learn params: %s", db.error()->description().c_str());
+      }
       // now process the learn in/out
       if (learnedIn==yes) {
         // now get lights

@@ -178,14 +178,15 @@ bool EnoceanVdc::addAndRememberDevice(EnoceanDevicePtr aEnoceanDevice)
 {
   if (addKnownDevice(aEnoceanDevice)) {
     // save enocean ID to DB
-    // - check if this subdevice is already stored
-    db.executef(
+    if(db.executef(
       "INSERT OR REPLACE INTO knownDevices (enoceanAddress, subdevice, eeProfile, eeManufacturer) VALUES (%d,%d,%d,%d)",
       aEnoceanDevice->getAddress(),
       aEnoceanDevice->getSubDevice(),
       aEnoceanDevice->getEEProfile(),
       aEnoceanDevice->getEEManufacturer()
-    );
+    )!=SQLITE_OK) {
+      ALOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
+    }
     return true;
   }
   return false;

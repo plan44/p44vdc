@@ -585,31 +585,37 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                   }
                 }
                 // - create DB entry for DALI group member
-                db.executef(
+                if (db.executef(
                   "INSERT OR REPLACE INTO compositeDevices (dimmerUID, dimmerType, groupNo) VALUES ('%q','GRP',%d)",
                   memberUID.getString().c_str(),
                   groupNo
-                );
+                )!=SQLITE_OK) {
+                  ALOG(LOG_ERR, "Error saving DALI group member: %s", db.error()->description().c_str());
+                }
               }
             }
             else {
               deviceFound = true;
               // - create DB entry for member of composite device
-              db.executef(
+              if (db.executef(
                 "INSERT OR REPLACE INTO compositeDevices (dimmerUID, dimmerType, collectionID) VALUES ('%q','%q',%lld)",
                 memberUID.getString().c_str(),
                 dimmerType.c_str(),
                 collectionID
-              );
+              )!=SQLITE_OK) {
+                ALOG(LOG_ERR, "Error saving DALI composite device member: %s", db.error()->description().c_str());
+              }
               if (collectionID<0) {
                 // use rowid of just inserted item as collectionID
                 collectionID = db.last_insert_rowid();
                 // - update already inserted first record
-                db.executef(
+                if (db.executef(
                   "UPDATE compositeDevices SET collectionID=%lld WHERE ROWID=%lld",
                   collectionID,
                   collectionID
-                );
+                )!=SQLITE_OK) {
+                  ALOG(LOG_ERR, "Error updating DALI composite device: %s", db.error()->description().c_str());
+                }
               }
             }
             // remember
@@ -647,21 +653,25 @@ ErrorPtr DaliVdc::ungroupDevice(DaliDevicePtr aDevice, VdcApiRequestPtr aRequest
     // composite device, delete grouping
     DaliCompositeDevicePtr dev = boost::dynamic_pointer_cast<DaliCompositeDevice>(aDevice);
     if (dev) {
-      db.executef(
+      if(db.executef(
         "DELETE FROM compositeDevices WHERE dimmerType!='GRP' AND collectionID=%ld",
         (long)dev->collectionID
-      );
+      )!=SQLITE_OK) {
+        ALOG(LOG_ERR, "Error deleting DALI composite device: %s", db.error()->description().c_str());
+      }
     }
   }
   else if (aDevice->daliTechnicalType()==dalidevice_group) {
-    // composite device, delete grouping
+    // group device, delete grouping
     DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(aDevice);
     if (dev) {
       int groupNo = dev->daliController->deviceInfo->shortAddress & DaliGroupMask;
-      db.executef(
+      if(db.executef(
         "DELETE FROM compositeDevices WHERE dimmerType='GRP' AND groupNo=%d",
         groupNo
-      );
+      )!=SQLITE_OK) {
+        ALOG(LOG_ERR, "Error deleting DALI group: %s", db.error()->description().c_str());
+      }
     }
   }
   else {

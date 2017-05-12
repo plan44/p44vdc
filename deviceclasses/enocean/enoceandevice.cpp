@@ -184,7 +184,9 @@ bool EnoceanDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aRe
 void EnoceanDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
   // clear learn-in data from DB
-  getEnoceanVdc().db.executef("DELETE FROM knownDevices WHERE enoceanAddress=%d AND subdevice=%d", getAddress(), getSubDevice());
+  if(getEnoceanVdc().db.executef("DELETE FROM knownDevices WHERE enoceanAddress=%d AND subdevice=%d", getAddress(), getSubDevice())!=SQLITE_OK) {
+    ALOG(LOG_ERR, "Error deleting device: %s", getEnoceanVdc().db.error()->description().c_str());
+  }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);
 }
