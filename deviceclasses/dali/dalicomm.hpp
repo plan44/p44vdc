@@ -58,7 +58,6 @@ namespace p44 {
       DALIFrame,
       MissingData,
       BadChecksum,
-      BadDeviceInfo,
       InvalidAnswer,
       AddressesMissing,
       AddressCollisions,

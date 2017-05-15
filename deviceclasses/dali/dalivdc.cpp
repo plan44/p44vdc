@@ -176,7 +176,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
       DaliDeviceInfoMap::iterator pos = deviceInfoCache.find(addr);
       if (pos!=deviceInfoCache.end() && pos->second->devInfStatus!=DaliDeviceInfo::devinf_needsquery) {
         // we already have real device info for this device, or know the device does not have any
-        // -> have it processed (but via mainloop to avoid stacking up recursions here
+        // -> have it processed (but via mainloop to avoid stacking up recursions here)
         LOG(LOG_INFO, "Using cached device info for device at shortAddress %d", addr);
         MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::deviceInfoValid, this, aBusDevices, aNextDev, aCompletedCB, pos->second));
         return;
@@ -369,17 +369,15 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
 void DaliVdc::deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError)
 {
   bool missingData = aError && aError->isError(DaliCommError::domain(), DaliCommError::MissingData);
-  bool badData =
-    aError &&
-    (aError->isError(DaliCommError::domain(), DaliCommError::BadChecksum) || aError->isError(DaliCommError::domain(), DaliCommError::BadDeviceInfo));
-  if (!Error::isOK(aError) && !missingData && !badData) {
+  bool badChecksum = aError && aError->isError(DaliCommError::domain(), DaliCommError::BadChecksum);
+  if (!Error::isOK(aError) && !missingData && !badChecksum) {
     // real fatal error, can't continue
     LOG(LOG_ERR, "Error reading device info: %s",aError->description().c_str());
     return aCompletedCB(aError);
   }
-  // no error, or error but due to missing or bad data -> device exists
-  if (missingData) { LOG(LOG_INFO, "Device at shortAddress %d does not have device info",aDaliDeviceInfoPtr->shortAddress); }
-  if (badData) { LOG(LOG_INFO, "Device at shortAddress %d does not have valid device info",aDaliDeviceInfoPtr->shortAddress); }
+  // no error, or error but due to missing or bad data -> device exists and possibly still has ok device info
+  if (missingData) { LOG(LOG_INFO, "Device at shortAddress %d is missing all or some device info data",aDaliDeviceInfoPtr->shortAddress); }
+  if (badChecksum) { LOG(LOG_INFO, "Device at shortAddress %d has checksum errors at least in one info bank",aDaliDeviceInfoPtr->shortAddress); }
   // update entry in the cache
   // Note: callback always gets a deviceInfo back, possibly with devinf_none if device does not have devInf at all (or garbage)
   //   So, assigning this here will make sure no entries with devinf_needsquery will remain.
