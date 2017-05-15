@@ -50,6 +50,9 @@ namespace p44 {
     // information from the device itself
     string hueModel;
 
+    // model software version
+    string swVersion;
+
     // reapply mechanism for difficult situations
     typedef enum {
       reapply_none, ///< do not re-apply
@@ -132,6 +135,9 @@ namespace p44 {
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     virtual string hardwareGUID() P44_OVERRIDE;
+
+    /// @return human readable version string
+    virtual string modelVersion() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

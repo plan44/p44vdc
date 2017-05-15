@@ -156,6 +156,10 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
     if (o) {
       hueModel += ": " + o->stringValue();
     }
+    o = aDeviceInfo->get("swversion");
+    if (o) {
+      swVersion = o->stringValue();
+    }
     // now look at state
     parseLightState(aDeviceInfo);
   }
@@ -188,7 +192,10 @@ string HueDevice::hardwareGUID()
     return inherited::hardwareGUID();
 }
 
-
+string HueDevice::modelVersion()
+{
+    return swVersion;
+}
 
 
 void HueDevice::checkPresence(PresenceCB aPresenceResultHandler)
