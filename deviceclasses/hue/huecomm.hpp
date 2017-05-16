@@ -109,9 +109,6 @@ namespace p44 {
   typedef boost::intrusive_ptr<HueApiOperation> HueApiOperationPtr;
 
 
-  // string used in place of UUID when using fixed hue API URL
-  #define PSEUDO_UUID_FOR_FIXED_API "fixed_api_base_URL"
-
   class BridgeFinder;
 
   class HueComm : public OperationQueue

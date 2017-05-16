@@ -222,7 +222,7 @@ public:
       keepAlive = BridgeFinderPtr(this);
       // - just put it in as the only auth candidate
       authCandidates.clear();
-      authCandidates[PSEUDO_UUID_FOR_FIXED_API] = hueComm.fixedBaseURL;
+      authCandidates[hueComm.uuid] = hueComm.fixedBaseURL;
       startedAuth = MainLoop::now();
       attemptPairingWithCandidates();
     }
@@ -235,7 +235,7 @@ public:
     callback = aFindHandler;
     uuid = hueComm.uuid;;
     userName = hueComm.userName;
-    if (hueComm.fixedBaseURL.empty() && uuid!=PSEUDO_UUID_FOR_FIXED_API) {
+    if (hueComm.fixedBaseURL.empty()) {
       // actually search for bridge
       keepAlive = BridgeFinderPtr(this);
       bridgeDetector->startSearch(boost::bind(&BridgeFinder::bridgeRefindHandler, this, _1, _2), uuid.c_str());

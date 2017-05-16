@@ -114,6 +114,7 @@ string HuePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 
 
 #define HUE_RECOLLECT_INTERVAL (30*Minute)
+#define PSEUDO_UUID_FOR_FIXED_API "fixed_api_base_URL" // used in place of uuid in fixed-IP case
 
 void HueVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
@@ -132,8 +133,8 @@ void HueVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 int HueVdc::getRescanModes() const
 {
-  // normal and incremental make sense, no exhaustive mode
-  return rescanmode_incremental+rescanmode_normal;
+  // all modes make sense, exhaustive forces discovery instead of using cached API URL
+  return rescanmode_incremental+rescanmode_normal+rescanmode_exhaustive;
 }
 
 
@@ -154,8 +155,12 @@ void HueVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
       fixedURL = i->get<bool>(3);
     }
   }
+  if ((aRescanFlags & rescanmode_exhaustive) && !fixedURL) {
+    // exhaustive rescan means we need to search for the bridge API
+    bridgeApiURL.clear();
+  }
   if (bridgeUuid.length()>0 || bridgeApiURL.length()>0) {
-    // we know a bridge by UUID, try to refind it
+    // we know a bridge by UUID or API URL, try to refind it
     refindBridge(aCompletedCB);
   }
   else {
@@ -199,7 +204,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
   if (Error::isOK(aError)) {
     // found already registered bridge again
     ALOG(LOG_NOTICE,
-      "Hue bridge %s found again:\n"
+      "Hue bridge uuid '%s' found again:\n"
       "- userName = %s\n"
       "- API base URL = %s",
       hueComm.uuid.c_str(),
@@ -235,7 +240,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
       return;
     }
     else {
-      ALOG(LOG_NOTICE, "Error refinding hue bridge uuid %s, error = %s", hueComm.uuid.c_str(), aError->description().c_str());
+      ALOG(LOG_NOTICE, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->description().c_str());
     }
     if (aCompletedCB) aCompletedCB(ErrorPtr()); // no hue bridge to collect lights from (but this is not a collect error)
   }
@@ -284,7 +289,7 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
           respErr = db.error("clearing hue bridge params");
         }
         else {
-          // done (separate learn-in required, because button press at the bridge is required)
+          // done
           respErr = Error::ok();
         }
       }
@@ -320,6 +325,7 @@ void HueVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tri
 {
   if (aEnableLearning) {
     if (!fixedURL || bridgeUserName.empty()) {
+      hueComm.fixedBaseURL.clear(); // do not use the cached URL for learning in/out!
       hueComm.findNewBridge(
         string_format("%s#%s", getVdcHost().modelName().c_str(), getVdcHost().getDeviceHardwareId().c_str()).c_str(),
         15*Second, // try to login for 15 secs
@@ -367,7 +373,10 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
       // new bridge found
       if (aOnlyEstablish!=no) {
         learnedIn = yes;
-        bridgeUuid = hueComm.uuid;
+        if (hueComm.uuid!=PSEUDO_UUID_FOR_FIXED_API) {
+          // only update if it is a real UUID.
+          bridgeUuid = hueComm.uuid;
+        }
         bridgeUserName = hueComm.userName;
         if (!fixedURL) {
           bridgeApiURL = hueComm.baseURL;

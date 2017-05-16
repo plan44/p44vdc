@@ -75,7 +75,7 @@ namespace p44 {
     rescanmode_incremental = 0x01, ///< incremental rescan
     rescanmode_normal = 0x02, ///< normal rescan
     rescanmode_exhaustive = 0x04, ///< exhaustive rescan
-    rescanmode_clearsettings = 0x08 ///< exhaustive rescan
+    rescanmode_clearsettings = 0x08 ///< clear settings (not for incremental)
   };
   typedef uint8_t RescanMode;
 
