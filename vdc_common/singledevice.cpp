@@ -309,10 +309,10 @@ ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInter
       }
     }
     else {
+      // everything else is not valid for numeric parameter
       err = Error::err<VdcApiError>(415, "invalid number");
     }
   }
-  // everything else is not valid for numeric parameter
   return err;
 }
 
@@ -645,8 +645,16 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
     if (o) {
       // caller did supply this parameter
       err = (*pos)->conforms(o, true); // check and convert to internal (for text enums)
-      if (!Error::isOK(err))
-        break; // error
+      if (!Error::isOK(err)) {
+        if (nonConformingAsNull() && !o->isNull()) {
+          o = aParams->newNull(); // convert it to NULL
+          err = (*pos)->conforms(o, true); // check again to see if NULL is conformant
+          if (!Error::isOK(err)) break; // NULL is not conformant -> error out
+        }
+        else {
+          break; // param is not conformant -> error out
+        }
+      }
     }
     else {
       // caller did not supply this parameter, get default value (which might be NULL)
@@ -921,6 +929,10 @@ ErrorPtr CustomAction::validateParams(ApiValuePtr aParams, ApiValuePtr aValidate
     if (vd) {
       // param with that name exists
       err = vd->conforms(val, false);
+      if (!Error::isOK(err) && action->nonConformingAsNull() && !val->isNull()) {
+        val = aParams->newNull(); // convert it to NULL
+        err = vd->conforms(val, true); // check again to see if NULL is conformant
+      }
     }
     if (Error::isOK(err)) {
       ApiValuePtr myParam = aValidatedParams->newValue(val->getType());

@@ -395,6 +395,10 @@ namespace p44 {
     ///   and prevent calling subclass' performCall() when parameters are not ok.
     void call(ApiValuePtr aParams, StatusCB aCompletedCB);
 
+    /// Allow non-conforming parameters to be treated as NULL (and used as such if NULL is allowed for that param)
+    /// @return true if non-conforming params should be converted to NULL internally
+    virtual bool nonConformingAsNull() { return false; }; // off by default
+
   protected:
 
     /// action implementation.
