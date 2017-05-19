@@ -1146,6 +1146,9 @@ string DaliSingleControllerDevice::modelName()
 }
 
 
+
+
+
 string DaliSingleControllerDevice::hardwareGUID()
 {
   if (daliController->deviceInfo->devInfStatus<=DaliDeviceInfo::devinf_only_gtin)

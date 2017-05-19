@@ -280,6 +280,9 @@ namespace p44 {
 
     DaliDevice(DaliVdc *aVdcP);
 
+    /// @return Vendor name for display purposes
+    virtual string vendorName() P44_OVERRIDE { return ""; }; // Prevent displaying vdc vendor for devices
+
     /// @return type of DALI device
     virtual DaliDeviceTypes daliTechnicalType() const = 0;
 
