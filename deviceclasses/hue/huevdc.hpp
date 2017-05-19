@@ -72,6 +72,7 @@ namespace p44 {
     /// @{
 
     uint64_t bridgeMacAddress; ///< the mac address of this hue bridge
+    string swVersion;
 
     /// @}
 
@@ -111,6 +112,13 @@ namespace p44 {
     /// - uuid:UUUUUUU = UUID
     /// - http:xxxx = API
     virtual string hardwareGUID() P44_OVERRIDE;
+
+    /// @return Vendor name for display purposes
+    /// @note if not empty, value will be used by vendorId() default implementation to create vendorname:xxx URN schema id
+    virtual string vendorName() P44_OVERRIDE;
+
+    /// @return human readable version string
+    virtual string modelVersion() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

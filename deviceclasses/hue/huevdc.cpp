@@ -71,6 +71,17 @@ string HueVdc::hardwareGUID()
 };
 
 
+string HueVdc::modelVersion()
+{
+  return swVersion;
+}
+
+
+string HueVdc::vendorName()
+{
+  return "Philips";
+}
+
 
 
 
@@ -445,6 +456,9 @@ void HueVdc::gotBridgeConfig(StatusCB aCollectedHandler, JsonObjectPtr aResult, 
     // get mac address
     if (aResult->get("mac", o)) {
       bridgeMacAddress = stringToMacAddress(o->stringValue().c_str());
+    }
+    if (aResult->get("swversion", o)) {
+      swVersion = o->stringValue();
     }
     // get name
     if (aResult->get("name", o)) {

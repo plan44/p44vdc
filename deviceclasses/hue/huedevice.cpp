@@ -194,7 +194,7 @@ string HueDevice::hardwareGUID()
 
 string HueDevice::modelVersion()
 {
-    return swVersion;
+  return swVersion;
 }
 
 
