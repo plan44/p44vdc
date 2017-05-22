@@ -113,6 +113,17 @@ string SensorBehaviour::getSensorRange()
 }
 
 
+string SensorBehaviour::getStatusText()
+{
+  if (hasDefinedState()) {
+    int fracDigits = (int)(-log(resolution)/log(10)+0.99);
+    if (fracDigits<0) fracDigits=0;
+    return string_format("%0.*f %s", fracDigits, currentValue, getSensorUnitText().c_str());
+  }
+  return inherited::getStatusText();
+}
+
+
 void SensorBehaviour::setSensorNameWithRange(const char *aName)
 {
   setHardwareName(string_format("%s, %s %s", aName, getSensorRange().c_str(), getSensorUnitText().c_str()));

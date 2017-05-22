@@ -87,7 +87,7 @@ namespace p44 {
     DsBinaryInputType getHardwareInputType() { return hardwareInputType; };
 
     /// set group
-    virtual void setGroup(DsGroup aGroup) { binInputGroup = aGroup; };
+    virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { binInputGroup = aGroup; };
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{
@@ -107,20 +107,24 @@ namespace p44 {
 
     /// check for defined state
     /// @return true if behaviour has a defined (non-NULL) state
-    virtual bool hasDefinedState();
+    virtual bool hasDefinedState() P44_OVERRIDE;
+
+    /// Get short text for a "first glance" status of the behaviour
+    /// @return string, really short, intended to be shown as a narrow column in a list
+    virtual string getStatusText() P44_OVERRIDE;
 
 
     /// @name ValueSource interface
     /// @{
 
     /// get descriptive name identifying the source within the entire vdc host (for using in selection lists)
-    virtual string getSourceName();
+    virtual string getSourceName() P44_OVERRIDE;
 
     /// get value
-    virtual double getSourceValue();
+    virtual double getSourceValue() P44_OVERRIDE;
 
     /// get time of last update
-    virtual MLMicroSeconds getSourceLastUpdate();
+    virtual MLMicroSeconds getSourceLastUpdate() P44_OVERRIDE;
 
     /// @}
 
@@ -128,12 +132,12 @@ namespace p44 {
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
   protected:
 
     /// the behaviour type
-    virtual BehaviourType getType() { return behaviour_binaryinput; };
+    virtual BehaviourType getType() P44_OVERRIDE { return behaviour_binaryinput; };
 
     /// returns the max extendedValue (depends on configuredInputType)
     /// @return max value the state is allowed to have. Normal binary inputs return 1 here, special cases like
@@ -143,21 +147,21 @@ namespace p44 {
 
 
     // property access implementation for descriptor/settings/states
-    virtual int numDescProps();
-    virtual const PropertyDescriptorPtr getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor);
-    virtual int numSettingsProps();
-    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor);
-    virtual int numStateProps();
-    virtual const PropertyDescriptorPtr getStateDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor);
+    virtual int numDescProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual int numSettingsProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual int numStateProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getStateDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     // combined field access for all types of properties
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<BinaryInputBehaviour> BinaryInputBehaviourPtr;

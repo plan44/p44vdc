@@ -24,6 +24,7 @@
 
 #include "device.hpp"
 #include "dsbehaviour.hpp"
+#include "valueunits.hpp"
 
 using namespace std;
 
@@ -81,6 +82,7 @@ namespace p44 {
     /// @{
 
     virtual DsChannelType getChannelType() = 0; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() = 0; ///< the unit
     virtual const char *getName() = 0; ///< descriptive channel name
     virtual double getMin() = 0; ///< min value
     virtual double getMax() = 0; ///< max value
@@ -218,6 +220,10 @@ namespace p44 {
     /// @return textual description of object, may contain LFs
     virtual string description();
 
+    /// Get short text for a "first glance" status of the behaviour
+    /// @return string, really short, intended to be shown as a narrow column in a list
+    virtual string getStatusText();
+
 
   protected:
 
@@ -242,12 +248,13 @@ namespace p44 {
 
   public:
     IndexChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; numIndices = 0; };
-    virtual DsChannelType getChannelType() { return channeltype_default; }; ///< no real dS channel type
-    virtual const char *getName() { return "string"; };
-    virtual double getMin() { return 0; }; // 0..numIndices-1
-    virtual double getMax() { return numIndices>0 ? numIndices-1 : 0; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "string"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // 0..numIndices-1
+    virtual double getMax() P44_OVERRIDE { return numIndices>0 ? numIndices-1 : 0; };
     int getIndex() { return getChannelValue(); }; // return as int for convenience
-    virtual double getDimPerMS() { return 0; }; // not dimmable
+    virtual double getDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
 
     void setNumIndices(uint32_t aNumIndices) { numIndices = aNumIndices; };
 
@@ -262,11 +269,12 @@ namespace p44 {
 
   public:
     DigitalChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 100; /* on or off */ };
-    virtual DsChannelType getChannelType() { return channeltype_default; }; ///< no real dS channel type
-    virtual const char *getName() { return "switch"; };
-    virtual double getMin() { return 0; }; // compatible with brightness: 0 to 100%
-    virtual double getMax() { return 100; };
-    virtual double getDimPerMS() { return 0; }; // not dimmable
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "switch"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // compatible with brightness: 0 to 100%
+    virtual double getMax() P44_OVERRIDE { return 100; };
+    virtual double getDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
 
   };
   typedef boost::intrusive_ptr<DigitalChannel> DigitalChannelPtr;
@@ -281,10 +289,11 @@ namespace p44 {
 
   public:
     DialChannel(OutputBehaviour &aOutput) : inherited(aOutput) { max=100; /* standard dimmer range */ resolution = 1; /* integer by default */ };
-    virtual DsChannelType getChannelType() { return channeltype_default; }; ///< no real dS channel type
-    virtual const char *getName() { return "dial"; };
-    virtual double getMin() { return 0; };
-    virtual double getMax() { return max; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "dial"; };
+    virtual double getMin() P44_OVERRIDE { return 0; };
+    virtual double getMax() P44_OVERRIDE { return max; };
 
     void setMax(double aMax) { max = aMax; };
   };

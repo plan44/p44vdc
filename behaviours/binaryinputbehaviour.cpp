@@ -111,6 +111,16 @@ bool BinaryInputBehaviour::hasDefinedState()
 }
 
 
+string BinaryInputBehaviour::getStatusText()
+{
+  if (hasDefinedState()) {
+    return string_format("%d", currentState);
+  }
+  return inherited::getStatusText();
+}
+
+
+
 // MARK: ===== value source implementation
 
 

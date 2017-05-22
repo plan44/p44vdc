@@ -47,12 +47,13 @@ namespace p44 {
 
     void setDimMin(double aMinDim) { minDim = aMinDim; };
 
-    virtual DsChannelType getChannelType() { return channeltype_brightness; }; ///< the dS channel type
-    virtual const char *getName() { return "brightness"; };
-    virtual double getMin() { return 0; }; // dS brightness goes from 0 to 100%
-    virtual double getMax() { return 100; };
-    virtual double getDimPerMS() { return 11.0/256*100/300; }; // dimming is 11 steps(1/256) per 300mS (as per ds-light.pdf specification) = 255/11*300 = 7 seconds full scale
-    virtual double getMinDim() { return minDim; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_brightness; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "brightness"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // dS brightness goes from 0 to 100%
+    virtual double getMax() P44_OVERRIDE { return 100; };
+    virtual double getDimPerMS() P44_OVERRIDE { return 11.0/256*100/300; }; // dimming is 11 steps(1/256) per 300mS (as per ds-light.pdf specification) = 255/11*300 = 7 seconds full scale
+    virtual double getMinDim() P44_OVERRIDE { return minDim; };
 
   };
   typedef boost::intrusive_ptr<BrightnessChannel> BrightnessChannelPtr;

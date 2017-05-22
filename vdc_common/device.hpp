@@ -459,6 +459,11 @@ namespace p44 {
     /// @return textual description of object, may contain LFs
     virtual string description() P44_OVERRIDE;
 
+    /// Get short text for a "first glance" status of the device
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getStatusText() P44_OVERRIDE;
+
+
   protected:
 
 

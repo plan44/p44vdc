@@ -77,11 +77,13 @@ namespace p44 {
 
     /// get channel by index
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
+    /// @param aPendingApplyOnly if set, a channel is only returned when its value is pending to be applied
     /// @return NULL for unknown channel
     ChannelBehaviourPtr getChannelByIndex(size_t aChannelIndex, bool aPendingApplyOnly = false);
 
     /// get output index by channelType
     /// @param aChannelType the channel type, can be channeltype_default to get primary/default channel
+    /// @param aPendingApplyOnly if set, a channel is only returned when its value is pending to be applied
     /// @return NULL for unknown channel
     ChannelBehaviourPtr getChannelByType(DsChannelType aChannelType, bool aPendingApplyOnly = false);
 
@@ -218,6 +220,11 @@ namespace p44 {
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
     virtual string description() P44_OVERRIDE;
+
+    /// Get short text for a "first glance" status of the behaviour
+    /// @return string, really short, intended to be shown as a narrow column in a list
+    virtual string getStatusText() P44_OVERRIDE;
+
 
   protected:
 

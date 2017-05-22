@@ -220,7 +220,6 @@ bool Device::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutio
 }
 
 
-
 void Device::installSettings(DeviceSettingsPtr aDeviceSettings)
 {
   if (aDeviceSettings) {
@@ -1818,7 +1817,7 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
 }
 
 
-// MARK: ===== Device description/shortDesc
+// MARK: ===== Device description/shortDesc/status
 
 
 string Device::description()
@@ -1828,5 +1827,21 @@ string Device::description()
   if (binaryInputs.size()>0) string_format_append(s, "\n- Binary Inputs: %lu", binaryInputs.size());
   if (sensors.size()>0) string_format_append(s, "\n- Sensors: %lu", sensors.size());
   if (numChannels()>0) string_format_append(s, "\n- Output Channels: %d", numChannels());
+  return s;
+}
+
+
+string Device::getStatusText()
+{
+  string s;
+  if (output) {
+    s = output->getStatusText();
+  }
+  if (s.empty() && sensors.size()>0) {
+    s = sensors[0]->getStatusText();
+  }
+  if (s.empty() && binaryInputs.size()>0) {
+    s = binaryInputs[0]->getStatusText();
+  }
   return s;
 }

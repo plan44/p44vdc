@@ -46,11 +46,12 @@ namespace p44 {
     /// Set time it takes to run trough a full range (0..100%), approximately
     void setFullRangeTime(MLMicroSeconds aFullRangeTime) { fullRangeTime = aFullRangeTime; };
 
-    virtual DsChannelType getChannelType() { return channeltype_shade_position_outside; }; ///< the dS channel type
-    virtual const char *getName() { return "position"; };
-    virtual double getMin() { return 0; }; // dS position goes from 0 to 100%
-    virtual double getMax() { return 100; };
-    virtual double getDimPerMS() { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_shade_position_outside; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "position"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
+    virtual double getMax() P44_OVERRIDE { return 100; };
+    virtual double getDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
 
   };
   typedef boost::intrusive_ptr<ShadowPositionChannel> ShadowPositionChannelPtr;
@@ -72,11 +73,12 @@ namespace p44 {
     /// Set time it takes to run trough a full range (0..100%), approximately
     void setFullRangeTime(MLMicroSeconds aFullRangeTime) { fullRangeTime = aFullRangeTime; };
 
-    virtual DsChannelType getChannelType() { return channeltype_shade_angle_outside; }; ///< the dS channel type
-    virtual const char *getName() { return "angle"; };
-    virtual double getMin() { return 0; }; // dS position goes from 0 to 100%
-    virtual double getMax() { return 100; };
-    virtual double getDimPerMS() { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_shade_angle_outside; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "angle"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
+    virtual double getMax() P44_OVERRIDE { return 100; };
+    virtual double getDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
 
   };
   typedef boost::intrusive_ptr<ShadowAngleChannel> ShadowAngleChannelPtr;

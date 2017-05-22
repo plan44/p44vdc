@@ -64,6 +64,15 @@ string ChannelBehaviour::description()
 
 
 
+string ChannelBehaviour::getStatusText()
+{
+  int fracDigits = (int)(-log(resolution)/log(10)+0.99);
+  if (fracDigits<0) fracDigits=0;
+  return string_format("%0.*f %s", fracDigits, cachedChannelValue, valueUnitName(getChannelUnit(), true).c_str());
+}
+
+
+
 // MARK: ===== channel value handling
 
 
@@ -280,6 +289,8 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
 enum {
   name_key,
   channelIndex_key,
+  siunit_key,
+  unitsymbol_key,
   min_key,
   max_key,
   resolution_key,
@@ -315,6 +326,8 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
   static const PropertyDescription channelDescProperties[numChannelDescProperties] = {
     { "name", apivalue_string, name_key+descriptions_key_offset, OKEY(channel_Key) },
     { "channelIndex", apivalue_uint64, channelIndex_key+descriptions_key_offset, OKEY(channel_Key) },
+    { "siunit", apivalue_string, siunit_key+descriptions_key_offset, OKEY(channel_Key) },
+    { "symbol", apivalue_string, unitsymbol_key+descriptions_key_offset, OKEY(channel_Key) },
     { "min", apivalue_double, min_key+descriptions_key_offset, OKEY(channel_Key) },
     { "max", apivalue_double, max_key+descriptions_key_offset, OKEY(channel_Key) },
     { "resolution", apivalue_double, resolution_key+descriptions_key_offset, OKEY(channel_Key) },
@@ -353,6 +366,12 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
           return true;
         case channelIndex_key+descriptions_key_offset:
           aPropValue->setUint8Value(channelIndex);
+          return true;
+        case siunit_key+descriptions_key_offset:
+          aPropValue->setStringValue(valueUnitName(getChannelUnit(), false));
+          return true;
+        case unitsymbol_key+descriptions_key_offset:
+          aPropValue->setStringValue(valueUnitName(getChannelUnit(), true));
           return true;
         case min_key+descriptions_key_offset:
           aPropValue->setDoubleValue(getMin());

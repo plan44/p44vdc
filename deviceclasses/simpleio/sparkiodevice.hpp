@@ -41,17 +41,15 @@ namespace p44 {
   };
 
 
-  class SparkModeChannel : public ChannelBehaviour
+  class SparkModeChannel : public IndexChannel
   {
-    typedef ChannelBehaviour inherited;
+    typedef IndexChannel inherited;
 
   public:
-    SparkModeChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* modes are integers */ };
+    SparkModeChannel(OutputBehaviour &aOutput) : inherited(aOutput) { setNumIndices(3); };
 
     virtual DsChannelType getChannelType() { return channeltype_sparkmode; }; ///< custom device-specific channel
     virtual const char *getName() { return "x-p44-sparkmode"; };
-    virtual double getMin() { return 0; }; // mode goes from 0..3
-    virtual double getMax() { return 3; };
     virtual bool wrapsAround() { return true; }; ///< mode wraps around
   };
 

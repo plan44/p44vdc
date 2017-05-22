@@ -37,10 +37,11 @@ namespace p44 {
   public:
     HeatingLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1% of full scale */ };
 
-    virtual DsChannelType getChannelType() { return channeltype_heatingLevel; };
-    virtual const char *getName() { return "heatingLevel"; };
-    virtual double getMin() { return 0; }; // heating is 0..100 (cooling would be -100..0)
-    virtual double getMax() { return 100; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_heatingLevel; };
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "heatingLevel"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // heating is 0..100 (cooling would be -100..0)
+    virtual double getMax() P44_OVERRIDE { return 100; };
     
   };
 

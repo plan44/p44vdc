@@ -64,12 +64,13 @@ namespace p44 {
   public:
     HueChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.1; /* 0.1 degree */ };
 
-    virtual DsChannelType getChannelType() { return channeltype_hue; }; ///< the dS channel type
-    virtual ColorLightMode colorMode() { return colorLightModeHueSaturation; };
-    virtual const char *getName() { return "hue"; };
-    virtual double getMin() { return 0; }; // hue goes from 0 to (almost) 360 degrees
-    virtual double getMax() { return 358.6; };
-    virtual bool wrapsAround() { return true; }; ///< hue wraps around
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_hue; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_degree, unitScaling_1); };
+    virtual ColorLightMode colorMode() P44_OVERRIDE { return colorLightModeHueSaturation; };
+    virtual const char *getName() P44_OVERRIDE { return "hue"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // hue goes from 0 to (almost) 360 degrees
+    virtual double getMax() P44_OVERRIDE { return 358.6; };
+    virtual bool wrapsAround() P44_OVERRIDE { return true; }; ///< hue wraps around
   };
 
 
@@ -80,11 +81,12 @@ namespace p44 {
   public:
     SaturationChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.1; /* 0.1 percent */ };
 
-    virtual DsChannelType getChannelType() { return channeltype_saturation; }; ///< the dS channel type
-    virtual ColorLightMode colorMode() { return colorLightModeHueSaturation; };
-    virtual const char *getName() { return "saturation"; };
-    virtual double getMin() { return 0; }; // saturation goes from 0 to 100 percent
-    virtual double getMax() { return 100; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_saturation; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual ColorLightMode colorMode() P44_OVERRIDE { return colorLightModeHueSaturation; };
+    virtual const char *getName() P44_OVERRIDE { return "saturation"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // saturation goes from 0 to 100 percent
+    virtual double getMax() P44_OVERRIDE { return 100; };
   };
 
 
@@ -95,11 +97,12 @@ namespace p44 {
   public:
     ColorTempChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1 mired */ };
 
-    virtual DsChannelType getChannelType() { return channeltype_colortemp; }; ///< the dS channel type
-    virtual ColorLightMode colorMode() { return colorLightModeCt; };
-    virtual const char *getName() { return "color temperature"; };
-    virtual double getMin() { return 100; }; // CT goes from 100 to 1000 mired (10000K to 1000K)
-    virtual double getMax() { return 1000; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_colortemp; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(ValueUnit_mired, unitScaling_1); };
+    virtual ColorLightMode colorMode() P44_OVERRIDE { return colorLightModeCt; };
+    virtual const char *getName() P44_OVERRIDE { return "color temperature"; };
+    virtual double getMin() P44_OVERRIDE { return 100; }; // CT goes from 100 to 1000 mired (10000K to 1000K)
+    virtual double getMax() P44_OVERRIDE { return 1000; };
   };
 
 
@@ -110,11 +113,12 @@ namespace p44 {
   public:
     CieXChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.01; /* 1% of full scale */ };
 
-    virtual DsChannelType getChannelType() { return channeltype_cie_x; }; ///< the dS channel type
-    virtual ColorLightMode colorMode() { return colorLightModeXY; };
-    virtual const char *getName() { return "CIE X"; };
-    virtual double getMin() { return 0; }; // CIE x and y have 0..1 range
-    virtual double getMax() { return 1; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_cie_x; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
+    virtual ColorLightMode colorMode() P44_OVERRIDE { return colorLightModeXY; };
+    virtual const char *getName() P44_OVERRIDE { return "CIE X"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // CIE x and y have 0..1 range
+    virtual double getMax() P44_OVERRIDE { return 1; };
   };
 
 
@@ -125,11 +129,12 @@ namespace p44 {
   public:
     CieYChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.01; /* 1% of full scale */ };
 
-    virtual DsChannelType getChannelType() { return channeltype_cie_y; }; ///< the dS channel type
-    virtual ColorLightMode colorMode() { return colorLightModeXY; };
-    virtual const char *getName() { return "CIE Y"; };
-    virtual double getMin() { return 0; }; // CIE x and y have 0..1 range
-    virtual double getMax() { return 1; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_cie_y; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
+    virtual ColorLightMode colorMode() P44_OVERRIDE { return colorLightModeXY; };
+    virtual const char *getName() P44_OVERRIDE { return "CIE Y"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // CIE x and y have 0..1 range
+    virtual double getMax() P44_OVERRIDE { return 1; };
   };
 
 

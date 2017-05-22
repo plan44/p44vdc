@@ -278,6 +278,10 @@ namespace p44 {
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
     virtual string getExtraInfo() { return ""; };
 
+    /// Get short text for a "first glance" status of the device
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getStatusText() { return ""; };
+
     /// @}
 
 

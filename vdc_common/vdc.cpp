@@ -766,7 +766,7 @@ void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const c
   aStatement.bind(aIndex++, defaultZoneID);
 }
 
-// MARK: ===== description/shortDesc
+// MARK: ===== description/shortDesc/status
 
 
 string Vdc::description()
@@ -781,6 +781,17 @@ string Vdc::description()
   );
   return d;
 }
+
+
+string Vdc::getStatusText()
+{
+  if (!Error::isOK(vdcErr)) {
+    return "Error";
+  }
+  return inherited::getStatusText();
+}
+
+
 
 
 

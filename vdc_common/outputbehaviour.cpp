@@ -590,3 +590,17 @@ string OutputBehaviour::description()
   return s;
 }
 
+
+string OutputBehaviour::getStatusText()
+{
+  // show first channel's value
+  ChannelBehaviourPtr ch = getChannelByType(0); // get main channel
+  if (ch) {
+    return ch->getStatusText();
+  }
+  return "";
+}
+
+
+
+

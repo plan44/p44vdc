@@ -39,6 +39,7 @@ namespace p44 {
     AirflowIntensityChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1% of full scale */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_intensity; };
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "airflow intensity"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // intensity level is 0..100 in % of device's available range
     virtual double getMax() P44_OVERRIDE { return 100; };
@@ -54,6 +55,7 @@ namespace p44 {
     AirflowDirectionChannel(OutputBehaviour &aOutput) : inherited(aOutput) { setNumIndices(numDsVentilationDirectionStates); }; ///< see DsVentilationDirectionState enum
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_direction; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "airflow direction"; };
   };
   typedef boost::intrusive_ptr<AirflowDirectionChannel> AirflowDirectionChannelPtr;
@@ -67,6 +69,7 @@ namespace p44 {
     LouverPositionChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1% of full scale */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_louver_position; };
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "louver position"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // intensity level is 0..100 in % of device's available range
     virtual double getMax() P44_OVERRIDE { return 100; };

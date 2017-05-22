@@ -350,6 +350,12 @@ namespace p44 {
     /// @return textual description of object
     virtual string description() P44_OVERRIDE;
 
+    /// Get short text for a "first glance" status of the behaviour
+    /// @return string, really short, intended to be shown as a narrow column in a list
+    virtual string getStatusText() P44_OVERRIDE;
+
+
+
   protected:
 
     // property access implementation
