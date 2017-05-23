@@ -594,7 +594,7 @@ string OutputBehaviour::description()
 string OutputBehaviour::getStatusText()
 {
   // show first channel's value
-  ChannelBehaviourPtr ch = getChannelByType(0); // get main channel
+  ChannelBehaviourPtr ch = getChannelByType(channeltype_default); // get default channel
   if (ch) {
     return ch->getStatusText();
   }
