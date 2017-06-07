@@ -84,7 +84,7 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   }
   // Power sensor
   powerSensor = SensorBehaviourPtr(new SensorBehaviour(*this));
-  powerSensor->setHardwareSensorConfig(sensorType_power, usage_undefined, 0, 2300, 0.01, STATE_POLL_INTERVAL, 10*STATE_POLL_INTERVAL);
+  powerSensor->setHardwareSensorConfig(sensorType_power, usage_undefined, 0, 2300, 0.01, STATE_POLL_INTERVAL, 10*STATE_POLL_INTERVAL, 5*STATE_POLL_INTERVAL);
   powerSensor->setSensorNameWithRange("Power");
   addBehaviour(powerSensor);
   // dsuid
