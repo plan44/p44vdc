@@ -212,42 +212,99 @@ static const char *windowText = "Window open/tilted";
 const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max,MSB,     LSB,  updateIv,aliveSignIv, handler,     typeText
   // A5-02-xx: Temperature sensors
-  // - 40 degree range                 behaviour_binaryinput
-  { 0, 0x02, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,   -40,    0, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,   -30,   10, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,   -20,   20, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  // - 40 degree range
+  //   -40..0
+  { 0, 0x02, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -40,    0, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -40,    0, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -30..10
+  { 0, 0x02, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -30,   10, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -30,   10, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -20..20
+  { 0, 0x02, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -20,   20, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20,   20, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -10..30
   { 0, 0x02, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -10,   30, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -10,   30, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   0..40
   { 0, 0x02, 0x05, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    10,   50, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x07, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    20,   60, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x08, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    30,   70, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x09, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    40,   80, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x0A, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    50,   90, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x0B, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    60,  100, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x05, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,      0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   10..50
+  { 0, 0x02, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         10,   50, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     10,   50, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   20..60
+  { 0, 0x02, 0x07, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         20,   60, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x07, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     20,   60, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   30..70
+  { 0, 0x02, 0x08, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         30,   70, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x08, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     30,   70, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   40..80
+  { 0, 0x02, 0x09, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         40,   80, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x09, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     40,   80, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   50..90
+  { 0, 0x02, 0x0A, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         50,   90, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x0A, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     50,   90, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   60..100
+  { 0, 0x02, 0x0B, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         60,  100, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x0B, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     60,  100, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
   // - 80 degree range
-  { 0, 0x02, 0x10, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,   -60,   20, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x11, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,   -50,   30, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x12, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,   -40,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x13, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,   -30,   50, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x14, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,   -20,   60, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -60..20
+  { 0, 0x02, 0x10, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -60,   20, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x10, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -60,   20, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -50..30
+  { 0, 0x02, 0x11, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -50,   30, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x11, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -50,   30, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -40..40
+  { 0, 0x02, 0x12, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -40,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x12, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -40,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -30..50
+  { 0, 0x02, 0x13, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -30,   50, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x13, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -30,   50, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -20..60
+  { 0, 0x02, 0x14, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -20,   60, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x14, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20,   60, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -10..70
   { 0, 0x02, 0x15, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -10,   70, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x15, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -10,   70, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   0..80
   { 0, 0x02, 0x16, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   80, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x17, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    10,   90, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x18, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    20,  100, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x19, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    30,  110, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x1A, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    40,  120, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x1B, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,    50,  130, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x16, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,      0,   80, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   10..90
+  { 0, 0x02, 0x17, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         10,   90, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x17, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     10,   90, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   20..100
+  { 0, 0x02, 0x18, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         20,  100, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x18, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     20,  100, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   30..110
+  { 0, 0x02, 0x19, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         30,  110, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x19, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     30,  110, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   40..120
+  { 0, 0x02, 0x1A, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         40,  120, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x1A, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     40,  120, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   50..130
+  { 0, 0x02, 0x1B, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         50,  130, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x1B, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,     50,  130, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
   // - 10 bit
+  //   -10..40
   { 0, 0x02, 0x20, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -10, 41.2, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  { 0, 0x02, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_undefined,   -40, 62.3, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x20, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -10, 41.2, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  //   -40..60
+  { 0, 0x02, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -40, 62.3, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
+  { 1, 0x02, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -40, 62.3, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
   // A5-04-xx: Temperature and Humidity
-  // - 0..40 degree indoor, e.g. Alpha Sense
+  // - 0..40 degree, e.g. Alpha Sense
+  //   - Default profile is indoor
   { 0, 0x04, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0, 40.8, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
   { 0, 0x04, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,          0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText, },
-  // -20..60 degree outdoor, e.g. Alpha Sense
+  //   - Alternate profile is outdoor
+  { 1, 0x04, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,      0, 40.8, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
+  { 1, 0x04, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_outdoors,      0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText, },
+  // - -20..60 degree, e.g. Alpha Sense or Eltako FFT65B
+  //   - Default profile is outdoor
   { 0, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
   { 0, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_outdoors,      0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText },
-
+  //   - Alternate profile is indoor
+  { 1, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
+  { 1, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,          0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText },
   // A5-06-xx: Light Sensors
   // - A5-06-01 outdoor
   { 0, 0x06, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_outdoors,    300,60000, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,      illumText },
@@ -336,7 +393,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // A5-10-06: Room Panel with Temperature Sensor, Set Point Control, Day/Night Control
   { 0, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText },
   { 0, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_set_point,   usage_user,          0,    1, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, setPointText },
-  { 0, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,       usage_user,           0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText },
+  { 0, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_none,        usage_user,          0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  dayNightText },
   // A5-10-06: Variant with Set Point Control as temperature scaled 0..40 degrees
   // - e.g. Eltako FTR55D
   { 1, 0x10, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText },
@@ -350,7 +407,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // A5-10-08: Room Control Panel with Temperature Sensor, Fan Speed and Occupancy button
   { 0, 0x10, 0x08, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText },
   { 0, 0x10, 0x08, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_fan_speed,   usage_room,         -1,    1, DB(3,7), DB(3,0), 100, 40*60, &fanSpeedHandler,  fanSpeedText },
-  { 0, 0x10, 0x08, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,   usage_user,           1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText },
+  { 0, 0x10, 0x08, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText },
 
   // A5-10-09: Room Control Panel with Temperature Sensor, Fan Speed and day/night control
   { 0, 0x10, 0x09, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   40, DB(1,7), DB(1,0), 100, 40*60, &invSensorHandler, tempText },
@@ -515,21 +572,82 @@ Enocean4BSDevice::Enocean4BSDevice(EnoceanVdc *aVdcP) :
 }
 
 
+static const char *indoorText = "indoor temperature";
+static const char *outdoorText = "outdoor temperature";
+
+
 static const ProfileVariantEntry profileVariants4BS[] = {
   // heating valve alternatives
-  { 1, 0x00A52001, 0, "heating valve" },
-  { 1, 0x01A52001, 0, "heating valve (with temperature sensor)" },
-  { 1, 0x02A52001, 0, "heating valve with binary output adjustment (e.g. MD10-FTL)" },
-  { 1, 0x03A52001, 0, "heating valve in self-regulation mode" },
+  {  1, 0x00A52001, 0, "heating valve" },
+  {  1, 0x01A52001, 0, "heating valve (with temperature sensor)" },
+  {  1, 0x02A52001, 0, "heating valve with binary output adjustment (e.g. MD10-FTL)" },
+  {  1, 0x03A52001, 0, "heating valve in self-regulation mode" },
   // room panel alternatives for set point
-  { 2, 0x00A51006, 0, "standard profile" },
-  { 2, 0x01A51006, 0, "set point interpreted as 0..40°C (e.g. FTR55D)" },
+  {  2, 0x00A51006, 0, "standard profile" },
+  {  2, 0x01A51006, 0, "set point interpreted as 0..40°C (e.g. FTR55D)" },
   // weather station alternatives for separated sun sensors
-  { 3, 0x01A51301, 0, "weather station device + 3 separate sun sensor devices" },
-  { 3, 0x00A51301, 0, "weather station with all sensors in single device" },
+  {  3, 0x01A51301, 0, "weather station device + 3 separate sun sensor devices" },
+  {  3, 0x00A51301, 0, "weather station with all sensors in single device" },
   // illumination sensor variants
-  { 4, 0x00A50601, 0, "outdoor illumination sensor" },
-  { 4, 0x01A50601, 0, "outdoor illumination with low light (e.g. FAH60)" },
+  {  4, 0x00A50601, 0, "outdoor illumination sensor" },
+  {  4, 0x01A50601, 0, "outdoor illumination with low light (e.g. FAH60)" },
+  // all temperature sensors have indoor and outdoor variant
+  // - 40 degree ranges
+  {  5, 0x00A50201, 0, indoorText },
+  {  5, 0x01A50201, 0, outdoorText },
+  {  6, 0x00A50202, 0, indoorText },
+  {  6, 0x01A50202, 0, outdoorText },
+  {  7, 0x00A50203, 0, indoorText },
+  {  7, 0x01A50203, 0, outdoorText },
+  {  8, 0x00A50204, 0, indoorText },
+  {  8, 0x01A50204, 0, outdoorText },
+  {  9, 0x00A50205, 0, indoorText },
+  {  9, 0x01A50205, 0, outdoorText },
+  { 10, 0x00A50206, 0, indoorText },
+  { 10, 0x01A50206, 0, outdoorText },
+  { 11, 0x00A50207, 0, indoorText },
+  { 11, 0x01A50207, 0, outdoorText },
+  { 12, 0x00A50208, 0, indoorText },
+  { 12, 0x01A50208, 0, outdoorText },
+  { 13, 0x00A50209, 0, indoorText },
+  { 13, 0x01A50209, 0, outdoorText },
+  { 14, 0x00A5020A, 0, indoorText },
+  { 14, 0x01A5020A, 0, outdoorText },
+  { 15, 0x00A5020B, 0, indoorText },
+  { 15, 0x01A5020B, 0, outdoorText },
+  // - 80 degree ranges
+  { 16, 0x00A50211, 0, indoorText },
+  { 16, 0x01A50211, 0, outdoorText },
+  { 17, 0x00A50212, 0, indoorText },
+  { 17, 0x01A50212, 0, outdoorText },
+  { 18, 0x00A50213, 0, indoorText },
+  { 18, 0x01A50213, 0, outdoorText },
+  { 19, 0x00A50214, 0, indoorText },
+  { 19, 0x01A50214, 0, outdoorText },
+  { 20, 0x00A50215, 0, indoorText },
+  { 20, 0x01A50215, 0, outdoorText },
+  { 21, 0x00A50216, 0, indoorText },
+  { 21, 0x01A50216, 0, outdoorText },
+  { 22, 0x00A50217, 0, indoorText },
+  { 22, 0x01A50217, 0, outdoorText },
+  { 23, 0x00A50218, 0, indoorText },
+  { 23, 0x01A50218, 0, outdoorText },
+  { 24, 0x00A50219, 0, indoorText },
+  { 24, 0x01A50219, 0, outdoorText },
+  { 25, 0x00A5021A, 0, indoorText },
+  { 25, 0x01A5021A, 0, outdoorText },
+  { 26, 0x00A5021B, 0, indoorText },
+  { 26, 0x01A5021B, 0, outdoorText },
+  // - 10 bit
+  { 27, 0x00A50220, 0, indoorText },
+  { 27, 0x01A50220, 0, outdoorText },
+  { 28, 0x00A50230, 0, indoorText },
+  { 28, 0x01A50230, 0, outdoorText },
+  // - with humidity
+  { 29, 0x00A50401, 0, indoorText },
+  { 29, 0x01A50401, 0, outdoorText },
+  { 29, 0x00A50402, 0, outdoorText }, // outdoor is default!
+  { 29, 0x01A50402, 0, indoorText },
   { 0, 0, 0, NULL } // terminator
 };
 
