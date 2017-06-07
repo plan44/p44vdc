@@ -54,6 +54,8 @@ namespace p44 {
   public:
     MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig);
 
+    virtual ~MyStromDevice();
+
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
     virtual string deviceTypeIdentifier() const { return "spark_io"; };

@@ -92,6 +92,11 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
 }
 
 
+MyStromDevice::~MyStromDevice()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(powerPollTicket);
+}
+
 
 bool MyStromDevice::myStromApiQuery(JsonWebClientCB aResponseCB, string aPathAndArgs)
 {
