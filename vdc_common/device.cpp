@@ -305,7 +305,8 @@ static const char *modelFeatureNames[numModelFeatures] = {
   "extradimmer",
   "umvrelay",
   "blinkconfig",
-  "umroutmode"
+  "umroutmode",
+  "fcu"
 };
 
 

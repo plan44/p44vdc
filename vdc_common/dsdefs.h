@@ -372,6 +372,7 @@ typedef enum {
   modelFeature_umvrelay, ///< Shows "Relay Function" settings in "Device Properties" dialog.
   modelFeature_blinkconfig, ///< Shows "Blink behavior for output on scene calls" settings in the advanced "Device Properties" dialog.
   modelFeature_umroutmode, ///< Enables the "Output mode" radio group in "Device Properties" dialog and influences its contents. The presented options will be: "single switched" (35) for all dSUIDs and "combined switched" (43), "combined two stage switched" (34), "combined three stage switched" (38) and "disabled" (0).
+  modelFeature_fcu, ///< enables FCU specific UI bits such as "automatic" flags
   numModelFeatures
 } DsModelFeatures;
 

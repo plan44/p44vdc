@@ -186,8 +186,11 @@ Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
       // ...but not the more specific PWM and heating props
       return no;
     case modelFeature_valvetype:
-      // for now, all climate control devices are heating valves
-      return yes;
+      // only for heating valve devices
+      return climateDeviceKind==climatedevice_heatingvalve ? yes : no;
+    case modelFeature_fcu:
+      // only for fcu devices
+      return climateDeviceKind==climatedevice_fancoilunit ? yes : no;
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
