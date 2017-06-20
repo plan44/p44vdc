@@ -194,20 +194,44 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
     while (aBusDevices->size()>0) {
       // get first remaining
       DaliBusDevicePtr busDevice = aBusDevices->front();
-      // duplicate dSUID check
-      bool anyDuplicates = false;
-      for (DaliBusDeviceList::iterator refpos = ++aBusDevices->begin(); refpos!=aBusDevices->end(); ++refpos) {
-        if (busDevice->dSUID==(*refpos)->dSUID) {
-          // duplicate dSUID, indicates DALI devices with invalid device info that slipped all heuristics
-          LOG(LOG_ERR, "Bus devices #%d and #%d have same dSUID -> assuming invalid device info, reverting both to short address based dSUID", busDevice->deviceInfo->shortAddress, (*refpos)->deviceInfo->shortAddress);
-          // - clear all device info except short address and revert to short address derived dSUID
-          (*refpos)->clearDeviceInfo();
-          anyDuplicates = true; // at least one found
+      // duplicate dSUID check for devInf-based IDs (if devinf is already detected unusable here, there's no need for checking)
+      if (busDevice->deviceInfo->devInfStatus>=DaliDeviceInfo::devinf_solid) {
+        DsUid thisDsuid;
+        #if OLD_BUGGY_CHKSUM_COMPATIBLE
+        if (busDevice->deviceInfo->devInfStatus==DaliDeviceInfo::devinf_notForID) {
+          // check native dsuid, not shortaddress based fallback
+          busDevice->dsUidForDeviceInfoStatus(thisDsuid, DaliDeviceInfo::devinf_solid);
         }
-      }
-      if (anyDuplicates) {
-        // consider my own info invalid as well
-        busDevice->clearDeviceInfo();
+        else
+        #endif
+        {
+          thisDsuid = busDevice->dSUID;
+        }
+        bool anyDuplicates = false;
+        for (DaliBusDeviceList::iterator refpos = ++aBusDevices->begin(); refpos!=aBusDevices->end(); ++refpos) {
+          DsUid otherDsuid;
+          #if OLD_BUGGY_CHKSUM_COMPATIBLE
+          if ((*refpos)->deviceInfo->devInfStatus==DaliDeviceInfo::devinf_notForID) {
+            // check native dsuid, not shortaddress based fallback
+            (*refpos)->dsUidForDeviceInfoStatus(otherDsuid, DaliDeviceInfo::devinf_solid);
+          }
+          else
+          #endif
+          {
+            otherDsuid = (*refpos)->dSUID;
+          }
+          if (thisDsuid==otherDsuid) {
+            // duplicate dSUID, indicates DALI devices with invalid device info that slipped all heuristics
+            LOG(LOG_ERR, "Bus devices #%d and #%d have same devinf-based dSUID -> assuming invalid device info, forcing both to short address based dSUID", busDevice->deviceInfo->shortAddress, (*refpos)->deviceInfo->shortAddress);
+            // - clear all device info except short address and revert to short address derived dSUID
+            (*refpos)->clearDeviceInfo();
+            anyDuplicates = true; // at least one found
+          }
+        }
+        if (anyDuplicates) {
+          // consider my own info invalid as well
+          busDevice->clearDeviceInfo();
+        }
       }
       // check if this device is part of a DALI group
       sqlite3pp::query qry(db);

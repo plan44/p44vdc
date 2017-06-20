@@ -127,8 +127,6 @@ void DaliBusDevice::deriveDsUid()
 {
   if (isDummy) return;
   // vDC implementation specific UUID:
-  DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s;
   #if OLD_BUGGY_CHKSUM_COMPATIBLE
   if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_maybe) {
     // assume we can use devInf to derive dSUID from
@@ -136,10 +134,8 @@ void DaliBusDevice::deriveDsUid()
     // but only actually use it if there is no device entry for the shortaddress-based dSUID with a non-zero name
     // (as this means the device has been already actively used/configured with the shortaddr-dSUID)
     // - calculate the short address based dSUID
-    s = daliVdc.vdcInstanceIdentifier();
-    string_format_append(s, "::%d", deviceInfo->shortAddress);
     DsUid shortAddrBasedDsUid;
-    shortAddrBasedDsUid.setNameInSpace(s, vdcNamespace);
+    dsUidForDeviceInfoStatus(shortAddrBasedDsUid, devinf_notForID);
     // - check for named device in database consisting of this dimmer with shortaddr based dSUID
     //   Note that only single dimmer device are checked for, composite devices will not have this compatibility mechanism
     sqlite3pp::query qry(daliVdc.getVdcHost().getDsParamStore());
@@ -159,7 +155,15 @@ void DaliBusDevice::deriveDsUid()
     }
   }
   #endif // OLD_BUGGY_CHKSUM_COMPATIBLE
-  if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
+  dsUidForDeviceInfoStatus(dSUID, deviceInfo->devInfStatus);
+}
+
+
+void DaliBusDevice::dsUidForDeviceInfoStatus(DsUid &aDsUid, DaliDeviceInfo::DaliDevInfStatus aDevInfStatus)
+{
+  DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
+  string s;
+  if (aDevInfStatus==DaliDeviceInfo::devinf_solid) {
     // uniquely identified by GTIN+Serial, but unknown partition value:
     // - Proceed according to dS rule 2:
     //   "vDC can determine GTIN and serial number of Device → combine GTIN and
@@ -175,8 +179,9 @@ void DaliBusDevice::deriveDsUid()
     s = daliVdc.vdcInstanceIdentifier();
     string_format_append(s, "::%d", deviceInfo->shortAddress);
   }
-  dSUID.setNameInSpace(s, vdcNamespace);
+  aDsUid.setNameInSpace(s, vdcNamespace);
 }
+
 
 
 

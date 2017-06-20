@@ -100,6 +100,9 @@ namespace p44 {
     /// derive the dSUID from collected device info
     virtual void deriveDsUid();
 
+    /// calculate (but not set) dSUID for a specific devInf statzs
+    void dsUidForDeviceInfoStatus(DsUid &aDsUid, DaliDeviceInfo::DaliDevInfStatus aDevInfStatus);
+
     /// check if bus device represents a DALI group
     /// @return true if group
     virtual bool isGrouped() { return false; }
