@@ -59,6 +59,16 @@ DaliComm::~DaliComm()
 }
 
 
+// MARK: ===== GTIN blacklist for ill-behaving devices
+
+
+const long long DALI_GTIN_blacklist[] = {
+  4052899919433, // OTi DALI 50/220…240/1A4 LT2 FAN - has garbage serial no, many duplicates!
+  0 // terminator
+};
+
+
+
 // MARK: ===== procedure management
 
 void DaliComm::startProcedure()
@@ -1386,17 +1396,32 @@ private:
         LOG(LOG_ERR, "DALI shortaddress %d has invalid GTIN=%lld/0x%llX -> ignoring", busAddress, deviceInfo->gtin, deviceInfo->gtin);
         deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
       }
-      else if (deviceInfo->serialNo==0 || deviceInfo->serialNo==0xFFFFFFFF) {
-        // all bits zero or all bits one is considered invalid serial,
-        // as well as 2-byte and 3-byte all-one serials are
-        LOG(LOG_ERR, "DALI shortaddress %d has suspect S/N=%lld/0x%llX -> ignoring", busAddress, deviceInfo->serialNo, deviceInfo->serialNo);
+      else {
         if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
-          // if everything else is ok, except for a all zero or all 1 serial number, consider GTIN valid
-          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_only_gtin;
+          // we have a GTIN -> check blacklist
+          int i=0;
+          while (DALI_GTIN_blacklist[i]!=0) {
+            if (deviceInfo->gtin==DALI_GTIN_blacklist[i]) {
+              // found in blacklist, invalidate serial
+              LOG(LOG_ERR, "GTIN %lld of DALI shortaddress %d is blacklisted because it is known to have invalid serial -> invalidating serial", deviceInfo->gtin, busAddress);
+              deviceInfo->serialNo = 0; // reset, make invalid for check below
+              break;
+            }
+            i++;
+          }
         }
-        else {
-          // was not solid before, consider completely invalid
-          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none;
+        if (deviceInfo->serialNo==0 || deviceInfo->serialNo==0xFFFFFFFF) {
+          // all bits zero or all bits one is considered invalid serial,
+          // as well as 2-byte and 3-byte all-one serials are
+          LOG(LOG_ERR, "DALI shortaddress %d has suspect S/N=%lld/0x%llX -> ignoring", busAddress, deviceInfo->serialNo, deviceInfo->serialNo);
+          if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
+            // if everything else is ok, except for a all zero or all 1 serial number, consider GTIN valid
+            deviceInfo->devInfStatus = DaliDeviceInfo::devinf_only_gtin;
+          }
+          else {
+            // was not solid before, consider completely invalid
+            deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none;
+          }
         }
       }
       // check for extra data device may have
