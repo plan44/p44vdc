@@ -132,8 +132,6 @@ namespace p44 {
     /// @note learn events (new devices found or devices removed) must be reported by calling reportLearnEvent() on VdcHost.
     virtual void setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish) P44_OVERRIDE;
 
-  protected:
-
     /// remove device
     /// @param aDevice device to remove (possibly only part of a multi-function physical device)
     virtual void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;

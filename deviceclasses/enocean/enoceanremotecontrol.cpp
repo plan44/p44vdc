@@ -85,14 +85,7 @@ void EnoceanRemoteControlDevice::buttonAction(bool aRight, bool aUp, bool aPress
     packet->radioUserData()[0] = 0x00; // release
     packet->setRadioStatus(status_T21); // released
   }
-  EnoceanAddress addr = getAddress(); // my own ID base derived address that is learned into this actor
-  // Note: For migrated settings cases, addr might contain a base address different from this modem's (that of the original EnOcean modem).
-  //   To facilitate migration (keeping the devices with current dSUIDs, derived from the original modem's base address),
-  //   we ignore the base address in addr and always use the actual base address of this modem
-  //   (otherwise the modem will not send any data at all).
-  addr &= 0x7F; // only keep the offset to the base address
-  addr += getEnoceanVdc().enoceanComm.idBase(); // add-in the actual modem base address
-  packet->setRadioSender(addr); // set as sender address
+  packet->setRadioSender(getEnoceanVdc().enoceanComm.makeSendAddress(getAddress()));
   getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
 }
 
@@ -212,6 +205,34 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         aSubDeviceIndex++;
       }
     }
+    else if (EEP_FUNC(aEEProfile)==PSEUDO_FUNC_SYSTEMELECTRONIC && aSubDeviceIndex<1) {
+      // SystemElectronic.de proprietary devices
+      if (EEP_TYPE(aEEProfile)==PSEUDO_TYPE_SE_HEATTUBE) {
+        // 4-Stage heat tube device
+        newDev = EnoceanDevicePtr(new EnoceanSEHeatTubeDevice(aVdcP));
+        // standard single-value scene table (SimpleScene)
+        newDev->installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*newDev)));
+        // assign channel and address
+        newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
+        // assign EPP information
+        newDev->setEEPInfo(aEEProfile, aEEManufacturer);
+        // is joker
+        newDev->setColorClass(class_blue_climate);
+        // function
+        newDev->setFunctionDesc("3 stage heating");
+        // is always updateable (no need to wait for incoming data)
+        newDev->setAlwaysUpdateable();
+        // - add standard output behaviour
+        OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*newDev.get()));
+        o->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, 900); // 900W according to data sheet
+        o->setGroupMembership(group_blue_heating, true); // put into simple heating group by default
+        o->addChannel(ChannelBehaviourPtr(new SEHeatTubeChannel(*o)));
+        // does not need a channel handler at all, just add behaviour
+        newDev->addBehaviour(o);
+        // count it
+        aSubDeviceIndex++;
+      }
+    }
   }
   // remote control devices never need a teach-in response
   // return device (or empty if none created)
@@ -239,14 +260,15 @@ void EnoceanRelayControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDi
       buttonAction(false, up, true);
       MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanRelayControlDevice::sendReleaseTelegram, this, aDoneCB, up), BUTTON_PRESS_TIME);
       ch->channelValueApplied();
+      return; // sendReleaseTelegram will call aDoneCB
     }
   }
+  inherited::applyChannelValues(aDoneCB, aForDimming);
 }
 
 
 void EnoceanRelayControlDevice::sendReleaseTelegram(SimpleCB aDoneCB, bool aUp)
 {
-  commandTicket = 0;
   // just release
   buttonAction(false, aUp, false);
   // schedule callback if set
@@ -263,8 +285,7 @@ void EnoceanRelayControlDevice::sendReleaseTelegram(SimpleCB aDoneCB, bool aUp)
 EnoceanBlindControlDevice::EnoceanBlindControlDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep) :
   inherited(aVdcP, aDsuidIndexStep),
   movingDirection(0),
-  commandTicket(0),
-  missedUpdate(false)
+  commandTicket(0)
 {
 };
 
@@ -288,7 +309,9 @@ void EnoceanBlindControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDi
   if (sb) {
     // ask shadow behaviour to start movement sequence
     sb->applyBlindChannels(boost::bind(&EnoceanBlindControlDevice::changeMovement, this, _1, _2), aDoneCB, aForDimming);
+    return; // changeMovement will call aDoneCB
   }
+  inherited::applyChannelValues(aDoneCB, aForDimming);
 }
 
 
@@ -357,6 +380,78 @@ void EnoceanBlindControlDevice::sendReleaseTelegram(SimpleCB aDoneCB)
   // schedule callback if set
   if (aDoneCB) {
     MainLoop::currentMainLoop().executeOnce(boost::bind(aDoneCB), PAUSE_TIME);
+  }
+}
+
+
+// MARK: ===== SystemElectronic Heat Tube device
+
+
+EnoceanSEHeatTubeDevice::EnoceanSEHeatTubeDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep) :
+  inherited(aVdcP, aDsuidIndexStep),
+  applyRepeatTicket(0)
+{
+}
+
+
+uint8_t EnoceanSEHeatTubeDevice::teachInSignal(int8_t aVariant)
+{
+  if (aVariant<1) {
+    // issue learn telegram
+    if (aVariant<0) return 1; // only query: we have a single teach-in variant
+    // send the manufacturer specific telegram for teach in:
+    //   DB3 = 0x00, DB2 = 0x00, DB1 = ((Channel << 2) & 0xFC) | 0x01, DB0 = 0x40
+    Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
+    packet->initForRorg(rorg_4BS);
+    packet->setRadioDestination(EnoceanBroadcast);
+    packet->set4BSdata(0x00000140);
+    packet->setRadioSender(getEnoceanVdc().enoceanComm.makeSendAddress(getAddress()));
+    getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
+    return 1;
+  }
+  return inherited::teachInSignal(aVariant);
+}
+
+
+
+void EnoceanSEHeatTubeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
+{
+  // standard output behaviour
+  if (output) {
+    ChannelBehaviourPtr ch = output->getChannelByType(channeltype_default);
+    if (ch->needsApplying()) {
+      int lvl  = ch->getChannelValue();
+      setPowerState(lvl);
+      ch->channelValueApplied();
+    }
+  }
+  inherited::applyChannelValues(aDoneCB, aForDimming);
+}
+
+
+void EnoceanSEHeatTubeDevice::setPowerState(int aLevel)
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(applyRepeatTicket);
+  // send the manufacturer specific telegram for setting power state:
+  //   DB3 = 0x00, DB2 = power, DB1 = ((Channel << 2) & 0xFC) | 0x01, DB0 = 0x40
+  //   power can be Off = 0x00, Power1 = 0x55, Power2 = 0xAA, Power3 = 0xFF
+  // - map it:
+  //   0..16 = off, 17..49 = power1, 50..82 = power2, 83..100 = power3
+  uint8_t pwr;
+  if (aLevel<17) pwr = 0;
+  else if (aLevel<50) pwr = 0x55;
+  else if (aLevel<83) pwr = 0xAA;
+  else pwr = 0xFF;
+  // - send command
+  Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
+  packet->initForRorg(rorg_4BS);
+  packet->setRadioDestination(EnoceanBroadcast);
+  packet->set4BSdata(0x00000140+((uint32_t)pwr<<16));
+  packet->setRadioSender(getEnoceanVdc().enoceanComm.makeSendAddress(getAddress()));
+  getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
+  // repeat non-zero power state level
+  if (pwr!=0x00) {
+    applyRepeatTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanSEHeatTubeDevice::setPowerState, this, aLevel), 2 * Minute);
   }
 }
 

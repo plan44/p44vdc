@@ -489,6 +489,11 @@ namespace p44 {
     /// send flush, i.e. a row of zeroes to re-sync EnOcean modem
     void flushLine();
 
+    /// convert the provided sender address to a sender address valid for the current modem
+    /// @param aSendAddr sender address as once recorded (only offset to base address is used, modem might have changed in the meantime)
+    /// @return sender address valid for the current modem (offset of original address combined with current modem base address)
+    EnoceanAddress makeSendAddress(EnoceanAddress aSendAddr);
+
     /// send a packet
     /// @param aPacket a Esp4Packet which must be ready for being finalize()d
     void sendPacket(Esp3PacketPtr aPacket);

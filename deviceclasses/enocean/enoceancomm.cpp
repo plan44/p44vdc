@@ -1323,6 +1323,17 @@ void EnoceanComm::sendPacket(Esp3PacketPtr aPacket)
 }
 
 
+EnoceanAddress EnoceanComm::makeSendAddress(EnoceanAddress aSendAddr)
+{
+  // Note: For migrated settings cases, addr might contain a base address different from this modem's (that of the original EnOcean modem).
+  //   To facilitate migration (keeping the devices with current dSUIDs, derived from the original modem's base address),
+  //   we ignore the base address in addr and always use the actual base address of this modem
+  //   (otherwise the modem will not send any data at all).
+  aSendAddr &= 0x7F; // only keep the offset to the base address
+  aSendAddr += idBase(); // add-in the actual modem base address
+  return aSendAddr;
+}
+
 
 void EnoceanComm::sendCommand(Esp3PacketPtr aCommandPacket, ESPPacketCB aResponsePacketCB)
 {

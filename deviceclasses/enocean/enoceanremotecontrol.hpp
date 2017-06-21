@@ -27,7 +27,7 @@
 #if ENABLE_ENOCEAN
 
 #include "enoceandevice.hpp"
-
+#include "channelbehaviour.hpp"
 
 using namespace std;
 
@@ -35,11 +35,16 @@ namespace p44 {
 
   // pseudo-RORG used in this implementation to identify "remote control" devices, i.e. those that use local baseID to send out actions
   #define PSEUDO_RORG_REMOTECONTROL 0xFF
+  // - switch controls
   #define PSEUDO_FUNC_SWITCHCONTROL 0xF6
   #define PSEUDO_TYPE_SIMPLEBLIND 0xFF // simplistic Fully-Up/Fully-Down blind controller
   #define PSEUDO_TYPE_BLIND 0xFE // time controlled blind with angle support
   #define PSEUDO_TYPE_ON_OFF 0xFD // simple relay switched on by key up and switched off by key down
   #define PSEUDO_TYPE_SWITCHED_LIGHT 0xFC // switched light (with full light behaviour)
+  // - proprietary
+  #define PSEUDO_FUNC_SYSTEMELECTRONIC 0x50 // SystemElectronic.de specific profiles
+  #define PSEUDO_TYPE_SE_HEATTUBE 0x01 // Heat tube protocol
+
 
 
   class EnoceanRemoteControlDevice : public EnoceanDevice
@@ -102,10 +107,6 @@ namespace p44 {
   {
     typedef EnoceanRemoteControlDevice inherited;
 
-    int movingDirection; ///< currently moving direction 0=stopped, -1=moving down, +1=moving up
-    long commandTicket;
-    bool missedUpdate;
-
   public:
 
     /// constructor
@@ -114,10 +115,10 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "enocean_relay"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_relay"; };
 
     /// apply channel values
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
 
   private:
 
@@ -132,7 +133,6 @@ namespace p44 {
 
     int movingDirection; ///< currently moving direction 0=stopped, -1=moving down, +1=moving up
     long commandTicket;
-    bool missedUpdate;
 
   public:
 
@@ -142,16 +142,16 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "enocean_blind"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_blind"; };
 
     /// sync channel values (with time-derived estimates of current blind position
-    virtual void syncChannelValues(SimpleCB aDoneCB);
+    virtual void syncChannelValues(SimpleCB aDoneCB) P44_OVERRIDE;
 
     /// apply channel values
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming);
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
 
     /// start or stop dimming (optimized blind controller version)
-    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode);
+    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode) P44_OVERRIDE;
 
   private:
 
@@ -159,6 +159,54 @@ namespace p44 {
     void sendReleaseTelegram(SimpleCB aDoneCB);
 
   };
+
+
+  /// digital switch channel
+  class SEHeatTubeChannel : public ChannelBehaviour
+  {
+    typedef ChannelBehaviour inherited;
+
+  public:
+    SEHeatTubeChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 33; /* 0, 33, 66, 100 */ };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "heating level"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // compatible with brightness: 0 to 100%
+    virtual double getMax() P44_OVERRIDE { return 100; };
+  };
+
+
+  class EnoceanSEHeatTubeDevice : public EnoceanRemoteControlDevice
+  {
+    typedef EnoceanRemoteControlDevice inherited;
+
+    long applyRepeatTicket;
+
+  public:
+
+    /// constructor
+    /// @param aDsuidIndexStep step between dSUID subdevice indices (default is 1, historically 2 for dual 2-way rocker switches)
+    EnoceanSEHeatTubeDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep = 1);
+
+    /// device type identifier
+    /// @return constant identifier for this type of device (one container might contain more than one type)
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_se_heattube"; };
+
+    /// @param aVariant -1 to just get number of available teach-in variants. 0..n to send teach-in signal;
+    ///   some devices may have different teach-in signals (like: one for ON, one for OFF).
+    /// @return number of teach-in signal variants the device can send
+    /// @note will be called via UI for devices that need to be learned into remote actors
+    virtual uint8_t teachInSignal(int8_t aVariant) P44_OVERRIDE;
+
+    /// apply channel values
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
+
+  private:
+
+    void setPowerState(int aLevel);
+
+  };
+
 
 }
 
