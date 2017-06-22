@@ -1091,7 +1091,7 @@ void EnoceanComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, Esp3P
     appVersion = (d[1]<<24)+(d[2]<<16)+(d[3]<<8)+d[4];
     apiVersion = (d[5]<<24)+(d[6]<<16)+(d[7]<<8)+d[8];
     myAddress = (d[9]<<24)+(d[10]<<16)+(d[11]<<8)+d[12];
-    FOCUSLOG("Received CO_RD_VERSION  answer: appVersion=0x%08X, apiVersion=0x%08X, modemAddress=0x%08X", appVersion, apiVersion, myAddress);
+    LOG(LOG_INFO, "EnOcean Module info (CO_RD_VERSION): appVersion=0x%08X, apiVersion=0x%08X, modemAddress=0x%08X", appVersion, apiVersion, myAddress);
   }
   else {
     initError(aCompletedCB, aRetriesLeft, aError);
@@ -1107,7 +1107,7 @@ void EnoceanComm::idbaseReceived(StatusCB aCompletedCB, int aRetriesLeft, Esp3Pa
   if (Error::isOK(aError)) {
     uint8_t *d = aEsp3PacketPtr->data();
     myIdBase = (d[1]<<24)+(d[2]<<16)+(d[3]<<8)+d[4];
-    FOCUSLOG("Received CO_RD_IDBASE  answer: idBase=0x%08X", myIdBase);
+    LOG(LOG_INFO, "EnOcean Module info (CO_RD_IDBASE): idBase=0x%08X", myIdBase);
   }
   else {
     initError(aCompletedCB, aRetriesLeft, aError);
