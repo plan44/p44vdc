@@ -100,11 +100,11 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
   else if (climateDeviceKind==climatedevice_fancoilunit) {
     // power state is the main channel
     // TODO: fan coil unit main channel will have a specific channel type later 
-    ch = ChannelBehaviourPtr(new DigitalChannel(*this));
+    ch = ChannelBehaviourPtr(new DigitalChannel(*this, "powerState"));
   }
   else {
     // output channel is an unspecified 0..100 dial, probably dummy
-    ch = ChannelBehaviourPtr(new DialChannel(*this));
+    ch = ChannelBehaviourPtr(new DialChannel(*this, "undefined_dial"));
   }
   addChannel(ch);
 }

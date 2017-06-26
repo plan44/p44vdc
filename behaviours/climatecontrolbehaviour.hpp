@@ -35,7 +35,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    HeatingLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1% of full scale */ };
+    HeatingLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput, "heatingLevel") { resolution = 1; /* 1% of full scale */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_heatingLevel; };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };

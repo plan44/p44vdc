@@ -947,7 +947,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     o->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_undefined, false, -1);
     o->setHardwareName(hardwareName);
     o->setGroupMembership(defaultGroup, true); // put into default group
-    o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o)));
+    o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "basic")));
     addBehaviour(o);
   }
   else {

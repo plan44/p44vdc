@@ -36,7 +36,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    AirflowIntensityChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1% of full scale */ };
+    AirflowIntensityChannel(OutputBehaviour &aOutput) : inherited(aOutput, "flowInten") { resolution = 1; /* 1% of full scale */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_intensity; };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
@@ -52,7 +52,7 @@ namespace p44 {
     typedef IndexChannel inherited;
 
   public:
-    AirflowDirectionChannel(OutputBehaviour &aOutput) : inherited(aOutput) { setNumIndices(numDsVentilationDirectionStates); }; ///< see DsVentilationDirectionState enum
+    AirflowDirectionChannel(OutputBehaviour &aOutput) : inherited(aOutput, "airDir") { setNumIndices(numDsVentilationDirectionStates); }; ///< see DsVentilationDirectionState enum
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_direction; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
@@ -66,7 +66,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    LouverPositionChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1% of full scale */ };
+    LouverPositionChannel(OutputBehaviour &aOutput) : inherited(aOutput, "louverPos") { resolution = 1; /* 1% of full scale */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_louver_position; };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };

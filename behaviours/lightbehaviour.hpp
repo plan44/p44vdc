@@ -39,7 +39,7 @@ namespace p44 {
     double minDim;
 
   public:
-    BrightnessChannel(OutputBehaviour &aOutput) : inherited(aOutput)
+    BrightnessChannel(OutputBehaviour &aOutput) : inherited(aOutput, "brightness")
     {
       resolution = 1.0/256*100; // light defaults to historic dS 1/256 of full scale resolution
       minDim = getMin()+1; // min dimming level defaults to one unit above zero

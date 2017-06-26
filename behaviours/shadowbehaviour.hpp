@@ -37,7 +37,7 @@ namespace p44 {
     MLMicroSeconds fullRangeTime;
 
   public:
-    ShadowPositionChannel(OutputBehaviour &aOutput) : inherited(aOutput)
+    ShadowPositionChannel(OutputBehaviour &aOutput) : inherited(aOutput, "position")
     {
       resolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
       fullRangeTime = 50*Second; // just an average blind full range time
@@ -64,7 +64,7 @@ namespace p44 {
     MLMicroSeconds fullRangeTime;
 
   public:
-    ShadowAngleChannel(OutputBehaviour &aOutput) : inherited(aOutput)
+    ShadowAngleChannel(OutputBehaviour &aOutput) : inherited(aOutput, "angle")
     {
       resolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
       fullRangeTime = 1.5*Second; // just an average blind angle turn time

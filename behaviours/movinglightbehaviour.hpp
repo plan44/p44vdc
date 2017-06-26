@@ -36,7 +36,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    VPosChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.01; /* arbitrary */ };
+    VPosChannel(OutputBehaviour &aOutput) : inherited(aOutput, "vPos") { resolution = 0.01; /* arbitrary */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_position_v; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
@@ -51,7 +51,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    HPosChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.01; /* arbitrary */ };
+    HPosChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hPos") { resolution = 0.01; /* arbitrary */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_position_h; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };

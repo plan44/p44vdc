@@ -47,7 +47,7 @@ namespace p44 {
 
   public:
 
-    ColorChannel(OutputBehaviour &aOutput) : inherited(aOutput) {};
+    ColorChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) {};
 
     virtual ColorLightMode colorMode() = 0;
 
@@ -62,7 +62,7 @@ namespace p44 {
     typedef ColorChannel inherited;
 
   public:
-    HueChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.1; /* 0.1 degree */ };
+    HueChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hue") { resolution = 0.1; /* 0.1 degree */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_hue; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_degree, unitScaling_1); };
@@ -79,7 +79,7 @@ namespace p44 {
     typedef ColorChannel inherited;
 
   public:
-    SaturationChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.1; /* 0.1 percent */ };
+    SaturationChannel(OutputBehaviour &aOutput) : inherited(aOutput, "sat") { resolution = 0.1; /* 0.1 percent */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_saturation; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
@@ -95,7 +95,7 @@ namespace p44 {
     typedef ColorChannel inherited;
 
   public:
-    ColorTempChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; /* 1 mired */ };
+    ColorTempChannel(OutputBehaviour &aOutput) : inherited(aOutput, "ct") { resolution = 1; /* 1 mired */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_colortemp; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(ValueUnit_mired, unitScaling_1); };
@@ -111,7 +111,7 @@ namespace p44 {
     typedef ColorChannel inherited;
 
   public:
-    CieXChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.01; /* 1% of full scale */ };
+    CieXChannel(OutputBehaviour &aOutput) : inherited(aOutput, "X") { resolution = 0.01; /* 1% of full scale */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_cie_x; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
@@ -127,7 +127,7 @@ namespace p44 {
     typedef ColorChannel inherited;
 
   public:
-    CieYChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 0.01; /* 1% of full scale */ };
+    CieYChannel(OutputBehaviour &aOutput) : inherited(aOutput, "Y") { resolution = 0.01; /* 1% of full scale */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_cie_y; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };

@@ -148,7 +148,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*newDev.get()));
         o->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
         o->setGroupMembership(group_black_variable, true); // put into joker group by default
-        o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o)));
+        o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "relay")));
         // does not need a channel handler at all, just add behaviour
         newDev->addBehaviour(o);
         // count it

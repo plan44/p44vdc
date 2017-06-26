@@ -126,7 +126,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     o->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
     o->setHardwareName("digitalout");
     o->setGroupMembership(group_black_variable, true); // put into joker group by default
-    o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o)));
+    o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "relay")));
     addBehaviour(o);
   }
   else if (digitalIoType==digitalio_blind) {

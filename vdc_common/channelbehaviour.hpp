@@ -76,7 +76,7 @@ namespace p44 {
 
   public:
 
-    ChannelBehaviour(OutputBehaviour &aOutput, const string aChannelId = "");
+    ChannelBehaviour(OutputBehaviour &aOutput, const string aChannelId);
 
 
     /// @name Fixed channel properties, partly from dS specs
@@ -253,7 +253,7 @@ namespace p44 {
     uint32_t numIndices; ///< number of valid indices (indices are 0..numIndices-1)
 
   public:
-    IndexChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 1; numIndices = 0; };
+    IndexChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 1; numIndices = 0; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "string"; };
@@ -274,7 +274,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    DigitalChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 100; /* on or off */ };
+    DigitalChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 100; /* on or off */ };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "switch"; };
@@ -294,7 +294,7 @@ namespace p44 {
     double max; ///< maximum value
 
   public:
-    DialChannel(OutputBehaviour &aOutput) : inherited(aOutput) { max=100; /* standard dimmer range */ resolution = 1; /* integer by default */ };
+    DialChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { max=100; /* standard dimmer range */ resolution = 1; /* integer by default */ };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "dial"; };

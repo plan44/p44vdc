@@ -167,7 +167,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    SEHeatTubeChannel(OutputBehaviour &aOutput) : inherited(aOutput) { resolution = 33; /* 0, 33, 66, 100 */ };
+    SEHeatTubeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "heatingLevel") { resolution = 33; /* 0, 33, 66, 100 */ };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "heating level"; };

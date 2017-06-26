@@ -37,7 +37,7 @@ namespace p44 {
     double dimPerMS;
 
   public:
-    AudioVolumeChannel(OutputBehaviour &aOutput) : inherited(aOutput)
+    AudioVolumeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "volume")
     {
       resolution = 0.1; // arbitrary, 1:1000 seems ok
       dimPerMS = (getMax()-getMin())/7000; // standard 7 seconds for full scale by default
@@ -62,7 +62,7 @@ namespace p44 {
     typedef IndexChannel inherited;
 
   public:
-    AudioPowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput) { setNumIndices(numDsAudioPowerStates); }; ///< see DsAudioPowerState enum
+    AudioPowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { setNumIndices(numDsAudioPowerStates); }; ///< see DsAudioPowerState enum
 
     virtual DsChannelType getChannelType() { return channeltype_p44_audio_power_state; }; ///< the dS channel type
     virtual const char *getName() { return "powerstate"; };
@@ -77,7 +77,7 @@ namespace p44 {
     typedef IndexChannel inherited;
 
   public:
-    AudioContentSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput) {};
+    AudioContentSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "contentSource") {};
 
     virtual DsChannelType getChannelType() { return channeltype_p44_audio_content_source; }; ///< the dS channel type
     virtual const char *getName() { return "contentsource"; };

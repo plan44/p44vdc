@@ -46,7 +46,7 @@ namespace p44 {
     typedef IndexChannel inherited;
 
   public:
-    SparkModeChannel(OutputBehaviour &aOutput) : inherited(aOutput) { setNumIndices(3); };
+    SparkModeChannel(OutputBehaviour &aOutput) : inherited(aOutput,"sparkMode") { setNumIndices(3); };
 
     virtual DsChannelType getChannelType() { return channeltype_sparkmode; }; ///< custom device-specific channel
     virtual const char *getName() { return "x-p44-sparkmode"; };
