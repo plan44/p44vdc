@@ -157,7 +157,7 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
     if (Error::isOK(respErr = checkParam(aParams, "query", query))) {
       // now read
       accessProperty(
-        access_read, query, VDC_API_DOMAIN, PropertyDescriptorPtr(),
+        access_read, query, VDC_API_DOMAIN, aRequest->getApiVersion(),
         boost::bind(&DsAddressable::propertyAccessed, this, aRequest, _1, _2)
       );
     }
@@ -173,7 +173,7 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
         preload = o->boolValue();
       }
       accessProperty(
-        preload ? access_write_preload : access_write, value, VDC_API_DOMAIN, PropertyDescriptorPtr(),
+        preload ? access_write_preload : access_write, value, VDC_API_DOMAIN, aRequest->getApiVersion(),
         boost::bind(&DsAddressable::propertyAccessed, this, aRequest, _1, _2)
       );
     }
@@ -223,14 +223,14 @@ void DsAddressable::methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError)
 
 
 
-bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain)
+bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain, int aApiVersion)
 {
   if (announced!=Never) {
     // device is announced: push can take place
     if (aPropertyQuery) {
       // a property change is to be notified
       accessProperty(
-        access_read, aPropertyQuery, aDomain, PropertyDescriptorPtr(),
+        access_read, aPropertyQuery, aDomain, aApiVersion,
         boost::bind(&DsAddressable::pushPropertyReady, this, aEvents, _1, _2)
       );
     }
@@ -273,7 +273,7 @@ void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultOb
 
 
 
-void DsAddressable::handleNotification(const string &aMethod, ApiValuePtr aParams)
+void DsAddressable::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   if (aMethod=="ping") {
     // issue device ping (which will issue a pong when device is reachable)

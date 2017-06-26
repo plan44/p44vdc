@@ -76,7 +76,7 @@ protected:
     if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
       // scene channels by their channel ID
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-      descP->propertyName = scene.getDevice().getChannelByIndex(aPropIndex)->getId();
+      descP->propertyName = scene.getDevice().getChannelByIndex(aPropIndex)->getId(aParentDescriptor->getApiVersion());
       descP->propertyType = aParentDescriptor->type();
       descP->propertyFieldKey = aPropIndex;
       descP->propertyObjectKey = OKEY(scenevalue_key);

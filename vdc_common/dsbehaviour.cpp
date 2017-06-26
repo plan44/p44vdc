@@ -67,7 +67,7 @@ bool DsBehaviour::pushBehaviourState()
     ApiValuePtr subQuery = query->newValue(apivalue_object);
     subQuery->add(string_format("%zu",index), subQuery->newValue(apivalue_null));
     query->add(string(getTypeName()).append("States"), subQuery);
-    return device.pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN);
+    return device.pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
   }
   // could not push
   return false;
@@ -105,9 +105,9 @@ ErrorPtr DsBehaviour::forget()
 // MARK: ===== property access
 
 
-string DsBehaviour::getId()
+string DsBehaviour::getId(int aApiVersion)
 {
-  if (!behaviourId.empty()) {
+  if (aApiVersion>=3 && !behaviourId.empty()) {
     return behaviourId;
   }
   else {

@@ -813,7 +813,7 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
         DsUid dsuid;
         if (Error::isOK(respErr = checkDsuidParam(aParams, "dSUID", dsuid))) {
           // operation method
-          respErr = handleMethodForDsUid(aMethod, aRequest, dsuid, aParams);
+          respErr = handleMethodForDsUid(aRequest, aMethod, dsuid, aParams);
         }
       }
     }
@@ -836,13 +836,13 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
           for (int i=0; i<o->arrayLength(); i++) {
             ApiValuePtr e = o->arrayGet(i);
             dsuid.setAsBinary(e->binaryValue());
-            handleNotificationForDsUid(aMethod, dsuid, aParams);
+            handleNotificationForDsUid(aRequest, aMethod, dsuid, aParams);
           }
         }
         else {
           // single dSUID
           dsuid.setAsBinary(o->binaryValue());
-          handleNotificationForDsUid(aMethod, dsuid, aParams);
+          handleNotificationForDsUid(aRequest, aMethod, dsuid, aParams);
         }
       }
     }
@@ -869,11 +869,6 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
 }
 
 
-/// vDC API version
-/// 1 (aka 1.0 in JSON) : first version, used in P44-DSB-DEH versions up to 0.5.0.x
-/// 2 : cleanup, no official JSON support any more, added MOC extensions
-#define VDC_API_VERSION 2
-
 ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
@@ -881,10 +876,15 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
   string s;
   // check API version
   if (Error::isOK(respErr = checkParam(aParams, "api_version", v))) {
-    if (v->int32Value()!=VDC_API_VERSION)
-      respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d", v->int32Value(), VDC_API_VERSION);
+    int version = v->int32Value();
+    if (version<VDC_API_VERSION_MIN || version>VDC_API_VERSION_MAX) {
+      // incompatible version
+      respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d..%d", version, VDC_API_VERSION_MIN, VDC_API_VERSION_MAX);
+    }
     else {
-      // API version ok, check dSUID
+      // API version ok, save it
+      aRequest->connection()->setApiVersion(version);
+      // check dSUID
       DsUid vdsmDsUid;
       if (Error::isOK(respErr = checkDsuidParam(aParams, "dSUID", vdsmDsUid))) {
         // same vdSM can restart session any time. Others will be rejected
@@ -996,7 +996,7 @@ DsAddressablePtr VdcHost::addressableForParams(const DsUid &aDsUid, ApiValuePtr 
 
 
 
-ErrorPtr VdcHost::handleMethodForDsUid(const string &aMethod, VdcApiRequestPtr aRequest, const DsUid &aDsUid, ApiValuePtr aParams)
+ErrorPtr VdcHost::handleMethodForDsUid(VdcApiRequestPtr aRequest, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams)
 {
   DsAddressablePtr addressable = addressableForParams(aDsUid, aParams);
   if (addressable) {
@@ -1016,11 +1016,11 @@ ErrorPtr VdcHost::handleMethodForDsUid(const string &aMethod, VdcApiRequestPtr a
 
 
 
-void VdcHost::handleNotificationForDsUid(const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams)
+void VdcHost::handleNotificationForDsUid(VdcApiRequestPtr aRequest, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams)
 {
   DsAddressablePtr addressable = addressableForParams(aDsUid, aParams);
   if (addressable) {
-    addressable->handleNotification(aMethod, aParams);
+    addressable->handleNotification(aRequest, aMethod, aParams);
   }
   else {
     LOG(LOG_WARNING, "Target entity %s not found for notification '%s'", aDsUid.getString().c_str(), aMethod.c_str());
@@ -1173,9 +1173,9 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
 }
 
 
-void VdcHost::handleNotification(const string &aMethod, ApiValuePtr aParams)
+void VdcHost::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
-  inherited::handleNotification(aMethod, aParams);
+  inherited::handleNotification(aRequest, aMethod, aParams);
 }
 
 

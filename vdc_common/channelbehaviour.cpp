@@ -47,9 +47,9 @@ void ChannelBehaviour::setResolution(double aResolution)
 }
 
 
-string ChannelBehaviour::getId()
+string ChannelBehaviour::getId(int aApiVersion)
 {
-  if (!channelId.empty()) {
+  if (aApiVersion>=3 && !channelId.empty()) {
     return channelId;
   }
   else {
@@ -403,7 +403,8 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         case name_key+descriptions_key_offset:
           aPropValue->setStringValue(getName());
           return true;
-        case channelIndex_key+descriptions_key_offset: // TODO: probably remove, use dsIndex instead consistently
+        case channelIndex_key+descriptions_key_offset:
+          if (aPropertyDescriptor->getApiVersion()>=3) return false; // property does not exist any more in v3 and later
           aPropValue->setUint8Value(channelIndex);
           return true;
         case dsIndex_key+descriptions_key_offset:

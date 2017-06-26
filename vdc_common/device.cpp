@@ -460,7 +460,7 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
 #define LEGACY_DIM_STEP_TIMEOUT (500*MilliSecond) // should be 400, but give it extra 100 because of delays in getting next dim call, especially for area scenes
 
 
-void Device::handleNotification(const string &aMethod, ApiValuePtr aParams)
+void Device::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr err;
   if (aMethod=="callScene") {
@@ -593,7 +593,7 @@ void Device::handleNotification(const string &aMethod, ApiValuePtr aParams)
         ApiValuePtr propValue = ch->newObject();
         propValue->add("channelStates", ch);
         // now access the property for write
-        accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, PropertyDescriptorPtr(), NULL); // no callback
+        accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, aRequest->getApiVersion(), NULL); // no callback
       }
     }
     if (!Error::isOK(err)) {
@@ -606,7 +606,7 @@ void Device::handleNotification(const string &aMethod, ApiValuePtr aParams)
     identifyToUser();
   }
   else {
-    inherited::handleNotification(aMethod, aParams);
+    inherited::handleNotification(aRequest, aMethod, aParams);
   }
 }
 
@@ -1633,16 +1633,16 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     // accessing one of the other containers: channels, buttons/inputs/sensors or scenes
     string id;
     if (aParentDescriptor->hasObjectKey(device_buttons_key)) {
-      id = buttons[aPropIndex]->getId();
+      id = buttons[aPropIndex]->getId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_inputs_key)) {
-      id = binaryInputs[aPropIndex]->getId();
+      id = binaryInputs[aPropIndex]->getId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_sensors_key)) {
-      id = sensors[aPropIndex]->getId();
+      id = sensors[aPropIndex]->getId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_channels_key)) {
-      id = getChannelByIndex(aPropIndex)->getId();
+      id = getChannelByIndex(aPropIndex)->getId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
       // scenes are still named by their index

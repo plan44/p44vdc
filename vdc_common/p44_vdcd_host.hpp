@@ -76,7 +76,11 @@ namespace p44 {
     /// @param aErrorData the optional "data" member for the vDC API error object
     /// @result empty or Error object in case of error sending error response
     virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr()) P44_OVERRIDE;
-    
+
+    /// get API version
+    /// @return API version for this connection
+    virtual int getApiVersion() P44_OVERRIDE;
+
   };
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;
 

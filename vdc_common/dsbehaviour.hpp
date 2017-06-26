@@ -172,9 +172,9 @@ namespace p44 {
     size_t getIndex() { return index; };
 
     /// get the behaviour ID
+    /// @param aApiVersion the API version to get the ID for. APIs before v3 always return the behaviour index as a numeric string
     /// @return the behaviour ID, which must be unique within the device and must always allow to re-find the same behaviour
-    /// @Note if no string behavior id has been set at creation, this will return decimal string representation of the behaviour index
-    string getId();
+    string getId(int aApiVersion);
 
     /// textual representation of getType()
     /// @return type string, which is the string used to prefix the xxxDescriptions, xxxSettings and xxxStates properties

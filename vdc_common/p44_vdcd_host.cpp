@@ -73,6 +73,13 @@ ApiValuePtr P44JsonApiRequest::newApiValue()
 }
 
 
+int P44JsonApiRequest::getApiVersion()
+{
+  // always use newest supported API for calls via the P44 config API channel
+  return VDC_API_VERSION_MAX;
+}
+
+
 // MARK: ===== perform self test
 
 #if SELFTESTING_ENABLED
@@ -340,13 +347,13 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
     ApiValuePtr params = JsonApiValue::newValueFromJson(aRequest);
     ApiValuePtr o;
     err = checkParam(params, "dSUID", o);
+    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm));
     if (Error::isOK(err)) {
       // operation method
       DsUid dsuid;
       if (isMethod) {
         dsuid.setAsBinary(o->binaryValue());
         // create request
-        P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm));
         // check for old-style name/index and generate basic query (1 or 2 levels)
         ApiValuePtr query = params->newObject();
         ApiValuePtr name = params->get("name");
@@ -363,7 +370,7 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
           params->add("query", query);
         }
         // have method handled
-        err = handleMethodForDsUid(cmd, request, dsuid, params);
+        err = handleMethodForDsUid(request, cmd, dsuid, params);
         // Note: if method returns NULL, it has sent or will send results itself.
         //   Otherwise, even if Error is ErrorOK we must send a generic response
       }
@@ -375,13 +382,13 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
           for (int i=0; i<o->arrayLength(); i++) {
             ApiValuePtr e = o->arrayGet(i);
             dsuid.setAsBinary(e->binaryValue());
-            handleNotificationForDsUid(cmd, dsuid, params);
+            handleNotificationForDsUid(request, cmd, dsuid, params);
           }
         }
         else {
           // single dSUID
           dsuid.setAsBinary(o->binaryValue());
-          handleNotificationForDsUid(cmd, dsuid, params);
+          handleNotificationForDsUid(request, cmd, dsuid, params);
         }
         // notifications are always successful
         err = ErrorPtr(new Error(Error::OK));

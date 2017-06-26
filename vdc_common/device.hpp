@@ -31,6 +31,9 @@ using namespace std;
 // originally, all behaviours were accessed by index, channels were accessed by channeltype
 // when ACCESS_BY_ID is set, all behaviours and channels are accessed by their getId().
 #define ACCESS_BY_ID 1
+#if VDC_API_VERSION_MAX>2 && !ACCESS_BY_ID
+  #error "Access by ID needed for API versions 3 and later"
+#endif
 
 namespace p44 {
 
@@ -337,11 +340,12 @@ namespace p44 {
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// called to let device handle device-level notification
+    /// @param aRequest this is the request from which the notification originates
     /// @param aMethod the notification
     /// @param aParams the parameters object
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this device.
-    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual void handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// call scene on this device
     /// @param aSceneNo the scene to call.

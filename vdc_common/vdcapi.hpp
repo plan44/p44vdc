@@ -87,8 +87,11 @@ namespace p44 {
   protected:
 
     VdcApiRequestCB apiRequestHandler;
+    int apiVersion;
 
   public:
+
+    VdcApiConnection() : apiVersion(0) {};
 
     /// install callback for received API requests
     /// @param aApiRequestHandler will be called when a API request has been received
@@ -116,6 +119,16 @@ namespace p44 {
     /// get a new API value suitable for this connection
     /// @return new API value of suitable internal implementation to be used on this API connection
     ApiValuePtr newApiValue();
+
+    /// get API version
+    /// @return API version for this connection
+    /// @note 0 is returned as long as API version is not yet determined
+    int getApiVersion() { return apiVersion; }
+
+    /// set API version for this connection
+    /// @param aApiVersion numeric API version to set
+    /// @note is effective only when current API version is not defined (==0)
+    void setApiVersion(int aApiVersion) { if (apiVersion==0) apiVersion = aApiVersion; };
 
   };
 
@@ -207,7 +220,11 @@ namespace p44 {
     /// @return new API value of suitable internal implementation to be used on this API connection
     /// @note default is asking the connection, but for special cases (e.g. vDC API requests via config API)
     ///   this might be overridden.
-    virtual ApiValuePtr newApiValue() { return connection()->newApiValue(); }; // default is asking connection
+    virtual ApiValuePtr newApiValue() { return connection()->newApiValue(); }; // default is asking connection (but p44 web api will override this)
+
+    /// get API version
+    /// @return API version for this request
+    virtual int getApiVersion() { return connection()->getApiVersion(); }; // default is asking connection (but p44 web api will override this)
 
   };
 

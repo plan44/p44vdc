@@ -346,7 +346,7 @@ namespace p44 {
     /// @{
 
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual void handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @}
 
@@ -490,8 +490,8 @@ namespace p44 {
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
     // method and notification dispatching
-    ErrorPtr handleMethodForDsUid(const string &aMethod, VdcApiRequestPtr aRequest, const DsUid &aDsUid, ApiValuePtr aParams);
-    void handleNotificationForDsUid(const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams);
+    ErrorPtr handleMethodForDsUid(VdcApiRequestPtr aRequest, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams);
+    void handleNotificationForDsUid(VdcApiRequestPtr aRequest, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams);
     DsAddressablePtr addressableForParams(const DsUid &aDsUid, ApiValuePtr aParams);
 
   private:

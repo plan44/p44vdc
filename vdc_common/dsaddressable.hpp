@@ -154,11 +154,12 @@ namespace p44 {
     void methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError);
 
     /// called by VdcHost to handle notifications directed to a dSUID
+    /// @param aRequest this is the request from which the notification originates
     /// @param aMethod the notification
     /// @param aParams the parameters object
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this DsAddressable.
-    virtual void handleNotification(const string &aMethod, ApiValuePtr aParams);
+    virtual void handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
 
     /// send a DsAddressable method or notification to vdSM
     /// @param aMethod the method or notification
@@ -172,8 +173,9 @@ namespace p44 {
     /// @param aPropertyQuery description of what property change should be pushed (same syntax as in getProperty API), can be NULL
     /// @param aEvents list of events to be pushed, can be NULL
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
+    /// @param aApiVersion the API version relevant for this push notification
     /// @return true if push could be sent, false otherwise (e.g. no vdSM connection, or device not yet announced)
-    bool pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain);
+    bool pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain, int aApiVersion);
 
     /// @}
 

@@ -28,5 +28,12 @@
 
 #include "application.hpp"
 
+/// vDC API version
+/// 1 (aka 1.0 in JSON) : first version, used in P44-DSB-DEH versions up to 0.5.0.x
+/// 2 : cleanup, no official JSON support any more, added MOC extensions
+/// 3 : changed addressing of buttons, sensors, binaryinputs and channels to string ids. Indices still available for mapping
+#define VDC_API_VERSION_MIN 2
+#define VDC_API_VERSION_MAX 3
+
 
 #endif /* defined(__p44vdc__common__) */

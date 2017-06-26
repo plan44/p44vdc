@@ -35,15 +35,17 @@ using namespace p44;
 
 
 
-void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB)
+void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB)
 {
   // create a list for possibly needed preparations
   PropertyPrepListPtr prepList = PropertyPrepListPtr(new PropertyPrepList);
+  // create root descriptor
+  PropertyDescriptorPtr parentDescriptor = PropertyDescriptorPtr(new RootPropertyDescriptor(aApiVersion));
   // first attempt to access
   // - create result object of same API type as query
   ApiValuePtr result;
   if (aMode==access_read) result = aQueryObject->newObject();
-  ErrorPtr err = accessPropertyInternal(aMode, aQueryObject, result, aDomain, aParentDescriptor, prepList);
+  ErrorPtr err = accessPropertyInternal(aMode, aQueryObject, result, aDomain, parentDescriptor, prepList);
   if (prepList->empty()) {
     // no need for preparation, immediately call back
     if (aAccessCompleteCB) aAccessCompleteCB(result, err);
@@ -51,7 +53,7 @@ void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQu
     return;
   }
   // need preparation
-  prepareNext(prepList, aMode, aQueryObject, aDomain, aParentDescriptor, aAccessCompleteCB, ErrorPtr());
+  prepareNext(prepList, aMode, aQueryObject, aDomain, parentDescriptor, aAccessCompleteCB, ErrorPtr());
 }
 
 
@@ -92,11 +94,8 @@ void PropertyContainer::prepareAccess(PropertyAccessMode aMode, PropertyDescript
 ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList)
 {
   ErrorPtr err;
+  assert(aParentDescriptor);
   FOCUSLOG("\naccessProperty: entered with query = %s", aQueryObject->description().c_str());
-  // make sure we always have a parent - in case none provided, the parent is "root".
-  if (!aParentDescriptor) {
-    aParentDescriptor = PropertyDescriptorPtr(new RootPropertyDescriptor());
-  }
   FOCUSLOG("- parentDescriptor '%s' (%s, %s), fieldKey=%zu, objectKey=%ld",
     aParentDescriptor->name(),
     aParentDescriptor->isStructured() ? "structured" : "scalar",

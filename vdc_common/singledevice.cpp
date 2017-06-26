@@ -1457,7 +1457,7 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
       events->add((*pos)->eventId, event);
       SALOG((*singleDeviceP), LOG_NOTICE, "- pushing event '%s' along with state change", (*pos)->eventId.c_str());
     }
-    return singleDeviceP->pushNotification(query, events, VDC_API_DOMAIN);
+    return singleDeviceP->pushNotification(query, events, VDC_API_DOMAIN, api->getApiVersion());
   }
   else {
     for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
@@ -1814,7 +1814,7 @@ bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
         events->add((*pos)->eventId, event);
         SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s'", (*pos)->eventId.c_str());
       }
-      return singleDeviceP->pushNotification(ApiValuePtr(), events, VDC_API_DOMAIN);
+      return singleDeviceP->pushNotification(ApiValuePtr(), events, VDC_API_DOMAIN, api->getApiVersion());
     }
     else {
       for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
@@ -1868,7 +1868,7 @@ bool DeviceProperties::pushProperty(ValueDescriptorPtr aPropertyDesc)
     ApiValuePtr subQuery = query->newValue(apivalue_object);
     subQuery->add(aPropertyDesc->getName(), subQuery->newValue(apivalue_null));
     query->add(string("deviceProperties"), subQuery);
-    return singleDeviceP->pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN);
+    return singleDeviceP->pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
   }
   return false; // cannot push
 }

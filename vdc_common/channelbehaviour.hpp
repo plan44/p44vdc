@@ -200,9 +200,9 @@ namespace p44 {
     /// @{
 
     /// get the channel ID
+    /// @param aApiVersion the API version to get the ID for. APIs before v3 always return the channel type as a numeric string
     /// @return the channel ID. The channel id must be unique within the device.
-    /// @note if no string channel id has been set at creation, this will return decimal string representation of the channel type
-    string getId();
+    string getId(int aApiVersion);
 
     /// get the channel index
     /// @return the channel index (0..N, 0=primary)

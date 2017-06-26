@@ -74,6 +74,8 @@ namespace p44 {
     PropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) : parentDescriptor(aParentDescriptor), rootOfObject(false) {};
     /// the parent descriptor (NULL at root level of DsAdressables)
     PropertyDescriptorPtr parentDescriptor;
+    /// API version
+    virtual int getApiVersion() const { return (parentDescriptor ? parentDescriptor->getApiVersion() : 0); };
     /// name of the property
     virtual const char *name() const = 0;
     /// type of the property
@@ -107,13 +109,15 @@ namespace p44 {
   class RootPropertyDescriptor : public PropertyDescriptor
   {
     typedef PropertyDescriptor inherited;
+    int apiVersion;
   public:
-    RootPropertyDescriptor() : inherited(PropertyDescriptorPtr()) { rootOfObject = true; };
+    RootPropertyDescriptor(int aApiVersion) : inherited(PropertyDescriptorPtr()) { rootOfObject = true; apiVersion = aApiVersion; };
     virtual const char *name() const P44_OVERRIDE { return "<root>"; };
     virtual ApiValueType type() const P44_OVERRIDE { return apivalue_object; };
     virtual size_t fieldKey() const P44_OVERRIDE { return 0; };
     virtual intptr_t objectKey() const P44_OVERRIDE { return 0; };
     virtual bool isArrayContainer() const P44_OVERRIDE { return false; };
+    virtual int getApiVersion() const P44_OVERRIDE { return apiVersion; };
   };
 
 
@@ -211,11 +215,12 @@ namespace p44 {
     /// read or write property
     /// @param aMode access mode (see PropertyAccessMode: read, write or write preload)
     /// @param aQueryObject the object defining the read or write query
-    /// @param aParentDescriptor the descriptor of the parent property, can be passed NULL at root level
+    /// @param aDomain the access domain
+    /// @param aApiVersion the API version relevant for this property access
     ///   (but will internally be repaced by a RootPropertyDescriptor)
     /// @param aAccessCompleteCB will be called when property access is complete. Callback's aError
     ///   returns Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
-    void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB);
+    void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB);
 
     /// @}
 
@@ -305,8 +310,8 @@ namespace p44 {
     /// @param aMode access mode (see PropertyAccessMode: read, write or write preload)
     /// @param aQueryObject the object defining the read or write query
     /// @param aResultObject for read, must be an object
-    /// @param aParentDescriptor the descriptor of the parent property, can be passed NULL at root level
-    ///   (but will internally be repaced by a RootPropertyDescriptor)
+    /// @param aDomain the access domain
+    /// @param aParentDescriptor the descriptor of the parent property, must not be NULL
     /// @param aPreparationList if not NULL, this list will be filled with property descriptors that need preparation before accessing.
     ///   Otherwise, properties are assumed to be prepared already and will be accessed directly
     /// @return Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
