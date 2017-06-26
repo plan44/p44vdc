@@ -68,9 +68,9 @@ namespace p44 {
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_degree, unitScaling_1); };
     virtual ColorLightMode colorMode() P44_OVERRIDE { return colorLightModeHueSaturation; };
     virtual const char *getName() P44_OVERRIDE { return "hue"; };
-    virtual double getMin() P44_OVERRIDE { return 0; }; // hue goes from 0 to (almost) 360 degrees
-    virtual double getMax() P44_OVERRIDE { return 358.6; };
-    virtual bool wrapsAround() P44_OVERRIDE { return true; }; ///< hue wraps around
+    virtual double getMin() P44_OVERRIDE { return 0; }; ///< hue goes from 0 to 360 degrees, with 0 and 360 meaning the same.
+    virtual double getMax() P44_OVERRIDE { return 360; }; ///< Note the max value will never be actually reached, as it wraps around to min
+    virtual bool wrapsAround() P44_OVERRIDE { return true; }; ///< hue wraps around, meaning max is considered identical to min
   };
 
 

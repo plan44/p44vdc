@@ -31,19 +31,22 @@ using namespace p44;
 // hue API conversion factors
 
 
-// - hue: brightness: Brightness of the light. This is a scale from the minimum brightness the light is capable of, 0,
-//        to the maximum capable brightness, 255. Note a brightness of 0 is not off.
-// - dS: brightness: 0..100
-#define HUEAPI_OFFSET_BRIGHTNESS 0.4 // hue brightness starts at 0 (lowest value, but not off), corresonds with one dS step = 0.4
-#define HUEAPI_FACTOR_BRIGHTNESS (255.0/(100-HUEAPI_OFFSET_BRIGHTNESS)) // dS has 99.6 (254/255) not-off brightness steps (0.4..100), 0 is reserved for off
+// - hue: brightness: Brightness of the light. This is a scale from the minimum brightness the light is capable of, 1,
+//   to the maximum capable brightness, 254. 0 does not turn off the light
+// - dS: non-off brightness: 0.4..100
+// Using equation hue = ds*HUEAPI_FACTOR_BRIGHTNESS + HUEAPI_OFFSET_BRIGHTNESS
+// describing a straight line trough points (DS_BRIGHTNESS_STEP,1) and (100,254)
+#define DS_BRIGHTNESS_STEP (100.0/255.0)
+#define HUEAPI_FACTOR_BRIGHTNESS ((254.0-1)/(100-DS_BRIGHTNESS_STEP))
+#define HUEAPI_OFFSET_BRIGHTNESS (1.0-DS_BRIGHTNESS_STEP*HUEAPI_FACTOR_BRIGHTNESS)
 
 // - hue: hue: Wrapping value between 0 and 65535. Both 0 and 65535 are red, 25500 is green and 46920 is blue.
-// - dS: hue: 0..358.6 degrees
+// - dS: hue: 0..360(exclusive) degrees. This means we will never see a channel value 360, because it is considered identical to 0
 #define HUEAPI_FACTOR_HUE (65535.0/360)
 
-// - hue: Saturation: 255 is the most saturated (colored) and 0 is the least saturated (white)
+// - hue: Saturation: 254 is the most saturated (colored) and 0 is the least saturated (white)
 // - dS: 0..100%
-#define HUEAPI_FACTOR_SATURATION (255.0/100)
+#define HUEAPI_FACTOR_SATURATION (254.0/100)
 
 // - hue: color temperature: 153..500 mired for 2012's hue bulbs
 // - dS: color temperature: 100..10000 mired
@@ -72,7 +75,7 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const
     ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this));
     cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
     cl->setHardwareName(string_format("color light #%s", lightID.c_str()));
-    cl->initMinBrightness(0.4); // min brightness is roughly 1/256
+    cl->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness
     addBehaviour(cl);
   }
   else {
@@ -83,7 +86,7 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const
     LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
     l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
     l->setHardwareName(string_format("monochrome light #%s", lightID.c_str()));
-    l->initMinBrightness(0.4); // min brightness is roughly 1/256
+    l->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness is roughly 1/256
     addBehaviour(l);
   }
   // derive the dSUID
@@ -298,7 +301,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
     if (aAnyway || !aForDimming || l->brightness->needsApplying()) {
       Brightness b = l->brightnessForHardware();
       transitionTime = l->transitionTimeToNewBrightness();
-      if (b==0) {
+      if (b<DS_BRIGHTNESS_STEP) {
         // light off, no other parameters
         newState->add("on", JsonObject::newBool(false));
         lightIsOn = false;
@@ -306,7 +309,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
       else {
         // light on
         newState->add("on", JsonObject::newBool(true));
-        newState->add("bri", JsonObject::newInt32((b-HUEAPI_OFFSET_BRIGHTNESS)*HUEAPI_FACTOR_BRIGHTNESS+0.5)); // 0.4..100 -> 0..255
+        newState->add("bri", JsonObject::newInt32(b*HUEAPI_FACTOR_BRIGHTNESS+HUEAPI_OFFSET_BRIGHTNESS+0.5)); // DS_BRIGHTNESS_STEP..100 -> 1..254
       }
     }
     // for color lights, also check color (but not if light is off)
@@ -430,7 +433,9 @@ void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aD
               }
             }
             else if (param=="bri" && !blockBrightness) {
-              aLightBehaviour->syncBrightnessFromHardware(val->int32Value()/HUEAPI_FACTOR_BRIGHTNESS+HUEAPI_OFFSET_BRIGHTNESS, false); // only sync if no new value pending already
+              double hb = val->int32Value(); // hue brightness from 1..254
+              if (hb<1) hb=1;
+              aLightBehaviour->syncBrightnessFromHardware(hb/HUEAPI_FACTOR_BRIGHTNESS, false); // only sync if no new value pending already
             }
           } // status data key/val
         } // status item found
@@ -456,7 +461,11 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
       if (o && o->boolValue()) {
         // lamp is on, get brightness
         o = state->get("bri");
-        if (o) l->syncBrightnessFromHardware(o->int32Value()/HUEAPI_FACTOR_BRIGHTNESS+HUEAPI_OFFSET_BRIGHTNESS); // 0..255 -> 0.4..100
+        if (o) {
+          double hb = o->int32Value(); // hue brightness from 1..254
+          if (hb<1) hb=1;
+          l->syncBrightnessFromHardware(hb/HUEAPI_FACTOR_BRIGHTNESS, false); // only sync if no new value pending already
+        }
       }
       else {
         l->syncBrightnessFromHardware(0); // off
@@ -470,9 +479,9 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
           if (mode=="hs") {
             cl->colorMode = colorLightModeHueSaturation;
             o = state->get("hue");
-            if (o) cl->hue->syncChannelValue(o->int32Value()/HUEAPI_FACTOR_HUE);
+            if (o) cl->hue->syncChannelValue((o->int32Value())/HUEAPI_FACTOR_HUE);
             o = state->get("sat");
-            if (o) cl->saturation->syncChannelValue(o->int32Value()/HUEAPI_FACTOR_SATURATION);
+            if (o) cl->saturation->syncChannelValue((o->int32Value())/HUEAPI_FACTOR_SATURATION);
           }
           else if (mode=="xy") {
             cl->colorMode = colorLightModeXY;

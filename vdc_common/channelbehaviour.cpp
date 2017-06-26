@@ -212,10 +212,26 @@ void ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aN
 void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime, bool aAlwaysApply)
 {
   // make sure new value is within bounds
-  if (aNewValue>getMax())
-    aNewValue = getMax();
-  else if (aNewValue<getMin())
-    aNewValue = getMin();
+  if (wrapsAround()) {
+    // In wrap-around mode, the max value is considered identical to the min value, so already REACHING it must wrap around
+    double range = getMax()-getMin();
+    int tms = (aNewValue-getMin()) / range;
+    if (tms>=1) {
+      aNewValue -= range*tms;
+    }
+    else if (tms<0) {
+      aNewValue += range*(tms+1);
+    }
+  }
+  else {
+    // setting value between and including max and min is ok, everything above and below will be capped to max and min
+    if (aNewValue<getMin()) {
+      aNewValue = getMin(); // just stay at min
+    }
+    else if (aNewValue>getMax()) {
+      aNewValue = getMax(); // just stay at max
+    }
+  }
   // prevent propagating changes smaller than device resolution, but always apply when transition is in progress
   if (aAlwaysApply || inTransition() || fabs(aNewValue-cachedChannelValue)>=getResolution()) {
     SALOG(output.device, LOG_INFO,
@@ -237,17 +253,23 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
 double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime)
 {
   double newValue = cachedChannelValue+aIncrement;
-  if (newValue<getMinDim()) {
-    if (wrapsAround())
-      newValue += getMax()-getMin(); // wrap backwards
-    else
-      newValue = getMinDim(); // just stay at min
+  if (wrapsAround()) {
+    // In wrap-around mode, the max value is considered identical to the min value, so already REACHING it must wrap around
+    if (newValue>=getMax()) {
+      newValue -= getMax()-getMin(); // wrap from max to min
+    }
+    else if (newValue<getMin()) {
+      newValue += getMax()-getMin(); // wrap from min to max (minDim is not considered in wraparound mode, makes no sense)
+    }
   }
-  else if (newValue>getMax()) {
-    if (wrapsAround())
-      newValue -= getMax()-getMin(); // wrap backwards
-    else
+  else {
+    // normal dimming, will stop at minDim and max
+    if (newValue<getMinDim()) {
+      newValue = getMinDim(); // just stay at min
+    }
+    else if (newValue>getMax()) {
       newValue = getMax(); // just stay at max
+    }
   }
   // apply (silently), only if value has actually changed (but even if change is below resolution)
   if (newValue!=cachedChannelValue) {

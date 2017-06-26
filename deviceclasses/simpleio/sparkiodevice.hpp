@@ -50,7 +50,6 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() { return channeltype_sparkmode; }; ///< custom device-specific channel
     virtual const char *getName() { return "x-p44-sparkmode"; };
-    virtual bool wrapsAround() { return true; }; ///< mode wraps around
   };
 
 
