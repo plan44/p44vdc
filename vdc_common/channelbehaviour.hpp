@@ -56,6 +56,7 @@ namespace p44 {
     /// @{
     uint8_t channelIndex; ///< the index of the channel within the device
     double resolution; ///< actual resolution within the device
+    string channelId; ///< string identifier for this channel. If string is empty, getId() will return decimal string representation of channelType()
     /// @}
 
     /// @name persistent settings
@@ -75,7 +76,7 @@ namespace p44 {
 
   public:
 
-    ChannelBehaviour(OutputBehaviour &aOutput);
+    ChannelBehaviour(OutputBehaviour &aOutput, const string aChannelId = "");
 
 
     /// @name Fixed channel properties, partly from dS specs
@@ -197,6 +198,11 @@ namespace p44 {
 
     /// @name interaction with digitalSTROM system
     /// @{
+
+    /// get the channel ID
+    /// @return the channel ID. The channel id must be unique within the device.
+    /// @note if no string channel id has been set at creation, this will return decimal string representation of the channel type
+    string getId();
 
     /// get the channel index
     /// @return the channel index (0..N, 0=primary)

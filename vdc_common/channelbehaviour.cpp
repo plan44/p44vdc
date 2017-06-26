@@ -27,8 +27,9 @@ using namespace p44;
 
 // MARK: ===== channel behaviour
 
-ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput) :
+ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChannelId) :
   output(aOutput),
+  channelId(aChannelId),
   channelUpdatePending(false), // no output update pending
   nextTransitionTime(0), // none
   channelLastSync(Never), // we don't known nor have we sent the output state
@@ -43,6 +44,18 @@ ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput) :
 void ChannelBehaviour::setResolution(double aResolution)
 {
   resolution = aResolution;
+}
+
+
+string ChannelBehaviour::getId()
+{
+  if (!channelId.empty()) {
+    return channelId;
+  }
+  else {
+    // no channel ID set, default to decimal string representation of channel type
+    return string_format("%d", getChannelType());
+  }
 }
 
 
@@ -311,6 +324,8 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
 enum {
   name_key,
   channelIndex_key,
+  dsIndex_key,
+  channelType_key,
   siunit_key,
   unitsymbol_key,
   min_key,
@@ -348,6 +363,8 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
   static const PropertyDescription channelDescProperties[numChannelDescProperties] = {
     { "name", apivalue_string, name_key+descriptions_key_offset, OKEY(channel_Key) },
     { "channelIndex", apivalue_uint64, channelIndex_key+descriptions_key_offset, OKEY(channel_Key) },
+    { "dsIndex", apivalue_uint64, dsIndex_key+descriptions_key_offset, OKEY(channel_Key) },
+    { "channelType", apivalue_uint64, channelType_key+descriptions_key_offset, OKEY(channel_Key) },
     { "siunit", apivalue_string, siunit_key+descriptions_key_offset, OKEY(channel_Key) },
     { "symbol", apivalue_string, unitsymbol_key+descriptions_key_offset, OKEY(channel_Key) },
     { "min", apivalue_double, min_key+descriptions_key_offset, OKEY(channel_Key) },
@@ -386,8 +403,14 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         case name_key+descriptions_key_offset:
           aPropValue->setStringValue(getName());
           return true;
-        case channelIndex_key+descriptions_key_offset:
+        case channelIndex_key+descriptions_key_offset: // TODO: probably remove, use dsIndex instead consistently
           aPropValue->setUint8Value(channelIndex);
+          return true;
+        case dsIndex_key+descriptions_key_offset:
+          aPropValue->setUint8Value(channelIndex);
+          return true;
+        case channelType_key+descriptions_key_offset:
+          aPropValue->setUint8Value(getChannelType());
           return true;
         case siunit_key+descriptions_key_offset:
           aPropValue->setStringValue(valueUnitName(getChannelUnit(), false));

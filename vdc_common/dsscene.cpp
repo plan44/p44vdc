@@ -72,10 +72,23 @@ protected:
       { "value", apivalue_double, value_key, OKEY(scenevalue_key) },
       { "dontCare", apivalue_bool, dontCare_key, OKEY(scenevalue_key) },
     };
+    #if ACCESS_BY_ID
+    if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
+      // scene channels by their channel ID
+      DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+      descP->propertyName = scene.getDevice().getChannelByIndex(aPropIndex)->getId();
+      descP->propertyType = aParentDescriptor->type();
+      descP->propertyFieldKey = aPropIndex;
+      descP->propertyObjectKey = OKEY(scenevalue_key);
+      return descP;
+    }
+    #endif
     // Note: SceneChannels is private an can't be derived, so no subclass adding properties must be considered
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&valueproperties[aPropIndex], aParentDescriptor));
   }
 
+
+  #if !ACCESS_BY_ID
 
   PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
   {
@@ -121,7 +134,9 @@ protected:
     return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
   }
 
+  #endif
 
+  
   PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
   {
     // the only subcontainer are the fields, handled by myself

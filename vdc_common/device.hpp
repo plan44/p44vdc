@@ -28,6 +28,10 @@
 
 using namespace std;
 
+// originally, all behaviours were accessed by index, channels were accessed by channeltype
+// when ACCESS_BY_ID is set, all behaviours and channels are accessed by their getId().
+#define ACCESS_BY_ID 1
+
 namespace p44 {
 
   class Device;

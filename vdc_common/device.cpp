@@ -1569,7 +1569,6 @@ int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 }
 
 
-
 PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   // device level properties
@@ -1629,6 +1628,34 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
       return descP;
     }
   }
+  #if ACCESS_BY_ID
+  else if (aParentDescriptor->isArrayContainer()) {
+    // accessing one of the other containers: channels, buttons/inputs/sensors or scenes
+    string id;
+    if (aParentDescriptor->hasObjectKey(device_buttons_key)) {
+      id = buttons[aPropIndex]->getId();
+    }
+    else if (aParentDescriptor->hasObjectKey(device_inputs_key)) {
+      id = binaryInputs[aPropIndex]->getId();
+    }
+    else if (aParentDescriptor->hasObjectKey(device_sensors_key)) {
+      id = sensors[aPropIndex]->getId();
+    }
+    else if (aParentDescriptor->hasObjectKey(device_channels_key)) {
+      id = getChannelByIndex(aPropIndex)->getId();
+    }
+    else if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
+      // scenes are still named by their index
+      id = string_format("%d", aPropIndex);
+    }
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = id;
+    descP->propertyType = apivalue_object;
+    descP->propertyFieldKey = aPropIndex;
+    descP->propertyObjectKey = aParentDescriptor->objectKey();
+    return descP;
+  }
+  #endif
   return PropertyDescriptorPtr();
 }
 
@@ -1636,15 +1663,57 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
 
 PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
 {
+  #if ACCESS_BY_ID
+  // efficient by-index access for scenes, as these are always accessed by index (they do not have a id)
+  if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
+    // array-like container: channels, buttons/inputs/sensors or scenes
+    PropertyDescriptorPtr propDesc;
+    bool numericName = getNextPropIndex(aPropMatch, aStartIndex);
+    int n = numProps(aDomain, aParentDescriptor);
+    if (aStartIndex!=PROPINDEX_NONE && aStartIndex<n) {
+      // within range, create descriptor
+      DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+      descP->propertyName = string_format("%d", aStartIndex);
+      descP->propertyType = aParentDescriptor->type();
+      descP->propertyFieldKey = aStartIndex;
+      descP->propertyObjectKey = aParentDescriptor->objectKey();
+      propDesc = PropertyDescriptorPtr(descP);
+      // advance index
+      aStartIndex++;
+    }
+    if (aStartIndex>=n || numericName) {
+      // no more descriptors OR specific descriptor accessed -> no "next" descriptor
+      aStartIndex = PROPINDEX_NONE;
+    }
+    return propDesc;
+  }
+  else if (
+    aParentDescriptor->hasObjectKey(device_channels_key) &&
+    aStartIndex==0 &&
+    aPropMatch=="0" &&
+    output &&
+    output->numChannels()>0
+  ) {
+    // special case for backwards compatibility: channel with id "0" is the default (first) channel
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = "0";
+    descP->propertyType = aParentDescriptor->type();
+    descP->propertyFieldKey = aStartIndex;
+    descP->propertyObjectKey = aParentDescriptor->objectKey();
+    // advance index
+    aStartIndex++;
+    return descP;
+  }
+  #else
   if (
     aParentDescriptor && aParentDescriptor->isArrayContainer() &&
     !aParentDescriptor->hasObjectKey(device_modelFeatures_key) // these are handled by base class via getDescriptorByIndex
   ) {
-    // array-like container
+    // array-like container: channels, buttons/inputs/sensors or scenes
     PropertyDescriptorPtr propDesc;
     bool numericName = getNextPropIndex(aPropMatch, aStartIndex);
     if (numericName && aParentDescriptor->hasObjectKey(device_channels_key)) {
-      // specific channel addressed by ID, look up index for it
+      // specific channel addressed by type, look up index for it
       DsChannelType ct = (DsChannelType)aStartIndex;
       aStartIndex = PROPINDEX_NONE; // default: not found
       // there is an output
@@ -1672,7 +1741,7 @@ PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStart
         }
       }
       else {
-        // is a scene, name by index
+        // is a scene/button/input/sensor, name by index
         descP->propertyName = string_format("%d", aStartIndex);
       }
       descP->propertyType = aParentDescriptor->type();
@@ -1688,6 +1757,7 @@ PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStart
     }
     return propDesc;
   }
+  #endif
   // None of the containers within Device - let base class handle Device-Level properties
   return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
 }

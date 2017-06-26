@@ -91,7 +91,14 @@ namespace p44 {
     Device &device;
 
     /// the index of this behaviour in the device's vector
+    /// @note the indices of behaviours are relevant for dS backwards compatibility, because
+    ///   older dS systems used the indices for idenitification of buttons/inputs/sensors
     size_t index;
+
+    /// the ID of the behaviour
+    /// @note If string is empty, getId() will return decimal string representation of getIndex(), for backwards compatibility
+    string behaviourId;
+
 
     /// @name behaviour description, constants or variables
     ///   set by device implementations when adding a Behaviour.
@@ -111,7 +118,7 @@ namespace p44 {
 
 
   public:
-    DsBehaviour(Device &aDevice);
+    DsBehaviour(Device &aDevice, const string aBehaviourId = "");
     virtual ~DsBehaviour();
 
     /// device type identifier
@@ -163,6 +170,11 @@ namespace p44 {
     /// get the index value
     /// @return index of this behaviour in one of the owning device's behaviour lists
     size_t getIndex() { return index; };
+
+    /// get the behaviour ID
+    /// @return the behaviour ID, which must be unique within the device and must always allow to re-find the same behaviour
+    /// @Note if no string behavior id has been set at creation, this will return decimal string representation of the behaviour index
+    string getId();
 
     /// textual representation of getType()
     /// @return type string, which is the string used to prefix the xxxDescriptions, xxxSettings and xxxStates properties

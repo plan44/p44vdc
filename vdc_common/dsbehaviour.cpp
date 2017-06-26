@@ -29,8 +29,9 @@ using namespace p44;
 
 // MARK: ===== DsBehaviour
 
-DsBehaviour::DsBehaviour(Device &aDevice) :
+DsBehaviour::DsBehaviour(Device &aDevice, const string aBehaviourId) :
   inheritedParams(aDevice.getVdcHost().getDsParamStore()),
+  behaviourId(aBehaviourId),
   index(0),
   device(aDevice),
   hardwareName("<undefined>"),
@@ -104,6 +105,21 @@ ErrorPtr DsBehaviour::forget()
 // MARK: ===== property access
 
 
+string DsBehaviour::getId()
+{
+  if (!behaviourId.empty()) {
+    return behaviourId;
+  }
+  else {
+    // no channel ID set, default to decimal string representation of channel type
+    return string_format("%zu", getIndex());
+  }
+}
+
+
+
+
+
 const char *DsBehaviour::getTypeName()
 {
   // Note: this must be the prefix for the xxxDescriptions, xxxSettings and xxxStates properties
@@ -121,6 +137,7 @@ const char *DsBehaviour::getTypeName()
 enum {
   name_key,
   type_key,
+  dsIndex_key,
   behaviourType_key,
   numDsBehaviourDescProperties
 };
@@ -165,6 +182,7 @@ PropertyDescriptorPtr DsBehaviour::getDescriptorByIndex(int aPropIndex, int aDom
   static const PropertyDescription descProperties[numDsBehaviourDescProperties] = {
     { "name", apivalue_string, name_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
     { "type", apivalue_string, type_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
+    { "dsIndex", apivalue_uint64, dsIndex_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
     { "x-p44-behaviourType", apivalue_string, behaviourType_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
   };
   static const PropertyDescription stateProperties[numDsBehaviourStateProperties] = {
@@ -216,6 +234,7 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
         // descriptions
         case name_key+descriptions_key_offset: aPropValue->setStringValue(hardwareName); return true;
         case type_key+descriptions_key_offset: aPropValue->setStringValue(getTypeName()); return true;
+        case dsIndex_key+descriptions_key_offset: aPropValue->setUint64Value(getIndex()); return true;
         case behaviourType_key+descriptions_key_offset: aPropValue->setStringValue(behaviourTypeIdentifier()); return true;
         // state
         case error_key+states_key_offset: aPropValue->setUint16Value(hardwareError); return true;
