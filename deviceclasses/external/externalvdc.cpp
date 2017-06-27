@@ -440,10 +440,33 @@ ErrorPtr ExternalDevice::processSimpleMessage(string aMessageType, string aValue
 }
 
 
+static int behaviourIndexById(BehaviourVector &aBV, const string aId)
+{
+  for (int i=0; i<aBV.size(); i++) {
+    if (aId==aBV[i]->getId(3)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+
+static int channelIndexById(OutputBehaviourPtr aOB, const string aId)
+{
+  for (int i=0; i<aOB->numChannels(); i++) {
+    ChannelBehaviourPtr cb = aOB->getChannelByIndex(i);
+    if (aId==cb->getId(3)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+
 
 ErrorPtr ExternalDevice::processInputJson(char aInputType, JsonObjectPtr aParams)
 {
-  uint32_t index = 0;
+  int index = -1;
   JsonObjectPtr o = aParams->get("index");
   if (o) {
     index = o->int32Value();
@@ -453,6 +476,19 @@ ErrorPtr ExternalDevice::processInputJson(char aInputType, JsonObjectPtr aParams
     DsChannelType ty = (DsChannelType)o->int32Value();
     ChannelBehaviourPtr cb = getChannelByType(ty);
     if (cb) index = (uint32_t)cb->getChannelIndex();
+  }
+  else if (aParams->get("id", o)) {
+    // access by id
+    string id = o->stringValue();
+    switch (aInputType) {
+      case 'B': index = behaviourIndexById(buttons, id); break;
+      case 'I': index = behaviourIndexById(binaryInputs, id); break;
+      case 'S': index = behaviourIndexById(sensors, id); break;
+      case 'C': index = channelIndexById(output, id); break;
+    }
+  }
+  if (index<0) {
+    return TextError::err("missing id, index or type");
   }
   o = aParams->get("value");
   if (o) {
@@ -631,6 +667,7 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
           message->add("message", JsonObject::newString("channel"));
           message->add("index", JsonObject::newInt32((int)i));
           message->add("type", JsonObject::newInt32(cb->getChannelType())); // informational
+          message->add("id", JsonObject::newString(cb->getId(3))); // informational
           message->add("value", JsonObject::newDouble(cb->getChannelValue()));
           sendDeviceApiJsonMessage(message);
         }
@@ -979,16 +1016,23 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       VdcButtonElement buttonElement = buttonElement_center;
       DsGroup group = defaultGroup; // default group for button is same as primary default
       string buttonName;
+      string id;
       bool isLocalButton = false;
       // - optional params
-      if (o2->get("id", o3)) buttonId = o3->int32Value();
+      if (o2->get("id", o3)) {
+        if (o3->isType(json_type_int))
+          buttonId = o3->int32Value(); // for backwards compatibility only. Should now use "buttonid"
+        else
+          id = o3->stringValue();
+      }
+      if (o2->get("buttonid", o3)) buttonId = o3->int32Value();
       if (o2->get("buttontype", o3)) buttonType = (VdcButtonType)o3->int32Value();
       if (o2->get("localbutton", o3)) isLocalButton = o3->boolValue();
       if (o2->get("element", o3)) buttonElement = (VdcButtonElement)o3->int32Value();
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("hardwarename", o3)) buttonName = o3->stringValue(); else buttonName = string_format("button_id%d_el%d", buttonId, buttonElement);
       // - create behaviour
-      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this));
+      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, id));
       bb->setHardwareButtonConfig(buttonId, buttonType, buttonElement, isLocalButton, buttonElement==buttonElement_down ? 1 : 0, true); // fixed mode
       bb->setGroup(group);
       bb->setHardwareName(buttonName);
@@ -1006,14 +1050,16 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       DsGroup group = defaultGroup; // default group for input is same as primary default
       MLMicroSeconds updateInterval = Never; // unknown
       string inputName;
+      string id;
       // - optional params
+      if (o2->get("id", o3)) id = o3->stringValue();
       if (o2->get("inputtype", o3)) inputType = (DsBinaryInputType)o3->int32Value();
       if (o2->get("usage", o3)) usage = (VdcUsageHint)o3->int32Value();
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("updateinterval", o3)) updateInterval = o3->doubleValue()*Second;
       if (o2->get("hardwarename", o3)) inputName = o3->stringValue(); else inputName = string_format("input_ty%d", inputType);
       // - create behaviour
-      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this));
+      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this, id));
       ib->setHardwareInputConfig(inputType, usage, true, updateInterval);
       ib->setGroup(group);
       ib->setHardwareName(inputName);
@@ -1035,7 +1081,9 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       MLMicroSeconds updateInterval = 5*Second; // assume mostly up-to-date
       MLMicroSeconds aliveSignInterval = 0; // no guaranteed alive sign interval
       string sensorName;
+      string id;
       // - optional params
+      if (o2->get("id", o3)) id = o3->stringValue();
       if (o2->get("sensortype", o3)) sensorType = (VdcSensorType)o3->int32Value();
       if (o2->get("usage", o3)) usage = (VdcUsageHint)o3->int32Value();
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
@@ -1046,7 +1094,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("max", o3)) max = o3->doubleValue();
       if (o2->get("resolution", o3)) resolution = o3->doubleValue();
       // - create behaviour
-      SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this));
+      SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, id));
       sb->setHardwareSensorConfig(sensorType, usage, min, max, resolution, updateInterval, aliveSignInterval); // no default changesOnlyInterval, external device should prevent unneeded updates
       sb->setGroup(group);
       sb->setHardwareName(sensorName);
