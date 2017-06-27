@@ -270,7 +270,7 @@ DsBehaviourPtr EnoceanSensorHandler::newSensorBehaviour(const EnoceanSensorDescr
   // create the behaviour
   switch (aSensorDescriptor.behaviourType) {
     case behaviour_sensor: {
-      SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*aDevice.get()));
+      SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*aDevice.get(),""));
       int numBits = (aSensorDescriptor.msBit-aSensorDescriptor.lsBit)+1; // number of bits
       double resolution = (aSensorDescriptor.max-aSensorDescriptor.min) / ((1<<numBits)-1); // units per LSB
       sb->setHardwareSensorConfig((VdcSensorType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, aSensorDescriptor.min, aSensorDescriptor.max, resolution, aSensorDescriptor.updateInterval*Second, aSensorDescriptor.aliveSignInterval*Second);
@@ -279,7 +279,7 @@ DsBehaviourPtr EnoceanSensorHandler::newSensorBehaviour(const EnoceanSensorDescr
       return sb;
     }
     case behaviour_binaryinput: {
-      BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*aDevice.get()));
+      BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*aDevice.get(),""));
       bb->setHardwareInputConfig((DsBinaryInputType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, true, aSensorDescriptor.updateInterval*Second);
       bb->setGroup(aSensorDescriptor.channelGroup);
       bb->setHardwareName(aSensorDescriptor.typeText);

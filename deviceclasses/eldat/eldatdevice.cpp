@@ -524,13 +524,13 @@ EldatDevicePtr EldatDevice::newDevice(
       newDev->setColorClass(class_black_joker);
       // Create two behaviours, one for the up button, one for the down button
       // - create button input 0 for what dS will handle as "down key" (actual button depends on rocker type - reversed or normal)
-      ButtonBehaviourPtr downBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get()));
+      ButtonBehaviourPtr downBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"down"));
       downBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
       downBhvr->setGroup(group_yellow_light); // pre-configure for light
       downBhvr->setHardwareName("down key");
       newDev->addBehaviour(downBhvr);
       // - create button input 1 for what dS will handle as "up key" (actual button depends on "reversed")
-      ButtonBehaviourPtr upBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get()));
+      ButtonBehaviourPtr upBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"up"));
       upBhvr->setGroup(group_yellow_light); // pre-configure for light
       upBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
       upBhvr->setHardwareName("up key");
@@ -555,7 +555,7 @@ EldatDevicePtr EldatDevice::newDevice(
       // Buttons can be used for anything
       newDev->setColorClass(class_black_joker);
       // Create one button behaviour
-      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get()));
+      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"button"));
       bb->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, true); // fixed mode
       bb->setGroup(group_yellow_light); // pre-configure for light
       bb->setHardwareName("button");
@@ -580,7 +580,7 @@ EldatDevicePtr EldatDevice::newDevice(
       // motion detectors can be used for anything
       newDev->setColorClass(class_black_joker);
       // Create one input behaviour
-      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
+      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"motion"));
       ib->setHardwareInputConfig(binInpType_motion, usage_room, true, 0);
       ib->setHardwareName("detector");
       newDev->addBehaviour(ib);

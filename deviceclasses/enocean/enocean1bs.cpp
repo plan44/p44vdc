@@ -66,7 +66,7 @@ EnoceanDevicePtr Enocean1BSDevice::newDevice(
       // create channel handler, EEP variant 1 means inverted state interpretation
       SingleContactHandlerPtr newHandler = SingleContactHandlerPtr(new SingleContactHandler(*newDev.get(), !(EEP_VARIANT(aEEProfile)==1)));
       // create the behaviour
-      BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get()));
+      BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"contact"));
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, 15*Minute);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName(newHandler->shortDesc());
