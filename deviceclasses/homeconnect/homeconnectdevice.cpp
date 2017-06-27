@@ -25,6 +25,13 @@
 
 #include "homeconnectvdc.hpp"
 
+#include "homeconnectdevicecoffemaker.hpp"
+#include "homeconnectdeviceoven.hpp"
+#include "homeconnectdevicedishwasher.hpp"
+#include "homeconnectdevicewasher.hpp"
+#include "homeconnectdevicedryer.hpp"
+#include "homeconnectdevicefridge.hpp"
+
 using namespace p44;
 
 
@@ -173,6 +180,67 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
 //    "haId": "SIEMENS-TI909701HC-xxxxxxxx"
 //  }
 
+// Example of all simulated devices
+//  {
+//    "data": {
+//      "homeappliances": [
+//        {
+//          "haId": "BOSCH-HCS06COM1-540745B9FEF475",
+//          "vib": "HCS06COM1",
+//          "brand": "BOSCH",
+//          "type": "CoffeeMaker",
+//          "name": "CoffeeMaker Simulator",
+//          "enumber": "HCS06COM1/01",
+//          "connected": true
+//        },
+//        {
+//          "haId": "SIEMENS-HCS02DWH1-79AFEC3005AA71",
+//          "vib": "HCS02DWH1",
+//          "brand": "SIEMENS",
+//          "type": "Dishwasher",
+//          "name": "Dishwasher Simulator",
+//          "enumber": "HCS02DWH1/03",
+//          "connected": true
+//        },
+//        {
+//          "haId": "BOSCH-HCS04DYR1-AC61438DAE236C",
+//          "vib": "HCS04DYR1",
+//          "brand": "BOSCH",
+//          "type": "Dryer",
+//          "name": "Dryer Simulator",
+//          "enumber": "HCS04DYR1/03",
+//          "connected": true
+//        },
+//        {
+//          "haId": "SIEMENS-HCS05FRF1-D516FBECC462AD",
+//          "vib": "HCS05FRF1",
+//          "brand": "SIEMENS",
+//          "type": "FridgeFreezer",
+//          "name": "Fridge Freezer Simulator",
+//          "enumber": "HCS05FRF1/03",
+//          "connected": true
+//        },
+//        {
+//          "haId": "BOSCH-HCS01OVN1-6796CE1BD8A471",
+//          "vib": "HCS01OVN1",
+//          "brand": "BOSCH",
+//          "type": "Oven",
+//          "name": "Oven Simulator",
+//          "enumber": "HCS01OVN1/03",
+//          "connected": true
+//        },
+//        {
+//          "haId": "SIEMENS-HCS03WCH1-2A48D7099DB1EB",
+//          "vib": "HCS03WCH1",
+//          "brand": "SIEMENS",
+//          "type": "Washer",
+//          "name": "Washer Simulator",
+//          "enumber": "HCS03WCH1/03",
+//          "connected": true
+//        }
+//      ]
+//    }
+//  }
 
 
 HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
@@ -194,20 +262,45 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
   if (aHomeApplicanceInfoRecord->get("vib", o)) {
     model = o->stringValue();
     if (aHomeApplicanceInfoRecord->get("type", o)) {
-      string ty = o->stringValue();
-      model += " " + ty;
-      if (ty=="CoffeeMaker") {
-        hcDevType = homeconnect_coffeemaker;
-      }
-      else if (ty=="Oven") {
-        hcDevType = homeconnect_oven;
-      }
+      model += " " + o->stringValue();
     }
   }
   if (aHomeApplicanceInfoRecord->get("enumber", o))
     modelGuid = o->stringValue();
   if (aHomeApplicanceInfoRecord->get("brand", o))
     vendor = o->stringValue();
+}
+
+HomeConnectDevicePtr HomeConnectDevice::createHomeConenctDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord)
+{
+  JsonObjectPtr o;
+  HomeConnectDevicePtr retVal = NULL;
+
+  // analyze the type of device in this json object and create proper specialized type
+  if (aHomeApplicanceInfoRecord->get("type", o)) {
+    string ty = o->stringValue();
+
+    if (ty=="CoffeeMaker") {
+      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceCoffeMaker(aVdcP, aHomeApplicanceInfoRecord));
+    }
+    else if (ty=="Oven") {
+      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceOven(aVdcP, aHomeApplicanceInfoRecord));
+    }
+    else if (ty=="Dishwasher") {
+      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceDishWasher(aVdcP, aHomeApplicanceInfoRecord));
+    }
+    else if (ty=="Washer") {
+      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceWasher(aVdcP, aHomeApplicanceInfoRecord));
+    }
+    else if (ty=="Dryer") {
+      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceDryer(aVdcP, aHomeApplicanceInfoRecord));
+    }
+    else if (ty=="FridgeFreezer") {
+      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceFridge(aVdcP, aHomeApplicanceInfoRecord));
+    }
+  }
+
+  return retVal;
 }
 
 
@@ -227,113 +320,6 @@ bool HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 bool HomeConnectDevice::configureDevice()
 {
   HomeConnectActionPtr a;
-  if (hcDevType==homeconnect_coffeemaker) {
-    // FIXME: ugly direct model match
-//    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
-    // FIXME: got even uglier:
-    standalone = (modelGuid.substr(0,10)=="TI909701HC");
-    // Create standard actions
-    // - enums that can be shared between actions
-    EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("temperatureLevel", true));
-    tempLevel->addEnum("Normal", 0, true); // default
-    tempLevel->addEnum("High", 1);
-    tempLevel->addEnum("VeryHigh", 2);
-    EnumValueDescriptorPtr beanAmount = EnumValueDescriptorPtr(new EnumValueDescriptor("beanAmount", true));
-    beanAmount->addEnum("VeryMild", 0);
-    beanAmount->addEnum("Mild", 1);
-    beanAmount->addEnum("Normal", 2, true); // default
-    beanAmount->addEnum("Strong", 3);
-    beanAmount->addEnum("VeryStrong", 4);
-    beanAmount->addEnum("DoubleShot", 5);
-    beanAmount->addEnum("DoubleShotPlus", 6);
-    beanAmount->addEnum("DoubleShotPlusPlus", 7);
-    // - command template
-    string cmdTemplate =
-      "PUT:programs/active:{\"data\":{\"key\":\"ConsumerProducts.CoffeeMaker.Program.Beverage.%s\","
-      "\"options\":[";
-    if (!standalone) {
-      cmdTemplate +=
-        "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{temperatureLevel}\"},";
-    }
-    cmdTemplate +=
-        "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.BeanAmount\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{beanAmount}\"},"
-        "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.FillQuantity\",\"value\":@{fillQuantity%%0}}"
-      "]}}";
-    // - espresso
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.espresso", "Espresso", string_format(cmdTemplate.c_str(),"Espresso")));
-    a->addParameter(tempLevel);
-    a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 35, 60, 5, true, 40)));
-    deviceActions->addAction(a);
-    // - espresso macciato
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.espressoMacchiato", "Espresso Macchiato", string_format(cmdTemplate.c_str(),"EspressoMacchiato")));
-    a->addParameter(tempLevel);
-    a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 40, 60, 10, true, 50)));
-    deviceActions->addAction(a);
-    // - (plain) coffee
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.coffee", "Coffee", string_format(cmdTemplate.c_str(),"Coffee")));
-    a->addParameter(tempLevel);
-    a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 60, 250, 10, true, 120)));
-    deviceActions->addAction(a);
-    // - Cappuccino
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.cappuccino", "Cappuccino", string_format(cmdTemplate.c_str(),"Cappuccino")));
-    a->addParameter(tempLevel);
-    a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 100, 250, 10, true, 180)));
-    deviceActions->addAction(a);
-    // - latte macchiato
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.latteMacchiato", "Latte Macchiato", string_format(cmdTemplate.c_str(),"LatteMacchiato")));
-    a->addParameter(tempLevel);
-    a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 200, 400, 20, true, 300)));
-    deviceActions->addAction(a);
-    // - latte macchiato
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.caffeLatte", "Caffe Latte", string_format(cmdTemplate.c_str(),"CaffeLatte")));
-    a->addParameter(tempLevel);
-    a->addParameter(beanAmount);
-    a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 100, 400, 20, true, 250)));
-    deviceActions->addAction(a);
-  }
-  else if (hcDevType==homeconnect_oven) {
-    // Create standard actions
-    HomeConnectActionPtr a;
-    // - command template
-    string cmdTemplate =
-      "PUT:programs/active:{\"data\":{\"key\":\"Cooking.Oven.Program.HeatingMode.%s\","
-      "\"options\":["
-      "{ \"key\":\"Cooking.Oven.Option.SetpointTemperature\",\"value\":@{Temperature%%0}},"
-      "{ \"key\":\"BSH.Common.Option.Duration\",\"value\":@{Duration%%0}}"
-      "]}}";
-    // - common params
-    ValueDescriptorPtr temp = ValueDescriptorPtr(new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30, 250, 1, true, 180));
-    ValueDescriptorPtr duration = ValueDescriptorPtr(new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340, 1, true, 600));
-    // - preheating
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Preheating", "Pre-heating", string_format(cmdTemplate.c_str(),"PreHeating")));
-    a->addParameter(temp);
-    a->addParameter(duration);
-    deviceActions->addAction(a);
-    // - Hot Air
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.HotAir", "Hot air", string_format(cmdTemplate.c_str(),"HotAir")));
-    a->addParameter(temp);
-    a->addParameter(duration);
-    deviceActions->addAction(a);
-    // - Top and bottom heating
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.TopBottomHeat", "Top and bottom heat", string_format(cmdTemplate.c_str(),"TopBottomHeating")));
-    a->addParameter(temp);
-    a->addParameter(duration);
-    deviceActions->addAction(a);
-    // - Pizza setting
-    a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PizzaSetting", "Pizza Setting", string_format(cmdTemplate.c_str(),"PizzaSetting")));
-    a->addParameter(temp);
-    a->addParameter(duration);
-    deviceActions->addAction(a);
-  }
-  else {
-    // unknown type: not configured
-    return false;
-  }
   // configure common things
   // - stop
   a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "stop current program", "DELETE:programs/active"));
@@ -479,8 +465,7 @@ string HomeConnectDevice::oemModelGUID()
 {
   switch (hcDevType) {
     case homeconnect_coffeemaker:
-      if (standalone) return "gs1:(01)7640156792102"; // Tischmodell - from aizo/dS number space, as defined 2016-12-11
-      else return "gs1:(01)7640156792096"; // Einbaumodell - from aizo/dS number space, as defined 2016-12-11
+      return "gs1:(01)7640156792096";
       break;
     case homeconnect_oven:
       return "gs1:(01)7640156792546";
