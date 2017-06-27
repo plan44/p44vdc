@@ -118,7 +118,7 @@ namespace p44 {
 
 
   public:
-    DsBehaviour(Device &aDevice, const string aBehaviourId = "");
+    DsBehaviour(Device &aDevice, const string aBehaviourId);
     virtual ~DsBehaviour();
 
     /// device type identifier

@@ -89,7 +89,7 @@ namespace p44 {
   public:
   
     /// constructor
-    ButtonBehaviour(Device &aDevice);
+    ButtonBehaviour(Device &aDevice, const string aId);
 
     /// initialisation of hardware-specific constants for this button input
     /// @param aButtonID the ID of the physical button (all inputs belonging to a single physical button

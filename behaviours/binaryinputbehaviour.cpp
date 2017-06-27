@@ -23,8 +23,8 @@
 
 using namespace p44;
 
-BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice) :
-  inherited(aDevice),
+BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
+  inherited(aDevice, aId),
   // persistent settings
   binInputGroup(group_black_variable),
   configuredInputType(binInpType_none),

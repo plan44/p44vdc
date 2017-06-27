@@ -23,8 +23,8 @@
 
 using namespace p44;
 
-SensorBehaviour::SensorBehaviour(Device &aDevice) :
-  inherited(aDevice),
+SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
+  inherited(aDevice, aId),
   // persistent settings
   sensorGroup(group_black_variable), // default to joker
   minPushInterval(2*Second), // do not push more often than every 2 seconds

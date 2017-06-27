@@ -34,8 +34,8 @@ using namespace p44;
 
 
 
-ButtonBehaviour::ButtonBehaviour(Device &aDevice) :
-  inherited(aDevice),
+ButtonBehaviour::ButtonBehaviour(Device &aDevice, const string aId) :
+  inherited(aDevice, aId),
   // persistent settings
   buttonGroup(group_yellow_light),
   buttonMode(buttonMode_inactive), // none by default, hardware should set a default matching the actual HW capabilities

@@ -69,7 +69,7 @@ namespace p44 {
   public:
 
     /// constructor
-    BinaryInputBehaviour(Device &aDevice);
+    BinaryInputBehaviour(Device &aDevice, const string aId);
 
     /// initialisation of hardware-specific constants for this binary input
     /// @param aInputType the input type (also called sensor function in classic dS)

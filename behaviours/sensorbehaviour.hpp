@@ -75,7 +75,7 @@ namespace p44 {
   public:
 
     /// constructor
-    SensorBehaviour(Device &aDevice);
+    SensorBehaviour(Device &aDevice, const string aId);
 
     /// initialisation of hardware-specific constants for this sensor
     /// @param aType the sensor type (Note: not the same as dS sensor types, needs mapping)

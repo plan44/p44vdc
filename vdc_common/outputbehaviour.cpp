@@ -26,7 +26,7 @@ using namespace p44;
 
 
 OutputBehaviour::OutputBehaviour(Device &aDevice) :
-  inherited(aDevice),
+  inherited(aDevice, "output"),
   // hardware derived params
   outputFunction(outputFunction_dimmer),
   outputUsage(usage_undefined),
