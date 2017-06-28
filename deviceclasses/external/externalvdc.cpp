@@ -610,8 +610,6 @@ bool ExternalDevice::prepareSceneCall(DsScenePtr aScene)
       case scene_cmd_stop: sceneCommandStr = "STOP"; break;
       case scene_cmd_climatecontrol_enable: sceneCommandStr = "CLIMATE_ENABLE"; break;
       case scene_cmd_climatecontrol_disable: sceneCommandStr = "CLIMATE_DISABLE"; break;
-      case scene_cmd_ventilation_airflow_automatic: sceneCommandStr = "AIRFLOW_AUTO"; break;
-      case scene_cmd_ventilation_louver_automatic: sceneCommandStr = "LOUVER_AUTO"; break;
       default: break; // not implemented, ignore for now
     }
     // send scene command message
@@ -918,8 +916,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   else if (outputType=="fancoilunit") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
     controlValues = true; // fan coil unit usually needs control values
-    // - standard device settings with scene table
-    installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
+    // - FCU device settings with scene table
+    installSettings(DeviceSettingsPtr(new FanCoilUnitDeviceSettings(*this)));
     // - create climate control fan coil unit output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_fancoilunit));
     cb->setGroupMembership(defaultGroup, true); // put into room temperature control group...

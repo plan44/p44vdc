@@ -30,6 +30,17 @@ using namespace std;
 
 namespace p44 {
 
+  /// ventilation airflow direction channel states
+  typedef enum {
+    fcuOperatingMode_off = 0,
+    fcuOperatingMode_heat = 1,
+    fcuOperatingMode_cool = 2,
+    fcuOperatingMode_fan = 3,
+    fcuOperatingMode_dry = 4,
+    numFcuOperationModes
+  } FcuOperationMode;
+
+
   class HeatingLevelChannel : public ChannelBehaviour
   {
     typedef ChannelBehaviour inherited;
@@ -43,6 +54,32 @@ namespace p44 {
     virtual double getMin() P44_OVERRIDE { return 0; }; // heating is 0..100 (cooling would be -100..0)
     virtual double getMax() P44_OVERRIDE { return 100; };
     
+  };
+
+
+  class FcuOperationModeChannel : public IndexChannel
+  {
+    typedef IndexChannel inherited;
+
+  public:
+    FcuOperationModeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "operationMode") { setNumIndices(numFcuOperationModes); }; ///< see FcuOperationModes enum
+
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_fcu_operation_mode; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "FCU operation mode"; };
+  };
+
+
+  class FcuPowerStateChannel : public FlagChannel
+  {
+    typedef FlagChannel inherited;
+
+  public:
+    FcuPowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { };
+
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_fcu_power_state; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "FCU power state"; };
   };
 
 
@@ -63,7 +100,6 @@ namespace p44 {
   typedef boost::intrusive_ptr<ClimateControlScene> ClimateControlScenePtr;
 
 
-
   /// the persistent parameters of a climate scene device (including scene table)
   class ClimateDeviceSettings : public SceneDeviceSettings
   {
@@ -71,6 +107,62 @@ namespace p44 {
 
   public:
     ClimateDeviceSettings(Device &aDevice);
+
+    /// factory method to create the correct subclass type of DsScene
+    /// @param aSceneNo the scene number to create a scene object for.
+    /// @note setDefaultSceneValues() must be called to set default scene values
+    virtual DsScenePtr newDefaultScene(SceneNo aSceneNo);
+
+  };
+
+
+
+  /// A FCU scene
+  class FanCoilUnitScene : public DsScene
+  {
+    typedef DsScene inherited;
+    friend class ClimateControlBehaviour;
+
+  public:
+    FanCoilUnitScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo); ///< constructor, sets values according to dS specs' default values
+
+    /// @name FanCoilUnitScene specific values
+    /// @{
+
+    bool powerState; ///< power on/off
+    FcuOperationMode operationMode; ///< operation mode
+    //double targetTempOffset; ///< ??? maybe
+
+    /// @}
+
+    /// Set default scene values for a specified scene number
+    /// @param aSceneNo the scene number to set default values
+    virtual void setDefaultSceneValues(SceneNo aSceneNo) P44_OVERRIDE;
+
+    // scene values implementation
+    virtual double sceneValue(size_t aOutputIndex) P44_OVERRIDE;
+    virtual void setSceneValue(size_t aOutputIndex, double aValue) P44_OVERRIDE;
+
+  protected:
+
+    // persistence implementation
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<FanCoilUnitScene> FanCoilUnitScenePtr;
+
+
+  /// the persistent parameters of a climate scene device (including scene table)
+  class FanCoilUnitDeviceSettings : public SceneDeviceSettings
+  {
+    typedef SceneDeviceSettings inherited;
+
+  public:
+    FanCoilUnitDeviceSettings(Device &aDevice);
 
     /// factory method to create the correct subclass type of DsScene
     /// @param aSceneNo the scene number to create a scene object for.
@@ -132,6 +224,10 @@ namespace p44 {
 
     /// @}
 
+    /// channels
+    ChannelBehaviourPtr heatingLevel; // Valve only
+    FlagChannelPtr powerState; // FCU only
+    IndexChannelPtr operationMode; // FCU only
 
   public:
 
@@ -140,7 +236,7 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour
-    virtual const char *behaviourTypeIdentifier() { return "climatecontrol"; };
+    virtual const char *behaviourTypeIdentifier() P44_OVERRIDE { return "climatecontrol"; };
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{
@@ -168,7 +264,7 @@ namespace p44 {
     /// check for presence of model feature (flag in dSS visibility matrix)
     /// @param aFeatureIndex the feature to check for
     /// @return yes if this output behaviour has the feature, no if (explicitly) not, undefined if asked entity does not know
-    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex);
+    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex) P44_OVERRIDE;
 
     /// Process a named control value. The type, group membership and settings of the device determine if at all,
     /// and if, how the value affects physical outputs of the device or general device operation
@@ -178,7 +274,7 @@ namespace p44 {
     /// @param aValue the control value to process
     /// @note base class by default forwards the control value to all of its output behaviours.
     /// @return true if value processing caused channel changes so channel values should be applied
-    virtual bool processControlValue(const string &aName, double aValue);
+    virtual bool processControlValue(const string &aName, double aValue) P44_OVERRIDE;
 
     /// apply scene to output channels
     /// @param aScene the scene to apply to output channels
@@ -186,36 +282,49 @@ namespace p44 {
     ///   false if scene cannot yet be applied to hardware, and/or will be performed later/separately
     /// @note this derived class' applyScene only implements special hard-wired behaviour specific scenes,
     ///   basic scene apply functionality is provided by base class' implementation already.
-    virtual bool applyScene(DsScenePtr aScene);
+    virtual bool applyScene(DsScenePtr aScene) P44_OVERRIDE;
 
     /// @}
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
   protected:
 
+    /// called by applyScene to load channel values from a scene.
+    /// @param aScene the scene to load channel values from
+    /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
+    ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
+    virtual void loadChannelsFromScene(DsScenePtr aScene) P44_OVERRIDE;
+
+    /// called by captureScene to save channel values to a scene.
+    /// @param aScene the scene to save channel values to
+    /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
+    ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
+    /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
+    virtual void saveChannelsToScene(DsScenePtr aScene) P44_OVERRIDE;
+
     // property access implementation for descriptor/settings/states
-    virtual int numSettingsProps();
-    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor);
+    virtual int numSettingsProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     // combined field access for all types of properties
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
     enum {
       outputflag_climateControlIdle = inherited::outputflag_nextflag<<0,
       outputflag_nextflag = inherited::outputflag_nextflag<<1
     };
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
 
   };

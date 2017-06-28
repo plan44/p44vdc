@@ -25,7 +25,7 @@
 using namespace p44;
 
 
-// MARK: ===== ClimateControlScene
+// MARK: ===== ClimateControlScene (single value, for heating valves)
 
 
 ClimateControlScene::ClimateControlScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -58,7 +58,6 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
   markClean(); // default values are always clean
 }
 
-
 // MARK: ===== ClimateDeviceSettings with default climate scenes factory
 
 
@@ -77,6 +76,144 @@ DsScenePtr ClimateDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 }
 
 
+// MARK: ===== FanCoilUnitScene (specific for FCU behaviour)
+
+FanCoilUnitScene::FanCoilUnitScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
+  inherited(aSceneDeviceSettings, aSceneNo),
+  powerState(false),
+  operationMode(fcuOperatingMode_off)
+{
+}
+
+
+void FanCoilUnitScene::setDefaultSceneValues(SceneNo aSceneNo)
+{
+  // set the base class scene defaults
+  inherited::setDefaultSceneValues(aSceneNo);
+  // very simple fixed defaults
+  // - heating scenes 0..5 set operating mode to cooling
+  // - cooling scenes 9..14 set operating mode to heating
+  if (aSceneNo>=0 && aSceneNo<=5) {
+    // heating energy level
+    powerState = true;
+    operationMode = fcuOperatingMode_heat;
+  }
+  else if (aSceneNo>=9 && aSceneNo<=14) {
+    powerState = true;
+    operationMode = fcuOperatingMode_cool;
+  }
+  else if (aSceneNo==30) {
+    powerState = false;
+    operationMode = fcuOperatingMode_off;
+  }
+  else {
+    // all others: dontcare
+    powerState = false;
+    operationMode = fcuOperatingMode_off;
+    setDontCare(true);
+  }
+  markClean(); // default values are always clean
+}
+
+
+double FanCoilUnitScene::sceneValue(size_t aChannelIndex)
+{
+  ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
+  switch (cb->getChannelType()) {
+    case channeltype_fcu_operation_mode: return operationMode;
+    case channeltype_fcu_power_state: return powerState ? 1 : 0;
+  }
+  return 0;
+}
+
+
+void FanCoilUnitScene::setSceneValue(size_t aChannelIndex, double aValue)
+{
+  ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
+  ClimateControlBehaviourPtr ccb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(getOutputBehaviour());
+  switch (cb->getChannelType()) {
+    case channeltype_fcu_operation_mode:
+      setPVar(operationMode, (FcuOperationMode)aValue);
+      break;
+    case channeltype_fcu_power_state:
+      setPVar(powerState, aValue>0);
+      break;
+  }
+}
+
+
+// MARK: ===== FanCoilUnitScene persistence
+
+const char *FanCoilUnitScene::tableName()
+{
+  return "FCUScenes";
+}
+
+// data field definitions
+
+static const size_t numFCUSceneFields = 2;
+
+size_t FanCoilUnitScene::numFieldDefs()
+{
+  return inherited::numFieldDefs()+numFCUSceneFields;
+}
+
+
+const FieldDefinition *FanCoilUnitScene::getFieldDef(size_t aIndex)
+{
+  static const FieldDefinition dataDefs[numFCUSceneFields] = {
+    { "powerState", SQLITE_INTEGER },
+    { "operationMode", SQLITE_INTEGER }
+  };
+  if (aIndex<inherited::numFieldDefs())
+    return inherited::getFieldDef(aIndex);
+  aIndex -= inherited::numFieldDefs();
+  if (aIndex<numFCUSceneFields)
+    return &dataDefs[aIndex];
+  return NULL;
+}
+
+
+/// load values from passed row
+void FanCoilUnitScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
+{
+  inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
+  // get the fields
+  aRow->getIfNotNull<bool>(aIndex++, powerState);
+  aRow->getCastedIfNotNull<FcuOperationMode, int>(aIndex++, operationMode);
+}
+
+
+/// bind values to passed statement
+void FanCoilUnitScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
+{
+  inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  // bind the fields
+  aStatement.bind(aIndex++, powerState);
+  aStatement.bind(aIndex++, (int)operationMode);
+}
+
+
+// MARK: ===== FanCoilUnitDeviceSettings with default FCU scenes factory
+
+
+FanCoilUnitDeviceSettings::FanCoilUnitDeviceSettings(Device &aDevice) :
+  inherited(aDevice)
+{
+}
+
+
+DsScenePtr FanCoilUnitDeviceSettings::newDefaultScene(SceneNo aSceneNo)
+{
+  FanCoilUnitScenePtr fcuControlScene = FanCoilUnitScenePtr(new FanCoilUnitScene(*this, aSceneNo));
+  fcuControlScene->setDefaultSceneValues(aSceneNo);
+  // return it
+  return fcuControlScene;
+}
+
+
+
+
 
 // MARK: ===== ClimateControlBehaviour
 
@@ -91,29 +228,28 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
   zoneTemperatureSetPointUpdated(Never)
 {
   // Note: there is no default group for climate, depends on application and must be set when instantiating the behaviour
-  // add the output channel
+  // - add the output channels
   ChannelBehaviourPtr ch;
   if (climateDeviceKind==climatedevice_heatingvalve) {
     // output channel is a heating valve
-    ch = ChannelBehaviourPtr(new HeatingLevelChannel(*this));
+    heatingLevel = ChannelBehaviourPtr(new HeatingLevelChannel(*this));
+    addChannel(heatingLevel);
   }
   else if (climateDeviceKind==climatedevice_fancoilunit) {
     // power state is the main channel
-    // TODO: fan coil unit main channel will have a specific channel type later 
-    ch = ChannelBehaviourPtr(new DigitalChannel(*this, "powerState"));
+    powerState = FlagChannelPtr(new FcuPowerStateChannel(*this));
+    addChannel(powerState);
+    // operation mode
+    operationMode = IndexChannelPtr(new FcuOperationModeChannel(*this));
+    addChannel(operationMode);
   }
-  else {
-    // output channel is an unspecified 0..100 dial, probably dummy
-    ch = ChannelBehaviourPtr(new DialChannel(*this, "undefined_dial"));
-  }
-  addChannel(ch);
 }
 
 
 
 bool ClimateControlBehaviour::processControlValue(const string &aName, double aValue)
 {
-  if (aName=="heatingLevel") {
+  if (aName=="heatingLevel" && climateDeviceKind==climatedevice_heatingvalve) {
     if (isMember(group_roomtemperature_control) && isEnabled()) {
       // if we have a heating level channel, "heatingLevel" will control it
       ChannelBehaviourPtr cb = getChannelByType(channeltype_heatingLevel);
@@ -198,12 +334,51 @@ Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 }
 
 
+void ClimateControlBehaviour::loadChannelsFromScene(DsScenePtr aScene)
+{
+  FanCoilUnitScenePtr fcuScene = boost::dynamic_pointer_cast<FanCoilUnitScene>(aScene);
+  if (fcuScene) {
+    // power state
+    powerState->setChannelValueIfNotDontCare(aScene, fcuScene->powerState ? 1 : 0, 0, 0, true);
+    // operation mode
+    operationMode->setChannelValueIfNotDontCare(aScene, fcuScene->operationMode, 0, 0, true);
+  }
+  ClimateControlScenePtr valveScene = boost::dynamic_pointer_cast<ClimateControlScene>(aScene);
+  if (valveScene) {
+    // heating level
+    heatingLevel->setChannelValueIfNotDontCare(aScene, valveScene->value, 0, 0, true);
+  }
+}
+
+
+void ClimateControlBehaviour::saveChannelsToScene(DsScenePtr aScene)
+{
+  FanCoilUnitScenePtr fcuScene = boost::dynamic_pointer_cast<FanCoilUnitScene>(aScene);
+  if (fcuScene) {
+    // power state
+    fcuScene->setPVar(fcuScene->powerState, powerState->getChannelValue()>0);
+    fcuScene->setSceneValueFlags(powerState->getChannelIndex(), valueflags_dontCare, false);
+    // operation mode
+    fcuScene->setPVar(fcuScene->operationMode, (FcuOperationMode)operationMode->getChannelValue());
+    fcuScene->setSceneValueFlags(operationMode->getChannelIndex(), valueflags_dontCare, false);
+  }
+  ClimateControlScenePtr valveScene = boost::dynamic_pointer_cast<ClimateControlScene>(aScene);
+  if (valveScene) {
+    // heating level
+    valveScene->setPVar(valveScene->value, heatingLevel->getChannelValue());
+    valveScene->setSceneValueFlags(heatingLevel->getChannelIndex(), valueflags_dontCare, false);
+  }
+}
+
+
+
+
 // apply scene
 // - execute special climate commands
 bool ClimateControlBehaviour::applyScene(DsScenePtr aScene)
 {
   // check the special hardwired scenes
-  if (isMember(group_roomtemperature_control)) {
+  if (climateDeviceKind==climatedevice_heatingvalve && isMember(group_roomtemperature_control)) {
     SceneCmd sceneCmd = aScene->sceneCmd;
     switch (sceneCmd) {
       case scene_cmd_climatecontrol_enable:

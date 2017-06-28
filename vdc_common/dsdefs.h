@@ -272,8 +272,14 @@ typedef enum {
   channeltype_airflow_flap_position = 14, ///< airflow flap position (angle), 0..100 of device's available range
   channeltype_airflow_louver_position = 15, ///< louver position (angle), 0..100 of device's available range
 
+  channeltype_airflow_louver_auto = 20, ///< louver automatic mode (0=off, >0=on)
+  channeltype_airflow_intensity_auto = 21, ///< airflow intensity automatic mode (0=off, >0=on)
+
   channeltype_custom_first = 192, ///< first device-specific channel
   channeltype_custom_last = 239, ///< last device-specific channel
+
+  channeltype_fcu_operation_mode = channeltype_custom_first+0, ///< FCU custom channel: operating mode
+  channeltype_fcu_power_state = channeltype_custom_first+1, ///< FCU custom channel: power state
 
   channeltype_p44_position_v = channeltype_custom_first+0, ///< vertical position (e.g for moving lights)
   channeltype_p44_position_h = channeltype_custom_first+1, ///< horizontal position (e.g for moving lights)

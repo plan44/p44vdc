@@ -77,6 +77,29 @@ namespace p44 {
   typedef boost::intrusive_ptr<LouverPositionChannel> LouverPositionChannelPtr;
 
 
+  class AirflowAutoChannel : public FlagChannel
+  {
+    typedef FlagChannel inherited;
+
+  public:
+    AirflowAutoChannel(OutputBehaviour &aOutput) : inherited(aOutput, "airFlowAuto") { };
+
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_intensity_auto; }; ///< the dS channel type
+    virtual const char *getName() P44_OVERRIDE { return "automatic airflow intensity"; };
+  };
+
+
+  class LouverAutoChannel : public FlagChannel
+  {
+    typedef FlagChannel inherited;
+
+  public:
+    LouverAutoChannel(OutputBehaviour &aOutput) : inherited(aOutput, "airLouverAuto") { };
+
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_louver_auto; }; ///< the dS channel type
+    virtual const char *getName() P44_OVERRIDE { return "automatic louver position (swing mode)"; };
+  };
+
 
 
 
@@ -89,7 +112,7 @@ namespace p44 {
   public:
     VentilationScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo); ///< constructor, sets values according to dS specs' default values
 
-    /// @name SimpleScene specific values
+    /// @name VentilationScene specific values
     /// @{
 
     double airflowIntensity; ///< main scene value, airflow
@@ -168,9 +191,6 @@ namespace p44 {
     /// @name internal volatile state
     /// @{
 
-    bool airflowIntensity_automatic; ///< if set, airflow intensity is in automatic mode
-    bool louverPosition_automatic; ///< if set, louver position is in automatic (swing) mode
-
     /// @}
 
 
@@ -188,7 +208,10 @@ namespace p44 {
     AirflowDirectionChannelPtr airflowDirection;
     /// the content source channel
     LouverPositionChannelPtr louverPosition;
-
+    /// louver automatic mode (swing mode) flag
+    FlagChannelPtr louverAuto;
+    /// airflow automatic intensity flag
+    FlagChannelPtr airflowAuto;
 
 
     /// @name interface towards actual device hardware (or simulation)
@@ -232,6 +255,22 @@ namespace p44 {
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
     virtual string shortDesc() P44_OVERRIDE;
+
+  protected:
+
+    /// called by applyScene to load channel values from a scene.
+    /// @param aScene the scene to load channel values from
+    /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
+    ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
+    virtual void loadChannelsFromScene(DsScenePtr aScene) P44_OVERRIDE;
+
+    /// called by captureScene to save channel values to a scene.
+    /// @param aScene the scene to save channel values to
+    /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
+    ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
+    /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
+    virtual void saveChannelsToScene(DsScenePtr aScene) P44_OVERRIDE;
+
 
   };
 

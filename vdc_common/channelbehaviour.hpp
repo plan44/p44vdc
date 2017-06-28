@@ -256,7 +256,7 @@ namespace p44 {
     IndexChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 1; numIndices = 0; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "string"; };
+    virtual const char *getName() P44_OVERRIDE { return "index"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // 0..numIndices-1
     virtual double getMax() P44_OVERRIDE { return numIndices>0 ? numIndices-1 : 0; };
     int getIndex() { return getChannelValue(); }; // return as int for convenience
@@ -266,7 +266,26 @@ namespace p44 {
 
   };
   typedef boost::intrusive_ptr<IndexChannel> IndexChannelPtr;
-  
+
+
+  /// boolean flag channel
+  class FlagChannel : public ChannelBehaviour
+  {
+    typedef ChannelBehaviour inherited;
+
+  public:
+    FlagChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 1; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "flag"; };
+    virtual double getMin() P44_OVERRIDE { return 0; };
+    virtual double getMax() P44_OVERRIDE { return 1; };
+    bool getFlag() { return getChannelValue()!=0; }; // return as bool for convenience
+    virtual double getDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
+
+  };
+  typedef boost::intrusive_ptr<FlagChannel> FlagChannelPtr;
+
 
   /// digital switch channel
   class DigitalChannel : public ChannelBehaviour

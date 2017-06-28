@@ -36,8 +36,9 @@ VentilationScene::VentilationScene(SceneDeviceSettings &aSceneDeviceSettings, Sc
 }
 
 
-#define DONT_CARE 0x80 // flag to mark value don't care
+#define DONT_CARE 0x80 // mask for don't care
 #define VALUE_MASK 0x7F // mask for value
+#define AUTO 0x7F // special value for setting auto channel
 
 typedef struct {
   uint8_t airflow; ///< air flow intensity value for this scene, uint_8 to save footprint
@@ -83,15 +84,23 @@ static const DefaultVentilationSceneParams defaultGroupScenes[NUMGROUPSCENES+1] 
   {  75,        2,         100,       scene_cmd_invoke    }, // 30 : stage 43
   {  100,       2,         100,       scene_cmd_invoke    }, // 31 : stage 44
   {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_none      }, // 32 : reserved
-  {  0,         DONT_CARE, DONT_CARE, scene_cmd_ventilation_airflow_automatic }, // 33 : stage auto flow intensity
+  {  AUTO,      DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 33 : stage auto flow intensity
   {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_none      }, // 34 : reserved
-  {  DONT_CARE, DONT_CARE, 0,         scene_cmd_ventilation_louver_automatic }, // 35 : stage auto louver position (swing mode)
+  {  DONT_CARE, DONT_CARE, AUTO,      scene_cmd_invoke    }, // 35 : stage auto louver position (swing mode)
   {  25,        DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 36 : noise reduction
   {  100,       DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 37 : boost
   // all other group scenes equal or higher
   {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 38..63 : reserved
 };
 
+
+// flags in globalSceneFlags
+enum {
+  // parent uses bit 0 and 1 (globalflags_sceneLevelMask) and bits 8..23
+  // ventilation scene global
+  ventilationflags_airflowauto = 0x0004, ///< automatic air flow intensity
+  ventilationflags_louverauto = 0x0008, ///< automatic louver position
+};
 
 
 
@@ -100,37 +109,60 @@ void VentilationScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
   // set the base class scene defaults
   inherited::setDefaultSceneValues(aSceneNo);
-  // get defaults from table
-  if (aSceneNo>NUMGROUPSCENES)
-    aSceneNo = NUMGROUPSCENES; // last entry in the table is the default for all higher scene numbers
-  const DefaultVentilationSceneParams &p = defaultGroupScenes[aSceneNo];
-  // init values from it
-  bool afi = false;
-  bool adi = false;
-  bool lpi = false;
-  airflowIntensity = p.airflow & VALUE_MASK;
-  afi = p.airflow & DONT_CARE;
-  airflowDirection = (DsVentilationAirflowDirection)(p.direction & VALUE_MASK);
-  adi = p.direction & DONT_CARE;
-  louverPosition = p.louverpos & VALUE_MASK;
-  lpi = p.louverpos & DONT_CARE;
-  // adjust values for global scenes
-  switch (aSceneNo) {
-    case FIRE:
-    case SMOKE:
-    case GAS:
-      airflowIntensity = 0;
-      afi = false;
-      break;
-    default:
-      break;
-  }
-  // adjust per-channel dontcare
   VentilationBehaviourPtr vb = boost::dynamic_pointer_cast<VentilationBehaviour>(getOutputBehaviour());
   if (vb) {
-    if (afi) setSceneValueFlags(vb->airflowIntensity->getChannelIndex(), valueflags_dontCare, true);
+    // get defaults from table
+    if (aSceneNo>NUMGROUPSCENES)
+      aSceneNo = NUMGROUPSCENES; // last entry in the table is the default for all higher scene numbers
+    const DefaultVentilationSceneParams &p = defaultGroupScenes[aSceneNo];
+    // init values from it
+    sceneCmd = p.sceneCmd;
+    bool afi = false;
+    bool adi = false;
+    bool lpi = false;
+    // - intensity
+    airflowIntensity = p.airflow & VALUE_MASK;
+    if (airflowIntensity==AUTO) {
+      airflowIntensity = 50;
+      setGlobalSceneFlag(ventilationflags_airflowauto, true);
+      setSceneValueFlags(vb->airflowIntensity->getChannelIndex(), valueflags_dontCare, true); // auto -> do not apply intensity
+    }
+    afi = p.airflow & DONT_CARE;
+    // - direction
+    airflowDirection = (DsVentilationAirflowDirection)(p.direction & VALUE_MASK);
+    adi = p.direction & DONT_CARE;
+    // - louver position
+    louverPosition = p.louverpos & VALUE_MASK;
+    if (louverPosition==AUTO) {
+      louverPosition = 50;
+      setGlobalSceneFlag(ventilationflags_louverauto, true);
+      setSceneValueFlags(vb->louverPosition->getChannelIndex(), valueflags_dontCare, true); // auto -> do not apply louver pos
+    }
+    lpi = p.louverpos & DONT_CARE;
+    // adjust values for global scenes
+    switch (aSceneNo) {
+      case FIRE:
+      case SMOKE:
+      case GAS:
+        // fan off, no automatic activity
+        airflowIntensity = 0;
+        setGlobalSceneFlag(ventilationflags_airflowauto, false);
+        setGlobalSceneFlag(ventilationflags_louverauto, false);
+        afi = false;
+        break;
+      default:
+        break;
+    }
+    // adjust per-channel dontcare
+    if (afi) {
+      setSceneValueFlags(vb->airflowIntensity->getChannelIndex(), valueflags_dontCare, true);
+      setSceneValueFlags(vb->airflowAuto->getChannelIndex(), valueflags_dontCare, true);
+    }
     if (adi) setSceneValueFlags(vb->airflowDirection->getChannelIndex(), valueflags_dontCare, true);
-    if (lpi) setSceneValueFlags(vb->louverPosition->getChannelIndex(), valueflags_dontCare, true);
+    if (lpi) {
+      setSceneValueFlags(vb->louverPosition->getChannelIndex(), valueflags_dontCare, true);
+      setSceneValueFlags(vb->louverAuto->getChannelIndex(), valueflags_dontCare, true);
+    }
   }
   markClean(); // default values are always clean
 }
@@ -143,6 +175,8 @@ double VentilationScene::sceneValue(size_t aChannelIndex)
     case channeltype_airflow_intensity: return airflowIntensity;
     case channeltype_airflow_direction: return airflowDirection;
     case channeltype_airflow_louver_position: return louverPosition;
+    case channeltype_airflow_louver_auto: return globalSceneFlags & ventilationflags_louverauto ? 1 : 0;
+    case channeltype_airflow_intensity_auto: return globalSceneFlags & ventilationflags_airflowauto ? 1 : 0;
   }
   return 0;
 }
@@ -155,14 +189,18 @@ void VentilationScene::setSceneValue(size_t aChannelIndex, double aValue)
   switch (cb->getChannelType()) {
     case channeltype_airflow_intensity:
       setPVar(airflowIntensity, aValue);
-      if (vb) vb->airflowIntensity_automatic = false;
       break;
     case channeltype_airflow_direction:
       setPVar(airflowDirection, (DsVentilationAirflowDirection)aValue);
       break;
     case channeltype_airflow_louver_position:
       setPVar(louverPosition, aValue);
-      if (vb) vb->louverPosition_automatic = false;
+      break;
+    case channeltype_airflow_louver_auto:
+      setGlobalSceneFlag(ventilationflags_louverauto, (bool)aValue);
+      break;
+    case channeltype_airflow_intensity_auto:
+      setGlobalSceneFlag(ventilationflags_airflowauto, (bool)aValue);
       break;
   }
 }
@@ -262,6 +300,12 @@ VentilationBehaviour::VentilationBehaviour(Device &aDevice, VentilationDeviceKin
   // - louver position
   louverPosition = LouverPositionChannelPtr(new LouverPositionChannel(*this));
   addChannel(louverPosition);
+  // - louver automatic
+  louverAuto = FlagChannelPtr(new LouverAutoChannel(*this));
+  addChannel(louverAuto);
+  // - louver position
+  airflowAuto = FlagChannelPtr(new AirflowAutoChannel(*this));
+  addChannel(airflowAuto);
 }
 
 
@@ -289,6 +333,50 @@ Tristate VentilationBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 }
 
 
+void VentilationBehaviour::loadChannelsFromScene(DsScenePtr aScene)
+{
+  VentilationScenePtr ventilationScene = boost::dynamic_pointer_cast<VentilationScene>(aScene);
+  if (ventilationScene) {
+    // load channels from scene
+    // - air flow intensity
+    airflowIntensity->setChannelValueIfNotDontCare(aScene, ventilationScene->airflowIntensity, 0, 0, true);
+    // - air flow intensity automatic
+    airflowAuto->setChannelValueIfNotDontCare(aScene, ventilationScene->globalSceneFlags & ventilationflags_airflowauto ? 1 : 0, 0, 0, true);
+    // - air flow direction
+    airflowDirection->setChannelValueIfNotDontCare(aScene, ventilationScene->airflowDirection, 0, 0, true);
+    // - louver position
+    louverPosition->setChannelValueIfNotDontCare(aScene, ventilationScene->louverPosition, 0, 0, true);
+    // - louver position automatic
+    louverAuto->setChannelValueIfNotDontCare(aScene, ventilationScene->globalSceneFlags & ventilationflags_louverauto ? 1 : 0, 0, 0, true);
+  }
+}
+
+
+void VentilationBehaviour::saveChannelsToScene(DsScenePtr aScene)
+{
+  VentilationScenePtr ventilationScene = boost::dynamic_pointer_cast<VentilationScene>(aScene);
+  if (ventilationScene) {
+    // save position and angle to scene
+    // - air flow intensity
+    ventilationScene->setPVar(ventilationScene->airflowIntensity, airflowIntensity->getChannelValue());
+    ventilationScene->setSceneValueFlags(airflowIntensity->getChannelIndex(), valueflags_dontCare, false);
+    // - air flow intensity automatic
+    ventilationScene->setGlobalSceneFlag(ventilationflags_airflowauto, airflowAuto->getFlag());
+    ventilationScene->setSceneValueFlags(airflowAuto->getChannelIndex(), valueflags_dontCare, false);
+    // - air flow direction
+    ventilationScene->setPVar(ventilationScene->airflowDirection, (DsVentilationAirflowDirection)airflowDirection->getChannelValue());
+    ventilationScene->setSceneValueFlags(airflowDirection->getChannelIndex(), valueflags_dontCare, false);
+    // - louver position
+    ventilationScene->setPVar(ventilationScene->louverPosition, louverPosition->getChannelValue());
+    ventilationScene->setSceneValueFlags(louverPosition->getChannelIndex(), valueflags_dontCare, false);
+    // - louver position automatic
+    ventilationScene->setGlobalSceneFlag(ventilationflags_louverauto, airflowAuto->getFlag());
+    ventilationScene->setSceneValueFlags(louverAuto->getChannelIndex(), valueflags_dontCare, false);
+  }
+}
+
+
+
 // apply scene
 // - execute special climate commands
 bool VentilationBehaviour::applyScene(DsScenePtr aScene)
@@ -296,27 +384,13 @@ bool VentilationBehaviour::applyScene(DsScenePtr aScene)
   // check the special hardwired scenes
   SceneCmd sceneCmd = aScene->sceneCmd;
   switch (sceneCmd) {
-    case scene_cmd_ventilation_airflow_automatic:
-      // switch to automatic airflow mode
-      airflowIntensity_automatic = true;
-      return true;
-    case scene_cmd_ventilation_louver_automatic:
-      // switch to automatic louver mode (swing mode)
-      louverPosition_automatic = true;
-      return true;
     case scene_cmd_off:
-    case scene_cmd_invoke:
     case scene_cmd_min:
     case scene_cmd_max:
     case scene_cmd_increment:
     case scene_cmd_decrement:
-      // these end automatic modes if they set the related channel
-      if (!aScene->isDontCare()) {
-        if (!aScene->isSceneValueFlagSet(airflowIntensity->getChannelIndex(), valueflags_dontCare))
-          airflowIntensity_automatic = false;
-        if (!aScene->isSceneValueFlagSet(louverPosition->getChannelIndex(), valueflags_dontCare))
-          louverPosition_automatic = false;
-      }
+      // these always end automatic airflow intensity mode
+      airflowAuto->setChannelValue(0);
       break;
     default:
       // all other scene calls are processed normally
