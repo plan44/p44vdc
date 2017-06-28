@@ -21,6 +21,8 @@
 
 #include "homeconnectdevicefridge.hpp"
 
+#if ENABLE_HOMECONNECT
+
 namespace p44 {
 
 HomeConnectDeviceFridge::HomeConnectDeviceFridge(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
@@ -41,3 +43,4 @@ bool HomeConnectDeviceFridge::configureDevice()
 
 } /* namespace p44 */
 
+#endif // ENABLE_HOMECONNECT

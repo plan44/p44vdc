@@ -21,6 +21,8 @@
 
 #include "homeconnectdevicedryer.hpp"
 
+#if ENABLE_HOMECONNECT
+
 namespace p44 {
 
 HomeConnectDeviceDryer::HomeConnectDeviceDryer(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
@@ -41,3 +43,4 @@ bool HomeConnectDeviceDryer::configureDevice()
 
 } /* namespace p44 */
 
+#endif // ENABLE_HOMECONNECT

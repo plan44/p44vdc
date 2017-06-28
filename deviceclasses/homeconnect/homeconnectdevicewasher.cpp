@@ -21,6 +21,8 @@
 
 #include "homeconnectdevicewasher.hpp"
 
+#if ENABLE_HOMECONNECT
+
 namespace p44 {
 
 HomeConnectDeviceWasher::HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
@@ -40,3 +42,5 @@ bool HomeConnectDeviceWasher::configureDevice()
 }
 
 } /* namespace p44 */
+
+#endif // ENABLE_HOMECONNECT
