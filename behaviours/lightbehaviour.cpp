@@ -183,10 +183,6 @@ void LightBehaviour::saveChannelsToScene(DsScenePtr aScene)
     lightScene->setPVar(lightScene->value, brightness->getChannelValue());
     lightScene->setSceneValueFlags(brightness->getChannelIndex(), valueflags_dontCare, false);
   }
-  else {
-    // only if not light scene, use default save
-    inherited::saveChannelsToScene(aScene);
-  }
 }
 
 

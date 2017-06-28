@@ -484,10 +484,6 @@ void AudioBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     stateRestoreCmd = audioScene->command;
     stateRestoreCmdValid = !audioScene->command.empty(); // only non-empty command is considered valid
   }
-  else {
-    // only if not audio scene, use default loader
-    inherited::loadChannelsFromScene(aScene);
-  }
 }
 
 
@@ -506,10 +502,6 @@ void AudioBehaviour::saveChannelsToScene(DsScenePtr aScene)
     if (stateRestoreCmdValid) {
       audioScene->setPVar(audioScene->command, stateRestoreCmd);
     }
-  }
-  else {
-    // only if not audio scene, use default save
-    inherited::saveChannelsToScene(aScene);
   }
 }
 

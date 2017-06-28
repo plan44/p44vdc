@@ -800,10 +800,6 @@ void ShadowBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     position->setChannelValueIfNotDontCare(shadowScene, shadowScene->value, 0, 0, true);
     angle->setChannelValueIfNotDontCare(shadowScene, shadowScene->angle, 0, 0, true);
   }
-  else {
-    // only if not shadow scene, use default loader
-    inherited::loadChannelsFromScene(aScene);
-  }
 }
 
 
@@ -816,10 +812,6 @@ void ShadowBehaviour::saveChannelsToScene(DsScenePtr aScene)
     shadowScene->setSceneValueFlags(position->getChannelIndex(), valueflags_dontCare, false);
     shadowScene->setPVar(shadowScene->angle, angle->getChannelValue());
     shadowScene->setSceneValueFlags(angle->getChannelIndex(), valueflags_dontCare, false);
-  }
-  else {
-    // only if not shadow scene, use default save
-    inherited::saveChannelsToScene(aScene);
   }
 }
 
