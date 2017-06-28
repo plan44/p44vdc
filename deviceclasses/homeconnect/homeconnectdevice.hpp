@@ -111,11 +111,15 @@ namespace p44 {
     typedef SingleDevice inherited;
     friend class HomeConnectAction;
 
-
+  protected:
     typedef enum {
       homeconnect_unknown,
       homeconnect_coffeemaker,
       homeconnect_oven,
+      homeconnect_dishwasher,
+      homeconnect_washer,
+      homeconnect_dryer,
+      homeconnect_fridge,
     } HomeConnectDeviceType;
 
     HomeConnectDeviceType hcDevType; ///< home connect device type
@@ -123,14 +127,16 @@ namespace p44 {
     string model; ///< the model name for the device
     string modelGuid; ///< the model guid for the device
     string vendor; ///< the vendor of this device
-    bool standalone; ///< set if this is the standalone model (which does not understand ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature)
 
     HomeConnectEventMonitorPtr eventMonitor; ///< event monitor
 
     DeviceStatePtr operationState;
 
-  public:
     HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
+  public:
+
+    /// A factory method that create a device of proper type
+    static HomeConnectDevicePtr createHomeConenctDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
@@ -202,7 +208,7 @@ namespace p44 {
 
   protected:
 
-    bool configureDevice();
+    virtual bool configureDevice();
     void deriveDsUid();
 
   private:

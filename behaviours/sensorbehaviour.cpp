@@ -394,8 +394,8 @@ const PropertyDescriptorPtr SensorBehaviour::getStateDescriptorByIndex(int aProp
   static const PropertyDescription properties[numStateProperties] = {
     { "value", apivalue_double, value_key+states_key_offset, OKEY(sensor_key) },
     { "age", apivalue_double, age_key+states_key_offset, OKEY(sensor_key) },
-    { "contextid", apivalue_uint64, contextid_key+states_key_offset, OKEY(sensor_key) },
-    { "contextmsg", apivalue_string, contextmsg_key+states_key_offset, OKEY(sensor_key) },
+    { "contextId", apivalue_uint64, contextid_key+states_key_offset, OKEY(sensor_key) },
+    { "contextMsg", apivalue_string, contextmsg_key+states_key_offset, OKEY(sensor_key) },
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
