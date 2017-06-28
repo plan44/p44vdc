@@ -38,6 +38,8 @@ DsBehaviour::DsBehaviour(Device &aDevice, const string aBehaviourId) :
   hardwareError(hardwareError_none),
   hardwareErrorUpdated(p44::Never)
 {
+  // default hardwareName to behaviour id if actually specified
+  if (!aBehaviourId.empty()) hardwareName = aBehaviourId;
 }
 
 
