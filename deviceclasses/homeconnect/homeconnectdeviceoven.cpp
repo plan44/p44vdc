@@ -80,7 +80,25 @@ bool HomeConnectDeviceOven::configureDevice()
   a->addParameter(duration);
   deviceActions->addAction(a);
 
+  // create states
+  configureOperationModeState(true, true, true, true, true, true);
+  configureRemoteControlState();
+  configureRemoteStartState();
+  configureDoorState(true);
+  configurePowerState(false, true);
+
   return inherited::configureDevice();
+}
+
+void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
+{
+  inherited::stateChanged(aChangedState, aEventsToPush);
+}
+
+void HomeConnectDeviceOven::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+{
+  ALOG(LOG_INFO, "Oven Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  inherited::handleEvent(aEventType, aEventData, aError);
 }
 
 } /* namespace p44 */

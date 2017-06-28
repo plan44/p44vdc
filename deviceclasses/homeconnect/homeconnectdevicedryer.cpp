@@ -38,7 +38,25 @@ HomeConnectDeviceDryer::~HomeConnectDeviceDryer()
 
 bool HomeConnectDeviceDryer::configureDevice()
 {
+  // create states
+  configureOperationModeState(false, true, true, true, true, false);
+  configureRemoteControlState();
+  configureRemoteStartState();
+  configureDoorState(false);
+  configurePowerState(false, false);
+
   return inherited::configureDevice();
+}
+
+void HomeConnectDeviceDryer::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
+{
+  inherited::stateChanged(aChangedState, aEventsToPush);
+}
+
+void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+{
+  ALOG(LOG_INFO, "Dryer Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  inherited::handleEvent(aEventType, aEventData, aError);
 }
 
 } /* namespace p44 */

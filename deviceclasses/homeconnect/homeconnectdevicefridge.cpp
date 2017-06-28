@@ -38,7 +38,20 @@ HomeConnectDeviceFridge::~HomeConnectDeviceFridge()
 
 bool HomeConnectDeviceFridge::configureDevice()
 {
+  configureDoorState(false);
+  configurePowerState(false, false);
   return inherited::configureDevice();
+}
+
+void HomeConnectDeviceFridge::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
+{
+  inherited::stateChanged(aChangedState, aEventsToPush);
+}
+
+void HomeConnectDeviceFridge::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+{
+  ALOG(LOG_INFO, "Fridge Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  inherited::handleEvent(aEventType, aEventData, aError);
 }
 
 } /* namespace p44 */

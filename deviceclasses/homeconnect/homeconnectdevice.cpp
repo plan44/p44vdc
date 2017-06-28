@@ -335,29 +335,110 @@ bool HomeConnectDevice::configureDevice()
   ));
   a->addParameter(powerState);
   deviceActions->addAction(a);
-  // create states
-  // - operation
-  EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
-  es->addEnum("Inactive", 0, true); // init state with this value
-  es->addEnum("Ready", 1);
-  es->addEnum("DelayedStart", 2); // oven only
-  es->addEnum("Run", 3);
-  es->addEnum("Pause", 4); // oven only
-  es->addEnum("ActionRequired", 5);
-  es->addEnum("Finished", 6);
-  es->addEnum("Error", 7);
-  es->addEnum("Aborting", 8);
-  operationState = DeviceStatePtr(new DeviceState(
-    *this, "operation", "Operation", ValueDescriptorPtr(es),
-    boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)
-  ));
-  deviceStates->addState(operationState);
+
+  // program name
+  programName = DeviceStatePtr(
+      new DeviceState(*this, "ProgramName", "Program Name", ValueDescriptorPtr(new TextValueDescriptor("state")),
+          boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
+  deviceStates->addState(programName);
+
   // configured ok
   return true;
 }
 
+// TODO: change for enum values? flags? leave the bool flags?
+void HomeConnectDevice::configureOperationModeState(bool aHasInactive, bool aHasDelayedStart, bool aHasPause,
+    bool aHasActionrequired, bool aHasError, bool aHasAborting)
+{
+  // - operation mode
+  EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
+  int currentEnumValue = 0;
 
+  if (aHasInactive) {
+    es->addEnum("Inactive", currentEnumValue++);
+  }
+  es->addEnum("Ready", currentEnumValue++);
+  if (aHasDelayedStart) {
+    es->addEnum("DelayedStart", currentEnumValue++);
+  }
+  es->addEnum("Run", currentEnumValue++);
+  if (aHasPause) {
+    es->addEnum("Pause", currentEnumValue++);
+  }
+  if (aHasActionrequired) {
+      es->addEnum("ActionRequired", currentEnumValue++);
+  }
+  es->addEnum("Finished", currentEnumValue++);
+  if (aHasError) {
+    es->addEnum("Error", currentEnumValue++);
+  }
+  if (aHasAborting) {
+    es->addEnum("Aborting", currentEnumValue++);
+  }
+  operationMode = DeviceStatePtr(
+      new DeviceState(*this, "OperationMode", "Status", ValueDescriptorPtr(es),
+          boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
+  deviceStates->addState(operationMode);
+}
 
+void HomeConnectDevice::configureRemoteControlState()
+{
+  // - remote control
+  EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
+  es->addEnum("Enabled", 0);
+  es->addEnum("Disabled", 1);
+  remoteControl = DeviceStatePtr(
+      new DeviceState(*this, "RemoteControl", "Remote Control", ValueDescriptorPtr(es),
+          boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
+  deviceStates->addState(remoteControl);
+}
+
+void HomeConnectDevice::configureRemoteStartState()
+{
+  // - remote control
+  EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
+  es->addEnum("Enabled", 0);
+  es->addEnum("Disabled", 1);
+  remoteStart = DeviceStatePtr(
+      new DeviceState(*this, "RemoteStart", "Remote Start", ValueDescriptorPtr(es),
+          boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
+  deviceStates->addState(remoteStart);
+}
+
+void HomeConnectDevice::configureDoorState(bool aHasLocked)
+{
+  // - remote control
+  EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
+  es->addEnum("Open", 0);
+  es->addEnum("Closed", 1);
+  if (aHasLocked) {
+    es->addEnum("Locked", 2);
+  }
+  doorState = DeviceStatePtr(
+      new DeviceState(*this, "DoorState", "Door Start", ValueDescriptorPtr(es),
+          boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
+  deviceStates->addState(doorState);
+}
+
+void HomeConnectDevice::configurePowerState(bool aHasOff, bool aHasStandby)
+{
+  // - operation mode
+  EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
+  int currentEnumValue = 0;
+
+  if (aHasOff) {
+    es->addEnum("Off", currentEnumValue++, true); // init state with this value
+  }
+  es->addEnum("On", currentEnumValue++);
+  if (aHasStandby) {
+    es->addEnum("Standby", currentEnumValue++);
+  }
+
+  powerState = DeviceStatePtr(
+      new DeviceState(*this, "PowerState", "Power State", ValueDescriptorPtr(es),
+          boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
+  deviceStates->addState(powerState);
+}
 
 void HomeConnectDevice::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
 {
@@ -398,30 +479,86 @@ void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryRes
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
 
-
 void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
-  // FIXME: tbd
-  ALOG(LOG_INFO, "Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
-  if (aEventType=="STATUS") {
-    JsonObjectPtr o;
-    if (aEventData && aEventData->get("key", o)) {
-      if (o->stringValue()=="BSH.Common.Status.OperationState") {
-        // get value
-        if (aEventData->get("value", o)) {
-          string os = o->stringValue();
-          ssize_t sp = os.rfind('.');
-          if (sp!=string::npos) {
-            string ostate = os.substr(sp+1);
-            if (operationState->value()->setStringValue(ostate)) {
-              ALOG(LOG_NOTICE, "New Operation State: %s", ostate.c_str());
-              operationState->push();
-            }
-          }
+  JsonObjectPtr oKey;
+  JsonObjectPtr oValue;
+
+  // make sure that all needed data are present
+  if (aEventData && aEventData->get("key", oKey) && aEventData->get("value", oValue) ) {
+    string key = oKey->stringValue();
+    string value = oValue->stringValue();
+
+    if (aEventType=="STATUS") {
+      if ((key=="BSH.Common.Status.OperationState") && (operationMode != NULL)) {
+        string operationValue = removeNamespace(value);
+        if (operationMode->value()->setStringValue(operationValue)) {
+          ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
+          operationMode->push();
+        } else {
+          ALOG(LOG_ERR, "Unknown Operation State: '%s' ('%s')", operationValue.c_str(), value.c_str());
+        }
+      } else if ((key=="BSH.Common.Status.RemoteControlActive") && (remoteControl != NULL)) {
+        string remoteControlValue;
+
+        if (value == "true") {
+          remoteControlValue = "Enabled";
+        } else if (value == "false") {
+          remoteControlValue = "Disabled";
+        }
+
+        if (!remoteControlValue.empty() && remoteControl->value()->setStringValue(remoteControlValue)) {
+          ALOG(LOG_NOTICE, "New Remote Control State: '%s'", remoteControlValue.c_str());
+          remoteControl->push();
+        } else {
+          ALOG(LOG_NOTICE, "Unknown Remote Control State: '%s' ('%s')", remoteControlValue.c_str(), value.c_str());
+        }
+      } else if ((key=="BSH.Common.Status.RemoteControlStartAllowed") && (remoteStart != NULL)) {
+        string remoteStartValue;
+
+        if (value == "true") {
+          remoteStartValue = "Enabled";
+        } else if (value == "false") {
+          remoteStartValue = "Disabled";
+        }
+
+        if (!remoteStartValue.empty() && remoteStart->value()->setStringValue(remoteStartValue)) {
+          ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
+          remoteStart->push();
+        } else {
+          ALOG(LOG_NOTICE, "Unknown Remote Start Allowed State: '%s' ('%s')", remoteStartValue.c_str(), value.c_str());
+        }
+      } else if ((key=="BSH.Common.Status.DoorState") && (doorState != NULL)) {
+        string doorValue = removeNamespace(value);
+        if (doorState->value()->setStringValue(doorValue)) {
+          ALOG(LOG_NOTICE, "Door State: '%s'", doorValue.c_str());
+          doorState->push();
+        } else {
+          ALOG(LOG_ERR, "Unknown Operation State: '%s' ('%s')", doorValue.c_str(), value.c_str());
+        }
+      }
+    } else if (aEventType=="NOTIFY") {
+      if ((key=="BSH.Common.Setting.PowerState") && (powerState != NULL)) {
+        string powerStateValue = removeNamespace(value);
+        if (powerState->value()->setStringValue(powerStateValue)) {
+          ALOG(LOG_NOTICE, "New Power State: '%s'", powerStateValue.c_str());
+          powerState->push();
+        } else {
+          ALOG(LOG_ERR, "Unknown Power State: '%s' ('%s')", powerStateValue.c_str(), value.c_str());
+        }
+      } else if ((key=="BSH.Common.Root.SelectedProgram") && (programName != NULL)) {
+        string programNameValue = removeNamespace(value);
+        if (programName->value()->setStringValue(programNameValue)) {
+          ALOG(LOG_NOTICE, "New Program Name State: '%s'", programNameValue.c_str());
+          programName->push();
+        } else {
+          ALOG(LOG_ERR, "Invalid Program Name: '%s' ('%s')", programNameValue.c_str(), value.c_str());
         }
       }
     }
   }
+  // FIXME: tbd
+
 }
 
 
@@ -544,6 +681,15 @@ string HomeConnectDevice::description()
   return s;
 }
 
+string HomeConnectDevice::removeNamespace(const string& aString)
+{
+  ssize_t sp = aString.rfind('.');
+  if (sp!=string::npos) {
+    return aString.substr(sp+1);
+  } else {
+    return aString;
+  }
+}
 
 #endif // ENABLE_HOMECONNECT
 

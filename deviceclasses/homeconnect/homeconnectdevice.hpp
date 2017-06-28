@@ -130,7 +130,13 @@ namespace p44 {
 
     HomeConnectEventMonitorPtr eventMonitor; ///< event monitor
 
-    DeviceStatePtr operationState;
+    // common states, they can be NULL in case this state is not valid for device class
+    DeviceStatePtr operationMode;
+    DeviceStatePtr remoteControl;
+    DeviceStatePtr remoteStart;
+    DeviceStatePtr doorState;
+    DeviceStatePtr powerState;
+    DeviceStatePtr programName;
 
     HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   public:
@@ -208,13 +214,27 @@ namespace p44 {
 
   protected:
 
+    // The following methods implement common behaviour and should be executed from subclasses overrides.
     virtual bool configureDevice();
+    virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
+    virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError);
+
+    // The following methods are used to configure common states
+    void configureOperationModeState(bool aHasInactive, bool aHasDelayedStart, bool aHasPause, bool aHasActionrequired,
+        bool aHasError, bool aHasAborting);
+    void configureRemoteControlState();
+    void configureRemoteStartState();
+    void configureDoorState(bool aHasLocked);
+    void configurePowerState(bool aHasOff, bool aHasStandby);
+
+    // Create dsuid based on device id
     void deriveDsUid();
+
+    // utility function to remove the namespace from home connect values, keys and paths
+    static string removeNamespace(const string& aString);
 
   private:
 
-    void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
-    void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError);
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
 
   };

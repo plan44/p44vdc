@@ -33,6 +33,8 @@ class HomeConnectDeviceWasher: public HomeConnectDevice
   typedef HomeConnectDevice inherited;
 
   virtual bool configureDevice() P44_OVERRIDE;
+  virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
+  virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError) P44_OVERRIDE;
 public:
   HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceWasher();

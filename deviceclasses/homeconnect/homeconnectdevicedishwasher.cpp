@@ -38,7 +38,25 @@ HomeConnectDeviceDishWasher::~HomeConnectDeviceDishWasher()
 
 bool HomeConnectDeviceDishWasher::configureDevice()
 {
+  // create states
+  configureOperationModeState(true, true, false, false, false, true);
+  configureRemoteControlState();
+  configureRemoteStartState();
+  configureDoorState(false);
+  configurePowerState(true, false);
+
   return inherited::configureDevice();
+}
+
+void HomeConnectDeviceDishWasher::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
+{
+  inherited::stateChanged(aChangedState, aEventsToPush);
+}
+
+void HomeConnectDeviceDishWasher::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+{
+  ALOG(LOG_INFO, "DishWasher Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  inherited::handleEvent(aEventType, aEventData, aError);
 }
 
 } /* namespace p44 */
