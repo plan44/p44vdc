@@ -251,6 +251,7 @@ void OutputBehaviour::saveChannelsToScene(DsScenePtr aScene)
       double newval = ch->getChannelValue();
       aScene->setSceneValue(0, newval);
     }
+    // make sure default channel's dontCare is not set
     aScene->setSceneValueFlags(0, valueflags_dontCare, false);
   }
 }
@@ -311,6 +312,8 @@ void OutputBehaviour::channelValuesCaptured(DsScenePtr aScene, bool aFromDevice,
 {
   // just save the current channel values to the scene
   saveChannelsToScene(aScene);
+  // - saving implies clearing scene-level dontcare
+  aScene->setDontCare(false);
   // done now
   if (aDoneCB) aDoneCB();
 }
