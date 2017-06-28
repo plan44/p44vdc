@@ -21,6 +21,8 @@
 
 #include "homeconnectdeviceoven.hpp"
 
+#if ENABLE_HOMECONNECT
+
 namespace p44 {
 
 HomeConnectDeviceOven::HomeConnectDeviceOven(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
@@ -82,4 +84,6 @@ bool HomeConnectDeviceOven::configureDevice()
 }
 
 } /* namespace p44 */
+
+#endif // ENABLE_HOMECONNECT
 

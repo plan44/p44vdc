@@ -24,6 +24,8 @@
 
 #include "homeconnectdevice.hpp"
 
+#if ENABLE_HOMECONNECT
+
 namespace p44 {
 
 class HomeConnectDeviceWasher: public HomeConnectDevice
@@ -37,5 +39,7 @@ public:
 };
 
 } /* namespace p44 */
+
+#endif // ENABLE_HOMECONNECT
 
 #endif /* __p44vdc__homeconnectdevicewasher__ */
