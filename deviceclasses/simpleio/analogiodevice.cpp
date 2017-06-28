@@ -109,8 +109,8 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
     // - is heating
     colorClass = class_blue_climate;
-    // - standard device settings with scene table
-    installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
+    // - valve needs climate control scene table (ClimateControlScene)
+    installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*this)));
     // - create climate control outout
     OutputBehaviourPtr ob = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_heatingvalve));
     ob->setGroupMembership(group_roomtemperature_control, true); // put into room temperature control group by default, NOT into standard blue)

@@ -904,8 +904,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   }
   else if (outputType=="heatingvalve") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
-    // - standard device settings with scene table
-    installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
+    // - valve needs climate control scene table (ClimateControlScene)
+    installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*this)));
     // - create climate control valve output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_heatingvalve));
     cb->setGroupMembership(defaultGroup, true); // put into room temperature control group by default, NOT into standard blue)
