@@ -21,6 +21,8 @@
 
 #include "homeconnectdevicecoffemaker.hpp"
 
+#if ENABLE_HOMECONNECT
+
 namespace p44 {
 
 HomeConnectDeviceCoffeMaker::HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
@@ -108,6 +110,7 @@ HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()
   // TODO Auto-generated destructor stub
 }
 
-
-
 } /* namespace p44 */
+
+#endif // ENABLE_HOMECONNECT
+
