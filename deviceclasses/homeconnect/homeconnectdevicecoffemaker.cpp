@@ -126,6 +126,11 @@ void HomeConnectDeviceCoffeMaker::handleEvent(string aEventType, JsonObjectPtr a
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
+string HomeConnectDeviceCoffeMaker::oemModelGUID()
+{
+  return "gs1:(01)7640156792096";
+}
+
 } /* namespace p44 */
 
 #endif // ENABLE_HOMECONNECT

@@ -59,6 +59,11 @@ void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEvent
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
+string HomeConnectDeviceDryer::oemModelGUID()
+{
+  return "gs1:(01)7640156792805";
+}
+
 } /* namespace p44 */
 
 #endif // ENABLE_HOMECONNECT

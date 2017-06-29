@@ -38,6 +38,8 @@ class HomeConnectDeviceDryer: public HomeConnectDevice
 public:
   HomeConnectDeviceDryer(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceDryer();
+
+  virtual string oemModelGUID() P44_OVERRIDE;
 };
 
 } /* namespace p44 */

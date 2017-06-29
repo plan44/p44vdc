@@ -38,6 +38,8 @@ class HomeConnectDeviceFridge: public HomeConnectDevice
 public:
   HomeConnectDeviceFridge(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceFridge();
+
+  virtual string oemModelGUID() P44_OVERRIDE;
 };
 
 } /* namespace p44 */

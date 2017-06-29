@@ -40,6 +40,8 @@ class HomeConnectDeviceCoffeMaker: public HomeConnectDevice
 public:
   HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceCoffeMaker();
+
+  virtual string oemModelGUID() P44_OVERRIDE;
 };
 
 } /* namespace p44 */

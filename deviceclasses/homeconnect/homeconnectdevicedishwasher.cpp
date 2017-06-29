@@ -59,6 +59,11 @@ void HomeConnectDeviceDishWasher::handleEvent(string aEventType, JsonObjectPtr a
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
+string HomeConnectDeviceDishWasher::oemModelGUID()
+{
+  return "gs1:(01)7640156792829";
+}
+
 } /* namespace p44 */
 
 #endif // ENABLE_HOMECONNECT

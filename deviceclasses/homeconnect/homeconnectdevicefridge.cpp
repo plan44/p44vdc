@@ -54,6 +54,11 @@ void HomeConnectDeviceFridge::handleEvent(string aEventType, JsonObjectPtr aEven
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
+string HomeConnectDeviceFridge::oemModelGUID()
+{
+  return "gs1:(01)7640156792812";
+}
+
 } /* namespace p44 */
 
 #endif // ENABLE_HOMECONNECT

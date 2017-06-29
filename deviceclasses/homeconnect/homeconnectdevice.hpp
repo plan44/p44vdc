@@ -200,7 +200,7 @@ namespace p44 {
     virtual string vendorName() P44_OVERRIDE;
 
     /// @return OEM model GUID in URN format to identify the OEM product MODEL hardware as uniquely as possible
-    virtual string oemModelGUID() P44_OVERRIDE;
+    virtual string oemModelGUID() P44_OVERRIDE = 0;
     
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

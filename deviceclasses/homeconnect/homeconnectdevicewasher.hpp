@@ -38,6 +38,8 @@ class HomeConnectDeviceWasher: public HomeConnectDevice
 public:
   HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceWasher();
+
+  virtual string oemModelGUID() P44_OVERRIDE;
 };
 
 } /* namespace p44 */

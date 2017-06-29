@@ -101,6 +101,11 @@ void HomeConnectDeviceOven::handleEvent(string aEventType, JsonObjectPtr aEventD
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
+string HomeConnectDeviceOven::oemModelGUID()
+{
+  return "gs1:(01)7640156792546";
+}
+
 } /* namespace p44 */
 
 #endif // ENABLE_HOMECONNECT

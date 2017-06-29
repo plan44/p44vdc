@@ -598,25 +598,6 @@ string HomeConnectDevice::vendorName()
 }
 
 
-string HomeConnectDevice::oemModelGUID()
-{
-  switch (hcDevType) {
-    case homeconnect_coffeemaker:
-      return "gs1:(01)7640156792096";
-      break;
-    case homeconnect_oven:
-      return "gs1:(01)7640156792546";
-      break;
-    default:
-      break;
-  }
-  // unknown
-  return "";
-}
-
-
-
-
 void HomeConnectDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
   // FIXME: implement
