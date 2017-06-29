@@ -63,7 +63,7 @@ DaliComm::~DaliComm()
 
 
 const long long DALI_GTIN_blacklist[] = {
-  4052899919433, // OTi DALI 50/220…240/1A4 LT2 FAN - has garbage serial no, many duplicates!
+  4052899919433ll, // OTi DALI 50/220…240/1A4 LT2 FAN - has garbage serial no, many duplicates!
   0 // terminator
 };
 
@@ -926,7 +926,7 @@ private:
       LOG(LOG_WARNING, "DaliComm: unconditional full bus scan (random address binary search) for ALL devices requested, will reassign conflicting short addresses.");
     }
     else {
-      foundDevicesPtr = aShortAddressListPtr; // use the already addressed devices 
+      foundDevicesPtr = aShortAddressListPtr; // use the already addressed devices
       LOG(LOG_WARNING, "DaliComm: bus scan (random address binary search) for devices without shortaddr - NO existing addresses will be reassigned.");
     }
     // Terminate any special modes first

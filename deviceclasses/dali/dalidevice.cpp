@@ -135,7 +135,7 @@ void DaliBusDevice::deriveDsUid()
     // (as this means the device has been already actively used/configured with the shortaddr-dSUID)
     // - calculate the short address based dSUID
     DsUid shortAddrBasedDsUid;
-    dsUidForDeviceInfoStatus(shortAddrBasedDsUid, devinf_notForID);
+    dsUidForDeviceInfoStatus(shortAddrBasedDsUid, DaliDeviceInfo::devinf_notForID);
     // - check for named device in database consisting of this dimmer with shortaddr based dSUID
     //   Note that only single dimmer device are checked for, composite devices will not have this compatibility mechanism
     sqlite3pp::query qry(daliVdc.getVdcHost().getDsParamStore());
