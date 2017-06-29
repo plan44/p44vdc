@@ -381,10 +381,11 @@ struct  _Vdcapi__VdsmNotificationDimChannel
   int32_t group;
   protobuf_c_boolean has_zone_id;
   int32_t zone_id;
+  char *channelid;
 };
 #define VDCAPI__VDSM__NOTIFICATION_DIM_CHANNEL__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__notification_dim_channel__descriptor) \
-    , 0,NULL, 0,0, 0,0, 0,0, 0,0, 0,0 }
+    , 0,NULL, 0,0, 0,0, 0,0, 0,0, 0,0, NULL }
 
 
 struct  _Vdcapi__VdsmNotificationSetOutputChannelValue
@@ -398,10 +399,11 @@ struct  _Vdcapi__VdsmNotificationSetOutputChannelValue
   int32_t channel;
   protobuf_c_boolean has_value;
   double value;
+  char *channelid;
 };
 #define VDCAPI__VDSM__NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&vdcapi__vdsm__notification_set_output_channel_value__descriptor) \
-    , 0,NULL, 0,1, 0,0, 0,0 }
+    , 0,NULL, 0,1, 0,0, 0,0, NULL }
 
 
 /* Vdcapi__VdsmRequestHello methods */

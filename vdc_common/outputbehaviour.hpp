@@ -79,24 +79,26 @@ namespace p44 {
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @param aPendingApplyOnly if set, a channel is only returned when its value is pending to be applied
     /// @return NULL for unknown channel
-    ChannelBehaviourPtr getChannelByIndex(size_t aChannelIndex, bool aPendingApplyOnly = false);
+    ChannelBehaviourPtr getChannelByIndex(int aChannelIndex, bool aPendingApplyOnly = false);
 
-    /// get output index by channelType
+    /// get channel by channelType
     /// @param aChannelType the channel type, can be channeltype_default to get primary/default channel
     /// @param aPendingApplyOnly if set, a channel is only returned when its value is pending to be applied
     /// @return NULL for unknown channel
     ChannelBehaviourPtr getChannelByType(DsChannelType aChannelType, bool aPendingApplyOnly = false);
+
+    /// get channel by channel ID
+    /// @param aChannelID the channel ID
+    /// @param aPendingApplyOnly if set, a channel is only returned when its value is pending to be applied
+    /// @return NULL for unknown channel
+    ChannelBehaviourPtr getChannelById(const string aChannelId, bool aPendingApplyOnly = false);
+
 
     /// add a channel to the output
     /// @param aChannel the channel to add
     /// @note this is usually called by initialisation code of classes derived from OutputBehaviour to
     ///   add the behaviour specific channels.
     void addChannel(ChannelBehaviourPtr aChannel);
-
-    /// get the actual type of the channel (i.e. resolve channeltype_default)
-    /// @param aChannelType channel type, can be channeltype_default
-    /// @return resolved channel type, always != channeltype_default, except if output has no channels at all
-    DsChannelType actualChannelType(DsChannelType aChannelType);
 
     /// get the actual output mode
     /// @return the actual output mode, never returns outputmode_default
@@ -133,14 +135,14 @@ namespace p44 {
     /// @param aChannelIndex channel index (might be different transformation depending on type)
     /// @return output value limited/transformed according to outputMode
     /// @note subclasses might implement behaviour-specific output transformations
-    virtual double outputValueAccordingToMode(double aChannelValue, size_t aChannelIndex);
+    virtual double outputValueAccordingToMode(double aChannelValue, int aChannelIndex);
 
     /// Convert actual output value back to channel value according to output-mode (for syncing back channel values)
     /// @param aOutputValue actual output value
     /// @param aChannelIndex channel index (might be different transformation depending on type)
     /// @return channel value converted back from actual output value according to outputMode
     /// @note subclasses might implement behaviour-specific output transformations
-    virtual double channelValueAccordingToMode(double aOutputValue, size_t aChannelIndex);
+    virtual double channelValueAccordingToMode(double aOutputValue, int aChannelIndex);
 
     /// @}
 
@@ -196,8 +198,8 @@ namespace p44 {
     virtual void onAtMinBrightness(DsScenePtr aScene) { /* NOP in base class, only relevant for lights */ };
 
     /// check if this channel of this device is allowed to dim now (for lights, this will prevent dimming lights that are off)
-    /// @param aChannelType the channel to check
-    virtual bool canDim(DsChannelType aChannelType) { return true; /* in base class, nothing prevents dimming */ };
+    /// @param aChannel the channel to check
+    virtual bool canDim(ChannelBehaviourPtr aChannel) { return true; /* in base class, nothing prevents dimming */ };
 
 
     /// Process a named control value. The type, group membership and settings of the device determine if at all,

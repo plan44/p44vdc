@@ -198,7 +198,7 @@ namespace p44 {
     virtual void syncChannelValues(SimpleCB aDoneCB) P44_OVERRIDE;
 
     /// start or stop dimming channel of this device. Usually implemented in device specific manner in subclasses.
-    /// @param aChannelType the channelType to start or stop dimming for
+    /// @param aChannel the channel to start or stop dimming for
     /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @note unlike the vDC API "dimChannel" command, which must be repeated for dimming operations >5sec, this
     ///   method MUST NOT terminate dimming automatically except when reaching the minimum or maximum level
@@ -207,7 +207,7 @@ namespace p44 {
     /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
-    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode) P44_OVERRIDE;
+    virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode) P44_OVERRIDE;
 
     /// Process a named control value. The type, group membership and settings of the device determine if at all,
     /// and if, how the value affects physical outputs of the device or general device operation
@@ -265,7 +265,7 @@ namespace p44 {
     void propertyChanged(ValueDescriptorPtr aChangedProperty);
     #endif
 
-    void changeChannelMovement(size_t aChannelIndex, SimpleCB aDoneCB, int aNewDirection);
+    void changeChannelMovement(int aChannelIndex, SimpleCB aDoneCB, int aNewDirection);
     void releaseButton(ButtonBehaviourPtr aButtonBehaviour);
 
   };

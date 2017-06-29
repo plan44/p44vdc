@@ -31,6 +31,23 @@
 
 using namespace p44;
 
+// MARK: ===== config API - P44JsonApiConnection
+
+
+P44JsonApiConnection::P44JsonApiConnection()
+{
+  setApiVersion(VDC_API_VERSION_MAX);
+}
+
+
+ApiValuePtr P44JsonApiConnection::newApiValue()
+{
+  return ApiValuePtr(new JsonApiValue);
+}
+
+
+
+
 
 // MARK: ===== config API - P44JsonApiRequest
 
@@ -39,6 +56,13 @@ P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aJsonComm)
 {
   jsonComm = aJsonComm;
 }
+
+
+VdcApiConnectionPtr P44JsonApiRequest::connection()
+{
+  return VdcApiConnectionPtr(new P44JsonApiConnection());
+}
+
 
 
 
@@ -64,19 +88,6 @@ ErrorPtr P44JsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage,
   ErrorPtr err = ErrorPtr(new Error(aErrorCode, aErrorMessage));
   P44VdcHost::sendCfgApiResponse(jsonComm, JsonObjectPtr(), err);
   return ErrorPtr();
-}
-
-
-ApiValuePtr P44JsonApiRequest::newApiValue()
-{
-  return ApiValuePtr(new JsonApiValue);
-}
-
-
-int P44JsonApiRequest::getApiVersion()
-{
-  // always use newest supported API for calls via the P44 config API channel
-  return VDC_API_VERSION_MAX;
 }
 
 
@@ -382,13 +393,13 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
           for (int i=0; i<o->arrayLength(); i++) {
             ApiValuePtr e = o->arrayGet(i);
             dsuid.setAsBinary(e->binaryValue());
-            handleNotificationForDsUid(request, cmd, dsuid, params);
+            handleNotificationForDsUid(request->connection(), cmd, dsuid, params);
           }
         }
         else {
           // single dSUID
           dsuid.setAsBinary(o->binaryValue());
-          handleNotificationForDsUid(request, cmd, dsuid, params);
+          handleNotificationForDsUid(request->connection(), cmd, dsuid, params);
         }
         // notifications are always successful
         err = ErrorPtr(new Error(Error::OK));

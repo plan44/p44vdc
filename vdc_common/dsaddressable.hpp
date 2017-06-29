@@ -154,12 +154,12 @@ namespace p44 {
     void methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError);
 
     /// called by VdcHost to handle notifications directed to a dSUID
-    /// @param aRequest this is the request from which the notification originates
+    /// @param aApiConnection this is the API connection from which the notification originates
     /// @param aMethod the notification
     /// @param aParams the parameters object
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this DsAddressable.
-    virtual void handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams);
 
     /// send a DsAddressable method or notification to vdSM
     /// @param aMethod the method or notification

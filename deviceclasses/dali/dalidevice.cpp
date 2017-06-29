@@ -1098,22 +1098,23 @@ void DaliSingleControllerDevice::applyChannelValues(SimpleCB aDoneCB, bool aForD
 
 
 // optimized DALI dimming implementation
-void DaliSingleControllerDevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
+void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
 {
   // start dimming
-  if (aChannelType==channeltype_brightness) {
-    // start dimming
-    ALOG(LOG_INFO,
-      "dimChannel (DALI): channel type %d (brightness) %s",
-      aChannelType,
-      aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
-    );
-    ChannelBehaviourPtr ch = getChannelByType(aChannelType);
-    daliController->dim(aDimMode, ch->getDimPerMS());
-  }
-  else {
-    // not my channel, use generic implementation
-    inherited::dimChannel(aChannelType, aDimMode);
+  if (aChannel) {
+    if (aChannel->getChannelType()==channeltype_brightness) {
+      // start dimming
+      ALOG(LOG_INFO,
+        "dimChannel (DALI): channel '%s' (brightness) %s",
+        aChannel->getName(),
+        aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
+      );
+      daliController->dim(aDimMode, aChannel->getDimPerMS());
+    }
+    else {
+      // not my channel, use generic implementation
+      inherited::dimChannel(aChannel, aDimMode);
+    }
   }
 }
 

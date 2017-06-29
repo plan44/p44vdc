@@ -107,7 +107,7 @@ ErrorPtr DsBehaviour::forget()
 // MARK: ===== property access
 
 
-string DsBehaviour::getId(int aApiVersion)
+string DsBehaviour::getApiId(int aApiVersion)
 {
   if (aApiVersion>=3 && !behaviourId.empty()) {
     return behaviourId;

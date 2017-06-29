@@ -704,17 +704,14 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
       break;
   }
   if (scene>=0) {
-    DsChannelType channeltype = channeltype_brightness; // default to brightness
-    if (aButtonBehaviour.buttonChannel!=channeltype_default) {
-      channeltype = aButtonBehaviour.buttonChannel;
-    }
     signalActivity(); // local activity
     // some action to perform on every light device
     for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
       DevicePtr dev = pos->second;
+      ChannelBehaviourPtr channel = dev->getChannelByType(aButtonBehaviour.buttonChannel);
       if (scene==STOP_S) {
         // stop dimming
-        dev->dimChannelForArea(channeltype, dimmode_stop, 0, 0);
+        dev->dimChannelForArea(channel, dimmode_stop, 0, 0);
       }
       else {
         // call scene or start dimming
@@ -733,7 +730,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
               l->brightness->setChannelValue(l->brightness->getMinDim(), 0, true);
             }
             // now dim (safety timeout after 10 seconds)
-            dev->dimChannelForArea(channeltype, localDimDirection>0 ? dimmode_up : dimmode_down, 0, 10*Second);
+            dev->dimChannelForArea(channel, localDimDirection>0 ? dimmode_up : dimmode_down, 0, 10*Second);
           }
           else {
             // call a scene
@@ -836,13 +833,13 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
           for (int i=0; i<o->arrayLength(); i++) {
             ApiValuePtr e = o->arrayGet(i);
             dsuid.setAsBinary(e->binaryValue());
-            handleNotificationForDsUid(aRequest, aMethod, dsuid, aParams);
+            handleNotificationForDsUid(aApiConnection, aMethod, dsuid, aParams);
           }
         }
         else {
           // single dSUID
           dsuid.setAsBinary(o->binaryValue());
-          handleNotificationForDsUid(aRequest, aMethod, dsuid, aParams);
+          handleNotificationForDsUid(aApiConnection, aMethod, dsuid, aParams);
         }
       }
     }
@@ -898,6 +895,13 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
           connectedVdsm = vdsmDsUid;
           // - remember the session's connection
           activeSessionConnection = aRequest->connection();
+          // - log connection
+          const char *ip = "<unknown>";
+          if (activeSessionConnection->socketConnection()) {
+            ip = activeSessionConnection->socketConnection()->getHost();
+          }
+          LOG(LOG_NOTICE, "=== vdSM %s (%s) starts new session with API Version %d", vdsmDsUid.getString().c_str(), ip, version);
+          // - inform interested objects
           postEvent(vdchost_vdcapi_connected);
           // - create answer
           ApiValuePtr result = activeSessionConnection->newApiValue();
@@ -1016,11 +1020,11 @@ ErrorPtr VdcHost::handleMethodForDsUid(VdcApiRequestPtr aRequest, const string &
 
 
 
-void VdcHost::handleNotificationForDsUid(VdcApiRequestPtr aRequest, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams)
+void VdcHost::handleNotificationForDsUid(VdcApiConnectionPtr aApiConnection, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams)
 {
   DsAddressablePtr addressable = addressableForParams(aDsUid, aParams);
   if (addressable) {
-    addressable->handleNotification(aRequest, aMethod, aParams);
+    addressable->handleNotification(aApiConnection, aMethod, aParams);
   }
   else {
     LOG(LOG_WARNING, "Target entity %s not found for notification '%s'", aDsUid.getString().c_str(), aMethod.c_str());
@@ -1173,9 +1177,9 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
 }
 
 
-void VdcHost::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
+void VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams)
 {
-  inherited::handleNotification(aRequest, aMethod, aParams);
+  inherited::handleNotification(aApiConnection, aMethod, aParams);
 }
 
 

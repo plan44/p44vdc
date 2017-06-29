@@ -36,7 +36,7 @@ AudioScene::AudioScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aScene
 }
 
 
-double AudioScene::sceneValue(size_t aChannelIndex)
+double AudioScene::sceneValue(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
@@ -48,7 +48,7 @@ double AudioScene::sceneValue(size_t aChannelIndex)
 }
 
 
-void AudioScene::setSceneValue(size_t aChannelIndex, double aValue)
+void AudioScene::setSceneValue(int aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
@@ -509,10 +509,10 @@ void AudioBehaviour::saveChannelsToScene(DsScenePtr aScene)
 // dS Dimming rule for Audio:
 //  "All selected devices which are turned on and in play state take part in the dimming process."
 
-bool AudioBehaviour::canDim(DsChannelType aChannelType)
+bool AudioBehaviour::canDim(ChannelBehaviourPtr aChannel)
 {
   // only devices that are on can be dimmed (volume changed)
-  if (aChannelType==channeltype_p44_audio_volume) {
+  if (aChannel->getChannelType()==channeltype_p44_audio_volume) {
     return powerState->getChannelValue()==dsAudioPower_on; // dimmable if on
   }
   else {

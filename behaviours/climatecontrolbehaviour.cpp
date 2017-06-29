@@ -116,7 +116,7 @@ void FanCoilUnitScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-double FanCoilUnitScene::sceneValue(size_t aChannelIndex)
+double FanCoilUnitScene::sceneValue(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
@@ -127,7 +127,7 @@ double FanCoilUnitScene::sceneValue(size_t aChannelIndex)
 }
 
 
-void FanCoilUnitScene::setSceneValue(size_t aChannelIndex, double aValue)
+void FanCoilUnitScene::setSceneValue(int aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   ClimateControlBehaviourPtr ccb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(getOutputBehaviour());

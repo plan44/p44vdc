@@ -126,8 +126,8 @@ namespace p44 {
     virtual void setDefaultSceneValues(SceneNo aSceneNo) P44_OVERRIDE;
 
     // scene values implementation
-    virtual double sceneValue(size_t aOutputIndex) P44_OVERRIDE;
-    virtual void setSceneValue(size_t aOutputIndex, double aValue) P44_OVERRIDE;
+    virtual double sceneValue(int aOutputIndex) P44_OVERRIDE;
+    virtual void setSceneValue(int aOutputIndex, double aValue) P44_OVERRIDE;
 
   protected:
 

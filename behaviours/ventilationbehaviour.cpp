@@ -168,7 +168,7 @@ void VentilationScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-double VentilationScene::sceneValue(size_t aChannelIndex)
+double VentilationScene::sceneValue(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
@@ -182,7 +182,7 @@ double VentilationScene::sceneValue(size_t aChannelIndex)
 }
 
 
-void VentilationScene::setSceneValue(size_t aChannelIndex, double aValue)
+void VentilationScene::setSceneValue(int aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   VentilationBehaviourPtr vb = boost::dynamic_pointer_cast<VentilationBehaviour>(getOutputBehaviour());

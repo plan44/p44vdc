@@ -64,8 +64,8 @@ namespace p44 {
   public:
     AudioPowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { setNumIndices(numDsAudioPowerStates); }; ///< see DsAudioPowerState enum
 
-    virtual DsChannelType getChannelType() { return channeltype_p44_audio_power_state; }; ///< the dS channel type
-    virtual const char *getName() { return "powerstate"; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_audio_power_state; }; ///< the dS channel type
+    virtual const char *getName() P44_OVERRIDE { return "powerstate"; };
 
   };
   typedef boost::intrusive_ptr<AudioPowerStateChannel> AudioPowerStateChannelPtr;
@@ -79,8 +79,8 @@ namespace p44 {
   public:
     AudioContentSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "contentSource") {};
 
-    virtual DsChannelType getChannelType() { return channeltype_p44_audio_content_source; }; ///< the dS channel type
-    virtual const char *getName() { return "contentsource"; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_audio_content_source; }; ///< the dS channel type
+    virtual const char *getName() P44_OVERRIDE { return "contentsource"; };
 
   };
   typedef boost::intrusive_ptr<AudioContentSourceChannel> AudioContentSourceChannelPtr;
@@ -106,11 +106,11 @@ namespace p44 {
 
     /// Set default scene values for a specified scene number
     /// @param aSceneNo the scene number to set default values
-    virtual void setDefaultSceneValues(SceneNo aSceneNo);
+    virtual void setDefaultSceneValues(SceneNo aSceneNo) P44_OVERRIDE;
 
     // scene values implementation
-    virtual double sceneValue(size_t aChannelIndex);
-    virtual void setSceneValue(size_t aChannelIndex, double aValue);
+    virtual double sceneValue(int aChannelIndex) P44_OVERRIDE;
+    virtual void setSceneValue(int aChannelIndex, double aValue) P44_OVERRIDE;
 
     // query flags
     bool hasFixVol();
@@ -130,16 +130,16 @@ namespace p44 {
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<AudioScene> AudioScenePtr;
@@ -158,11 +158,11 @@ namespace p44 {
     /// factory method to create the correct subclass type of DsScene
     /// @param aSceneNo the scene number to create a scene object for.
     /// @note setDefaultSceneValues() must be called to set default scene values
-    virtual DsScenePtr newDefaultScene(SceneNo aSceneNo);
+    virtual DsScenePtr newDefaultScene(SceneNo aSceneNo) P44_OVERRIDE;
 
     /// factory method to create the correct subclass type of DsScene
     /// suitable for storing current state for later undo.
-    virtual DsScenePtr newUndoStateScene();
+    virtual DsScenePtr newUndoStateScene() P44_OVERRIDE;
 
   };
 
@@ -195,7 +195,7 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour
-    virtual const char *behaviourTypeIdentifier() { return "audio"; };
+    virtual const char *behaviourTypeIdentifier() P44_OVERRIDE { return "audio"; };
 
     /// the volume channel
     AudioVolumeChannelPtr volume;
@@ -217,7 +217,7 @@ namespace p44 {
     /// check for presence of model feature (flag in dSS visibility matrix)
     /// @param aFeatureIndex the feature to check for
     /// @return yes if this output behaviour has the feature, no if (explicitly) not, undefined if asked entity does not know
-    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex);
+    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex) P44_OVERRIDE;
 
     /// apply scene to output channels
     /// @param aScene the scene to apply to output channels
@@ -225,36 +225,36 @@ namespace p44 {
     ///   false if scene cannot yet be applied to hardware, and will be performed later
     /// @note this derived class' applyScene only implements special hard-wired behaviour specific scenes
     ///   basic scene apply functionality is provided by base class' implementation already.
-    virtual bool applyScene(DsScenePtr aScene);
+    virtual bool applyScene(DsScenePtr aScene) P44_OVERRIDE;
 
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
     /// @param aScene the scene that was called (if not dontCare, applyScene() has already been called)
     /// @param aDoneCB will be called when scene actions have completed (but not necessarily when stopped by stopSceneActions())
-    virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB);
+    virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB) P44_OVERRIDE;
 
     /// will be called to stop all ongoing actions before next callScene etc. is issued.
     /// @note this must stop all ongoing actions such that applying another scene or action right afterwards
     ///   cannot mess up things.
-    virtual void stopSceneActions();
+    virtual void stopSceneActions() P44_OVERRIDE;
 
     /// check if this channel of this device is allowed to dim now (for lights, this will prevent dimming lights that are off)
-    /// @param aChannelType the channel to check
-    virtual bool canDim(DsChannelType aChannelType);
+    /// @param aChannel the channel to check
+    virtual bool canDim(ChannelBehaviourPtr aChannel) P44_OVERRIDE;
 
     /// identify the device to the user in a behaviour-specific way
     /// @note implemented as blinking for LightBehaviour
-    virtual void identifyToUser();
+    virtual void identifyToUser() P44_OVERRIDE;
 
     /// @}
 
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
   protected:
 
@@ -262,14 +262,14 @@ namespace p44 {
     /// @param aScene the scene to load channel values from
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
-    virtual void loadChannelsFromScene(DsScenePtr aScene);
+    virtual void loadChannelsFromScene(DsScenePtr aScene) P44_OVERRIDE;
 
     /// called by captureScene to save channel values to a scene.
     /// @param aScene the scene to save channel values to
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
     /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
-    virtual void saveChannelsToScene(DsScenePtr aScene);
+    virtual void saveChannelsToScene(DsScenePtr aScene) P44_OVERRIDE;
 
   };
 

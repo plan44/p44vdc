@@ -49,8 +49,8 @@ namespace p44 {
     virtual void setDefaultSceneValues(SceneNo aSceneNo);
 
     // scene values implementation
-    virtual double sceneValue(size_t aOutputIndex);
-    virtual void setSceneValue(size_t aOutputIndex, double aValue);
+    virtual double sceneValue(int aOutputIndex);
+    virtual void setSceneValue(int aOutputIndex, double aValue);
 
   protected:
 

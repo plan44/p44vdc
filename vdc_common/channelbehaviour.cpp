@@ -47,7 +47,7 @@ void ChannelBehaviour::setResolution(double aResolution)
 }
 
 
-string ChannelBehaviour::getId(int aApiVersion)
+string ChannelBehaviour::getApiId(int aApiVersion)
 {
   if (aApiVersion>=3 && !channelId.empty()) {
     return channelId;

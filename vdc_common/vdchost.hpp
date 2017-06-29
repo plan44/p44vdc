@@ -346,7 +346,7 @@ namespace p44 {
     /// @{
 
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-    virtual void handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @}
 
@@ -491,7 +491,7 @@ namespace p44 {
 
     // method and notification dispatching
     ErrorPtr handleMethodForDsUid(VdcApiRequestPtr aRequest, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams);
-    void handleNotificationForDsUid(VdcApiRequestPtr aRequest, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams);
+    void handleNotificationForDsUid(VdcApiConnectionPtr aApiConnection, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams);
     DsAddressablePtr addressableForParams(const DsUid &aDsUid, ApiValuePtr aParams);
 
   private:

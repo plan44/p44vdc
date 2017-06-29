@@ -158,30 +158,30 @@ namespace p44 {
     /// get per-value scene flags
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @return the flag word
-    virtual uint32_t sceneValueFlags(size_t aChannelIndex);
+    virtual uint32_t sceneValueFlags(int aChannelIndex);
 
     /// modify per-value scene flags
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @param aFlagMask the flags to set or clear
     /// @param aSet if true, flags set in aFlagMask will be set, otherwise cleared
     /// @note marks scene dirty if flags are actually changed
-    virtual void setSceneValueFlags(size_t aChannelIndex, uint32_t aFlagMask, bool aSet);
+    virtual void setSceneValueFlags(int aChannelIndex, uint32_t aFlagMask, bool aSet);
 
     /// get scene value
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @return the scene value
-    virtual double sceneValue(size_t aChannelIndex) = 0;
+    virtual double sceneValue(int aChannelIndex) = 0;
 
     /// modify scene value
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @param aValue the new scene value
     /// @note marks scene dirty if value is actually changed
-    virtual void setSceneValue(size_t aChannelIndex, double aValue) = 0;
+    virtual void setSceneValue(int aChannelIndex, double aValue) = 0;
 
     /// utility: check a scene value flag
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @param aFlagMask the flag to check
-    bool isSceneValueFlagSet(size_t aChannelIndex, uint32_t aFlagMask);
+    bool isSceneValueFlagSet(int aChannelIndex, uint32_t aFlagMask);
 
     /// @}
 

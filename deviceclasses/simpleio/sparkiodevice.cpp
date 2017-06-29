@@ -42,7 +42,7 @@ SparkLightScene::SparkLightScene(SceneDeviceSettings &aSceneDeviceSettings, Scen
 // MARK: ===== spark scene values/channels
 
 
-double SparkLightScene::sceneValue(size_t aChannelIndex)
+double SparkLightScene::sceneValue(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
@@ -53,7 +53,7 @@ double SparkLightScene::sceneValue(size_t aChannelIndex)
 }
 
 
-void SparkLightScene::setSceneValue(size_t aChannelIndex, double aValue)
+void SparkLightScene::setSceneValue(int aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {

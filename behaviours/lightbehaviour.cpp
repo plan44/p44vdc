@@ -128,7 +128,7 @@ void LightBehaviour::syncBrightnessFromHardware(Brightness aBrightness, bool aAl
 }
 
 
-double LightBehaviour::outputValueAccordingToMode(double aChannelValue, size_t aChannelIndex)
+double LightBehaviour::outputValueAccordingToMode(double aChannelValue, int aChannelIndex)
 {
   // non-default channels and dimmable brightness are passed directly
   if (aChannelIndex!=0 || isDimmable()) {
@@ -226,7 +226,7 @@ MLMicroSeconds LightBehaviour::transitionTimeFromSceneEffect(VdcSceneEffect aEff
 // dS Dimming rule for Light:
 //  Rule 4 All devices which are turned on and not in local priority state take part in the dimming process.
 
-bool LightBehaviour::canDim(DsChannelType aChannelType)
+bool LightBehaviour::canDim(ChannelBehaviourPtr aChannel)
 {
   // to dim anything (not only brightness), brightness value must be >0
   return brightness->getChannelValue()>0;

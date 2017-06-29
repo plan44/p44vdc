@@ -26,6 +26,7 @@
 
 #include "jsoncomm.hpp"
 
+
 using namespace std;
 
 namespace p44 {
@@ -39,6 +40,41 @@ namespace p44 {
     virtual const char *getErrorDomain() const { return P44VdcError::domain(); };
     P44VdcError(ErrorCode aError) : Error(aError) {};
   };
+
+
+
+  /// Dummy config API "connection" object
+  class P44JsonApiConnection : public VdcApiConnection
+  {
+    typedef VdcApiConnection inherited;
+
+
+  public:
+
+    P44JsonApiConnection();
+
+    /// install callback for received API requests
+    /// @param aApiRequestHandler will be called when a API request has been received
+    void setRequestHandler(VdcApiRequestCB aApiRequestHandler);
+
+    /// The underlying socket connection
+    /// @return socket connection
+    virtual SocketCommPtr socketConnection() P44_OVERRIDE { return SocketCommPtr(); };
+
+    /// Cannot send a API request
+    /// @return empty or Error object in case of error
+    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE
+      { return TextError::err("cant send request to config API"); };
+
+    /// request closing connection after last message has been sent
+    virtual void closeAfterSend() P44_OVERRIDE {};
+
+    /// get a new API value suitable for this connection
+    /// @return new API value of suitable internal implementation to be used on this API connection
+    virtual ApiValuePtr newApiValue() P44_OVERRIDE;
+
+  };
+
 
 
 
@@ -59,11 +95,7 @@ namespace p44 {
 
     /// get the API connection this request originates from
     /// @return API connection
-    virtual VdcApiConnectionPtr connection()  P44_OVERRIDE { return VdcApiConnectionPtr(); } // is not really a regular VDC API call, so there's no connection
-
-    /// get a new API value suitable for answering this request connection
-    /// @return new API value of suitable internal implementation to be used on this API connection
-    virtual ApiValuePtr newApiValue() P44_OVERRIDE;
+    virtual VdcApiConnectionPtr connection() P44_OVERRIDE;
 
     /// send a vDC API result (answer for successful method call)
     /// @param aResult the result as a ApiValue. Can be NULL for procedure calls without return value
@@ -76,10 +108,6 @@ namespace p44 {
     /// @param aErrorData the optional "data" member for the vDC API error object
     /// @result empty or Error object in case of error sending error response
     virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr()) P44_OVERRIDE;
-
-    /// get API version
-    /// @return API version for this connection
-    virtual int getApiVersion() P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;

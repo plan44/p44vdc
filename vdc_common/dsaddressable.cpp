@@ -273,7 +273,7 @@ void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultOb
 
 
 
-void DsAddressable::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
+void DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams)
 {
   if (aMethod=="ping") {
     // issue device ping (which will issue a pong when device is reachable)

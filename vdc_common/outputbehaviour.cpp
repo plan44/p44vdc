@@ -80,7 +80,7 @@ void OutputBehaviour::setHardwareOutputConfig(VdcOutputFunction aOutputFunction,
 
 void OutputBehaviour::addChannel(ChannelBehaviourPtr aChannel)
 {
-  aChannel->channelIndex = channels.size();
+  aChannel->channelIndex = (int)channels.size();
   channels.push_back(aChannel);
 }
 
@@ -92,7 +92,7 @@ size_t OutputBehaviour::numChannels()
 
 
 
-ChannelBehaviourPtr OutputBehaviour::getChannelByIndex(size_t aChannelIndex, bool aPendingApplyOnly)
+ChannelBehaviourPtr OutputBehaviour::getChannelByIndex(int aChannelIndex, bool aPendingApplyOnly)
 {
   if (aChannelIndex<channels.size()) {
     ChannelBehaviourPtr ch = channels[aChannelIndex];
@@ -120,13 +120,25 @@ ChannelBehaviourPtr OutputBehaviour::getChannelByType(DsChannelType aChannelType
 }
 
 
-DsChannelType OutputBehaviour::actualChannelType(DsChannelType aChannelType)
+ChannelBehaviourPtr OutputBehaviour::getChannelById(const string aChannelId, bool aPendingApplyOnly)
 {
-  if (aChannelType!=channeltype_default) return aChannelType;
-  // need to resolve
-  if (channels.size()>0) return channels[0]->getChannelType(); // resolved default channel
-  // no channel, return as-is
-  return aChannelType;
+  if (aChannelId=="0") return getChannelByIndex(0); // default channel
+  const char *s = aChannelId.c_str();
+  if (*s=='#') {
+    s++;
+    int ci;
+    if (sscanf(s, "%d", &ci)==1) {
+      return getChannelByIndex(ci);
+    }
+  }
+  for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+    if ((*pos)->channelId==aChannelId) {
+      if (!aPendingApplyOnly || (*pos)->needsApplying())
+        return *pos; // found
+      break; // found but has no apply pending -> return no channel
+    }
+  }
+  return ChannelBehaviourPtr();
 }
 
 
@@ -191,7 +203,7 @@ void OutputBehaviour::setOutputMode(VdcOutputMode aOutputMode)
 }
 
 
-double OutputBehaviour::outputValueAccordingToMode(double aChannelValue, size_t aChannelIndex)
+double OutputBehaviour::outputValueAccordingToMode(double aChannelValue, int aChannelIndex)
 {
   // non-default channels are just passed directly
   if (aChannelIndex!=0) return aChannelValue;
@@ -215,7 +227,7 @@ double OutputBehaviour::outputValueAccordingToMode(double aChannelValue, size_t 
 }
 
 
-double OutputBehaviour::channelValueAccordingToMode(double aOutputValue, size_t aChannelIndex)
+double OutputBehaviour::channelValueAccordingToMode(double aOutputValue, int aChannelIndex)
 {
   // Base class does not do any backwards transformations
   return aOutputValue;

@@ -74,7 +74,7 @@ namespace p44 {
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
     virtual string getExtraInfo() P44_OVERRIDE;
       
-    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode) P44_OVERRIDE;
+    virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode) P44_OVERRIDE;
 
     /// @name interaction with subclasses, actually representing physical I/O
     /// @{

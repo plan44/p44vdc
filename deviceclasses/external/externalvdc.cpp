@@ -443,7 +443,7 @@ ErrorPtr ExternalDevice::processSimpleMessage(string aMessageType, string aValue
 static int behaviourIndexById(BehaviourVector &aBV, const string aId)
 {
   for (int i=0; i<aBV.size(); i++) {
-    if (aId==aBV[i]->getId(3)) {
+    if (aId==aBV[i]->getApiId(3)) {
       return i;
     }
   }
@@ -453,13 +453,8 @@ static int behaviourIndexById(BehaviourVector &aBV, const string aId)
 
 static int channelIndexById(OutputBehaviourPtr aOB, const string aId)
 {
-  for (int i=0; i<aOB->numChannels(); i++) {
-    ChannelBehaviourPtr cb = aOB->getChannelByIndex(i);
-    if (aId==cb->getId(3)) {
-      return i;
-    }
-  }
-  return -1;
+  ChannelBehaviourPtr cb = aOB->getChannelById(aId);
+  return cb ? cb->getChannelIndex() : -1;
 }
 
 
@@ -665,7 +660,7 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
           message->add("message", JsonObject::newString("channel"));
           message->add("index", JsonObject::newInt32((int)i));
           message->add("type", JsonObject::newInt32(cb->getChannelType())); // informational
-          message->add("id", JsonObject::newString(cb->getId(3))); // informational
+          message->add("id", JsonObject::newString(cb->getApiId(3))); // informational
           message->add("value", JsonObject::newDouble(cb->getChannelValue()));
           sendDeviceApiJsonMessage(message);
         }
@@ -677,31 +672,30 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 }
 
 
-void ExternalDevice::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
+void ExternalDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
 {
-  // start dimming
-  ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
-  if (sb && useMovement) {
-    // no channel check, there's only global dimming of the blind, no separate position/angle
-    sb->dimBlind(boost::bind(&ExternalDevice::changeChannelMovement, this, 0, _1, _2), aDimMode);
-  }
-  else if (useMovement) {
-    // not shadow, but still use movement for dimming
-    ChannelBehaviourPtr cb = getChannelByType(aChannelType);
-    if (cb) {
-      changeChannelMovement(cb->getChannelIndex(), NULL, aDimMode);
+  if (aChannel) {
+    // start dimming
+    ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+    if (sb && useMovement) {
+      // no channel check, there's only global dimming of the blind, no separate position/angle
+      sb->dimBlind(boost::bind(&ExternalDevice::changeChannelMovement, this, 0, _1, _2), aDimMode);
     }
-  }
-  else {
-    inherited::dimChannel(aChannelType, aDimMode);
+    else if (useMovement) {
+      // not shadow, but still use movement for dimming
+      changeChannelMovement(aChannel->getChannelIndex(), NULL, aDimMode);
+    }
+    else {
+      inherited::dimChannel(aChannel, aDimMode);
+    }
   }
 }
 
 
-void ExternalDevice::changeChannelMovement(size_t aChannelIndex, SimpleCB aDoneCB, int aNewDirection)
+void ExternalDevice::changeChannelMovement(int aChannelIndex, SimpleCB aDoneCB, int aNewDirection)
 {
   if (deviceConnector->simpletext) {
-    string m = string_format("MV%zu=%d", aChannelIndex, aNewDirection);
+    string m = string_format("MV%d=%d", aChannelIndex, aNewDirection);
     sendDeviceApiSimpleMessage(m);
   }
   else {

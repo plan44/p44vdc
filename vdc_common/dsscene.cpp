@@ -76,7 +76,7 @@ protected:
     if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
       // scene channels by their channel ID
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-      descP->propertyName = scene.getDevice().getChannelByIndex(aPropIndex)->getId(aParentDescriptor->getApiVersion());
+      descP->propertyName = scene.getDevice().getChannelByIndex(aPropIndex)->getApiId(aParentDescriptor->getApiVersion());
       descP->propertyType = aParentDescriptor->type();
       descP->propertyFieldKey = aPropIndex;
       descP->propertyObjectKey = OKEY(scenevalue_key);
@@ -348,12 +348,12 @@ int DsScene::numSceneValues()
 }
 
 
-uint32_t DsScene::sceneValueFlags(size_t aOutputIndex)
+uint32_t DsScene::sceneValueFlags(int aChannelIndex)
 {
   uint32_t flags = 0;
   // up to 16 channel's dontCare flags are mapped into globalSceneFlags
-  if (aOutputIndex<numSceneValues()) {
-    if (globalSceneFlags & (globalflags_valueDontCare0<<aOutputIndex)) {
+  if (aChannelIndex<numSceneValues()) {
+    if (globalSceneFlags & (globalflags_valueDontCare0<<aChannelIndex)) {
       flags |= valueflags_dontCare; // this value's dontCare is set
     }
   }
@@ -361,11 +361,11 @@ uint32_t DsScene::sceneValueFlags(size_t aOutputIndex)
 }
 
 
-void DsScene::setSceneValueFlags(size_t aOutputIndex, uint32_t aFlagMask, bool aSet)
+void DsScene::setSceneValueFlags(int aChannelIndex, uint32_t aFlagMask, bool aSet)
 {
   // up to 16 channel's dontCare flags are mapped into globalSceneFlags
-  if (aOutputIndex<numSceneValues()) {
-    uint32_t flagmask = globalflags_valueDontCare0<<aOutputIndex;
+  if (aChannelIndex<numSceneValues()) {
+    uint32_t flagmask = globalflags_valueDontCare0<<aChannelIndex;
     uint32_t newFlags;
     if (aSet)
       newFlags = globalSceneFlags | ((aFlagMask & valueflags_dontCare) ? flagmask : 0);
@@ -381,10 +381,10 @@ void DsScene::setSceneValueFlags(size_t aOutputIndex, uint32_t aFlagMask, bool a
 
 
 // utility function to check scene value flag
-bool DsScene::isSceneValueFlagSet(size_t aOutputIndex, uint32_t aFlagMask)
+bool DsScene::isSceneValueFlagSet(int aChannelIndex, uint32_t aFlagMask)
 {
   // only dontCare flag exists per value in base class
-  return sceneValueFlags(aOutputIndex) & aFlagMask;
+  return sceneValueFlags(aChannelIndex) & aFlagMask;
 }
 
 

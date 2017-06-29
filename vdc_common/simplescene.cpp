@@ -26,13 +26,13 @@ SimpleScene::SimpleScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSce
 // MARK: ===== scene values/channels
 
 
-double SimpleScene::sceneValue(size_t aOutputIndex)
+double SimpleScene::sceneValue(int aOutputIndex)
 {
   return value;
 }
 
 
-void SimpleScene::setSceneValue(size_t aOutputIndex, double aValue)
+void SimpleScene::setSceneValue(int aOutputIndex, double aValue)
 {
   if (aOutputIndex==0) {
     setPVar(value, aValue);

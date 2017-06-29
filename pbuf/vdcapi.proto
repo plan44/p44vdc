@@ -140,16 +140,18 @@ message vdsm_NotificationSetControlValue {
 
 message vdsm_NotificationDimChannel {
     repeated string dSUID = 1;
-    optional int32 channel = 2;
+    optional int32 channel = 2; // channel by type
     optional int32 mode = 3;
     optional int32 area = 4;
     optional int32 group = 5;
     optional int32 zone_id = 6;
+    optional string channelId = 7; // new in API v3
 }
 
 message vdsm_NotificationSetOutputChannelValue {
     repeated string dSUID = 1;
     optional bool apply_now = 2 [ default = true ];
-    optional int32 channel = 3;
+    optional int32 channel = 3; // channel by type
     optional double value = 4;
+    optional string channelId = 5; // new in API v3
 }

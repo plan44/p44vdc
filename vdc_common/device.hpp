@@ -29,7 +29,7 @@
 using namespace std;
 
 // originally, all behaviours were accessed by index, channels were accessed by channeltype
-// when ACCESS_BY_ID is set, all behaviours and channels are accessed by their getId().
+// when ACCESS_BY_ID is set, all behaviours and channels are accessed by their getApiId().
 #define ACCESS_BY_ID 1
 #if VDC_API_VERSION_MAX>2 && !ACCESS_BY_ID
   #error "Access by ID needed for API versions 3 and later"
@@ -90,7 +90,7 @@ namespace p44 {
     // volatile internal state
     long dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
     VdcDimMode currentDimMode; ///< current dimming in progress
-    DsChannelType currentDimChannel; ///< currently dimmed channel (if dimming in progress)
+    ChannelBehaviourPtr currentDimChannel; ///< currently dimmed channel (if dimming in progress)
     long dimHandlerTicket; ///< for standard dimming
     bool isDimming; ///< if set, dimming is in progress
     uint8_t areaDimmed; ///< last dimmed area (so continue know which dimming command to re-start in case it comes late)
@@ -340,12 +340,12 @@ namespace p44 {
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// called to let device handle device-level notification
-    /// @param aRequest this is the request from which the notification originates
+    /// @param aApiConnection this is the API connection from which the notification originates
     /// @param aMethod the notification
     /// @param aParams the parameters object
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this device.
-    virtual void handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// call scene on this device
     /// @param aSceneNo the scene to call.
@@ -366,13 +366,13 @@ namespace p44 {
 
 
     /// start or stop dimming channel of this device.
-    /// @param aChannel the channelType to start or stop dimming for
+    /// @param aChannel the channel to start or stop dimming for
     /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @param aArea the area (1..4, 0=room) to restrict dimming to. Can be -1 to override local priority
     /// @param aAutoStopAfter max dimming time, dimming will stop when this time has passed
     /// @note this method is internally used to implement vDC API dimChannel and dim-related scene calls, but
     ///    it is exposed as directly controlling dimming might be useful for other purposes (e.g. identify)
-    void dimChannelForArea(DsChannelType aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
+    void dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
 
 
     /// Process a named control value. The type, group membership and settings of the device determine if at all,
@@ -421,7 +421,7 @@ namespace p44 {
     void requestUpdatingChannels(SimpleCB aUpdatedOrCachedCB);
 
     /// start or stop dimming channel of this device. Usually implemented in device specific manner in subclasses.
-    /// @param aChannelType the channelType to start or stop dimming for
+    /// @param aChannel the channel to start or stop dimming for
     /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @note unlike the vDC API "dimChannel" command, which must be repeated for dimming operations >5sec, this
     ///   method MUST NOT terminate dimming automatically except when reaching the minimum or maximum level
@@ -430,7 +430,7 @@ namespace p44 {
     /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
-    virtual void dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode);
+    virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode);
 
     /// identify the device to the user
     /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
@@ -454,12 +454,19 @@ namespace p44 {
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @param aPendingApplyOnly if true, only channels with pending values to be applied are returned
     /// @return NULL for unknown channel
-    ChannelBehaviourPtr getChannelByIndex(size_t aChannelIndex, bool aPendingApplyOnly = false);
+    ChannelBehaviourPtr getChannelByIndex(int aChannelIndex, bool aPendingApplyOnly = false);
 
     /// get output index by channelType
     /// @param aChannelType the channel type, can be channeltype_default to get primary/default channel
     /// @return NULL for unknown channel
     ChannelBehaviourPtr getChannelByType(DsChannelType aChannelType, bool aPendingApplyOnly = false);
+
+    /// get channel by channel ID
+    /// @param aChannelID the channel ID
+    /// @param aPendingApplyOnly if set, a channel is only returned when its value is pending to be applied
+    /// @return NULL for unknown channel
+    ChannelBehaviourPtr getChannelById(const string aChannelId, bool aPendingApplyOnly = false);
+
 
     /// @}
 
@@ -555,7 +562,9 @@ namespace p44 {
 
     DsGroupMask behaviourGroups();
 
-    void dimAutostopHandler(DsChannelType aChannel);
+    ErrorPtr checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel);
+
+    void dimAutostopHandler(ChannelBehaviourPtr aChannel);
     void dimHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNow);
     void dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNextDimAt);
     void outputSceneValueSaved(DsScenePtr aScene);

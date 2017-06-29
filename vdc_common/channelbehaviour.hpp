@@ -54,9 +54,9 @@ namespace p44 {
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
-    uint8_t channelIndex; ///< the index of the channel within the device
+    int channelIndex; ///< the index of the channel within the device
     double resolution; ///< actual resolution within the device
-    string channelId; ///< string identifier for this channel. If string is empty, getId() will return decimal string representation of channelType()
+    string channelId; ///< string identifier for this channel. If string is empty, getApiId() will return decimal string representation of channelType()
     /// @}
 
     /// @name persistent settings
@@ -199,14 +199,14 @@ namespace p44 {
     /// @name interaction with digitalSTROM system
     /// @{
 
-    /// get the channel ID
+    /// get the channel ID as used in the API
     /// @param aApiVersion the API version to get the ID for. APIs before v3 always return the channel type as a numeric string
     /// @return the channel ID. The channel id must be unique within the device.
-    string getId(int aApiVersion);
+    string getApiId(int aApiVersion);
 
     /// get the channel index
     /// @return the channel index (0..N, 0=primary)
-    size_t getChannelIndex() { return channelIndex; };
+    int getChannelIndex() { return channelIndex; };
 
     /// get the resolution this channel has in the hardware of this particular device
     /// @return resolution of channel value (size of smallest step output can take, LSB)

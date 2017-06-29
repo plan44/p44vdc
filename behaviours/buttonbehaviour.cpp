@@ -477,7 +477,8 @@ void ButtonBehaviour::localSwitchOutput()
 void ButtonBehaviour::localDim(bool aStart)
 {
   BLOG(LOG_NOTICE, "Button[%zu] '%s': Local dim %s", index, hardwareName.c_str(), aStart ? "START" : "STOP");
-  if (device.output) {
+  ChannelBehaviourPtr channel = device.getChannelByIndex(0); // default channel
+  if (channel) {
     if (aStart) {
       // start dimming, determine direction (directly from two-way buttons or via toggling direction for single buttons)
       VdcDimMode dm = twoWayDirection();
@@ -486,11 +487,11 @@ void ButtonBehaviour::localDim(bool aStart)
         dimmingUp = !dimmingUp; // change direction
         dm = dimmingUp ? dimmode_up : dimmode_down;
       }
-      device.dimChannel(channeltype_default, dm);
+      device.dimChannel(channel, dm);
     }
     else {
       // just stop
-      device.dimChannel(channeltype_default, dimmode_stop);
+      device.dimChannel(channel, dimmode_stop);
     }
   }
 }

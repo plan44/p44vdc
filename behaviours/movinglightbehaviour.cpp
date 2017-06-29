@@ -39,7 +39,7 @@ MovingLightScene::MovingLightScene(SceneDeviceSettings &aSceneDeviceSettings, Sc
 // MARK: ===== color scene values/channels
 
 
-double MovingLightScene::sceneValue(size_t aChannelIndex)
+double MovingLightScene::sceneValue(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
@@ -51,7 +51,7 @@ double MovingLightScene::sceneValue(size_t aChannelIndex)
 }
 
 
-void MovingLightScene::setSceneValue(size_t aChannelIndex, double aValue)
+void MovingLightScene::setSceneValue(int aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {

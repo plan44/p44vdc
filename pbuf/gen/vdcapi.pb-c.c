@@ -2518,7 +2518,7 @@ const ProtobufCMessageDescriptor vdcapi__vdsm__notification_set_control_value__d
   (ProtobufCMessageInit) vdcapi__vdsm__notification_set_control_value__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor vdcapi__vdsm__notification_dim_channel__field_descriptors[6] =
+static const ProtobufCFieldDescriptor vdcapi__vdsm__notification_dim_channel__field_descriptors[7] =
 {
   {
     "dSUID",
@@ -2592,10 +2592,23 @@ static const ProtobufCFieldDescriptor vdcapi__vdsm__notification_dim_channel__fi
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "channelId",
+    7,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Vdcapi__VdsmNotificationDimChannel, channelid),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned vdcapi__vdsm__notification_dim_channel__field_indices_by_name[] = {
   3,   /* field[3] = area */
   1,   /* field[1] = channel */
+  6,   /* field[6] = channelId */
   0,   /* field[0] = dSUID */
   4,   /* field[4] = group */
   2,   /* field[2] = mode */
@@ -2604,7 +2617,7 @@ static const unsigned vdcapi__vdsm__notification_dim_channel__field_indices_by_n
 static const ProtobufCIntRange vdcapi__vdsm__notification_dim_channel__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 6 }
+  { 0, 7 }
 };
 const ProtobufCMessageDescriptor vdcapi__vdsm__notification_dim_channel__descriptor =
 {
@@ -2614,7 +2627,7 @@ const ProtobufCMessageDescriptor vdcapi__vdsm__notification_dim_channel__descrip
   "Vdcapi__VdsmNotificationDimChannel",
   "vdcapi",
   sizeof(Vdcapi__VdsmNotificationDimChannel),
-  6,
+  7,
   vdcapi__vdsm__notification_dim_channel__field_descriptors,
   vdcapi__vdsm__notification_dim_channel__field_indices_by_name,
   1,  vdcapi__vdsm__notification_dim_channel__number_ranges,
@@ -2622,7 +2635,7 @@ const ProtobufCMessageDescriptor vdcapi__vdsm__notification_dim_channel__descrip
   NULL,NULL,NULL    /* reserved[123] */
 };
 static const protobuf_c_boolean vdcapi__vdsm__notification_set_output_channel_value__apply_now__default_value = 1;
-static const ProtobufCFieldDescriptor vdcapi__vdsm__notification_set_output_channel_value__field_descriptors[4] =
+static const ProtobufCFieldDescriptor vdcapi__vdsm__notification_set_output_channel_value__field_descriptors[5] =
 {
   {
     "dSUID",
@@ -2672,17 +2685,30 @@ static const ProtobufCFieldDescriptor vdcapi__vdsm__notification_set_output_chan
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "channelId",
+    5,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Vdcapi__VdsmNotificationSetOutputChannelValue, channelid),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned vdcapi__vdsm__notification_set_output_channel_value__field_indices_by_name[] = {
   1,   /* field[1] = apply_now */
   2,   /* field[2] = channel */
+  4,   /* field[4] = channelId */
   0,   /* field[0] = dSUID */
   3,   /* field[3] = value */
 };
 static const ProtobufCIntRange vdcapi__vdsm__notification_set_output_channel_value__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 4 }
+  { 0, 5 }
 };
 const ProtobufCMessageDescriptor vdcapi__vdsm__notification_set_output_channel_value__descriptor =
 {
@@ -2692,7 +2718,7 @@ const ProtobufCMessageDescriptor vdcapi__vdsm__notification_set_output_channel_v
   "Vdcapi__VdsmNotificationSetOutputChannelValue",
   "vdcapi",
   sizeof(Vdcapi__VdsmNotificationSetOutputChannelValue),
-  4,
+  5,
   vdcapi__vdsm__notification_set_output_channel_value__field_descriptors,
   vdcapi__vdsm__notification_set_output_channel_value__field_indices_by_name,
   1,  vdcapi__vdsm__notification_set_output_channel_value__number_ranges,

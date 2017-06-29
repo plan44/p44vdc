@@ -45,7 +45,7 @@ ShadowScene::ShadowScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSce
 // MARK: ===== shadow scene values/channels
 
 
-double ShadowScene::sceneValue(size_t aChannelIndex)
+double ShadowScene::sceneValue(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   if (cb->getChannelType()==channeltype_shade_angle_outside) {
@@ -55,7 +55,7 @@ double ShadowScene::sceneValue(size_t aChannelIndex)
 }
 
 
-void ShadowScene::setSceneValue(size_t aChannelIndex, double aValue)
+void ShadowScene::setSceneValue(int aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   if (cb->getChannelType()==channeltype_shade_angle_outside) {
@@ -840,14 +840,14 @@ void ShadowBehaviour::identifyToUser()
 {
   VdcDimMode dimMode = position->getChannelValue()>50 ? dimmode_down : dimmode_up;
   // move a little
-  device.dimChannelForArea(channeltype_default, dimMode, -1, IDENTITY_MOVE_TIME);
+  device.dimChannelForArea(device.getChannelByIndex(0), dimMode, -1, IDENTITY_MOVE_TIME);
   MainLoop::currentMainLoop().executeOnce(boost::bind(&ShadowBehaviour::reverseIdentify, this, dimMode==dimmode_up ? dimmode_down : dimmode_up), IDENTITY_MOVE_TIME*2);
 }
 
 
 void ShadowBehaviour::reverseIdentify(VdcDimMode aDimMode)
 {
-  device.dimChannelForArea(channeltype_default, aDimMode, -1, IDENTITY_MOVE_TIME);
+  device.dimChannelForArea(device.getChannelByIndex(0), aDimMode, -1, IDENTITY_MOVE_TIME);
 }
 
 

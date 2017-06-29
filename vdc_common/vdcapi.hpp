@@ -118,7 +118,7 @@ namespace p44 {
 
     /// get a new API value suitable for this connection
     /// @return new API value of suitable internal implementation to be used on this API connection
-    ApiValuePtr newApiValue();
+    virtual ApiValuePtr newApiValue();
 
     /// get API version
     /// @return API version for this connection

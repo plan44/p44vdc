@@ -58,7 +58,7 @@ ColorLightScene::ColorLightScene(SceneDeviceSettings &aSceneDeviceSettings, Scen
 // MARK: ===== color scene values/channels
 
 
-double ColorLightScene::sceneValue(size_t aChannelIndex)
+double ColorLightScene::sceneValue(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
@@ -73,7 +73,7 @@ double ColorLightScene::sceneValue(size_t aChannelIndex)
 }
 
 
-void ColorLightScene::setSceneValue(size_t aChannelIndex, double aValue)
+void ColorLightScene::setSceneValue(int aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {

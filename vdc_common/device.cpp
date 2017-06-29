@@ -47,7 +47,6 @@ Device::Device(Vdc *aVdcP) :
   dimHandlerTicket(0),
   dimTimeoutTicket(0),
   currentDimMode(dimmode_stop),
-  currentDimChannel(channeltype_default),
   areaDimmed(0),
   areaDimMode(dimmode_stop),
   vdcP(aVdcP),
@@ -401,7 +400,7 @@ bool Device::needsToApplyChannels()
 }
 
 
-ChannelBehaviourPtr Device::getChannelByIndex(size_t aChannelIndex, bool aPendingApplyOnly)
+ChannelBehaviourPtr Device::getChannelByIndex(int aChannelIndex, bool aPendingApplyOnly)
 {
   if (!output) return ChannelBehaviourPtr();
   return output->getChannelByIndex(aChannelIndex, aPendingApplyOnly);
@@ -412,6 +411,13 @@ ChannelBehaviourPtr Device::getChannelByType(DsChannelType aChannelType, bool aP
 {
   if (!output) return ChannelBehaviourPtr();
   return output->getChannelByType(aChannelType, aPendingApplyOnly);
+}
+
+
+ChannelBehaviourPtr Device::getChannelById(const string aChannelId, bool aPendingApplyOnly)
+{
+  if (!output) return ChannelBehaviourPtr();
+  return output->getChannelById(aChannelId, aPendingApplyOnly);
 }
 
 
@@ -460,7 +466,27 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
 #define LEGACY_DIM_STEP_TIMEOUT (500*MilliSecond) // should be 400, but give it extra 100 because of delays in getting next dim call, especially for area scenes
 
 
-void Device::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
+ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel)
+{
+  ChannelBehaviourPtr ch;
+  ApiValuePtr o;
+  aChannel.reset();
+  if ((o = aParams->get("channel"))) {
+    aChannel = getChannelByType(o->int32Value());
+  }
+  else if ((o = aParams->get("channelId"))) {
+    aChannel = getChannelById(o->stringValue());
+  }
+  if (!aChannel) {
+    return Error::err<VdcApiError>(400, "Need to specify channel(type) or channelId");
+  }
+  return ErrorPtr();
+}
+
+
+
+
+void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr err;
   if (aMethod=="callScene") {
@@ -552,9 +578,10 @@ void Device::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod
   else if (aMethod=="dimChannel") {
     // start or stop dimming a channel
     ApiValuePtr o;
-    if (Error::isOK(err = checkParam(aParams, "channel", o))) {
-      DsChannelType channel = (DsChannelType)o->int32Value();
+    ChannelBehaviourPtr channel;
+    if (Error::isOK(err = checkChannel(aParams, channel))) {
       if (Error::isOK(err = checkParam(aParams, "mode", o))) {
+        // mode
         int mode = o->int32Value();
         int area = 0;
         o = aParams->get("area");
@@ -562,18 +589,21 @@ void Device::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod
           area = o->int32Value();
         }
         // start/stop dimming
-        dimChannelForArea(channel,mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
+        dimChannelForArea(channel, mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
+      }
+      else {
+        err = Error::err<VdcApiError>(400, "Need to specify channel(type) or channelId");
       }
     }
     if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "callSceneMin error: %s", err->description().c_str());
+      ALOG(LOG_WARNING, "dimChannel error: %s", err->description().c_str());
     }
   }
   else if (aMethod=="setOutputChannelValue") {
     // set output channel value (alias for setProperty outputStates)
     ApiValuePtr o;
-    if (Error::isOK(err = checkParam(aParams, "channel", o))) {
-      DsChannelType channel = (DsChannelType)o->int32Value();
+    ChannelBehaviourPtr channel;
+    if (Error::isOK(err = checkChannel(aParams, channel))) {
       if (Error::isOK(err = checkParam(aParams, "value", o))) {
         double value = o->doubleValue();
         // check optional apply_now flag
@@ -588,12 +618,12 @@ void Device::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod
         o->add("value", o->newDouble(value));
         // - channel id
         ApiValuePtr ch = o->newObject();
-        ch->add(string_format("%d",channel), o);
+        ch->add(channel->getApiId(3), o);
         // - channelStates
         ApiValuePtr propValue = ch->newObject();
         propValue->add("channelStates", ch);
         // now access the property for write
-        accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, aRequest->getApiVersion(), NULL); // no callback
+        accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, 3, NULL); // no callback
       }
     }
     if (!Error::isOK(err)) {
@@ -606,7 +636,7 @@ void Device::handleNotification(VdcApiRequestPtr aRequest, const string &aMethod
     identifyToUser();
   }
   else {
-    inherited::handleNotification(aRequest, aMethod, aParams);
+    inherited::handleNotification(aApiConnection, aMethod, aParams);
   }
 }
 
@@ -673,17 +703,13 @@ static SceneNo offSceneForArea(int aArea)
 
 // implementation of "dimChannel" vDC API command and legacy dimming
 // Note: ensures dimming only continues for at most aAutoStopAfter
-void Device::dimChannelForArea(DsChannelType aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
+void Device::dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
 {
-  LOG(LOG_DEBUG, "dimChannelForArea: aChannel=%d, aDimMode=%d, aArea=%d", aChannel, aDimMode, aArea);
-  // dimming is NOP in devices having no output
-  if (!output) return;
-  // make sure default channel type is resolve to actual type
-  aChannel = output->actualChannelType(aChannel);
-  LOG(LOG_DEBUG, "- actual channel type = %d", aChannel);
+  if (!aChannel) return;
+  LOG(LOG_DEBUG, "dimChannelForArea: aChannel=%s, aDimMode=%d, aArea=%d", aChannel->getName(), aDimMode, aArea);
   // check basic dimmability (e.g. avoid dimming brightness for lights that are off)
   if (aDimMode!=dimmode_stop && !(output->canDim(aChannel))) {
-    LOG(LOG_DEBUG, "- behaviour does not allow dimming channel type %d now (e.g. because light is off)", aChannel);
+    LOG(LOG_DEBUG, "- behaviour does not allow dimming channel '%s' now (e.g. because light is off)", aChannel->getName());
     return;
   }
   // check area if any
@@ -751,7 +777,7 @@ void Device::dimChannelForArea(DsChannelType aChannel, VdcDimMode aDimMode, int 
 
 
 // autostop handler (for both dimChannel and legacy dimming)
-void Device::dimAutostopHandler(DsChannelType aChannel)
+void Device::dimAutostopHandler(ChannelBehaviourPtr aChannel)
 {
   // timeout: stop dimming immediately
   dimTimeoutTicket = 0;
@@ -765,31 +791,30 @@ void Device::dimAutostopHandler(DsChannelType aChannel)
 #define DIM_STEP_INTERVAL (DIM_STEP_INTERVAL_MS*MilliSecond)
 
 // actual dimming implementation, usually overridden by subclasses to provide more optimized/precise dimming
-void Device::dimChannel(DsChannelType aChannelType, VdcDimMode aDimMode)
+void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
 {
-  ALOG(LOG_INFO,
-    "dimChannel (generic): channel type %d %s",
-    aChannelType, aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
-  );
-  // Simple base class implementation just increments/decrements channel values periodically (and skips steps when applying values is too slow)
-  if (aDimMode==dimmode_stop) {
-    // stop dimming
-    isDimming = false;
-    MainLoop::currentMainLoop().cancelExecutionTicket(dimHandlerTicket);
-  }
-  else {
-    // start dimming
-    ChannelBehaviourPtr ch = getChannelByType(aChannelType);
-    if (ch) {
+  if (aChannel) {
+    ALOG(LOG_INFO,
+      "dimChannel (generic): channel '%s' %s",
+      aChannel->getName(), aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
+    );
+    // Simple base class implementation just increments/decrements channel values periodically (and skips steps when applying values is too slow)
+    if (aDimMode==dimmode_stop) {
+      // stop dimming
+      isDimming = false;
+      MainLoop::currentMainLoop().cancelExecutionTicket(dimHandlerTicket);
+    }
+    else {
+      // start dimming
       // make sure the start point is calculated if needed
-      ch->getChannelValueCalculated();
-      ch->setNeedsApplying(0); // force re-applying start point, no transition time
+      aChannel->getChannelValueCalculated();
+      aChannel->setNeedsApplying(0); // force re-applying start point, no transition time
       // calculate increment
-      double increment = (aDimMode==dimmode_up ? DIM_STEP_INTERVAL_MS : -DIM_STEP_INTERVAL_MS) * ch->getDimPerMS();
+      double increment = (aDimMode==dimmode_up ? DIM_STEP_INTERVAL_MS : -DIM_STEP_INTERVAL_MS) * aChannel->getDimPerMS();
       // start ticking
       isDimming = true;
       // wait for all apply operations to really complete before starting to dim
-      SimpleCB dd = boost::bind(&Device::dimDoneHandler, this, ch, increment, MainLoop::now()+10*MilliSecond);
+      SimpleCB dd = boost::bind(&Device::dimDoneHandler, this, aChannel, increment, MainLoop::now()+10*MilliSecond);
       waitForApplyComplete(boost::bind(&Device::requestApplyingChannels, this, dd, false, false));
     }
   }
@@ -1088,7 +1113,7 @@ void Device::callScene(SceneNo aSceneNo, bool aForce)
       else if (areaDimmed!=0 && areaDimMode!=dimmode_stop) {
         // continue received too late, already stopped -> restart dimming
         ALOG(LOG_DEBUG, "Area scene dimming continue received too late -> restarting dimming, will not be smooth");
-        dimChannelForArea(channeltype_default, areaDimMode, areaDimmed, LEGACY_DIM_STEP_TIMEOUT);
+        dimChannelForArea(getChannelByIndex(0), areaDimMode, areaDimmed, LEGACY_DIM_STEP_TIMEOUT);
       }
       // - otherwise: NOP
       return;
@@ -1096,17 +1121,17 @@ void Device::callScene(SceneNo aSceneNo, bool aForce)
     // first check legacy (inc/dec scene) dimming
     if (cmd==scene_cmd_increment) {
       if (!prepareSceneCall(scene)) return;
-      dimChannelForArea(channeltype_default, dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT);
+      dimChannelForArea(getChannelByIndex(0), dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT);
       return;
     }
     else if (cmd==scene_cmd_decrement) {
       if (!prepareSceneCall(scene)) return;
-      dimChannelForArea(channeltype_default, dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT);
+      dimChannelForArea(getChannelByIndex(0), dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT);
       return;
     }
     else if (cmd==scene_cmd_stop) {
       if (!prepareSceneCall(scene)) return;
-      dimChannelForArea(channeltype_default, dimmode_stop, area, 0);
+      dimChannelForArea(getChannelByIndex(0), dimmode_stop, area, 0);
       return;
     }
     // we get here only if callScene is not legacy dimming
@@ -1633,16 +1658,16 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     // accessing one of the other containers: channels, buttons/inputs/sensors or scenes
     string id;
     if (aParentDescriptor->hasObjectKey(device_buttons_key)) {
-      id = buttons[aPropIndex]->getId(aParentDescriptor->getApiVersion());
+      id = buttons[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_inputs_key)) {
-      id = binaryInputs[aPropIndex]->getId(aParentDescriptor->getApiVersion());
+      id = binaryInputs[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_sensors_key)) {
-      id = sensors[aPropIndex]->getId(aParentDescriptor->getApiVersion());
+      id = sensors[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_channels_key)) {
-      id = getChannelByIndex(aPropIndex)->getId(aParentDescriptor->getApiVersion());
+      id = getChannelByIndex(aPropIndex)->getApiId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
       // scenes are still named by their index
