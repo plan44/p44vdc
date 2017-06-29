@@ -40,8 +40,7 @@ bool HomeConnectDeviceDryer::configureDevice()
 {
   // create states
   configureOperationModeState(false, true, true, true, true, false);
-  configureRemoteControlState();
-  configureRemoteStartState();
+  configureRemoteControlState(true);
   configureDoorState(false);
   configurePowerState(false, false);
 

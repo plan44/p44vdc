@@ -109,7 +109,7 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
 
   // create states
   configureOperationModeState(true, false, false, true, true, true);
-  configureRemoteStartState();
+  configureRemoteControlState(false);
   configurePowerState(false, true);
 
   return inherited::configureDevice();

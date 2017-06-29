@@ -82,8 +82,7 @@ bool HomeConnectDeviceOven::configureDevice()
 
   // create states
   configureOperationModeState(true, true, true, true, true, true);
-  configureRemoteControlState();
-  configureRemoteStartState();
+  configureRemoteControlState(true);
   configureDoorState(true);
   configurePowerState(false, true);
 

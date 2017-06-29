@@ -133,10 +133,11 @@ namespace p44 {
     // common states, they can be NULL in case this state is not valid for device class
     DeviceStatePtr operationMode;
     DeviceStatePtr remoteControl;
-    DeviceStatePtr remoteStart;
     DeviceStatePtr doorState;
     DeviceStatePtr powerState;
-    DeviceStatePtr programName;
+
+    // Common Properties
+    ValueDescriptorPtr programName;
 
     HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   public:
@@ -222,8 +223,7 @@ namespace p44 {
     // The following methods are used to configure common states
     void configureOperationModeState(bool aHasInactive, bool aHasDelayedStart, bool aHasPause, bool aHasActionrequired,
         bool aHasError, bool aHasAborting);
-    void configureRemoteControlState();
-    void configureRemoteStartState();
+    void configureRemoteControlState(bool aHasControlStart);
     void configureDoorState(bool aHasLocked);
     void configurePowerState(bool aHasOff, bool aHasStandby);
 

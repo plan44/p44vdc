@@ -40,8 +40,7 @@ bool HomeConnectDeviceDishWasher::configureDevice()
 {
   // create states
   configureOperationModeState(true, true, false, false, false, true);
-  configureRemoteControlState();
-  configureRemoteStartState();
+  configureRemoteControlState(true);
   configureDoorState(false);
   configurePowerState(true, false);
 

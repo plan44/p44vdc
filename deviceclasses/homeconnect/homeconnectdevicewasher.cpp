@@ -40,8 +40,7 @@ bool HomeConnectDeviceWasher::configureDevice()
 {
   // create states
   configureOperationModeState(false, true, true, true, true, false);
-  configureRemoteControlState();
-  configureRemoteStartState();
+  configureRemoteControlState(true);
   configureDoorState(true);
   configurePowerState(false, false);
 
