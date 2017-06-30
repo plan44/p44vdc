@@ -308,12 +308,6 @@ namespace p44 {
     /// @name color services for implementing color lights
     /// @{
 
-    /// @param aPWM will receive the PWM value corresponding to current brightness from 0..aMax
-    /// @param aMax max PWM duty cycle value
-    /// @param aPWM PWM value to be converted back to brightness
-    /// @param aMax max PWM duty cycle value
-
-
     /// get RGB colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue will receive the R,G,B values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue
@@ -338,6 +332,19 @@ namespace p44 {
     /// @param aRed,aGreen,aBlue,aWhite,aAmber will receive the R,G,B,W,A values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite,aAmber
     void getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax);
+
+    /// get Cool White and Warm White colors (from current CT + brightness) for applying to lamp
+    /// @param aCW,aWW will receive the CW and WW values corresponding to current channels
+    /// @param aMax max value for aCW,aWW
+    void getCWWW(double &aCW, double &aWW, double aMax);
+
+    /// set Cool White and Warm White values from lamp  (to update channel values from actual lamp setting)
+    /// @param aCW,aWW current CW and WW values
+    /// @param aMax max value for aCW,aWW
+    void setCWWW(double aCW, double aWW, double aMax);
+
+
+
 
     /// @}
 

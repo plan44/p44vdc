@@ -506,7 +506,7 @@ RGBColorLightBehaviour::RGBColorLightBehaviour(Device &aDevice) :
 {
   // default to sRGB with D65 white point
   matrix3x3_copy(sRGB_d65_calibration, calibration);
-  // default white assumed to contribute equally to R,G,B with 50% each
+  // default white assumed to contribute equally to R,G,B with 35% each
   whiteRGB[0] = 0.35; whiteRGB[1] = 0.35; whiteRGB[2] = 0.35;
   // default amber assumed to be AMBER web color #FFBE00 = 100%, 75%, 0% contributing 50% intensity
   amberRGB[0] = 0.5; amberRGB[1] = 0.375; amberRGB[2] = 0;
@@ -698,6 +698,86 @@ void RGBColorLightBehaviour::setRGBW(double aRed, double aGreen, double aBlue, d
     // force recalculation of derived color value
     derivedValuesComplete = false;
   }
+}
+
+
+
+
+// Simplistic mired to CW/WW conversion
+// - turn up WW from 0 to 100 over 100..1000 mired
+// - turn down CW from 100 to CW_MIN over 100.1000 mired
+
+#define CW_MIN (0.5)
+
+
+void RGBColorLightBehaviour::getCWWW(double &aCW, double &aWW, double aMax)
+{
+  Row3 xyV;
+  Row3 HSV;
+  double mired;
+  switch (colorMode) {
+    case colorLightModeCt: {
+      // we have mired, use it
+      mired = ct->getTransitionalValue();
+      break;
+    }
+    case colorLightModeXY: {
+      // get mired from x,y
+      xyV[0] = cieX->getTransitionalValue();
+      xyV[1] = cieY->getTransitionalValue();
+      xyV[2] = 1;
+      xyVtoCT(xyV, mired);
+      break;
+    }
+    case colorLightModeHueSaturation: {
+      // get mired from HS
+      HSV[0] = hue->getTransitionalValue(); // 0..360
+      HSV[1] = saturation->getTransitionalValue()/100; // 0..1
+      HSV[2] = 1;
+      HSVtoxyV(HSV,xyV);
+      xyVtoCT(xyV, mired);
+      break;
+    }
+    default: {
+      mired = 333; // default to 3000k
+    }
+  }
+  // mired to CW/WW
+  double b = brightness->getTransitionalValue()/100; // 0..1
+  double t = (mired-ct->getMin()) / (ct->getMax()-ct->getMin()); // 0..1 scale of possible mireds, 0=coldest, 1=warmest
+  // Equations:
+  aWW = t * b;
+  aCW = ((1-t)*(1-CW_MIN)+CW_MIN) * b;
+  // scale
+  aWW *= aMax;
+  aCW *= aMax;
+}
+
+
+void RGBColorLightBehaviour::setCWWW(double aCW, double aWW, double aMax)
+{
+  double t;
+  double b;
+  // descale
+  aCW /= aMax;
+  aWW /= aMax;
+  // Reverse Equations
+  if (aWW==0) {
+    t = 233; // 3000k default
+    b = 0;
+  }
+  else {
+    t = 1 / ((aCW/aWW) - CW_MIN + 1);
+    if (t>0) {
+      b = aWW / t;
+    }
+    else {
+      b = 1;
+    }
+  }
+  // back to mired and brightness
+  ct->syncChannelValue(t*(ct->getMax()-ct->getMin())+ct->getMin());
+  brightness->syncChannelValue(b*100);
 }
 
 
