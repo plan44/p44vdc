@@ -398,7 +398,7 @@ void HomeConnectDevice::configureRemoteControlState(bool aHasControlStart)
 void HomeConnectDevice::configureDoorState(bool aHasLocked)
 {
   // - remote control
-  EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
+  EnumValueDescriptor *es = new EnumValueDescriptor("DoorState", true);
   es->addEnum("DoorOpen", 0);
   es->addEnum("DoorClosed", 1);
   if (aHasLocked) {
@@ -465,6 +465,8 @@ void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryRes
     string_format("/api/homeappliances/%s/events",haId.c_str()).c_str(),
     boost::bind(&HomeConnectDevice::handleEvent, this, _1, _2, _3))
   );
+  // start pooling cycle
+  poolState();
   // FIXME: implement
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
@@ -485,8 +487,6 @@ void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData,
         if (operationMode->value()->setStringValue(operationValue)) {
           ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
           operationMode->push();
-        } else {
-          ALOG(LOG_ERR, "Unknown Operation State: '%s' ('%s')", operationValue.c_str(), value.c_str());
         }
       } else if ((key=="BSH.Common.Status.RemoteControlActive") && (remoteControl != NULL)) {
         string remoteControlValue;
@@ -523,8 +523,6 @@ void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData,
         if (doorState->value()->setStringValue(doorValue)) {
           ALOG(LOG_NOTICE, "Door State: '%s'", doorValue.c_str());
           doorState->push();
-        } else {
-          ALOG(LOG_ERR, "Unknown Operation State: '%s' ('%s')", doorValue.c_str(), value.c_str());
         }
       }
     } else if (aEventType=="NOTIFY") {
@@ -533,23 +531,87 @@ void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData,
         if (powerState->value()->setStringValue(powerStateValue)) {
           ALOG(LOG_NOTICE, "New Power State: '%s'", powerStateValue.c_str());
           powerState->push();
-        } else {
-          ALOG(LOG_ERR, "Unknown Power State: '%s' ('%s')", powerStateValue.c_str(), value.c_str());
         }
       } else if ((key=="BSH.Common.Root.SelectedProgram") && (programName != NULL)) {
         string programNameValue = removeNamespace(value);
         if (programName->setStringValue(programNameValue)) {
           ALOG(LOG_NOTICE, "New Program Name State: '%s'", programNameValue.c_str());
-        } else {
-          ALOG(LOG_ERR, "Invalid Program Name: '%s' ('%s')", programNameValue.c_str(), value.c_str());
         }
       }
     }
   }
 }
 
+void HomeConnectDevice::poolState()
+{
+  // Start query the statuses and settings of the device
+  homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/status", haId.c_str()).c_str(),
+      boost::bind(&HomeConnectDevice::poolStateStatusDone, this, _1, _2));
+}
 
+void HomeConnectDevice::poolStateStatusDone(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  // if we got proper response then analyze it
+  if ( (aResult != NULL) && (Error::isOK(aError)) ) {
+    JsonObjectPtr data = aResult->get("data");
 
+    if (data != NULL) {
+      JsonObjectPtr statusArray = data->get("status");
+
+      if (statusArray != NULL) {
+        for (int i = 0; i < statusArray->arrayLength(); i++) {
+          handleEvent("STATUS", statusArray->arrayGet(i), aError);
+        }
+      }
+    }
+  }
+
+  homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/settings", haId.c_str()).c_str(),
+      boost::bind(&HomeConnectDevice::poolStateSettingsDone, this, _1, _2));
+}
+
+void HomeConnectDevice::poolStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  // if we got proper response then analyze it
+  if ( (aResult != NULL) && (Error::isOK(aError)) ) {
+    JsonObjectPtr data = aResult->get("data");
+
+    if (data != NULL) {
+      JsonObjectPtr settingsArray = data->get("settings");
+
+      if (settingsArray != NULL) {
+        for (int i = 0; i < settingsArray->arrayLength(); i++) {
+          handleEvent("NOTIFY", settingsArray->arrayGet(i), aError);
+        }
+      }
+    }
+  }
+
+  homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/programs/selected", haId.c_str()).c_str(),
+      boost::bind(&HomeConnectDevice::poolStateProgramDone, this, _1, _2));
+}
+
+void HomeConnectDevice::poolStateProgramDone(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  if ( (aResult != NULL) && (Error::isOK(aError)) ) {
+    JsonObjectPtr data = aResult->get("data");
+
+    if (data != NULL) {
+      JsonObjectPtr key = data->get("key");
+
+      if (key != NULL) {
+        JsonObjectPtr event = JsonObject::newObj();
+        event->add("key", JsonObject::newString("BSH.Common.Root.SelectedProgram"));
+        event->add("value", JsonObject::newString(data->get("key")->stringValue()));
+
+        handleEvent("NOTIFY", event, aError);
+      }
+    }
+  }
+
+  // start new loop
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::poolState, this), 10 * Minute);
+}
 
 bool HomeConnectDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {

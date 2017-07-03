@@ -220,6 +220,12 @@ namespace p44 {
     virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
     virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError);
 
+    // Pool the state of the device and process the responses
+    void poolState();
+    virtual void poolStateStatusDone(JsonObjectPtr aResult, ErrorPtr aError);
+    virtual void poolStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aError);
+    virtual void poolStateProgramDone(JsonObjectPtr aResult, ErrorPtr aError);
+
     // The following methods are used to configure common states
     void configureOperationModeState(bool aHasInactive, bool aHasDelayedStart, bool aHasPause, bool aHasActionrequired,
         bool aHasError, bool aHasAborting);
