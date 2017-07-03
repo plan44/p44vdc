@@ -324,21 +324,34 @@ bool HomeConnectDevice::configureDevice()
   // - stop
   a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "stop current program", "DELETE:programs/active"));
   deviceActions->addAction(a);
-  // - power state
-  EnumValueDescriptorPtr powerState = EnumValueDescriptorPtr(new EnumValueDescriptor("powerState", true));
-  powerState->addEnum("On", 0, true); // on, default for action
-  powerState->addEnum("Standby", 1);
-  powerState->addEnum("Off", 2); // full off
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Power", "switch power state",
+  // - power state off
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOff", "Switch power state off",
     "PUT:settings/BSH.Common.Setting.PowerState:"
-    "{\"data\":{\"key\":\"BSH.Common.Setting.PowerState\",\"value\":\"BSH.Common.EnumType.PowerState.@{powerState}\"}}"
+    "{\"data\":{\"key\":\"BSH.Common.Setting.PowerState\",\"value\":\"BSH.Common.EnumType.PowerState.Off\"}}"
   ));
-  a->addParameter(powerState);
+  // - power state standby
+  deviceActions->addAction(a);
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.StandBy", "Switch power state standby",
+    "PUT:settings/BSH.Common.Setting.PowerState:"
+    "{\"data\":{\"key\":\"BSH.Common.Setting.PowerState\",\"value\":\"BSH.Common.EnumType.PowerState.Standby\"}}"
+  ));
+  // - power state on
+  deviceActions->addAction(a);
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOn", "Switch power state on",
+    "PUT:settings/BSH.Common.Setting.PowerState:"
+    "{\"data\":{\"key\":\"BSH.Common.Setting.PowerState\",\"value\":\"BSH.Common.EnumType.PowerState.On\"}}"
+  ));
   deviceActions->addAction(a);
 
   // program name
   programName = ValueDescriptorPtr(new TextValueDescriptor("ProgramName"));
   deviceProperties->addProperty(programName);
+
+  // common events
+  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramFinished", "Program Finished")));
+  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramAborted", "Program Aborted")));
+  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramStarted", "Program Started")));
+  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "AlarmClockElapsed", "Alarm Clock Elapsed")));
 
   // configured ok
   return true;
@@ -486,7 +499,12 @@ void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData,
         string operationValue = "Mode" + removeNamespace(value);
         if (operationMode->value()->setStringValue(operationValue)) {
           ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
-          operationMode->push();
+
+          if (operationValue == "ModeRun") {
+            operationMode->pushWithEvent(deviceEvents->getEvent("ProgramStarted"));
+          } else {
+            operationMode->push();
+          }
         }
       } else if ((key=="BSH.Common.Status.RemoteControlActive") && (remoteControl != NULL)) {
         string remoteControlValue;
@@ -537,6 +555,14 @@ void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData,
         if (programName->setStringValue(programNameValue)) {
           ALOG(LOG_NOTICE, "New Program Name State: '%s'", programNameValue.c_str());
         }
+      }
+    } else if (aEventType=="EVENT")  {
+      if (key=="BSH.Common.Event.ProgramFinished") {
+        operationMode->pushWithEvent(deviceEvents->getEvent("ProgramFinished"));
+      } else if (key=="BSH.Common.Event.ProgramAborted") {
+        operationMode->pushWithEvent(deviceEvents->getEvent("ProgramAborted"));
+      } else if (key=="BSH.Common.Event.AlarmClockElapsed") {
+        operationMode->pushWithEvent(deviceEvents->getEvent("AlarmClockElapsed"));
       }
     }
   }
