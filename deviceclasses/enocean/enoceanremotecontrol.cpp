@@ -421,7 +421,7 @@ void EnoceanSEHeatTubeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimm
     ChannelBehaviourPtr ch = output->getChannelByType(channeltype_default);
     if (ch->needsApplying()) {
       int lvl  = ch->getChannelValue();
-      setPowerState(lvl);
+      setPowerState(lvl, true);
       ch->channelValueApplied();
     }
   }
@@ -429,7 +429,7 @@ void EnoceanSEHeatTubeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimm
 }
 
 
-void EnoceanSEHeatTubeDevice::setPowerState(int aLevel)
+void EnoceanSEHeatTubeDevice::setPowerState(int aLevel, bool aInitial)
 {
   MainLoop::currentMainLoop().cancelExecutionTicket(applyRepeatTicket);
   // send the manufacturer specific telegram for setting power state:
@@ -451,7 +451,10 @@ void EnoceanSEHeatTubeDevice::setPowerState(int aLevel)
   getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
   // repeat non-zero power state level
   if (pwr!=0x00) {
-    applyRepeatTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanSEHeatTubeDevice::setPowerState, this, aLevel), 2 * Minute);
+    applyRepeatTicket = MainLoop::currentMainLoop().executeOnce(
+      boost::bind(&EnoceanSEHeatTubeDevice::setPowerState, this, aLevel, false),
+      aInitial ? 1*Second : 2 * Minute // quickly send mode a second time to compensate for bug in Tube FW, then repeat every 2 mins
+    );
   }
 }
 

@@ -203,7 +203,7 @@ namespace p44 {
 
   private:
 
-    void setPowerState(int aLevel);
+    void setPowerState(int aLevel, bool aInitial);
 
   };
 
