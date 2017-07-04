@@ -350,6 +350,7 @@ bool HomeConnectDevice::configureDevice()
   // common events
   deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramFinished", "Program Finished")));
   deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramAborted", "Program Aborted")));
+  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "LocallyOperated", "Locally Operated")));
   deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramStarted", "Program Started")));
   deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "AlarmClockElapsed", "Alarm Clock Elapsed")));
 
@@ -542,6 +543,8 @@ void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData,
           ALOG(LOG_NOTICE, "Door State: '%s'", doorValue.c_str());
           doorState->push();
         }
+      } else if ((key=="BSH.Common.Status.LocalControlActive") && (operationMode != NULL)) {
+        operationMode->pushWithEvent(deviceEvents->getEvent("LocallyOperated"));
       }
     } else if (aEventType=="NOTIFY") {
       if ((key=="BSH.Common.Setting.PowerState") && (powerState != NULL)) {
@@ -557,12 +560,14 @@ void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData,
         }
       }
     } else if (aEventType=="EVENT")  {
-      if (key=="BSH.Common.Event.ProgramFinished") {
-        operationMode->pushWithEvent(deviceEvents->getEvent("ProgramFinished"));
-      } else if (key=="BSH.Common.Event.ProgramAborted") {
-        operationMode->pushWithEvent(deviceEvents->getEvent("ProgramAborted"));
-      } else if (key=="BSH.Common.Event.AlarmClockElapsed") {
-        operationMode->pushWithEvent(deviceEvents->getEvent("AlarmClockElapsed"));
+      if (operationMode != NULL) {
+        if (key=="BSH.Common.Event.ProgramFinished") {
+          operationMode->pushWithEvent(deviceEvents->getEvent("ProgramFinished"));
+        } else if (key=="BSH.Common.Event.ProgramAborted") {
+          operationMode->pushWithEvent(deviceEvents->getEvent("ProgramAborted"));
+        } else if (key=="BSH.Common.Event.AlarmClockElapsed") {
+          operationMode->pushWithEvent(deviceEvents->getEvent("AlarmClockElapsed"));
+        }
       }
     }
   }
