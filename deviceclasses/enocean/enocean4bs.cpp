@@ -786,8 +786,8 @@ EnoceanDevicePtr EnoceanA52001Handler::newDevice(
     newDev->setColorClass(class_blue_climate);
     // function
     newDev->setFunctionDesc("heating valve actuator");
-    // climate control output
-    ClimateControlBehaviourPtr cb = ClimateControlBehaviourPtr(new ClimateControlBehaviour(*newDev.get(), climatedevice_heatingvalve));
+    // climate control output (assume possible use for heating and cooling (even if only applying absolute heating level value to valve)
+    ClimateControlBehaviourPtr cb = ClimateControlBehaviourPtr(new ClimateControlBehaviour(*newDev.get(), climatedevice_simple, hscapability_heatingAndCooling));
     cb->setGroupMembership(group_roomtemperature_control, true);
     cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName("valve");

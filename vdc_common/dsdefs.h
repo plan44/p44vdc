@@ -287,7 +287,7 @@ typedef enum {
   channeltype_p44_audio_volume = channeltype_custom_first+20, ///< // FIXME: p44-specific channel type for audio volume until dS specifies one
   channeltype_p44_audio_power_state = channeltype_custom_first+21, ///< audio power state (DsAudioPowerState) // FIXME: p44-specific channel type for audio power state until dS specifies one
   channeltype_p44_audio_content_source = channeltype_custom_first+22, ///< audio content source // FIXME: p44-specific channel type for audio content source until dS specifies one
-  channeltype_heatingLevel = channeltype_custom_first+23, ///< heatingLevel channel // FIXME: p44-specific channel type for heating level until dS specifies one
+  channeltype_p44_powerLevel = channeltype_custom_first+23, ///< power level for simple heating or cooling device (such as valve) // FIXME: p44-specific channel type for heating level until dS specifies one
 
   numChannelTypes = 240 // 0..239 are channel types
 } DsChannelTypeEnum;

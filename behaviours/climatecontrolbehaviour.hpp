@@ -41,17 +41,17 @@ namespace p44 {
   } FcuOperationMode;
 
 
-  class HeatingLevelChannel : public ChannelBehaviour
+  class PowerLevelChannel : public ChannelBehaviour
   {
     typedef ChannelBehaviour inherited;
 
   public:
-    HeatingLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput, "heatingLevel") { resolution = 1; /* 1% of full scale */ };
+    PowerLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerLevel") { resolution = 1; /* 1% of full scale */ };
 
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_heatingLevel; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_powerLevel; };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "heatingLevel"; };
-    virtual double getMin() P44_OVERRIDE { return 0; }; // heating is 0..100 (cooling would be -100..0)
+    virtual const char *getName() P44_OVERRIDE { return "Power level"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // 0..100 (cooling or heating)
     virtual double getMax() P44_OVERRIDE { return 100; };
     
   };
@@ -175,7 +175,7 @@ namespace p44 {
 
 
   typedef enum {
-    climatedevice_heatingvalve,
+    climatedevice_simple,
     climatedevice_fancoilunit
   } ClimateDeviceKind;
 
@@ -225,14 +225,14 @@ namespace p44 {
     /// @}
 
     /// channels
-    ChannelBehaviourPtr heatingLevel; // Valve only
+    ChannelBehaviourPtr powerLevel; // Valve only
     FlagChannelPtr powerState; // FCU only
     IndexChannelPtr operationMode; // FCU only
 
   public:
 
 
-    ClimateControlBehaviour(Device &aDevice, ClimateDeviceKind aKind);
+    ClimateControlBehaviour(Device &aDevice, ClimateDeviceKind aKind, VdcHeatingSystemCapability aDefaultHeatingSystemCapability);
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour

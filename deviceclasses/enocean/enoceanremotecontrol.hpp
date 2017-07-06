@@ -161,20 +161,6 @@ namespace p44 {
   };
 
 
-  /// digital switch channel
-  class SEHeatTubeChannel : public ChannelBehaviour
-  {
-    typedef ChannelBehaviour inherited;
-
-  public:
-    SEHeatTubeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "heatingLevel") { resolution = 33; /* 0, 33, 66, 100 */ };
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
-    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "heating level"; };
-    virtual double getMin() P44_OVERRIDE { return 0; }; // compatible with brightness: 0 to 100%
-    virtual double getMax() P44_OVERRIDE { return 100; };
-  };
-
 
   class EnoceanSEHeatTubeDevice : public EnoceanRemoteControlDevice
   {

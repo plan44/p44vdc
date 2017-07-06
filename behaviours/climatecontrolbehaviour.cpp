@@ -25,7 +25,7 @@
 using namespace p44;
 
 
-// MARK: ===== ClimateControlScene (single value, for heating valves)
+// MARK: ===== ClimateControlScene (single value, for heating (and simple cooling) valves or other heating/cooling devices)
 
 
 ClimateControlScene::ClimateControlScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -218,10 +218,10 @@ DsScenePtr FanCoilUnitDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 // MARK: ===== ClimateControlBehaviour
 
 
-ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceKind aKind) :
+ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceKind aKind, VdcHeatingSystemCapability aDefaultHeatingSystemCapability) :
   inherited(aDevice),
   climateDeviceKind(aKind),
-  heatingSystemCapability(hscapability_heatingAndCooling), // assume valve can handle both negative and positive values (even if only by applying absolute value to valve)
+  heatingSystemCapability(aDefaultHeatingSystemCapability),
   climateControlIdle(false), // assume valve active
   runProphylaxis(false), // no run scheduled
   zoneTemperatureUpdated(Never),
@@ -230,10 +230,10 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
   // Note: there is no default group for climate, depends on application and must be set when instantiating the behaviour
   // - add the output channels
   ChannelBehaviourPtr ch;
-  if (climateDeviceKind==climatedevice_heatingvalve) {
-    // output channel is a heating valve
-    heatingLevel = ChannelBehaviourPtr(new HeatingLevelChannel(*this));
-    addChannel(heatingLevel);
+  if (climateDeviceKind==climatedevice_simple) {
+    // output channel is a simple unipolar heating/simple cooling valve. The power level can also be cooling in simple cooling
+    powerLevel = ChannelBehaviourPtr(new PowerLevelChannel(*this));
+    addChannel(powerLevel);
   }
   else if (climateDeviceKind==climatedevice_fancoilunit) {
     // power state is the main channel
@@ -249,10 +249,10 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
 
 bool ClimateControlBehaviour::processControlValue(const string &aName, double aValue)
 {
-  if (aName=="heatingLevel" && climateDeviceKind==climatedevice_heatingvalve) {
+  if (aName=="heatingLevel" && climateDeviceKind==climatedevice_simple) {
     if (isMember(group_roomtemperature_control) && isEnabled()) {
-      // if we have a heating level channel, "heatingLevel" will control it
-      ChannelBehaviourPtr cb = getChannelByType(channeltype_heatingLevel);
+      // if we have a heating/cooling power level channel, "heatingLevel" will control it
+      ChannelBehaviourPtr cb = getChannelByType(channeltype_p44_powerLevel);
       if (cb) {
         // clip to -100..0..100 range
         if (aValue<-100) aValue = -100;
@@ -323,7 +323,7 @@ Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
       return no;
     case modelFeature_valvetype:
       // only for heating valve devices
-      return climateDeviceKind==climatedevice_heatingvalve ? yes : no;
+      return climateDeviceKind==climatedevice_simple ? yes : no;
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
@@ -343,7 +343,7 @@ void ClimateControlBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   ClimateControlScenePtr valveScene = boost::dynamic_pointer_cast<ClimateControlScene>(aScene);
   if (valveScene) {
     // heating level
-    heatingLevel->setChannelValueIfNotDontCare(aScene, valveScene->value, 0, 0, true);
+    powerLevel->setChannelValueIfNotDontCare(aScene, valveScene->value, 0, 0, true);
   }
 }
 
@@ -362,8 +362,8 @@ void ClimateControlBehaviour::saveChannelsToScene(DsScenePtr aScene)
   ClimateControlScenePtr valveScene = boost::dynamic_pointer_cast<ClimateControlScene>(aScene);
   if (valveScene) {
     // heating level
-    valveScene->setPVar(valveScene->value, heatingLevel->getChannelValue());
-    valveScene->setSceneValueFlags(heatingLevel->getChannelIndex(), valueflags_dontCare, false);
+    valveScene->setPVar(valveScene->value, powerLevel->getChannelValue());
+    valveScene->setSceneValueFlags(powerLevel->getChannelIndex(), valueflags_dontCare, false);
   }
 }
 
@@ -375,7 +375,7 @@ void ClimateControlBehaviour::saveChannelsToScene(DsScenePtr aScene)
 bool ClimateControlBehaviour::applyScene(DsScenePtr aScene)
 {
   // check the special hardwired scenes
-  if (climateDeviceKind==climatedevice_heatingvalve && isMember(group_roomtemperature_control)) {
+  if (climateDeviceKind==climatedevice_simple && isMember(group_roomtemperature_control)) {
     SceneCmd sceneCmd = aScene->sceneCmd;
     switch (sceneCmd) {
       case scene_cmd_climatecontrol_enable:

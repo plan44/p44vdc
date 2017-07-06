@@ -901,7 +901,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     // - valve needs climate control scene table (ClimateControlScene)
     installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*this)));
     // - create climate control valve output
-    OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_heatingvalve));
+    OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_simple, hscapability_heatingAndCooling));
     cb->setGroupMembership(defaultGroup, true); // put into room temperature control group by default, NOT into standard blue)
     cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
@@ -913,7 +913,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     // - FCU device settings with scene table
     installSettings(DeviceSettingsPtr(new FanCoilUnitDeviceSettings(*this)));
     // - create climate control fan coil unit output
-    OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_fancoilunit));
+    OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_fancoilunit, hscapability_heatingAndCooling));
     cb->setGroupMembership(defaultGroup, true); // put into room temperature control group...
     cb->setHardwareOutputConfig(outputFunction_internallyControlled, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
