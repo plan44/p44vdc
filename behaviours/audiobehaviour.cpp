@@ -41,7 +41,7 @@ double AudioScene::sceneValue(int aChannelIndex)
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
     case channeltype_p44_audio_content_source: return contentSource;
-    case channeltype_p44_audio_power_state: return powerState;
+    case channeltype_power_state: return powerState;
     default: return inherited::sceneValue(aChannelIndex);
   }
   return 0;
@@ -53,7 +53,7 @@ void AudioScene::setSceneValue(int aChannelIndex, double aValue)
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
     case channeltype_p44_audio_content_source: setPVar(contentSource, (uint32_t)aValue); break;
-    case channeltype_p44_audio_power_state: setPVar(powerState, (DsAudioPowerState)aValue); break;
+    case channeltype_power_state: setPVar(powerState, (DsAudioPowerState)aValue); break;
     default: inherited::setSceneValue(aChannelIndex, aValue); break;
   }
 }
@@ -512,7 +512,7 @@ void AudioBehaviour::saveChannelsToScene(DsScenePtr aScene)
 bool AudioBehaviour::canDim(ChannelBehaviourPtr aChannel)
 {
   // only devices that are on can be dimmed (volume changed)
-  if (aChannel->getChannelType()==channeltype_p44_audio_volume) {
+  if (aChannel->getChannelType()==channeltype_audio_volume) {
     return powerState->getChannelValue()==dsAudioPower_on; // dimmable if on
   }
   else {

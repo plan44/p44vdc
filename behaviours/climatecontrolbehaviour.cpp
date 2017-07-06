@@ -121,7 +121,7 @@ double FanCoilUnitScene::sceneValue(int aChannelIndex)
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
     case channeltype_fcu_operation_mode: return operationMode;
-    case channeltype_fcu_power_state: return powerState ? 1 : 0;
+    case channeltype_power_state: return powerState ? 1 : 0;
   }
   return 0;
 }
@@ -135,7 +135,7 @@ void FanCoilUnitScene::setSceneValue(int aChannelIndex, double aValue)
     case channeltype_fcu_operation_mode:
       setPVar(operationMode, (FcuOperationMode)aValue);
       break;
-    case channeltype_fcu_power_state:
+    case channeltype_power_state:
       setPVar(powerState, aValue>0);
       break;
   }
@@ -252,7 +252,7 @@ bool ClimateControlBehaviour::processControlValue(const string &aName, double aV
   if (aName=="heatingLevel" && climateDeviceKind==climatedevice_simple) {
     if (isMember(group_roomtemperature_control) && isEnabled()) {
       // if we have a heating/cooling power level channel, "heatingLevel" will control it
-      ChannelBehaviourPtr cb = getChannelByType(channeltype_p44_powerLevel);
+      ChannelBehaviourPtr cb = getChannelByType(channeltype_heating_power);
       if (cb) {
         // clip to -100..0..100 range
         if (aValue<-100) aValue = -100;

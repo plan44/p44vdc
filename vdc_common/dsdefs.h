@@ -271,7 +271,10 @@ typedef enum {
   channeltype_airflow_direction = 13, ///< airflow direction (DsVentilationDirectionState)
   channeltype_airflow_flap_position = 14, ///< airflow flap position (angle), 0..100 of device's available range
   channeltype_airflow_louver_position = 15, ///< louver position (angle), 0..100 of device's available range
-
+  channeltype_heating_power = 16, ///< power level for simple heating or cooling device (such as valve)
+  channeltype_cooling_capacity = 17, ///< cooling capacity
+  channeltype_audio_volume = 18, /// audio volume
+  channeltype_power_state = 19, ///< FCU custom channel: power state
   channeltype_airflow_louver_auto = 20, ///< louver automatic mode (0=off, >0=on)
   channeltype_airflow_intensity_auto = 21, ///< airflow intensity automatic mode (0=off, >0=on)
 
@@ -279,15 +282,11 @@ typedef enum {
   channeltype_custom_last = 239, ///< last device-specific channel
 
   channeltype_fcu_operation_mode = channeltype_custom_first+0, ///< FCU custom channel: operating mode
-  channeltype_fcu_power_state = channeltype_custom_first+1, ///< FCU custom channel: power state
 
   channeltype_p44_position_v = channeltype_custom_first+0, ///< vertical position (e.g for moving lights)
   channeltype_p44_position_h = channeltype_custom_first+1, ///< horizontal position (e.g for moving lights)
 
-  channeltype_p44_audio_volume = channeltype_custom_first+20, ///< // FIXME: p44-specific channel type for audio volume until dS specifies one
-  channeltype_p44_audio_power_state = channeltype_custom_first+21, ///< audio power state (DsAudioPowerState) // FIXME: p44-specific channel type for audio power state until dS specifies one
   channeltype_p44_audio_content_source = channeltype_custom_first+22, ///< audio content source // FIXME: p44-specific channel type for audio content source until dS specifies one
-  channeltype_p44_powerLevel = channeltype_custom_first+23, ///< power level for simple heating or cooling device (such as valve) // FIXME: p44-specific channel type for heating level until dS specifies one
 
   numChannelTypes = 240 // 0..239 are channel types
 } DsChannelTypeEnum;

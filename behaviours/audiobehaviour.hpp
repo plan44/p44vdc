@@ -37,13 +37,13 @@ namespace p44 {
     double dimPerMS;
 
   public:
-    AudioVolumeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "volume")
+    AudioVolumeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "audioVolume")
     {
       resolution = 0.1; // arbitrary, 1:1000 seems ok
       dimPerMS = (getMax()-getMin())/7000; // standard 7 seconds for full scale by default
     };
 
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_audio_volume; }; ///< the dS channel type
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_audio_volume; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "volume"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS volume goes from 0 to 100%
@@ -64,7 +64,7 @@ namespace p44 {
   public:
     AudioPowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { setNumIndices(numDsAudioPowerStates); }; ///< see DsAudioPowerState enum
 
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_audio_power_state; }; ///< the dS channel type
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_power_state; }; ///< the dS channel type
     virtual const char *getName() P44_OVERRIDE { return "powerstate"; };
 
   };

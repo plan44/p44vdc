@@ -46,11 +46,11 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    PowerLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerLevel") { resolution = 1; /* 1% of full scale */ };
+    PowerLevelChannel(OutputBehaviour &aOutput) : inherited(aOutput, "heatingPower") { resolution = 1; /* 1% of full scale */ };
 
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_powerLevel; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_heating_power; };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "Power level"; };
+    virtual const char *getName() P44_OVERRIDE { return "power level"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // 0..100 (cooling or heating)
     virtual double getMax() P44_OVERRIDE { return 100; };
     
@@ -77,7 +77,7 @@ namespace p44 {
   public:
     FcuPowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { };
 
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_fcu_power_state; }; ///< the dS channel type
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_power_state; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "FCU power state"; };
   };

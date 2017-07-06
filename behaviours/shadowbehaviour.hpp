@@ -37,7 +37,7 @@ namespace p44 {
     MLMicroSeconds fullRangeTime;
 
   public:
-    ShadowPositionChannel(OutputBehaviour &aOutput) : inherited(aOutput, "position")
+    ShadowPositionChannel(OutputBehaviour &aOutput) : inherited(aOutput, "shadePositionOutside")
     {
       resolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
       fullRangeTime = 50*Second; // just an average blind full range time
@@ -48,7 +48,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_shade_position_outside; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "position"; };
+    virtual const char *getName() P44_OVERRIDE { return "shade position (outside)"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
     virtual double getDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
@@ -64,7 +64,7 @@ namespace p44 {
     MLMicroSeconds fullRangeTime;
 
   public:
-    ShadowAngleChannel(OutputBehaviour &aOutput) : inherited(aOutput, "angle")
+    ShadowAngleChannel(OutputBehaviour &aOutput) : inherited(aOutput, "shadeOpeningAngleOutside")
     {
       resolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
       fullRangeTime = 1.5*Second; // just an average blind angle turn time
@@ -75,7 +75,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_shade_angle_outside; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "angle"; };
+    virtual const char *getName() P44_OVERRIDE { return "shade angle (outside)"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
     virtual double getDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime

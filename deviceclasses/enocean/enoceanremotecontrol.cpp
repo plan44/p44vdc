@@ -228,7 +228,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         o->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, 900); // 900W according to data sheet
         o->setGroupMembership(group_blue_heating, true); // put into simple heating group by default (not room temp control, but that would be possible also)
         // set resolution on channel
-        ChannelBehaviourPtr ch = o->getChannelByType(channeltype_p44_powerLevel);
+        ChannelBehaviourPtr ch = o->getChannelByType(channeltype_heating_power);
         if (ch) {
           ch->setResolution(33.3); // 3 stages only, 0, 33, 66, 100
         }
