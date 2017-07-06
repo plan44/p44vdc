@@ -88,7 +88,7 @@ namespace p44 {
     /// @param aName the name of the action.
     /// @param aDescription a description string for the action.
     /// @param aApiCommandTemplate the API command template to use for this action
-    HomeConnectAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aApiCommandTemplate);
+    HomeConnectAction(SingleDevice &aSingleDevice, const string& aName, const string& aDescription, const string& aApiCommandTemplate);
 
     HomeConnectDevice &getHomeConnectDevice();
 
@@ -112,17 +112,7 @@ namespace p44 {
     friend class HomeConnectAction;
 
   protected:
-    typedef enum {
-      homeconnect_unknown,
-      homeconnect_coffeemaker,
-      homeconnect_oven,
-      homeconnect_dishwasher,
-      homeconnect_washer,
-      homeconnect_dryer,
-      homeconnect_fridge,
-    } HomeConnectDeviceType;
 
-    HomeConnectDeviceType hcDevType; ///< home connect device type
     string haId; ///< the home appliance ID
     string model; ///< the model name for the device
     string modelGuid; ///< the model guid for the device

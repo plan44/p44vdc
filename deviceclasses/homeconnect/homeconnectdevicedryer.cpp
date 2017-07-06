@@ -28,7 +28,7 @@ namespace p44 {
 HomeConnectDeviceDryer::HomeConnectDeviceDryer(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  hcDevType = homeconnect_dryer;
+
 }
 
 HomeConnectDeviceDryer::~HomeConnectDeviceDryer()

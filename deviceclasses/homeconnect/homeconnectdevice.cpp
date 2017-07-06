@@ -88,7 +88,7 @@ void HomeConnectScene::setDefaultSceneValues(SceneNo aSceneNo)
 // MARK: ====== HomeConnectAction
 
 
-HomeConnectAction::HomeConnectAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aApiCommandTemplate) :
+HomeConnectAction::HomeConnectAction(SingleDevice &aSingleDevice, const string& aName, const string& aDescription, const string& aApiCommandTemplate) :
   inherited(aSingleDevice, aName, aDescription),
   apiCommandTemplate(aApiCommandTemplate)
 {
@@ -244,8 +244,7 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
 
 
 HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-  inherited(aVdcP),
-  hcDevType(homeconnect_unknown)
+  inherited(aVdcP)
 {
   // home connect appliances are single devices
   setColorClass(class_white_singledevices);
