@@ -30,6 +30,7 @@
 
 #if ENABLE_ENOCEAN
 
+#include "climatecontrolbehaviour.hpp"
 #include "shadowbehaviour.hpp"
 #include "lightbehaviour.hpp"
 #include "enoceanvdc.hpp"
@@ -211,7 +212,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         // 4-Stage heat tube device
         newDev = EnoceanDevicePtr(new EnoceanSEHeatTubeDevice(aVdcP));
         // standard single-value scene table (SimpleScene)
-        newDev->installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*newDev)));
+        newDev->installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*newDev)));
         // assign channel and address
         newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
         // assign EPP information
@@ -223,10 +224,14 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         // is always updateable (no need to wait for incoming data)
         newDev->setAlwaysUpdateable();
         // - add standard output behaviour
-        OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*newDev.get()));
+        OutputBehaviourPtr o = OutputBehaviourPtr(new ClimateControlBehaviour(*newDev.get(), climatedevice_simple, hscapability_heatingOnly));
         o->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, 900); // 900W according to data sheet
-        o->setGroupMembership(group_blue_heating, true); // put into simple heating group by default
-        o->addChannel(ChannelBehaviourPtr(new SEHeatTubeChannel(*o)));
+        o->setGroupMembership(group_blue_heating, true); // put into simple heating group by default (not room temp control, but that would be possible also)
+        // set resolution on channel
+        ChannelBehaviourPtr ch = o->getChannelByType(channeltype_p44_powerLevel);
+        if (ch) {
+          ch->setResolution(33.3); // 3 stages only, 0, 33, 66, 100
+        }
         // does not need a channel handler at all, just add behaviour
         newDev->addBehaviour(o);
         // count it
