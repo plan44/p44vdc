@@ -81,13 +81,10 @@ bool HomeConnectDeviceDishWasher::configureDevice()
   addAction("std.Quick45",   "Quick 45C",   "Quick45", delayedStart);
 
 
-  ValueDescriptorPtr valueDescriptor = ValueDescriptorPtr(
+  delayedStartProp = ValueDescriptorPtr(
     new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1, true));
 
-
-  delayedStartState = DeviceStatePtr(new DeviceState(*this, "DelayedStart", "Delayed Start", valueDescriptor,
-		          boost::bind(&HomeConnectDeviceDishWasher::stateChanged, this, _1, _2)));
-  deviceStates->addState(delayedStartState);
+  deviceProperties->addProperty(delayedStartProp, true);
 
   return inherited::configureDevice();
 }
@@ -100,6 +97,21 @@ void HomeConnectDeviceDishWasher::stateChanged(DeviceStatePtr aChangedState, Dev
 void HomeConnectDeviceDishWasher::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
   ALOG(LOG_INFO, "DishWasher Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+
+  JsonObjectPtr oKey;
+  JsonObjectPtr oValue;
+
+  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
+    return;
+  }
+
+  string key = (oKey != NULL) ? oKey->stringValue() : "";
+
+  if (aEventType == "NOTIFY" && key == "BSH.Common.Option.StartInRelative") {
+    int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
+    delayedStartProp->setInt32Value(value);
+    return;
+  }
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
