@@ -480,7 +480,7 @@ void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryRes
     boost::bind(&HomeConnectDevice::handleEvent, this, _1, _2, _3))
   );
   // start pooling cycle
-  poolState();
+  pollState();
   // FIXME: implement
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
@@ -573,14 +573,14 @@ void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData,
   }
 }
 
-void HomeConnectDevice::poolState()
+void HomeConnectDevice::pollState()
 {
   // Start query the statuses and settings of the device
   homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/status", haId.c_str()).c_str(),
-      boost::bind(&HomeConnectDevice::poolStateStatusDone, this, _1, _2));
+      boost::bind(&HomeConnectDevice::pollStateStatusDone, this, _1, _2));
 }
 
-void HomeConnectDevice::poolStateStatusDone(JsonObjectPtr aResult, ErrorPtr aError)
+void HomeConnectDevice::pollStateStatusDone(JsonObjectPtr aResult, ErrorPtr aError)
 {
   // if we got proper response then analyze it
   if ( (aResult != NULL) && (Error::isOK(aError)) ) {
@@ -598,10 +598,10 @@ void HomeConnectDevice::poolStateStatusDone(JsonObjectPtr aResult, ErrorPtr aErr
   }
 
   homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/settings", haId.c_str()).c_str(),
-      boost::bind(&HomeConnectDevice::poolStateSettingsDone, this, _1, _2));
+      boost::bind(&HomeConnectDevice::pollStateSettingsDone, this, _1, _2));
 }
 
-void HomeConnectDevice::poolStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aError)
+void HomeConnectDevice::pollStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aError)
 {
   // if we got proper response then analyze it
   if ( (aResult != NULL) && (Error::isOK(aError)) ) {
@@ -619,10 +619,10 @@ void HomeConnectDevice::poolStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aE
   }
 
   homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/programs/selected", haId.c_str()).c_str(),
-      boost::bind(&HomeConnectDevice::poolStateProgramDone, this, _1, _2));
+      boost::bind(&HomeConnectDevice::pollStateProgramDone, this, _1, _2));
 }
 
-void HomeConnectDevice::poolStateProgramDone(JsonObjectPtr aResult, ErrorPtr aError)
+void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aError)
 {
   if ( (aResult != NULL) && (Error::isOK(aError)) ) {
     JsonObjectPtr data = aResult->get("data");
@@ -641,7 +641,7 @@ void HomeConnectDevice::poolStateProgramDone(JsonObjectPtr aResult, ErrorPtr aEr
   }
 
   // start new loop
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::poolState, this), 10 * Minute);
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::pollState, this), 10 * Minute);
 }
 
 bool HomeConnectDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
