@@ -80,6 +80,7 @@ bool HomeConnectDeviceDryer::configureDevice()
   dryingTargetCottonSynthetic->addEnum("CupboardDryPlus", i++, false);
 
   EnumValueDescriptorPtr dryingTargetMix = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
+  i = 0;
   dryingTargetMix->addEnum("IronDry", i++, false);
   dryingTargetMix->addEnum("CupboardDry", i++, false);
 
@@ -88,11 +89,13 @@ bool HomeConnectDeviceDryer::configureDevice()
   addAction("std.Mix",       "Mix",       "Mix",       dryingTargetMix);
 
 
-  dryingTargetState = DeviceStatePtr(new DeviceState(*this, "DryingTarget", "Drying Target", dryingTargetCottonSynthetic,
-		          boost::bind(&HomeConnectDeviceDryer::stateChanged, this, _1, _2)));
-  deviceStates->addState(dryingTargetState);
+  dryingTargetProp = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
+  i = 0;
+  dryingTargetCottonSynthetic->addEnum("IronDry", i++, false);
+  dryingTargetCottonSynthetic->addEnum("CupboardDry", i++, false);
+  dryingTargetCottonSynthetic->addEnum("CupboardDryPlus", i++, false);
 
-
+  deviceProperties->addProperty(dryingTargetProp, true);
   // create states
   configureOperationModeState(false, true, true, true, true, false);
   configureRemoteControlState(true);
@@ -111,12 +114,28 @@ void HomeConnectDeviceDryer::stateChanged(DeviceStatePtr aChangedState, DeviceEv
 void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
   ALOG(LOG_INFO, "Dryer Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+
+  JsonObjectPtr oKey;
+  JsonObjectPtr oValue;
+
+  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
+    return;
+  }
+
+  string key = (oKey != NULL) ? oKey->stringValue() : "";
+
+  if (aEventType == "NOTIFY" && key == "BaValueSH.Common.Option.DryingTarget") {
+    string value = (oValue != NULL) ? oValue->stringValue() : "";
+    dryingTargetProp->setStringValue(value);
+    return;
+  }
+
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
 void HomeConnectDeviceDryer::addAction(const string& aName, const string& aDescription, const string& aApiCommandSuffix, ValueDescriptorPtr aParameter)
 {
-  HomeConnectCommandBuilder builder(string("LaundryCare.Dryer.Program.") + aApiCommandSuffix);
+  HomeConnectCommandBuilder builder("LaundryCare.Dryer.Program." + aApiCommandSuffix);
   builder.addOption("BSH.Common.Option.DryingTarget", "@{DryingTarget%%0}");
 
   HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, builder.build()));
