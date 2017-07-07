@@ -114,15 +114,12 @@ void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEvent
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
-void HomeConnectDeviceDryer::addAction(const string& aName, const string& aDescription, const char* aApiCommandSuffix, ValueDescriptorPtr aParameter)
+void HomeConnectDeviceDryer::addAction(const string& aName, const string& aDescription, const string& aApiCommandSuffix, ValueDescriptorPtr aParameter)
 {
-  static const string cmdTemplate = "PUT:programs/active:{\"data\":{\"key\":\"LaundryCare.Dryer.Program.%s\","
-    "\"options\":["
-	"{ \"key\":\"BSH.Common.Option.DryingTarget\",\"value\":@{DryingTarget%%0}}"
-	"]}}";
+  HomeConnectCommandBuilder builder(string("LaundryCare.Dryer.Program.") + aApiCommandSuffix);
+  builder.addOption("BSH.Common.Option.DryingTarget", "@{DryingTarget%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(
-    new HomeConnectAction(*this, aName, aDescription, string_format(cmdTemplate.c_str(), aApiCommandSuffix)));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, builder.build()));
   action->addParameter(aParameter);
   deviceActions->addAction(action);
 }

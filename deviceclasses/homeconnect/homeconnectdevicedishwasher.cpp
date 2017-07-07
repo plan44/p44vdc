@@ -86,11 +86,6 @@ bool HomeConnectDeviceDishWasher::configureDevice()
 
   deviceProperties->addProperty(delayedStartProp, true);
 
-  delayedStartProp = ValueDescriptorPtr(
-    new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1, true));
-
-  deviceProperties->addProperty(delayedStartProp, true);
-
   return inherited::configureDevice();
 }
 
