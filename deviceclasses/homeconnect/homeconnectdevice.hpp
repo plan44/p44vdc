@@ -29,6 +29,7 @@
 #include "jsonobject.hpp"
 #include "simplescene.hpp"
 #include "homeconnectcomm.hpp"
+#include <sstream>
 
 using namespace std;
 
@@ -104,6 +105,46 @@ namespace p44 {
   typedef boost::intrusive_ptr<HomeConnectAction> HomeConnectActionPtr;
   
 
+  class HomeConnectCommandBuilder
+  {
+  private:
+    string programName;
+
+    map<string, string> options;
+  public:
+    HomeConnectCommandBuilder(string aProgramName) : programName(aProgramName)
+    {}
+
+    void addOption(string key, string value)
+    {
+    	options[key] = value;
+    }
+
+    string build()
+    {
+      stringstream ss;
+
+      ss << "PUT:programs/active:{\"data\":{\"key\":\"" << programName << "\",";
+
+      if(options.size() != 0)
+      {
+
+        ss << "\"options\":[";
+
+        for(map<string, string>::iterator it = options.begin(); it != options.end(); it++)
+        {
+          ss << "{ \"key\":\"" << it->first << "\",\"value\":" << it->second << "}";
+        }
+
+        ss.get();
+        ss << "]";
+      }
+
+      ss << "}}";
+      return ss.str();
+    }
+
+  };
 
   typedef boost::intrusive_ptr<HomeConnectDevice> HomeConnectDevicePtr;
   class HomeConnectDevice : public SingleDevice
