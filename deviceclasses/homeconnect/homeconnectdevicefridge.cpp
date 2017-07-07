@@ -38,8 +38,20 @@ HomeConnectDeviceFridge::~HomeConnectDeviceFridge()
 
 bool HomeConnectDeviceFridge::configureDevice()
 {
-  configureDoorState(false);
-  configurePowerState(false, false);
+  // configure door state
+  DoorStateConfiguration dsConfig = { 0 };
+  dsConfig.hasOpen = true;
+  dsConfig.hasClosed = true;
+  dsConfig.hasLocked = false;
+  configureDoorState(dsConfig);
+
+  // configure power state
+  PowerStateConfiguration psConfig = { 0 };
+  psConfig.hasOff = false;
+  psConfig.hasOn = true;
+  psConfig.hasStandby = false;
+  configurePowerState(psConfig);
+
   return inherited::configureDevice();
 }
 

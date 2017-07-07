@@ -358,88 +358,106 @@ bool HomeConnectDevice::configureDevice()
   return true;
 }
 
-// TODO: change for enum values? flags? leave the bool flags?
-void HomeConnectDevice::configureOperationModeState(bool aHasInactive, bool aHasDelayedStart, bool aHasPause,
-    bool aHasActionrequired, bool aHasError, bool aHasAborting)
+void HomeConnectDevice::configureOperationModeState(const OperationModeConfiguration& aConfiguration)
 {
   // - operation mode
-  EnumValueDescriptor *es = new EnumValueDescriptor("OperationMode", true);
+  EnumValueDescriptor *omes = new EnumValueDescriptor("OperationMode", true);
   int currentEnumValue = 0;
 
-  if (aHasInactive) {
-    es->addEnum("ModeInactive", currentEnumValue++);
+  if (aConfiguration.hasInactive) {
+    omes->addEnum("ModeInactive", currentEnumValue++);
   }
-  es->addEnum("ModeReady", currentEnumValue++);
-  if (aHasDelayedStart) {
-    es->addEnum("ModeDelayedStart", currentEnumValue++);
+  if (aConfiguration.hasReady) {
+    omes->addEnum("ModeReady", currentEnumValue++);
   }
-  es->addEnum("ModeRun", currentEnumValue++);
-  if (aHasPause) {
-    es->addEnum("ModePause", currentEnumValue++);
+  if (aConfiguration.hasDelayedStart) {
+    omes->addEnum("ModeDelayedStart", currentEnumValue++);
   }
-  if (aHasActionrequired) {
-      es->addEnum("ModeActionRequired", currentEnumValue++);
+  if (aConfiguration.hasRun) {
+    omes->addEnum("ModeRun", currentEnumValue++);
   }
-  es->addEnum("ModeFinished", currentEnumValue++);
-  if (aHasError) {
-    es->addEnum("ModeError", currentEnumValue++);
+  if (aConfiguration.hasPause) {
+    omes->addEnum("ModePause", currentEnumValue++);
   }
-  if (aHasAborting) {
-    es->addEnum("ModeAborting", currentEnumValue++);
+  if (aConfiguration.hasActionrequired) {
+    omes->addEnum("ModeActionRequired", currentEnumValue++);
+  }
+  if (aConfiguration.hasFinished) {
+    omes->addEnum("ModeFinished", currentEnumValue++);
+  }
+  if (aConfiguration.hasError) {
+    omes->addEnum("ModeError", currentEnumValue++);
+  }
+  if (aConfiguration.hasAborting) {
+    omes->addEnum("ModeAborting", currentEnumValue++);
   }
   operationMode = DeviceStatePtr(
-      new DeviceState(*this, "OperationMode", "Status", ValueDescriptorPtr(es),
+      new DeviceState(*this, "OperationMode", "Status", ValueDescriptorPtr(omes),
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(operationMode);
 }
 
-void HomeConnectDevice::configureRemoteControlState(bool aHasControlStart)
+void HomeConnectDevice::configureRemoteControlState(const RemoteControlConfiguration& aConfiguration)
 {
   // - remote control
-  EnumValueDescriptor *es = new EnumValueDescriptor("RemoteControl", true);
+  EnumValueDescriptor *rces = new EnumValueDescriptor("RemoteControl", true);
+  int currentEnumValue = 0;
 
-  es->addEnum("RemoteControlInactive", 0);
-  es->addEnum("RemoteStartActive", 1);
-  if (aHasControlStart) {
-    es->addEnum("RemoteControlActive", 2);
+  if (aConfiguration.hasControlInactive) {
+    rces->addEnum("RemoteControlInactive", currentEnumValue++);
   }
+  if (aConfiguration.hasControlActive) {
+    rces->addEnum("RemoteControlActive", currentEnumValue++);
+  }
+  if (aConfiguration.hasStartActive) {
+    rces->addEnum("RemoteStartActive", currentEnumValue++);
+  }
+
   remoteControl = DeviceStatePtr(
-      new DeviceState(*this, "RemoteControl", "Remote Control", ValueDescriptorPtr(es),
+      new DeviceState(*this, "RemoteControl", "Remote Control", ValueDescriptorPtr(rces),
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(remoteControl);
 }
 
-void HomeConnectDevice::configureDoorState(bool aHasLocked)
+void HomeConnectDevice::configureDoorState(const DoorStateConfiguration& aConfiguration)
 {
-  // - remote control
-  EnumValueDescriptor *es = new EnumValueDescriptor("DoorState", true);
-  es->addEnum("DoorOpen", 0);
-  es->addEnum("DoorClosed", 1);
-  if (aHasLocked) {
-    es->addEnum("DoorLocked", 2);
+  // - door state
+  EnumValueDescriptor *dses = new EnumValueDescriptor("DoorState", true);
+  int currentEnumValue = 0;
+
+  if (aConfiguration.hasOpen) {
+    dses->addEnum("DoorOpen", currentEnumValue++);
+  }
+  if (aConfiguration.hasClosed) {
+    dses->addEnum("DoorClosed", currentEnumValue++);
+  }
+  if (aConfiguration.hasLocked) {
+    dses->addEnum("DoorLocked", currentEnumValue++);
   }
   doorState = DeviceStatePtr(
-      new DeviceState(*this, "DoorState", "Door State", ValueDescriptorPtr(es),
+      new DeviceState(*this, "DoorState", "Door State", ValueDescriptorPtr(dses),
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(doorState);
 }
 
-void HomeConnectDevice::configurePowerState(bool aHasOff, bool aHasStandby)
+void HomeConnectDevice::configurePowerState(const PowerStateConfiguration& aConfiguration)
 {
   // - operation mode
-  EnumValueDescriptor *es = new EnumValueDescriptor("state", true);
+  EnumValueDescriptor *pses = new EnumValueDescriptor("PowerState", true);
   int currentEnumValue = 0;
 
-  if (aHasOff) {
-    es->addEnum("PowerOff", currentEnumValue++, true); // init state with this value
+  if (aConfiguration.hasOff) {
+    pses->addEnum("PowerOff", currentEnumValue++);
   }
-  es->addEnum("PowerOn", currentEnumValue++);
-  if (aHasStandby) {
-    es->addEnum("PowerStandby", currentEnumValue++);
+  if (aConfiguration.hasOn) {
+    pses->addEnum("PowerOn", currentEnumValue++);
+  }
+  if (aConfiguration.hasStandby) {
+    pses->addEnum("PowerStandby", currentEnumValue++);
   }
 
   powerState = DeviceStatePtr(
-      new DeviceState(*this, "PowerState", "Power State", ValueDescriptorPtr(es),
+      new DeviceState(*this, "PowerState", "Power State", ValueDescriptorPtr(pses),
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(powerState);
 }
@@ -453,10 +471,6 @@ void HomeConnectDevice::stateChanged(DeviceStatePtr aChangedState, DeviceEventsL
   );
 }
 
-
-
-
-
 HomeConnectVdc &HomeConnectDevice::homeConnectVdc()
 {
   return *(static_cast<HomeConnectVdc *>(vdcP));
@@ -467,9 +481,6 @@ HomeConnectComm &HomeConnectDevice::homeConnectComm()
 {
   return (static_cast<HomeConnectVdc *>(vdcP))->homeConnectComm;
 }
-
-
-
 
 void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {

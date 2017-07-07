@@ -80,11 +80,39 @@ bool HomeConnectDeviceOven::configureDevice()
   a->addParameter(duration);
   deviceActions->addAction(a);
 
-  // create states
-  configureOperationModeState(true, true, true, true, true, true);
-  configureRemoteControlState(true);
-  configureDoorState(true);
-  configurePowerState(false, true);
+  // configure operation mode
+  OperationModeConfiguration omConfig = { 0 };
+  omConfig.hasInactive = true;
+  omConfig.hasReady = true;
+  omConfig.hasDelayedStart = true;
+  omConfig.hasRun = true;
+  omConfig.hasPause = true;
+  omConfig.hasActionrequired = true;
+  omConfig.hasFinished = true;
+  omConfig.hasError = true;
+  omConfig.hasAborting = true;
+  configureOperationModeState(omConfig);
+
+  // configure remote control
+  RemoteControlConfiguration rcConfig = { 0 };
+  rcConfig.hasControlInactive = true;
+  rcConfig.hasControlActive = true;
+  rcConfig.hasStartActive = true;
+  configureRemoteControlState(rcConfig);
+
+  // configure door state
+  DoorStateConfiguration dsConfig = { 0 };
+  dsConfig.hasOpen = true;
+  dsConfig.hasClosed = true;
+  dsConfig.hasLocked = true;
+  configureDoorState(dsConfig);
+
+  // configure power state
+  PowerStateConfiguration psConfig = { 0 };
+  psConfig.hasOff = false;
+  psConfig.hasOn = true;
+  psConfig.hasStandby = true;
+  configurePowerState(psConfig);
 
   return inherited::configureDevice();
 }

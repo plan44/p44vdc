@@ -215,6 +215,36 @@ namespace p44 {
 
   protected:
 
+    typedef struct {
+      bool hasInactive : 1;
+      bool hasReady : 1;
+      bool hasDelayedStart : 1;
+      bool hasRun : 1;
+      bool hasPause : 1;
+      bool hasActionrequired : 1;
+      bool hasFinished : 1;
+      bool hasError : 1;
+      bool hasAborting : 1;
+    } OperationModeConfiguration;
+
+    typedef struct {
+      bool hasControlInactive : 1;
+      bool hasControlActive : 1;
+      bool hasStartActive : 1;
+    } RemoteControlConfiguration;
+
+    typedef struct {
+      bool hasOpen : 1;
+      bool hasClosed : 1;
+      bool hasLocked : 1;
+    } DoorStateConfiguration;
+
+    typedef struct {
+      bool hasOff : 1;
+      bool hasOn : 1;
+      bool hasStandby : 1;
+    } PowerStateConfiguration;
+
     // The following methods implement common behaviour and should be executed from subclasses overrides.
     virtual bool configureDevice();
     virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
@@ -227,11 +257,10 @@ namespace p44 {
     virtual void pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aError);
 
     // The following methods are used to configure common states
-    void configureOperationModeState(bool aHasInactive, bool aHasDelayedStart, bool aHasPause, bool aHasActionrequired,
-        bool aHasError, bool aHasAborting);
-    void configureRemoteControlState(bool aHasControlStart);
-    void configureDoorState(bool aHasLocked);
-    void configurePowerState(bool aHasOff, bool aHasStandby);
+    void configureOperationModeState(const OperationModeConfiguration& aConfiguration);
+    void configureRemoteControlState(const RemoteControlConfiguration& aConfiguration);
+    void configureDoorState(const DoorStateConfiguration& aConfiguration);
+    void configurePowerState(const PowerStateConfiguration& aConfiguration);
 
     // Create dsuid based on device id
     void deriveDsUid();

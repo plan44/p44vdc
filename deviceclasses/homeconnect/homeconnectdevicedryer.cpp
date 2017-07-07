@@ -38,11 +38,39 @@ HomeConnectDeviceDryer::~HomeConnectDeviceDryer()
 
 bool HomeConnectDeviceDryer::configureDevice()
 {
-  // create states
-  configureOperationModeState(false, true, true, true, true, false);
-  configureRemoteControlState(true);
-  configureDoorState(false);
-  configurePowerState(false, false);
+  // configure operation mode
+  OperationModeConfiguration omConfig = { 0 };
+  omConfig.hasInactive = false;
+  omConfig.hasReady = true;
+  omConfig.hasDelayedStart = true;
+  omConfig.hasRun = true;
+  omConfig.hasPause = true;
+  omConfig.hasActionrequired = true;
+  omConfig.hasFinished = true;
+  omConfig.hasError = true;
+  omConfig.hasAborting = false;
+  configureOperationModeState(omConfig);
+
+  // configure remote control
+  RemoteControlConfiguration rcConfig = { 0 };
+  rcConfig.hasControlInactive = true;
+  rcConfig.hasControlActive = true;
+  rcConfig.hasStartActive = true;
+  configureRemoteControlState(rcConfig);
+
+  // configure door state
+  DoorStateConfiguration dsConfig = { 0 };
+  dsConfig.hasOpen = true;
+  dsConfig.hasClosed = true;
+  dsConfig.hasLocked = false;
+  configureDoorState(dsConfig);
+
+  // configure power state
+  PowerStateConfiguration psConfig = { 0 };
+  psConfig.hasOff = false;
+  psConfig.hasOn = true;
+  psConfig.hasStandby = false;
+  configurePowerState(psConfig);
 
   return inherited::configureDevice();
 }
