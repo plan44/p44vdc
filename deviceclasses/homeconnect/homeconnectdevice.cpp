@@ -648,10 +648,19 @@ void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aEr
 
       if (key != NULL) {
         JsonObjectPtr event = JsonObject::newObj();
+
+        // create a dummy event that contain information about current program
         event->add("key", JsonObject::newString("BSH.Common.Root.SelectedProgram"));
         event->add("value", JsonObject::newString(data->get("key")->stringValue()));
-
         handleEvent("NOTIFY", event, aError);
+
+        // selected program can have selected options, we also should inform devices about theirs values
+        JsonObjectPtr optionsArray = data->get("options");
+        if (optionsArray != NULL) {
+          for (int i = 0; i < optionsArray->arrayLength(); i++) {
+            handleEvent("NOTIFY", optionsArray->arrayGet(i), aError);
+          }
+        }
       }
     }
   }
