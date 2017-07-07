@@ -271,6 +271,11 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
     vendor = o->stringValue();
 }
 
+HomeConnectDevice::~HomeConnectDevice()
+{
+
+}
+
 HomeConnectDevicePtr HomeConnectDevice::createHomeConenctDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord)
 {
   JsonObjectPtr o;

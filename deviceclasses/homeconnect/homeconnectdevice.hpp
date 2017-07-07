@@ -140,6 +140,7 @@ namespace p44 {
     ValueDescriptorPtr programName;
 
     HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
+    virtual ~HomeConnectDevice();
   public:
 
     /// A factory method that create a device of proper type
