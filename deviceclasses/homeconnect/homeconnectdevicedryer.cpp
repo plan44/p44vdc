@@ -114,7 +114,7 @@ void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEvent
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
-void HomeConnectDeviceDryer::addAction(const string& aName, const string& aDescription, const string& aApiCommandSuffix, ValueDescriptorPtr aParameter)
+void HomeConnectDeviceDryer::addAction(const string& aName, const string& aDescription, const char* aApiCommandSuffix, ValueDescriptorPtr aParameter)
 {
   static const string cmdTemplate = "PUT:programs/active:{\"data\":{\"key\":\"LaundryCare.Dryer.Program.%s\","
     "\"options\":["
