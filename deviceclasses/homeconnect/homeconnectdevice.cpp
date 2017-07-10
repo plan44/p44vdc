@@ -31,6 +31,7 @@
 #include "homeconnectdevicewasher.hpp"
 #include "homeconnectdevicedryer.hpp"
 #include "homeconnectdevicefridge.hpp"
+#include <sstream>
 
 using namespace p44;
 
@@ -148,6 +149,36 @@ ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, const string aName,
 void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError)
 {
   if (aCompletedCB) aCompletedCB(aError);
+}
+
+HomeConnectCommandBuilder::HomeConnectCommandBuilder(string aProgramName) :
+  programName(aProgramName)
+{
+}
+
+string HomeConnectCommandBuilder::build()
+{
+  stringstream ss;
+
+  ss << "PUT:programs/active:{\"data\":{\"key\":\"" << programName << "\",";
+
+  if(options.size() != 0)
+  {
+
+    ss << "\"options\":[";
+
+    for(map<string, string>::iterator it = options.begin(); it != options.end(); it++)
+    {
+      ss << "{ \"key\":\"" << it->first << "\",\"value\":" << it->second << "},";
+    }
+
+    ss.get(); //remove last comma
+    ss << "]";
+  }
+
+  ss << "}}";
+  return ss.str();
+
 }
 
 

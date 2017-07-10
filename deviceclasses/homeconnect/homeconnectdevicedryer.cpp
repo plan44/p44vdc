@@ -38,7 +38,6 @@ HomeConnectDeviceDryer::~HomeConnectDeviceDryer()
 
 bool HomeConnectDeviceDryer::configureDevice()
 {
-<<<<<<< Upstream, based on upstream/addonvdc_master
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = false;
@@ -72,7 +71,7 @@ bool HomeConnectDeviceDryer::configureDevice()
   psConfig.hasOn = true;
   psConfig.hasStandby = false;
   configurePowerState(psConfig);
-=======
+
   EnumValueDescriptorPtr dryingTargetCottonSynthetic = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   int i = 0;
   dryingTargetCottonSynthetic->addEnum("IronDry", i++, false);
@@ -96,13 +95,6 @@ bool HomeConnectDeviceDryer::configureDevice()
   dryingTargetCottonSynthetic->addEnum("CupboardDryPlus", i++, false);
 
   deviceProperties->addProperty(dryingTargetProp, true);
-  // create states
-  configureOperationModeState(false, true, true, true, true, false);
-  configureRemoteControlState(true);
-  configureDoorState(false);
-  configurePowerState(false, false);
->>>>>>> 8816c27 add actions for dryer
-
   return inherited::configureDevice();
 }
 
@@ -124,7 +116,7 @@ void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEvent
 
   string key = (oKey != NULL) ? oKey->stringValue() : "";
 
-  if (aEventType == "NOTIFY" && key == "BaValueSH.Common.Option.DryingTarget") {
+  if (aEventType == "NOTIFY" && key == "BSH.Common.Option.DryingTarget") {
     string value = (oValue != NULL) ? oValue->stringValue() : "";
     dryingTargetProp->setStringValue(value);
     return;
@@ -133,12 +125,12 @@ void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEvent
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
-void HomeConnectDeviceDryer::addAction(const string& aName, const string& aDescription, const string& aApiCommandSuffix, ValueDescriptorPtr aParameter)
+void HomeConnectDeviceDryer::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)
 {
-  HomeConnectCommandBuilder builder("LaundryCare.Dryer.Program." + aApiCommandSuffix);
+  HomeConnectCommandBuilder builder("LaundryCare.Dryer.Program." + aProgramName);
   builder.addOption("BSH.Common.Option.DryingTarget", "@{DryingTarget%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, builder.build()));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
   action->addParameter(aParameter);
   deviceActions->addAction(action);
 }

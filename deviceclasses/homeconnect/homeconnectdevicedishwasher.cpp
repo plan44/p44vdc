@@ -71,6 +71,7 @@ bool HomeConnectDeviceDishWasher::configureDevice()
   psConfig.hasOn = true;
   psConfig.hasStandby = false;
   configurePowerState(psConfig);
+
   ValueDescriptorPtr delayedStart = ValueDescriptorPtr(
     new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1, true));
 
@@ -115,12 +116,12 @@ void HomeConnectDeviceDishWasher::handleEvent(string aEventType, JsonObjectPtr a
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
-void HomeConnectDeviceDishWasher::addAction(const string& aName, const string& aDescription, const string& aApiCommandSuffix, ValueDescriptorPtr aParameter)
+void HomeConnectDeviceDishWasher::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)
 {
-  HomeConnectCommandBuilder builder(string("Dishcare.Dishwasher.Program.") + aApiCommandSuffix);
+  HomeConnectCommandBuilder builder("Dishcare.Dishwasher.Program." + aProgramName);
   builder.addOption("BSH.Common.Option.StartInRelative", "@{DelayedStart%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, builder.build()));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
   action->addParameter(aParameter);
   deviceActions->addAction(action);
 }
