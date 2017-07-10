@@ -38,7 +38,57 @@ HomeConnectDeviceDishWasher::~HomeConnectDeviceDishWasher()
 
 bool HomeConnectDeviceDishWasher::configureDevice()
 {
+  // configure operation mode
+  OperationModeConfiguration omConfig = { 0 };
+  omConfig.hasInactive = true;
+  omConfig.hasReady = true;
+  omConfig.hasDelayedStart = true;
+  omConfig.hasRun = true;
+  omConfig.hasPause = false;
+  omConfig.hasActionrequired = false;
+  omConfig.hasFinished = true;
+  omConfig.hasError = false;
+  omConfig.hasAborting = true;
+  configureOperationModeState(omConfig);
+
+  // configure remote control
+  RemoteControlConfiguration rcConfig = { 0 };
+  rcConfig.hasControlInactive = true;
+  rcConfig.hasControlActive = true;
+  rcConfig.hasStartActive = true;
+  configureRemoteControlState(rcConfig);
+
+  // configure door state
+  DoorStateConfiguration dsConfig = { 0 };
+  dsConfig.hasOpen = true;
+  dsConfig.hasClosed = true;
+  dsConfig.hasLocked = false;
+  configureDoorState(dsConfig);
+
+  // configure power state
+  PowerStateConfiguration psConfig = { 0 };
+  psConfig.hasOff = true;
+  psConfig.hasOn = true;
+  psConfig.hasStandby = false;
+  configurePowerState(psConfig);
+
   return inherited::configureDevice();
+}
+
+void HomeConnectDeviceDishWasher::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
+{
+  inherited::stateChanged(aChangedState, aEventsToPush);
+}
+
+void HomeConnectDeviceDishWasher::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+{
+  ALOG(LOG_INFO, "DishWasher Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  inherited::handleEvent(aEventType, aEventData, aError);
+}
+
+string HomeConnectDeviceDishWasher::oemModelGUID()
+{
+  return "gs1:(01)7640156792829";
 }
 
 } /* namespace p44 */

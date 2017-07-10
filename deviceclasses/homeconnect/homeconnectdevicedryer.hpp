@@ -33,9 +33,13 @@ class HomeConnectDeviceDryer: public HomeConnectDevice
   typedef HomeConnectDevice inherited;
 
   virtual bool configureDevice() P44_OVERRIDE;
+  virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
+  virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError) P44_OVERRIDE;
 public:
   HomeConnectDeviceDryer(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceDryer();
+
+  virtual string oemModelGUID() P44_OVERRIDE;
 };
 
 } /* namespace p44 */
