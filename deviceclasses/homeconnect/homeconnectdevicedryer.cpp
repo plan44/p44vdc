@@ -90,11 +90,11 @@ bool HomeConnectDeviceDryer::configureDevice()
 
   dryingTargetProp = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   i = 0;
-  dryingTargetCottonSynthetic->addEnum("IronDry", i++, false);
-  dryingTargetCottonSynthetic->addEnum("CupboardDry", i++, false);
-  dryingTargetCottonSynthetic->addEnum("CupboardDryPlus", i++, false);
+  dryingTargetProp->addEnum("IronDry", i++, false);
+  dryingTargetProp->addEnum("CupboardDry", i++, false);
+  dryingTargetProp->addEnum("CupboardDryPlus", i++, false);
 
-  deviceProperties->addProperty(dryingTargetProp, true);
+  deviceProperties->addProperty(dryingTargetProp);
   return inherited::configureDevice();
 }
 
@@ -116,9 +116,9 @@ void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEvent
 
   string key = (oKey != NULL) ? oKey->stringValue() : "";
 
-  if (aEventType == "NOTIFY" && key == "BSH.Common.Option.DryingTarget") {
+  if (aEventType == "NOTIFY" && key == "LaundryCare.Dryer.Option.DryingTarget") {
     string value = (oValue != NULL) ? oValue->stringValue() : "";
-    dryingTargetProp->setStringValue(value);
+    dryingTargetProp->setStringValue(removeNamespace(value));
     return;
   }
 
@@ -128,10 +128,10 @@ void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEvent
 void HomeConnectDeviceDryer::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)
 {
   HomeConnectCommandBuilder builder("LaundryCare.Dryer.Program." + aProgramName);
-  builder.addOption("BSH.Common.Option.DryingTarget", "@{DryingTarget%%0}");
+  builder.addOption("LaundryCare.Dryer.Option.DryingTarget", "\"LaundryCare.Dryer.EnumType.DryingTarget.@{DryingTarget}\"");
 
   HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
-  action->addParameter(aParameter);
+  action->addParameter(aParameter, true);
   deviceActions->addAction(action);
 }
 

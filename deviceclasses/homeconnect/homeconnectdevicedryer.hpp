@@ -32,7 +32,7 @@ class HomeConnectDeviceDryer: public HomeConnectDevice
 {
   typedef HomeConnectDevice inherited;
 
-  ValueDescriptorPtr dryingTargetProp;
+  EnumValueDescriptorPtr dryingTargetProp;
 
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
