@@ -106,8 +106,20 @@ void FanCoilUnitScene::setDefaultSceneValues(SceneNo aSceneNo)
     powerState = false;
     operationMode = fcuOperatingMode_off;
   }
+  else if (aSceneNo==40) {
+    powerState = true;
+    operationMode = fcuOperatingMode_fan;
+  }
+  else if (aSceneNo==41) {
+    powerState = true;
+    operationMode = fcuOperatingMode_dry;
+  }
+  else if (aSceneNo==42) {
+    powerState = true;
+    operationMode = fcuOperatingMode_auto;
+  }
   else {
-    // all others: dontcare
+    // all others: dontcare, but generally off
     powerState = false;
     operationMode = fcuOperatingMode_off;
     setDontCare(true);

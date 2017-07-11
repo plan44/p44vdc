@@ -857,7 +857,6 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("configurl", o)) {
     configUrl = o->stringValue();
   }
-
   // - basic output behaviour
   VdcOutputFunction outputFunction = outputFunction_custom; // not defined yet
   if (aInitParams->get("dimmable", o)) {

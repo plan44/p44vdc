@@ -37,6 +37,7 @@ namespace p44 {
     fcuOperatingMode_cool = 2,
     fcuOperatingMode_fan = 3,
     fcuOperatingMode_dry = 4,
+    fcuOperatingMode_auto = 5,
     numFcuOperationModes
   } FcuOperationMode;
 
