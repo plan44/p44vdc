@@ -170,6 +170,15 @@ string ExternalDevice::oemModelGUID()
 }
 
 
+string ExternalDevice::webuiURLString()
+{
+  if (!configUrl.empty())
+    return configUrl;
+  else
+    return inherited::webuiURLString();
+}
+
+
 
 
 void ExternalDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
@@ -844,6 +853,11 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("deviceclassversion", o)) {
     devClassVersion = o->int32Value();
   }
+  // - get config URI
+  if (aInitParams->get("configurl", o)) {
+    configUrl = o->stringValue();
+  }
+
   // - basic output behaviour
   VdcOutputFunction outputFunction = outputFunction_custom; // not defined yet
   if (aInitParams->get("dimmable", o)) {
@@ -1383,6 +1397,10 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       if (aMessage->get("iconname", o)) {
         externalVdc.iconBaseName = o->stringValue();
       }
+      // - get config URI
+      if (aMessage->get("configurl", o)) {
+        externalVdc.configUrl = o->stringValue();
+      }
     }
     else if (msg=="log") {
       // log something
@@ -1521,6 +1539,16 @@ const char *ExternalVdc::vdcClassIdentifier() const
 {
   return "External_Device_Container";
 }
+
+
+string ExternalVdc::webuiURLString()
+{
+  if (!configUrl.empty())
+    return configUrl;
+  else
+    return inherited::webuiURLString();
+}
+
 
 
 void ExternalVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)

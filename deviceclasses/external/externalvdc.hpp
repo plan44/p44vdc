@@ -110,6 +110,7 @@ namespace p44 {
     string oemModelGUIDString; ///< the OEM model GUID, which is used to match devices with dS database
     string typeIdentifier; ///< the type identifier
     string devClass; ///< device class
+    string configUrl; ///< custom value for configURL if not empty
     uint32_t devClassVersion; ///< device class version
 
 
@@ -159,6 +160,9 @@ namespace p44 {
     ///   to coexist in a system.
     /// @return version or 0 if no version exists
     virtual uint32_t deviceClassVersion() P44_OVERRIDE { return devClassVersion; }
+
+    /// @return URL for Web-UI (for access from local LAN)
+    virtual string webuiURLString() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -319,6 +323,7 @@ namespace p44 {
 
     string iconBaseName; ///< the base icon name
     string modelNameString; ///< the string to be returned by modelName()
+    string configUrl; ///< custom value for configURL if not empty
 
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
@@ -343,13 +348,15 @@ namespace p44 {
     /// @return a combination of rescanmode_xxx bits
     virtual int getRescanModes() const P44_OVERRIDE { return rescanmode_exhaustive; }; // only exhaustive makes sense
 
-
     /// Custom identification for external vDCs
     /// @{
 
     /// @return human readable, language independent model name/short description
     /// @note base class will construct this from global product name and vdcModelSuffix()
     virtual string modelName() P44_OVERRIDE;
+
+    /// @return URL for Web-UI (for access from local LAN)
+    virtual string webuiURLString() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
