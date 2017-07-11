@@ -28,7 +28,7 @@ namespace p44 {
 HomeConnectDeviceDryer::HomeConnectDeviceDryer(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  hcDevType = homeconnect_dryer;
+
 }
 
 HomeConnectDeviceDryer::~HomeConnectDeviceDryer()
@@ -72,6 +72,29 @@ bool HomeConnectDeviceDryer::configureDevice()
   psConfig.hasStandby = false;
   configurePowerState(psConfig);
 
+  EnumValueDescriptorPtr dryingTargetCottonSynthetic = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
+  int i = 0;
+  dryingTargetCottonSynthetic->addEnum("IronDry", i++, false);
+  dryingTargetCottonSynthetic->addEnum("CupboardDry", i++, false);
+  dryingTargetCottonSynthetic->addEnum("CupboardDryPlus", i++, false);
+
+  EnumValueDescriptorPtr dryingTargetMix = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
+  i = 0;
+  dryingTargetMix->addEnum("IronDry", i++, false);
+  dryingTargetMix->addEnum("CupboardDry", i++, false);
+
+  addAction("std.Cotton",    "Cotton",    "Cotton",    dryingTargetCottonSynthetic);
+  addAction("std.Synthetic", "Synthetic", "Synthetic", dryingTargetCottonSynthetic);
+  addAction("std.Mix",       "Mix",       "Mix",       dryingTargetMix);
+
+
+  dryingTargetProp = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
+  i = 0;
+  dryingTargetProp->addEnum("IronDry", i++, false);
+  dryingTargetProp->addEnum("CupboardDry", i++, false);
+  dryingTargetProp->addEnum("CupboardDryPlus", i++, false);
+
+  deviceProperties->addProperty(dryingTargetProp);
   return inherited::configureDevice();
 }
 
@@ -83,7 +106,33 @@ void HomeConnectDeviceDryer::stateChanged(DeviceStatePtr aChangedState, DeviceEv
 void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
   ALOG(LOG_INFO, "Dryer Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+
+  JsonObjectPtr oKey;
+  JsonObjectPtr oValue;
+
+  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
+    return;
+  }
+
+  string key = (oKey != NULL) ? oKey->stringValue() : "";
+
+  if (aEventType == "NOTIFY" && key == "LaundryCare.Dryer.Option.DryingTarget") {
+    string value = (oValue != NULL) ? oValue->stringValue() : "";
+    dryingTargetProp->setStringValue(removeNamespace(value));
+    return;
+  }
+
   inherited::handleEvent(aEventType, aEventData, aError);
+}
+
+void HomeConnectDeviceDryer::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)
+{
+  HomeConnectCommandBuilder builder("LaundryCare.Dryer.Program." + aProgramName);
+  builder.addOption("LaundryCare.Dryer.Option.DryingTarget", "\"LaundryCare.Dryer.EnumType.DryingTarget.@{DryingTarget}\"");
+
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
+  action->addParameter(aParameter, true);
+  deviceActions->addAction(action);
 }
 
 string HomeConnectDeviceDryer::oemModelGUID()

@@ -32,9 +32,13 @@ class HomeConnectDeviceDryer: public HomeConnectDevice
 {
   typedef HomeConnectDevice inherited;
 
+  EnumValueDescriptorPtr dryingTargetProp;
+
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError) P44_OVERRIDE;
+
+  void addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter);
 public:
   HomeConnectDeviceDryer(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceDryer();

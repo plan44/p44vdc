@@ -28,7 +28,7 @@ namespace p44 {
 HomeConnectDeviceCoffeMaker::HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     standalone(false), inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  hcDevType = homeconnect_coffeemaker;
+
 }
 
 HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()

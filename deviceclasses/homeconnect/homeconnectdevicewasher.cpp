@@ -28,7 +28,7 @@ namespace p44 {
 HomeConnectDeviceWasher::HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  hcDevType = homeconnect_washer;
+
 }
 
 HomeConnectDeviceWasher::~HomeConnectDeviceWasher()

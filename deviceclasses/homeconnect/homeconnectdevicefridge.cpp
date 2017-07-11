@@ -28,7 +28,7 @@ namespace p44 {
 HomeConnectDeviceFridge::HomeConnectDeviceFridge(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  hcDevType = homeconnect_fridge;
+
 }
 
 HomeConnectDeviceFridge::~HomeConnectDeviceFridge()
