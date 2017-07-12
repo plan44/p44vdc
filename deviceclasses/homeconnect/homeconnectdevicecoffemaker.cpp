@@ -144,19 +144,19 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
   HomeConnectCommandBuilder builder("ConsumerProducts.CoffeeMaker.Program.Beverage." + aProgramName);
 
   if(!standalone) {
-    builder.addOption("ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature", "\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{temperatureLevel}\"");
+    builder.addOption("ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature", "\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{TemperatureLevel}\"");
   }
 
-  builder.addOption("ConsumerProducts.CoffeeMaker.Option.BeanAmount", "\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{beanAmount}\"");
-  builder.addOption("ConsumerProducts.CoffeeMaker.Option.FillQuantity", "@{fillQuantity%%0}");
+  builder.addOption("ConsumerProducts.CoffeeMaker.Option.BeanAmount", "\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{BeanAmount}\"");
+  builder.addOption("ConsumerProducts.CoffeeMaker.Option.FillQuantity", "@{FillQuantity%%0}");
 
-  EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("temperatureLevel", true));
+  EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("TemperatureLevel", true));
   int i = 0;
   tempLevel->addEnum("Normal", i++, true); // default
   tempLevel->addEnum("High", i++);
   tempLevel->addEnum("VeryHigh", i++);
 
-  EnumValueDescriptorPtr beanAmount = EnumValueDescriptorPtr(new EnumValueDescriptor("beanAmount", true));
+  EnumValueDescriptorPtr beanAmount = EnumValueDescriptorPtr(new EnumValueDescriptor("BeanAmount", true));
   i = 0;
   beanAmount->addEnum("VeryMild", i++);
   beanAmount->addEnum("Mild", i++);
@@ -168,7 +168,7 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
   beanAmount->addEnum("DoubleShotPlusPlus", i++);
 
   ValueDescriptorPtr fillAmount =
-      ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity",
+      ValueDescriptorPtr(new NumericValueDescriptor("FillQuantity",
                                                     valueType_numeric,
                                                     VALUE_UNIT(valueUnit_liter, unitScaling_milli),
                                                     aFillAmountMin,
