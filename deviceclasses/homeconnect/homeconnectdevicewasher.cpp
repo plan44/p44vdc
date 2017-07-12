@@ -163,12 +163,12 @@ void HomeConnectDeviceWasher::addAction(const string& aName, const string& aDesc
   deviceActions->addAction(action);
 }
 
-EnumValueDescriptorPtr HomeConnectDeviceWasher::createEnumDescriptor(string aName, int aMaxValue, const char** names)
+EnumValueDescriptorPtr HomeConnectDeviceWasher::createEnumDescriptor(string aName, int aMaxValue, const char** aEnumNames)
 {
   EnumValueDescriptorPtr descriptor = EnumValueDescriptorPtr(new EnumValueDescriptor(aName, true));
   for(int i = 0 ; i <= aMaxValue; i++)
   {
-    descriptor->addEnum(names[i], i, false);
+    descriptor->addEnum(aEnumNames[i], i, false);
   }
   return descriptor;
 }

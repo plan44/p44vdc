@@ -67,7 +67,7 @@ class HomeConnectDeviceWasher: public HomeConnectDevice
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError) P44_OVERRIDE;
   void addAction(const string& aName, const string& aDescription, const string& aApiCommandTemplate, ValueDescriptorPtr aParameter, ValueDescriptorPtr aSpinSpeed);
-  EnumValueDescriptorPtr createEnumDescriptor(string aName, int aMaxValue, const char** names);
+  EnumValueDescriptorPtr createEnumDescriptor(string aName, int aMaxValue, const char** aEnumNames);
 
 public:
   HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
