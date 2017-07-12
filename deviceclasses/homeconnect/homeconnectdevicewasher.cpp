@@ -25,6 +25,29 @@
 
 namespace p44 {
 
+const char* HomeConnectDeviceWasher::temperatureNames[temperature_Num] = {
+  "Cold",
+  "GC20",
+  "GC30",
+  "GC40",
+  "GC50",
+  "GC60",
+  "GC70",
+  "GC80",
+  "GC90"
+  };
+
+const char* HomeConnectDeviceWasher::spinSpeedNames[spinSpeed_Num] = {
+  "Off",
+  "RPM400",
+  "RPM600",
+  "RPM800",
+  "RPM1000",
+  "RPM1200",
+  "RPM1400",
+  "RPM1600"
+  };
+
 HomeConnectDeviceWasher::HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
@@ -35,41 +58,6 @@ HomeConnectDeviceWasher::~HomeConnectDeviceWasher()
 {
   // TODO Auto-generated destructor stub
 }
-
-const char* HomeConnectDeviceWasher::toString(Temperature aTemperature)
-{
-  switch(aTemperature)
-  {
-    case temperature_Cold : return "Cold";
-    case temperature_GC20 : return "GC20";
-    case temperature_GC30 : return "GC30";
-    case temperature_GC40 : return "GC40";
-    case temperature_GC50 : return "GC50";
-    case temperature_GC60 : return "GC60";
-    case temperature_GC70 : return "GC70";
-    case temperature_GC80 : return "GC80";
-    case temperature_GC90 : return "GC90";
-  }
-  return "";
-}
-
-const char* HomeConnectDeviceWasher::toString(SpinSpeed aSpinSpeed)
-{
-  switch(aSpinSpeed)
-  {
-    case spinSpeed_Off :     return "Off";
-    case spinSpeed_RPM400 :  return "RPM400";
-    case spinSpeed_RPM600 :  return "RPM600";
-    case spinSpeed_RPM800 :  return "RPM800";
-    case spinSpeed_RPM1000 : return "RPM1000";
-    case spinSpeed_RPM1200 : return "RPM1200";
-    case spinSpeed_RPM1400 : return "RPM1400";
-    case spinSpeed_RPM1600 : return "RPM1600";
-  }
-  return "";
-}
-
-
 
 bool HomeConnectDeviceWasher::configureDevice()
 {
@@ -107,13 +95,13 @@ bool HomeConnectDeviceWasher::configureDevice()
   psConfig.hasStandby = false;
   configurePowerState(psConfig);
 
-  EnumValueDescriptorPtr temperatureCotton = createEnumDescriptor("Temperature", temperature_GC90);
-  EnumValueDescriptorPtr temperatureEasyCare = createEnumDescriptor("Temperature", temperature_GC60);
-  EnumValueDescriptorPtr temperature = createEnumDescriptor("Temperature", temperature_GC40);
+  EnumValueDescriptorPtr temperatureCotton = createEnumDescriptor("Temperature", temperature_GC90, temperatureNames);
+  EnumValueDescriptorPtr temperatureEasyCare = createEnumDescriptor("Temperature", temperature_GC60, temperatureNames);
+  EnumValueDescriptorPtr temperature = createEnumDescriptor("Temperature", temperature_GC40, temperatureNames);
 
-  EnumValueDescriptorPtr spinSpeedCottonMix = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1600);
-  EnumValueDescriptorPtr spinSpeedEasyCare = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1200);
-  EnumValueDescriptorPtr spinSpeedDelicatesSilkWool = createEnumDescriptor("SpinSpeed", spinSpeed_RPM800);
+  EnumValueDescriptorPtr spinSpeedCottonMix = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1600, spinSpeedNames);
+  EnumValueDescriptorPtr spinSpeedEasyCare = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1200, spinSpeedNames);
+  EnumValueDescriptorPtr spinSpeedDelicatesSilkWool = createEnumDescriptor("SpinSpeed", spinSpeed_RPM800, spinSpeedNames);
 
   addAction("std.Cotton",        "Cotton",           "Cotton",        temperatureCotton,   spinSpeedCottonMix);
   addAction("std.EasyCare",      "Easy Care",        "EasyCare",      temperatureEasyCare, spinSpeedEasyCare);
@@ -121,8 +109,8 @@ bool HomeConnectDeviceWasher::configureDevice()
   addAction("std.DelicatesSilk", "Delicates / Silk", "DelicatesSilk", temperature,         spinSpeedDelicatesSilkWool);
   addAction("std.Wool",          "Wool",             "Wool",          temperature,         spinSpeedDelicatesSilkWool);
 
-  temperatureProp = createEnumDescriptor("Temperature", temperature_GC90);
-  spinSpeedProp = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1600);
+  temperatureProp = createEnumDescriptor("Temperature", temperature_GC90, temperatureNames);
+  spinSpeedProp = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1600, spinSpeedNames);
 
   deviceProperties->addProperty(temperatureProp);
   deviceProperties->addProperty(spinSpeedProp);
@@ -173,6 +161,16 @@ void HomeConnectDeviceWasher::addAction(const string& aName, const string& aDesc
   action->addParameter(aTemperature, true);
   action->addParameter(aSpinSpeed, true);
   deviceActions->addAction(action);
+}
+
+EnumValueDescriptorPtr HomeConnectDeviceWasher::createEnumDescriptor(string aName, int aMaxValue, const char** names)
+{
+  EnumValueDescriptorPtr descriptor = EnumValueDescriptorPtr(new EnumValueDescriptor(aName, true));
+  for(int i = 0 ; i <= aMaxValue; i++)
+  {
+    descriptor->addEnum(names[i], i, false);
+  }
+  return descriptor;
 }
 
 string HomeConnectDeviceWasher::oemModelGUID()

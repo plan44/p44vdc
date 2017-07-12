@@ -41,7 +41,8 @@ class HomeConnectDeviceWasher: public HomeConnectDevice
     temperature_GC60,
     temperature_GC70,
     temperature_GC80,
-    temperature_GC90
+    temperature_GC90,
+    temperature_Num
   } Temperature;
 
   typedef enum {
@@ -52,9 +53,12 @@ class HomeConnectDeviceWasher: public HomeConnectDevice
     spinSpeed_RPM1000,
     spinSpeed_RPM1200,
     spinSpeed_RPM1400,
-    spinSpeed_RPM1600
+    spinSpeed_RPM1600,
+    spinSpeed_Num
   } SpinSpeed;
 
+  static const char* temperatureNames[temperature_Num];
+  static const char* spinSpeedNames[spinSpeed_Num];
 
   EnumValueDescriptorPtr temperatureProp;
   EnumValueDescriptorPtr spinSpeedProp;
@@ -63,20 +67,7 @@ class HomeConnectDeviceWasher: public HomeConnectDevice
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError) P44_OVERRIDE;
   void addAction(const string& aName, const string& aDescription, const string& aApiCommandTemplate, ValueDescriptorPtr aParameter, ValueDescriptorPtr aSpinSpeed);
-
-  static const char* toString(Temperature aTemperature);
-  static const char* toString(SpinSpeed aSpinSpeed);
-
-  template <typename EnumType>
-  EnumValueDescriptorPtr createEnumDescriptor(string aName, EnumType aMaxValue)
-  {
-    EnumValueDescriptorPtr descriptor = EnumValueDescriptorPtr(new EnumValueDescriptor(aName, true));
-    for(int i = 0 ; i <= aMaxValue; i++)
-    {
-  	  descriptor->addEnum(toString(EnumType(i)), i, false);
-    }
-    return descriptor;
-  }
+  EnumValueDescriptorPtr createEnumDescriptor(string aName, int aMaxValue, const char** names);
 
 public:
   HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
