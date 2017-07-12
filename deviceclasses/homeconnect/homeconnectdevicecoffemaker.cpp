@@ -43,69 +43,29 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
 //    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
   // FIXME: got even uglier:
   standalone = (modelGuid.substr(0,10)=="TI909701HC");
-  // Create standard actions
-  // - enums that can be shared between actions
-  EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("temperatureLevel", true));
-  tempLevel->addEnum("Normal", 0, true); // default
-  tempLevel->addEnum("High", 1);
-  tempLevel->addEnum("VeryHigh", 2);
-  EnumValueDescriptorPtr beanAmount = EnumValueDescriptorPtr(new EnumValueDescriptor("beanAmount", true));
-  beanAmount->addEnum("VeryMild", 0);
-  beanAmount->addEnum("Mild", 1);
-  beanAmount->addEnum("Normal", 2, true); // default
-  beanAmount->addEnum("Strong", 3);
-  beanAmount->addEnum("VeryStrong", 4);
-  beanAmount->addEnum("DoubleShot", 5);
-  beanAmount->addEnum("DoubleShotPlus", 6);
-  beanAmount->addEnum("DoubleShotPlusPlus", 7);
-  // - command template
-  string cmdTemplate =
-    "PUT:programs/active:{\"data\":{\"key\":\"ConsumerProducts.CoffeeMaker.Program.Beverage.%s\","
-    "\"options\":[";
-  if (!standalone) {
-    cmdTemplate +=
-      "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{temperatureLevel}\"},";
-  }
-  cmdTemplate +=
-      "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.BeanAmount\",\"value\":\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{beanAmount}\"},"
-      "{ \"key\":\"ConsumerProducts.CoffeeMaker.Option.FillQuantity\",\"value\":@{fillQuantity%%0}}"
-    "]}}";
-  // - espresso
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.espresso", "Espresso", string_format(cmdTemplate.c_str(),"Espresso")));
-  a->addParameter(tempLevel);
-  a->addParameter(beanAmount);
-  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 35, 60, 5, true, 40)));
-  deviceActions->addAction(a);
-  // - espresso macciato
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.espressoMacchiato", "Espresso Macchiato", string_format(cmdTemplate.c_str(),"EspressoMacchiato")));
-  a->addParameter(tempLevel);
-  a->addParameter(beanAmount);
-  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 40, 60, 10, true, 50)));
-  deviceActions->addAction(a);
-  // - (plain) coffee
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.coffee", "Coffee", string_format(cmdTemplate.c_str(),"Coffee")));
-  a->addParameter(tempLevel);
-  a->addParameter(beanAmount);
-  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 60, 250, 10, true, 120)));
-  deviceActions->addAction(a);
-  // - Cappuccino
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.cappuccino", "Cappuccino", string_format(cmdTemplate.c_str(),"Cappuccino")));
-  a->addParameter(tempLevel);
-  a->addParameter(beanAmount);
-  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 100, 250, 10, true, 180)));
-  deviceActions->addAction(a);
-  // - latte macchiato
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.latteMacchiato", "Latte Macchiato", string_format(cmdTemplate.c_str(),"LatteMacchiato")));
-  a->addParameter(tempLevel);
-  a->addParameter(beanAmount);
-  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 200, 400, 20, true, 300)));
-  deviceActions->addAction(a);
-  // - latte macchiato
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.caffeLatte", "Caffe Latte", string_format(cmdTemplate.c_str(),"CaffeLatte")));
-  a->addParameter(tempLevel);
-  a->addParameter(beanAmount);
-  a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 100, 400, 20, true, 250)));
-  deviceActions->addAction(a);
+
+  addAction("std.Espresso",          "Espresso",            "Espresso",          35,  60,  5,  40);
+  addAction("std.EspressoMacchiato", "Espresso Macchiato",  "EspressoMacchiato", 40,  60,  10, 50);
+  addAction("std.Coffee",            "Coffee",              "Coffee",            60,  250, 10, 120);
+  addAction("std.Cappuccino",        "Cappuccino",          "Cappuccino",        100, 250, 10, 180);
+  addAction("std.LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 300);
+  addAction("std.CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 250);
+
+  beanAmountProp = EnumValueDescriptorPtr(new EnumValueDescriptor("BeanAmount", true));
+  int i = 0;
+  beanAmountProp->addEnum("VeryMild", i++);
+  beanAmountProp->addEnum("Mild", i++);
+  beanAmountProp->addEnum("Normal", i++, true);
+  beanAmountProp->addEnum("Strong", i++);
+  beanAmountProp->addEnum("VeryStrong", i++);
+  beanAmountProp->addEnum("DoubleShot", i++);
+  beanAmountProp->addEnum("DoubleShotPlus", i++);
+  beanAmountProp->addEnum("DoubleShotPlusPlus", i++);
+
+  fillQuantityProp = ValueDescriptorPtr(new NumericValueDescriptor("FillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 0, 400, 1));
+
+  deviceProperties->addProperty(beanAmountProp);
+  deviceProperties->addProperty(fillQuantityProp);
 
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
@@ -145,7 +105,83 @@ void HomeConnectDeviceCoffeMaker::stateChanged(DeviceStatePtr aChangedState, Dev
 void HomeConnectDeviceCoffeMaker::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
   ALOG(LOG_INFO, "CoffeMaker Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+
+  JsonObjectPtr oKey;
+  JsonObjectPtr oValue;
+
+  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
+    return;
+  }
+
+  if( aEventType == "NOTIFY") {
+    string key = (oKey != NULL) ? oKey->stringValue() : "";
+
+    if (key == "ConsumerProducts.CoffeeMaker.Option.BeanAmount") {
+      string value = (oValue != NULL) ? oValue->stringValue() : "";
+      beanAmountProp->setStringValue(removeNamespace(value));
+      return;
+    }
+
+    if (key == "ConsumerProducts.CoffeeMaker.Option.FillQuantity") {
+      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
+      fillQuantityProp->setInt32Value(value);
+      return;
+    }
+  }
+
   inherited::handleEvent(aEventType, aEventData, aError);
+}
+
+void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
+                                            const string& aDescription,
+                                            const string& aProgramName,
+                                            double aFillAmountMin,
+                                            double aFillAmountMax,
+                                            double aFillAmountResolution,
+                                            double aFillAmountDefault)
+{
+
+  HomeConnectCommandBuilder builder("ConsumerProducts.CoffeeMaker.Program.Beverage." + aProgramName);
+
+  if(!standalone) {
+    builder.addOption("ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature", "\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{temperatureLevel}\"");
+  }
+
+  builder.addOption("ConsumerProducts.CoffeeMaker.Option.BeanAmount", "\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{beanAmount}\"");
+  builder.addOption("ConsumerProducts.CoffeeMaker.Option.FillQuantity", "@{fillQuantity%%0}");
+
+  EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("temperatureLevel", true));
+  int i = 0;
+  tempLevel->addEnum("Normal", i++, true); // default
+  tempLevel->addEnum("High", i++);
+  tempLevel->addEnum("VeryHigh", i++);
+
+  EnumValueDescriptorPtr beanAmount = EnumValueDescriptorPtr(new EnumValueDescriptor("beanAmount", true));
+  i = 0;
+  beanAmount->addEnum("VeryMild", i++);
+  beanAmount->addEnum("Mild", i++);
+  beanAmount->addEnum("Normal", i++, true); // default
+  beanAmount->addEnum("Strong", i++);
+  beanAmount->addEnum("VeryStrong", i++);
+  beanAmount->addEnum("DoubleShot", i++);
+  beanAmount->addEnum("DoubleShotPlus", i++);
+  beanAmount->addEnum("DoubleShotPlusPlus", i++);
+
+  ValueDescriptorPtr fillAmount =
+      ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity",
+                                                    valueType_numeric,
+                                                    VALUE_UNIT(valueUnit_liter, unitScaling_milli),
+                                                    aFillAmountMin,
+                                                    aFillAmountMax,
+                                                    aFillAmountResolution,
+                                                    true,
+                                                    aFillAmountDefault));
+
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
+  action->addParameter(tempLevel);
+  action->addParameter(beanAmount);
+  action->addParameter(fillAmount);
+  deviceActions->addAction(action);
 }
 
 string HomeConnectDeviceCoffeMaker::oemModelGUID()

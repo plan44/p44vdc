@@ -33,10 +33,20 @@ class HomeConnectDeviceCoffeMaker: public HomeConnectDevice
   typedef HomeConnectDevice inherited;
 
   bool standalone; ///< set if this is the standalone model (which does not understand ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature)
+  EnumValueDescriptorPtr beanAmountProp;
+  ValueDescriptorPtr fillQuantityProp;
 
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError) P44_OVERRIDE;
+
+  void addAction(const string& aActionName,
+                 const string& aDescription,
+                 const string& aProgramName,
+                 double aFillAmountMin,
+                 double aFillAmountMax,
+                 double aFillAmountResolution,
+                 double aFillAmountDefault);
 public:
   HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceCoffeMaker();
