@@ -38,14 +38,6 @@ HomeConnectDeviceOven::~HomeConnectDeviceOven()
 
 bool HomeConnectDeviceOven::configureDevice()
 {
-  // Create standard actions
-  HomeConnectActionPtr a;
-  // - command template
-  string cmdTemplate = "PUT:programs/active:{\"data\":{\"key\":\"Cooking.Oven.Program.HeatingMode.%s\","
-      "\"options\":["
-      "{ \"key\":\"Cooking.Oven.Option.SetpointTemperature\",\"value\":@{Temperature%%0}},"
-      "{ \"key\":\"BSH.Common.Option.Duration\",\"value\":@{Duration%%0}}"
-      "]}}";
   // - common params
   ValueDescriptorPtr temp = ValueDescriptorPtr(
       new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30,
@@ -53,32 +45,32 @@ bool HomeConnectDeviceOven::configureDevice()
   ValueDescriptorPtr duration = ValueDescriptorPtr(
       new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
           1, true, 600));
-  // - preheating
-  a = HomeConnectActionPtr(
-      new HomeConnectAction(*this, "std.Preheating", "Pre-heating", string_format(cmdTemplate.c_str(), "PreHeating")));
-  a->addParameter(temp);
-  a->addParameter(duration);
-  deviceActions->addAction(a);
-  // - Hot Air
-  a = HomeConnectActionPtr(
-      new HomeConnectAction(*this, "std.HotAir", "Hot air", string_format(cmdTemplate.c_str(), "HotAir")));
-  a->addParameter(temp);
-  a->addParameter(duration);
-  deviceActions->addAction(a);
-  // - Top and bottom heating
-  a = HomeConnectActionPtr(
-      new HomeConnectAction(*this, "std.TopBottomHeat", "Top and bottom heat",
-          string_format(cmdTemplate.c_str(), "TopBottomHeating")));
-  a->addParameter(temp);
-  a->addParameter(duration);
-  deviceActions->addAction(a);
-  // - Pizza setting
-  a = HomeConnectActionPtr(
-      new HomeConnectAction(*this, "std.PizzaSetting", "Pizza Setting",
-          string_format(cmdTemplate.c_str(), "PizzaSetting")));
-  a->addParameter(temp);
-  a->addParameter(duration);
-  deviceActions->addAction(a);
+
+  addAction("std.Preheating",    "Pre-heating",         "PreHeating",       temp, duration);
+  addAction("std.HotAir",        "Hot air",             "HotAir",           temp, duration);
+  addAction("std.TopBottomHeat", "Top and bottom heat", "TopBottomHeating", temp, duration);
+  addAction("std.PizzaSetting",  "Pizza Setting",       "PizzaSetting",     temp, duration);
+
+  setTemperatureProp = ValueDescriptorPtr(
+      new NumericValueDescriptor("SetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
+
+  currentTemperatureProp = ValueDescriptorPtr(
+      new NumericValueDescriptor("CurrentTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
+
+  elapsedProgramTimeProp = ValueDescriptorPtr(
+      new NumericValueDescriptor("ElapsedProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
+
+  remainingProgramTimeProp = ValueDescriptorPtr(
+      new NumericValueDescriptor("RemainingProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
+
+  programProgressProp = ValueDescriptorPtr(
+      new NumericValueDescriptor("ProgramProgress", valueType_numeric, VALUE_UNIT(valueUnit_percent, unitScaling_1), 0, 100, 1));
+
+  deviceProperties->addProperty(setTemperatureProp);
+  deviceProperties->addProperty(currentTemperatureProp);
+  deviceProperties->addProperty(elapsedProgramTimeProp);
+  deviceProperties->addProperty(remainingProgramTimeProp);
+  deviceProperties->addProperty(programProgressProp);
 
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
@@ -125,9 +117,64 @@ void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEve
 void HomeConnectDeviceOven::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
   ALOG(LOG_INFO, "Oven Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+
+  JsonObjectPtr oKey;
+  JsonObjectPtr oValue;
+
+  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
+    return;
+  }
+
+  string key = (oKey != NULL) ? oKey->stringValue() : "";
+
+  if (aEventType == "NOTIFY") {
+    if (key == "BSH.Common.Option.ElapsedProgramTime") {
+      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
+      elapsedProgramTimeProp->setInt32Value(value);
+      return;
+    }
+
+    if (key == "BSH.Common.Option.RemainingProgramTime") {
+      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
+      remainingProgramTimeProp->setInt32Value(value);
+      return;
+    }
+
+    if (key == "BSH.Common.Option.ProgramProgress") {
+      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
+      programProgressProp->setInt32Value(value);
+      return;
+    }
+
+    if (key == "Cooking.Oven.Option.SetpointTemperature") {
+      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
+      setTemperatureProp->setInt32Value(value);
+      return;
+    }
+  }
+
+  if (aEventType == "STATUS") {
+    if (key == "Cooking.Oven.Status.CurrentCavityTemperature") {
+      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
+      currentTemperatureProp->setInt32Value(value);
+      return;
+    }
+  }
+
   inherited::handleEvent(aEventType, aEventData, aError);
 }
 
+void HomeConnectDeviceOven::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aTemperature, ValueDescriptorPtr aDuration)
+{
+  HomeConnectCommandBuilder builder("Cooking.Oven.Program.HeatingMode." + aProgramName);
+  builder.addOption("Cooking.Oven.Option.SetpointTemperature", "@{Temperature%%0}");
+  builder.addOption("BSH.Common.Option.Duration", "@{Duration%%0}");
+
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
+  action->addParameter(aTemperature);
+  action->addParameter(aDuration);
+  deviceActions->addAction(action);
+}
 string HomeConnectDeviceOven::oemModelGUID()
 {
   return "gs1:(01)7640156792546";
