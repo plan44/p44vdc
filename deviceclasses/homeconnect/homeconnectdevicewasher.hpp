@@ -32,9 +32,52 @@ class HomeConnectDeviceWasher: public HomeConnectDevice
 {
   typedef HomeConnectDevice inherited;
 
+  typedef enum {
+    temperature_Cold,
+    temperature_GC20,
+    temperature_GC30,
+    temperature_GC40,
+    temperature_GC50,
+    temperature_GC60,
+    temperature_GC70,
+    temperature_GC80,
+    temperature_GC90
+  } Temperature;
+
+  typedef enum {
+    spinSpeed_Off,
+    spinSpeed_RPM400,
+    spinSpeed_RPM600,
+    spinSpeed_RPM800,
+    spinSpeed_RPM1000,
+    spinSpeed_RPM1200,
+    spinSpeed_RPM1400,
+    spinSpeed_RPM1600
+  } SpinSpeed;
+
+
+  EnumValueDescriptorPtr temperatureProp;
+  EnumValueDescriptorPtr spinSpeedProp;
+
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError) P44_OVERRIDE;
+  void addAction(const string& aName, const string& aDescription, const string& aApiCommandTemplate, ValueDescriptorPtr aParameter, ValueDescriptorPtr aSpinSpeed);
+
+  static const char* toString(Temperature aTemperature);
+  static const char* toString(SpinSpeed aSpinSpeed);
+
+  template <typename EnumType>
+  EnumValueDescriptorPtr createEnumDescriptor(string aName, EnumType aMaxValue)
+  {
+    EnumValueDescriptorPtr descriptor = EnumValueDescriptorPtr(new EnumValueDescriptor(aName, true));
+    for(int i = 0 ; i <= aMaxValue; i++)
+    {
+  	  descriptor->addEnum(toString(EnumType(i)), i, false);
+    }
+    return descriptor;
+  }
+
 public:
   HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceWasher();
