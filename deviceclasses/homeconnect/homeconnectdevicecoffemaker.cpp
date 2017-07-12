@@ -28,7 +28,12 @@ namespace p44 {
 HomeConnectDeviceCoffeMaker::HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     standalone(false), inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  hcDevType = homeconnect_coffeemaker;
+
+}
+
+HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()
+{
+  // TODO Auto-generated destructor stub
 }
 
 bool HomeConnectDeviceCoffeMaker::configureDevice()
@@ -102,15 +107,52 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   a->addParameter(ValueDescriptorPtr(new NumericValueDescriptor("fillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 100, 400, 20, true, 250)));
   deviceActions->addAction(a);
 
+  // configure operation mode
+  OperationModeConfiguration omConfig = { 0 };
+  omConfig.hasInactive = true;
+  omConfig.hasReady = true;
+  omConfig.hasDelayedStart = false;
+  omConfig.hasRun = true;
+  omConfig.hasPause = false;
+  omConfig.hasActionrequired = true;
+  omConfig.hasFinished = true;
+  omConfig.hasError = true;
+  omConfig.hasAborting = true;
+  configureOperationModeState(omConfig);
+
+  // configure remote control
+  RemoteControlConfiguration rcConfig = { 0 };
+  rcConfig.hasControlInactive = true;
+  rcConfig.hasControlActive = false;  // coffee machine do not have BSH.Common.Status.RemoteControlActive so it is either inactive or start Allowed
+  rcConfig.hasStartActive = true;
+  configureRemoteControlState(rcConfig);
+
+  // configure power state
+  PowerStateConfiguration psConfig = { 0 };
+  psConfig.hasOff = false;
+  psConfig.hasOn = true;
+  psConfig.hasStandby = true;
+  configurePowerState(psConfig);
+
   return inherited::configureDevice();
 }
 
-HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()
+void HomeConnectDeviceCoffeMaker::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
 {
-  // TODO Auto-generated destructor stub
+  inherited::stateChanged(aChangedState, aEventsToPush);
+}
+
+void HomeConnectDeviceCoffeMaker::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+{
+  ALOG(LOG_INFO, "CoffeMaker Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  inherited::handleEvent(aEventType, aEventData, aError);
+}
+
+string HomeConnectDeviceCoffeMaker::oemModelGUID()
+{
+  return "gs1:(01)7640156792096";
 }
 
 } /* namespace p44 */
 
 #endif // ENABLE_HOMECONNECT
-

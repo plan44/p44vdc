@@ -28,7 +28,7 @@ namespace p44 {
 HomeConnectDeviceFridge::HomeConnectDeviceFridge(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  hcDevType = homeconnect_fridge;
+
 }
 
 HomeConnectDeviceFridge::~HomeConnectDeviceFridge()
@@ -38,7 +38,37 @@ HomeConnectDeviceFridge::~HomeConnectDeviceFridge()
 
 bool HomeConnectDeviceFridge::configureDevice()
 {
+  // configure door state
+  DoorStateConfiguration dsConfig = { 0 };
+  dsConfig.hasOpen = true;
+  dsConfig.hasClosed = true;
+  dsConfig.hasLocked = false;
+  configureDoorState(dsConfig);
+
+  // configure power state
+  PowerStateConfiguration psConfig = { 0 };
+  psConfig.hasOff = false;
+  psConfig.hasOn = true;
+  psConfig.hasStandby = false;
+  configurePowerState(psConfig);
+
   return inherited::configureDevice();
+}
+
+void HomeConnectDeviceFridge::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
+{
+  inherited::stateChanged(aChangedState, aEventsToPush);
+}
+
+void HomeConnectDeviceFridge::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+{
+  ALOG(LOG_INFO, "Fridge Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  inherited::handleEvent(aEventType, aEventData, aError);
+}
+
+string HomeConnectDeviceFridge::oemModelGUID()
+{
+  return "gs1:(01)7640156792812";
 }
 
 } /* namespace p44 */
