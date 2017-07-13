@@ -60,12 +60,6 @@ void HomeConnectDeviceFridge::stateChanged(DeviceStatePtr aChangedState, DeviceE
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceFridge::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
-{
-  ALOG(LOG_INFO, "Fridge Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
-  inherited::handleEvent(aEventType, aEventData, aError);
-}
-
 string HomeConnectDeviceFridge::oemModelGUID()
 {
   return "gs1:(01)7640156792812";

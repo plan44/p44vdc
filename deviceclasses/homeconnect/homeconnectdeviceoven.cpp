@@ -114,54 +114,48 @@ void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEve
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceOven::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+void HomeConnectDeviceOven::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
 {
-  ALOG(LOG_INFO, "Oven Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  ALOG(LOG_INFO, "Oven Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
-  JsonObjectPtr oKey;
-  JsonObjectPtr oValue;
-
-  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
+  if (aKey == "BSH.Common.Option.ElapsedProgramTime") {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    elapsedProgramTimeProp->setInt32Value(value);
     return;
   }
 
-  string key = (oKey != NULL) ? oKey->stringValue() : "";
-
-  if (aEventType == "NOTIFY") {
-    if (key == "BSH.Common.Option.ElapsedProgramTime") {
-      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
-      elapsedProgramTimeProp->setInt32Value(value);
-      return;
-    }
-
-    if (key == "BSH.Common.Option.RemainingProgramTime") {
-      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
-      remainingProgramTimeProp->setInt32Value(value);
-      return;
-    }
-
-    if (key == "BSH.Common.Option.ProgramProgress") {
-      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
-      programProgressProp->setInt32Value(value);
-      return;
-    }
-
-    if (key == "Cooking.Oven.Option.SetpointTemperature") {
-      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
-      setTemperatureProp->setInt32Value(value);
-      return;
-    }
+  if (aKey == "BSH.Common.Option.RemainingProgramTime") {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    remainingProgramTimeProp->setInt32Value(value);
+    return;
   }
 
-  if (aEventType == "STATUS") {
-    if (key == "Cooking.Oven.Status.CurrentCavityTemperature") {
-      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
-      currentTemperatureProp->setInt32Value(value);
-      return;
-    }
+  if (aKey == "BSH.Common.Option.ProgramProgress") {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    programProgressProp->setInt32Value(value);
+    return;
   }
 
-  inherited::handleEvent(aEventType, aEventData, aError);
+  if (aKey == "Cooking.Oven.Option.SetpointTemperature") {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    setTemperatureProp->setInt32Value(value);
+    return;
+  }
+
+  inherited::handleEventTypeNotify(aKey, aValue);
+}
+
+void HomeConnectDeviceOven::handleEventTypeStatus(string aKey, JsonObjectPtr aValue)
+{
+  ALOG(LOG_INFO, "Oven Event 'STATUS' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
+
+  if (aKey == "Cooking.Oven.Status.CurrentCavityTemperature") {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    currentTemperatureProp->setInt32Value(value);
+    return;
+  }
+
+  inherited::handleEventTypeStatus(aKey, aValue);
 }
 
 void HomeConnectDeviceOven::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aTemperature, ValueDescriptorPtr aDuration)

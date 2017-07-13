@@ -199,8 +199,6 @@ void HomeConnectApiOperation::abortOperation(ErrorPtr aError)
   inherited::abortOperation(aError);
 }
 
-
-
 // MARK: ===== HomeConnectEventMonitor
 
 
@@ -242,6 +240,20 @@ void HomeConnectEventMonitor::sendGetEventRequest()
   );
 }
 
+EventType HomeConnectEventMonitor::getEventType()
+{
+  if (eventTypeString == "NOTIFY") {
+    return eventType_Notify;
+  }
+  if (eventTypeString == "STATUS") {
+    return eventType_Status;
+  }
+  if (eventTypeString == "EVENT") {
+      return eventType_Event;
+  }
+  return eventType_Unknown;
+}
+
 
 #define EVENT_STREAM_RESTART_DELAY (15*Second)
 
@@ -264,8 +276,8 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
       string data;
       if (keyAndValue(line, field, data, ':')) {
         if (field=="event") {
-          eventType = data;
-          FOCUSLOG(">>> Got event type: %s", eventType.c_str());
+          eventTypeString = data;
+          FOCUSLOG(">>> Got event type: %s", eventTypeString.c_str());
         }
         else if (field=="data") {
           eventData = data;
@@ -275,9 +287,9 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
       else {
         if (line.empty()) {
           // empty line signals complete event but only if at least a type was found
-          if (!eventType.empty()) {
+          if (!eventTypeString.empty()) {
             FOCUSLOG(">>> Event is complete, dispatch now, one callback per item");
-            if (eventType!="KEEP-ALIVE") {
+            if (eventTypeString!="KEEP-ALIVE") {
               // convert data to JSON
               bool reporteditem = false;
               JsonObjectPtr jsondata = JsonObject::objFromText(eventData.c_str());
@@ -290,20 +302,22 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
                     if (item) {
                       // deliver
                       reporteditem = true;
-                      if (eventCB) eventCB(eventType, item, ErrorPtr());
+                      if (eventCB) {
+                        eventCB(getEventType(), item, ErrorPtr());
+                      }
                     }
                   }
                 }
               }
               if (!reporteditem) {
                 // event w/o data or without items array in data, report event type along with raw data (or no data)
-                if (eventCB) eventCB(eventType, jsondata, ErrorPtr());
+                if (eventCB) eventCB(getEventType(), jsondata, ErrorPtr());
               }
             }
           }
           // done
           eventData.clear();
-          eventType.clear();
+          eventTypeString.clear();
         }
       }
     }

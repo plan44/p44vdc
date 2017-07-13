@@ -123,32 +123,22 @@ void HomeConnectDeviceWasher::stateChanged(DeviceStatePtr aChangedState, DeviceE
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceWasher::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+void HomeConnectDeviceWasher::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
 {
-  ALOG(LOG_INFO, "Washer Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  ALOG(LOG_INFO, "Washer Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
-  JsonObjectPtr oKey;
-  JsonObjectPtr oValue;
-
-  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
+  if (aKey == "LaundryCare.Washer.Option.Temperature") {
+    string value = (aValue != NULL) ? aValue->stringValue() : "";
+    temperatureProp->setStringValue(removeNamespace(value));
+    return;
+  }
+  if (aKey == "LaundryCare.Washer.Option.SpinSpeed") {
+    string value = (aValue != NULL) ? aValue->stringValue() : "";
+    spinSpeedProp->setStringValue(removeNamespace(value));
     return;
   }
 
-  string key = (oKey != NULL) ? oKey->stringValue() : "";
-
-  if (aEventType == "NOTIFY"){
-    if (key == "LaundryCare.Washer.Option.Temperature") {
-      string value = (oValue != NULL) ? oValue->stringValue() : "";
-      temperatureProp->setStringValue(removeNamespace(value));
-      return;
-    }
-    if (key == "LaundryCare.Washer.Option.SpinSpeed") {
-      string value = (oValue != NULL) ? oValue->stringValue() : "";
-      spinSpeedProp->setStringValue(removeNamespace(value));
-      return;
-    }
-  }
-  inherited::handleEvent(aEventType, aEventData, aError);
+  inherited::handleEventTypeNotify(aKey, aValue);
 }
 
 void HomeConnectDeviceWasher::addAction(const string& aName, const string& aDescription, const string& aApiCommandSuffix, ValueDescriptorPtr aTemperature,ValueDescriptorPtr aSpinSpeed)

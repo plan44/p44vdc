@@ -102,34 +102,23 @@ void HomeConnectDeviceCoffeMaker::stateChanged(DeviceStatePtr aChangedState, Dev
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceCoffeMaker::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+void HomeConnectDeviceCoffeMaker::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
 {
-  ALOG(LOG_INFO, "CoffeMaker Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  ALOG(LOG_INFO, "CoffeMaker Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
-  JsonObjectPtr oKey;
-  JsonObjectPtr oValue;
-
-  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
+  if (aKey == "ConsumerProducts.CoffeeMaker.Option.BeanAmount") {
+    string value = (aValue != NULL) ? aValue->stringValue() : "";
+    beanAmountProp->setStringValue(removeNamespace(value));
     return;
   }
 
-  if( aEventType == "NOTIFY") {
-    string key = (oKey != NULL) ? oKey->stringValue() : "";
-
-    if (key == "ConsumerProducts.CoffeeMaker.Option.BeanAmount") {
-      string value = (oValue != NULL) ? oValue->stringValue() : "";
-      beanAmountProp->setStringValue(removeNamespace(value));
-      return;
-    }
-
-    if (key == "ConsumerProducts.CoffeeMaker.Option.FillQuantity") {
-      int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
-      fillQuantityProp->setInt32Value(value);
-      return;
-    }
+  if (aKey == "ConsumerProducts.CoffeeMaker.Option.FillQuantity") {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    fillQuantityProp->setInt32Value(value);
+    return;
   }
 
-  inherited::handleEvent(aEventType, aEventData, aError);
+  inherited::handleEventTypeNotify(aKey, aValue);
 }
 
 void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
