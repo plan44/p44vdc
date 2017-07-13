@@ -72,6 +72,8 @@ bool HomeConnectDeviceOven::configureDevice()
   deviceProperties->addProperty(remainingProgramTimeProp);
   deviceProperties->addProperty(programProgressProp);
 
+  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "PreheatFinished", "Pre-heating finished")));
+
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = true;
@@ -143,6 +145,15 @@ void HomeConnectDeviceOven::handleEventTypeNotify(string aKey, JsonObjectPtr aVa
   }
 
   inherited::handleEventTypeNotify(aKey, aValue);
+}
+
+void HomeConnectDeviceOven::handleEventTypeEvent(string aKey)
+{
+  ALOG(LOG_INFO, "Oven Event 'EVENT' - item: %s", aKey.c_str());
+
+  if(aKey == "Cooking.Oven.Event.PreheatFinished") {
+    deviceEvents->pushEvent("PreheatFinished");
+  }
 }
 
 void HomeConnectDeviceOven::handleEventTypeStatus(string aKey, JsonObjectPtr aValue)
