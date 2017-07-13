@@ -95,25 +95,16 @@ void HomeConnectDeviceDishWasher::stateChanged(DeviceStatePtr aChangedState, Dev
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceDishWasher::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+void HomeConnectDeviceDishWasher::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
 {
-  ALOG(LOG_INFO, "DishWasher Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  ALOG(LOG_INFO, "DishWasher Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
-  JsonObjectPtr oKey;
-  JsonObjectPtr oValue;
-
-  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
-    return;
-  }
-
-  string key = (oKey != NULL) ? oKey->stringValue() : "";
-
-  if (aEventType == "NOTIFY" && key == "BSH.Common.Option.StartInRelative") {
-    int32_t value = (oValue != NULL) ? oValue->int32Value() : 0;
+  if (aKey == "BSH.Common.Option.StartInRelative") {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
     delayedStartProp->setInt32Value(value);
     return;
   }
-  inherited::handleEvent(aEventType, aEventData, aError);
+  inherited::handleEventTypeNotify(aKey, aValue);
 }
 
 void HomeConnectDeviceDishWasher::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)

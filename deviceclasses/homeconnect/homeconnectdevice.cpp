@@ -531,91 +531,135 @@ void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryRes
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
 
-void HomeConnectDevice::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+void HomeConnectDevice::handleEvent(EventType aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
   JsonObjectPtr oKey;
   JsonObjectPtr oValue;
 
   // make sure that all needed data are present
-  if (aEventData && aEventData->get("key", oKey) && aEventData->get("value", oValue) ) {
-    string key = (oKey != NULL) ? oKey->stringValue() : "";
-    string value = (oValue != NULL) ? oValue->stringValue() : "";
+  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
+    return;
+  }
 
-    if (aEventType=="STATUS") {
-      if ((key=="BSH.Common.Status.OperationState") && (operationMode != NULL)) {
-        string operationValue = "Mode" + removeNamespace(value);
-        if (operationMode->value()->setStringValue(operationValue)) {
-          ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
+  string key = (oKey != NULL) ? oKey->stringValue() : "";
 
-          if (operationValue == "ModeRun") {
-            operationMode->pushWithEvent(deviceEvents->getEvent("ProgramStarted"));
-          } else {
-            operationMode->push();
-          }
-        }
-      } else if ((key=="BSH.Common.Status.RemoteControlActive") && (remoteControl != NULL)) {
-        string remoteControlValue;
+  switch(aEventType) {
+    case eventType_Status : {
+      handleEventTypeStatus(key, oValue);
+      return;
+    }
+    case eventType_Notify: {
+      handleEventTypeNotify(key, oValue);
+      return;
+    }
+    case eventType_Event: {
+      handleEventTypeEvent(key);
+      return;
+    }
+  }
+}
 
-        if (value == "true") {
-          if (remoteControl->value()->getStringValue() != "RemoteStartActive") {
-            remoteControlValue = "RemoteControlActive";
-          }
-        } else if (value == "false") {
-          remoteControlValue = "RemoteControlInactive";
-        }
+void HomeConnectDevice::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
+{
+  string value = (aValue != NULL) ? aValue->stringValue() : "";
 
-        if (!remoteControlValue.empty() && remoteControl->value()->setStringValue(remoteControlValue)) {
-          ALOG(LOG_NOTICE, "New Remote Control State: '%s'", remoteControlValue.c_str());
-          remoteControl->push();
-        }
-      } else if ((key=="BSH.Common.Status.RemoteControlStartAllowed") && (remoteControl != NULL)) {
-        string remoteStartValue;
+  if ((aKey == "BSH.Common.Setting.PowerState") && (powerState != NULL)) {
+    string powerStateValue = "Power" + removeNamespace(value);
+    if (powerState->value()->setStringValue(powerStateValue)) {
+      ALOG(LOG_NOTICE, "New Power State: '%s'", powerStateValue.c_str());
+      powerState->push();
+    }
+    return;
+  }
 
-        if (value == "true") {
-          remoteStartValue = "RemoteStartActive";
-        } else if (value == "false") {
-          if (remoteControl->value()->getStringValue() == "RemoteStartActive") {
-            remoteStartValue = "RemoteControlActive";
-          }
-        }
+  if ((aKey == "BSH.Common.Root.SelectedProgram") && (programName != NULL)) {
+    string programNameValue = removeNamespace(value);
+    if (programName->setStringValue(programNameValue)) {
+      ALOG(LOG_NOTICE, "New Program Name State: '%s'", programNameValue.c_str());
+    }
+  }
+}
 
-        if (!remoteStartValue.empty() && remoteControl->value()->setStringValue(remoteStartValue)) {
-          ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
-          remoteControl->push();
-        }
-      } else if ((key=="BSH.Common.Status.DoorState") && (doorState != NULL)) {
-        string doorValue = "Door" + removeNamespace(value);
-        if (doorState->value()->setStringValue(doorValue)) {
-          ALOG(LOG_NOTICE, "Door State: '%s'", doorValue.c_str());
-          doorState->push();
-        }
-      } else if ((key=="BSH.Common.Status.LocalControlActive") && (operationMode != NULL)) {
-        operationMode->pushWithEvent(deviceEvents->getEvent("LocallyOperated"));
-      }
-    } else if (aEventType=="NOTIFY") {
-      if ((key=="BSH.Common.Setting.PowerState") && (powerState != NULL)) {
-        string powerStateValue = "Power" + removeNamespace(value);
-        if (powerState->value()->setStringValue(powerStateValue)) {
-          ALOG(LOG_NOTICE, "New Power State: '%s'", powerStateValue.c_str());
-          powerState->push();
-        }
-      } else if ((key=="BSH.Common.Root.SelectedProgram") && (programName != NULL)) {
-        string programNameValue = removeNamespace(value);
-        if (programName->setStringValue(programNameValue)) {
-          ALOG(LOG_NOTICE, "New Program Name State: '%s'", programNameValue.c_str());
-        }
-      }
-    } else if (aEventType=="EVENT")  {
-      if (operationMode != NULL) {
-        if (key=="BSH.Common.Event.ProgramFinished") {
-          operationMode->pushWithEvent(deviceEvents->getEvent("ProgramFinished"));
-        } else if (key=="BSH.Common.Event.ProgramAborted") {
-          operationMode->pushWithEvent(deviceEvents->getEvent("ProgramAborted"));
-        } else if (key=="BSH.Common.Event.AlarmClockElapsed") {
-          operationMode->pushWithEvent(deviceEvents->getEvent("AlarmClockElapsed"));
-        }
+void HomeConnectDevice::handleEventTypeEvent(string aKey)
+{
+  if (operationMode == NULL) {
+    return;
+  }
+
+  if (aKey=="BSH.Common.Event.ProgramFinished") {
+    operationMode->pushWithEvent(deviceEvents->getEvent("ProgramFinished"));
+  } else if (aKey=="BSH.Common.Event.ProgramAborted") {
+    operationMode->pushWithEvent(deviceEvents->getEvent("ProgramAborted"));
+  } else if (aKey=="BSH.Common.Event.AlarmClockElapsed") {
+    operationMode->pushWithEvent(deviceEvents->getEvent("AlarmClockElapsed"));
+  }
+}
+
+void HomeConnectDevice::handleEventTypeStatus(string aKey, JsonObjectPtr aValue)
+{
+  string value = (aValue != NULL) ? aValue->stringValue() : "";
+
+  if ((aKey == "BSH.Common.Status.OperationState") && (operationMode != NULL)) {
+    string operationValue = "Mode" + removeNamespace(value);
+    if (operationMode->value()->setStringValue(operationValue)) {
+      ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
+
+      if (operationValue == "ModeRun") {
+        operationMode->pushWithEvent(deviceEvents->getEvent("ProgramStarted"));
+      } else {
+        operationMode->push();
       }
     }
+    return;
+  }
+
+  if ((aKey == "BSH.Common.Status.RemoteControlActive") && (remoteControl != NULL)) {
+    string remoteControlValue;
+
+    if (value == "true") {
+      if (remoteControl->value()->getStringValue() != "RemoteStartActive") {
+        remoteControlValue = "RemoteControlActive";
+      }
+    } else if (value == "false") {
+      remoteControlValue = "RemoteControlInactive";
+    }
+
+    if (!remoteControlValue.empty() && remoteControl->value()->setStringValue(remoteControlValue)) {
+      ALOG(LOG_NOTICE, "New Remote Control State: '%s'", remoteControlValue.c_str());
+      remoteControl->push();
+    }
+    return;
+  }
+
+  if ((aKey == "BSH.Common.Status.RemoteControlStartAllowed") && (remoteControl != NULL)) {
+    string remoteStartValue;
+
+    if (value == "true") {
+      remoteStartValue = "RemoteStartActive";
+    } else if (value == "false") {
+      if (remoteControl->value()->getStringValue() == "RemoteStartActive") {
+        remoteStartValue = "RemoteControlActive";
+      }
+    }
+
+    if (!remoteStartValue.empty() && remoteControl->value()->setStringValue(remoteStartValue)) {
+      ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
+      remoteControl->push();
+    }
+    return;
+  }
+
+  if ((aKey=="BSH.Common.Status.DoorState") && (doorState != NULL)) {
+    string doorValue = "Door" + removeNamespace(value);
+    if (doorState->value()->setStringValue(doorValue)) {
+      ALOG(LOG_NOTICE, "Door State: '%s'", doorValue.c_str());
+      doorState->push();
+    }
+    return;
+  }
+
+  if ((aKey=="BSH.Common.Status.LocalControlActive") && (operationMode != NULL)) {
+    operationMode->pushWithEvent(deviceEvents->getEvent("LocallyOperated"));
   }
 }
 
@@ -637,7 +681,7 @@ void HomeConnectDevice::pollStateStatusDone(JsonObjectPtr aResult, ErrorPtr aErr
 
       if (statusArray != NULL) {
         for (int i = 0; i < statusArray->arrayLength(); i++) {
-          handleEvent("STATUS", statusArray->arrayGet(i), aError);
+          handleEvent(eventType_Status, statusArray->arrayGet(i), aError);
         }
       }
     }
@@ -658,7 +702,7 @@ void HomeConnectDevice::pollStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aE
 
       if (settingsArray != NULL) {
         for (int i = 0; i < settingsArray->arrayLength(); i++) {
-          handleEvent("NOTIFY", settingsArray->arrayGet(i), aError);
+          handleEvent(eventType_Notify, settingsArray->arrayGet(i), aError);
         }
       }
     }
@@ -682,13 +726,13 @@ void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aEr
         // create a dummy event that contain information about current program
         event->add("key", JsonObject::newString("BSH.Common.Root.SelectedProgram"));
         event->add("value", JsonObject::newString(data->get("key")->stringValue()));
-        handleEvent("NOTIFY", event, aError);
+        handleEvent(eventType_Notify, event, aError);
 
         // selected program can have selected options, we also should inform devices about theirs values
         JsonObjectPtr optionsArray = data->get("options");
         if (optionsArray != NULL) {
           for (int i = 0; i < optionsArray->arrayLength(); i++) {
-            handleEvent("NOTIFY", optionsArray->arrayGet(i), aError);
+            handleEvent(eventType_Notify, optionsArray->arrayGet(i), aError);
           }
         }
       }

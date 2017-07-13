@@ -253,7 +253,10 @@ namespace p44 {
     // The following methods implement common behaviour and should be executed from subclasses overrides.
     virtual bool configureDevice();
     virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
-    virtual void handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError);
+    void handleEvent(EventType aEventType, JsonObjectPtr aEventData, ErrorPtr aError);
+    virtual void handleEventTypeNotify(string aKey, JsonObjectPtr aValue);
+    virtual void handleEventTypeEvent(string aKey);
+    virtual void handleEventTypeStatus(string aKey, JsonObjectPtr aValue);
 
     // Pool the state of the device and process the responses
     void pollState();

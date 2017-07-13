@@ -103,26 +103,17 @@ void HomeConnectDeviceDryer::stateChanged(DeviceStatePtr aChangedState, DeviceEv
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceDryer::handleEvent(string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
+void HomeConnectDeviceDryer::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
 {
-  ALOG(LOG_INFO, "Dryer Event '%s' - item: %s", aEventType.c_str(), aEventData ? aEventData->c_strValue() : "<none>");
+  ALOG(LOG_INFO, "Dryer Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
-  JsonObjectPtr oKey;
-  JsonObjectPtr oValue;
-
-  if (!aEventData || !aEventData->get("key", oKey) || !aEventData->get("value", oValue) ) {
-    return;
-  }
-
-  string key = (oKey != NULL) ? oKey->stringValue() : "";
-
-  if (aEventType == "NOTIFY" && key == "LaundryCare.Dryer.Option.DryingTarget") {
-    string value = (oValue != NULL) ? oValue->stringValue() : "";
+  if (aKey == "LaundryCare.Dryer.Option.DryingTarget") {
+    string value = (aValue != NULL) ? aValue->stringValue() : "";
     dryingTargetProp->setStringValue(removeNamespace(value));
     return;
   }
 
-  inherited::handleEvent(aEventType, aEventData, aError);
+  inherited::handleEventTypeNotify(aKey, aValue);
 }
 
 void HomeConnectDeviceDryer::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)

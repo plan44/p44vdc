@@ -95,12 +95,19 @@ namespace p44 {
   typedef boost::intrusive_ptr<HomeConnectApiOperation> HomeConnectApiOperationPtr;
 
 
+  typedef enum {
+    eventType_Unknown,
+    eventType_Status,
+    eventType_Notify,
+    eventType_Event
+  } EventType;
+
   /// will be called to deliver events
   /// @param aEventType the type of event
   /// @param aEventData the event data.
   /// @param aError error in case of failure, error code is either a HomeConnectCommErrors enum or the error code as
   ///   delivered by the API itself.
-  typedef boost::function<void (string aEventType, JsonObjectPtr aEventData, ErrorPtr aError)> HomeConnectEventResultCB;
+  typedef boost::function<void (EventType aEventType, JsonObjectPtr aEventData, ErrorPtr aError)> HomeConnectEventResultCB;
 
 
   class HomeConnectEventMonitor: public JsonWebClient
@@ -112,7 +119,7 @@ namespace p44 {
     HomeConnectEventResultCB eventCB;
 
     string eventBuffer; ///< accumulating event data
-    string eventType;
+    string eventTypeString;
     string eventData;
 
   public:
@@ -129,6 +136,7 @@ namespace p44 {
 
     void sendGetEventRequest();
     void processEventData(const string &aResponse, ErrorPtr aError);
+    EventType getEventType();
 
   };
   typedef boost::intrusive_ptr<HomeConnectEventMonitor> HomeConnectEventMonitorPtr;
