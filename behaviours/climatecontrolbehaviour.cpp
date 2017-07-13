@@ -90,15 +90,15 @@ void FanCoilUnitScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
   // set the base class scene defaults
   inherited::setDefaultSceneValues(aSceneNo);
-  // very simple fixed defaults
-  // - heating scenes 0..5 set operating mode to cooling
-  // - cooling scenes 9..14 set operating mode to heating
+  // simple fixed defaults
+  // - heating scenes 0..5 set operating mode to heating
+  // - cooling scenes 6..11 set operating mode to cooling
   if (aSceneNo>=0 && aSceneNo<=5) {
     // heating energy level
-    powerState = true;
+    powerState = aSceneNo!=0; // Scene 0 also turns off the device
     operationMode = fcuOperatingMode_heat;
   }
-  else if (aSceneNo>=9 && aSceneNo<=14) {
+  else if (aSceneNo>=6 && aSceneNo<=11) {
     powerState = true;
     operationMode = fcuOperatingMode_cool;
   }
