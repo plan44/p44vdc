@@ -41,6 +41,7 @@ class HomeConnectDeviceOven: public HomeConnectDevice
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEventTypeNotify(string aKey, JsonObjectPtr aValue) P44_OVERRIDE;
+  virtual void handleEventTypeEvent(string aKey) P44_OVERRIDE;
   virtual void handleEventTypeStatus(string aKey, JsonObjectPtr aValue) P44_OVERRIDE;
 
   void addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aTemperature, ValueDescriptorPtr aDuration);
