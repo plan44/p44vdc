@@ -289,11 +289,10 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
   JsonObjectPtr o;
   if (aHomeApplicanceInfoRecord->get("haId", o))
     haId = o->stringValue();
+
+  model = "Siemens";
   if (aHomeApplicanceInfoRecord->get("vib", o)) {
-    model = o->stringValue();
-    if (aHomeApplicanceInfoRecord->get("type", o)) {
-      model += " " + o->stringValue();
-    }
+    model += " " + o->stringValue();
   }
   if (aHomeApplicanceInfoRecord->get("enumber", o))
     modelGuid = o->stringValue();

@@ -170,8 +170,9 @@ void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aRe
           if (simpleIdentifyAndAddDevice(newDev)) {
             // actually added, no duplicate, set the name
             // (otherwise, this is an incremental collect and we knew this light already)
-            JsonObjectPtr n = ha->get("name");
-            if (n) newDev->initializeName(n->stringValue());
+            JsonObjectPtr type = ha->get("type");
+            JsonObjectPtr vib = ha->get("vib");
+            if (type && vib) newDev->initializeName(type->stringValue() + " " + vib->stringValue());
           }
         }
       }
