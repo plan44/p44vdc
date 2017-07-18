@@ -36,7 +36,7 @@ class HomeConnectDeviceDishWasher: public HomeConnectDevice
 
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
-  virtual void handleEventTypeNotify(string aKey, JsonObjectPtr aValue) P44_OVERRIDE;
+  virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue) P44_OVERRIDE;
 
   void addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter);
 

@@ -254,9 +254,9 @@ namespace p44 {
     virtual bool configureDevice();
     virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
     void handleEvent(EventType aEventType, JsonObjectPtr aEventData, ErrorPtr aError);
-    virtual void handleEventTypeNotify(string aKey, JsonObjectPtr aValue);
-    virtual void handleEventTypeEvent(string aKey);
-    virtual void handleEventTypeStatus(string aKey, JsonObjectPtr aValue);
+    virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue);
+    virtual void handleEventTypeEvent(const string& aKey);
+    virtual void handleEventTypeStatus(const string& aKey, JsonObjectPtr aValue);
 
     // Pool the state of the device and process the responses
     void pollState();

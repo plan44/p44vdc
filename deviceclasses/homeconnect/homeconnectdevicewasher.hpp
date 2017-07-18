@@ -65,7 +65,7 @@ class HomeConnectDeviceWasher: public HomeConnectDevice
 
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
-  virtual void handleEventTypeNotify(string aKey, JsonObjectPtr aValue) P44_OVERRIDE;
+  virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue) P44_OVERRIDE;
 
   void addAction(const string& aName, const string& aDescription, const string& aApiCommandTemplate, ValueDescriptorPtr aParameter, ValueDescriptorPtr aSpinSpeed);
   EnumValueDescriptorPtr createEnumDescriptor(string aName, int aMaxValue, const char** aEnumNames);

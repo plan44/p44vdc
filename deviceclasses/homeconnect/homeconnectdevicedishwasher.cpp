@@ -95,7 +95,7 @@ void HomeConnectDeviceDishWasher::stateChanged(DeviceStatePtr aChangedState, Dev
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceDishWasher::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
+void HomeConnectDeviceDishWasher::handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue)
 {
   ALOG(LOG_INFO, "DishWasher Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 

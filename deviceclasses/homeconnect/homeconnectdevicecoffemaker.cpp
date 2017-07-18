@@ -102,7 +102,7 @@ void HomeConnectDeviceCoffeMaker::stateChanged(DeviceStatePtr aChangedState, Dev
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceCoffeMaker::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
+void HomeConnectDeviceCoffeMaker::handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue)
 {
   ALOG(LOG_INFO, "CoffeMaker Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 

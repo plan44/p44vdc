@@ -559,7 +559,7 @@ void HomeConnectDevice::handleEvent(EventType aEventType, JsonObjectPtr aEventDa
   }
 }
 
-void HomeConnectDevice::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
+void HomeConnectDevice::handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue)
 {
   string value = (aValue != NULL) ? aValue->stringValue() : "";
 
@@ -580,7 +580,7 @@ void HomeConnectDevice::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
   }
 }
 
-void HomeConnectDevice::handleEventTypeEvent(string aKey)
+void HomeConnectDevice::handleEventTypeEvent(const string& aKey)
 {
   if (operationMode == NULL) {
     return;
@@ -595,7 +595,7 @@ void HomeConnectDevice::handleEventTypeEvent(string aKey)
   }
 }
 
-void HomeConnectDevice::handleEventTypeStatus(string aKey, JsonObjectPtr aValue)
+void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr aValue)
 {
   string value = (aValue != NULL) ? aValue->stringValue() : "";
 

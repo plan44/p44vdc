@@ -103,7 +103,7 @@ void HomeConnectDeviceDryer::stateChanged(DeviceStatePtr aChangedState, DeviceEv
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceDryer::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
+void HomeConnectDeviceDryer::handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue)
 {
   ALOG(LOG_INFO, "Dryer Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
