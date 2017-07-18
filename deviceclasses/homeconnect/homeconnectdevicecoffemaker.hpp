@@ -52,6 +52,7 @@ public:
   virtual ~HomeConnectDeviceCoffeMaker();
 
   virtual string oemModelGUID() P44_OVERRIDE;
+  virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 };
 
 } /* namespace p44 */

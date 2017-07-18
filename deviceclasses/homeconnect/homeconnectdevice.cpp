@@ -745,13 +745,8 @@ void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aEr
 
 bool HomeConnectDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getIcon("homeconnect_coffee", aIcon, aWithData, aResolutionPrefix))
-    return true;
-  else
-    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+  return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
 }
-
-
 
 string HomeConnectDevice::hardwareGUID()
 {
