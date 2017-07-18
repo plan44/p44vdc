@@ -116,7 +116,7 @@ void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEve
   inherited::stateChanged(aChangedState, aEventsToPush);
 }
 
-void HomeConnectDeviceOven::handleEventTypeNotify(string aKey, JsonObjectPtr aValue)
+void HomeConnectDeviceOven::handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue)
 {
   ALOG(LOG_INFO, "Oven Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
@@ -147,7 +147,7 @@ void HomeConnectDeviceOven::handleEventTypeNotify(string aKey, JsonObjectPtr aVa
   inherited::handleEventTypeNotify(aKey, aValue);
 }
 
-void HomeConnectDeviceOven::handleEventTypeEvent(string aKey)
+void HomeConnectDeviceOven::handleEventTypeEvent(const string& aKey)
 {
   ALOG(LOG_INFO, "Oven Event 'EVENT' - item: %s", aKey.c_str());
 
@@ -156,7 +156,7 @@ void HomeConnectDeviceOven::handleEventTypeEvent(string aKey)
   }
 }
 
-void HomeConnectDeviceOven::handleEventTypeStatus(string aKey, JsonObjectPtr aValue)
+void HomeConnectDeviceOven::handleEventTypeStatus(const string& aKey, JsonObjectPtr aValue)
 {
   ALOG(LOG_INFO, "Oven Event 'STATUS' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
