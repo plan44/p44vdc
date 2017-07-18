@@ -756,16 +756,6 @@ void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aEr
   MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::pollState, this), 10 * Minute);
 }
 
-bool HomeConnectDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
-{
-  if (getIcon("homeconnect_coffee", aIcon, aWithData, aResolutionPrefix))
-    return true;
-  else
-    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
-}
-
-
-
 string HomeConnectDevice::hardwareGUID()
 {
   return string_format("haId:%s", haId.c_str());

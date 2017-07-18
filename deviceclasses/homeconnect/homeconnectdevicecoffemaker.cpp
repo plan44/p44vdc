@@ -178,6 +178,14 @@ string HomeConnectDeviceCoffeMaker::oemModelGUID()
   return "gs1:(01)7640156792096";
 }
 
+bool HomeConnectDeviceCoffeMaker::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
+{
+  if (getIcon("homeconnect_coffee", aIcon, aWithData, aResolutionPrefix))
+    return true;
+  else
+    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+}
+
 } /* namespace p44 */
 
 #endif // ENABLE_HOMECONNECT

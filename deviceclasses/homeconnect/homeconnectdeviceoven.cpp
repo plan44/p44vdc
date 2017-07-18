@@ -185,6 +185,14 @@ string HomeConnectDeviceOven::oemModelGUID()
   return "gs1:(01)7640156792546";
 }
 
+bool HomeConnectDeviceOven::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
+{
+  if (getIcon("homeconnect_oven", aIcon, aWithData, aResolutionPrefix))
+    return true;
+  else
+    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+}
+
 } /* namespace p44 */
 
 #endif // ENABLE_HOMECONNECT
