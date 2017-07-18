@@ -171,7 +171,7 @@ void HomeConnectDeviceOven::handleEventTypeStatus(string aKey, JsonObjectPtr aVa
 
 void HomeConnectDeviceOven::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aTemperature, ValueDescriptorPtr aDuration)
 {
-  HomeConnectCommandBuilder builder("Cooking.Oven.Program.HeatingMode." + aProgramName);
+  HomeConnectProgramBuilder builder("Cooking.Oven.Program.HeatingMode." + aProgramName);
   builder.addOption("Cooking.Oven.Option.SetpointTemperature", "@{Temperature%%0}");
   builder.addOption("BSH.Common.Option.Duration", "@{Duration%%0}");
 

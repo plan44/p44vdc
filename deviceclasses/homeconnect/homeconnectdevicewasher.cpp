@@ -143,7 +143,7 @@ void HomeConnectDeviceWasher::handleEventTypeNotify(string aKey, JsonObjectPtr a
 
 void HomeConnectDeviceWasher::addAction(const string& aName, const string& aDescription, const string& aApiCommandSuffix, ValueDescriptorPtr aTemperature,ValueDescriptorPtr aSpinSpeed)
 {
-  HomeConnectCommandBuilder builder("LaundryCare.Washer.Program." + aApiCommandSuffix);
+  HomeConnectProgramBuilder builder("LaundryCare.Washer.Program." + aApiCommandSuffix);
   builder.addOption("LaundryCare.Washer.Option.Temperature", "\"LaundryCare.Washer.EnumType.Temperature.@{Temperature}\"");
   builder.addOption("LaundryCare.Washer.Option.SpinSpeed", "\"LaundryCare.Washer.EnumType.SpinSpeed.@{SpinSpeed}\"");
 

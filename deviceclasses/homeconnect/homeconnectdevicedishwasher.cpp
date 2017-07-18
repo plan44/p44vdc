@@ -109,7 +109,7 @@ void HomeConnectDeviceDishWasher::handleEventTypeNotify(string aKey, JsonObjectP
 
 void HomeConnectDeviceDishWasher::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)
 {
-  HomeConnectCommandBuilder builder("Dishcare.Dishwasher.Program." + aProgramName);
+  HomeConnectProgramBuilder builder("Dishcare.Dishwasher.Program." + aProgramName);
   builder.addOption("BSH.Common.Option.StartInRelative", "@{DelayedStart%%0}");
 
   HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
