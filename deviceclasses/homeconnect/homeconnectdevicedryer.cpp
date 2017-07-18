@@ -118,7 +118,7 @@ void HomeConnectDeviceDryer::handleEventTypeNotify(const string& aKey, JsonObjec
 
 void HomeConnectDeviceDryer::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)
 {
-  HomeConnectCommandBuilder builder("LaundryCare.Dryer.Program." + aProgramName);
+  HomeConnectProgramBuilder builder("LaundryCare.Dryer.Program." + aProgramName);
   builder.addOption("LaundryCare.Dryer.Option.DryingTarget", "\"LaundryCare.Dryer.EnumType.DryingTarget.@{DryingTarget}\"");
 
   HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));

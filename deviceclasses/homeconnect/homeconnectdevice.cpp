@@ -151,12 +151,12 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
   if (aCompletedCB) aCompletedCB(aError);
 }
 
-HomeConnectCommandBuilder::HomeConnectCommandBuilder(string aProgramName) :
+HomeConnectProgramBuilder::HomeConnectProgramBuilder(const string& aProgramName) :
   programName(aProgramName)
 {
 }
 
-string HomeConnectCommandBuilder::build()
+string HomeConnectProgramBuilder::build()
 {
   stringstream ss;
 
@@ -179,6 +179,20 @@ string HomeConnectCommandBuilder::build()
   ss << "}}";
   return ss.str();
 
+}
+
+HomeConnectSettingBuilder::HomeConnectSettingBuilder(const string& aSettingName) :
+  settingName(aSettingName)
+{
+}
+
+string HomeConnectSettingBuilder::build()
+{
+  stringstream ss;
+
+  ss << "PUT:settings/" << settingName << ":{\"data\":{\"key\":\"" << settingName << "\",\"value\":" << value << "}}";
+
+  return ss.str();
 }
 
 
@@ -355,27 +369,26 @@ bool HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 bool HomeConnectDevice::configureDevice()
 {
   HomeConnectActionPtr a;
+  HomeConnectSettingBuilder settingBuilder = HomeConnectSettingBuilder("BSH.Common.Setting.PowerState");
   // configure common things
   // - stop
   a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "stop current program", "DELETE:programs/active"));
   deviceActions->addAction(a);
   // - power state off
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOff", "Switch power state off",
-    "PUT:settings/BSH.Common.Setting.PowerState:"
-    "{\"data\":{\"key\":\"BSH.Common.Setting.PowerState\",\"value\":\"BSH.Common.EnumType.PowerState.Off\"}}"
-  ));
+
+  settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.Off\"");
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOff", "Switch power state off", settingBuilder.build()));
   // - power state standby
   deviceActions->addAction(a);
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.StandBy", "Switch power state standby",
-    "PUT:settings/BSH.Common.Setting.PowerState:"
-    "{\"data\":{\"key\":\"BSH.Common.Setting.PowerState\",\"value\":\"BSH.Common.EnumType.PowerState.Standby\"}}"
-  ));
+
+  settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.Standby\"");
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.StandBy", "Switch power state standby", settingBuilder.build()));
   // - power state on
   deviceActions->addAction(a);
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOn", "Switch power state on",
-    "PUT:settings/BSH.Common.Setting.PowerState:"
-    "{\"data\":{\"key\":\"BSH.Common.Setting.PowerState\",\"value\":\"BSH.Common.EnumType.PowerState.On\"}}"
-  ));
+
+  settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.On\"");
+  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOn", "Switch power state on", settingBuilder.build()));
+
   deviceActions->addAction(a);
 
   // program name

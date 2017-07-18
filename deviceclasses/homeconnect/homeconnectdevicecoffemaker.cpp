@@ -130,7 +130,7 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
                                             double aFillAmountDefault)
 {
 
-  HomeConnectCommandBuilder builder("ConsumerProducts.CoffeeMaker.Program.Beverage." + aProgramName);
+  HomeConnectProgramBuilder builder("ConsumerProducts.CoffeeMaker.Program.Beverage." + aProgramName);
 
   if(!standalone) {
     builder.addOption("ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature", "\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{TemperatureLevel}\"");

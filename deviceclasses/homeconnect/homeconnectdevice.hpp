@@ -104,17 +104,31 @@ namespace p44 {
   typedef boost::intrusive_ptr<HomeConnectAction> HomeConnectActionPtr;
   
 
-  class HomeConnectCommandBuilder
+  class HomeConnectProgramBuilder
   {
   private:
     string programName;
 
     map<string, string> options;
   public:
-    HomeConnectCommandBuilder(string aProgramName);
+    HomeConnectProgramBuilder(const string& aProgramName);
 
-    void addOption(string key, string value) {  options[key] = value; }
+    void addOption(const string& aKey, const string& aValue) {  options[aKey] = aValue; }
 
+    string build();
+
+  };
+
+  class HomeConnectSettingBuilder
+  {
+  private:
+    string settingName;
+    string value;
+
+  public:
+    HomeConnectSettingBuilder(const string& aSettingName);
+
+    void setValue(const string& aValue) { value = aValue; }
     string build();
 
   };
