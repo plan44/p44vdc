@@ -52,12 +52,70 @@ bool HomeConnectDeviceFridge::configureDevice()
   psConfig.hasStandby = false;
   configurePowerState(psConfig);
 
+  fridgeSuperMode = ValueDescriptorPtr(new NumericValueDescriptor("FridgeSuperMode", valueType_boolean, valueUnit_none, 0, 1, 1, true, 0));
+  freezerSuperMode = ValueDescriptorPtr(new NumericValueDescriptor("FreezerSuperMode", valueType_boolean, valueUnit_none, 0, 1, 1, true, 0));
+
+  fridgeTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FridgeSetTemperature", valueType_numeric, valueUnit_celsius, 2, 8, 1));
+  freezerTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FreezerSetTemperature", valueType_numeric, valueUnit_celsius,-24, -16, 1));
+
+  deviceProperties->addProperty(fridgeSuperMode);
+  deviceProperties->addProperty(freezerSuperMode);
+  deviceProperties->addProperty(fridgeTemperature);
+  deviceProperties->addProperty(freezerTemperature);
+
+
+  HomeConnectSettingBuilder builder("Refrigeration.FridgeFreezer.Setting.SuperModeFreezer");
+  builder.setValue("true");
+
+  HomeConnectActionPtr freezerAction = HomeConnectActionPtr(new HomeConnectAction(*this, "SetFreezerSuperMode", "Set freezer Super Mode", builder.build()));
+  deviceActions->addAction(freezerAction);
+
+  builder = HomeConnectSettingBuilder("Refrigeration.FridgeFreezer.Setting.SuperModeRefrigerator");
+  builder.setValue("true");
+
+  HomeConnectActionPtr fridgeAction = HomeConnectActionPtr(new HomeConnectAction(*this, "SetFridgeSuperMode", "Set fridge Super Mode", builder.build()));
+  deviceActions->addAction(fridgeAction);
+
   return inherited::configureDevice();
 }
 
 void HomeConnectDeviceFridge::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
 {
   inherited::stateChanged(aChangedState, aEventsToPush);
+}
+
+void HomeConnectDeviceFridge::handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue)
+{
+  ALOG(LOG_INFO, "Fridge/Freezer Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
+
+  if (aKey == "Refrigeration.FridgeFreezer.Setting.SetpointTemperatureFreezer") {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    freezerTemperature->setInt32Value(value);
+    return;
+  }
+
+  if (aKey == "Refrigeration.FridgeFreezer.Setting.SetpointTemperatureRefrigerator") {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    fridgeTemperature->setInt32Value(value);
+    return;
+  }
+
+  if (aKey == "Refrigeration.FridgeFreezer.Setting.SuperModeFreezer") {
+    bool value = (aValue != NULL) ? aValue->boolValue() : false;
+    int32_t intValue = value ? 1 : 0;
+    freezerSuperMode->setInt32Value(intValue);
+    return;
+  }
+
+  if (aKey == "Refrigeration.FridgeFreezer.Setting.SuperModeRefrigerator") {
+    bool value = (aValue != NULL) ? aValue->boolValue() : false;
+    int32_t intValue = value ? 1 : 0;
+    fridgeSuperMode->setInt32Value(intValue);
+    return;
+  }
+
+
+  inherited::handleEventTypeNotify(aKey, aValue);
 }
 
 string HomeConnectDeviceFridge::oemModelGUID()
