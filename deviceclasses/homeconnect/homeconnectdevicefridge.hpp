@@ -32,8 +32,14 @@ class HomeConnectDeviceFridge: public HomeConnectDevice
 {
   typedef HomeConnectDevice inherited;
 
+  ValueDescriptorPtr fridgeSuperMode;
+  ValueDescriptorPtr freezerSuperMode;
+  ValueDescriptorPtr fridgeTemperature;
+  ValueDescriptorPtr freezerTemperature;
+
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
+  virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue) P44_OVERRIDE;
 public:
   HomeConnectDeviceFridge(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceFridge();
