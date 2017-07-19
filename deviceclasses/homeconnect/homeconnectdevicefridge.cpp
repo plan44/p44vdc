@@ -66,15 +66,17 @@ bool HomeConnectDeviceFridge::configureDevice()
 
   HomeConnectSettingBuilder builder("Refrigeration.FridgeFreezer.Setting.SuperModeFreezer");
   builder.setValue("true");
+  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "SetFreezerSuperMode", "Set freezer Super Mode", builder.build())));
 
-  HomeConnectActionPtr freezerAction = HomeConnectActionPtr(new HomeConnectAction(*this, "SetFreezerSuperMode", "Set freezer Super Mode", builder.build()));
-  deviceActions->addAction(freezerAction);
+  builder.setValue("false");
+  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "CancelFreezerSuperMode", "Cancel freezer Super Mode", builder.build())));
 
   builder = HomeConnectSettingBuilder("Refrigeration.FridgeFreezer.Setting.SuperModeRefrigerator");
   builder.setValue("true");
+  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "SetFridgeSuperMode", "Set fridge Super Mode", builder.build())));
 
-  HomeConnectActionPtr fridgeAction = HomeConnectActionPtr(new HomeConnectAction(*this, "SetFridgeSuperMode", "Set fridge Super Mode", builder.build()));
-  deviceActions->addAction(fridgeAction);
+  builder.setValue("false");
+  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "CancelFridgeSuperMode", "Cancel fridge Super Mode", builder.build())));
 
   return inherited::configureDevice();
 }
