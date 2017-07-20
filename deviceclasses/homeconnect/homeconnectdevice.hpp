@@ -29,6 +29,7 @@
 #include "jsonobject.hpp"
 #include "simplescene.hpp"
 #include "homeconnectcomm.hpp"
+#include <boost/optional.hpp>
 
 using namespace std;
 
@@ -44,12 +45,26 @@ namespace p44 {
 
   public:
 
-    HomeConnectDeviceSettings(Device &aDevice) : inherited(aDevice) {};
+    HomeConnectDeviceSettings(Device &aDevice,
+                              boost::optional<string> aFireAction = boost::none,
+                              boost::optional<string> aLeaveHomeAction = boost::none,
+                              boost::optional<string> aDeepOffAction = boost::none,
+                              boost::optional<string> aSleepAction = boost::none) :
+      inherited(aDevice),
+      fireAction(aFireAction),
+      leaveHomeAction(aLeaveHomeAction),
+      deepOffAction(aDeepOffAction),
+      sleepAction(aSleepAction) {};
 
     /// factory method to create the correct subclass type of DsScene
     /// @param aSceneNo the scene number to create a scene object for.
     /// @note setDefaultSceneValues() must be called to set default scene values
     virtual DsScenePtr newDefaultScene(SceneNo aSceneNo);
+
+    boost::optional<string> fireAction;
+    boost::optional<string> leaveHomeAction;
+    boost::optional<string> deepOffAction;
+    boost::optional<string> sleepAction;
 
 
   };
@@ -62,9 +77,15 @@ namespace p44 {
   {
     typedef SimpleCmdScene inherited;
 
+    const HomeConnectDeviceSettings& deviceSettings;
+
+    void setActionIfPresent(const boost::optional<string>& aAction);
+
   public:
 
-    HomeConnectScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) : inherited(aSceneDeviceSettings, aSceneNo) {};
+    HomeConnectScene(HomeConnectDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
+      inherited(aSceneDeviceSettings, aSceneNo),
+      deviceSettings(aSceneDeviceSettings) {};
 
     /// Set default scene values for a specified scene number
     /// @param aSceneNo the scene number to set default values

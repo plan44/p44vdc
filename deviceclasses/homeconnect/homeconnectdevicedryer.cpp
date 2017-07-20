@@ -28,7 +28,7 @@ namespace p44 {
 HomeConnectDeviceDryer::HomeConnectDeviceDryer(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-
+  installSettings(new HomeConnectDeviceSettings(*this, string("std.Stop")));
 }
 
 HomeConnectDeviceDryer::~HomeConnectDeviceDryer()

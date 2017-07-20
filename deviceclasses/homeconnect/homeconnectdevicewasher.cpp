@@ -51,7 +51,7 @@ const char* HomeConnectDeviceWasher::spinSpeedNames[spinSpeed_Num] = {
 HomeConnectDeviceWasher::HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-
+  installSettings(new HomeConnectDeviceSettings(*this, string("std.Stop")));
 }
 
 HomeConnectDeviceWasher::~HomeConnectDeviceWasher()

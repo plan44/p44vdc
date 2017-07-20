@@ -55,34 +55,36 @@ void HomeConnectScene::setDefaultSceneValues(SceneNo aSceneNo)
   // modify scenes according to dS kettle standard behaviour
   switch (aSceneNo) {
     case ABSENT:
+      setActionIfPresent(deviceSettings.leaveHomeAction);
+      break;
     case FIRE:
+      setActionIfPresent(deviceSettings.fireAction);
+      break;
     case SLEEPING:
-    case ROOM_OFF:
+      setActionIfPresent(deviceSettings.sleepAction);
+      break;
     case DEEP_OFF:
-      // turn off the applicance
-      value = 0; // not used in ActionOutputBehaviour
-      setDontCare(false);
-      command = "std.stop"; // "deviceaction:" is default prefix, do not explicitly set it
+      setActionIfPresent(deviceSettings.deepOffAction);
       break;
-    case PANIC:
-    case SMOKE:
-    case WATER:
-    case GAS:
-    case ALARM1:
-    case ALARM2:
-    case ALARM3:
-    case ALARM4:
-      // no operation for these by default (but still, only sensible action is stop, so we preconfigure that here, with dontCare set)
-      value = 0; // not used in ActionOutputBehaviour
-      setDontCare(true); // but no action by default
-      command = "std.stop"; // "deviceaction:" is default prefix, do not explicitly set it
-      break;
+
     default:
       // no operation by default for all other scenes
       setDontCare(true);
       break;
   }
   markClean(); // default values are always clean
+}
+
+void HomeConnectScene::setActionIfPresent(const boost::optional<string>& aAction)
+{
+  if(!aAction) {
+    setDontCare(true);
+    return;
+  }
+
+  setDontCare(false);
+  value = 0;
+  command = *aAction;
 }
 
 
@@ -293,7 +295,6 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
 {
   // home connect appliances are single devices
   setColorClass(class_white_singledevices);
-  installSettings(DeviceSettingsPtr(new HomeConnectDeviceSettings(*this)));
   // - set a action output behaviour (no classic output properties and channels)
   OutputBehaviourPtr ab = OutputBehaviourPtr(new ActionOutputBehaviour(*this));
   ab->setGroupMembership(group_black_variable, true);
