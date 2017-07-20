@@ -40,6 +40,9 @@ class HomeConnectDeviceFridge: public HomeConnectDevice
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue) P44_OVERRIDE;
+  void propertyChanged(ValueDescriptorPtr aChangedProperty);
+  void sendNewSetting(const string& aSettingName, const string& aValue);
+  void sendSettingFinished(JsonObjectPtr aResult, ErrorPtr aError);
 public:
   HomeConnectDeviceFridge(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceFridge();
