@@ -63,20 +63,22 @@ bool HomeConnectDeviceFridge::configureDevice()
   deviceProperties->addProperty(fridgeTemperature);
   deviceProperties->addProperty(freezerTemperature);
 
+  deviceProperties->setPropertyChangedHandler(boost::bind(&HomeConnectDeviceFridge::propertyChanged, this, _1));
+
 
   HomeConnectSettingBuilder builder("Refrigeration.FridgeFreezer.Setting.SuperModeFreezer");
   builder.setValue("true");
-  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "SetFreezerSuperMode", "Set freezer Super Mode", builder.build())));
+  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "std.SetFreezerSuperMode", "Set freezer Super Mode", builder.build())));
 
   builder.setValue("false");
-  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "CancelFreezerSuperMode", "Cancel freezer Super Mode", builder.build())));
+  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "std.CancelFreezerSuperMode", "Cancel freezer Super Mode", builder.build())));
 
   builder = HomeConnectSettingBuilder("Refrigeration.FridgeFreezer.Setting.SuperModeRefrigerator");
   builder.setValue("true");
-  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "SetFridgeSuperMode", "Set fridge Super Mode", builder.build())));
+  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "std.SetFridgeSuperMode", "Set fridge Super Mode", builder.build())));
 
   builder.setValue("false");
-  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "CancelFridgeSuperMode", "Cancel fridge Super Mode", builder.build())));
+  deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "std.CancelFridgeSuperMode", "Cancel fridge Super Mode", builder.build())));
 
   return inherited::configureDevice();
 }
@@ -118,6 +120,44 @@ void HomeConnectDeviceFridge::handleEventTypeNotify(const string& aKey, JsonObje
 
 
   inherited::handleEventTypeNotify(aKey, aValue);
+}
+
+void HomeConnectDeviceFridge::propertyChanged(ValueDescriptorPtr aChangedProperty)
+{
+  ALOG(LOG_DEBUG, "Fridge/Freezer property changed, name:  %s, value: %s", aChangedProperty->getName().c_str(), aChangedProperty->getStringValue().c_str());
+
+
+  if (aChangedProperty == fridgeTemperature) {
+    sendNewSetting("Refrigeration.FridgeFreezer.Setting.SetpointTemperatureRefrigerator", aChangedProperty->getStringValue());
+    return;
+  }
+
+  if (aChangedProperty == freezerTemperature) {
+    sendNewSetting("Refrigeration.FridgeFreezer.Setting.SetpointTemperatureFreezer", aChangedProperty->getStringValue());
+    return;
+  }
+}
+
+void HomeConnectDeviceFridge::sendNewSetting(const string& aSettingName,const string& aValue)
+{
+  ALOG(LOG_DEBUG, "Fridge/Freezer - setting:  %s, to value: %s", aSettingName.c_str(), aValue.c_str());
+
+  string jsonData = "{ \"data\": { \"key\": \"" + aSettingName + "\", \"value\":" + aValue + "}}";
+  homeConnectComm().apiAction("PUT",
+                              "/api/homeappliances/" + haId + "/settings/" + aSettingName,
+                              JsonObject::objFromText(jsonData.c_str()),
+                              boost::bind(&HomeConnectDeviceFridge::sendSettingFinished, this, _1, _2));
+}
+
+void HomeConnectDeviceFridge::sendSettingFinished(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    ALOG(LOG_DEBUG, "Fridge/Freezer - setting parameter finished, result %s", aResult ? aResult->c_strValue() : "<none>");
+  }
+  else {
+    ALOG(LOG_WARNING, "Fridge/Freezer - setting parameter failed, error: %s", aError->getErrorMessage());
+  }
+
 }
 
 string HomeConnectDeviceFridge::oemModelGUID()
