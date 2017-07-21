@@ -65,13 +65,6 @@ bool HomeConnectDeviceDryer::configureDevice()
   dsConfig.hasLocked = false;
   configureDoorState(dsConfig);
 
-  // configure power state
-  PowerStateConfiguration psConfig = { 0 };
-  psConfig.hasOff = false;
-  psConfig.hasOn = true;
-  psConfig.hasStandby = false;
-  configurePowerState(psConfig);
-
   EnumValueDescriptorPtr dryingTargetCottonSynthetic = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   int i = 0;
   dryingTargetCottonSynthetic->addEnum("IronDry", i++, false);
