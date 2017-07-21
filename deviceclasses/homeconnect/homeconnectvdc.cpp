@@ -167,7 +167,9 @@ void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aRe
           JsonObjectPtr ha = has->arrayGet(i);
           // create device (might be a dummy if ha.type is not yet supported)
           HomeConnectDevicePtr newDev =  HomeConnectDevice::createHomeConenctDevice(this, ha);
-          simpleIdentifyAndAddDevice(newDev);
+          if(newDev->isKnownDevice()) {
+            simpleIdentifyAndAddDevice(newDev);
+          }
         }
       }
       else {

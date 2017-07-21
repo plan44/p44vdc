@@ -808,6 +808,11 @@ string HomeConnectDevice::oemModelGUID()
   return "gs1:(01)" + gtin;
 }
 
+bool HomeConnectDevice::isKnownDevice()
+{
+  return !gtin.empty();
+}
+
 
 void HomeConnectDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {

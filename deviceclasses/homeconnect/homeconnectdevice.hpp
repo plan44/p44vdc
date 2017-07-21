@@ -222,7 +222,9 @@ namespace p44 {
 
     /// @return OEM model GUID in URN format to identify the OEM product MODEL hardware as uniquely as possible
     virtual string oemModelGUID() P44_OVERRIDE;
-    
+
+    bool isKnownDevice();
+
     /// @}
 
   protected:
