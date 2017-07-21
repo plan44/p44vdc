@@ -853,9 +853,9 @@ void HomeConnectDevice::disconnectableHandler(bool aForgetParams, DisconnectCB a
   }
 }
 
-string HomeConnectDevice::createDeviceName(JsonObjectPtr networkJson, JsonObjectPtr aFileJson)
+string HomeConnectDevice::createDeviceName(JsonObjectPtr aNetworkJson, JsonObjectPtr aFileJson)
 {
-  JsonObjectPtr name = networkJson->get("name");
+  JsonObjectPtr name = aNetworkJson->get("name");
   if (name && !name->stringValue().empty()) {
     string deviceName = name->stringValue();
     ALOG(LOG_DEBUG, "Using device name returned by Home connect cloud: '%s'", deviceName.c_str());
