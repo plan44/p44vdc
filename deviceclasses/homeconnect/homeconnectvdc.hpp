@@ -98,7 +98,6 @@ namespace p44 {
   private:
 
     void deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError);
-    string createDeviceName(JsonObjectPtr json);
 
   };
 

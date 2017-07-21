@@ -117,11 +117,6 @@ void HomeConnectDeviceDishWasher::addAction(const string& aActionName, const str
   deviceActions->addAction(action);
 }
 
-string HomeConnectDeviceDishWasher::oemModelGUID()
-{
-  return "gs1:(01)7640156792829";
-}
-
 bool HomeConnectDeviceDishWasher::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   if (getIcon("homeconnect_dishwasher", aIcon, aWithData, aResolutionPrefix))

@@ -153,11 +153,6 @@ void HomeConnectDeviceFridge::sendSettingFinished(JsonObjectPtr aResult, ErrorPt
 
 }
 
-string HomeConnectDeviceFridge::oemModelGUID()
-{
-  return "gs1:(01)7640156792812";
-}
-
 bool HomeConnectDeviceFridge::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   if (getIcon("homeconnect_fridge", aIcon, aWithData, aResolutionPrefix))

@@ -145,6 +145,7 @@ namespace p44 {
     string model; ///< the model name for the device
     string modelGuid; ///< the model guid for the device
     string vendor; ///< the vendor of this device
+    string gtin;
 
     HomeConnectEventMonitorPtr eventMonitor; ///< event monitor
 
@@ -220,8 +221,10 @@ namespace p44 {
     virtual string vendorName() P44_OVERRIDE;
 
     /// @return OEM model GUID in URN format to identify the OEM product MODEL hardware as uniquely as possible
-    virtual string oemModelGUID() P44_OVERRIDE = 0;
-    
+    virtual string oemModelGUID() P44_OVERRIDE;
+
+    bool isKnownDevice();
+
     /// @}
 
   protected:
@@ -285,6 +288,7 @@ namespace p44 {
   private:
 
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
+    string createDeviceName(JsonObjectPtr aNetworkJson, JsonObjectPtr aFileJson);
 
   };
   
