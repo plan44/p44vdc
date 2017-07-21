@@ -88,13 +88,6 @@ bool HomeConnectDeviceWasher::configureDevice()
   dsConfig.hasLocked = true;
   configureDoorState(dsConfig);
 
-  // configure power state
-  PowerStateConfiguration psConfig = { 0 };
-  psConfig.hasOff = false;
-  psConfig.hasOn = true;
-  psConfig.hasStandby = false;
-  configurePowerState(psConfig);
-
   EnumValueDescriptorPtr temperatureCotton = createEnumDescriptor("Temperature", temperature_GC90, temperatureNames);
   EnumValueDescriptorPtr temperatureEasyCare = createEnumDescriptor("Temperature", temperature_GC60, temperatureNames);
   EnumValueDescriptorPtr temperature = createEnumDescriptor("Temperature", temperature_GC40, temperatureNames);

@@ -45,13 +45,6 @@ bool HomeConnectDeviceFridge::configureDevice()
   dsConfig.hasLocked = false;
   configureDoorState(dsConfig);
 
-  // configure power state
-  PowerStateConfiguration psConfig = { 0 };
-  psConfig.hasOff = false;
-  psConfig.hasOn = true;
-  psConfig.hasStandby = false;
-  configurePowerState(psConfig);
-
   fridgeSuperMode = ValueDescriptorPtr(new NumericValueDescriptor("FridgeSuperMode", valueType_boolean, valueUnit_none, 0, 1, 1, true, 0));
   freezerSuperMode = ValueDescriptorPtr(new NumericValueDescriptor("FreezerSuperMode", valueType_boolean, valueUnit_none, 0, 1, 1, true, 0));
 
