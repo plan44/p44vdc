@@ -180,10 +180,6 @@ void HomeConnectDeviceOven::addAction(const string& aActionName, const string& a
   action->addParameter(aDuration);
   deviceActions->addAction(action);
 }
-string HomeConnectDeviceOven::oemModelGUID()
-{
-  return "gs1:(01)7640156792546";
-}
 
 bool HomeConnectDeviceOven::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {

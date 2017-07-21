@@ -301,18 +301,42 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
   LOG(LOG_DEBUG, "ApplianceInfo = %s", aHomeApplicanceInfoRecord->c_strValue());
   // set basic info
   JsonObjectPtr o;
+  string vib;
   if (aHomeApplicanceInfoRecord->get("haId", o))
     haId = o->stringValue();
 
   if (aHomeApplicanceInfoRecord->get("brand", o)) {
     model = o->stringValue();
     if (aHomeApplicanceInfoRecord->get("vib", o))
-    model += " " + o->stringValue();
+      vib = o->stringValue();
+      model += " " + vib;
   }
   if (aHomeApplicanceInfoRecord->get("enumber", o))
     modelGuid = o->stringValue();
   if (aHomeApplicanceInfoRecord->get("brand", o))
     vendor = o->stringValue();
+
+  string dir = getVdcHost().getConfigDir();
+
+  string fn = dir  + "singledevicesettings_homeconnect_" + vib + ".json";
+  JsonObjectPtr config = JsonObject::objFromFile(fn.c_str());
+  if (!config) {
+    ALOG(LOG_WARNING, "Cannot read configuration file: '%s'", fn.c_str());
+    return;
+  }
+
+  ALOG(LOG_DEBUG, "Configuration file read successfully: '%s'", fn.c_str());
+
+  if (!config->get("dSGTIN", o)) {
+    ALOG(LOG_WARNING, "dSGTIN not defined in configuration file");
+    return;
+  }
+
+  gtin = o->stringValue();
+
+  ALOG(LOG_DEBUG, "Device GTIN read from file: '%s'", gtin.c_str());
+
+  initializeName(createDeviceName(aHomeApplicanceInfoRecord, config));
 }
 
 HomeConnectDevice::~HomeConnectDevice()
@@ -779,6 +803,11 @@ string HomeConnectDevice::vendorName()
   return vendor;
 }
 
+string HomeConnectDevice::oemModelGUID()
+{
+  return "gs1:(01)" + gtin;
+}
+
 
 void HomeConnectDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
@@ -824,6 +853,27 @@ void HomeConnectDevice::disconnectableHandler(bool aForgetParams, DisconnectCB a
   }
 }
 
+string HomeConnectDevice::createDeviceName(JsonObjectPtr networkJson, JsonObjectPtr aFileJson)
+{
+  JsonObjectPtr name = networkJson->get("name");
+  if (name && !name->stringValue().empty()) {
+    string deviceName = name->stringValue();
+    ALOG(LOG_DEBUG, "Using device name returned by Home connect cloud: '%s'", deviceName.c_str());
+    return deviceName;
+  }
+
+
+  name = aFileJson->get("defaultName");
+  if (name) {
+    string deviceName = name->stringValue();
+    ALOG(LOG_DEBUG, "Using device name from configuration file : '%s'", deviceName.c_str());
+    return deviceName;
+  }
+
+  ALOG(LOG_DEBUG, "Cannot create device name");
+  return "";
+
+}
 
 void HomeConnectDevice::deriveDsUid()
 {

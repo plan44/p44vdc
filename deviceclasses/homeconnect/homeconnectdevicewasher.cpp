@@ -163,11 +163,6 @@ EnumValueDescriptorPtr HomeConnectDeviceWasher::createEnumDescriptor(string aNam
   return descriptor;
 }
 
-string HomeConnectDeviceWasher::oemModelGUID()
-{
-  return "gs1:(01)7640156792799";
-}
-
 bool HomeConnectDeviceWasher::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   if (getIcon("homeconnect_washer", aIcon, aWithData, aResolutionPrefix))

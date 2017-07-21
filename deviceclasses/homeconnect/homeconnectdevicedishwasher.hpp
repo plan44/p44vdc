@@ -44,7 +44,6 @@ public:
   HomeConnectDeviceDishWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
   virtual ~HomeConnectDeviceDishWasher();
 
-  virtual string oemModelGUID() P44_OVERRIDE;
   virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 };
 

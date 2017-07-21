@@ -126,11 +126,6 @@ void HomeConnectDeviceDryer::addAction(const string& aActionName, const string& 
   deviceActions->addAction(action);
 }
 
-string HomeConnectDeviceDryer::oemModelGUID()
-{
-  return "gs1:(01)7640156792805";
-}
-
 bool HomeConnectDeviceDryer::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   if (getIcon("homeconnect_dryer", aIcon, aWithData, aResolutionPrefix))

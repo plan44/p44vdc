@@ -167,11 +167,7 @@ void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aRe
           JsonObjectPtr ha = has->arrayGet(i);
           // create device (might be a dummy if ha.type is not yet supported)
           HomeConnectDevicePtr newDev =  HomeConnectDevice::createHomeConenctDevice(this, ha);
-          if (simpleIdentifyAndAddDevice(newDev)) {
-            // actually added, no duplicate, set the name
-            // (otherwise, this is an incremental collect and we knew this light already)
-            newDev->initializeName(createDeviceName(ha));
-          }
+          simpleIdentifyAndAddDevice(newDev);
         }
       }
       else {
@@ -181,30 +177,6 @@ void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aRe
   }
   if (aCompletedCB) aCompletedCB(aError);
 }
-
-string HomeConnectVdc::createDeviceName(JsonObjectPtr json)
-{
-  JsonObjectPtr name = json->get("name");
-  if (name && !name->stringValue().empty()) {
-    string deviceName = name->stringValue();
-    ALOG(LOG_DEBUG, "Using device name returned by Home connect : '%s'", deviceName.c_str());
-    return deviceName;
-  }
-
-  JsonObjectPtr type = json->get("type");
-  JsonObjectPtr vib = json->get("vib");
-  if (type && vib) {
-    string deviceName = type->stringValue() + " " + vib->stringValue();
-    ALOG(LOG_DEBUG, "Using device name created from type and vib : '%s'", deviceName.c_str());
-    return deviceName;
-  }
-
-  ALOG(LOG_DEBUG, "Cannot create device name");
-  return "";
-
-}
-
-
 
 ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
