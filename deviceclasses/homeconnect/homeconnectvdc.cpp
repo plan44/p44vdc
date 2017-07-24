@@ -210,6 +210,88 @@ ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &a
   return respErr;
 }
 
+static char homeconnect_key;
+
+enum {
+  homeConnectVdcCommStatus,
+  homeConnectVdcDeveloperApi,
+  homeConnectVdcPropertiesMax
+};
+
+
+int HomeConnectVdc::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  // Note: only add my own count when accessing root level properties!!
+  if (aParentDescriptor->isRootOfObject()) {
+    // Accessing properties at the Device (root) level, add mine
+    return inherited::numProps(aDomain, aParentDescriptor)+homeConnectVdcPropertiesMax;
+  }
+  // just return base class' count
+  return inherited::numProps(aDomain, aParentDescriptor);
+}
+
+PropertyDescriptorPtr HomeConnectVdc::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  static const PropertyDescription properties[homeConnectVdcPropertiesMax] = {
+    { "homeConnectAccountStatus", apivalue_string, homeConnectVdcCommStatus, OKEY(homeconnect_key) },
+    { "homeConnectDeveloperApi", apivalue_bool, homeConnectVdcDeveloperApi, OKEY(homeconnect_key) },
+  };
+
+  if (aParentDescriptor->isRootOfObject()) {
+    // root level - accessing properties on the Device level
+    int n = inherited::numProps(aDomain, aParentDescriptor);
+    if (aPropIndex<n)
+      return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor); // base class' property
+    aPropIndex -= n; // rebase to 0 for my own first property
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+  }
+  else {
+    // other level
+    return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor); // base class' property
+  }
+}
+
+bool HomeConnectVdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(homeconnect_key)) {
+    if (aMode==access_read) {
+      // read properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        case homeConnectVdcCommStatus: {
+        // set property string homeConnectAccountStatus: disconnected | offline| connected
+          if (homeConnectComm.isConnected()) {
+            aPropValue->setStringValue("connected");
+          } else {
+            if (homeConnectComm.isAuthenticated()) {
+              aPropValue->setStringValue("offline");
+            } else {
+              aPropValue->setStringValue("disconnected");
+            }
+          }
+          return true;
+        }
+        case homeConnectVdcDeveloperApi:{
+          aPropValue->setBoolValue(homeConnectComm.getDeveloperApi());
+          return true;
+        }
+
+      }
+    } else if (aMode==access_write) {
+      // write properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        case homeConnectVdcDeveloperApi:{
+          ALOG(LOG_INFO, "Setting dev log to: %s", aPropValue->boolValue() ? "true" : "false");
+          homeConnectComm.setDeveloperApi(aPropValue->boolValue());
+          //TODO: add storing in persistent storage, read during startup and reinit comm.
+          return true;
+        }
+      }
+    }
+  }
+  // not my field, let base class handle it
+  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
+}
+
 
 
 #endif // ENABLE_HOMECONNECT

@@ -157,6 +157,10 @@ void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPt
       }
     }
   }
+
+  // api is ready if the communication succeed.
+  homeConnectComm.apiReady = Error::isOK(error);
+
   // now save return data (but not above, because we might need reqest "data" to re-run the request after a token refresh
   data = aJsonResponse;
   // done
