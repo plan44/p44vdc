@@ -69,7 +69,7 @@ bool HomeConnectVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aR
 //  1 : first version
 //  2 : second, completely incompatible version
 #define HOMECONNECT_SCHEMA_MIN_VERSION 2 // minimally supported version, anything older will be deleted
-#define HOMECONNECT_SCHEMA_VERSION 2 // current version
+#define HOMECONNECT_SCHEMA_VERSION 3 // current version
 
 string HomeConnectPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
@@ -82,8 +82,15 @@ string HomeConnectPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVers
     sql.append(
       "ALTER TABLE globs ADD authData TEXT;"
       "ALTER TABLE globs ADD authScope TEXT;"
+      "ALTER TABLE globs ADD developerApi INTEGER;"
     );
     // reached final version in one step
+    aToVersion = HOMECONNECT_SCHEMA_VERSION;
+  } else if (aFromVersion==2) {
+    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql.append(
+      "ALTER TABLE globs ADD developerApi INTEGER;"
+    );
     aToVersion = HOMECONNECT_SCHEMA_VERSION;
   }
   return sql;
@@ -100,12 +107,13 @@ void HomeConnectVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   if (Error::isOK(error)) {
     // load account parameters
     sqlite3pp::query qry(db);
-    if (qry.prepare("SELECT authData FROM globs")==SQLITE_OK) {
+    if (qry.prepare("SELECT authData, developerApi FROM globs")==SQLITE_OK) {
       sqlite3pp::query::iterator i = qry.begin();
       if (i!=qry.end()) {
         // authorize
         string authData = nonNullCStr(i->get<const char *>(0));
         homeConnectComm.setAuthentication(authData);
+        homeConnectComm.setDeveloperApi(i->get<bool>(1));
       }
     }
   }
@@ -280,10 +288,16 @@ bool HomeConnectVdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         case homeConnectVdcDeveloperApi:{
-          ALOG(LOG_INFO, "Setting dev log to: %s", aPropValue->boolValue() ? "true" : "false");
           homeConnectComm.setDeveloperApi(aPropValue->boolValue());
-          //TODO: add storing in persistent storage, read during startup and reinit comm.
-          return true;
+
+          // write the new setting to the database and search for devices in new API
+          if (db.executef("UPDATE globs SET developerApi=%i", aPropValue->boolValue() ? 1 : 0)!=SQLITE_OK) {
+            ALOG(LOG_ERR, db.error("saving authentication info")->getErrorMessage());
+            return false;
+          } else {
+            ALOG(LOG_INFO, "Updated developerApi to: %s", aPropValue->boolValue() ? "true" : "false");
+            return true;
+          }
         }
       }
     }
