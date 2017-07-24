@@ -169,8 +169,17 @@ namespace p44 {
     ///  (usually a JSON object with an access_token and possibly a refresh_token)
     void setAuthentication(string aAuthData);
 
+    // return if authorization data are provided
+    bool isAuthenticated() { return !accessToken.empty() && !refreshToken.empty(); }
+
+    // return if the vdc is currently connected
+    bool isConnected() { return isAuthenticated() && apiReady; }
+
     /// set API mode
     void setDeveloperApi(bool aEnabled) { developerApi = aEnabled; };
+
+    /// get API mode
+    bool getDeveloperApi() { return developerApi; };
 
     /// @return true if API is configured
     bool isConfigured() { return !refreshToken.empty(); };
