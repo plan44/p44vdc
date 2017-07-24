@@ -28,7 +28,10 @@ namespace p44 {
 HomeConnectDeviceOven::HomeConnectDeviceOven(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  installSettings(new HomeConnectDeviceSettings(*this, string("std.StandBy")));
+  HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
+  settings->fireAction = "std.StandBy";
+
+  installSettings(settings);
 }
 
 HomeConnectDeviceOven::~HomeConnectDeviceOven()

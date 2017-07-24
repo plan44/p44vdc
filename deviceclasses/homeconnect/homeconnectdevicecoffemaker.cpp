@@ -29,7 +29,13 @@ HomeConnectDeviceCoffeMaker::HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, 
     standalone(false),
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  installSettings(new HomeConnectDeviceSettings(*this, string("std.StandBy"), string("std.StandBy"), string("std.StandBy"), string("std.StandBy")));
+  HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
+  settings->fireAction = "std.StandBy";
+  settings->leaveHomeAction = "std.StandBy";
+  settings->deepOffAction = "std.StandBy";
+  settings->sleepAction = "std.StandBy";
+
+  installSettings(settings);
 }
 
 HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()

@@ -28,7 +28,10 @@ namespace p44 {
 HomeConnectDeviceDishWasher::HomeConnectDeviceDishWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
-  installSettings(new HomeConnectDeviceSettings(*this, string("std.PowerOff")));
+  HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
+  settings->fireAction = "std.PowerOff";
+
+  installSettings(settings);
 }
 
 HomeConnectDeviceDishWasher::~HomeConnectDeviceDishWasher()

@@ -55,16 +55,16 @@ void HomeConnectScene::setDefaultSceneValues(SceneNo aSceneNo)
   // modify scenes according to dS kettle standard behaviour
   switch (aSceneNo) {
     case ABSENT:
-      setActionIfPresent(deviceSettings.leaveHomeAction);
+      setActionIfNotEmpty(deviceSettings.leaveHomeAction);
       break;
     case FIRE:
-      setActionIfPresent(deviceSettings.fireAction);
+      setActionIfNotEmpty(deviceSettings.fireAction);
       break;
     case SLEEPING:
-      setActionIfPresent(deviceSettings.sleepAction);
+      setActionIfNotEmpty(deviceSettings.sleepAction);
       break;
     case DEEP_OFF:
-      setActionIfPresent(deviceSettings.deepOffAction);
+      setActionIfNotEmpty(deviceSettings.deepOffAction);
       break;
 
     default:
@@ -75,16 +75,16 @@ void HomeConnectScene::setDefaultSceneValues(SceneNo aSceneNo)
   markClean(); // default values are always clean
 }
 
-void HomeConnectScene::setActionIfPresent(const boost::optional<string>& aAction)
+void HomeConnectScene::setActionIfNotEmpty(const string& aAction)
 {
-  if(!aAction) {
+  if(aAction.empty()) {
     setDontCare(true);
     return;
   }
 
   setDontCare(false);
   value = 0;
-  command = *aAction;
+  command = aAction;
 }
 
 

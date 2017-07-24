@@ -45,26 +45,18 @@ namespace p44 {
 
   public:
 
-    HomeConnectDeviceSettings(Device &aDevice,
-                              boost::optional<string> aFireAction = boost::none,
-                              boost::optional<string> aLeaveHomeAction = boost::none,
-                              boost::optional<string> aDeepOffAction = boost::none,
-                              boost::optional<string> aSleepAction = boost::none) :
-      inherited(aDevice),
-      fireAction(aFireAction),
-      leaveHomeAction(aLeaveHomeAction),
-      deepOffAction(aDeepOffAction),
-      sleepAction(aSleepAction) {};
+    HomeConnectDeviceSettings(Device &aDevice) :
+      inherited(aDevice) {};
 
     /// factory method to create the correct subclass type of DsScene
     /// @param aSceneNo the scene number to create a scene object for.
     /// @note setDefaultSceneValues() must be called to set default scene values
     virtual DsScenePtr newDefaultScene(SceneNo aSceneNo);
 
-    boost::optional<string> fireAction;
-    boost::optional<string> leaveHomeAction;
-    boost::optional<string> deepOffAction;
-    boost::optional<string> sleepAction;
+    string fireAction;
+    string leaveHomeAction;
+    string deepOffAction;
+    string sleepAction;
 
 
   };
@@ -79,7 +71,7 @@ namespace p44 {
 
     const HomeConnectDeviceSettings& deviceSettings;
 
-    void setActionIfPresent(const boost::optional<string>& aAction);
+    void setActionIfNotEmpty(const string& aAction);
 
   public:
 
