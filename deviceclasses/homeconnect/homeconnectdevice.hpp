@@ -29,6 +29,7 @@
 #include "jsonobject.hpp"
 #include "simplescene.hpp"
 #include "homeconnectcomm.hpp"
+#include <boost/optional.hpp>
 
 using namespace std;
 
@@ -44,12 +45,18 @@ namespace p44 {
 
   public:
 
-    HomeConnectDeviceSettings(Device &aDevice) : inherited(aDevice) {};
+    HomeConnectDeviceSettings(Device &aDevice) :
+      inherited(aDevice) {};
 
     /// factory method to create the correct subclass type of DsScene
     /// @param aSceneNo the scene number to create a scene object for.
     /// @note setDefaultSceneValues() must be called to set default scene values
     virtual DsScenePtr newDefaultScene(SceneNo aSceneNo);
+
+    string fireAction;
+    string leaveHomeAction;
+    string deepOffAction;
+    string sleepAction;
 
 
   };
@@ -62,9 +69,15 @@ namespace p44 {
   {
     typedef SimpleCmdScene inherited;
 
+    const HomeConnectDeviceSettings& deviceSettings;
+
+    void setActionIfNotEmpty(const string& aAction);
+
   public:
 
-    HomeConnectScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) : inherited(aSceneDeviceSettings, aSceneNo) {};
+    HomeConnectScene(HomeConnectDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
+      inherited(aSceneDeviceSettings, aSceneNo),
+      deviceSettings(aSceneDeviceSettings) {};
 
     /// Set default scene values for a specified scene number
     /// @param aSceneNo the scene number to set default values

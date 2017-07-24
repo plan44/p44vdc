@@ -26,9 +26,16 @@
 namespace p44 {
 
 HomeConnectDeviceCoffeMaker::HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-    standalone(false), inherited(aVdcP, aHomeApplicanceInfoRecord)
+    standalone(false),
+    inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
+  HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
+  settings->fireAction = "std.StandBy";
+  settings->leaveHomeAction = "std.StandBy";
+  settings->deepOffAction = "std.StandBy";
+  settings->sleepAction = "std.StandBy";
 
+  installSettings(settings);
 }
 
 HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()
