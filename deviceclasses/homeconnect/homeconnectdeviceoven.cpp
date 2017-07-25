@@ -54,8 +54,8 @@ bool HomeConnectDeviceOven::configureDevice()
   addAction("std.TopBottomHeat", "Top and bottom heat", "TopBottomHeating", temp, duration);
   addAction("std.PizzaSetting",  "Pizza Setting",       "PizzaSetting",     temp, duration);
 
-  setTemperatureProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("SetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
+  targetTemperatureProp = ValueDescriptorPtr(
+      new NumericValueDescriptor("OvenTargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
 
   currentTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("CurrentTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
@@ -69,7 +69,7 @@ bool HomeConnectDeviceOven::configureDevice()
   programProgressProp = ValueDescriptorPtr(
       new NumericValueDescriptor("ProgramProgress", valueType_numeric, VALUE_UNIT(valueUnit_percent, unitScaling_1), 0, 100, 1));
 
-  deviceProperties->addProperty(setTemperatureProp);
+  deviceProperties->addProperty(targetTemperatureProp);
   deviceProperties->addProperty(currentTemperatureProp);
   deviceProperties->addProperty(elapsedProgramTimeProp);
   deviceProperties->addProperty(remainingProgramTimeProp);
@@ -143,7 +143,7 @@ void HomeConnectDeviceOven::handleEventTypeNotify(const string& aKey, JsonObject
 
   if (aKey == "Cooking.Oven.Option.SetpointTemperature") {
     int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    setTemperatureProp->setInt32Value(value);
+    targetTemperatureProp->setInt32Value(value);
     return;
   }
 

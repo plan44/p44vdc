@@ -48,8 +48,8 @@ bool HomeConnectDeviceFridge::configureDevice()
   fridgeSuperMode = ValueDescriptorPtr(new NumericValueDescriptor("FridgeSuperMode", valueType_boolean, valueUnit_none, 0, 1, 1, true, 0));
   freezerSuperMode = ValueDescriptorPtr(new NumericValueDescriptor("FreezerSuperMode", valueType_boolean, valueUnit_none, 0, 1, 1, true, 0));
 
-  fridgeTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FridgeSetTemperature", valueType_numeric, valueUnit_celsius, 2, 8, 1));
-  freezerTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FreezerSetTemperature", valueType_numeric, valueUnit_celsius,-24, -16, 1));
+  fridgeTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FridgeTargetTemperature", valueType_numeric, valueUnit_celsius, 2, 8, 1));
+  freezerTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FreezerTargetTemperature", valueType_numeric, valueUnit_celsius,-24, -16, 1));
 
   deviceProperties->addProperty(fridgeSuperMode);
   deviceProperties->addProperty(freezerSuperMode);

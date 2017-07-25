@@ -32,7 +32,7 @@ class HomeConnectDeviceOven: public HomeConnectDevice
 {
   typedef HomeConnectDevice inherited;
 
-  ValueDescriptorPtr setTemperatureProp;
+  ValueDescriptorPtr targetTemperatureProp;
   ValueDescriptorPtr currentTemperatureProp;
   ValueDescriptorPtr elapsedProgramTimeProp;
   ValueDescriptorPtr remainingProgramTimeProp;
