@@ -145,6 +145,7 @@ void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPt
         errorkey = o->stringValue();
         if (errorkey=="invalid_token") {
           // the access token has expired, we need to do a refresh operation
+          homeConnectComm.apiReady = false;
           refreshAccessToken();
           return;
         }
@@ -155,11 +156,14 @@ void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPt
         // other application level error, create text error from it
         error = TextError::err("%s: %s", errorkey.c_str(), errordesc.c_str());
       }
-    }
-  }
 
-  // api is ready if the communication succeed.
-  homeConnectComm.apiReady = Error::isOK(error);
+      // we got a response from server (it can be also error description)
+      homeConnectComm.apiReady = true;
+    }
+  } else {
+    // error during communication
+    homeConnectComm.apiReady = false;
+  }
 
   // now save return data (but not above, because we might need reqest "data" to re-run the request after a token refresh
   data = aJsonResponse;
