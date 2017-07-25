@@ -351,6 +351,7 @@ HomeConnectComm::HomeConnectComm() :
 void HomeConnectComm::setAuthentication(string aAuthData)
 {
   accessToken.clear();
+  refreshToken.clear();
   JsonObjectPtr auth = JsonObject::objFromText(aAuthData.c_str());
   if (auth) {
     JsonObjectPtr o;
