@@ -610,7 +610,8 @@ void HomeConnectDevice::handleEventTypeNotify(const string& aKey, JsonObjectPtr 
     return;
   }
 
-  if ((aKey == "BSH.Common.Root.SelectedProgram") && (programName != NULL)) {
+  if ((aKey == "BSH.Common.Root.SelectedProgram" || aKey == "BSH.Common.Root.ActiveProgram") &&
+       programName != NULL && !value.empty()) {
     string programNameValue = removeNamespace(value);
     if (programName->setStringValue(programNameValue)) {
       ALOG(LOG_NOTICE, "New Program Name State: '%s'", programNameValue.c_str());
