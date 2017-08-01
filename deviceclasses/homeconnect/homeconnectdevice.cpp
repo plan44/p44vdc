@@ -599,11 +599,7 @@ void HomeConnectDevice::handleEvent(EventType aEventType, JsonObjectPtr aEventDa
 
 void HomeConnectDevice::handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue)
 {
-  if (aValue == NULL) {
-    return;
-  }
-
-  string value = aValue->stringValue();
+  string value = (aValue != NULL) ? aValue->stringValue() : "";
 
   if ((aKey == "BSH.Common.Setting.PowerState") && (powerState != NULL)) {
     string powerStateValue = "Power" + removeNamespace(value);
@@ -615,7 +611,7 @@ void HomeConnectDevice::handleEventTypeNotify(const string& aKey, JsonObjectPtr 
   }
 
   if ((aKey == "BSH.Common.Root.SelectedProgram" || aKey == "BSH.Common.Root.ActiveProgram") &&
-       programName != NULL) {
+       programName != NULL && !value.empty()) {
     string programNameValue = removeNamespace(value);
     if (programName->setStringValue(programNameValue)) {
       ALOG(LOG_NOTICE, "New Program Name State: '%s'", programNameValue.c_str());
