@@ -107,21 +107,16 @@ HomeConnectDevice &HomeConnectAction::getHomeConnectDevice()
 
 void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
-  ErrorPtr err;
   // direct execution of home connect API commands
   // Syntax:
   //   method:resturlpath[:jsonBody]
   string cmd = apiCommandTemplate;
-  err = substitutePlaceholders(cmd, boost::bind(&HomeConnectAction::valueLookup, this, aParams, _1, _2));
-  if (!Error::isOK(err)) {
-    if (aCompletedCB) aCompletedCB(err);
-    return;
-  }
-
+  ErrorPtr err = substitutePlaceholders(cmd, boost::bind(&HomeConnectAction::valueLookup, this, aParams, _1, _2));
   string method;
   string r;
-  if (!keyAndValue(cmd, method, r)) {
-    err = TextError::err("Invalid Home Connect command template", cmd.c_str());
+
+  if (!Error::isOK(err) || !keyAndValue(cmd, method, r)) {
+    if (Error::isOK(err)) err = TextError::err("Invalid Home Connect command template", cmd.c_str());
     if (aCompletedCB) aCompletedCB(err);
     return;
   }
