@@ -115,8 +115,13 @@ void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
   string method;
   string r;
 
-  if (!Error::isOK(err) || !keyAndValue(cmd, method, r)) {
-    if (Error::isOK(err)) err = TextError::err("Invalid Home Connect command template", cmd.c_str());
+  if (Error::isOK(err)) {
+    if(!keyAndValue(cmd, method, r)) {
+      err = TextError::err("Invalid Home Connect command template", cmd.c_str());
+    }
+  }
+
+  if (!Error::isOK(err)) {
     if (aCompletedCB) aCompletedCB(err);
     return;
   }
