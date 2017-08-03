@@ -45,34 +45,7 @@ HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()
 
 bool HomeConnectDeviceCoffeMaker::configureDevice()
 {
-  HomeConnectActionPtr a;
-  // FIXME: ugly direct model match
-//    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
-  // FIXME: got even uglier:
-  standalone = (modelGuid.substr(0,10)=="TI909701HC");
-
-  addAction("std.Espresso",          "Espresso",            "Espresso",          35,  60,  5,  40);
-  addAction("std.EspressoMacchiato", "Espresso Macchiato",  "EspressoMacchiato", 40,  60,  10, 50);
-  addAction("std.Coffee",            "Coffee",              "Coffee",            60,  250, 10, 120);
-  addAction("std.Cappuccino",        "Cappuccino",          "Cappuccino",        100, 250, 10, 180);
-  addAction("std.LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 300);
-  addAction("std.CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 250);
-
-  beanAmountProp = EnumValueDescriptorPtr(new EnumValueDescriptor("BeanAmount", true));
-  int i = 0;
-  beanAmountProp->addEnum("VeryMild", i++);
-  beanAmountProp->addEnum("Mild", i++);
-  beanAmountProp->addEnum("Normal", i++, true);
-  beanAmountProp->addEnum("Strong", i++);
-  beanAmountProp->addEnum("VeryStrong", i++);
-  beanAmountProp->addEnum("DoubleShot", i++);
-  beanAmountProp->addEnum("DoubleShotPlus", i++);
-  beanAmountProp->addEnum("DoubleShotPlusPlus", i++);
-
-  fillQuantityProp = ValueDescriptorPtr(new NumericValueDescriptor("FillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 0, 400, 1));
-
-  deviceProperties->addProperty(beanAmountProp);
-  deviceProperties->addProperty(fillQuantityProp);
+  inherited::configureDevice();
 
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
@@ -101,7 +74,35 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   psConfig.hasStandby = true;
   configurePowerState(psConfig);
 
-  return inherited::configureDevice();
+  // FIXME: ugly direct model match
+//    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
+  // FIXME: got even uglier:
+  standalone = (modelGuid.substr(0,10)=="TI909701HC");
+
+  addAction("std.Espresso",          "Espresso",            "Espresso",          35,  60,  5,  40);
+  addAction("std.EspressoMacchiato", "Espresso Macchiato",  "EspressoMacchiato", 40,  60,  10, 50);
+  addAction("std.Coffee",            "Coffee",              "Coffee",            60,  250, 10, 120);
+  addAction("std.Cappuccino",        "Cappuccino",          "Cappuccino",        100, 250, 10, 180);
+  addAction("std.LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 300);
+  addAction("std.CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 250);
+
+  beanAmountProp = EnumValueDescriptorPtr(new EnumValueDescriptor("BeanAmount", true));
+  int i = 0;
+  beanAmountProp->addEnum("VeryMild", i++);
+  beanAmountProp->addEnum("Mild", i++);
+  beanAmountProp->addEnum("Normal", i++, true);
+  beanAmountProp->addEnum("Strong", i++);
+  beanAmountProp->addEnum("VeryStrong", i++);
+  beanAmountProp->addEnum("DoubleShot", i++);
+  beanAmountProp->addEnum("DoubleShotPlus", i++);
+  beanAmountProp->addEnum("DoubleShotPlusPlus", i++);
+
+  fillQuantityProp = ValueDescriptorPtr(new NumericValueDescriptor("FillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 0, 400, 1));
+
+  deviceProperties->addProperty(beanAmountProp);
+  deviceProperties->addProperty(fillQuantityProp);
+
+  return true;
 }
 
 void HomeConnectDeviceCoffeMaker::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -173,7 +174,7 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
                                                     true,
                                                     aFillAmountDefault));
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectPowerOnAction(*this, aActionName, aDescription, builder.build(), *powerState, *programName));
   action->addParameter(tempLevel);
   action->addParameter(beanAmount);
   action->addParameter(fillAmount);

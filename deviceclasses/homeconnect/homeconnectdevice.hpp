@@ -92,6 +92,8 @@ namespace p44 {
   {
     typedef DeviceAction inherited;
 
+  protected:
+
     string apiCommandTemplate;
 
   public:
@@ -116,6 +118,28 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<HomeConnectAction> HomeConnectActionPtr;
   
+  class HomeConnectPowerOnAction : public HomeConnectAction
+  {
+    typedef HomeConnectAction inherited;
+    DeviceState& powerState;
+    ValueDescriptor& programName;
+
+    static const MLMicroSeconds RESCHEDULE_INTERVAL = 10 * Second;
+
+    void devicePoweredOn(ApiValuePtr aParams, StatusCB aCompletedCB, ErrorPtr aError, string aCommandTemplate);
+
+  public:
+
+    HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
+                             const string& aName,
+                             const string& aDescription,
+                             const string& aApiCommandTemplate,
+                             DeviceState& aPowerState,
+                             ValueDescriptor& aProgramName);
+
+    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
+  };
+
 
   class HomeConnectProgramBuilder
   {

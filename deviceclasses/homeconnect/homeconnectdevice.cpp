@@ -153,6 +153,51 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
   if (aCompletedCB) aCompletedCB(aError);
 }
 
+HomeConnectPowerOnAction::HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
+                                                   const string& aName,
+                                                   const string& aDescription,
+                                                   const string& aApiCommandTemplate,
+                                                   DeviceState& aPowerState,
+                                                   ValueDescriptor& aProgramName) :
+    inherited(aSingleDevice, aName, aDescription, aApiCommandTemplate),
+    powerState(aPowerState),
+    programName(aProgramName) {}
+
+void HomeConnectPowerOnAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
+{
+  if (powerState.value()->getStringValue() != "PowerOn") {
+    LOG(LOG_DEBUG, "Device will be powered on, before proceeding with action %s", apiCommandTemplate.c_str());
+    HomeConnectSettingBuilder settingBuilder = HomeConnectSettingBuilder("BSH.Common.Setting.PowerState");
+    settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.On\"");
+
+    string targetCommandTemplate = apiCommandTemplate;
+    apiCommandTemplate = settingBuilder.build();
+    inherited::performCall(aParams->newNull(), boost::bind(&HomeConnectPowerOnAction::devicePoweredOn, this, aParams, aCompletedCB, _1, targetCommandTemplate));
+    return;
+  }
+
+  if (programName.getStringValue() == "ApplianceOnRinsing") {
+    LOG(LOG_DEBUG, "Appliance on rinsing, reschedule action");
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::performCall, this, aParams, aCompletedCB), RESCHEDULE_INTERVAL);
+    return;
+  }
+
+  LOG(LOG_DEBUG, "Device is powered on, proceed with action %s", apiCommandTemplate.c_str());
+  inherited::performCall(aParams, aCompletedCB);
+  return;
+}
+
+void HomeConnectPowerOnAction::devicePoweredOn(ApiValuePtr aParams, StatusCB aCompletedCB, ErrorPtr aError, string aCommandTemplate)
+{
+  if (!Error::isOK(aError)) {
+    if (aCompletedCB) aCompletedCB(aError);
+    return;
+  }
+
+  apiCommandTemplate = aCommandTemplate;
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::performCall, this, aParams, aCompletedCB), RESCHEDULE_INTERVAL);
+}
+
 HomeConnectProgramBuilder::HomeConnectProgramBuilder(const string& aProgramName) :
   programName(aProgramName)
 {
