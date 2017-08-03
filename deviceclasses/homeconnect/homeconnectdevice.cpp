@@ -107,32 +107,38 @@ HomeConnectDevice &HomeConnectAction::getHomeConnectDevice()
 
 void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
-  ErrorPtr err;
   // direct execution of home connect API commands
   // Syntax:
   //   method:resturlpath[:jsonBody]
   string cmd = apiCommandTemplate;
-  err = substitutePlaceholders(cmd, boost::bind(&HomeConnectAction::valueLookup, this, aParams, _1, _2));
-  JsonObjectPtr jsonBody;
+  ErrorPtr err = substitutePlaceholders(cmd, boost::bind(&HomeConnectAction::valueLookup, this, aParams, _1, _2));
+  string method;
+  string r;
+
   if (Error::isOK(err)) {
-    string method;
-    string r;
-    if (keyAndValue(cmd, method, r)) {
-      string path;
-      string body;
-      if (!keyAndValue(r, path, body)) {
-        path = r;
-      }
-      else {
-        // make JSON from text
-        jsonBody = JsonObject::objFromText(body.c_str());
-      }
-      // complete path
-      string urlpath = "/api/homeappliances/" + getHomeConnectDevice().haId + "/" + path;
-      getHomeConnectDevice().homeConnectComm().apiAction(method, urlpath, jsonBody, boost::bind(&HomeConnectAction::apiCommandSent, this, aCompletedCB, _1, _2));
+    if(!keyAndValue(cmd, method, r)) {
+      err = TextError::err("Invalid Home Connect command template", cmd.c_str());
     }
   }
-  if (aCompletedCB) aCompletedCB(err);
+
+  if (!Error::isOK(err)) {
+    if (aCompletedCB) aCompletedCB(err);
+    return;
+  }
+
+  string path;
+  string body;
+  JsonObjectPtr jsonBody;
+  if (!keyAndValue(r, path, body)) {
+    path = r;
+  }
+  else {
+    // make JSON from text
+    jsonBody = JsonObject::objFromText(body.c_str());
+  }
+  // complete path
+  string urlpath = "/api/homeappliances/" + getHomeConnectDevice().haId + "/" + path;
+  getHomeConnectDevice().homeConnectComm().apiAction(method, urlpath, jsonBody, boost::bind(&HomeConnectAction::apiCommandSent, this, aCompletedCB, _1, _2));
 }
 
 
