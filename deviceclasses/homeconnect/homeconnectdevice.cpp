@@ -158,10 +158,10 @@ HomeConnectPowerOnAction::HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
                                                    const string& aDescription,
                                                    const string& aApiCommandTemplate,
                                                    DeviceState& aPowerState,
-                                                   ValueDescriptor& aProgramName) :
+                                                   DeviceState& aOperationMode) :
     inherited(aSingleDevice, aName, aDescription, aApiCommandTemplate),
     powerState(aPowerState),
-    programName(aProgramName) {}
+    operationMode(aOperationMode) {}
 
 void HomeConnectPowerOnAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
@@ -176,13 +176,13 @@ void HomeConnectPowerOnAction::performCall(ApiValuePtr aParams, StatusCB aComple
     return;
   }
 
-  if (programName.getStringValue() == "ApplianceOnRinsing") {
-    LOG(LOG_DEBUG, "Appliance on rinsing, reschedule action");
+  if (operationMode.value()->getStringValue() != "ModeReady") {
+    LOG(LOG_DEBUG, "Device is not ready, reschedule action");
     MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::performCall, this, aParams, aCompletedCB), RESCHEDULE_INTERVAL);
     return;
   }
 
-  LOG(LOG_DEBUG, "Device is powered on, proceed with action %s", apiCommandTemplate.c_str());
+  LOG(LOG_DEBUG, "Device is powered on and ready, proceed with action %s", apiCommandTemplate.c_str());
   inherited::performCall(aParams, aCompletedCB);
   return;
 }

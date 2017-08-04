@@ -122,7 +122,7 @@ namespace p44 {
   {
     typedef HomeConnectAction inherited;
     DeviceState& powerState;
-    ValueDescriptor& programName;
+    DeviceState& operationMode;
 
     static const MLMicroSeconds RESCHEDULE_INTERVAL = 10 * Second;
 
@@ -135,7 +135,7 @@ namespace p44 {
                              const string& aDescription,
                              const string& aApiCommandTemplate,
                              DeviceState& aPowerState,
-                             ValueDescriptor& aProgramName);
+                             DeviceState& aOperationMode);
 
     virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
   };

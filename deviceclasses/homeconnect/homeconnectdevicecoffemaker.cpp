@@ -45,7 +45,7 @@ HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()
 
 bool HomeConnectDeviceCoffeMaker::configureDevice()
 {
-  inherited::configureDevice();
+  bool ret = inherited::configureDevice();
 
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
@@ -102,7 +102,7 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   deviceProperties->addProperty(beanAmountProp);
   deviceProperties->addProperty(fillQuantityProp);
 
-  return true;
+  return ret;
 }
 
 void HomeConnectDeviceCoffeMaker::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -174,7 +174,7 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
                                                     true,
                                                     aFillAmountDefault));
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectPowerOnAction(*this, aActionName, aDescription, builder.build(), *powerState, *programName));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectPowerOnAction(*this, aActionName, aDescription, builder.build(), *powerState, *operationMode));
   action->addParameter(tempLevel);
   action->addParameter(beanAmount);
   action->addParameter(fillAmount);
