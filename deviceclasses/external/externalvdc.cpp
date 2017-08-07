@@ -1085,6 +1085,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       double resolution = 1;
       MLMicroSeconds updateInterval = 5*Second; // assume mostly up-to-date
       MLMicroSeconds aliveSignInterval = 0; // no guaranteed alive sign interval
+      MLMicroSeconds changesOnlyInterval = 5*Minute; // report same value again only after >=5min
       string sensorName;
       string id;
       // - optional params
@@ -1094,13 +1095,14 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("updateinterval", o3)) updateInterval = o3->doubleValue()*Second;
       if (o2->get("alivesigninterval", o3)) aliveSignInterval = o3->doubleValue()*Second;
+      if (o2->get("changesonlyinterval", o3)) changesOnlyInterval = o3->doubleValue()*Second;
       if (o2->get("hardwarename", o3)) sensorName = o3->stringValue(); else sensorName = string_format("sensor_ty%d", sensorType);
       if (o2->get("min", o3)) min = o3->doubleValue();
       if (o2->get("max", o3)) max = o3->doubleValue();
       if (o2->get("resolution", o3)) resolution = o3->doubleValue();
       // - create behaviour
       SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, id));
-      sb->setHardwareSensorConfig(sensorType, usage, min, max, resolution, updateInterval, aliveSignInterval); // no default changesOnlyInterval, external device should prevent unneeded updates
+      sb->setHardwareSensorConfig(sensorType, usage, min, max, resolution, updateInterval, aliveSignInterval, changesOnlyInterval);
       sb->setGroup(group);
       sb->setHardwareName(sensorName);
       addBehaviour(sb);
