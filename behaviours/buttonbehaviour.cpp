@@ -90,7 +90,7 @@ void ButtonBehaviour::setHardwareButtonConfig(int aButtonID, VdcButtonType aType
 
 void ButtonBehaviour::buttonAction(bool aPressed)
 {
-  BLOG(LOG_NOTICE, "Button[%zu] '%s' was %s", index, hardwareName.c_str(), aPressed ? "pressed" : "released");
+  BLOG(LOG_NOTICE, "Button[%zu] %s '%s' was %s", index, behaviourId.c_str(), hardwareName.c_str(), aPressed ? "pressed" : "released");
   bool stateChanged = aPressed!=buttonPressed;
   buttonPressed = aPressed; // remember new state
   // check which statemachine to use
@@ -476,7 +476,7 @@ void ButtonBehaviour::localSwitchOutput()
 
 void ButtonBehaviour::localDim(bool aStart)
 {
-  BLOG(LOG_NOTICE, "Button[%zu] '%s': Local dim %s", index, hardwareName.c_str(), aStart ? "START" : "STOP");
+  BLOG(LOG_NOTICE, "Button[%zu] %s '%s': Local dim %s", index, behaviourId.c_str(), hardwareName.c_str(), aStart ? "START" : "STOP");
   ChannelBehaviourPtr channel = device.getChannelByIndex(0); // default channel
   if (channel) {
     if (aStart) {
@@ -538,8 +538,8 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
   actionMode = aActionMode;
   actionId = aActionId;
   BLOG(LOG_NOTICE,
-    "Button[%zu] '%s' pushes actionMode = %d, actionId %d",
-    index, hardwareName.c_str(), actionMode, actionId
+    "Button[%zu] %s '%s' pushes actionMode = %d, actionId %d",
+    index, behaviourId.c_str(), hardwareName.c_str(), actionMode, actionId
   );
   // issue a state property push
   pushBehaviourState();
