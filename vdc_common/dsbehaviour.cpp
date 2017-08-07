@@ -67,7 +67,7 @@ bool DsBehaviour::pushBehaviourState()
     ApiValuePtr query = api->newApiValue();
     query->setType(apivalue_object);
     ApiValuePtr subQuery = query->newValue(apivalue_object);
-    subQuery->add(string_format("%zu",index), subQuery->newValue(apivalue_null));
+    subQuery->add(getApiId(api->getApiVersion()), subQuery->newValue(apivalue_null));
     query->add(string(getTypeName()).append("States"), subQuery);
     return device.pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
   }
