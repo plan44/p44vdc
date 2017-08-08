@@ -49,10 +49,10 @@ bool HomeConnectDeviceOven::configureDevice()
       new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
           1, true, 600));
 
-  addAction("std.Preheating",    "Pre-heating",         "PreHeating",       temp, duration);
-  addAction("std.HotAir",        "Hot air",             "HotAir",           temp, duration);
-  addAction("std.TopBottomHeat", "Top and bottom heat", "TopBottomHeating", temp, duration);
-  addAction("std.PizzaSetting",  "Pizza Setting",       "PizzaSetting",     temp, duration);
+  addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
+  addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
+  addAction("std.TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
+  addAction("std.PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
 
   targetTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("OvenTargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
