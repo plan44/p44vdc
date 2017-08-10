@@ -166,9 +166,7 @@ const char *VdcHost::getIconDir()
 void VdcHost::setPersistentDataDir(const char *aPersistentDataDir)
 {
 	persistentDataDir = nonNullCStr(aPersistentDataDir);
-	if (!persistentDataDir.empty() && persistentDataDir[persistentDataDir.length()-1]!='/') {
-		persistentDataDir.append("/");
-	}
+  pathstring_format_append(persistentDataDir,""); // make sure filenames can be appended without adding a delimiter
 }
 
 
@@ -182,9 +180,7 @@ const char *VdcHost::getPersistentDataDir()
 void VdcHost::setConfigDir(const char *aConfigDir)
 {
   configDir = nonNullCStr(aConfigDir);
-  if (!configDir.empty() && configDir[configDir.length()-1]!='/') {
-    configDir.append("/");
-  }
+  pathstring_format_append(configDir,""); // make sure filenames can be appended without adding a delimiter
 }
 
 
