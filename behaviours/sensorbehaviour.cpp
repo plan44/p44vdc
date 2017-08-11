@@ -27,7 +27,7 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
   // persistent settings
   sensorGroup(group_black_variable), // default to joker
-  minPushInterval(2*Second), // do not push more often than every 2 seconds
+  minPushInterval(30*Second), // do not push more often than every 2 seconds
   changesOnlyInterval(0), // report every sensor update (even if value unchanged)
   // state
   lastUpdate(Never),
