@@ -36,7 +36,7 @@ static char dsscene_channels_key;
 static char scenevalue_key;
 
 // local property container for channels/outputs
-class SceneChannels : public PropertyContainer
+class SceneChannels P44_FINAL: public PropertyContainer
 {
   typedef PropertyContainer inherited;
 
