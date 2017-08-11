@@ -225,27 +225,35 @@ HomeConnectEventMonitor::~HomeConnectEventMonitor()
   
 }
 
+#define EVENT_STREAM_RESTART_DELAY (15*Second)
 
 void HomeConnectEventMonitor::sendGetEventRequest()
 {
-  // - set up the extra auth headers
-  eventBuffer.clear();
-  clearRequestHeaders();
-  addRequestHeader("Authorization", string_format("Bearer %s", homeConnectComm.accessToken.c_str()));
-  addRequestHeader("Accept", "text/event-stream");
-  addRequestHeader("Cache-Control", "no-cache");
-  // - make the call
-  FOCUSLOG(">>> Sending event stream GET request to '%s'", urlPath.c_str());
-  httpRequest(
-    (homeConnectComm.baseUrl()+urlPath).c_str(),
-    boost::bind(&HomeConnectEventMonitor::processEventData, this, _1, _2),
-    "GET",
-    NULL, // no request body
-    NULL, // no body content type
-    -1, // not saving into file descriptor
-    false, // no need to save headers
-    true // stream result
-  );
+	// connecting to event stream make sense only when the homm channel is working
+  if (homeConnectComm.apiReady)
+  {
+	  // - set up the extra auth headers
+	  eventBuffer.clear();
+	  clearRequestHeaders();
+	  addRequestHeader("Authorization", string_format("Bearer %s", homeConnectComm.accessToken.c_str()));
+	  addRequestHeader("Accept", "text/event-stream");
+	  addRequestHeader("Cache-Control", "no-cache");
+	  // - make the call
+	  FOCUSLOG(">>> Sending event stream GET request to '%s'", urlPath.c_str());
+	  httpRequest(
+		(homeConnectComm.baseUrl()+urlPath).c_str(),
+		boost::bind(&HomeConnectEventMonitor::processEventData, this, _1, _2),
+		"GET",
+		NULL, // no request body
+		NULL, // no body content type
+		-1, // not saving into file descriptor
+		false, // no need to save headers
+		true // stream result
+	  );
+  } else {
+    // not ready yet - schedule restart
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
+  }
 }
 
 EventType HomeConnectEventMonitor::getEventType()
@@ -262,8 +270,6 @@ EventType HomeConnectEventMonitor::getEventType()
   return eventType_Unknown;
 }
 
-
-#define EVENT_STREAM_RESTART_DELAY (15*Second)
 
 void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr aError)
 {
@@ -334,6 +340,8 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
   }
   else {
     LOG(LOG_WARNING, "HomeConnect Event stream '%s' error: %s", urlPath.c_str(), aError->description().c_str());
+    // error in comm - schedule restart
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
   }
 }
 
