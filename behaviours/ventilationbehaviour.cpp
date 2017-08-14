@@ -373,7 +373,7 @@ void VentilationBehaviour::saveChannelsToScene(DsScenePtr aScene)
     ventilationScene->setPVar(ventilationScene->louverPosition, louverPosition->getChannelValue());
     ventilationScene->setSceneValueFlags(louverPosition->getChannelIndex(), valueflags_dontCare, false);
     // - louver position automatic
-    ventilationScene->setGlobalSceneFlag(ventilationflags_louverauto, airflowAuto->getFlag());
+    ventilationScene->setGlobalSceneFlag(ventilationflags_louverauto, louverAuto->getFlag());
     ventilationScene->setSceneValueFlags(louverAuto->getChannelIndex(), valueflags_dontCare, false);
   }
 }
