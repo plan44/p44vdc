@@ -55,7 +55,7 @@ bool HomeConnectDeviceOven::configureDevice()
   addAction("std.PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
 
   targetTemperatureProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("OvenTargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
+      new NumericValueDescriptor("TargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
 
   currentTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("CurrentTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
