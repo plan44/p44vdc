@@ -136,6 +136,7 @@ namespace p44 {
 
     void sendGetEventRequest();
     void processEventData(const string &aResponse, ErrorPtr aError);
+    void apiQueryDone(JsonObjectPtr aResult, ErrorPtr aError);
     EventType getEventType();
 
   };
