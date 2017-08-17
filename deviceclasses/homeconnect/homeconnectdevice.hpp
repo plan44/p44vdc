@@ -123,6 +123,7 @@ namespace p44 {
     typedef HomeConnectAction inherited;
     DeviceState& powerState;
     DeviceState& operationMode;
+    string powerOffCommandTemplate;
 
     static const MLMicroSeconds RESCHEDULE_INTERVAL = 10 * Second;
 
@@ -133,7 +134,8 @@ namespace p44 {
     HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
                              const string& aName,
                              const string& aDescription,
-                             const string& aApiCommandTemplate,
+                             const string& aPowerOnCommandTemplate,
+                             const string& aPowerOffCommandTemplate,
                              DeviceState& aPowerState,
                              DeviceState& aOperationMode);
 
@@ -143,14 +145,33 @@ namespace p44 {
 
   class HomeConnectProgramBuilder
   {
+  public:
+    typedef enum
+    {
+      Mode_Activate,
+      Mode_Select
+    } Mode;
+
+    string toString(Mode aMode)
+    {
+      switch(aMode) {
+      case Mode_Activate : return "active";
+      case Mode_Select : return "selected";
+      default : return "unknown";
+      }
+    }
+
   private:
     string programName;
+    Mode mode;
 
     map<string, string> options;
   public:
     HomeConnectProgramBuilder(const string& aProgramName);
 
-    void addOption(const string& aKey, const string& aValue) {  options[aKey] = aValue; }
+    HomeConnectProgramBuilder& addOption(const string& aKey, const string& aValue) {  options[aKey] = aValue; return *this; }
+
+    HomeConnectProgramBuilder& selectMode(Mode aMode) { mode = aMode; return *this; }
 
     string build();
 

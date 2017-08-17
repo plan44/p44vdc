@@ -174,7 +174,14 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
                                                     true,
                                                     aFillAmountDefault));
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectPowerOnAction(*this, aActionName, aDescription, builder.build(), *powerState, *operationMode));
+  HomeConnectActionPtr action =
+      HomeConnectActionPtr(new HomeConnectPowerOnAction(*this,
+                                                        aActionName,
+                                                        aDescription,
+                                                        builder.selectMode(HomeConnectProgramBuilder::Mode_Activate).build(),
+                                                        builder.selectMode(HomeConnectProgramBuilder::Mode_Select).build(),
+                                                        *powerState,
+                                                        *operationMode));
   action->addParameter(tempLevel);
   action->addParameter(beanAmount);
   action->addParameter(fillAmount);
