@@ -38,24 +38,37 @@
 
 using namespace p44;
 
+
 // how often to write mainloop statistics into log output
-//#define DEFAULT_MAINLOOP_STATS_INTERVAL (60) // every 5 min (with periodic activity every 5 seconds: 60*5 = 300 = 5min)
-#define DEFAULT_MAINLOOP_STATS_INTERVAL (0) // not by default. We can use setMainLoopStatsInterval() to enable
+#ifndef DEFAULT_MAINLOOP_STATS_INTERVAL
+  //#define DEFAULT_MAINLOOP_STATS_INTERVAL (60) // every 5 min (with periodic activity every 5 seconds: 60*5 = 300 = 5min)
+  #define DEFAULT_MAINLOOP_STATS_INTERVAL (0) // not by default. We can use setMainLoopStatsInterval() to enable
+#endif
 
 // how long vDC waits after receiving ok from one announce until it fires the next
-#define ANNOUNCE_PAUSE (10*MilliSecond)
+#ifndef ANNOUNCE_PAUSE
+  #define ANNOUNCE_PAUSE (10*MilliSecond)
+#endif
 
 // how long until a not acknowledged registrations is considered timed out (and next device can be attempted)
-#define ANNOUNCE_TIMEOUT (30*Second)
+#ifndef ANNOUNCE_TIMEOUT
+  #define ANNOUNCE_TIMEOUT (30*Second)
+#endif
 
 // how long until a not acknowledged announcement for a device is retried again for the same device
-#define ANNOUNCE_RETRY_TIMEOUT (300*Second)
+#ifndef ANNOUNCE_RETRY_TIMEOUT
+  #define ANNOUNCE_RETRY_TIMEOUT (300*Second)
+#endif
 
 // default product name
-#define DEFAULT_PRODUCT_NAME "plan44.ch vdcd"
+#ifndef DEFAULT_PRODUCT_NAME
+  #define DEFAULT_PRODUCT_NAME "plan44.ch vdcd"
+#endif
 
 // default description template
-#define DEFAULT_DESCRIPTION_TEMPLATE "%V %M%N #%S"
+#ifndef DEFAULT_DESCRIPTION_TEMPLATE
+  #define DEFAULT_DESCRIPTION_TEMPLATE "%V %M%N #%S"
+#endif
 
 
 static VdcHost *sharedVdcHostP = NULL;
@@ -346,7 +359,7 @@ void VdcHost::startRunning()
   //   but will post network lost event if we do NOT have a connection now.
   isNetworkConnected();
   // start periodic tasks needed during normal running like announcement checking and saving parameters
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, vdcHostP, _1), 1*Second);
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, vdcHostP, _2), 1*Second);
 }
 
 
@@ -603,16 +616,16 @@ bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
 
 #define ACTIVITY_PAUSE_INTERVAL (1*Second)
 
-void VdcHost::periodicTask(MLMicroSeconds aCycleStartTime)
+void VdcHost::periodicTask(MLMicroSeconds aNow)
 {
   // cancel any pending executions
   MainLoop::currentMainLoop().cancelExecutionTicket(periodicTaskTicket);
   // prevent during activity as saving DB might affect performance
   if (
-    (aCycleStartTime>lastActivity+ACTIVITY_PAUSE_INTERVAL) || // some time passed after last activity or...
-    (aCycleStartTime>lastPeriodicRun+PERIODIC_TASK_FORCE_INTERVAL) // ...too much time passed since last run
+    (aNow>lastActivity+ACTIVITY_PAUSE_INTERVAL) || // some time passed after last activity or...
+    (aNow>lastPeriodicRun+PERIODIC_TASK_FORCE_INTERVAL) // ...too much time passed since last run
   ) {
-    lastPeriodicRun = aCycleStartTime;
+    lastPeriodicRun = aNow;
     if (!collecting) {
       // re-check network connection, might cause re-collection in some vdcs
       isNetworkConnected();
@@ -643,7 +656,7 @@ void VdcHost::periodicTask(MLMicroSeconds aCycleStartTime)
     }
   }
   // schedule next run
-  periodicTaskTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, this, _1), PERIODIC_TASK_INTERVAL);
+  periodicTaskTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, this, _2), PERIODIC_TASK_INTERVAL);
 }
 
 

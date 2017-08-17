@@ -176,8 +176,9 @@ namespace p44 {
       dm_auxvdsm_needs_change, // need for auxiliary vdsm run state change (needs to be started or stopped)
     } dmState;
 
-    long rescanTicket;
-    long evaluateTicket;
+    MLTicket pollTicket;
+    MLTicket rescanTicket;
+    MLTicket evaluateTicket;
 
 
     // private constructor, use sharedDiscoveryManager() to obtain singleton
@@ -262,7 +263,7 @@ namespace p44 {
     void client_callback(AvahiClient *c, AvahiClientState state);
     #endif
 
-    bool avahi_poll();
+    void avahi_poll(MLTimer &aTicket);
     void avahi_ds_entry_group_callback(AvahiService *aService, AvahiEntryGroup *g, AvahiEntryGroupState state);
 
     static void avahi_debug_browse_callback(AvahiServiceBrowser *b, AvahiIfIndex interface, AvahiProtocol protocol, AvahiBrowserEvent event, const char *name, const char *type, const char *domain, AVAHI_GCC_UNUSED AvahiLookupResultFlags flags, void* userdata);

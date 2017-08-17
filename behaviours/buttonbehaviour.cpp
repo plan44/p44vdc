@@ -411,7 +411,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
   BFOCUSLOG(" -->                       exit state %s with %sfurther timing needed", stateNames[state], timerRef!=Never ? "" : "NO ");
   if (timerRef!=Never) {
     // need timing, schedule calling again
-    buttonStateMachineTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&ButtonBehaviour::checkStandardStateMachine, this, false, _1), 10*MilliSecond);
+    buttonStateMachineTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&ButtonBehaviour::checkStandardStateMachine, this, false, _2), 10*MilliSecond);
   }
 }
 

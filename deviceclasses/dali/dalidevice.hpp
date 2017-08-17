@@ -203,7 +203,7 @@ namespace p44 {
     void queryYCoordResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
     void queryCTResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
 
-    void dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aCycleStartTime);
+    void dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aNow);
 
     void queryStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
 

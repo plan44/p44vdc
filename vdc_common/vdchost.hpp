@@ -538,7 +538,7 @@ namespace p44 {
     void signalActivity();
 
     // periodic task
-    void periodicTask(MLMicroSeconds aCycleStartTime);
+    void periodicTask(MLMicroSeconds aNow);
 
     // getting MAC
     void getMyMac(StatusCB aCompletedCB, bool aFactoryReset);

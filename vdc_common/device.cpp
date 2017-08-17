@@ -842,7 +842,7 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
   }
   if (isDimming) {
     // now schedule next inc/update step
-    dimHandlerTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&Device::dimHandler, this, aChannel, aIncrement, _1), aNextDimAt);
+    dimHandlerTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&Device::dimHandler, this, aChannel, aIncrement, _2), aNextDimAt);
   }
 }
 
