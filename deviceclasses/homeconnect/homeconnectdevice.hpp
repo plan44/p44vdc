@@ -123,7 +123,7 @@ namespace p44 {
     typedef HomeConnectAction inherited;
     DeviceState& powerState;
     DeviceState& operationMode;
-    string powerOffCommandTemplate;
+    string ifPowerOffCommand;
 
     static const MLMicroSeconds RESCHEDULE_INTERVAL = 10 * Second;
 
@@ -134,8 +134,8 @@ namespace p44 {
     HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
                              const string& aName,
                              const string& aDescription,
-                             const string& aPowerOnCommandTemplate,
-                             const string& aPowerOffCommandTemplate,
+                             const string& aIfPowerOnCommand,
+                             const string& aIfPowerOffCommand,
                              DeviceState& aPowerState,
                              DeviceState& aOperationMode);
 

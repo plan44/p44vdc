@@ -162,24 +162,24 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
 HomeConnectPowerOnAction::HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
                                                    const string& aName,
                                                    const string& aDescription,
-                                                   const string& aPowerOnCommandTemplate,
-                                                   const string& aPowerOffCommandTemplate,
+                                                   const string& aIfPowerOnCommand,
+                                                   const string& aIfPowerOffCommand,
                                                    DeviceState& aPowerState,
                                                    DeviceState& aOperationMode) :
-    inherited(aSingleDevice, aName, aDescription, aPowerOnCommandTemplate),
+    inherited(aSingleDevice, aName, aDescription, aIfPowerOnCommand),
     powerState(aPowerState),
     operationMode(aOperationMode),
-    powerOffCommandTemplate(aPowerOffCommandTemplate) {}
+    ifPowerOffCommand(aIfPowerOffCommand) {}
 
 void HomeConnectPowerOnAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
   if (powerState.value()->getStringValue() != "PowerOn") {
-    LOG(LOG_DEBUG, "Device will be powered on, before proceeding with action %s", powerOffCommandTemplate.c_str());
+    LOG(LOG_DEBUG, "Device will be powered on, before proceeding with action %s", ifPowerOffCommand.c_str());
     HomeConnectSettingBuilder settingBuilder = HomeConnectSettingBuilder("BSH.Common.Setting.PowerState");
     settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.On\"");
 
     apiCommandTemplate = settingBuilder.build();
-    inherited::performCall(aParams->newNull(), boost::bind(&HomeConnectPowerOnAction::devicePoweredOn, this, aParams, aCompletedCB, _1, powerOffCommandTemplate));
+    inherited::performCall(aParams->newNull(), boost::bind(&HomeConnectPowerOnAction::devicePoweredOn, this, aParams, aCompletedCB, _1, ifPowerOffCommand));
     return;
   }
 

@@ -147,6 +147,13 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
   builder.addOption("ConsumerProducts.CoffeeMaker.Option.BeanAmount", "\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{BeanAmount}\"");
   builder.addOption("ConsumerProducts.CoffeeMaker.Option.FillQuantity", "@{FillQuantity%%0}");
 
+
+  builder.selectMode(HomeConnectProgramBuilder::Mode_Activate);
+  string runProgramCommand = builder.build();
+
+  builder.selectMode(HomeConnectProgramBuilder::Mode_Select);
+  string selectProgramCommand = builder.build();
+
   EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("TemperatureLevel", true));
   int i = 0;
   tempLevel->addEnum("Normal", i++, true); // default
@@ -178,8 +185,8 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
       HomeConnectActionPtr(new HomeConnectPowerOnAction(*this,
                                                         aActionName,
                                                         aDescription,
-                                                        builder.selectMode(HomeConnectProgramBuilder::Mode_Activate).build(),
-                                                        builder.selectMode(HomeConnectProgramBuilder::Mode_Select).build(),
+                                                        runProgramCommand,
+                                                        selectProgramCommand,
                                                         *powerState,
                                                         *operationMode));
   action->addParameter(tempLevel);
