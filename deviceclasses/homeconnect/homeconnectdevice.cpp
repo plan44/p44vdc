@@ -196,7 +196,9 @@ void HomeConnectPowerOnAction::devicePoweredOn(ApiValuePtr aParams, StatusCB aCo
   }
 
   if (operationMode.value()->getStringValue() != "ModeReady") {
-    LOG(LOG_DEBUG, "Device is not ready, reschedule action");
+    LOG(LOG_DEBUG, "Device is not ready, reschedule action but call completed callback anyway");
+    if (aCompletedCB) aCompletedCB(Error::ok());
+    aCompletedCB.clear();
     MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::devicePoweredOn, this, aParams, aCompletedCB, aError, aCommandTemplate), RESCHEDULE_INTERVAL);
     return;
   }
