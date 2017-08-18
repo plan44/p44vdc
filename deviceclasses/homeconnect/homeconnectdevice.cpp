@@ -117,7 +117,7 @@ void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 
   if (Error::isOK(err)) {
     if(!keyAndValue(cmd, method, r)) {
-      err = TextError::err("Invalid Home Connect command template", cmd.c_str());
+      err = TextError::err("Invalid Home Connect command template: '%s'", cmd.c_str());
     }
   }
 
@@ -649,6 +649,7 @@ void HomeConnectDevice::handleEvent(EventType aEventType, JsonObjectPtr aEventDa
       handleEventTypeEvent(key);
       return;
     }
+    default: return;
   }
 }
 

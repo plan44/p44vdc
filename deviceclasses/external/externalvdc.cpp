@@ -653,7 +653,7 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       cl->deriveColorMode();
     }
     // generic channel apply
-    for (size_t i=0; i<numChannels(); i++) {
+    for (int i=0; i<numChannels(); i++) {
       ChannelBehaviourPtr cb = getChannelByIndex(i);
       if (cb->needsApplying()) {
         // get value and apply mode
@@ -661,7 +661,7 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         chval = output->outputValueAccordingToMode(chval, i);
         // send channel value message
         if (deviceConnector->simpletext) {
-          string m = string_format("C%zu=%lf", i, chval);
+          string m = string_format("C%d=%lf", i, chval);
           sendDeviceApiSimpleMessage(m);
         }
         else {

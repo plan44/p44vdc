@@ -82,7 +82,7 @@ namespace p44 {
     virtual string description() P44_OVERRIDE;
 
     /// set user assignable name
-    /// @param new name of the hue device
+    /// @param aName new name of the hue device
     /// @note will propagate the name to the hue bridge to name the light itself
     virtual void setName(const string &aName) P44_OVERRIDE;
 

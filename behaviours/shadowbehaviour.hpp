@@ -209,7 +209,7 @@ namespace p44 {
   /// callback from ShadowBehaviour to device implementation to perform moving sequence
   /// @param aDoneCB must be called when the movement change has been applied (as precisely as
   ///   possible at the time when the movement change actually happens in the hardware).
-  /// @param aNewDirection: 0=stopp, -1=start moving down, +1=start moving up
+  /// @param aNewDirection 0=stopp, -1=start moving down, +1=start moving up
   /// @note implementation should NOT call channelValueApplied(), this is done by ShadowBehaviour when appropriate
   typedef boost::function<void (SimpleCB aDoneCB, int aNewDirection)> MovementChangeCB;
 
@@ -289,7 +289,6 @@ namespace p44 {
     /// @param aMinMoveTime minimal movement time that can be applied
     /// @param aMaxShortMoveTime maximum short movement time (in case where a certain on impulse length might trigger permanent moves)
     /// @param aMinLongMoveTime minimum time for a long move (e.g. permanent move stoppable by another impulse)
-    /// @param aStopDelayTime delay after stop before any new movement is started
     void setDeviceParams(ShadowDeviceKind aShadowDeviceKind, bool aHasEndContacts, MLMicroSeconds aMinMoveTime, MLMicroSeconds aMaxShortMoveTime=0, MLMicroSeconds aMinLongMoveTime=0);
 
     /// initiates a blind moving sequence to apply current channel values to hardware

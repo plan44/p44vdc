@@ -292,7 +292,7 @@ bool HomeConnectVdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
 
           // write the new setting to the database and search for devices in new API
           if (db.executef("UPDATE globs SET developerApi=%i", aPropValue->boolValue() ? 1 : 0)!=SQLITE_OK) {
-            ALOG(LOG_ERR, db.error("saving authentication info")->getErrorMessage());
+            ALOG(LOG_ERR, "%s", db.error("saving authentication info")->getErrorMessage());
             return false;
           } else {
             ALOG(LOG_INFO, "Updated developerApi to: %s", aPropValue->boolValue() ? "true" : "false");

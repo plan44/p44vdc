@@ -1808,7 +1808,7 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aProperty
   }
   else if (aPropertyDescriptor->hasObjectKey(device_channels_key)) {
     if (!output) return PropertyContainerPtr(); // none
-    return output->getChannelByIndex(aPropertyDescriptor->fieldKey());
+    return output->getChannelByIndex((int)aPropertyDescriptor->fieldKey());
   }
   else if (aPropertyDescriptor->hasObjectKey(device_scenes_key)) {
     SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
