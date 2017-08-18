@@ -61,7 +61,7 @@ namespace p44 {
     } ReapplyMode;
     ReapplyMode reapplyMode;
     int reapplyCount;
-    long reapplyTicket;
+    MLTicket reapplyTicket;
 
 
   public:

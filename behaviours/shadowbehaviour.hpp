@@ -261,7 +261,7 @@ namespace p44 {
     double referenceAngle; ///< reference (starting) angle during moves
     MovementChangeCB movementCB; ///< routine to call to change movement
     MLMicroSeconds referenceTime; ///< if not Never, time when last movement was started
-    long movingTicket;
+    MLTicket movingTicket;
     bool runIntoEnd; ///< if set, move is expected to run into end contact, so no timer will be set up
     bool updateMoveTimeAtEndReached; ///< if set (only makes sense with hasEndContacts), difference between reference time and now will update open or close time
     SimpleCB endContactMoveAppliedCB; ///< callback to trigger when end contacts stop movement

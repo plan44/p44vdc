@@ -132,7 +132,7 @@ namespace p44 {
     typedef EnoceanRemoteControlDevice inherited;
 
     int movingDirection; ///< currently moving direction 0=stopped, -1=moving down, +1=moving up
-    long commandTicket;
+    MLTicket commandTicket;
 
   public:
 
@@ -166,7 +166,7 @@ namespace p44 {
   {
     typedef EnoceanRemoteControlDevice inherited;
 
-    long applyRepeatTicket;
+    MLTicket applyRepeatTicket;
 
   public:
 

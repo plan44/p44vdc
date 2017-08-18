@@ -252,7 +252,7 @@ namespace p44 {
   {
     typedef ZfDevice inherited;
 
-    long pressedTicket;
+    MLTicket pressedTicket;
 
   public:
 

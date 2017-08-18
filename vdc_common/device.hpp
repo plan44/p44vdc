@@ -88,10 +88,10 @@ namespace p44 {
     DsClass colorClass; ///< basic color of the device (can be black)
 
     // volatile internal state
-    long dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
+    MLTicket dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
     VdcDimMode currentDimMode; ///< current dimming in progress
     ChannelBehaviourPtr currentDimChannel; ///< currently dimmed channel (if dimming in progress)
-    long dimHandlerTicket; ///< for standard dimming
+    MLTicket dimHandlerTicket; ///< for standard dimming
     bool isDimming; ///< if set, dimming is in progress
     uint8_t areaDimmed; ///< last dimmed area (so continue know which dimming command to re-start in case it comes late)
     VdcDimMode areaDimMode; ///< last area dim mode
@@ -103,7 +103,7 @@ namespace p44 {
     int missedApplyAttempts; ///< number of apply attempts that could not be executed. If>0, completing next apply will trigger a re-apply to finalize values
     SimpleCB updatedOrCachedCB; ///< will be called when current values are either read from hardware, or new values have been requested for applying
     bool updateInProgress; ///< set when updating channel values from hardware is in progress
-    long serializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
+    MLTicket serializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
 
   public:
 

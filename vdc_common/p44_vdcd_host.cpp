@@ -103,7 +103,7 @@ class SelfTestRunner
   ButtonInputPtr button;
   IndicatorOutputPtr redLED;
   IndicatorOutputPtr greenLED;
-  long errorReportTicket;
+  MLTicket errorReportTicket;
   ErrorPtr globalError;
 public:
   static void initialize(VdcHost &aVdcHost, StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED)

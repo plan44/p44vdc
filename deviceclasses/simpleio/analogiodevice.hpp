@@ -55,7 +55,7 @@ namespace p44 {
 
     AnalogIoType analogIOType;
 
-    long transitionTicket;
+    MLTicket transitionTicket;
 
   public:
     AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig);

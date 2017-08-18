@@ -202,7 +202,7 @@ namespace p44 {
     int holdRepeats;
     bool dimmingUp;
     MLMicroSeconds timerRef;
-    long buttonStateMachineTicket;
+    MLTicket buttonStateMachineTicket;
 
     // state machine params
     static const int t_long_function_delay = 500*MilliSecond;

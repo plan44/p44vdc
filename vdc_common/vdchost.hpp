@@ -130,8 +130,8 @@ namespace p44 {
     string vdcModelNameTemplate; ///< how to generate vdc model names (that's what shows up in HW-Info in dS)
 
     bool collecting;
-    long announcementTicket;
-    long periodicTaskTicket;
+    MLTicket announcementTicket;
+    MLTicket periodicTaskTicket;
     MLMicroSeconds lastActivity;
     MLMicroSeconds lastPeriodicRun;
 
@@ -156,7 +156,7 @@ namespace p44 {
 
     // active vDC API session
     DsUid connectedVdsm;
-    long sessionActivityTicket;
+    MLTicket sessionActivityTicket;
     VdcApiConnectionPtr activeSessionConnection;
 
   public:

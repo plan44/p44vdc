@@ -114,10 +114,10 @@ namespace p44 {
 
     /// @name internal volatile state
     /// @{
-    long blinkTicket; ///< when blinking
+    MLTicket blinkTicket; ///< when blinking
     SimpleCB blinkDoneHandler; ///< called when blinking done
     LightScenePtr blinkRestoreScene; ///< scene to restore
-    long fadeDownTicket; ///< for slow fading operations
+    MLTicket fadeDownTicket; ///< for slow fading operations
     bool hardwareHasSetMinDim; ///< if set, hardware has set minDim (prevents loading from DB)
     /// @}
 
