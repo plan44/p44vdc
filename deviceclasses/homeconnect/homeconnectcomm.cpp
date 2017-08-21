@@ -32,7 +32,6 @@
 
 using namespace p44;
 
-#include "regexp.hpp"
 #define DEVELOPER_BASE_URL "https://developer.home-connect.com"
 #define PRODUCTION_BASE_URL "https://api.home-connect.com"
 
@@ -86,7 +85,7 @@ void HomeConnectApiOperation::sendRequest()
   homeConnectComm.httpAPIComm.addRequestHeader("Accept", "application/vnd.bsh.sdk.v1+json");
   homeConnectComm.httpAPIComm.addRequestHeader("Cache-Control", "no-cache");
   // - issue the request
-  homeConnectComm.httpAPIComm.jsonRequest((homeConnectComm.baseUrl()+urlPath).c_str(), boost::bind(&HomeConnectApiOperation::processAnswer, this, _1, _2), method.c_str(), data, "application/vnd.bsh.sdk.v1+json");
+  homeConnectComm.httpAPIComm.jsonRequest((homeConnectComm.baseUrl()+urlPath).c_str(), boost::bind(&HomeConnectApiOperation::processAnswer, this, _1, _2), method.c_str(), data, "application/vnd.bsh.sdk.v1+json", true);
 }
 
 
@@ -155,29 +154,18 @@ void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPt
             // the description should contain the following text:
             // The rate limit \"10 successive error calls in 10 minutes\" was reached. Requests are blocked during the remaining period of 397 seconds.
 
-            int lockdownTimeout = HomeConnectComm::MaxLockdownTimeout;
+            int lockdownTimeoutInSeconds = HomeConnectComm::MaxLockdownTimeout / Second;
 
             // if we have access to response headers
             if (homeConnectComm.httpAPIComm.responseHeaders) {
               // try to get the Retry-After header
               std::map<string,string>::iterator it = homeConnectComm.httpAPIComm.responseHeaders->find("Retry-After");
               if (it != homeConnectComm.httpAPIComm.responseHeaders->end()) {
-                lockdownTimeout = atoi(it->second.c_str());
+                lockdownTimeoutInSeconds = atoi(it->second.c_str());
               }
             }
 
-  //          // Alternative in case the headers are not properly send (not tested!)
-  //          RegExp regExp;
-  //          regExp.compile(".*?remaining period of (\\d*).*");
-  //
-  //          if (regExp.match(errordesc, true)) {
-  //            LOG(LOG_INFO, "Parsed the error response! '%s'", regExp.getCapture(1).c_str());
-  //            timeout = atoi(regExp.getCapture(1).c_str());
-  //          } else {
-  //            LOG(LOG_INFO, "Text '%s' do not match pattern", errordesc.c_str());
-  //          }
-
-            homeConnectComm.setLockDownTime(lockdownTimeout * Second);
+            homeConnectComm.setLockDownTime(lockdownTimeoutInSeconds * Second);
           }
           string errordesc;
           if (e->get("description", o)) {
@@ -189,10 +177,9 @@ void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPt
             error = TextError::err("%s: %s", errorkey.c_str(), errordesc.c_str());
           }
         }
-
-        // we got a response from server (it can be also error description)
-        homeConnectComm.apiReady = true;
       }
+      // we got a response from server (it can be also error description)
+      homeConnectComm.apiReady = true;
     }
   } else {
     // error during communication
