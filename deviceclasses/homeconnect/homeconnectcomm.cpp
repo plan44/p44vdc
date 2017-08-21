@@ -32,7 +32,6 @@
 
 using namespace p44;
 
-
 #define DEVELOPER_BASE_URL "https://developer.home-connect.com"
 #define PRODUCTION_BASE_URL "https://api.home-connect.com"
 
@@ -86,7 +85,7 @@ void HomeConnectApiOperation::sendRequest()
   homeConnectComm.httpAPIComm.addRequestHeader("Accept", "application/vnd.bsh.sdk.v1+json");
   homeConnectComm.httpAPIComm.addRequestHeader("Cache-Control", "no-cache");
   // - issue the request
-  homeConnectComm.httpAPIComm.jsonRequest((homeConnectComm.baseUrl()+urlPath).c_str(), boost::bind(&HomeConnectApiOperation::processAnswer, this, _1, _2), method.c_str(), data, "application/vnd.bsh.sdk.v1+json");
+  homeConnectComm.httpAPIComm.jsonRequest((homeConnectComm.baseUrl()+urlPath).c_str(), boost::bind(&HomeConnectApiOperation::processAnswer, this, _1, _2), method.c_str(), data, "application/vnd.bsh.sdk.v1+json", true);
 }
 
 
@@ -104,7 +103,8 @@ void HomeConnectApiOperation::refreshAccessToken()
     boost::bind(&HomeConnectApiOperation::processRefreshAnswer, this, _1, _2),
     "POST",
     postdata,
-    "application/x-www-form-urlencoded"
+    "application/x-www-form-urlencoded",
+    true
   );
 }
 
@@ -149,16 +149,35 @@ void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPt
             homeConnectComm.apiReady = false;
             refreshAccessToken();
             return;
+          } else if (errorkey=="429") {
+            // this is a rate limit error, try to get the missing time from the error description and set lockdown on the comm
+            // the description should contain the following text:
+            // The rate limit \"10 successive error calls in 10 minutes\" was reached. Requests are blocked during the remaining period of 397 seconds.
+
+            int lockdownTimeoutInSeconds = HomeConnectComm::MaxLockdownTimeout / Second;
+
+            // if we have access to response headers
+            if (homeConnectComm.httpAPIComm.responseHeaders) {
+              // try to get the Retry-After header
+              std::map<string,string>::iterator it = homeConnectComm.httpAPIComm.responseHeaders->find("Retry-After");
+              if (it != homeConnectComm.httpAPIComm.responseHeaders->end()) {
+                lockdownTimeoutInSeconds = atoi(it->second.c_str());
+              }
+            }
+
+            homeConnectComm.setLockDownTime(lockdownTimeoutInSeconds * Second);
           }
           string errordesc;
           if (e->get("description", o)) {
             errordesc = o->stringValue();
           }
-          // other application level error, create text error from it
-          error = TextError::err("%s: %s", errorkey.c_str(), errordesc.c_str());
+
+          if (Error::isOK(error)) {
+            // if no comm error is set then create application level error
+            error = TextError::err("%s: %s", errorkey.c_str(), errordesc.c_str());
+          }
         }
       }
-
       // we got a response from server (it can be also error description)
       homeConnectComm.apiReady = true;
     }
@@ -367,7 +386,8 @@ void HomeConnectEventMonitor::apiQueryDone(JsonObjectPtr aResult, ErrorPtr aErro
 HomeConnectComm::HomeConnectComm() :
   inherited(MainLoop::currentMainLoop()),
   httpAPIComm(MainLoop::currentMainLoop()),
-  developerApi(false)
+  findInProgress(false), apiReady(false),
+  developerApi(false), isLockDown(false)
 {
   httpAPIComm.isMemberVariable();
 }
@@ -407,12 +427,36 @@ void HomeConnectComm::apiQuery(const char* aUrlPath, HomeConnectApiResultCB aRes
 
 void HomeConnectComm::apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler)
 {
-  HomeConnectApiOperationPtr op = HomeConnectApiOperationPtr(new HomeConnectApiOperation(*this, aMethod, aUrlPath, aData, aResultHandler));
-  queueOperation(op);
-  // process operations
-  processOperations();
+  if (!isLockDown) {
+    HomeConnectApiOperationPtr op = HomeConnectApiOperationPtr(new HomeConnectApiOperation(*this, aMethod, aUrlPath, aData, aResultHandler));
+    queueOperation(op);
+    // process operations
+    processOperations();
+  } else {
+    LOG(LOG_INFO, "Cannot send command during lock down.");
+    if (aResultHandler) {
+      aResultHandler(NULL, WebError::webErr(429, "Communication temporally disabled"));
+    }
+  }
+}
+
+void HomeConnectComm::setLockDownTime(MLMicroSeconds aLockDownTime)
+{
+  if (aLockDownTime > MaxLockdownTimeout) {
+    LOG(LOG_INFO, "Requested timeout %ds to big! Limiting to %ds", aLockDownTime / Second, MaxLockdownTimeout / Second);
+    aLockDownTime = MaxLockdownTimeout;
+  }
+
+  LOG(LOG_INFO, "Set lock down for %i s", aLockDownTime / Second);
+  isLockDown = true;
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectComm::setLockDownTimeExpired, this), aLockDownTime);
 }
 
 
+void HomeConnectComm::setLockDownTimeExpired()
+{
+  LOG(LOG_INFO, "Lock down finished!");
+  isLockDown = false;
+}
 
 #endif // ENABLE_HOMECONNECT

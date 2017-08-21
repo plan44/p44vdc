@@ -156,7 +156,8 @@ namespace p44 {
     string refreshToken; ///< the Oauth refresh token that can be used to obtain access tokens
 
     bool developerApi; ///< if set, developer (simulator) API is used
-
+    bool isLockDown;   ///< if set, no requests can send send to the cloud (we are cut off)
+    const static MLMicroSeconds MaxLockdownTimeout = 10 * Minute;
   public:
 
     HomeConnectComm();
@@ -203,7 +204,12 @@ namespace p44 {
     /// @param aResultHandler will be called with the result
     void apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler);
 
+    /// Set a lockdown on communication so no request can be send to the cloud
+    /// @param aLockDownTime the time for with the lockdown is in effect
+    void setLockDownTime(MLMicroSeconds aLockDownTime);
 
+    /// a callback that is executed after the lockdown timeout expires
+    void setLockDownTimeExpired();
     /// @}
 
   };

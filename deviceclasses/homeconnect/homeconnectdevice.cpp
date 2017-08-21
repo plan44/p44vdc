@@ -779,10 +779,13 @@ void HomeConnectDevice::pollStateStatusDone(JsonObjectPtr aResult, ErrorPtr aErr
         }
       }
     }
-  }
 
-  homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/settings", haId.c_str()).c_str(),
-      boost::bind(&HomeConnectDevice::pollStateSettingsDone, this, _1, _2));
+    homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/settings", haId.c_str()).c_str(),
+        boost::bind(&HomeConnectDevice::pollStateSettingsDone, this, _1, _2));
+  } else {
+    // start new loop
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::pollState, this), 10 * Minute);
+  }
 }
 
 void HomeConnectDevice::pollStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aError)
@@ -800,10 +803,13 @@ void HomeConnectDevice::pollStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aE
         }
       }
     }
-  }
 
-  homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/programs/selected", haId.c_str()).c_str(),
-      boost::bind(&HomeConnectDevice::pollStateProgramDone, this, _1, _2));
+    homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/programs/selected", haId.c_str()).c_str(),
+        boost::bind(&HomeConnectDevice::pollStateProgramDone, this, _1, _2));
+  } else {
+    // start new loop
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::pollState, this), 10 * Minute);
+  }
 }
 
 void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aError)
