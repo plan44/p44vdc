@@ -75,6 +75,9 @@ namespace p44 {
   public:
 
     /// constructor
+    /// @param aDevice the device the behaviour belongs to
+    /// @param aId the string ID for that sensor.
+    ///   If empty string is passed, an id will be auto-generated from the sensor type (after setHardwareSensorConfig() is called)
     SensorBehaviour(Device &aDevice, const string aId);
 
     /// initialisation of hardware-specific constants for this sensor
@@ -117,6 +120,9 @@ namespace p44 {
 
     /// @return sensor unit as text (symbol)
     string getSensorUnitText();
+
+    /// @return sensor type as text
+    string getSensorTypeText();
 
     /// @return formatted sensor value range as string
     string getSensorRange();
@@ -192,6 +198,11 @@ namespace p44 {
 
     /// the behaviour type
     virtual BehaviourType getType() P44_OVERRIDE { return behaviour_sensor; };
+
+    /// automatic id for this behaviour
+    /// @return returns a ID for the behaviour.
+    /// @note this is only valid for a fully configured behaviour, as it is derived from configured parameters
+    virtual string getAutoId() P44_OVERRIDE;
 
     // property access implementation for descriptor/settings/states
     virtual int numDescProps() P44_OVERRIDE;

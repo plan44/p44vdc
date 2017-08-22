@@ -1037,7 +1037,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("hardwarename", o3)) buttonName = o3->stringValue(); else buttonName = string_format("button_id%d_el%d", buttonId, buttonElement);
       // - create behaviour
-      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, id));
+      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, id)); // automatic id if not specified
       bb->setHardwareButtonConfig(buttonId, buttonType, buttonElement, isLocalButton, buttonElement==buttonElement_down ? 1 : 0, true); // fixed mode
       bb->setGroup(group);
       bb->setHardwareName(buttonName);
@@ -1064,7 +1064,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("updateinterval", o3)) updateInterval = o3->doubleValue()*Second;
       if (o2->get("hardwarename", o3)) inputName = o3->stringValue(); else inputName = string_format("input_ty%d", inputType);
       // - create behaviour
-      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this, id));
+      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this, id)); // automatic id if not specified
       ib->setHardwareInputConfig(inputType, usage, true, updateInterval);
       ib->setGroup(group);
       ib->setHardwareName(inputName);
@@ -1101,7 +1101,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("max", o3)) max = o3->doubleValue();
       if (o2->get("resolution", o3)) resolution = o3->doubleValue();
       // - create behaviour
-      SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, id));
+      SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, id)); // automatic id if not specified
       sb->setHardwareSensorConfig(sensorType, usage, min, max, resolution, updateInterval, aliveSignInterval, changesOnlyInterval);
       sb->setGroup(group);
       sb->setHardwareName(sensorName);

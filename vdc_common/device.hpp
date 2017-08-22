@@ -283,7 +283,7 @@ namespace p44 {
 
     /// add a behaviour and set its index
     /// @param aBehaviour a newly created behaviour, will get added to the correct button/binaryInput/sensor/output
-    ///   array and given the correct index value.
+    ///   array, given the correct index value, and the behaviour id will be made unique if needed by appending an index
     void addBehaviour(DsBehaviourPtr aBehaviour);
 
     /// get scenes

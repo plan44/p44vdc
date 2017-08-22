@@ -69,6 +69,9 @@ namespace p44 {
   public:
 
     /// constructor
+    /// @param aDevice the device the behaviour belongs to
+    /// @param aId the string ID for that button.
+    ///   If empty string is passed, an id will be auto-generated (at setHardwareInputConfig())
     BinaryInputBehaviour(Device &aDevice, const string aId);
 
     /// initialisation of hardware-specific constants for this binary input
@@ -138,6 +141,11 @@ namespace p44 {
 
     /// the behaviour type
     virtual BehaviourType getType() P44_OVERRIDE { return behaviour_binaryinput; };
+
+    /// automatic id for this behaviour
+    /// @return returns a ID for the behaviour.
+    /// @note this is only valid for a fully configured behaviour, as it is derived from configured parameters
+    virtual string getAutoId() P44_OVERRIDE;
 
     /// returns the max extendedValue (depends on configuredInputType)
     /// @return max value the state is allowed to have. Normal binary inputs return 1 here, special cases like

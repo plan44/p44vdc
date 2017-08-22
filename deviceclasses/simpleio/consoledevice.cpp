@@ -79,7 +79,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
     consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 0, _1, _2));
     // - create one button input
-    ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"single"));
+    ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
     b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, false); // mode not restricted
     b->setGroup(group_yellow_light); // pre-configure for light
     b->setHardwareName(string_format("console key '%c'",name[0]));
@@ -94,7 +94,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     // - create down button (index 0)
     consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
     consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 0, _1, _2));
-    ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"down"));
+    ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
     b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
     b->setGroup(group_yellow_light); // pre-configure for light
     b->setHardwareName(string_format("console key '%c'",consoleKey1->getKeyCode()));
@@ -102,7 +102,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     // - create up button (index 1)
     consoleKey2 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0]+1, name.c_str());
     consoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 1, _1, _2));
-    b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"up"));
+    b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
     b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
     b->setGroup(group_yellow_light); // pre-configure for light
     b->setHardwareName(string_format("console key '%c'",consoleKey2->getKeyCode()));
@@ -130,7 +130,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     consoleKey2 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0]+1, name.c_str());
     consoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorHandler, this, 1, _1, _2)); // up
     // - create one sensor input
-    SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this,"simsensor"));
+    SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
     //s->setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 50, 1, 30*Second, 300*Second);
     s->setHardwareSensorConfig(sensorType_temperature, usage_room, 0, 50, 1, 30*Second, 300*Second);
     s->setHardwareName("Console simulated Sensor 0..50");
@@ -149,14 +149,14 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     ob->setHardwareName("Simulated valve, -100..100");
     addBehaviour(ob);
     // - create feedback sensor input
-    SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this,"simvalvesensor"));
+    SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
     sb->setHardwareSensorConfig(sensorType_temperature, usage_room, 0, 40, 40.0/255, 100*Second, 5*Minute);
     sb->setGroup(group_blue_heating);
     sb->setHardwareName("Simulated Temperature 0..40 °C");
     sb->updateSensorValue(21); // default to 21 degrees
     addBehaviour(sb);
     // - create low battery binary input
-    BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"simbat"));
+    BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
     bb->setHardwareInputConfig(binInpType_lowBattery, usage_room, true, 100*Second);
     bb->setGroup(group_blue_heating);
     bb->setHardwareName("Simulated Low Battery Indicator");

@@ -236,19 +236,44 @@ void Device::installSettings(DeviceSettingsPtr aDeviceSettings)
 void Device::addBehaviour(DsBehaviourPtr aBehaviour)
 {
   if (aBehaviour) {
+    BehaviourVector *bvP = NULL;
     switch (aBehaviour->getType()) {
       case behaviour_button:
-        aBehaviour->index = buttons.size();
-        buttons.push_back(aBehaviour);
-        break;
+        bvP = &buttons;
+        goto addbehaviour;
       case behaviour_binaryinput:
-        aBehaviour->index = binaryInputs.size();
-        binaryInputs.push_back(aBehaviour);
-        break;
+        bvP = &binaryInputs;
+        goto addbehaviour;
       case behaviour_sensor:
-        aBehaviour->index = sensors.size();
-        sensors.push_back(aBehaviour);
+        bvP = &sensors;
+        goto addbehaviour;
+      addbehaviour:
+      {
+        // set automatic id if none set before
+        if (aBehaviour->behaviourId.empty()) {
+          aBehaviour->behaviourId = aBehaviour->getAutoId();
+        }
+        // check for duplicate id
+        int instance = 1;
+        string id = aBehaviour->behaviourId; // start with plain ID
+        BehaviourVector::iterator pos = bvP->begin();
+        while (pos!=bvP->end()) {
+          if ((*pos)->behaviourId==id) {
+            // duplicate
+            instance++;
+            id = string_format("%s_%d", aBehaviour->behaviourId.c_str(), instance);
+            pos = bvP->begin(); // re-check from beginning
+          }
+          ++pos;
+        }
+        // now the id is unique for sure
+        aBehaviour->behaviourId = id; // assign it
+        // assign the index
+        aBehaviour->index = bvP->size();
+        // add it
+        bvP->push_back(aBehaviour);
         break;
+      }
       case behaviour_output:
       case behaviour_actionOutput:
       {

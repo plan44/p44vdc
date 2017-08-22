@@ -797,10 +797,10 @@ EnoceanDevicePtr EnoceanA52001Handler::newDevice(
     newDev->addChannelHandler(newHandler);
     if (EEP_VARIANT(aEEProfile)!=0) {
       // all non-default profiles have the valve sensor enabled -> add built-in temp sensor
-      EnoceanSensorHandler::addSensorChannel(newDev, tempSensor, false);
+      EnoceanSensorHandler::addSensorChannel(newDev, tempSensor, false, NULL); // automatic id
     }
     // report low bat status as a binary input
-    EnoceanSensorHandler::addSensorChannel(newDev, lowBatInput, false);
+    EnoceanSensorHandler::addSensorChannel(newDev, lowBatInput, false, NULL); // automatic id
     // A5-20-01 need teach-in response if requested (i.e. if this device creation is caused by learn-in, not reinstantiation from DB)
     if (aSendTeachInResponse) {
       newDev->sendTeachInResponse();
@@ -1035,47 +1035,47 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
       // this is the main device
       newDev->setFunctionDesc("environmental multisensor");
       // - Add channel-built-in behaviour
-      newHandler->behaviour = EnoceanSensorHandler::newSensorBehaviour(A513dawnSensor, newDev);
+      newHandler->behaviour = EnoceanSensorHandler::newSensorBehaviour(A513dawnSensor, newDev, "dawn");
       // - register the handler and the default behaviour
       newDev->addChannelHandler(newHandler);
       // - Add extra behaviours for A5-13-01
-      newHandler->outdoorTemp = EnoceanSensorHandler::newSensorBehaviour(A513outdoorTemp, newDev);
+      newHandler->outdoorTemp = EnoceanSensorHandler::newSensorBehaviour(A513outdoorTemp, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->outdoorTemp);
-      newHandler->windSpeed = EnoceanSensorHandler::newSensorBehaviour(A513windSpeed, newDev);
+      newHandler->windSpeed = EnoceanSensorHandler::newSensorBehaviour(A513windSpeed, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->windSpeed);
-      newHandler->dayIndicator = EnoceanSensorHandler::newSensorBehaviour(A513dayIndicator, newDev);
+      newHandler->dayIndicator = EnoceanSensorHandler::newSensorBehaviour(A513dayIndicator, newDev, "daylight");
       newDev->addBehaviour(newHandler->dayIndicator);
-      newHandler->rainIndicator = EnoceanSensorHandler::newSensorBehaviour(A513rainIndicator, newDev);
+      newHandler->rainIndicator = EnoceanSensorHandler::newSensorBehaviour(A513rainIndicator, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->rainIndicator);
       // sub sensors in same device?
       if (!separateSunSensors) {
         // - Add extra behaviours for A5-13-02
-        newHandler->sunWest = EnoceanSensorHandler::newSensorBehaviour(A513sunWest, newDev);
+        newHandler->sunWest = EnoceanSensorHandler::newSensorBehaviour(A513sunWest, newDev, "sun_west");
         newDev->addBehaviour(newHandler->sunWest);
-        newHandler->sunSouth = EnoceanSensorHandler::newSensorBehaviour(A513sunSouth, newDev);
+        newHandler->sunSouth = EnoceanSensorHandler::newSensorBehaviour(A513sunSouth, newDev, "sun_south");
         newDev->addBehaviour(newHandler->sunSouth);
-        newHandler->sunEast = EnoceanSensorHandler::newSensorBehaviour(A513sunEast, newDev);
+        newHandler->sunEast = EnoceanSensorHandler::newSensorBehaviour(A513sunEast, newDev, "sun_east");
         newDev->addBehaviour(newHandler->sunEast);
       }
     }
     else if (aSubDeviceIndex==1) {
       // this is a sun direction sensor
       newDev->setFunctionDesc("sun west sensor");
-      newHandler->sunWest = EnoceanSensorHandler::newSensorBehaviour(A513sunWest, newDev);
+      newHandler->sunWest = EnoceanSensorHandler::newSensorBehaviour(A513sunWest, newDev, "sun_west");
       newDev->addChannelHandler(newHandler);
       newDev->addBehaviour(newHandler->sunWest);
     }
     else if (aSubDeviceIndex==2) {
       // this is a sun direction sensor
       newDev->setFunctionDesc("sun south sensor");
-      newHandler->sunSouth = EnoceanSensorHandler::newSensorBehaviour(A513sunSouth, newDev);
+      newHandler->sunSouth = EnoceanSensorHandler::newSensorBehaviour(A513sunSouth, newDev, "sun_south");
       newDev->addChannelHandler(newHandler);
       newDev->addBehaviour(newHandler->sunSouth);
     }
     else if (aSubDeviceIndex==3) {
       // this is a sun direction sensor
       newDev->setFunctionDesc("sun east sensor");
-      newHandler->sunEast = EnoceanSensorHandler::newSensorBehaviour(A513sunEast, newDev);
+      newHandler->sunEast = EnoceanSensorHandler::newSensorBehaviour(A513sunEast, newDev, "sun_east");
       newDev->addChannelHandler(newHandler);
       newDev->addBehaviour(newHandler->sunEast);
     }

@@ -87,6 +87,17 @@ void ButtonBehaviour::setHardwareButtonConfig(int aButtonID, VdcButtonType aType
 }
 
 
+string ButtonBehaviour::getAutoId()
+{
+  if (buttonType==buttonType_2way) {
+    return buttonElementID==buttonElement_up ? "up" : "down";
+  }
+  else {
+    return "button";
+  }
+}
+
+
 
 void ButtonBehaviour::buttonAction(bool aPressed)
 {
