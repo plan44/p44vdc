@@ -314,6 +314,7 @@ namespace p44 {
     virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
     virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
     virtual bool setStringValue(const string aValue) P44_OVERRIDE;
+    bool setStringValueCaseInsensitive(const string& aValue);
 
   protected:
 
