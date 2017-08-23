@@ -95,6 +95,7 @@ namespace p44 {
   protected:
 
     string apiCommandTemplate;
+    void performCall(ApiValuePtr aParams, StatusCB aCompletedCB, const string& aCommandTemplate);
 
   public:
 
@@ -124,10 +125,14 @@ namespace p44 {
     DeviceState& powerState;
     DeviceState& operationMode;
     string ifPowerOffCommand;
+    string ifPowerOnCommand;
 
     static const MLMicroSeconds RESCHEDULE_INTERVAL = 10 * Second;
+    static const unsigned int RETRY_COUNT = 5;
 
-    void devicePoweredOn(ApiValuePtr aParams, StatusCB aCompletedCB, ErrorPtr aError, string aCommandTemplate);
+    void powerOnDevice(ApiValuePtr aParams, StatusCB aCompletedCB);
+    void devicePoweredOn(ApiValuePtr aParams, StatusCB aCompletedCB, ErrorPtr aError);
+    void runActionIfReady(ApiValuePtr aParams, StatusCB aCompletedCB, unsigned int aRetriesLeft);
 
   public:
 
@@ -186,7 +191,7 @@ namespace p44 {
   public:
     HomeConnectSettingBuilder(const string& aSettingName);
 
-    void setValue(const string& aValue) { value = aValue; }
+    HomeConnectSettingBuilder& setValue(const string& aValue) { value = aValue; return *this; }
     string build();
 
   };
