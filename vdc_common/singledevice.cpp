@@ -445,6 +445,16 @@ bool EnumValueDescriptor::setStringValue(const string aEnumText)
   return false; // no change
 }
 
+bool EnumValueDescriptor::setStringValueCaseInsensitive(const string& aValue)
+{
+  for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
+    if (lowerCase(pos->first) == lowerCase(aValue)) {
+      // found
+      return setInt32Value(pos->second);
+    }
+  }
+  return false; // no change
+}
 
 
 void EnumValueDescriptor::addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault)
