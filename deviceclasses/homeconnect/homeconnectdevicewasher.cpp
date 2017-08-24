@@ -125,12 +125,12 @@ void HomeConnectDeviceWasher::handleEventTypeNotify(const string& aKey, JsonObje
 
   if (aKey == "LaundryCare.Washer.Option.Temperature") {
     string value = (aValue != NULL) ? aValue->stringValue() : "";
-    temperatureProp->setStringValue(removeNamespace(value));
+    temperatureProp->setStringValueCaseInsensitive(removeNamespace(value));
     return;
   }
   if (aKey == "LaundryCare.Washer.Option.SpinSpeed") {
     string value = (aValue != NULL) ? aValue->stringValue() : "";
-    spinSpeedProp->setStringValue(removeNamespace(value));
+    spinSpeedProp->setStringValueCaseInsensitive(removeNamespace(value));
     return;
   }
 

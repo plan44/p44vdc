@@ -214,9 +214,13 @@ namespace p44 {
 
     // common states, they can be NULL in case this state is not valid for device class
     DeviceStatePtr operationMode;
+    EnumValueDescriptorPtr operationModeDescriptor;
     DeviceStatePtr remoteControl;
+    EnumValueDescriptorPtr remoteControlDescriptor;
     DeviceStatePtr doorState;
+    EnumValueDescriptorPtr doorStateDescriptor;
     DeviceStatePtr powerState;
+    EnumValueDescriptorPtr powerStateDescriptor;
 
     // Common Properties
     ValueDescriptorPtr programName;

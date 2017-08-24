@@ -105,7 +105,7 @@ void HomeConnectDeviceDryer::handleEventTypeNotify(const string& aKey, JsonObjec
 
   if (aKey == "LaundryCare.Dryer.Option.DryingTarget") {
     string value = (aValue != NULL) ? aValue->stringValue() : "";
-    dryingTargetProp->setStringValue(removeNamespace(value));
+    dryingTargetProp->setStringValueCaseInsensitive(removeNamespace(value));
     return;
   }
 
