@@ -70,9 +70,9 @@ bool HomeConnectDeviceDryer::configureDevice()
 
   EnumValueDescriptorPtr dryingTargetCottonSynthetic = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   int i = 0;
-  dryingTargetCottonSynthetic->addEnum("IronDry", i++, false);
-  dryingTargetCottonSynthetic->addEnum("CupboardDry", i++, false);
-  dryingTargetCottonSynthetic->addEnum("CupboardDryPlus", i++, false);
+  dryingTargetCottonSynthetic->addEnum("IronDry", i++);
+  dryingTargetCottonSynthetic->addEnum("CupboardDry", i++, true);
+  dryingTargetCottonSynthetic->addEnum("CupboardDryPlus", i++);
 
   EnumValueDescriptorPtr dryingTargetMix = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   i = 0;
