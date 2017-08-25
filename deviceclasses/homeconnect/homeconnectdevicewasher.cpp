@@ -144,8 +144,8 @@ void HomeConnectDeviceWasher::addAction(const string& aName, const string& aDesc
   builder.addOption("LaundryCare.Washer.Option.SpinSpeed", "\"LaundryCare.Washer.EnumType.SpinSpeed.@{SpinSpeed}\"");
 
   HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, builder.build()));
-  action->addParameter(aTemperature, true);
-  action->addParameter(aSpinSpeed, true);
+  action->addParameter(aTemperature);
+  action->addParameter(aSpinSpeed);
   deviceActions->addAction(action);
 }
 
