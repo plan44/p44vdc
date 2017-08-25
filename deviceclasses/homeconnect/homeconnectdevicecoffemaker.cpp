@@ -116,7 +116,7 @@ void HomeConnectDeviceCoffeMaker::handleEventTypeNotify(const string& aKey, Json
 
   if (aKey == "ConsumerProducts.CoffeeMaker.Option.BeanAmount") {
     string value = (aValue != NULL) ? aValue->stringValue() : "";
-    beanAmountProp->setStringValue(removeNamespace(value));
+    beanAmountProp->setStringValueCaseInsensitive(removeNamespace(value));
     return;
   }
 

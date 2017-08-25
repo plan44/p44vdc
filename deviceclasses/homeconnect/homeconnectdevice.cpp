@@ -516,38 +516,38 @@ bool HomeConnectDevice::configureDevice()
 void HomeConnectDevice::configureOperationModeState(const OperationModeConfiguration& aConfiguration)
 {
   // - operation mode
-  EnumValueDescriptor *omes = new EnumValueDescriptor("OperationMode", true);
+  operationModeDescriptor = new EnumValueDescriptor("OperationMode", true);
   int currentEnumValue = 0;
 
   if (aConfiguration.hasInactive) {
-    omes->addEnum("ModeInactive", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeInactive", currentEnumValue++);
   }
   if (aConfiguration.hasReady) {
-    omes->addEnum("ModeReady", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeReady", currentEnumValue++);
   }
   if (aConfiguration.hasDelayedStart) {
-    omes->addEnum("ModeDelayedStart", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeDelayedStart", currentEnumValue++);
   }
   if (aConfiguration.hasRun) {
-    omes->addEnum("ModeRun", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeRun", currentEnumValue++);
   }
   if (aConfiguration.hasPause) {
-    omes->addEnum("ModePause", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModePause", currentEnumValue++);
   }
   if (aConfiguration.hasActionrequired) {
-    omes->addEnum("ModeActionRequired", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeActionRequired", currentEnumValue++);
   }
   if (aConfiguration.hasFinished) {
-    omes->addEnum("ModeFinished", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeFinished", currentEnumValue++);
   }
   if (aConfiguration.hasError) {
-    omes->addEnum("ModeError", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeError", currentEnumValue++);
   }
   if (aConfiguration.hasAborting) {
-    omes->addEnum("ModeAborting", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeAborting", currentEnumValue++);
   }
   operationMode = DeviceStatePtr(
-      new DeviceState(*this, "OperationMode", "Status", ValueDescriptorPtr(omes),
+      new DeviceState(*this, "OperationMode", "Status", operationModeDescriptor,
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(operationMode);
 }
@@ -555,21 +555,21 @@ void HomeConnectDevice::configureOperationModeState(const OperationModeConfigura
 void HomeConnectDevice::configureRemoteControlState(const RemoteControlConfiguration& aConfiguration)
 {
   // - remote control
-  EnumValueDescriptor *rces = new EnumValueDescriptor("RemoteControl", true);
+  remoteControlDescriptor= new EnumValueDescriptor("RemoteControl", true);
   int currentEnumValue = 0;
 
   if (aConfiguration.hasControlInactive) {
-    rces->addEnum("RemoteControlInactive", currentEnumValue++);
+    remoteControlDescriptor->addEnum("RemoteControlInactive", currentEnumValue++);
   }
   if (aConfiguration.hasControlActive) {
-    rces->addEnum("RemoteControlActive", currentEnumValue++);
+    remoteControlDescriptor->addEnum("RemoteControlActive", currentEnumValue++);
   }
   if (aConfiguration.hasStartActive) {
-    rces->addEnum("RemoteStartActive", currentEnumValue++);
+    remoteControlDescriptor->addEnum("RemoteStartActive", currentEnumValue++);
   }
 
   remoteControl = DeviceStatePtr(
-      new DeviceState(*this, "RemoteControl", "Remote Control", ValueDescriptorPtr(rces),
+      new DeviceState(*this, "RemoteControl", "Remote Control", remoteControlDescriptor,
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(remoteControl);
 }
@@ -577,20 +577,20 @@ void HomeConnectDevice::configureRemoteControlState(const RemoteControlConfigura
 void HomeConnectDevice::configureDoorState(const DoorStateConfiguration& aConfiguration)
 {
   // - door state
-  EnumValueDescriptor *dses = new EnumValueDescriptor("DoorState", true);
+  doorStateDescriptor = new EnumValueDescriptor("DoorState", true);
   int currentEnumValue = 0;
 
   if (aConfiguration.hasOpen) {
-    dses->addEnum("DoorOpen", currentEnumValue++);
+    doorStateDescriptor->addEnum("DoorOpen", currentEnumValue++);
   }
   if (aConfiguration.hasClosed) {
-    dses->addEnum("DoorClosed", currentEnumValue++);
+    doorStateDescriptor->addEnum("DoorClosed", currentEnumValue++);
   }
   if (aConfiguration.hasLocked) {
-    dses->addEnum("DoorLocked", currentEnumValue++);
+    doorStateDescriptor->addEnum("DoorLocked", currentEnumValue++);
   }
   doorState = DeviceStatePtr(
-      new DeviceState(*this, "DoorState", "Door State", ValueDescriptorPtr(dses),
+      new DeviceState(*this, "DoorState", "Door State", doorStateDescriptor,
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(doorState);
 }
@@ -598,21 +598,21 @@ void HomeConnectDevice::configureDoorState(const DoorStateConfiguration& aConfig
 void HomeConnectDevice::configurePowerState(const PowerStateConfiguration& aConfiguration)
 {
   // - operation mode
-  EnumValueDescriptor *pses = new EnumValueDescriptor("PowerState", true);
+  powerStateDescriptor = new EnumValueDescriptor("PowerState", true);
   int currentEnumValue = 0;
 
   if (aConfiguration.hasOff) {
-    pses->addEnum("PowerOff", currentEnumValue++);
+    powerStateDescriptor->addEnum("PowerOff", currentEnumValue++);
   }
   if (aConfiguration.hasOn) {
-    pses->addEnum("PowerOn", currentEnumValue++);
+    powerStateDescriptor->addEnum("PowerOn", currentEnumValue++);
   }
   if (aConfiguration.hasStandby) {
-    pses->addEnum("PowerStandby", currentEnumValue++);
+    powerStateDescriptor->addEnum("PowerStandby", currentEnumValue++);
   }
 
   powerState = DeviceStatePtr(
-      new DeviceState(*this, "PowerState", "Power State", ValueDescriptorPtr(pses),
+      new DeviceState(*this, "PowerState", "Power State", powerStateDescriptor,
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(powerState);
 }
@@ -685,7 +685,7 @@ void HomeConnectDevice::handleEventTypeNotify(const string& aKey, JsonObjectPtr 
 
   if ((aKey == "BSH.Common.Setting.PowerState") && (powerState != NULL)) {
     string powerStateValue = "Power" + removeNamespace(value);
-    if (powerState->value()->setStringValue(powerStateValue)) {
+    if (powerStateDescriptor->setStringValueCaseInsensitive(powerStateValue)) {
       ALOG(LOG_NOTICE, "New Power State: '%s'", powerStateValue.c_str());
       powerState->push();
     }
@@ -722,7 +722,7 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
 
   if ((aKey == "BSH.Common.Status.OperationState") && (operationMode != NULL)) {
     string operationValue = "Mode" + removeNamespace(value);
-    if (operationMode->value()->setStringValue(operationValue)) {
+    if (operationModeDescriptor->setStringValueCaseInsensitive(operationValue)) {
       ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
 
       if (operationValue == "ModeRun") {
@@ -738,14 +738,14 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
     string remoteControlValue;
 
     if (value == "true") {
-      if (remoteControl->value()->getStringValue() != "RemoteStartActive") {
+      if (remoteControlDescriptor->getStringValue() != "RemoteStartActive") {
         remoteControlValue = "RemoteControlActive";
       }
     } else if (value == "false") {
       remoteControlValue = "RemoteControlInactive";
     }
 
-    if (!remoteControlValue.empty() && remoteControl->value()->setStringValue(remoteControlValue)) {
+    if (!remoteControlValue.empty() && remoteControlDescriptor->setStringValueCaseInsensitive(remoteControlValue)) {
       ALOG(LOG_NOTICE, "New Remote Control State: '%s'", remoteControlValue.c_str());
       remoteControl->push();
     }
@@ -758,12 +758,12 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
     if (value == "true") {
       remoteStartValue = "RemoteStartActive";
     } else if (value == "false") {
-      if (remoteControl->value()->getStringValue() == "RemoteStartActive") {
+      if (remoteControlDescriptor->getStringValue() == "RemoteStartActive") {
         remoteStartValue = "RemoteControlActive";
       }
     }
 
-    if (!remoteStartValue.empty() && remoteControl->value()->setStringValue(remoteStartValue)) {
+    if (!remoteStartValue.empty() && remoteControlDescriptor->setStringValueCaseInsensitive(remoteStartValue)) {
       ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
       remoteControl->push();
     }
@@ -772,7 +772,7 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
 
   if ((aKey=="BSH.Common.Status.DoorState") && (doorState != NULL)) {
     string doorValue = "Door" + removeNamespace(value);
-    if (doorState->value()->setStringValue(doorValue)) {
+    if (doorStateDescriptor->setStringValueCaseInsensitive(doorValue)) {
       ALOG(LOG_NOTICE, "Door State: '%s'", doorValue.c_str());
       doorState->push();
     }
