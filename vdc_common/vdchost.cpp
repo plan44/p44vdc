@@ -77,6 +77,7 @@ VdcHost::VdcHost() :
   inheritedParams(dsParamStore),
   mac(0),
   networkConnected(true), // start with the assumption of a connected network
+  maxApiVersion(0), // no API version limit
   externalDsuid(false),
   storedDsuid(false),
   DsAddressable(this),
@@ -883,9 +884,10 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
   // check API version
   if (Error::isOK(respErr = checkParam(aParams, "api_version", v))) {
     int version = v->int32Value();
-    if (version<VDC_API_VERSION_MIN || version>VDC_API_VERSION_MAX) {
+    int maxversion = (maxApiVersion==0 || maxApiVersion>=VDC_API_VERSION_MAX) ? VDC_API_VERSION_MAX : maxApiVersion;
+    if (version<VDC_API_VERSION_MIN || version>maxversion) {
       // incompatible version
-      respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d..%d", version, VDC_API_VERSION_MIN, VDC_API_VERSION_MAX);
+      respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d..%d", version, VDC_API_VERSION_MIN, maxversion);
     }
     else {
       // API version ok, save it

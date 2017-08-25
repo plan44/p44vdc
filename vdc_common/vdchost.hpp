@@ -155,6 +155,7 @@ namespace p44 {
     int mainLoopStatsCounter;
 
     // active vDC API session
+    int maxApiVersion; // limit for API version to support (for testing client's backwards compatibility), 0=no limit
     DsUid connectedVdsm;
     MLTicket sessionActivityTicket;
     VdcApiConnectionPtr activeSessionConnection;
@@ -224,6 +225,11 @@ namespace p44 {
     /// Set network interface to use for determining IP address and checking for being available for network connections
     /// @param aIfNameForConnections name of the network device, empty string to use default interface
     void setNetworkIf(const string aIfNameForConnections) { ifNameForConn = aIfNameForConnections; };
+
+    /// Set maximum API version to support (to test backwards compatibility of connecting vdsms)
+    /// @param aMaxApiVersion max API version to support, 0 = all implemented versions
+    void setMaxApiVersion(int aMaxApiVersion) { maxApiVersion = aMaxApiVersion; };
+
 
     /// Set directory for loading device icons
     /// @param aIconDir  full path to directory to load device icons from. Empty string or NULL means "no icons"
