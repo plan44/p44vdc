@@ -60,20 +60,8 @@ bool HomeConnectDeviceOven::configureDevice()
   currentTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("CurrentTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
 
-  elapsedProgramTimeProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("ElapsedProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
-
-  remainingProgramTimeProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("RemainingProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
-
-  programProgressProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("ProgramProgress", valueType_numeric, VALUE_UNIT(valueUnit_percent, unitScaling_1), 0, 100, 1));
-
   deviceProperties->addProperty(targetTemperatureProp);
   deviceProperties->addProperty(currentTemperatureProp);
-  deviceProperties->addProperty(elapsedProgramTimeProp);
-  deviceProperties->addProperty(remainingProgramTimeProp);
-  deviceProperties->addProperty(programProgressProp);
 
   deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "PreheatFinished", "Pre-heating finished")));
 
@@ -111,6 +99,13 @@ bool HomeConnectDeviceOven::configureDevice()
   psConfig.hasStandby = true;
   configurePowerState(psConfig);
 
+  // configure program status properties
+  ProgramStatusConfiguration progStatusConfig = { 0 };
+  progStatusConfig.hasElapsedTime = true;
+  progStatusConfig.hasRemainingTime = true;
+  progStatusConfig.hasProgres = true;
+  configureProgramStatus(progStatusConfig);
+
   return inherited::configureDevice();
 }
 
@@ -122,24 +117,6 @@ void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEve
 void HomeConnectDeviceOven::handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue)
 {
   ALOG(LOG_INFO, "Oven Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
-
-  if (aKey == "BSH.Common.Option.ElapsedProgramTime") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    elapsedProgramTimeProp->setInt32Value(value);
-    return;
-  }
-
-  if (aKey == "BSH.Common.Option.RemainingProgramTime") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    remainingProgramTimeProp->setInt32Value(value);
-    return;
-  }
-
-  if (aKey == "BSH.Common.Option.ProgramProgress") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    programProgressProp->setInt32Value(value);
-    return;
-  }
 
   if (aKey == "Cooking.Oven.Option.SetpointTemperature") {
     int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;

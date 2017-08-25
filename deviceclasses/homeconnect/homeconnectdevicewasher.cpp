@@ -91,6 +91,13 @@ bool HomeConnectDeviceWasher::configureDevice()
   dsConfig.hasLocked = true;
   configureDoorState(dsConfig);
 
+  // configure program status properties
+  ProgramStatusConfiguration progStatusConfig = { 0 };
+  progStatusConfig.hasElapsedTime = false;
+  progStatusConfig.hasRemainingTime = true;
+  progStatusConfig.hasProgres = true;
+  configureProgramStatus(progStatusConfig);
+
   EnumValueDescriptorPtr temperatureCotton = createEnumDescriptor("Temperature", temperature_GC90, temperature_GC40, temperatureNames);
   EnumValueDescriptorPtr temperatureEasyCare = createEnumDescriptor("Temperature", temperature_GC60, temperature_GC40, temperatureNames);
   EnumValueDescriptorPtr temperature = createEnumDescriptor("Temperature", temperature_GC40, temperature_GC40, temperatureNames);

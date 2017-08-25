@@ -34,9 +34,6 @@ class HomeConnectDeviceOven: public HomeConnectDevice
 
   ValueDescriptorPtr targetTemperatureProp;
   ValueDescriptorPtr currentTemperatureProp;
-  ValueDescriptorPtr elapsedProgramTimeProp;
-  ValueDescriptorPtr remainingProgramTimeProp;
-  ValueDescriptorPtr programProgressProp;
 
   virtual bool configureDevice() P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
