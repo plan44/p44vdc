@@ -118,7 +118,7 @@ void HomeConnectDeviceDryer::addAction(const string& aActionName, const string& 
   builder.addOption("LaundryCare.Dryer.Option.DryingTarget", "\"LaundryCare.Dryer.EnumType.DryingTarget.@{DryingTarget}\"");
 
   HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
-  action->addParameter(aParameter, true);
+  action->addParameter(aParameter);
   deviceActions->addAction(action);
 }
 
