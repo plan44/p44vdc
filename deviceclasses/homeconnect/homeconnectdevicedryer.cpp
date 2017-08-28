@@ -68,6 +68,13 @@ bool HomeConnectDeviceDryer::configureDevice()
   dsConfig.hasLocked = false;
   configureDoorState(dsConfig);
 
+  // configure program status properties
+  ProgramStatusConfiguration progStatusConfig = { 0 };
+  progStatusConfig.hasElapsedTime = false;
+  progStatusConfig.hasRemainingTime = true;
+  progStatusConfig.hasProgres = true;
+  configureProgramStatus(progStatusConfig);
+
   EnumValueDescriptorPtr dryingTargetCottonSynthetic = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   int i = 0;
   dryingTargetCottonSynthetic->addEnum("IronDry", i++);
@@ -76,8 +83,8 @@ bool HomeConnectDeviceDryer::configureDevice()
 
   EnumValueDescriptorPtr dryingTargetMix = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   i = 0;
-  dryingTargetMix->addEnum("IronDry", i++, false);
-  dryingTargetMix->addEnum("CupboardDry", i++, false);
+  dryingTargetMix->addEnum("IronDry", i++);
+  dryingTargetMix->addEnum("CupboardDry", i++, true);
 
   addAction("std.Cotton",    "Cotton",    "Cotton",    dryingTargetCottonSynthetic);
   addAction("std.Synthetic", "Synthetic", "Synthetic", dryingTargetCottonSynthetic);

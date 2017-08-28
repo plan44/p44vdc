@@ -224,6 +224,9 @@ namespace p44 {
 
     // Common Properties
     ValueDescriptorPtr programName;
+    ValueDescriptorPtr remainingProgramTime;
+    ValueDescriptorPtr programProgress;
+    ValueDescriptorPtr elapsedProgramTime;
 
     HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
     virtual ~HomeConnectDevice();
@@ -326,6 +329,12 @@ namespace p44 {
       bool hasStandby : 1;
     } PowerStateConfiguration;
 
+    typedef struct {
+      bool hasElapsedTime : 1;
+      bool hasRemainingTime : 1;
+      bool hasProgres : 1;
+    } ProgramStatusConfiguration;
+
     // The following methods implement common behaviour and should be executed from subclasses overrides.
     virtual bool configureDevice();
     virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
@@ -345,6 +354,7 @@ namespace p44 {
     void configureRemoteControlState(const RemoteControlConfiguration& aConfiguration);
     void configureDoorState(const DoorStateConfiguration& aConfiguration);
     void configurePowerState(const PowerStateConfiguration& aConfiguration);
+    void configureProgramStatus(const ProgramStatusConfiguration& aConfiguration);
 
     // Create dsuid based on device id
     void deriveDsUid();

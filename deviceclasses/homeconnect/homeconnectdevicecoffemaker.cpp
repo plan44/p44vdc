@@ -74,6 +74,13 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   psConfig.hasStandby = true;
   configurePowerState(psConfig);
 
+  // configure program status properties
+  ProgramStatusConfiguration progStatusConfig = { 0 };
+  progStatusConfig.hasElapsedTime = false;
+  progStatusConfig.hasRemainingTime = true;
+  progStatusConfig.hasProgres = true;
+  configureProgramStatus(progStatusConfig);
+
   // FIXME: ugly direct model match
 //    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
   // FIXME: got even uglier:

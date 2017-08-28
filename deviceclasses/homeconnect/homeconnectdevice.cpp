@@ -617,6 +617,27 @@ void HomeConnectDevice::configurePowerState(const PowerStateConfiguration& aConf
   deviceStates->addState(powerState);
 }
 
+void HomeConnectDevice::configureProgramStatus(const ProgramStatusConfiguration& aConfiguration)
+{
+  if (aConfiguration.hasElapsedTime) {
+    elapsedProgramTime = ValueDescriptorPtr(
+        new NumericValueDescriptor("ElapsedProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
+    deviceProperties->addProperty(elapsedProgramTime);
+  }
+
+  if (aConfiguration.hasRemainingTime) {
+    remainingProgramTime = ValueDescriptorPtr(
+        new NumericValueDescriptor("RemainingProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
+    deviceProperties->addProperty(remainingProgramTime);
+  }
+
+  if (aConfiguration.hasProgres) {
+    programProgress = ValueDescriptorPtr(
+        new NumericValueDescriptor("ProgramProgress", valueType_numeric, VALUE_UNIT(valueUnit_percent, unitScaling_1), 0, 100, 1));
+    deviceProperties->addProperty(programProgress);
+  }
+}
+
 void HomeConnectDevice::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
 {
   // nop for now
@@ -698,6 +719,25 @@ void HomeConnectDevice::handleEventTypeNotify(const string& aKey, JsonObjectPtr 
     if (programName->setStringValue(programNameValue)) {
       ALOG(LOG_NOTICE, "New Program Name State: '%s'", programNameValue.c_str());
     }
+    return;
+  }
+
+  if ((aKey == "BSH.Common.Option.ElapsedProgramTime") && (elapsedProgramTime != NULL)) {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    elapsedProgramTime->setInt32Value(value);
+    return;
+  }
+
+  if ((aKey == "BSH.Common.Option.RemainingProgramTime") && (remainingProgramTime != NULL)) {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    remainingProgramTime->setInt32Value(value);
+    return;
+  }
+
+  if ((aKey == "BSH.Common.Option.ProgramProgress") && (programProgress != NULL)) {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    programProgress->setInt32Value(value);
+    return;
   }
 }
 
@@ -729,6 +769,17 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
         operationMode->pushWithEvent(deviceEvents->getEvent("ProgramStarted"));
       } else {
         operationMode->push();
+
+        // the following information is valid only in case the program is running
+        if (elapsedProgramTime != NULL) {
+          elapsedProgramTime->invalidate();
+        }
+        if (remainingProgramTime != NULL) {
+          remainingProgramTime->invalidate();
+        }
+        if (programProgress != NULL) {
+          programProgress->invalidate();
+        }
       }
     }
     return;
