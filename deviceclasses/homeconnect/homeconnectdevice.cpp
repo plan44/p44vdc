@@ -32,6 +32,8 @@
 #include "homeconnectdevicedryer.hpp"
 #include "homeconnectdevicefridge.hpp"
 #include <sstream>
+#include <boost/algorithm/string/split.hpp>
+#include <functional>
 
 using namespace p44;
 
@@ -872,7 +874,14 @@ void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aEr
 
 string HomeConnectDevice::hardwareGUID()
 {
-  return string_format("haId:%s", haId.c_str());
+  vector<string> splitedStrings;
+  boost::split(splitedStrings, haId, boost::bind(std::equal_to<char>(), _1, '-'));
+  // getting last part of haId, ex. "SIEMENS-HCS05FRF1-D516FBECC462AD"
+  string last;
+  if (!splitedStrings.empty()) {
+    last = splitedStrings.back();
+  }
+  return string_format("haId:%s", last.c_str());
 }
 
 
