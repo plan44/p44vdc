@@ -207,6 +207,7 @@ namespace p44 {
 
     /// defines how "heatingLevel" is applied to the output
     VdcHeatingSystemCapability heatingSystemCapability;
+    VdcHeatingSystemType heatingSystemType;
 
     /// @}
 
@@ -294,6 +295,8 @@ namespace p44 {
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
     virtual string shortDesc() P44_OVERRIDE;
+
+    VdcHeatingSystemType getHeatingSystemType()  { return heatingSystemType; }
 
   protected:
 
