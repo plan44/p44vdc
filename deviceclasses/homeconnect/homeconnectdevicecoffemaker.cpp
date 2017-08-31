@@ -136,6 +136,33 @@ void HomeConnectDeviceCoffeMaker::handleEventTypeNotify(const string& aKey, Json
   inherited::handleEventTypeNotify(aKey, aValue);
 }
 
+
+void HomeConnectDeviceCoffeMaker::handleEventTypeStatus(const string& aKey, JsonObjectPtr aValue)
+{
+  if ((aKey == "BSH.Common.Status.RemoteControlStartAllowed") && (remoteControl != NULL)) {
+
+    if (aValue) {
+      string remoteStartValue;
+      bool value = aValue->boolValue();
+
+      if (value) {
+        remoteStartValue = "RemoteStartActive";
+      }
+      else {
+        remoteStartValue = "RemoteControlInactive";
+      }
+
+      if (remoteControlDescriptor->setStringValueCaseInsensitive(remoteStartValue)) {
+        ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
+        remoteControl->push();
+      }
+    }
+    return;
+  }
+
+  inherited::handleEventTypeStatus(aKey, aValue);
+}
+
 void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
                                             const string& aDescription,
                                             const string& aProgramName,
