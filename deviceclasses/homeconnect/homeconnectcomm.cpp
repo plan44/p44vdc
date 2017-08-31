@@ -251,7 +251,7 @@ HomeConnectEventMonitor::~HomeConnectEventMonitor()
 void HomeConnectEventMonitor::sendGetEventRequest()
 {
 	// connecting to event stream make sense only when the homm channel is working
-  if (homeConnectComm.apiReady)
+  if (homeConnectComm.apiReady && !homeConnectComm.isLockDown)
   {
 	  // - set up the extra auth headers
 	  eventBuffer.clear();
@@ -443,11 +443,11 @@ void HomeConnectComm::apiAction(const string aMethod, const string aUrlPath, Jso
 void HomeConnectComm::setLockDownTime(MLMicroSeconds aLockDownTime)
 {
   if (aLockDownTime > MaxLockdownTimeout) {
-    LOG(LOG_INFO, "Requested timeout %ds to big! Limiting to %ds", aLockDownTime / Second, MaxLockdownTimeout / Second);
+    LOG(LOG_INFO, "Requested timeout %i s to big! Limiting to %i s", (int)(aLockDownTime / Second), (int)(MaxLockdownTimeout / Second));
     aLockDownTime = MaxLockdownTimeout;
   }
 
-  LOG(LOG_INFO, "Set lock down for %i s", aLockDownTime / Second);
+  LOG(LOG_INFO, "Set lock down for %i s", (int)(aLockDownTime / Second));
   isLockDown = true;
   MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectComm::setLockDownTimeExpired, this), aLockDownTime);
 }
