@@ -99,7 +99,9 @@ namespace p44 {
     eventType_Unknown,
     eventType_Status,
     eventType_Notify,
-    eventType_Event
+    eventType_Event,
+    eventType_Disconnected,
+    eventType_Connected
   } EventType;
 
   /// will be called to deliver events

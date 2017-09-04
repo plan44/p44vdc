@@ -184,6 +184,11 @@ void HomeConnectPowerOnAction::performCall(ApiValuePtr aParams, StatusCB aComple
     return;
   }
 
+  if (operationMode.value()->getStringValue() != "ModeReady") {
+    runActionWhenReady(aParams, aCompletedCB, RETRY_COUNT);
+    return;
+  }
+
   LOG(LOG_DEBUG, "Device is powered on, proceed with action");
   inherited::performCall(aParams, aCompletedCB, ifPowerOnCommand);
   return;
@@ -210,11 +215,11 @@ void HomeConnectPowerOnAction::devicePoweredOn(ApiValuePtr aParams, StatusCB aCo
     return;
   }
 
-  runActionIfReady(aParams, aCompletedCB, RETRY_COUNT);
+  runActionWhenReady(aParams, aCompletedCB, RETRY_COUNT);
 
 }
 
-void HomeConnectPowerOnAction::runActionIfReady(ApiValuePtr aParams, StatusCB aCompletedCB, unsigned int aRetriesLeft)
+void HomeConnectPowerOnAction::runActionWhenReady(ApiValuePtr aParams, StatusCB aCompletedCB, unsigned int aRetriesLeft)
 {
   if (operationMode.value()->getStringValue() != "ModeReady") {
 
@@ -228,7 +233,7 @@ void HomeConnectPowerOnAction::runActionIfReady(ApiValuePtr aParams, StatusCB aC
     LOG(LOG_DEBUG, "Device is not ready, reschedule action but call completed callback anyway");
     if (aCompletedCB) aCompletedCB(Error::ok());
     aCompletedCB.clear();
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::runActionIfReady, this, aParams, aCompletedCB, aRetriesLeft), RESCHEDULE_INTERVAL);
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::runActionWhenReady, this, aParams, aCompletedCB, aRetriesLeft), RESCHEDULE_INTERVAL);
     return;
   }
 
@@ -676,6 +681,16 @@ void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryRes
 
 void HomeConnectDevice::handleEvent(EventType aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
+  if (aEventType == eventType_Disconnected) {
+    handleEventTypeDisconnected();
+    return;
+  }
+
+  if (aEventType == eventType_Connected) {
+    handleEventTypeConnected();
+    return;
+  }
+
   JsonObjectPtr oKey;
   JsonObjectPtr oValue;
 
@@ -691,11 +706,11 @@ void HomeConnectDevice::handleEvent(EventType aEventType, JsonObjectPtr aEventDa
       handleEventTypeStatus(key, oValue);
       return;
     }
-    case eventType_Notify: {
+    case eventType_Notify : {
       handleEventTypeNotify(key, oValue);
       return;
     }
-    case eventType_Event: {
+    case eventType_Event : {
       handleEventTypeEvent(key);
       return;
     }
@@ -835,6 +850,16 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
   if ((aKey=="BSH.Common.Status.LocalControlActive") && (operationMode != NULL)) {
     operationMode->pushWithEvent(deviceEvents->getEvent("LocallyOperated"));
   }
+}
+
+void HomeConnectDevice::handleEventTypeDisconnected()
+{
+  ALOG(LOG_NOTICE, "Device disconnected");
+}
+
+void HomeConnectDevice::handleEventTypeConnected()
+{
+  ALOG(LOG_NOTICE, "Device connected");
 }
 
 void HomeConnectDevice::pollState()
