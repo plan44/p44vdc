@@ -41,8 +41,8 @@ using namespace p44;
 
 // MARK: ===== ExternalDeviceAction
 
-ExternalDeviceAction::ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription) :
-  inherited(aSingleDevice, aName, aDescription),
+ExternalDeviceAction::ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle) :
+  inherited(aSingleDevice, aName, aDescription, aTitle),
   callback(NULL)
 {
 }
@@ -120,7 +120,7 @@ void ExternalDeviceAction::callPerformed(JsonObjectPtr aStatusInfo)
 ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag) :
   #if ENABLE_EXTERNAL_SINGLEDEVICE
   inherited(aVdcP, false), // do not enable single device mechanisms by default
-  noConfirmAction(false),
+  noConfirmAction(false), // expect action execution to be confirmed
   #else
   inherited(aVdcP),
   #endif
@@ -338,7 +338,8 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
       else if (aMessageType=="confirmAction") {
         JsonObjectPtr o;
         if (aMessage->get("action", o)) {
-          ExternalDeviceActionPtr a = boost::dynamic_pointer_cast<ExternalDeviceAction>(deviceActions->getAction(o->stringValue()));
+          ExternalDeviceActionPtr a = boost::dynamic_pointer_cast<ExternalDeviceAction>(dynamicDeviceActions->getAction(o->stringValue()));
+          if (!a) a = boost::dynamic_pointer_cast<ExternalDeviceAction>(deviceActions->getAction(o->stringValue()));
           if (a) a->callPerformed(aMessage);
         }
         else {
@@ -407,6 +408,18 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
         else {
           // only push events without a state change
           deviceEvents->pushEvents(evs);
+        }
+      }
+      else if (aMessageType=="dynamicAction") {
+        JsonObjectPtr o;
+        // dynamic action added/changed/deleted
+        if (aMessage->get("changes", o)) {
+          string actionId;
+          JsonObjectPtr actionConfig;
+          o->resetKeyIteration();
+          if (o->nextKeyValue(actionId, actionConfig)) {
+            err = updateDynamicActionFromJSON(actionId, actionConfig);
+          }
         }
       }
       #endif
@@ -771,9 +784,18 @@ bool ExternalDevice::processControlValue(const string &aName, double aValue)
 ErrorPtr ExternalDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription)
 {
   // base class just creates a unspecific action
-  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription));
+  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription, ""));
   return ErrorPtr();
 }
+
+
+ErrorPtr ExternalDevice::dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle)
+{
+  // base class just creates a unspecific action
+  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription, aTitle));
+  return ErrorPtr();
+}
+
 
 #endif
 
@@ -1110,6 +1132,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   }
   #if ENABLE_EXTERNAL_SINGLEDEVICE
   // create actions/states/events and properties from JSON
+  if (aInitParams->get("noconfirmaction", o)) noConfirmAction = o->boolValue();
   err = configureFromJSON(aInitParams);
   if (!Error::isOK(err)) return err;
   if (deviceProperties) deviceProperties->setPropertyChangedHandler(boost::bind(&ExternalDevice::propertyChanged, this, _1));

@@ -61,7 +61,7 @@ namespace p44 {
     /// @param aSingleDevice the single device this action belongs to
     /// @param aName the name of the action.
     /// @param aDescription a description string for the action.
-    ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription);
+    ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle);
 
     virtual ~ExternalDeviceAction();
 
@@ -244,6 +244,7 @@ namespace p44 {
     /// @{
 
     virtual ErrorPtr actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription) P44_OVERRIDE;
+    virtual ErrorPtr dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle) P44_OVERRIDE;
 
     /// @}
 
