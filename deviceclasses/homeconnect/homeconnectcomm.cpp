@@ -287,7 +287,13 @@ EventType HomeConnectEventMonitor::getEventType()
     return eventType_Status;
   }
   if (eventTypeString == "EVENT") {
-      return eventType_Event;
+    return eventType_Event;
+  }
+  if (eventTypeString == "DISCONNECTED") {
+    return eventType_Disconnected;
+  }
+  if (eventTypeString == "CONNECTED") {
+    return eventType_Connected;
   }
   return eventType_Unknown;
 }

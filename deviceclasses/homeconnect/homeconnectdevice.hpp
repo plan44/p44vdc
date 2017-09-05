@@ -127,12 +127,12 @@ namespace p44 {
     string ifPowerOffCommand;
     string ifPowerOnCommand;
 
-    static const MLMicroSeconds RESCHEDULE_INTERVAL = 10 * Second;
-    static const unsigned int RETRY_COUNT = 5;
+    static const MLMicroSeconds RESCHEDULE_INTERVAL = 5 * Second;
+    static const unsigned int RETRY_COUNT = 10;
 
     void powerOnDevice(ApiValuePtr aParams, StatusCB aCompletedCB);
     void devicePoweredOn(ApiValuePtr aParams, StatusCB aCompletedCB, ErrorPtr aError);
-    void runActionIfReady(ApiValuePtr aParams, StatusCB aCompletedCB, unsigned int aRetriesLeft);
+    void runActionWhenReady(ApiValuePtr aParams, StatusCB aCompletedCB, unsigned int aRetriesLeft);
 
   public:
 
@@ -342,6 +342,8 @@ namespace p44 {
     virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue);
     virtual void handleEventTypeEvent(const string& aKey);
     virtual void handleEventTypeStatus(const string& aKey, JsonObjectPtr aValue);
+    virtual void handleEventTypeDisconnected();
+    virtual void handleEventTypeConnected();
 
     // Pool the state of the device and process the responses
     void pollState();
