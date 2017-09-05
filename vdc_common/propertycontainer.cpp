@@ -90,6 +90,13 @@ void PropertyContainer::prepareAccess(PropertyAccessMode aMode, PropertyDescript
 }
 
 
+void PropertyContainer::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  // nothing to un-prepare/finalize in base class
+}
+
+
+
 
 ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList)
 {
@@ -235,7 +242,12 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
                 }
               }
             }
-          }
+            if (propDesc->needsPreparation(aMode)) {
+              // unprepare (e.g. allow implementations to free resources created for accessing a property)
+              FOCUSLOG("- property '%s' access with preparation complete -> unpreparing", propDesc->name());
+              finishAccess(aMode, propDesc);
+            }
+          } // actual access, not preparation
         }
         else {
           // no descriptor found for this query element

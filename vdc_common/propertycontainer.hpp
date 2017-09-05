@@ -280,8 +280,17 @@ namespace p44 {
     /// prepare access to a property (for example if the property needs I/O to update its value before being read).
     /// @param aMode access mode (see PropertyAccessMode: read, write, write preload or delete)
     /// @param aPropertyDescriptor decriptor that signalled a need for preparation
-    /// @note this base class just calls aPreparedCB with success status.
+    /// @param aPreparedCB will be called when property is ready to be accessed with aMode
+    /// @note this base class implementation just calls aPreparedCB with success status.
     virtual void prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB);
+
+    /// This is called when access to a property that needed preparation (see prepareAccess()) has been accessed.
+    /// This can be used e.g. to free properties generated on the fly at prepareAccess(), or to perform
+    /// @param aMode access mode (see PropertyAccessMode: read, write, write preload or delete)
+    /// @param aPropertyDescriptor decriptor that signalled a need for preparation
+    /// @note this is always called for to-be prepared properties, even if access itself was not successful
+    /// @note this base class implementation does nothing
+    virtual void finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor);
 
     /// access single field in this container
     /// @param aMode access mode (see PropertyAccessMode: read, write, write preload or delete)
@@ -290,7 +299,6 @@ namespace p44 {
     /// @return false if value could not be accessed
     /// @note this base class always returns false, as it does not have any properties implemented
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) { return false; };
-
 
     /// post-process written properties in subcontainers. This is called after a property write access has
     /// compleded successfully in a subcontainer (as returned by this object's getContainer()), and can be used to commit container
