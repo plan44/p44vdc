@@ -40,6 +40,44 @@ namespace p44 {
 
   typedef boost::intrusive_ptr<OutputBehaviour> OutputBehaviourPtr;
 
+
+  /// descriptor for device configuration
+  class DeviceConfigurationDescriptor : public PropertyContainer
+  {
+    string id;
+    string description;
+
+  public:
+
+    DeviceConfigurationDescriptor(const string aId, const string aDescription) : id(aId), description(aDescription) {};
+
+    string getId() { return id; };
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE P44_FINAL;
+
+  };
+  typedef boost::intrusive_ptr<DeviceConfigurationDescriptor> DeviceConfigurationDescriptorPtr;
+  typedef vector<DeviceConfigurationDescriptorPtr> DeviceConfigurationsVector;
+
+  /// @name Well-known device configuration ids
+  /// @{
+
+  namespace DeviceConfigurations {
+    // texts
+    extern const char *buttonSingle;
+    extern const char *buttonTwoWay;
+    extern const char *buttonTwoWayReversed;
+  }
+
+  /// @}
+
+
+
   /// base class representing a virtual digitalSTROM device.
   /// For each type of subsystem (EnOcean, DALI, ...) this class is subclassed to implement
   /// the vDC' specifics, in particular the interface with the hardware.
@@ -97,6 +135,9 @@ namespace p44 {
     SimpleCB updatedOrCachedCB; ///< will be called when current values are either read from hardware, or new values have been requested for applying
     bool updateInProgress; ///< set when updating channel values from hardware is in progress
     MLTicket serializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
+
+    // volatile device configurations list (created when property actually accessed)
+    DeviceConfigurationsVector cachedConfigurations;
 
   public:
 
@@ -240,7 +281,6 @@ namespace p44 {
     virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex);
 
     /// @}
-
 
 
     /// @name other device level methods
@@ -533,13 +573,35 @@ namespace p44 {
     
     /// @}
 
+    /// @name device configurations
+    /// @{
+
+    /// get the current device configuration ID
+    /// @return current configuration ID or empty string if device does not have multiple configurations
+    virtual string getDeviceConfigurationId();
+
+    /// switch the device to a new configuration
+    /// @param aConfigurationId ID of configuration to switch to
+    /// @return Error if a device could not be switched to (or already had) the specified configuration
+    /// @note calling this method might cause device objects to get deleted, including this one
+    virtual ErrorPtr switchConfiguration(const string aConfigurationId);
+
+    /// get the list of possible device configurations
+    /// @param aConfigurations will be assigned the device configurations that can be applied to the device (including the current configuration)
+    /// @param aStatusCB will be called when aConfigurations are updated
+    virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB);
+
+    /// @}
+    
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual void prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual void finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     virtual ErrorPtr writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, int aDomain, PropertyContainerPtr aContainer) P44_OVERRIDE;
 
     /// set local priority of the device if specified scene does not have dontCare set.
@@ -570,6 +632,7 @@ namespace p44 {
     void serializerWatchdog();
     bool checkForReapply();
     void forkDoneCB(SimpleCB aOriginalCB, SimpleCB aNewCallback);
+    void configurationPrepared(StatusCB aPreparedCB);
 
   };
 

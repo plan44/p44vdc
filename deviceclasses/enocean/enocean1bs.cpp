@@ -84,9 +84,9 @@ EnoceanDevicePtr Enocean1BSDevice::newDevice(
 
 static const ProfileVariantEntry E1BSprofileVariants[] = {
   // single contact alternatives
-  { 1, 0x00D50001, 0, "single contact" },
-  { 1, 0x01D50001, 0, "single contact (inverted, e.g. for window contact)" },
-  { 0, 0, 0, NULL } // terminator
+  { 1, 0x00D50001, 0, "single contact", NULL },
+  { 1, 0x01D50001, 0, "single contact (inverted, e.g. for window contact)", NULL },
+  { 0, 0, 0, NULL, NULL } // terminator
 };
 
 

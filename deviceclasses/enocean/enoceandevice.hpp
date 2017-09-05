@@ -102,6 +102,7 @@ namespace p44 {
     EnoceanProfile eep; ///< the EEP
     EnoceanSubDevice subDeviceIndices; ///< number of subdevice indices this profile affects, 0 = all
     const char *description; ///< description of profile variant for UI
+    const char *configId; ///< well-known string ID for the variant, NULL when variant is identified by eep
   } ProfileVariantEntry;
 
   typedef vector<EnoceanChannelHandlerPtr> EnoceanChannelHandlerVector;
@@ -239,8 +240,6 @@ namespace p44 {
     void setUpdateAtEveryReceive(bool aUpdateAtEveryReceive = true) { updateAtEveryReceive = aUpdateAtEveryReceive; };
 
 
-
-
     /// get the enocean address identifying the hardware that contains this logical device
     /// @return EnOcean device ID/address
     /// Note: for some actors, this might also be the sender address (in id base range of the modem module)
@@ -283,15 +282,6 @@ namespace p44 {
     /// @return textual description of object
     virtual string description() P44_OVERRIDE;
 
-    /// get profile variants this device can have
-    /// @param aApiObjectValue must be an object typed API value, will receive profile variants as EEP/description key/values
-    /// @return true if device has variants
-    bool getProfileVariants(ApiValuePtr aApiObjectValue);
-
-    /// @param aProfile must be an EEP profile code
-    /// @return true if profile variant is valid and can be set
-    bool setProfileVariant(EnoceanProfile aProfile);
-
 
     /// @name identification of the addressable entity
     /// @{
@@ -323,6 +313,11 @@ namespace p44 {
 
 
   protected:
+
+    /// device configurations implementation
+    virtual string getDeviceConfigurationId() P44_OVERRIDE;
+    virtual ErrorPtr switchConfiguration(const string aConfigurationId) P44_OVERRIDE;
+    virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB) P44_OVERRIDE;
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;

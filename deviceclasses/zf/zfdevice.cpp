@@ -192,8 +192,6 @@ string ZfDevice::description()
 
 
 enum {
-  typeVariants_key,
-  devicetype_key,
   messageage_key,
   rssi_key,
   numProperties
@@ -217,8 +215,6 @@ int ZfDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 PropertyDescriptorPtr ZfDevice::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numProperties] = {
-    { "x-p44-profileVariants", apivalue_null, typeVariants_key, OKEY(zfDevice_key) },
-    { "x-p44-profile", apivalue_int64, devicetype_key, OKEY(zfDevice_key) },
     { "x-p44-packetAge", apivalue_double, messageage_key, OKEY(zfDevice_key) },
     { "x-p44-rssi", apivalue_int64, rssi_key, OKEY(zfDevice_key) },
   };
@@ -244,11 +240,6 @@ bool ZfDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pro
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
-        case typeVariants_key:
-          aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
-          return getTypeVariants(aPropValue);
-        case devicetype_key:
-          aPropValue->setInt32Value(getZfDeviceType()); return true;
         case messageage_key:
           // Note lastMessageTime is set to now at startup, so additionally check lastRSSI
           if (lastMessageTime==Never || lastRSSI<=-999)
@@ -264,13 +255,6 @@ bool ZfDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pro
           return true;
       }
     }
-    else {
-      // write properties
-      switch (aPropertyDescriptor->fieldKey()) {
-        case devicetype_key:
-          setTypeVariant((ZfDeviceType)aPropValue->int32Value()); return true;
-      }
-    }
   }
   // not my field, let base class handle it
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
@@ -281,9 +265,9 @@ bool ZfDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pro
 
 
 static const ZfTypeVariantEntry ZfTypeVariants[] = {
-  { 1, zf_button,               0, "button" },
-  { 1, zf_contact,              0, "contact" },
-  { 0, zf_unknown, 0, NULL } // terminator
+  { 1, zf_button,               0, "button", NULL },
+  { 1, zf_contact,              0, "contact", NULL },
+  { 0, zf_unknown, 0, NULL, NULL } // terminator
 };
 
 
@@ -294,37 +278,58 @@ const ZfTypeVariantEntry *ZfDevice::deviceTypeVariantsTable()
 
 
 
-bool ZfDevice::getTypeVariants(ApiValuePtr aApiObjectValue)
+void ZfDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB)
 {
   // check if current profile is one of the interchangeable ones
   const ZfTypeVariantEntry *currentVariant = deviceTypeVariantsTable();
+  bool anyVariants = false;
   while (currentVariant && currentVariant->typeGroup!=0) {
     // look for current type in the list of variants
     if (getZfDeviceType()==currentVariant->zfDeviceType) {
       // create string from all other variants (same typeGroup), if any
-      bool anyVariants = false;
       const ZfTypeVariantEntry *variant = deviceTypeVariantsTable();
       while (variant->typeGroup!=0) {
         if (variant->typeGroup==currentVariant->typeGroup) {
           if (variant->zfDeviceType!=getZfDeviceType()) anyVariants = true; // another variant than just myself
-          aApiObjectValue->add(string_format("%d",variant->zfDeviceType), aApiObjectValue->newString(variant->description));
+          string id;
+          if (variant->configId)
+            id = variant->configId; // has well-known configuration id
+          else
+            id = string_format("zf_%d", variant->zfDeviceType); // id generated from ZF type
+          aConfigurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, variant->description)));
         }
         variant++;
       }
-      // there are variants
-      return anyVariants;
+      break;
     }
     currentVariant++;
   }
-  return false; // no variants
+  if (!anyVariants) aConfigurations.clear(); // prevent single option to show at all
+  if (aStatusCB) aStatusCB(ErrorPtr());
 }
 
 
-bool ZfDevice::setTypeVariant(ZfDeviceType aType)
+string ZfDevice::getDeviceConfigurationId()
 {
-  // verify if changeable profile code requested
-  // - check for already having that profile
-  if (aType==getZfDeviceType()) return true; // we already have that type -> NOP
+  const ZfTypeVariantEntry *currentVariant = deviceTypeVariantsTable();
+  while (currentVariant && currentVariant->typeGroup!=0) {
+    if (currentVariant->configId && getZfDeviceType()==currentVariant->zfDeviceType) {
+      return currentVariant->configId; // has a well-known name, return that
+    }
+    currentVariant++;
+  }
+  // return a id generated from EEP
+  return  string_format("zf_%d", getZfDeviceType());
+}
+
+
+ErrorPtr ZfDevice::switchConfiguration(const string aConfigurationId)
+{
+  ZfDeviceType newType = zf_unknown;
+  int nt;
+  if (sscanf(aConfigurationId.c_str(), "zf_%d", &nt)==1) {
+    newType = (ZfDeviceType)nt;
+  }
   // - find my typeGroup
   const ZfTypeVariantEntry *currentVariant = deviceTypeVariantsTable();
   while (currentVariant && currentVariant->typeGroup!=0) {
@@ -332,17 +337,22 @@ bool ZfDevice::setTypeVariant(ZfDeviceType aType)
       // this is my type group, now check if requested type is in my type group as well
       const ZfTypeVariantEntry *variant = deviceTypeVariantsTable();
       while (variant && variant->typeGroup!=0) {
-        if (variant->typeGroup==currentVariant->typeGroup && variant->zfDeviceType==aType) {
+        if (
+          (variant->typeGroup==currentVariant->typeGroup) &&
+          ((newType!=zf_unknown && newType==variant->zfDeviceType) || (newType==zf_unknown && variant->configId && aConfigurationId==variant->configId))
+        ) {
+          // prevent switching if new profile is same as current one
+          if (variant->zfDeviceType==currentVariant->zfDeviceType) return ErrorPtr(); // we already have that type -> NOP
           // requested type is in my group, change now
           switchTypes(*currentVariant, *variant); // will delete this device, so return immediately afterwards
-          return true; // changed profile
+          return ErrorPtr(); // changed profile
         }
         variant++;
       }
     }
     currentVariant++;
   }
-  return false; // invalid profile
+  return inherited::switchConfiguration(aConfigurationId); // unknown profile at this level
 }
 
 
