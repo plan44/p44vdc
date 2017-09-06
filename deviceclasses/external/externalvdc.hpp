@@ -120,6 +120,9 @@ namespace p44 {
     bool querySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
     bool sceneCommands; ///< if set, scene commands are forwarded to the external device
 
+    string configurationId; ///< current configuration's id
+    DeviceConfigurationsVector configurations; ///< the device's possible configurations
+
     #if ENABLE_EXTERNAL_SINGLEDEVICE
     bool noConfirmAction; ///< if set, device implementation is not expected to use
     #endif
@@ -237,6 +240,10 @@ namespace p44 {
     ///   aDevice argument to the DisconnectCB handler.
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
+    /// device configurations implementation
+    virtual string getDeviceConfigurationId() P44_OVERRIDE;
+    virtual ErrorPtr switchConfiguration(const string aConfigurationId) P44_OVERRIDE;
+    virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB) P44_OVERRIDE;
 
     #if ENABLE_EXTERNAL_SINGLEDEVICE
 

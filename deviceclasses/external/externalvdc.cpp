@@ -606,6 +606,46 @@ void ExternalDevice::releaseButton(ButtonBehaviourPtr aButtonBehaviour)
 }
 
 
+// MARK: ===== device configurations
+
+
+void ExternalDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB)
+{
+  if (configurations.size()>0) {
+    aConfigurations = configurations;
+  }
+  else {
+    aConfigurations.clear(); // prevent singular config
+  }
+  if (aStatusCB) aStatusCB(ErrorPtr());
+}
+
+
+string ExternalDevice::getDeviceConfigurationId()
+{
+  return configurationId;
+}
+
+
+ErrorPtr ExternalDevice::switchConfiguration(const string aConfigurationId)
+{
+  for (DeviceConfigurationsVector::iterator pos=configurations.begin(); pos!=configurations.end(); ++pos) {
+    if ((*pos)->getId()==aConfigurationId) {
+      // known configuration, apply it
+      if (aConfigurationId==configurationId) return ErrorPtr(); // no need to switch
+      if (!deviceConnector->simpletext) {
+        JsonObjectPtr message = JsonObject::newObj();
+        message->add("message", JsonObject::newString("setConfiguration"));
+        message->add("id", JsonObject::newString(aConfigurationId));
+        sendDeviceApiJsonMessage(message);
+      }
+      return ErrorPtr();
+    }
+  }
+  return inherited::switchConfiguration(aConfigurationId); // unknown profile at this level
+}
+
+
 
 // MARK: ===== output control
 
@@ -1128,6 +1168,23 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       sb->setGroup(group);
       sb->setHardwareName(sensorName);
       addBehaviour(sb);
+    }
+  }
+  // device configurations
+  if (aInitParams->get("currentConfigId", o)) {
+    configurationId = o->stringValue();
+  }
+  if (aInitParams->get("configurations", o)) {
+    if (deviceConnector->simpletext) return TextError::err("Devices with multiple configurations must use JSON protocol");
+    for (int i=0; i<o->arrayLength(); i++) {
+      JsonObjectPtr o2 = o->arrayGet(i);
+      JsonObjectPtr o3;
+      string id;
+      string description;
+      // - optional params
+      if (o2->get("id", o3)) id = o3->stringValue();
+      if (o2->get("description", o3)) description = o3->stringValue();
+      configurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, description)));
     }
   }
   #if ENABLE_EXTERNAL_SINGLEDEVICE
