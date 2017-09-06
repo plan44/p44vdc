@@ -528,6 +528,17 @@ typedef enum {
 } VdcHeatingSystemCapability;
 
 
+typedef enum {
+  hstype_unknown = 0,
+  hstype_floor = 1,
+  hstype_radiator = 2,
+  hstype_wall = 3,
+  hstype_convectorPassive = 4,
+  hstype_convectorActive = 5,
+  hstype_floorLowEnergy = 6
+} VdcHeatingSystemType;
+
+
 /// hardware error status
 typedef enum {
   hardwareError_none = 0, ///< hardware is ok
