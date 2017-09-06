@@ -423,7 +423,7 @@ const char *ClimateControlBehaviour::tableName()
 
 // data field definitions
 
-static const size_t numFields = 1;
+static const size_t numFields = 2;
 
 size_t ClimateControlBehaviour::numFieldDefs()
 {
@@ -435,6 +435,7 @@ const FieldDefinition *ClimateControlBehaviour::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numFields] = {
     { "heatingSystemCapability", SQLITE_INTEGER },
+    { "heatingSystemType", SQLITE_INTEGER },
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
@@ -454,6 +455,7 @@ void ClimateControlBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   if (aCommonFlagsP) climateControlIdle = *aCommonFlagsP & outputflag_climateControlIdle;
   // get the fields
   aRow->getCastedIfNotNull<VdcHeatingSystemCapability, int>(aIndex++, heatingSystemCapability);
+  aRow->getCastedIfNotNull<VdcHeatingSystemType, int>(aIndex++, heatingSystemType);
 }
 
 
@@ -466,6 +468,7 @@ void ClimateControlBehaviour::bindToStatement(sqlite3pp::statement &aStatement, 
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, heatingSystemCapability);
+  aStatement.bind(aIndex++, heatingSystemType);
 }
 
 
@@ -478,6 +481,7 @@ static char climatecontrol_key;
 
 enum {
   heatingSystemCapability_key,
+  heatingSystemType_key,
   numSettingsProperties
 };
 
@@ -487,6 +491,7 @@ const PropertyDescriptorPtr ClimateControlBehaviour::getSettingsDescriptorByInde
 {
   static const PropertyDescription properties[numSettingsProperties] = {
     { "heatingSystemCapability", apivalue_uint64, heatingSystemCapability_key+settings_key_offset, OKEY(climatecontrol_key) },
+    { "heatingSystemType", apivalue_uint64, heatingSystemType_key+settings_key_offset, OKEY(climatecontrol_key) },
   };
   int n = inherited::numSettingsProps();
   if (aPropIndex<n)
@@ -506,6 +511,7 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case heatingSystemCapability_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemCapability); return true;
+        case heatingSystemType_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemType); return true;
       }
     }
     else {
@@ -513,6 +519,7 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case heatingSystemCapability_key+settings_key_offset: setPVar(heatingSystemCapability, (VdcHeatingSystemCapability)aPropValue->uint8Value()); return true;
+        case heatingSystemType_key+settings_key_offset: setPVar(heatingSystemType, (VdcHeatingSystemType)aPropValue->uint8Value()); return true;
       }
     }
   }
