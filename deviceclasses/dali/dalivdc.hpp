@@ -42,6 +42,9 @@ namespace p44 {
 
   typedef std::list<DaliBusDevicePtr> DaliBusDeviceList;
   typedef std::map<uint8_t, DaliDeviceInfoPtr> DaliDeviceInfoMap;
+  #if ENABLE_DALI_INPUTS
+  typedef std::list<DaliInputDevicePtr> DaliInputDeviceList;
+  #endif
 
   typedef boost::shared_ptr<DaliBusDeviceList> DaliBusDeviceListPtr;
 
@@ -59,9 +62,14 @@ namespace p44 {
   class DaliVdc : public Vdc
   {
     typedef Vdc inherited;
+    friend class DaliInputDevice;
 
 		DaliPersistence db;
     DaliDeviceInfoMap deviceInfoCache;
+
+    #if ENABLE_DALI_INPUTS
+    DaliInputDeviceList inputDevices;
+    #endif
 
   public:
     DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
@@ -129,6 +137,12 @@ namespace p44 {
     void testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
     void testRW(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte);
     void testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+
+    #if ENABLE_DALI_INPUTS
+    void daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2);
+    DaliInputDevicePtr addInputDevice(const string aConfig, DaliAddress aDaliBaseAddress);
+    ErrorPtr addDaliInput(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
+    #endif
 
   };
 

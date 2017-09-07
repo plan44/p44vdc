@@ -32,6 +32,9 @@ DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag)
 {
   daliComm = DaliCommPtr(new 	DaliComm(MainLoop::currentMainLoop()));
+  #if ENABLE_DALI_INPUTS
+  daliComm->setBridgeEventHandler(boost::bind(&DaliVdc::daliEventHandler, this, _1, _2, _3));
+  #endif
 }
 
 
@@ -57,12 +60,21 @@ bool DaliVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResoluti
 // Version history
 //  1 : first version
 //  2 : added groupNo (0..15) for DALI groups
+//  3 : added support for input devices
 #define DALI_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
-#define DALI_SCHEMA_VERSION 2 // current version
+#define DALI_SCHEMA_VERSION 3 // current version
 
 string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
+  // input devices table needed for fromVersion==0 and 2
+  static const char *inputDevicesTable =
+    "CREATE TABLE inputDevices ("
+    " daliInputConfig TEXT," // the input configuration
+    " daliBaseAddr INTEGER," // DALI base address (internal abstracted DaliAddress type) of input device
+    " PRIMARY KEY (daliBaseAddr)"
+    ");";
+
   if (aFromVersion==0) {
     // create DB from scratch
 		// - use standard globs table for schema version
@@ -77,6 +89,7 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
       " PRIMARY KEY (dimmerUID)"
       ");"
     );
+    sql.append(inputDevicesTable);
     // reached final version in one step
     aToVersion = DALI_SCHEMA_VERSION;
   }
@@ -86,6 +99,12 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
       "ALTER TABLE compositeDevices ADD groupNo INTEGER;";
     // reached version 2
     aToVersion = 2;
+  }
+  else if (aFromVersion==2) {
+    // V2->V3: added support for input devices
+    sql = inputDevicesTable;
+    // reached version 3
+    aToVersion = 3;
   }
   return sql;
 }
@@ -118,6 +137,18 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // clear the cache, we want fresh info from the devices!
     deviceInfoCache.clear();
+    #if ENABLE_DALI_INPUTS
+    inputDevices.clear();
+    sqlite3pp::query qry(db);
+    if (qry.prepare("SELECT daliInputConfig, daliBaseAddr, rowid FROM inputDevices")==SQLITE_OK) {
+      for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
+        DaliInputDevicePtr dev = addInputDevice(i->get<string>(0), i->get<int>(1));
+        if (dev) {
+          dev->daliInputDeviceRowID = i->get<int>(2);
+        }
+      }
+    }
+    #endif
   }
   // start collecting, allow quick scan when not exhaustively collecting (will still use full scan when bus collisions are detected)
   daliComm->daliFullBusScan(boost::bind(&DaliVdc::deviceListReceived, this, aCompletedCB, _1, _2, _3), !(aRescanFlags & rescanmode_exhaustive));
@@ -437,6 +468,12 @@ ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod,
     // create a composite device out of existing single-channel ones
     respErr = groupDevices(aRequest, aParams);
   }
+  #if ENABLE_DALI_INPUTS
+  else if (aMethod=="x-p44-addDaliInput") {
+    // add a DALI based input device
+    respErr = addDaliInput(aRequest, aParams);
+  }
+  #endif
   else if (aMethod=="x-p44-daliScan") {
     // diagnostics: scan the entire DALI bus
     respErr = daliScan(aRequest, aParams);
@@ -594,6 +631,17 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                       groupMask |= (1<<(i->get<int>(0)));
                     }
                   }
+                  #if ENABLE_DALI_INPUTS
+                  if (qry.prepare("SELECT DISTINCT daliBaseAddr FROM inputDevices")==SQLITE_OK) {
+                    for (sqlite3pp::query::iterator i = qry.begin(); i!=qry.end(); ++i) {
+                      DaliAddress a = i->get<int>(0);
+                      if (a & DaliGroup) {
+                        // this is a DALI group in use by an input device
+                        groupMask |= (1<<(a & DaliGroupMask));
+                      }
+                    }
+                  }
+                  #endif
                   for (groupNo=0; groupNo<16; ++groupNo) {
                     if ((groupMask & (1<<groupNo))==0) {
                       // group number is free - use it
@@ -786,6 +834,86 @@ void DaliVdc::testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint
     aCompletedCB(aError);
   }
 }
+
+#if ENABLE_DALI_INPUTS
+
+// MARK: ===== DALI input devices
+
+DaliInputDevicePtr DaliVdc::addInputDevice(const string aConfig, DaliAddress aDaliBaseAddress)
+{
+  DaliInputDevicePtr newDev = DaliInputDevicePtr(new DaliInputDevice(this, aConfig, aDaliBaseAddress));
+  // add to container if device was created
+  if (newDev) {
+    // add to container
+    simpleIdentifyAndAddDevice(newDev);
+  }
+  return newDev;
+}
+
+
+ErrorPtr DaliVdc::addDaliInput(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
+{
+  ErrorPtr respErr;
+  // add a new static device
+  string deviceConfig;
+  DaliAddress baseAddress;
+  respErr = checkStringParam(aParams, "deviceConfig", deviceConfig);
+  if (Error::isOK(respErr)) {
+    ApiValuePtr o;
+    respErr = checkParam(aParams, "daliAddress", o);
+    if (Error::isOK(respErr)) {
+      baseAddress = o->uint8Value();
+      // optional name
+      string name; // default to config
+      checkStringParam(aParams, "name", name);
+      // try to create device
+      DaliInputDevicePtr dev = addInputDevice(deviceConfig, baseAddress);
+      if (!dev) {
+        respErr = WebError::webErr(500, "invalid configuration for DALI input device -> none created");
+      }
+      else {
+        // set name
+        if (name.size()>0) dev->setName(name);
+        // insert into database
+        if(db.executef(
+          "INSERT OR REPLACE INTO inputDevices (daliInputConfig, daliBaseAddr) VALUES ('%q', %d)",
+          deviceConfig.c_str(), baseAddress
+        )!=SQLITE_OK) {
+          respErr = db.error("saving DALI input device params");
+        }
+        else {
+          dev->daliInputDeviceRowID = db.last_insert_rowid();
+          // confirm
+          ApiValuePtr r = aRequest->newApiValue();
+          r->setType(apivalue_object);
+          r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
+          r->add("rowid", r->newUint64(dev->daliInputDeviceRowID));
+          r->add("name", r->newString(dev->getName()));
+          aRequest->sendResult(r);
+          respErr.reset(); // make sure we don't send an extra ErrorOK
+        }
+      }
+    }
+  }
+  return respErr;
+}
+
+
+void DaliVdc::daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2)
+{
+  for(DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+    DaliInputDevicePtr inputDev = boost::dynamic_pointer_cast<DaliInputDevice>(*pos);
+    if (inputDev) {
+      if (inputDev->checkDaliEvent(aEvent, aData1, aData2))
+        break; // event consumed
+    }
+  }
+}
+
+
+
+#endif // ENABLE_DALI_INPUTS
+
 
 #endif // ENABLE_DALI
 
