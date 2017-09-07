@@ -1482,6 +1482,10 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       if (aMessage->get("configurl", o)) {
         externalVdc.configUrl = o->stringValue();
       }
+      // - always visible (even when empty)
+      if (aMessage->get("alwaysVisible", o)) {
+        externalVdc.alwaysVisible = o->boolValue();
+      }
     }
     else if (msg=="log") {
       // log something
@@ -1572,6 +1576,7 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
+  alwaysVisible(false),
   iconBaseName("vdc_ext") // default icon name
 {
   // create device API server and set connection specifications

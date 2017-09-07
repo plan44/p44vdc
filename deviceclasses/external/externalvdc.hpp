@@ -332,6 +332,7 @@ namespace p44 {
     string iconBaseName; ///< the base icon name
     string modelNameString; ///< the string to be returned by modelName()
     string configUrl; ///< custom value for configURL if not empty
+    bool alwaysVisible; ///< visible even if no devices contained
 
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
@@ -349,7 +350,7 @@ namespace p44 {
 
     /// External device container should not be announced when it has no devices
     /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return true; }
+    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return !alwaysVisible; };
 
     /// get supported rescan modes for this vDC. This indicates (usually to a web-UI) which
     /// of the flags to collectDevices() make sense for this vDC.
