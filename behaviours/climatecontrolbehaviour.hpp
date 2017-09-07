@@ -297,6 +297,7 @@ namespace p44 {
     virtual string shortDesc() P44_OVERRIDE;
 
     VdcHeatingSystemType getHeatingSystemType()  { return heatingSystemType; }
+    VdcHeatingSystemCapability getHeatingSystemCapability() { return heatingSystemCapability; }
 
   protected:
 
