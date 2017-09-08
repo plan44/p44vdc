@@ -57,6 +57,7 @@ namespace p44 {
     EldatDeviceType eldatDeviceType; ///< the device type
     EldatSubDevice subDeviceIndices; ///< number of subdevice indices this profile affects, 0 = all
     const char *description; ///< description of profile variant for UI
+    const char *configId; ///< well-known string ID for the variant, NULL when variant is identified by eep
   } EldatTypeVariantEntry;
 
 
@@ -193,16 +194,6 @@ namespace p44 {
     /// @return textual description of object
     virtual string description() P44_OVERRIDE;
 
-    /// get type variants this device can have
-    /// @param aApiObjectValue must be an object typed API value, will receive profile variants as type/description key/values
-    /// @return true if device has variants
-    bool getTypeVariants(ApiValuePtr aApiObjectValue);
-
-    /// @param aType must be an Eldat device type
-    /// @return true if type variant is valid and can be set
-    bool setTypeVariant(EldatDeviceType aType);
-    
-
     /// @name identification of the addressable entity
     /// @{
 
@@ -231,6 +222,11 @@ namespace p44 {
 
   protected:
 
+    /// device configurations implementation
+    virtual string getDeviceConfigurationId() P44_OVERRIDE;
+    virtual ErrorPtr switchConfiguration(const string aConfigurationId) P44_OVERRIDE;
+    virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB) P44_OVERRIDE;
+
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
@@ -254,7 +250,7 @@ namespace p44 {
   {
     typedef EldatDevice inherited;
 
-    long pressedTicket;
+    MLTicket pressedTicket;
 
   public:
 

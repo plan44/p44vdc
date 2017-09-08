@@ -190,8 +190,6 @@ string EldatDevice::description()
 
 
 enum {
-  typeVariants_key,
-  devicetype_key,
   messageage_key,
   rssi_key,
   numProperties
@@ -215,8 +213,6 @@ int EldatDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 PropertyDescriptorPtr EldatDevice::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numProperties] = {
-    { "x-p44-profileVariants", apivalue_null, typeVariants_key, OKEY(eldatDevice_key) },
-    { "x-p44-profile", apivalue_int64, devicetype_key, OKEY(eldatDevice_key) },
     { "x-p44-packetAge", apivalue_double, messageage_key, OKEY(eldatDevice_key) },
     { "x-p44-rssi", apivalue_int64, rssi_key, OKEY(eldatDevice_key) },
   };
@@ -242,11 +238,6 @@ bool EldatDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
-        case typeVariants_key:
-          aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
-          return getTypeVariants(aPropValue);
-        case devicetype_key:
-          aPropValue->setInt32Value(getEldatDeviceType()); return true;
         case messageage_key:
           // Note lastMessageTime is set to now at startup, so additionally check lastRSSI
           if (lastMessageTime==Never || lastRSSI<=-999)
@@ -262,13 +253,6 @@ bool EldatDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
           return true;
       }
     }
-    else {
-      // write properties
-      switch (aPropertyDescriptor->fieldKey()) {
-        case devicetype_key:
-          setTypeVariant((EldatDeviceType)aPropValue->int32Value()); return true;
-      }
-    }
   }
   // not my field, let base class handle it
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
@@ -280,11 +264,11 @@ bool EldatDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 
 static const EldatTypeVariantEntry EldatTypeVariants[] = {
   // dual rocker RPS button alternatives
-  { 1, eldat_rocker,            2, "2-way 1/0 or up/down buttons" }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
-  { 1, eldat_rocker_reversed,   2, "2-way 0/1 or down/up buttons (reversed)" }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
-  { 1, eldat_button,            2, "single button" },
-  { 1, eldat_motiondetector,    0, "motion detector" },
-  { 0, eldat_unknown, 0, NULL } // terminator
+  { 1, eldat_rocker,            2, "2-way 1/0 or up/down buttons", DeviceConfigurations::buttonTwoWay }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
+  { 1, eldat_rocker_reversed,   2, "2-way 0/1 or down/up buttons (reversed)", DeviceConfigurations::buttonTwoWayReversed }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
+  { 1, eldat_button,            2, "single button", DeviceConfigurations::buttonSingle  },
+  { 1, eldat_motiondetector,    0, "motion detector", NULL },
+  { 0, eldat_unknown, 0, NULL, NULL } // terminator
 };
 
 
@@ -295,37 +279,59 @@ const EldatTypeVariantEntry *EldatDevice::deviceTypeVariantsTable()
 
 
 
-bool EldatDevice::getTypeVariants(ApiValuePtr aApiObjectValue)
+void EldatDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB)
 {
   // check if current profile is one of the interchangeable ones
   const EldatTypeVariantEntry *currentVariant = deviceTypeVariantsTable();
+  bool anyVariants = false;
   while (currentVariant && currentVariant->typeGroup!=0) {
     // look for current type in the list of variants
     if (getEldatDeviceType()==currentVariant->eldatDeviceType) {
       // create string from all other variants (same typeGroup), if any
-      bool anyVariants = false;
       const EldatTypeVariantEntry *variant = deviceTypeVariantsTable();
       while (variant->typeGroup!=0) {
         if (variant->typeGroup==currentVariant->typeGroup) {
           if (variant->eldatDeviceType!=getEldatDeviceType()) anyVariants = true; // another variant than just myself
-          aApiObjectValue->add(string_format("%d",variant->eldatDeviceType), aApiObjectValue->newString(variant->description));
+          string id;
+          if (variant->configId)
+            id = variant->configId; // has well-known configuration id
+          else
+            id = string_format("eldat_%d", variant->eldatDeviceType); // id generated from type
+          aConfigurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, variant->description)));
         }
         variant++;
       }
-      // there are variants
-      return anyVariants;
+      break;
     }
     currentVariant++;
   }
-  return false; // no variants
+  if (!anyVariants) aConfigurations.clear(); // prevent single option to show at all
+  if (aStatusCB) aStatusCB(ErrorPtr());
 }
 
 
-bool EldatDevice::setTypeVariant(EldatDeviceType aType)
+string EldatDevice::getDeviceConfigurationId()
 {
-  // verify if changeable profile code requested
-  // - check for already having that profile
-  if (aType==getEldatDeviceType()) return true; // we already have that type -> NOP
+  const EldatTypeVariantEntry *currentVariant = deviceTypeVariantsTable();
+  while (currentVariant && currentVariant->typeGroup!=0) {
+    if (currentVariant->configId && getEldatDeviceType()==currentVariant->eldatDeviceType) {
+      return currentVariant->configId; // has a well-known name, return that
+    }
+    currentVariant++;
+  }
+  // return a id generated from EEP
+  return  string_format("eldat_%d", getEldatDeviceType());
+}
+
+
+
+ErrorPtr EldatDevice::switchConfiguration(const string aConfigurationId)
+{
+  EldatDeviceType newType = eldat_unknown;
+  int nt;
+  if (sscanf(aConfigurationId.c_str(), "eldat_%d", &nt)==1) {
+    newType = (EldatDeviceType)nt;
+  }
   // - find my typeGroup
   const EldatTypeVariantEntry *currentVariant = deviceTypeVariantsTable();
   while (currentVariant && currentVariant->typeGroup!=0) {
@@ -333,17 +339,22 @@ bool EldatDevice::setTypeVariant(EldatDeviceType aType)
       // this is my type group, now check if requested type is in my type group as well
       const EldatTypeVariantEntry *variant = deviceTypeVariantsTable();
       while (variant && variant->typeGroup!=0) {
-        if (variant->typeGroup==currentVariant->typeGroup && variant->eldatDeviceType==aType) {
+        if (
+          (variant->typeGroup==currentVariant->typeGroup) &&
+          ((newType!=eldat_unknown && newType==variant->eldatDeviceType) || (newType==eldat_unknown && variant->configId && aConfigurationId==variant->configId))
+        ) {
+          // prevent switching if new profile is same as current one
+          if (variant->eldatDeviceType==currentVariant->eldatDeviceType) return ErrorPtr(); // we already have that type -> NOP
           // requested type is in my group, change now
           switchTypes(*currentVariant, *variant); // will delete this device, so return immediately afterwards
-          return true; // changed profile
+          return ErrorPtr(); // changed profile
         }
         variant++;
       }
     }
     currentVariant++;
   }
-  return false; // invalid profile
+  return inherited::switchConfiguration(aConfigurationId); // unknown profile at this level
 }
 
 
@@ -524,13 +535,13 @@ EldatDevicePtr EldatDevice::newDevice(
       newDev->setColorClass(class_black_joker);
       // Create two behaviours, one for the up button, one for the down button
       // - create button input 0 for what dS will handle as "down key" (actual button depends on rocker type - reversed or normal)
-      ButtonBehaviourPtr downBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"down"));
+      ButtonBehaviourPtr downBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
       downBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
       downBhvr->setGroup(group_yellow_light); // pre-configure for light
       downBhvr->setHardwareName("down key");
       newDev->addBehaviour(downBhvr);
       // - create button input 1 for what dS will handle as "up key" (actual button depends on "reversed")
-      ButtonBehaviourPtr upBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"up"));
+      ButtonBehaviourPtr upBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
       upBhvr->setGroup(group_yellow_light); // pre-configure for light
       upBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
       upBhvr->setHardwareName("up key");
@@ -555,7 +566,7 @@ EldatDevicePtr EldatDevice::newDevice(
       // Buttons can be used for anything
       newDev->setColorClass(class_black_joker);
       // Create one button behaviour
-      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"button"));
+      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
       bb->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, true); // fixed mode
       bb->setGroup(group_yellow_light); // pre-configure for light
       bb->setHardwareName("button");
@@ -580,7 +591,7 @@ EldatDevicePtr EldatDevice::newDevice(
       // motion detectors can be used for anything
       newDev->setColorClass(class_black_joker);
       // Create one input behaviour
-      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"motion"));
+      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
       ib->setHardwareInputConfig(binInpType_motion, usage_room, true, 0);
       ib->setHardwareName("detector");
       newDev->addBehaviour(ib);

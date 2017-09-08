@@ -61,7 +61,7 @@ namespace p44 {
     /// @param aSingleDevice the single device this action belongs to
     /// @param aName the name of the action.
     /// @param aDescription a description string for the action.
-    ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription);
+    ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle);
 
     virtual ~ExternalDeviceAction();
 
@@ -119,6 +119,9 @@ namespace p44 {
     bool controlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
     bool querySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
     bool sceneCommands; ///< if set, scene commands are forwarded to the external device
+
+    string configurationId; ///< current configuration's id
+    DeviceConfigurationsVector configurations; ///< the device's possible configurations
 
     #if ENABLE_EXTERNAL_SINGLEDEVICE
     bool noConfirmAction; ///< if set, device implementation is not expected to use
@@ -237,6 +240,10 @@ namespace p44 {
     ///   aDevice argument to the DisconnectCB handler.
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
+    /// device configurations implementation
+    virtual string getDeviceConfigurationId() P44_OVERRIDE;
+    virtual ErrorPtr switchConfiguration(const string aConfigurationId) P44_OVERRIDE;
+    virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB) P44_OVERRIDE;
 
     #if ENABLE_EXTERNAL_SINGLEDEVICE
 
@@ -244,6 +251,7 @@ namespace p44 {
     /// @{
 
     virtual ErrorPtr actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription) P44_OVERRIDE;
+    virtual ErrorPtr dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle) P44_OVERRIDE;
 
     /// @}
 
@@ -324,6 +332,7 @@ namespace p44 {
     string iconBaseName; ///< the base icon name
     string modelNameString; ///< the string to be returned by modelName()
     string configUrl; ///< custom value for configURL if not empty
+    bool alwaysVisible; ///< visible even if no devices contained
 
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
@@ -341,7 +350,7 @@ namespace p44 {
 
     /// External device container should not be announced when it has no devices
     /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return true; }
+    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return !alwaysVisible; };
 
     /// get supported rescan modes for this vDC. This indicates (usually to a web-UI) which
     /// of the flags to collectDevices() make sense for this vDC.

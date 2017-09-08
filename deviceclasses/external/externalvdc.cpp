@@ -41,8 +41,8 @@ using namespace p44;
 
 // MARK: ===== ExternalDeviceAction
 
-ExternalDeviceAction::ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription) :
-  inherited(aSingleDevice, aName, aDescription),
+ExternalDeviceAction::ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle) :
+  inherited(aSingleDevice, aName, aDescription, aTitle),
   callback(NULL)
 {
 }
@@ -120,7 +120,7 @@ void ExternalDeviceAction::callPerformed(JsonObjectPtr aStatusInfo)
 ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag) :
   #if ENABLE_EXTERNAL_SINGLEDEVICE
   inherited(aVdcP, false), // do not enable single device mechanisms by default
-  noConfirmAction(false),
+  noConfirmAction(false), // expect action execution to be confirmed
   #else
   inherited(aVdcP),
   #endif
@@ -338,7 +338,8 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
       else if (aMessageType=="confirmAction") {
         JsonObjectPtr o;
         if (aMessage->get("action", o)) {
-          ExternalDeviceActionPtr a = boost::dynamic_pointer_cast<ExternalDeviceAction>(deviceActions->getAction(o->stringValue()));
+          ExternalDeviceActionPtr a = boost::dynamic_pointer_cast<ExternalDeviceAction>(dynamicDeviceActions->getAction(o->stringValue()));
+          if (!a) a = boost::dynamic_pointer_cast<ExternalDeviceAction>(deviceActions->getAction(o->stringValue()));
           if (a) a->callPerformed(aMessage);
         }
         else {
@@ -407,6 +408,18 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
         else {
           // only push events without a state change
           deviceEvents->pushEvents(evs);
+        }
+      }
+      else if (aMessageType=="dynamicAction") {
+        JsonObjectPtr o;
+        // dynamic action added/changed/deleted
+        if (aMessage->get("changes", o)) {
+          string actionId;
+          JsonObjectPtr actionConfig;
+          o->resetKeyIteration();
+          if (o->nextKeyValue(actionId, actionConfig)) {
+            err = updateDynamicActionFromJSON(actionId, actionConfig);
+          }
         }
       }
       #endif
@@ -593,6 +606,46 @@ void ExternalDevice::releaseButton(ButtonBehaviourPtr aButtonBehaviour)
 }
 
 
+// MARK: ===== device configurations
+
+
+void ExternalDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB)
+{
+  if (configurations.size()>0) {
+    aConfigurations = configurations;
+  }
+  else {
+    aConfigurations.clear(); // prevent singular config
+  }
+  if (aStatusCB) aStatusCB(ErrorPtr());
+}
+
+
+string ExternalDevice::getDeviceConfigurationId()
+{
+  return configurationId;
+}
+
+
+ErrorPtr ExternalDevice::switchConfiguration(const string aConfigurationId)
+{
+  for (DeviceConfigurationsVector::iterator pos=configurations.begin(); pos!=configurations.end(); ++pos) {
+    if ((*pos)->getId()==aConfigurationId) {
+      // known configuration, apply it
+      if (aConfigurationId==configurationId) return ErrorPtr(); // no need to switch
+      if (!deviceConnector->simpletext) {
+        JsonObjectPtr message = JsonObject::newObj();
+        message->add("message", JsonObject::newString("setConfiguration"));
+        message->add("id", JsonObject::newString(aConfigurationId));
+        sendDeviceApiJsonMessage(message);
+      }
+      return ErrorPtr();
+    }
+  }
+  return inherited::switchConfiguration(aConfigurationId); // unknown profile at this level
+}
+
+
 
 // MARK: ===== output control
 
@@ -653,7 +706,7 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       cl->deriveColorMode();
     }
     // generic channel apply
-    for (size_t i=0; i<numChannels(); i++) {
+    for (int i=0; i<numChannels(); i++) {
       ChannelBehaviourPtr cb = getChannelByIndex(i);
       if (cb->needsApplying()) {
         // get value and apply mode
@@ -661,7 +714,7 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         chval = output->outputValueAccordingToMode(chval, i);
         // send channel value message
         if (deviceConnector->simpletext) {
-          string m = string_format("C%zu=%lf", i, chval);
+          string m = string_format("C%d=%lf", i, chval);
           sendDeviceApiSimpleMessage(m);
         }
         else {
@@ -771,9 +824,18 @@ bool ExternalDevice::processControlValue(const string &aName, double aValue)
 ErrorPtr ExternalDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription)
 {
   // base class just creates a unspecific action
-  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription));
+  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription, ""));
   return ErrorPtr();
 }
+
+
+ErrorPtr ExternalDevice::dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle)
+{
+  // base class just creates a unspecific action
+  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription, aTitle));
+  return ErrorPtr();
+}
+
 
 #endif
 
@@ -1037,7 +1099,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("hardwarename", o3)) buttonName = o3->stringValue(); else buttonName = string_format("button_id%d_el%d", buttonId, buttonElement);
       // - create behaviour
-      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, id));
+      ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, id)); // automatic id if not specified
       bb->setHardwareButtonConfig(buttonId, buttonType, buttonElement, isLocalButton, buttonElement==buttonElement_down ? 1 : 0, true); // fixed mode
       bb->setGroup(group);
       bb->setHardwareName(buttonName);
@@ -1064,7 +1126,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("updateinterval", o3)) updateInterval = o3->doubleValue()*Second;
       if (o2->get("hardwarename", o3)) inputName = o3->stringValue(); else inputName = string_format("input_ty%d", inputType);
       // - create behaviour
-      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this, id));
+      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this, id)); // automatic id if not specified
       ib->setHardwareInputConfig(inputType, usage, true, updateInterval);
       ib->setGroup(group);
       ib->setHardwareName(inputName);
@@ -1101,15 +1163,33 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("max", o3)) max = o3->doubleValue();
       if (o2->get("resolution", o3)) resolution = o3->doubleValue();
       // - create behaviour
-      SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, id));
+      SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, id)); // automatic id if not specified
       sb->setHardwareSensorConfig(sensorType, usage, min, max, resolution, updateInterval, aliveSignInterval, changesOnlyInterval);
       sb->setGroup(group);
       sb->setHardwareName(sensorName);
       addBehaviour(sb);
     }
   }
+  // device configurations
+  if (aInitParams->get("currentConfigId", o)) {
+    configurationId = o->stringValue();
+  }
+  if (aInitParams->get("configurations", o)) {
+    if (deviceConnector->simpletext) return TextError::err("Devices with multiple configurations must use JSON protocol");
+    for (int i=0; i<o->arrayLength(); i++) {
+      JsonObjectPtr o2 = o->arrayGet(i);
+      JsonObjectPtr o3;
+      string id;
+      string description;
+      // - optional params
+      if (o2->get("id", o3)) id = o3->stringValue();
+      if (o2->get("description", o3)) description = o3->stringValue();
+      configurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, description)));
+    }
+  }
   #if ENABLE_EXTERNAL_SINGLEDEVICE
   // create actions/states/events and properties from JSON
+  if (aInitParams->get("noconfirmaction", o)) noConfirmAction = o->boolValue();
   err = configureFromJSON(aInitParams);
   if (!Error::isOK(err)) return err;
   if (deviceProperties) deviceProperties->setPropertyChangedHandler(boost::bind(&ExternalDevice::propertyChanged, this, _1));
@@ -1402,6 +1482,10 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       if (aMessage->get("configurl", o)) {
         externalVdc.configUrl = o->stringValue();
       }
+      // - always visible (even when empty)
+      if (aMessage->get("alwaysVisible", o)) {
+        externalVdc.alwaysVisible = o->boolValue();
+      }
     }
     else if (msg=="log") {
       // log something
@@ -1492,6 +1576,7 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
+  alwaysVisible(false),
   iconBaseName("vdc_ext") // default icon name
 {
   // create device API server and set connection specifications

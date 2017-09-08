@@ -55,7 +55,7 @@ namespace p44 {
 
     long long ledChainDeviceRowID; ///< the ROWID this device was created from (0=none)
 
-    long transitionTicket;
+    MLTicket transitionTicket;
 
     /// current color values
     double r, g, b, w;

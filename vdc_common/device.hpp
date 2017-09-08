@@ -28,13 +28,6 @@
 
 using namespace std;
 
-// originally, all behaviours were accessed by index, channels were accessed by channeltype
-// when ACCESS_BY_ID is set, all behaviours and channels are accessed by their getApiId().
-#define ACCESS_BY_ID 1
-#if VDC_API_VERSION_MAX>2 && !ACCESS_BY_ID
-  #error "Access by ID needed for API versions 3 and later"
-#endif
-
 namespace p44 {
 
   class Device;
@@ -46,6 +39,44 @@ namespace p44 {
   typedef vector<DsBehaviourPtr> BehaviourVector;
 
   typedef boost::intrusive_ptr<OutputBehaviour> OutputBehaviourPtr;
+
+
+  /// descriptor for device configuration
+  class DeviceConfigurationDescriptor : public PropertyContainer
+  {
+    string id;
+    string description;
+
+  public:
+
+    DeviceConfigurationDescriptor(const string aId, const string aDescription) : id(aId), description(aDescription) {};
+
+    string getId() { return id; };
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE P44_FINAL;
+
+  };
+  typedef boost::intrusive_ptr<DeviceConfigurationDescriptor> DeviceConfigurationDescriptorPtr;
+  typedef vector<DeviceConfigurationDescriptorPtr> DeviceConfigurationsVector;
+
+  /// @name Well-known device configuration ids
+  /// @{
+
+  namespace DeviceConfigurations {
+    // texts
+    extern const char *buttonSingle;
+    extern const char *buttonTwoWay;
+    extern const char *buttonTwoWayReversed;
+  }
+
+  /// @}
+
+
 
   /// base class representing a virtual digitalSTROM device.
   /// For each type of subsystem (EnOcean, DALI, ...) this class is subclassed to implement
@@ -88,10 +119,10 @@ namespace p44 {
     DsClass colorClass; ///< basic color of the device (can be black)
 
     // volatile internal state
-    long dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
+    MLTicket dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
     VdcDimMode currentDimMode; ///< current dimming in progress
     ChannelBehaviourPtr currentDimChannel; ///< currently dimmed channel (if dimming in progress)
-    long dimHandlerTicket; ///< for standard dimming
+    MLTicket dimHandlerTicket; ///< for standard dimming
     bool isDimming; ///< if set, dimming is in progress
     uint8_t areaDimmed; ///< last dimmed area (so continue know which dimming command to re-start in case it comes late)
     VdcDimMode areaDimMode; ///< last area dim mode
@@ -103,7 +134,10 @@ namespace p44 {
     int missedApplyAttempts; ///< number of apply attempts that could not be executed. If>0, completing next apply will trigger a re-apply to finalize values
     SimpleCB updatedOrCachedCB; ///< will be called when current values are either read from hardware, or new values have been requested for applying
     bool updateInProgress; ///< set when updating channel values from hardware is in progress
-    long serializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
+    MLTicket serializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
+
+    // volatile device configurations list (created when property actually accessed)
+    DeviceConfigurationsVector cachedConfigurations;
 
   public:
 
@@ -249,7 +283,6 @@ namespace p44 {
     /// @}
 
 
-
     /// @name other device level methods
     /// @{
 
@@ -283,7 +316,7 @@ namespace p44 {
 
     /// add a behaviour and set its index
     /// @param aBehaviour a newly created behaviour, will get added to the correct button/binaryInput/sensor/output
-    ///   array and given the correct index value.
+    ///   array, given the correct index value, and the behaviour id will be made unique if needed by appending an index
     void addBehaviour(DsBehaviourPtr aBehaviour);
 
     /// get scenes
@@ -462,7 +495,7 @@ namespace p44 {
     ChannelBehaviourPtr getChannelByType(DsChannelType aChannelType, bool aPendingApplyOnly = false);
 
     /// get channel by channel ID
-    /// @param aChannelID the channel ID
+    /// @param aChannelId the channel ID
     /// @param aPendingApplyOnly if set, a channel is only returned when its value is pending to be applied
     /// @return NULL for unknown channel
     ChannelBehaviourPtr getChannelById(const string aChannelId, bool aPendingApplyOnly = false);
@@ -540,13 +573,35 @@ namespace p44 {
     
     /// @}
 
+    /// @name device configurations
+    /// @{
+
+    /// get the current device configuration ID
+    /// @return current configuration ID or empty string if device does not have multiple configurations
+    virtual string getDeviceConfigurationId();
+
+    /// switch the device to a new configuration
+    /// @param aConfigurationId ID of configuration to switch to
+    /// @return Error if a device could not be switched to (or already had) the specified configuration
+    /// @note calling this method might cause device objects to get deleted, including this one
+    virtual ErrorPtr switchConfiguration(const string aConfigurationId);
+
+    /// get the list of possible device configurations
+    /// @param aConfigurations will be assigned the device configurations that can be applied to the device (including the current configuration)
+    /// @param aStatusCB will be called when aConfigurations are updated
+    virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB);
+
+    /// @}
+    
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual void prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual void finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     virtual ErrorPtr writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, int aDomain, PropertyContainerPtr aContainer) P44_OVERRIDE;
 
     /// set local priority of the device if specified scene does not have dontCare set.
@@ -577,6 +632,7 @@ namespace p44 {
     void serializerWatchdog();
     bool checkForReapply();
     void forkDoneCB(SimpleCB aOriginalCB, SimpleCB aNewCallback);
+    void configurationPrepared(StatusCB aPreparedCB);
 
   };
 

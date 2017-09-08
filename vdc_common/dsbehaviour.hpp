@@ -194,6 +194,11 @@ namespace p44 {
     /// type of behaviour
     virtual BehaviourType getType() = 0;
 
+    /// automatic id for this behaviour
+    /// @return returns a ID for the behaviour.
+    /// @note this is only valid for a fully configured behaviour, as it is derived from configured parameters
+    virtual string getAutoId() { return getTypeName(); } // base class just returns the behaviour type (sensor, button, binaryInput)
+
     /// @name property access implementation for descriptor/settings/states
     /// @{
 

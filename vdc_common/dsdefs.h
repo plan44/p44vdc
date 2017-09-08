@@ -333,6 +333,11 @@ typedef enum {
   binInpType_garageDoorOpen = 16, ///< garage door is open
   binInpType_sunProtection = 17, ///< protect against too much sunlight
   binInpType_frost = 18, ///< frost detector
+  binInpType_heatingActivated = 19, ///< heating system activated
+  binInpType_heatingChangeOver = 20, ///< heating system change over (active=warm water, non active=cold water)
+  binInpType_initStatus = 21, ///< can indicate when not all functions are ready yet
+  binInpType_malfunction = 22, ///< malfunction, device needs maintainance, cannot operate
+  binInpType_service = 23, ///< device needs service, but can still operate normally at the moment
 } DsBinaryInputType;
 
 
@@ -413,7 +418,7 @@ typedef enum {
   sensorType_power = 14, ///< Power in W
   sensorType_current = 15, ///< Electric current in A
   sensorType_energy = 16, ///< Energy in kWh
-  sensorType_consumption = 17, ///< Electric Consumption in VA
+  sensorType_apparent_power = 17, ///< Apparent electric power in VA
   sensorType_air_pressure = 18, ///< Air pressure in hPa
   sensorType_wind_direction = 19, ///< Wind direction in degrees
   sensorType_sound_volume = 20, ///< Sound pressure level in dB
@@ -427,7 +432,7 @@ typedef enum {
   sensorType_water_flowrate = 28, ///< Water flow rate in liters/second
   sensorType_length = 29, ///< Length in meters
   sensorType_mass = 30, ///< mass in grams
-  sensorType_duration = 31, ///< duration in seconds
+  sensorType_duration = 31, ///< time in seconds
   numVdcSensorTypes
 } VdcSensorType;
 

@@ -130,8 +130,8 @@ namespace p44 {
     string vdcModelNameTemplate; ///< how to generate vdc model names (that's what shows up in HW-Info in dS)
 
     bool collecting;
-    long announcementTicket;
-    long periodicTaskTicket;
+    MLTicket announcementTicket;
+    MLTicket periodicTaskTicket;
     MLMicroSeconds lastActivity;
     MLMicroSeconds lastPeriodicRun;
 
@@ -155,8 +155,9 @@ namespace p44 {
     int mainLoopStatsCounter;
 
     // active vDC API session
+    int maxApiVersion; // limit for API version to support (for testing client's backwards compatibility), 0=no limit
     DsUid connectedVdsm;
-    long sessionActivityTicket;
+    MLTicket sessionActivityTicket;
     VdcApiConnectionPtr activeSessionConnection;
 
   public:
@@ -224,6 +225,11 @@ namespace p44 {
     /// Set network interface to use for determining IP address and checking for being available for network connections
     /// @param aIfNameForConnections name of the network device, empty string to use default interface
     void setNetworkIf(const string aIfNameForConnections) { ifNameForConn = aIfNameForConnections; };
+
+    /// Set maximum API version to support (to test backwards compatibility of connecting vdsms)
+    /// @param aMaxApiVersion max API version to support, 0 = all implemented versions
+    void setMaxApiVersion(int aMaxApiVersion) { maxApiVersion = aMaxApiVersion; };
+
 
     /// Set directory for loading device icons
     /// @param aIconDir  full path to directory to load device icons from. Empty string or NULL means "no icons"
@@ -538,7 +544,7 @@ namespace p44 {
     void signalActivity();
 
     // periodic task
-    void periodicTask(MLMicroSeconds aCycleStartTime);
+    void periodicTask(MLMicroSeconds aNow);
 
     // getting MAC
     void getMyMac(StatusCB aCompletedCB, bool aFactoryReset);

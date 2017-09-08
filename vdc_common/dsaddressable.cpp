@@ -223,16 +223,22 @@ void DsAddressable::methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError)
 
 
 
-bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain, int aApiVersion)
+bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain, int aApiVersion, bool aDeletedProperty)
 {
   if (announced!=Never) {
     // device is announced: push can take place
     if (aPropertyQuery) {
-      // a property change is to be notified
-      accessProperty(
-        access_read, aPropertyQuery, aDomain, aApiVersion,
-        boost::bind(&DsAddressable::pushPropertyReady, this, aEvents, _1, _2)
-      );
+      if (aDeletedProperty) {
+        // a property deletion is to be notified -> the query itself is what needs to be pushed
+        pushPropertyReady(aEvents, aPropertyQuery, ErrorPtr());
+      }
+      else {
+        // a property change is to be notified -> read the property
+        accessProperty(
+          access_read, aPropertyQuery, aDomain, aApiVersion,
+          boost::bind(&DsAddressable::pushPropertyReady, this, aEvents, _1, _2)
+        );
+      }
     }
     else {
       // no property query, event-only -> send events right away

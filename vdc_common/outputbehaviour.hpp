@@ -88,7 +88,7 @@ namespace p44 {
     ChannelBehaviourPtr getChannelByType(DsChannelType aChannelType, bool aPendingApplyOnly = false);
 
     /// get channel by channel ID
-    /// @param aChannelID the channel ID
+    /// @param aChannelId the channel ID
     /// @param aPendingApplyOnly if set, a channel is only returned when its value is pending to be applied
     /// @return NULL for unknown channel
     ChannelBehaviourPtr getChannelById(const string aChannelId, bool aPendingApplyOnly = false);

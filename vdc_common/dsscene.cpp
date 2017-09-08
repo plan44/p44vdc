@@ -72,7 +72,6 @@ protected:
       { "value", apivalue_double, value_key, OKEY(scenevalue_key) },
       { "dontCare", apivalue_bool, dontCare_key, OKEY(scenevalue_key) },
     };
-    #if ACCESS_BY_ID
     if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
       // scene channels by their channel ID
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
@@ -82,61 +81,11 @@ protected:
       descP->propertyObjectKey = OKEY(scenevalue_key);
       return descP;
     }
-    #endif
     // Note: SceneChannels is private an can't be derived, so no subclass adding properties must be considered
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&valueproperties[aPropIndex], aParentDescriptor));
   }
 
 
-  #if !ACCESS_BY_ID
-
-  PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
-  {
-    if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
-      // array-like container of channels
-      PropertyDescriptorPtr propDesc;
-      bool numericName = getNextPropIndex(aPropMatch, aStartIndex);
-      if (numericName) {
-        // specific channel addressed by ID, look up index for it
-        DsChannelType ct = (DsChannelType)aStartIndex;
-        aStartIndex = PROPINDEX_NONE; // default to not found
-        ChannelBehaviourPtr cb = scene.getDevice().getChannelByType(ct);
-        if (cb) {
-          aStartIndex = (int)cb->getChannelIndex(); // found, return index
-        }
-      }
-      int n = numProps(aDomain, aParentDescriptor);
-      if (aStartIndex!=PROPINDEX_NONE && aStartIndex<n) {
-        // within range, create descriptor
-        DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-        if (numericName) {
-          // query specified a channel number -> return same number in result (to return "0" when default channel "0" was explicitly queried)
-          descP->propertyName = aPropMatch; // query = name of object
-        }
-        else {
-          // wildcard, name by channel type
-          descP->propertyName = string_format("%d", scene.getDevice().getChannelByIndex(aStartIndex)->getChannelType());
-        }
-        descP->propertyType = aParentDescriptor->type();
-        descP->propertyFieldKey = aStartIndex;
-        descP->propertyObjectKey = OKEY(scenevalue_key);
-        propDesc = PropertyDescriptorPtr(descP);
-        // advance index
-        aStartIndex++;
-      }
-      if (aStartIndex>=n || numericName) {
-        // no more descriptors OR specific descriptor accessed -> no "next" descriptor
-        aStartIndex = PROPINDEX_NONE;
-      }
-      return propDesc;
-    }
-    // actual fields of a single channel
-    return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
-  }
-
-  #endif
-
-  
   PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
   {
     // the only subcontainer are the fields, handled by myself
@@ -144,13 +93,12 @@ protected:
   }
 
 
-
   bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
   {
     if (aPropertyDescriptor->hasObjectKey(scenevalue_key)) {
       // Scene value level
       // - get the output index
-      size_t outputIndex = aPropertyDescriptor->parentDescriptor->fieldKey();
+      int outputIndex = (int)aPropertyDescriptor->parentDescriptor->fieldKey();
       if (aMode==access_read) {
         // read properties
         switch (aPropertyDescriptor->fieldKey()) {

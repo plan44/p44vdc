@@ -117,7 +117,7 @@ void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 
   if (Error::isOK(err)) {
     if(!keyAndValue(cmd, method, r)) {
-      err = TextError::err("Invalid Home Connect command template", cmd.c_str());
+      err = TextError::err("Invalid Home Connect command template: '%s'", cmd.c_str());
     }
   }
 
@@ -162,33 +162,28 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
 HomeConnectPowerOnAction::HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
                                                    const string& aName,
                                                    const string& aDescription,
-                                                   const string& aApiCommandTemplate,
+                                                   const string& aIfPowerOnCommand,
+                                                   const string& aIfPowerOffCommand,
                                                    DeviceState& aPowerState,
                                                    DeviceState& aOperationMode) :
-    inherited(aSingleDevice, aName, aDescription, aApiCommandTemplate),
+    inherited(aSingleDevice, aName, aDescription, aIfPowerOnCommand),
     powerState(aPowerState),
-    operationMode(aOperationMode) {}
+    operationMode(aOperationMode),
+    ifPowerOffCommand(aIfPowerOffCommand) {}
 
 void HomeConnectPowerOnAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
   if (powerState.value()->getStringValue() != "PowerOn") {
-    LOG(LOG_DEBUG, "Device will be powered on, before proceeding with action %s", apiCommandTemplate.c_str());
+    LOG(LOG_DEBUG, "Device will be powered on, before proceeding with action %s", ifPowerOffCommand.c_str());
     HomeConnectSettingBuilder settingBuilder = HomeConnectSettingBuilder("BSH.Common.Setting.PowerState");
     settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.On\"");
 
-    string targetCommandTemplate = apiCommandTemplate;
     apiCommandTemplate = settingBuilder.build();
-    inherited::performCall(aParams->newNull(), boost::bind(&HomeConnectPowerOnAction::devicePoweredOn, this, aParams, aCompletedCB, _1, targetCommandTemplate));
+    inherited::performCall(aParams->newNull(), boost::bind(&HomeConnectPowerOnAction::devicePoweredOn, this, aParams, aCompletedCB, _1, ifPowerOffCommand));
     return;
   }
 
-  if (operationMode.value()->getStringValue() != "ModeReady") {
-    LOG(LOG_DEBUG, "Device is not ready, reschedule action");
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::performCall, this, aParams, aCompletedCB), RESCHEDULE_INTERVAL);
-    return;
-  }
-
-  LOG(LOG_DEBUG, "Device is powered on and ready, proceed with action %s", apiCommandTemplate.c_str());
+  LOG(LOG_DEBUG, "Device is powered on, proceed with action %s", apiCommandTemplate.c_str());
   inherited::performCall(aParams, aCompletedCB);
   return;
 }
@@ -200,12 +195,21 @@ void HomeConnectPowerOnAction::devicePoweredOn(ApiValuePtr aParams, StatusCB aCo
     return;
   }
 
+  if (operationMode.value()->getStringValue() != "ModeReady") {
+    LOG(LOG_DEBUG, "Device is not ready, reschedule action but call completed callback anyway");
+    if (aCompletedCB) aCompletedCB(Error::ok());
+    aCompletedCB.clear();
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::devicePoweredOn, this, aParams, aCompletedCB, aError, aCommandTemplate), RESCHEDULE_INTERVAL);
+    return;
+  }
+
   apiCommandTemplate = aCommandTemplate;
   MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::performCall, this, aParams, aCompletedCB), RESCHEDULE_INTERVAL);
 }
 
 HomeConnectProgramBuilder::HomeConnectProgramBuilder(const string& aProgramName) :
-  programName(aProgramName)
+  programName(aProgramName),
+  mode(Mode_Activate)
 {
 }
 
@@ -213,7 +217,7 @@ string HomeConnectProgramBuilder::build()
 {
   stringstream ss;
 
-  ss << "PUT:programs/active:{\"data\":{\"key\":\"" << programName << "\",";
+  ss << "PUT:programs/" << toString(mode) << ":{\"data\":{\"key\":\"" << programName << "\",";
 
   if(options.size() != 0)
   {
@@ -645,6 +649,7 @@ void HomeConnectDevice::handleEvent(EventType aEventType, JsonObjectPtr aEventDa
       handleEventTypeEvent(key);
       return;
     }
+    default: return;
   }
 }
 

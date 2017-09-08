@@ -721,13 +721,13 @@ void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
 }
 
 
-void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aCycleStartTime)
+void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aNow)
 {
   daliVdc.daliComm->daliSendCommand(aDaliAddress, aCommand);
   // schedule next command
-  // - DALI UP and DOWN run 200mS, but can be repeated earlier, so we use 150mS to make sure we don't have hickups
-  //   Note: DALI bus speed limits commands to 120Bytes/sec max, i.e. about 20 per 150mS, i.e. max 10 lamps dimming
-  dimRepeaterTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&DaliBusDevice::dimRepeater, this, aDaliAddress, aCommand, _1), aCycleStartTime+200*MilliSecond);
+  // - DALI UP and DOWN run 200mS, but can be repeated earlier
+  //   Note: DALI bus speed limits commands to 120Bytes/sec max, i.e. about 20 per 200mS, i.e. max 10 lamps dimming
+  dimRepeaterTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&DaliBusDevice::dimRepeater, this, aDaliAddress, aCommand, _2), aNow+200*MilliSecond);
 }
 
 

@@ -49,7 +49,7 @@ namespace p44 {
     JsonWebClient myStromComm;
 
     SensorBehaviourPtr powerSensor;
-    long powerPollTicket;
+    MLTicket powerPollTicket;
 
   public:
     MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig);

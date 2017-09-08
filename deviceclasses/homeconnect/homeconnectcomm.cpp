@@ -135,26 +135,28 @@ void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPt
 {
   error = aError;
   if (Error::isOK(error) || error->isDomain(WebError::domain())) {
-    // check for application level errors
-    JsonObjectPtr e;
-    if (aJsonResponse && aJsonResponse->get("error", e)) {
-      // there is an error
-      JsonObjectPtr o;
-      string errorkey;
-      if (e->get("key", o)) {
-        errorkey = o->stringValue();
-        if (errorkey=="invalid_token") {
-          // the access token has expired, we need to do a refresh operation
-          homeConnectComm.apiReady = false;
-          refreshAccessToken();
-          return;
+    // check if there is a proper response
+    if (aJsonResponse) {
+      JsonObjectPtr e;
+      if (aJsonResponse->get("error", e)) {
+        // there is an error
+        JsonObjectPtr o;
+        string errorkey;
+        if (e->get("key", o)) {
+          errorkey = o->stringValue();
+          if (errorkey=="invalid_token") {
+            // the access token has expired, we need to do a refresh operation
+            homeConnectComm.apiReady = false;
+            refreshAccessToken();
+            return;
+          }
+          string errordesc;
+          if (e->get("description", o)) {
+            errordesc = o->stringValue();
+          }
+          // other application level error, create text error from it
+          error = TextError::err("%s: %s", errorkey.c_str(), errordesc.c_str());
         }
-        string errordesc;
-        if (e->get("description", o)) {
-          errordesc = o->stringValue();
-        }
-        // other application level error, create text error from it
-        error = TextError::err("%s: %s", errorkey.c_str(), errordesc.c_str());
       }
 
       // we got a response from server (it can be also error description)
@@ -239,7 +241,7 @@ void HomeConnectEventMonitor::sendGetEventRequest()
 	  addRequestHeader("Accept", "text/event-stream");
 	  addRequestHeader("Cache-Control", "no-cache");
 	  // - make the call
-	  FOCUSLOG(">>> Sending event stream GET request to '%s'", urlPath.c_str());
+	  FOCUSLOG(">>> Sending event stream GET request to '%s' with token '%s'", urlPath.c_str(), homeConnectComm.accessToken.c_str());
 	  httpRequest(
 		(homeConnectComm.baseUrl()+urlPath).c_str(),
 		boost::bind(&HomeConnectEventMonitor::processEventData, this, _1, _2),
@@ -251,6 +253,7 @@ void HomeConnectEventMonitor::sendGetEventRequest()
 		true // stream result
 	  );
   } else {
+    LOG(LOG_WARNING, "Event stream, Api not ready yet wait 15s");
     // not ready yet - schedule restart
     MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
   }
@@ -280,7 +283,7 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
       return;
     }
     eventBuffer += aResponse;
-    FOCUSLOG(">>> Accumulated Event data: %s", aResponse.c_str());
+    FOCUSLOG(">>> Accumulated Event from '%s' data: %s", urlPath.c_str(), aResponse.c_str());
     // process
     const char *cu = eventBuffer.c_str();
     string line;
@@ -339,13 +342,23 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
     eventBuffer.erase(0,cu-eventBuffer.c_str());
   }
   else {
-    LOG(LOG_WARNING, "HomeConnect Event stream '%s' error: %s", urlPath.c_str(), aError->description().c_str());
+    LOG(LOG_WARNING, "HomeConnect Event stream '%s' error: %s, message: '%s'", urlPath.c_str(), aError->description().c_str(), aResponse.c_str());
     // error in comm - schedule restart
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
+    if (aError->getErrorCode() == 401) {
+      // this is invalid token issue - refresh token by sending dummy request
+      homeConnectComm.apiQuery("/api/homeappliances", boost::bind(&HomeConnectEventMonitor::apiQueryDone, this, _1, _2));
+    } else {
+      MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
+    }
   }
 }
 
-
+void HomeConnectEventMonitor::apiQueryDone(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  LOG(LOG_WARNING, "Api request finished, try to reopen the event channel");
+  // the request was done, try to open event channel again
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), 1*Second);
+}
 
 
 

@@ -84,7 +84,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     buttonInput = ButtonInputPtr(new ButtonInput(ioname.c_str()));
     buttonInput->setButtonHandler(boost::bind(&DigitalIODevice::buttonHandler, this, _1, _2), true);
     // - create one button input
-    ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"button"));
+    ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
     b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, false); // mode not restricted
     b->setHardwareName("digitalin");
     b->setGroup(group_yellow_light); // pre-configure for light
@@ -98,7 +98,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     digitalInput = DigitalIoPtr(new DigitalIo(ioname.c_str(), false));
     digitalInput->setInputChangedHandler(boost::bind(&DigitalIODevice::inputHandler, this, _1), INPUT_DEBOUNCE_TIME, 0); // edge detection if possible, mainloop idle poll otherwise
     // - create one binary input
-    BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"input"));
+    BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
     b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
     b->setHardwareName("digitalin");
     addBehaviour(b);

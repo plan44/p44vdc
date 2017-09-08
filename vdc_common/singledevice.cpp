@@ -626,10 +626,11 @@ PropertyContainerPtr ValueList::getContainer(const PropertyDescriptorPtr &aPrope
 
 // MARK: ===== DeviceAction
 
-DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription) :
+DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription, const string aTitle) :
   singleDeviceP(&aSingleDevice),
   actionId(aId),
-  actionDescription(aDescription)
+  actionDescription(aDescription),
+  actionTitle(aTitle)
 {
   // install value list for parameters
   actionParams = ValueListPtr(new ValueList);
@@ -708,6 +709,7 @@ void DeviceAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 
 enum {
   actiondescription_key,
+  actiontitle_key,
   actionparams_key,
   numActionProperties
 };
@@ -726,6 +728,7 @@ PropertyDescriptorPtr DeviceAction::getDescriptorByIndex(int aPropIndex, int aDo
   // device level properties
   static const PropertyDescription properties[numActionProperties] = {
     { "description", apivalue_string, actiondescription_key, OKEY(deviceaction_key) },
+    { "title", apivalue_string, actiontitle_key, OKEY(deviceaction_key) },
     { "params", apivalue_object, actionparams_key, OKEY(deviceaction_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
@@ -752,11 +755,18 @@ bool DeviceAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
   if (aPropertyDescriptor->hasObjectKey(deviceaction_key) && aMode==access_read) {
     switch (aPropertyDescriptor->fieldKey()) {
       case actiondescription_key: aPropValue->setStringValue(actionDescription); return true;
+      case actiontitle_key:
+        if (actionTitle.empty()) {
+          return false; // empty title is not shown
+        }
+        else {
+          aPropValue->setStringValue(actionTitle);
+          return true;
+        }
     }
   }
   return false;
 }
-
 
 
 // MARK: ===== DeviceActions container
@@ -831,6 +841,76 @@ void DeviceActions::addAction(DeviceActionPtr aAction)
 {
   deviceActions.push_back(aAction);
 }
+
+
+
+// MARK: ===== DynamicDeviceActions container
+
+
+void DynamicDeviceActions::addToModelUIDHash(string &aHashedString)
+{
+  // dynamic actions must not be part of ModelUID! -> NOP
+}
+
+
+
+bool DynamicDeviceActions::removeActionInternal(DeviceActionPtr aAction)
+{
+  if (!aAction) return false;
+  for (ActionsVector::iterator pos = deviceActions.begin(); pos!=deviceActions.end(); ++pos) {
+    if ((*pos)->actionId==aAction->getId()) {
+      // already exists, remove it from container (might be the same object as aAction, or a different one with the same id)
+      deviceActions.erase(pos);
+      return true;
+    }
+  }
+  return false;
+}
+
+
+void DynamicDeviceActions::addOrUpdateDynamicAction(DeviceActionPtr aAction)
+{
+  if (!aAction) return;
+  // if action with same name already exists, remove it from the container first
+  removeActionInternal(aAction);
+  // (re)add the action now
+  deviceActions.push_back(aAction);
+  // report the change via push
+  pushActionChange(aAction, false);
+}
+
+
+void DynamicDeviceActions::removeDynamicAction(DeviceActionPtr aAction)
+{
+  if (removeActionInternal(aAction)) {
+    // actually deleted
+    pushActionChange(aAction, true);
+  }
+}
+
+
+bool DynamicDeviceActions::pushActionChange(DeviceActionPtr aAction, bool aRemoved)
+{
+  if (!aAction) return false;
+  SingleDevice &sd = *aAction->singleDeviceP;
+  VdcApiConnectionPtr api = sd.getVdcHost().getSessionConnection();
+  SALOG((sd), LOG_NOTICE, "%spushing: dynamic action '%s' was %s", api ? "" : "Not announced, not ", aAction->getId().c_str(), aRemoved ? "removed" : "added or changed");
+  // try to push to connected vDC API client
+  if (api) {
+    // create query for description property to get pushed
+    ApiValuePtr query = api->newApiValue();
+    query->setType(apivalue_object);
+    ApiValuePtr subQuery = query->newValue(apivalue_object);
+    subQuery->add(aAction->getId(), subQuery->newValue(apivalue_null));
+    query->add(string("dynamicActionDescriptions"), subQuery);
+    // let pushNotification execute the query and
+    return sd.pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion(), aRemoved);
+  }
+  // no API, cannot not push
+  return false;
+}
+
+
 
 
 
@@ -1997,6 +2077,8 @@ void SingleDevice::enableAsSingleDevice()
 {
   // create actions
   if (!deviceActions) deviceActions = DeviceActionsPtr(new DeviceActions);
+  // create dynamic actions
+  if (!dynamicDeviceActions) dynamicDeviceActions = DynamicDeviceActionsPtr(new DynamicDeviceActions);
   // create custom actions
   if (!customActions) customActions = CustomActionsPtr(new CustomActions(*this));
   // create states
@@ -2019,6 +2101,7 @@ void SingleDevice::addToModelUIDHash(string &aHashedString)
   // action names
   inherited::addToModelUIDHash(aHashedString);
   if (deviceActions) deviceActions->addToModelUIDHash(aHashedString);
+  // Note: dynamic device actions are NOT part of the hash!
   if (deviceStates) deviceStates->addToModelUIDHash(aHashedString);
   if (deviceEvents) deviceEvents->addToModelUIDHash(aHashedString);
   if (deviceProperties) deviceProperties->addToModelUIDHash(aHashedString);
@@ -2086,10 +2169,12 @@ void SingleDevice::loadSettingsFromFiles()
 void SingleDevice::call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB)
 {
   if (!customActions->call(aActionId, aParams, aCompletedCB)) {
-    if (!deviceActions->call(aActionId, aParams, aCompletedCB)) {
-      // action does not exist, call back with error
-      if (aCompletedCB) {
-        aCompletedCB(Error::err<VdcApiError>(501, "action '%s' does not exist", aActionId.c_str()));
+    if (!dynamicDeviceActions->call(aActionId, aParams, aCompletedCB)) {
+      if (!deviceActions->call(aActionId, aParams, aCompletedCB)) {
+        // action does not exist, call back with error
+        if (aCompletedCB) {
+          aCompletedCB(Error::err<VdcApiError>(501, "action '%s' does not exist", aActionId.c_str()));
+        }
       }
     }
   }
@@ -2211,6 +2296,7 @@ void SingleDevice::sceneInvokedActionComplete(ErrorPtr aError)
 enum {
   // singledevice level properties
   deviceActionDescriptions_key,
+  dynamicActionDescriptions_key,
   customActions_key,
   deviceStateDescriptions_key,
   deviceStates_key,
@@ -2240,6 +2326,7 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
   static const PropertyDescription properties[numSingleDeviceProperties] = {
     // common device properties
     { "deviceActionDescriptions", apivalue_object, deviceActionDescriptions_key, OKEY(singledevice_key) },
+    { "dynamicActionDescriptions", apivalue_object, dynamicActionDescriptions_key, OKEY(singledevice_key) },
     { "customActions", apivalue_object, customActions_key, OKEY(singledevice_key) },
     { "deviceStateDescriptions", apivalue_object, deviceStateDescriptions_key, OKEY(devicestatedesc_key) },
     { "deviceStates", apivalue_object, deviceStates_key, OKEY(devicestate_key) },
@@ -2266,6 +2353,8 @@ PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPr
     switch (aPropertyDescriptor->fieldKey()) {
       case deviceActionDescriptions_key:
         return deviceActions;
+      case dynamicActionDescriptions_key:
+        return dynamicDeviceActions;
       case customActions_key:
         return customActions;
       case deviceStateDescriptions_key:
@@ -2285,12 +2374,22 @@ PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPr
 
 // MARK: ===== dynamic configuration of single devices via JSON
 
+
 ErrorPtr SingleDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription)
 {
   // base class just creates a unspecific action
-  aAction = DeviceActionPtr(new DeviceAction(*this, aActionId, aDescription));
+  aAction = DeviceActionPtr(new DeviceAction(*this, aActionId, aDescription, ""));
   return ErrorPtr();
 }
+
+
+ErrorPtr SingleDevice::dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle)
+{
+  // base class just creates a unspecific action
+  aAction = DeviceActionPtr(new DeviceAction(*this, aActionId, aDescription, aTitle));
+  return ErrorPtr();
+}
+
 
 
 ErrorPtr SingleDevice::stateFromJSON(DeviceStatePtr &aState, JsonObjectPtr aJSONConfig, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor)
@@ -2316,6 +2415,57 @@ ErrorPtr SingleDevice::propertyFromJSON(ValueDescriptorPtr &aProperty, JsonObjec
 
 
 
+ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfig, const string aActionId, bool aPush)
+{
+  JsonObjectPtr o;
+  ErrorPtr err;
+  DeviceActionPtr a;
+  string desc = aActionId; // default to name
+  if (aJSONConfig && aJSONConfig->get("description", o)) desc = o->stringValue();
+  if (aDynamic) {
+    // dynamic action
+    if (!aJSONConfig || !aJSONConfig->get("title", o)) {
+      return TextError::err("Dynamic action must have a title");
+    }
+    string title = o->stringValue();
+    err = dynamicActionFromJSON(a, aJSONConfig, aActionId, desc, title);
+  }
+  else {
+    // standard action
+    err = actionFromJSON(a, aJSONConfig, aActionId, desc);
+  }
+  if (!Error::isOK(err)) return err;
+  // check for params
+  if (aJSONConfig && aJSONConfig->get("params", o)) {
+    string pname;
+    JsonObjectPtr param;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(pname, param)) {
+      ValueDescriptorPtr p;
+      ErrorPtr err = parseValueDesc(p, param, pname);
+      if (!Error::isOK(err)) return err;
+      bool optional = !(p->isDefault()); // by default, no default value means the value is optional
+      JsonObjectPtr o3;
+      if (param->get("optional", o3)) {
+        optional = o3->boolValue();
+      }
+      a->addParameter(p, !optional);
+    }
+  }
+  if (aDynamic) {
+    if (aPush)
+      dynamicDeviceActions->addOrUpdateDynamicAction(a); // at runtime change
+    else
+      dynamicDeviceActions->addAction(a); // normal add, no push when added at device creation time
+  }
+  else {
+    deviceActions->addAction(a);
+  }
+  return err;
+}
+
+
+
 
 ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
 {
@@ -2323,91 +2473,69 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
   ErrorPtr err;
 
   // check for single device actions
-  if (aJSONConfig->get("actions", o)) {
-    enableAsSingleDevice(); // must behave as a single device
-    string name;
-    JsonObjectPtr action;
-    o->resetKeyIteration();
-    while (o->nextKeyValue(name, action)) {
-      JsonObjectPtr o2;
-      string desc = name; // default to name
-      if (action && action->get("description", o2)) desc = o2->stringValue();
-        // create the action
-        DeviceActionPtr a;
-        err = actionFromJSON(a, action, name, desc);
-        if (!Error::isOK(err)) return err;
-        // check for params
-        if (action && action->get("params", o2)) {
-          string pname;
-          JsonObjectPtr param;
-          o2->resetKeyIteration();
-          while (o2->nextKeyValue(pname, param)) {
-            ValueDescriptorPtr p;
-            ErrorPtr err = parseValueDesc(p, param, pname);
-            if (!Error::isOK(err)) return err;
-            bool optional = !(p->isDefault()); // by default, no default value means the value is optional
-            JsonObjectPtr o3;
-            if (param->get("optional", o3)) {
-              optional = o3->boolValue();
-            }
-            a->addParameter(p, !optional);
-          }
-        }
-      deviceActions->addAction(a);
+  for (int dynamic=0; dynamic<=1; dynamic++) {
+    if (aJSONConfig->get(dynamic ? "dynamicactions" : "actions", o)) {
+      enableAsSingleDevice(); // must behave as a single device
+      string actionId;
+      JsonObjectPtr actionConfig;
+      o->resetKeyIteration();
+      while (o->nextKeyValue(actionId, actionConfig)) {
+        err = addActionFromJSON(dynamic, actionConfig, actionId, false);
+        if (!Error::isOK(err)) return err->withPrefix("Error creating action '%s': ", actionId.c_str());
+      }
     }
   }
   // check for single device states
   if (aJSONConfig->get("states", o)) {
     enableAsSingleDevice(); // must behave as a single device
-    string name;
-    JsonObjectPtr state;
+    string stateId;
+    JsonObjectPtr stateConfig;
     o->resetKeyIteration();
-    while (o->nextKeyValue(name, state)) {
+    while (o->nextKeyValue(stateId, stateConfig)) {
       JsonObjectPtr o2;
-      string desc = name; // default to name
-      if (state->get("description", o2)) desc = o2->stringValue();
+      string desc = stateId; // default to name
+      if (stateConfig && stateConfig->get("description", o2)) desc = o2->stringValue();
       ValueDescriptorPtr v;
-      ErrorPtr err = parseValueDesc(v, state, "state");
-      if (!Error::isOK(err)) return err;
+      err = parseValueDesc(v, stateConfig, "state");
+      if (!Error::isOK(err)) return err->withPrefix("Error in 'state' of '%s': ", stateId.c_str());
       // create the state
       DeviceStatePtr s;
-      err = stateFromJSON(s, state, name, desc, v);
-      if (!Error::isOK(err)) return err;
+      err = stateFromJSON(s, stateConfig, stateId, desc, v);
+      if (!Error::isOK(err)) return err->withPrefix("Error creating state '%s': ", stateId.c_str());
       deviceStates->addState(s);
     }
   }
   // check for single device events
   if (aJSONConfig->get("events", o)) {
     enableAsSingleDevice(); // must behave as a single device
-    string name;
-    JsonObjectPtr event;
+    string eventId;
+    JsonObjectPtr eventConfig;
     o->resetKeyIteration();
-    while (o->nextKeyValue(name, event)) {
+    while (o->nextKeyValue(eventId, eventConfig)) {
       // create the event
       JsonObjectPtr o2;
-      string desc = name; // default to name
-      if (event && event->get("description", o2)) desc = o2->stringValue();
+      string desc = eventId; // default to name
+      if (eventConfig && eventConfig->get("description", o2)) desc = o2->stringValue();
       DeviceEventPtr e;
-      err = eventFromJSON(e, event, name, desc);
-      if (!Error::isOK(err)) return err;
+      err = eventFromJSON(e, eventConfig, eventId, desc);
+      if (!Error::isOK(err)) return err->withPrefix("Error creating event '%s': ", eventId.c_str());
       deviceEvents->addEvent(e);
     }
   }
   // check for single device properties
   if (aJSONConfig->get("properties", o)) {
     enableAsSingleDevice(); // must behave as a single device
-    string name;
-    JsonObjectPtr prop;
+    string propId;
+    JsonObjectPtr propConfig;
     o->resetKeyIteration();
-    while (o->nextKeyValue(name, prop)) {
-      if (!prop) return TextError::err("property must specify type");
+    while (o->nextKeyValue(propId, propConfig)) {
       // create the property (is represented by a ValueDescriptor)
       bool readonly = false;
       JsonObjectPtr o2;
-      if (prop->get("readonly", o2))
+      if (propConfig && propConfig->get("readonly", o2))
         readonly = o2->boolValue();
       ValueDescriptorPtr p;
-      err = propertyFromJSON(p, prop, name);
+      err = propertyFromJSON(p, propConfig, propId);
       if (!Error::isOK(err)) {
         return err;
       }
@@ -2415,6 +2543,19 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
     }
   }
   // successful
+  return ErrorPtr();
+}
+
+
+ErrorPtr SingleDevice::updateDynamicActionFromJSON(const string aActionId, JsonObjectPtr aJSONConfig)
+{
+  if (!aJSONConfig || aJSONConfig->isType(json_type_null)) {
+    dynamicDeviceActions->removeDynamicAction(dynamicDeviceActions->getAction(aActionId));
+  }
+  else {
+    // add or change
+    return addActionFromJSON(true, aJSONConfig, aActionId, true);
+  }
   return ErrorPtr();
 }
 

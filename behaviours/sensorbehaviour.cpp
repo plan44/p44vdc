@@ -40,20 +40,6 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
 }
 
 
-void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval)
-{
-  sensorType = aType;
-  sensorUsage = aUsage;
-  min = aMin;
-  max = aMax;
-  resolution = aResolution;
-  updateInterval = aUpdateInterval;
-  aliveSignInterval = aAliveSignInterval;
-  // default only, devices once created will have this as a persistent setting
-  changesOnlyInterval = aDefaultChangesOnlyInterval;
-}
-
-
 
 // The value units corresponding with the sensor type
 const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
@@ -74,7 +60,7 @@ const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
   VALUE_UNIT(valueUnit_watt, unitScaling_1), ///< Power in W
   VALUE_UNIT(valueUnit_ampere, unitScaling_1), ///< Electric current in A
   VALUE_UNIT(valueUnit_watthour, unitScaling_kilo), ///< Energy in kWh
-  VALUE_UNIT(valueUnit_voltampere, unitScaling_1), ///< Electric Consumption in VA
+  VALUE_UNIT(valueUnit_voltampere, unitScaling_1), ///< Apparent electric power in VA
   VALUE_UNIT(valueUnit_pascal, unitScaling_hecto), ///< Air pressure in hPa
   VALUE_UNIT(valueUnit_degree, unitScaling_1), ///< Wind direction in degrees
   VALUE_UNIT(valueUnit_bel, unitScaling_deci), ///< Sound pressure level in dB
@@ -88,8 +74,66 @@ const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
   VALUE_UNIT(valueUnit_literpersecond, unitScaling_1), ///< Water flow rate in liters/second
   VALUE_UNIT(valueUnit_meter, unitScaling_1), ///< Length in meters
   VALUE_UNIT(valueUnit_gram, unitScaling_1), ///< mass in grams
-  VALUE_UNIT(valueUnit_second, unitScaling_1), ///< duration in seconds
+  VALUE_UNIT(valueUnit_second, unitScaling_1), ///< time in seconds
 };
+
+
+const char *sensorTypeIds[numVdcSensorTypes] = {
+  "undefined", ///< none
+  "temperature", ///< temperature in degrees celsius
+  "humidity", ///< relative humidity in %
+  "brightness", ///< illumination in lux
+  "voltage", ///< supply voltage level in Volts
+  "co_concentration", ///< CO (carbon monoxide) concentration in ppm
+  "radon_activity", ///< Radon activity in Bq/m3
+  "gas_type", ///< gas type sensor
+  "particles_st_10um", ///< particles <10µm in μg/m3
+  "particles_st_2500nm", ///< particles <2.5µm in μg/m3
+  "particles_st_1um", ///< particles <1µm in μg/m3
+  "set_point", ///< room operating panel set point, 0..1
+  "fan_speed", ///< fan speed, 0..1 (0=off, <0=auto)
+  "wind_speed", ///< wind speed in m/s
+  "power", ///< Power in W
+  "current", ///< Electric current in A
+  "energy", ///< Energy in kWh
+  "apparent_power", ///< Apparent electric power in VA
+  "air_pressure", ///< Air pressure in hPa
+  "wind_direction", ///< Wind direction in degrees
+  "sound_pressure", ///< Sound pressure level in dB
+  "precipitation", ///< Precipitation in mm/m2
+  "co2_concentration", ///< CO2 (carbon dioxide) concentration in ppm
+  "gust_speed", ///< gust speed in m/S
+  "gust_direction", ///< gust direction in degrees
+  "generated_power", ///< Generated power in W
+  "generated_energy", ///< Generated energy in kWh
+  "water_quantity", ///< Water quantity in liters
+  "water_flow", ///< Water flow rate in liters/second
+  "length", ///< Length in meters
+  "mass", ///< mass in grams
+  "time", ///< duration in seconds
+};
+
+
+
+void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval)
+{
+  sensorType = aType;
+  sensorUsage = aUsage;
+  min = aMin;
+  max = aMax;
+  resolution = aResolution;
+  updateInterval = aUpdateInterval;
+  aliveSignInterval = aAliveSignInterval;
+  // default only, devices once created will have this as a persistent setting
+  changesOnlyInterval = aDefaultChangesOnlyInterval;
+}
+
+
+string SensorBehaviour::getAutoId()
+{
+  return sensorTypeIds[sensorType];
+}
+
 
 
 ValueUnit SensorBehaviour::getSensorUnit()

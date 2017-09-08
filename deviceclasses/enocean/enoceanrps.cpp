@@ -46,19 +46,19 @@ EnoceanRPSDevice::EnoceanRPSDevice(EnoceanVdc *aVdcP) :
 
 static const ProfileVariantEntry RPSprofileVariants[] = {
   // dual rocker RPS button alternatives
-  { 1, 0x00F602FF, 2, "dual rocker switch (as 2-way rockers)" }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
-  { 1, 0x02F602FF, 2, "dual rocker switch (2-way, reversed)" }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
-  { 1, 0x01F602FF, 2, "dual rocker switch (up and down as separate buttons)" },
+  { 1, 0x00F602FF, 2, "dual rocker switch (as 2-way rockers)", DeviceConfigurations::buttonTwoWay }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
+  { 1, 0x02F602FF, 2, "dual rocker switch (2-way, reversed)", DeviceConfigurations::buttonTwoWayReversed }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
+  { 1, 0x01F602FF, 2, "dual rocker switch (up and down as separate buttons)", DeviceConfigurations::buttonSingle },
   { 1, 0x00F60401, 0, "key card activated switch ERP1" },
   { 1, 0x00F60402, 0, "key card activated switch ERP2" },
   { 1, 0x00F604C0, 0, "key card activated switch FKC/FKF" },
   { 1, 0x00F60501, 0, "Liquid Leakage detector" },
   { 1, 0x00F605C0, 0, "Smoke detector FRW/GUARD" },
   // quad rocker RPS button alternatives
-  { 2, 0x00F603FF, 2, "quad rocker switch (as 2-way rockers)" }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
-  { 2, 0x02F603FF, 2, "quad rocker switch (2-way, reversed)" }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
-  { 2, 0x01F603FF, 2, "quad rocker switch (up and down as separate buttons)" },
-  { 0, 0, 0, NULL } // terminator
+  { 2, 0x00F603FF, 2, "quad rocker switch (as 2-way rockers)", DeviceConfigurations::buttonTwoWay }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
+  { 2, 0x02F603FF, 2, "quad rocker switch (2-way, reversed)", DeviceConfigurations::buttonTwoWayReversed }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
+  { 2, 0x01F603FF, 2, "quad rocker switch (up and down as separate buttons)", DeviceConfigurations::buttonSingle },
+  { 0, 0, 0, NULL, NULL } // terminator
 };
 
 
@@ -104,7 +104,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         EnoceanRpsButtonHandlerPtr buttonHandler = EnoceanRpsButtonHandlerPtr(new EnoceanRpsButtonHandler(*newDev.get()));
         buttonHandler->switchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
         buttonHandler->isRockerUp = isUp;
-        ButtonBehaviourPtr buttonBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"button"));
+        ButtonBehaviourPtr buttonBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
         buttonBhvr->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, true); // fixed mode
         buttonBhvr->setGroup(group_yellow_light); // pre-configure for light
         buttonBhvr->setHardwareName(isUp ? "upper key" : "lower key");
@@ -138,7 +138,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         EnoceanRpsButtonHandlerPtr downHandler = EnoceanRpsButtonHandlerPtr(new EnoceanRpsButtonHandler(*newDev.get()));
         downHandler->switchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
         downHandler->isRockerUp = reversed; // normal: first button is the hardware-down-button, reversed: hardware-up-button
-        ButtonBehaviourPtr downBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"down"));
+        ButtonBehaviourPtr downBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),""));  // automatic id
         downBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
         downBhvr->setGroup(group_yellow_light); // pre-configure for light
         downBhvr->setHardwareName("down key");
@@ -148,7 +148,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         EnoceanRpsButtonHandlerPtr upHandler = EnoceanRpsButtonHandlerPtr(new EnoceanRpsButtonHandler(*newDev.get()));
         upHandler->switchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
         upHandler->isRockerUp = !reversed; // normal: second button is the hardware-up-button, reversed: hardware-down-button
-        ButtonBehaviourPtr upBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"up"));
+        ButtonBehaviourPtr upBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
         upBhvr->setGroup(group_yellow_light); // pre-configure for light
         upBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
         upBhvr->setHardwareName("up key");
@@ -177,7 +177,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       // Single input with tri-state (extendedValue)
       // - Input0: 0: window closed (Handle down position), 1: window fully open, 2: window tilted
       EnoceanRpsWindowHandleHandlerPtr newHandler = EnoceanRpsWindowHandleHandlerPtr(new EnoceanRpsWindowHandleHandler(*newDev.get()));
-      BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"windowhandle"));
+      BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
       bb->setHardwareInputConfig(binInpType_windowHandle, usage_undefined, true, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Window open/tilted");
@@ -278,7 +278,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       BinaryInputBehaviourPtr bb;
       // - Alarm: 1: Alarm, 0: no Alarm
       newHandler = EnoceanRpsSmokeDetectorHandlerPtr(new EnoceanRpsSmokeDetectorHandler(*newDev.get()));
-      bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"alarm"));
+      bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
       bb->setHardwareInputConfig(binInpType_smoke, usage_room, true, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Smoke alarm");
@@ -287,7 +287,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newDev->addChannelHandler(newHandler);
       // - Low Battery: 1: battery low, 0: battery OK
       newHandler = EnoceanRpsSmokeDetectorHandlerPtr(new EnoceanRpsSmokeDetectorHandler(*newDev.get()));
-      bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"lowbat"));
+      bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
       bb->setHardwareInputConfig(binInpType_lowBattery, usage_room, true, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Low battery");

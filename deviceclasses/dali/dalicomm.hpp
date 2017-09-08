@@ -135,7 +135,7 @@ namespace p44 {
     static ErrorPtr busyError() { return ErrorPtr(new DaliCommError(DaliCommError::Busy)); };
 
     MLMicroSeconds closeAfterIdleTime;
-    long connectionTimeoutTicket;
+    MLTicket connectionTimeoutTicket;
 
     int expectedBridgeResponses; ///< not yet received bridge responses
     bool responsesInSequence; ///< set when repsonses need to be in sequence with requests

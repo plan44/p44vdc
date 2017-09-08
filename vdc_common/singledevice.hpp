@@ -362,12 +362,14 @@ namespace p44 {
     typedef PropertyContainer inherited;
 
     friend class DeviceActions;
+    friend class DynamicDeviceActions;
     friend class CustomAction;
 
   protected:
 
     string actionId; ///< id of the action (key in the container object)
     string actionDescription; ///< a descriptive string for the action (for logs and debugging)
+    string actionTitle; ///< for dynamic actions: the title of the action in user's language (assigned by the user by a UI of the device itself, immutable from dS)
     ValueListPtr actionParams; ///< the parameter descriptions of this action
 
     SingleDevice *singleDeviceP; ///< the single device this action belongs to
@@ -377,8 +379,9 @@ namespace p44 {
     /// create the action
     /// @param aSingleDevice the single device this action belongs to
     /// @param aId the ID of the action (key in the container)
-    /// @param aDescription a description string for the action.
-    DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription);
+    /// @param aDescription a description string for the action (for log files primarily)
+    /// @param aTitle a user language description/name for the action, usually set by the user via direct device interaction (UI, apps, ...)
+    DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription, const string aTitle);
 
     /// get id
     string getId() { return actionId; };
@@ -421,10 +424,11 @@ namespace p44 {
 
 
 
-
-  class DeviceActions P44_FINAL : public PropertyContainer
+  class DeviceActions : public PropertyContainer
   {
     typedef PropertyContainer inherited;
+
+  protected:
 
     typedef vector<DeviceActionPtr> ActionsVector;
 
@@ -442,8 +446,8 @@ namespace p44 {
     ///   and prevent calling subclass' performCall() when parameters are not ok.
     bool call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB);
 
-    /// get state (for applying updates)
-    /// @param aActionId id of the state to get
+    /// get action
+    /// @param aActionId id of the action to get
     DeviceActionPtr getAction(const string aActionId);
 
     /// add an action (at device setup time only)
@@ -456,12 +460,41 @@ namespace p44 {
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE P44_FINAL;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
     
   };
   typedef boost::intrusive_ptr<DeviceActions> DeviceActionsPtr;
+
+
+
+  class DynamicDeviceActions P44_FINAL : public DeviceActions
+  {
+    typedef DeviceActions inherited;
+
+  public:
+
+    /// add or update a dynamic action.
+    /// @note If device is announced with a vDC API client (vdSM), the changed action description will be pushed)
+    /// @param aAction the action to add (if its actionId is new) or update (if its actionId already exists)
+    void addOrUpdateDynamicAction(DeviceActionPtr aAction);
+
+    /// remove a dynamic device action.
+    /// @note If device is announced with a vDC API client (vdSM), the removal will be pushed (empty action description)
+    /// @param aAction the action
+    void removeDynamicAction(DeviceActionPtr aAction);
+
+    /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
+    virtual void addToModelUIDHash(string &aHashedString);
+
+  private:
+
+    bool removeActionInternal(DeviceActionPtr aAction);
+    bool pushActionChange(DeviceActionPtr aAction, bool aRemoved);
+
+  };
+  typedef boost::intrusive_ptr<DynamicDeviceActions> DynamicDeviceActionsPtr;
 
 
 
@@ -903,6 +936,7 @@ namespace p44 {
   protected:
 
     DeviceActionsPtr deviceActions; ///< the device's standard actions
+    DynamicDeviceActionsPtr dynamicDeviceActions; ///< the device's dynamic (device-side user customizable/added) actions
     CustomActionsPtr customActions; ///< the device's custom actions
     DeviceStatesPtr deviceStates; ///< the device's states
     DeviceEventsPtr deviceEvents; ///< the device's events
@@ -965,6 +999,13 @@ namespace p44 {
     ErrorPtr configureFromJSON(JsonObjectPtr aJSONConfig);
 
 
+    /// dynamically configure dynamic action (add/change/remove)
+    /// @note this can be used by device implementations for adding/changing dynamic actions while device is operational.
+    /// @param aJSONConfig JSON config object for creating or updating an action. If NULL or null json object, action will be deleted
+    /// @return ok or parsing error
+    ErrorPtr updateDynamicActionFromJSON(const string aActionId, JsonObjectPtr aJSONConfig);
+
+
     /// @name API implementation
     /// @{
 
@@ -1003,6 +1044,13 @@ namespace p44 {
     /// @return ok or parsing error
     virtual ErrorPtr actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription);
 
+    /// creates a dynamic device action
+    /// @param aAction will be assigned the new dynamic action
+    /// @param aJSONConfig JSON config object for an action. Implementation can fetch specific params from it
+    /// @note other params see DynamicDeviceAction constructor
+    /// @return ok or parsing error
+    virtual ErrorPtr dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle);
+
     /// creates a device state
     /// @param aState will be assigned the new state
     /// @param aJSONConfig JSON config object for a state. Implementation can fetch specific params from it
@@ -1021,7 +1069,6 @@ namespace p44 {
     /// @return ok or parsing error
     virtual ErrorPtr propertyFromJSON(ValueDescriptorPtr &aProperty, JsonObjectPtr aJSONConfig, const string aPropName);
 
-
     /// @}
 
 
@@ -1034,6 +1081,7 @@ namespace p44 {
 
     void invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
     void sceneInvokedActionComplete(ErrorPtr aError);
+    ErrorPtr addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfig, const string aActionId, bool aPush);
 
   };
 

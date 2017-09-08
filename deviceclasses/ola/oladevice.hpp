@@ -59,7 +59,7 @@ namespace p44 {
     DmxChannel hPosChannel;
     DmxChannel vPosChannel;
 
-    long transitionTicket;
+    MLTicket transitionTicket;
 
   public:
 

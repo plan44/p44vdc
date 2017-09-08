@@ -120,7 +120,7 @@ namespace p44 {
     typedef VdcHost inherited;
     friend class P44JsonApiRequest;
 
-    long learnIdentifyTicket;
+    MLTicket learnIdentifyTicket;
     JsonCommPtr learnIdentifyRequest;
 
   public:
