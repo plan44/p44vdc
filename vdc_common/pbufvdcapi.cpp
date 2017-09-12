@@ -393,13 +393,6 @@ bool PbufApiValue::setStringValue(const string &aString)
 }
 
 
-void PbufApiValue::setNull()
-{
-  clear();
-}
-
-
-
 void PbufApiValue::getValueFromMessageField(const ProtobufCFieldDescriptor &aFieldDescriptor, const ProtobufCMessage &aMessage)
 {
   const uint8_t *baseP = (const uint8_t *)(&aMessage);
