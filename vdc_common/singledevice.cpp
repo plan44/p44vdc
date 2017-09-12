@@ -85,7 +85,7 @@ bool ValueDescriptor::needsConformanceCheck(ApiValuePtr aApiValue, ErrorPtr &aEr
   if (aApiValue->isNull()) {
     // check NULL value here, same for all types
     if (!isOptionalValue) {
-      aError = Error::err<VdcApiError>(415, "Non-optional parameter, null not allowed");
+      aError = Error::err<VdcApiError>(415, "Non-optional value, null not allowed");
       return false; // Error -> no type specific check needed any more
     }
     else {
@@ -1968,6 +1968,7 @@ PropertyDescriptorPtr DeviceProperties::getDescriptorByIndex(int aPropIndex, int
     DynamicPropertyDescriptor *dp = static_cast<DynamicPropertyDescriptor *>(p.get());
     // access via deviceProperties, we directly want to see the values
     dp->propertyType = apivalue_null; // switch to leaf (of variable type)
+    dp->deletable = true; // some properties might be assigned NULL to "delete", "invalidate" or "reset" them in some way (properties that do not allow null will complain at conforms())
     dp->needsReadPrep = values[aPropIndex]->doesNeedFetch(); // for values, we might need a fetch
   }
   return p;
