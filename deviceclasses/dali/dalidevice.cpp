@@ -1512,9 +1512,12 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   else if (type=="illumination") {
     inputType = input_illumination;
   }
+  else if (type=="bistable") {
+    inputType = input_bistable;
+  }
   else {
-    // default
-    inputType = input_generic;
+    // default to pulse input
+    inputType = input_pulse;
   }
   // create behaviours
   if (inputType==input_button) {
@@ -1568,7 +1571,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     ib->setHardwareName("light");
     addBehaviour(ib);
   }
-  else if (inputType==input_generic) {
+  else if (inputType==input_bistable || inputType==input_pulse) {
     // Standard device settings without scene table
     colorClass = class_black_joker;
     installSettings();
@@ -1621,7 +1624,7 @@ void DaliInputDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
 
 
 #define BUTTON_RELEASE_TIMEOUT (100*MilliSecond)
-
+#define INPUT_RELEASE_TIMEOUT (2*Second)
 
 bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aData2)
 {
@@ -1638,51 +1641,58 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
         // we are listening to scene calls
         if ((aData1 & 0x01) && (aData2 & 0xF0)==DALICMD_GO_TO_SCENE) {
           refindex = aData2 & 0x0F;
+          aData2 = DALICMD_GO_TO_SCENE; // normalize to allow catching command below
+          // if used as bistable binary input, consider scenes 0..7 as off, 8..15 as on
+          on = refindex>=8;
+          off = !on;
         }
       }
+      else if (baseAddress & DaliGroup) {
+        // we are listening to group calls
+        if (a & DaliGroup) refindex = a & DaliGroupMask;
+      }
       else {
-        if (baseAddress & DaliGroup) {
-          // we are listening to group calls
-          if (a & DaliGroup) refindex = a & DaliGroupMask;
+        // we are listening to single addresses
+        refindex = a & DaliAddressMask;
+      }
+      // now refindex = referenced address/group/scene
+      if (refindex>=0) {
+        // check if in range
+        int baseindex = baseAddress & DaliAddressMask;
+        if (refindex>=baseindex && refindex<baseindex+numAddresses) {
+          inpindex = refindex-baseindex;
+        }
+      }
+      if (inpindex>=0) {
+        // check type of command
+        if ((aData1 & 0x01)==0) {
+          // direct arc, always pulse
+          on = aData2 > 128; // at least half -> on
+          off = aData2==0; // -> off
         }
         else {
-          // we are listening to single addresses
-          refindex = a & DaliAddressMask;
-        }
-        if (refindex>=0) {
-          // check if in range
-          int baseindex = baseAddress & DaliAddressMask;
-          if (refindex>=baseindex && refindex<baseindex+numAddresses) {
-            inpindex = refindex-baseindex;
+          switch (aData2) {
+            case DALICMD_RECALL_MAX_LEVEL:
+            // dimming via DALI button not supported because bus timing is too tight for both directions
+            //case DALICMD_ON_AND_STEP_UP:
+            //case DALICMD_STEP_UP:
+            //case DALICMD_UP:
+              on = true;
+              break;
+            case DALICMD_OFF:
+            case DALICMD_RECALL_MIN_LEVEL:
+            // dimming via DALI button not supported because bus timing is too tight for both directions
+            //case DALICMD_DOWN:
+            //case DALICMD_STEP_DOWN:
+            //case DALICMD_STEP_DOWN_AND_OFF:
+              off = true;
+              break;
+            default:
+              break;
           }
         }
-        if (inpindex>=0) {
-          // check type of command
-          if ((aData1 & 0x01)==0) {
-            // direct arc, always pulse
-            on = aData2 > 128; // at least half -> on
-            off = aData2==0; // -> off
-          }
-          else {
-            switch (aData2) {
-              case DALICMD_OFF:
-                off = true;
-                break;
-              case DALICMD_ON_AND_STEP_UP:
-              case DALICMD_STEP_UP:
-              case DALICMD_UP:
-                on = true;
-                break;
-              case DALICMD_DOWN:
-              case DALICMD_STEP_DOWN:
-              case DALICMD_STEP_DOWN_AND_OFF:
-                off = true;
-                break;
-              default:
-                break;
-            }
-          }
-          // now process
+        // now process
+        if (on || off) {
           switch (inputType) {
             case input_button:
             case input_rocker:
@@ -1692,19 +1702,25 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
               releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::buttonReleased, this, inpindex), BUTTON_RELEASE_TIMEOUT);
               break;
             }
+            case input_pulse:
+            {
+              BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[inpindex]);
+              ib->updateInputState(1);
+              releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::inputReleased, this, inpindex), INPUT_RELEASE_TIMEOUT);
+              break;
+            }
             case input_motion:
             case input_illumination:
+            case input_bistable:
             default:
             {
-              if (on || off) {
-                BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[inpindex]);
-                ib->updateInputState(on ? 1 : 0);
-              }
+              BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[inpindex]);
+              ib->updateInputState(on ? 1 : 0);
               break;
             }
           }
-          return true; // consumed
         }
+        return true; // consumed
       }
     }
   }
@@ -1721,6 +1737,14 @@ void DaliInputDevice::buttonReleased(int aButtonNo)
   bb->buttonAction(false);
 }
 
+
+
+void DaliInputDevice::inputReleased(int aInputNo)
+{
+  releaseTicket = 0;
+  BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[aInputNo]);
+  ib->updateInputState(0);
+}
 
 
 
@@ -1742,8 +1766,12 @@ string DaliInputDevice::modelName()
     case input_illumination:
       m += "illumination sensor";
       break;
+    case input_bistable:
+      m += "bistable input";
+      break;
+    case input_pulse:
     default:
-      m += "input";
+      m += "pulse input";
       break;
   }
   return m;

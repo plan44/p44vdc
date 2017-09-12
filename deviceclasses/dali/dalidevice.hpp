@@ -573,7 +573,8 @@ namespace p44 {
       input_rocker,
       input_motion,
       input_illumination,
-      input_generic
+      input_bistable,
+      input_pulse
     } DaliInputType;
 
     DaliInputType inputType;
@@ -650,6 +651,7 @@ namespace p44 {
   private:
 
     void buttonReleased(int aButtonNo);
+    void inputReleased(int aInputNo);
 
   };
 
