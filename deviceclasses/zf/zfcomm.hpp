@@ -97,7 +97,7 @@ namespace p44 {
 		
     ZfPacketCB receivedPacketHandler;
 
-    long aliveCheckTicket; ///< checking for interface being alive
+    MLTicket aliveCheckTicket; ///< checking for interface being alive
 
 	public:
 		

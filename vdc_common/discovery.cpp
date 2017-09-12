@@ -87,7 +87,8 @@ DiscoveryManager::DiscoveryManager() :
   publishWebPort(0),
   publishSshPort(0),
   rescanTicket(0),
-  evaluateTicket(0)
+  evaluateTicket(0),
+  pollTicket(0)
 {
   // register a cleanup handler
   MainLoop::currentMainLoop().registerCleanupHandler(boost::bind(&DiscoveryManager::stop, this));
@@ -115,7 +116,7 @@ DiscoveryManager::~DiscoveryManager()
 void DiscoveryManager::stop()
 {
   // unregister idle handler
-  MainLoop::currentMainLoop().unregisterIdleHandlers(this);
+  MainLoop::currentMainLoop().cancelExecutionTicket(pollTicket);
   // stop service
   stopService();
   // stop polling
@@ -125,6 +126,9 @@ void DiscoveryManager::stop()
     simple_poll = NULL;
   }
 }
+
+#define AVAHI_POLL_INTERVAL (30*MilliSecond)
+#define AVAHI_POLL_TOLERANCE (15*MilliSecond)
 
 
 ErrorPtr DiscoveryManager::start(
@@ -142,7 +146,7 @@ ErrorPtr DiscoveryManager::start(
   }
   if (Error::isOK(err)) {
     // start polling
-    MainLoop::currentMainLoop().registerIdleHandler(this, boost::bind(&DiscoveryManager::avahi_poll, this));
+    MainLoop::currentMainLoop().executeTicketOnce(pollTicket, boost::bind(&DiscoveryManager::avahi_poll, this, _1));
     // prepare service
     MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), INITIAL_STARTUP_DELAY);
   }
@@ -151,12 +155,13 @@ ErrorPtr DiscoveryManager::start(
 
 
 
-bool DiscoveryManager::avahi_poll()
+void DiscoveryManager::avahi_poll(MLTimer &aTimer)
 {
   if (simple_poll) {
     avahi_simple_poll_iterate(simple_poll, 0);
   }
-  return true; // done for this cycle
+  // schedule next execution
+  MainLoop::currentMainLoop().retriggerTimer(aTimer, AVAHI_POLL_INTERVAL, AVAHI_POLL_TOLERANCE);
 }
 
 

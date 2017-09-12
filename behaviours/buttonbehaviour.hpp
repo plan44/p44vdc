@@ -89,6 +89,9 @@ namespace p44 {
   public:
   
     /// constructor
+    /// @param aDevice the device the behaviour belongs to
+    /// @param aId the string ID for that button.
+    ///   If empty string is passed, an id will be auto-generated
     ButtonBehaviour(Device &aDevice, const string aId);
 
     /// initialisation of hardware-specific constants for this button input
@@ -104,7 +107,7 @@ namespace p44 {
     void setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, bool aButtonModeFixed);
 
     /// set group
-    virtual void setGroup(DsGroup aGroup) { setPVar(buttonGroup, aGroup); };
+    virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { setPVar(buttonGroup, aGroup); };
 
     /// set function
     virtual void setFunction(DsButtonFunc aFunc) { setPVar(buttonFunc, aFunc); };
@@ -133,7 +136,7 @@ namespace p44 {
 
     /// check for defined state
     /// @return true if behaviour has a defined (non-NULL) state
-    virtual bool hasDefinedState();
+    virtual bool hasDefinedState() P44_OVERRIDE;
 
     
     /// @return button element that defines the function of this button in local operation modes
@@ -141,22 +144,27 @@ namespace p44 {
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
   protected:
 
     /// the behaviour type
-    virtual BehaviourType getType() { return behaviour_button; };
+    virtual BehaviourType getType() P44_OVERRIDE { return behaviour_button; };
+
+    /// automatic id for this behaviour
+    /// @return returns a ID for the behaviour.
+    /// @note this is only valid for a fully configured behaviour, as it is derived from configured parameters
+    virtual string getAutoId() P44_OVERRIDE;
 
     // property access implementation for descriptor/settings/states
-    virtual int numDescProps();
-    virtual const PropertyDescriptorPtr getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor);
-    virtual int numSettingsProps();
-    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor);
-    virtual int numStateProps();
-    virtual const PropertyDescriptorPtr getStateDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor);
+    virtual int numDescProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual int numSettingsProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual int numStateProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getStateDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     // combined field access for all types of properties
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
     enum {
@@ -166,11 +174,11 @@ namespace p44 {
       buttonflag_OBSOLETE_simpleStateMachine = buttonflag_firstflag<<2, // legacy, was used only from 1.5.3.2 .. 1.5.3.5
       buttonflag_nextflag = buttonflag_firstflag<<3
     };
-        virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   private:
 
@@ -202,7 +210,7 @@ namespace p44 {
     int holdRepeats;
     bool dimmingUp;
     MLMicroSeconds timerRef;
-    long buttonStateMachineTicket;
+    MLTicket buttonStateMachineTicket;
 
     // state machine params
     static const int t_long_function_delay = 500*MilliSecond;

@@ -87,6 +87,17 @@ void ButtonBehaviour::setHardwareButtonConfig(int aButtonID, VdcButtonType aType
 }
 
 
+string ButtonBehaviour::getAutoId()
+{
+  if (buttonType==buttonType_2way) {
+    return buttonElementID==buttonElement_up ? "up" : "down";
+  }
+  else {
+    return "button";
+  }
+}
+
+
 
 void ButtonBehaviour::buttonAction(bool aPressed)
 {
@@ -411,7 +422,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
   BFOCUSLOG(" -->                       exit state %s with %sfurther timing needed", stateNames[state], timerRef!=Never ? "" : "NO ");
   if (timerRef!=Never) {
     // need timing, schedule calling again
-    buttonStateMachineTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&ButtonBehaviour::checkStandardStateMachine, this, false, _1), 10*MilliSecond);
+    buttonStateMachineTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&ButtonBehaviour::checkStandardStateMachine, this, false, _2), 10*MilliSecond);
   }
 }
 

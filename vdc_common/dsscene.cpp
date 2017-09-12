@@ -150,7 +150,7 @@ protected:
     if (aPropertyDescriptor->hasObjectKey(scenevalue_key)) {
       // Scene value level
       // - get the output index
-      size_t outputIndex = aPropertyDescriptor->parentDescriptor->fieldKey();
+      int outputIndex = (int)aPropertyDescriptor->parentDescriptor->fieldKey();
       if (aMode==access_read) {
         // read properties
         switch (aPropertyDescriptor->fieldKey()) {

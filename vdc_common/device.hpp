@@ -88,10 +88,10 @@ namespace p44 {
     DsClass colorClass; ///< basic color of the device (can be black)
 
     // volatile internal state
-    long dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
+    MLTicket dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
     VdcDimMode currentDimMode; ///< current dimming in progress
     ChannelBehaviourPtr currentDimChannel; ///< currently dimmed channel (if dimming in progress)
-    long dimHandlerTicket; ///< for standard dimming
+    MLTicket dimHandlerTicket; ///< for standard dimming
     bool isDimming; ///< if set, dimming is in progress
     uint8_t areaDimmed; ///< last dimmed area (so continue know which dimming command to re-start in case it comes late)
     VdcDimMode areaDimMode; ///< last area dim mode
@@ -103,7 +103,7 @@ namespace p44 {
     int missedApplyAttempts; ///< number of apply attempts that could not be executed. If>0, completing next apply will trigger a re-apply to finalize values
     SimpleCB updatedOrCachedCB; ///< will be called when current values are either read from hardware, or new values have been requested for applying
     bool updateInProgress; ///< set when updating channel values from hardware is in progress
-    long serializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
+    MLTicket serializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
 
   public:
 
@@ -283,7 +283,7 @@ namespace p44 {
 
     /// add a behaviour and set its index
     /// @param aBehaviour a newly created behaviour, will get added to the correct button/binaryInput/sensor/output
-    ///   array and given the correct index value.
+    ///   array, given the correct index value, and the behaviour id will be made unique if needed by appending an index
     void addBehaviour(DsBehaviourPtr aBehaviour);
 
     /// get scenes
@@ -462,7 +462,7 @@ namespace p44 {
     ChannelBehaviourPtr getChannelByType(DsChannelType aChannelType, bool aPendingApplyOnly = false);
 
     /// get channel by channel ID
-    /// @param aChannelID the channel ID
+    /// @param aChannelId the channel ID
     /// @param aPendingApplyOnly if set, a channel is only returned when its value is pending to be applied
     /// @return NULL for unknown channel
     ChannelBehaviourPtr getChannelById(const string aChannelId, bool aPendingApplyOnly = false);

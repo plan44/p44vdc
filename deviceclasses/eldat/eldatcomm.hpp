@@ -66,7 +66,7 @@ namespace p44 {
 		
     EldatMessageCB receivedMessageHandler;
 
-    long aliveCheckTicket; ///< checking for interface being alive
+    MLTicket aliveCheckTicket; ///< checking for interface being alive
 
     // Eldat module product identification and version
     uint16_t usbPid;

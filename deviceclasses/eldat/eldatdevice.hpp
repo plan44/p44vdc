@@ -254,7 +254,7 @@ namespace p44 {
   {
     typedef EldatDevice inherited;
 
-    long pressedTicket;
+    MLTicket pressedTicket;
 
   public:
 

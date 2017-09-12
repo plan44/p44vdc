@@ -78,7 +78,7 @@ namespace p44 {
 
     int instanceNumber; ///< the instance number identifying this instance among other instances of this class
     int tag; ///< tag used to in self test failures for showing on LEDs
-    long pairTicket; ///< used for pairing
+    MLTicket pairTicket; ///< used for pairing
 
     /// generic vdc flag word
     int vdcFlags;
@@ -88,7 +88,7 @@ namespace p44 {
     /// periodic rescan, collecting
     MLMicroSeconds rescanInterval; ///< rescan interval, 0 if none
     RescanMode rescanMode; ///< mode to use for periodic rescan
-    long rescanTicket; ///< rescan ticket
+    MLTicket rescanTicket; ///< rescan ticket
     bool collecting; ///< currently collecting
 
     ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all

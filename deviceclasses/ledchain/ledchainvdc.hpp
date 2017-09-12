@@ -72,7 +72,7 @@ namespace p44 {
     LedChainDeviceList sortedSegments; ///< list of devices, ordered by firstLED
     uint16_t renderStart; ///< first LED needing rendering (valid if renderTicket!=0)
     uint16_t renderEnd; ///< end of rendering range = first LED not needing rendering (valid if renderTicket!=0)
-    long renderTicket;
+    MLTicket renderTicket;
 
   public:
   

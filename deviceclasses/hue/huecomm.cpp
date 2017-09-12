@@ -183,7 +183,7 @@ public:
   StringStringMap authCandidates; ///< bridges to try auth with, key=uuid, value=baseURL
   StringStringMap::iterator currentAuthCandidate; ///< next auth candiate
   MLMicroSeconds startedAuth; ///< when auth was started
-  long retryLoginTicket;
+  MLTicket retryLoginTicket;
 
   // params and results
   string uuid; ///< the UUID for searching the hue bridge via SSDP

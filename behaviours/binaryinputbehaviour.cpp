@@ -40,6 +40,36 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
 }
 
 
+const char *inputTypeIds[numVdcSensorTypes] = {
+  "generic", ///< no system function
+  "presence", ///< Presence
+  "light", ///< Light
+  "presence_in_darkness", ///< Presence in darkness
+  "twilight", ///< twilight
+  "motion", ///< motion
+  "motion_in_darkness", ///< motion in darkness
+  "smoke", ///< smoke
+  "wind", ///< wind
+  "rain", ///< rain
+  "sun", ///< solar radiation (sun light above threshold)
+  "thermostat", ///< thermostat (temperature below user-adjusted threshold)
+  "low_battery", ///< device has low battery
+  "window_open", ///< window is open
+  "door_open", ///< door is open
+  "window_handle", ///< TRI-STATE! Window handle, has extendedValue showing closed/open/tilted, bool value is just closed/open
+  "garage_open", ///< garage door is open
+  "sun_protection", ///< protect against too much sunlight
+  "frost", ///< frost detector
+  "heating_activated", ///< heating system activated
+  "heating_changeover", ///< heating system change over (active=warm water, non active=cold water)
+  "initializing", ///< can indicate when not all functions are ready yet
+  "malfunction", ///< malfunction, device needs maintainance, cannot operate
+  "service", ///< device needs service, but can still operate normally at the moment
+};
+
+
+
+
 void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval)
 {
   hardwareInputType = aInputType;
@@ -49,6 +79,13 @@ void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, 
   // set default input mode to hardware type
   configuredInputType = hardwareInputType;
 }
+
+
+string BinaryInputBehaviour::getAutoId()
+{
+  return inputTypeIds[hardwareInputType];
+}
+
 
 
 InputState BinaryInputBehaviour::maxExtendedValue()

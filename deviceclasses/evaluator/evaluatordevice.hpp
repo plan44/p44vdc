@@ -81,13 +81,13 @@ namespace p44 {
     /// active value sources
     typedef map<string, ValueSource *> ValueSourcesMap;
     ValueSourcesMap valueMap;
-    long valueParseTicket;
+    MLTicket valueParseTicket;
 
     Tristate currentState;
 
     MLMicroSeconds conditionMetSince; ///< since when do we see condition permanently met
     bool onConditionMet; ///< true: conditionMetSince relates to ON-condition, false: conditionMetSince relates to OFF-condition
-    long evaluateTicket;
+    MLTicket evaluateTicket;
     bool evaluating; ///< protection against cyclic references
 
     EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(deviceSettings); };

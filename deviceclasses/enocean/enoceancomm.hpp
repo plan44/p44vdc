@@ -430,7 +430,7 @@ namespace p44 {
     ESPPacketCB eventPacketHandler;
 
     DigitalIoPtr enoceanResetPin;
-    long aliveCheckTicket;
+    MLTicket aliveCheckTicket;
 
     // Enocean module identification and version
     uint32_t appVersion;
@@ -440,7 +440,7 @@ namespace p44 {
 
     // Command queue
     EnoceanCmdList cmdQueue; ///< commands awaiting send or receive
-    long cmdTimeoutTicket; ///< timeout for waiting for command response
+    MLTicket cmdTimeoutTicket; ///< timeout for waiting for command response
 
 	public:
 		

@@ -377,8 +377,8 @@ int SimpleCmdScene::substitutePlaceholders(string &aCommandStr)
     }
     else if (keyAndValue(v, k, chv, ':')) {
       // scan channel number with optional scaling and offset
-      ssize_t chn;
-      if (sscanf(chv.c_str(), "%ld", &chn)==1) {
+      int chn;
+      if (sscanf(chv.c_str(), "%d", &chn)==1) {
         double chfactor = 1;
         double choffset = 0;
         int numFracDigits = 0;

@@ -142,17 +142,20 @@ namespace p44 {
     /// @param aDevice the device to add the channel to
     /// @param aSensorDescriptor a sensor or binary input descriptor
     /// @param aSetDeviceDescription if set, this sensor channel is the "main" channel and will set description on the device itself
+    /// @param aId if not NULL, a string to be used for the behaviour ID
     static void addSensorChannel(
       EnoceanDevicePtr aDevice,
       const EnoceanSensorDescriptor &aSensorDescriptor,
-      bool aSetDeviceDescription
+      bool aSetDeviceDescription,
+      const char *aId
     );
 
     /// factory: create behaviour (sensor/binary input) by descriptor
     /// @param aDevice the device to add the behaviour to
     /// @param aSensorDescriptor a sensor or binary input descriptor
+    /// @param aId if not NULL, a string to be used for the behaviour ID
     /// @return the behaviour
-    static DsBehaviourPtr newSensorBehaviour(const EnoceanSensorDescriptor &aSensorDescriptor, DevicePtr aDevice);
+    static DsBehaviourPtr newSensorBehaviour(const EnoceanSensorDescriptor &aSensorDescriptor, DevicePtr aDevice, const char *aId);
 
     /// utility: get description string from sensor descriptor info
     static string sensorDesc(const EnoceanSensorDescriptor &aSensorDescriptor);
