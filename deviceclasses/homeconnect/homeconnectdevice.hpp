@@ -358,6 +358,10 @@ namespace p44 {
     void configurePowerState(const PowerStateConfiguration& aConfiguration);
     void configureProgramStatus(const ProgramStatusConfiguration& aConfiguration);
 
+    void addDefaultPowerOnAction();
+    void addDefaultStandByAction();
+    void addDefaultPowerOffAction();
+
     // Create dsuid based on device id
     void deriveDsUid();
 
@@ -368,6 +372,7 @@ namespace p44 {
 
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
     string createDeviceName(JsonObjectPtr aNetworkJson, JsonObjectPtr aFileJson);
+    void addPowerStateAction(const string& aName, const string& aDescription, const string& aParameter);
 
   };
   

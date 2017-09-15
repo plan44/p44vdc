@@ -47,6 +47,9 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
 {
   bool ret = inherited::configureDevice();
 
+  addDefaultStandByAction();
+  addDefaultPowerOnAction();
+
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = true;

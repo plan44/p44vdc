@@ -85,6 +85,10 @@ bool HomeConnectDeviceDishWasher::configureDevice()
   ValueDescriptorPtr delayedStart = ValueDescriptorPtr(
     new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1, true));
 
+
+  addDefaultPowerOffAction();
+  addDefaultPowerOnAction();
+
   addAction("std.Auto3545",    "Auto 35-45C", "Auto1",   delayedStart);
   addAction("std.Auto4565",    "Auto 45-65C", "Auto2",   delayedStart);
   addAction("std.Auto6575",    "Auto 65-75C", "Auto3",   delayedStart);

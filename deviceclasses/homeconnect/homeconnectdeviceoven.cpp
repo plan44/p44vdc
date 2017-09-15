@@ -49,6 +49,9 @@ bool HomeConnectDeviceOven::configureDevice()
       new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
           1, true, 600));
 
+  addDefaultStandByAction();
+  addDefaultPowerOnAction();
+
   addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
   addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
   addAction("std.TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
