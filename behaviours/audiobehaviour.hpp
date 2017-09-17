@@ -195,7 +195,7 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour
-    virtual const char *behaviourTypeIdentifier() P44_OVERRIDE { return "audio"; };
+    virtual const char *behaviourTypeIdentifier() P44_OVERRIDE P44_FINAL { return "audio"; };
 
     /// the volume channel
     AudioVolumeChannelPtr volume;

@@ -123,7 +123,9 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour
-    /// @note default is the basic behaviour type name. Subclasses need to override this method to get separate identification!
+    /// @note default is the basic behaviour type name (output/sensor/binaryInput/buttonInput/actionOutput).
+    ///   Specific output behaviour subclasses will return identifiers such as "light", "shadow"
+    ///   (but not any more variants like "colorlight" or "rgblight").
     virtual const char *behaviourTypeIdentifier() { return getTypeName(); }
 
     /// initialisation of hardware-specific constants for this behaviour
