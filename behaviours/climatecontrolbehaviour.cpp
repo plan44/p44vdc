@@ -328,8 +328,8 @@ Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
       // heating outputs can't blink
       return no;
     case modelFeature_heatinggroup:
-      // Assumption: virtual heating control devices (valves) do have group and mode setting...
-      return yes;
+      // Only simple heating control devices (valves) do have heating group setting
+      return climateDeviceKind==climatedevice_simple ? yes : no;
     case modelFeature_heatingoutmode:
       // ...but not the more specific PWM and heating props
       return no;
