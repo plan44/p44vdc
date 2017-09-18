@@ -194,28 +194,30 @@ DsScenePtr ColorLightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 // MARK: ===== ColorLightBehaviour
 
 
-ColorLightBehaviour::ColorLightBehaviour(Device &aDevice) :
+ColorLightBehaviour::ColorLightBehaviour(Device &aDevice, bool aCtOnly) :
   inherited(aDevice),
+  ctOnly(aCtOnly),
   colorMode(colorLightModeNone),
   derivedValuesComplete(false)
 {
   // primary channel of a color light is always a dimmer controlling the brightness
-  setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, -1);
+  setHardwareOutputConfig(ctOnly ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, -1);
   // Create and add auxiliary channels to the device for Hue, Saturation, Color Temperature and CIE x,y
+  // Note: all channels always exists, but for CT only lights, only CT is exposed in the API
   // - hue
   hue = ChannelBehaviourPtr(new HueChannel(*this));
-  addChannel(hue);
+  if (!aCtOnly) addChannel(hue);
   // - saturation
   saturation = ChannelBehaviourPtr(new SaturationChannel(*this));
-  addChannel(saturation);
+  if (!aCtOnly) addChannel(saturation);
   // - color temperature
   ct = ChannelBehaviourPtr(new ColorTempChannel(*this));
   addChannel(ct);
   // - CIE x and y
   cieX = ChannelBehaviourPtr(new CieXChannel(*this));
-  addChannel(cieX);
+  if (!aCtOnly) addChannel(cieX);
   cieY = ChannelBehaviourPtr(new CieYChannel(*this));
-  addChannel(cieY);
+  if (!aCtOnly) addChannel(cieY);
 }
 
 
@@ -309,40 +311,40 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
   switch (aColorLightScene->colorMode) {
     case colorLightModeHueSaturation: {
       // don't care unused ones
-      aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
       // enable the used values
-      aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, false);
-      aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, false);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, false);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, false);
       break;
     }
     case colorLightModeXY: {
       // don't care unused ones
-      aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
       // enable the used values
-      aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, false);
-      aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, false);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, false);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, false);
       break;
     }
     case colorLightModeCt: {
       // don't care unused ones
-      aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
       // enable the used values
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, false);
       break;
     }
     default: {
       // all color related information is dontCare
-      aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
+      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
       break;
     }
@@ -361,15 +363,17 @@ bool ColorLightBehaviour::deriveColorMode()
   // colors have changed, so this invalidates the derived channel values
   derivedValuesComplete = false;
   // check changed channels
-  if (hue->needsApplying() || saturation->needsApplying()) {
-    colorMode = colorLightModeHueSaturation;
-    return true;
+  if (!ctOnly) {
+    if (hue->needsApplying() || saturation->needsApplying()) {
+      colorMode = colorLightModeHueSaturation;
+      return true;
+    }
+    else if (cieX->needsApplying() || cieY->needsApplying()) {
+      colorMode = colorLightModeXY;
+      return true;
+    }
   }
-  else if (cieX->needsApplying() || cieY->needsApplying()) {
-    colorMode = colorLightModeXY;
-    return true;
-  }
-  else if (ct->needsApplying()) {
+  if (ct->needsApplying()) {
     colorMode = colorLightModeCt;
     return true;
   }
@@ -500,9 +504,10 @@ string ColorLightBehaviour::description()
 
 // MARK: ===== RGBColorLightBehaviour
 
+#define DUMP_CONVERSION_TABLE 0
 
-RGBColorLightBehaviour::RGBColorLightBehaviour(Device &aDevice) :
-  inherited(aDevice)
+RGBColorLightBehaviour::RGBColorLightBehaviour(Device &aDevice, bool aCtOnly) :
+  inherited(aDevice, aCtOnly)
 {
   // default to sRGB with D65 white point
   matrix3x3_copy(sRGB_d65_calibration, calibration);
@@ -510,6 +515,45 @@ RGBColorLightBehaviour::RGBColorLightBehaviour(Device &aDevice) :
   whiteRGB[0] = 0.35; whiteRGB[1] = 0.35; whiteRGB[2] = 0.35;
   // default amber assumed to be AMBER web color #FFBE00 = 100%, 75%, 0% contributing 50% intensity
   amberRGB[0] = 0.5; amberRGB[1] = 0.375; amberRGB[2] = 0;
+
+  #if DUMP_CONVERSION_TABLE
+  // dump a conversion table for HSV -> RGBWA and then back -> HSV, with deltas (dH,dS,dV)
+  printf("H;S;V;R;G;B;W;A;H2;S2;V2;dH;dS;dV\n");
+  for (int v = 0; v<=100; v += 20) {
+    for (int s = 0; s<=100; s += 20) {
+      for (int h = 0; h<360; h += 60) {
+        // set
+        hue->setChannelValue(h);
+        saturation->setChannelValue(s);
+        brightness->setChannelValue(v);
+        double r,g,b,w,a;
+        // convert TO RGBWA
+        getRGBWA(r, g, b, w, a, 100);
+        // destroy values to make sure they get recalculated
+        hue->setChannelValue(99);
+        saturation->setChannelValue(66);
+        brightness->setChannelValue(33);
+        hue->channelValueApplied(true);
+        saturation->channelValueApplied(true);
+        brightness->channelValueApplied(true);
+        // convert back FROM RGBWA
+        setRGBWA(r, g, b, w, a, 100);
+        // dump
+        printf(
+          "%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d\n",
+          h,s,v,
+          (int)r, (int)g, (int)b, (int)w, (int)a,
+          (int)hue->getChannelValue(),
+          (int)saturation->getChannelValue(),
+          (int)brightness->getChannelValue(),
+          h-(int)hue->getChannelValue(),
+          s-(int)saturation->getChannelValue(),
+          v-(int)brightness->getChannelValue()
+        );
+      }
+    }
+  }
+  #endif // DUMP_CONVERSION_TABLE
 }
 
 
@@ -632,14 +676,18 @@ static double transferToColor(Row3 &aCol, double &aRed, double &aGreen, double &
 
 static void transferFromColor(Row3 &aCol, double aAmount, double &aRed, double &aGreen, double &aBlue)
 {
-  // first scale RGB down to non-transferable amount
-  if (aCol[0]<1) aRed *= 1-aCol[0];
-  if (aCol[1]<1) aGreen *= 1-aCol[1];
-  if (aCol[2]<1) aBlue *= 1-aCol[2];
-  // then add amount from separate color
+  // add amount from separate color
   aRed += aAmount*aCol[0];
   aGreen += aAmount*aCol[1];
   aBlue += aAmount*aCol[2];
+  // scale down if we exceed 1
+  double m = aRed>aGreen ? aRed : aGreen;
+  m = aBlue>m ? aBlue : m;
+  if (m>1) {
+    aRed /= m;
+    aGreen /= m;
+    aBlue /= m;
+  }
 }
 
 
@@ -701,11 +749,37 @@ void RGBColorLightBehaviour::setRGBW(double aRed, double aGreen, double aBlue, d
 }
 
 
+void RGBColorLightBehaviour::setRGBWA(double aRed, double aGreen, double aBlue, double aWhite, double aAmber, double aMax)
+{
+  Row3 RGB;
+  RGB[0] = aRed/aMax;
+  RGB[1] = aGreen/aMax;
+  RGB[2] = aBlue/aMax;
+  // transfer the amber amount into RGB
+  transferFromColor(amberRGB, aAmber/aMax, RGB[0], RGB[1], RGB[2]);
+  // transfer the white amount into RGB
+  transferFromColor(whiteRGB, aWhite/aMax, RGB[0], RGB[1], RGB[2]);
+  // always convert to HSV, as this can actually represent the values seen on the light
+  Row3 HSV;
+  RGBtoHSV(RGB, HSV);
+  // set the channels
+  hue->syncChannelValue(HSV[0]);
+  saturation->syncChannelValue(HSV[1]*100);
+  brightness->syncChannelValue(HSV[2]*100);
+  // change the mode if needed
+  if (colorMode!=colorLightModeHueSaturation) {
+    colorMode = colorLightModeHueSaturation;
+    // force recalculation of derived color value
+    derivedValuesComplete = false;
+  }
+}
+
+
 
 
 // Simplistic mired to CW/WW conversion
 // - turn up WW from 0 to 100 over 100..1000 mired
-// - turn down CW from 100 to CW_MIN over 100.1000 mired
+// - turn down CW from 100 to CW_MIN over 100..1000 mired
 
 #define CW_MIN (0.5)
 

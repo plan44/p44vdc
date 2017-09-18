@@ -953,12 +953,21 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     l->setHardwareName(hardwareName);
     addBehaviour(l);
   }
+  else if (outputType=="ctlight") {
+    if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
+    // - CT only lights use color light settings, which include a color scene table
+    installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
+    // - add two-channel color light behaviour in CT only mode
+    RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, true));
+    l->setHardwareName(hardwareName);
+    addBehaviour(l);
+  }
   else if (outputType=="colorlight") {
     if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
     // - use color light settings, which include a color scene table
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
-    RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this));
+    RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
     l->setHardwareName(hardwareName);
     addBehaviour(l);
   }
@@ -967,7 +976,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     // - use moving light settings, which include a color+position scene table
     installSettings(DeviceSettingsPtr(new MovingLightDeviceSettings(*this)));
     // - add moving color light behaviour
-    MovingLightBehaviourPtr ml = MovingLightBehaviourPtr(new MovingLightBehaviour(*this));
+    MovingLightBehaviourPtr ml = MovingLightBehaviourPtr(new MovingLightBehaviour(*this, false));
     ml->setHardwareName(hardwareName);
     addBehaviour(ml);
   }

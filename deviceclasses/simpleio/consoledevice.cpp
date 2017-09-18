@@ -187,7 +187,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     // - use color light settings, which include a color scene table
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
-    ColorLightBehaviourPtr l = ColorLightBehaviourPtr(new ColorLightBehaviour(*this));
+    ColorLightBehaviourPtr l = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, false));
     addBehaviour(l);
   }
   deriveDsUid();

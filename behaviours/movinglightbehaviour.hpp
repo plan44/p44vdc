@@ -128,7 +128,7 @@ namespace p44 {
     /// @}
 
 
-    MovingLightBehaviour(Device &aDevice);
+    MovingLightBehaviour(Device &aDevice, bool aCtOnly);
 
     /// check for presence of model feature (flag in dSS visibility matrix)
     /// @param aFeatureIndex the feature to check for

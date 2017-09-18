@@ -199,6 +199,8 @@ namespace p44 {
     typedef LightBehaviour inherited;
     friend class ColorLightScene;
 
+    bool ctOnly; // if set, behaviour only exposes brightness and colortemperature channels
+
   public:
 
     /// @name internal volatile state
@@ -218,13 +220,15 @@ namespace p44 {
     /// @}
 
 
-    ColorLightBehaviour(Device &aDevice);
+    /// Constructor for color and tunable white lights
+    /// @param aCtOnly if set, only color temperature is supported (no HSV or CieX/Y)
+    ColorLightBehaviour(Device &aDevice, bool aCtOnly);
 
     /// @name color services for implementing color lights
     /// @{
 
     /// @return true if light is not full color, but color temperature only
-    bool isCtOnly() { return false; }
+    bool isCtOnly() { return ctOnly; }
 
     /// derives the color mode from channel values that need to be applied to hardware
     /// @return true if mode could be found
@@ -291,11 +295,11 @@ namespace p44 {
     /// @name settings (color calibration)
     /// @{
     Matrix3x3 calibration; ///< calibration matrix: [[Xr,Xg,Xb],[Yr,Yg,Yb],[Zr,Zg,Zb]]
-    Row3 whiteRGB; ///< R,G,B relative intensities that can be replaced by a extra white channel
-    Row3 amberRGB; ///< R,G,B relative intensities that can be replaced by a extra amber channel
+    Row3 whiteRGB; ///< R,G,B relative intensities that can be replaced by a extra (cold)white channel
+    Row3 amberRGB; ///< R,G,B relative intensities that can be replaced by a extra amber (warm white) channel
     /// @}
 
-    RGBColorLightBehaviour(Device &aDevice);
+    RGBColorLightBehaviour(Device &aDevice, bool aCtOnly);
 
     /// @name color services for implementing color lights
     /// @{
@@ -310,20 +314,25 @@ namespace p44 {
     /// @param aMax max value for aRed,aGreen,aBlue
     void setRGB(double aRed, double aGreen, double aBlue, double aMax);
 
-    /// get RGB colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
+    /// get RGBW colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue,aWhite will receive the R,G,B,W values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite
     void getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax);
 
-    /// set RGB values from lamp (to update channel values from actual lamp setting)
+    /// set RGBW values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue,aWhite current R,G,B,W values to be converted to color channel settings
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite
     void setRGBW(double aRed, double aGreen, double aBlue, double aWhite, double aMax);
 
-    /// get RGB colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
+    /// get RGBWA colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue,aWhite,aAmber will receive the R,G,B,W,A values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite,aAmber
     void getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax);
+
+    /// set RGBWA values from lamp (to update channel values from actual lamp setting)
+    /// @param aRed,aGreen,aBlue,aWhite,aAmber current R,G,B,W,A values to be converted to color channel settings
+    /// @param aMax max value for aRed,aGreen,aBlue,aWhite
+    void setRGBWA(double aRed, double aGreen, double aBlue, double aWhite, double aAmber, double aMax);
 
     /// get Cool White and Warm White colors (from current CT + brightness) for applying to lamp
     /// @param aCW,aWW will receive the CW and WW values corresponding to current channels

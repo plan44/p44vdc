@@ -72,7 +72,7 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const
     // - use color light settings, which include a color scene table
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // - set the behaviour
-    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this));
+    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, false));
     cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
     cl->setHardwareName(string_format("color light #%s", lightID.c_str()));
     cl->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness

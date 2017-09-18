@@ -156,8 +156,8 @@ DsScenePtr MovingLightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 // MARK: ===== MovingLightBehaviour
 
 
-MovingLightBehaviour::MovingLightBehaviour(Device &aDevice) :
-  inherited(aDevice)
+MovingLightBehaviour::MovingLightBehaviour(Device &aDevice, bool aCtOnly) :
+  inherited(aDevice, aCtOnly)
 {
   // Create and add auxiliary channels to the device for horizontal and vertical position
   // - horizontal position
