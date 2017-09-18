@@ -902,12 +902,13 @@ bool DaliSingleControllerDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Note: setting up behaviours late, because we want the brightness dimmer already assigned for the hardware name
   if (daliController->supportsDT8) {
-    // set up dS behaviour for color light
+    // set up dS behaviour for color or CT light
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // set the behaviour
-    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this));
-    cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 0); // DALI lights are always dimmable, no power known
-    cl->setHardwareName(string_format("DALI DT8 color light"));
+    bool ctOnly = daliController->dt8CT && !daliController->dt8Color;
+    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, ctOnly));
+    cl->setHardwareOutputConfig(cl->isCtOnly() ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 0); // DALI lights are always dimmable, no power known
+    cl->setHardwareName(string_format("DALI DT8 %s light", cl->isCtOnly() ? "tunable white" : "color"));
     cl->initMinBrightness(0.4); // min brightness is 0.4 (~= 1/256)
     addBehaviour(cl);
   }
@@ -1210,7 +1211,8 @@ bool DaliCompositeDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
   // set up dS behaviour for color lights, which include a color scene table
   installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
   // set the behaviour
-  RGBColorLightBehaviourPtr cl = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this));
+  bool ctOnly = dimmers[dimmer_white] && dimmers[dimmer_amber] && !dimmers[dimmer_red];
+  RGBColorLightBehaviourPtr cl = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, ctOnly));
   cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 0); // DALI lights are always dimmable, no power known
   cl->setHardwareName(string_format("DALI composite color light"));
   cl->initMinBrightness(0.4); // min brightness is 0.4 (~= 1/256)
@@ -1224,7 +1226,8 @@ bool DaliCompositeDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 bool DaliCompositeDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getIcon("dali_color", aIcon, aWithData, aResolutionPrefix))
+  RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+  if (getIcon(cl->isCtOnly() ? "dali_ct" : "dali_color", aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
@@ -1233,14 +1236,21 @@ bool DaliCompositeDevice::getDeviceIcon(string &aIcon, bool aWithData, const cha
 
 string DaliCompositeDevice::getExtraInfo()
 {
-  string s = string_format(
-    "DALI short addresses: Red:%d, Green:%d, Blue:%d",
-    dimmers[dimmer_red]->deviceInfo->shortAddress,
-    dimmers[dimmer_green]->deviceInfo->shortAddress,
-    dimmers[dimmer_blue]->deviceInfo->shortAddress
-  );
+  string s = "DALI short addresses: ";
+  if (dimmers[dimmer_red]) {
+    string_format_append(s, " Red:%d", dimmers[dimmer_red]->deviceInfo->shortAddress);
+  }
+  if (dimmers[dimmer_green]) {
+    string_format_append(s, " Green:%d", dimmers[dimmer_green]->deviceInfo->shortAddress);
+  }
+  if (dimmers[dimmer_blue]) {
+    string_format_append(s, " Blue:%d", dimmers[dimmer_blue]->deviceInfo->shortAddress);
+  }
   if (dimmers[dimmer_white]) {
-    string_format_append(s, ", White:%d", dimmers[dimmer_white]->deviceInfo->shortAddress);
+    string_format_append(s, " White:%d", dimmers[dimmer_white]->deviceInfo->shortAddress);
+  }
+  if (dimmers[dimmer_amber]) {
+    string_format_append(s, " Warmwhite/amber:%d", dimmers[dimmer_amber]->deviceInfo->shortAddress);
   }
   return s;
 }
@@ -1256,6 +1266,8 @@ bool DaliCompositeDevice::addDimmer(DaliBusDevicePtr aDimmerBusDevice, string aD
     dimmers[dimmer_blue] = aDimmerBusDevice;
   else if (aDimmerType=="W")
     dimmers[dimmer_white] = aDimmerBusDevice;
+  else if (aDimmerType=="A")
+    dimmers[dimmer_amber] = aDimmerBusDevice;
   else
     return false; // cannot add
   return true; // added ok
@@ -1291,7 +1303,22 @@ void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryR
   double b = dimmers[dimmer_blue] ? dimmers[dimmer_blue]->currentBrightness : 0;
   if (dimmers[dimmer_white]) {
     double w = dimmers[dimmer_white]->currentBrightness;
-    cl->setRGBW(r, g, b, w, 255);
+    if (dimmers[dimmer_amber]) {
+      double a = dimmers[dimmer_amber]->currentBrightness;
+      // could be CT only
+      if (cl->isCtOnly()) {
+        // treat as two-channel tunable white
+        cl->setCWWW(w, a, 255);
+      }
+      else {
+        // RGBWA
+        cl->setRGBWA(r, g, b, w, a, 255);
+      }
+    }
+    else {
+      // RGBW
+      cl->setRGBW(r, g, b, w, 255);
+    }
   }
   else {
     cl->setRGB(r, g, b, 255);
@@ -1366,37 +1393,52 @@ void DaliCompositeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       // transition time is that of the brightness channel
       MLMicroSeconds tt = cl->transitionTimeToNewBrightness();
       // RGB lamp, get components
-      double r,g,b,w;
+      double r,g,b,w,a;
       if (dimmers[dimmer_white]) {
-        // RGBW
-        cl->getRGBW(r, g, b, w, 100); // dali dimmers use abstracted 0..100% brightness as input
-        if (!aForDimming) {
-          ALOG(LOG_INFO,
-            "DALI composite RGB: R=%d, G=%d, B=%d, W=%d",
-            (int)r, (int)g, (int)b, (int)w
-          );
+        // RGBW, RGBWA or CT-only
+        if (dimmers[dimmer_amber]) {
+          // RGBWA or CT
+          if (cl->isCtOnly()) {
+            // CT
+            cl->getCWWW(w, a, 100); // dali dimmers use abstracted 0..100% brightness as input
+            if (!aForDimming) {
+              ALOG(LOG_INFO, "DALI composite CWWW: CW=%d, WW=%d", (int)w, (int)a);
+            }
+          }
+          else {
+            // RGBWA
+            cl->getRGBWA(r, g, b, w, a, 100); // dali dimmers use abstracted 0..100% brightness as input
+            if (!aForDimming) {
+              ALOG(LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
+            }
+          }
         }
-        dimmers[dimmer_white]->setTransitionTime(tt);
+        else {
+          cl->getRGBW(r, g, b, w, 100); // dali dimmers use abstracted 0..100% brightness as input
+          if (!aForDimming) {
+            ALOG(LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
+          }
+        }
       }
       else {
         // RGB
         cl->getRGB(r, g, b, 100); // dali dimmers use abstracted 0..100% brightness as input
         if (!aForDimming) {
-          ALOG(LOG_INFO,
-            "DALI composite: R=%d, G=%d, B=%d",
-            (int)r, (int)g, (int)b
-          );
+          ALOG(LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
         }
       }
       // set transition time for all dimmers to brightness transition time
-      dimmers[dimmer_red]->setTransitionTime(tt);
-      dimmers[dimmer_green]->setTransitionTime(tt);
-      dimmers[dimmer_blue]->setTransitionTime(tt);
+      if (dimmers[dimmer_red]) dimmers[dimmer_red]->setTransitionTime(tt);
+      if (dimmers[dimmer_green]) dimmers[dimmer_green]->setTransitionTime(tt);
+      if (dimmers[dimmer_blue]) dimmers[dimmer_blue]->setTransitionTime(tt);
+      if (dimmers[dimmer_white]) dimmers[dimmer_white]->setTransitionTime(tt);
+      if (dimmers[dimmer_amber]) dimmers[dimmer_amber]->setTransitionTime(tt);
       // apply new values
-      dimmers[dimmer_red]->setBrightness(r);
-      dimmers[dimmer_green]->setBrightness(g);
-      dimmers[dimmer_blue]->setBrightness(b);
+      if (dimmers[dimmer_red]) dimmers[dimmer_red]->setBrightness(r);
+      if (dimmers[dimmer_green]) dimmers[dimmer_green]->setBrightness(g);
+      if (dimmers[dimmer_blue]) dimmers[dimmer_blue]->setBrightness(b);
       if (dimmers[dimmer_white]) dimmers[dimmer_white]->setBrightness(w);
+      if (dimmers[dimmer_amber]) dimmers[dimmer_amber]->setBrightness(a);
     } // if needs update
     // anyway, applied now
     cl->appliedColorValues();

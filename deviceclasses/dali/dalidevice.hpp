@@ -436,7 +436,8 @@ namespace p44 {
       dimmer_red,
       dimmer_green,
       dimmer_blue,
-      dimmer_white,
+      dimmer_white, // (cold) white
+      dimmer_amber, // amber or warm white
       numDimmers
     };
     typedef uint8_t DimmerIndex;
