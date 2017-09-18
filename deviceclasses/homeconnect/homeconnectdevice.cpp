@@ -482,27 +482,9 @@ bool HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 bool HomeConnectDevice::configureDevice()
 {
-  HomeConnectActionPtr a;
-  HomeConnectSettingBuilder settingBuilder = HomeConnectSettingBuilder("BSH.Common.Setting.PowerState");
   // configure common things
   // - stop
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "stop current program", "DELETE:programs/active"));
-  deviceActions->addAction(a);
-  // - power state off
-
-  settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.Off\"");
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOff", "Switch power state off", settingBuilder.build()));
-  // - power state standby
-  deviceActions->addAction(a);
-
-  settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.Standby\"");
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.StandBy", "Switch power state standby", settingBuilder.build()));
-  // - power state on
-  deviceActions->addAction(a);
-
-  settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.On\"");
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOn", "Switch power state on", settingBuilder.build()));
-
+  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "Stop current program", "DELETE:programs/active"));
   deviceActions->addAction(a);
 
   // program name
@@ -645,6 +627,28 @@ void HomeConnectDevice::configureProgramStatus(const ProgramStatusConfiguration&
   }
 }
 
+void HomeConnectDevice::addDefaultPowerOnAction()
+{
+  addPowerStateAction("std.PowerOn", "Switch power state on", "On");
+}
+
+void HomeConnectDevice::addDefaultStandByAction()
+{
+  addPowerStateAction("std.StandBy", "Switch power state standby", "Standby");
+}
+
+void HomeConnectDevice::addDefaultPowerOffAction()
+{
+  addPowerStateAction("std.PowerOff", "Switch power state off", "Off");
+}
+
+void HomeConnectDevice::addPowerStateAction(const string& aName, const string& aDescription, const string& aParameter)
+{
+  HomeConnectSettingBuilder settingBuilder =
+      HomeConnectSettingBuilder("BSH.Common.Setting.PowerState").setValue("\"BSH.Common.EnumType.PowerState." + aParameter + "\"");
+  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, settingBuilder.build()));
+  deviceActions->addAction(a);
+}
 void HomeConnectDevice::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
 {
   // nop for now
