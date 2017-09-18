@@ -86,68 +86,6 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<HomeConnectScene> HomeConnectScenePtr;
 
-
-
-  class HomeConnectAction : public DeviceAction
-  {
-    typedef DeviceAction inherited;
-
-  protected:
-
-    string apiCommandTemplate;
-    void performCall(ApiValuePtr aParams, StatusCB aCompletedCB, const string& aCommandTemplate);
-
-  public:
-
-    /// create the action
-    /// @param aSingleDevice the single device this action belongs to
-    /// @param aName the name of the action.
-    /// @param aDescription a description string for the action.
-    /// @param aApiCommandTemplate the API command template to use for this action
-    HomeConnectAction(SingleDevice &aSingleDevice, const string& aName, const string& aDescription, const string& aApiCommandTemplate);
-
-    HomeConnectDevice &getHomeConnectDevice();
-
-    /// implementation of action
-    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
-
-  private:
-
-    ErrorPtr valueLookup(ApiValuePtr aParams, const string aName, string &aValue);
-    void apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError);
-    
-  };
-  typedef boost::intrusive_ptr<HomeConnectAction> HomeConnectActionPtr;
-  
-  class HomeConnectPowerOnAction : public HomeConnectAction
-  {
-    typedef HomeConnectAction inherited;
-    DeviceState& powerState;
-    DeviceState& operationMode;
-    string ifPowerOffCommand;
-    string ifPowerOnCommand;
-
-    static const MLMicroSeconds RESCHEDULE_INTERVAL = 5 * Second;
-    static const unsigned int RETRY_COUNT = 10;
-
-    void powerOnDevice(ApiValuePtr aParams, StatusCB aCompletedCB);
-    void devicePoweredOn(ApiValuePtr aParams, StatusCB aCompletedCB, ErrorPtr aError);
-    void runActionWhenReady(ApiValuePtr aParams, StatusCB aCompletedCB, unsigned int aRetriesLeft);
-
-  public:
-
-    HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
-                             const string& aName,
-                             const string& aDescription,
-                             const string& aIfPowerOnCommand,
-                             const string& aIfPowerOffCommand,
-                             DeviceState& aPowerState,
-                             DeviceState& aOperationMode);
-
-    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
-  };
-
-
   class HomeConnectProgramBuilder
   {
   public:

@@ -23,6 +23,8 @@
 
 #if ENABLE_HOMECONNECT
 
+#include "homeconnectaction.hpp"
+
 namespace p44 {
 
 HomeConnectDeviceDishWasher::HomeConnectDeviceDishWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :

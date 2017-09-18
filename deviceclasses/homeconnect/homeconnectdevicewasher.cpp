@@ -23,6 +23,8 @@
 
 #if ENABLE_HOMECONNECT
 
+#include "homeconnectaction.hpp"
+
 namespace p44 {
 
 const char* HomeConnectDeviceWasher::temperatureNames[temperature_Num] = {
