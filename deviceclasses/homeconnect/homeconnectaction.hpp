@@ -1,7 +1,7 @@
 //
-//  Copyright (c) 2016 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2017 digitalSTROM.org, Zurich, Switzerland
 //
-//  Author: Lukas Zeller <luz@plan44.ch>
+//  Author: Michal Badecki <michal.badecki@digitalstrom.com>
 //
 //  This file is part of p44vdc.
 //
@@ -26,9 +26,9 @@
 #if ENABLE_HOMECONNECT
 
 #include "jsonobject.hpp"
+#include "simplescene.hpp"
+#include "homeconnectcomm.hpp"
 #include <boost/optional.hpp>
-
-using namespace std;
 
 namespace p44 {
 
@@ -65,33 +65,63 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<HomeConnectAction> HomeConnectActionPtr;
   
-  class HomeConnectPowerOnAction : public HomeConnectAction
+  class HomeConnectActionWithOperationMode : public HomeConnectAction
   {
     typedef HomeConnectAction inherited;
-    DeviceState& powerState;
-    DeviceState& operationMode;
-    string ifPowerOffCommand;
-    string ifPowerOnCommand;
 
+  protected:
     static const MLMicroSeconds RESCHEDULE_INTERVAL = 5 * Second;
     static const unsigned int RETRY_COUNT = 10;
 
+    EnumValueDescriptor& operationMode;
+
+    void runActionWhenReady(ApiValuePtr aParams, StatusCB aCompletedCB, const string& aActionCommand, unsigned int aRetriesLeft);
+
+  public:
+    HomeConnectActionWithOperationMode(SingleDevice &aSingleDevice,
+                                       EnumValueDescriptor& aOperationMode,
+                                       const string& aName,
+                                       const string& aDescription,
+                                       const string& aApiCommandTemplate);
+  };
+
+  class HomeConnectPowerOnAction : public HomeConnectActionWithOperationMode
+  {
+    typedef HomeConnectActionWithOperationMode inherited;
+    EnumValueDescriptor& powerState;
+    string ifDelayedCommand;
+    string standardCommand;
+
     void powerOnDevice(ApiValuePtr aParams, StatusCB aCompletedCB);
     void devicePoweredOn(ApiValuePtr aParams, StatusCB aCompletedCB, ErrorPtr aError);
-    void runActionWhenReady(ApiValuePtr aParams, StatusCB aCompletedCB, unsigned int aRetriesLeft);
-
   public:
 
     HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
                              const string& aName,
                              const string& aDescription,
-                             const string& aIfPowerOnCommand,
-                             const string& aIfPowerOffCommand,
-                             DeviceState& aPowerState,
-                             DeviceState& aOperationMode);
+                             const string& aStandardCommand,
+                             const string& aIfDelayedCommand,
+                             EnumValueDescriptor& aPowerState,
+                             EnumValueDescriptor& aOperationMode);
 
     virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
   };
+
+  class HomeConnectGoToStandbyAction : public HomeConnectActionWithOperationMode
+  {
+    typedef HomeConnectActionWithOperationMode inherited;
+
+    EnumValueDescriptor& powerState;
+
+  public:
+    HomeConnectGoToStandbyAction(SingleDevice &aSingleDevice,
+                                 EnumValueDescriptor& aPowerState,
+                                 EnumValueDescriptor& aOperationMode);
+
+    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
+  };
+
+  typedef boost::intrusive_ptr<HomeConnectGoToStandbyAction> HomeConnectGoToStandbyActionPtr;
   
 } // namespace p44
 

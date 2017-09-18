@@ -20,6 +20,7 @@
 //
 
 #include "homeconnectdevicecoffemaker.hpp"
+#include "homeconnectaction.hpp"
 
 #if ENABLE_HOMECONNECT
 
@@ -48,9 +49,6 @@ HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()
 bool HomeConnectDeviceCoffeMaker::configureDevice()
 {
   bool ret = inherited::configureDevice();
-
-  addDefaultStandByAction();
-  addDefaultPowerOnAction();
 
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
@@ -90,6 +88,11 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
 //    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
   // FIXME: got even uglier:
   standalone = (modelGuid.substr(0,10)=="TI909701HC");
+
+  HomeConnectGoToStandbyActionPtr action =
+      HomeConnectGoToStandbyActionPtr(new HomeConnectGoToStandbyAction(*this, *powerStateDescriptor, *operationModeDescriptor));
+  deviceActions->addAction(action);
+  addDefaultPowerOnAction();
 
   addAction("std.Espresso",          "Espresso",            "Espresso",          35,  60,  5,  40);
   addAction("std.EspressoMacchiato", "Espresso Macchiato",  "EspressoMacchiato", 40,  60,  10, 50);
@@ -226,8 +229,8 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
                                                         aDescription,
                                                         runProgramCommand,
                                                         selectProgramCommand,
-                                                        *powerState,
-                                                        *operationMode));
+                                                        *powerStateDescriptor,
+                                                        *operationModeDescriptor));
   action->addParameter(tempLevel);
   action->addParameter(beanAmount);
   action->addParameter(fillAmount);
