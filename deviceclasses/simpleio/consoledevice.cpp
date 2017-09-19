@@ -80,7 +80,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 0, _1, _2));
     // - create one button input
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
-    b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, false); // mode not restricted
+    b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, 1); // not combinable, but mode not fixed
     b->setGroup(group_yellow_light); // pre-configure for light
     b->setHardwareName(string_format("console key '%c'",name[0]));
     addBehaviour(b);
@@ -95,7 +95,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
     consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 0, _1, _2));
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
-    b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
+    b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, 0); // counterpart up-button has buttonIndex 1, fixed mode
     b->setGroup(group_yellow_light); // pre-configure for light
     b->setHardwareName(string_format("console key '%c'",consoleKey1->getKeyCode()));
     addBehaviour(b);
@@ -103,7 +103,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     consoleKey2 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0]+1, name.c_str());
     consoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 1, _1, _2));
     b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
-    b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
+    b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, 0); // counterpart down-button has buttonIndex 0, fixed mode
     b->setGroup(group_yellow_light); // pre-configure for light
     b->setHardwareName(string_format("console key '%c'",consoleKey2->getKeyCode()));
     addBehaviour(b);

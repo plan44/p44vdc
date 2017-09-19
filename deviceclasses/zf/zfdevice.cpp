@@ -497,7 +497,7 @@ ZfDevicePtr ZfDevice::newDevice(
       newDev->setColorClass(class_black_joker);
       // Create one button behaviour
       ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
-      bb->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, true); // fixed mode
+      bb->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, 0); // fixed mode
       bb->setGroup(group_yellow_light); // pre-configure for light
       bb->setHardwareName("button");
       newDev->addBehaviour(bb);

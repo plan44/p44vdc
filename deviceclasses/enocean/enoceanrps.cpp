@@ -105,7 +105,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         buttonHandler->switchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
         buttonHandler->isRockerUp = isUp;
         ButtonBehaviourPtr buttonBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
-        buttonBhvr->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, true); // fixed mode
+        buttonBhvr->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, 2); // combinable in pairs
         buttonBhvr->setGroup(group_yellow_light); // pre-configure for light
         buttonBhvr->setHardwareName(isUp ? "upper key" : "lower key");
         buttonHandler->behaviour = buttonBhvr;
@@ -139,7 +139,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         downHandler->switchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
         downHandler->isRockerUp = reversed; // normal: first button is the hardware-down-button, reversed: hardware-up-button
         ButtonBehaviourPtr downBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),""));  // automatic id
-        downBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
+        downBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, 0); // counterpart up-button has buttonIndex 1, fixed mode
         downBhvr->setGroup(group_yellow_light); // pre-configure for light
         downBhvr->setHardwareName("down key");
         downHandler->behaviour = downBhvr;
@@ -150,7 +150,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         upHandler->isRockerUp = !reversed; // normal: second button is the hardware-up-button, reversed: hardware-down-button
         ButtonBehaviourPtr upBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
         upBhvr->setGroup(group_yellow_light); // pre-configure for light
-        upBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
+        upBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, 0); // counterpart down-button has buttonIndex 0, fixed mode
         upBhvr->setHardwareName("up key");
         upHandler->behaviour = upBhvr;
         newDev->addChannelHandler(upHandler);

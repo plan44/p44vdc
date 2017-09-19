@@ -1088,6 +1088,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       JsonObjectPtr o3;
       // set defaults
       int buttonId = 0;
+      int combinables = 0; // fixed mode, not combinable
       VdcButtonType buttonType = buttonType_single;
       VdcButtonElement buttonElement = buttonElement_center;
       DsGroup group = defaultGroup; // default group for button is same as primary default
@@ -1106,10 +1107,11 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("localbutton", o3)) isLocalButton = o3->boolValue();
       if (o2->get("element", o3)) buttonElement = (VdcButtonElement)o3->int32Value();
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
+      if (o2->get("combinables", o3)) combinables = (DsGroup)o3->int32Value();
       if (o2->get("hardwarename", o3)) buttonName = o3->stringValue(); else buttonName = string_format("button_id%d_el%d", buttonId, buttonElement);
       // - create behaviour
       ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, id)); // automatic id if not specified
-      bb->setHardwareButtonConfig(buttonId, buttonType, buttonElement, isLocalButton, buttonElement==buttonElement_down ? 1 : 0, true); // fixed mode
+      bb->setHardwareButtonConfig(buttonId, buttonType, buttonElement, isLocalButton, buttonElement==buttonElement_down ? 1 : 0, combinables);
       bb->setGroup(group);
       bb->setHardwareName(buttonName);
       addBehaviour(bb);

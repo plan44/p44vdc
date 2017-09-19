@@ -58,6 +58,7 @@ namespace p44 {
     VdcButtonType buttonType; ///< type of button
     VdcButtonElement buttonElementID; ///< identifies element of a multi-input button hardware-button
     DsButtonMode fixedButtonMode; ///< if not buttonMode_inactive, then this is the only mode that can be set
+    int combinables; ///< number of other device's submodules in total (including this device) that upstream might combine to form two-way buttons.
     /// @}
 
     /// @name persistent settings
@@ -101,10 +102,19 @@ namespace p44 {
     /// @param aElement the element of the physical button this input represents (like: up or down for a 2-way rocker)
     /// @param aSupportsLocalKeyMode true if this button can be local key
     /// @param aCounterPartIndex for 2-way buttons, this identifies the index of the counterpart input (needed for dS 1.0 LTMODE compatibility only)
-    /// @param aButtonModeFixed if set, buttonMode can only be switched between hardware-derived default mode and disabled
+    /// @param aNumCombinables determine if and how this button input's device can be combined with other submodules of the same dSUID
+    ///   - aNumCombinables==0 -> no cross-device combinations possible, button mode is fixed (one-way, two-way, whatever).
+    ///   - aNumCombinables==1 -> no cross-device combinations possible, but button mode can be changed.
+    //    - if aNumCombinables>1 this is the number of devices (including this one) with same basse dSUID but different submodule indices
+    ///     that may be combined to form two-way buttons externally by assigning them respective DsButtonModes.
+    ///     Note that this automatically implies the button mode is NOT fixed. The device containing such buttonInputs will report
+    ///     modelfeature "twowayconfig", to enable upstream UI to offer forming two-way buttons out of combinable members.
+    ///     The range of submodule indices available for combinations calculates as follows:
+    ///     - baseIndex = subModuleIndex MOD aNumCombinables
+    ///     - range: baseIndex..baseIndex+aNumCombinables-1
     /// @note this must be called once before the device gets added to the device container. Implementation might
     ///   also derive default values for settings from this information.
-    void setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, bool aButtonModeFixed);
+    void setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, int aNumCombinables);
 
     /// set group
     virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { setPVar(buttonGroup, aGroup); };

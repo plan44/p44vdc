@@ -446,9 +446,13 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       }
       return no; // no button that supports local key mode
     case modelFeature_pushbcombined:
-    case modelFeature_twowayconfig:
-      // Assumption: devices with more than single button input are combined up/down (or even 4-way and more) buttons, and need two-way config
-      return buttons.size()>1 ? yes : no;
+      return no; // this is for SDS200 only, does not make sense with vdcs at all
+    case modelFeature_twowayconfig: {
+      // devices with one button that has combinables>1 can possibly be combined and thus need this modelfeature to show the UI
+      if (buttons.size()!=1) return no; // none or multiple buttons in this device -> not combinable
+      ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[0]);
+      return b->combinables>1 ? yes : no;
+    }
     case modelFeature_highlevel:
       // Assumption: only black joker devices can have a high-level (app) functionality
       return colorClass==class_black_joker ? yes : no;
