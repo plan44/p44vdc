@@ -67,6 +67,7 @@ HomeConnectDeviceWasher::~HomeConnectDeviceWasher()
 
 bool HomeConnectDeviceWasher::configureDevice()
 {
+  bool ret = inherited::configureDevice();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = false;
@@ -121,7 +122,7 @@ bool HomeConnectDeviceWasher::configureDevice()
   deviceProperties->addProperty(temperatureProp);
   deviceProperties->addProperty(spinSpeedProp);
 
-  return inherited::configureDevice();
+  return ret;
 }
 
 void HomeConnectDeviceWasher::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -153,7 +154,11 @@ void HomeConnectDeviceWasher::addAction(const string& aName, const string& aDesc
   builder.addOption("LaundryCare.Washer.Option.Temperature", "\"LaundryCare.Washer.EnumType.Temperature.@{Temperature}\"");
   builder.addOption("LaundryCare.Washer.Option.SpinSpeed", "\"LaundryCare.Washer.EnumType.SpinSpeed.@{SpinSpeed}\"");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, builder.build()));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this,
+                                                                                     *operationModeDescriptor,
+                                                                                     aName,
+                                                                                     aDescription,
+                                                                                     builder.build()));
   action->addParameter(aTemperature);
   action->addParameter(aSpinSpeed);
   deviceActions->addAction(action);

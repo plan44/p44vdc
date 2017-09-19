@@ -41,6 +41,7 @@ HomeConnectDeviceFridge::~HomeConnectDeviceFridge()
 
 bool HomeConnectDeviceFridge::configureDevice()
 {
+  bool ret = inherited::configureDevice();
   // configure door state
   DoorStateConfiguration dsConfig = { 0 };
   dsConfig.hasOpen = true;
@@ -76,7 +77,7 @@ bool HomeConnectDeviceFridge::configureDevice()
   builder.setValue("false");
   deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "std.CancelFridgeSuperMode", "Cancel fridge Super Mode", builder.build())));
 
-  return inherited::configureDevice();
+  return ret;
 }
 
 void HomeConnectDeviceFridge::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)

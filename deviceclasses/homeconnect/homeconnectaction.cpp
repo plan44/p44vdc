@@ -109,6 +109,25 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
   if (aCompletedCB) aCompletedCB(aError);
 }
 
+
+HomeConnectRunProgramAction::HomeConnectRunProgramAction(SingleDevice &aSingleDevice,
+                                                         EnumValueDescriptor& aOperationMode,
+                                                         const string& aName,
+                                                         const string& aDescription,
+                                                         const string& aApiCommandTemplate) :
+    inherited(aSingleDevice, aName, aDescription, aApiCommandTemplate),
+    operationMode(aOperationMode) {}
+
+void HomeConnectRunProgramAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
+{
+  if (operationMode.getStringValue() != "ModeReady") {
+    aCompletedCB(TextError::err("Cannot run program, because device is not ready"));
+    return;
+  }
+
+  inherited::performCall(aParams, aCompletedCB);
+}
+
 HomeConnectActionWithOperationMode::HomeConnectActionWithOperationMode(SingleDevice &aSingleDevice,
                                                                        EnumValueDescriptor& aOperationMode,
                                                                        const string& aName,

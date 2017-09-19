@@ -44,6 +44,7 @@ HomeConnectDeviceDishWasher::~HomeConnectDeviceDishWasher()
 
 bool HomeConnectDeviceDishWasher::configureDevice()
 {
+  bool ret = inherited::configureDevice();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = true;
@@ -104,7 +105,7 @@ bool HomeConnectDeviceDishWasher::configureDevice()
 
   deviceProperties->addProperty(delayedStartProp, true);
 
-  return inherited::configureDevice();
+  return ret;
 }
 
 void HomeConnectDeviceDishWasher::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -129,7 +130,11 @@ void HomeConnectDeviceDishWasher::addAction(const string& aActionName, const str
   HomeConnectProgramBuilder builder("Dishcare.Dishwasher.Program." + aProgramName);
   builder.addOption("BSH.Common.Option.StartInRelative", "@{DelayedStart%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this,
+                                                                                     *operationModeDescriptor,
+                                                                                     aActionName,
+                                                                                     aDescription,
+                                                                                     builder.build()));
   action->addParameter(aParameter);
   deviceActions->addAction(action);
 }

@@ -65,6 +65,24 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<HomeConnectAction> HomeConnectActionPtr;
   
+  class HomeConnectRunProgramAction : public HomeConnectAction
+  {
+    typedef HomeConnectAction inherited;
+
+  protected:
+    EnumValueDescriptor& operationMode;
+
+  public:
+    HomeConnectRunProgramAction(SingleDevice &aSingleDevice,
+                                EnumValueDescriptor& aOperationMode,
+                                const string& aName,
+                                const string& aDescription,
+                                const string& aApiCommandTemplate);
+
+    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
+
+  };
+
   class HomeConnectActionWithOperationMode : public HomeConnectAction
   {
     typedef HomeConnectAction inherited;
