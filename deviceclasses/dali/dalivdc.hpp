@@ -103,7 +103,7 @@ namespace p44 {
     /// @param aDevice the device to ungroup
     /// @param aRequest the API request that causes the ungroup, will be sent an OK when ungrouping is complete
     /// @return error if not successful
-    ErrorPtr ungroupDevice(DaliDevicePtr aDevice, VdcApiRequestPtr aRequest);
+    ErrorPtr ungroupDevice(DalioutputDevicePtr aDevice, VdcApiRequestPtr aRequest);
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

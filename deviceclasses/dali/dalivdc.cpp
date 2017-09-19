@@ -160,7 +160,7 @@ void DaliVdc::removeLightDevices(bool aForget)
 {
   DeviceVector::iterator pos = devices.begin();
   while (pos!=devices.end()) {
-    DaliDevicePtr dev = boost::dynamic_pointer_cast<DaliDevice>(*pos);
+    DalioutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
     if (dev) {
       // inform upstream about these devices going offline now (if API connection is up at all at this time)
       dev->reportVanished();
@@ -638,7 +638,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         // search for this device
         for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
           // only non-composite DALI devices can be grouped at all
-          DaliDevicePtr dev = boost::dynamic_pointer_cast<DaliDevice>(*pos);
+          DalioutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
           if (dev && dev->daliTechnicalType()!=dalidevice_composite && dev->getDsUid() == memberUID) {
             // found this device
             // - check type of grouping
@@ -741,7 +741,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 }
 
 
-ErrorPtr DaliVdc::ungroupDevice(DaliDevicePtr aDevice, VdcApiRequestPtr aRequest)
+ErrorPtr DaliVdc::ungroupDevice(DalioutputDevicePtr aDevice, VdcApiRequestPtr aRequest)
 {
   ErrorPtr respErr;
   if (aDevice->daliTechnicalType()==dalidevice_composite) {

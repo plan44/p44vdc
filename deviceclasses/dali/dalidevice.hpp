@@ -36,14 +36,14 @@ namespace p44 {
   class DaliVdc;
   class DaliBusDevice;
   class DaliBusDeviceGroup;
-  class DaliDevice;
+  class DaliOutputDevice;
   class DaliSingleControllerDevice;
   class DaliCompositeDevice;
   class DaliInputDevice;
 
   typedef boost::intrusive_ptr<DaliBusDevice> DaliBusDevicePtr;
   typedef boost::intrusive_ptr<DaliBusDeviceGroup> DaliBusDeviceGroupPtr;
-  typedef boost::intrusive_ptr<DaliDevice> DaliDevicePtr;
+  typedef boost::intrusive_ptr<DaliOutputDevice> DalioutputDevicePtr;
   typedef boost::intrusive_ptr<DaliSingleControllerDevice> DaliSingleControllerDevicePtr;
   typedef boost::intrusive_ptr<DaliCompositeDevice> DaliCompositeDevicePtr;
   typedef boost::intrusive_ptr<DaliInputDevice> DaliInputDevicePtr;
@@ -52,7 +52,7 @@ namespace p44 {
   {
     typedef P44Obj inherited;
     friend class DaliBusDeviceGroup;
-    friend class DaliDevice;
+    friend class DaliOutputDevice;
     friend class DaliCompositeDevice;
     friend class DaliSingleControllerDevice;
     friend class DaliVdc;
@@ -215,7 +215,7 @@ namespace p44 {
   class DaliBusDeviceGroup : public DaliBusDevice
   {
     typedef DaliBusDevice inherited;
-    friend class DaliDevice;
+    friend class DaliOutputDevice;
     friend class DaliCompositeDevice;
     friend class DaliVdc;
 
@@ -263,7 +263,6 @@ namespace p44 {
     void initNextGroupMember(StatusCB aCompletedCB, DaliComm::ShortAddressList::iterator aNextMember);
     void groupMembershipResponse(StatusCB aCompletedCB, DaliComm::ShortAddressList::iterator aNextMember, uint16_t aGroups, ErrorPtr aError);
 
-
   };
 
 
@@ -276,14 +275,14 @@ namespace p44 {
 
 
   /// base class for all DALI output/dimmer devices
-  class DaliDevice : public Device
+  class DaliOutputDevice : public Device
   {
     typedef Device inherited;
     friend class DaliDeviceCollector;
 
   public:
 
-    DaliDevice(DaliVdc *aVdcP);
+    DaliOutputDevice(DaliVdc *aVdcP);
 
     /// @return Vendor name for display purposes
     virtual string vendorName() P44_OVERRIDE { return ""; }; // Prevent displaying vdc vendor for devices
@@ -306,9 +305,9 @@ namespace p44 {
 
 
 
-  class DaliSingleControllerDevice : public DaliDevice
+  class DaliSingleControllerDevice : public DaliOutputDevice
   {
-    typedef DaliDevice inherited;
+    typedef DaliOutputDevice inherited;
     friend class DaliDeviceCollector;
 
   public:
@@ -421,9 +420,9 @@ namespace p44 {
   };
 
 
-  class DaliCompositeDevice : public DaliDevice
+  class DaliCompositeDevice : public DaliOutputDevice
   {
-    typedef DaliDevice inherited;
+    typedef DaliOutputDevice inherited;
     friend class DaliDeviceCollector;
     friend class DaliVdc;
 

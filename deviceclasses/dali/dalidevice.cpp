@@ -855,7 +855,7 @@ void DaliBusDeviceGroup::deriveDsUid()
 // MARK: ===== DaliDevice (base class)
 
 
-DaliDevice::DaliDevice(DaliVdc *aVdcP) :
+DaliOutputDevice::DaliOutputDevice(DaliVdc *aVdcP) :
   Device((Vdc *)aVdcP)
 {
   // DALI devices are always light (in this implementation, at least)
@@ -863,13 +863,13 @@ DaliDevice::DaliDevice(DaliVdc *aVdcP) :
 }
 
 
-DaliVdc &DaliDevice::daliVdc()
+DaliVdc &DaliOutputDevice::daliVdc()
 {
   return *(static_cast<DaliVdc *>(vdcP));
 }
 
 
-ErrorPtr DaliDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
+ErrorPtr DaliOutputDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   if (aMethod=="x-p44-ungroupDevice") {
     // Remove this device from the installation, forget the settings
@@ -893,7 +893,7 @@ ErrorPtr DaliDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
 
 
 DaliSingleControllerDevice::DaliSingleControllerDevice(DaliVdc *aVdcP) :
-  DaliDevice(aVdcP)
+  DaliOutputDevice(aVdcP)
 {
 }
 
@@ -1200,7 +1200,7 @@ string DaliSingleControllerDevice::description()
 
 
 DaliCompositeDevice::DaliCompositeDevice(DaliVdc *aVdcP) :
-  DaliDevice(aVdcP)
+  DaliOutputDevice(aVdcP)
 {
 }
 
@@ -1569,7 +1569,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     installSettings();
     // - create one button input
     ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
-    bb->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, false); // mode not restricted
+    bb->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, 1); // mode not restricted
     bb->setGroup(group_yellow_light); // pre-configure for light
     bb->setHardwareName("button");
     addBehaviour(bb);
@@ -1582,13 +1582,13 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     installSettings();
     // - create down button (index 0)
     ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
-    bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
+    bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, 0); // counterpart up-button has buttonIndex 1, fixed mode
     bb->setGroup(group_yellow_light); // pre-configure for light
     bb->setHardwareName("down");
     addBehaviour(bb);
     // - create up button (index 1)
     bb = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
-    bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
+    bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, 0); // counterpart down-button has buttonIndex 0, fixed mode
     bb->setGroup(group_yellow_light); // pre-configure for light
     bb->setHardwareName("up");
     addBehaviour(bb);
