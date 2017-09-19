@@ -31,6 +31,7 @@
 
 #include "dalidefs.h"
 
+
 using namespace std;
 
 // Note: before 2015-02-27, we had a bug which caused the last extra byte not being read, so the checksum reached zero
@@ -43,7 +44,50 @@ using namespace std;
   #define OLD_BUGGY_CHKSUM_COMPATIBLE 1
 #endif
 
+
+// MARK: ===== DALI Bridge commands and responses
+
+// bridge commands
+// - one byte commands 0..7
+#define CMD_CODE_RESET 0  // reset
+#define CMD_CODE_VERSION 1 // get version
+
+// - three byte commands 8..n
+#define CMD_CODE_SEND16 0x10 // send 16-bit DALI sequence, return RESP_ACK when done
+#define CMD_CODE_2SEND16 0x11 // double send 16-bit DALI sequence with 10mS gap in between, return RESP_ACK when done
+#define CMD_CODE_SEND16_REC8 0x12 // send 16-bit command, receive one 8-bit DALI response, return RESP_DATA when data received, RESP_ACK with error code
+// - 3 byte debug commands
+#define CMD_CODE_ECHO_DATA1 0x41 // returns RESP_DATA echoing DATA1
+#define CMD_CODE_ECHO_DATA2 0x42 // returns RESP_DATA echoing DATA2
+#define CMD_CODE_OVLRESET 0x43 // reset overload, DATA1 0=autoreset enabled, 1=autoreset disabled, 0x55=overload detector disabled
+#define CMD_CODE_EDGEADJ 0x44 // set DALI sending edge adjustment, DATA1=sending delay for going-inactive edge, DATA2=delay of sampling point, in number of 1/256th periods (with actual resolution of 1/16th bit for now)
+
+// bridge responses/events
+// - responses
+#define RESP_CODE_ACK 0x2A // * reponse for all commands that do not return data, second byte is status
+#define RESP_CODE_ACK_RETRIED 0x2B // + command has executed with at least one retry
+#define RESP_CODE_DATA 0x3D // = response for commands that return data, second byte is data
+#define RESP_CODE_DATA_RETRIED 0x3E // > response with data, but has executed with at least one retry
+// - events
+#define EVENT_CODE_FOREIGN_FRAME 0x23 // # received DALI frame sent by another master on the bus (two bytes follow)
+// - ACK status codes
+#define ACK_OK 0x30 // ok status
+#define ACK_TIMEOUT 0x31 // timeout receiving from DALI
+#define ACK_FRAME_ERR 0x32 // rx frame error
+#define ACK_OVERLOAD 0x33 // bus overload (max current for longer period = possibly shortened)
+#define ACK_INVALIDCMD 0x39 // invalid command
+
+//#define BUFFERED_BRIDGE_RESPONSES_HIGH 35 // Rx buf in bridge is 80 bytes = 40 answers, only use 35 to make sure
+//#define BUFFERED_BRIDGE_RESPONSES_LOW 5 // low watermark to restart sending
+#define BUFFERED_BRIDGE_RESPONSES_HIGH 5 // Conservative to prevent lockup
+#define BUFFERED_BRIDGE_RESPONSES_LOW 2 // low watermark to restart sending
+
+
+
 namespace p44 {
+
+  // MARK: ===== DaliComm
+
 
   class DaliCommError : public Error
   {
@@ -82,7 +126,13 @@ namespace p44 {
   const DaliAddress DaliGroup = 0x80; // marks group address
   const DaliAddress DaliBroadcast = 0xFF; // all devices on the bus
   const DaliAddress DaliAddressMask = 0x3F; // address mask
-  const DaliAddress DaliGroupMask = 0x0F; // address mask
+  const DaliAddress DaliGroupMask = 0x0F; // group address mask
+  // - pseudo-address for scene numbers
+  const DaliAddress DaliScene = 0x40; // marks scene number
+  const DaliAddress DaliSceneMask = 0x0F; // scene number mask
+  // - pseudo-address for "no address"
+  const DaliAddress NoDaliAddress = 0xC0; // not an address (but a command)
+
 
   /// DALI device information record
   class DaliDeviceInfo : public P44Obj
@@ -122,6 +172,15 @@ namespace p44 {
   typedef boost::intrusive_ptr<DaliDeviceInfo> DaliDeviceInfoPtr;
 
 
+
+  /// callback for DALI bridge events (not part of a command)
+  typedef boost::function<void (uint8_t aEvent, uint8_t aData1, uint8_t aData2)> DaliBridgeEventCB;
+
+  /// callback function for sendBridgeCommand
+  typedef boost::function<void (uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)> DaliBridgeResultCB;
+
+
+
   typedef boost::intrusive_ptr<DaliComm> DaliCommPtr;
 
   /// A class providing low level access to the DALI bus
@@ -142,6 +201,8 @@ namespace p44 {
 
     uint8_t sendEdgeAdj; ///< adjustment for sending rising edge - first param to CMD_CODE_EDGEADJ
     uint8_t samplePointAdj; ///< adjustment for sampling point - second param to CMD_CODE_EDGEADJ
+
+    DaliBridgeEventCB bridgeEventHandler; ///< will be called for bridge events
 
   public:
 
@@ -170,9 +231,9 @@ namespace p44 {
     /// @param how much (in 1/256th DALI bit time units) to delay or advance the sample point when receiving DALI data
     void setDaliSampleAdj(int8_t aSamplePointDelay) { samplePointAdj = (uint8_t)aSamplePointDelay; };
 
-
-    /// callback function for sendBridgeCommand
-    typedef boost::function<void (uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)> DaliBridgeResultCB;
+    /// set event handler
+    /// @param aEventHandler will be called when a dali bridge event is received
+    void setBridgeEventHandler(DaliBridgeEventCB aEventHandler) { bridgeEventHandler = aEventHandler; };
 
     /// Send DALI command to bridge
     /// @param aCmd bridge command byte
@@ -181,7 +242,6 @@ namespace p44 {
     /// @param aResultCB callback executed when bridge response arrives
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
     void sendBridgeCommand(uint8_t aCmd, uint8_t aDali1, uint8_t aDali2, DaliBridgeResultCB aResultCB, int aWithDelay = -1);
-
 
     /// callback function for daliSendXXX methods
     typedef boost::function<void (ErrorPtr aError, bool aRetried)> DaliCommandStatusCB;
@@ -290,6 +350,9 @@ namespace p44 {
     /// @return DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     static DaliAddress addressFromDaliResponse(uint8_t aAnswer);
 
+    /// utility function to format DaliAddress
+    /// @param aAddress DALI address (device short address, or group address + DaliGroup, or scene number + DaliScene or DaliBroadcast)
+    static string formatDaliAddress(DaliAddress aAddress);
 
     /// @}
 

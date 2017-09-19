@@ -172,6 +172,10 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
               if (queryValue->isType(apivalue_object)) {
                 subQuery = queryValue; // query specifies next level, just use it
               }
+              else if ((aMode==access_write||aMode==access_write_preload) && queryValue->isNull()) {
+                // non-deleteable structured value just assigned null -> prevent recursion
+                err = Error::err<VdcApiError>(403, "Cannot delete or invalidate '%s'", propDesc->name());
+              }
               else if (queryName!="*" && (!wildcard || propDesc->isWildcardAddressable())) {
                 // don't recurse deeper when query name is "*" or property is not wildcard-addressable
                 // special case is "*" as leaf in query - only recurse if it is not present
@@ -236,8 +240,12 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
                 FOCUSLOG("    - accessField for '%s' returns %s", propDesc->name(), fieldValue->description().c_str());
               }
               else {
-                // write access: just pass the value
-                if (!accessField(aMode, queryValue, propDesc)) { // write
+                // write access
+                // - writing NULL to a leaf is ok only if the leaf is marked deletable
+                if (queryValue->isNull() && !propDesc->isDeletable()) {
+                  err = Error::err<VdcApiError>(403, "Writing null to '%s' is not allowed", propDesc->name());
+                }
+                else if (!accessField(aMode, queryValue, propDesc)) { // write
                   err = Error::err<VdcApiError>(403, "Write access to '%s' denied", propDesc->name());
                 }
               }

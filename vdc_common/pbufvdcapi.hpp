@@ -75,35 +75,34 @@ namespace p44 {
     PbufApiValue();
     virtual ~PbufApiValue();
 
-    virtual ApiValuePtr newValue(ApiValueType aObjectType);
+    virtual ApiValuePtr newValue(ApiValueType aObjectType) P44_OVERRIDE;
 
-    virtual void clear();
-    virtual void operator=(ApiValue &aApiValue);
+    virtual void clear() P44_OVERRIDE;
+    virtual void operator=(ApiValue &aApiValue) P44_OVERRIDE;
 
-    virtual void add(const string &aKey, ApiValuePtr aObj);
-    virtual ApiValuePtr get(const string &aKey);
-    virtual void del(const string &aKey);
-    virtual int arrayLength();
-    virtual void arrayAppend(const ApiValuePtr aObj);
-    virtual ApiValuePtr arrayGet(int aAtIndex);
-    virtual void arrayPut(int aAtIndex, ApiValuePtr aObj);
-    virtual bool resetKeyIteration();
-    virtual bool nextKeyValue(string &aKey, ApiValuePtr &aValue);
+    virtual void add(const string &aKey, ApiValuePtr aObj) P44_OVERRIDE;
+    virtual ApiValuePtr get(const string &aKey) P44_OVERRIDE;
+    virtual void del(const string &aKey) P44_OVERRIDE;
+    virtual int arrayLength() P44_OVERRIDE;
+    virtual void arrayAppend(const ApiValuePtr aObj) P44_OVERRIDE;
+    virtual ApiValuePtr arrayGet(int aAtIndex) P44_OVERRIDE;
+    virtual void arrayPut(int aAtIndex, ApiValuePtr aObj) P44_OVERRIDE;
+    virtual bool resetKeyIteration() P44_OVERRIDE;
+    virtual bool nextKeyValue(string &aKey, ApiValuePtr &aValue) P44_OVERRIDE;
 
-    virtual uint64_t uint64Value();
-    virtual int64_t int64Value();
-    virtual double doubleValue();
-    virtual bool boolValue();
-    virtual string binaryValue();
-    virtual string stringValue();
+    virtual uint64_t uint64Value() P44_OVERRIDE;
+    virtual int64_t int64Value() P44_OVERRIDE;
+    virtual double doubleValue() P44_OVERRIDE;
+    virtual bool boolValue() P44_OVERRIDE;
+    virtual string binaryValue() P44_OVERRIDE;
+    virtual string stringValue() P44_OVERRIDE;
 
-    virtual void setUint64Value(uint64_t aUint64);
-    virtual void setInt64Value(int64_t aInt64);
-    virtual void setDoubleValue(double aDouble);
-    virtual void setBoolValue(bool aBool);
-    virtual void setBinaryValue(const string &aString);
-    virtual bool setStringValue(const string &aString);
-    virtual void setNull();
+    virtual void setUint64Value(uint64_t aUint64) P44_OVERRIDE;
+    virtual void setInt64Value(int64_t aInt64) P44_OVERRIDE;
+    virtual void setDoubleValue(double aDouble) P44_OVERRIDE;
+    virtual void setBoolValue(bool aBool) P44_OVERRIDE;
+    virtual void setBinaryValue(const string &aString) P44_OVERRIDE;
+    virtual bool setStringValue(const string &aString) P44_OVERRIDE;
 
     /// @name protobuf-c interfacing
     /// @{

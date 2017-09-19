@@ -200,7 +200,7 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour
-    virtual const char *behaviourTypeIdentifier() P44_OVERRIDE { return "ventilation"; };
+    virtual const char *behaviourTypeIdentifier() P44_OVERRIDE P44_FINAL { return "ventilation"; };
 
     /// the volume channel
     AirflowIntensityChannelPtr airflowIntensity;

@@ -35,6 +35,12 @@
 #include "dalivdc.hpp"
 #include "colorlightbehaviour.hpp"
 
+#if ENABLE_DALI_INPUTS
+#include "buttonbehaviour.hpp"
+#include "sensorbehaviour.hpp"
+#include "binaryinputbehaviour.hpp"
+#endif
+
 #include <math.h>
 
 
@@ -942,18 +948,7 @@ bool DaliSingleControllerDevice::getDeviceIcon(string &aIcon, bool aWithData, co
 
 string DaliSingleControllerDevice::getExtraInfo()
 {
-  if (daliTechnicalType()==dalidevice_group) {
-    return string_format(
-      "DALI group address: %d",
-      daliController->deviceInfo->shortAddress & DaliGroupMask
-    );
-  }
-  else {
-    return string_format(
-      "DALI short address: %d",
-      daliController->deviceInfo->shortAddress
-    );
-  }
+  return "DALI "+DaliComm::formatDaliAddress(daliController->deviceInfo->shortAddress);
 }
 
 
@@ -1488,6 +1483,359 @@ string DaliCompositeDevice::description()
   if (dimmer) s.append(dimmer->description());
   return s;
 }
+
+
+#if ENABLE_DALI_INPUTS
+
+
+// MARK: ===== DaliInputDevice
+
+DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, DaliAddress aBaseAddress) :
+  inherited(aVdcP),
+  daliInputDeviceRowID(0),
+  releaseTicket(0)
+{
+  baseAddress = aBaseAddress;
+  numAddresses = 1;
+  // decode config
+  string type = aDaliInputConfig;
+  // TODO: add more options
+  if (type=="button") {
+    inputType = input_button;
+  }
+  else if (type=="rocker") {
+    inputType = input_rocker;
+  }
+  else if (type=="motion") {
+    inputType = input_motion;
+  }
+  else if (type=="illumination") {
+    inputType = input_illumination;
+  }
+  else if (type=="bistable") {
+    inputType = input_bistable;
+  }
+  else {
+    // default to pulse input
+    inputType = input_pulse;
+  }
+  // create behaviours
+  if (inputType==input_button) {
+    // Simple single button device
+    colorClass = class_black_joker;
+    // - standard device settings without scene table
+    installSettings();
+    // - create one button input
+    ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
+    bb->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, false); // mode not restricted
+    bb->setGroup(group_yellow_light); // pre-configure for light
+    bb->setHardwareName("button");
+    addBehaviour(bb);
+  }
+  else if (inputType==input_rocker) {
+    // Two-way Rocker Button device
+    numAddresses = 2;
+    colorClass = class_black_joker;
+    // - standard device settings without scene table
+    installSettings();
+    // - create down button (index 0)
+    ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
+    bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
+    bb->setGroup(group_yellow_light); // pre-configure for light
+    bb->setHardwareName("down");
+    addBehaviour(bb);
+    // - create up button (index 1)
+    bb = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
+    bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
+    bb->setGroup(group_yellow_light); // pre-configure for light
+    bb->setHardwareName("up");
+    addBehaviour(bb);
+  }
+  else if (inputType==input_motion) {
+    // Standard device settings without scene table
+    colorClass = class_red_security;
+    installSettings();
+    // - create one binary input
+    BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
+    ib->setHardwareInputConfig(binInpType_motion, usage_undefined, true, Never);
+    ib->setHardwareName("motion");
+    addBehaviour(ib);
+  }
+  else if (inputType==input_illumination) {
+    // Standard device settings without scene table
+    colorClass = class_yellow_light;
+    installSettings();
+    // - create one binary input
+    BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
+    ib->setHardwareInputConfig(binInpType_light, usage_undefined, true, Never);
+    ib->setHardwareName("light");
+    addBehaviour(ib);
+  }
+  else if (inputType==input_bistable || inputType==input_pulse) {
+    // Standard device settings without scene table
+    colorClass = class_black_joker;
+    installSettings();
+    // - create one binary input
+    BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
+    ib->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
+    ib->setHardwareName("input");
+    addBehaviour(ib);
+  }
+  else {
+    ALOG(LOG_ERR, "unknown device type");
+  }
+}
+
+
+
+bool DaliInputDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  // derive dSUID
+  deriveDsUid();
+  return true; // simple identification, callback will not be called
+}
+
+
+DaliVdc &DaliInputDevice::daliVdc()
+{
+  return *(static_cast<DaliVdc *>(vdcP));
+}
+
+
+bool DaliInputDevice::isSoftwareDisconnectable()
+{
+  return true;
+}
+
+
+void DaliInputDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
+{
+  ALOG(LOG_DEBUG, "disconnecting DALI input device with rowid=%lld", daliInputDeviceRowID);
+  // clear learn-in data from DB
+  if (daliInputDeviceRowID) {
+    if(daliVdc().db.executef("DELETE FROM inputDevices WHERE rowid=%lld", daliInputDeviceRowID)!=SQLITE_OK) {
+      ALOG(LOG_ERR, "deleting DALI input device: %s", daliVdc().db.error()->description().c_str());
+    }
+  }
+  // disconnection is immediate, so we can call inherited right now
+  inherited::disconnect(aForgetParams, aDisconnectResultHandler);
+}
+
+
+
+#define BUTTON_RELEASE_TIMEOUT (100*MilliSecond)
+#define INPUT_RELEASE_TIMEOUT (2*Second)
+
+bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aData2)
+{
+  int refindex = -1; // none
+  int inpindex = -1; // none
+  bool on = false;
+  bool off = false;
+  if (aEvent==EVENT_CODE_FOREIGN_FRAME) {
+    DaliAddress a = DaliComm::addressFromDaliResponse(aData1);
+    if (a!=NoDaliAddress) {
+      // evaluate forward frame
+      // - special check for scene call
+      if (baseAddress & DaliScene) {
+        // we are listening to scene calls
+        if ((aData1 & 0x01) && (aData2 & 0xF0)==DALICMD_GO_TO_SCENE) {
+          refindex = aData2 & 0x0F;
+          aData2 = DALICMD_GO_TO_SCENE; // normalize to allow catching command below
+          // if used as bistable binary input, consider scenes 0..7 as off, 8..15 as on
+          on = refindex>=8;
+          off = !on;
+        }
+      }
+      else if (baseAddress & DaliGroup) {
+        // we are listening to group calls
+        if (a & DaliGroup) refindex = a & DaliGroupMask;
+      }
+      else {
+        // we are listening to single addresses
+        refindex = a & DaliAddressMask;
+      }
+      // now refindex = referenced address/group/scene
+      if (refindex>=0) {
+        // check if in range
+        int baseindex = baseAddress & DaliAddressMask;
+        if (refindex>=baseindex && refindex<baseindex+numAddresses) {
+          inpindex = refindex-baseindex;
+        }
+      }
+      if (inpindex>=0) {
+        // check type of command
+        if ((aData1 & 0x01)==0) {
+          // direct arc, always pulse
+          on = aData2 > 128; // at least half -> on
+          off = aData2==0; // -> off
+        }
+        else {
+          switch (aData2) {
+            case DALICMD_RECALL_MAX_LEVEL:
+            // dimming via DALI button not supported because bus timing is too tight for both directions
+            //case DALICMD_ON_AND_STEP_UP:
+            //case DALICMD_STEP_UP:
+            //case DALICMD_UP:
+              on = true;
+              break;
+            case DALICMD_OFF:
+            case DALICMD_RECALL_MIN_LEVEL:
+            // dimming via DALI button not supported because bus timing is too tight for both directions
+            //case DALICMD_DOWN:
+            //case DALICMD_STEP_DOWN:
+            //case DALICMD_STEP_DOWN_AND_OFF:
+              off = true;
+              break;
+            default:
+              break;
+          }
+        }
+        // now process
+        if (on || off) {
+          switch (inputType) {
+            case input_button:
+            case input_rocker:
+            {
+              ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[inpindex]);
+              bb->buttonAction(true);
+              releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::buttonReleased, this, inpindex), BUTTON_RELEASE_TIMEOUT);
+              break;
+            }
+            case input_pulse:
+            {
+              BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[inpindex]);
+              ib->updateInputState(1);
+              releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::inputReleased, this, inpindex), INPUT_RELEASE_TIMEOUT);
+              break;
+            }
+            case input_motion:
+            case input_illumination:
+            case input_bistable:
+            default:
+            {
+              BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[inpindex]);
+              ib->updateInputState(on ? 1 : 0);
+              break;
+            }
+          }
+        }
+        return true; // consumed
+      }
+    }
+  }
+  // not handled
+  return false;
+}
+
+
+
+void DaliInputDevice::buttonReleased(int aButtonNo)
+{
+  releaseTicket = 0;
+  ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[aButtonNo]);
+  bb->buttonAction(false);
+}
+
+
+
+void DaliInputDevice::inputReleased(int aInputNo)
+{
+  releaseTicket = 0;
+  BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[aInputNo]);
+  ib->updateInputState(0);
+}
+
+
+
+
+/// @return human readable model name/short description
+string DaliInputDevice::modelName()
+{
+  string m = "DALI ";
+  switch (inputType) {
+    case input_button:
+      m += "button";
+      break;
+    case input_rocker:
+      m += "two-way rocker button";
+      break;
+    case input_motion:
+      m += "motion sensor";
+      break;
+    case input_illumination:
+      m += "illumination sensor";
+      break;
+    case input_bistable:
+      m += "bistable input";
+      break;
+    case input_pulse:
+    default:
+      m += "pulse input";
+      break;
+  }
+  return m;
+}
+
+
+bool DaliInputDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
+{
+  const char *iconname = NULL;
+  bool colored = false;
+  switch (inputType) {
+    case input_button:
+      iconname = "dali_button";
+      colored = true;
+      break;
+    case input_rocker:
+      iconname = "dali_rocker";
+      colored = true;
+      break;
+    case input_motion:
+    case input_illumination:
+      iconname = "dali_sensor";
+      break;
+    default:
+      break;
+  }
+  if (iconname) {
+    if (colored) {
+      if (getClassColoredIcon(iconname, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix)) return true;
+    }
+    else {
+      if (getIcon(iconname, aIcon, aWithData, aResolutionPrefix)) return true;
+    }
+  }
+  // no specific icon found
+  return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+
+}
+
+
+string DaliInputDevice::getExtraInfo()
+{
+  string e = "DALI ";
+  e += DaliComm::formatDaliAddress(baseAddress);
+  if (numAddresses>1) string_format_append(e, " + %d more", numAddresses-1);
+  return e;
+}
+
+
+void DaliInputDevice::deriveDsUid()
+{
+  // vDC implementation specific UUID:
+  //   UUIDv5 with name = classcontainerinstanceid::baseAddress:inputType
+  DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
+  string s = vdcP->vdcInstanceIdentifier();
+  string_format_append(s, "::%u:%u", baseAddress, inputType);
+  dSUID.setNameInSpace(s, vdcNamespace);
+}
+
+
+
+
+#endif // ENABLE_DALI_INPUTS
+
 
 #endif // ENABLE_DALI
 

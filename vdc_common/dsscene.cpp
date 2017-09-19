@@ -124,6 +124,7 @@ protected:
     }
     return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
   }
+  
 };
 typedef boost::intrusive_ptr<SceneChannels> SceneChannelsPtr;
 

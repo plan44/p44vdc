@@ -130,10 +130,6 @@ namespace p44 {
 
     MovingLightBehaviour(Device &aDevice);
 
-    /// device type identifier
-    /// @return constant identifier for this type of behaviour
-    virtual const char *behaviourTypeIdentifier() { return "movingcolorlight"; };
-
     /// check for presence of model feature (flag in dSS visibility matrix)
     /// @param aFeatureIndex the feature to check for
     /// @return yes if this output behaviour has the feature, no if (explicitly) not, undefined if asked entity does not know

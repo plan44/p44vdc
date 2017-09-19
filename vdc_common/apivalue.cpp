@@ -46,7 +46,6 @@ ApiValueType ApiValue::getType()
 
 void ApiValue::setType(ApiValueType aType)
 {
-  // base class: just set type
   if (aType!=objectType) {
     objectType = aType;
     // type has changed, make sure internals are cleared
