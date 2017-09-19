@@ -44,6 +44,7 @@ HomeConnectDeviceDryer::~HomeConnectDeviceDryer()
 
 bool HomeConnectDeviceDryer::configureDevice()
 {
+  bool ret = inherited::configureDevice();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = false;
@@ -101,7 +102,7 @@ bool HomeConnectDeviceDryer::configureDevice()
   dryingTargetProp->addEnum("CupboardDryPlus", i++, false);
 
   deviceProperties->addProperty(dryingTargetProp);
-  return inherited::configureDevice();
+  return ret;
 }
 
 void HomeConnectDeviceDryer::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -127,7 +128,11 @@ void HomeConnectDeviceDryer::addAction(const string& aActionName, const string& 
   HomeConnectProgramBuilder builder("LaundryCare.Dryer.Program." + aProgramName);
   builder.addOption("LaundryCare.Dryer.Option.DryingTarget", "\"LaundryCare.Dryer.EnumType.DryingTarget.@{DryingTarget}\"");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this,
+                                                                                     *operationModeDescriptor,
+                                                                                     aActionName,
+                                                                                     aDescription,
+                                                                                     builder.build()));
   action->addParameter(aParameter);
   deviceActions->addAction(action);
 }

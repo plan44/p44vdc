@@ -44,21 +44,8 @@ HomeConnectDeviceOven::~HomeConnectDeviceOven()
 
 bool HomeConnectDeviceOven::configureDevice()
 {
+  bool ret = inherited::configureDevice();
   // - common params
-  ValueDescriptorPtr temp = ValueDescriptorPtr(
-      new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30,
-          250, 1, true, 180));
-  ValueDescriptorPtr duration = ValueDescriptorPtr(
-      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
-          1, true, 600));
-
-  addDefaultStandByAction();
-  addDefaultPowerOnAction();
-
-  addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
-  addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
-  addAction("std.TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
-  addAction("std.PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
 
   targetTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("TargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
@@ -112,7 +99,23 @@ bool HomeConnectDeviceOven::configureDevice()
   progStatusConfig.hasProgres = true;
   configureProgramStatus(progStatusConfig);
 
-  return inherited::configureDevice();
+
+  addDefaultStandByAction();
+  addDefaultPowerOnAction();
+
+  ValueDescriptorPtr temp = ValueDescriptorPtr(
+      new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30,
+          250, 1, true, 180));
+  ValueDescriptorPtr duration = ValueDescriptorPtr(
+      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
+          1, true, 600));
+
+  addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
+  addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
+  addAction("std.TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
+  addAction("std.PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
+
+  return ret;
 }
 
 void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -161,7 +164,7 @@ void HomeConnectDeviceOven::addAction(const string& aActionName, const string& a
   builder.addOption("Cooking.Oven.Option.SetpointTemperature", "@{Temperature%%0}");
   builder.addOption("BSH.Common.Option.Duration", "@{Duration%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this, *operationModeDescriptor, aActionName, aDescription, builder.build()));
   action->addParameter(aTemperature);
   action->addParameter(aDuration);
   deviceActions->addAction(action);
