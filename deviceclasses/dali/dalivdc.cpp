@@ -155,10 +155,35 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 }
 
 
+
+void DaliVdc::removeLightDevices(bool aForget)
+{
+  DeviceVector::iterator pos = devices.begin();
+  while (pos!=devices.end()) {
+    DaliDevicePtr dev = boost::dynamic_pointer_cast<DaliDevice>(*pos);
+    if (dev) {
+      // inform upstream about these devices going offline now (if API connection is up at all at this time)
+      dev->reportVanished();
+      // now actually remove
+      getVdcHost().removeDevice(dev, aForget);
+      // erase from list
+      pos = devices.erase(pos);
+    }
+    else {
+      // skip non-outputs
+      pos++;
+    }
+  }
+}
+
+
+
 // recollect devices after grouping change without scanning bus again
 void DaliVdc::recollectDevices(StatusCB aCompletedCB)
 {
-  removeDevices(false);
+
+  // remove DALI scannable output devices (but not inputs)
+  removeLightDevices(false);
   // no scan used, just use the cache
   // - create a Dali bus device for every cached devInf
   DaliBusDeviceListPtr busDevices(new DaliBusDeviceList);
