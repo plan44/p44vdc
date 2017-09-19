@@ -20,6 +20,7 @@
 //
 
 #include "homeconnectdevicewasher.hpp"
+#include "homeconnectaction.hpp"
 
 #if ENABLE_HOMECONNECT
 

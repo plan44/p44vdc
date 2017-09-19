@@ -32,6 +32,7 @@
 #include "homeconnectdevicewasher.hpp"
 #include "homeconnectdevicedryer.hpp"
 #include "homeconnectdevicefridge.hpp"
+#include "homeconnectaction.hpp"
 #include <sstream>
 #include <boost/algorithm/string/split.hpp>
 #include <functional>

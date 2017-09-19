@@ -1,7 +1,7 @@
 //
-//  Copyright (c) 2016 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2017 digitalSTROM.org, Zurich, Switzerland
 //
-//  Author: Lukas Zeller <luz@plan44.ch>
+//  Author: Michal Badecki <michal.badecki@digitalstrom.com>
 //
 //  This file is part of p44vdc.
 //
@@ -109,33 +109,63 @@ void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aRes
   if (aCompletedCB) aCompletedCB(aError);
 }
 
+HomeConnectActionWithOperationMode::HomeConnectActionWithOperationMode(SingleDevice &aSingleDevice,
+                                                                       EnumValueDescriptor& aOperationMode,
+                                                                       const string& aName,
+                                                                       const string& aDescription,
+                                                                       const string& aApiCommandTemplate) :
+    inherited(aSingleDevice, aName, aDescription, aApiCommandTemplate),
+    operationMode(aOperationMode) {}
+
+
+void HomeConnectActionWithOperationMode::runActionWhenReady(ApiValuePtr aParams, StatusCB aCompletedCB, const string& aActionCommand, unsigned int aRetriesLeft)
+{
+  if (operationMode.getStringValue() != "ModeReady") {
+
+    if (aRetriesLeft-- == 0) {
+      LOG(LOG_WARNING, "Device is still not ready after %u retries, stop trying", RETRY_COUNT);
+      ErrorPtr err = TextError::err("Device operation mode is not ready");
+      if (aCompletedCB) aCompletedCB(err);
+      return;
+    }
+
+    LOG(LOG_DEBUG, "Device is not ready, reschedule action but call completed callback anyway");
+    if (aCompletedCB) aCompletedCB(Error::ok());
+    aCompletedCB.clear();
+    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::runActionWhenReady, this, aParams, aCompletedCB, aActionCommand, aRetriesLeft), RESCHEDULE_INTERVAL);
+    return;
+  }
+
+  LOG(LOG_DEBUG, "Device is powered on and ready, proceed with action");
+  inherited::performCall(aParams, aCompletedCB, aActionCommand);
+}
+
 HomeConnectPowerOnAction::HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
                                                    const string& aName,
                                                    const string& aDescription,
-                                                   const string& aIfPowerOnCommand,
-                                                   const string& aIfPowerOffCommand,
-                                                   DeviceState& aPowerState,
-                                                   DeviceState& aOperationMode) :
-    inherited(aSingleDevice, aName, aDescription, aIfPowerOnCommand),
+                                                   const string& aStandardCommand,
+                                                   const string& aIfDelayedCommand,
+                                                   EnumValueDescriptor& aPowerState,
+                                                   EnumValueDescriptor& aOperationMode) :
+    inherited(aSingleDevice, aOperationMode, aName, aDescription, aStandardCommand),
     powerState(aPowerState),
-    operationMode(aOperationMode),
-    ifPowerOnCommand(aIfPowerOnCommand),
-    ifPowerOffCommand(aIfPowerOffCommand) {}
+    standardCommand(aStandardCommand),
+    ifDelayedCommand(aIfDelayedCommand) {}
 
 void HomeConnectPowerOnAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
-  if (powerState.value()->getStringValue() != "PowerOn") {
+  if (powerState.getStringValue() != "PowerOn") {
     powerOnDevice(aParams, aCompletedCB);
     return;
   }
 
-  if (operationMode.value()->getStringValue() != "ModeReady") {
-    runActionWhenReady(aParams, aCompletedCB, RETRY_COUNT);
+  if (operationMode.getStringValue() != "ModeReady") {
+    runActionWhenReady(aParams, aCompletedCB, ifDelayedCommand, RETRY_COUNT);
     return;
   }
 
   LOG(LOG_DEBUG, "Device is powered on, proceed with action");
-  inherited::performCall(aParams, aCompletedCB, ifPowerOnCommand);
+  inherited::performCall(aParams, aCompletedCB, standardCommand);
   return;
 }
 
@@ -156,36 +186,40 @@ void HomeConnectPowerOnAction::devicePoweredOn(ApiValuePtr aParams, StatusCB aCo
 {
   if (!Error::isOK(aError)) {
     LOG(LOG_WARNING, "Device could not be powered on, probably because it was on already. Proceed with action");
-    inherited::performCall(aParams, aCompletedCB, ifPowerOnCommand);
+    inherited::performCall(aParams, aCompletedCB, standardCommand);
     return;
   }
 
-  runActionWhenReady(aParams, aCompletedCB, RETRY_COUNT);
-
+  runActionWhenReady(aParams, aCompletedCB, ifDelayedCommand, RETRY_COUNT);
 }
 
-void HomeConnectPowerOnAction::runActionWhenReady(ApiValuePtr aParams, StatusCB aCompletedCB, unsigned int aRetriesLeft)
+
+HomeConnectGoToStandbyAction::HomeConnectGoToStandbyAction(SingleDevice &aSingleDevice,
+                                                           EnumValueDescriptor& aPowerState,
+                                                           EnumValueDescriptor& aOperationMode) :
+    inherited(aSingleDevice,
+              aOperationMode,
+              "std.StandBy",
+              "Switch power state standby",
+              HomeConnectSettingBuilder("BSH.Common.Setting.PowerState").setValue("\"BSH.Common.EnumType.PowerState.Standby\"").build()),
+    powerState(aPowerState) {}
+
+void HomeConnectGoToStandbyAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
-  if (operationMode.value()->getStringValue() != "ModeReady") {
-
-    if (aRetriesLeft-- == 0) {
-      LOG(LOG_WARNING, "Device is still not ready after %u retries, stop trying", RETRY_COUNT);
-      ErrorPtr err = TextError::err("Device operation mode is not ready");
-      if (aCompletedCB) aCompletedCB(err);
-      return;
-    }
-
-    LOG(LOG_DEBUG, "Device is not ready, reschedule action but call completed callback anyway");
-    if (aCompletedCB) aCompletedCB(Error::ok());
-    aCompletedCB.clear();
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::runActionWhenReady, this, aParams, aCompletedCB, aRetriesLeft), RESCHEDULE_INTERVAL);
+  if (powerState.getStringValue() == "PowerStandby") {
+    LOG(LOG_DEBUG, "Device is already in Standby, ignoring action");
+    aCompletedCB(Error::ok());
     return;
   }
 
-  LOG(LOG_DEBUG, "Device is powered on and ready, proceed with action");
-  inherited::performCall(aParams, aCompletedCB, ifPowerOffCommand);
-}
+  if (operationMode.getStringValue() != "ModeReady") {
+    LOG(LOG_DEBUG, "Cannot go to standby now, there is action in progress. Wait until it is finished");
+    runActionWhenReady(aParams, aCompletedCB, apiCommandTemplate, RETRY_COUNT);
+    return;
+  }
 
+  inherited::performCall(aParams, aCompletedCB);
+}
 
 #endif // ENABLE_HOMECONNECT
 

@@ -20,6 +20,7 @@
 //
 
 #include "homeconnectdeviceoven.hpp"
+#include "homeconnectaction.hpp"
 
 #if ENABLE_HOMECONNECT
 
