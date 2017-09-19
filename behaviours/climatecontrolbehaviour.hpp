@@ -205,6 +205,10 @@ namespace p44 {
     /// @note this flag is not exposed as a property, but set/reset by callScene(29=wintermode) and callScene(30=summermode)
     bool climateControlIdle;
 
+    /// set if climate controlling output is turn to heating (true) or cooling (false)
+    /// @note this flag is not exposed as a property, but set/reset by callScene(<0,6>=heating) and callScene(<7,11>=cooling)
+    bool climateModeHeating;
+
     /// defines how "heatingLevel" is applied to the output
     VdcHeatingSystemCapability heatingSystemCapability;
     VdcHeatingSystemType heatingSystemType;
@@ -245,6 +249,9 @@ namespace p44 {
 
     /// @return true if device should be in idle mode
     bool isClimateControlIdle() { return climateControlIdle; };
+
+    /// @return true if device should be in heating mode
+    bool isClimateModeHeating() { return climateModeHeating; };
 
     /// @return true if device should run a prophylaxis cycle
     /// @note automatically resets the internal flag when queried
