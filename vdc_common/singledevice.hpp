@@ -314,6 +314,7 @@ namespace p44 {
     virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
     virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
     virtual bool setStringValue(const string aValue) P44_OVERRIDE;
+    bool setStringValueCaseInsensitive(const string& aValue);
 
   protected:
 
@@ -380,7 +381,7 @@ namespace p44 {
     /// @param aId the ID of the action (key in the container)
     /// @param aDescription a description string for the action (for log files primarily)
     /// @param aTitle a user language description/name for the action, usually set by the user via direct device interaction (UI, apps, ...)
-    DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription, const string aTitle);
+    DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription, const string aTitle = "");
 
     /// get id
     string getId() { return actionId; };

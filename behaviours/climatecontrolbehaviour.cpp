@@ -40,6 +40,24 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
   inherited::setDefaultSceneValues(aSceneNo);
   // Add special climate behaviour scene commands
   switch (aSceneNo) {
+    case CLIMATE_HEAT_TEMP_OFF:
+    case CLIMATE_HEAT_TEMP_COMFORT:
+    case CLIMATE_HEAT_TEMP_ECO:
+    case CLIMATE_HEAT_TEMP_NOTUSED:
+    case CLIMATE_HEAT_TEMP_NIGHT:
+    case CLIMATE_HEAT_TEMP_HOLIDAY:
+      sceneCmd = scene_cmd_climatecontrol_enable_heating;
+      sceneArea = 0; // not an area scene any more
+      break;
+    case CLIMATE_COOL_TEMP_OFF:
+    case CLIMATE_COOL_TEMP_COMFORT:
+    case CLIMATE_COOL_TEMP_ECO:
+    case CLIMATE_COOL_TEMP_NOTUSED:
+    case CLIMATE_COOL_TEMP_NIGHT:
+    case CLIMATE_COOL_TEMP_HOLIDAY:
+      sceneCmd = scene_cmd_climatecontrol_enable_cooling;
+      sceneArea = 0; // not an area scene any more
+      break;
     case CLIMATE_ENABLE:
       sceneCmd = scene_cmd_climatecontrol_enable;
       sceneArea = 0; // not an area scene any more
@@ -234,10 +252,14 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
   inherited(aDevice),
   climateDeviceKind(aKind),
   heatingSystemCapability(aDefaultHeatingSystemCapability),
+  heatingSystemType(hstype_unknown),
   climateControlIdle(false), // assume valve active
+  climateModeHeating(true),  // assume heating enabled
   runProphylaxis(false), // no run scheduled
   zoneTemperatureUpdated(Never),
-  zoneTemperatureSetPointUpdated(Never)
+  zoneTemperature(0),
+  zoneTemperatureSetPointUpdated(Never),
+  zoneTemperatureSetPoint(0)
 {
   // Note: there is no default group for climate, depends on application and must be set when instantiating the behaviour
   // - add the output channels
@@ -402,6 +424,14 @@ bool ClimateControlBehaviour::applyScene(DsScenePtr aScene)
         // valve prophylaxis
         runProphylaxis = true;
         return true;
+      case scene_cmd_climatecontrol_enable_heating:
+        // switch to heating mode
+        climateModeHeating = true;
+        return true;
+      case scene_cmd_climatecontrol_enable_cooling:
+        // switch to cooling mode
+        climateModeHeating = false;
+        return true;
       default:
         // all other scene calls are suppressed in group_roomtemperature_control
         return false;
@@ -423,7 +453,7 @@ const char *ClimateControlBehaviour::tableName()
 
 // data field definitions
 
-static const size_t numFields = 1;
+static const size_t numFields = 2;
 
 size_t ClimateControlBehaviour::numFieldDefs()
 {
@@ -435,6 +465,7 @@ const FieldDefinition *ClimateControlBehaviour::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numFields] = {
     { "heatingSystemCapability", SQLITE_INTEGER },
+    { "heatingSystemType", SQLITE_INTEGER },
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
@@ -454,6 +485,7 @@ void ClimateControlBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   if (aCommonFlagsP) climateControlIdle = *aCommonFlagsP & outputflag_climateControlIdle;
   // get the fields
   aRow->getCastedIfNotNull<VdcHeatingSystemCapability, int>(aIndex++, heatingSystemCapability);
+  aRow->getCastedIfNotNull<VdcHeatingSystemType, int>(aIndex++, heatingSystemType);
 }
 
 
@@ -466,6 +498,7 @@ void ClimateControlBehaviour::bindToStatement(sqlite3pp::statement &aStatement, 
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, heatingSystemCapability);
+  aStatement.bind(aIndex++, heatingSystemType);
 }
 
 
@@ -478,6 +511,7 @@ static char climatecontrol_key;
 
 enum {
   heatingSystemCapability_key,
+  heatingSystemType_key,
   numSettingsProperties
 };
 
@@ -487,6 +521,7 @@ const PropertyDescriptorPtr ClimateControlBehaviour::getSettingsDescriptorByInde
 {
   static const PropertyDescription properties[numSettingsProperties] = {
     { "heatingSystemCapability", apivalue_uint64, heatingSystemCapability_key+settings_key_offset, OKEY(climatecontrol_key) },
+    { "heatingSystemType", apivalue_uint64, heatingSystemType_key+settings_key_offset, OKEY(climatecontrol_key) },
   };
   int n = inherited::numSettingsProps();
   if (aPropIndex<n)
@@ -506,6 +541,7 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case heatingSystemCapability_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemCapability); return true;
+        case heatingSystemType_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemType); return true;
       }
     }
     else {
@@ -513,6 +549,7 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case heatingSystemCapability_key+settings_key_offset: setPVar(heatingSystemCapability, (VdcHeatingSystemCapability)aPropValue->uint8Value()); return true;
+        case heatingSystemType_key+settings_key_offset: setPVar(heatingSystemType, (VdcHeatingSystemType)aPropValue->uint8Value()); return true;
       }
     }
   }
