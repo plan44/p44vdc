@@ -58,7 +58,7 @@ using namespace p44;
 // MARK: ===== HueDevice
 
 
-HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const string &aUniqueID) :
+HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool aCTOnly, const string &aUniqueID) :
   inherited(aVdcP),
   lightID(aLightID),
   uniqueID(aUniqueID),
@@ -67,14 +67,14 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const
 {
   // hue devices are lights
   setColorClass(class_yellow_light);
-  if (aIsColor) {
+  if (aIsColor || aCTOnly) {
     // color lamp
     // - use color light settings, which include a color scene table
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // - set the behaviour
-    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, false));
-    cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
-    cl->setHardwareName(string_format("color light #%s", lightID.c_str()));
+    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, aCTOnly));
+    cl->setHardwareOutputConfig(aCTOnly ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
+    cl->setHardwareName(string_format("%s light #%s", aCTOnly ? "tunable white" : "color", lightID.c_str()));
     cl->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness
     addBehaviour(cl);
   }
@@ -173,7 +173,15 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
 
 bool HueDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (output && getIcon(output->getOutputFunction()==outputFunction_colordimmer ? "hue" : "hue_lux", aIcon, aWithData, aResolutionPrefix))
+  const char *iconname = NULL;
+  if (output) {
+    switch (output->getOutputFunction()) {
+      case outputFunction_colordimmer: iconname = "hue"; break;
+      case outputFunction_ctdimmer: iconname = "hue_ct"; break;
+      default: iconname = "hue_lux"; break;
+    }
+  }
+  if (iconname && getIcon(iconname, aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);

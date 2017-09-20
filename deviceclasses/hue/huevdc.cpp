@@ -489,19 +489,24 @@ void HueVdc::collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aR
       // create hue device
       if (lightInfo) {
         // pre 1.3 bridges, which do not know yet hue Lux, don't have the "state" -> no state == all lights have color (hue or living color)
-        // 1.3 and later bridges do have "state", and if "state" contains "colormode", it's a color light
+        // 1.3 and later bridges do have "state", and if "state" contains "colormode", it's a color light or a tunable white
         bool hasColor = true; // assume color (default if no "state" delivered in answer)
+        bool ctOnly = false; // not tunable white only (default if no "state" delivered in answer)
         JsonObjectPtr o = lightInfo->get("state");
         if (o) {
-          JsonObjectPtr cm = o->get("colormode");
-          if (!cm) hasColor = false; // lamp without color mode -> just brightness (hue lux)
+          JsonObjectPtr o2 = o->get("colormode");
+          if (!o2) hasColor = false; // lamp without colormode -> just brightness (hue lux)
+          if (hasColor) {
+            o2 = o->get("hue");
+            if (!o2) ctOnly = true; // lamp with colormode, but without hue -> tunable white (hue ambiance)
+          }
         }
         // 1.4 and later FINALLY have a "uniqueid"!
         string uniqueID;
         o = lightInfo->get("uniqueid");
         if (o) uniqueID = o->stringValue();
         // create device now
-        HueDevicePtr newDev = HueDevicePtr(new HueDevice(this, lightID, hasColor, uniqueID));
+        HueDevicePtr newDev = HueDevicePtr(new HueDevice(this, lightID, hasColor, ctOnly, uniqueID));
         if (simpleIdentifyAndAddDevice(newDev)) {
           // actually added, no duplicate, set the name
           // (otherwise, this is an incremental collect and we knew this light already)
