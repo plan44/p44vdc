@@ -86,6 +86,14 @@ bool HomeConnectDeviceDishWasher::configureDevice()
   progStatusConfig.hasProgres = true;
   configureProgramStatus(progStatusConfig);
 
+  EventConfiguration eventConfig = { 0 };
+  eventConfig.hasAlarmClockElapsed = false;
+  eventConfig.hasLocallyOperated = false;
+  eventConfig.hasProgramAborted = true;
+  eventConfig.hasProgramFinished = true;
+  eventConfig.hasProgramStarted = true;
+  configureEvents(eventConfig);
+
   ValueDescriptorPtr delayedStart = ValueDescriptorPtr(
     new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1, true));
 

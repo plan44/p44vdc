@@ -341,13 +341,6 @@ bool HomeConnectDevice::configureDevice()
   programName = ValueDescriptorPtr(new TextValueDescriptor("ProgramName"));
   deviceProperties->addProperty(programName);
 
-  // common events
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramFinished", "Program Finished")));
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramAborted", "Program Aborted")));
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "LocallyOperated", "Locally Operated")));
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramStarted", "Program Started")));
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "AlarmClockElapsed", "Alarm Clock Elapsed")));
-
   // configured ok
   return true;
 }
@@ -474,6 +467,26 @@ void HomeConnectDevice::configureProgramStatus(const ProgramStatusConfiguration&
     programProgress = ValueDescriptorPtr(
         new NumericValueDescriptor("ProgramProgress", valueType_numeric, VALUE_UNIT(valueUnit_percent, unitScaling_1), 0, 100, 1));
     deviceProperties->addProperty(programProgress);
+  }
+}
+
+
+void HomeConnectDevice::configureEvents(const EventConfiguration& aConfiguration)
+{
+  if (aConfiguration.hasAlarmClockElapsed) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "AlarmClockElapsed", "Alarm Clock Elapsed")));
+  }
+  if (aConfiguration.hasLocallyOperated) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "LocallyOperated", "Locally Operated")));
+  }
+  if (aConfiguration.hasProgramAborted) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramAborted", "Program Aborted")));
+  }
+  if (aConfiguration.hasProgramFinished) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramFinished", "Program Finished")));
+  }
+  if (aConfiguration.hasProgramStarted) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramStarted", "Program Started")));
   }
 }
 
@@ -619,12 +632,17 @@ void HomeConnectDevice::handleEventTypeEvent(const string& aKey)
     return;
   }
 
+  DeviceEventPtr event;
   if (aKey=="BSH.Common.Event.ProgramFinished") {
-    operationMode->pushWithEvent(deviceEvents->getEvent("ProgramFinished"));
+    event = deviceEvents->getEvent("ProgramFinished");
   } else if (aKey=="BSH.Common.Event.ProgramAborted") {
-    operationMode->pushWithEvent(deviceEvents->getEvent("ProgramAborted"));
+    event = deviceEvents->getEvent("ProgramAborted");
   } else if (aKey=="BSH.Common.Event.AlarmClockElapsed") {
-    operationMode->pushWithEvent(deviceEvents->getEvent("AlarmClockElapsed"));
+    event = deviceEvents->getEvent("AlarmClockElapsed");
+  }
+
+  if (event) {
+    operationMode->pushWithEvent(event);
   }
 }
 
@@ -632,28 +650,8 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
 {
   string value = (aValue != NULL) ? aValue->stringValue() : "";
 
-  if ((aKey == "BSH.Common.Status.OperationState") && (operationMode != NULL)) {
-    string operationValue = "Mode" + removeNamespace(value);
-    if (operationModeDescriptor->setStringValueCaseInsensitive(operationValue)) {
-      ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
-
-      if (operationValue == "ModeRun") {
-        operationMode->pushWithEvent(deviceEvents->getEvent("ProgramStarted"));
-      } else {
-        operationMode->push();
-
-        // the following information is valid only in case the program is running
-        if (elapsedProgramTime != NULL) {
-          elapsedProgramTime->invalidate();
-        }
-        if (remainingProgramTime != NULL) {
-          remainingProgramTime->invalidate();
-        }
-        if (programProgress != NULL) {
-          programProgress->invalidate();
-        }
-      }
-    }
+  if (aKey == "BSH.Common.Status.OperationState") {
+    handleOperationStateChange(value);
     return;
   }
 
@@ -703,7 +701,10 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
   }
 
   if ((aKey=="BSH.Common.Status.LocalControlActive") && (operationMode != NULL)) {
-    operationMode->pushWithEvent(deviceEvents->getEvent("LocallyOperated"));
+    DeviceEventPtr event = deviceEvents->getEvent("LocallyOperated");
+    if (event) {
+      operationMode->pushWithEvent(event);
+    }
   }
 }
 
@@ -715,6 +716,40 @@ void HomeConnectDevice::handleEventTypeDisconnected()
 void HomeConnectDevice::handleEventTypeConnected()
 {
   ALOG(LOG_NOTICE, "Device connected");
+}
+
+void HomeConnectDevice::handleOperationStateChange(const string& aNewValue)
+{
+  if (operationMode == NULL) {
+    return;
+  }
+
+  string operationValue = "Mode" + removeNamespace(aNewValue);
+  if (!operationModeDescriptor->setStringValueCaseInsensitive(operationValue)) {
+    return;
+  }
+
+  ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
+
+  if (operationValue == "ModeRun") {
+    DeviceEventPtr event = deviceEvents->getEvent("ProgramStarted");
+    if (event) {
+      operationMode->pushWithEvent(event);
+    }
+  } else {
+    operationMode->push();
+
+    // the following information is valid only in case the program is running
+    if (elapsedProgramTime != NULL) {
+      elapsedProgramTime->invalidate();
+    }
+    if (remainingProgramTime != NULL) {
+      remainingProgramTime->invalidate();
+    }
+    if (programProgress != NULL) {
+      programProgress->invalidate();
+    }
+  }
 }
 
 void HomeConnectDevice::pollState()

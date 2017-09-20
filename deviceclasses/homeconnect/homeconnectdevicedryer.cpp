@@ -79,6 +79,14 @@ bool HomeConnectDeviceDryer::configureDevice()
   progStatusConfig.hasProgres = true;
   configureProgramStatus(progStatusConfig);
 
+  EventConfiguration eventConfig = { 0 };
+  eventConfig.hasAlarmClockElapsed = false;
+  eventConfig.hasLocallyOperated = true;
+  eventConfig.hasProgramAborted = false;
+  eventConfig.hasProgramFinished = true;
+  eventConfig.hasProgramStarted = true;
+  configureEvents(eventConfig);
+
   EnumValueDescriptorPtr dryingTargetCottonSynthetic = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   int i = 0;
   dryingTargetCottonSynthetic->addEnum("IronDry", i++);
