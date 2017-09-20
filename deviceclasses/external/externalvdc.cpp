@@ -667,6 +667,8 @@ bool ExternalDevice::prepareSceneCall(DsScenePtr aScene)
       case scene_cmd_stop: sceneCommandStr = "STOP"; break;
       case scene_cmd_climatecontrol_enable: sceneCommandStr = "CLIMATE_ENABLE"; break;
       case scene_cmd_climatecontrol_disable: sceneCommandStr = "CLIMATE_DISABLE"; break;
+      case scene_cmd_climatecontrol_enable_heating: sceneCommandStr = "CLIMATE_HEATING"; break;
+      case scene_cmd_climatecontrol_enable_cooling: sceneCommandStr = "CLIMATE_COOLING"; break;
       default: break; // not implemented, ignore for now
     }
     // send scene command message
