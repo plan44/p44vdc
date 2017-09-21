@@ -308,6 +308,7 @@ namespace p44 {
     void addDefaultPowerOnAction();
     void addDefaultStandByAction();
     void addDefaultPowerOffAction();
+    void addProgramNameProperty();
 
     // Create dsuid based on device id
     void deriveDsUid();

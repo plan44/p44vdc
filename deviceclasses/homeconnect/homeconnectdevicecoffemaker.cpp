@@ -50,6 +50,7 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
 {
   bool ret = inherited::configureDevice();
 
+  addProgramNameProperty();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = true;
