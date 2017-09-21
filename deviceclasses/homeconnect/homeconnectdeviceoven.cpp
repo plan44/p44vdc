@@ -45,7 +45,8 @@ HomeConnectDeviceOven::~HomeConnectDeviceOven()
 bool HomeConnectDeviceOven::configureDevice()
 {
   bool ret = inherited::configureDevice();
-  // - common params
+
+  addProgramNameProperty();
 
   targetTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("TargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));

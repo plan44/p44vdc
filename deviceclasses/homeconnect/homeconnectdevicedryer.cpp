@@ -45,6 +45,8 @@ HomeConnectDeviceDryer::~HomeConnectDeviceDryer()
 bool HomeConnectDeviceDryer::configureDevice()
 {
   bool ret = inherited::configureDevice();
+
+  addProgramNameProperty();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = false;

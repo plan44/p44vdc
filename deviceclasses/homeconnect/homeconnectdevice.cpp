@@ -337,10 +337,6 @@ bool HomeConnectDevice::configureDevice()
   HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "Stop current program", "DELETE:programs/active"));
   deviceActions->addAction(a);
 
-  // program name
-  programName = ValueDescriptorPtr(new TextValueDescriptor("ProgramName"));
-  deviceProperties->addProperty(programName);
-
   // configured ok
   return true;
 }
@@ -512,6 +508,15 @@ void HomeConnectDevice::addPowerStateAction(const string& aName, const string& a
   HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, settingBuilder.build()));
   deviceActions->addAction(a);
 }
+
+
+void HomeConnectDevice::addProgramNameProperty()
+{
+  programName = ValueDescriptorPtr(new TextValueDescriptor("ProgramName"));
+  deviceProperties->addProperty(programName);
+}
+
+
 void HomeConnectDevice::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
 {
   // nop for now
