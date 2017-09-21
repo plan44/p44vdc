@@ -22,6 +22,11 @@
 #ifndef __p44vdc__climatecontrolbehaviour__
 #define __p44vdc__climatecontrolbehaviour__
 
+#ifndef ENABLE_FCU_SUPPORT
+  #define ENABLE_FCU_SUPPORT 1
+#endif
+
+
 #include "device.hpp"
 #include "outputbehaviour.hpp"
 #include "simplescene.hpp"
@@ -29,18 +34,6 @@
 using namespace std;
 
 namespace p44 {
-
-  /// ventilation airflow direction channel states
-  typedef enum {
-    fcuOperatingMode_off = 0,
-    fcuOperatingMode_heat = 1,
-    fcuOperatingMode_cool = 2,
-    fcuOperatingMode_fan = 3,
-    fcuOperatingMode_dry = 4,
-    fcuOperatingMode_auto = 5,
-    numFcuOperationModes
-  } FcuOperationMode;
-
 
   class PowerLevelChannel : public ChannelBehaviour
   {
@@ -54,8 +47,21 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "power level"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // 0..100 (cooling or heating)
     virtual double getMax() P44_OVERRIDE { return 100; };
-    
+
   };
+
+  #if ENABLE_FCU_SUPPORT
+
+  /// ventilation airflow direction channel states
+  typedef enum {
+    fcuOperatingMode_off = 0,
+    fcuOperatingMode_heat = 1,
+    fcuOperatingMode_cool = 2,
+    fcuOperatingMode_fan = 3,
+    fcuOperatingMode_dry = 4,
+    fcuOperatingMode_auto = 5,
+    numFcuOperationModes
+  } FcuOperationMode;
 
 
   class FcuOperationModeChannel : public IndexChannel
@@ -83,6 +89,7 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "FCU power state"; };
   };
 
+  #endif // ENABLE_FCU_SUPPORT
 
 
   /// A climate scene
@@ -117,6 +124,7 @@ namespace p44 {
   };
 
 
+  #if ENABLE_FCU_SUPPORT
 
   /// A FCU scene
   class FanCoilUnitScene : public DsScene
@@ -172,7 +180,7 @@ namespace p44 {
     
   };
 
-
+  #endif // ENABLE_FCU_SUPPORT
 
 
   typedef enum {

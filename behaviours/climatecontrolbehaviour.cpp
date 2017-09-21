@@ -96,6 +96,9 @@ DsScenePtr ClimateDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 // MARK: ===== FanCoilUnitScene (specific for FCU behaviour)
 
+#if ENABLE_FCU_SUPPORT
+
+
 FanCoilUnitScene::FanCoilUnitScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo),
   powerState(false),
@@ -241,7 +244,7 @@ DsScenePtr FanCoilUnitDeviceSettings::newDefaultScene(SceneNo aSceneNo)
   return fcuControlScene;
 }
 
-
+#endif // ENABLE_FCU_SUPPORT
 
 
 
@@ -269,6 +272,7 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
     powerLevel = ChannelBehaviourPtr(new PowerLevelChannel(*this));
     addChannel(powerLevel);
   }
+  #if ENABLE_FCU_SUPPORT
   else if (climateDeviceKind==climatedevice_fancoilunit) {
     // power state is the main channel
     powerState = FlagChannelPtr(new FcuPowerStateChannel(*this));
@@ -277,6 +281,7 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
     operationMode = IndexChannelPtr(new FcuOperationModeChannel(*this));
     addChannel(operationMode);
   }
+  #endif // ENABLE_FCU_SUPPORT
 }
 
 
@@ -367,6 +372,7 @@ Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 
 void ClimateControlBehaviour::loadChannelsFromScene(DsScenePtr aScene)
 {
+  #if ENABLE_FCU_SUPPORT
   FanCoilUnitScenePtr fcuScene = boost::dynamic_pointer_cast<FanCoilUnitScene>(aScene);
   if (fcuScene) {
     // power state
@@ -374,6 +380,7 @@ void ClimateControlBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     // operation mode
     operationMode->setChannelValueIfNotDontCare(aScene, fcuScene->operationMode, 0, 0, true);
   }
+  #endif // ENABLE_FCU_SUPPORT
   ClimateControlScenePtr valveScene = boost::dynamic_pointer_cast<ClimateControlScene>(aScene);
   if (valveScene) {
     // heating level
@@ -384,6 +391,7 @@ void ClimateControlBehaviour::loadChannelsFromScene(DsScenePtr aScene)
 
 void ClimateControlBehaviour::saveChannelsToScene(DsScenePtr aScene)
 {
+  #if ENABLE_FCU_SUPPORT
   FanCoilUnitScenePtr fcuScene = boost::dynamic_pointer_cast<FanCoilUnitScene>(aScene);
   if (fcuScene) {
     // power state
@@ -393,6 +401,7 @@ void ClimateControlBehaviour::saveChannelsToScene(DsScenePtr aScene)
     fcuScene->setPVar(fcuScene->operationMode, (FcuOperationMode)operationMode->getChannelValue());
     fcuScene->setSceneValueFlags(operationMode->getChannelIndex(), valueflags_dontCare, false);
   }
+  #endif // ENABLE_FCU_SUPPORT
   ClimateControlScenePtr valveScene = boost::dynamic_pointer_cast<ClimateControlScene>(aScene);
   if (valveScene) {
     // heating level

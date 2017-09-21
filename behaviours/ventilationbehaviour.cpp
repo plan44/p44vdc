@@ -21,6 +21,8 @@
 
 #include "ventilationbehaviour.hpp"
 
+#if ENABLE_FCU_SUPPORT
+
 using namespace p44;
 
 
@@ -420,4 +422,6 @@ string VentilationBehaviour::description()
   s.append(inherited::description());
   return s;
 }
+
+#endif // ENABLE_FCU_SUPPORT
 
