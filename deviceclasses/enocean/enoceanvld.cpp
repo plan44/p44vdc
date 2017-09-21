@@ -25,6 +25,10 @@
 
 #include "enoceanvdc.hpp"
 
+#include "buttonbehaviour.hpp"
+#include "sensorbehaviour.hpp"
+#include "binaryinputbehaviour.hpp"
+
 
 using namespace p44;
 
@@ -72,18 +76,256 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 ) {
   EnoceanDevicePtr newDev; // none so far
   // check for specialized handlers for certain profiles first
-//  if (EEP_PURE(aEEProfile)==0xA52001) {
-//    // Note: Profile has variants (with and without temperature sensor)
-//    // use specialized handler for output functions of heating valve (valve value, summer/winter, prophylaxis)
-//    newDev = EnoceanA52001Handler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
-//  }
-//  else
+  if (EEP_PURE(aEEProfile)==0xD20601) {
+    // Note: Profile has variants (with and without temperature sensor)
+    // use specialized handler for output functions of heating valve (valve value, summer/winter, prophylaxis)
+    newDev = EnoceanD20601Handler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
+  }
+  else
   {
     // check table based sensors, might create more than one device
 // TODO: %%% no real profiles yet"
 //    newDev = EnoceanSensorHandler::newDevice(aVdcP, createVLDDeviceFunc, enoceanVLDdescriptors, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
   return newDev;
+}
+
+
+// MARK: ===== EnoceanD20601Handler
+
+/// sensor bitfield extractor function and check for validity for D2-06-01 profile
+static void D20601SensorHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  uint64_t value = bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  // now pass to behaviour
+  if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
+    // D20601 values all have the last two values in the bitrange reserved for invalid/notsupported value
+    int fieldsize = aSensorDescriptor.msBit-aSensorDescriptor.lsBit+1;
+    uint64_t maxval = (1<<fieldsize)-1;
+    if (value==maxval || value==maxval-1)
+      sb->invalidateSensorValue(); // not a valid value
+    else
+      sb->updateEngineeringValue(value); // update the value
+  }
+}
+
+
+/// binary input bitfield extractor function and check for validity for D2-06-01 profile
+static void D20601InputHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  uint64_t value = bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  // now pass to behaviour
+  if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
+    // D20601 binary values use 4-bit fields, with bit 0=signal and 0xE and 0xF indicating invalid/notsupported
+    if (value==0xF || value==0xE)
+      bb->invalidateInputState(); // not a valid value
+    else
+      bb->updateInputState(value & 1);
+  }
+}
+
+
+/// binary input bitfield extractor function and check for validity for window tilted input in D2-06-01 profile
+static void D20601TiltedHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  uint64_t value = bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  // now pass to behaviour
+  if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
+    // D20601 binary values use 4-bit fields, with 0=undefined, 1..0xD=state and 0xE and 0xF indicating invalid/notsupported
+    if (value==0 || value==0xF || value==0xE)
+      bb->invalidateInputState(); // not a valid value
+    else
+      bb->updateInputState(value==2);
+  }
+}
+
+
+/// binary input bitfield extractor function and check for validity for window handle position input in D2-06-01 profile
+static void D20601HandlePosHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  uint64_t value = bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  // now pass to behaviour
+  if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
+    // D20601 binary values use 4-bit fields, with 0=undefined, 1..0xD=state and 0xE and 0xF indicating invalid/notsupported
+    if (value==0 || value==0xF || value==0xE)
+      bb->invalidateInputState(); // not a valid value
+    else
+      bb->updateInputState(value==2 ? 0 : (value==1 ? 2 : 1)); // handle down->closed, handle up->tilted, everything else -> window open
+  }
+}
+
+
+// configuration for D2-06-01 sensor channels
+
+// - D2-06-01 sensor telegram
+static const p44::EnoceanSensorDescriptor D20601handleposition =
+  { 0, 0x06, 0x01, 0, class_black_joker, group_blue_windows, behaviour_binaryinput, binInpType_windowHandle, usage_undefined, 0, 2, DB(7,7), DB(7,4), 100, 40*60, &D20601HandlePosHandler, "Window Handle State" };
+static const p44::EnoceanSensorDescriptor D20601temperature =
+  { 0, 0x06, 0x01, 0, class_black_joker, group_roomtemperature_control, behaviour_sensor, sensorType_temperature, usage_room, -20, 61.6, DB(4,7), DB(4,0), 100, 40*60, &D20601SensorHandler, tempText };
+static const p44::EnoceanSensorDescriptor D20601humidity =
+  { 0, 0x06, 0x01, 0, class_black_joker, group_roomtemperature_control, behaviour_sensor, sensorType_humidity, usage_room, 0, 127.5, DB(3,7), DB(3,0), 100, 40*60, &D20601SensorHandler, humText };
+static const p44::EnoceanSensorDescriptor D20601illumination =
+  { 0, 0x06, 0x01, 0, class_black_joker, group_yellow_light, behaviour_sensor, sensorType_illumination, usage_undefined, 0, 65535, DB(2,7), DB(1,0), 100, 40*60, &D20601SensorHandler, illumText };
+static const p44::EnoceanSensorDescriptor D20601battery =
+  { 0, 0x06, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_none, usage_undefined, 0, 155, DB(0,7), DB(0,3), 100, 40*60, &D20601SensorHandler, supplyText };
+static const p44::EnoceanSensorDescriptor D20601burglaryAlarm =
+  { 0, 0x06, 0x01, 0, class_red_security, group_red_security, behaviour_binaryinput, binInpType_none, usage_undefined, 0, 1, DB(8,7), DB(8,4), 100, 40*60, &D20601InputHandler, "Burglary alarm" };
+static const p44::EnoceanSensorDescriptor D20601protectionAlarm =
+  { 0, 0x06, 0x01, 0, class_red_security, group_red_security, behaviour_binaryinput, binInpType_none, usage_undefined, 0, 1, DB(8,3), DB(8,0), 100, 40*60, &D20601InputHandler, "Protection alarm" };
+static const p44::EnoceanSensorDescriptor D20601motion =
+  { 0, 0x06, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_motion, usage_undefined, 0, 1, DB(5,7), DB(5,4), 100, 40*60, &D20601InputHandler, motionText };
+static const p44::EnoceanSensorDescriptor D20601tilt =
+  { 0, 0x06, 0x01, 0, class_black_joker, group_blue_windows, behaviour_binaryinput, binInpType_none, usage_undefined, 0, 1, DB(7,3), DB(7,0), 100, 40*60, &D20601TiltedHandler, "Window tilted" };
+
+
+EnoceanD20601Handler::EnoceanD20601Handler(EnoceanDevice &aDevice) :
+  inherited(aDevice)
+{
+}
+
+// static factory method
+EnoceanDevicePtr EnoceanD20601Handler::newDevice(
+  EnoceanVdc *aVdcP,
+  EnoceanAddress aAddress,
+  EnoceanSubDevice &aSubDeviceIndex, // current subdeviceindex, factory returns NULL when no device can be created for this subdevice index
+  EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer,
+  bool aSendTeachInResponse
+) {
+  // D2-06-01 - Multisensor Window Handle
+  // - e.g. SODA S8
+  // create devices
+  EnoceanDevicePtr newDev; // none so far
+  int numdevices = 3; // subindex 0,1 = buttons, 2 = sensors
+  if (aSubDeviceIndex<numdevices) {
+    // create EnoceanRPSDevice device
+    newDev = EnoceanDevicePtr(new EnoceanVLDDevice(aVdcP));
+    // standard device settings without scene table
+    newDev->installSettings();
+    // assign channel and address
+    newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
+    // assign EPP information
+    newDev->setEEPInfo(aEEProfile, aEEManufacturer);
+    if (aSubDeviceIndex<2) {
+      // buttons
+      newDev->setFunctionDesc("button");
+      // set icon name: generic button
+      newDev->setIconInfo("button", true);
+      // buttons can be used for anything
+      newDev->setColorClass(class_black_joker);
+      // Create single handler, up button for even aSubDevice, down button for odd aSubDevice
+      int bidx = aSubDeviceIndex & 0x01; // 0 or 1
+      EnoceanChannelHandlerPtr buttonHandler = EnoceanChannelHandlerPtr(new EnoceanD20601ButtonHandler(*newDev.get(), bidx));
+      ButtonBehaviourPtr buttonBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
+      buttonBhvr->setHardwareButtonConfig(0, buttonType_2way, bidx==0 ? buttonElement_down : buttonElement_up, false, 1-bidx, 2); // combined by default, combinable in pairs
+      buttonBhvr->setGroup(group_grey_shadow); // pre-configure for shadow
+      buttonBhvr->setHardwareName(bidx==0 ? "down key" : "up key");
+      buttonHandler->behaviour = buttonBhvr;
+      newDev->addChannelHandler(buttonHandler);
+      // count it
+      // - separate buttons use all indices 0,1,2,3...
+      aSubDeviceIndex++;
+    }
+    else if (aSubDeviceIndex==2) {
+      // this sensor carrying device
+      newDev->setFunctionDesc("multisensor window handle");
+      // set icon name: enocean device
+      //newDev->setIconInfo("enocean", true);
+      // sensors are not specifically targeted
+      newDev->setColorClass(class_black_joker);
+      // - create D2-06-01 specific handler (which handles all sensors and inputs, but not buttons)
+      EnoceanD20601HandlerPtr newHandler = EnoceanD20601HandlerPtr(new EnoceanD20601Handler(*newDev.get()));
+      // - channel-built-in behaviour is main function = window position
+      newHandler->behaviour = EnoceanSensorHandler::newSensorBehaviour(D20601handleposition, newDev, NULL); // automatic id;
+      newDev->addChannelHandler(newHandler);
+      // - add extra sensors
+      newHandler->temperatureSensor = EnoceanSensorHandler::newSensorBehaviour(D20601temperature, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->temperatureSensor);
+      newHandler->humiditySensor = EnoceanSensorHandler::newSensorBehaviour(D20601humidity, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->humiditySensor);
+      newHandler->illuminationSensor = EnoceanSensorHandler::newSensorBehaviour(D20601illumination, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->illuminationSensor);
+      newHandler->batterySensor = EnoceanSensorHandler::newSensorBehaviour(D20601battery, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->batterySensor);
+      // - and input behaviours
+      newHandler->burglaryAlarmInput = EnoceanSensorHandler::newSensorBehaviour(D20601burglaryAlarm, newDev, "burglary"); // specific id
+      newDev->addBehaviour(newHandler->burglaryAlarmInput);
+      newHandler->protectionAlarmInput = EnoceanSensorHandler::newSensorBehaviour(D20601protectionAlarm, newDev, "protection"); // specific id
+      newDev->addBehaviour(newHandler->protectionAlarmInput);
+      newHandler->motionInput = EnoceanSensorHandler::newSensorBehaviour(D20601motion, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->motionInput);
+      newHandler->tiltInput = EnoceanSensorHandler::newSensorBehaviour(D20601tilt, newDev, "tilted"); // specific id
+      newDev->addBehaviour(newHandler->tiltInput);
+      // count it
+      aSubDeviceIndex++;
+    }
+  }
+  // return device (or empty if none created)
+  return newDev;
+}
+
+
+
+// handle incoming data from device and extract data for this channel
+void EnoceanD20601Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
+{
+  if (!aEsp3PacketPtr->radioHasTeachInfo()) {
+    // only look at non-teach-in packets
+    uint8_t *dataP = aEsp3PacketPtr->radioUserData();
+    int datasize = (int)aEsp3PacketPtr->radioUserDataLength();
+    if (datasize!=10) return; // wrong data size
+    // check message type
+    if (dataP[0]==0x00) {
+      // Sensor Values message
+      if (behaviour) handleBitField(D20601handleposition, behaviour, dataP, datasize);
+      if (temperatureSensor) handleBitField(D20601temperature, behaviour, dataP, datasize);
+      if (humiditySensor) handleBitField(D20601humidity, humiditySensor, dataP, datasize);
+      if (illuminationSensor) handleBitField(D20601illumination, illuminationSensor, dataP, datasize);
+      if (batterySensor) handleBitField(D20601battery, batterySensor, dataP, datasize);
+      if (burglaryAlarmInput) handleBitField(D20601burglaryAlarm, burglaryAlarmInput, dataP, datasize);
+      if (protectionAlarmInput) handleBitField(D20601protectionAlarm, protectionAlarmInput, dataP, datasize);
+      if (motionInput) handleBitField(D20601motion, motionInput, dataP, datasize);
+      if (tiltInput) handleBitField(D20601tilt, tiltInput, dataP, datasize);
+    }
+  }
+}
+
+
+string EnoceanD20601Handler::shortDesc()
+{
+  return "Multisensor Window Handle";
+}
+
+
+
+// MARK: ===== EnoceanD20601ButtonHandler
+
+EnoceanD20601ButtonHandler::EnoceanD20601ButtonHandler(EnoceanDevice &aDevice, int aSwitchIndex) :
+  inherited(aDevice)
+{
+  switchIndex = aSwitchIndex;
+  pressed = false;
+}
+
+
+// device specific radio packet handling
+void EnoceanD20601ButtonHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
+{
+  // BR = down = index 0 = DB(6,7..4)
+  // BL = up = index 1 = DB(6,3..0)
+  uint8_t buttonActivity = (aEsp3PacketPtr->radioUserData()[3]>>(switchIndex ? 0 : 4)) & 0x0F;
+  ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(behaviour);
+  if (bb) {
+    if (buttonActivity==1)
+      bb->buttonAction(true); // pressed
+    else if (buttonActivity==2)
+      bb->buttonAction(false); // released
+  }
+}
+
+
+string EnoceanD20601ButtonHandler::shortDesc()
+{
+  return "Window Handle Button";
 }
 
 

@@ -84,7 +84,7 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, uint16_t aFirstLED, uint16_t 
   // just color light settings, which include a color scene table
   installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
   // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
-  RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this));
+  RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
   // - set minimum brightness
   l->initMinBrightness(getLedChainVdc().getMinBrightness());
   addBehaviour(l);

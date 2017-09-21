@@ -78,7 +78,7 @@ namespace p44 {
     /// set a new type
     /// @param aType to convert object into
     /// @note existing data will be discarded (not converted)!
-    virtual void setType(ApiValueType aType);
+    void setType(ApiValueType aType);
 
     /// set API value to value of another API value
     /// @param aApiValue to get value of

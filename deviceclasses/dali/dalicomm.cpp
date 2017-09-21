@@ -51,6 +51,8 @@ DaliComm::DaliComm(MainLoop &aMainLoop) :
   sendEdgeAdj(DEFAULT_SENDING_EDGE_ADJUSTMENT),
   samplePointAdj(DEFAULT_SAMPLING_POINT_ADJUSTMENT)
 {
+  // serialqueue needs a buffer as we use NOT_ENOUGH_BYTES mechanism
+  setAcceptBuffer(21); // actually min 3 bytes for EVENT_CODE_FOREIGN_FRAME
 }
 
 
@@ -92,41 +94,6 @@ bool DaliComm::isBusy()
 
 
 // MARK: ===== DALI bridge low level communication
-
-// DALI Bridge commands and responses
-// ==================================
-//
-// bridge commands
-// - one byte commands 0..7
-#define CMD_CODE_RESET 0  // reset
-#define CMD_CODE_VERSION 1 // get version
-
-// - three byte commands 8..n
-#define CMD_CODE_SEND16 0x10 // send 16-bit DALI sequence, return RESP_ACK when done
-#define CMD_CODE_2SEND16 0x11 // double send 16-bit DALI sequence with 10mS gap in between, return RESP_ACK when done
-#define CMD_CODE_SEND16_REC8 0x12 // send 16-bit command, receive one 8-bit DALI response, return RESP_DATA when data received, RESP_ACK with error code
-// - 3 byte debug commands
-#define CMD_CODE_ECHO_DATA1 0x41 // returns RESP_DATA echoing DATA1
-#define CMD_CODE_ECHO_DATA2 0x42 // returns RESP_DATA echoing DATA2
-#define CMD_CODE_OVLRESET 0x43 // reset overload, DATA1 0=autoreset enabled, 1=autoreset disabled, 0x55=overload detector disabled
-#define CMD_CODE_EDGEADJ 0x44 // set DALI sending edge adjustment, DATA1=sending delay for going-inactive edge, DATA2=delay of sampling point, in number of 1/256th periods (with actual resolution of 1/16th bit for now)
-
-// bridge responses
-#define RESP_CODE_ACK 0x2A // * reponse for all commands that do not return data, second byte is status
-#define RESP_CODE_ACK_RETRIED 0x2B // + command has executed with at least one retry
-#define RESP_CODE_DATA 0x3D // = response for commands that return data, second byte is data
-#define RESP_CODE_DATA_RETRIED 0x3E // > response with data, but has executed with at least one retry
-// - ACK status codes
-#define ACK_OK 0x30 // ok status
-#define ACK_TIMEOUT 0x31 // timeout receiving from DALI
-#define ACK_FRAME_ERR 0x32 // rx frame error
-#define ACK_OVERLOAD 0x33 // bus overload (max current for longer period = possibly shortened)
-#define ACK_INVALIDCMD 0x39 // invalid command
-
-//#define BUFFERED_BRIDGE_RESPONSES_HIGH 35 // Rx buf in bridge is 80 bytes = 40 answers, only use 35 to make sure
-//#define BUFFERED_BRIDGE_RESPONSES_LOW 5 // low watermark to restart sending
-#define BUFFERED_BRIDGE_RESPONSES_HIGH 5 // Conservative to prevent lockup
-#define BUFFERED_BRIDGE_RESPONSES_LOW 2 // low watermark to restart sending
 
 
 static const char *bridgeCmdName(uint8_t aBridgeCmd)
@@ -325,18 +292,34 @@ void DaliComm::daliQueryResponseHandler(DaliQueryResultCB aResultCB, uint8_t aRe
 
 ssize_t DaliComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
 {
-  // no bridge answers expected -> consume any extra bytes.
-  // DALI bridge protocol NEVER sends data on its own, so
-  // extra bytes while no response expected are always sign of desynchronisation
-  if (FOCUSLOGENABLED) {
-    string b;
-    b.assign((char *)aBytes, aNumBytes);
-    FOCUSLOG("DALI bridge: received extra bytes (%s) -> bridge was apparently out of sync", binaryToHexString(b, ' ').c_str());
+  // before bridge V6, no data is expected except answers for commands
+  // from bridge V6 onwards, bridge may send event data using EVENT_CODE_FOREIGN_FRAME
+  #if ENABLE_DALI_INPUTS
+  if (aBytes[0]==EVENT_CODE_FOREIGN_FRAME) {
+    if (aNumBytes<3) return NOT_ENOUGH_BYTES;
+    // detected forward frame on the bus from another master
+    LOG(LOG_INFO, "DALI bridge event: 0x%02X 0x%02X 0x%02X from other master on bus", aBytes[0], aBytes[1], aBytes[2]);
+    // invoke handler
+    if (bridgeEventHandler) {
+      bridgeEventHandler(aBytes[0], aBytes[1], aBytes[2]);
+    }
+    return 3; // 3 bytes of event message consumed, but no more
   }
-  else {
-    LOG(LOG_WARNING,"DALI bridge: received %zu extra bytes -> bridge was apparently out of sync", aNumBytes);
+  else
+  #endif
+  {
+    // no forward frame event and no bridge answers expected -> consume any extra bytes.
+    // extra bytes while no response expected are always sign of desynchronisation
+    if (FOCUSLOGENABLED) {
+      string b;
+      b.assign((char *)aBytes, aNumBytes);
+      FOCUSLOG("DALI bridge: received extra bytes (%s) -> bridge was apparently out of sync", binaryToHexString(b, ' ').c_str());
+    }
+    else {
+      LOG(LOG_WARNING,"DALI bridge: received %zu extra bytes -> bridge was apparently out of sync", aNumBytes);
+    }
+    return aNumBytes;
   }
-  return aNumBytes;
 }
 
 
@@ -563,17 +546,39 @@ uint8_t DaliComm::dali1FromAddress(DaliAddress aAddress)
 
 DaliAddress DaliComm::addressFromDaliResponse(uint8_t aResponse)
 {
-  aResponse &= 0xFE;
+  aResponse &= 0xFE; // mask out direct arc bit
   if (aResponse==0xFE) {
     return DaliBroadcast; // broadcast
   }
-  else if (aResponse & 0x80) {
+  else if ((aResponse & 0xC0)==0x80) {
     return ((aResponse>>1) & DaliGroupMask) + DaliGroup;
   }
-  else {
+  else if ((aResponse & 0xC0)==0x00) {
     return (aResponse>>1) & DaliAddressMask; // device short address
   }
+  else {
+    return NoDaliAddress; // is not a DALI address
+  }
 }
+
+
+string DaliComm::formatDaliAddress(DaliAddress aAddress)
+{
+  if (aAddress==DaliBroadcast) {
+    return "broadcast";
+  }
+  else if (aAddress & DaliGroup) {
+    return string_format("group address %d", aAddress & DaliGroupMask); // group address
+  }
+  else if (aAddress & DaliScene) {
+    return string_format("scene number %d", aAddress & DaliSceneMask); // scene number (not really an address...)
+  }
+  else {
+    return string_format("short address %d", aAddress & DaliAddressMask); // single device address
+  }
+}
+
+
 
 
 // MARK: ===== DALI bus data R/W test

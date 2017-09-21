@@ -274,7 +274,7 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour
-    virtual const char *behaviourTypeIdentifier() { return "shadow"; };
+    virtual const char *behaviourTypeIdentifier() P44_FINAL { return "shadow"; };
 
     /// the channels
     ShadowPositionChannelPtr position;

@@ -67,7 +67,9 @@ namespace p44 {
     scene_cmd_audio_resume_on, ///< audio: Resume On
     scene_cmd_climatecontrol_disable, ///< climate control: switch to system disabled (summer mode)
     scene_cmd_climatecontrol_enable, ///< climate control: switch to system enabled (winter mode)
-    scene_cmd_climatecontrol_valve_prophylaxis ///< climate control: Valve prophylaxis
+    scene_cmd_climatecontrol_valve_prophylaxis, ///< climate control: Valve prophylaxis
+    scene_cmd_climatecontrol_enable_heating,    ///< climate control: Enable heating mode
+    scene_cmd_climatecontrol_enable_cooling     ///< climate control: Enable cooling mode
   } SceneCmd;
   
 

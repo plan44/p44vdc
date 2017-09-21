@@ -65,7 +65,7 @@ namespace p44 {
 
 
   public:
-    HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, const string &aUniqueID);
+    HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool aCTOnly, const string &aUniqueID);
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;

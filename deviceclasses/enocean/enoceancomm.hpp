@@ -73,6 +73,7 @@ namespace p44 {
     rorg_VLD = 0xD2, ///< Variable Length Data
     rorg_MSC = 0xD1, ///< Manufacturer specific communication
     rorg_ADT = 0xA6, ///< Adressing Destination Telegram
+    rorg_UTE = 0xD4, ///< UTE - Universal TEach-in
     rorg_SM_LRN_REQ = 0xC6, ///< Smart Ack Learn Request
     rorg_SM_LRN_ANS = 0xC7, ///< Smart Ack Learn Answer
     rorg_SM_REC = 0xA7, ///< Smart Ack Reclaim
@@ -193,7 +194,6 @@ namespace p44 {
       ps_dataread,
       ps_complete
     } PacketState;
-
 
   private:
     // packet contents
@@ -353,7 +353,7 @@ namespace p44 {
     /// @note is valid for all telegrams, returns rorg_invalid for non-radio telegrams
     RadioOrg eepRorg();
 
-    /// 
+    /// returns true if radio packet has teach-in info
     /// @param aMinLearnDBm if!=0, learn-in info must have at least aMinLearnDBm radio signal strength
     ///   for implicit learn-in information (RPS switches, window handle, key card)
     /// @param aMinDBmForAll if set, all learn-in is considered valid only when aMinLearnDBm signal strength is found
@@ -362,6 +362,11 @@ namespace p44 {
     /// Note: 4BS teach-in without EEP information (D0.7 cleared) will still return true, as these ARE teach-in telegrams,
     ///   however eepProfile will return func_unknown and type_unknown in this case
     bool radioHasTeachInfo(int aMinLearnDBm=0, bool aMinDBmForAll=false);
+
+    /// check type of teach-in info
+    /// @return yes if specificially for teach-in, no if specifically for teach-out, undefined if both possible
+    /// @note only returns meaningful information if isTeachInfoValid() returns true
+    Tristate teachInfoType();
 
     /// @return EEP signature as 0x00rrfftt (rr=RORG, ff=FUNC, tt=TYPE)
     ///   ff and tt can be func_unknown or type_unknown if not extractable from telegram

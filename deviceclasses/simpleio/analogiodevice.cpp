@@ -99,7 +99,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
         // - use color light settings, which include a color scene table
         installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
         // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
-        RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this));
+        RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
         addBehaviour(l);
       }
     }

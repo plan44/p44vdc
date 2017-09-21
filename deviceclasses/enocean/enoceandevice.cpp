@@ -337,37 +337,59 @@ string EnoceanDevice::description()
 
 
 
-bool EnoceanDevice::getProfileVariants(ApiValuePtr aApiObjectValue)
+void EnoceanDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB)
 {
   // check if current profile is one of the interchangeable ones
   const ProfileVariantEntry *currentVariant = profileVariantsTable();
+  bool anyVariants = false;
   while (currentVariant && currentVariant->profileGroup!=0) {
     // look for current EEP in the list of variants
     if (getEEProfile()==currentVariant->eep) {
       // create string from all other variants (same profileGroup), if any
-      bool anyVariants = false;
       const ProfileVariantEntry *variant = profileVariantsTable();
       while (variant->profileGroup!=0) {
         if (variant->profileGroup==currentVariant->profileGroup) {
           if (variant->eep!=getEEProfile()) anyVariants = true; // another variant than just myself
-          aApiObjectValue->add(string_format("%d",variant->eep), aApiObjectValue->newString(variant->description));
+          string id;
+          if (variant->configId)
+            id = variant->configId; // has well-known configuration id
+          else
+            id = string_format("eep_%08X", variant->eep); // id generated from EEP
+          aConfigurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, variant->description)));
         }
         variant++;
       }
-      // there are variants
-      return anyVariants;
+      break;
     }
     currentVariant++;
   }
-  return false; // no variants
+  if (!anyVariants) aConfigurations.clear(); // prevent single option to show at all
+  if (aStatusCB) aStatusCB(ErrorPtr());
 }
 
 
-bool EnoceanDevice::setProfileVariant(EnoceanProfile aProfile)
+string EnoceanDevice::getDeviceConfigurationId()
 {
-  // verify if changeable profile code requested
-  // - check for already having that profile
-  if (aProfile==getEEProfile()) return true; // we already have that profile -> NOP
+  const ProfileVariantEntry *currentVariant = profileVariantsTable();
+  while (currentVariant && currentVariant->profileGroup!=0) {
+    if (currentVariant->configId && getEEProfile()==currentVariant->eep) {
+      return currentVariant->configId; // has a well-known name, return that
+    }
+    currentVariant++;
+  }
+  // return a id generated from EEP
+  return  string_format("eep_%08X", getEEProfile());
+}
+
+
+
+ErrorPtr EnoceanDevice::switchConfiguration(const string aConfigurationId)
+{
+  EnoceanProfile newProfile = 0;
+  unsigned long np;
+  if (sscanf(aConfigurationId.c_str(), "eep_%lx", &np)==1) {
+    newProfile = (EnoceanProfile)np;
+  }
   // - find my profileGroup
   const ProfileVariantEntry *currentVariant = profileVariantsTable();
   while (currentVariant && currentVariant->profileGroup!=0) {
@@ -375,17 +397,22 @@ bool EnoceanDevice::setProfileVariant(EnoceanProfile aProfile)
       // this is my profile group, now check if requested profile is in my profile group as well
       const ProfileVariantEntry *variant = profileVariantsTable();
       while (variant && variant->profileGroup!=0) {
-        if (variant->profileGroup==currentVariant->profileGroup && variant->eep==aProfile) {
+        if (
+          (variant->profileGroup==currentVariant->profileGroup) &&
+          ((newProfile!=0 && newProfile==variant->eep) || (newProfile==0 && variant->configId && aConfigurationId==variant->configId))
+        ) {
+          // prevent switching if new profile is same as current one
+          if (variant->eep==currentVariant->eep) return ErrorPtr(); // we already have that profile -> NOP
           // requested profile is in my group, change now
           switchProfiles(*currentVariant, *variant); // will delete this device, so return immediately afterwards
-          return true; // changed profile
+          return ErrorPtr(); // changed profile
         }
         variant++;
       }
     }
     currentVariant++;
   }
-  return false; // invalid profile
+  return inherited::switchConfiguration(aConfigurationId); // unknown profile at this level
 }
 
 
@@ -448,8 +475,6 @@ void EnoceanDevice::switchProfiles(const ProfileVariantEntry &aFromVariant, cons
 
 
 enum {
-  profileVariants_key,
-  profile_key,
   packetage_key,
   rssi_key,
   repeaterCount_key,
@@ -474,8 +499,6 @@ int EnoceanDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor
 PropertyDescriptorPtr EnoceanDevice::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numProperties] = {
-    { "x-p44-profileVariants", apivalue_null, profileVariants_key, OKEY(enoceanDevice_key) },
-    { "x-p44-profile", apivalue_int64, profile_key, OKEY(enoceanDevice_key) },
     { "x-p44-packetAge", apivalue_double, packetage_key, OKEY(enoceanDevice_key) },
     { "x-p44-rssi", apivalue_int64, rssi_key, OKEY(enoceanDevice_key) },
     { "x-p44-repeaterCount", apivalue_int64, repeaterCount_key, OKEY(enoceanDevice_key) },
@@ -502,11 +525,6 @@ bool EnoceanDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
-        case profileVariants_key:
-          aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
-          return getProfileVariants(aPropValue);
-        case profile_key:
-          aPropValue->setInt32Value(getEEProfile()); return true;
         case packetage_key:
           // Note lastPacketTime is set to now at startup, so additionally check lastRSSI
           if (lastPacketTime==Never || lastRSSI<=-999)
@@ -526,13 +544,6 @@ bool EnoceanDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
           else
             aPropValue->setUint8Value(lastRepeaterCount);
           return true;
-      }
-    }
-    else {
-      // write properties
-      switch (aPropertyDescriptor->fieldKey()) {
-        case profile_key:
-          setProfileVariant(aPropValue->int32Value()); return true;
       }
     }
   }

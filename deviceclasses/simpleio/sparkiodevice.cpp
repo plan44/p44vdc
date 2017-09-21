@@ -134,7 +134,7 @@ void SparkLightScene::setDefaultSceneValues(SceneNo aSceneNo)
 
 
 SparkLightBehaviour::SparkLightBehaviour(Device &aDevice) :
-  inherited(aDevice)
+  inherited(aDevice, false)
 {
   // add special spark mode channel
   sparkmode = ChannelBehaviourPtr(new SparkModeChannel(*this));

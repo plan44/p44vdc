@@ -38,6 +38,60 @@
 using namespace p44;
 
 
+// MARK: ===== DeviceConfigurationDescriptor
+
+
+enum {
+  dcd_description_key,
+  numDcdProperties
+};
+
+static char dcd_key;
+
+
+int DeviceConfigurationDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return numDcdProperties;
+}
+
+
+PropertyDescriptorPtr DeviceConfigurationDescriptor::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  // device level properties
+  static const PropertyDescription properties[numDcdProperties] = {
+    { "description", apivalue_string, dcd_description_key, OKEY(dcd_key) },
+  };
+  if (aParentDescriptor->isRootOfObject()) {
+    // root level property of this object hierarchy
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+bool DeviceConfigurationDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(dcd_key) && aMode==access_read) {
+    switch (aPropertyDescriptor->fieldKey()) {
+      case dcd_description_key: aPropValue->setStringValue(description); return true;
+    }
+  }
+  return false;
+}
+
+
+// Well-known device configuration id strings
+namespace p44 { namespace DeviceConfigurations {
+
+  const char *buttonSingle = "oneWay";
+  const char *buttonTwoWay = "twoWay";
+  const char *buttonTwoWayReversed = "twoWayInverse";
+
+} }
+
+
+
+
 // MARK: ===== Device
 
 
@@ -210,6 +264,7 @@ DsClass Device::getDominantColorClass()
 }
 
 
+
 bool Device::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   if (getClassColoredIcon("vdsd", getDominantColorClass(), aIcon, aWithData, aResolutionPrefix))
@@ -217,6 +272,30 @@ bool Device::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutio
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
 }
+
+
+
+void Device::getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB)
+{
+  aConfigurations.clear();
+  if (aStatusCB) aStatusCB(ErrorPtr());
+}
+
+
+
+string Device::getDeviceConfigurationId()
+{
+  return ""; // base class: no configuration ID
+}
+
+
+
+ErrorPtr Device::switchConfiguration(const string aConfigurationId)
+{
+  // base class: no known configurations
+  return WebError::webErr(404, "Unknown configurationId '%s'", aConfigurationId.c_str());
+}
+
 
 
 void Device::installSettings(DeviceSettingsPtr aDeviceSettings)
@@ -367,9 +446,13 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       }
       return no; // no button that supports local key mode
     case modelFeature_pushbcombined:
-    case modelFeature_twowayconfig:
-      // Assumption: devices with more than single button input are combined up/down (or even 4-way and more) buttons, and need two-way config
-      return buttons.size()>1 ? yes : no;
+      return no; // this is for SDS200 only, does not make sense with vdcs at all
+    case modelFeature_twowayconfig: {
+      // devices with one button that has combinables>1 can possibly be combined and thus need this modelfeature to show the UI
+      if (buttons.size()!=1) return no; // none or multiple buttons in this device -> not combinable
+      ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[0]);
+      return b->combinables>1 ? yes : no;
+    }
     case modelFeature_highlevel:
       // Assumption: only black joker devices can have a high-level (app) functionality
       return colorClass==class_black_joker ? yes : no;
@@ -453,7 +536,20 @@ ChannelBehaviourPtr Device::getChannelById(const string aChannelId, bool aPendin
 ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
-  if (aMethod=="x-p44-removeDevice") {
+  if (aMethod=="setConfiguration") {
+    ApiValuePtr o = aParams->get("configurationId");
+    if (!o) {
+      respErr = WebError::webErr(400, "missing configurationId parameter");
+    }
+    else {
+      DevicePtr keepAlive(this); // make sure we live long enough to send result
+      respErr = switchConfiguration(o->stringValue());
+      if (Error::isOK(respErr)) {
+        aRequest->sendResult(ApiValuePtr());
+      }
+    }
+  }
+  else if (aMethod=="x-p44-removeDevice") {
     if (isSoftwareDisconnectable()) {
       // confirm first, because device will get deleted in the process
       aRequest->sendResult(ApiValuePtr());
@@ -1561,6 +1657,9 @@ enum {
   undoState_key,
   // model features
   modelFeatures_key,
+  // device configurations
+  configurationDescriptions_key,
+  configurationId_key,
   // device class
   deviceClass_key,
   deviceClassVersion_key,
@@ -1584,6 +1683,8 @@ static char device_channels_key;
 static char device_scenes_key;
 
 static char device_modelFeatures_key;
+static char device_configurations_key;
+
 
 
 int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
@@ -1607,6 +1708,9 @@ int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
   }
   else if (aParentDescriptor->hasObjectKey(device_channels_key)) {
     return numChannels(); // if no output, this returns 0
+  }
+  else if (aParentDescriptor->hasObjectKey(device_configurations_key)) {
+    return (int)cachedConfigurations.size();
   }
   else if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
     SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
@@ -1654,6 +1758,9 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     { "undoState", apivalue_object, undoState_key, OKEY(device_key) },
     // the modelFeatures (row from former dSS visibility matrix, controlling what is shown in the UI)
     { "modelFeatures", apivalue_object+propflag_container, modelFeatures_key, OKEY(device_modelFeatures_key) },
+    // the current and possible configurations for the device (button two-way vs. 2 one-way etc.)
+    { "configurationDescriptions", apivalue_object+propflag_container+propflag_needsreadprep, configurationDescriptions_key, OKEY(device_configurations_key) },
+    { "configurationId", apivalue_string, configurationId_key, OKEY(device_key) },
     // device class
     { "deviceClass", apivalue_string, deviceClass_key, OKEY(device_key) },
     { "deviceClassVersion", apivalue_uint64, deviceClassVersion_key, OKEY(device_key) }
@@ -1678,9 +1785,8 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
       return descP;
     }
   }
-  #if ACCESS_BY_ID
   else if (aParentDescriptor->isArrayContainer()) {
-    // accessing one of the other containers: channels, buttons/inputs/sensors or scenes
+    // accessing one of the other containers: channels, buttons/inputs/sensors, scenes or configurations
     string id;
     if (aParentDescriptor->hasObjectKey(device_buttons_key)) {
       id = buttons[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
@@ -1698,6 +1804,9 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
       // scenes are still named by their index
       id = string_format("%d", aPropIndex);
     }
+    else if (aParentDescriptor->hasObjectKey(device_configurations_key)) {
+      id = cachedConfigurations[aPropIndex]->getId();
+    }
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyName = id;
     descP->propertyType = apivalue_object;
@@ -1705,7 +1814,6 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     descP->propertyObjectKey = aParentDescriptor->objectKey();
     return descP;
   }
-  #endif
   return PropertyDescriptorPtr();
 }
 
@@ -1713,7 +1821,6 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
 
 PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
 {
-  #if ACCESS_BY_ID
   // efficient by-index access for scenes, as these are always accessed by index (they do not have a id)
   if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
     // array-like container: channels, buttons/inputs/sensors or scenes
@@ -1754,60 +1861,6 @@ PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStart
     aStartIndex++;
     return descP;
   }
-  #else
-  if (
-    aParentDescriptor && aParentDescriptor->isArrayContainer() &&
-    !aParentDescriptor->hasObjectKey(device_modelFeatures_key) // these are handled by base class via getDescriptorByIndex
-  ) {
-    // array-like container: channels, buttons/inputs/sensors or scenes
-    PropertyDescriptorPtr propDesc;
-    bool numericName = getNextPropIndex(aPropMatch, aStartIndex);
-    if (numericName && aParentDescriptor->hasObjectKey(device_channels_key)) {
-      // specific channel addressed by type, look up index for it
-      DsChannelType ct = (DsChannelType)aStartIndex;
-      aStartIndex = PROPINDEX_NONE; // default: not found
-      // there is an output
-      ChannelBehaviourPtr cb = getChannelByType(ct);
-      if (cb) {
-        aStartIndex = (int)cb->getChannelIndex();
-      }
-    }
-    int n = numProps(aDomain, aParentDescriptor);
-    if (aStartIndex!=PROPINDEX_NONE && aStartIndex<n) {
-      // within range, create descriptor
-      DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-      if (aParentDescriptor->hasObjectKey(device_channels_key)) {
-        // is a channel
-        if (numericName) {
-          // query specified a channel number -> return same number in result (to return "0" when default channel "0" was explicitly queried)
-          descP->propertyName = aPropMatch; // query = name of object
-        }
-        else {
-          // wildcard, result object is named after channelType
-          ChannelBehaviourPtr cb = getChannelByIndex(aStartIndex);
-          if (cb) {
-            descP->propertyName = string_format("%d", cb->getChannelType());
-          }
-        }
-      }
-      else {
-        // is a scene/button/input/sensor, name by index
-        descP->propertyName = string_format("%d", aStartIndex);
-      }
-      descP->propertyType = aParentDescriptor->type();
-      descP->propertyFieldKey = aStartIndex;
-      descP->propertyObjectKey = aParentDescriptor->objectKey();
-      propDesc = PropertyDescriptorPtr(descP);
-      // advance index
-      aStartIndex++;
-    }
-    if (aStartIndex>=n || numericName) {
-      // no more descriptors OR specific descriptor accessed -> no "next" descriptor
-      aStartIndex = PROPINDEX_NONE;
-    }
-    return propDesc;
-  }
-  #endif
   // None of the containers within Device - let base class handle Device-Level properties
   return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
 }
@@ -1847,6 +1900,9 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aProperty
     }
     return NULL; // no output or special output with no standard properties (e.g. actionOutput)
   }
+  else if (aPropertyDescriptor->hasObjectKey(device_configurations_key)) {
+    return cachedConfigurations[aPropertyDescriptor->fieldKey()];
+  }
   else if (aPropertyDescriptor->hasObjectKey(device_key)) {
     // device level object properties
     if (aPropertyDescriptor->fieldKey()==undoState_key) {
@@ -1855,6 +1911,25 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aProperty
   }
   // unknown here
   return NULL;
+}
+
+
+
+void Device::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+{
+  if (aPropertyDescriptor->hasObjectKey(device_configurations_key)) {
+    // have device create these
+    getDeviceConfigurations(cachedConfigurations, aPreparedCB);
+  }
+}
+
+
+void Device::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(device_configurations_key)) {
+    // we dont need these any more
+    cachedConfigurations.clear();
+  }
 }
 
 
@@ -1882,6 +1957,9 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           aPropValue->setBoolValue(isSoftwareDisconnectable()); return true;
         case teachinSignals_key:
           aPropValue->setInt8Value(teachInSignal(-1)); return true; // query number of teach-in signals
+        case configurationId_key:
+          if (getDeviceConfigurationId().empty()) return false; // device does not have multiple configurations
+          aPropValue->setStringValue(getDeviceConfigurationId()); return true; // current device configuration
       }
     }
     else {

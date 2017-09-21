@@ -40,6 +40,24 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
   inherited::setDefaultSceneValues(aSceneNo);
   // Add special climate behaviour scene commands
   switch (aSceneNo) {
+    case CLIMATE_HEAT_TEMP_OFF:
+    case CLIMATE_HEAT_TEMP_COMFORT:
+    case CLIMATE_HEAT_TEMP_ECO:
+    case CLIMATE_HEAT_TEMP_NOTUSED:
+    case CLIMATE_HEAT_TEMP_NIGHT:
+    case CLIMATE_HEAT_TEMP_HOLIDAY:
+      sceneCmd = scene_cmd_climatecontrol_enable_heating;
+      sceneArea = 0; // not an area scene any more
+      break;
+    case CLIMATE_COOL_TEMP_OFF:
+    case CLIMATE_COOL_TEMP_COMFORT:
+    case CLIMATE_COOL_TEMP_ECO:
+    case CLIMATE_COOL_TEMP_NOTUSED:
+    case CLIMATE_COOL_TEMP_NIGHT:
+    case CLIMATE_COOL_TEMP_HOLIDAY:
+      sceneCmd = scene_cmd_climatecontrol_enable_cooling;
+      sceneArea = 0; // not an area scene any more
+      break;
     case CLIMATE_ENABLE:
       sceneCmd = scene_cmd_climatecontrol_enable;
       sceneArea = 0; // not an area scene any more
@@ -234,10 +252,14 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
   inherited(aDevice),
   climateDeviceKind(aKind),
   heatingSystemCapability(aDefaultHeatingSystemCapability),
+  heatingSystemType(hstype_unknown),
   climateControlIdle(false), // assume valve active
+  climateModeHeating(true),  // assume heating enabled
   runProphylaxis(false), // no run scheduled
   zoneTemperatureUpdated(Never),
-  zoneTemperatureSetPointUpdated(Never)
+  zoneTemperature(0),
+  zoneTemperatureSetPointUpdated(Never),
+  zoneTemperatureSetPoint(0)
 {
   // Note: there is no default group for climate, depends on application and must be set when instantiating the behaviour
   // - add the output channels
@@ -328,8 +350,8 @@ Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
       // heating outputs can't blink
       return no;
     case modelFeature_heatinggroup:
-      // Assumption: virtual heating control devices (valves) do have group and mode setting...
-      return yes;
+      // Only simple heating control devices (valves) do have heating group setting
+      return climateDeviceKind==climatedevice_simple ? yes : no;
     case modelFeature_heatingoutmode:
       // ...but not the more specific PWM and heating props
       return no;
@@ -401,6 +423,14 @@ bool ClimateControlBehaviour::applyScene(DsScenePtr aScene)
       case scene_cmd_climatecontrol_valve_prophylaxis:
         // valve prophylaxis
         runProphylaxis = true;
+        return true;
+      case scene_cmd_climatecontrol_enable_heating:
+        // switch to heating mode
+        climateModeHeating = true;
+        return true;
+      case scene_cmd_climatecontrol_enable_cooling:
+        // switch to cooling mode
+        climateModeHeating = false;
         return true;
       default:
         // all other scene calls are suppressed in group_roomtemperature_control

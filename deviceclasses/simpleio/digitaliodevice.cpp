@@ -85,7 +85,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     buttonInput->setButtonHandler(boost::bind(&DigitalIODevice::buttonHandler, this, _1, _2), true);
     // - create one button input
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
-    b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, false); // mode not restricted
+    b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, 1); // not combinable, but mode not restricted
     b->setHardwareName("digitalin");
     b->setGroup(group_yellow_light); // pre-configure for light
     addBehaviour(b);

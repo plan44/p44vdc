@@ -136,7 +136,7 @@ namespace p44 {
 
 
 
-  /// heating valve handler
+  /// weather station handler
   class EnoceanA5130XHandler : public EnoceanChannelHandler
   {
     typedef EnoceanChannelHandler inherited;

@@ -72,13 +72,13 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     colorClass = class_black_joker;
     // - create down button (index 0)
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"evaldown"));
-    b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, true); // counterpart up-button has buttonIndex 1, fixed mode
+    b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, 0); // counterpart up-button has buttonIndex 1, fixed mode
     b->setHardwareName("off condition met");
     b->setGroup(group_black_variable); // pre-configure for app button
     addBehaviour(b);
     // - create up button (index 1)
     b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"evalup"));
-    b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, true); // counterpart down-button has buttonIndex 0, fixed mode
+    b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, 0); // counterpart down-button has buttonIndex 0, fixed mode
     b->setHardwareName("on condition met");
     b->setGroup(group_black_variable); // pre-configure for app button
     addBehaviour(b);

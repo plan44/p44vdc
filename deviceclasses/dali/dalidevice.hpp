@@ -36,21 +36,23 @@ namespace p44 {
   class DaliVdc;
   class DaliBusDevice;
   class DaliBusDeviceGroup;
-  class DaliDevice;
+  class DaliOutputDevice;
   class DaliSingleControllerDevice;
   class DaliCompositeDevice;
+  class DaliInputDevice;
 
   typedef boost::intrusive_ptr<DaliBusDevice> DaliBusDevicePtr;
   typedef boost::intrusive_ptr<DaliBusDeviceGroup> DaliBusDeviceGroupPtr;
-  typedef boost::intrusive_ptr<DaliDevice> DaliDevicePtr;
+  typedef boost::intrusive_ptr<DaliOutputDevice> DalioutputDevicePtr;
   typedef boost::intrusive_ptr<DaliSingleControllerDevice> DaliSingleControllerDevicePtr;
   typedef boost::intrusive_ptr<DaliCompositeDevice> DaliCompositeDevicePtr;
+  typedef boost::intrusive_ptr<DaliInputDevice> DaliInputDevicePtr;
 
   class DaliBusDevice : public P44Obj
   {
     typedef P44Obj inherited;
     friend class DaliBusDeviceGroup;
-    friend class DaliDevice;
+    friend class DaliOutputDevice;
     friend class DaliCompositeDevice;
     friend class DaliSingleControllerDevice;
     friend class DaliVdc;
@@ -213,7 +215,7 @@ namespace p44 {
   class DaliBusDeviceGroup : public DaliBusDevice
   {
     typedef DaliBusDevice inherited;
-    friend class DaliDevice;
+    friend class DaliOutputDevice;
     friend class DaliCompositeDevice;
     friend class DaliVdc;
 
@@ -261,7 +263,6 @@ namespace p44 {
     void initNextGroupMember(StatusCB aCompletedCB, DaliComm::ShortAddressList::iterator aNextMember);
     void groupMembershipResponse(StatusCB aCompletedCB, DaliComm::ShortAddressList::iterator aNextMember, uint16_t aGroups, ErrorPtr aError);
 
-
   };
 
 
@@ -273,15 +274,15 @@ namespace p44 {
   } DaliDeviceTypes;
 
 
-  /// base class for all DALI devices
-  class DaliDevice : public Device
+  /// base class for all DALI output/dimmer devices
+  class DaliOutputDevice : public Device
   {
     typedef Device inherited;
     friend class DaliDeviceCollector;
 
   public:
 
-    DaliDevice(DaliVdc *aVdcP);
+    DaliOutputDevice(DaliVdc *aVdcP);
 
     /// @return Vendor name for display purposes
     virtual string vendorName() P44_OVERRIDE { return ""; }; // Prevent displaying vdc vendor for devices
@@ -304,9 +305,9 @@ namespace p44 {
 
 
 
-  class DaliSingleControllerDevice : public DaliDevice
+  class DaliSingleControllerDevice : public DaliOutputDevice
   {
-    typedef DaliDevice inherited;
+    typedef DaliOutputDevice inherited;
     friend class DaliDeviceCollector;
 
   public:
@@ -419,9 +420,9 @@ namespace p44 {
   };
 
 
-  class DaliCompositeDevice : public DaliDevice
+  class DaliCompositeDevice : public DaliOutputDevice
   {
-    typedef DaliDevice inherited;
+    typedef DaliOutputDevice inherited;
     friend class DaliDeviceCollector;
     friend class DaliVdc;
 
@@ -434,7 +435,8 @@ namespace p44 {
       dimmer_red,
       dimmer_green,
       dimmer_blue,
-      dimmer_white,
+      dimmer_white, // (cold) white
+      dimmer_amber, // amber or warm white
       numDimmers
     };
     typedef uint8_t DimmerIndex;
@@ -550,6 +552,110 @@ namespace p44 {
     
   };
 
+
+  #if ENABLE_DALI_INPUTS
+
+  // MARK: ===== DALI input device
+
+  /// base class for all DALI input devices
+  class DaliInputDevice : public Device
+  {
+    typedef Device inherited;
+    friend class DaliVdc;
+
+    long long daliInputDeviceRowID; ///< the ROWID this device was created from (0=none)
+
+    DaliAddress baseAddress;
+    int numAddresses;
+
+    typedef enum {
+      input_button,
+      input_rocker,
+      input_motion,
+      input_illumination,
+      input_bistable,
+      input_pulse
+    } DaliInputType;
+
+    DaliInputType inputType;
+
+    MLTicket releaseTicket;
+
+  public:
+
+    DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, DaliAddress aBaseAddress);
+
+    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+
+    /// get typed container reference
+    DaliVdc &daliVdc();
+
+    /// check if device can be disconnected by software (i.e. Web-UI)
+    /// @return true if device might be disconnectable by the user via software (i.e. web UI)
+    /// @note devices returning true here might still refuse disconnection on a case by case basis when
+    ///   operational state does not allow disconnection.
+    /// @note devices returning false here might still be disconnectable using disconnect() triggered
+    ///   by vDC API "remove" method.
+    virtual bool isSoftwareDisconnectable() P44_OVERRIDE;
+
+    /// disconnect device. For static device, this means removing the config from the container's DB. Note that command line
+    /// static devices cannot be disconnected.
+    /// @param aForgetParams if set, not only the connection to the device is removed, but also all parameters related to it
+    ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
+    /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
+    ///   false in case it is certain that the device is still connected to this and only this vDC
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
+
+
+    /// @name identification of the addressable entity
+    /// @{
+
+    /// device type identifier
+    /// @return constant identifier for this type of device (one container might contain more than one type)
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "dali_input"; };
+
+    /// @return Vendor name for display purposes
+    virtual string vendorName() P44_OVERRIDE { return ""; }; // Prevent displaying vdc vendor for devices
+
+    /// @return human readable model name/short description
+    virtual string modelName() P44_OVERRIDE;
+
+    /// Get icon data or name
+    /// @param aIcon string to put result into (when method returns true)
+    /// - if aWithData is set, binary PNG icon data for given resolution prefix is returned
+    /// - if aWithData is not set, only the icon name (without file extension) is returned
+    /// @param aWithData if set, PNG data is returned, otherwise only name
+    /// @return true if there is an icon, false if not
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+    /// Get extra info (plan44 specific) to describe the addressable in more detail
+    /// @return string, single line extra info describing aspects of the device not visible elsewhere
+    virtual string getExtraInfo() P44_OVERRIDE;
+
+    /// @}
+
+    /// derive the dSUID from collected device info
+    void deriveDsUid();
+
+
+  protected:
+
+    /// is called to process an incoming DALI event
+    /// @param aEvent dali bridge event code
+    /// @param aData1 event data 1
+    /// @param aData1 event data 2
+    /// @return true if event has been fully processed by the device
+    bool checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aData2);
+
+  private:
+
+    void buttonReleased(int aButtonNo);
+    void inputReleased(int aInputNo);
+
+  };
+
+  #endif // ENABLE_DALI_INPUTS
 
 
 } // namespace p44

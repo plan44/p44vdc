@@ -61,37 +61,36 @@ namespace p44 {
 
     JsonApiValue();
 
-    virtual ApiValuePtr newValue(ApiValueType aObjectType);
+    virtual ApiValuePtr newValue(ApiValueType aObjectType) P44_OVERRIDE;
 
     static ApiValuePtr newValueFromJson(JsonObjectPtr aJsonObject);
 
-    virtual void clear();
-    virtual void operator=(ApiValue &aApiValue);
+    virtual void clear() P44_OVERRIDE;
+    virtual void operator=(ApiValue &aApiValue) P44_OVERRIDE;
 
-    virtual void add(const string &aKey, ApiValuePtr aObj) { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->add(aKey.c_str(), o->jsonObject()); };
-    virtual ApiValuePtr get(const string &aKey)  { JsonObjectPtr o; if (jsonObj && jsonObj->get(aKey.c_str(), o)) return newValueFromJson(o); else return ApiValuePtr(); };
-    virtual void del(const string &aKey) { if (jsonObj) jsonObj->del(aKey.c_str()); };
-    virtual int arrayLength() { return jsonObj ? jsonObj->arrayLength() : 0; };
-    virtual void arrayAppend(ApiValuePtr aObj) { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->arrayAppend(o->jsonObject()); };
-    virtual ApiValuePtr arrayGet(int aAtIndex) { if (jsonObj) { JsonObjectPtr o = jsonObj->arrayGet(aAtIndex); return newValueFromJson(o); } else return ApiValuePtr(); };
-    virtual void arrayPut(int aAtIndex, ApiValuePtr aObj) { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->arrayPut(aAtIndex, o->jsonObject()); };
-    virtual bool resetKeyIteration() { if (jsonObj) return jsonObj->resetKeyIteration(); else return false; };
-    virtual bool nextKeyValue(string &aKey, ApiValuePtr &aValue) { if (jsonObj) { JsonObjectPtr o; bool gotone = jsonObj->nextKeyValue(aKey, o); aValue = newValueFromJson(o); return gotone; } else return false; };
+    virtual void add(const string &aKey, ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->add(aKey.c_str(), o->jsonObject()); };
+    virtual ApiValuePtr get(const string &aKey) P44_OVERRIDE { JsonObjectPtr o; if (jsonObj && jsonObj->get(aKey.c_str(), o)) return newValueFromJson(o); else return ApiValuePtr(); };
+    virtual void del(const string &aKey) P44_OVERRIDE { if (jsonObj) jsonObj->del(aKey.c_str()); };
+    virtual int arrayLength() P44_OVERRIDE { return jsonObj ? jsonObj->arrayLength() : 0; };
+    virtual void arrayAppend(ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->arrayAppend(o->jsonObject()); };
+    virtual ApiValuePtr arrayGet(int aAtIndex) P44_OVERRIDE { if (jsonObj) { JsonObjectPtr o = jsonObj->arrayGet(aAtIndex); return newValueFromJson(o); } else return ApiValuePtr(); };
+    virtual void arrayPut(int aAtIndex, ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->arrayPut(aAtIndex, o->jsonObject()); };
+    virtual bool resetKeyIteration() P44_OVERRIDE { if (jsonObj) return jsonObj->resetKeyIteration(); else return false; };
+    virtual bool nextKeyValue(string &aKey, ApiValuePtr &aValue) P44_OVERRIDE { if (jsonObj) { JsonObjectPtr o; bool gotone = jsonObj->nextKeyValue(aKey, o); aValue = newValueFromJson(o); return gotone; } else return false; };
 
-    virtual uint64_t uint64Value() { return jsonObj ? (uint64_t)jsonObj->int64Value() : 0; };
-    virtual int64_t int64Value() { return jsonObj ? jsonObj->int64Value() : 0; };
-    virtual double doubleValue() { return jsonObj ? jsonObj->doubleValue() : 0; };
-    virtual bool boolValue() { return jsonObj ? jsonObj->boolValue() : false; };
-    virtual string binaryValue();
-    virtual string stringValue() { if (getType()==apivalue_string) { return jsonObj ? jsonObj->stringValue() : ""; } else return inherited::stringValue(); };
+    virtual uint64_t uint64Value() P44_OVERRIDE { return jsonObj ? (uint64_t)jsonObj->int64Value() : 0; };
+    virtual int64_t int64Value() P44_OVERRIDE { return jsonObj ? jsonObj->int64Value() : 0; };
+    virtual double doubleValue() P44_OVERRIDE { return jsonObj ? jsonObj->doubleValue() : 0; };
+    virtual bool boolValue() P44_OVERRIDE { return jsonObj ? jsonObj->boolValue() : false; };
+    virtual string binaryValue() P44_OVERRIDE;
+    virtual string stringValue() P44_OVERRIDE { if (getType()==apivalue_string) { return jsonObj ? jsonObj->stringValue() : ""; } else return inherited::stringValue(); };
 
-    virtual void setUint64Value(uint64_t aUint64) { jsonObj = JsonObject::newInt64(aUint64); }
-    virtual void setInt64Value(int64_t aInt64) { jsonObj = JsonObject::newInt64(aInt64); };
-    virtual void setDoubleValue(double aDouble) { jsonObj = JsonObject::newDouble(aDouble); };
-    virtual void setBoolValue(bool aBool) { jsonObj = JsonObject::newBool(aBool); };
-    virtual void setBinaryValue(const string &aBinary);
-    virtual bool setStringValue(const string &aString);
-    virtual void setNull() { jsonObj.reset(); }
+    virtual void setUint64Value(uint64_t aUint64) P44_OVERRIDE { jsonObj = JsonObject::newInt64(aUint64); }
+    virtual void setInt64Value(int64_t aInt64) P44_OVERRIDE { jsonObj = JsonObject::newInt64(aInt64); };
+    virtual void setDoubleValue(double aDouble) P44_OVERRIDE { jsonObj = JsonObject::newDouble(aDouble); };
+    virtual void setBoolValue(bool aBool) P44_OVERRIDE { jsonObj = JsonObject::newBool(aBool); };
+    virtual void setBinaryValue(const string &aBinary) P44_OVERRIDE;
+    virtual bool setStringValue(const string &aString) P44_OVERRIDE;
 
     JsonObjectPtr jsonObject() { return jsonObj; };
 

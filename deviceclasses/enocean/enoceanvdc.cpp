@@ -360,14 +360,16 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 // -50 = for v2 bridge 223: very close to device, about 10-20cm
 // -55 = for v2 bridge 223: within approx one meter of the TCM310
 
-Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer)
+Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType)
 {
   // no learn/unlearn actions detected so far
   // - check if we know that device address already. If so, it is a learn-out
   bool learnIn = enoceanDevices.find(aDeviceAddress)==enoceanDevices.end();
   if (learnIn) {
-    // new device learned in, add logical devices for it
-    if  (onlyEstablish!=no) {
+    // this is a not-yet known device, so we might be able to learn it in
+    if  (onlyEstablish!=no && aTeachInfoType!=no) {
+      // neither our side nor the info in the telegram insists on learn-out, so we can learn-in
+      // - create devices from EEP
       int numNewDevices = EnoceanDevice::createDevicesFromEEP(this, aDeviceAddress, aEEProfile, aManufacturer);
       if (numNewDevices>0) {
         // successfully learned at least one device
@@ -378,9 +380,11 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
     }
   }
   else {
-    if (onlyEstablish!=yes) {
-      // device learned out, un-pair all logical dS devices it has represented
-      // but keep dS level config in case it is reconnected
+    // this is an already known device, so we might be able to learn it out
+    if (onlyEstablish!=yes && aTeachInfoType!=yes) {
+      // neither our side nor the info in the telegram insists on learn-in, so we can learn-out
+      // - un-pair all logical dS devices it has represented
+      //   but keep dS level config in case it is reconnected
       unpairDevicesByAddress(aDeviceAddress, false);
       getVdcHost().reportLearnEvent(false, ErrorPtr());
       return no; // always successful learn out
@@ -408,7 +412,24 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     // explicit ones are always recognized
     if (aEsp3PacketPtr->radioHasTeachInfo(disableProximityCheck ? 0 : MIN_LEARN_DBM, false)) {
       LOG(LOG_NOTICE, "Learn mode enabled: processing EnOcean learn packet: %s", aEsp3PacketPtr->description().c_str());
-      if (processLearn(aEsp3PacketPtr->radioSender(), aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer())!=undefined) {
+      Tristate lrn = processLearn(aEsp3PacketPtr->radioSender(), aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer(), aEsp3PacketPtr->teachInfoType());
+      // check for UTE, may need confirmation
+      if (aEsp3PacketPtr->eepRorg()==rorg_UTE) {
+        uint8_t db6 = aEsp3PacketPtr->radioUserData()[0]; // DB6 (in EEP specs order)
+        if ((db6 & 0x40)==0) {
+          // UTE teach-in response expected
+          // - is a echo of the request, except for first byte, so just use modified incoming packet
+          aEsp3PacketPtr->radioUserData()[0] =
+            (db6 & 0x80) | // keep uni-/bidirectional bit
+            (lrn==yes ? 0x10 : (lrn==no ? 0x20 : 0x00)); // learn-in/learn-out status feedback
+          // set destination
+          aEsp3PacketPtr->setRadioDestination(aEsp3PacketPtr->radioSender());
+          // now send
+          LOG(LOG_INFO, "Sending UTE teach-in response for EEP %06X", EEP_PURE(aEsp3PacketPtr->eepProfile()));
+          enoceanComm.sendCommand(aEsp3PacketPtr, NULL);
+        }
+      }
+      if (lrn!=undefined) {
         // - only allow one learn action (to prevent learning out device when
         //   button is released or other repetition of radio packet)
         learningMode = false;
@@ -496,7 +517,7 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
         );
       }
       // try to process
-      Tristate lrn = processLearn(deviceAddress, profile, manufacturer);
+      Tristate lrn = processLearn(deviceAddress, profile, manufacturer, undefined);
       if (lrn==no) {
         // learn out
         confirmCode = 0x20;

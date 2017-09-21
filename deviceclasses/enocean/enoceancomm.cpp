@@ -370,7 +370,6 @@ uint8_t Esp3Packet::radioStatus()
   int statusoffset = 0;
   if (rorg!=rorg_invalid) {
     statusoffset = (int)dataLength()-1; // last byte is status...
-    if (rorg==rorg_VLD) statusoffset--; // ..except for VLD, where last byte is CRC
   }
   if (statusoffset<0) return 0;
   return data()[statusoffset]; // this is the status byte
@@ -392,7 +391,6 @@ size_t Esp3Packet::radioUserDataLength()
   bytes -= 1; // RORG byte
   bytes -= 1; // one status byte
   bytes -= 4; // 4 bytes for sender
-  if (rorg==rorg_VLD) bytes -= 1; // extra CRC
   return bytes<0 ? 0 : bytes;
 }
 
@@ -405,7 +403,6 @@ void Esp3Packet::setRadioUserDataLength(size_t aSize)
   aSize += 1; // RORG byte
   aSize += 1; // one status byte
   aSize += 4; // 4 bytes for sender
-  if (rorg==rorg_VLD) aSize += 1; // extra CRC
   // this is the complete data length
   setDataLength(aSize);
 }
@@ -502,12 +499,11 @@ void Esp3Packet::initForRorg(RadioOrg aRadioOrg, size_t aVLDsize)
 // MARK: ===== Enocean Eqipment Profile (EEP) information extraction
 
 
-// Radio telegram data
+// Radio telegram data (in ESP3, does not contain data checksum crc, e.g. for VLD)
 //  0        : RORG
 //  1..n     : user data, n bytes
 //  n+1..n+4 : sender address
 //  n+5      : status
-//  n+6      : for VLD only: CRC
 
 RadioOrg Esp3Packet::eepRorg()
 {
@@ -550,7 +546,7 @@ RadioOrg Esp3Packet::eepRorg()
 //  x   x    x   x   x   x  LRN  x   x   c    D5   00   01     1 Contact  c:0=open,1=closed
 
 
-// 4BS teach-in telegram
+// 4BS teach-in telegram (note: byte numbering is in radioUserData() buffer order, actual 4BS byte numbering is reversed!)
 //
 //       D[0]      |       D[1]      |       D[2]      |              D[3]
 // 7 6 5 4 3 2 1 0 | 7 6 5 4 3 2 1 0 | 7 6 5 4 3 2 1 0 |  7   6   5   4   3   2   1   0
@@ -559,11 +555,19 @@ RadioOrg Esp3Packet::eepRorg()
 //    FUNC    |     TYPE      |      MANUFACTURER      | typ res res sta bit
 
 
-// SA_LEARN_REQUEST
+// SA_LEARN_REQUEST (note: byte numbering is in radioUserData() buffer order, actual 4BS byte numbering is reversed!)
 //
 //    D[0]     D[1]   D[2] D[3] D[4] D[5] D[6] D[7] D[8] D[9] D[10] D[11] D[12] D[13] D[14] D[15]
 //  rrrrrmmm mmmmmmmm RORG FUNC TYPE RSSI ID3  ID2  ID1  ID0   ID3   ID2   ID1   ID0  STAT  CHECK
 //  Req  Manufacturer|   EEP No.    |dBm |    Repeater ID    |       Sender ID       |     |
+
+
+// UTE Teach-In Query (note: byte numbering is in radioUserData() buffer order, actual 4BS byte numbering is reversed!)
+//
+//           D[0]              |    D[1]   |    D[2]   |   D[3]    |    D[4]   |    D[5]   |    D[6]
+//  7    6     5  4    3 2 1 0 | 765432310 | 765432310 | 76543 210 | 765432310 | 765432310 | 765432310
+// BiDi NoRP TeachRQ  TeachCmd |  Channel  |  MID LSB  | resvd MID |   TYPE    |   FUNC    |    RORG
+
 
 
 EnoceanProfile Esp3Packet::eepProfile()
@@ -630,6 +634,13 @@ EnoceanProfile Esp3Packet::eepProfile()
         (((EnoceanProfile)radioUserData()[3])<<8) | // FUNC field
         radioUserData()[4]; // TYPE field
     }
+    else if (rorg==rorg_UTE) {
+      // UTE teach in request
+      profile =
+        (((EnoceanProfile)radioUserData()[6])<<16) | // RORG field
+        (((EnoceanProfile)radioUserData()[5])<<8) | // FUNC field
+        radioUserData()[4]; // TYPE field
+    }
   } // valid rorg
   // return it
   return profile;
@@ -650,6 +661,11 @@ EnoceanManufacturer Esp3Packet::eepManufacturer()
       man =
         ((((EnoceanManufacturer)radioUserData()[0])&0x07)<<8) |
         radioUserData()[1];
+    }
+    else if (rorg==rorg_UTE) {
+      man =
+        ((((EnoceanManufacturer)radioUserData()[3])&0x07)<<8) |
+        radioUserData()[2];
     }
   }
   // return it
@@ -672,9 +688,25 @@ bool Esp3Packet::radioHasTeachInfo(int aMinLearnDBm, bool aMinDBmForAll)
       return ((radioUserData()[3] & LRN_BIT_MASK)==0) && explicitLearnOK; // 4BS telegrams have teach-in info if LRN bit is *cleared*
     case rorg_SM_LRN_REQ:
       return explicitLearnOK; // smart ack learn requests are by definition teach-in commands and have full EEP signature
+    case rorg_UTE:
+      return ((radioUserData()[0] & 0xF) == 0x00); // UTE if CMD identifier is 0 (teach-in)
     default:
       return false; // no or unknown radio telegram -> no teach-in info
   }
+}
+
+
+Tristate Esp3Packet::teachInfoType()
+{
+  if (eepRorg()==rorg_UTE) {
+    uint8_t teachCmd = (radioUserData()[0]>>4)&0x03;
+    switch (teachCmd) {
+      case 0 : return yes; // request is specifically for teach-in
+      case 1 : return no; // request is specifically for teach-out
+      default: return undefined; // request is not specific, can be teach in or out
+    }
+  }
+  return undefined;
 }
 
 

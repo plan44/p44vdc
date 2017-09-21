@@ -54,19 +54,20 @@ ButtonBehaviour::ButtonBehaviour(Device &aDevice, const string aId) :
   buttonActionId(0),
   stateMachineMode(statemachine_standard)
 {
-  // set default hrdware configuration
-  setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, false);
+  // set default hardware configuration
+  setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, 1); // not combinable, but button mode writable
   // reset the button state machine
   resetStateMachine();
 }
 
 
-void ButtonBehaviour::setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, bool aButtonModeFixed)
+void ButtonBehaviour::setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, int aNumCombinables)
 {
   buttonID = aButtonID;
   buttonType = aType;
   buttonElementID = aElement;
   supportsLocalKeyMode = aSupportsLocalKeyMode;
+  combinables = aNumCombinables;
   // now derive default settings from hardware
   // - default to standard mode
   buttonMode = buttonMode_standard;
@@ -80,8 +81,8 @@ void ButtonBehaviour::setHardwareButtonConfig(int aButtonID, VdcButtonType aType
       buttonMode = (DsButtonMode)((int)buttonMode_rockerDown_pairWith0+aCounterPartIndex);
     }
   }
-  if (aButtonModeFixed) {
-    // limit settings to this mode
+  if (combinables==0) {
+    // not combinable and limited to only this mode
     fixedButtonMode = buttonMode;
   }
 }
@@ -670,6 +671,7 @@ enum {
   buttonID_key,
   buttonType_key,
   buttonElementID_key,
+  combinables_key,
   numDescProperties
 };
 
@@ -682,6 +684,7 @@ const PropertyDescriptorPtr ButtonBehaviour::getDescDescriptorByIndex(int aPropI
     { "buttonID", apivalue_uint64, buttonID_key+descriptions_key_offset, OKEY(button_key) },
     { "buttonType", apivalue_uint64, buttonType_key+descriptions_key_offset, OKEY(button_key) },
     { "buttonElementID", apivalue_uint64, buttonElementID_key+descriptions_key_offset, OKEY(button_key) },
+    { "combinables", apivalue_uint64, combinables_key+descriptions_key_offset, OKEY(button_key) },
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -766,6 +769,9 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case buttonElementID_key+descriptions_key_offset:
           aPropValue->setUint64Value(buttonElementID);
+          return true;
+        case combinables_key+descriptions_key_offset:
+          aPropValue->setUint64Value(combinables); // 0 and 1 both mean non-combinable, but 1 means that buttonmode is still not fixed
           return true;
         // Settings properties
         case group_key+settings_key_offset:

@@ -42,6 +42,9 @@ namespace p44 {
 
   typedef std::list<DaliBusDevicePtr> DaliBusDeviceList;
   typedef std::map<uint8_t, DaliDeviceInfoPtr> DaliDeviceInfoMap;
+  #if ENABLE_DALI_INPUTS
+  typedef std::list<DaliInputDevicePtr> DaliInputDeviceList;
+  #endif
 
   typedef boost::shared_ptr<DaliBusDeviceList> DaliBusDeviceListPtr;
 
@@ -59,9 +62,14 @@ namespace p44 {
   class DaliVdc : public Vdc
   {
     typedef Vdc inherited;
+    friend class DaliInputDevice;
 
 		DaliPersistence db;
     DaliDeviceInfoMap deviceInfoCache;
+
+    #if ENABLE_DALI_INPUTS
+    DaliInputDeviceList inputDevices;
+    #endif
 
   public:
     DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
@@ -95,7 +103,7 @@ namespace p44 {
     /// @param aDevice the device to ungroup
     /// @param aRequest the API request that causes the ungroup, will be sent an OK when ungrouping is complete
     /// @return error if not successful
-    ErrorPtr ungroupDevice(DaliDevicePtr aDevice, VdcApiRequestPtr aRequest);
+    ErrorPtr ungroupDevice(DalioutputDevicePtr aDevice, VdcApiRequestPtr aRequest);
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -106,6 +114,8 @@ namespace p44 {
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
   private:
+
+    void removeLightDevices(bool aForget);
 
     void deviceListReceived(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aDeviceListPtr, DaliComm::ShortAddressListPtr aUnreliableDeviceListPtr, ErrorPtr aError);
     void queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, ErrorPtr aError);
@@ -129,6 +139,12 @@ namespace p44 {
     void testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
     void testRW(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte);
     void testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+
+    #if ENABLE_DALI_INPUTS
+    void daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2);
+    DaliInputDevicePtr addInputDevice(const string aConfig, DaliAddress aDaliBaseAddress);
+    ErrorPtr addDaliInput(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
+    #endif
 
   };
 

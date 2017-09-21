@@ -174,8 +174,9 @@ namespace p44 {
     /// @param aEvents list of events to be pushed, can be NULL
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
     /// @param aApiVersion the API version relevant for this push notification
+    /// @param aDeletedProperty if set, the aPropertyQuery describes a property that has been deleted
     /// @return true if push could be sent, false otherwise (e.g. no vdSM connection, or device not yet announced)
-    bool pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain, int aApiVersion);
+    bool pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain, int aApiVersion, bool aDeletedProperty = false);
 
     /// @}
 
