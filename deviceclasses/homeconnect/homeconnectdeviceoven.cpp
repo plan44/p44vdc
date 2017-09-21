@@ -99,6 +99,14 @@ bool HomeConnectDeviceOven::configureDevice()
   progStatusConfig.hasProgres = true;
   configureProgramStatus(progStatusConfig);
 
+  EventConfiguration eventConfig = { 0 };
+  eventConfig.hasAlarmClockElapsed = true;
+  eventConfig.hasLocallyOperated = true;
+  eventConfig.hasProgramAborted = true;
+  eventConfig.hasProgramFinished = true;
+  eventConfig.hasProgramStarted = true;
+  configureEvents(eventConfig);
+
 
   addDefaultStandByAction();
   addDefaultPowerOnAction();

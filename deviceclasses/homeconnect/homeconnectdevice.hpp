@@ -273,6 +273,14 @@ namespace p44 {
       bool hasProgres : 1;
     } ProgramStatusConfiguration;
 
+    typedef struct {
+      bool hasProgramFinished : 1;
+      bool hasProgramAborted : 1;
+      bool hasLocallyOperated : 1;
+      bool hasProgramStarted : 1;
+      bool hasAlarmClockElapsed : 1;
+    } EventConfiguration;
+
     // The following methods implement common behaviour and should be executed from subclasses overrides.
     virtual bool configureDevice();
     virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
@@ -295,6 +303,7 @@ namespace p44 {
     void configureDoorState(const DoorStateConfiguration& aConfiguration);
     void configurePowerState(const PowerStateConfiguration& aConfiguration);
     void configureProgramStatus(const ProgramStatusConfiguration& aConfiguration);
+    void configureEvents(const EventConfiguration& aConfiguration);
 
     void addDefaultPowerOnAction();
     void addDefaultStandByAction();
@@ -311,6 +320,7 @@ namespace p44 {
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
     string createDeviceName(JsonObjectPtr aNetworkJson, JsonObjectPtr aFileJson);
     void addPowerStateAction(const string& aName, const string& aDescription, const string& aParameter);
+    void handleOperationStateChange(const string& aNewValue);
 
   };
   

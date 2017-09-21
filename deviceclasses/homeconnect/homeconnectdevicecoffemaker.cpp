@@ -84,6 +84,14 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   progStatusConfig.hasProgres = true;
   configureProgramStatus(progStatusConfig);
 
+  EventConfiguration eventConfig = { 0 };
+  eventConfig.hasAlarmClockElapsed = false;
+  eventConfig.hasLocallyOperated = true;
+  eventConfig.hasProgramAborted = false;
+  eventConfig.hasProgramFinished = false;
+  eventConfig.hasProgramStarted = true;
+  configureEvents(eventConfig);
+
   // FIXME: ugly direct model match
 //    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
   // FIXME: got even uglier:
