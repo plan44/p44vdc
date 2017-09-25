@@ -66,8 +66,8 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
 
   // configure remote control
   RemoteControlConfiguration rcConfig = { 0 };
-  rcConfig.hasControlInactive = true;
-  rcConfig.hasControlActive = false;  // coffee machine do not have BSH.Common.Status.RemoteControlActive so it is either inactive or start Allowed
+  rcConfig.hasControlInactive = false;
+  rcConfig.hasControlActive = true;
   rcConfig.hasStartActive = true;
   configureRemoteControlState(rcConfig);
 
@@ -166,7 +166,7 @@ void HomeConnectDeviceCoffeMaker::handleEventTypeStatus(const string& aKey, Json
         remoteStartValue = "RemoteStartActive";
       }
       else {
-        remoteStartValue = "RemoteControlInactive";
+        remoteStartValue = "RemoteControlActive";
       }
 
       if (remoteControlDescriptor->setStringValueCaseInsensitive(remoteStartValue)) {
