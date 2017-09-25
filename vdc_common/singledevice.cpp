@@ -879,6 +879,22 @@ void DynamicDeviceActions::addOrUpdateDynamicAction(DeviceActionPtr aAction)
   pushActionChange(aAction, false);
 }
 
+void DynamicDeviceActions::addOrUpdateDynamicActions(ActionsVector &aActions)
+{
+  ActionsVector resultVector;
+
+  std::sort(aActions.begin(), aActions.end(), compareByTitle);
+  std::sort(deviceActions.begin(), deviceActions.end(), compareByTitle);
+
+  std::set_difference(
+      aActions.begin(), aActions.end(),
+      deviceActions.begin(), deviceActions.end(),
+      back_inserter(resultVector),
+      compareByTitle);
+
+  std::for_each(resultVector.begin(), resultVector.end(), boost::bind(&DynamicDeviceActions::addOrUpdateDynamicAction, this, _1));
+}
+
 
 void DynamicDeviceActions::removeDynamicAction(DeviceActionPtr aAction)
 {
@@ -886,6 +902,23 @@ void DynamicDeviceActions::removeDynamicAction(DeviceActionPtr aAction)
     // actually deleted
     pushActionChange(aAction, true);
   }
+}
+
+
+void DynamicDeviceActions::removeDynamicActions(ActionsVector &aActions)
+{
+  ActionsVector resultVector;
+
+  std::sort(aActions.begin(), aActions.end(), compareById);
+  std::sort(deviceActions.begin(), deviceActions.end(), compareById);
+
+  std::set_difference(
+      deviceActions.begin(), deviceActions.end(),
+      aActions.begin(), aActions.end(),
+      back_inserter(resultVector),
+      compareById);
+
+  std::for_each(resultVector.begin(), resultVector.end(), boost::bind(&DynamicDeviceActions::removeDynamicAction, this, _1));
 }
 
 
@@ -910,6 +943,12 @@ bool DynamicDeviceActions::pushActionChange(DeviceActionPtr aAction, bool aRemov
   return false;
 }
 
+
+void DynamicDeviceActions::updateDynamicActions(ActionsVector &aActions)
+{
+  removeDynamicActions(aActions);
+  addOrUpdateDynamicActions(aActions);
+}
 
 
 
