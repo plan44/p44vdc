@@ -331,6 +331,8 @@ Tristate VentilationBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_fcu:
       // "fcu" model feature triggers ventilation-specific channel settings
       return yes;
+    case modelFeature_outmodegeneric:
+      return no;
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
