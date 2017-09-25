@@ -512,7 +512,8 @@ namespace p44 {
   private:
 
     static bool compareById(DeviceActionPtr aActionL, DeviceActionPtr aActionR) { return (aActionL->getId() < aActionR->getId()); }
-    static bool compareByTitle(DeviceActionPtr aActionL, DeviceActionPtr aActionR) { return (aActionL->getActionTitle() < aActionR->getActionTitle()); }
+    static bool compareByIdAndTitle(DeviceActionPtr aActionL, DeviceActionPtr aActionR) {
+      return (aActionL->getId() == aActionR->getId()) ? (aActionL->getActionTitle() < aActionR->getActionTitle()) : (aActionL->getId() < aActionR->getId()); }
 
     bool removeActionInternal(DeviceActionPtr aAction);
     bool pushActionChange(DeviceActionPtr aAction, bool aRemoved);

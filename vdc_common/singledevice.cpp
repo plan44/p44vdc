@@ -883,14 +883,14 @@ void DynamicDeviceActions::addOrUpdateDynamicActions(ActionsVector &aActions)
 {
   ActionsVector resultVector;
 
-  std::sort(aActions.begin(), aActions.end(), compareByTitle);
-  std::sort(deviceActions.begin(), deviceActions.end(), compareByTitle);
+  std::sort(aActions.begin(), aActions.end(), compareByIdAndTitle);
+  std::sort(deviceActions.begin(), deviceActions.end(), compareByIdAndTitle);
 
   std::set_difference(
       aActions.begin(), aActions.end(),
       deviceActions.begin(), deviceActions.end(),
       back_inserter(resultVector),
-      compareByTitle);
+      compareByIdAndTitle);
 
   std::for_each(resultVector.begin(), resultVector.end(), boost::bind(&DynamicDeviceActions::addOrUpdateDynamicAction, this, _1));
 }
