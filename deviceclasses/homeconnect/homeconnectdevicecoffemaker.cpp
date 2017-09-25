@@ -29,7 +29,6 @@
 namespace p44 {
 
 HomeConnectDeviceCoffeMaker::HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-    standalone(false),
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
@@ -93,11 +92,6 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   eventConfig.hasProgramStarted = true;
   configureEvents(eventConfig);
 
-  // FIXME: ugly direct model match
-//    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
-  // FIXME: got even uglier:
-  standalone = (modelGuid.substr(0,10)=="TI909701HC");
-
   HomeConnectGoToStandbyActionPtr action =
       HomeConnectGoToStandbyActionPtr(new HomeConnectGoToStandbyAction(*this, *powerStateDescriptor, *operationModeDescriptor));
   deviceActions->addAction(action);
@@ -107,8 +101,8 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   addAction("std.EspressoMacchiato", "Espresso Macchiato",  "EspressoMacchiato", 40,  60,  10, 50);
   addAction("std.Coffee",            "Coffee",              "Coffee",            60,  250, 10, 120);
   addAction("std.Cappuccino",        "Cappuccino",          "Cappuccino",        100, 250, 10, 180);
-  addAction("std.LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 300);
-  addAction("std.CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 250);
+  addAction("std.LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 250);
+  addAction("std.CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 200);
 
   beanAmountProp = EnumValueDescriptorPtr(new EnumValueDescriptor("BeanAmount", true));
   int i = 0;
@@ -191,10 +185,6 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
 
   HomeConnectProgramBuilder builder("ConsumerProducts.CoffeeMaker.Program.Beverage." + aProgramName);
 
-  if(!standalone) {
-    builder.addOption("ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature", "\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{TemperatureLevel}\"");
-  }
-
   builder.addOption("ConsumerProducts.CoffeeMaker.Option.BeanAmount", "\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{BeanAmount}\"");
   builder.addOption("ConsumerProducts.CoffeeMaker.Option.FillQuantity", "@{FillQuantity%%0}");
 
@@ -205,14 +195,9 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
   builder.selectMode(HomeConnectProgramBuilder::Mode_Select);
   string selectProgramCommand = builder.build();
 
-  EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("TemperatureLevel", true));
-  int i = 0;
-  tempLevel->addEnum("Normal", i++, true); // default
-  tempLevel->addEnum("High", i++);
-  tempLevel->addEnum("VeryHigh", i++);
 
   EnumValueDescriptorPtr beanAmount = EnumValueDescriptorPtr(new EnumValueDescriptor("BeanAmount", true));
-  i = 0;
+  int i = 0;
   beanAmount->addEnum("VeryMild", i++);
   beanAmount->addEnum("Mild", i++);
   beanAmount->addEnum("Normal", i++, true); // default
@@ -240,7 +225,6 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
                                                         selectProgramCommand,
                                                         *powerStateDescriptor,
                                                         *operationModeDescriptor));
-  action->addParameter(tempLevel);
   action->addParameter(beanAmount);
   action->addParameter(fillAmount);
   deviceActions->addAction(action);
