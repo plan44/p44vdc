@@ -32,7 +32,6 @@ class HomeConnectDeviceCoffeMaker: public HomeConnectDevice
 {
   typedef HomeConnectDevice inherited;
 
-  bool standalone; ///< set if this is the standalone model (which does not understand ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature)
   EnumValueDescriptorPtr beanAmountProp;
   ValueDescriptorPtr fillQuantityProp;
 
