@@ -255,6 +255,9 @@ namespace p44 {
 
     virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
 
+    void setMinValue(double aValue) { min = aValue; }
+    void setMaxValue(double aValue) { max = aValue; }
+
   protected:
 
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
