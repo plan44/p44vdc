@@ -25,6 +25,7 @@
 #if ENABLE_HOMECONNECT
 
 #include "homeconnectaction.hpp"
+#include <ctime>
 
 namespace p44 {
 
@@ -97,7 +98,7 @@ bool HomeConnectDeviceDishWasher::configureDevice()
   configureEvents(eventConfig);
 
   ValueDescriptorPtr delayedStart = ValueDescriptorPtr(
-    new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1, true));
+    new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_minute, unitScaling_1), 0, 1439, 1, true));
 
 
   addDefaultPowerOffAction();
@@ -111,7 +112,7 @@ bool HomeConnectDeviceDishWasher::configureDevice()
 
 
   delayedStartProp = ValueDescriptorPtr(
-    new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1, true));
+    new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_minute, unitScaling_1), 0, 1439, 1, true));
 
   deviceProperties->addProperty(delayedStartProp, true);
 
@@ -128,17 +129,30 @@ void HomeConnectDeviceDishWasher::handleEventTypeNotify(const string& aKey, Json
   ALOG(LOG_INFO, "DishWasher Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
   if (aKey == "BSH.Common.Option.StartInRelative") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    delayedStartProp->setInt32Value(value);
+    handleStartInRelativeChange((aValue != NULL) ? aValue->int32Value() : 0);
     return;
   }
+
   inherited::handleEventTypeNotify(aKey, aValue);
+}
+
+void HomeConnectDeviceDishWasher::handleStartInRelativeChange(int32_t aValue)
+{
+  if (aValue == 0) {
+    delayedStartProp->invalidate();
+    return;
+  }
+
+  std::time_t currentTime = time(0);
+  std::tm* localTime = localtime(&currentTime);
+
+  delayedStartProp->setInt32Value((localTime->tm_hour * 60) + localTime->tm_min + (aValue / 60));
 }
 
 void HomeConnectDeviceDishWasher::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)
 {
   HomeConnectProgramBuilder builder("Dishcare.Dishwasher.Program." + aProgramName);
-  builder.addOption("BSH.Common.Option.StartInRelative", "@{DelayedStart%%0}");
+  builder.addOption("BSH.Common.Option.StartInRelative", "@{DelayedStart*60%%0}");
 
   HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this,
                                                                                      *operationModeDescriptor,
