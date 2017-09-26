@@ -21,6 +21,8 @@
 
 #include "ventilationbehaviour.hpp"
 
+#if ENABLE_FCU_SUPPORT
+
 using namespace p44;
 
 
@@ -329,6 +331,8 @@ Tristate VentilationBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_fcu:
       // "fcu" model feature triggers ventilation-specific channel settings
       return yes;
+    case modelFeature_outmodegeneric:
+      return no;
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
@@ -420,4 +424,6 @@ string VentilationBehaviour::description()
   s.append(inherited::description());
   return s;
 }
+
+#endif // ENABLE_FCU_SUPPORT
 

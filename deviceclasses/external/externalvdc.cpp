@@ -36,6 +36,9 @@
 
 using namespace p44;
 
+#ifndef ENABLE_FCU_SUPPORT
+  #define ENABLE_FCU_SUPPORT 1
+#endif
 
 #if ENABLE_EXTERNAL_SINGLEDEVICE
 
@@ -993,6 +996,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
   }
+  #if ENABLE_FCU_SUPPORT
   else if (outputType=="fancoilunit") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
     controlValues = true; // fan coil unit usually needs control values
@@ -1027,6 +1031,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     vb->setHardwareName(hardwareName);
     addBehaviour(vb);
   }
+  #endif // ENABLE_FCU_SUPPORT
   else if (outputType=="shadow") {
     if (defaultGroup==group_undefined) defaultGroup = group_grey_shadow;
     // - use shadow scene settings

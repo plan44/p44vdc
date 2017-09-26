@@ -26,6 +26,12 @@
 #include "outputbehaviour.hpp"
 #include "simplescene.hpp"
 
+#ifndef ENABLE_FCU_SUPPORT
+  #define ENABLE_FCU_SUPPORT 1
+#endif
+
+#if ENABLE_FCU_SUPPORT
+
 using namespace std;
 
 namespace p44 {
@@ -277,5 +283,7 @@ namespace p44 {
   typedef boost::intrusive_ptr<VentilationBehaviour> VentilationBehaviourPtr;
 
 } // namespace p44
+
+#endif // ENABLE_FCU_SUPPORT
 
 #endif /* defined(__p44vdc__ventilationbehaviour__) */
