@@ -40,6 +40,7 @@ class HomeConnectDeviceCoffeMaker: public HomeConnectDevice
   virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue) P44_OVERRIDE;
 
   virtual void handleRemoteStartAllowedChange(JsonObjectPtr aNewValue) P44_OVERRIDE;
+  virtual void handleOperationStateChange(const string& aNewValue) P44_OVERRIDE;
 
   void addAction(const string& aActionName,
                  const string& aDescription,
