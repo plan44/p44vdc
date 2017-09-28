@@ -389,6 +389,9 @@ namespace p44 {
     /// get id
     string getId() { return actionId; };
 
+    /// get action title
+    string getActionTitle() { return actionTitle; };
+
     /// add parameter
     /// @param aValueDesc a value descriptor object.
     /// @param aMandatory if set, parameter must be explicitly specified
@@ -478,6 +481,11 @@ namespace p44 {
 
   public:
 
+    /// compare existing actions with the list, get actions to remove and actions to add or change
+    /// @note action has changed when action title changed
+    /// @param aActions current set of actions
+    void updateDynamicActions(ActionsVector &aActions);
+
     /// add or update a dynamic action.
     /// @note If device is announced with a vDC API client (vdSM), the changed action description will be pushed)
     /// @param aAction the action to add (if its actionId is new) or update (if its actionId already exists)
@@ -492,6 +500,13 @@ namespace p44 {
     virtual void addToModelUIDHash(string &aHashedString);
 
   private:
+
+    static bool compareById(DeviceActionPtr aActionL, DeviceActionPtr aActionR) { return (aActionL->getId() < aActionR->getId()); }
+    static bool compareByIdAndTitle(DeviceActionPtr aActionL, DeviceActionPtr aActionR) {
+      return (aActionL->getId() == aActionR->getId()) ? (aActionL->getActionTitle() < aActionR->getActionTitle()) : (aActionL->getId() < aActionR->getId()); }
+
+    void removeDynamicActionsExcept(ActionsVector &aActions);
+    void addOrUpdateDynamicActions(ActionsVector &aActions);
 
     bool removeActionInternal(DeviceActionPtr aAction);
     bool pushActionChange(DeviceActionPtr aAction, bool aRemoved);
