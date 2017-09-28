@@ -491,20 +491,10 @@ namespace p44 {
     /// @param aAction the action to add (if its actionId is new) or update (if its actionId already exists)
     void addOrUpdateDynamicAction(DeviceActionPtr aAction);
 
-    /// add or update a dynamic actions.
-    /// @note If device is announced with a vDC API client (vdSM), the changed action description will be pushed)
-    /// @param aAction set of actions to add (if its actionId is new) or update (if its actionId already exists)
-    void addOrUpdateDynamicActions(ActionsVector &aActions);
-
     /// remove a dynamic device action.
     /// @note If device is announced with a vDC API client (vdSM), the removal will be pushed (empty action description)
     /// @param aAction the action
     void removeDynamicAction(DeviceActionPtr aAction);
-    
-    /// remove a dynamic device actions.
-    /// @note If device is announced with a vDC API client (vdSM), the removal will be pushed (empty action description)
-    /// @param aActions actual action set
-    void removeDynamicActions(ActionsVector &aActions);
 
     /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
     virtual void addToModelUIDHash(string &aHashedString);
@@ -514,6 +504,9 @@ namespace p44 {
     static bool compareById(DeviceActionPtr aActionL, DeviceActionPtr aActionR) { return (aActionL->getId() < aActionR->getId()); }
     static bool compareByIdAndTitle(DeviceActionPtr aActionL, DeviceActionPtr aActionR) {
       return (aActionL->getId() == aActionR->getId()) ? (aActionL->getActionTitle() < aActionR->getActionTitle()) : (aActionL->getId() < aActionR->getId()); }
+
+    void removeDynamicActionsExcept(ActionsVector &aActions);
+    void addOrUpdateDynamicActions(ActionsVector &aActions);
 
     bool removeActionInternal(DeviceActionPtr aAction);
     bool pushActionChange(DeviceActionPtr aAction, bool aRemoved);

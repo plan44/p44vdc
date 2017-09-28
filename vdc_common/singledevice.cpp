@@ -905,7 +905,7 @@ void DynamicDeviceActions::removeDynamicAction(DeviceActionPtr aAction)
 }
 
 
-void DynamicDeviceActions::removeDynamicActions(ActionsVector &aActions)
+void DynamicDeviceActions::removeDynamicActionsExcept(ActionsVector &aActions)
 {
   ActionsVector resultVector;
 
@@ -946,7 +946,7 @@ bool DynamicDeviceActions::pushActionChange(DeviceActionPtr aAction, bool aRemov
 
 void DynamicDeviceActions::updateDynamicActions(ActionsVector &aActions)
 {
-  removeDynamicActions(aActions);
+  removeDynamicActionsExcept(aActions);
   addOrUpdateDynamicActions(aActions);
 }
 
