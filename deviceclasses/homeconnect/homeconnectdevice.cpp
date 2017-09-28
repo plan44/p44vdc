@@ -655,44 +655,18 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
 {
   string value = (aValue != NULL) ? aValue->stringValue() : "";
 
-  if (aKey == "BSH.Common.Status.OperationState") {
+  if (aKey == "BSH.Common.Status.OperationState" && (operationMode != NULL)) {
     handleOperationStateChange(value);
     return;
   }
 
   if ((aKey == "BSH.Common.Status.RemoteControlActive") && (remoteControl != NULL)) {
-    string remoteControlValue;
-
-    if (value == "true") {
-      if (remoteControlDescriptor->getStringValue() != "RemoteStartActive") {
-        remoteControlValue = "RemoteControlActive";
-      }
-    } else if (value == "false") {
-      remoteControlValue = "RemoteControlInactive";
-    }
-
-    if (!remoteControlValue.empty() && remoteControlDescriptor->setStringValueCaseInsensitive(remoteControlValue)) {
-      ALOG(LOG_NOTICE, "New Remote Control State: '%s'", remoteControlValue.c_str());
-      remoteControl->push();
-    }
+    handleRemoteControlActiveChange(aValue);
     return;
   }
 
   if ((aKey == "BSH.Common.Status.RemoteControlStartAllowed") && (remoteControl != NULL)) {
-    string remoteStartValue;
-
-    if (value == "true") {
-      remoteStartValue = "RemoteStartActive";
-    } else if (value == "false") {
-      if (remoteControlDescriptor->getStringValue() == "RemoteStartActive") {
-        remoteStartValue = "RemoteControlActive";
-      }
-    }
-
-    if (!remoteStartValue.empty() && remoteControlDescriptor->setStringValueCaseInsensitive(remoteStartValue)) {
-      ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
-      remoteControl->push();
-    }
+    handleRemoteStartAllowedChange(aValue);
     return;
   }
 
@@ -725,10 +699,6 @@ void HomeConnectDevice::handleEventTypeConnected()
 
 void HomeConnectDevice::handleOperationStateChange(const string& aNewValue)
 {
-  if (operationMode == NULL) {
-    return;
-  }
-
   string operationValue = "Mode" + removeNamespace(aNewValue);
   if (!operationModeDescriptor->setStringValueCaseInsensitive(operationValue)) {
     return;
@@ -754,6 +724,51 @@ void HomeConnectDevice::handleOperationStateChange(const string& aNewValue)
     if (programProgress != NULL) {
       programProgress->invalidate();
     }
+  }
+}
+
+void HomeConnectDevice::handleRemoteStartAllowedChange(JsonObjectPtr aNewValue)
+{
+  if (aNewValue == NULL) {
+    return;
+  }
+  string remoteStartValue;
+  bool value = aNewValue->boolValue();
+
+  if (value) {
+    remoteStartValue = "RemoteStartActive";
+  } else {
+    if (remoteControlDescriptor->getStringValue() == "RemoteStartActive") {
+      remoteStartValue = "RemoteControlActive";
+    }
+  }
+
+  if (!remoteStartValue.empty() && remoteControlDescriptor->setStringValueCaseInsensitive(remoteStartValue)) {
+    ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
+    remoteControl->push();
+  }
+}
+
+void HomeConnectDevice::handleRemoteControlActiveChange(JsonObjectPtr aNewValue)
+{
+  if (aNewValue == NULL) {
+    return;
+  }
+
+  string remoteControlValue;
+  bool value = aNewValue->boolValue();
+
+  if (value) {
+    if (remoteControlDescriptor->getStringValue() != "RemoteStartActive") {
+      remoteControlValue = "RemoteControlActive";
+    }
+  } else {
+    remoteControlValue = "RemoteControlInactive";
+  }
+
+  if (!remoteControlValue.empty() && remoteControlDescriptor->setStringValueCaseInsensitive(remoteControlValue)) {
+    ALOG(LOG_NOTICE, "New Remote Control State: '%s'", remoteControlValue.c_str());
+    remoteControl->push();
   }
 }
 

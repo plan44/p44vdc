@@ -291,6 +291,10 @@ namespace p44 {
     virtual void handleEventTypeDisconnected();
     virtual void handleEventTypeConnected();
 
+    virtual void handleRemoteStartAllowedChange(JsonObjectPtr aNewValue);
+    virtual void handleOperationStateChange(const string& aNewValue);
+    void handleRemoteControlActiveChange(JsonObjectPtr aNewValue);
+
     // Pool the state of the device and process the responses
     void pollState();
     virtual void pollStateStatusDone(JsonObjectPtr aResult, ErrorPtr aError);
@@ -321,7 +325,6 @@ namespace p44 {
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
     string createDeviceName(JsonObjectPtr aNetworkJson, JsonObjectPtr aFileJson);
     void addPowerStateAction(const string& aName, const string& aDescription, const string& aParameter);
-    void handleOperationStateChange(const string& aNewValue);
 
   };
   
