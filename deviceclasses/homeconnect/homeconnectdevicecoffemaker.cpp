@@ -58,7 +58,7 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   omConfig.hasRun = true;
   omConfig.hasPause = false;
   omConfig.hasActionrequired = true;
-  omConfig.hasFinished = true;
+  omConfig.hasFinished = false;
   omConfig.hasError = true;
   omConfig.hasAborting = true;
   configureOperationModeState(omConfig);
@@ -88,7 +88,7 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   eventConfig.hasAlarmClockElapsed = false;
   eventConfig.hasLocallyOperated = true;
   eventConfig.hasProgramAborted = false;
-  eventConfig.hasProgramFinished = false;
+  eventConfig.hasProgramFinished = true;
   eventConfig.hasProgramStarted = true;
   configureEvents(eventConfig);
 
@@ -147,31 +147,39 @@ void HomeConnectDeviceCoffeMaker::handleEventTypeNotify(const string& aKey, Json
   inherited::handleEventTypeNotify(aKey, aValue);
 }
 
-
-void HomeConnectDeviceCoffeMaker::handleEventTypeStatus(const string& aKey, JsonObjectPtr aValue)
+void HomeConnectDeviceCoffeMaker::handleRemoteStartAllowedChange(JsonObjectPtr aNewValue)
 {
-  if ((aKey == "BSH.Common.Status.RemoteControlStartAllowed") && (remoteControl != NULL)) {
-
-    if (aValue) {
-      string remoteStartValue;
-      bool value = aValue->boolValue();
-
-      if (value) {
-        remoteStartValue = "RemoteStartActive";
-      }
-      else {
-        remoteStartValue = "RemoteControlActive";
-      }
-
-      if (remoteControlDescriptor->setStringValueCaseInsensitive(remoteStartValue)) {
-        ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
-        remoteControl->push();
-      }
-    }
+  if (aNewValue == NULL) {
     return;
   }
 
-  inherited::handleEventTypeStatus(aKey, aValue);
+  string remoteStartValue;
+  bool value = aNewValue->boolValue();
+
+  if (value) {
+    remoteStartValue = "RemoteStartActive";
+  }
+  else {
+    remoteStartValue = "RemoteControlActive";
+  }
+
+  if (remoteControlDescriptor->setStringValueCaseInsensitive(remoteStartValue)) {
+    ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
+    remoteControl->push();
+  }
+}
+
+void HomeConnectDeviceCoffeMaker::handleOperationStateChange(const string& aNewValue)
+{
+  if (aNewValue == "BSH.Common.EnumType.OperationState.Finished") {
+    if (operationModeDescriptor->getStringValue() == "ModeRun") {
+      deviceEvents->pushEvent("ProgramFinished");
+    }
+  }
+  else {
+    inherited::handleOperationStateChange(aNewValue);
+  }
+
 }
 
 void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
