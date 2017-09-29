@@ -114,6 +114,10 @@ namespace p44 {
     /// @return the sensor type
     VdcSensorType getSensorType() { return sensorType; };
 
+    /// get the update interval
+    /// @return the update interval
+    MLMicroSeconds getUpdateInterval() { return updateInterval; };
+
     /// get sensor type
     /// @return the value unit of the sensor
     ValueUnit getSensorUnit();

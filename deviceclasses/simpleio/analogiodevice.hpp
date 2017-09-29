@@ -45,7 +45,8 @@ namespace p44 {
       analogio_unknown,
       analogio_dimmer,
       analogio_rgbdimmer,
-      analogio_valve
+      analogio_valve,
+      analogio_sensor
     } AnalogIoType;
 
     AnalogIoPtr analogIO; // brighness for single channel, red for RGB
@@ -55,10 +56,11 @@ namespace p44 {
 
     AnalogIoType analogIOType;
 
-    MLTicket transitionTicket;
+    MLTicket timerTicket; // for output transitions and input poll
 
   public:
     AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig);
+    virtual ~AnalogIODevice();
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
@@ -100,6 +102,9 @@ namespace p44 {
     void deriveDsUid();
 
   private:
+
+    void analogInputPoll(MLTimer &aTimer, MLMicroSeconds aNow);
+
 
     virtual void applyChannelValueSteps(bool aForDimming, double aStepSize);
 

@@ -24,16 +24,16 @@
 #if ENABLE_STATIC
 
 #include "lightbehaviour.hpp"
+#include "sensorbehaviour.hpp"
 #include "colorlightbehaviour.hpp"
 #include "climatecontrolbehaviour.hpp"
 
 using namespace p44;
 
-
 AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
   analogIOType(analogio_unknown),
-  transitionTicket(0)
+  timerTicket(0)
 {
   // Config is:
   //  <pin(s) specification>:[<behaviour mode>]
@@ -52,6 +52,8 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     analogIOType = analogio_rgbdimmer;
   else if (mode=="valve")
     analogIOType = analogio_valve;
+  else if (mode.find("sensor")==0) // sensor can have further specification in mode string
+    analogIOType = analogio_sensor;
   else {
     LOG(LOG_ERR, "unknown analog IO type: %s", mode.c_str());
   }
@@ -118,9 +120,48 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     ob->setHardwareName("Valve, 0..100");
     addBehaviour(ob);
   }
+  else if (analogIOType==analogio_sensor) {
+    int sensorType = sensorType_none;
+    int sensorUsage = usage_undefined;
+    double min = 0;
+    double max = 100;
+    double resolution = 1;
+    int pollIntervalS = 30;
+    // optionally, sensor can specify type, usage, sensor;tt;uu;mi;ma;res
+    sscanf(mode.c_str(), "sensor;%d;%d;%d", &sensorType, &sensorUsage, &pollIntervalS);
+    // Analog input as sensor
+    analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), false, 0));
+    // - query range
+    analogIO->getRange(min, max, resolution);
+    // sensor only, standard settings without scene table
+    installSettings();
+    // single sensor behaviour
+    SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, "")); // automatic
+    sb->setHardwareSensorConfig((VdcSensorType)sensorType, (VdcUsageHint)sensorUsage, min, max, resolution, pollIntervalS*Second, pollIntervalS*Second);
+    addBehaviour(sb);
+    // install polling for it
+    timerTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&AnalogIODevice::analogInputPoll, this, _1, _2));
+  }
 	deriveDsUid();
 }
 
+AnalogIODevice::~AnalogIODevice()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(timerTicket);
+}
+
+
+
+void AnalogIODevice::analogInputPoll(MLTimer &aTimer, MLMicroSeconds aNow)
+{
+  if (sensors.size()>0) {
+    SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
+    if (sb) {
+      sb->updateSensorValue(analogIO->value());
+    }
+    MainLoop::currentMainLoop().retriggerTimer(aTimer, sb->getUpdateInterval());
+  }
+}
 
 
 
@@ -131,7 +172,7 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   MLMicroSeconds transitionTime = 0;
   // abort previous transition
-  MainLoop::currentMainLoop().cancelExecutionTicket(transitionTicket);
+  MainLoop::currentMainLoop().cancelExecutionTicket(timerTicket);
   // generic device, show changed channels
   if (analogIOType==analogio_dimmer) {
     // single channel PWM dimmer
@@ -191,7 +232,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     if (l->brightnessTransitionStep(aStepSize)) {
       ALOG(LOG_DEBUG, "AnalogIO transitional PWM value: %.2f", w);
       // not yet complete, schedule next step
-      transitionTicket = MainLoop::currentMainLoop().executeOnce(
+      timerTicket = MainLoop::currentMainLoop().executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
         TRANSITION_STEP_TIME
       );
@@ -228,7 +269,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     if (cl->colorTransitionStep(aStepSize)) {
       ALOG(LOG_DEBUG, "AnalogIO transitional RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
       // not yet complete, schedule next step
-      transitionTicket = MainLoop::currentMainLoop().executeOnce(
+      timerTicket = MainLoop::currentMainLoop().executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
         TRANSITION_STEP_TIME
       );
