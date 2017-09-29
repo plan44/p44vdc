@@ -157,8 +157,8 @@ namespace p44 {
     string accessToken; ///< the access token for issuing requests (obtained via OAuth)
     string refreshToken; ///< the Oauth refresh token that can be used to obtain access tokens
 
-    bool developerApi; ///< if set, developer (simulator) API is used
-    bool isLockDown;   ///< if set, no requests can send send to the cloud (we are cut off)
+    bool developerApi;        ///< if set, developer (simulator) API is used
+    MLTicket lockdownTicket;  ///< A ticket that is used to cancel the currently running lockdown timer
     const static MLMicroSeconds MaxLockdownTimeout = 10 * Minute;
   public:
 
@@ -212,6 +212,13 @@ namespace p44 {
 
     /// a callback that is executed after the lockdown timeout expires
     void setLockDownTimeExpired();
+
+    /// cancel the current lockdown
+    void cancelLockDown();
+
+    // check if the lockdown is in effect
+    bool isLockDown() { return (lockdownTicket != 0); }
+
     /// @}
 
   };
