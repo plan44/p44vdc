@@ -251,7 +251,7 @@ HomeConnectEventMonitor::~HomeConnectEventMonitor()
 void HomeConnectEventMonitor::sendGetEventRequest()
 {
 	// connecting to event stream make sense only when the homm channel is working
-  if (homeConnectComm.apiReady && !homeConnectComm.isLockDown)
+  if (homeConnectComm.apiReady && !homeConnectComm.isLockDown())
   {
 	  // - set up the extra auth headers
 	  eventBuffer.clear();
@@ -393,7 +393,7 @@ HomeConnectComm::HomeConnectComm() :
   inherited(MainLoop::currentMainLoop()),
   httpAPIComm(MainLoop::currentMainLoop()),
   findInProgress(false), apiReady(false),
-  developerApi(false), isLockDown(false)
+  developerApi(false), lockdownTicket(0)
 {
   httpAPIComm.isMemberVariable();
 }
@@ -433,7 +433,7 @@ void HomeConnectComm::apiQuery(const char* aUrlPath, HomeConnectApiResultCB aRes
 
 void HomeConnectComm::apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler)
 {
-  if (!isLockDown) {
+  if (!isLockDown()) {
     HomeConnectApiOperationPtr op = HomeConnectApiOperationPtr(new HomeConnectApiOperation(*this, aMethod, aUrlPath, aData, aResultHandler));
     queueOperation(op);
     // process operations
@@ -453,16 +453,27 @@ void HomeConnectComm::setLockDownTime(MLMicroSeconds aLockDownTime)
     aLockDownTime = MaxLockdownTimeout;
   }
 
+  // cancel potential previous lockdown
+  cancelLockDown();
+
   LOG(LOG_INFO, "Set lock down for %i s", (int)(aLockDownTime / Second));
-  isLockDown = true;
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectComm::setLockDownTimeExpired, this), aLockDownTime);
+  lockdownTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectComm::setLockDownTimeExpired, this), aLockDownTime);
 }
 
 
 void HomeConnectComm::setLockDownTimeExpired()
 {
   LOG(LOG_INFO, "Lock down finished!");
-  isLockDown = false;
+  lockdownTicket = 0;
+}
+
+void HomeConnectComm::cancelLockDown()
+{
+  // check and cancel potential previous lockdown
+  if (lockdownTicket != 0) {
+    LOG(LOG_INFO, "Cancel previous lockdown");
+    MainLoop::currentMainLoop().cancelExecutionTicket(lockdownTicket);
+  }
 }
 
 #endif // ENABLE_HOMECONNECT
