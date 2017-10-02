@@ -332,11 +332,6 @@ bool HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 bool HomeConnectDevice::configureDevice()
 {
-  // configure common things
-  // - stop
-  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "Stop current program", "DELETE:programs/active"));
-  deviceActions->addAction(a);
-
   // configured ok
   return true;
 }
@@ -499,6 +494,12 @@ void HomeConnectDevice::addDefaultStandByAction()
 void HomeConnectDevice::addDefaultPowerOffAction()
 {
   addPowerStateAction("std.PowerOff", "Switch power state off", "Off");
+}
+
+void HomeConnectDevice::addDefaultStopAction()
+{
+  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "Stop current program", "DELETE:programs/active"));
+  deviceActions->addAction(a);
 }
 
 void HomeConnectDevice::addPowerStateAction(const string& aName, const string& aDescription, const string& aParameter)

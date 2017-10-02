@@ -96,11 +96,12 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
       HomeConnectGoToStandbyActionPtr(new HomeConnectGoToStandbyAction(*this, *powerStateDescriptor, *operationModeDescriptor));
   deviceActions->addAction(action);
   addDefaultPowerOnAction();
+  addDefaultStopAction();
 
   addAction("std.Espresso",          "Espresso",            "Espresso",          35,  60,  5,  40);
   addAction("std.EspressoMacchiato", "Espresso Macchiato",  "EspressoMacchiato", 40,  60,  10, 50);
-  addAction("std.Coffee",            "Coffee",              "Coffee",            60,  250, 10, 120);
-  addAction("std.Cappuccino",        "Cappuccino",          "Cappuccino",        100, 250, 10, 180);
+  addAction("std.Coffee",            "Coffee",              "Coffee",            60,  250, 10, 100);
+  addAction("std.Cappuccino",        "Cappuccino",          "Cappuccino",        100, 300, 20, 180);
   addAction("std.LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 250);
   addAction("std.CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 200);
 
@@ -115,7 +116,7 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   beanAmountProp->addEnum("DoubleShotPlus", i++);
   beanAmountProp->addEnum("DoubleShotPlusPlus", i++);
 
-  fillQuantityProp = ValueDescriptorPtr(new NumericValueDescriptor("FillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 0, 400, 1));
+  fillQuantityProp = ValueDescriptorPtr(new NumericValueDescriptor("FillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 0, 400, 1, true, 0));
 
   deviceProperties->addProperty(beanAmountProp);
   deviceProperties->addProperty(fillQuantityProp);

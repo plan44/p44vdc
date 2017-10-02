@@ -103,6 +103,7 @@ bool HomeConnectDeviceDishWasher::configureDevice()
 
   addDefaultPowerOffAction();
   addDefaultPowerOnAction();
+  addDefaultStopAction();
 
   addAction("std.Auto3545",    "Auto 35-45C", "Auto1",   delayedStart);
   addAction("std.Auto4565",    "Auto 45-65C", "Auto2",   delayedStart);

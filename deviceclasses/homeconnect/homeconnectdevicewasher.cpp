@@ -126,6 +126,8 @@ bool HomeConnectDeviceWasher::configureDevice()
   addAction("std.DelicatesSilk", "Delicates / Silk", "DelicatesSilk", temperature,         spinSpeedDelicatesSilkWool);
   addAction("std.Wool",          "Wool",             "Wool",          temperature,         spinSpeedDelicatesSilkWool);
 
+  addDefaultStopAction();
+
   temperatureProp = createEnumDescriptor("Temperature", temperature_GC90, temperature_GC40, temperatureNames);
   spinSpeedProp = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1600, spinSpeed_RPM1000, spinSpeedNames);
 
