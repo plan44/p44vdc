@@ -104,6 +104,8 @@ bool HomeConnectDeviceDryer::configureDevice()
   addAction("std.Synthetic", "Synthetic", "Synthetic", dryingTargetCottonSynthetic);
   addAction("std.Mix",       "Mix",       "Mix",       dryingTargetMix);
 
+  addDefaultStopAction();
+
 
   dryingTargetProp = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   i = 0;

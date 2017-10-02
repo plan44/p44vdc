@@ -103,7 +103,7 @@ bool HomeConnectDeviceOven::configureDevice()
   EventConfiguration eventConfig = { 0 };
   eventConfig.hasAlarmClockElapsed = true;
   eventConfig.hasLocallyOperated = true;
-  eventConfig.hasProgramAborted = true;
+  eventConfig.hasProgramAborted = false;
   eventConfig.hasProgramFinished = true;
   eventConfig.hasProgramStarted = true;
   configureEvents(eventConfig);
@@ -111,13 +111,14 @@ bool HomeConnectDeviceOven::configureDevice()
 
   addDefaultStandByAction();
   addDefaultPowerOnAction();
+  addDefaultStopAction();
 
   ValueDescriptorPtr temp = ValueDescriptorPtr(
       new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30,
-          250, 1, true, 180));
+          250, 1, true, 200));
   ValueDescriptorPtr duration = ValueDescriptorPtr(
-      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
-          1, true, 600));
+      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340,
+          1, true, 0));
 
   addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
   addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
