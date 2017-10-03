@@ -518,6 +518,13 @@ void ClimateControlBehaviour::bindToStatement(sqlite3pp::statement &aStatement, 
 
 static char climatecontrol_key;
 
+// description properties
+
+enum {
+  activeCoolingMode_key,
+  numDescProperties
+};
+
 // settings properties
 
 enum {
@@ -526,6 +533,19 @@ enum {
   numSettingsProperties
 };
 
+
+int ClimateControlBehaviour::numDescProps() { return inherited::numDescProps()+numDescProperties; }
+const PropertyDescriptorPtr ClimateControlBehaviour::getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
+{
+    static const PropertyDescription properties[numDescProperties] = {
+      { "activeCoolingMode", apivalue_bool, activeCoolingMode_key+descriptions_key_offset, OKEY(climatecontrol_key) },
+    };
+    int n = inherited::numDescProps();
+    if (aPropIndex<n)
+      return inherited::getDescDescriptorByIndex(aPropIndex, aParentDescriptor);
+    aPropIndex -= n;
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+}
 
 int ClimateControlBehaviour::numSettingsProps() { return inherited::numSettingsProps()+numSettingsProperties; }
 const PropertyDescriptorPtr ClimateControlBehaviour::getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
@@ -553,6 +573,7 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
         // Settings properties
         case heatingSystemCapability_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemCapability); return true;
         case heatingSystemType_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemType); return true;
+        case activeCoolingMode_key+descriptions_key_offset: aPropValue->setBoolValue(true); return true;
       }
     }
     else {
