@@ -546,9 +546,9 @@ void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryRes
     string_format("/api/homeappliances/%s/events",haId.c_str()).c_str(),
     boost::bind(&HomeConnectDevice::handleEvent, this, _1, _2, _3))
   );
-  // start pooling cycle
+  // we need to poll the state once
   pollState();
-  // FIXME: implement
+
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
 
@@ -798,9 +798,6 @@ void HomeConnectDevice::pollStateStatusDone(JsonObjectPtr aResult, ErrorPtr aErr
 
     homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/settings", haId.c_str()).c_str(),
         boost::bind(&HomeConnectDevice::pollStateSettingsDone, this, _1, _2));
-  } else {
-    // start new loop
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::pollState, this), 10 * Minute);
   }
 }
 
@@ -822,9 +819,6 @@ void HomeConnectDevice::pollStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aE
 
     homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/programs/selected", haId.c_str()).c_str(),
         boost::bind(&HomeConnectDevice::pollStateProgramDone, this, _1, _2));
-  } else {
-    // start new loop
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::pollState, this), 10 * Minute);
   }
 }
 
@@ -854,9 +848,6 @@ void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aEr
       }
     }
   }
-
-  // start new loop
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::pollState, this), 10 * Minute);
 }
 
 string HomeConnectDevice::hardwareGUID()
