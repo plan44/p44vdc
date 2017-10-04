@@ -240,5 +240,52 @@ void HomeConnectGoToStandbyAction::performCall(ApiValuePtr aParams, StatusCB aCo
   inherited::performCall(aParams, aCompletedCB);
 }
 
+HomeConnectStopAction::HomeConnectStopAction(SingleDevice &aSingleDevice,
+                                             EnumValueDescriptor& aOperationMode,
+                                             const string& aName,
+                                             const string& aDescription) :
+    inherited(aSingleDevice,
+              aOperationMode,
+              aName,
+              aDescription,
+              "DELETE:programs/active") {}
+
+void HomeConnectStopAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
+{
+  string value = operationMode.getStringValue();
+  if (value != "ModeRun" &&
+      value != "ModeDelayedStart" &&
+      value != "ModePause" &&
+      value != "ModeActionRequired") {
+    LOG(LOG_DEBUG, "Request cannot be performed since no active program is set, ignoring action");
+    aCompletedCB(Error::ok());
+    return;
+  }
+
+  inherited::performCall(aParams, aCompletedCB);
+}
+
+
+HomeConnectStopIfNotTimedAction::HomeConnectStopIfNotTimedAction(SingleDevice &aSingleDevice,
+                                                                 EnumValueDescriptor& aOperationMode,
+                                                                 ValueDescriptor& aRemainingProgramTime) :
+   inherited(aSingleDevice,
+             aOperationMode,
+             "std.StopIfNotTimed",
+             "Stop program if it is not timed"),
+   remainingProgramTime(aRemainingProgramTime) {}
+
+void HomeConnectStopIfNotTimedAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
+{
+  ApiValuePtr value =  VdcHost::sharedVdcHost()->newApiValue();
+  if (remainingProgramTime.getValue(value)) {
+    LOG(LOG_DEBUG, "Program is timed, ignoring action");
+    aCompletedCB(Error::ok());
+    return;
+  }
+
+  inherited::performCall(aParams, aCompletedCB);
+}
+
 #endif // ENABLE_HOMECONNECT
 
