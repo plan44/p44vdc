@@ -498,7 +498,7 @@ void HomeConnectDevice::addDefaultPowerOffAction()
 
 void HomeConnectDevice::addDefaultStopAction()
 {
-  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "Stop current program", "DELETE:programs/active"));
+  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectStopAction(*this, *operationModeDescriptor, "std.Stop", "Stop current program"));
   deviceActions->addAction(a);
 }
 
@@ -620,8 +620,12 @@ void HomeConnectDevice::handleEventTypeNotify(const string& aKey, JsonObjectPtr 
   }
 
   if ((aKey == "BSH.Common.Option.RemainingProgramTime") && (remainingProgramTime != NULL)) {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    remainingProgramTime->setInt32Value(value);
+    if (aValue == NULL) {
+      remainingProgramTime->invalidate();
+    }
+    else {
+      remainingProgramTime->setInt32Value(aValue->int32Value());
+    }
     return;
   }
 

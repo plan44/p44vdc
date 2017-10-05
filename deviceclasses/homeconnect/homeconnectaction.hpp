@@ -141,6 +141,36 @@ namespace p44 {
 
   typedef boost::intrusive_ptr<HomeConnectGoToStandbyAction> HomeConnectGoToStandbyActionPtr;
   
+
+  class HomeConnectStopAction : public HomeConnectActionWithOperationMode
+  {
+    typedef HomeConnectActionWithOperationMode inherited;
+
+  public:
+    HomeConnectStopAction(SingleDevice &aSingleDevice,
+                          EnumValueDescriptor& aOperationMode,
+                          const string& aName,
+                          const string& aDescription);
+
+    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
+
+  };
+
+  class HomeConnectStopIfNotTimedAction : public HomeConnectStopAction
+  {
+    typedef HomeConnectStopAction inherited;
+
+    ValueDescriptor& remainingProgramTime;
+
+  public:
+    HomeConnectStopIfNotTimedAction(SingleDevice &aSingleDevice,
+                                    EnumValueDescriptor& aOperationMode,
+                                    ValueDescriptor& aRemainingProgramTime);
+
+    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
+
+  };
+
 } // namespace p44
 
 

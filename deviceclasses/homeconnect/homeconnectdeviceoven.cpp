@@ -33,6 +33,9 @@ HomeConnectDeviceOven::HomeConnectDeviceOven(HomeConnectVdc *aVdcP, JsonObjectPt
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
   settings->fireAction = "std.StandBy";
+  settings->deepOffAction = "std.StopIfNotTimed";
+  settings->leaveHomeAction = "std.StopIfNotTimed";
+  settings->sleepAction = "std.StopIfNotTimed";
 
   installSettings(settings);
 }
@@ -124,6 +127,8 @@ bool HomeConnectDeviceOven::configureDevice()
   addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
   addAction("std.TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
   addAction("std.PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
+
+  deviceActions->addAction(new HomeConnectStopIfNotTimedAction(*this, *operationModeDescriptor, *remainingProgramTime));
 
   return ret;
 }
