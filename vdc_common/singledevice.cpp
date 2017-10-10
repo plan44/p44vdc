@@ -178,7 +178,6 @@ int ValueDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescript
 
 PropertyDescriptorPtr ValueDescriptor::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  // device level properties
   static const PropertyDescription properties[numValueProperties] = {
     { "type", apivalue_string, type_key, OKEY(value_key) },
     { "siunit", apivalue_string, unit_key, OKEY(value_key) },

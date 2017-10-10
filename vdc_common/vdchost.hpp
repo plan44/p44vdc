@@ -33,7 +33,6 @@
 
 #include "vdcapi.hpp"
 
-
 using namespace std;
 
 namespace p44 {
@@ -42,6 +41,7 @@ namespace p44 {
   class Device;
   class ButtonBehaviour;
   class DsUid;
+  class LocalController;
 
   typedef boost::intrusive_ptr<Vdc> VdcPtr;
   typedef boost::intrusive_ptr<Device> DevicePtr;
@@ -109,6 +109,7 @@ namespace p44 {
 
     friend class Vdc;
     friend class DsAddressable;
+    friend class LocalController;
 
     bool externalDsuid; ///< set when dSUID is set to a external value (usually UUIDv1 based)
     bool storedDsuid; ///< set when using stored (DB persisted) dSUID that is not equal to default dSUID 
@@ -160,9 +161,14 @@ namespace p44 {
     MLTicket sessionActivityTicket;
     VdcApiConnectionPtr activeSessionConnection;
 
+    #if ENABLE_LOCALCONTROLLER
+    LocalController *localController;
+    #endif
+
   public:
 
     VdcHost();
+    virtual ~VdcHost();
 
     /// VdcHost is a singleton, get access to it
     /// @return vdc host

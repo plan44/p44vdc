@@ -455,9 +455,9 @@ void EnoceanDevice::switchProfiles(const ProfileVariantEntry &aFromVariant, cons
       hasNameOrZone = true;
       newDev->initializeName(getAssignedName());
     }
-    if (newDev->deviceSettings && deviceSettings && deviceSettings->zoneID!=0) {
+    if (newDev->deviceSettings && getZoneID()!=0) {
       hasNameOrZone = true;
-      newDev->deviceSettings->zoneID = deviceSettings->zoneID;
+      newDev->deviceSettings->zoneID = getZoneID();
     }
     // - add it to the container
     getEnoceanVdc().addAndRememberDevice(newDev);

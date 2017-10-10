@@ -83,7 +83,7 @@ namespace p44 {
     /// generic vdc flag word
     int vdcFlags;
     /// default dS zone ID
-    int defaultZoneID;
+    DsZoneID defaultZoneID;
 
     /// periodic rescan, collecting
     MLMicroSeconds rescanInterval; ///< rescan interval, 0 if none

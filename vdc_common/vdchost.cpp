@@ -35,6 +35,11 @@
 #include "lightbehaviour.hpp"
 #endif
 
+#if ENABLE_LOCALCONTROLLER
+#include "localcontroller.hpp"
+#endif
+
+
 
 using namespace p44;
 
@@ -96,6 +101,18 @@ VdcHost::VdcHost() :
   sharedVdcHostP = this;
   // obtain default MAC address (might be changed by setIdMode())
   mac = macAddress();
+  #if ENABLE_LOCALCONTROLLER
+  localController = new LocalController(*this);
+  localController->isMemberVariable();
+  #endif
+}
+
+
+VdcHost::~VdcHost()
+{
+  #if ENABLE_LOCALCONTROLLER
+  if (localController) delete localController;
+  #endif
 }
 
 
@@ -117,6 +134,9 @@ void VdcHost::postEvent(VdchostEvent aEvent)
   for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
     pos->second->handleGlobalEvent(aEvent);
   }
+  #if ENABLE_LOCALCONTROLLER
+  localController->processGlobalEvent(aEvent);
+  #endif
   // also let app-level event monitor know
   if (eventMonitorHandler) {
     eventMonitorHandler(aEvent);
@@ -361,6 +381,9 @@ void VdcHost::startRunning()
   isNetworkConnected();
   // start periodic tasks needed during normal running like announcement checking and saving parameters
   MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, vdcHostP, _2), 1*Second);
+  #if ENABLE_LOCALCONTROLLER
+  localController->startRunning();
+  #endif
 }
 
 
@@ -454,6 +477,9 @@ void VdcHost::deviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNe
   }
   else {
     LOG(LOG_NOTICE, "--- initialized device: %s",aNextDevice->second->description().c_str());
+    #if ENABLE_LOCALCONTROLLER
+    localController->deviceAdded(aNextDevice->second);
+    #endif
   }
   // check next
   ++aNextDevice;
@@ -503,6 +529,9 @@ void VdcHost::duplicateIgnored(DevicePtr aDevice)
 void VdcHost::deviceInitialized(DevicePtr aDevice)
 {
   LOG(LOG_NOTICE, "--- initialized device: %s",aDevice->description().c_str());
+  #if ENABLE_LOCALCONTROLLER
+  localController->deviceAdded(aDevice);
+  #endif
   // trigger announcing when initialized (no problem when called while already announcing)
   startAnnouncing();
 }
@@ -524,6 +553,9 @@ void VdcHost::removeDevice(DevicePtr aDevice, bool aForget)
   // remove from container-wide map of devices
   dSDevices.erase(aDevice->getDsUid());
   LOG(LOG_NOTICE, "--- removed device: %s", aDevice->shortDesc().c_str());
+  #if ENABLE_LOCALCONTROLLER
+  localController->deviceRemoved(aDevice);
+  #endif
 }
 
 
@@ -635,6 +667,9 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
       // do a save run as well
       // - myself
       save();
+      #if ENABLE_LOCALCONTROLLER
+      localController->save();
+      #endif
       // - device containers
       for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
         pos->second->save();
@@ -666,9 +701,15 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
 
 void VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
-  if (!activeSessionConnection) {
-    // not connected to a vdSM, handle clicks locally
-    handleClickLocally(aButtonBehaviour, aClickType);
+  #if ENABLE_LOCALCONTROLLER
+  if (!localController->processButtonClick(aButtonBehaviour, aClickType))
+  #endif
+  {
+    // not handled by local controller
+    if (!activeSessionConnection) {
+      // not connected to a vdSM, handle clicks locally
+      handleClickLocally(aButtonBehaviour, aClickType);
+    }
   }
 }
 
@@ -1197,33 +1238,40 @@ void VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const strin
 
 // MARK: ===== property access
 
-static char devicecontainer_key;
-static char vdc_container_key;
-static char vdc_key;
+static char vdchost_obj;
+static char vdcs_obj;
+static char vdc_obj;
+static char localController_obj;
 
 enum {
   vdcs_key,
   valueSources_key,
-  numDeviceContainerProperties
+  #if ENABLE_LOCALCONTROLLER
+  localController_key,
+  #endif
+  numVdcHostProperties
 };
 
 
 
 int VdcHost::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor->hasObjectKey(vdc_container_key)) {
+  if (aParentDescriptor->hasObjectKey(vdcs_obj)) {
     return (int)vdcs.size();
   }
-  return inherited::numProps(aDomain, aParentDescriptor)+numDeviceContainerProperties;
+  return inherited::numProps(aDomain, aParentDescriptor)+numVdcHostProperties;
 }
 
 
 // note: is only called when getDescriptorByName does not resolve the name
 PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  static const PropertyDescription properties[numDeviceContainerProperties] = {
-    { "x-p44-vdcs", apivalue_object+propflag_container, vdcs_key, OKEY(vdc_container_key) },
-    { "x-p44-valueSources", apivalue_null, valueSources_key, OKEY(devicecontainer_key) },
+  static const PropertyDescription properties[numVdcHostProperties] = {
+    { "x-p44-vdcs", apivalue_object+propflag_container, vdcs_key, OKEY(vdcs_obj) },
+    { "x-p44-valueSources", apivalue_null, valueSources_key, OKEY(vdchost_obj) },
+    #if ENABLE_LOCALCONTROLLER
+    { "x-p44-localController", apivalue_object, localController_key, OKEY(localController_obj) },
+    #endif
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -1235,11 +1283,11 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
 
 PropertyDescriptorPtr VdcHost::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor->hasObjectKey(vdc_container_key)) {
+  if (aParentDescriptor->hasObjectKey(vdcs_obj)) {
     // accessing one of the vdcs by numeric index
     return getDescriptorByNumericName(
       aPropMatch, aStartIndex, aDomain, aParentDescriptor,
-      OKEY(vdc_key)
+      OKEY(vdc_obj)
     );
   }
   // None of the containers within Device - let base class handle Device-Level properties
@@ -1253,7 +1301,12 @@ PropertyContainerPtr VdcHost::getContainer(const PropertyDescriptorPtr &aPropert
     // local container
     return PropertyContainerPtr(this); // handle myself
   }
-  else if (aPropertyDescriptor->hasObjectKey(vdc_key)) {
+  #if ENABLE_LOCALCONTROLLER
+  else if (aPropertyDescriptor->hasObjectKey(localController_obj)) {
+    return localController;
+  }
+  #endif
+  else if (aPropertyDescriptor->hasObjectKey(vdc_obj)) {
     // - just iterate into map, we'll never have more than a few logical vdcs!
     int i = 0;
     for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
@@ -1271,7 +1324,7 @@ PropertyContainerPtr VdcHost::getContainer(const PropertyDescriptorPtr &aPropert
 
 bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
-  if (aPropertyDescriptor->hasObjectKey(devicecontainer_key)) {
+  if (aPropertyDescriptor->hasObjectKey(vdchost_obj)) {
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case valueSources_key:
@@ -1386,6 +1439,9 @@ ErrorPtr VdcHost::loadAndFixDsUID()
       save();
     }
   }
+  #if ENABLE_LOCALCONTROLLER
+  localController->load();
+  #endif
   return ErrorPtr();
 }
 
