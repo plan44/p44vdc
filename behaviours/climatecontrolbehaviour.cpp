@@ -573,7 +573,8 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
         // Settings properties
         case heatingSystemCapability_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemCapability); return true;
         case heatingSystemType_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemType); return true;
-        case activeCoolingMode_key+descriptions_key_offset: aPropValue->setBoolValue(true); return true;
+        case activeCoolingMode_key+descriptions_key_offset: aPropValue->setBoolValue(true);
+            return (climateDeviceKind==climatedevice_fancoilunit);
       }
     }
     else {
