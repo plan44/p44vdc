@@ -66,20 +66,20 @@ const char *ZoneDescriptor::tableName()
 
 // primary key field definitions
 
-static const size_t numKeys = 1;
+static const size_t numZoneKeys = 1;
 
 size_t ZoneDescriptor::numKeyDefs()
 {
   // no parent id, zones are global
-  return numKeys;
+  return numZoneKeys;
 }
 
 const FieldDefinition *ZoneDescriptor::getKeyDef(size_t aIndex)
 {
-  static const FieldDefinition keyDefs[numKeys] = {
+  static const FieldDefinition keyDefs[numZoneKeys] = {
     { "zoneId", SQLITE_INTEGER }, // uniquely identifies this zone
   };
-  if (aIndex<numKeys)
+  if (aIndex<numZoneKeys)
     return &keyDefs[aIndex];
   return NULL;
 }
@@ -87,23 +87,23 @@ const FieldDefinition *ZoneDescriptor::getKeyDef(size_t aIndex)
 
 // data field definitions
 
-static const size_t numFields = 1;
+static const size_t numZoneFields = 1;
 
 size_t ZoneDescriptor::numFieldDefs()
 {
-  return inheritedParams::numFieldDefs()+numFields;
+  return inheritedParams::numFieldDefs()+numZoneFields;
 }
 
 
 const FieldDefinition *ZoneDescriptor::getFieldDef(size_t aIndex)
 {
-  static const FieldDefinition dataDefs[numFields] = {
+  static const FieldDefinition dataDefs[numZoneFields] = {
     { "zoneName", SQLITE_TEXT }
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
   aIndex -= inheritedParams::numFieldDefs();
-  if (aIndex<numFields)
+  if (aIndex<numZoneFields)
     return &dataDefs[aIndex];
   return NULL;
 }
@@ -323,6 +323,279 @@ PropertyContainerPtr ZoneList::getContainer(const PropertyDescriptorPtr &aProper
 
 
 
+// MARK: ===== SceneDescriptor
+
+SceneDescriptor::SceneDescriptor() :
+  inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore())
+{
+}
+
+
+SceneDescriptor::~SceneDescriptor()
+{
+}
+
+
+// MARK: ===== SceneDescriptor persistence
+
+const char *SceneDescriptor::tableName()
+{
+  return "sceneDescriptors";
+}
+
+
+// primary key field definitions
+
+static const size_t numSceneKeys = 1;
+
+size_t SceneDescriptor::numKeyDefs()
+{
+  // no parent id, zones are global
+  return numSceneKeys;
+}
+
+const FieldDefinition *SceneDescriptor::getKeyDef(size_t aIndex)
+{
+  static const FieldDefinition keyDefs[numSceneKeys] = {
+    { "sceneNo", SQLITE_INTEGER }, // uniquely identifies this zone
+  };
+  if (aIndex<numSceneKeys)
+    return &keyDefs[aIndex];
+  return NULL;
+}
+
+
+// data field definitions
+
+static const size_t numSceneFields = 1;
+
+size_t SceneDescriptor::numFieldDefs()
+{
+  return inheritedParams::numFieldDefs()+numSceneFields;
+}
+
+
+const FieldDefinition *SceneDescriptor::getFieldDef(size_t aIndex)
+{
+  static const FieldDefinition dataDefs[numSceneFields] = {
+    { "sceneName", SQLITE_TEXT }
+  };
+  if (aIndex<inheritedParams::numFieldDefs())
+    return inheritedParams::getFieldDef(aIndex);
+  aIndex -= inheritedParams::numFieldDefs();
+  if (aIndex<numSceneFields)
+    return &dataDefs[aIndex];
+  return NULL;
+}
+
+
+void SceneDescriptor::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
+{
+  inheritedParams::loadFromRowWithoutParentId(aRow, aIndex, aCommonFlagsP);
+  // get zoneID
+  sceneNo = (DsSceneNumber)aRow->getWithDefault(aIndex++, 0);
+  // the name
+  sceneName = nonNullCStr(aRow->get<const char *>(aIndex++));
+}
+
+
+void SceneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
+{
+  inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  // - my own id
+  aStatement.bind(aIndex++, sceneNo);
+  // - title
+  aStatement.bind(aIndex++, sceneName.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+}
+
+
+// MARK: ===== ZoneDescriptor property access implementation
+
+enum {
+  sceneName_key,
+  numSceneProperties
+};
+
+static char scenedescriptor_key;
+
+
+
+int SceneDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return numSceneProperties;
+}
+
+
+PropertyDescriptorPtr SceneDescriptor::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  static const PropertyDescription properties[numSceneProperties] = {
+    { "name", apivalue_string, zoneName_key, OKEY(scenedescriptor_key) }
+  };
+  if (aParentDescriptor->isRootOfObject()) {
+    // root level property of this object hierarchy
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(scenedescriptor_key)) {
+    if (aMode==access_read) {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case sceneName_key: aPropValue->setStringValue(sceneName); return true;
+      }
+    }
+    else {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case zoneName_key: setPVar(sceneName, aPropValue->stringValue()); return true;
+      }
+    }
+  }
+  return false;
+}
+
+
+// MARK: ===== SceneList
+
+
+SceneDescriptorPtr SceneList::getSceneByNo(DsSceneNumber aSceneNo, bool aCreateNewIfNotExisting)
+{
+  SceneDescriptorPtr scene;
+  for (ScenesVector::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
+    if ((*pos)->sceneNo==aSceneNo) {
+      scene = *pos;
+      break;
+    }
+  }
+  if (!scene && aCreateNewIfNotExisting) {
+    // create new scene descriptor on the fly
+    scene = SceneDescriptorPtr(new SceneDescriptor);
+    scene->sceneNo = aSceneNo;
+    scene->sceneName = string_format("Scene #%d", aSceneNo);
+    scene->markClean(); // not modified yet, no need to save
+    scenes.push_back(scene);
+  }
+  return scene;
+}
+
+
+// MARK: ===== SceneList persistence
+
+ErrorPtr SceneList::load()
+{
+  ErrorPtr err;
+
+  // create a template
+  SceneDescriptorPtr newScene = SceneDescriptorPtr(new SceneDescriptor());
+  // get the query
+  sqlite3pp::query *queryP = newScene->newLoadAllQuery(NULL);
+  if (queryP==NULL) {
+    // real error preparing query
+    err = newScene->paramStore.error();
+  }
+  else {
+    for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
+      // got record
+      // - load record fields into zone descriptor object
+      int index = 0;
+      newScene->loadFromRow(row, index, NULL);
+      // - put custom action into container
+      scenes.push_back(newScene);
+      // - fresh object for next row
+      newScene = SceneDescriptorPtr(new SceneDescriptor());
+    }
+    delete queryP; queryP = NULL;
+  }
+  return err;
+}
+
+
+ErrorPtr SceneList::save()
+{
+  ErrorPtr err;
+
+  // save all elements (only dirty ones will be actually stored to DB)
+  for (ScenesVector::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
+    err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
+    if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->sceneNo, err->description().c_str());
+  }
+  return err;
+}
+
+
+// MARK: ===== SceneList property access implementation
+
+int SceneList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return (int)scenes.size();
+}
+
+
+static char scenelist_key;
+
+PropertyDescriptorPtr SceneList::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  if (aPropIndex<scenes.size()) {
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = string_format("%u", scenes[aPropIndex]->sceneNo);
+    descP->propertyType = apivalue_object;
+    descP->deletable = true; // scene is deletable
+    descP->propertyFieldKey = aPropIndex;
+    descP->propertyObjectKey = OKEY(scenelist_key);
+    return descP;
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+PropertyDescriptorPtr SceneList::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
+{
+  PropertyDescriptorPtr p = inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
+  if (!p && aMode==access_write && isNamedPropSpec(aPropMatch)) {
+    // writing to non-existing scene -> insert new scene
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = aPropMatch;
+    descP->propertyType = apivalue_object;
+    descP->deletable = true; // new scenes are deletable
+    descP->propertyFieldKey = scenes.size(); // new zone will be appended, so index is current size
+    descP->propertyObjectKey = OKEY(scenelist_key);
+    uint16_t newSceneNo = MAX_SCENE_NO;
+    if (sscanf(aPropMatch.c_str(), "%hd", &newSceneNo)==1) {
+      if (newSceneNo<MAX_SCENE_NO) {
+        getSceneByNo((DsSceneNumber)newSceneNo, true);
+      }
+      // valid new scene
+      p = descP;
+    }
+  }
+  return p;
+}
+
+
+bool SceneList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(scenelist_key) && aMode==access_delete) {
+    // only field-level access is deleting a zone
+    SceneDescriptorPtr ds = scenes[aPropertyDescriptor->fieldKey()];
+    ds->deleteFromStore(); // remove from store
+    scenes.erase(scenes.begin()+aPropertyDescriptor->fieldKey()); // remove from container
+    return true;
+  }
+  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
+}
+
+
+PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->hasObjectKey(scenelist_key)) {
+    return scenes[aPropertyDescriptor->fieldKey()];
+  }
+  return NULL;
+}
+
+
 
 // MARK: ===== LocalController
 
@@ -330,6 +603,7 @@ LocalController::LocalController(VdcHost &aVdcHost) :
   vdcHost(aVdcHost)
 {
   localZones.isMemberVariable();
+  localScenes.isMemberVariable();
 }
 
 
@@ -378,20 +652,29 @@ void LocalController::startRunning()
 
 ErrorPtr LocalController::load()
 {
-  return localZones.load();
+  ErrorPtr err;
+  err = localZones.load();
+  if (!Error::isOK(err)) LOG(LOG_ERR, "could not load localZones: %s", err->description().c_str());
+  err = localScenes.load();
+  if (!Error::isOK(err)) LOG(LOG_ERR, "could not load localScenes: %s", err->description().c_str());
+  return err;
 }
 
 
 ErrorPtr LocalController::save()
 {
-  return localZones.save();
+  ErrorPtr err;
+  err = localZones.save();
+  if (!Error::isOK(err)) LOG(LOG_ERR, "could not save localZones: %s", err->description().c_str());
+  err = localScenes.save();
+  if (!Error::isOK(err)) LOG(LOG_ERR, "could not save localScenes: %s", err->description().c_str());
+  return err;
 }
 
 
 
 // MARK: ===== LocalController property access
 
-static char scenelist_key;
 static char triggerlist_key;
 
 enum {
@@ -444,10 +727,10 @@ PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr &
     switch (aPropertyDescriptor->fieldKey()) {
       case zones_key:
         return ZoneListPtr(&localZones);
-//      case scenes_key:
-//        return scenes;
+      case scenes_key:
+        return SceneListPtr(&localScenes);
 //      case triggers_key:
-//        return triggers;
+//        return TriggerListPtr(&localTriggers);
     }
   }
   // unknown here

@@ -122,6 +122,87 @@ namespace p44 {
   typedef boost::intrusive_ptr<ZoneList> ZoneListPtr;
 
 
+  /// scene descriptor
+  /// holds information about scene (global scope)
+  class SceneDescriptor : public PropertyContainer, public PersistentParams
+  {
+    typedef PropertyContainer inherited;
+    typedef PersistentParams inheritedParams;
+    friend class SceneList;
+
+    DsSceneNumber sceneNo; ///< global dS scene ID
+    string sceneName; ///< the user facing name of the scene
+
+  public:
+
+    SceneDescriptor();
+    virtual ~SceneDescriptor();
+
+    /// get the name
+    /// @return name of this zone
+    string getName() const { return sceneName; };
+
+    /// get the dS scene number
+    /// @return ID of this scene
+    int getSceneNo() const { return sceneNo; };
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+
+    // persistence implementation
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numKeyDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getKeyDef(size_t aIndex) P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<SceneDescriptor> SceneDescriptorPtr;
+
+
+  /// scene list
+  /// list of scenes defined by user
+  class SceneList : public PropertyContainer
+  {
+    typedef PropertyContainer inherited;
+
+  public:
+
+    typedef vector<SceneDescriptorPtr> ScenesVector;
+
+    ScenesVector scenes;
+
+    /// load zones
+    ErrorPtr load();
+
+    /// save zones
+    ErrorPtr save();
+
+    /// get zone by ID
+    /// @param aZoneId zone to look up
+    /// @param aCreateNewIfNotExisting if true, a zone is created on the fly when none exists for the given ID
+    /// @return zone or NULL if zoneID is not known (and none created)
+    SceneDescriptorPtr getSceneByNo(DsSceneNumber aSceneNo, bool aCreateNewIfNotExisting = false);
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<SceneList> SceneListPtr;
+
+
 
   /// local controller
   /// manages local zones, scenes, triggers
@@ -131,8 +212,8 @@ namespace p44 {
 
     VdcHost &vdcHost; ///< local reference to vdc host
 
-    ZoneList localZones; ///< the local zones
-
+    ZoneList localZones; ///< the locally used/defined zones
+    SceneList localScenes; ///< the locally defined scenes
 
   public:
 
