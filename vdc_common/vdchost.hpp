@@ -167,7 +167,7 @@ namespace p44 {
 
   public:
 
-    VdcHost();
+    VdcHost(bool aWithLocalController = false);
     virtual ~VdcHost();
 
     /// VdcHost is a singleton, get access to it

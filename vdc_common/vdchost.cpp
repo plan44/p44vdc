@@ -78,7 +78,7 @@ using namespace p44;
 
 static VdcHost *sharedVdcHostP = NULL;
 
-VdcHost::VdcHost() :
+VdcHost::VdcHost(bool aWithLocalController) :
   inheritedParams(dsParamStore),
   mac(0),
   networkConnected(true), // start with the assumption of a connected network
@@ -95,6 +95,9 @@ VdcHost::VdcHost() :
   localDimDirection(0), // undefined
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
   mainLoopStatsCounter(0),
+  #if ENABLE_LOCALCONTROLLER
+  localController(NULL),
+  #endif
   productName(DEFAULT_PRODUCT_NAME)
 {
   // remember singleton's address
@@ -102,8 +105,10 @@ VdcHost::VdcHost() :
   // obtain default MAC address (might be changed by setIdMode())
   mac = macAddress();
   #if ENABLE_LOCALCONTROLLER
-  localController = new LocalController(*this);
-  localController->isMemberVariable();
+  if (aWithLocalController) {
+    localController = new LocalController(*this);
+    localController->isMemberVariable();
+  }
   #endif
 }
 
@@ -135,7 +140,7 @@ void VdcHost::postEvent(VdchostEvent aEvent)
     pos->second->handleGlobalEvent(aEvent);
   }
   #if ENABLE_LOCALCONTROLLER
-  localController->processGlobalEvent(aEvent);
+  if (localController) localController->processGlobalEvent(aEvent);
   #endif
   // also let app-level event monitor know
   if (eventMonitorHandler) {
@@ -336,7 +341,7 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     macAddressToString(mac, ':').c_str(),
     ipv4ToString(getIpV4Address()).c_str()
   );
-  // start the API server
+  // start the API server if API is enabled
   if (vdcApiServer) {
     vdcApiServer->setConnectionStatusHandler(boost::bind(&VdcHost::vdcApiConnectionStatusHandler, this, _1, _2));
     vdcApiServer->start();
@@ -382,7 +387,7 @@ void VdcHost::startRunning()
   // start periodic tasks needed during normal running like announcement checking and saving parameters
   MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, vdcHostP, _2), 1*Second);
   #if ENABLE_LOCALCONTROLLER
-  localController->startRunning();
+  if (localController) localController->startRunning();
   #endif
 }
 
@@ -478,7 +483,7 @@ void VdcHost::deviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNe
   else {
     LOG(LOG_NOTICE, "--- initialized device: %s",aNextDevice->second->description().c_str());
     #if ENABLE_LOCALCONTROLLER
-    localController->deviceAdded(aNextDevice->second);
+    if (localController) localController->deviceAdded(aNextDevice->second);
     #endif
   }
   // check next
@@ -530,7 +535,7 @@ void VdcHost::deviceInitialized(DevicePtr aDevice)
 {
   LOG(LOG_NOTICE, "--- initialized device: %s",aDevice->description().c_str());
   #if ENABLE_LOCALCONTROLLER
-  localController->deviceAdded(aDevice);
+  if (localController) localController->deviceAdded(aDevice);
   #endif
   // trigger announcing when initialized (no problem when called while already announcing)
   startAnnouncing();
@@ -554,7 +559,7 @@ void VdcHost::removeDevice(DevicePtr aDevice, bool aForget)
   dSDevices.erase(aDevice->getDsUid());
   LOG(LOG_NOTICE, "--- removed device: %s", aDevice->shortDesc().c_str());
   #if ENABLE_LOCALCONTROLLER
-  localController->deviceRemoved(aDevice);
+  if (localController) localController->deviceRemoved(aDevice);
   #endif
 }
 
@@ -668,7 +673,7 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
       // - myself
       save();
       #if ENABLE_LOCALCONTROLLER
-      localController->save();
+      if (localController) localController->save();
       #endif
       // - device containers
       for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
@@ -702,7 +707,7 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
 void VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
   #if ENABLE_LOCALCONTROLLER
-  if (!localController->processButtonClick(aButtonBehaviour, aClickType))
+  if (!localController || !localController->processButtonClick(aButtonBehaviour, aClickType))
   #endif
   {
     // not handled by local controller
@@ -1303,7 +1308,7 @@ PropertyContainerPtr VdcHost::getContainer(const PropertyDescriptorPtr &aPropert
   }
   #if ENABLE_LOCALCONTROLLER
   else if (aPropertyDescriptor->hasObjectKey(localController_obj)) {
-    return localController;
+    return localController; // can be NULL if local controller is not enabled
   }
   #endif
   else if (aPropertyDescriptor->hasObjectKey(vdc_obj)) {
@@ -1440,7 +1445,7 @@ ErrorPtr VdcHost::loadAndFixDsUID()
     }
   }
   #if ENABLE_LOCALCONTROLLER
-  localController->load();
+  if (localController) localController->load();
   #endif
   return ErrorPtr();
 }

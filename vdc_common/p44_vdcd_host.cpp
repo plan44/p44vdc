@@ -228,7 +228,8 @@ string P44VdcHost::webuiURLString()
 // MARK: ===== Config API
 
 
-P44VdcHost::P44VdcHost() :
+P44VdcHost::P44VdcHost(bool aWithLocalController) :
+  inherited(aWithLocalController),
   learnIdentifyTicket(0),
   webUiPort(0)
 {
