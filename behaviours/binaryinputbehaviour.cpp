@@ -107,7 +107,7 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
     device.getVdcHost().signalDeviceUserAction(device, true);
     // Note: even if global identify handler processes this, still report state changes (otherwise upstream could get out of sync)
   }
-  BLOG(changedState ? LOG_NOTICE : LOG_INFO, "BinaryInput[%zu] %s '%s' reports %s state = %d", index, behaviourId.c_str(), hardwareName.c_str(), changedState ? "NEW" : "same", aNewState);
+  BLOG(changedState ? LOG_NOTICE : LOG_INFO, "BinaryInput[%zu] %s '%s' reports %s state = %d", index, behaviourId.c_str(), getHardwareName().c_str(), changedState ? "NEW" : "same", aNewState);
   // in all cases, forward binary input state changes
   if (changedState || now>lastPush+changesOnlyInterval) {
     // changed state or no update sent for more than changesOnlyInterval

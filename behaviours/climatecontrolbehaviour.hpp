@@ -330,6 +330,8 @@ namespace p44 {
     virtual void saveChannelsToScene(DsScenePtr aScene) P44_OVERRIDE;
 
     // property access implementation for descriptor/settings/states
+    virtual int numDescProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual int numSettingsProps() P44_OVERRIDE;
     virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     // combined field access for all types of properties

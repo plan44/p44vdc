@@ -201,7 +201,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   // update value
   if (aMinChange<0) aMinChange = resolution/2;
   if (fabs(aValue - currentValue) > aMinChange) changedValue = true;
-  BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' reports %s value = %0.3f %s", index, behaviourId.c_str(), hardwareName.c_str(), changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
+  BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' reports %s value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
   if (contextId>=0 || !contextMsg.empty()) {
     LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", contextId, contextMsg.c_str());
   }
@@ -230,7 +230,7 @@ bool SensorBehaviour::pushSensor(bool aChanged, bool aAlways)
         return true;
       }
       else {
-        BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), hardwareName.c_str());
+        BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
       }
     }
   }
