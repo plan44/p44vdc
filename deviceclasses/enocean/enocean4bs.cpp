@@ -582,6 +582,9 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   {  1, 0x01A52001, 0, "heating valve (with temperature sensor)", NULL },
   {  1, 0x02A52001, 0, "heating valve with binary output adjustment (e.g. MD10-FTL)", NULL },
   {  1, 0x03A52001, 0, "heating valve in self-regulation mode", NULL },
+  // heating valve alternatives
+  {  1, 0x00A52004, 0, "heating valve", NULL },
+  {  1, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
   // room panel alternatives for set point
   {  2, 0x00A51006, 0, "standard profile", NULL },
   {  2, 0x01A51006, 0, "set point interpreted as 0..40°C (e.g. FTR55D)", NULL },
@@ -709,12 +712,14 @@ EnoceanDevicePtr Enocean4BSDevice::newDevice(
   // check for specialized handlers for certain profiles first
   if (EEP_PURE(aEEProfile)==0xA52001) {
     // Note: Profile has variants (with and without temperature sensor)
-    // use specialized handler for output functions of heating valve (valve value, summer/winter, prophylaxis)
     newDev = EnoceanA52001Handler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
+  }
+  else if (EEP_PURE(aEEProfile)==0xA52004) {
+    // Note: Profile has variants (with and without sensors)
+    newDev = EnoceanA52004Handler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
   else if (EEP_PURE(aEEProfile)==0xA51301) {
     // Note: Profile has variants (single device or with separate light sensors for sun directions)
-    // use specialized handler for multi-telegram sensor
     newDev = EnoceanA5130XHandler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
   else {
@@ -853,10 +858,6 @@ void EnoceanA52001Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 
 
 
-/// collect data for outgoing message from this channel
-/// @param aEsp3PacketPtr must be set to a suitable packet if it is empty, or packet data must be augmented with
-///   channel's data when packet already exists
-/// @note non-outputs will do nothing in this method
 void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr)
 {
   ClimateControlBehaviourPtr cb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(behaviour);
@@ -873,7 +874,7 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
     }
     if (serviceState!=service_idle) {
       // process pending service steps
-      // - DB(1,0) set to 1 = normal operation (not service)
+      // - DB(1,0) set to 1 = service operation
       data |= DBMASK(1,0); // service on
       if (serviceState==service_openvalve) {
         // trigger force full open
@@ -972,6 +973,239 @@ string EnoceanA52001Handler::shortDesc()
 {
   return string_format("valve output, 0..100 %%");
 }
+
+
+// MARK: ===== EnoceanA52004Handler
+
+
+EnoceanA52004Handler::EnoceanA52004Handler(EnoceanDevice &aDevice) :
+  inherited(aDevice),
+  serviceState(service_idle),
+  lastActualValvePos(50), // assume centered
+  lastRequestedValvePos(50) // assume centered
+{
+}
+
+// configuration for included sensor channels
+static const p44::EnoceanSensorDescriptor A52004roomTemp =
+  { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room, 10, 30, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText };
+static const p44::EnoceanSensorDescriptor A52004feedTemp =
+  { 0, 0x20, 0x04, 0, class_blue_climate, group_blue_heating,            behaviour_sensor,      sensorType_temperature, usage_undefined, 20, 80, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, "feed temperature" };
+static const p44::EnoceanSensorDescriptor A52004setpointTemp =
+  { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_user, 10, 30, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, setPointText };
+static const p44::EnoceanSensorDescriptor A52004lowBatInput =
+  { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 0,  1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  "Low Battery" };
+
+
+// static factory method
+EnoceanDevicePtr EnoceanA52004Handler::newDevice(
+  EnoceanVdc *aVdcP,
+  EnoceanAddress aAddress,
+  EnoceanSubDevice &aSubDeviceIndex, // current subdeviceindex, factory returns NULL when no device can be created for this subdevice index
+  EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer,
+  bool aSendTeachInResponse
+) {
+  // A5-20-04: heating valve actuator
+  // - e.g. Hora SmartDrive MX aka Eltako TF-FKS
+  // create device
+  EnoceanDevicePtr newDev; // none so far
+  if (aSubDeviceIndex<1) {
+    // only one device
+    newDev = EnoceanDevicePtr(new Enocean4BSDevice(aVdcP));
+    // valve needs climate control scene table (ClimateControlScene)
+    newDev->installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*newDev)));
+    // assign channel and address
+    newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
+    // assign EPP information
+    newDev->setEEPInfo(aEEProfile, aEEManufacturer);
+    // is heating
+    newDev->setColorClass(class_blue_climate);
+    // function
+    newDev->setFunctionDesc("heating valve actuator");
+    // climate control output (assume possible use for heating and cooling (even if only applying absolute heating level value to valve)
+    ClimateControlBehaviourPtr cb = ClimateControlBehaviourPtr(new ClimateControlBehaviour(*newDev.get(), climatedevice_simple, hscapability_heatingAndCooling));
+    cb->setGroupMembership(group_roomtemperature_control, true);
+    cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
+    cb->setHardwareName("valve");
+    // - create A5-20-04 specific handler for output
+    EnoceanA52004HandlerPtr newHandler = EnoceanA52004HandlerPtr(new EnoceanA52004Handler(*newDev.get()));
+    newHandler->behaviour = cb;
+    newDev->addChannelHandler(newHandler);
+    if (EEP_VARIANT(aEEProfile)!=0) {
+      // all non-default profiles have the sensors enabled
+      // - built-in room temperature
+      newHandler->roomTemp = EnoceanSensorHandler::newSensorBehaviour(A52004roomTemp, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->roomTemp);
+      // - built-in feed temperature
+      newHandler->feedTemp = EnoceanSensorHandler::newSensorBehaviour(A52004feedTemp, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->feedTemp);
+      // - set point temperature
+      newHandler->setpointTemp = EnoceanSensorHandler::newSensorBehaviour(A52004setpointTemp, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->setpointTemp);
+    }
+    // report low bat status as a binary input
+    newHandler->lowBatInput = EnoceanSensorHandler::newSensorBehaviour(A52004lowBatInput, newDev, NULL); // automatic id
+    newDev->addBehaviour(newHandler->lowBatInput);
+    // A5-20-04 need teach-in response if requested (i.e. if this device creation is caused by learn-in, not reinstantiation from DB)
+    if (aSendTeachInResponse) {
+      newDev->sendTeachInResponse();
+    }
+    newDev->setUpdateAtEveryReceive();
+    // count it
+    aSubDeviceIndex++;
+  }
+  // return device (or empty if none created)
+  return newDev;
+}
+
+
+
+void EnoceanA52004Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
+{
+  if (!aEsp3PacketPtr->radioHasTeachInfo()) {
+    // only look at non-teach-in packets
+    uint8_t *dataP = aEsp3PacketPtr->radioUserData();
+    int datasize = (int)aEsp3PacketPtr->radioUserDataLength();
+    if (aEsp3PacketPtr->eepRorg()==rorg_4BS && datasize==4) {
+      // only look at 4BS packets of correct length
+      // All sensors need to be checked here, we don't have separate handlers for them
+      // because sensor value meaning depends on additional status bits in A5-20-04
+      bool lowBat = false;
+      bool measurementOn = !ENOBIT(0, 7, dataP, datasize);
+      // - check failure
+      if (ENOBIT(0, 0, dataP, datasize)) {
+        // DB1 transmits failure code
+        uint8_t fc = ENOBYTE(1, dataP, datasize) & 0xFF;
+        HLOG(LOG_NOTICE, "EnOcean valve A5-20-04 failure code: %d", fc);
+        switch (fc) {
+          case 18:
+            // battery empty
+            HLOG(LOG_ERR, "EnOcean valve error: battery is low");
+            behaviour->setHardwareError(hardwareError_lowBattery);
+            lowBat = true;
+            break;
+          case 33:
+            HLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
+            goto valveErr;
+          case 36:
+            HLOG(LOG_ERR, "EnOcean valve error: end point detection error");
+          valveErr:
+            behaviour->setHardwareError(hardwareError_overload);
+            break;
+        }
+      }
+      else {
+        // DB1 transmits room temperature
+        if (roomTemp && measurementOn) EnoceanSensors::handleBitField(A52004roomTemp, roomTemp, dataP, datasize);
+      }
+      // - update low bat state
+      boost::dynamic_pointer_cast<BinaryInputBehaviour>(lowBatInput)->updateInputState(lowBat);
+      if (ENOBIT(0, 1, dataP, datasize)) {
+        // set point transmitted
+        if (setpointTemp) EnoceanSensors::handleBitField(A52004setpointTemp, setpointTemp, dataP, datasize);
+      }
+      else {
+        // feed temperature transmitted
+        if (feedTemp && measurementOn) EnoceanSensors::handleBitField(A52004feedTemp, feedTemp, dataP, datasize);
+      }
+      // show general status
+      HLOG(LOG_NOTICE,
+        "EnOcean valve actual set point: %d%% open\n"
+        "- Buttons %s, Status %s",
+        ENOBYTE(3, dataP, datasize), // DB3 = valve position, range is 0..100% (NOT 0..255!)
+        ENOBIT(0, 2, dataP, datasize) ? "locked" : "unlocked",
+        ENOBIT(0, 0, dataP, datasize) ? "FAILURE" : "ok"
+      );
+    }
+  }
+}
+
+
+
+void EnoceanA52004Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr)
+{
+  ClimateControlBehaviourPtr cb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(behaviour);
+  if (cb) {
+    // get the right channel
+    ChannelBehaviourPtr ch = cb->getChannelByIndex(dsChannelIndex);
+    // prepare 4BS packet (create packet if none created already)
+    uint32_t data;
+    Enocean4BSDevice::prepare4BSpacket(aEsp3PacketPtr, data);
+    // check for pending service cycle
+    if (cb->shouldRunProphylaxis() && serviceState==service_idle) {
+      // needs to initiate a prophylaxis cycle (only if not already one running)
+      serviceState = service_openvalve; // first fully open
+    }
+    if (serviceState!=service_idle) {
+      // process pending service steps
+      // - DB0..1 = service command 0=no change, 1=open valve, 2=run init, 3=close valve
+      if (serviceState==service_openvalve) {
+        // trigger force full open
+        LOG(LOG_NOTICE, "- valve prophylaxis operation: fully opening valve");
+        data |= 0x1<<DB(0,0); // service: open valve
+        data |= 0x9<<DB(1,0); // wake-up-cycle: 300S=5min (close valve then)
+        // next is closing
+        serviceState = service_closevalve;
+        device.needOutgoingUpdate();
+      }
+      else if (serviceState==service_closevalve) {
+        // trigger force fully closed
+        LOG(LOG_NOTICE, "- valve prophylaxis operation: fully closing valve");
+        data |= 0x3<<DB(0,0); // service: close valve
+        data |= 0x9<<DB(1,0); // wake-up-cycle: 300S=5min (return to normal operation then)
+        // next is normal operation again
+        serviceState = service_idle;
+        device.needOutgoingUpdate();
+      }
+    }
+    else {
+      // Normal operation
+      // - wake up cycle: fast in winter, slow in summer
+      if (cb->isClimateControlIdle()) {
+        data |= 54<<DB(1,0); // 12 hours
+        data |= DBMASK(1,6); // measurement disabled
+        LOG(LOG_NOTICE, "- valve is in IDLE mode (slow updates)");
+      }
+      else {
+        data |= 39<<DB(1,0); // 20 min
+        if (!roomTemp && !feedTemp) {
+          // nobody interested in measurements, don't waste battery on performing them
+          data |= DBMASK(1,6); // measurement disabled
+        }
+      }
+      // - valve position
+      //   Note: value is always positive even for cooling, because climateControlBehaviour checks outputfunction and sees this is a unipolar valve
+      int8_t newValue = cb->outputValueAccordingToMode(ch->getChannelValue(), ch->getChannelIndex());
+      // Still: limit to 0..100 to make sure
+      if (newValue<0) newValue = 0;
+      else if (newValue>100) newValue=100;
+      data |= newValue<<DB(3,0);
+      // - set point (only for displaying it)
+      double currentTemp, setPoint;
+      if (cb->getZoneTemperatures(currentTemp, setPoint)) {
+        if (setPoint<10) setPoint=10;
+        else if (setPoint>30) setPoint=30;
+        uint8_t sp = (uint8_t)((setPoint-10)/20*255);
+        data |= sp<<DB(2,0);
+      }
+      // display orientation == 0 == standard
+      // button lock == 0 == not locked
+      LOG(LOG_NOTICE, "- requesting new valve position: %d%% open", newValue);
+    }
+    // save data
+    aEsp3PacketPtr->set4BSdata(data);
+    // value from this channel is applied to the outgoing telegram
+    ch->channelValueApplied(true); // applied even if channel did not have needsApplying() status before
+  }
+}
+
+
+
+string EnoceanA52004Handler::shortDesc()
+{
+  return string_format("valve output, 0..100 %%");
+}
+
 
 
 

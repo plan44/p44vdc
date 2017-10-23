@@ -30,8 +30,14 @@
 
 /// enocean bit specification to bit number macro
 #define DB(byte,bit) (byte*8+bit)
-/// enocean bit specification to bit mask macro
-#define DBMASK(byte,bit) ((uint32_t)1<<DB(byte,bit))
+/// bit no to bitmask
+#define BITMASK(bitno) ((uint32_t)1<<bitno)
+/// enocean bit specification to bit mask macro (within 32-bit 4BS data)
+#define DBMASK(byte,bit) (BITMASK(DB(byte,bit)))
+/// get byte from radio data according to enocean spec byte number (reversed index)
+#define ENOBYTE(byte,data,size) (data[size-byte])
+/// get bit value from radio data according to enocean spec byte and bit number
+#define ENOBIT(byte,bit,data,size) ((ENOBYTE(byte,data,size) & BITMASK(bit))!=0)
 
 using namespace std;
 
