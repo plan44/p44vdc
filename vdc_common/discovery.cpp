@@ -650,16 +650,14 @@ void DiscoveryManager::avahi_ds_entry_group_callback(AvahiService *aService, Ava
       if (dmState<dm_started)
         dmState = dm_started;
       #if ENABLE_AUXVDSM
-      LOG(LOG_NOTICE, "discovery: successfully published %s service '%s'.", auxVdsmRunning ? "vdSM" : "vDC", vdcHost->publishedDescription().c_str());
       // start scanning for master vdsms
       if (auxVdsmDsUid) {
         // We have an auxiliary vdsm we need to monitor
         // - create browser to look out for master vdsms
         startBrowsingVdms(aService);
       }
-      #else
-      LOG(LOG_NOTICE, "discovery: successfully published vDC service '%s'.", vdcHost->publishedDescription().c_str());
       #endif
+      LOG(LOG_NOTICE, "discovery: successfully published services as '%s'.", vdcHost->publishedDescription().c_str());
       break;
     }
     case AVAHI_ENTRY_GROUP_COLLISION: {
