@@ -269,7 +269,7 @@ namespace p44 {
 		/// initialize
     /// @param aCompletedCB will be called when the entire container is initialized or has been aborted with a fatal error
     /// @param aFactoryReset if set, database will be reset
-    void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset);
 
     /// start running normally
     void startRunning();

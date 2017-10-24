@@ -91,7 +91,7 @@ ErrorPtr P44JsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage,
 }
 
 
-// MARK: ===== perform self test
+// MARK: ===== self test runner
 
 #if SELFTESTING_ENABLED
 
@@ -200,8 +200,18 @@ private:
 
 };
 
-#endif
+#endif // SELFTESTING_ENABLED
 
+
+// MARK: ===== P44VdcHost
+
+
+P44VdcHost::P44VdcHost(bool aWithLocalController) :
+  inherited(aWithLocalController),
+  learnIdentifyTicket(0),
+  webUiPort(0)
+{
+}
 
 
 void P44VdcHost::selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED)
@@ -224,22 +234,25 @@ string P44VdcHost::webuiURLString()
 }
 
 
-
-// MARK: ===== Config API
-
-
-P44VdcHost::P44VdcHost(bool aWithLocalController) :
-  inherited(aWithLocalController),
-  learnIdentifyTicket(0),
-  webUiPort(0)
+void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
-  configApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
+  // start config API, if we have one
+  if (configApiServer) {
+    configApiServer->startServer(boost::bind(&P44VdcHost::configApiConnectionHandler, this, _1), 3);
+  }
+  // now init rest of vdc host
+  inherited::initialize(aCompletedCB, aFactoryReset);
 }
 
 
-void P44VdcHost::startConfigApi()
+void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed)
 {
-  configApiServer->startServer(boost::bind(&P44VdcHost::configApiConnectionHandler, this, _1), 3);
+  if (!configApiServer) {
+    // can be enabled only once
+    configApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
+    configApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, AF_INET);
+    configApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
+  }
 }
 
 
