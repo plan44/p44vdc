@@ -570,19 +570,29 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
+        // Description properties
+        case activeCoolingMode_key+descriptions_key_offset:
+          aPropValue->setBoolValue(climateDeviceKind==climatedevice_fancoilunit); // FCUs can cool actively
+          return true;
         // Settings properties
-        case heatingSystemCapability_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemCapability); return true;
-        case heatingSystemType_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemType); return true;
-        case activeCoolingMode_key+descriptions_key_offset: aPropValue->setBoolValue(true);
-            return (climateDeviceKind==climatedevice_fancoilunit);
+        case heatingSystemCapability_key+settings_key_offset:
+          aPropValue->setUint8Value(heatingSystemCapability);
+          return true;
+        case heatingSystemType_key+settings_key_offset:
+          aPropValue->setUint8Value(heatingSystemType);
+          return true;
       }
     }
     else {
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
-        case heatingSystemCapability_key+settings_key_offset: setPVar(heatingSystemCapability, (VdcHeatingSystemCapability)aPropValue->uint8Value()); return true;
-        case heatingSystemType_key+settings_key_offset: setPVar(heatingSystemType, (VdcHeatingSystemType)aPropValue->uint8Value()); return true;
+        case heatingSystemCapability_key+settings_key_offset:
+          setPVar(heatingSystemCapability, (VdcHeatingSystemCapability)aPropValue->uint8Value());
+          return true;
+        case heatingSystemType_key+settings_key_offset:
+          setPVar(heatingSystemType, (VdcHeatingSystemType)aPropValue->uint8Value());
+          return true;
       }
     }
   }
