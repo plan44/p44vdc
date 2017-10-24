@@ -373,7 +373,8 @@ void VdcHost::vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::
   }
   // anyway, initialize next
   aNextVdc++;
-  initializeNextVdc(aCompletedCB, aFactoryReset, aNextVdc);
+  // ...but unwind stack first, let mainloop call next init
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::initializeNextVdc, this, aCompletedCB, aFactoryReset, aNextVdc));
 }
 
 
