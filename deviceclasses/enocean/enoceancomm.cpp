@@ -386,7 +386,6 @@ uint8_t Esp3Packet::radioRepeaterCount()
 size_t Esp3Packet::radioUserDataLength()
 {
   if (packetType()!=pt_radio) return 0; // no data
-  RadioOrg rorg = eepRorg();
   int bytes = (int)dataLength(); // start with actual length
   bytes -= 1; // RORG byte
   bytes -= 1; // one status byte
@@ -398,7 +397,6 @@ size_t Esp3Packet::radioUserDataLength()
 void Esp3Packet::setRadioUserDataLength(size_t aSize)
 {
   if (packetType()!=pt_radio) return; // is not radio packet
-  RadioOrg rorg = eepRorg();
   // add extra length needed for fixed fields in radio packet
   aSize += 1; // RORG byte
   aSize += 1; // one status byte
