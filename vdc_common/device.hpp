@@ -303,6 +303,10 @@ namespace p44 {
     /// @return color class number
     DsClass getDominantColorClass();
 
+    /// get the zoneID (room) for this device
+    /// @return a zoneID, can be 0 if device is not assigned to a zone (yet)
+    DsZoneID getZoneID();
+
     /// set user assignable name
     /// @param aName name of the addressable entity
     virtual void setName(const string &aName) P44_OVERRIDE;

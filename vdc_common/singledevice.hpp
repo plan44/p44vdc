@@ -105,11 +105,6 @@ namespace p44 {
     /// @param aPrevious if set, the previous value is returned
     int32_t getInt32Value(bool aAsInternal = false, bool aPrevious = false);
 
-
-    /// get the name
-    /// @return the name
-    string getName() { return valueName; };
-
     /// @}
 
     /// Setting state and state parameter value to allow query via API and property pushing

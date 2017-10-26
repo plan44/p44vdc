@@ -694,7 +694,7 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
       // write
       switch (aPropertyDescriptor->fieldKey()) {
         case defaultzone_key:
-          setPVar(defaultZoneID, aPropValue->int32Value());
+          setPVar(defaultZoneID, (DsZoneID)aPropValue->int32Value());
           return true;
       }
     }
@@ -755,7 +755,7 @@ void Vdc::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *a
   // get the field value
   vdcFlags = aRow->get<int>(aIndex++);
   setName(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  defaultZoneID = aRow->get<int>(aIndex++);
+  defaultZoneID = aRow->getCasted<DsZoneID, int>(aIndex++);
 }
 
 

@@ -555,56 +555,65 @@ void DiscoveryManager::startAdvertisingDS(AvahiService *aService)
         goto fail;
       }
     }
-    #if ENABLE_AUXVDSM
-    // - advertise the auxiliary vdsm if it is running, vdc host itself otherwise
-    if (auxVdsmRunning && auxVdsmDsUid) {
-      // The auxiliary vdsm is running, advertise it to the network
-      // - create the vdsm dsuid TXT record
-      string txt_dsuid = string_format("dSUID=%s", auxVdsmDsUid->getString().c_str());
-      if ((avahiErr = avahi_add_service(
-        aService,
-        dSEntryGroup,
-        AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, // all interfaces and protocols (as enabled at server level)
-        (AvahiPublishFlags)0, // no flags
-        descriptiveName.c_str(),
-        VDSM_SERVICE_TYPE, // vdsm
-        NULL, // no domain
-        NULL, // no host
-        auxVdsmPort, // auxiliary vdsm's ds485 port
-        txt_dsuid.c_str(), // TXT record for the auxiliary vdsm's dSUID
-        VDSM_ROLE_COLLECTABLE, // TXT record signalling this vdsm may be collected by ds485p
-        vdsmAuxiliary ? VDSM_ROLE_AUXILIARY : NULL, // TXT record signalling this vdsm is auxiliary
-        noAuto ? VDSM_VDC_ROLE_NOAUTO : NULL, // noauto flag or early TXT terminator
-        NULL // TXT record terminator
-      ))<0) {
-        LOG(LOG_ERR, "avahi: failed to add _ds-vdsm._tcp service: %s", avahi_strerror(avahiErr));
-        goto fail;
+    if (vdcHost->vdcApiServer) {
+      // only publish in case vdc does have a vDC API configured at all
+      #if ENABLE_AUXVDSM
+      // - advertise the auxiliary vdsm if it is running, vdc host itself otherwise
+      if (auxVdsmRunning && auxVdsmDsUid) {
+        // The auxiliary vdsm is running, advertise it to the network
+        // - create the vdsm dsuid TXT record
+        string txt_dsuid = string_format("dSUID=%s", auxVdsmDsUid->getString().c_str());
+        if ((avahiErr = avahi_add_service(
+          aService,
+          dSEntryGroup,
+          AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, // all interfaces and protocols (as enabled at server level)
+          (AvahiPublishFlags)0, // no flags
+          descriptiveName.c_str(),
+          VDSM_SERVICE_TYPE, // vdsm
+          NULL, // no domain
+          NULL, // no host
+          auxVdsmPort, // auxiliary vdsm's ds485 port
+          txt_dsuid.c_str(), // TXT record for the auxiliary vdsm's dSUID
+          VDSM_ROLE_COLLECTABLE, // TXT record signalling this vdsm may be collected by ds485p
+          vdsmAuxiliary ? VDSM_ROLE_AUXILIARY : NULL, // TXT record signalling this vdsm is auxiliary
+          noAuto ? VDSM_VDC_ROLE_NOAUTO : NULL, // noauto flag or early TXT terminator
+          NULL // TXT record terminator
+        ))<0) {
+          LOG(LOG_ERR, "avahi: failed to add _ds-vdsm._tcp service: %s", avahi_strerror(avahiErr));
+          goto fail;
+        }
       }
-    }
-    else
-    #endif // ENABLE_AUXVDSM
-    {
-      // The auxiliary vdsm is NOT running or not present at all, advertise the vdc host (p44vdc) to the network
-      int vdcPort = 0;
-      sscanf(vdcHost->vdcApiServer->getPort(), "%d", &vdcPort);
-      string txt_dsuid = string_format("dSUID=%s", vdcHost->getDsUid().getString().c_str());
-      if ((avahiErr = avahi_add_service(
-        aService,
-        dSEntryGroup,
-        AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, // all interfaces and protocols (as enabled at server level)
-        (AvahiPublishFlags)0, // no flags
-        descriptiveName.c_str(),
-        VDC_SERVICE_TYPE, // vdc
-        NULL, // no domain
-        NULL, // no host
-        vdcPort, // the vdc API host port
-        txt_dsuid.c_str(), // TXT record for the vdc host's dSUID
-        noAuto ? VDSM_VDC_ROLE_NOAUTO : NULL, // noauto flag or early TXT terminator
-        NULL // TXT record terminator
-      ))<0) {
-        LOG(LOG_ERR, "avahi: failed to add _ds-vdc._tcp service: %s", avahi_strerror(avahiErr));
-        goto fail;
+      else
+      #endif // ENABLE_AUXVDSM
+      {
+        // The auxiliary vdsm is NOT running or not present at all, advertise the vdc host (p44vdc) to the network
+        int vdcPort = 0;
+        sscanf(vdcHost->vdcApiServer->getPort(), "%d", &vdcPort);
+        string txt_dsuid = string_format("dSUID=%s", vdcHost->getDsUid().getString().c_str());
+        if ((avahiErr = avahi_add_service(
+          aService,
+          dSEntryGroup,
+          AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, // all interfaces and protocols (as enabled at server level)
+          (AvahiPublishFlags)0, // no flags
+          descriptiveName.c_str(),
+          VDC_SERVICE_TYPE, // vdc
+          NULL, // no domain
+          NULL, // no host
+          vdcPort, // the vdc API host port
+          txt_dsuid.c_str(), // TXT record for the vdc host's dSUID
+          noAuto ? VDSM_VDC_ROLE_NOAUTO : NULL, // noauto flag or early TXT terminator
+          NULL // TXT record terminator
+        ))<0) {
+          LOG(LOG_ERR, "avahi: failed to add _ds-vdc._tcp service: %s", avahi_strerror(avahiErr));
+          goto fail;
+        }
       }
+    } // has vDC API
+    else if (!publishWebPort && !publishSshPort) {
+      // no vDC API and nothing else to publish: just
+      dmState = dm_disabled; // disabled
+      LOG(LOG_WARNING, "avahi: no services to publish - disabled advertising");
+      return;
     }
     // register the services
     if ((avahiErr = avahi_entry_group_commit(dSEntryGroup)) < 0) {
@@ -650,16 +659,14 @@ void DiscoveryManager::avahi_ds_entry_group_callback(AvahiService *aService, Ava
       if (dmState<dm_started)
         dmState = dm_started;
       #if ENABLE_AUXVDSM
-      LOG(LOG_NOTICE, "discovery: successfully published %s service '%s'.", auxVdsmRunning ? "vdSM" : "vDC", vdcHost->publishedDescription().c_str());
       // start scanning for master vdsms
       if (auxVdsmDsUid) {
         // We have an auxiliary vdsm we need to monitor
         // - create browser to look out for master vdsms
         startBrowsingVdms(aService);
       }
-      #else
-      LOG(LOG_NOTICE, "discovery: successfully published vDC service '%s'.", vdcHost->publishedDescription().c_str());
       #endif
+      LOG(LOG_NOTICE, "discovery: successfully published services as '%s'.", vdcHost->publishedDescription().c_str());
       break;
     }
     case AVAHI_ENTRY_GROUP_COLLISION: {
