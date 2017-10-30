@@ -2430,7 +2430,10 @@ ErrorPtr SingleDevice::dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjec
   return ErrorPtr();
 }
 
-
+ErrorPtr SingleDevice::parameterFromJSON(ValueDescriptorPtr &aParameter, JsonObjectPtr aJSONConfig, const string aParamName)
+{
+  return parseValueDesc(aParameter, aJSONConfig, aParamName);
+}
 
 ErrorPtr SingleDevice::stateFromJSON(DeviceStatePtr &aState, JsonObjectPtr aJSONConfig, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor)
 {
@@ -2482,7 +2485,7 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
     o->resetKeyIteration();
     while (o->nextKeyValue(pname, param)) {
       ValueDescriptorPtr p;
-      ErrorPtr err = parseValueDesc(p, param, pname);
+      ErrorPtr err = parameterFromJSON(p, param, pname);
       if (!Error::isOK(err)) return err;
       bool optional = !(p->isDefault()); // by default, no default value means the value is optional
       JsonObjectPtr o3;
