@@ -291,6 +291,8 @@ typedef enum {
   channeltype_power_state = 19, ///< FCU custom channel: power state
   channeltype_airflow_louver_auto = 20, ///< louver automatic mode (0=off, >0=on)
   channeltype_airflow_intensity_auto = 21, ///< airflow intensity automatic mode (0=off, >0=on)
+  channeltype_water_temperature = 22,
+  channeltype_water_flow = 23,
 
   channeltype_custom_first = 192, ///< first device-specific channel
   channeltype_custom_last = 239, ///< last device-specific channel

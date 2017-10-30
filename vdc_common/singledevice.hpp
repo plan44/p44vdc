@@ -1064,6 +1064,13 @@ namespace p44 {
     /// @return ok or parsing error
     virtual ErrorPtr dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle);
 
+    /// creates a device action parameter
+    /// @param aParameter will be assigned the new dynamic action
+    /// @param aJSONConfig JSON config object for an action parameter.
+    /// @param aParamName name of the parameter
+    /// @return ok or parsing error
+    virtual ErrorPtr parameterFromJSON(ValueDescriptorPtr &aParameter, JsonObjectPtr aJSONConfig, const string aParamName);
+
     /// creates a device state
     /// @param aState will be assigned the new state
     /// @param aJSONConfig JSON config object for a state. Implementation can fetch specific params from it
