@@ -185,7 +185,7 @@ namespace p44 {
 
     /// get an API value that would work for the session connection if we had one
     /// @return an API value of the same type as session connection will use
-    ApiValuePtr newApiValue() { return vdcApiServer ? vdcApiServer->newApiValue() : ApiValuePtr(); };
+    ApiValuePtr newApiValue();
 
     /// set user assignable name
     /// @param aName name of this instance of the vdc host
@@ -269,7 +269,7 @@ namespace p44 {
 		/// initialize
     /// @param aCompletedCB will be called when the entire container is initialized or has been aborted with a fatal error
     /// @param aFactoryReset if set, database will be reset
-    void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset);
 
     /// start running normally
     void startRunning();

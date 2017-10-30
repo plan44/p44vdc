@@ -610,7 +610,7 @@ void DiscoveryManager::startAdvertisingDS(AvahiService *aService)
       }
     } // has vDC API
     else if (!publishWebPort && !publishSshPort) {
-      // no vDC API and nothing else to publish: just
+      // no vDC API and nothing else to publish: just disable advertising
       dmState = dm_disabled; // disabled
       LOG(LOG_WARNING, "avahi: no services to publish - disabled advertising");
       return;

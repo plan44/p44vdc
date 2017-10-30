@@ -94,7 +94,7 @@ size_t ZfPacket::getPacket(size_t aNumBytes, uint8_t *aBytes, ZfPacketPtr &aPack
 
 string ZfPacket::description()
 {
-  return string_format("ZFpacket from 0x%08lX, opcode=%d, data=%d, rssi=%d", (uint32_t)uid, (int)opCode, (int)data, (int)rssi);
+  return string_format("ZFpacket from 0x%08lX, opcode=%d, data=%d, rssi=%d", (unsigned long)uid, (int)opCode, (int)data, (int)rssi);
 }
 
 

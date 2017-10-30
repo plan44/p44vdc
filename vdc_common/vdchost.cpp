@@ -29,6 +29,8 @@
 
 #include "macaddress.hpp"
 
+#include "jsonvdcapi.hpp" // need it for the case of no vDC api, as default
+
 #if ENABLE_LOCAL_BEHAVIOUR
 // for local behaviour
 #include "buttonbehaviour.hpp"
@@ -146,6 +148,12 @@ void VdcHost::postEvent(VdchostEvent aEvent)
   if (eventMonitorHandler) {
     eventMonitorHandler(aEvent);
   }
+}
+
+
+ApiValuePtr VdcHost::newApiValue()
+{
+  return vdcApiServer ? vdcApiServer->newApiValue() : ApiValuePtr(new JsonApiValue);
 }
 
 
@@ -373,7 +381,8 @@ void VdcHost::vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::
   }
   // anyway, initialize next
   aNextVdc++;
-  initializeNextVdc(aCompletedCB, aFactoryReset, aNextVdc);
+  // ...but unwind stack first, let mainloop call next init
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::initializeNextVdc, this, aCompletedCB, aFactoryReset, aNextVdc));
 }
 
 

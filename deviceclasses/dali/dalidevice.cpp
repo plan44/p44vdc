@@ -1393,7 +1393,7 @@ void DaliCompositeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       // transition time is that of the brightness channel
       MLMicroSeconds tt = cl->transitionTimeToNewBrightness();
       // RGB lamp, get components
-      double r,g,b,w,a;
+      double r=0,g=0,b=0,w=0,a=0;
       if (dimmers[dimmer_white]) {
         // RGBW, RGBWA or CT-only
         if (dimmers[dimmer_amber]) {

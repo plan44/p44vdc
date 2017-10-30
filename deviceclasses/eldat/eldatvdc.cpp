@@ -267,7 +267,7 @@ Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, in
   char function = aData[0];
   // Unlike enocean, we only learn in/out one pair per learning action: A-B or C-D
   EldatDeviceType type = eldat_unknown;
-  EldatSubDevice subdevice;
+  EldatSubDevice subdevice = 0;
   EldatSubDevice numSubDevices = 1; // default to 1 (for removal, 0 for removing all subdevices of same address)
   switch (function) {
     case 'A':

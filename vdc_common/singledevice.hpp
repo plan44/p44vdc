@@ -226,7 +226,7 @@ namespace p44 {
 
 
   /// parameter descriptor subclass for numeric parameters, describing parameter via min/max/resolution
-  class NumericValueDescriptor P44_FINAL : public ValueDescriptor
+  class NumericValueDescriptor : public ValueDescriptor
   {
     typedef ValueDescriptor inherited;
 
@@ -242,26 +242,26 @@ namespace p44 {
     NumericValueDescriptor(const string aName, VdcValueType aValueType, ValueUnit aValueUnit, double aMin, double aMax, double aResolution, bool aHasDefault = false, double aDefaultValue = 0) :
       inherited(aName, aValueType, aValueUnit, aHasDefault), min(aMin), max(aMax), resolution(aResolution), value(aDefaultValue) {};
 
-    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_FINAL P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_FINAL P44_OVERRIDE;
 
-    virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
-    virtual bool updateDoubleValue(double aValue, double aMinChange = -1) P44_OVERRIDE;
+    virtual bool setDoubleValue(double aValue) P44_FINAL P44_OVERRIDE;
+    virtual bool updateDoubleValue(double aValue, double aMinChange = -1) P44_FINAL P44_OVERRIDE;
 
-    virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
+    virtual bool setInt32Value(int32_t aValue) P44_FINAL P44_OVERRIDE;
 
     void setMinValue(double aValue) { min = aValue; }
     void setMaxValue(double aValue) { max = aValue; }
 
   protected:
 
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_FINAL P44_OVERRIDE;
 
   };
 
 
   /// parameter descriptor subclass for text parameters
-  class TextValueDescriptor P44_FINAL : public ValueDescriptor
+  class TextValueDescriptor : public ValueDescriptor
   {
     typedef ValueDescriptor inherited;
 
@@ -274,16 +274,16 @@ namespace p44 {
     TextValueDescriptor(const string aName, bool aHasDefault = false, const string aDefaultValue = "") :
       inherited(aName, valueType_string, valueUnit_none, aHasDefault), value(aDefaultValue) {};
 
-    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_FINAL P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_FINAL P44_OVERRIDE;
 
-    virtual bool setStringValue(const string aValue) P44_OVERRIDE;
+    virtual bool setStringValue(const string aValue) P44_FINAL P44_OVERRIDE;
     
   };
 
 
   /// parameter descriptor subclass for enumeration parameters, describing parameter via a list of possible values
-  class EnumValueDescriptor P44_FINAL : public ValueDescriptor
+  class EnumValueDescriptor : public ValueDescriptor
   {
     typedef ValueDescriptor inherited;
 
@@ -306,20 +306,20 @@ namespace p44 {
     /// @param aIsDefault if set, this is considered the default value
     void addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault = false);
 
-    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_FINAL P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_FINAL P44_OVERRIDE;
 
-    virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
-    virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
-    virtual bool setStringValue(const string aValue) P44_OVERRIDE;
+    virtual bool setInt32Value(int32_t aValue) P44_FINAL P44_OVERRIDE;
+    virtual bool setDoubleValue(double aValue) P44_FINAL P44_OVERRIDE;
+    virtual bool setStringValue(const string aValue) P44_FINAL P44_OVERRIDE;
     bool setStringValueCaseInsensitive(const string& aValue);
 
   protected:
 
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_FINAL P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<EnumValueDescriptor> EnumValueDescriptorPtr;
