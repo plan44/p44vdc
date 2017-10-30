@@ -185,7 +185,7 @@ namespace p44 {
 
     /// get an API value that would work for the session connection if we had one
     /// @return an API value of the same type as session connection will use
-    ApiValuePtr newApiValue() { return vdcApiServer ? vdcApiServer->newApiValue() : ApiValuePtr(); };
+    ApiValuePtr newApiValue();
 
     /// set user assignable name
     /// @param aName name of this instance of the vdc host
