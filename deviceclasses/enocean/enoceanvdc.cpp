@@ -298,7 +298,7 @@ ErrorPtr EnoceanVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
       // now create device(s)
       if (Error::isOK(respErr)) {
         // create devices as if this was a learn-in
-        int newDevices = EnoceanDevice::createDevicesFromEEP(this, addr, eep, manufacturer_unknown);
+        int newDevices = EnoceanDevice::createDevicesFromEEP(this, addr, eep, manufacturer_unknown, true); // signalling smartAck suppresses teach-in responses that make no sense here
         if (newDevices<1) {
           respErr = WebError::webErr(400, "Unknown EEP specification, no device(s) created");
         }
@@ -360,7 +360,7 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 // -50 = for v2 bridge 223: very close to device, about 10-20cm
 // -55 = for v2 bridge 223: within approx one meter of the TCM310
 
-Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType)
+Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, bool aSmartAck)
 {
   // no learn/unlearn actions detected so far
   // - check if we know that device address already. If so, it is a learn-out
@@ -370,7 +370,7 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
     if  (onlyEstablish!=no && aTeachInfoType!=no) {
       // neither our side nor the info in the telegram insists on learn-out, so we can learn-in
       // - create devices from EEP
-      int numNewDevices = EnoceanDevice::createDevicesFromEEP(this, aDeviceAddress, aEEProfile, aManufacturer);
+      int numNewDevices = EnoceanDevice::createDevicesFromEEP(this, aDeviceAddress, aEEProfile, aManufacturer, aSmartAck);
       if (numNewDevices>0) {
         // successfully learned at least one device
         // - update learn status (device learned)
@@ -412,7 +412,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     // explicit ones are always recognized
     if (aEsp3PacketPtr->radioHasTeachInfo(disableProximityCheck ? 0 : MIN_LEARN_DBM, false)) {
       LOG(LOG_NOTICE, "Learn mode enabled: processing EnOcean learn packet: %s", aEsp3PacketPtr->description().c_str());
-      Tristate lrn = processLearn(aEsp3PacketPtr->radioSender(), aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer(), aEsp3PacketPtr->teachInfoType());
+      Tristate lrn = processLearn(aEsp3PacketPtr->radioSender(), aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer(), aEsp3PacketPtr->teachInfoType(), false);
       // check for UTE, may need confirmation
       if (aEsp3PacketPtr->eepRorg()==rorg_UTE) {
         uint8_t db6 = aEsp3PacketPtr->radioUserData()[0]; // DB6 (in EEP specs order)
@@ -517,7 +517,7 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
         );
       }
       // try to process
-      Tristate lrn = processLearn(deviceAddress, profile, manufacturer, undefined);
+      Tristate lrn = processLearn(deviceAddress, profile, manufacturer, undefined, true); // smart ack
       if (lrn==no) {
         // learn out
         confirmCode = 0x20;
