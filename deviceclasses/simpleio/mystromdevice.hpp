@@ -58,7 +58,7 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "spark_io"; };
+    virtual string deviceTypeIdentifier() const { return "mystrom"; };
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
@@ -104,7 +104,7 @@ namespace p44 {
     virtual string modelName() { return "myStrom switch"; }
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
-    virtual string vendorId() { return "vendorname:mystrom.ch"; };
+    virtual string vendorName() { return "mystrom.ch"; };
 
     /// @}
 
