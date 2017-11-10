@@ -355,6 +355,8 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 
 // MARK: ===== learn and unlearn devices
 
+#define SMART_ACK_RESPONSE_TIME (100*MilliSecond)
+
 #define MIN_LEARN_DBM -50
 // -50 = for experimental luz v1 patched bridge: within approx one meter of the TCM310
 // -50 = for v2 bridge 223: very close to device, about 10-20cm
@@ -373,9 +375,20 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
       int numNewDevices = EnoceanDevice::createDevicesFromEEP(this, aDeviceAddress, aEEProfile, aManufacturer, aSmartAck);
       if (numNewDevices>0) {
         // successfully learned at least one device
-        // - update learn status (device learned)
+        // - confirm smart ack FIRST (before reporting end-of-learn!)
+        if (aSmartAck) {
+          enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_LEARNED, SMART_ACK_RESPONSE_TIME);
+        }
+        // - now report learned-in, which will in turn disable smart-ack learn
         getVdcHost().reportLearnEvent(true, ErrorPtr());
         return yes; // learned in
+      }
+      else {
+        // unknown EEP
+        if (aSmartAck) {
+          enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_UNKNOWNEEP);
+        }
+        return undefined; // nothing learned in, nothing learned out
       }
     }
   }
@@ -386,9 +399,18 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
       // - un-pair all logical dS devices it has represented
       //   but keep dS level config in case it is reconnected
       unpairDevicesByAddress(aDeviceAddress, false);
+      // - confirm smart ack FIRST (before reporting end-of-learn!)
+      if (aSmartAck) {
+        enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_REMOVED);
+      }
+      // - now report learned-out, which will in turn disable smart-ack learn
       getVdcHost().reportLearnEvent(false, ErrorPtr());
       return no; // always successful learn out
     }
+  }
+  if (aSmartAck) {
+    // generic failure to learn in or out, confirm with "no capacity to learn in new device"
+    enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_NOMEM);
   }
   return undefined; // nothing learned in, nothing learned out
 }
@@ -463,8 +485,6 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
 }
 
 
-#define SMART_ACK_RESPONSE_TIME_MS 100
-
 void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)
 {
   if (aError) {
@@ -474,7 +494,6 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
   uint8_t *dataP = aEsp3PacketPtr->data();
   uint8_t eventCode = dataP[0];
   if (eventCode==SA_CONFIRM_LEARN) {
-    uint8_t confirmCode = 0x13; // default: reject with "controller has no place for further mailbox"
     if (learningMode) {
       // process smart-ack learn
       // - extract learn data
@@ -517,31 +536,13 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
         );
       }
       // try to process
-      Tristate lrn = processLearn(deviceAddress, profile, manufacturer, undefined, true); // smart ack
-      if (lrn==no) {
-        // learn out
-        confirmCode = 0x20;
-      }
-      else if (lrn==yes) {
-        // learn in
-        confirmCode = 0x00;
-      }
-      else {
-        // unknown EEP
-        confirmCode = 0x11;
-        LOG(LOG_WARNING, "Received SA_CONFIRM_LEARN with unknown EEP %06X -> rejecting", profile);
-      }
+      // Note: processLearn will always confirm the SA_CONFIRM_LEARN event (even if failing)
+      processLearn(deviceAddress, profile, manufacturer, undefined, true); // smart ack
     }
     else {
       LOG(LOG_WARNING, "Received SA_CONFIRM_LEARN while not in learning mode -> rejecting");
+      enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_NOMEM);
     }
-    // always send response for SA_CONFIRM_LEARN
-    Esp3PacketPtr respPacket = Esp3Packet::newEsp3Message(pt_response, RET_OK, 3);
-    respPacket->data()[1] = (SMART_ACK_RESPONSE_TIME_MS>>8) & 0xFF;
-    respPacket->data()[2] = SMART_ACK_RESPONSE_TIME_MS & 0xFF;
-    respPacket->data()[3] = confirmCode;
-    // issue response
-    enoceanComm.sendPacket(respPacket); // immediate response, not in queue
   }
   else {
     LOG(LOG_INFO, "Unknown Event code: %d", eventCode);

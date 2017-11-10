@@ -1163,7 +1163,7 @@ void EnoceanComm::aliveCheck()
 
 void EnoceanComm::smartAckLearnMode(bool aEnabled, MLMicroSeconds aTimeout)
 {
-  FOCUSLOG("EnoceanComm: %sabling smartAck learn mode in enocean module", aEnabled ? "en" : "dis");
+  LOG(LOG_INFO, "EnoceanComm: %sabling smartAck learn mode in enocean module", aEnabled ? "en" : "dis");
   // send a EPS3 command to the modem to check if it is alive
   Esp3PacketPtr saPacket = Esp3Packet::newEsp3Message(pt_smart_ack_command, SA_WR_LEARNMODE, 6);
   // params
@@ -1177,6 +1177,24 @@ void EnoceanComm::smartAckLearnMode(bool aEnabled, MLMicroSeconds aTimeout)
   saPacket->data()[6] = toMs & 0xFF;
   // issue command
   sendCommand(saPacket, NULL); // we don't need the response (but there is one)
+}
+
+
+void EnoceanComm::smartAckRespondToLearn(uint8_t aConfirmCode, MLMicroSeconds aResponseTime)
+{
+  LOG(LOG_INFO, "EnoceanComm: responding to smartAck learn with code 0x%02X", aConfirmCode);
+  // send a EPS3 command to the modem as response to SA_CONFIRM_LEARN
+  Esp3PacketPtr respPacket = Esp3Packet::newEsp3Message(pt_response, RET_OK, 3);
+  uint16_t respMs = 0;
+  if (aConfirmCode==SA_RESPONSECODE_LEARNED) {
+    // response time only if confirming successful learn-in
+    respMs = (uint16_t)(aResponseTime/MilliSecond);
+  }
+  respPacket->data()[1] = (respMs>>8) & 0xFF;
+  respPacket->data()[2] = respMs & 0xFF;
+  respPacket->data()[3] = aConfirmCode;
+  // issue response
+  sendPacket(respPacket); // immediate response, not in queue
 }
 
 
