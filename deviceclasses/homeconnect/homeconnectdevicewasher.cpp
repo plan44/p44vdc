@@ -20,8 +20,11 @@
 //
 
 #include "homeconnectdevicewasher.hpp"
+#include "homeconnectaction.hpp"
 
 #if ENABLE_HOMECONNECT
+
+#include "homeconnectaction.hpp"
 
 namespace p44 {
 
@@ -64,6 +67,9 @@ HomeConnectDeviceWasher::~HomeConnectDeviceWasher()
 
 bool HomeConnectDeviceWasher::configureDevice()
 {
+  bool ret = inherited::configureDevice();
+
+  addProgramNameProperty();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = false;
@@ -91,13 +97,28 @@ bool HomeConnectDeviceWasher::configureDevice()
   dsConfig.hasLocked = true;
   configureDoorState(dsConfig);
 
-  EnumValueDescriptorPtr temperatureCotton = createEnumDescriptor("Temperature", temperature_GC90, temperatureNames);
-  EnumValueDescriptorPtr temperatureEasyCare = createEnumDescriptor("Temperature", temperature_GC60, temperatureNames);
-  EnumValueDescriptorPtr temperature = createEnumDescriptor("Temperature", temperature_GC40, temperatureNames);
+  // configure program status properties
+  ProgramStatusConfiguration progStatusConfig = { 0 };
+  progStatusConfig.hasElapsedTime = false;
+  progStatusConfig.hasRemainingTime = true;
+  progStatusConfig.hasProgres = true;
+  configureProgramStatus(progStatusConfig);
 
-  EnumValueDescriptorPtr spinSpeedCottonMix = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1600, spinSpeedNames);
-  EnumValueDescriptorPtr spinSpeedEasyCare = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1200, spinSpeedNames);
-  EnumValueDescriptorPtr spinSpeedDelicatesSilkWool = createEnumDescriptor("SpinSpeed", spinSpeed_RPM800, spinSpeedNames);
+  EventConfiguration eventConfig = { 0 };
+  eventConfig.hasAlarmClockElapsed = false;
+  eventConfig.hasLocallyOperated = true;
+  eventConfig.hasProgramAborted = false;
+  eventConfig.hasProgramFinished = true;
+  eventConfig.hasProgramStarted = true;
+  configureEvents(eventConfig);
+
+  EnumValueDescriptorPtr temperatureCotton = createEnumDescriptor("Temperature", temperature_GC90, temperature_GC40, temperatureNames);
+  EnumValueDescriptorPtr temperatureEasyCare = createEnumDescriptor("Temperature", temperature_GC60, temperature_GC40, temperatureNames);
+  EnumValueDescriptorPtr temperature = createEnumDescriptor("Temperature", temperature_GC40, temperature_GC40, temperatureNames);
+
+  EnumValueDescriptorPtr spinSpeedCottonMix = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1600, spinSpeed_RPM1000, spinSpeedNames);
+  EnumValueDescriptorPtr spinSpeedEasyCare = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1200, spinSpeed_RPM1000, spinSpeedNames);
+  EnumValueDescriptorPtr spinSpeedDelicatesSilkWool = createEnumDescriptor("SpinSpeed", spinSpeed_RPM800, spinSpeed_RPM800, spinSpeedNames);
 
   addAction("std.Cotton",        "Cotton",           "Cotton",        temperatureCotton,   spinSpeedCottonMix);
   addAction("std.EasyCare",      "Easy Care",        "EasyCare",      temperatureEasyCare, spinSpeedEasyCare);
@@ -105,13 +126,15 @@ bool HomeConnectDeviceWasher::configureDevice()
   addAction("std.DelicatesSilk", "Delicates / Silk", "DelicatesSilk", temperature,         spinSpeedDelicatesSilkWool);
   addAction("std.Wool",          "Wool",             "Wool",          temperature,         spinSpeedDelicatesSilkWool);
 
-  temperatureProp = createEnumDescriptor("Temperature", temperature_GC90, temperatureNames);
-  spinSpeedProp = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1600, spinSpeedNames);
+  addDefaultStopAction();
+
+  temperatureProp = createEnumDescriptor("Temperature", temperature_GC90, temperature_GC40, temperatureNames);
+  spinSpeedProp = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1600, spinSpeed_RPM1000, spinSpeedNames);
 
   deviceProperties->addProperty(temperatureProp);
   deviceProperties->addProperty(spinSpeedProp);
 
-  return inherited::configureDevice();
+  return ret;
 }
 
 void HomeConnectDeviceWasher::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -125,12 +148,12 @@ void HomeConnectDeviceWasher::handleEventTypeNotify(const string& aKey, JsonObje
 
   if (aKey == "LaundryCare.Washer.Option.Temperature") {
     string value = (aValue != NULL) ? aValue->stringValue() : "";
-    temperatureProp->setStringValue(removeNamespace(value));
+    temperatureProp->setStringValueCaseInsensitive(removeNamespace(value));
     return;
   }
   if (aKey == "LaundryCare.Washer.Option.SpinSpeed") {
     string value = (aValue != NULL) ? aValue->stringValue() : "";
-    spinSpeedProp->setStringValue(removeNamespace(value));
+    spinSpeedProp->setStringValueCaseInsensitive(removeNamespace(value));
     return;
   }
 
@@ -143,18 +166,22 @@ void HomeConnectDeviceWasher::addAction(const string& aName, const string& aDesc
   builder.addOption("LaundryCare.Washer.Option.Temperature", "\"LaundryCare.Washer.EnumType.Temperature.@{Temperature}\"");
   builder.addOption("LaundryCare.Washer.Option.SpinSpeed", "\"LaundryCare.Washer.EnumType.SpinSpeed.@{SpinSpeed}\"");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, builder.build()));
-  action->addParameter(aTemperature, true);
-  action->addParameter(aSpinSpeed, true);
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this,
+                                                                                     *operationModeDescriptor,
+                                                                                     aName,
+                                                                                     aDescription,
+                                                                                     builder.build()));
+  action->addParameter(aTemperature);
+  action->addParameter(aSpinSpeed);
   deviceActions->addAction(action);
 }
 
-EnumValueDescriptorPtr HomeConnectDeviceWasher::createEnumDescriptor(string aName, int aMaxValue, const char** aEnumNames)
+EnumValueDescriptorPtr HomeConnectDeviceWasher::createEnumDescriptor(string aName, int aMaxValue, int aDefValue, const char** aEnumNames)
 {
   EnumValueDescriptorPtr descriptor = EnumValueDescriptorPtr(new EnumValueDescriptor(aName, true));
   for(int i = 0 ; i <= aMaxValue; i++)
   {
-    descriptor->addEnum(aEnumNames[i], i, false);
+    descriptor->addEnum(aEnumNames[i], i, (i == aDefValue));
   }
   return descriptor;
 }

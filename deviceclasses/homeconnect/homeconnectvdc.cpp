@@ -208,8 +208,13 @@ ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &a
       respErr = db.error("saving authentication info");
     }
     else {
-      // now collect the devices from the new account
-      collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), rescanmode_clearsettings);
+      // make sure to cancel any potential active lockdown (we could have changed the account)
+      homeConnectComm.cancelLockDown();
+
+      // now start collecting the devices from the new account
+      collectDevices(NULL, rescanmode_clearsettings);
+      // but return ok as the authorisation data were properly added
+      respErr = Error::ok();
     }
   }
   else {

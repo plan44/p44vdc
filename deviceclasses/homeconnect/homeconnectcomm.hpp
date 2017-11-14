@@ -99,7 +99,9 @@ namespace p44 {
     eventType_Unknown,
     eventType_Status,
     eventType_Notify,
-    eventType_Event
+    eventType_Event,
+    eventType_Disconnected,
+    eventType_Connected
   } EventType;
 
   /// will be called to deliver events
@@ -155,8 +157,9 @@ namespace p44 {
     string accessToken; ///< the access token for issuing requests (obtained via OAuth)
     string refreshToken; ///< the Oauth refresh token that can be used to obtain access tokens
 
-    bool developerApi; ///< if set, developer (simulator) API is used
-
+    bool developerApi;        ///< if set, developer (simulator) API is used
+    MLTicket lockdownTicket;  ///< A ticket that is used to cancel the currently running lockdown timer
+    const static MLMicroSeconds MaxLockdownTimeout = 10 * Minute;
   public:
 
     HomeConnectComm();
@@ -203,6 +206,18 @@ namespace p44 {
     /// @param aResultHandler will be called with the result
     void apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler);
 
+    /// Set a lockdown on communication so no request can be send to the cloud
+    /// @param aLockDownTime the time for with the lockdown is in effect
+    void setLockDownTime(MLMicroSeconds aLockDownTime);
+
+    /// a callback that is executed after the lockdown timeout expires
+    void setLockDownTimeExpired();
+
+    /// cancel the current lockdown
+    void cancelLockDown();
+
+    // check if the lockdown is in effect
+    bool isLockDown() { return (lockdownTicket != 0); }
 
     /// @}
 

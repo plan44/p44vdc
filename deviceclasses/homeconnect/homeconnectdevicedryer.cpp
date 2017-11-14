@@ -20,8 +20,11 @@
 //
 
 #include "homeconnectdevicedryer.hpp"
+#include "homeconnectaction.hpp"
 
 #if ENABLE_HOMECONNECT
+
+#include "homeconnectaction.hpp"
 
 namespace p44 {
 
@@ -41,6 +44,9 @@ HomeConnectDeviceDryer::~HomeConnectDeviceDryer()
 
 bool HomeConnectDeviceDryer::configureDevice()
 {
+  bool ret = inherited::configureDevice();
+
+  addProgramNameProperty();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = false;
@@ -68,20 +74,37 @@ bool HomeConnectDeviceDryer::configureDevice()
   dsConfig.hasLocked = false;
   configureDoorState(dsConfig);
 
+  // configure program status properties
+  ProgramStatusConfiguration progStatusConfig = { 0 };
+  progStatusConfig.hasElapsedTime = false;
+  progStatusConfig.hasRemainingTime = true;
+  progStatusConfig.hasProgres = true;
+  configureProgramStatus(progStatusConfig);
+
+  EventConfiguration eventConfig = { 0 };
+  eventConfig.hasAlarmClockElapsed = false;
+  eventConfig.hasLocallyOperated = true;
+  eventConfig.hasProgramAborted = false;
+  eventConfig.hasProgramFinished = true;
+  eventConfig.hasProgramStarted = true;
+  configureEvents(eventConfig);
+
   EnumValueDescriptorPtr dryingTargetCottonSynthetic = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   int i = 0;
-  dryingTargetCottonSynthetic->addEnum("IronDry", i++, false);
-  dryingTargetCottonSynthetic->addEnum("CupboardDry", i++, false);
-  dryingTargetCottonSynthetic->addEnum("CupboardDryPlus", i++, false);
+  dryingTargetCottonSynthetic->addEnum("IronDry", i++);
+  dryingTargetCottonSynthetic->addEnum("CupboardDry", i++, true);
+  dryingTargetCottonSynthetic->addEnum("CupboardDryPlus", i++);
 
   EnumValueDescriptorPtr dryingTargetMix = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
   i = 0;
-  dryingTargetMix->addEnum("IronDry", i++, false);
-  dryingTargetMix->addEnum("CupboardDry", i++, false);
+  dryingTargetMix->addEnum("IronDry", i++);
+  dryingTargetMix->addEnum("CupboardDry", i++, true);
 
   addAction("std.Cotton",    "Cotton",    "Cotton",    dryingTargetCottonSynthetic);
   addAction("std.Synthetic", "Synthetic", "Synthetic", dryingTargetCottonSynthetic);
   addAction("std.Mix",       "Mix",       "Mix",       dryingTargetMix);
+
+  addDefaultStopAction();
 
 
   dryingTargetProp = EnumValueDescriptorPtr(new EnumValueDescriptor("DryingTarget", true));
@@ -91,7 +114,7 @@ bool HomeConnectDeviceDryer::configureDevice()
   dryingTargetProp->addEnum("CupboardDryPlus", i++, false);
 
   deviceProperties->addProperty(dryingTargetProp);
-  return inherited::configureDevice();
+  return ret;
 }
 
 void HomeConnectDeviceDryer::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -105,7 +128,7 @@ void HomeConnectDeviceDryer::handleEventTypeNotify(const string& aKey, JsonObjec
 
   if (aKey == "LaundryCare.Dryer.Option.DryingTarget") {
     string value = (aValue != NULL) ? aValue->stringValue() : "";
-    dryingTargetProp->setStringValue(removeNamespace(value));
+    dryingTargetProp->setStringValueCaseInsensitive(removeNamespace(value));
     return;
   }
 
@@ -117,8 +140,12 @@ void HomeConnectDeviceDryer::addAction(const string& aActionName, const string& 
   HomeConnectProgramBuilder builder("LaundryCare.Dryer.Program." + aProgramName);
   builder.addOption("LaundryCare.Dryer.Option.DryingTarget", "\"LaundryCare.Dryer.EnumType.DryingTarget.@{DryingTarget}\"");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
-  action->addParameter(aParameter, true);
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this,
+                                                                                     *operationModeDescriptor,
+                                                                                     aActionName,
+                                                                                     aDescription,
+                                                                                     builder.build()));
+  action->addParameter(aParameter);
   deviceActions->addAction(action);
 }
 

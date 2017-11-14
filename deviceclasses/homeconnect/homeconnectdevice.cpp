@@ -24,6 +24,7 @@
 #if ENABLE_HOMECONNECT
 
 #include "homeconnectvdc.hpp"
+#include "homeconnectaction.hpp"
 
 #include "homeconnectdevicecoffemaker.hpp"
 #include "homeconnectdeviceoven.hpp"
@@ -31,7 +32,10 @@
 #include "homeconnectdevicewasher.hpp"
 #include "homeconnectdevicedryer.hpp"
 #include "homeconnectdevicefridge.hpp"
+#include "homeconnectaction.hpp"
 #include <sstream>
+#include <boost/algorithm/string/split.hpp>
+#include <functional>
 
 using namespace p44;
 
@@ -85,126 +89,6 @@ void HomeConnectScene::setActionIfNotEmpty(const string& aAction)
   setDontCare(false);
   value = 0;
   command = aAction;
-}
-
-
-// MARK: ====== HomeConnectAction
-
-
-HomeConnectAction::HomeConnectAction(SingleDevice &aSingleDevice, const string& aName, const string& aDescription, const string& aApiCommandTemplate) :
-  inherited(aSingleDevice, aName, aDescription),
-  apiCommandTemplate(aApiCommandTemplate)
-{
-}
-
-
-HomeConnectDevice &HomeConnectAction::getHomeConnectDevice()
-{
-  return *(static_cast<HomeConnectDevice *>(singleDeviceP));
-}
-
-
-
-void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
-{
-  // direct execution of home connect API commands
-  // Syntax:
-  //   method:resturlpath[:jsonBody]
-  string cmd = apiCommandTemplate;
-  ErrorPtr err = substitutePlaceholders(cmd, boost::bind(&HomeConnectAction::valueLookup, this, aParams, _1, _2));
-  string method;
-  string r;
-
-  if (Error::isOK(err)) {
-    if(!keyAndValue(cmd, method, r)) {
-      err = TextError::err("Invalid Home Connect command template: '%s'", cmd.c_str());
-    }
-  }
-
-  if (!Error::isOK(err)) {
-    if (aCompletedCB) aCompletedCB(err);
-    return;
-  }
-
-  string path;
-  string body;
-  JsonObjectPtr jsonBody;
-  if (!keyAndValue(r, path, body)) {
-    path = r;
-  }
-  else {
-    // make JSON from text
-    jsonBody = JsonObject::objFromText(body.c_str());
-  }
-  // complete path
-  string urlpath = "/api/homeappliances/" + getHomeConnectDevice().haId + "/" + path;
-  getHomeConnectDevice().homeConnectComm().apiAction(method, urlpath, jsonBody, boost::bind(&HomeConnectAction::apiCommandSent, this, aCompletedCB, _1, _2));
-}
-
-
-ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, const string aName, string &aValue)
-{
-  ApiValuePtr v = aParams->get(aName);
-  if (v) {
-    aValue = v->stringValue();
-    return ErrorPtr();
-  }
-  return ErrorPtr(TextError::err("no substitution found for '%s'", aName.c_str()));
-}
-
-
-
-void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError)
-{
-  if (aCompletedCB) aCompletedCB(aError);
-}
-
-HomeConnectPowerOnAction::HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
-                                                   const string& aName,
-                                                   const string& aDescription,
-                                                   const string& aIfPowerOnCommand,
-                                                   const string& aIfPowerOffCommand,
-                                                   DeviceState& aPowerState,
-                                                   DeviceState& aOperationMode) :
-    inherited(aSingleDevice, aName, aDescription, aIfPowerOnCommand),
-    powerState(aPowerState),
-    operationMode(aOperationMode),
-    ifPowerOffCommand(aIfPowerOffCommand) {}
-
-void HomeConnectPowerOnAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
-{
-  if (powerState.value()->getStringValue() != "PowerOn") {
-    LOG(LOG_DEBUG, "Device will be powered on, before proceeding with action %s", ifPowerOffCommand.c_str());
-    HomeConnectSettingBuilder settingBuilder = HomeConnectSettingBuilder("BSH.Common.Setting.PowerState");
-    settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.On\"");
-
-    apiCommandTemplate = settingBuilder.build();
-    inherited::performCall(aParams->newNull(), boost::bind(&HomeConnectPowerOnAction::devicePoweredOn, this, aParams, aCompletedCB, _1, ifPowerOffCommand));
-    return;
-  }
-
-  LOG(LOG_DEBUG, "Device is powered on, proceed with action %s", apiCommandTemplate.c_str());
-  inherited::performCall(aParams, aCompletedCB);
-  return;
-}
-
-void HomeConnectPowerOnAction::devicePoweredOn(ApiValuePtr aParams, StatusCB aCompletedCB, ErrorPtr aError, string aCommandTemplate)
-{
-  if (!Error::isOK(aError)) {
-    if (aCompletedCB) aCompletedCB(aError);
-    return;
-  }
-
-  if (operationMode.value()->getStringValue() != "ModeReady") {
-    LOG(LOG_DEBUG, "Device is not ready, reschedule action but call completed callback anyway");
-    if (aCompletedCB) aCompletedCB(Error::ok());
-    aCompletedCB.clear();
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::devicePoweredOn, this, aParams, aCompletedCB, aError, aCommandTemplate), RESCHEDULE_INTERVAL);
-    return;
-  }
-
-  apiCommandTemplate = aCommandTemplate;
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::performCall, this, aParams, aCompletedCB), RESCHEDULE_INTERVAL);
 }
 
 HomeConnectProgramBuilder::HomeConnectProgramBuilder(const string& aProgramName) :
@@ -448,40 +332,6 @@ bool HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 bool HomeConnectDevice::configureDevice()
 {
-  HomeConnectActionPtr a;
-  HomeConnectSettingBuilder settingBuilder = HomeConnectSettingBuilder("BSH.Common.Setting.PowerState");
-  // configure common things
-  // - stop
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.Stop", "stop current program", "DELETE:programs/active"));
-  deviceActions->addAction(a);
-  // - power state off
-
-  settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.Off\"");
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOff", "Switch power state off", settingBuilder.build()));
-  // - power state standby
-  deviceActions->addAction(a);
-
-  settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.Standby\"");
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.StandBy", "Switch power state standby", settingBuilder.build()));
-  // - power state on
-  deviceActions->addAction(a);
-
-  settingBuilder.setValue("\"BSH.Common.EnumType.PowerState.On\"");
-  a = HomeConnectActionPtr(new HomeConnectAction(*this, "std.PowerOn", "Switch power state on", settingBuilder.build()));
-
-  deviceActions->addAction(a);
-
-  // program name
-  programName = ValueDescriptorPtr(new TextValueDescriptor("ProgramName"));
-  deviceProperties->addProperty(programName);
-
-  // common events
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramFinished", "Program Finished")));
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramAborted", "Program Aborted")));
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "LocallyOperated", "Locally Operated")));
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramStarted", "Program Started")));
-  deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "AlarmClockElapsed", "Alarm Clock Elapsed")));
-
   // configured ok
   return true;
 }
@@ -489,38 +339,38 @@ bool HomeConnectDevice::configureDevice()
 void HomeConnectDevice::configureOperationModeState(const OperationModeConfiguration& aConfiguration)
 {
   // - operation mode
-  EnumValueDescriptor *omes = new EnumValueDescriptor("OperationMode", true);
+  operationModeDescriptor = new EnumValueDescriptor("OperationMode", true);
   int currentEnumValue = 0;
 
   if (aConfiguration.hasInactive) {
-    omes->addEnum("ModeInactive", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeInactive", currentEnumValue++);
   }
   if (aConfiguration.hasReady) {
-    omes->addEnum("ModeReady", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeReady", currentEnumValue++);
   }
   if (aConfiguration.hasDelayedStart) {
-    omes->addEnum("ModeDelayedStart", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeDelayedStart", currentEnumValue++);
   }
   if (aConfiguration.hasRun) {
-    omes->addEnum("ModeRun", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeRun", currentEnumValue++);
   }
   if (aConfiguration.hasPause) {
-    omes->addEnum("ModePause", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModePause", currentEnumValue++);
   }
   if (aConfiguration.hasActionrequired) {
-    omes->addEnum("ModeActionRequired", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeActionRequired", currentEnumValue++);
   }
   if (aConfiguration.hasFinished) {
-    omes->addEnum("ModeFinished", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeFinished", currentEnumValue++);
   }
   if (aConfiguration.hasError) {
-    omes->addEnum("ModeError", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeError", currentEnumValue++);
   }
   if (aConfiguration.hasAborting) {
-    omes->addEnum("ModeAborting", currentEnumValue++);
+    operationModeDescriptor->addEnum("ModeAborting", currentEnumValue++);
   }
   operationMode = DeviceStatePtr(
-      new DeviceState(*this, "OperationMode", "Status", ValueDescriptorPtr(omes),
+      new DeviceState(*this, "OperationMode", "Status", operationModeDescriptor,
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(operationMode);
 }
@@ -528,21 +378,21 @@ void HomeConnectDevice::configureOperationModeState(const OperationModeConfigura
 void HomeConnectDevice::configureRemoteControlState(const RemoteControlConfiguration& aConfiguration)
 {
   // - remote control
-  EnumValueDescriptor *rces = new EnumValueDescriptor("RemoteControl", true);
+  remoteControlDescriptor= new EnumValueDescriptor("RemoteControl", true);
   int currentEnumValue = 0;
 
   if (aConfiguration.hasControlInactive) {
-    rces->addEnum("RemoteControlInactive", currentEnumValue++);
+    remoteControlDescriptor->addEnum("RemoteControlInactive", currentEnumValue++);
   }
   if (aConfiguration.hasControlActive) {
-    rces->addEnum("RemoteControlActive", currentEnumValue++);
+    remoteControlDescriptor->addEnum("RemoteControlActive", currentEnumValue++);
   }
   if (aConfiguration.hasStartActive) {
-    rces->addEnum("RemoteStartActive", currentEnumValue++);
+    remoteControlDescriptor->addEnum("RemoteStartActive", currentEnumValue++);
   }
 
   remoteControl = DeviceStatePtr(
-      new DeviceState(*this, "RemoteControl", "Remote Control", ValueDescriptorPtr(rces),
+      new DeviceState(*this, "RemoteControl", "Remote Control", remoteControlDescriptor,
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(remoteControl);
 }
@@ -550,20 +400,20 @@ void HomeConnectDevice::configureRemoteControlState(const RemoteControlConfigura
 void HomeConnectDevice::configureDoorState(const DoorStateConfiguration& aConfiguration)
 {
   // - door state
-  EnumValueDescriptor *dses = new EnumValueDescriptor("DoorState", true);
+  doorStateDescriptor = new EnumValueDescriptor("DoorState", true);
   int currentEnumValue = 0;
 
   if (aConfiguration.hasOpen) {
-    dses->addEnum("DoorOpen", currentEnumValue++);
+    doorStateDescriptor->addEnum("DoorOpen", currentEnumValue++);
   }
   if (aConfiguration.hasClosed) {
-    dses->addEnum("DoorClosed", currentEnumValue++);
+    doorStateDescriptor->addEnum("DoorClosed", currentEnumValue++);
   }
   if (aConfiguration.hasLocked) {
-    dses->addEnum("DoorLocked", currentEnumValue++);
+    doorStateDescriptor->addEnum("DoorLocked", currentEnumValue++);
   }
   doorState = DeviceStatePtr(
-      new DeviceState(*this, "DoorState", "Door State", ValueDescriptorPtr(dses),
+      new DeviceState(*this, "DoorState", "Door State", doorStateDescriptor,
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(doorState);
 }
@@ -571,24 +421,102 @@ void HomeConnectDevice::configureDoorState(const DoorStateConfiguration& aConfig
 void HomeConnectDevice::configurePowerState(const PowerStateConfiguration& aConfiguration)
 {
   // - operation mode
-  EnumValueDescriptor *pses = new EnumValueDescriptor("PowerState", true);
+  powerStateDescriptor = new EnumValueDescriptor("PowerState", true);
   int currentEnumValue = 0;
 
   if (aConfiguration.hasOff) {
-    pses->addEnum("PowerOff", currentEnumValue++);
+    powerStateDescriptor->addEnum("PowerOff", currentEnumValue++);
   }
   if (aConfiguration.hasOn) {
-    pses->addEnum("PowerOn", currentEnumValue++);
+    powerStateDescriptor->addEnum("PowerOn", currentEnumValue++);
   }
   if (aConfiguration.hasStandby) {
-    pses->addEnum("PowerStandby", currentEnumValue++);
+    powerStateDescriptor->addEnum("PowerStandby", currentEnumValue++);
   }
 
   powerState = DeviceStatePtr(
-      new DeviceState(*this, "PowerState", "Power State", ValueDescriptorPtr(pses),
+      new DeviceState(*this, "PowerState", "Power State", powerStateDescriptor,
           boost::bind(&HomeConnectDevice::stateChanged, this, _1, _2)));
   deviceStates->addState(powerState);
 }
+
+void HomeConnectDevice::configureProgramStatus(const ProgramStatusConfiguration& aConfiguration)
+{
+  if (aConfiguration.hasElapsedTime) {
+    elapsedProgramTime = ValueDescriptorPtr(
+        new NumericValueDescriptor("ElapsedProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
+    deviceProperties->addProperty(elapsedProgramTime);
+  }
+
+  if (aConfiguration.hasRemainingTime) {
+    remainingProgramTime = ValueDescriptorPtr(
+        new NumericValueDescriptor("RemainingProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
+    deviceProperties->addProperty(remainingProgramTime);
+  }
+
+  if (aConfiguration.hasProgres) {
+    programProgress = ValueDescriptorPtr(
+        new NumericValueDescriptor("ProgramProgress", valueType_numeric, VALUE_UNIT(valueUnit_percent, unitScaling_1), 0, 100, 1));
+    deviceProperties->addProperty(programProgress);
+  }
+}
+
+
+void HomeConnectDevice::configureEvents(const EventConfiguration& aConfiguration)
+{
+  if (aConfiguration.hasAlarmClockElapsed) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "AlarmClockElapsed", "Alarm Clock Elapsed")));
+  }
+  if (aConfiguration.hasLocallyOperated) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "LocallyOperated", "Locally Operated")));
+  }
+  if (aConfiguration.hasProgramAborted) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramAborted", "Program Aborted")));
+  }
+  if (aConfiguration.hasProgramFinished) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramFinished", "Program Finished")));
+  }
+  if (aConfiguration.hasProgramStarted) {
+    deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "ProgramStarted", "Program Started")));
+  }
+}
+
+void HomeConnectDevice::addDefaultPowerOnAction()
+{
+  addPowerStateAction("std.PowerOn", "Switch power state on", "On");
+}
+
+void HomeConnectDevice::addDefaultStandByAction()
+{
+  addPowerStateAction("std.StandBy", "Switch power state standby", "Standby");
+}
+
+void HomeConnectDevice::addDefaultPowerOffAction()
+{
+  addPowerStateAction("std.PowerOff", "Switch power state off", "Off");
+}
+
+void HomeConnectDevice::addDefaultStopAction()
+{
+  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectStopAction(*this, *operationModeDescriptor, "std.Stop", "Stop current program"));
+  deviceActions->addAction(a);
+}
+
+void HomeConnectDevice::addPowerStateAction(const string& aName, const string& aDescription, const string& aParameter)
+{
+  HomeConnectSettingBuilder settingBuilder =
+      HomeConnectSettingBuilder("BSH.Common.Setting.PowerState").setValue("\"BSH.Common.EnumType.PowerState." + aParameter + "\"");
+  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectAction(*this, aName, aDescription, settingBuilder.build()));
+  deviceActions->addAction(a);
+}
+
+
+void HomeConnectDevice::addProgramNameProperty()
+{
+  programName = ValueDescriptorPtr(new TextValueDescriptor("ProgramName"));
+  deviceProperties->addProperty(programName);
+}
+
 
 void HomeConnectDevice::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
 {
@@ -618,14 +546,24 @@ void HomeConnectDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryRes
     string_format("/api/homeappliances/%s/events",haId.c_str()).c_str(),
     boost::bind(&HomeConnectDevice::handleEvent, this, _1, _2, _3))
   );
-  // start pooling cycle
+  // we need to poll the state once
   pollState();
-  // FIXME: implement
+
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
 
 void HomeConnectDevice::handleEvent(EventType aEventType, JsonObjectPtr aEventData, ErrorPtr aError)
 {
+  if (aEventType == eventType_Disconnected) {
+    handleEventTypeDisconnected();
+    return;
+  }
+
+  if (aEventType == eventType_Connected) {
+    handleEventTypeConnected();
+    return;
+  }
+
   JsonObjectPtr oKey;
   JsonObjectPtr oValue;
 
@@ -641,11 +579,11 @@ void HomeConnectDevice::handleEvent(EventType aEventType, JsonObjectPtr aEventDa
       handleEventTypeStatus(key, oValue);
       return;
     }
-    case eventType_Notify: {
+    case eventType_Notify : {
       handleEventTypeNotify(key, oValue);
       return;
     }
-    case eventType_Event: {
+    case eventType_Event : {
       handleEventTypeEvent(key);
       return;
     }
@@ -659,7 +597,7 @@ void HomeConnectDevice::handleEventTypeNotify(const string& aKey, JsonObjectPtr 
 
   if ((aKey == "BSH.Common.Setting.PowerState") && (powerState != NULL)) {
     string powerStateValue = "Power" + removeNamespace(value);
-    if (powerState->value()->setStringValue(powerStateValue)) {
+    if (powerStateDescriptor->setStringValueCaseInsensitive(powerStateValue)) {
       ALOG(LOG_NOTICE, "New Power State: '%s'", powerStateValue.c_str());
       powerState->push();
     }
@@ -672,6 +610,29 @@ void HomeConnectDevice::handleEventTypeNotify(const string& aKey, JsonObjectPtr 
     if (programName->setStringValue(programNameValue)) {
       ALOG(LOG_NOTICE, "New Program Name State: '%s'", programNameValue.c_str());
     }
+    return;
+  }
+
+  if ((aKey == "BSH.Common.Option.ElapsedProgramTime") && (elapsedProgramTime != NULL)) {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    elapsedProgramTime->setInt32Value(value);
+    return;
+  }
+
+  if ((aKey == "BSH.Common.Option.RemainingProgramTime") && (remainingProgramTime != NULL)) {
+    if (aValue == NULL) {
+      remainingProgramTime->invalidate();
+    }
+    else {
+      remainingProgramTime->setInt32Value(aValue->int32Value());
+    }
+    return;
+  }
+
+  if ((aKey == "BSH.Common.Option.ProgramProgress") && (programProgress != NULL)) {
+    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
+    programProgress->setInt32Value(value);
+    return;
   }
 }
 
@@ -681,12 +642,17 @@ void HomeConnectDevice::handleEventTypeEvent(const string& aKey)
     return;
   }
 
+  DeviceEventPtr event;
   if (aKey=="BSH.Common.Event.ProgramFinished") {
-    operationMode->pushWithEvent(deviceEvents->getEvent("ProgramFinished"));
+    event = deviceEvents->getEvent("ProgramFinished");
   } else if (aKey=="BSH.Common.Event.ProgramAborted") {
-    operationMode->pushWithEvent(deviceEvents->getEvent("ProgramAborted"));
+    event = deviceEvents->getEvent("ProgramAborted");
   } else if (aKey=="BSH.Common.Event.AlarmClockElapsed") {
-    operationMode->pushWithEvent(deviceEvents->getEvent("AlarmClockElapsed"));
+    event = deviceEvents->getEvent("AlarmClockElapsed");
+  }
+
+  if (event) {
+    operationMode->pushWithEvent(event);
   }
 }
 
@@ -694,59 +660,24 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
 {
   string value = (aValue != NULL) ? aValue->stringValue() : "";
 
-  if ((aKey == "BSH.Common.Status.OperationState") && (operationMode != NULL)) {
-    string operationValue = "Mode" + removeNamespace(value);
-    if (operationMode->value()->setStringValue(operationValue)) {
-      ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
-
-      if (operationValue == "ModeRun") {
-        operationMode->pushWithEvent(deviceEvents->getEvent("ProgramStarted"));
-      } else {
-        operationMode->push();
-      }
-    }
+  if (aKey == "BSH.Common.Status.OperationState" && (operationMode != NULL)) {
+    handleOperationStateChange(value);
     return;
   }
 
   if ((aKey == "BSH.Common.Status.RemoteControlActive") && (remoteControl != NULL)) {
-    string remoteControlValue;
-
-    if (value == "true") {
-      if (remoteControl->value()->getStringValue() != "RemoteStartActive") {
-        remoteControlValue = "RemoteControlActive";
-      }
-    } else if (value == "false") {
-      remoteControlValue = "RemoteControlInactive";
-    }
-
-    if (!remoteControlValue.empty() && remoteControl->value()->setStringValue(remoteControlValue)) {
-      ALOG(LOG_NOTICE, "New Remote Control State: '%s'", remoteControlValue.c_str());
-      remoteControl->push();
-    }
+    handleRemoteControlActiveChange(aValue);
     return;
   }
 
   if ((aKey == "BSH.Common.Status.RemoteControlStartAllowed") && (remoteControl != NULL)) {
-    string remoteStartValue;
-
-    if (value == "true") {
-      remoteStartValue = "RemoteStartActive";
-    } else if (value == "false") {
-      if (remoteControl->value()->getStringValue() == "RemoteStartActive") {
-        remoteStartValue = "RemoteControlActive";
-      }
-    }
-
-    if (!remoteStartValue.empty() && remoteControl->value()->setStringValue(remoteStartValue)) {
-      ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
-      remoteControl->push();
-    }
+    handleRemoteStartAllowedChange(aValue);
     return;
   }
 
   if ((aKey=="BSH.Common.Status.DoorState") && (doorState != NULL)) {
     string doorValue = "Door" + removeNamespace(value);
-    if (doorState->value()->setStringValue(doorValue)) {
+    if (doorStateDescriptor->setStringValueCaseInsensitive(doorValue)) {
       ALOG(LOG_NOTICE, "Door State: '%s'", doorValue.c_str());
       doorState->push();
     }
@@ -754,7 +685,95 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
   }
 
   if ((aKey=="BSH.Common.Status.LocalControlActive") && (operationMode != NULL)) {
-    operationMode->pushWithEvent(deviceEvents->getEvent("LocallyOperated"));
+    DeviceEventPtr event = deviceEvents->getEvent("LocallyOperated");
+    if (event) {
+      operationMode->pushWithEvent(event);
+    }
+  }
+}
+
+void HomeConnectDevice::handleEventTypeDisconnected()
+{
+  ALOG(LOG_NOTICE, "Device disconnected");
+}
+
+void HomeConnectDevice::handleEventTypeConnected()
+{
+  ALOG(LOG_NOTICE, "Device connected");
+}
+
+void HomeConnectDevice::handleOperationStateChange(const string& aNewValue)
+{
+  string operationValue = "Mode" + removeNamespace(aNewValue);
+  if (!operationModeDescriptor->setStringValueCaseInsensitive(operationValue)) {
+    return;
+  }
+
+  ALOG(LOG_NOTICE, "New Operation State: '%s'", operationValue.c_str());
+
+  if (operationValue == "ModeRun") {
+    DeviceEventPtr event = deviceEvents->getEvent("ProgramStarted");
+    if (event) {
+      operationMode->pushWithEvent(event);
+    }
+  } else {
+    operationMode->push();
+
+    // the following information is valid only in case the program is running
+    if (elapsedProgramTime != NULL) {
+      elapsedProgramTime->invalidate();
+    }
+    if (remainingProgramTime != NULL) {
+      remainingProgramTime->invalidate();
+    }
+    if (programProgress != NULL) {
+      programProgress->invalidate();
+    }
+  }
+}
+
+void HomeConnectDevice::handleRemoteStartAllowedChange(JsonObjectPtr aNewValue)
+{
+  if (aNewValue == NULL) {
+    return;
+  }
+  string remoteStartValue;
+  bool value = aNewValue->boolValue();
+
+  if (value) {
+    remoteStartValue = "RemoteStartActive";
+  } else {
+    if (remoteControlDescriptor->getStringValue() == "RemoteStartActive") {
+      remoteStartValue = "RemoteControlActive";
+    }
+  }
+
+  if (!remoteStartValue.empty() && remoteControlDescriptor->setStringValueCaseInsensitive(remoteStartValue)) {
+    ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
+    remoteControl->push();
+  }
+}
+
+void HomeConnectDevice::handleRemoteControlActiveChange(JsonObjectPtr aNewValue)
+{
+  if (aNewValue == NULL) {
+    return;
+  }
+
+  string remoteControlValue;
+  bool value = aNewValue->boolValue();
+
+  if (value) {
+    if (remoteControlDescriptor->getStringValue() != "RemoteStartActive") {
+      remoteControlValue = "RemoteControlActive";
+    }
+  } else {
+    remoteControlValue = "RemoteControlInactive";
+  }
+
+  if (!remoteControlValue.empty() && remoteControlDescriptor->setStringValueCaseInsensitive(remoteControlValue)) {
+    ALOG(LOG_NOTICE, "New Remote Control State: '%s'", remoteControlValue.c_str());
+    remoteControl->push();
   }
 }
 
@@ -780,10 +799,10 @@ void HomeConnectDevice::pollStateStatusDone(JsonObjectPtr aResult, ErrorPtr aErr
         }
       }
     }
-  }
 
-  homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/settings", haId.c_str()).c_str(),
-      boost::bind(&HomeConnectDevice::pollStateSettingsDone, this, _1, _2));
+    homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/settings", haId.c_str()).c_str(),
+        boost::bind(&HomeConnectDevice::pollStateSettingsDone, this, _1, _2));
+  }
 }
 
 void HomeConnectDevice::pollStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aError)
@@ -801,10 +820,10 @@ void HomeConnectDevice::pollStateSettingsDone(JsonObjectPtr aResult, ErrorPtr aE
         }
       }
     }
-  }
 
-  homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/programs/selected", haId.c_str()).c_str(),
-      boost::bind(&HomeConnectDevice::pollStateProgramDone, this, _1, _2));
+    homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/programs/selected", haId.c_str()).c_str(),
+        boost::bind(&HomeConnectDevice::pollStateProgramDone, this, _1, _2));
+  }
 }
 
 void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aError)
@@ -833,14 +852,18 @@ void HomeConnectDevice::pollStateProgramDone(JsonObjectPtr aResult, ErrorPtr aEr
       }
     }
   }
-
-  // start new loop
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectDevice::pollState, this), 10 * Minute);
 }
 
 string HomeConnectDevice::hardwareGUID()
 {
-  return string_format("haId:%s", haId.c_str());
+  vector<string> splitedStrings;
+  boost::split(splitedStrings, haId, boost::bind(std::equal_to<char>(), _1, '-'));
+  // getting last part of haId, ex. "SIEMENS-HCS05FRF1-D516FBECC462AD"
+  string last;
+  if (!splitedStrings.empty()) {
+    last = splitedStrings.back();
+  }
+  return string_format("haId:%s", last.c_str());
 }
 
 
