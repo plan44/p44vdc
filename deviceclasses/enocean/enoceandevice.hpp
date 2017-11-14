@@ -205,12 +205,14 @@ namespace p44 {
     /// @param aAddress the EnOcean address
     /// @param aProfile the EPP
     /// @param aManufacturer the manufacturer code
+    /// @param aSmartAck set if creating devices as part of a smart-ack learn-in
     /// @return number of devices created
     static int createDevicesFromEEP(
       EnoceanVdc *aVdcP,
       EnoceanAddress aAddress,
       EnoceanProfile aProfile,
-      EnoceanManufacturer aManufacturer
+      EnoceanManufacturer aManufacturer,
+      bool aSmartAck
     );
     
 

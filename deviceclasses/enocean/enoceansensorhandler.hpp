@@ -35,7 +35,7 @@
 /// enocean bit specification to bit mask macro (within 32-bit 4BS data)
 #define DBMASK(byte,bit) (BITMASK(DB(byte,bit)))
 /// get byte from radio data according to enocean spec byte number (reversed index)
-#define ENOBYTE(byte,data,size) (data[size-byte])
+#define ENOBYTE(byte,data,size) (data[size-byte-1])
 /// get bit value from radio data according to enocean spec byte and bit number
 #define ENOBIT(byte,bit,data,size) ((ENOBYTE(byte,data,size) & BITMASK(bit))!=0)
 

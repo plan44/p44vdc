@@ -46,7 +46,7 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
     case CLIMATE_HEAT_TEMP_NOTUSED:
     case CLIMATE_HEAT_TEMP_NIGHT:
     case CLIMATE_HEAT_TEMP_HOLIDAY:
-      sceneCmd = scene_cmd_climatecontrol_enable_heating;
+      sceneCmd = scene_cmd_climatecontrol_mode_heating;
       sceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_COOL_TEMP_OFF:
@@ -55,7 +55,12 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
     case CLIMATE_COOL_TEMP_NOTUSED:
     case CLIMATE_COOL_TEMP_NIGHT:
     case CLIMATE_COOL_TEMP_HOLIDAY:
-      sceneCmd = scene_cmd_climatecontrol_enable_cooling;
+      sceneCmd = scene_cmd_climatecontrol_mode_cooling;
+      sceneArea = 0; // not an area scene any more
+      break;
+    case CLIMATE_COOL_PASSIVE_ON:
+    case CLIMATE_COOL_PASSIVE_OFF:
+      sceneCmd = scene_cmd_climatecontrol_mode_passive_cooling;
       sceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_ENABLE:
@@ -435,12 +440,13 @@ bool ClimateControlBehaviour::applyScene(DsScenePtr aScene)
         // valve prophylaxis
         runProphylaxis = true;
         return true;
-      case scene_cmd_climatecontrol_enable_heating:
+      case scene_cmd_climatecontrol_mode_heating:
         // switch to heating mode
         climateModeHeating = true;
         return true;
-      case scene_cmd_climatecontrol_enable_cooling:
-        // switch to cooling mode
+      case scene_cmd_climatecontrol_mode_cooling:
+      case scene_cmd_climatecontrol_mode_passive_cooling:
+        // switch to cooling mode (active or passive)
         climateModeHeating = false;
         return true;
       default:

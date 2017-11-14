@@ -418,7 +418,8 @@ static const char *modelFeatureNames[numModelFeatures] = {
   "umvrelay",
   "blinkconfig",
   "umroutmode",
-  "fcu"
+  "fcu",
+  "extendedvalvetypes"
 };
 
 

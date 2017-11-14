@@ -43,24 +43,27 @@ typedef enum {
   ROOM_ON = 5,                      ///< preset 1 - main room on
   CLIMATE_HEAT_TEMP_HOLIDAY = 5,    ///< climate control: temperature holiday/vacation, heating mode
   AREA_1_ON = 6,                    ///< area 1 on / audio: reserved
-  CLIMATE_COOL_TEMP_COMFORT = 6,    ///< climate control: temperature comfort, cooling mode
+  CLIMATE_COOL_PASSIVE_ON = 6,      ///< climate control: passive cooling mode, on
   AREA_2_ON = 7,                    ///< area 2 on
   AUDIO_REPEAT_OFF = 7,             ///< audio: Repeat off
-  CLIMATE_COOL_TEMP_OFF = 7,        ///< climate control: temperature off, cooling mode
+  CLIMATE_COOL_PASSIVE_OFF = 7,     ///< climate control: passive cooling mode, off
   AREA_3_ON = 8,                    ///< area 3 on
   AUDIO_REPEAT_1 = 8,               ///< audio: Repeat 1
-  CLIMATE_COOL_TEMP_ECO = 8,        ///< climate control: temperature eco, cooling mode
+  CLIMATE_RESERVED = 8,             ///< climate control: reserved (was once used as MANUAL mode)
   AREA_4_ON = 9,                    ///< area 4 on
   AUDIO_REPEAT_ALL = 9,             ///< audio: Repeat all
-  CLIMATE_COOL_TEMP_NOTUSED = 9,    ///< climate control: temperature notused/cool/setback, cooling mode
+  CLIMATE_COOL_TEMP_OFF = 9,        ///< climate control: temperature off, cooling mode
   T1234_CONT = 10,                  ///< area 1-4 increment/decrement continue
-  CLIMATE_COOL_TEMP_NIGHT = 10,     ///< climate control: temperature night, cooling mode
+  CLIMATE_COOL_TEMP_COMFORT = 10,   ///< climate control: temperature comfort, cooling mode
   DEC_S = 11,                       ///< decrement value
-  CLIMATE_COOL_TEMP_HOLIDAY = 11,   ///< climate control: temperature holiday/vacation, cooling mode
-  INC_S = 12,             ///< increment value
-  MIN_S = 13,             ///< minimum value
-  MAX_S = 14,             ///< maximum value
-  STOP_S = 15,            ///< stop
+  CLIMATE_COOL_TEMP_ECO = 11,       ///< climate control: temperature eco, cooling mode
+  INC_S = 12,                       ///< increment value
+  CLIMATE_COOL_TEMP_NOTUSED = 12,   ///< climate control: temperature notused/cool/setback, cooling mode
+  MIN_S = 13,                       ///< minimum value
+  CLIMATE_COOL_TEMP_NIGHT = 13,     ///< climate control: temperature night, cooling mode
+  MAX_S = 14,                       ///< maximum value
+  CLIMATE_COOL_TEMP_HOLIDAY = 14,   ///< climate control: temperature holiday/vacation, cooling mode
+  STOP_S = 15,                      ///< stop
   ///< 16 reserved
   PRESET_2 = 17,          ///< preset 2
   PRESET_3 = 18,          ///< preset 3
@@ -399,6 +402,7 @@ typedef enum {
   modelFeature_blinkconfig, ///< Shows "Blink behavior for output on scene calls" settings in the advanced "Device Properties" dialog.
   modelFeature_umroutmode, ///< Enables the "Output mode" radio group in "Device Properties" dialog and influences its contents. The presented options will be: "single switched" (35) for all dSUIDs and "combined switched" (43), "combined two stage switched" (34), "combined three stage switched" (38) and "disabled" (0).
   modelFeature_fcu, ///< enables FCU specific UI bits such as "automatic" flags
+  modelFeature_extendedvalvetypes, ///< Rehau specific modelFeature, extends list of available valve types in "Device Properties" dialog.
   numModelFeatures
 } DsModelFeatures;
 
