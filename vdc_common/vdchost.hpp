@@ -33,7 +33,6 @@
 
 #include "vdcapi.hpp"
 
-
 using namespace std;
 
 namespace p44 {
@@ -42,6 +41,7 @@ namespace p44 {
   class Device;
   class ButtonBehaviour;
   class DsUid;
+  class LocalController;
 
   typedef boost::intrusive_ptr<Vdc> VdcPtr;
   typedef boost::intrusive_ptr<Device> DevicePtr;
@@ -109,6 +109,7 @@ namespace p44 {
 
     friend class Vdc;
     friend class DsAddressable;
+    friend class LocalController;
 
     bool externalDsuid; ///< set when dSUID is set to a external value (usually UUIDv1 based)
     bool storedDsuid; ///< set when using stored (DB persisted) dSUID that is not equal to default dSUID 
@@ -160,9 +161,14 @@ namespace p44 {
     MLTicket sessionActivityTicket;
     VdcApiConnectionPtr activeSessionConnection;
 
+    #if ENABLE_LOCALCONTROLLER
+    LocalController *localController;
+    #endif
+
   public:
 
-    VdcHost();
+    VdcHost(bool aWithLocalController = false);
+    virtual ~VdcHost();
 
     /// VdcHost is a singleton, get access to it
     /// @return vdc host
@@ -179,7 +185,7 @@ namespace p44 {
 
     /// get an API value that would work for the session connection if we had one
     /// @return an API value of the same type as session connection will use
-    ApiValuePtr newApiValue() { return vdcApiServer ? vdcApiServer->newApiValue() : ApiValuePtr(); };
+    ApiValuePtr newApiValue();
 
     /// set user assignable name
     /// @param aName name of this instance of the vdc host
@@ -263,7 +269,7 @@ namespace p44 {
 		/// initialize
     /// @param aCompletedCB will be called when the entire container is initialized or has been aborted with a fatal error
     /// @param aFactoryReset if set, database will be reset
-    void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset);
 
     /// start running normally
     void startRunning();

@@ -76,7 +76,7 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
   // get the field value
   aRow->getIfNotNull<int>(aIndex++, deviceFlags);
   device.setName(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  aRow->getIfNotNull<int>(aIndex++, zoneID);
+  aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, zoneID);
 }
 
 
@@ -87,5 +87,5 @@ void DeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
   // bind the fields
   aStatement.bind(aIndex++, deviceFlags);
   aStatement.bind(aIndex++, device.getAssignedName().c_str(), false);  // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, zoneID);
+  aStatement.bind(aIndex++, (int)zoneID);
 }

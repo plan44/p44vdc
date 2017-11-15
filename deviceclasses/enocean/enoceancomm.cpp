@@ -386,7 +386,6 @@ uint8_t Esp3Packet::radioRepeaterCount()
 size_t Esp3Packet::radioUserDataLength()
 {
   if (packetType()!=pt_radio) return 0; // no data
-  RadioOrg rorg = eepRorg();
   int bytes = (int)dataLength(); // start with actual length
   bytes -= 1; // RORG byte
   bytes -= 1; // one status byte
@@ -398,7 +397,6 @@ size_t Esp3Packet::radioUserDataLength()
 void Esp3Packet::setRadioUserDataLength(size_t aSize)
 {
   if (packetType()!=pt_radio) return; // is not radio packet
-  RadioOrg rorg = eepRorg();
   // add extra length needed for fixed fields in radio packet
   aSize += 1; // RORG byte
   aSize += 1; // one status byte
@@ -982,10 +980,10 @@ static const EnoceanManufacturerDesc manufacturerDescriptions[] = {
   { 0X042, "Ermine Corp" },
   { 0X043, "Soda" },
   { 0X044, "Eke Automation" },
-  { 0X045, "Holter Regelarmutren" },
+  { 0X045, "Holter Regelarmaturen" },
   { 0X046, "Id Rf" },
   { 0X047, "Deuta Controls" },
-  { 0X048, "Ewatchh" },
+  { 0X048, "Ewatch" },
   { 0X049, "Micropelt" },
   { 0X04A, "Caleffi Spa" },
   { 0X04B, "Digital Concepts" },
@@ -1165,7 +1163,7 @@ void EnoceanComm::aliveCheck()
 
 void EnoceanComm::smartAckLearnMode(bool aEnabled, MLMicroSeconds aTimeout)
 {
-  FOCUSLOG("EnoceanComm: %sabling smartAck learn mode in enocean module", aEnabled ? "en" : "dis");
+  LOG(LOG_INFO, "EnoceanComm: %sabling smartAck learn mode in enocean module", aEnabled ? "en" : "dis");
   // send a EPS3 command to the modem to check if it is alive
   Esp3PacketPtr saPacket = Esp3Packet::newEsp3Message(pt_smart_ack_command, SA_WR_LEARNMODE, 6);
   // params
@@ -1179,6 +1177,24 @@ void EnoceanComm::smartAckLearnMode(bool aEnabled, MLMicroSeconds aTimeout)
   saPacket->data()[6] = toMs & 0xFF;
   // issue command
   sendCommand(saPacket, NULL); // we don't need the response (but there is one)
+}
+
+
+void EnoceanComm::smartAckRespondToLearn(uint8_t aConfirmCode, MLMicroSeconds aResponseTime)
+{
+  LOG(LOG_INFO, "EnoceanComm: responding to smartAck learn with code 0x%02X", aConfirmCode);
+  // send a EPS3 command to the modem as response to SA_CONFIRM_LEARN
+  Esp3PacketPtr respPacket = Esp3Packet::newEsp3Message(pt_response, RET_OK, 3);
+  uint16_t respMs = 0;
+  if (aConfirmCode==SA_RESPONSECODE_LEARNED) {
+    // response time only if confirming successful learn-in
+    respMs = (uint16_t)(aResponseTime/MilliSecond);
+  }
+  respPacket->data()[1] = (respMs>>8) & 0xFF;
+  respPacket->data()[2] = respMs & 0xFF;
+  respPacket->data()[3] = aConfirmCode;
+  // issue response
+  sendPacket(respPacket); // immediate response, not in queue
 }
 
 

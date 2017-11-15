@@ -56,7 +56,7 @@ namespace p44 {
     virtual ~DeviceSettings() {}; // important for multiple inheritance!
 
     /// global dS zone ID, zero if no zone assigned
-    int zoneID;
+    DsZoneID zoneID;
 
     // persistence implementation
     virtual const char *tableName();

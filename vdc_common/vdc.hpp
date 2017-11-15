@@ -83,7 +83,7 @@ namespace p44 {
     /// generic vdc flag word
     int vdcFlags;
     /// default dS zone ID
-    int defaultZoneID;
+    DsZoneID defaultZoneID;
 
     /// periodic rescan, collecting
     MLMicroSeconds rescanInterval; ///< rescan interval, 0 if none
@@ -161,6 +161,10 @@ namespace p44 {
     /// devices.
     /// @return if true, this vDC should not be announced towards the dS system when it has no devices
     virtual bool invisibleWhenEmpty() { return false; }
+
+    /// some vdcs can have definitions of parameters, states, and properties changing depending on the device information
+    /// @return if true, this vDC should be queried for all actions parameters, states and properties descriptions
+    virtual bool dynamicDefinitions() { return false; } // by default dynamic definitions are not used
 
     /// get user assigned name of the vDC container, or if there is none, a synthesized default name
     /// @return name string

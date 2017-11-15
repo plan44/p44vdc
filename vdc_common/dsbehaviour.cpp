@@ -34,12 +34,10 @@ DsBehaviour::DsBehaviour(Device &aDevice, const string aBehaviourId) :
   behaviourId(aBehaviourId),
   index(0),
   device(aDevice),
-  hardwareName("<undefined>"),
+  hardwareName(""), // empty, will show behaviour ID by default
   hardwareError(hardwareError_none),
   hardwareErrorUpdated(p44::Never)
 {
-  // default hardwareName to behaviour id if actually specified
-  if (!aBehaviourId.empty()) hardwareName = aBehaviourId;
 }
 
 
@@ -234,7 +232,7 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
       // Read
       switch (aPropertyDescriptor->fieldKey()) {
         // descriptions
-        case name_key+descriptions_key_offset: aPropValue->setStringValue(hardwareName); return true;
+        case name_key+descriptions_key_offset: aPropValue->setStringValue(getHardwareName()); return true;
         case type_key+descriptions_key_offset: aPropValue->setStringValue(getTypeName()); return true;
         case dsIndex_key+descriptions_key_offset: aPropValue->setUint64Value(getIndex()); return true;
         case behaviourType_key+descriptions_key_offset: aPropValue->setStringValue(behaviourTypeIdentifier()); return true;
@@ -259,7 +257,7 @@ string DsBehaviour::shortDesc()
 
 string DsBehaviour::description()
 {
-  string s = string_format("\n- behaviour hardware name: '%s'", hardwareName.c_str());
+  string s = string_format("\n- behaviour hardware name: '%s'", getHardwareName().c_str());
   string_format_append(s, "\n- hardwareError: %d\n", hardwareError);
   return s;
 }

@@ -588,6 +588,7 @@ enum {
 
 enum {
   capability_metering_key,
+  capability_dynamicdefinitions_key,
   numCapabilities
 };
 
@@ -643,6 +644,7 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
     // capabilities level
     static const PropertyDescription capability_props[numClassContainerProperties] = {
       { "metering", apivalue_bool, capability_metering_key, OKEY(capabilities_container_key) },
+      { "dynamicDefinitions", apivalue_bool, capability_dynamicdefinitions_key, OKEY(capabilities_container_key) },
     };
     // simple, all on this level
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&capability_props[aPropIndex], aParentDescriptor));
@@ -692,7 +694,7 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
       // write
       switch (aPropertyDescriptor->fieldKey()) {
         case defaultzone_key:
-          setPVar(defaultZoneID, aPropValue->int32Value());
+          setPVar(defaultZoneID, (DsZoneID)aPropValue->int32Value());
           return true;
       }
     }
@@ -702,6 +704,7 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case capability_metering_key: aPropValue->setBoolValue(false); return true; // TODO: implement actual metering flag
+        case capability_dynamicdefinitions_key: aPropValue->setBoolValue(dynamicDefinitions()); return true;
       }
     }
   }
@@ -752,7 +755,7 @@ void Vdc::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *a
   // get the field value
   vdcFlags = aRow->get<int>(aIndex++);
   setName(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  defaultZoneID = aRow->get<int>(aIndex++);
+  defaultZoneID = aRow->getCasted<DsZoneID, int>(aIndex++);
 }
 
 

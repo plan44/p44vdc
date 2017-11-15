@@ -134,7 +134,8 @@ namespace p44 {
     void setHardwareName(const string &aHardwareName) { hardwareName = aHardwareName; };
 
     /// @return hardware name
-    string getHardwareName() { return hardwareName; };
+    /// @note if no specific name was set with setHardwareName(), this returns the behaviourId
+    string getHardwareName() { return hardwareName.empty() ? behaviourId : hardwareName; };
 
     /// update of hardware status
     void setHardwareError(VdcHardwareError aHardwareError);

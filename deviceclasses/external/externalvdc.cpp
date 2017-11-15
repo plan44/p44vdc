@@ -36,6 +36,9 @@
 
 using namespace p44;
 
+#ifndef ENABLE_FCU_SUPPORT
+  #define ENABLE_FCU_SUPPORT 1
+#endif
 
 #if ENABLE_EXTERNAL_SINGLEDEVICE
 
@@ -667,8 +670,9 @@ bool ExternalDevice::prepareSceneCall(DsScenePtr aScene)
       case scene_cmd_stop: sceneCommandStr = "STOP"; break;
       case scene_cmd_climatecontrol_enable: sceneCommandStr = "CLIMATE_ENABLE"; break;
       case scene_cmd_climatecontrol_disable: sceneCommandStr = "CLIMATE_DISABLE"; break;
-      case scene_cmd_climatecontrol_enable_heating: sceneCommandStr = "CLIMATE_HEATING"; break;
-      case scene_cmd_climatecontrol_enable_cooling: sceneCommandStr = "CLIMATE_COOLING"; break;
+      case scene_cmd_climatecontrol_mode_heating: sceneCommandStr = "CLIMATE_HEATING"; break;
+      case scene_cmd_climatecontrol_mode_cooling: sceneCommandStr = "CLIMATE_COOLING"; break;
+      case scene_cmd_climatecontrol_mode_passive_cooling: sceneCommandStr = "CLIMATE_PASSIVE_COOLING"; break;
       default: break; // not implemented, ignore for now
     }
     // send scene command message
@@ -993,6 +997,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
   }
+  #if ENABLE_FCU_SUPPORT
   else if (outputType=="fancoilunit") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
     controlValues = true; // fan coil unit usually needs control values
@@ -1027,6 +1032,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     vb->setHardwareName(hardwareName);
     addBehaviour(vb);
   }
+  #endif // ENABLE_FCU_SUPPORT
   else if (outputType=="shadow") {
     if (defaultGroup==group_undefined) defaultGroup = group_grey_shadow;
     // - use shadow scene settings

@@ -172,6 +172,15 @@ Device::~Device()
 }
 
 
+DsZoneID Device::getZoneID()
+{
+  if (deviceSettings) {
+    return deviceSettings->zoneID;
+  }
+  return 0; // not assigned to a zone
+}
+
+
 string Device::vendorName()
 {
   // default to same vendor as class container
@@ -409,7 +418,8 @@ static const char *modelFeatureNames[numModelFeatures] = {
   "umvrelay",
   "blinkconfig",
   "umroutmode",
-  "fcu"
+  "fcu",
+  "extendedvalvetypes"
 };
 
 
@@ -1672,7 +1682,7 @@ const int numDeviceProperties = numDeviceFieldKeys+3*numBehaviourArrays;
 
 
 
-static char device_key;
+static char device_obj;
 static char device_output_key;
 
 static char device_buttons_key;
@@ -1728,12 +1738,12 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
   // device level properties
   static const PropertyDescription properties[numDeviceProperties] = {
     // common device properties
-    { "primaryGroup", apivalue_uint64, colorClass_key, OKEY(device_key) },
-    { "zoneID", apivalue_uint64, zoneID_key, OKEY(device_key) },
-    { "progMode", apivalue_bool, progMode_key, OKEY(device_key) },
-    { "implementationId", apivalue_string, implementationId_key, OKEY(device_key) },
-    { "x-p44-softwareRemovable", apivalue_bool, softwareRemovable_key, OKEY(device_key) },
-    { "x-p44-teachInSignals", apivalue_int64, teachinSignals_key, OKEY(device_key) },
+    { "primaryGroup", apivalue_uint64, colorClass_key, OKEY(device_obj) },
+    { "zoneID", apivalue_uint64, zoneID_key, OKEY(device_obj) },
+    { "progMode", apivalue_bool, progMode_key, OKEY(device_obj) },
+    { "implementationId", apivalue_string, implementationId_key, OKEY(device_obj) },
+    { "x-p44-softwareRemovable", apivalue_bool, softwareRemovable_key, OKEY(device_obj) },
+    { "x-p44-teachInSignals", apivalue_int64, teachinSignals_key, OKEY(device_obj) },
     // the behaviour arrays
     // Note: the prefixes for xxxDescriptions, xxxSettings and xxxStates must match
     //   getTypeName() of the behaviours.
@@ -1755,15 +1765,15 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     { "outputState", apivalue_object, states_key_offset, OKEY(device_output_key) },
     // the scenes array
     { "scenes", apivalue_object+propflag_container, scenes_key, OKEY(device_scenes_key) },
-    { "undoState", apivalue_object, undoState_key, OKEY(device_key) },
+    { "undoState", apivalue_object, undoState_key, OKEY(device_obj) },
     // the modelFeatures (row from former dSS visibility matrix, controlling what is shown in the UI)
     { "modelFeatures", apivalue_object+propflag_container, modelFeatures_key, OKEY(device_modelFeatures_key) },
     // the current and possible configurations for the device (button two-way vs. 2 one-way etc.)
     { "configurationDescriptions", apivalue_object+propflag_container+propflag_needsreadprep, configurationDescriptions_key, OKEY(device_configurations_key) },
-    { "configurationId", apivalue_string, configurationId_key, OKEY(device_key) },
+    { "configurationId", apivalue_string, configurationId_key, OKEY(device_obj) },
     // device class
-    { "deviceClass", apivalue_string, deviceClass_key, OKEY(device_key) },
-    { "deviceClassVersion", apivalue_uint64, deviceClassVersion_key, OKEY(device_key) }
+    { "deviceClass", apivalue_string, deviceClass_key, OKEY(device_obj) },
+    { "deviceClassVersion", apivalue_uint64, deviceClassVersion_key, OKEY(device_obj) }
   };
   // C++ object manages different levels, check aParentDescriptor
   if (aParentDescriptor->isRootOfObject()) {
@@ -1903,7 +1913,7 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aProperty
   else if (aPropertyDescriptor->hasObjectKey(device_configurations_key)) {
     return cachedConfigurations[aPropertyDescriptor->fieldKey()];
   }
-  else if (aPropertyDescriptor->hasObjectKey(device_key)) {
+  else if (aPropertyDescriptor->hasObjectKey(device_obj)) {
     // device level object properties
     if (aPropertyDescriptor->fieldKey()==undoState_key) {
       return previousState;
@@ -1936,15 +1946,15 @@ void Device::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPrope
 
 bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
-  if (aPropertyDescriptor->hasObjectKey(device_key)) {
+  if (aPropertyDescriptor->hasObjectKey(device_obj)) {
     // Device level field properties
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case colorClass_key:
-          aPropValue->setUint16Value(colorClass); return true;
+          aPropValue->setUint16Value(getColorClass()); return true;
         case zoneID_key:
-          if (deviceSettings) { aPropValue->setUint16Value(deviceSettings->zoneID); } return true;
+          aPropValue->setUint16Value(getZoneID()); return true;
         case progMode_key:
           aPropValue->setBoolValue(progMode); return true;
         case implementationId_key:
@@ -1967,7 +1977,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
       switch (aPropertyDescriptor->fieldKey()) {
         case zoneID_key:
           if (deviceSettings) {
-            deviceSettings->setPVar(deviceSettings->zoneID, aPropValue->int32Value());
+            deviceSettings->setPVar(deviceSettings->zoneID, (DsZoneID)aPropValue->int32Value());
           }
           return true;
         case progMode_key:

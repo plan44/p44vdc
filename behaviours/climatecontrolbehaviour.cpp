@@ -46,7 +46,7 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
     case CLIMATE_HEAT_TEMP_NOTUSED:
     case CLIMATE_HEAT_TEMP_NIGHT:
     case CLIMATE_HEAT_TEMP_HOLIDAY:
-      sceneCmd = scene_cmd_climatecontrol_enable_heating;
+      sceneCmd = scene_cmd_climatecontrol_mode_heating;
       sceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_COOL_TEMP_OFF:
@@ -55,7 +55,12 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
     case CLIMATE_COOL_TEMP_NOTUSED:
     case CLIMATE_COOL_TEMP_NIGHT:
     case CLIMATE_COOL_TEMP_HOLIDAY:
-      sceneCmd = scene_cmd_climatecontrol_enable_cooling;
+      sceneCmd = scene_cmd_climatecontrol_mode_cooling;
+      sceneArea = 0; // not an area scene any more
+      break;
+    case CLIMATE_COOL_PASSIVE_ON:
+    case CLIMATE_COOL_PASSIVE_OFF:
+      sceneCmd = scene_cmd_climatecontrol_mode_passive_cooling;
       sceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_ENABLE:
@@ -95,6 +100,9 @@ DsScenePtr ClimateDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 
 // MARK: ===== FanCoilUnitScene (specific for FCU behaviour)
+
+#if ENABLE_FCU_SUPPORT
+
 
 FanCoilUnitScene::FanCoilUnitScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo),
@@ -241,7 +249,7 @@ DsScenePtr FanCoilUnitDeviceSettings::newDefaultScene(SceneNo aSceneNo)
   return fcuControlScene;
 }
 
-
+#endif // ENABLE_FCU_SUPPORT
 
 
 
@@ -269,6 +277,7 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
     powerLevel = ChannelBehaviourPtr(new PowerLevelChannel(*this));
     addChannel(powerLevel);
   }
+  #if ENABLE_FCU_SUPPORT
   else if (climateDeviceKind==climatedevice_fancoilunit) {
     // power state is the main channel
     powerState = FlagChannelPtr(new FcuPowerStateChannel(*this));
@@ -277,6 +286,7 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
     operationMode = IndexChannelPtr(new FcuOperationModeChannel(*this));
     addChannel(operationMode);
   }
+  #endif // ENABLE_FCU_SUPPORT
 }
 
 
@@ -358,6 +368,8 @@ Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_valvetype:
       // only for heating valve devices
       return climateDeviceKind==climatedevice_simple ? yes : no;
+    case modelFeature_outmodegeneric:
+      return no;
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
@@ -367,6 +379,7 @@ Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 
 void ClimateControlBehaviour::loadChannelsFromScene(DsScenePtr aScene)
 {
+  #if ENABLE_FCU_SUPPORT
   FanCoilUnitScenePtr fcuScene = boost::dynamic_pointer_cast<FanCoilUnitScene>(aScene);
   if (fcuScene) {
     // power state
@@ -374,6 +387,7 @@ void ClimateControlBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     // operation mode
     operationMode->setChannelValueIfNotDontCare(aScene, fcuScene->operationMode, 0, 0, true);
   }
+  #endif // ENABLE_FCU_SUPPORT
   ClimateControlScenePtr valveScene = boost::dynamic_pointer_cast<ClimateControlScene>(aScene);
   if (valveScene) {
     // heating level
@@ -384,6 +398,7 @@ void ClimateControlBehaviour::loadChannelsFromScene(DsScenePtr aScene)
 
 void ClimateControlBehaviour::saveChannelsToScene(DsScenePtr aScene)
 {
+  #if ENABLE_FCU_SUPPORT
   FanCoilUnitScenePtr fcuScene = boost::dynamic_pointer_cast<FanCoilUnitScene>(aScene);
   if (fcuScene) {
     // power state
@@ -393,6 +408,7 @@ void ClimateControlBehaviour::saveChannelsToScene(DsScenePtr aScene)
     fcuScene->setPVar(fcuScene->operationMode, (FcuOperationMode)operationMode->getChannelValue());
     fcuScene->setSceneValueFlags(operationMode->getChannelIndex(), valueflags_dontCare, false);
   }
+  #endif // ENABLE_FCU_SUPPORT
   ClimateControlScenePtr valveScene = boost::dynamic_pointer_cast<ClimateControlScene>(aScene);
   if (valveScene) {
     // heating level
@@ -424,12 +440,13 @@ bool ClimateControlBehaviour::applyScene(DsScenePtr aScene)
         // valve prophylaxis
         runProphylaxis = true;
         return true;
-      case scene_cmd_climatecontrol_enable_heating:
+      case scene_cmd_climatecontrol_mode_heating:
         // switch to heating mode
         climateModeHeating = true;
         return true;
-      case scene_cmd_climatecontrol_enable_cooling:
-        // switch to cooling mode
+      case scene_cmd_climatecontrol_mode_cooling:
+      case scene_cmd_climatecontrol_mode_passive_cooling:
+        // switch to cooling mode (active or passive)
         climateModeHeating = false;
         return true;
       default:
@@ -507,6 +524,13 @@ void ClimateControlBehaviour::bindToStatement(sqlite3pp::statement &aStatement, 
 
 static char climatecontrol_key;
 
+// description properties
+
+enum {
+  activeCoolingMode_key,
+  numDescProperties
+};
+
 // settings properties
 
 enum {
@@ -515,6 +539,19 @@ enum {
   numSettingsProperties
 };
 
+
+int ClimateControlBehaviour::numDescProps() { return inherited::numDescProps()+numDescProperties; }
+const PropertyDescriptorPtr ClimateControlBehaviour::getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
+{
+    static const PropertyDescription properties[numDescProperties] = {
+      { "activeCoolingMode", apivalue_bool, activeCoolingMode_key+descriptions_key_offset, OKEY(climatecontrol_key) },
+    };
+    int n = inherited::numDescProps();
+    if (aPropIndex<n)
+      return inherited::getDescDescriptorByIndex(aPropIndex, aParentDescriptor);
+    aPropIndex -= n;
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+}
 
 int ClimateControlBehaviour::numSettingsProps() { return inherited::numSettingsProps()+numSettingsProperties; }
 const PropertyDescriptorPtr ClimateControlBehaviour::getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
@@ -539,17 +576,29 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
+        // Description properties
+        case activeCoolingMode_key+descriptions_key_offset:
+          aPropValue->setBoolValue(climateDeviceKind==climatedevice_fancoilunit); // FCUs can cool actively
+          return true;
         // Settings properties
-        case heatingSystemCapability_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemCapability); return true;
-        case heatingSystemType_key+settings_key_offset: aPropValue->setUint8Value(heatingSystemType); return true;
+        case heatingSystemCapability_key+settings_key_offset:
+          aPropValue->setUint8Value(heatingSystemCapability);
+          return true;
+        case heatingSystemType_key+settings_key_offset:
+          aPropValue->setUint8Value(heatingSystemType);
+          return true;
       }
     }
     else {
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
-        case heatingSystemCapability_key+settings_key_offset: setPVar(heatingSystemCapability, (VdcHeatingSystemCapability)aPropValue->uint8Value()); return true;
-        case heatingSystemType_key+settings_key_offset: setPVar(heatingSystemType, (VdcHeatingSystemType)aPropValue->uint8Value()); return true;
+        case heatingSystemCapability_key+settings_key_offset:
+          setPVar(heatingSystemCapability, (VdcHeatingSystemCapability)aPropValue->uint8Value());
+          return true;
+        case heatingSystemType_key+settings_key_offset:
+          setPVar(heatingSystemType, (VdcHeatingSystemType)aPropValue->uint8Value());
+          return true;
       }
     }
   }

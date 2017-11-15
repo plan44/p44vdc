@@ -105,11 +105,6 @@ namespace p44 {
     /// @param aPrevious if set, the previous value is returned
     int32_t getInt32Value(bool aAsInternal = false, bool aPrevious = false);
 
-
-    /// get the name
-    /// @return the name
-    string getName() { return valueName; };
-
     /// @}
 
     /// Setting state and state parameter value to allow query via API and property pushing
@@ -231,7 +226,7 @@ namespace p44 {
 
 
   /// parameter descriptor subclass for numeric parameters, describing parameter via min/max/resolution
-  class NumericValueDescriptor P44_FINAL : public ValueDescriptor
+  class NumericValueDescriptor : public ValueDescriptor
   {
     typedef ValueDescriptor inherited;
 
@@ -247,23 +242,26 @@ namespace p44 {
     NumericValueDescriptor(const string aName, VdcValueType aValueType, ValueUnit aValueUnit, double aMin, double aMax, double aResolution, bool aHasDefault = false, double aDefaultValue = 0) :
       inherited(aName, aValueType, aValueUnit, aHasDefault), min(aMin), max(aMax), resolution(aResolution), value(aDefaultValue) {};
 
-    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_FINAL P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_FINAL P44_OVERRIDE;
 
-    virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
-    virtual bool updateDoubleValue(double aValue, double aMinChange = -1) P44_OVERRIDE;
+    virtual bool setDoubleValue(double aValue) P44_FINAL P44_OVERRIDE;
+    virtual bool updateDoubleValue(double aValue, double aMinChange = -1) P44_FINAL P44_OVERRIDE;
 
-    virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
+    virtual bool setInt32Value(int32_t aValue) P44_FINAL P44_OVERRIDE;
+
+    void setMinValue(double aValue) { min = aValue; }
+    void setMaxValue(double aValue) { max = aValue; }
 
   protected:
 
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_FINAL P44_OVERRIDE;
 
   };
 
 
   /// parameter descriptor subclass for text parameters
-  class TextValueDescriptor P44_FINAL : public ValueDescriptor
+  class TextValueDescriptor : public ValueDescriptor
   {
     typedef ValueDescriptor inherited;
 
@@ -276,16 +274,16 @@ namespace p44 {
     TextValueDescriptor(const string aName, bool aHasDefault = false, const string aDefaultValue = "") :
       inherited(aName, valueType_string, valueUnit_none, aHasDefault), value(aDefaultValue) {};
 
-    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_FINAL P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_FINAL P44_OVERRIDE;
 
-    virtual bool setStringValue(const string aValue) P44_OVERRIDE;
+    virtual bool setStringValue(const string aValue) P44_FINAL P44_OVERRIDE;
     
   };
 
 
   /// parameter descriptor subclass for enumeration parameters, describing parameter via a list of possible values
-  class EnumValueDescriptor P44_FINAL : public ValueDescriptor
+  class EnumValueDescriptor : public ValueDescriptor
   {
     typedef ValueDescriptor inherited;
 
@@ -308,20 +306,20 @@ namespace p44 {
     /// @param aIsDefault if set, this is considered the default value
     void addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault = false);
 
-    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_OVERRIDE;
-    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_OVERRIDE;
+    virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_FINAL P44_OVERRIDE;
+    virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_FINAL P44_OVERRIDE;
 
-    virtual bool setInt32Value(int32_t aValue) P44_OVERRIDE;
-    virtual bool setDoubleValue(double aValue) P44_OVERRIDE;
-    virtual bool setStringValue(const string aValue) P44_OVERRIDE;
+    virtual bool setInt32Value(int32_t aValue) P44_FINAL P44_OVERRIDE;
+    virtual bool setDoubleValue(double aValue) P44_FINAL P44_OVERRIDE;
+    virtual bool setStringValue(const string aValue) P44_FINAL P44_OVERRIDE;
     bool setStringValueCaseInsensitive(const string& aValue);
 
   protected:
 
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_FINAL P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<EnumValueDescriptor> EnumValueDescriptorPtr;
@@ -385,6 +383,9 @@ namespace p44 {
 
     /// get id
     string getId() { return actionId; };
+
+    /// get action title
+    string getActionTitle() { return actionTitle; };
 
     /// add parameter
     /// @param aValueDesc a value descriptor object.
@@ -475,6 +476,11 @@ namespace p44 {
 
   public:
 
+    /// compare existing actions with the list, get actions to remove and actions to add or change
+    /// @note action has changed when action title changed
+    /// @param aActions current set of actions
+    void updateDynamicActions(ActionsVector &aActions);
+
     /// add or update a dynamic action.
     /// @note If device is announced with a vDC API client (vdSM), the changed action description will be pushed)
     /// @param aAction the action to add (if its actionId is new) or update (if its actionId already exists)
@@ -489,6 +495,13 @@ namespace p44 {
     virtual void addToModelUIDHash(string &aHashedString);
 
   private:
+
+    static bool compareById(DeviceActionPtr aActionL, DeviceActionPtr aActionR) { return (aActionL->getId() < aActionR->getId()); }
+    static bool compareByIdAndTitle(DeviceActionPtr aActionL, DeviceActionPtr aActionR) {
+      return (aActionL->getId() == aActionR->getId()) ? (aActionL->getActionTitle() < aActionR->getActionTitle()) : (aActionL->getId() < aActionR->getId()); }
+
+    void removeDynamicActionsExcept(ActionsVector &aActions);
+    void addOrUpdateDynamicActions(ActionsVector &aActions);
 
     bool removeActionInternal(DeviceActionPtr aAction);
     bool pushActionChange(DeviceActionPtr aAction, bool aRemoved);
@@ -1050,6 +1063,13 @@ namespace p44 {
     /// @note other params see DynamicDeviceAction constructor
     /// @return ok or parsing error
     virtual ErrorPtr dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle);
+
+    /// creates a device action parameter
+    /// @param aParameter will be assigned the new dynamic action
+    /// @param aJSONConfig JSON config object for an action parameter.
+    /// @param aParamName name of the parameter
+    /// @return ok or parsing error
+    virtual ErrorPtr parameterFromJSON(ValueDescriptorPtr &aParameter, JsonObjectPtr aJSONConfig, const string aParamName);
 
     /// creates a device state
     /// @param aState will be assigned the new state

@@ -40,6 +40,8 @@ namespace p44 {
     friend class Device;
     friend class VdcHost; // for local mode
 
+  public:
+
     typedef enum {
       statemachine_standard, ///< digitalSTROM standard button state machine
       statemachine_simple, ///< no dimming, only tips, tolerant to missing a pressed/released event sometimes
@@ -121,6 +123,9 @@ namespace p44 {
 
     /// set function
     virtual void setFunction(DsButtonFunc aFunc) { setPVar(buttonFunc, aFunc); };
+
+    /// set state machine mode
+    void setStateMachineMode(ButtonStateMachineMode aStateMachineMode) { stateMachineMode = aStateMachineMode; }
 
 
     /// @name interface towards actual device hardware (or simulation)

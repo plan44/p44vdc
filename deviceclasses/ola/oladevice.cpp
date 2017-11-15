@@ -134,14 +134,14 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
         // also has position, use moving light behaviour
         installSettings(DeviceSettingsPtr(new MovingLightDeviceSettings(*this)));
         // - add moving color light behaviour
-        MovingLightBehaviourPtr ml = MovingLightBehaviourPtr(new MovingLightBehaviour(*this));
+        MovingLightBehaviourPtr ml = MovingLightBehaviourPtr(new MovingLightBehaviour(*this, false));
         addBehaviour(ml);
       }
       else {
         // just color light settings, which include a color scene table
         installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
         // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
-        RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this));
+        RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
         addBehaviour(l);
       }
     }

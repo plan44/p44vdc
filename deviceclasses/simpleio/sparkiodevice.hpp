@@ -46,7 +46,7 @@ namespace p44 {
     typedef IndexChannel inherited;
 
   public:
-    SparkModeChannel(OutputBehaviour &aOutput) : inherited(aOutput,"sparkMode") { setNumIndices(3); };
+    SparkModeChannel(OutputBehaviour &aOutput) : inherited(aOutput,"sparkMode") { setNumIndices(4); };
 
     virtual DsChannelType getChannelType() { return channeltype_sparkmode; }; ///< custom device-specific channel
     virtual const char *getName() { return "x-p44-sparkmode"; };
@@ -217,7 +217,7 @@ namespace p44 {
     virtual string hardwareGUID() { return string_format("sparkcoreid:%s", sparkCoreID.c_str()); }
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
-    virtual string vendorId() { return "vendorname:particle.io"; };
+    virtual string vendorName() { return "particle.io"; };
 
     /// @}
 

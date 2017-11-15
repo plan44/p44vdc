@@ -102,7 +102,7 @@ string ButtonBehaviour::getAutoId()
 
 void ButtonBehaviour::buttonAction(bool aPressed)
 {
-  BLOG(LOG_NOTICE, "Button[%zu] %s '%s' was %s", index, behaviourId.c_str(), hardwareName.c_str(), aPressed ? "pressed" : "released");
+  BLOG(LOG_NOTICE, "Button[%zu] %s '%s' was %s", index, behaviourId.c_str(), getHardwareName().c_str(), aPressed ? "pressed" : "released");
   bool stateChanged = aPressed!=buttonPressed;
   buttonPressed = aPressed; // remember new state
   // check which statemachine to use
@@ -467,7 +467,7 @@ VdcDimMode ButtonBehaviour::twoWayDirection()
 
 void ButtonBehaviour::localSwitchOutput()
 {
-  BLOG(LOG_NOTICE, "Button[%zu] '%s': Local switch", index, hardwareName.c_str());
+  BLOG(LOG_NOTICE, "Button[%zu] '%s': Local switch", index, getHardwareName().c_str());
   int dir = twoWayDirection();
   if (dir==0) {
     // single button, toggle
@@ -488,7 +488,7 @@ void ButtonBehaviour::localSwitchOutput()
 
 void ButtonBehaviour::localDim(bool aStart)
 {
-  BLOG(LOG_NOTICE, "Button[%zu] %s '%s': Local dim %s", index, behaviourId.c_str(), hardwareName.c_str(), aStart ? "START" : "STOP");
+  BLOG(LOG_NOTICE, "Button[%zu] %s '%s': Local dim %s", index, behaviourId.c_str(), getHardwareName().c_str(), aStart ? "START" : "STOP");
   ChannelBehaviourPtr channel = device.getChannelByIndex(0); // default channel
   if (channel) {
     if (aStart) {
@@ -527,7 +527,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     // button press not consumed on global level, forward to upstream dS
     BLOG(LOG_NOTICE,
       "Button[%zu] '%s' pushes value = %d, clickType %d",
-      index, hardwareName.c_str(), buttonPressed, aClickType
+      index, getHardwareName().c_str(), buttonPressed, aClickType
     );
     // issue a state property push
     pushBehaviourState();
@@ -551,7 +551,7 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
   actionId = aActionId;
   BLOG(LOG_NOTICE,
     "Button[%zu] %s '%s' pushes actionMode = %d, actionId %d",
-    index, behaviourId.c_str(), hardwareName.c_str(), actionMode, actionId
+    index, behaviourId.c_str(), getHardwareName().c_str(), actionMode, actionId
   );
   // issue a state property push
   pushBehaviourState();

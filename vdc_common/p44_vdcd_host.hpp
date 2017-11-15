@@ -123,16 +123,19 @@ namespace p44 {
     MLTicket learnIdentifyTicket;
     JsonCommPtr learnIdentifyRequest;
 
+    SocketCommPtr configApiServer; ///< JSON API for web interface
+
   public:
 
     int webUiPort; ///< port number of the web-UI (on the same host). 0 if no Web-UI present
 
-    P44VdcHost();
+    P44VdcHost(bool aWithLocalController = false);
 
-    /// JSON API for web interface
-    SocketCommPtr configApiServer;
-
-    void startConfigApi();
+    /// enable config API
+    /// @param aServiceOrPort port number or service string
+    /// @param aNonLocalAllowed if set, non-local clients are allowed to connect to the config API
+    /// @note API server will be started only at initialize()
+    void enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed);
 
 		/// perform self testing
     /// @param aCompletedCB will be called when the entire self test is done
@@ -143,6 +146,11 @@ namespace p44 {
 
     /// @return URL for Web-UI (for access from local LAN)
     virtual string webuiURLString();
+
+    /// initialize
+    /// @param aCompletedCB will be called when the entire container is initialized or has been aborted with a fatal error
+    /// @param aFactoryReset if set, database will be reset
+    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset);
 
   private:
 

@@ -160,8 +160,14 @@ namespace p44 {
   #define CO_READY 0x04 // informs about controller readyness state
   #define CO_EVENT_SECUREDEVICES 0x05 // informs about secure device related events
 
-
-
+  // ESP3: Smart ack learn response, confirm codes
+  #define SA_RESPONSECODE_LEARNED 0x00 // learned in
+  #define SA_RESPONSECODE_UNKNOWNEEP 0x11 // EEP not known, learn-in rejected
+  #define SA_RESPONSECODE_NOMAILBOX 0x12 // No mailbox available, learn-in rejected
+  #define SA_RESPONSECODE_NOMEM 0x13 // No memory for new device available, learn-in rejected
+  #define SA_RESPONSECODE_BADRSSI 0x14 // RSSI not good enough, learn-in rejected
+  #define SA_RESPONSECODE_REMOVED 0x20 // learned out
+  #define SA_RESPONSECODE_NOTSUPP 0xFF // function not supported
 
   /// Enocean Manufacturer number (11 bits)
   typedef uint16_t EnoceanManufacturer;
@@ -517,6 +523,10 @@ namespace p44 {
     /// @param aTimeout smart ack learn timeout
     void smartAckLearnMode(bool aEnabled, MLMicroSeconds aTimeout);
 
+    /// send response to learn request (SA_CONFIRM_LEARN)
+    /// @param aConfirmCode confirm code, see SA_RESPONSECODE_xxx
+    /// @param aResponseTime for learn-in (SA_RESPONSECODE_LEARNED), how fast the mailbox will be ready for device to claim it
+    void smartAckRespondToLearn(uint8_t aConfirmCode, MLMicroSeconds aResponseTime = 0);
 
   protected:
 

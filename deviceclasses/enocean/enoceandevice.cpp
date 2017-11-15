@@ -455,9 +455,9 @@ void EnoceanDevice::switchProfiles(const ProfileVariantEntry &aFromVariant, cons
       hasNameOrZone = true;
       newDev->initializeName(getAssignedName());
     }
-    if (newDev->deviceSettings && deviceSettings && deviceSettings->zoneID!=0) {
+    if (newDev->deviceSettings && getZoneID()!=0) {
       hasNameOrZone = true;
-      newDev->deviceSettings->zoneID = deviceSettings->zoneID;
+      newDev->deviceSettings->zoneID = getZoneID();
     }
     // - add it to the container
     getEnoceanVdc().addAndRememberDevice(newDev);
@@ -591,7 +591,7 @@ EnoceanDevicePtr EnoceanDevice::newDevice(
 }
 
 
-int EnoceanDevice::createDevicesFromEEP(EnoceanVdc *aVdcP, EnoceanAddress aAddress, EnoceanProfile aProfile, EnoceanManufacturer aManufacturer)
+int EnoceanDevice::createDevicesFromEEP(EnoceanVdc *aVdcP, EnoceanAddress aAddress, EnoceanProfile aProfile, EnoceanManufacturer aManufacturer, bool aSmartAck)
 {
   EnoceanSubDevice subDeviceIndex = 0; // start at index zero
   int numDevices = 0; // number of devices
@@ -602,7 +602,7 @@ int EnoceanDevice::createDevicesFromEEP(EnoceanVdc *aVdcP, EnoceanAddress aAddre
       aAddress,
       subDeviceIndex, // index to create a device for
       aProfile, aManufacturer,
-      subDeviceIndex==0 // allow sending teach-in response for first subdevice only
+      subDeviceIndex==0 && !aSmartAck // allow sending teach-in response for first subdevice only, and only if not smartAck
     );
     if (!newDev) {
       // could not create a device for subDeviceIndex
