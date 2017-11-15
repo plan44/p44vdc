@@ -1,0 +1,277 @@
+//
+//  Copyright (c) 2017 digitalSTROM.org, Zurich, Switzerland
+//
+//  Author: Krystian Heberlein <krystian.heberlein@digitalstrom.com>
+//
+//  This file is part of p44vdc.
+//
+//  p44vdc is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  p44vdc is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
+//
+
+#include "netatmodevice.hpp"
+
+
+#if ENABLE_NETATMO
+
+using namespace p44;
+
+
+// MARK: ===== NetatmoDevice
+
+enum class NetatmoDevice::StatusTrend {
+    rising,
+    steady,
+    sinking,
+    _num
+};
+
+
+NetatmoDevice::NetatmoDevice(NetatmoVdc *aVdcP, INetatmoComm& aINetatmoComm, JsonObjectPtr aDeviceData, VdcUsageHint aUsageArea, const string& aBaseStationId) :
+  inherited(aVdcP),
+  usageArea(aUsageArea),
+  baseStationId(aBaseStationId)
+{
+  setIdentificationData(aDeviceData);
+
+  setColorClass(class_white_singledevices);
+  installSettings(DeviceSettingsPtr(new NetatmoDeviceSettings(*this)));
+  // - set a action output behaviour (no classic output properties and channels)
+  OutputBehaviourPtr ab = OutputBehaviourPtr(new ActionOutputBehaviour(*this));
+  ab->setGroupMembership(group_undefined, true);
+  addBehaviour(ab);
+
+  cbConnection = aINetatmoComm.registerCallback([=](auto...params){ this->updateData(params...); });
+
+}
+
+
+NetatmoDevice::~NetatmoDevice()
+{
+  cbConnection.disconnect();
+}
+
+
+void NetatmoDevice::setIdentificationData(JsonObjectPtr aJson)
+{
+  if (aJson) {
+    if (auto idJson = aJson->get("_id")) {
+      netatmoId = idJson->stringValue();
+    }
+
+    if (auto nameJson = aJson->get("module_name")) {
+      netatmoName = nameJson->stringValue();
+      initializeName(netatmoName);
+    }
+
+    if (auto fwJson = aJson->get("firmware")) {
+      netatmoFw = fwJson->stringValue();
+    }
+  }
+}
+
+void NetatmoDevice::updateData(JsonObjectPtr aJson)
+{
+  /* FIXME: missing measurementTimestamp, statusTempTrend*/
+  if (aJson) {
+    if (auto swVersionJson = aJson->get("firmware")) {
+      swVersion->setStringValue(swVersionJson->stringValue());
+    }
+
+    if (auto dashBoardData = aJson->get("dashboard_data")) {
+      if (auto tempJson = dashBoardData->get("Temperature")) {
+        sensorTemperature->updateSensorValue(tempJson->doubleValue());
+      }
+
+      if (auto humidityJson = dashBoardData->get("Humidity")) {
+        sensorHumidity->updateSensorValue(humidityJson->doubleValue());
+      }
+    }
+  }
+}
+
+
+JsonObjectPtr NetatmoDevice::findDeviceJson(JsonObjectPtr aJsonArray, const string& aDeviceId)
+{
+  if (aJsonArray) {
+    for (int index=0; auto device = aJsonArray->arrayGet(index); index++) {
+      if (auto id = device->get("_id")) {
+        if (id->stringValue() == aDeviceId) return device;
+      }
+    }
+  }
+  return nullptr;
+}
+
+
+JsonObjectPtr NetatmoDevice::findModuleJson(JsonObjectPtr aJsonArray)
+{
+
+  if (auto baseStationDevice = findDeviceJson(aJsonArray, baseStationId)) {
+    if (auto modules = baseStationDevice->get("modules")) {
+      if (auto module = findDeviceJson(modules, netatmoId)) return module;
+    }
+  }
+  return nullptr;
+}
+
+
+void NetatmoDevice::configureDevice()
+{
+
+  swVersion = ValueDescriptorPtr(new TextValueDescriptor("SwVersion"));
+  deviceProperties->addProperty(swVersion, true);
+
+  measurementTimestamp = ValueDescriptorPtr(new TextValueDescriptor("MeasurementTimestamp"));
+  deviceProperties->addProperty(measurementTimestamp, true);
+
+  sensorTemperature = SensorBehaviourPtr(new SensorBehaviour(*this, "SensorTemperature"));
+  sensorTemperature->setHardwareSensorConfig(sensorType_temperature, usageArea, -40, 65, 0.1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
+  sensorTemperature->setSensorNameWithRange("Temperature");
+  addBehaviour(sensorTemperature);
+
+  sensorHumidity = SensorBehaviourPtr(new SensorBehaviour(*this, "SensorHumidity"));
+  sensorHumidity->setHardwareSensorConfig(sensorType_humidity, usageArea, 0, 100, 1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
+  sensorHumidity->setSensorNameWithRange("Humidity");
+  sensorHumidity->setGroup(group_undefined);
+  addBehaviour(sensorHumidity);
+
+  EnumValueDescriptorPtr tempTrendEnum = createTrendEnum("StatusTempTrend");
+  statusTempTrend = DeviceStatePtr(new DeviceState(
+      *this, "StatusTempTrend", "Temperature trend", tempTrendEnum, [](auto...){}
+  ));
+  deviceStates->addState(statusTempTrend);
+
+  // derive the dSUID
+  deriveDsUid();
+}
+
+
+SensorBehaviourPtr NetatmoDevice::createSensorCO2()
+{
+  auto sensorCO2 = SensorBehaviourPtr(new SensorBehaviour(*this, "SensorCO2"));
+  sensorCO2->setHardwareSensorConfig(sensorType_gas_CO2, usageArea, 0, 5000, 1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
+  sensorCO2->setSensorNameWithRange("CO2 Concentration");
+  return sensorCO2;
+}
+
+
+SensorBehaviourPtr NetatmoDevice::createSensorNoise()
+{
+  auto sensorNoise = SensorBehaviourPtr(new SensorBehaviour(*this, "SensorNoise"));
+  sensorNoise->setHardwareSensorConfig(sensorType_sound_volume, usageArea, 35, 120, 1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
+  sensorNoise->setSensorNameWithRange("Noise");
+  return sensorNoise;
+}
+
+
+BinaryInputBehaviourPtr NetatmoDevice::createStatusBattery()
+{
+  auto battery = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"StatusBattery"));
+  battery->setHardwareInputConfig(binInpType_lowBattery, usageArea, true, Never);
+  battery->setGroup(group_black_variable);
+  battery->setHardwareName("Battery");
+  return battery;
+}
+
+EnumValueDescriptorPtr NetatmoDevice::createTrendEnum(const string& aName)
+{
+  EnumValueDescriptorPtr trendEnum = new EnumValueDescriptor(aName);
+  trendEnum->addEnum("rising", static_cast<int>(StatusTrend::rising));
+  trendEnum->addEnum("steady", static_cast<int>(StatusTrend::steady));
+  trendEnum->addEnum("sinking", static_cast<int>(StatusTrend::sinking));
+  return trendEnum;
+}
+
+
+void NetatmoDevice::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
+{
+  ALOG(LOG_INFO, "- stateChanged: %s changed from '%s' to '%s'",
+      aChangedState->getId().c_str(),
+      aChangedState->value()->getStringValue(false, true).c_str(),
+      aChangedState->value()->getStringValue(false, false).c_str()
+  );
+}
+
+
+bool NetatmoDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+{
+  configureDevice();
+  // Note: not using instant identification here, because we eventually need API calls here.
+  identificationOK(aIdentifyCB);
+  return false; // not complete, callback signals identification complete
+}
+
+
+NetatmoVdc &NetatmoDevice::netatmoVdc()
+{
+  return *(static_cast<NetatmoVdc *>(vdcP));
+}
+
+
+
+void NetatmoDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
+{
+  if (aCompletedCB) aCompletedCB(Error::ok());
+}
+
+
+string NetatmoDevice::hardwareGUID()
+{
+  return string_format("netatmoDeviceId:%s", netatmoId.c_str());
+}
+
+
+string NetatmoDevice::modelVersion()
+{
+  return netatmoFw;
+}
+
+
+string NetatmoDevice::vendorName()
+{
+  return "Netatmo";
+}
+
+
+void NetatmoDevice::checkPresence(PresenceCB aPresenceResultHandler)
+{
+  // TODO
+  if (aPresenceResultHandler) aPresenceResultHandler(true);
+}
+
+
+void NetatmoDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
+{
+ // TODO
+}
+
+
+void NetatmoDevice::deriveDsUid()
+{
+  // vDC implementation specific UUID:
+  DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
+  string s = "netatmodevice::";
+  s += netatmoId;
+  dSUID.setNameInSpace(s, vdcNamespace);
+}
+
+
+string NetatmoDevice::description()
+{
+  return string_format("\n- device model: %s, device id: %s", modelName().c_str(), netatmoId.c_str());
+}
+
+
+#endif // ENABLE_NETATMO
+
