@@ -20,8 +20,12 @@
 //
 
 #include "homeconnectdevicedishwasher.hpp"
+#include "homeconnectaction.hpp"
 
 #if ENABLE_HOMECONNECT
+
+#include "homeconnectaction.hpp"
+#include <ctime>
 
 namespace p44 {
 
@@ -41,6 +45,9 @@ HomeConnectDeviceDishWasher::~HomeConnectDeviceDishWasher()
 
 bool HomeConnectDeviceDishWasher::configureDevice()
 {
+  bool ret = inherited::configureDevice();
+
+  addProgramNameProperty();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = true;
@@ -75,8 +82,28 @@ bool HomeConnectDeviceDishWasher::configureDevice()
   psConfig.hasStandby = false;
   configurePowerState(psConfig);
 
+  // configure program status properties
+  ProgramStatusConfiguration progStatusConfig = { 0 };
+  progStatusConfig.hasElapsedTime = false;
+  progStatusConfig.hasRemainingTime = true;
+  progStatusConfig.hasProgres = true;
+  configureProgramStatus(progStatusConfig);
+
+  EventConfiguration eventConfig = { 0 };
+  eventConfig.hasAlarmClockElapsed = false;
+  eventConfig.hasLocallyOperated = false;
+  eventConfig.hasProgramAborted = true;
+  eventConfig.hasProgramFinished = true;
+  eventConfig.hasProgramStarted = true;
+  configureEvents(eventConfig);
+
   ValueDescriptorPtr delayedStart = ValueDescriptorPtr(
-    new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1, true));
+    new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_minute, unitScaling_1), 0, 1439, 1, true));
+
+
+  addDefaultPowerOffAction();
+  addDefaultPowerOnAction();
+  addDefaultStopAction();
 
   addAction("std.Auto3545",    "Auto 35-45C", "Auto1",   delayedStart);
   addAction("std.Auto4565",    "Auto 45-65C", "Auto2",   delayedStart);
@@ -86,11 +113,11 @@ bool HomeConnectDeviceDishWasher::configureDevice()
 
 
   delayedStartProp = ValueDescriptorPtr(
-    new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1, true));
+    new NumericValueDescriptor("DelayedStart", valueType_numeric, VALUE_UNIT(valueUnit_minute, unitScaling_1), 0, 1439, 1, true));
 
   deviceProperties->addProperty(delayedStartProp, true);
 
-  return inherited::configureDevice();
+  return ret;
 }
 
 void HomeConnectDeviceDishWasher::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -103,19 +130,36 @@ void HomeConnectDeviceDishWasher::handleEventTypeNotify(const string& aKey, Json
   ALOG(LOG_INFO, "DishWasher Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
 
   if (aKey == "BSH.Common.Option.StartInRelative") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    delayedStartProp->setInt32Value(value);
+    handleStartInRelativeChange((aValue != NULL) ? aValue->int32Value() : 0);
     return;
   }
+
   inherited::handleEventTypeNotify(aKey, aValue);
+}
+
+void HomeConnectDeviceDishWasher::handleStartInRelativeChange(int32_t aValue)
+{
+  if (aValue == 0) {
+    delayedStartProp->invalidate();
+    return;
+  }
+
+  std::time_t currentTime = time(0);
+  std::tm* localTime = localtime(&currentTime);
+
+  delayedStartProp->setInt32Value((localTime->tm_hour * 60) + localTime->tm_min + (aValue / 60));
 }
 
 void HomeConnectDeviceDishWasher::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter)
 {
   HomeConnectProgramBuilder builder("Dishcare.Dishwasher.Program." + aProgramName);
-  builder.addOption("BSH.Common.Option.StartInRelative", "@{DelayedStart%%0}");
+  builder.addOption("BSH.Common.Option.StartInRelative", "@{DelayedStart*60%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this,
+                                                                                     *operationModeDescriptor,
+                                                                                     aActionName,
+                                                                                     aDescription,
+                                                                                     builder.build()));
   action->addParameter(aParameter);
   deviceActions->addAction(action);
 }

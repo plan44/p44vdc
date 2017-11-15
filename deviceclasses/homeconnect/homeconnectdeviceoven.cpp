@@ -20,8 +20,11 @@
 //
 
 #include "homeconnectdeviceoven.hpp"
+#include "homeconnectaction.hpp"
 
 #if ENABLE_HOMECONNECT
+
+#include "homeconnectaction.hpp"
 
 namespace p44 {
 
@@ -30,6 +33,9 @@ HomeConnectDeviceOven::HomeConnectDeviceOven(HomeConnectVdc *aVdcP, JsonObjectPt
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
   settings->fireAction = "std.StandBy";
+  settings->deepOffAction = "std.StopIfNotTimed";
+  settings->leaveHomeAction = "std.StopIfNotTimed";
+  settings->sleepAction = "std.StopIfNotTimed";
 
   installSettings(settings);
 }
@@ -41,18 +47,9 @@ HomeConnectDeviceOven::~HomeConnectDeviceOven()
 
 bool HomeConnectDeviceOven::configureDevice()
 {
-  // - common params
-  ValueDescriptorPtr temp = ValueDescriptorPtr(
-      new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30,
-          250, 1, true, 180));
-  ValueDescriptorPtr duration = ValueDescriptorPtr(
-      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
-          1, true, 600));
+  bool ret = inherited::configureDevice();
 
-  addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
-  addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
-  addAction("std.TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
-  addAction("std.PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
+  addProgramNameProperty();
 
   targetTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("TargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
@@ -60,20 +57,8 @@ bool HomeConnectDeviceOven::configureDevice()
   currentTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("CurrentTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
 
-  elapsedProgramTimeProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("ElapsedProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
-
-  remainingProgramTimeProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("RemainingProgramTime", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340, 1));
-
-  programProgressProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("ProgramProgress", valueType_numeric, VALUE_UNIT(valueUnit_percent, unitScaling_1), 0, 100, 1));
-
   deviceProperties->addProperty(targetTemperatureProp);
   deviceProperties->addProperty(currentTemperatureProp);
-  deviceProperties->addProperty(elapsedProgramTimeProp);
-  deviceProperties->addProperty(remainingProgramTimeProp);
-  deviceProperties->addProperty(programProgressProp);
 
   deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "PreheatFinished", "Pre-heating finished")));
 
@@ -111,7 +96,41 @@ bool HomeConnectDeviceOven::configureDevice()
   psConfig.hasStandby = true;
   configurePowerState(psConfig);
 
-  return inherited::configureDevice();
+  // configure program status properties
+  ProgramStatusConfiguration progStatusConfig = { 0 };
+  progStatusConfig.hasElapsedTime = true;
+  progStatusConfig.hasRemainingTime = true;
+  progStatusConfig.hasProgres = true;
+  configureProgramStatus(progStatusConfig);
+
+  EventConfiguration eventConfig = { 0 };
+  eventConfig.hasAlarmClockElapsed = true;
+  eventConfig.hasLocallyOperated = true;
+  eventConfig.hasProgramAborted = false;
+  eventConfig.hasProgramFinished = true;
+  eventConfig.hasProgramStarted = true;
+  configureEvents(eventConfig);
+
+
+  addDefaultStandByAction();
+  addDefaultPowerOnAction();
+  addDefaultStopAction();
+
+  ValueDescriptorPtr temp = ValueDescriptorPtr(
+      new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30,
+          250, 1, true, 200));
+  ValueDescriptorPtr duration = ValueDescriptorPtr(
+      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340,
+          1, true, 0));
+
+  addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
+  addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
+  addAction("std.TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
+  addAction("std.PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
+
+  deviceActions->addAction(new HomeConnectStopIfNotTimedAction(*this, *operationModeDescriptor, *remainingProgramTime));
+
+  return ret;
 }
 
 void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -122,24 +141,6 @@ void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEve
 void HomeConnectDeviceOven::handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue)
 {
   ALOG(LOG_INFO, "Oven Event 'NOTIFY' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
-
-  if (aKey == "BSH.Common.Option.ElapsedProgramTime") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    elapsedProgramTimeProp->setInt32Value(value);
-    return;
-  }
-
-  if (aKey == "BSH.Common.Option.RemainingProgramTime") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    remainingProgramTimeProp->setInt32Value(value);
-    return;
-  }
-
-  if (aKey == "BSH.Common.Option.ProgramProgress") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    programProgressProp->setInt32Value(value);
-    return;
-  }
 
   if (aKey == "Cooking.Oven.Option.SetpointTemperature") {
     int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
@@ -178,7 +179,7 @@ void HomeConnectDeviceOven::addAction(const string& aActionName, const string& a
   builder.addOption("Cooking.Oven.Option.SetpointTemperature", "@{Temperature%%0}");
   builder.addOption("BSH.Common.Option.Duration", "@{Duration%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectAction(*this, aActionName, aDescription, builder.build()));
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this, *operationModeDescriptor, aActionName, aDescription, builder.build()));
   action->addParameter(aTemperature);
   action->addParameter(aDuration);
   deviceActions->addAction(action);

@@ -20,8 +20,11 @@
 //
 
 #include "homeconnectdevicefridge.hpp"
+#include "homeconnectaction.hpp"
 
 #if ENABLE_HOMECONNECT
+
+#include "homeconnectaction.hpp"
 
 namespace p44 {
 
@@ -38,6 +41,7 @@ HomeConnectDeviceFridge::~HomeConnectDeviceFridge()
 
 bool HomeConnectDeviceFridge::configureDevice()
 {
+  bool ret = inherited::configureDevice();
   // configure door state
   DoorStateConfiguration dsConfig = { 0 };
   dsConfig.hasOpen = true;
@@ -48,8 +52,8 @@ bool HomeConnectDeviceFridge::configureDevice()
   fridgeSuperMode = ValueDescriptorPtr(new NumericValueDescriptor("FridgeSuperMode", valueType_boolean, valueUnit_none, 0, 1, 1, true, 0));
   freezerSuperMode = ValueDescriptorPtr(new NumericValueDescriptor("FreezerSuperMode", valueType_boolean, valueUnit_none, 0, 1, 1, true, 0));
 
-  fridgeTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FridgeTargetTemperature", valueType_numeric, valueUnit_celsius, 2, 8, 1));
-  freezerTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FreezerTargetTemperature", valueType_numeric, valueUnit_celsius,-24, -16, 1));
+  fridgeTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FridgeTargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 2, 8, 1));
+  freezerTemperature = ValueDescriptorPtr(new NumericValueDescriptor("FreezerTargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1),-24, -16, 1));
 
   deviceProperties->addProperty(fridgeSuperMode);
   deviceProperties->addProperty(freezerSuperMode);
@@ -73,7 +77,7 @@ bool HomeConnectDeviceFridge::configureDevice()
   builder.setValue("false");
   deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "std.CancelFridgeSuperMode", "Cancel fridge Super Mode", builder.build())));
 
-  return inherited::configureDevice();
+  return ret;
 }
 
 void HomeConnectDeviceFridge::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)

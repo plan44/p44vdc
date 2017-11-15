@@ -86,63 +86,6 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<HomeConnectScene> HomeConnectScenePtr;
 
-
-
-  class HomeConnectAction : public DeviceAction
-  {
-    typedef DeviceAction inherited;
-
-  protected:
-
-    string apiCommandTemplate;
-
-  public:
-
-    /// create the action
-    /// @param aSingleDevice the single device this action belongs to
-    /// @param aName the name of the action.
-    /// @param aDescription a description string for the action.
-    /// @param aApiCommandTemplate the API command template to use for this action
-    HomeConnectAction(SingleDevice &aSingleDevice, const string& aName, const string& aDescription, const string& aApiCommandTemplate);
-
-    HomeConnectDevice &getHomeConnectDevice();
-
-    /// implementation of action
-    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
-
-  private:
-
-    ErrorPtr valueLookup(ApiValuePtr aParams, const string aName, string &aValue);
-    void apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError);
-    
-  };
-  typedef boost::intrusive_ptr<HomeConnectAction> HomeConnectActionPtr;
-  
-  class HomeConnectPowerOnAction : public HomeConnectAction
-  {
-    typedef HomeConnectAction inherited;
-    DeviceState& powerState;
-    DeviceState& operationMode;
-    string ifPowerOffCommand;
-
-    static const MLMicroSeconds RESCHEDULE_INTERVAL = 10 * Second;
-
-    void devicePoweredOn(ApiValuePtr aParams, StatusCB aCompletedCB, ErrorPtr aError, string aCommandTemplate);
-
-  public:
-
-    HomeConnectPowerOnAction(SingleDevice &aSingleDevice,
-                             const string& aName,
-                             const string& aDescription,
-                             const string& aIfPowerOnCommand,
-                             const string& aIfPowerOffCommand,
-                             DeviceState& aPowerState,
-                             DeviceState& aOperationMode);
-
-    virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
-  };
-
-
   class HomeConnectProgramBuilder
   {
   public:
@@ -186,7 +129,7 @@ namespace p44 {
   public:
     HomeConnectSettingBuilder(const string& aSettingName);
 
-    void setValue(const string& aValue) { value = aValue; }
+    HomeConnectSettingBuilder& setValue(const string& aValue) { value = aValue; return *this; }
     string build();
 
   };
@@ -209,12 +152,19 @@ namespace p44 {
 
     // common states, they can be NULL in case this state is not valid for device class
     DeviceStatePtr operationMode;
+    EnumValueDescriptorPtr operationModeDescriptor;
     DeviceStatePtr remoteControl;
+    EnumValueDescriptorPtr remoteControlDescriptor;
     DeviceStatePtr doorState;
+    EnumValueDescriptorPtr doorStateDescriptor;
     DeviceStatePtr powerState;
+    EnumValueDescriptorPtr powerStateDescriptor;
 
     // Common Properties
     ValueDescriptorPtr programName;
+    ValueDescriptorPtr remainingProgramTime;
+    ValueDescriptorPtr programProgress;
+    ValueDescriptorPtr elapsedProgramTime;
 
     HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
     virtual ~HomeConnectDevice();
@@ -317,6 +267,20 @@ namespace p44 {
       bool hasStandby : 1;
     } PowerStateConfiguration;
 
+    typedef struct {
+      bool hasElapsedTime : 1;
+      bool hasRemainingTime : 1;
+      bool hasProgres : 1;
+    } ProgramStatusConfiguration;
+
+    typedef struct {
+      bool hasProgramFinished : 1;
+      bool hasProgramAborted : 1;
+      bool hasLocallyOperated : 1;
+      bool hasProgramStarted : 1;
+      bool hasAlarmClockElapsed : 1;
+    } EventConfiguration;
+
     // The following methods implement common behaviour and should be executed from subclasses overrides.
     virtual bool configureDevice();
     virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
@@ -324,6 +288,12 @@ namespace p44 {
     virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue);
     virtual void handleEventTypeEvent(const string& aKey);
     virtual void handleEventTypeStatus(const string& aKey, JsonObjectPtr aValue);
+    virtual void handleEventTypeDisconnected();
+    virtual void handleEventTypeConnected();
+
+    virtual void handleRemoteStartAllowedChange(JsonObjectPtr aNewValue);
+    virtual void handleOperationStateChange(const string& aNewValue);
+    void handleRemoteControlActiveChange(JsonObjectPtr aNewValue);
 
     // Pool the state of the device and process the responses
     void pollState();
@@ -336,6 +306,14 @@ namespace p44 {
     void configureRemoteControlState(const RemoteControlConfiguration& aConfiguration);
     void configureDoorState(const DoorStateConfiguration& aConfiguration);
     void configurePowerState(const PowerStateConfiguration& aConfiguration);
+    void configureProgramStatus(const ProgramStatusConfiguration& aConfiguration);
+    void configureEvents(const EventConfiguration& aConfiguration);
+
+    void addDefaultPowerOnAction();
+    void addDefaultStandByAction();
+    void addDefaultPowerOffAction();
+    void addDefaultStopAction();
+    void addProgramNameProperty();
 
     // Create dsuid based on device id
     void deriveDsUid();
@@ -347,6 +325,7 @@ namespace p44 {
 
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
     string createDeviceName(JsonObjectPtr aNetworkJson, JsonObjectPtr aFileJson);
+    void addPowerStateAction(const string& aName, const string& aDescription, const string& aParameter);
 
   };
   

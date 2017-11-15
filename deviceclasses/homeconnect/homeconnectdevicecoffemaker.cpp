@@ -20,13 +20,15 @@
 //
 
 #include "homeconnectdevicecoffemaker.hpp"
+#include "homeconnectaction.hpp"
 
 #if ENABLE_HOMECONNECT
+
+#include "homeconnectaction.hpp"
 
 namespace p44 {
 
 HomeConnectDeviceCoffeMaker::HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-    standalone(false),
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
@@ -47,6 +49,7 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
 {
   bool ret = inherited::configureDevice();
 
+  addProgramNameProperty();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
   omConfig.hasInactive = true;
@@ -55,15 +58,15 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   omConfig.hasRun = true;
   omConfig.hasPause = false;
   omConfig.hasActionrequired = true;
-  omConfig.hasFinished = true;
+  omConfig.hasFinished = false;
   omConfig.hasError = true;
   omConfig.hasAborting = true;
   configureOperationModeState(omConfig);
 
   // configure remote control
   RemoteControlConfiguration rcConfig = { 0 };
-  rcConfig.hasControlInactive = true;
-  rcConfig.hasControlActive = false;  // coffee machine do not have BSH.Common.Status.RemoteControlActive so it is either inactive or start Allowed
+  rcConfig.hasControlInactive = false;
+  rcConfig.hasControlActive = true;
   rcConfig.hasStartActive = true;
   configureRemoteControlState(rcConfig);
 
@@ -74,17 +77,33 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   psConfig.hasStandby = true;
   configurePowerState(psConfig);
 
-  // FIXME: ugly direct model match
-//    standalone = (modelGuid=="TI909701HC/03") || (modelGuid=="TI909701HC/00");
-  // FIXME: got even uglier:
-  standalone = (modelGuid.substr(0,10)=="TI909701HC");
+  // configure program status properties
+  ProgramStatusConfiguration progStatusConfig = { 0 };
+  progStatusConfig.hasElapsedTime = false;
+  progStatusConfig.hasRemainingTime = true;
+  progStatusConfig.hasProgres = true;
+  configureProgramStatus(progStatusConfig);
+
+  EventConfiguration eventConfig = { 0 };
+  eventConfig.hasAlarmClockElapsed = false;
+  eventConfig.hasLocallyOperated = true;
+  eventConfig.hasProgramAborted = false;
+  eventConfig.hasProgramFinished = true;
+  eventConfig.hasProgramStarted = true;
+  configureEvents(eventConfig);
+
+  HomeConnectGoToStandbyActionPtr action =
+      HomeConnectGoToStandbyActionPtr(new HomeConnectGoToStandbyAction(*this, *powerStateDescriptor, *operationModeDescriptor));
+  deviceActions->addAction(action);
+  addDefaultPowerOnAction();
+  addDefaultStopAction();
 
   addAction("std.Espresso",          "Espresso",            "Espresso",          35,  60,  5,  40);
   addAction("std.EspressoMacchiato", "Espresso Macchiato",  "EspressoMacchiato", 40,  60,  10, 50);
-  addAction("std.Coffee",            "Coffee",              "Coffee",            60,  250, 10, 120);
-  addAction("std.Cappuccino",        "Cappuccino",          "Cappuccino",        100, 250, 10, 180);
-  addAction("std.LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 300);
-  addAction("std.CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 250);
+  addAction("std.Coffee",            "Coffee",              "Coffee",            60,  250, 10, 100);
+  addAction("std.Cappuccino",        "Cappuccino",          "Cappuccino",        100, 300, 20, 180);
+  addAction("std.LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 250);
+  addAction("std.CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 200);
 
   beanAmountProp = EnumValueDescriptorPtr(new EnumValueDescriptor("BeanAmount", true));
   int i = 0;
@@ -97,7 +116,7 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   beanAmountProp->addEnum("DoubleShotPlus", i++);
   beanAmountProp->addEnum("DoubleShotPlusPlus", i++);
 
-  fillQuantityProp = ValueDescriptorPtr(new NumericValueDescriptor("FillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 0, 400, 1));
+  fillQuantityProp = ValueDescriptorPtr(new NumericValueDescriptor("FillQuantity", valueType_numeric, VALUE_UNIT(valueUnit_liter, unitScaling_milli), 0, 400, 1, true, 0));
 
   deviceProperties->addProperty(beanAmountProp);
   deviceProperties->addProperty(fillQuantityProp);
@@ -116,7 +135,7 @@ void HomeConnectDeviceCoffeMaker::handleEventTypeNotify(const string& aKey, Json
 
   if (aKey == "ConsumerProducts.CoffeeMaker.Option.BeanAmount") {
     string value = (aValue != NULL) ? aValue->stringValue() : "";
-    beanAmountProp->setStringValue(removeNamespace(value));
+    beanAmountProp->setStringValueCaseInsensitive(removeNamespace(value));
     return;
   }
 
@@ -127,6 +146,41 @@ void HomeConnectDeviceCoffeMaker::handleEventTypeNotify(const string& aKey, Json
   }
 
   inherited::handleEventTypeNotify(aKey, aValue);
+}
+
+void HomeConnectDeviceCoffeMaker::handleRemoteStartAllowedChange(JsonObjectPtr aNewValue)
+{
+  if (aNewValue == NULL) {
+    return;
+  }
+
+  string remoteStartValue;
+  bool value = aNewValue->boolValue();
+
+  if (value) {
+    remoteStartValue = "RemoteStartActive";
+  }
+  else {
+    remoteStartValue = "RemoteControlActive";
+  }
+
+  if (remoteControlDescriptor->setStringValueCaseInsensitive(remoteStartValue)) {
+    ALOG(LOG_NOTICE, "New Remote Start Allowed State: '%s'", remoteStartValue.c_str());
+    remoteControl->push();
+  }
+}
+
+void HomeConnectDeviceCoffeMaker::handleOperationStateChange(const string& aNewValue)
+{
+  if (aNewValue == "BSH.Common.EnumType.OperationState.Finished") {
+    if (operationModeDescriptor->getStringValue() == "ModeRun") {
+      deviceEvents->pushEvent("ProgramFinished");
+    }
+  }
+  else {
+    inherited::handleOperationStateChange(aNewValue);
+  }
+
 }
 
 void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
@@ -140,10 +194,6 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
 
   HomeConnectProgramBuilder builder("ConsumerProducts.CoffeeMaker.Program.Beverage." + aProgramName);
 
-  if(!standalone) {
-    builder.addOption("ConsumerProducts.CoffeeMaker.Option.CoffeeTemperature", "\"ConsumerProducts.CoffeeMaker.EnumType.CoffeeTemperature.@{TemperatureLevel}\"");
-  }
-
   builder.addOption("ConsumerProducts.CoffeeMaker.Option.BeanAmount", "\"ConsumerProducts.CoffeeMaker.EnumType.BeanAmount.@{BeanAmount}\"");
   builder.addOption("ConsumerProducts.CoffeeMaker.Option.FillQuantity", "@{FillQuantity%%0}");
 
@@ -154,14 +204,9 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
   builder.selectMode(HomeConnectProgramBuilder::Mode_Select);
   string selectProgramCommand = builder.build();
 
-  EnumValueDescriptorPtr tempLevel = EnumValueDescriptorPtr(new EnumValueDescriptor("TemperatureLevel", true));
-  int i = 0;
-  tempLevel->addEnum("Normal", i++, true); // default
-  tempLevel->addEnum("High", i++);
-  tempLevel->addEnum("VeryHigh", i++);
 
   EnumValueDescriptorPtr beanAmount = EnumValueDescriptorPtr(new EnumValueDescriptor("BeanAmount", true));
-  i = 0;
+  int i = 0;
   beanAmount->addEnum("VeryMild", i++);
   beanAmount->addEnum("Mild", i++);
   beanAmount->addEnum("Normal", i++, true); // default
@@ -187,9 +232,8 @@ void HomeConnectDeviceCoffeMaker::addAction(const string& aActionName,
                                                         aDescription,
                                                         runProgramCommand,
                                                         selectProgramCommand,
-                                                        *powerState,
-                                                        *operationMode));
-  action->addParameter(tempLevel);
+                                                        *powerStateDescriptor,
+                                                        *operationModeDescriptor));
   action->addParameter(beanAmount);
   action->addParameter(fillAmount);
   deviceActions->addAction(action);
