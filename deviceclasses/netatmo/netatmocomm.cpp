@@ -110,8 +110,8 @@ const string NetatmoComm::BASE_URL = "https://api.netatmo.com";
 const string NetatmoComm::GET_STATIONS_DATA_URL = "/api/getstationsdata";
 const string NetatmoComm::GET_HOME_COACHS_URL = "/api/gethomecoachsdata";
 const string NetatmoComm::AUTHENTICATE_URL = "https://api.netatmo.com/oauth2/token";
-const string NetatmoComm::CLIENT_ID = "52823f931877590c917b23f7";
-const string NetatmoComm::CLIENT_SECRET = "Q5rt19RMedbTkHblsIE5mKK3rhKKQQcCJ9AJwr";
+const string NetatmoComm::CLIENT_ID = "";
+const string NetatmoComm::CLIENT_SECRET = "";
 
 
 NetatmoComm::NetatmoComm() :
