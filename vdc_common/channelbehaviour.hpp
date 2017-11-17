@@ -208,6 +208,10 @@ namespace p44 {
     /// @return the channel index (0..N, 0=primary)
     int getChannelIndex() { return channelIndex; };
 
+    /// get the channel id (may be empty)
+    /// @return the channelId string
+    const string& getChannelId() { return channelId; }
+
     /// get the resolution this channel has in the hardware of this particular device
     /// @return resolution of channel value (size of smallest step output can take, LSB)
     double getResolution() { return resolution; }; ///< actual resolution of the hardware
