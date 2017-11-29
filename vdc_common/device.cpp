@@ -990,6 +990,7 @@ void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForD
     AFOCUSLOG("requestApplyingChannels called with output disabled -> NOP");
     // - just call back immediately
     if (aAppliedOrSupersededCB) aAppliedOrSupersededCB();
+    return;
   }
   AFOCUSLOG("requestApplyingChannels entered");
   // Caller wants current channel values applied to hardware
