@@ -2550,10 +2550,10 @@ ErrorPtr SingleDevice::standardActionsFromJSON(JsonObjectPtr aJSONConfig)
   ErrorPtr err;
 
   // check for standard device actions
-  if (aJSONConfig->get("autoAddStandardActions", o) && o->boolValue()) {
+  if (aJSONConfig->get("autoaddstandardactions", o) && o->boolValue()) {
     autoAddStandardActions();
   }
-  if (aJSONConfig->get("standardActions", o)) {
+  if (aJSONConfig->get("standardactions", o)) {
     enableStandardActions(); // must behave as a single device with standard actions
     string actionId;
     string actionTitle;
