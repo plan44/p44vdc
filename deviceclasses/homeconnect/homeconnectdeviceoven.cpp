@@ -120,8 +120,8 @@ bool HomeConnectDeviceOven::configureDevice()
       new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30,
           250, 1, true, 200));
   ValueDescriptorPtr duration = ValueDescriptorPtr(
-      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340,
-          1, true, 0));
+      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
+          1, true, 600));
 
   addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
   addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
