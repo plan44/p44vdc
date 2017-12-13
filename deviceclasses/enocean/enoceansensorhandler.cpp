@@ -155,7 +155,7 @@ bool EnoceanSensorHandler::isAlive()
 {
   if (sensorChannelDescriptorP->aliveSignInterval<=0)
     return true; // no alive sign interval to check, assume alive
-  // check if gotten no message for longer than aliveSignInterval
+  // check if gotten no message for longer than aliveSignInterval*factor
   if (MainLoop::now()-device.getLastPacketTime() < sensorChannelDescriptorP->aliveSignInterval*Second*TIMEOUT_FACTOR_FOR_INACTIVE)
     return true;
   // timed out

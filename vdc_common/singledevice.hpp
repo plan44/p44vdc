@@ -354,14 +354,18 @@ namespace p44 {
   typedef boost::intrusive_ptr<ValueList> ValueListPtr;
 
 
-
+  /// DeviceAction models a command with parameters that can be executed on the device
+  /// customActions (and as a read-only special case, standardActions) are always based
+  /// on a DeviceAction plus some parameter values overriding the DeviceAction's defaults.
   class DeviceAction : public PropertyContainer
   {
     typedef PropertyContainer inherited;
 
     friend class DeviceActions;
     friend class DynamicDeviceActions;
+    friend class ActionMacro;
     friend class CustomAction;
+    friend class StandardAction;
 
   protected:
 
@@ -374,7 +378,7 @@ namespace p44 {
 
   public:
 
-    /// create the action
+    /// create the device action
     /// @param aSingleDevice the single device this action belongs to
     /// @param aId the ID of the action (key in the container)
     /// @param aDescription a description string for the action (for log files primarily)
@@ -390,7 +394,7 @@ namespace p44 {
     /// add parameter
     /// @param aValueDesc a value descriptor object.
     /// @param aMandatory if set, parameter must be explicitly specified
-    void addParameter(ValueDescriptorPtr aValueDesc, bool aMandatory = false);
+    virtual void addParameter(ValueDescriptorPtr aValueDesc, bool aMandatory = false);
 
     /// call the action
     /// @param aParams an ApiValue of type apivalue_object, expected to
@@ -424,10 +428,13 @@ namespace p44 {
   typedef boost::intrusive_ptr<DeviceAction> DeviceActionPtr;
 
 
-
+  /// DeviceActions is the container of all actions that are statically and natively
+  /// (i.e. always, unless vdc implementation or device itself changes) available in a device.
+  /// The set of DeviceActions cannot change during a vDC API session.
   class DeviceActions : public PropertyContainer
   {
     typedef PropertyContainer inherited;
+    friend class SingleDevice;
 
   protected:
 
@@ -469,7 +476,12 @@ namespace p44 {
   typedef boost::intrusive_ptr<DeviceActions> DeviceActionsPtr;
 
 
-
+  /// DynamicDeviceActions is the container of actions that are currently available in
+  /// the device, but might change because they are based on customer changeable
+  /// information such as purchase of vendor-provided recipe books, subscribed video services
+  /// available radio stations, playlists etc.
+  /// The set of DeviceActions can change during a vDC API session - if this happens,
+  /// Changes will be alerted upstream via vDC API push notification.
   class DynamicDeviceActions P44_FINAL : public DeviceActions
   {
     typedef DeviceActions inherited;
@@ -510,14 +522,14 @@ namespace p44 {
   typedef boost::intrusive_ptr<DynamicDeviceActions> DynamicDeviceActionsPtr;
 
 
-
-
-  class CustomAction P44_FINAL : public PropertyContainer, public PersistentParams
+  /// ActionMacro is a generic "Macro" which refers to a DeviceAction and
+  /// optionally carries some parameter values to apply to the DeviceAction when
+  /// the ActionMacro is called.
+  class ActionMacro : public PropertyContainer
   {
-    typedef PersistentParams inheritedParams;
-    typedef PropertyContainer inheritedProps;
+  protected:
 
-    friend class CustomActions;
+    typedef PropertyContainer inheritedProps;
 
     SingleDevice &singleDevice; ///< the single device this custom action belongs to
 
@@ -525,7 +537,7 @@ namespace p44 {
     string actionTitle; ///< the user-faced name of the action
     uint32_t flags; ///< flags
 
-    /// references the standard action on which this custom action is based
+    /// references the DeviceAction on which this custom action is based
     DeviceActionPtr action;
 
     /// the parameters stored in this custom action.
@@ -538,9 +550,14 @@ namespace p44 {
 
   public:
 
-    /// create the custom action
+    /// create the action macro
     /// @param aSingleDevice the single device this custom action belongs to
-    CustomAction(SingleDevice &aSingleDevice);
+    ActionMacro(SingleDevice &aSingleDevice);
+
+    /// configure the macro
+    /// @param aDeviceActionId the ID of the device action to call when the macro is called
+    /// @param aParams the parameters (optional) to be passed to the actione when the macro is called
+    ErrorPtr configureMacro(const string aDeviceActionId, JsonObjectPtr aParams);
 
     /// call the custom action
     /// @param aParams an ApiValue of type apivalue_object, may be used to override stored parameters
@@ -554,6 +571,29 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
+    // parameter validation
+    ErrorPtr validateParams(ApiValuePtr aParams, ApiValuePtr aValidatedParams, bool aSkipInvalid);
+
+  };
+
+
+  /// CustomAction is a ActionMacro that can be created/modified/deleted via the
+  /// vDC API and eventually by the user
+  class CustomAction P44_FINAL : public ActionMacro, public PersistentParams
+  {
+    typedef PersistentParams inheritedParams;
+    typedef ActionMacro inherited;
+
+    friend class CustomActions;
+
+  public:
+
+    /// create the custom action
+    /// @param aSingleDevice the single device this custom action belongs to
+    CustomAction(SingleDevice &aSingleDevice);
+
+  protected:
+
     // persistence implementation
     virtual const char *tableName() P44_OVERRIDE;
     virtual size_t numKeyDefs() P44_OVERRIDE;
@@ -563,15 +603,16 @@ namespace p44 {
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
-  private:
-
-    ErrorPtr validateParams(ApiValuePtr aParams, ApiValuePtr aValidatedParams, bool aSkipInvalid);
+    // property access implementation
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<CustomAction> CustomActionPtr;
 
 
-
+  /// CustomActions is the container of vDC-API (=user) defined ActionMacros
+  /// which are stored persistently for this device in the database, and
+  /// can be created, modified and deleted via the vDC API.
   class CustomActions P44_FINAL : public PropertyContainer
   {
     typedef PropertyContainer inherited;
@@ -585,7 +626,6 @@ namespace p44 {
   public:
 
     CustomActions(SingleDevice &aSingleDevice) : singleDevice(aSingleDevice) { };
-
 
     /// call a custom action
     /// @param aActionId name of the action to call
@@ -605,8 +645,6 @@ namespace p44 {
     bool isDirty();
     /// make all settings clean (not to be saved to DB)
     void markClean();
-    /// load default set or overriding custom actions from files
-    void loadActionsFromFiles();
 
   protected:
 
@@ -619,6 +657,70 @@ namespace p44 {
 
   };
   typedef boost::intrusive_ptr<CustomActions> CustomActionsPtr;
+
+
+
+  /// StandardAction is a ActionMacro that can only be read and called via the vDC API,
+  /// but cannot be modified. The set of available standard action is defined via static
+  /// vDC configuration (in code, or by reading config files)
+  class StandardAction P44_FINAL : public ActionMacro
+  {
+    typedef ActionMacro inherited;
+    friend class StandardActions;
+
+  public:
+
+    /// create the standard action
+    /// @param aSingleDevice the single device this action belongs to
+    /// @param aId the ID of the action (key in the container)
+    /// @param aTitle a description/name for the action
+    StandardAction(SingleDevice &aSingleDevice, const string aId, const string aTitle = "");
+
+  };
+  typedef boost::intrusive_ptr<StandardAction> StandardActionPtr;
+
+
+  /// StandardActions is the container of statically (config file) defined ActionMacros
+  /// which can be inspected and called, but are not writable via the vDC API.
+  class StandardActions P44_FINAL : public PropertyContainer
+  {
+    typedef PropertyContainer inherited;
+
+    typedef vector<StandardActionPtr> StandardActionsVector;
+
+    StandardActionsVector standardActions;
+
+    SingleDevice &singleDevice; ///< the single device the standard actions belong to
+
+  public:
+
+    StandardActions(SingleDevice &aSingleDevice) : singleDevice(aSingleDevice) { };
+
+    /// call a standard action
+    /// @param aActionId name of the action to call
+    /// @param aParams an ApiValue of type apivalue_object, can be empty or
+    ///   contain parameters overriding those stored in the custom action
+    /// @param aCompletedCB will be called when call has completed
+    /// @return true if action exists and was executed (or failed with action-level error), false if this action does not exist
+    bool call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB);
+
+    /// add a standard action
+    /// @param aAction the standard action to add
+    void addStandardAction(StandardActionPtr aAction);
+
+    /// @param aHashedString append model relevant strings to this value for creating modelUID() hash
+    void addToModelUIDHash(string &aHashedString);
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<StandardActions> StandardActionsPtr;
+
 
 
 
@@ -942,7 +1044,10 @@ namespace p44 {
 
     friend class DeviceActions;
     friend class CustomActions;
+    friend class StandardActions;
+    friend class ActionMacro;
     friend class CustomAction;
+    friend class StandardAction;
     friend class DeviceStates;
     friend class DeviceEvents;
 
@@ -950,7 +1055,8 @@ namespace p44 {
 
     DeviceActionsPtr deviceActions; ///< the device's standard actions
     DynamicDeviceActionsPtr dynamicDeviceActions; ///< the device's dynamic (device-side user customizable/added) actions
-    CustomActionsPtr customActions; ///< the device's custom actions
+    CustomActionsPtr customActions; ///< the device's custom actions (user defined macros)
+    StandardActionsPtr standardActions; ///< the device's standard actions (predefined macros)
     DeviceStatesPtr deviceStates; ///< the device's states
     DeviceEventsPtr deviceEvents; ///< the device's events
 
@@ -1000,9 +1106,6 @@ namespace p44 {
     /// make all settings clean (not to be saved to DB)
     virtual void markClean() P44_OVERRIDE;
 
-    /// load additional settings from files
-    void loadSettingsFromFiles();
-
     /// @}
 
 
@@ -1011,6 +1114,24 @@ namespace p44 {
     /// @return ok or parsing error
     ErrorPtr configureFromJSON(JsonObjectPtr aJSONConfig);
 
+    /// load standard actions from JSON
+    /// @param aJSONConfig a JSON object possibly containing:
+    ///   - an object called "standardActions" of which each field describes a standard action
+    ///     to be added.
+    ///   - a boolean field called "autoAddStandardActions"; if it is true,
+    ///     autoAddStandardActions() is called (to avoid listing std actions that are
+    ///     just proxies for device actions without any modified parameters)
+    /// @return ok or parsing error
+    /// @note this is not part of configureFromJSON because loading standard actions
+    ///   requires all deviceActions be present. Depending on how the device is
+    ///   implemented, deviceActions might come from additional sources than
+    ///   just the config, and possibly from sources only getting available after
+    ///   calling configureFromJSON(), or from sources determined by other criteria
+    ///   than a hardware specific config file (e.g. a device class specific file)
+    ErrorPtr standardActionsFromJSON(JsonObjectPtr aJSONConfig);
+
+    /// automatically add all device actions as standard actions
+    void autoAddStandardActions();
 
     /// dynamically configure dynamic action (add/change/remove)
     /// @note this can be used by device implementations for adding/changing dynamic actions while device is operational.
@@ -1102,6 +1223,7 @@ namespace p44 {
     void invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
     void sceneInvokedActionComplete(ErrorPtr aError);
     ErrorPtr addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfig, const string aActionId, bool aPush);
+    void enableStandardActions();
 
   };
 

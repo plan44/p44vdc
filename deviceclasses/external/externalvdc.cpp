@@ -1211,6 +1211,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("noconfirmaction", o)) noConfirmAction = o->boolValue();
   err = configureFromJSON(aInitParams);
   if (!Error::isOK(err)) return err;
+  err = standardActionsFromJSON(aInitParams);
+  if (!Error::isOK(err)) return err;
   if (deviceProperties) deviceProperties->setPropertyChangedHandler(boost::bind(&ExternalDevice::propertyChanged, this, _1));
   // if any of the singledevice features are selected, protocol must be JSON
   if (deviceActions && deviceConnector->simpletext) {

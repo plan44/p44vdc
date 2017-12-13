@@ -631,6 +631,10 @@ DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const 
   actionDescription(aDescription),
   actionTitle(aTitle)
 {
+  // FIXME: remove later: warning indicating not-yet-converted vdc implementations
+  if (actionId.substr(0,4)=="std.") {
+    SALOG(aSingleDevice, LOG_WARNING, "old style device implementation: actions should not have 'std.' prefix in the id!");
+  }
   // install value list for parameters
   actionParams = ValueListPtr(new ValueList);
 }
@@ -954,9 +958,8 @@ void DynamicDeviceActions::updateDynamicActions(ActionsVector &aActions)
 
 // MARK: ===== CustomAction
 
-CustomAction::CustomAction(SingleDevice &aSingleDevice) :
+ActionMacro::ActionMacro(SingleDevice &aSingleDevice) :
   singleDevice(aSingleDevice),
-  inheritedParams(aSingleDevice.getVdcHost().getDsParamStore()),
   flags(0)
 {
   storedParams = ApiValuePtr(new JsonApiValue()); // must be JSON as we store params as JSON
@@ -964,14 +967,14 @@ CustomAction::CustomAction(SingleDevice &aSingleDevice) :
 }
 
 
-void CustomAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
+void ActionMacro::call(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
   ErrorPtr err;
 
   // custom actions might exist that do not have a valid action (any more)
   if (!action) {
-    LOG(LOG_ERR, "- custom action %s cannot be invoked because it is not based on a valid standard action", actionId.c_str());
-    aCompletedCB(Error::err<VdcApiError>(500, "custom action has no valid standard action to call"));
+    LOG(LOG_ERR, "- action macro '%s' cannot be invoked because it is not based on a valid device action", actionId.c_str());
+    aCompletedCB(Error::err<VdcApiError>(500, "action macro has no valid device action to call"));
     return;
   }
   // copy each of the stored params, unless same param is alreday in aParams (which means overridden)
@@ -990,17 +993,18 @@ void CustomAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
     }
   }
   // parameters collected, now invoke actual device action
-  LOG(LOG_INFO, "- custom action %s calls %s:%s", actionId.c_str(), action->actionId.c_str(), aParams->description().c_str());
+  LOG(LOG_INFO, "- action macro '%s' calls '%s':%s", actionId.c_str(), action->actionId.c_str(), aParams->description().c_str());
   action->call(aParams, aCompletedCB);
 }
 
 
 
-// MARK: ===== CustomAction property access
+// MARK: ===== ActionMacro property access
 
 enum {
   customactionaction_key,
   customactiontitle_key,
+  customactiondesc_key,
   customactionparams_key,
   numCustomActionProperties
 };
@@ -1008,18 +1012,19 @@ enum {
 static char customaction_key;
 
 
-int CustomAction::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+int ActionMacro::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   return numCustomActionProperties;
 }
 
 
-PropertyDescriptorPtr CustomAction::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+PropertyDescriptorPtr ActionMacro::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   // device level properties
   static const PropertyDescription properties[numCustomActionProperties] = {
     { "action", apivalue_string, customactionaction_key, OKEY(customaction_key) },
     { "title", apivalue_string, customactiontitle_key, OKEY(customaction_key) },
+    { "description", apivalue_string, customactiondesc_key, OKEY(customaction_key) },
     { "params", apivalue_null, customactionparams_key, OKEY(customaction_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
@@ -1030,7 +1035,7 @@ PropertyDescriptorPtr CustomAction::getDescriptorByIndex(int aPropIndex, int aDo
 }
 
 
-ErrorPtr CustomAction::validateParams(ApiValuePtr aParams, ApiValuePtr aValidatedParams, bool aSkipInvalid)
+ErrorPtr ActionMacro::validateParams(ApiValuePtr aParams, ApiValuePtr aValidatedParams, bool aSkipInvalid)
 {
   // rebuild params
   aValidatedParams->clear();
@@ -1077,7 +1082,7 @@ ErrorPtr CustomAction::validateParams(ApiValuePtr aParams, ApiValuePtr aValidate
 }
 
 
-bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+bool ActionMacro::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
   if (aPropertyDescriptor->hasObjectKey(customaction_key)) {
     if (aMode==access_read) {
@@ -1085,6 +1090,13 @@ bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
       switch (aPropertyDescriptor->fieldKey()) {
         case customactionaction_key: aPropValue->setStringValue(action ? action->actionId : "INVALID"); return true;
         case customactiontitle_key: aPropValue->setStringValue(actionTitle); return true;
+        case customactiondesc_key: {
+          if (actionTitle.empty() && action)
+            aPropValue->setStringValue(action->actionDescription);
+          else
+            aPropValue->setStringValue(actionTitle);
+          return true;
+        }
         case customactionparams_key: {
           // simply return the stored params object
           *aPropValue = *storedParams; // do a value copy because  API value types might be different
@@ -1092,51 +1104,47 @@ bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
         }
       }
     }
-    else {
-      // write
-      switch (aPropertyDescriptor->fieldKey()) {
-        case customactionaction_key: {
-          // assign new action
-          DeviceActionPtr a = singleDevice.deviceActions->getAction(aPropValue->stringValue());
-          if (a) {
-            // action exists
-            action = a; // assign it
-            markDirty();
-            // clean parameters to conform with new action
-            ApiValuePtr newParams = storedParams->newValue(apivalue_object);
-            validateParams(storedParams, newParams, true); // just skip invalid ones
-            storedParams = newParams; // use cleaned-up set of params
-            return true;
-          }
-          SALOG(singleDevice, LOG_ERR, "there is no deviceAction called '%s'", aPropValue->stringValue().c_str());
-          return false;
-        }
-        case customactiontitle_key: {
-          setPVar(actionTitle, aPropValue->stringValue());
-          return true;
-        }
-        case customactionparams_key: {
-          ApiValuePtr newParams = storedParams->newValue(apivalue_object);
-          ErrorPtr err = validateParams(aPropValue, newParams, false);
-          if (Error::isOK(err)) {
-            // assign
-            markDirty();
-            storedParams = newParams;
-            return true;
-          }
-          // error
-          SALOG(singleDevice, LOG_ERR, "writing 'params' failed: %s", err->description().c_str());
-          return false;
-        }
-      }
-    }
-    return false;
   }
   return inheritedProps::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
 
 
-// MARK: ===== CustomAction persistence
+ErrorPtr ActionMacro::configureMacro(const string aDeviceActionId, JsonObjectPtr aParams)
+{
+  ErrorPtr err;
+  // - look up device action this macro is based on
+  action = singleDevice.deviceActions->getAction(aDeviceActionId);
+  if (!action && aDeviceActionId.substr(0,4)=="std.") {
+    // try without possibly historically present "std." prefix
+    // (for custom actions created before separating standard actions from device actions)
+    action = singleDevice.deviceActions->getAction(aDeviceActionId.substr(4));
+    // FIXME: remove later: warning indicating macro definition (=last saved when deviceActions still had the 'std.' prefix)
+    if (action) {
+      SALOG(singleDevice, LOG_INFO, "old-style macro '%s' still uses 'std.' prefix for deviceAction -> last saved before standardActions", actionId.c_str());
+    }
+  }
+  if (action) {
+    // get and validate params
+    ApiValuePtr loadedParams;
+    if (aParams) loadedParams = JsonApiValue::newValueFromJson(aParams);
+    err = validateParams(loadedParams, storedParams, true);
+  }
+  else {
+    // referring to unknown device action
+    err = TextError::err("device action '%s' is unknown - cannot base macro '%s' on it", aDeviceActionId.c_str(), actionId.c_str());
+  }
+  return err;
+}
+
+
+// MARK: ===== CustomAction
+
+CustomAction::CustomAction(SingleDevice &aSingleDevice) :
+  inherited(aSingleDevice),
+  inheritedParams(aSingleDevice.getVdcHost().getDsParamStore())
+{
+}
+
 
 const char *CustomAction::tableName()
 {
@@ -1144,6 +1152,7 @@ const char *CustomAction::tableName()
 }
 
 
+// MARK: ===== CustomAction persistence
 
 // primary key field definitions
 
@@ -1208,17 +1217,11 @@ void CustomAction::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, ui
   string jsonparams = nonNullCStr(aRow->get<const char *>(aIndex++));
   // flags
   flags = aRow->get<int>(aIndex++);
-  // - look it up
-  action = singleDevice.deviceActions->getAction(baseAction);
-  if (action) {
-    // get and validate params
-    JsonObjectPtr j = JsonObject::objFromText(jsonparams.c_str());
-    ApiValuePtr loadedParams = JsonApiValue::newValueFromJson(j);
-    validateParams(loadedParams, storedParams, true);
-  }
-  else {
-    // this is an invalid custom action
-    SALOG(singleDevice, LOG_ERR, "invalid custom action '%s' - refers to non-existing action '%s'", actionId.c_str(), baseAction.c_str())
+  // - configure it
+  JsonObjectPtr j = JsonObject::objFromText(jsonparams.c_str());
+  ErrorPtr err = configureMacro(baseAction, j);
+  if (!Error::isOK(err)) {
+    SALOG(singleDevice, LOG_ERR, "error loading custom action: %s", err->description().c_str());
   }
 }
 
@@ -1246,8 +1249,62 @@ void CustomAction::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex
 }
 
 
-// MARK: ===== CustomActions container
+// MARK: ===== CustomAction property access
 
+bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(customaction_key)) {
+    if (aMode==access_read) {
+      // read is implemented in common base class
+      return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
+    }
+    else {
+      // write is only available in customAction
+      switch (aPropertyDescriptor->fieldKey()) {
+        case customactionaction_key: {
+          // assign new action
+          DeviceActionPtr a = singleDevice.deviceActions->getAction(aPropValue->stringValue());
+          if (a) {
+            // action exists
+            action = a; // assign it
+            markDirty();
+            // clean parameters to conform with new action
+            ApiValuePtr newParams = storedParams->newValue(apivalue_object);
+            validateParams(storedParams, newParams, true); // just skip invalid ones
+            storedParams = newParams; // use cleaned-up set of params
+            return true;
+          }
+          SALOG(singleDevice, LOG_ERR, "there is no deviceAction called '%s'", aPropValue->stringValue().c_str());
+          return false;
+        }
+        case customactiontitle_key: {
+          setPVar(actionTitle, aPropValue->stringValue());
+          return true;
+        }
+        case customactionparams_key: {
+          ApiValuePtr newParams = storedParams->newValue(apivalue_object);
+          ErrorPtr err = validateParams(aPropValue, newParams, false);
+          if (Error::isOK(err)) {
+            // assign
+            markDirty();
+            storedParams = newParams;
+            return true;
+          }
+          // error
+          SALOG(singleDevice, LOG_ERR, "writing 'params' failed: %s", err->description().c_str());
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+  return inheritedProps::accessField(aMode, aPropValue, aPropertyDescriptor);
+}
+
+
+
+
+// MARK: ===== CustomActions container
 
 int CustomActions::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -1357,8 +1414,6 @@ ErrorPtr CustomActions::load()
       newAction = CustomActionPtr(new CustomAction(singleDevice));
     }
     delete queryP; queryP = NULL;
-    // Now check for default settings from files
-    loadActionsFromFiles();
   }
   return err;
 }
@@ -1406,91 +1461,78 @@ void CustomActions::markClean()
 }
 
 
-void CustomActions::loadActionsFromFiles()
+// MARK: ===== StandardAction
+
+StandardAction::StandardAction(SingleDevice &aSingleDevice, const string aId, const string aTitle) :
+  inherited(aSingleDevice)
 {
-  string dir = singleDevice.getVdcHost().getConfigDir();
-  const int numLevels = 4;
-  string levelids[numLevels];
-  // Level strategy: most specialized will be active, unless lower levels specify explicit override
-  // - Baselines are hardcoded defaults plus settings (already) loaded from persistent store
-  // - Level 0 are actions related to the device instance (dSUID)
-  // - Level 1 are actions related to the device type (deviceTypeIdentifier())
-  // - Level 2 are actions related to the device class/version (deviceClass()_deviceClassVersion())
-  // - Level 3 are actions related to the vDC (vdcClassIdentifier())
-  levelids[0] = "vdsd_" + singleDevice.getDsUid().getString();
-  levelids[1] = string(singleDevice.deviceTypeIdentifier()) + "_device";
-  levelids[2] = string_format("%s_%d_class", singleDevice.deviceClass().c_str(), singleDevice.deviceClassVersion());
-  levelids[3] = singleDevice.vdcP->vdcClassIdentifier();
-  for(int i=0; i<numLevels; ++i) {
-    // try to open config file
-    string fn = dir+"actions_"+levelids[i]+".csv";
-    string line;
-    int lineNo = 0;
-    FILE *file = fopen(fn.c_str(), "r");
-    if (!file) {
-      int syserr = errno;
-      if (syserr!=ENOENT) {
-        // file not existing is ok, all other errors must be reported
-        SALOG(singleDevice, LOG_ERR, "failed opening file '%s' - %s", fn.c_str(), strerror(syserr));
-      }
-      // don't process, try next
-      SALOG(singleDevice, LOG_DEBUG, "loadActionsFromFiles: tried '%s' - not found", fn.c_str());
-    }
-    else {
-      // file opened
-      SALOG(singleDevice, LOG_DEBUG, "loadActionsFromFiles: found '%s' - processing", fn.c_str());
-      while (string_fgetline(file, line)) {
-        lineNo++;
-        // skip empty lines and those starting with #, allowing to format and comment CSV
-        if (line.empty() || line[0]=='#') {
-          // skip this line
-          continue;
-        }
-        string f;
-        const char *p = line.c_str();
-        // first field is action id
-        bool overridden = false;
-        if (nextCSVField(p, f)) {
-          const char *fp = f.c_str();
-          if (!*fp) continue; // empty actionid field -> invalid line
-          // check override prefix
-          if (*fp=='!') {
-            ++fp;
-            overridden = true;
-          }
-          // get action id
-          string actionId = fp;
-          if (actionId.size()==0) {
-            SALOG(singleDevice, LOG_ERR, "%s:%d - missing activity name", fn.c_str(), lineNo);
-            continue; // no valid scene number -> invalid line
-          }
-          // check if this action already exists
-          CustomActionPtr a;
-          for (CustomActionsVector::iterator pos = customActions.begin(); pos!=customActions.end(); ++pos) {
-            if ((*pos)->actionId==actionId) {
-              // action already exists
-              if (!overridden) continue; // action already exists (user setting or more specialized level) -> dont apply
-              a = (*pos);
-            }
-          }
-          if (!a) {
-            a = CustomActionPtr(new CustomAction(singleDevice));
-            a->actionId = actionId;
-            customActions.push_back(a);
-          }
-          // process rest of CSV line as property name/value pairs
-          a->readPropsFromCSV(VDC_API_DOMAIN, false, p, fn.c_str(), lineNo);
-          // these changes are NOT to be made persistent in DB!
-          a->markClean();
-          // put scene into table
-          SALOG(singleDevice, LOG_INFO, "Custom action '%s' %sloaded from config file %s", actionId.c_str(), overridden ? "(with override) " : "", fn.c_str());
-        }
-      }
-      fclose(file);
-    }
+  actionId = aId;
+  actionTitle = aTitle;
+}
+
+
+// MARK: ===== StandardActions container
+
+
+void StandardActions::addStandardAction(StandardActionPtr aAction)
+{
+  standardActions.push_back(aAction);
+}
+
+
+void StandardActions::addToModelUIDHash(string &aHashedString)
+{
+  for (StandardActionsVector::iterator pos = standardActions.begin(); pos!=standardActions.end(); ++pos) {
+    aHashedString += ':';
+    aHashedString += (*pos)->actionId;
   }
 }
 
+
+
+int StandardActions::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return (int)standardActions.size();
+}
+
+
+static char standardactions_key;
+
+PropertyDescriptorPtr StandardActions::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  if (aPropIndex<standardActions.size()) {
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = standardActions[aPropIndex]->actionId;
+    descP->propertyType = apivalue_object;
+    descP->propertyFieldKey = aPropIndex;
+    descP->propertyObjectKey = OKEY(standardactions_key);
+    return descP;
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+PropertyContainerPtr StandardActions::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->hasObjectKey(standardactions_key)) {
+    return standardActions[aPropertyDescriptor->fieldKey()];
+  }
+  return NULL;
+}
+
+
+bool StandardActions::call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB)
+{
+  for (StandardActionsVector::iterator pos = standardActions.begin(); pos!=standardActions.end(); ++pos) {
+    if ((*pos)->actionId==aActionId) {
+      // action exists
+      (*pos)->call(aParams, aCompletedCB);
+      return true; // done, callback will finish it
+    }
+  }
+  // custom action does not exist
+  return false; // we might want to try device action directly
+}
 
 
 // MARK: ===== DeviceStateParams
@@ -2129,6 +2171,14 @@ void SingleDevice::enableAsSingleDevice()
 }
 
 
+void SingleDevice::enableStandardActions()
+{
+  enableAsSingleDevice();
+  // create standard actions
+  if (!standardActions) standardActions = StandardActionsPtr(new StandardActions(*this));
+}
+
+
 
 SingleDevice::~SingleDevice()
 {
@@ -2140,6 +2190,7 @@ void SingleDevice::addToModelUIDHash(string &aHashedString)
   // action names
   inherited::addToModelUIDHash(aHashedString);
   if (deviceActions) deviceActions->addToModelUIDHash(aHashedString);
+  if (standardActions) standardActions->addToModelUIDHash(aHashedString);
   // Note: dynamic device actions are NOT part of the hash!
   if (deviceStates) deviceStates->addToModelUIDHash(aHashedString);
   if (deviceEvents) deviceEvents->addToModelUIDHash(aHashedString);
@@ -2154,7 +2205,6 @@ void SingleDevice::addToModelUIDHash(string &aHashedString)
 
 ErrorPtr SingleDevice::load()
 {
-  // NOTE: load the custom actions first (so saved ones will be there when loadFromFiles occurs at inherited::load()
   ErrorPtr err;
   if (customActions) customActions->load();
   if (Error::isOK(err)) {
@@ -2195,24 +2245,18 @@ void SingleDevice::markClean()
 }
 
 
-void SingleDevice::loadSettingsFromFiles()
-{
-  inherited::loadSettingsFromFiles();
-  if (customActions) customActions->loadActionsFromFiles();
-}
-
-
-
 // MARK: ===== SingleDevice API calls
 
 void SingleDevice::call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB)
 {
   if (!customActions->call(aActionId, aParams, aCompletedCB)) {
-    if (!dynamicDeviceActions->call(aActionId, aParams, aCompletedCB)) {
-      if (!deviceActions->call(aActionId, aParams, aCompletedCB)) {
-        // action does not exist, call back with error
-        if (aCompletedCB) {
-          aCompletedCB(Error::err<VdcApiError>(501, "action '%s' does not exist", aActionId.c_str()));
+    if (!standardActions || !standardActions->call(aActionId, aParams, aCompletedCB)) {
+      if (!dynamicDeviceActions->call(aActionId, aParams, aCompletedCB)) {
+        if (!deviceActions->call(aActionId, aParams, aCompletedCB)) {
+          // action does not exist, call back with error
+          if (aCompletedCB) {
+            aCompletedCB(Error::err<VdcApiError>(501, "action '%s' does not exist", aActionId.c_str()));
+          }
         }
       }
     }
@@ -2327,8 +2371,6 @@ void SingleDevice::sceneInvokedActionComplete(ErrorPtr aError)
 
 
 
-
-
 // MARK: ===== SingleDevice property access
 
 
@@ -2337,6 +2379,7 @@ enum {
   deviceActionDescriptions_key,
   dynamicActionDescriptions_key,
   customActions_key,
+  standardActions_key,
   deviceStateDescriptions_key,
   deviceStates_key,
   deviceEventDescriptions_key,
@@ -2367,6 +2410,7 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
     { "deviceActionDescriptions", apivalue_object, deviceActionDescriptions_key, OKEY(singledevice_key) },
     { "dynamicActionDescriptions", apivalue_object, dynamicActionDescriptions_key, OKEY(singledevice_key) },
     { "customActions", apivalue_object, customActions_key, OKEY(singledevice_key) },
+    { "standardActions", apivalue_object, standardActions_key, OKEY(singledevice_key) },
     { "deviceStateDescriptions", apivalue_object, deviceStateDescriptions_key, OKEY(devicestatedesc_key) },
     { "deviceStates", apivalue_object, deviceStates_key, OKEY(devicestate_key) },
     { "deviceEventDescriptions", apivalue_object, deviceEventDescriptions_key, OKEY(deviceeventdesc_key) },
@@ -2396,6 +2440,8 @@ PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPr
         return dynamicDeviceActions;
       case customActions_key:
         return customActions;
+      case standardActions_key:
+        return standardActions;
       case deviceStateDescriptions_key:
       case deviceStates_key:
         return deviceStates;
@@ -2476,7 +2522,7 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
     // standard action
     err = actionFromJSON(a, aJSONConfig, aActionId, desc);
   }
-  if (!Error::isOK(err)) return err;
+  if (!Error::isOK(err) || !a) return err;
   // check for params
   if (aJSONConfig && aJSONConfig->get("params", o)) {
     string pname;
@@ -2486,6 +2532,7 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
       ValueDescriptorPtr p;
       ErrorPtr err = parameterFromJSON(p, param, pname);
       if (!Error::isOK(err)) return err;
+      if (!p) continue; // if the parsing was ok, but no parameter was created do not add it to the action
       bool optional = !(p->isDefault()); // by default, no default value means the value is optional
       JsonObjectPtr o3;
       if (param->get("optional", o3)) {
@@ -2507,6 +2554,56 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
 }
 
 
+ErrorPtr SingleDevice::standardActionsFromJSON(JsonObjectPtr aJSONConfig)
+{
+  JsonObjectPtr o;
+  ErrorPtr err;
+
+  // check for standard device actions
+  if (aJSONConfig->get("autoaddstandardactions", o) && o->boolValue()) {
+    autoAddStandardActions();
+  }
+  if (aJSONConfig->get("standardactions", o)) {
+    enableStandardActions(); // must behave as a single device with standard actions
+    string actionId;
+    string actionTitle;
+    JsonObjectPtr stdActionConfig;
+    o->resetKeyIteration();
+    while (o->nextKeyValue(actionId, stdActionConfig)) {
+      JsonObjectPtr o2;
+      if (!stdActionConfig->get("action", o2)) {
+        err = TextError::err("missing 'action' parameter");
+      }
+      else {
+        string baseAction = o2->stringValue();
+        string title;
+        if (stdActionConfig->get("title", o2)) {
+          title = o2->stringValue();
+        }
+        StandardActionPtr a = StandardActionPtr(new StandardAction(*this, actionId, title));
+        JsonObjectPtr p = stdActionConfig->get("params");
+        err = a->configureMacro(baseAction, p);
+        if (Error::isOK(err)) {
+          standardActions->addStandardAction(a);
+        }
+      }
+      if (!Error::isOK(err)) return err->withPrefix("Error creating standard action '%s': ", actionId.c_str());
+    }
+  }
+  return ErrorPtr();
+}
+
+
+void SingleDevice::autoAddStandardActions()
+{
+  enableStandardActions(); // must behave as a single device with standard actions
+  for (DeviceActions::ActionsVector::iterator pos = deviceActions->deviceActions.begin(); pos!=deviceActions->deviceActions.end(); ++pos) {
+    string id = (*pos)->getId();
+    StandardActionPtr a = StandardActionPtr(new StandardAction(*this, "std." + id));
+    a->configureMacro(id, JsonObjectPtr()); // no parameters
+    standardActions->addStandardAction(a);
+  }
+}
 
 
 ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
