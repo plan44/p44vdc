@@ -1004,6 +1004,7 @@ void ActionMacro::call(ApiValuePtr aParams, StatusCB aCompletedCB)
 enum {
   customactionaction_key,
   customactiontitle_key,
+  customactiondesc_key,
   customactionparams_key,
   numCustomActionProperties
 };
@@ -1023,6 +1024,7 @@ PropertyDescriptorPtr ActionMacro::getDescriptorByIndex(int aPropIndex, int aDom
   static const PropertyDescription properties[numCustomActionProperties] = {
     { "action", apivalue_string, customactionaction_key, OKEY(customaction_key) },
     { "title", apivalue_string, customactiontitle_key, OKEY(customaction_key) },
+    { "description", apivalue_string, customactiondesc_key, OKEY(customaction_key) },
     { "params", apivalue_null, customactionparams_key, OKEY(customaction_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
@@ -1088,6 +1090,13 @@ bool ActionMacro::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
       switch (aPropertyDescriptor->fieldKey()) {
         case customactionaction_key: aPropValue->setStringValue(action ? action->actionId : "INVALID"); return true;
         case customactiontitle_key: aPropValue->setStringValue(actionTitle); return true;
+        case customactiondesc_key: {
+          if (actionTitle.empty() && action)
+            aPropValue->setStringValue(action->actionDescription);
+          else
+            aPropValue->setStringValue(actionTitle);
+          return true;
+        }
         case customactionparams_key: {
           // simply return the stored params object
           *aPropValue = *storedParams; // do a value copy because  API value types might be different
@@ -2550,10 +2559,10 @@ ErrorPtr SingleDevice::standardActionsFromJSON(JsonObjectPtr aJSONConfig)
   ErrorPtr err;
 
   // check for standard device actions
-  if (aJSONConfig->get("autoAddStandardActions", o) && o->boolValue()) {
+  if (aJSONConfig->get("autoaddstandardactions", o) && o->boolValue()) {
     autoAddStandardActions();
   }
-  if (aJSONConfig->get("standardActions", o)) {
+  if (aJSONConfig->get("standardactions", o)) {
     enableStandardActions(); // must behave as a single device with standard actions
     string actionId;
     string actionTitle;
