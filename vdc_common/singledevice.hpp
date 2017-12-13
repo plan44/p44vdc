@@ -394,7 +394,7 @@ namespace p44 {
     /// add parameter
     /// @param aValueDesc a value descriptor object.
     /// @param aMandatory if set, parameter must be explicitly specified
-    void addParameter(ValueDescriptorPtr aValueDesc, bool aMandatory = false);
+    virtual void addParameter(ValueDescriptorPtr aValueDesc, bool aMandatory = false);
 
     /// call the action
     /// @param aParams an ApiValue of type apivalue_object, expected to

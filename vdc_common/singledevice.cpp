@@ -2522,7 +2522,7 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
     // standard action
     err = actionFromJSON(a, aJSONConfig, aActionId, desc);
   }
-  if (!Error::isOK(err)) return err;
+  if (!Error::isOK(err) || !a) return err;
   // check for params
   if (aJSONConfig && aJSONConfig->get("params", o)) {
     string pname;
@@ -2532,6 +2532,7 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
       ValueDescriptorPtr p;
       ErrorPtr err = parameterFromJSON(p, param, pname);
       if (!Error::isOK(err)) return err;
+      if (!p) continue; // if the parsing was ok, but no parameter was created do not add it to the action
       bool optional = !(p->isDefault()); // by default, no default value means the value is optional
       JsonObjectPtr o3;
       if (param->get("optional", o3)) {
