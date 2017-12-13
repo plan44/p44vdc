@@ -100,6 +100,10 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
+    /// some vdcs can have definitions of parameters, states, and properties changing depending on the device information
+    /// @return if true, this vDC should be queried for all actions parameters, states and properties descriptions
+    virtual bool dynamicDefinitions() { return true; } P44_OVERRIDE;// by default dynamic definitions are not used
+
   private:
 
     void deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError);
