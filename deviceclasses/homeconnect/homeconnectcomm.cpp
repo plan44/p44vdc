@@ -235,7 +235,8 @@ HomeConnectEventMonitor::HomeConnectEventMonitor(HomeConnectComm &aHomeConnectCo
   inherited(MainLoop::currentMainLoop()),
   homeConnectComm(aHomeConnectComm),
   urlPath(aUrlPath),
-  eventCB(aEventCB)
+  eventCB(aEventCB),
+  eventGotID(false)
 {
   sendGetEventRequest();
 }
@@ -304,7 +305,9 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
   if (Error::isOK(aError)) {
     if (aResponse.empty()) {
       // end of stream - schedule restart
-      MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
+      MainLoop::currentMainLoop().executeOnce(
+          boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this),
+          EVENT_STREAM_RESTART_DELAY);
       return;
     }
     eventBuffer += aResponse;
@@ -313,53 +316,59 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
     const char *cu = eventBuffer.c_str();
     string line;
     while (nextLine(cu, line)) {
-      // process line
-      string field;
-      string data;
-      if (keyAndValue(line, field, data, ':')) {
-        if (field=="event") {
-          eventTypeString = data;
-          FOCUSLOG(">>> Got event type: %s", eventTypeString.c_str());
-        }
-        else if (field=="data") {
-          eventData = data;
-          FOCUSLOG(">>> Got event data: %s", eventData.c_str());
-        }
-      }
-      else {
-        if (line.empty()) {
-          // empty line signals complete event but only if at least a type was found
-          if (!eventTypeString.empty()) {
-            FOCUSLOG(">>> Event is complete, dispatch now, one callback per item");
-            if (eventTypeString!="KEEP-ALIVE") {
-              // convert data to JSON
-              bool reporteditem = false;
-              JsonObjectPtr jsondata = JsonObject::objFromText(eventData.c_str());
-              if (jsondata) {
-                // iterate trough items
-                JsonObjectPtr items;
-                if (jsondata->get("items", items)) {
-                  for (int i=0; i<items->arrayLength(); i++) {
-                    JsonObjectPtr item = items->arrayGet(i);
-                    if (item) {
-                      // deliver
-                      reporteditem = true;
-                      if (eventCB) {
-                        eventCB(getEventType(), item, ErrorPtr());
-                      }
+      if (line.empty()) {
+        // empty line signals complete event but only if at least a type was found
+        if (!eventTypeString.empty()) {
+          FOCUSLOG(">>> Event is complete, dispatch now, one callback per item");
+          if (eventTypeString != "KEEP-ALIVE") {
+            // convert data to JSON
+            bool reporteditem = false;
+            JsonObjectPtr jsondata = JsonObject::objFromText(eventData.c_str());
+            if (jsondata) {
+              // iterate trough items
+              JsonObjectPtr items;
+              if (jsondata->get("items", items)) {
+                for (int i = 0; i < items->arrayLength(); i++) {
+                  JsonObjectPtr item = items->arrayGet(i);
+                  if (item) {
+                    // deliver
+                    reporteditem = true;
+                    if (eventCB) {
+                      eventCB(getEventType(), item, ErrorPtr());
                     }
                   }
                 }
               }
-              if (!reporteditem) {
-                // event w/o data or without items array in data, report event type along with raw data (or no data)
-                if (eventCB) eventCB(getEventType(), jsondata, ErrorPtr());
-              }
+            }
+            if (!reporteditem) {
+              // event w/o data or without items array in data, report event type along with raw data (or no data)
+              if (eventCB)
+                eventCB(getEventType(), jsondata, ErrorPtr());
             }
           }
-          // done
-          eventData.clear();
-          eventTypeString.clear();
+        }
+        // done
+        eventData.clear();
+        eventTypeString.clear();
+        eventGotID = false;
+      } else {
+        string field;
+        string data;
+        if (keyAndValue(line, field, data, ':')) {
+          if (field == "event") {
+            eventTypeString = data;
+            FOCUSLOG(">>> Got event type: %s", eventTypeString.c_str());
+          } else if (field == "data") {
+            eventData = data;
+            FOCUSLOG(">>> Got event data: %s", eventData.c_str());
+          } else if (field == "id") {
+            eventGotID = true;
+            FOCUSLOG(">>> Got field id: %s", data.c_str());
+          } else if( !eventGotID ) {
+            eventData += line;
+            FOCUSLOG(">>> Got more data: %s", line.c_str());
+            FOCUSLOG(">>> Event data: %s", eventData.c_str());
+          }
         }
       }
     }

@@ -123,6 +123,7 @@ namespace p44 {
     string eventBuffer; ///< accumulating event data
     string eventTypeString;
     string eventData;
+    bool eventGotID;
 
   public:
 
