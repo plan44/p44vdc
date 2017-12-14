@@ -30,7 +30,6 @@
 #include "simplescene.hpp"
 #include "sensorbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
-#include "netatmocomm.hpp"
 
 using namespace std;
 
@@ -78,6 +77,7 @@ namespace p44 {
 
 
   using NetatmoDevicePtr = boost::intrusive_ptr<NetatmoDevice>;
+  using NetatmoDeviceList = list<NetatmoDevicePtr>;
 
   class NetatmoDevice : public SingleDevice
   {
@@ -101,12 +101,18 @@ namespace p44 {
     /*device states*/
     DeviceStatePtr statusTempTrend;
 
-    enum class StatusTrend;
+    enum class StatusTrend{
+        rising,
+        steady,
+        sinking,
+        _num
+    };
 
     string netatmoId;
     string netatmoName;
     string netatmoFw;
     string baseStationId;
+    string netatmoType;
 
     boost::signals2::connection cbConnection;
 
@@ -185,6 +191,13 @@ namespace p44 {
     /*Device status factory*/
     EnumValueDescriptorPtr createTrendEnum(const string& aName);
     BinaryInputBehaviourPtr createStatusBattery();
+
+    static StatusTrend getStatusTrend(const string& aTrend);
+
+    string getNetatmoType() const { return netatmoType; }
+    string getBaseStationId() const { return baseStationId; }
+
+    void setUsageArea(VdcUsageHint aUsageHint) { usageArea = aUsageHint; }
 
 
     /// Callbacks for state ans property changes

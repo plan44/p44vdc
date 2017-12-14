@@ -25,7 +25,7 @@
 
 #if ENABLE_NETATMO
 
-#include "netatmodevice.hpp"
+#include "netatmodeviceenumerator.hpp"
 
 using namespace std;
 

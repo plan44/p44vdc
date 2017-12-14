@@ -33,6 +33,7 @@
 #include "sstream"
 #include "boost/algorithm/string.hpp"
 #include "netatmovdc.hpp"
+#include "netatmodeviceenumerator.hpp"
 
 using namespace p44;
 
@@ -186,6 +187,16 @@ void NetatmoComm::pollCycle()
       }
     }
   });
+
+  apiQuery(Query::getHomeCoachsData, [&](const string& aResponse, ErrorPtr aError){
+
+    if (Error::isOK(aError)) {
+      if (auto jsonResponse = JsonObject::objFromText(aResponse.c_str())) {
+        dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
+      }
+    }
+  });
+  
   MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, NETATMO_POLLING_INTERVAL);
 }
 

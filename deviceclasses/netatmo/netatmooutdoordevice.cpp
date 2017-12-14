@@ -31,7 +31,7 @@ using namespace p44;
 
 
 NetatmoOutdoorDevice::NetatmoOutdoorDevice(NetatmoVdc *aVdcP, INetatmoComm& aINetatmoComm, JsonObjectPtr aDeviceData, const string& aBaseStationId) :
-  inherited(aVdcP, aINetatmoComm, aDeviceData, usage_outdoors, aBaseStationId)
+  inherited(aVdcP, aINetatmoComm, aDeviceData, usage_undefined, aBaseStationId)
 {
 
 }
@@ -39,19 +39,8 @@ NetatmoOutdoorDevice::NetatmoOutdoorDevice(NetatmoVdc *aVdcP, INetatmoComm& aINe
 
 void NetatmoOutdoorDevice::configureDevice()
 {
-  sensorPressure =  SensorBehaviourPtr(new SensorBehaviour(*this, "SensorPressure"));
-  sensorPressure->setHardwareSensorConfig(sensorType_air_pressure, usageArea, 260, 1160, 1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
-  sensorPressure->setSensorNameWithRange("Air Pressure");
-  addBehaviour(sensorPressure);
-
   statusBattery = createStatusBattery();
   addBehaviour(statusBattery);
-
-  EnumValueDescriptorPtr pressureTrendEnum = createTrendEnum("StatusPressureTrend");
-  statusPressureTrend = DeviceStatePtr(new DeviceState(
-      *this, "StatusPressureTrend", "Pressure trend", pressureTrendEnum, [](auto...){}
-  ));
-  deviceStates->addState(statusPressureTrend);
 
   inherited::configureDevice();
 }
@@ -59,24 +48,10 @@ void NetatmoOutdoorDevice::configureDevice()
 
 void NetatmoOutdoorDevice::updateData(JsonObjectPtr aJson)
 {
-  // FIXME:    missing statusPressureTrend;
-
-  /* pressure is stored in base station*/
-  if (auto baseStationJson = findDeviceJson(aJson, baseStationId)) {
-    if (auto dashBoardData = baseStationJson->get("dashboard_data")) {
-
-      if (auto pressureJson = dashBoardData->get("Pressure")) {
-        sensorPressure->updateSensorValue(pressureJson->doubleValue());
-      }
-    }
-  }
-
   if (auto deviceJson = findModuleJson(aJson)) {
     if (auto batteryJson = deviceJson->get("battery_vp")) {
       statusBattery->updateInputState(batteryJson->int32Value() < LOW_BATTERY_THRESHOLD_OUTDOOR);
     }
-
-
 
     inherited::updateData(deviceJson);
   }
@@ -85,8 +60,7 @@ void NetatmoOutdoorDevice::updateData(JsonObjectPtr aJson)
 
 bool NetatmoOutdoorDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  //TODO: device icons
-  if (getIcon("harmony", aIcon, aWithData, aResolutionPrefix))
+  if (getIcon("WeatherStationOutdoorModule_16", aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);

@@ -29,13 +29,6 @@ using namespace p44;
 
 // MARK: ===== NetatmoDevice
 
-enum class NetatmoDevice::StatusTrend {
-    rising,
-    steady,
-    sinking,
-    _num
-};
-
 
 NetatmoDevice::NetatmoDevice(NetatmoVdc *aVdcP, INetatmoComm& aINetatmoComm, JsonObjectPtr aDeviceData, VdcUsageHint aUsageArea, const string& aBaseStationId) :
   inherited(aVdcP),
@@ -65,6 +58,10 @@ NetatmoDevice::~NetatmoDevice()
 void NetatmoDevice::setIdentificationData(JsonObjectPtr aJson)
 {
   if (aJson) {
+    if (auto typeJson = aJson->get("type")) {
+      netatmoType = typeJson->stringValue();
+    }
+
     if (auto idJson = aJson->get("_id")) {
       netatmoId = idJson->stringValue();
     }
@@ -80,9 +77,40 @@ void NetatmoDevice::setIdentificationData(JsonObjectPtr aJson)
   }
 }
 
+
+void NetatmoDevice::configureDevice()
+{
+
+  swVersion = ValueDescriptorPtr(new TextValueDescriptor("SwVersion"));
+  deviceProperties->addProperty(swVersion, true);
+
+  measurementTimestamp = ValueDescriptorPtr(new NumericValueDescriptor("MeasurementTimestamp", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, (24*60*60), 1));
+  deviceProperties->addProperty(measurementTimestamp, true);
+
+  sensorTemperature = SensorBehaviourPtr(new SensorBehaviour(*this, "SensorTemperature"));
+  sensorTemperature->setHardwareSensorConfig(sensorType_temperature, usageArea, -40, 65, 0.1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
+  sensorTemperature->setSensorNameWithRange("Temperature");
+  addBehaviour(sensorTemperature);
+
+  sensorHumidity = SensorBehaviourPtr(new SensorBehaviour(*this, "SensorHumidity"));
+  sensorHumidity->setHardwareSensorConfig(sensorType_humidity, usageArea, 0, 100, 1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
+  sensorHumidity->setSensorNameWithRange("Humidity");
+  sensorHumidity->setGroup(group_undefined);
+  addBehaviour(sensorHumidity);
+
+  EnumValueDescriptorPtr tempTrendEnum = createTrendEnum("StatusTempTrend");
+  statusTempTrend = DeviceStatePtr(new DeviceState(
+      *this, "StatusTempTrend", "Temperature trend", tempTrendEnum, [](auto...){}
+  ));
+  deviceStates->addState(statusTempTrend);
+
+  // derive the dSUID
+  deriveDsUid();
+}
+
+
 void NetatmoDevice::updateData(JsonObjectPtr aJson)
 {
-  /* FIXME: missing measurementTimestamp, statusTempTrend*/
   if (aJson) {
     if (auto swVersionJson = aJson->get("firmware")) {
       swVersion->setStringValue(swVersionJson->stringValue());
@@ -96,7 +124,35 @@ void NetatmoDevice::updateData(JsonObjectPtr aJson)
       if (auto humidityJson = dashBoardData->get("Humidity")) {
         sensorHumidity->updateSensorValue(humidityJson->doubleValue());
       }
+
+      if (auto tempTrendJson = dashBoardData->get("temp_trend")) {
+        auto statusTrend = getStatusTrend(tempTrendJson->stringValue());
+        if (statusTrend < StatusTrend::_num){
+          if (statusTempTrend->value()->setInt32Value(static_cast<int>(statusTrend))){
+            statusTempTrend->push();
+          }
+        }
+      }
+
+      if (auto timestampJson = dashBoardData->get("time_utc")){
+        //TODO
+        auto tmpstmp = timestampJson->int64Value();
+        LOG(LOG_INFO, "\n\nTIMESTAMP RAW %d\n\n", tmpstmp);
+
+        time_t myTime = static_cast<time_t>(tmpstmp);
+        struct tm * timeStruct = localtime(&myTime);
+
+        LOG(LOG_INFO, "\n\n MY TIME  %d %d %d\n\n", timeStruct->tm_hour, timeStruct->tm_min, timeStruct->tm_sec);
+
+        auto secondsToday = (timeStruct->tm_hour*60*60) + (timeStruct->tm_min*60) + timeStruct->tm_sec;
+
+        measurementTimestamp->setInt32Value(secondsToday);
+
+
+      }
+
     }
+
   }
 }
 
@@ -126,34 +182,13 @@ JsonObjectPtr NetatmoDevice::findModuleJson(JsonObjectPtr aJsonArray)
 }
 
 
-void NetatmoDevice::configureDevice()
+NetatmoDevice::StatusTrend NetatmoDevice::getStatusTrend(const string& aTrend)
 {
+  if      (aTrend == "up")      return StatusTrend::rising;
+  else if (aTrend == "stable")  return StatusTrend::steady;
+  else if (aTrend == "down")    return StatusTrend::sinking;
 
-  swVersion = ValueDescriptorPtr(new TextValueDescriptor("SwVersion"));
-  deviceProperties->addProperty(swVersion, true);
-
-  measurementTimestamp = ValueDescriptorPtr(new TextValueDescriptor("MeasurementTimestamp"));
-  deviceProperties->addProperty(measurementTimestamp, true);
-
-  sensorTemperature = SensorBehaviourPtr(new SensorBehaviour(*this, "SensorTemperature"));
-  sensorTemperature->setHardwareSensorConfig(sensorType_temperature, usageArea, -40, 65, 0.1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
-  sensorTemperature->setSensorNameWithRange("Temperature");
-  addBehaviour(sensorTemperature);
-
-  sensorHumidity = SensorBehaviourPtr(new SensorBehaviour(*this, "SensorHumidity"));
-  sensorHumidity->setHardwareSensorConfig(sensorType_humidity, usageArea, 0, 100, 1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
-  sensorHumidity->setSensorNameWithRange("Humidity");
-  sensorHumidity->setGroup(group_undefined);
-  addBehaviour(sensorHumidity);
-
-  EnumValueDescriptorPtr tempTrendEnum = createTrendEnum("StatusTempTrend");
-  statusTempTrend = DeviceStatePtr(new DeviceState(
-      *this, "StatusTempTrend", "Temperature trend", tempTrendEnum, [](auto...){}
-  ));
-  deviceStates->addState(statusTempTrend);
-
-  // derive the dSUID
-  deriveDsUid();
+  return StatusTrend::_num;
 }
 
 
@@ -209,7 +244,7 @@ bool NetatmoDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
   configureDevice();
   // Note: not using instant identification here, because we eventually need API calls here.
   identificationOK(aIdentifyCB);
-  return false; // not complete, callback signals identification complete
+  return true;
 }
 
 

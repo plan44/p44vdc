@@ -39,12 +39,22 @@ NetatmoIndoorBaseDevice::NetatmoIndoorBaseDevice(NetatmoVdc *aVdcP, INetatmoComm
 
 void NetatmoIndoorBaseDevice::configureDevice()
 {
+  sensorPressure =  SensorBehaviourPtr(new SensorBehaviour(*this, "SensorPressure"));
+  sensorPressure->setHardwareSensorConfig(sensorType_air_pressure, usageArea, 260, 1160, 1, SENSOR_UPDATE_INTERVAL, SENSOR_ALIVESIGN_INTERVAL);
+  sensorPressure->setSensorNameWithRange("Air Pressure");
+  addBehaviour(sensorPressure);
 
   sensorCO2 = createSensorCO2();
   addBehaviour(sensorCO2);
 
   sensorNoise = createSensorNoise();
   addBehaviour(sensorNoise);
+
+  EnumValueDescriptorPtr pressureTrendEnum = createTrendEnum("StatusPressureTrend");
+  statusPressureTrend = DeviceStatePtr(new DeviceState(
+      *this, "StatusPressureTrend", "Pressure trend", pressureTrendEnum, [](auto...){}
+  ));
+  deviceStates->addState(statusPressureTrend);
 
   inherited::configureDevice();
 }
@@ -59,6 +69,11 @@ void NetatmoIndoorBaseDevice::updateData(JsonObjectPtr aJson)
     }
 
     if (auto dashBoardData = deviceJson->get("dashboard_data")) {
+
+      if (auto pressureJson = dashBoardData->get("Pressure")) {
+        sensorPressure->updateSensorValue(pressureJson->doubleValue());
+      }
+
       if (!co2calibration) {
         if (auto CO2Json = dashBoardData->get("CO2")) {
           sensorCO2->updateSensorValue(CO2Json->int32Value());
@@ -67,6 +82,15 @@ void NetatmoIndoorBaseDevice::updateData(JsonObjectPtr aJson)
 
       if (auto noiseJson = dashBoardData->get("Noise")) {
         sensorNoise->updateSensorValue(noiseJson->int32Value());
+      }
+
+      if (auto pressureTrendJson = dashBoardData->get("pressure_trend")) {
+        auto statusTrend = getStatusTrend(pressureTrendJson->stringValue());
+        if (statusTrend < StatusTrend::_num){
+          if (statusPressureTrend->value()->setInt32Value(static_cast<int>(statusTrend))) {
+            statusPressureTrend->push();
+          }
+        }
       }
     }
 
@@ -78,8 +102,7 @@ void NetatmoIndoorBaseDevice::updateData(JsonObjectPtr aJson)
 
 bool NetatmoIndoorBaseDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  // TODO: device icon
-  if (getIcon("harmony", aIcon, aWithData, aResolutionPrefix))
+  if (getIcon("WeatherStationIndoorBase_16", aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);

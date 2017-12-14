@@ -107,8 +107,7 @@ void NetatmoHealthyCoachDevice::updateData(JsonObjectPtr aJson)
 
 bool NetatmoHealthyCoachDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  // TODO: device icon
-  if (getIcon("harmony", aIcon, aWithData, aResolutionPrefix))
+  if (getIcon("HealthyHomeCoach_16", aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);

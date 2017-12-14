@@ -25,7 +25,8 @@
 
 #if ENABLE_NETATMO
 
-#include "netatmodevice.hpp"
+#include "netatmodeviceenumerator.hpp"
+#include "p44vdc_common.hpp"
 
 using namespace std;
 
@@ -49,8 +50,11 @@ namespace p44 {
     /*device sensors*/
     SensorBehaviourPtr sensorCO2;
     SensorBehaviourPtr sensorNoise;
+    SensorBehaviourPtr sensorPressure;
 
     /*device states*/
+    DeviceStatePtr statusPressureTrend;
+
 
     public:
     NetatmoIndoorBaseDevice(NetatmoVdc *aVdcP, INetatmoComm& aINetatmoComm, JsonObjectPtr aDeviceData);

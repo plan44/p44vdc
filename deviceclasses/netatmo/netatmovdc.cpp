@@ -31,15 +31,22 @@
 #if ENABLE_NETATMO
 
 #include "utils.hpp"
+#include "netatmodeviceenumerator.hpp"
+
 
 using namespace p44;
 
 
 NetatmoVdc::NetatmoVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag),
-  deviceEnumerator(this, netatmoComm)
+  deviceEnumerator(make_unique<NetatmoDeviceEnumerator>(this, netatmoComm))
 {
   initializeName("Netatmo Controller");
+}
+
+NetatmoVdc::~NetatmoVdc()
+{
+
 }
 
 
@@ -156,8 +163,9 @@ void NetatmoVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
 
-  deviceEnumerator.collectDevices(aCompletedCB);
+  deviceEnumerator->collectDevices(aCompletedCB);
 }
+
 
 static char netatmo_key;
 

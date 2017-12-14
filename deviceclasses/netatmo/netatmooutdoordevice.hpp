@@ -25,7 +25,7 @@
 
 #if ENABLE_NETATMO
 
-#include "netatmodevice.hpp"
+#include "netatmodeviceenumerator.hpp"
 
 using namespace std;
 
@@ -47,12 +47,9 @@ namespace p44 {
     protected:
 
     /*device sensors*/
-    SensorBehaviourPtr sensorPressure;
 
     /*device states*/
     BinaryInputBehaviourPtr statusBattery;
-    DeviceStatePtr statusPressureTrend;
-
 
     public:
     NetatmoOutdoorDevice(NetatmoVdc *aVdcP, INetatmoComm& aINetatmoComm, JsonObjectPtr aDeviceData, const string& aBaseStationId);

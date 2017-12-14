@@ -29,6 +29,7 @@
 
 #include "jsonobject.hpp"
 #include "vdc.hpp"
+#include "netatmodevice.hpp"
 
 namespace p44 {
 
@@ -39,8 +40,10 @@ namespace p44 {
 
       NetatmoVdc* netatmoVdc;
       NetatmoComm& netatmoComm;
-      DeviceList deviceList;
+      NetatmoDeviceList deviceList;
       string netatmoBaseId;
+
+      pair<time_t, string> firstBase;
 
 
     public:
@@ -54,6 +57,7 @@ namespace p44 {
       void collectDevicesFromArray(JsonObjectPtr aJson);
       static JsonObjectPtr getDevicesJson(JsonObjectPtr aJson);
       static JsonObjectPtr getUserEmailJson(JsonObjectPtr aJson);
+      void enableOutdoorTemperatureSensor();
   };
 
 } // namespace p44
