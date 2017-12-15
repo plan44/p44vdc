@@ -218,7 +218,7 @@ HomeConnectGoToStandbyAction::HomeConnectGoToStandbyAction(SingleDevice &aSingle
                                                            EnumValueDescriptor& aOperationMode) :
     inherited(aSingleDevice,
               aOperationMode,
-              "std.StandBy",
+              "StandBy",
               "Switch power state standby",
               HomeConnectSettingBuilder("BSH.Common.Setting.PowerState").setValue("\"BSH.Common.EnumType.PowerState.Standby\"").build()),
     powerState(aPowerState) {}
@@ -271,7 +271,7 @@ HomeConnectStopIfNotTimedAction::HomeConnectStopIfNotTimedAction(SingleDevice &a
                                                                  ValueDescriptor& aRemainingProgramTime) :
    inherited(aSingleDevice,
              aOperationMode,
-             "std.StopIfNotTimed",
+             "StopIfNotTimed",
              "Stop program if it is not timed"),
    remainingProgramTime(aRemainingProgramTime) {}
 

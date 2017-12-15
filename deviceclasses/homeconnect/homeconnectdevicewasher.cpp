@@ -55,7 +55,7 @@ HomeConnectDeviceWasher::HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObje
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
-  settings->fireAction = "std.Stop";
+  settings->fireAction = "Stop";
 
   installSettings(settings);
 }

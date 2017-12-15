@@ -32,10 +32,10 @@ HomeConnectDeviceOven::HomeConnectDeviceOven(HomeConnectVdc *aVdcP, JsonObjectPt
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
-  settings->fireAction = "std.StandBy";
-  settings->deepOffAction = "std.StopIfNotTimed";
-  settings->leaveHomeAction = "std.StopIfNotTimed";
-  settings->sleepAction = "std.StopIfNotTimed";
+  settings->fireAction = "StandBy";
+  settings->deepOffAction = "StopIfNotTimed";
+  settings->leaveHomeAction = "StopIfNotTimed";
+  settings->sleepAction = "StopIfNotTimed";
 
   installSettings(settings);
 }

@@ -33,7 +33,7 @@ HomeConnectDeviceDishWasher::HomeConnectDeviceDishWasher(HomeConnectVdc *aVdcP, 
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
-  settings->fireAction = "std.PowerOff";
+  settings->fireAction = "PowerOff";
 
   installSettings(settings);
 }
@@ -105,11 +105,11 @@ bool HomeConnectDeviceDishWasher::configureDevice()
   addDefaultPowerOnAction();
   addDefaultStopAction();
 
-  addAction("std.Auto3545",    "Auto 35-45C", "Auto1",   delayedStart);
-  addAction("std.Auto4565",    "Auto 45-65C", "Auto2",   delayedStart);
-  addAction("std.Auto6575",    "Auto 65-75C", "Auto3",   delayedStart);
-  addAction("std.Eco50",       "Eco 50C",     "Eco50",   delayedStart);
-  addAction("std.QuickWash45", "Quick 45C",   "Quick45", delayedStart);
+  addAction("Auto3545",    "Auto 35-45C", "Auto1",   delayedStart);
+  addAction("Auto4565",    "Auto 45-65C", "Auto2",   delayedStart);
+  addAction("Auto6575",    "Auto 65-75C", "Auto3",   delayedStart);
+  addAction("Eco50",       "Eco 50C",     "Eco50",   delayedStart);
+  addAction("QuickWash45", "Quick 45C",   "Quick45", delayedStart);
 
 
   delayedStartProp = ValueDescriptorPtr(
