@@ -302,80 +302,7 @@ EventType HomeConnectEventMonitor::getEventType()
 
 void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr aError)
 {
-  if (Error::isOK(aError)) {
-    if (aResponse.empty()) {
-      // end of stream - schedule restart
-      MainLoop::currentMainLoop().executeOnce(
-          boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this),
-          EVENT_STREAM_RESTART_DELAY);
-      return;
-    }
-    eventBuffer += aResponse;
-    FOCUSLOG(">>> Accumulated Event from '%s' data: %s", urlPath.c_str(), aResponse.c_str());
-    // process
-    const char *cu = eventBuffer.c_str();
-    string line;
-    while (nextLine(cu, line)) {
-      if (line.empty()) {
-        // empty line signals complete event but only if at least a type was found
-        if (!eventTypeString.empty()) {
-          FOCUSLOG(">>> Event is complete, dispatch now, one callback per item");
-          if (eventTypeString != "KEEP-ALIVE") {
-            // convert data to JSON
-            bool reporteditem = false;
-            JsonObjectPtr jsondata = JsonObject::objFromText(eventData.c_str());
-            if (jsondata) {
-              // iterate trough items
-              JsonObjectPtr items;
-              if (jsondata->get("items", items)) {
-                for (int i = 0; i < items->arrayLength(); i++) {
-                  JsonObjectPtr item = items->arrayGet(i);
-                  if (item) {
-                    // deliver
-                    reporteditem = true;
-                    if (eventCB) {
-                      eventCB(getEventType(), item, ErrorPtr());
-                    }
-                  }
-                }
-              }
-            }
-            if (!reporteditem) {
-              // event w/o data or without items array in data, report event type along with raw data (or no data)
-              if (eventCB)
-                eventCB(getEventType(), jsondata, ErrorPtr());
-            }
-          }
-        }
-        // done
-        eventData.clear();
-        eventTypeString.clear();
-        eventGotID = false;
-      } else {
-        string field;
-        string data;
-        if (keyAndValue(line, field, data, ':')) {
-          if (field == "event") {
-            eventTypeString = data;
-            FOCUSLOG(">>> Got event type: %s", eventTypeString.c_str());
-          } else if (field == "data") {
-            eventData = data;
-            FOCUSLOG(">>> Got event data: %s", eventData.c_str());
-          } else if (field == "id") {
-            eventGotID = true;
-            FOCUSLOG(">>> Got field id: %s", data.c_str());
-          } else if( !eventGotID ) {
-            eventData += line;
-            FOCUSLOG(">>> Got more data: %s", line.c_str());
-            FOCUSLOG(">>> Event data: %s", eventData.c_str());
-          }
-        }
-      }
-    }
-    // remove processed data
-    eventBuffer.erase(0,cu-eventBuffer.c_str());
-  }
-  else {
+  if (!Error::isOK(aError)) {
     LOG(LOG_WARNING, "HomeConnect Event stream '%s' error: %s, message: '%s'", urlPath.c_str(), aError->description().c_str(), aResponse.c_str());
     // error in comm - schedule restart
     if (aError->getErrorCode() == 401) {
@@ -384,8 +311,93 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
     } else {
       MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
     }
+    return;
+  }
+
+  if (aResponse.empty()) {
+    // end of stream - schedule restart
+    MainLoop::currentMainLoop().executeOnce(
+        boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this),
+        EVENT_STREAM_RESTART_DELAY);
+    return;
+  }
+
+  eventBuffer += aResponse;
+  FOCUSLOG(">>> Accumulated Event from '%s' data: %s", urlPath.c_str(), aResponse.c_str());
+  // process
+  const char *cu = eventBuffer.c_str();
+  string line;
+  while (nextLine(cu, line)) {
+    parseLine(line);
+  }
+  // remove processed data
+  eventBuffer.erase(0,cu-eventBuffer.c_str());
+}
+
+void HomeConnectEventMonitor::parseLine(const string& aLine)
+{
+  if (aLine.empty()) {
+    // empty line signals complete event but only if at least a type was found
+    if (!eventTypeString.empty()) {
+      FOCUSLOG(">>> Event is complete, dispatch now, one callback per item");
+      if (eventTypeString != "KEEP-ALIVE") {
+        completeEvent();
+      }
+    }
+    // done
+    eventData.clear();
+    eventTypeString.clear();
+    eventGotID = false;
+  } else {
+    string field;
+    string data;
+    if (keyAndValue(aLine, field, data, ':')) {
+      if (field == "event") {
+        eventTypeString = data;
+        FOCUSLOG(">>> Got event type: %s", eventTypeString.c_str());
+      } else if (field == "data") {
+        eventData += data;
+        FOCUSLOG(">>> Got event data: %s", eventData.c_str());
+      } else if (field == "id") {
+        eventGotID = true;
+        FOCUSLOG(">>> Got field id: %s", data.c_str());
+      } else if( !eventGotID ) {
+        eventData += aLine;
+        FOCUSLOG(">>> Got more data: %s", aLine.c_str());
+        FOCUSLOG(">>> Event data: %s", eventData.c_str());
+      }
+    }
   }
 }
+
+void HomeConnectEventMonitor::completeEvent()
+{
+  // convert data to JSON
+  bool reporteditem = false;
+  JsonObjectPtr jsondata = JsonObject::objFromText(eventData.c_str());
+  if (jsondata) {
+    // iterate trough items
+    JsonObjectPtr items;
+    if (jsondata->get("items", items)) {
+      for (int i = 0; i < items->arrayLength(); i++) {
+        JsonObjectPtr item = items->arrayGet(i);
+        if (item) {
+          // deliver
+          reporteditem = true;
+          if (eventCB) {
+            eventCB(getEventType(), item, ErrorPtr());
+          }
+        }
+      }
+    }
+  }
+  if (!reporteditem) {
+    // event w/o data or without items array in data, report event type along with raw data (or no data)
+    if (eventCB)
+      eventCB(getEventType(), jsondata, ErrorPtr());
+  }
+}
+
 
 void HomeConnectEventMonitor::apiQueryDone(JsonObjectPtr aResult, ErrorPtr aError)
 {
@@ -393,7 +405,6 @@ void HomeConnectEventMonitor::apiQueryDone(JsonObjectPtr aResult, ErrorPtr aErro
   // the request was done, try to open event channel again
   MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), 1*Second);
 }
-
 
 
 // MARK: ===== HomeConnectComm
