@@ -455,6 +455,19 @@ bool EnumValueDescriptor::setStringValueCaseInsensitive(const string& aValue)
   return false; // no change
 }
 
+EnumValueDescriptorPtr EnumValueDescriptor::create(const char* aName, std::vector<const char*> aValues)
+{
+  EnumValueDescriptorPtr desc = EnumValueDescriptorPtr(new EnumValueDescriptor(aName, true));
+
+  int i = 0;
+  for(std::vector<const char*>::iterator it = aValues.begin(); it < aValues.end(); it++) {
+    desc->addEnum(*it, i++);
+  }
+
+  return desc;
+}
+
+
 
 void EnumValueDescriptor::addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault)
 {

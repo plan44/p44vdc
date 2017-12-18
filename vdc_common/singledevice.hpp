@@ -281,6 +281,8 @@ namespace p44 {
     
   };
 
+  class EnumValueDescriptor;
+  typedef boost::intrusive_ptr<EnumValueDescriptor> EnumValueDescriptorPtr;
 
   /// parameter descriptor subclass for enumeration parameters, describing parameter via a list of possible values
   class EnumValueDescriptor : public ValueDescriptor
@@ -314,6 +316,8 @@ namespace p44 {
     virtual bool setStringValue(const string aValue) P44_FINAL P44_OVERRIDE;
     bool setStringValueCaseInsensitive(const string& aValue);
 
+    static EnumValueDescriptorPtr create(const char* aName, std::vector<const char*> aValues);
+
   protected:
 
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
@@ -322,7 +326,6 @@ namespace p44 {
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_FINAL P44_OVERRIDE;
 
   };
-  typedef boost::intrusive_ptr<EnumValueDescriptor> EnumValueDescriptorPtr;
 
 
   class ValueList : public PropertyContainer
