@@ -28,7 +28,7 @@
 
 #include "netatmovdc.hpp"
 
-#if ENABLE_NETATMO
+#if ENABLE_NETATMO_V2
 
 #include "utils.hpp"
 #include "netatmodeviceenumerator.hpp"
@@ -279,4 +279,4 @@ void NetatmoVdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, 
 }
 
 
-#endif // ENABLE_NETATMO
+#endif // ENABLE_NETATMO_V2

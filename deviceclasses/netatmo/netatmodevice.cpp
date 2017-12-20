@@ -22,7 +22,7 @@
 #include "netatmodevice.hpp"
 
 
-#if ENABLE_NETATMO
+#if ENABLE_NETATMO_V2
 
 using namespace p44;
 
@@ -33,7 +33,8 @@ using namespace p44;
 NetatmoDevice::NetatmoDevice(NetatmoVdc *aVdcP, INetatmoComm& aINetatmoComm, JsonObjectPtr aDeviceData, VdcUsageHint aUsageArea, const string& aBaseStationId) :
   inherited(aVdcP),
   usageArea(aUsageArea),
-  baseStationId(aBaseStationId)
+  baseStationId(aBaseStationId),
+  isPresent(true)
 {
   setIdentificationData(aDeviceData);
 
@@ -135,25 +136,50 @@ void NetatmoDevice::updateData(JsonObjectPtr aJson)
       }
 
       if (auto timestampJson = dashBoardData->get("time_utc")){
-        //TODO
-        auto tmpstmp = timestampJson->int64Value();
-        LOG(LOG_INFO, "\n\nTIMESTAMP RAW %d\n\n", tmpstmp);
+        auto secondsToday = getSecondsFromMidnight(timestampJson->int64Value());
+        measurementTimestamp->setInt32Value(secondsToday.count());
 
-        time_t myTime = static_cast<time_t>(tmpstmp);
-        struct tm * timeStruct = localtime(&myTime);
+        bool wasPresent = isPresent;
+        isPresent = getElapsedHoursFromLastMeasure(timestampJson->int64Value()).count() >= LAST_MEASUREMENT_ELAPSED_HOURS_MAX;
 
-        LOG(LOG_INFO, "\n\n MY TIME  %d %d %d\n\n", timeStruct->tm_hour, timeStruct->tm_min, timeStruct->tm_sec);
-
-        auto secondsToday = (timeStruct->tm_hour*60*60) + (timeStruct->tm_min*60) + timeStruct->tm_sec;
-
-        measurementTimestamp->setInt32Value(secondsToday);
-
+        // if last measurement was measured longer than 12 hrs ago, set device to inactive
+        if (wasPresent != isPresent && !isPresent) hasVanished(false);
 
       }
 
+      }
     }
 
   }
+}
+
+
+chrono::seconds NetatmoDevice::getSecondsFromMidnight(time_t aTimestamp)
+{
+  using namespace chrono;
+
+  system_clock::time_point timestamp = system_clock::from_time_t(aTimestamp);
+
+  struct tm * timeStruct = localtime(&aTimestamp);
+  // set midnight time
+  timeStruct->tm_sec = 0;
+  timeStruct->tm_min = 0;
+  timeStruct->tm_hour = 0;
+
+  system_clock::time_point midnight = system_clock::from_time_t(mktime(timeStruct));
+
+  return duration_cast<seconds>(timestamp - midnight);
+}
+
+
+chrono::hours NetatmoDevice::getElapsedHoursFromLastMeasure(time_t aTimestamp)
+{
+  using namespace chrono;
+
+  system_clock::time_point timestamp = system_clock::from_time_t(aTimestamp);
+  system_clock::time_point now = system_clock::now();
+
+  return duration_cast<hours>(now - timestamp);
 }
 
 
@@ -281,8 +307,7 @@ string NetatmoDevice::vendorName()
 
 void NetatmoDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
-  // TODO
-  if (aPresenceResultHandler) aPresenceResultHandler(true);
+  if (aPresenceResultHandler) aPresenceResultHandler(isPresent);
 }
 
 
@@ -308,5 +333,5 @@ string NetatmoDevice::description()
 }
 
 
-#endif // ENABLE_NETATMO
+#endif // ENABLE_NETATMO_V2
 

@@ -23,7 +23,7 @@
 #define __p44vdc__netatmoindoorbasedevice__
 
 
-#if ENABLE_NETATMO
+#if ENABLE_NETATMO_V2
 
 #include "netatmodeviceenumerator.hpp"
 #include "p44vdc_common.hpp"
@@ -92,5 +92,5 @@ namespace p44 {
 } // namespace p44
 
 
-#endif // ENABLE_NETATMO
+#endif // ENABLE_NETATMO_V2
 #endif // __p44vdc__netatmoindoorbasedevice__

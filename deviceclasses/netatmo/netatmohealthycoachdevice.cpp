@@ -22,7 +22,7 @@
 #include "netatmohealthycoachdevice.hpp"
 
 
-#if ENABLE_NETATMO
+#if ENABLE_NETATMO_V2
 
 using namespace p44;
 
@@ -127,5 +127,5 @@ string NetatmoHealthyCoachDevice::oemModelGUID()
 
 
 
-#endif // ENABLE_NETATMO
+#endif // ENABLE_NETATMO_V2
 

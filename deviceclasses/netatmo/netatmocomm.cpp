@@ -28,7 +28,7 @@
 
 #include "netatmocomm.hpp"
 
-#if ENABLE_NETATMO
+#if ENABLE_NETATMO_V2
 
 #include "sstream"
 #include "boost/algorithm/string.hpp"
@@ -59,24 +59,30 @@ NetatmoOperation::NetatmoOperation(
 void NetatmoOperation::sendRequest()
 {
   auto httpCallback = [=](const string& aResponse, ErrorPtr aError){
-    string decoded;
-    streamBuffer += aResponse;
 
-    bool chunked = any_of(
-        httpClient.getHttpApi().responseHeaders->begin(),
-        httpClient.getHttpApi().responseHeaders->end(),
-        [=](auto aElem){ return ((aElem.first == "Transfer-Encoding") && (aElem.second == "chunked")); }
-        );
+    if (Error::isOK(aError)){
+      string decoded;
+      streamBuffer += aResponse;
 
-    if (chunked) {
-      decoded = httputils::decodeChunkData(streamBuffer);
+      bool chunked = any_of(
+          httpClient.getHttpApi().responseHeaders->begin(),
+          httpClient.getHttpApi().responseHeaders->end(),
+          [=](auto aElem){ return ((aElem.first == "Transfer-Encoding") && (aElem.second == "chunked")); }
+      );
+
+      if (chunked) {
+        decoded = httputils::decodeChunkData(streamBuffer);
+      } else {
+        decoded = aResponse;
+      }
+
+      /* check if string is valid as json data */
+      if (auto jsonResponse = JsonObject::objFromText(decoded.c_str())){
+        this->processAnswer(decoded, aError);
+      }
     } else {
-      decoded = aResponse;
-    }
-
-    /* check if string is valid as json data */
-    if (auto jsonResponse = JsonObject::objFromText(decoded.c_str())){
-      this->processAnswer(decoded, aError);
+      LOG(LOG_ERR, "NetatmoOperation Response Error: '%s'", aError->description().c_str());
+      inherited::abortOperation(aError);
     }
 
   };
@@ -313,4 +319,4 @@ string NetatmoComm::getAccountStatusString()
   }
 }
 
-#endif // ENABLE_NETATMO
+#endif // ENABLE_NETATMO_V2

@@ -24,7 +24,7 @@
 
 #include "p44vdc_common.hpp"
 
-#if ENABLE_NETATMO
+#if ENABLE_NETATMO_V2
 
 #include "boost/optional.hpp"
 #include "boost/signals2.hpp"
@@ -65,7 +65,7 @@ namespace p44 {
 
   using UpdateDataCB = boost::function<void(JsonObjectPtr)>;
 
-  class INetatmoComm : public P44Obj
+  class INetatmoComm
   {
     public:
       virtual ~INetatmoComm() {}
@@ -142,5 +142,5 @@ namespace p44 {
 
 } // namespace p44
 
-#endif // ENABLE_NETATMO
+#endif // ENABLE_NETATMO_V2
 #endif // __p44vdc__netatmocomm__

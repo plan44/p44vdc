@@ -25,7 +25,7 @@
 
 #include "p44vdc_common.hpp"
 
-#if ENABLE_NETATMO
+#if ENABLE_NETATMO_V2
 
 #include "jsonobject.hpp"
 #include "vdc.hpp"
@@ -63,5 +63,5 @@ namespace p44 {
 } // namespace p44
 
 
-#endif // ENABLE_NETATMO
+#endif // ENABLE_NETATMO_V2
 #endif // __p44vdc__netatmodeviceenumerator__

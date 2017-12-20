@@ -25,7 +25,7 @@
 #include "netatmoindoorbasedevice.hpp"
 #include "netatmooutdoordevice.hpp"
 
-#if ENABLE_NETATMO
+#if ENABLE_NETATMO_V2
 
 using namespace p44;
 
@@ -71,7 +71,8 @@ void NetatmoDeviceEnumerator::collectDevices(StatusCB aCompletedCB)
       netatmoVdc->simpleIdentifyAndAddDevice(device);
     }
 
-    deviceList.clear();	
+    deviceList.clear();
+    if (aCompletedCB) aCompletedCB(Error::ok());
   });
 
 
@@ -176,5 +177,5 @@ JsonObjectPtr NetatmoDeviceEnumerator::getUserEmailJson(JsonObjectPtr aJson)
 
 
 
-#endif // ENABLE_NETATMO
+#endif // ENABLE_NETATMO_V2
 

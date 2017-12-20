@@ -24,12 +24,13 @@
 
 #include "netatmovdc.hpp"
 
-#if ENABLE_NETATMO
+#if ENABLE_NETATMO_V2
 
 #include "singledevice.hpp"
 #include "simplescene.hpp"
 #include "sensorbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
+#include <chrono>
 
 using namespace std;
 
@@ -89,6 +90,7 @@ namespace p44 {
     static const MLMicroSeconds SENSOR_ALIVESIGN_INTERVAL = 10*Minute;
     static const int LOW_BATTERY_THRESHOLD_INDOOR = 4920;
     static const int LOW_BATTERY_THRESHOLD_OUTDOOR = 4500;
+    static const int LAST_MEASUREMENT_ELAPSED_HOURS_MAX = 12;
 
     /*device properties*/
     ValueDescriptorPtr swVersion;
@@ -113,6 +115,8 @@ namespace p44 {
     string netatmoFw;
     string baseStationId;
     string netatmoType;
+
+    bool isPresent;
 
     boost::signals2::connection cbConnection;
 
@@ -196,9 +200,9 @@ namespace p44 {
 
     string getNetatmoType() const { return netatmoType; }
     string getBaseStationId() const { return baseStationId; }
+    string getNetatmoId() const { return netatmoId; }
 
     void setUsageArea(VdcUsageHint aUsageHint) { usageArea = aUsageHint; }
-
 
     /// Callbacks for state ans property changes
     void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
@@ -208,6 +212,8 @@ namespace p44 {
     virtual void configureDevice();
     void setIdentificationData(JsonObjectPtr aJson);
     virtual void updateData(JsonObjectPtr aJson);
+    static chrono::seconds getSecondsFromMidnight(time_t aTimestamp);
+    static chrono::hours getElapsedHoursFromLastMeasure(time_t aTimestamp);
     JsonObjectPtr findDeviceJson(JsonObjectPtr aJsonArray, const string& aDeviceId);
     virtual JsonObjectPtr findModuleJson(JsonObjectPtr aJsonArray);
 
@@ -217,5 +223,5 @@ namespace p44 {
 } // namespace p44
 
 
-#endif // ENABLE_NETATMO
+#endif // ENABLE_NETATMO_V2
 #endif // __p44vdc__netatmodevice__
