@@ -123,10 +123,10 @@ bool HomeConnectDeviceOven::configureDevice()
       new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
           1, true, 600));
 
-  addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
-  addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
-  addAction("std.TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
-  addAction("std.PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
+  addAction("Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
+  addAction("HotAir",           "Hot air",             "HotAir",           temp, duration);
+  addAction("TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
+  addAction("PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
 
   deviceActions->addAction(new HomeConnectStopIfNotTimedAction(*this, *operationModeDescriptor, *remainingProgramTime));
 

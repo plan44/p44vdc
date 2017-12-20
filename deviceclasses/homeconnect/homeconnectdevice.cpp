@@ -500,7 +500,7 @@ void HomeConnectDevice::addDefaultPowerOffAction()
 
 void HomeConnectDevice::addDefaultStopAction()
 {
-  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectStopAction(*this, *operationModeDescriptor, "std.Stop", "Stop current program"));
+  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectStopAction(*this, *operationModeDescriptor, "Stop", "Stop current program"));
   deviceActions->addAction(a);
 }
 
