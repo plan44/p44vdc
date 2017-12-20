@@ -39,7 +39,7 @@ using namespace p44;
 
 NetatmoVdc::NetatmoVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag),
-  deviceEnumerator(make_unique<NetatmoDeviceEnumerator>(this, netatmoComm))
+  deviceEnumerator(this, netatmoComm)
 {
   initializeName("Netatmo Controller");
 }
@@ -163,7 +163,7 @@ void NetatmoVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
 
-  deviceEnumerator->collectDevices(aCompletedCB);
+  deviceEnumerator.collectDevices(aCompletedCB);
 }
 
 

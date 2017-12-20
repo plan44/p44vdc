@@ -40,7 +40,7 @@ namespace p44 {
 
       NetatmoVdc* netatmoVdc;
       NetatmoComm& netatmoComm;
-      NetatmoDeviceList deviceList;
+      DeviceList deviceList;
       string netatmoBaseId;
 
       pair<time_t, string> firstBase;

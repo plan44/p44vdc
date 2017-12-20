@@ -24,6 +24,7 @@
 #include "netatmohealthycoachdevice.hpp"
 #include "netatmoindoorbasedevice.hpp"
 #include "netatmooutdoordevice.hpp"
+#include "netatmovdc.hpp"
 
 #if ENABLE_NETATMO_V2
 
@@ -33,7 +34,7 @@ using namespace p44;
 NetatmoDeviceEnumerator::NetatmoDeviceEnumerator(NetatmoVdc* aNetatmoVdc, NetatmoComm& aNetatmoComm) :
     netatmoVdc(aNetatmoVdc),
     netatmoComm(aNetatmoComm),
-    firstBase(make_pair(LONG_MAX, ""))
+    firstBase(make_pair(numeric_limits<time_t>::max(), ""))
 {
 
 }
@@ -67,12 +68,9 @@ void NetatmoDeviceEnumerator::collectDevices(StatusCB aCompletedCB)
       collectDevicesFromArray(devices);
     }
 
-    for (auto& device : deviceList){
-      netatmoVdc->simpleIdentifyAndAddDevice(device);
-    }
+    netatmoVdc->identifyAndAddDevices(deviceList, aCompletedCB);
 
     deviceList.clear();
-    if (aCompletedCB) aCompletedCB(Error::ok());
   });
 
 
@@ -122,13 +120,13 @@ void NetatmoDeviceEnumerator::enumerateAndEmplaceDevice(JsonObjectPtr aJson)
 
         }
 
-        deviceList.emplace_back(NetatmoDevicePtr(new NetatmoIndoorBaseDevice(netatmoVdc, netatmoComm, aJson)));
+        deviceList.emplace_back(DevicePtr(new NetatmoIndoorBaseDevice(netatmoVdc, netatmoComm, aJson)));
       } else if (type == "NAModule1") {
-        deviceList.emplace_back(NetatmoDevicePtr(new NetatmoOutdoorDevice(netatmoVdc, netatmoComm, aJson, netatmoBaseId)));
+        deviceList.emplace_back(DevicePtr(new NetatmoOutdoorDevice(netatmoVdc, netatmoComm, aJson, netatmoBaseId)));
       } else if (type == "NAModule4") {
-        deviceList.emplace_back(NetatmoDevicePtr(new NetatmoAddIndoorDevice(netatmoVdc, netatmoComm, aJson, netatmoBaseId)));
+        deviceList.emplace_back(DevicePtr(new NetatmoAddIndoorDevice(netatmoVdc, netatmoComm, aJson, netatmoBaseId)));
       } else if (type == "NHC") {
-        deviceList.emplace_back(NetatmoDevicePtr(new NetatmoHealthyCoachDevice(netatmoVdc, netatmoComm, aJson)));
+        deviceList.emplace_back(DevicePtr(new NetatmoHealthyCoachDevice(netatmoVdc, netatmoComm, aJson)));
       }
     }
   }
@@ -136,12 +134,14 @@ void NetatmoDeviceEnumerator::enumerateAndEmplaceDevice(JsonObjectPtr aJson)
 
 void NetatmoDeviceEnumerator::enableOutdoorTemperatureSensor()
 {
-  auto it = find_if(deviceList.begin(), deviceList.end(), [=](NetatmoDevicePtr aDevice){
-    return ((aDevice->getNetatmoType() == "NAModule1") && (aDevice->getBaseStationId() == firstBase.second));
+  auto it = find_if(deviceList.begin(), deviceList.end(), [=](DevicePtr aDevice){
+    auto dev = boost::dynamic_pointer_cast<NetatmoDevice>(aDevice);
+    return ((dev->getNetatmoType() == "NAModule1") && (dev->getBaseStationId() == firstBase.second));
   });
 
   if (it != deviceList.end()){
-   (*it)->setUsageArea(usage_outdoors);
+    auto dev = boost::dynamic_pointer_cast<NetatmoDevice>(*it);
+    dev->setUsageArea(usage_outdoors);
   }
 
 }

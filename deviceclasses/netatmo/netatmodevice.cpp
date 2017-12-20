@@ -20,6 +20,7 @@
 //
 
 #include "netatmodevice.hpp"
+#include "netatmovdc.hpp"
 
 
 #if ENABLE_NETATMO_V2
@@ -147,10 +148,9 @@ void NetatmoDevice::updateData(JsonObjectPtr aJson)
 
       }
 
-      }
     }
-
   }
+
 }
 
 

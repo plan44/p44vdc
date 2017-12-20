@@ -29,6 +29,7 @@
 #include "vdc.hpp"
 #include "device.hpp"
 #include "netatmocomm.hpp"
+#include "netatmodeviceenumerator.hpp"
 
 
 using namespace std;
@@ -37,7 +38,6 @@ namespace p44 {
 
   class NetatmoVdc;
   class NetatmoComm;
-  class NetatmoDeviceEnumerator;
 
 
   using NetatmoVdcPtr = boost::intrusive_ptr<NetatmoVdc>;
@@ -47,7 +47,7 @@ namespace p44 {
     using inherited = Vdc;
 
     NetatmoComm netatmoComm;
-    unique_ptr<NetatmoDeviceEnumerator> deviceEnumerator;
+    NetatmoDeviceEnumerator deviceEnumerator;
 
 
   public:

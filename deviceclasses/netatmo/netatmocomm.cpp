@@ -32,7 +32,6 @@
 
 #include "sstream"
 #include "boost/algorithm/string.hpp"
-#include "netatmovdc.hpp"
 #include "netatmodeviceenumerator.hpp"
 
 using namespace p44;

@@ -22,7 +22,6 @@
 #ifndef __p44vdc__netatmodevice__
 #define __p44vdc__netatmodevice__
 
-#include "netatmovdc.hpp"
 
 #if ENABLE_NETATMO_V2
 
@@ -31,6 +30,7 @@
 #include "sensorbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
 #include <chrono>
+#include "boost/signals2.hpp"
 
 using namespace std;
 
