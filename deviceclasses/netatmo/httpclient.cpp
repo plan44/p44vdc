@@ -19,6 +19,8 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if ENABLE_NETATMO_V2
+
 #include "httpclient.hpp"
 
 // File scope debugging options
@@ -174,4 +176,4 @@ HttpClient::HttpClient() :
   httpApi.isMemberVariable();
 }
 
-
+#endif // ENABLE_NETATMO_V2

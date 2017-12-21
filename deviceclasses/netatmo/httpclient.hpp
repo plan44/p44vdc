@@ -23,6 +23,9 @@
 #define __p44utils__httpclient__
 
 #include "p44utils_common.hpp"
+
+#if ENABLE_NETATMO_V2
+
 #include "httpcomm.hpp"
 #include "operationqueue.hpp"
 
@@ -110,5 +113,5 @@ namespace httputils {
 
 } // namespace p44
 
-
+#endif // ENABLE_NETATMO_V2
 #endif /* defined(__p44utils__httpclient__) */
