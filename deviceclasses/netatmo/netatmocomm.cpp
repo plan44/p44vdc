@@ -188,7 +188,12 @@ void NetatmoComm::pollCycle()
 
     if (Error::isOK(aError)) {
       if (auto jsonResponse = JsonObject::objFromText(aResponse.c_str())) {
-        dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
+        // even when api error occured, http code is 200, thus error check in json response is needed
+        if (checkIfAccessTokenExpired(jsonResponse)){
+          refreshAccessToken();
+        } else {
+          dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
+        }
       }
     }
   });
@@ -230,6 +235,19 @@ void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword
 
       httpClient.queueOperation(op);
       httpClient.processOperations();
+}
+
+bool NetatmoComm::checkIfAccessTokenExpired(JsonObjectPtr aJsonResponse)
+{
+  if (aJsonResponse){
+    if (auto errorJson = aJsonResponse->get("error")){
+      if (auto errMsgJson = errorJson->get("message")){
+        LOG(LOG_WARNING, "Response Error: '%s'", errMsgJson->stringValue().c_str());
+        return errMsgJson->stringValue() == "Access token expired";
+      }
+    }
+  }
+  return false;
 }
 
 
