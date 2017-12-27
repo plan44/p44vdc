@@ -141,7 +141,7 @@ void NetatmoDevice::updateData(JsonObjectPtr aJson)
         measurementTimestamp->setInt32Value(secondsToday.count());
 
         bool wasPresent = isPresent;
-        isPresent = getElapsedHoursFromLastMeasure(timestampJson->int64Value()).count() >= LAST_MEASUREMENT_ELAPSED_HOURS_MAX;
+        isPresent = getElapsedHoursFromLastMeasure(timestampJson->int64Value()).count() < LAST_MEASUREMENT_ELAPSED_HOURS_MAX;
 
         // if last measurement was measured longer than 12 hrs ago, set device to inactive
         if (wasPresent != isPresent && !isPresent) hasVanished(false);
@@ -270,7 +270,7 @@ bool NetatmoDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
   configureDevice();
   // Note: not using instant identification here, because we eventually need API calls here.
   identificationOK(aIdentifyCB);
-  return true;
+  return false;
 }
 
 
