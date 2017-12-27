@@ -113,10 +113,11 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
       methodCompleted(aRequest, respErr);
       return respErr;
     }
+
     netatmoComm.setAccessToken(accessToken);
     netatmoComm.setRefreshToken(refreshToken);
-    markDirty();
-    save();
+    storeDataAndScanForDevices();
+
   } else if (aMethod=="authorizeByEmail") {
     string mail, password;
 
@@ -138,21 +139,24 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
     }
 
     netatmoComm.authorizeByEmail(mail, password, [&](ErrorPtr aError){
-      if (Error::isOK(aError)) {
-        markDirty();
-        save();
-      }
+      if (Error::isOK(aError)) storeDataAndScanForDevices();
     });
   } else if (aMethod=="disconnect") {
     netatmoComm.disconnect();
-    markDirty();
-    save();
+    storeDataAndScanForDevices();
   } else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
 
   if (aRequest) methodCompleted(aRequest, respErr);
   return respErr;
+}
+
+void NetatmoVdc::storeDataAndScanForDevices()
+{
+  markDirty();
+  save();
+  scanForDevices({}, rescanmode_normal);
 }
 
 

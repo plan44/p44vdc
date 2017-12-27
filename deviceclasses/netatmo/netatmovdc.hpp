@@ -97,6 +97,8 @@ namespace p44 {
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
+    void storeDataAndScanForDevices();
+
 
   };
 
