@@ -128,7 +128,7 @@ namespace p44 {
 
      void apiQuery(Query aQuery, HttpCommCB aResponseCB);
 
-     void pollCycle();
+     void pollCycle(bool aEnqueueNextPoll=true);
 
      void authorizeByEmail(const string& aEmail, const string& aPassword, StatusCB aCompletedCB);
      bool checkIfAccessTokenExpired(JsonObjectPtr aJsonResponse);

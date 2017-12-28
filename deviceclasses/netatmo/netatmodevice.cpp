@@ -35,7 +35,8 @@ NetatmoDevice::NetatmoDevice(NetatmoVdc *aVdcP, INetatmoComm& aINetatmoComm, Jso
   inherited(aVdcP),
   usageArea(aUsageArea),
   baseStationId(aBaseStationId),
-  isPresent(true)
+  isPresent(true),
+  measurementAbsloluteTimestamp(chrono::system_clock::to_time_t(chrono::system_clock::now()))
 {
   setIdentificationData(aDeviceData);
 
@@ -137,19 +138,19 @@ void NetatmoDevice::updateData(JsonObjectPtr aJson)
       }
 
       if (auto timestampJson = dashBoardData->get("time_utc")){
-        auto secondsToday = getSecondsFromMidnight(timestampJson->int64Value());
+        measurementAbsloluteTimestamp = timestampJson->int64Value();
+        auto secondsToday = getSecondsFromMidnight(measurementAbsloluteTimestamp);
         measurementTimestamp->setInt32Value(secondsToday.count());
-
-        bool wasPresent = isPresent;
-        isPresent = getElapsedHoursFromLastMeasure(timestampJson->int64Value()).count() < LAST_MEASUREMENT_ELAPSED_HOURS_MAX;
-
-        // if last measurement was measured longer than 12 hrs ago, set device to inactive
-        if (wasPresent != isPresent && !isPresent) hasVanished(false);
-
       }
 
     }
   }
+
+  bool wasPresent = isPresent;
+  isPresent = getElapsedHoursFromLastMeasure(measurementAbsloluteTimestamp).count() < LAST_MEASUREMENT_ELAPSED_HOURS_MAX;
+
+  // if last measurement was measured longer than 12 hrs ago, set device to inactive
+  if (wasPresent != isPresent && !isPresent) reportVanished();
 
 }
 

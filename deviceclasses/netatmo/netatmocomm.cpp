@@ -182,7 +182,7 @@ boost::signals2::connection NetatmoComm::registerCallback(UpdateDataCB aCallback
 }
 
 
-void NetatmoComm::pollCycle()
+void NetatmoComm::pollCycle(bool aEnqueueNextPoll)
 {
   apiQuery(Query::getStationsData, [&](const string& aResponse, ErrorPtr aError){
 
@@ -190,6 +190,7 @@ void NetatmoComm::pollCycle()
       if (auto jsonResponse = JsonObject::objFromText(aResponse.c_str())) {
         // even when api error occured, http code is 200, thus error check in json response is needed
         if (checkIfAccessTokenExpired(jsonResponse)){
+          accountStatus = AccountStatus::disconnected;
           refreshAccessToken();
         } else {
           dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
@@ -206,8 +207,9 @@ void NetatmoComm::pollCycle()
       }
     }
   });
-  
-  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, NETATMO_POLLING_INTERVAL);
+
+  if (aEnqueueNextPoll)
+    MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, NETATMO_POLLING_INTERVAL);
 }
 
 void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword, StatusCB aCompletedCB)
@@ -261,20 +263,29 @@ void NetatmoComm::refreshAccessToken()
         <<"&client_id="<<CLIENT_ID
         <<"&client_secret="<<CLIENT_SECRET;
 
+    auto refreshAccessTokenCB = [=](const string& aResponse, ErrorPtr aError){
+      this->gotAccessData(aResponse, aError, [=](ErrorPtr aError){
+        if (Error::isOK(aError)){
+          // poll data when access token has been renewed
+          MainLoop::currentMainLoop().executeOnce([=](auto...){ this->pollCycle(false); }, 30*Second);
+        }
+      });
+    };
 
     auto op = NetatmoOperationPtr(
-            new NetatmoOperation(
-                httpClient,
-                "POST",
-                AUTHENTICATE_URL,
-                requestBody.str(),
-                [=](auto...params){ this->gotAccessData(params...); },
-                "application/x-www-form-urlencoded;charset=UTF-8"
-            )
-        );
+        new NetatmoOperation(
+            httpClient,
+            "POST",
+            AUTHENTICATE_URL,
+            requestBody.str(),
+            refreshAccessTokenCB,
+            "application/x-www-form-urlencoded;charset=UTF-8"
+        )
+    );
 
-        httpClient.queueOperation(op);
-        httpClient.processOperations();
+    httpClient.queueOperation(op);
+    httpClient.processOperations();
+    
   } else {
     LOG(LOG_ERR, "NetatmoComm::refreshAccessToken no refresh token available");
   }
