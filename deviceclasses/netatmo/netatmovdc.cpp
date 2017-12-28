@@ -37,6 +37,8 @@
 using namespace p44;
 
 
+const string NetatmoVdc::CONFIG_FILE = "config.json";
+
 NetatmoVdc::NetatmoVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag),
   deviceEnumerator(this, netatmoComm)
@@ -72,7 +74,13 @@ bool NetatmoVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResol
 
 void NetatmoVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  string filePath = getVdcHost().getConfigDir();
+  filePath.append(CONFIG_FILE);
+  LOG(LOG_INFO, "Loading configuration from file '%s'", filePath.c_str());
+  netatmoComm.loadConfigFile(JsonObject::objFromFile(filePath.c_str()));
+  // load persistent data
   load();
+  // schedule data polling
   MainLoop::currentMainLoop().executeOnce([&](auto...){ this->netatmoComm.pollCycle(); }, NETATMO_POLLING_START_DELAY);
   // schedule incremental re-collect from time to time
   setPeriodicRecollection(NETATMO_RECOLLECT_INTERVAL, rescanmode_incremental);
@@ -156,7 +164,7 @@ void NetatmoVdc::storeDataAndScanForDevices()
 {
   markDirty();
   save();
-  scanForDevices({}, rescanmode_normal);
+  collectDevices({}, rescanmode_normal);
 }
 
 

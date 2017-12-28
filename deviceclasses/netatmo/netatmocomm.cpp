@@ -116,14 +116,29 @@ const string NetatmoComm::BASE_URL = "https://api.netatmo.com";
 const string NetatmoComm::GET_STATIONS_DATA_URL = "/api/getstationsdata";
 const string NetatmoComm::GET_HOME_COACHS_URL = "/api/gethomecoachsdata";
 const string NetatmoComm::AUTHENTICATE_URL = "https://api.netatmo.com/oauth2/token";
-const string NetatmoComm::CLIENT_ID = "";
-const string NetatmoComm::CLIENT_SECRET = "";
 
 
 NetatmoComm::NetatmoComm() :
     accountStatus(AccountStatus::disconnected)
 {
   httpClient.isMemberVariable();
+}
+
+void NetatmoComm::loadConfigFile(JsonObjectPtr aConfigJson)
+{
+  if (aConfigJson) {
+    if (auto clientIdJson = aConfigJson->get("client_id")){
+      clientId = clientIdJson->stringValue();
+      LOG(LOG_INFO, "CLIENT ID: '%s'", clientId.c_str());
+    }
+
+    if (auto clientSecretJson = aConfigJson->get("client_secret")){
+      clientSecret = clientSecretJson->stringValue();
+      LOG(LOG_INFO, "CLIENT SECRET: '%s'", clientSecret.c_str());
+    }
+  } else {
+    LOG(LOG_ERR, "NetatmoComm error: cannot load configuration");
+  }
 }
 
 
@@ -219,8 +234,8 @@ void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword
   requestBody<<"grant_type=password"
       <<"&username="<<HttpComm::urlEncode(aEmail, false)
       <<"&password="<<HttpComm::urlEncode(aPassword, false)
-      <<"&client_id="<<CLIENT_ID
-      <<"&client_secret="<<CLIENT_SECRET
+      <<"&client_id="<<clientId
+      <<"&client_secret="<<clientSecret
       <<"&scope="<<HttpComm::urlEncode("read_station read_homecoach", false);
 
 
@@ -260,8 +275,8 @@ void NetatmoComm::refreshAccessToken()
 
     requestBody<<"grant_type=refresh_token"
         <<"&refresh_token="<<refreshToken
-        <<"&client_id="<<CLIENT_ID
-        <<"&client_secret="<<CLIENT_SECRET;
+        <<"&client_id="<<clientId
+        <<"&client_secret="<<clientSecret;
 
     auto refreshAccessTokenCB = [=](const string& aResponse, ErrorPtr aError){
       this->gotAccessData(aResponse, aError, [=](ErrorPtr aError){

@@ -59,11 +59,7 @@ void NetatmoAddIndoorDevice::updateData(JsonObjectPtr aJson)
       if (auto baseStationJson = findDeviceJson(aJson, baseStationId)){
         if (auto co2calJson = baseStationJson->get("co2_calibrating")) {
           co2calibration = co2calJson->boolValue();
-        } else {
-          LOG(LOG_INFO, "co2_calibrating not found ");
         }
-      } else {
-        LOG(LOG_INFO, "baseStationJson not found ");
       }
 
       if (!co2calibration) {

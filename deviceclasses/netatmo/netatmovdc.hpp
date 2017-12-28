@@ -47,6 +47,7 @@ namespace p44 {
     using inherited = Vdc;
 
     static const MLMicroSeconds NETATMO_POLLING_START_DELAY = 30*Second;
+    static const string CONFIG_FILE;
 
     NetatmoComm netatmoComm;
     NetatmoDeviceEnumerator deviceEnumerator;

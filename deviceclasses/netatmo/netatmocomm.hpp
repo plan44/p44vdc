@@ -97,8 +97,8 @@ namespace p44 {
      static const string GET_STATIONS_DATA_URL;
      static const string GET_HOME_COACHS_URL;
      static const string AUTHENTICATE_URL;
-     static const string CLIENT_ID;
-     static const string CLIENT_SECRET;
+     string clientId;
+     string clientSecret;
      // basing on api description: 
      // "Do not try to pull data every minute. 
      // Netatmo Weather Station sends its measures to the server every ten minutes"
@@ -110,6 +110,7 @@ namespace p44 {
      NetatmoComm();
      virtual ~NetatmoComm() {}
 
+     void loadConfigFile(JsonObjectPtr aConfigJson);
      void setAccessToken(const string& aAccessToken) { accessToken = aAccessToken; }
      string getAccessToken() const { return accessToken; }
      void setRefreshToken(const string& aRefreshToken) { refreshToken = aRefreshToken; }
