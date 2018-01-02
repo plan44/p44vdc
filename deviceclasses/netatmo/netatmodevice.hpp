@@ -94,7 +94,10 @@ namespace p44 {
 
     /*device properties*/
     ValueDescriptorPtr swVersion;
+    // relative timestamp: seconds from midnight
     ValueDescriptorPtr measurementTimestamp;
+    // absolute timestamp (unix time)
+    time_t measurementAbsloluteTimestamp;
 
     /*device sensors*/
     SensorBehaviourPtr sensorTemperature;

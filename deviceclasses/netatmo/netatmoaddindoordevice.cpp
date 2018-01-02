@@ -19,6 +19,7 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 #include "netatmoaddindoordevice.hpp"
+#include "netatmodeviceenumerator.hpp"
 
 
 #if ENABLE_NETATMO_V2
@@ -51,12 +52,16 @@ void NetatmoAddIndoorDevice::configureDevice()
 void NetatmoAddIndoorDevice::updateData(JsonObjectPtr aJson)
 {
   if (auto deviceJson = findModuleJson(aJson)) {
-    auto co2calibration = true;
-    if (auto co2calJson = deviceJson->get("co2_calibrating")) {
-      co2calibration = co2calJson->boolValue();
-    }
 
     if (auto dashBoardData = deviceJson->get("dashboard_data")) {
+      // check if co2 is calibration now. Data available only on base station
+      auto co2calibration = true;
+      if (auto baseStationJson = findDeviceJson(aJson, baseStationId)){
+        if (auto co2calJson = baseStationJson->get("co2_calibrating")) {
+          co2calibration = co2calJson->boolValue();
+        }
+      }
+
       if (!co2calibration) {
         if (auto CO2Json = dashBoardData->get("CO2")) {
           sensorCO2->updateSensorValue(CO2Json->int32Value());

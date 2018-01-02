@@ -37,6 +37,8 @@
 using namespace p44;
 
 
+const string NetatmoVdc::CONFIG_FILE = "config.json";
+
 NetatmoVdc::NetatmoVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag),
   deviceEnumerator(this, netatmoComm)
@@ -72,8 +74,14 @@ bool NetatmoVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResol
 
 void NetatmoVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  string filePath = getVdcHost().getConfigDir();
+  filePath.append(CONFIG_FILE);
+  LOG(LOG_INFO, "Loading configuration from file '%s'", filePath.c_str());
+  netatmoComm.loadConfigFile(JsonObject::objFromFile(filePath.c_str()));
+  // load persistent data
   load();
-  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->netatmoComm.pollCycle(); }, NetatmoComm::NETATMO_POLLING_INTERVAL);
+  // schedule data polling
+  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->netatmoComm.pollCycle(); }, NETATMO_POLLING_START_DELAY);
   // schedule incremental re-collect from time to time
   setPeriodicRecollection(NETATMO_RECOLLECT_INTERVAL, rescanmode_incremental);
   if (aCompletedCB) aCompletedCB(Error::ok());
@@ -113,10 +121,11 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
       methodCompleted(aRequest, respErr);
       return respErr;
     }
+
     netatmoComm.setAccessToken(accessToken);
     netatmoComm.setRefreshToken(refreshToken);
-    markDirty();
-    save();
+    storeDataAndScanForDevices();
+
   } else if (aMethod=="authorizeByEmail") {
     string mail, password;
 
@@ -138,21 +147,24 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
     }
 
     netatmoComm.authorizeByEmail(mail, password, [&](ErrorPtr aError){
-      if (Error::isOK(aError)) {
-        markDirty();
-        save();
-      }
+      if (Error::isOK(aError)) storeDataAndScanForDevices();
     });
   } else if (aMethod=="disconnect") {
     netatmoComm.disconnect();
-    markDirty();
-    save();
+    storeDataAndScanForDevices();
   } else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
 
   if (aRequest) methodCompleted(aRequest, respErr);
   return respErr;
+}
+
+void NetatmoVdc::storeDataAndScanForDevices()
+{
+  markDirty();
+  save();
+  collectDevices({}, rescanmode_normal);
 }
 
 

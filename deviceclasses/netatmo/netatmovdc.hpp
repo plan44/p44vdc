@@ -46,6 +46,9 @@ namespace p44 {
   {
     using inherited = Vdc;
 
+    static const MLMicroSeconds NETATMO_POLLING_START_DELAY = 30*Second;
+    static const string CONFIG_FILE;
+
     NetatmoComm netatmoComm;
     NetatmoDeviceEnumerator deviceEnumerator;
 
@@ -94,6 +97,8 @@ namespace p44 {
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+    void storeDataAndScanForDevices();
 
 
   };

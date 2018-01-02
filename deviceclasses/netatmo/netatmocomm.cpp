@@ -116,14 +116,29 @@ const string NetatmoComm::BASE_URL = "https://api.netatmo.com";
 const string NetatmoComm::GET_STATIONS_DATA_URL = "/api/getstationsdata";
 const string NetatmoComm::GET_HOME_COACHS_URL = "/api/gethomecoachsdata";
 const string NetatmoComm::AUTHENTICATE_URL = "https://api.netatmo.com/oauth2/token";
-const string NetatmoComm::CLIENT_ID = "";
-const string NetatmoComm::CLIENT_SECRET = "";
 
 
 NetatmoComm::NetatmoComm() :
     accountStatus(AccountStatus::disconnected)
 {
   httpClient.isMemberVariable();
+}
+
+void NetatmoComm::loadConfigFile(JsonObjectPtr aConfigJson)
+{
+  if (aConfigJson) {
+    if (auto clientIdJson = aConfigJson->get("client_id")){
+      clientId = clientIdJson->stringValue();
+      LOG(LOG_INFO, "CLIENT ID: '%s'", clientId.c_str());
+    }
+
+    if (auto clientSecretJson = aConfigJson->get("client_secret")){
+      clientSecret = clientSecretJson->stringValue();
+      LOG(LOG_INFO, "CLIENT SECRET: '%s'", clientSecret.c_str());
+    }
+  } else {
+    LOG(LOG_ERR, "NetatmoComm error: cannot load configuration");
+  }
 }
 
 
@@ -184,11 +199,24 @@ boost::signals2::connection NetatmoComm::registerCallback(UpdateDataCB aCallback
 
 void NetatmoComm::pollCycle()
 {
+  pollState();
+  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, NETATMO_POLLING_INTERVAL);
+}
+
+
+void NetatmoComm::pollState()
+{
   apiQuery(Query::getStationsData, [&](const string& aResponse, ErrorPtr aError){
 
     if (Error::isOK(aError)) {
       if (auto jsonResponse = JsonObject::objFromText(aResponse.c_str())) {
-        dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
+        // even when api error occured, http code is 200, thus error check in json response is needed
+        if (hasAccessTokenExpired(jsonResponse)){
+          accountStatus = AccountStatus::disconnected;
+          refreshAccessToken();
+        } else {
+          dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
+        }
       }
     }
   });
@@ -201,9 +229,8 @@ void NetatmoComm::pollCycle()
       }
     }
   });
-  
-  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, NETATMO_POLLING_INTERVAL);
 }
+
 
 void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword, StatusCB aCompletedCB)
 {
@@ -212,8 +239,8 @@ void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword
   requestBody<<"grant_type=password"
       <<"&username="<<HttpComm::urlEncode(aEmail, false)
       <<"&password="<<HttpComm::urlEncode(aPassword, false)
-      <<"&client_id="<<CLIENT_ID
-      <<"&client_secret="<<CLIENT_SECRET
+      <<"&client_id="<<clientId
+      <<"&client_secret="<<clientSecret
       <<"&scope="<<HttpComm::urlEncode("read_station read_homecoach", false);
 
 
@@ -232,6 +259,19 @@ void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword
       httpClient.processOperations();
 }
 
+bool NetatmoComm::hasAccessTokenExpired(JsonObjectPtr aJsonResponse)
+{
+  if (aJsonResponse){
+    if (auto errorJson = aJsonResponse->get("error")){
+      if (auto errMsgJson = errorJson->get("message")){
+        LOG(LOG_WARNING, "Response Error: '%s'", errMsgJson->stringValue().c_str());
+        return errMsgJson->stringValue() == "Access token expired";
+      }
+    }
+  }
+  return false;
+}
+
 
 void NetatmoComm::refreshAccessToken()
 {
@@ -240,23 +280,34 @@ void NetatmoComm::refreshAccessToken()
 
     requestBody<<"grant_type=refresh_token"
         <<"&refresh_token="<<refreshToken
-        <<"&client_id="<<CLIENT_ID
-        <<"&client_secret="<<CLIENT_SECRET;
+        <<"&client_id="<<clientId
+        <<"&client_secret="<<clientSecret;
 
+    auto refreshAccessTokenCB = [=](const string& aResponse, ErrorPtr aError){
+      this->gotAccessData(aResponse, aError, [=](ErrorPtr aError){
+        if (Error::isOK(aError)){
+          // poll data when access token has been renewed
+          MainLoop::currentMainLoop().executeOnce([=](auto...){ this->pollState(); }, 30*Second);
+        } else {
+          LOG(LOG_ERR, "NetatmoComm::refreshAccessToken '%s'", aError->description().c_str());
+        }
+      });
+    };
 
     auto op = NetatmoOperationPtr(
-            new NetatmoOperation(
-                httpClient,
-                "POST",
-                AUTHENTICATE_URL,
-                requestBody.str(),
-                [=](auto...params){ this->gotAccessData(params...); },
-                "application/x-www-form-urlencoded;charset=UTF-8"
-            )
-        );
+        new NetatmoOperation(
+            httpClient,
+            "POST",
+            AUTHENTICATE_URL,
+            requestBody.str(),
+            refreshAccessTokenCB,
+            "application/x-www-form-urlencoded;charset=UTF-8"
+        )
+    );
 
-        httpClient.queueOperation(op);
-        httpClient.processOperations();
+    httpClient.queueOperation(op);
+    httpClient.processOperations();
+    
   } else {
     LOG(LOG_ERR, "NetatmoComm::refreshAccessToken no refresh token available");
   }
