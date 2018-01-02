@@ -197,14 +197,21 @@ boost::signals2::connection NetatmoComm::registerCallback(UpdateDataCB aCallback
 }
 
 
-void NetatmoComm::pollCycle(bool aEnqueueNextPoll)
+void NetatmoComm::pollCycle()
+{
+  pollState();
+  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, NETATMO_POLLING_INTERVAL);
+}
+
+
+void NetatmoComm::pollState()
 {
   apiQuery(Query::getStationsData, [&](const string& aResponse, ErrorPtr aError){
 
     if (Error::isOK(aError)) {
       if (auto jsonResponse = JsonObject::objFromText(aResponse.c_str())) {
         // even when api error occured, http code is 200, thus error check in json response is needed
-        if (checkIfAccessTokenExpired(jsonResponse)){
+        if (hasAccessTokenExpired(jsonResponse)){
           accountStatus = AccountStatus::disconnected;
           refreshAccessToken();
         } else {
@@ -222,10 +229,8 @@ void NetatmoComm::pollCycle(bool aEnqueueNextPoll)
       }
     }
   });
-
-  if (aEnqueueNextPoll)
-    MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, NETATMO_POLLING_INTERVAL);
 }
+
 
 void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword, StatusCB aCompletedCB)
 {
@@ -254,7 +259,7 @@ void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword
       httpClient.processOperations();
 }
 
-bool NetatmoComm::checkIfAccessTokenExpired(JsonObjectPtr aJsonResponse)
+bool NetatmoComm::hasAccessTokenExpired(JsonObjectPtr aJsonResponse)
 {
   if (aJsonResponse){
     if (auto errorJson = aJsonResponse->get("error")){
@@ -282,7 +287,9 @@ void NetatmoComm::refreshAccessToken()
       this->gotAccessData(aResponse, aError, [=](ErrorPtr aError){
         if (Error::isOK(aError)){
           // poll data when access token has been renewed
-          MainLoop::currentMainLoop().executeOnce([=](auto...){ this->pollCycle(false); }, 30*Second);
+          MainLoop::currentMainLoop().executeOnce([=](auto...){ this->pollState(); }, 30*Second);
+        } else {
+          LOG(LOG_ERR, "NetatmoComm::refreshAccessToken '%s'", aError->description().c_str());
         }
       });
     };
