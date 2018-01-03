@@ -175,7 +175,10 @@ void NetatmoVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
 
-  deviceEnumerator.collectDevices(aCompletedCB);
+  deviceEnumerator.collectDevices([=](auto aError){
+    netatmoComm.pollState();
+    if (aCompletedCB) aCompletedCB(aError);
+  });
 }
 
 
