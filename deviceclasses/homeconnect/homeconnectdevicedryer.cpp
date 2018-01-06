@@ -32,7 +32,7 @@ HomeConnectDeviceDryer::HomeConnectDeviceDryer(HomeConnectVdc *aVdcP, JsonObject
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
-  settings->fireAction = "std.Stop";
+  settings->fireAction = "Stop";
 
   installSettings(settings);
 }
@@ -100,9 +100,9 @@ bool HomeConnectDeviceDryer::configureDevice()
   dryingTargetMix->addEnum("IronDry", i++);
   dryingTargetMix->addEnum("CupboardDry", i++, true);
 
-  addAction("std.Cotton",    "Cotton",    "Cotton",    dryingTargetCottonSynthetic);
-  addAction("std.Synthetic", "Synthetic", "Synthetic", dryingTargetCottonSynthetic);
-  addAction("std.Mix",       "Mix",       "Mix",       dryingTargetMix);
+  addAction("Cotton",    "Cotton",    "Cotton",    dryingTargetCottonSynthetic);
+  addAction("Synthetic", "Synthetic", "Synthetic", dryingTargetCottonSynthetic);
+  addAction("Mix",       "Mix",       "Mix",       dryingTargetMix);
 
   addDefaultStopAction();
 

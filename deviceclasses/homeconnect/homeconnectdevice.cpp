@@ -323,6 +323,8 @@ bool HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
     LOG(LOG_WARNING,"HomeConnect device model '%s' not implemented -> ignored", model.c_str());
     return false; // cannot configure this device
   }
+  // publish device standard actions if device was successfully configured
+  autoAddStandardActions();
   // derive the dSUID
   deriveDsUid();
   return true; // simple identification, callback will not be called
@@ -483,22 +485,22 @@ void HomeConnectDevice::configureEvents(const EventConfiguration& aConfiguration
 
 void HomeConnectDevice::addDefaultPowerOnAction()
 {
-  addPowerStateAction("std.PowerOn", "Switch power state on", "On");
+  addPowerStateAction("PowerOn", "Switch power state on", "On");
 }
 
 void HomeConnectDevice::addDefaultStandByAction()
 {
-  addPowerStateAction("std.StandBy", "Switch power state standby", "Standby");
+  addPowerStateAction("StandBy", "Switch power state standby", "Standby");
 }
 
 void HomeConnectDevice::addDefaultPowerOffAction()
 {
-  addPowerStateAction("std.PowerOff", "Switch power state off", "Off");
+  addPowerStateAction("PowerOff", "Switch power state off", "Off");
 }
 
 void HomeConnectDevice::addDefaultStopAction()
 {
-  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectStopAction(*this, *operationModeDescriptor, "std.Stop", "Stop current program"));
+  HomeConnectActionPtr a = HomeConnectActionPtr(new HomeConnectStopAction(*this, *operationModeDescriptor, "Stop", "Stop current program"));
   deviceActions->addAction(a);
 }
 

@@ -32,10 +32,10 @@ HomeConnectDeviceOven::HomeConnectDeviceOven(HomeConnectVdc *aVdcP, JsonObjectPt
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
-  settings->fireAction = "std.StandBy";
-  settings->deepOffAction = "std.StopIfNotTimed";
-  settings->leaveHomeAction = "std.StopIfNotTimed";
-  settings->sleepAction = "std.StopIfNotTimed";
+  settings->fireAction = "StandBy";
+  settings->deepOffAction = "StopIfNotTimed";
+  settings->leaveHomeAction = "StopIfNotTimed";
+  settings->sleepAction = "StopIfNotTimed";
 
   installSettings(settings);
 }
@@ -120,13 +120,13 @@ bool HomeConnectDeviceOven::configureDevice()
       new NumericValueDescriptor("Temperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 30,
           250, 1, true, 200));
   ValueDescriptorPtr duration = ValueDescriptorPtr(
-      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 0, 86340,
-          1, true, 0));
+      new NumericValueDescriptor("Duration", valueType_numeric, VALUE_UNIT(valueUnit_second, unitScaling_1), 1, 86340,
+          1, true, 600));
 
-  addAction("std.Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
-  addAction("std.HotAir",           "Hot air",             "HotAir",           temp, duration);
-  addAction("std.TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
-  addAction("std.PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
+  addAction("Preheating",       "Pre-heating",         "PreHeating",       temp, duration);
+  addAction("HotAir",           "Hot air",             "HotAir",           temp, duration);
+  addAction("TopBottomHeating", "Top and bottom heat", "TopBottomHeating", temp, duration);
+  addAction("PizzaSetting",     "Pizza Setting",       "PizzaSetting",     temp, duration);
 
   deviceActions->addAction(new HomeConnectStopIfNotTimedAction(*this, *operationModeDescriptor, *remainingProgramTime));
 

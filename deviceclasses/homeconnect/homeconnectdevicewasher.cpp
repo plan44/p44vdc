@@ -55,7 +55,7 @@ HomeConnectDeviceWasher::HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObje
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
-  settings->fireAction = "std.Stop";
+  settings->fireAction = "Stop";
 
   installSettings(settings);
 }
@@ -120,11 +120,11 @@ bool HomeConnectDeviceWasher::configureDevice()
   EnumValueDescriptorPtr spinSpeedEasyCare = createEnumDescriptor("SpinSpeed", spinSpeed_RPM1200, spinSpeed_RPM1000, spinSpeedNames);
   EnumValueDescriptorPtr spinSpeedDelicatesSilkWool = createEnumDescriptor("SpinSpeed", spinSpeed_RPM800, spinSpeed_RPM800, spinSpeedNames);
 
-  addAction("std.Cotton",        "Cotton",           "Cotton",        temperatureCotton,   spinSpeedCottonMix);
-  addAction("std.EasyCare",      "Easy Care",        "EasyCare",      temperatureEasyCare, spinSpeedEasyCare);
-  addAction("std.Mix",           "Mix",              "Mix",           temperature,         spinSpeedCottonMix);
-  addAction("std.DelicatesSilk", "Delicates / Silk", "DelicatesSilk", temperature,         spinSpeedDelicatesSilkWool);
-  addAction("std.Wool",          "Wool",             "Wool",          temperature,         spinSpeedDelicatesSilkWool);
+  addAction("Cotton",        "Cotton",           "Cotton",        temperatureCotton,   spinSpeedCottonMix);
+  addAction("EasyCare",      "Easy Care",        "EasyCare",      temperatureEasyCare, spinSpeedEasyCare);
+  addAction("Mix",           "Mix",              "Mix",           temperature,         spinSpeedCottonMix);
+  addAction("DelicatesSilk", "Delicates / Silk", "DelicatesSilk", temperature,         spinSpeedDelicatesSilkWool);
+  addAction("Wool",          "Wool",             "Wool",          temperature,         spinSpeedDelicatesSilkWool);
 
   addDefaultStopAction();
 

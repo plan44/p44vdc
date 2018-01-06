@@ -123,6 +123,7 @@ namespace p44 {
     string eventBuffer; ///< accumulating event data
     string eventTypeString;
     string eventData;
+    bool eventGotID;
 
   public:
 
@@ -138,6 +139,8 @@ namespace p44 {
 
     void sendGetEventRequest();
     void processEventData(const string &aResponse, ErrorPtr aError);
+    void parseLine(const string& aLine);
+    void completeEvent();
     void apiQueryDone(JsonObjectPtr aResult, ErrorPtr aError);
     EventType getEventType();
 
