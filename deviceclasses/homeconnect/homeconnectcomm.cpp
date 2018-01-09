@@ -358,6 +358,17 @@ void HomeConnectEventMonitor::parseLine(const string& aLine)
       } else if (field == "data") {
         eventData += data;
         FOCUSLOG(">>> Got event data: %s", eventData.c_str());
+        string dfield;
+        string ddata;
+        keyAndValue(eventData, dfield, ddata, ':');
+        if(dfield == "error"){
+          FOCUSLOG(">>> Error event is complete, dispatch now");
+          completeEvent();
+          // done
+          eventData.clear();
+          eventTypeString.clear();
+          eventGotID = false;
+        }
       } else if (field == "id") {
         eventGotID = true;
         FOCUSLOG(">>> Got field id: %s", data.c_str());
