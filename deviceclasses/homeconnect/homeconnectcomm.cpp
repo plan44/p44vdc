@@ -153,19 +153,7 @@ void HomeConnectApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPt
             // this is a rate limit error, try to get the missing time from the error description and set lockdown on the comm
             // the description should contain the following text:
             // The rate limit \"10 successive error calls in 10 minutes\" was reached. Requests are blocked during the remaining period of 397 seconds.
-
-            int lockdownTimeoutInSeconds = HomeConnectComm::MaxLockdownTimeout / Second;
-
-            // if we have access to response headers
-            if (homeConnectComm.httpAPIComm.responseHeaders) {
-              // try to get the Retry-After header
-              std::map<string,string>::iterator it = homeConnectComm.httpAPIComm.responseHeaders->find("Retry-After");
-              if (it != homeConnectComm.httpAPIComm.responseHeaders->end()) {
-                lockdownTimeoutInSeconds = atoi(it->second.c_str());
-              }
-            }
-
-            homeConnectComm.setLockDownTime(lockdownTimeoutInSeconds * Second);
+            homeConnectComm.setLockDownTime(homeConnectComm.calculateLockDownTime() * Second);
           }
           string errordesc;
           if (e->get("description", o)) {
@@ -308,6 +296,9 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
     if (aError->getErrorCode() == 401) {
       // this is invalid token issue - refresh token by sending dummy request
       homeConnectComm.apiQuery("/api/homeappliances", boost::bind(&HomeConnectEventMonitor::apiQueryDone, this, _1, _2));
+    } else if (aError->getErrorCode() == 429 ){
+      LOG(LOG_WARNING, "HomeConnect Event stream Error 429 : locking down communication!");
+      homeConnectComm.setLockDownTime(homeConnectComm.calculateLockDownTime() * Second);
     } else {
       MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
     }
@@ -322,8 +313,25 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
     return;
   }
 
+  // check if there is 429 error
+  JsonObjectPtr jsonresponse ( JsonObject::objFromText(aResponse.c_str()) );
+  if( jsonresponse ){
+    JsonObjectPtr e;
+    if( jsonresponse->get("error", e) ){
+      JsonObjectPtr ekey;
+      if( e->get("key", ekey) ){
+        if( ekey->stringValue() == "429" ){
+          LOG(LOG_WARNING, "HomeConnect Error 429 : locking down communication!");
+          homeConnectComm.setLockDownTime(homeConnectComm.calculateLockDownTime() * Second);
+          return;
+        }
+      }
+    }
+  }
+
   eventBuffer += aResponse;
   FOCUSLOG(">>> Accumulated Event from '%s' data: %s", urlPath.c_str(), aResponse.c_str());
+
   // process
   const char *cu = eventBuffer.c_str();
   string line;
@@ -358,17 +366,6 @@ void HomeConnectEventMonitor::parseLine(const string& aLine)
       } else if (field == "data") {
         eventData += data;
         FOCUSLOG(">>> Got event data: %s", eventData.c_str());
-        string dfield;
-        string ddata;
-        keyAndValue(eventData, dfield, ddata, ':');
-        if(dfield == "error"){
-          FOCUSLOG(">>> Error event is complete, dispatch now");
-          completeEvent();
-          // done
-          eventData.clear();
-          eventTypeString.clear();
-          eventGotID = false;
-        }
       } else if (field == "id") {
         eventGotID = true;
         FOCUSLOG(">>> Got field id: %s", data.c_str());
@@ -475,6 +472,27 @@ void HomeConnectComm::apiAction(const string aMethod, const string aUrlPath, Jso
       aResultHandler(NULL, WebError::webErr(429, "Communication temporally disabled"));
     }
   }
+}
+
+MLMicroSeconds HomeConnectComm::calculateLockDownTime()
+{
+  // try to get the missing time from response header
+  // the description should contain the following text:
+  // The rate limit \"10 successive error calls in 10 minutes\" was reached. Requests are blocked during the remaining period of 397 seconds.
+
+  int lockdownTimeoutInSeconds = HomeConnectComm::MaxLockdownTimeout / Second;
+
+  // if we have access to response headers
+  if (httpAPIComm.responseHeaders) {
+    // try to get the Retry-After header
+    std::map<string, string>::iterator it =
+        httpAPIComm.responseHeaders->find("Retry-After");
+    if (it != httpAPIComm.responseHeaders->end()) {
+      lockdownTimeoutInSeconds = atoi(it->second.c_str());
+    }
+  }
+
+  return lockdownTimeoutInSeconds;
 }
 
 void HomeConnectComm::setLockDownTime(MLMicroSeconds aLockDownTime)
