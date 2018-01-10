@@ -120,7 +120,7 @@ const string NetatmoComm::AUTHENTICATE_URL = "https://api.netatmo.com/oauth2/tok
 
 NetatmoComm::NetatmoComm(ParamStore &aParamStore,  const string& aRowId) :
     accountStatus(AccountStatus::disconnected),
-    storage("CommSettings", aParamStore, aRowId,  {"accessToken",   accessToken},
+    storage(aRowId, "CommSettings", aParamStore,  {"accessToken",   accessToken},
                                                   {"refreshToken",  refreshToken},
                                                   {"userEmail",     userEmail},
                                                   {"clientId",      clientId},
@@ -199,18 +199,28 @@ void NetatmoComm::apiQuery(Query aQuery, HttpCommCB aResponseCB)
 {
   if (auto command = buildQuery(aQuery)) {
 
+    auto apiQueryCB = [=](const string& aResponse, ErrorPtr aError){
+      // even when api error occured, http code is 200,
+      // thus error check in json response is needed
+      if (hasAccessTokenExpired(JsonObject::objFromText(aResponse.c_str()))) {
+        refreshAccessToken([=](ErrorPtr aRefreshTokenError){
+          if (Error::isOK(aRefreshTokenError)) {
+            // if refresh token succeeded, retry operation
+            this->apiQuery(aQuery, aResponseCB);
+          } else {
+            // if refreshing failed, call response callback with an error
+            if (aResponseCB) aResponseCB({}, aRefreshTokenError);
+          }
+        });
+      } else {
+        // save an error and set account status
+        updateAccountStatus(aError);
+        if (aResponseCB) aResponseCB(aResponse, aError);
+      }
+    };
+
     auto op = NetatmoOperationPtr(
-        new NetatmoOperation(
-            httpClient,
-            "GET",
-            command.value().c_str(),
-            {},
-            [=](const string& aResponse, ErrorPtr aError){
-                // save an error and set account status
-                updateAccountStatus(aError);
-                if (aResponseCB) aResponseCB(aResponse, aError);
-              }
-        )
+        new NetatmoOperation(httpClient, "GET", command.value(), {}, apiQueryCB)
     );
 
     httpClient.queueOperation(op);
@@ -229,28 +239,30 @@ boost::signals2::connection NetatmoComm::registerCallback(UpdateDataCB aCallback
 
 void NetatmoComm::pollCycle()
 {
-  pollState();
-  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, NETATMO_POLLING_INTERVAL);
+  // get weather stations state
+  pollStationsData();
+  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, POLLING_INTERVAL);
 }
 
 
-void NetatmoComm::pollState()
+void NetatmoComm::pollStationsData()
 {
   apiQuery(Query::getStationsData, [&](const string& aResponse, ErrorPtr aError){
 
     if (Error::isOK(aError)) {
       if (auto jsonResponse = JsonObject::objFromText(aResponse.c_str())) {
-        // even when api error occured, http code is 200, thus error check in json response is needed
-        if (hasAccessTokenExpired(jsonResponse)){
-          accountStatus = AccountStatus::disconnected;
-          refreshAccessToken([&](){ this->pollState(); });
-        } else {
           dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
-        }
       }
+      // now get home coach devices state
+      pollHomeCoachsData();
     }
-  });
 
+  });
+}
+
+
+void NetatmoComm::pollHomeCoachsData()
+{
   apiQuery(Query::getHomeCoachsData, [&](const string& aResponse, ErrorPtr aError){
 
     if (Error::isOK(aError)) {
@@ -258,6 +270,7 @@ void NetatmoComm::pollState()
         dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
       }
     }
+
   });
 }
 
@@ -291,11 +304,16 @@ void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword
 
 bool NetatmoComm::hasAccessTokenExpired(JsonObjectPtr aJsonResponse)
 {
+  // The response might be {"error":{"code":3,"message":"Access token expired"}}
+  // or {"error":{"code":2,"message":"Invalid access token"}}
   if (aJsonResponse){
     if (auto errorJson = aJsonResponse->get("error")){
       if (auto errMsgJson = errorJson->get("message")){
-        LOG(LOG_WARNING, "Response Error: '%s'", errMsgJson->stringValue().c_str());
-        return errMsgJson->stringValue() == "Access token expired";
+        LOG(LOG_ERR, "Response Error: '%s'", errMsgJson->stringValue().c_str());
+      }
+      if (auto errCodeJson = errorJson->get("code")){
+        int errCode = errCodeJson->int32Value();
+        return (errCode == API_ERROR_INVALID_TOKEN || errCode == API_ERROR_TOKEN_EXPIRED);
       }
     }
   }
@@ -303,11 +321,13 @@ bool NetatmoComm::hasAccessTokenExpired(JsonObjectPtr aJsonResponse)
 }
 
 
-void NetatmoComm::refreshAccessToken(SimpleCB aCallback)
+void NetatmoComm::refreshAccessToken(StatusCB aCompletedCB)
 {
-  if (refreshTokenRetries++ >= NETATMO_REFRESH_TOKEN_RETRY_MAX) {
-    LOG(LOG_ERR, "Refresh Access Token not succedded. Account '%s' is going to be diconnected.", userEmail.c_str());
+  if (refreshTokenRetries++ >= REFRESH_TOKEN_RETRY_MAX) {
+    LOG(LOG_ERR, "Refresh Access Token not succeded. Account '%s' is going to be disconnected.", userEmail.c_str());
     disconnect();
+    refreshTokenRetries = 0;
+    if (aCompletedCB) aCompletedCB(TextError::err("Max retries exceeded for refresh token"));
     return;
   }
 
@@ -323,9 +343,11 @@ void NetatmoComm::refreshAccessToken(SimpleCB aCallback)
       this->gotAccessData(aResponse, aError, [=](ErrorPtr aError){
         if (Error::isOK(aError)){
           // retry when access token has been renewed
-          MainLoop::currentMainLoop().executeOnce([=](auto...){ if (aCallback) aCallback(); });
+          MainLoop::currentMainLoop().executeOnce([=](auto...){ if (aCompletedCB) aCompletedCB(aError); });
         } else {
+          // otherwise retry to refresh token
           LOG(LOG_ERR, "NetatmoComm::refreshAccessToken '%s'", aError->description().c_str());
+          this->refreshAccessToken(aCompletedCB);
         }
       });
     };
@@ -346,6 +368,7 @@ void NetatmoComm::refreshAccessToken(SimpleCB aCallback)
     
   } else {
     LOG(LOG_ERR, "NetatmoComm::refreshAccessToken no refresh token available");
+    if (aCompletedCB) aCompletedCB(TextError::err("No refresh token is available"));
   }
 
 }
@@ -378,7 +401,6 @@ void NetatmoComm::updateAccountStatus(ErrorPtr aError)
       LOG(LOG_ERR, "HttpCommError %s ", aError->description().c_str());
     } else if (aError->getErrorCode() == 401 || aError->getErrorCode() == 403) {
       accountStatus = AccountStatus::disconnected;
-      refreshAccessToken([&](){ this->pollState(); });
       LOG(LOG_ERR, "Authorization Error %s %d", aError->description().c_str());
     } else {
       LOG(LOG_ERR, "Communication Error %s %d", aError->description().c_str());

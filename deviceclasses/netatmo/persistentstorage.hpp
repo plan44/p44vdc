@@ -77,7 +77,6 @@ template <typename ...Args>
 class PersistentStorage : public PersistentParams
 {
   std::string name;
-  std::string id;
   std::array<std::unique_ptr<detail::Field>, sizeof...(Args)> fieldDefs;
 
   using inherited = PersistentParams;
@@ -96,25 +95,24 @@ class PersistentStorage : public PersistentParams
   }
 
 public:
-  PersistentStorage(const std::string& aTableName, ParamStore &aParamStore, const std::string& aId, detail::PairType<Args>... aArgs) :
+  PersistentStorage(const std::string& aTableName, ParamStore &aParamStore, detail::PairType<Args>... aArgs) :
     inherited(aParamStore),
-    name(aTableName),
-    id(aId)
-{
+    name(aTableName)
+  {
     size_t index = 0;
     using expand_type = int[];
     expand_type { (add(aArgs, index++), 0)... };
-}
-
-  void load()
-  {
-    loadFromStore(id.c_str());
   }
 
-  void save()
+  void load(const string& aRowId)
+  {
+    loadFromStore(aRowId.c_str());
+  }
+
+  void save(const string& aRowId)
   {
     markDirty();
-    saveToStore(id.c_str(), true);
+    saveToStore(aRowId.c_str(), true);
   }
 
   const char *tableName() P44_OVERRIDE { return name.c_str(); };
@@ -154,6 +152,29 @@ public:
   }
 };
 
+template <typename ...Args>
+class PersistentStorageWithRowId : public PersistentStorage<Args...>
+{
+  std::string rowId;
+
+  using inherited = PersistentStorage<Args...>;
+
+public:
+
+  PersistentStorageWithRowId(const string& aRowId, const std::string& aTableName, ParamStore &aParamStore, detail::PairType<Args>&&... aArgs) :
+    rowId(aRowId),
+    inherited(aTableName, aParamStore, std::forward<detail::PairType<Args>>(aArgs)...) {}
+
+  void load()
+  {
+    inherited::load(rowId);
+  }
+
+  void save()
+  {
+    inherited::save(rowId);
+  }
+};
 
 } // namespace p44
 

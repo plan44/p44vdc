@@ -55,20 +55,16 @@ void NetatmoDeviceEnumerator::getWeatherDevices(StatusCB aCompletedCB)
 
     if (Error::isOK(aError)) {
       if (auto jsonResponse = (JsonObject::objFromText(aResponse.c_str()))) {
-        if (NetatmoComm::hasAccessTokenExpired(jsonResponse)) {
-          netatmoComm.refreshAccessToken([=](){ this->collectDevices(aCompletedCB); });
-        } else {
-          // save user email
-          if (auto email = getUserEmailJson(jsonResponse)) {
-            netatmoComm.setUserEmail(email->stringValue());
-          }
-          // parse devices
-          if (auto devices = getDevicesJson(jsonResponse)) {
-            collectWeatherDevices(devices);
-          }
-          // get home coach devices
-          getHomeCoachDevices(aCompletedCB);
+        // save user email
+        if (auto email = getUserEmailJson(jsonResponse)) {
+          netatmoComm.setUserEmail(email->stringValue());
         }
+        // parse devices
+        if (auto devices = getDevicesJson(jsonResponse)) {
+          collectWeatherDevices(devices);
+        }
+        // get home coach devices
+        getHomeCoachDevices(aCompletedCB);
       }
     } else {
       deviceList.clear();
@@ -82,6 +78,7 @@ void NetatmoDeviceEnumerator::getWeatherDevices(StatusCB aCompletedCB)
 void NetatmoDeviceEnumerator::getHomeCoachDevices(StatusCB aCompletedCB)
 {
   netatmoComm.apiQuery(NetatmoComm::Query::getHomeCoachsData, [=](const string &aResponse, ErrorPtr aError){
+
     if (Error::isOK(aError)) {
       if (auto devices = getDevicesJson(JsonObject::objFromText(aResponse.c_str()))) {
         collectDevicesFromArray(devices);

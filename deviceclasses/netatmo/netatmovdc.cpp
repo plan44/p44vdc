@@ -172,7 +172,7 @@ void NetatmoVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
   }
 
   deviceEnumerator->collectDevices([=](auto aError){
-    netatmoComm->pollState();
+    netatmoComm->pollStationsData();
     if (aCompletedCB) aCompletedCB(aError);
   });
 }
