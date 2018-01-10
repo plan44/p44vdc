@@ -118,11 +118,18 @@ const string NetatmoComm::GET_HOME_COACHS_URL = "/api/gethomecoachsdata";
 const string NetatmoComm::AUTHENTICATE_URL = "https://api.netatmo.com/oauth2/token";
 
 
-NetatmoComm::NetatmoComm() :
-    accountStatus(AccountStatus::disconnected)
+NetatmoComm::NetatmoComm(ParamStore &aParamStore,  const string& aRowId) :
+    accountStatus(AccountStatus::disconnected),
+    storage("CommSettings", aParamStore, aRowId,  {"accessToken",   accessToken},
+                                                  {"refreshToken",  refreshToken},
+                                                  {"userEmail",     userEmail},
+                                                  {"clientId",      clientId},
+                                                  {"clientSecret",  clientSecret})
 {
   httpClient.isMemberVariable();
+  storage.load();
 }
+
 
 void NetatmoComm::loadConfigFile(JsonObjectPtr aConfigJson)
 {
@@ -139,6 +146,28 @@ void NetatmoComm::loadConfigFile(JsonObjectPtr aConfigJson)
   } else {
     LOG(LOG_ERR, "NetatmoComm error: cannot load configuration");
   }
+  storage.save();
+}
+
+
+void NetatmoComm::setAccessToken(const string& aAccessToken)
+{
+  accessToken = aAccessToken;
+  storage.save();
+}
+
+
+void NetatmoComm::setRefreshToken(const string& aRefreshToken)
+{
+  refreshToken = aRefreshToken;
+  storage.save();
+}
+
+
+void NetatmoComm::setUserEmail(const string& aUserEmail)
+{
+  userEmail = aUserEmail;
+  storage.save();
 }
 
 
@@ -321,7 +350,7 @@ void NetatmoComm::gotAccessData(const string& aResponse, ErrorPtr aError, Status
       accessToken = accessTokenJson->stringValue();
       if (auto refreshTokenJson = jsonResponse->get("refresh_token")) {
         refreshToken = refreshTokenJson->stringValue();
-        // note: save tokens to database
+        storage.save();
       }
       if (aCompletedCB) aCompletedCB(Error::ok());
       return;
@@ -355,6 +384,7 @@ void NetatmoComm::disconnect()
   refreshToken.clear();
   userEmail.clear();
 
+  storage.save();
   accountStatus = AccountStatus::disconnected;
 }
 

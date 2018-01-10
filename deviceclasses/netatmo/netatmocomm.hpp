@@ -32,6 +32,7 @@
 #include "jsonwebclient.hpp"
 #include "serialqueue.hpp"
 #include "httpclient.hpp"
+#include "persistentstorage.hpp"
 
 
 using namespace std;
@@ -92,6 +93,7 @@ namespace p44 {
      ErrorPtr error;
 
      boost::signals2::signal<void(JsonObjectPtr)> dataPollCBs;
+     PersistentStorage<string, string, string, string, string> storage;
 
      static const string BASE_URL;
      static const string GET_STATIONS_DATA_URL;
@@ -107,15 +109,15 @@ namespace p44 {
 
    public:
 
-     NetatmoComm();
+     NetatmoComm(ParamStore &aParamStore,  const string& aRowId);
      virtual ~NetatmoComm() {}
 
      void loadConfigFile(JsonObjectPtr aConfigJson);
-     void setAccessToken(const string& aAccessToken) { accessToken = aAccessToken; }
+     void setAccessToken(const string& aAccessToken);
      string getAccessToken() const { return accessToken; }
-     void setRefreshToken(const string& aRefreshToken) { refreshToken = aRefreshToken; }
+     void setRefreshToken(const string& aRefreshToken);
      string getRefreshToken() const { return refreshToken; }
-     void setUserEmail(const string& aUserEmail) { userEmail = aUserEmail; }
+     void setUserEmail(const string& aUserEmail);
      string getUserEmail() const { return userEmail; }
      AccountStatus getAccountStatus() const { return accountStatus; }
 
