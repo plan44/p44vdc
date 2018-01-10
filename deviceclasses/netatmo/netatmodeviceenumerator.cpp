@@ -45,37 +45,64 @@ void NetatmoDeviceEnumerator::collectDevices(StatusCB aCompletedCB)
   deviceList.clear();
 
   // get weather devices
-  netatmoComm.apiQuery(NetatmoComm::Query::getStationsData, [=](const string &aResponse, ErrorPtr aError) mutable {
-
-    if (auto jsonResponse = JsonObject::objFromText(aResponse.c_str())) {
-
-      if (auto email = getUserEmailJson(jsonResponse)) {
-        netatmoComm.setUserEmail(email->stringValue());
-        netatmoVdc->markDirty();
-        netatmoVdc->save();
-      }
-
-      if (auto devices = getDevicesJson(jsonResponse)) {
-        collectWeatherDevices(devices);
-      }
-    }
-  });
-
-  // get home coach devices
-  netatmoComm.apiQuery(NetatmoComm::Query::getHomeCoachsData, [=](const string &aResponse, ErrorPtr aError){
-
-    if (auto devices = getDevicesJson(JsonObject::objFromText(aResponse.c_str()))) {
-      collectDevicesFromArray(devices);
-    }
-
-    netatmoVdc->identifyAndAddDevices(deviceList, aCompletedCB);
-
-    deviceList.clear();
-  });
-
-
-
+  getWeatherDevices(aCompletedCB);
 }
+
+
+void NetatmoDeviceEnumerator::getWeatherDevices(StatusCB aCompletedCB)
+{
+  netatmoComm.apiQuery(NetatmoComm::Query::getStationsData, [=](const string &aResponse, ErrorPtr aError) {
+
+    if (Error::isOK(aError)) {
+      if (auto jsonResponse = (JsonObject::objFromText(aResponse.c_str()))) {
+        if (NetatmoComm::hasAccessTokenExpired(jsonResponse)) {
+          netatmoComm.refreshAccessToken([=](){ this->collectDevices(aCompletedCB); });
+        } else {
+          // save user email
+          if (auto email = getUserEmailJson(jsonResponse)) {
+            netatmoComm.setUserEmail(email->stringValue());
+          }
+          // parse devices
+          if (auto devices = getDevicesJson(jsonResponse)) {
+            collectWeatherDevices(devices);
+          }
+          // get home coach devices
+          getHomeCoachDevices(aCompletedCB);
+        }
+      }
+    } else {
+      deviceList.clear();
+      if (aCompletedCB) aCompletedCB(aError);
+    }
+
+  });
+}
+
+
+void NetatmoDeviceEnumerator::getHomeCoachDevices(StatusCB aCompletedCB)
+{
+  netatmoComm.apiQuery(NetatmoComm::Query::getHomeCoachsData, [=](const string &aResponse, ErrorPtr aError){
+    if (Error::isOK(aError)) {
+      if (auto devices = getDevicesJson(JsonObject::objFromText(aResponse.c_str()))) {
+        collectDevicesFromArray(devices);
+      }
+      // discovery has been completed, add devices now
+      discoveryCompleted(aCompletedCB);
+    } else {
+      deviceList.clear();
+      if (aCompletedCB) aCompletedCB(aError);
+    }
+
+  });
+}
+
+
+void NetatmoDeviceEnumerator::discoveryCompleted(StatusCB aCompletedCB)
+{
+  netatmoVdc->identifyAndAddDevices(deviceList, aCompletedCB);
+  deviceList.clear();
+}
+
 
 void NetatmoDeviceEnumerator::collectWeatherDevices(JsonObjectPtr aJson)
 {
@@ -88,9 +115,9 @@ void NetatmoDeviceEnumerator::collectWeatherDevices(JsonObjectPtr aJson)
     }
 
     enableOutdoorTemperatureSensor();
-
   }
 }
+
 
 void NetatmoDeviceEnumerator::collectDevicesFromArray(JsonObjectPtr aJson)
 {
@@ -100,6 +127,7 @@ void NetatmoDeviceEnumerator::collectDevicesFromArray(JsonObjectPtr aJson)
     }
   }
 }
+
 
 void NetatmoDeviceEnumerator::enumerateAndEmplaceDevice(JsonObjectPtr aJson)
 {
@@ -132,6 +160,7 @@ void NetatmoDeviceEnumerator::enumerateAndEmplaceDevice(JsonObjectPtr aJson)
   }
 }
 
+
 void NetatmoDeviceEnumerator::enableOutdoorTemperatureSensor()
 {
   auto it = find_if(deviceList.begin(), deviceList.end(), [=](DevicePtr aDevice){
@@ -143,7 +172,6 @@ void NetatmoDeviceEnumerator::enableOutdoorTemperatureSensor()
     auto dev = boost::dynamic_pointer_cast<NetatmoDevice>(*it);
     dev->setUsageArea(usage_outdoors);
   }
-
 }
 
 

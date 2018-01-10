@@ -92,6 +92,8 @@ namespace p44 {
      AccountStatus accountStatus;
      ErrorPtr error;
 
+     int refreshTokenRetries;
+
      boost::signals2::signal<void(JsonObjectPtr)> dataPollCBs;
      PersistentStorage<string, string, string, string, string> storage;
 
@@ -105,6 +107,7 @@ namespace p44 {
      // "Do not try to pull data every minute. 
      // Netatmo Weather Station sends its measures to the server every ten minutes"
      static const MLMicroSeconds NETATMO_POLLING_INTERVAL = (10*Minute);
+     static const int NETATMO_REFRESH_TOKEN_RETRY_MAX = 3;
 
 
    public:
@@ -135,8 +138,8 @@ namespace p44 {
      void pollState();
 
      void authorizeByEmail(const string& aEmail, const string& aPassword, StatusCB aCompletedCB);
-     bool hasAccessTokenExpired(JsonObjectPtr aJsonResponse);
-     void refreshAccessToken();
+     static bool hasAccessTokenExpired(JsonObjectPtr aJsonResponse);
+     void refreshAccessToken(SimpleCB aCallback);
      void gotAccessData(const string& aResponse, ErrorPtr aError, StatusCB aCompletedCB={});
      string getAccountStatusString();
      void updateAccountStatus(ErrorPtr aError);
