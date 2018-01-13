@@ -71,6 +71,8 @@ namespace p44 {
     bool supportsDT8; // supports device type 8 features
     bool dt8Color; // supports DT 8 color features
     bool dt8CT; // supports DT 8 color temperature features
+    uint8_t dt8RPrimaryColors; // if>0, how many primary coloer channels are supported
+    uint8_t dt8RGBWAFchannels; // if>0, how many RGBWAF channels are supported
 
     /// cached status (call updateStatus() to update these)
     bool isDummy; ///< set if dummy (not found on bus, but known to be part of a composite device)
@@ -86,8 +88,13 @@ namespace p44 {
     uint8_t currentFadeRate; ///< currently set DALI fade rate
     // - DT8 params
     ColorLightMode currentColorMode; ///< current color mode
-    uint16_t currentXorCT; ///< current CIE X or CT
-    uint16_t currentY; ///< current CIE Y
+    uint16_t currentXorCT; ///< current CIE X or CT or Red
+    uint16_t currentY; ///< current CIE Y or Green
+    uint8_t currentR; ///< current Red
+    uint8_t currentG; ///< current Green
+    uint8_t currentB; ///< current Blue
+    uint8_t currentW; ///< current White
+    uint8_t currentA; ///< current Amber
 
   public:
 
@@ -159,6 +166,11 @@ namespace p44 {
     /// @return true if parameters have changed
     bool setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY = 0);
 
+    /// set new color parameters
+    /// @param aR,aG,aB,aW,aA new values
+    /// @return true if parameters have changed
+    bool setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t aW = 0, uint8_t aA = 0);
+
     /// activate new color parameters
     void activateColorParams();
 
@@ -204,6 +216,7 @@ namespace p44 {
     void queryXCoordResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
     void queryYCoordResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
     void queryCTResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
+    void queryRGBWAFResponse(StatusCB aCompletedCB, uint16_t aResIndex, uint16_t aResponse16, ErrorPtr aError);
 
     void dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aNow);
 
