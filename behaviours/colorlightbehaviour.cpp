@@ -565,7 +565,7 @@ static double colorCompScaled(double aColorComp, double aMax)
   return aColorComp;
 }
 
-void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue, double aMax)
+void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue, double aMax, bool aNoBrightness)
 {
   Row3 RGB;
   Row3 xyV;
@@ -576,7 +576,7 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
     case colorLightModeHueSaturation: {
       HSV[0] = hue->getTransitionalValue(); // 0..360
       HSV[1] = saturation->getTransitionalValue()/100; // 0..1
-      HSV[2] = brightness->getTransitionalValue()/100; // 0..1
+      HSV[2] = aNoBrightness ? 1 : brightness->getTransitionalValue()/100; // 0..1
       HSVtoRGB(HSV, RGB);
       break;
     }
@@ -592,7 +592,7 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
       if (RGB[1]>m) m = RGB[1];
       if (RGB[2]>m) m = RGB[2];
       // include actual brightness into scale calculation
-      scale = brightness->getTransitionalValue()/100/m;
+      if (!aNoBrightness) scale = brightness->getTransitionalValue()/100/m;
       break;
     }
     case colorLightModeXY: {
@@ -604,12 +604,12 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
       xyVtoXYZ(xyV, XYZ);
       // convert using calibration for this lamp
       XYZtoRGB(calibration, XYZ, RGB);
-      scale = brightness->getTransitionalValue()/100; // 0..1
+      if (!aNoBrightness) scale = brightness->getTransitionalValue()/100; // 0..1
       break;
     }
     default: {
       // no color, just set R=G=B=brightness
-      RGB[0] = brightness->getTransitionalValue()/100;
+      RGB[0] = aNoBrightness ? 1 : brightness->getTransitionalValue()/100;
       RGB[1] = RGB[0];
       RGB[2] = RGB[0];
       break;
@@ -693,11 +693,11 @@ static void transferFromColor(Row3 &aCol, double aAmount, double &aRed, double &
 
 
 
-void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax)
+void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax, bool aNoBrightness)
 {
   // first get 0..1 RGB
   double r,g,b;
-  getRGB(r, g, b, 1);
+  getRGB(r, g, b, 1, aNoBrightness);
   // transfer as much as possible to the white channel
   double w = transferToColor(whiteRGB, r, g, b);
   // Finally scale as requested
@@ -708,11 +708,11 @@ void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue
 }
 
 
-void RGBColorLightBehaviour::getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax)
+void RGBColorLightBehaviour::getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax, bool aNoBrightness)
 {
   // first get RGBW
   double r,g,b;
-  getRGB(r, g, b, 1);
+  getRGB(r, g, b, 1, aNoBrightness);
   // transfer as much as possible to the white channel
   double w = transferToColor(whiteRGB, r, g, b);
   // then transfer as much as possible to the amber channel

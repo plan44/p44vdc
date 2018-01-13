@@ -37,6 +37,7 @@ namespace p44 {
     colorLightModeHueSaturation, ///< "hs" - hue & saturation
     colorLightModeXY, ///< "xy" - CIE color space coordinates
     colorLightModeCt, ///< "ct" - Mired color temperature: 153 (6500K) to 500 (2000K)
+    colorLightModeRGBWA, ///< direct RGBWA channels, not directly supported at colorlightbehaviour level, but internally in some devices
   } ColorLightMode;
 
 
@@ -307,7 +308,8 @@ namespace p44 {
     /// get RGB colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue will receive the R,G,B values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue
-    void getRGB(double &aRed, double &aGreen, double &aBlue, double aMax);
+    /// @param aNoBrightness if set, RGB is calculated at full brightness
+    void getRGB(double &aRed, double &aGreen, double &aBlue, double aMax, bool aNoBrightness = false);
 
     /// set RGB values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue current R,G,B values to be converted to color channel settings
@@ -317,7 +319,8 @@ namespace p44 {
     /// get RGBW colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue,aWhite will receive the R,G,B,W values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite
-    void getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax);
+    /// @param aNoBrightness if set, RGBW is calculated at full brightness
+    void getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax, bool aNoBrightness = false);
 
     /// set RGBW values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue,aWhite current R,G,B,W values to be converted to color channel settings
@@ -327,7 +330,8 @@ namespace p44 {
     /// get RGBWA colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue,aWhite,aAmber will receive the R,G,B,W,A values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite,aAmber
-    void getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax);
+    /// @param aNoBrightness if set, RGBWA is calculated at full brightness
+    void getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax, bool aNoBrightness = false);
 
     /// set RGBWA values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue,aWhite,aAmber current R,G,B,W,A values to be converted to color channel settings
