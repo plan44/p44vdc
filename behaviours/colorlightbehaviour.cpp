@@ -360,7 +360,7 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
 bool ColorLightBehaviour::deriveColorMode()
 {
   // the need to derive the color modes only arises when
-  // colors have changed, so this invalidates the derived channel values
+  // colors (may) have changed, so this invalidates the derived channel values
   derivedValuesComplete = false;
   // check changed channels
   if (!ctOnly) {

@@ -162,7 +162,8 @@ namespace p44 {
     ///   condition is already met to allow saving virtual brightness to scenes)
     void syncBrightnessFromHardware(Brightness aBrightness, bool aAlwaysSync=false);
 
-    /// wrapper to confirm having applied brightness
+    /// Check if brightness change needs to be applied to hardware
+    /// @return true if brightness has pending change
     bool brightnessNeedsApplying() { return brightness->needsApplying(); };
 
     /// step through transitions

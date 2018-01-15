@@ -1170,39 +1170,41 @@ void DaliSingleControllerDevice::applyChannelValues(SimpleCB aDoneCB, bool aForD
   LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
   if (l && needsToApplyChannels()) {
     bool needactivation = false;
-    bool neednewbrightness = l->brightnessNeedsApplying(); // sample here because deriving color might
+    bool neednewbrightness = l->brightnessNeedsApplying(); // sample here because deriving color might override this
     // two modes: either DALI controller can handle colors and/or colortemp, or it only has direct RGBWAF
     RGBColorLightBehaviourPtr rgbl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
     if (rgbl) {
       // DALI controller uses RGB(WA) for color settings
-      rgbl->deriveColorMode();
-      double r=0,g=0,b=0,w=0,a=0;
-      // simple multi-channel RGBWA(F) only, we need to supply RGB(WA) values
-      if (daliController->dt8RGBWAFchannels>3) {
-        // RGBW, RGBWA or CT-only
-        if (daliController->dt8RGBWAFchannels>4) {
-          // RGBWA
-          rgbl->getRGBWA(r, g, b, w, a, 127, true);
-          if (!aForDimming) {
-            ALOG(LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
+      if (rgbl->deriveColorMode()) {
+        // color mode derived from to-be-applied channels -> need to apply new color information
+        double r=0,g=0,b=0,w=0,a=0;
+        if (daliController->dt8RGBWAFchannels>3) {
+          // RGBW or RGBWA
+          if (daliController->dt8RGBWAFchannels>4) {
+            // RGBWA
+            rgbl->getRGBWA(r, g, b, w, a, 127, true);
+            if (!aForDimming) {
+              ALOG(LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
+            }
+          }
+          else {
+            // RGBW
+            rgbl->getRGBW(r, g, b, w, 127, true);
+            if (!aForDimming) {
+              ALOG(LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
+            }
           }
         }
         else {
-          rgbl->getRGBW(r, g, b, w, 127, true);
+          // RGB
+          rgbl->getRGB(r, g, b, 127, true);
           if (!aForDimming) {
-            ALOG(LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
+            ALOG(LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
           }
         }
+        needactivation = daliController->setRGBWAParams(r, g, b, w, a);
+        rgbl->appliedColorValues();
       }
-      else {
-        // RGB
-        rgbl->getRGB(r, g, b, 127, true);
-        if (!aForDimming) {
-          ALOG(LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
-        }
-      }
-      needactivation = daliController->setRGBWAParams(r, g, b, w, a);
-      rgbl->appliedColorValues();
     }
     else {
       // DALI controller is either non-color or understands Cie or Ct directly

@@ -232,7 +232,7 @@ namespace p44 {
     bool isCtOnly() { return ctOnly; }
 
     /// derives the color mode from channel values that need to be applied to hardware
-    /// @return true if mode could be found
+    /// @return true if new mode could be found (which also means that color needs to be applied to HW)
     bool deriveColorMode();
 
     /// derives the values for the not-current color representations' channels
@@ -347,9 +347,6 @@ namespace p44 {
     /// @param aCW,aWW current CW and WW values
     /// @param aMax max value for aCW,aWW
     void setCWWW(double aCW, double aWW, double aMax);
-
-
-
 
     /// @}
 
