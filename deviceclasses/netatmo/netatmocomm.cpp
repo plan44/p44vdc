@@ -118,11 +118,19 @@ const string NetatmoComm::GET_HOME_COACHS_URL = "/api/gethomecoachsdata";
 const string NetatmoComm::AUTHENTICATE_URL = "https://api.netatmo.com/oauth2/token";
 
 
-NetatmoComm::NetatmoComm() :
-    accountStatus(AccountStatus::disconnected)
+NetatmoComm::NetatmoComm(ParamStore &aParamStore,  const string& aRowId) :
+    accountStatus(AccountStatus::disconnected),
+    storage(aRowId, "CommSettings", aParamStore,  {"accessToken",   accessToken},
+                                                  {"refreshToken",  refreshToken},
+                                                  {"userEmail",     userEmail},
+                                                  {"clientId",      clientId},
+                                                  {"clientSecret",  clientSecret}),
+    refreshTokenRetries(0)
 {
   httpClient.isMemberVariable();
+  storage.load();
 }
+
 
 void NetatmoComm::loadConfigFile(JsonObjectPtr aConfigJson)
 {
@@ -139,6 +147,28 @@ void NetatmoComm::loadConfigFile(JsonObjectPtr aConfigJson)
   } else {
     LOG(LOG_ERR, "NetatmoComm error: cannot load configuration");
   }
+  storage.save();
+}
+
+
+void NetatmoComm::setAccessToken(const string& aAccessToken)
+{
+  accessToken = aAccessToken;
+  storage.save();
+}
+
+
+void NetatmoComm::setRefreshToken(const string& aRefreshToken)
+{
+  refreshToken = aRefreshToken;
+  storage.save();
+}
+
+
+void NetatmoComm::setUserEmail(const string& aUserEmail)
+{
+  userEmail = aUserEmail;
+  storage.save();
 }
 
 
@@ -169,18 +199,28 @@ void NetatmoComm::apiQuery(Query aQuery, HttpCommCB aResponseCB)
 {
   if (auto command = buildQuery(aQuery)) {
 
+    auto apiQueryCB = [=](const string& aResponse, ErrorPtr aError){
+      // even when api error occured, http code is 200,
+      // thus error check in json response is needed
+      if (hasAccessTokenExpired(JsonObject::objFromText(aResponse.c_str()))) {
+        refreshAccessToken([=](ErrorPtr aRefreshTokenError){
+          if (Error::isOK(aRefreshTokenError)) {
+            // if refresh token succeeded, retry operation
+            this->apiQuery(aQuery, aResponseCB);
+          } else {
+            // if refreshing failed, call response callback with an error
+            if (aResponseCB) aResponseCB({}, aRefreshTokenError);
+          }
+        });
+      } else {
+        // save an error and set account status
+        updateAccountStatus(aError);
+        if (aResponseCB) aResponseCB(aResponse, aError);
+      }
+    };
+
     auto op = NetatmoOperationPtr(
-        new NetatmoOperation(
-            httpClient,
-            "GET",
-            command.value().c_str(),
-            {},
-            [=](const string& aResponse, ErrorPtr aError){
-                // save an error and set account status
-                updateAccountStatus(aError);
-                if (aResponseCB) aResponseCB(aResponse, aError);
-              }
-        )
+        new NetatmoOperation(httpClient, "GET", command.value(), {}, apiQueryCB)
     );
 
     httpClient.queueOperation(op);
@@ -199,28 +239,30 @@ boost::signals2::connection NetatmoComm::registerCallback(UpdateDataCB aCallback
 
 void NetatmoComm::pollCycle()
 {
-  pollState();
-  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, NETATMO_POLLING_INTERVAL);
+  // get weather stations state
+  pollStationsData();
+  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->pollCycle(); }, POLLING_INTERVAL);
 }
 
 
-void NetatmoComm::pollState()
+void NetatmoComm::pollStationsData()
 {
   apiQuery(Query::getStationsData, [&](const string& aResponse, ErrorPtr aError){
 
     if (Error::isOK(aError)) {
       if (auto jsonResponse = JsonObject::objFromText(aResponse.c_str())) {
-        // even when api error occured, http code is 200, thus error check in json response is needed
-        if (hasAccessTokenExpired(jsonResponse)){
-          accountStatus = AccountStatus::disconnected;
-          refreshAccessToken();
-        } else {
           dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
-        }
       }
+      // now get home coach devices state
+      pollHomeCoachsData();
     }
-  });
 
+  });
+}
+
+
+void NetatmoComm::pollHomeCoachsData()
+{
   apiQuery(Query::getHomeCoachsData, [&](const string& aResponse, ErrorPtr aError){
 
     if (Error::isOK(aError)) {
@@ -228,6 +270,7 @@ void NetatmoComm::pollState()
         dataPollCBs(NetatmoDeviceEnumerator::getDevicesJson(jsonResponse));
       }
     }
+
   });
 }
 
@@ -261,11 +304,16 @@ void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword
 
 bool NetatmoComm::hasAccessTokenExpired(JsonObjectPtr aJsonResponse)
 {
+  // The response might be {"error":{"code":3,"message":"Access token expired"}}
+  // or {"error":{"code":2,"message":"Invalid access token"}}
   if (aJsonResponse){
     if (auto errorJson = aJsonResponse->get("error")){
       if (auto errMsgJson = errorJson->get("message")){
-        LOG(LOG_WARNING, "Response Error: '%s'", errMsgJson->stringValue().c_str());
-        return errMsgJson->stringValue() == "Access token expired";
+        LOG(LOG_ERR, "Response Error: '%s'", errMsgJson->stringValue().c_str());
+      }
+      if (auto errCodeJson = errorJson->get("code")){
+        int errCode = errCodeJson->int32Value();
+        return (errCode == API_ERROR_INVALID_TOKEN || errCode == API_ERROR_TOKEN_EXPIRED);
       }
     }
   }
@@ -273,8 +321,16 @@ bool NetatmoComm::hasAccessTokenExpired(JsonObjectPtr aJsonResponse)
 }
 
 
-void NetatmoComm::refreshAccessToken()
+void NetatmoComm::refreshAccessToken(StatusCB aCompletedCB)
 {
+  if (refreshTokenRetries++ >= REFRESH_TOKEN_RETRY_MAX) {
+    LOG(LOG_ERR, "Refresh Access Token not succeded. Account '%s' is going to be disconnected.", userEmail.c_str());
+    disconnect();
+    refreshTokenRetries = 0;
+    if (aCompletedCB) aCompletedCB(TextError::err("Max retries exceeded for refresh token"));
+    return;
+  }
+
   if (!refreshToken.empty()) {
     stringstream requestBody;
 
@@ -286,10 +342,12 @@ void NetatmoComm::refreshAccessToken()
     auto refreshAccessTokenCB = [=](const string& aResponse, ErrorPtr aError){
       this->gotAccessData(aResponse, aError, [=](ErrorPtr aError){
         if (Error::isOK(aError)){
-          // poll data when access token has been renewed
-          MainLoop::currentMainLoop().executeOnce([=](auto...){ this->pollState(); }, 30*Second);
+          // retry when access token has been renewed
+          MainLoop::currentMainLoop().executeOnce([=](auto...){ if (aCompletedCB) aCompletedCB(aError); });
         } else {
+          // otherwise retry to refresh token
           LOG(LOG_ERR, "NetatmoComm::refreshAccessToken '%s'", aError->description().c_str());
+          this->refreshAccessToken(aCompletedCB);
         }
       });
     };
@@ -310,6 +368,7 @@ void NetatmoComm::refreshAccessToken()
     
   } else {
     LOG(LOG_ERR, "NetatmoComm::refreshAccessToken no refresh token available");
+    if (aCompletedCB) aCompletedCB(TextError::err("No refresh token is available"));
   }
 
 }
@@ -321,7 +380,8 @@ void NetatmoComm::gotAccessData(const string& aResponse, ErrorPtr aError, Status
       accessToken = accessTokenJson->stringValue();
       if (auto refreshTokenJson = jsonResponse->get("refresh_token")) {
         refreshToken = refreshTokenJson->stringValue();
-        // note: save tokens to database
+        refreshTokenRetries = 0;
+        storage.save();
       }
       if (aCompletedCB) aCompletedCB(Error::ok());
       return;
@@ -341,7 +401,6 @@ void NetatmoComm::updateAccountStatus(ErrorPtr aError)
       LOG(LOG_ERR, "HttpCommError %s ", aError->description().c_str());
     } else if (aError->getErrorCode() == 401 || aError->getErrorCode() == 403) {
       accountStatus = AccountStatus::disconnected;
-      refreshAccessToken();
       LOG(LOG_ERR, "Authorization Error %s %d", aError->description().c_str());
     } else {
       LOG(LOG_ERR, "Communication Error %s %d", aError->description().c_str());
@@ -355,6 +414,7 @@ void NetatmoComm::disconnect()
   refreshToken.clear();
   userEmail.clear();
 
+  storage.save();
   accountStatus = AccountStatus::disconnected;
 }
 

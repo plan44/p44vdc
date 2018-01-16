@@ -49,8 +49,8 @@ namespace p44 {
     static const MLMicroSeconds NETATMO_POLLING_START_DELAY = 30*Second;
     static const string CONFIG_FILE;
 
-    NetatmoComm netatmoComm;
-    NetatmoDeviceEnumerator deviceEnumerator;
+    unique_ptr<NetatmoComm> netatmoComm;
+    unique_ptr<NetatmoDeviceEnumerator> deviceEnumerator;
 
 
   public:
@@ -63,12 +63,6 @@ namespace p44 {
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
-
-    // persistence implementation
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   private:
     /// Initialize vdc
@@ -97,9 +91,6 @@ namespace p44 {
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
-
-    void storeDataAndScanForDevices();
-
 
   };
 

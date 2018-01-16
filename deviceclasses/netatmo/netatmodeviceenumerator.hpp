@@ -51,6 +51,10 @@ namespace p44 {
       ~NetatmoDeviceEnumerator(){};
 
       void collectDevices(StatusCB aCompletedCB);
+      void getWeatherDevices(StatusCB aCompletedCB);
+      void getHomeCoachDevices(StatusCB aCompletedCB);
+      void discoveryCompleted(StatusCB aCompletedCB);
+
 
       void enumerateAndEmplaceDevice(JsonObjectPtr aJson);
       void collectWeatherDevices(JsonObjectPtr aJson);
