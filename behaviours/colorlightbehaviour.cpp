@@ -460,18 +460,18 @@ void ColorLightBehaviour::appliedColorValues()
 
 bool ColorLightBehaviour::colorTransitionStep(double aStepSize)
 {
-  bool moreSteps = brightness->transitionStep(aStepSize);
+  bool moreSteps = false;
   switch (colorMode) {
     case colorLightModeHueSaturation:
-      hue->transitionStep(aStepSize);
-      saturation->transitionStep(aStepSize);
+      if (hue->transitionStep(aStepSize)) moreSteps = true;
+      if (saturation->transitionStep(aStepSize)) moreSteps = true;
       break;
     case colorLightModeCt:
-      ct->transitionStep(aStepSize);
+      if (ct->transitionStep(aStepSize)) moreSteps = true;
       break;
     case colorLightModeXY:
-      cieX->transitionStep(aStepSize);
-      cieY->transitionStep(aStepSize);
+      if (cieX->transitionStep(aStepSize)) moreSteps = true;
+      if (cieY->transitionStep(aStepSize)) moreSteps = true;
       break;
     default:
       // no color

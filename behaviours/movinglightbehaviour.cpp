@@ -217,10 +217,11 @@ void MovingLightBehaviour::saveChannelsToScene(DsScenePtr aScene)
 
 
 
-void MovingLightBehaviour::positionTransitionStep(double aStepSize)
+bool MovingLightBehaviour::positionTransitionStep(double aStepSize)
 {
-  horizontalPosition->transitionStep(aStepSize);
-  verticalPosition->transitionStep(aStepSize);
+  bool moreSteps = horizontalPosition->transitionStep(aStepSize);
+  if (verticalPosition->transitionStep(aStepSize)) moreSteps = true;
+  return moreSteps;
 }
 
 

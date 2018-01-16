@@ -97,7 +97,7 @@ bool ChannelBehaviour::transitionStep(double aStepSize)
   }
   if (inTransition()) {
     setTransitionProgress(transitionProgress+aStepSize);
-    return true; // still in transition (at least until this step is actually applied)
+    return inTransition(); // transition might be complete with this step
   }
   // no longer in transition
   return false;
