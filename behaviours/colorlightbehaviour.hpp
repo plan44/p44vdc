@@ -262,6 +262,28 @@ namespace p44 {
     /// @return textual description of object
     virtual string shortDesc();
 
+    /// @name color services for implementing color lights
+    /// @{
+
+    /// get CIEx,y from current color mode (possibly in transition)
+    /// @param aCieX will receive CIE X component, 0..1
+    /// @param aCieY will receive CIE Y component, 0..1
+    /// @return false if values are not available
+    bool getCIExy(double &aCieX, double &aCieY);
+
+    /// get Color Temperature from current color mode
+    /// @param aCT will receive color temperature in mired
+    /// @return false if values are not available
+    bool getCT(double &aCT);
+
+    /// get Hue+Saturation from current color mode
+    /// @param aHue will receive hue component, 0..360
+    /// @param aSaturation will receive saturation component, 0..100%
+    /// @return false if values are not available
+    bool getHueSaturation(double &aHue, double &aSaturation);
+
+    /// @}
+
   protected:
 
     /// called by applyScene to load channel values from a scene.
@@ -276,7 +298,6 @@ namespace p44 {
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
     /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
     virtual void saveChannelsToScene(DsScenePtr aScene);
-
 
     /// utility function, adjusts channel-level dontCare flags to current color mode
     void adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene);

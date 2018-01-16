@@ -382,7 +382,95 @@ bool ColorLightBehaviour::deriveColorMode()
 }
 
 
+bool ColorLightBehaviour::getCIExy(double &aCieX, double &aCieY)
+{
+  Row3 HSV;
+  Row3 xyV;
+  switch (colorMode) {
+    case colorLightModeHueSaturation:
+      HSV[0] = hue->getTransitionalValue(); // 0..360
+      HSV[1] = saturation->getTransitionalValue()/100; // 0..1
+      HSV[2] = 1;
+      HSVtoxyV(HSV, xyV);
+      aCieX = xyV[0];
+      aCieY = xyV[1];
+      break;
+    case colorLightModeXY:
+      aCieX = cieX->getTransitionalValue();
+      aCieY = cieY->getTransitionalValue();
+      break;
+    case colorLightModeCt:
+      CTtoxyV(ct->getTransitionalValue(), xyV);
+      aCieX = xyV[0];
+      aCieY = xyV[1];
+      break;
+    default:
+      return false; // unknown color mode
+  }
+  return true;
+}
 
+
+bool ColorLightBehaviour::getCT(double &aCT)
+{
+  Row3 HSV;
+  Row3 xyV;
+  switch (colorMode) {
+    case colorLightModeHueSaturation:
+      HSV[0] = hue->getTransitionalValue(); // 0..360
+      HSV[1] = saturation->getTransitionalValue()/100; // 0..1
+      HSV[2] = 1;
+      HSVtoxyV(HSV, xyV);
+      xyVtoCT(xyV, aCT);
+      break;
+    case colorLightModeXY:
+      // missing HSV and ct
+      xyV[0] = cieX->getTransitionalValue();
+      xyV[1] = cieY->getTransitionalValue();
+      xyV[2] = 1;
+      xyVtoCT(xyV, aCT);
+      break;
+    case colorLightModeCt:
+      aCT = ct->getTransitionalValue();
+      break;
+    default:
+      return false; // unknown color mode
+  }
+  return true;
+}
+
+
+bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation)
+{
+  Row3 HSV;
+  Row3 xyV;
+  switch (colorMode) {
+    case colorLightModeHueSaturation:
+      aHue = hue->getTransitionalValue(); // 0..360
+      aSaturation = saturation->getTransitionalValue();
+      break;
+    case colorLightModeXY:
+      xyV[0] = cieX->getTransitionalValue();
+      xyV[1] = cieY->getTransitionalValue();
+      xyV[2] = 1;
+    xyVtoHSV:
+      xyVtoHSV(xyV, HSV);
+      aHue = HSV[0];
+      aSaturation = HSV[1]*100; // 0..100%
+      break;
+    case colorLightModeCt:
+      CTtoxyV(ct->getTransitionalValue(), xyV);
+      goto xyVtoHSV;
+    default:
+      return false; // unknown color mode
+  }
+  return true;
+}
+
+
+
+// Note: altough very similar to the getXXX() above, this one does not operate on transitional values and also
+//       can share some code when calculating two missing modes at once
 void ColorLightBehaviour::deriveMissingColorChannels()
 {
   if (!derivedValuesComplete) {
@@ -394,7 +482,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         // missing CIE and ct
         HSV[0] = hue->getChannelValue(); // 0..360
         HSV[1] = saturation->getChannelValue()/100; // 0..1
-        HSV[2] = brightness->getChannelValue()/100; // 0..1
+        HSV[2] = 1;
         HSVtoxyV(HSV, xyV);
         cieX->syncChannelValue(xyV[0]);
         cieY->syncChannelValue(xyV[1]);
@@ -405,7 +493,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         // missing HSV and ct
         xyV[0] = cieX->getChannelValue();
         xyV[1] = cieY->getChannelValue();
-        xyV[2] = brightness->getChannelValue()/100; // 0..1
+        xyV[2] = 1;
         xyVtoCT(xyV, mired);
         ct->syncChannelValue(mired);
       xyVtoHSV:
@@ -427,7 +515,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
     derivedValuesComplete = true;
     if (DBGLOGENABLED(LOG_DEBUG)) {
       // show all values, plus RGB
-      DBGLOG(LOG_DEBUG, "Color mode = %s, actual and derived channel settings:", colorMode==colorLightModeHueSaturation ? "HSB" : (colorMode==colorLightModeXY ? "CIExy" : (colorMode==colorLightModeCt ? "CT" : "none")));
+      DBGLOG(LOG_DEBUG, "Color mode = %s, actual and derived channel settings:", colorMode==colorLightModeHueSaturation ? "HSV" : (colorMode==colorLightModeXY ? "CIExy" : (colorMode==colorLightModeCt ? "CT" : "none")));
       DBGLOG(LOG_DEBUG, "- HSV : %6.1f, %6.1f, %6.1f [%%, %%, %%]", hue->getChannelValue(), saturation->getChannelValue(), brightness->getChannelValue());
       DBGLOG(LOG_DEBUG, "- xyV : %6.4f, %6.4f, %6.4f [0..1, 0..1, %%]", cieX->getChannelValue(), cieY->getChannelValue(), brightness->getChannelValue());
       DBGLOG(LOG_DEBUG, "- CT  : %6.0f, %6.0f [mired, K]", ct->getChannelValue(), 1E6/ct->getChannelValue());
