@@ -450,7 +450,7 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         // - none for now
         // States properties
         case value_key+states_key_offset:
-          setChannelValue(aPropValue->doubleValue(), 0, true); // always apply, no transition time
+          setChannelValue(aPropValue->doubleValue(), output.transitionTime, true); // always apply, default transition time (normally 0, unless set in outputState)
           return true;
       }
     }

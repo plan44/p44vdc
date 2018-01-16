@@ -37,7 +37,8 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   defaultOutputMode(outputmode_disabled), // none by default, hardware should set a default matching the actual HW capabilities
   pushChanges(false), // do not push changes
   // volatile state
-  localPriority(false) // no local priority
+  localPriority(false), // no local priority
+  transitionTime(0) // immediate transitions by default
 {
   // set default group membership (which is group_undefined)
   resetGroupMembership();
@@ -507,6 +508,7 @@ const PropertyDescriptorPtr OutputBehaviour::getSettingsDescriptorByIndex(int aP
 
 enum {
   localPriority_key,
+  transitiontime_key,
   numStateProperties
 };
 
@@ -515,7 +517,8 @@ int OutputBehaviour::numStateProps() { return numStateProperties; }
 const PropertyDescriptorPtr OutputBehaviour::getStateDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numStateProperties] = {
-    { "localPriority", apivalue_bool, localPriority_key+states_key_offset, OKEY(output_key) }
+    { "localPriority", apivalue_bool, localPriority_key+states_key_offset, OKEY(output_key) },
+    { "transitionTime", apivalue_double, transitiontime_key+states_key_offset, OKEY(output_key) }
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -569,6 +572,9 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case localPriority_key+states_key_offset:
           aPropValue->setBoolValue(localPriority);
           return true;
+        case transitiontime_key+states_key_offset:
+          aPropValue->setDoubleValue((double)transitionTime/Second);
+          return true;
       }
     }
     else {
@@ -583,7 +589,10 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         // State properties
         case localPriority_key+states_key_offset:
-          setPVar(localPriority, aPropValue->boolValue());
+          localPriority = aPropValue->boolValue();
+          return true;
+        case transitiontime_key+states_key_offset:
+          transitionTime = aPropValue->doubleValue()*Second;
           return true;
       }
     }

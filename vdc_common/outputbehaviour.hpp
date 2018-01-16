@@ -45,6 +45,7 @@ namespace p44 {
     /// @{
     VdcOutputFunction outputFunction; ///< the function of the output
     VdcUsageHint outputUsage; ///< the input type when device has hardwired functions
+    VdcOutputMode defaultOutputMode; ///< the default mode of the output - this mode ist used when outputMode is set to outputmode_default
     bool variableRamp; ///< output has variable ramp times
     double maxPower; ///< max power in Watts the output can control
     /// @}
@@ -60,8 +61,8 @@ namespace p44 {
 
     /// @name internal volatile state
     /// @{
-    VdcOutputMode defaultOutputMode; ///< the default mode of the output - this mode ist used when outputMode is set to outputmode_default
     bool localPriority; ///< if set device is in local priority mode
+    MLMicroSeconds transitionTime; ///< default transition time when changing this output
     /// @}
 
   public:
