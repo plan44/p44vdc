@@ -261,7 +261,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     // RGB, RGBW or RGBWA dimmer
     RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
     MovingLightBehaviourPtr ml = boost::dynamic_pointer_cast<MovingLightBehaviour>(output);
-    bool moreSteps = l->brightnessTransitionStep(aStepSize);
+    bool moreSteps = cl->brightnessTransitionStep(aStepSize);
     if (cl->colorTransitionStep(aStepSize)) moreSteps = true;
     if (ml && ml->positionTransitionStep(aStepSize)) moreSteps = true;
     // RGB lamp, get components
