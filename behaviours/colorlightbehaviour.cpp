@@ -243,8 +243,8 @@ void ColorLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   // now load color specific scene information
   ColorLightScenePtr colorLightScene = boost::dynamic_pointer_cast<ColorLightScene>(aScene);
   if (colorLightScene) {
-    MLMicroSeconds ttUp = transitionTimeFromSceneEffect(colorLightScene->effect, true);
-    MLMicroSeconds ttDown = transitionTimeFromSceneEffect(colorLightScene->effect, false);
+    MLMicroSeconds ttUp = transitionTimeFromSceneEffect(colorLightScene->effect, colorLightScene->effectParam, true);
+    MLMicroSeconds ttDown = transitionTimeFromSceneEffect(colorLightScene->effect, colorLightScene->effectParam, false);
     // prepare next color values in channels
     colorMode = colorLightScene->colorMode;
     switch (colorMode) {
