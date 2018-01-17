@@ -1510,20 +1510,20 @@ void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryR
       // could be CT only
       if (cl->isCtOnly()) {
         // treat as two-channel tunable white
-        cl->setCWWW(w, a, 255);
+        cl->setCWWW(w, a, 100); // dali dimmers use abstracted 0..100% brightness
       }
       else {
         // RGBWA
-        cl->setRGBWA(r, g, b, w, a, 255);
+        cl->setRGBWA(r, g, b, w, a, 100); // dali dimmers use abstracted 0..100% brightness
       }
     }
     else {
       // RGBW
-      cl->setRGBW(r, g, b, w, 255);
+      cl->setRGBW(r, g, b, w, 100); // dali dimmers use abstracted 0..100% brightness
     }
   }
   else {
-    cl->setRGB(r, g, b, 255);
+    cl->setRGB(r, g, b, 100); // dali dimmers use abstracted 0..100% brightness
   }
   // complete - continue with initialisation in superclasses
   inherited::initializeDevice(aCompletedCB, aFactoryReset);

@@ -31,7 +31,7 @@ using namespace std;
 namespace p44 {
 
   typedef uint8_t DimmingTime; ///< dimming time with bits 0..3 = mantissa in 6.666mS, bits 4..7 = exponent (# of bits to shift left)
-  typedef double Brightness;
+  typedef double Brightness; ///< 0..100% brightness
 
   class BrightnessChannel : public ChannelBehaviour
   {
