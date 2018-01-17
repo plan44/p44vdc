@@ -158,8 +158,27 @@ bool ChannelBehaviour::getChannelValueBool()
 double ChannelBehaviour::getTransitionalValue()
 {
   if (inTransition()) {
-    // calculate transitional value
-    return previousChannelValue+transitionProgress*(cachedChannelValue-previousChannelValue);
+    double d = cachedChannelValue-previousChannelValue;
+    if (wrapsAround()) {
+      // wraparound channels - use shorter distance
+      double r = getMax()-getMin();
+      // - find out shorter transition distance
+      double ad = fabs(d);
+      if (ad>r/2) {
+        // more than half the range -> other way around is shorter
+        ad = r-ad; // shorter way
+        d = ad * (d>=0 ? -1 : 1); // opposite sign of original
+      }
+      double res = previousChannelValue+transitionProgress*d;
+      // - wraparound
+      if (res>=getMax()) res -= r;
+      else if (res<getMin()) res += r;
+      return res;
+    }
+    else {
+      // simple non-wrapping transition
+      return previousChannelValue+transitionProgress*d;
+    }
   }
   else {
     // current value is cached value
