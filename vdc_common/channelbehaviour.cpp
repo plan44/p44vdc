@@ -258,7 +258,6 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     cachedChannelValue = aNewValue;
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
-    channelLastSync = Never; // cachedChannelValue is no longer applied (does not correspond with actual hardware)
   }
 }
 
@@ -293,7 +292,6 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     cachedChannelValue = newValue;
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
-    channelLastSync = Never; // cachedChannelValue is no longer applied (does not correspond with actual hardware)
   }
   return newValue;
 }
@@ -439,7 +437,7 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
           if (channelLastSync==Never)
             aPropValue->setNull(); // no value known
           else
-            aPropValue->setDoubleValue((double)(MainLoop::now()-channelLastSync)/Second);
+            aPropValue->setDoubleValue((double)(MainLoop::now()-channelLastSync)/Second); // time of last sync (does not necessarily relate to currently visible "value", as this might be a to-be-applied new value already)
           return true;
       }
     }
