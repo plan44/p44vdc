@@ -232,7 +232,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     analogIO->setValue(pwm);
     // next step
     if (moreSteps) {
-      ALOG(LOG_DEBUG, "AnalogIO transitional PWM value: %.2f", w);
+      ALOG(LOG_DEBUG, "AnalogIO transitional brightness value: %.2f", w);
       // not yet complete, schedule next step
       timerTicket = MainLoop::currentMainLoop().executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
@@ -245,7 +245,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   else if (analogIOType==analogio_rgbdimmer) {
     // three channel RGB PWM dimmer
     RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
-    bool moreSteps = cl->brightnessTransitionStep();
+    bool moreSteps = cl->brightnessTransitionStep(aStepSize);
     if (cl->colorTransitionStep(aStepSize)) moreSteps = true;
     // RGB lamp, get components
     double r, g, b, pwm;

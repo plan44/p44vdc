@@ -50,6 +50,9 @@ DsScenePtr LightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 #define STANDARD_DIM_CURVE_EXPONENT 4 // standard exponent, usually ok for PWM for LEDs
 
+#define DUMP_CONVERSION_TABLE 0 // set to get a brightness to PWM conversion table on stdout
+
+
 LightBehaviour::LightBehaviour(Device &aDevice) :
   inherited(aDevice),
   // hardware derived parameters
@@ -75,6 +78,20 @@ LightBehaviour::LightBehaviour(Device &aDevice) :
   // add the brightness channel (every light has brightness)
   brightness = BrightnessChannelPtr(new BrightnessChannel(*this));
   addChannel(brightness);
+  #if DUMP_CONVERSION_TABLE
+  // dump a conversion table for HSV -> RGBWA and then back -> HSV, with deltas (dH,dS,dV)
+  printf("B-in;PWM100-out;PWM-4096;B-back\n");
+  for (double b = 0; b<=100; b += 0.05) {
+    double pwm = brightnessToPWM(b, 100);
+    uint16_t pwm4096 = (uint16_t)(pwm*40.96+0.5);
+    double bb = PWMToBrightness(pwm, 100);
+    // dump
+    printf(
+      "%.2f;%.4f;%d;%.2f\n",
+      b, pwm, pwm4096, bb
+    );
+  }
+  #endif // DUMP_CONVERSION_TABLE
 }
 
 
