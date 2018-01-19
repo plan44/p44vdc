@@ -45,10 +45,8 @@ HomeConnectDeviceCoffeMaker::~HomeConnectDeviceCoffeMaker()
   // TODO Auto-generated destructor stub
 }
 
-bool HomeConnectDeviceCoffeMaker::configureDevice()
+void HomeConnectDeviceCoffeMaker::configureDevice(StatusCB aStatusCB)
 {
-  bool ret = inherited::configureDevice();
-
   addProgramNameProperty();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
@@ -121,7 +119,7 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   deviceProperties->addProperty(beanAmountProp);
   deviceProperties->addProperty(fillQuantityProp);
 
-  return ret;
+  aStatusCB(Error::ok());
 }
 
 void HomeConnectDeviceCoffeMaker::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)

@@ -34,12 +34,13 @@ class HomeConnectDeviceDishWasher: public HomeConnectDevice
 
   ValueDescriptorPtr delayedStartProp;
 
-  virtual bool configureDevice() P44_OVERRIDE;
+  virtual void configureDevice(StatusCB aStatusCB) P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue) P44_OVERRIDE;
   void handleStartInRelativeChange(int32_t aValue);
 
   void addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aParameter);
+  void gotAvailablePrograms(JsonObjectPtr aResult, ErrorPtr aError, ValueDescriptorPtr aDelayedStart, StatusCB aStatusCB);
 
 public:
   HomeConnectDeviceDishWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);

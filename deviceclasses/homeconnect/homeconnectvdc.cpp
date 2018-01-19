@@ -166,26 +166,30 @@ void HomeConnectVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFla
 
 void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError)
 {
-  if (Error::isOK(aError)) {
-    JsonObjectPtr o = aResult->get("data");
-    if (o) {
-      JsonObjectPtr has = o->get("homeappliances");
-      if (has) {
-        for (int i=0; i<has->arrayLength(); i++) {
-          JsonObjectPtr ha = has->arrayGet(i);
-          // create device (might be a dummy if ha.type is not yet supported)
-          HomeConnectDevicePtr newDev =  HomeConnectDevice::createHomeConenctDevice(this, ha);
-          if(newDev->isKnownDevice()) {
-            simpleIdentifyAndAddDevice(newDev);
-          }
+  if (!Error::isOK(aError)) {
+    if (aCompletedCB) aCompletedCB(aError);
+    return;
+  }
+
+  DeviceList newDevices;
+  JsonObjectPtr o = aResult->get("data");
+  if (o) {
+    JsonObjectPtr has = o->get("homeappliances");
+    if (has) {
+      for (int i=0; i<has->arrayLength(); i++) {
+        JsonObjectPtr ha = has->arrayGet(i);
+        // create device (might be a dummy if ha.type is not yet supported)
+        HomeConnectDevicePtr newDev =  HomeConnectDevice::createHomeConenctDevice(this, ha);
+        if(newDev->isKnownDevice()) {
+          newDevices.push_back(newDev);
         }
       }
-      else {
-        ALOG(LOG_INFO, "No home appliances");
-      }
+    }
+    else {
+      ALOG(LOG_INFO, "No home appliances");
     }
   }
-  if (aCompletedCB) aCompletedCB(aError);
+  identifyAndAddDevices(newDevices, aCompletedCB);
 }
 
 ErrorPtr HomeConnectVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)

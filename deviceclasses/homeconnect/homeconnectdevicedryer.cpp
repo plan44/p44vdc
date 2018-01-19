@@ -42,10 +42,8 @@ HomeConnectDeviceDryer::~HomeConnectDeviceDryer()
   // TODO Auto-generated destructor stub
 }
 
-bool HomeConnectDeviceDryer::configureDevice()
+void HomeConnectDeviceDryer::configureDevice(StatusCB aStatusCB)
 {
-  bool ret = inherited::configureDevice();
-
   addProgramNameProperty();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
@@ -114,7 +112,7 @@ bool HomeConnectDeviceDryer::configureDevice()
   dryingTargetProp->addEnum("CupboardDryPlus", i++, false);
 
   deviceProperties->addProperty(dryingTargetProp);
-  return ret;
+  aStatusCB(Error::ok());
 }
 
 void HomeConnectDeviceDryer::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
