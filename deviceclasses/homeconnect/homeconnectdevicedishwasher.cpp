@@ -43,9 +43,8 @@ HomeConnectDeviceDishWasher::~HomeConnectDeviceDishWasher()
   // TODO Auto-generated destructor stub
 }
 
-bool HomeConnectDeviceDishWasher::configureDevice()
+void HomeConnectDeviceDishWasher::configureDevice(StatusCB aStatusCB)
 {
-  bool ret = inherited::configureDevice();
 
   addProgramNameProperty();
   // configure operation mode
@@ -105,7 +104,6 @@ bool HomeConnectDeviceDishWasher::configureDevice()
   addDefaultPowerOnAction();
   addDefaultStopAction();
 
-  addAction("Auto3545",    "Auto 35-45C", "Auto1",   delayedStart);
   addAction("Auto4565",    "Auto 45-65C", "Auto2",   delayedStart);
   addAction("Auto6575",    "Auto 65-75C", "Auto3",   delayedStart);
   addAction("Eco50",       "Eco 50C",     "Eco50",   delayedStart);
@@ -117,8 +115,35 @@ bool HomeConnectDeviceDishWasher::configureDevice()
 
   deviceProperties->addProperty(delayedStartProp, true);
 
-  return ret;
+  homeConnectComm().apiQuery(string_format("/api/homeappliances/%s/programs/available", haId.c_str()).c_str(),
+      boost::bind(&HomeConnectDeviceDishWasher::gotAvailablePrograms, this, _1, _2, delayedStart, aStatusCB));
 }
+
+void HomeConnectDeviceDishWasher::gotAvailablePrograms(JsonObjectPtr aResult, ErrorPtr aError, ValueDescriptorPtr aDelayedStart, StatusCB aStatusCB)
+{
+  if (!Error::isOK(aError)) {
+    aStatusCB(aError);
+    return;
+  }
+
+  JsonObjectPtr programs;
+  JsonObjectPtr data = aResult->get("data");
+  if (data) {
+    programs = data->get("programs");
+  }
+
+  if (programs) {
+    for(int i = 0 ; i < programs->arrayLength(); i++) {
+      JsonObjectPtr key = programs->arrayGet(i)->get("key");
+      if (key && key->stringValue() == "Dishcare.Dishwasher.Program.Auto1") {
+        ALOG(LOG_DEBUG, "Found Auto1 program, adding action");
+        addAction("Auto3545", "Auto 35-45C", "Auto1", aDelayedStart);
+      }
+    }
+  }
+  aStatusCB(Error::ok());
+}
+
 
 void HomeConnectDeviceDishWasher::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
 {

@@ -45,10 +45,8 @@ HomeConnectDeviceOven::~HomeConnectDeviceOven()
   // TODO Auto-generated destructor stub
 }
 
-bool HomeConnectDeviceOven::configureDevice()
+void HomeConnectDeviceOven::configureDevice(StatusCB aStatusCB)
 {
-  bool ret = inherited::configureDevice();
-
   addProgramNameProperty();
 
   targetTemperatureProp = ValueDescriptorPtr(
@@ -130,7 +128,7 @@ bool HomeConnectDeviceOven::configureDevice()
 
   deviceActions->addAction(new HomeConnectStopIfNotTimedAction(*this, *operationModeDescriptor, *remainingProgramTime));
 
-  return ret;
+  aStatusCB(Error::ok());
 }
 
 void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)

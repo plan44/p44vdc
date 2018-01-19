@@ -35,7 +35,7 @@ class HomeConnectDeviceOven: public HomeConnectDevice
   ValueDescriptorPtr targetTemperatureProp;
   ValueDescriptorPtr currentTemperatureProp;
 
-  virtual bool configureDevice() P44_OVERRIDE;
+  virtual void configureDevice(StatusCB aStatusCB) P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue) P44_OVERRIDE;
   virtual void handleEventTypeEvent(const string& aKey) P44_OVERRIDE;

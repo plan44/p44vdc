@@ -319,23 +319,15 @@ HomeConnectDevicePtr HomeConnectDevice::createHomeConenctDevice(HomeConnectVdc *
 
 bool HomeConnectDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
-  if (!configureDevice()) {
-    LOG(LOG_WARNING,"HomeConnect device model '%s' not implemented -> ignored", model.c_str());
-    return false; // cannot configure this device
-  }
-  // publish device standard actions if device was successfully configured
-  autoAddStandardActions();
-  // derive the dSUID
-  deriveDsUid();
-  return true; // simple identification, callback will not be called
+  configureDevice(boost::bind(&HomeConnectDevice::configurationDone, this, aIdentifyCB, _1));
+  return false;
 }
 
-
-
-bool HomeConnectDevice::configureDevice()
+void HomeConnectDevice::configurationDone(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError)
 {
-  // configured ok
-  return true;
+  autoAddStandardActions();
+  deriveDsUid();
+  if (aIdentifyCB) aIdentifyCB(aError, this);
 }
 
 void HomeConnectDevice::configureOperationModeState(const OperationModeConfiguration& aConfiguration)
