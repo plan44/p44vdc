@@ -177,7 +177,14 @@ void HomeConnectDeviceOven::addAction(const string& aActionName, const string& a
   builder.addOption("Cooking.Oven.Option.SetpointTemperature", "@{Temperature%%0}");
   builder.addOption("BSH.Common.Option.Duration", "@{Duration%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this, *operationModeDescriptor, aActionName, aDescription, builder.build()));
+  string command = builder.build();
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectPowerOnAction(*this,
+                                                                                  aActionName,
+                                                                                  aDescription,
+                                                                                  command,
+                                                                                  command,
+                                                                                  *powerStateDescriptor,
+                                                                                  *operationModeDescriptor));
   action->addParameter(aTemperature);
   action->addParameter(aDuration);
   deviceActions->addAction(action);

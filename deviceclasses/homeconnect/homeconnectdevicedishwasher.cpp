@@ -180,11 +180,14 @@ void HomeConnectDeviceDishWasher::addAction(const string& aActionName, const str
   HomeConnectProgramBuilder builder("Dishcare.Dishwasher.Program." + aProgramName);
   builder.addOption("BSH.Common.Option.StartInRelative", "@{DelayedStart*60%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this,
-                                                                                     *operationModeDescriptor,
-                                                                                     aActionName,
-                                                                                     aDescription,
-                                                                                     builder.build()));
+  string command = builder.build();
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectPowerOnAction(*this,
+                                                                                  aActionName,
+                                                                                  aDescription,
+                                                                                  command,
+                                                                                  command,
+                                                                                  *powerStateDescriptor,
+                                                                                  *operationModeDescriptor));
   action->addParameter(aParameter);
   deviceActions->addAction(action);
 }
