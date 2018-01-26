@@ -625,11 +625,12 @@ PropertyContainerPtr ValueList::getContainer(const PropertyDescriptorPtr &aPrope
 
 // MARK: ===== DeviceAction
 
-DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription, const string aTitle) :
+DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription, const string aTitle, const string aCategory) :
   singleDeviceP(&aSingleDevice),
   actionId(aId),
   actionDescription(aDescription),
-  actionTitle(aTitle)
+  actionTitle(aTitle),
+  actionCategory(aCategory)
 {
   // FIXME: remove later: warning indicating not-yet-converted vdc implementations
   if (actionId.substr(0,4)=="std.") {
@@ -714,6 +715,7 @@ enum {
   actiondescription_key,
   actiontitle_key,
   actionparams_key,
+  actioncategory_key,
   numActionProperties
 };
 
@@ -732,7 +734,8 @@ PropertyDescriptorPtr DeviceAction::getDescriptorByIndex(int aPropIndex, int aDo
   static const PropertyDescription properties[numActionProperties] = {
     { "description", apivalue_string, actiondescription_key, OKEY(deviceaction_key) },
     { "title", apivalue_string, actiontitle_key, OKEY(deviceaction_key) },
-    { "params", apivalue_object, actionparams_key, OKEY(deviceaction_key) }
+    { "params", apivalue_object, actionparams_key, OKEY(deviceaction_key) },
+    { "category", apivalue_string, actioncategory_key, OKEY(deviceaction_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
@@ -764,6 +767,14 @@ bool DeviceAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
         }
         else {
           aPropValue->setStringValue(actionTitle);
+          return true;
+        }
+      case actioncategory_key:
+        if (actionCategory.empty()) {
+          return false;
+        }
+        else {
+          aPropValue->setStringValue(actionCategory);
           return true;
         }
     }
