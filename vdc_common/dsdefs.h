@@ -476,7 +476,8 @@ typedef enum {
   scene_effect_smooth = 1, ///< smooth (default: 100mS) normal transition
   scene_effect_slow = 2, ///< slow (default: 1min) transition
   scene_effect_custom = 3, ///< custom (default: 5sec) transition
-  scene_effect_alert = 4, ///< blink (for light devices) / alerting (in general: an effect that draws the user’s attention)
+  scene_effect_alert = 4, ///< blink (for light devices, effectParam!=0 allows detail control) / alerting (in general: an effect that draws the user’s attention)
+  scene_effect_transition = 5, ///< transition time according to scene-level effectParam (milliseconds)
 } VdcSceneEffect;
 
 

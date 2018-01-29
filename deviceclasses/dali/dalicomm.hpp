@@ -312,6 +312,12 @@ namespace p44 {
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
     void daliSendQuery(DaliAddress aAddress, uint16_t aQueryCommand, DaliQueryResultCB aResultCB, int aWithDelay = -1);
 
+    /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
+    /// @param aQueryCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
+    /// @param aResultCB result callback
+    /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
+    void daliSendDtrAndQuery(DaliAddress aAddress, uint16_t aQueryCommand, uint8_t aDTRValue, DaliQueryResultCB aResultCB, int aWithDelay = -1);
+
     /// callback function for daliSendDTXXX methods returning data
     typedef boost::function<void (uint16_t a16BitResult, ErrorPtr aError)> Dali16BitValueQueryResultCB;
 
@@ -321,6 +327,13 @@ namespace p44 {
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
     void daliSend16BitValueAndCommand(DaliAddress aAddress, uint16_t aCommand, uint16_t aValue16, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+
+    /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
+    /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
+    /// @param aValue0,1,2 3 8-bit values to be put into DTR, DTR1, DTR2 before sending the command
+    /// @param aStatusCB status callback
+    /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
+    void daliSend3x8BitValueAndCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aValue0, uint8_t aValue1, uint8_t aValue2, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
 
     /// Send DALI query for 16-bit value, when MSB is returned by query and LSB is returned in DTR
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)

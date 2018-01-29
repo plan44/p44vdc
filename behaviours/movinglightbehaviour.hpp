@@ -141,7 +141,8 @@ namespace p44 {
 
     /// step through transitions
     /// @param aStepSize how much to step. Default is zero and means starting transition
-    void positionTransitionStep(double aStepSize = 0);
+    /// @return true if there's another step to take, false if end of transition already reached
+    bool positionTransitionStep(double aStepSize = 0);
 
     /// mark horizontal and vertical position values applied
     void appliedPosition();

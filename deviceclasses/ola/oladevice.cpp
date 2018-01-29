@@ -219,6 +219,7 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         // - calculate and start transition
         //   TODO: depending to what channel has changed, take transition time from that channel. For now always using brightness transition time
         transitionTime = cl->transitionTimeToNewBrightness();
+        cl->brightnessTransitionStep(); // init
         cl->colorTransitionStep(); // init
         if (ml) ml->positionTransitionStep(); // init
         applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)TRANSITION_STEP_TIME/transitionTime);
@@ -238,10 +239,11 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   if (olaType==ola_dimmer) {
     // single channel dimmer
     LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+    bool moreSteps = l->brightnessTransitionStep(aStepSize);
     double w = l->brightnessForHardware()*255/100;
     setDMXChannel(whiteChannel,(DmxValue)w);
     // next step
-    if (l->brightnessTransitionStep(aStepSize)) {
+    if (moreSteps) {
       ALOG(LOG_DEBUG, "transitional DMX512 value %d=%d", whiteChannel, (int)w);
       // not yet complete, schedule next step
       transitionTicket = MainLoop::currentMainLoop().executeOnce(
@@ -259,6 +261,9 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     // RGB, RGBW or RGBWA dimmer
     RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
     MovingLightBehaviourPtr ml = boost::dynamic_pointer_cast<MovingLightBehaviour>(output);
+    bool moreSteps = cl->brightnessTransitionStep(aStepSize);
+    if (cl->colorTransitionStep(aStepSize)) moreSteps = true;
+    if (ml && ml->positionTransitionStep(aStepSize)) moreSteps = true;
     // RGB lamp, get components
     double r,g,b;
     double w = 0;
@@ -291,11 +296,9 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       setDMXChannel(hPosChannel,(DmxValue)h);
       v = ml->verticalPosition->getTransitionalValue()/100*255;
       setDMXChannel(vPosChannel,(DmxValue)v);
-      // step position
-      ml->positionTransitionStep(aStepSize);
     }
     // next step
-    if (cl->colorTransitionStep(aStepSize)) {
+    if (moreSteps) {
       ALOG(LOG_DEBUG,
         "transitional DMX512 values R(%hd)=%d, G(%hd)=%d, B(%hd)=%d, W(%hd)=%d, A(%hd)=%d, H(%hd)=%d, V(%hd)=%d",
         redChannel, (int)r, greenChannel, (int)g, blueChannel, (int)b,

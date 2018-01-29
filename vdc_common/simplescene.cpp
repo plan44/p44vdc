@@ -20,6 +20,7 @@ SimpleScene::SimpleScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSce
 {
   value = 0;
   effect = scene_effect_smooth;
+  effectParam = 0;
 }
 
 
@@ -49,7 +50,7 @@ const char *SimpleScene::tableName()
 
 // data field definitions
 
-static const size_t numSceneFields = 2;
+static const size_t numSceneFields = 3;
 
 size_t SimpleScene::numFieldDefs()
 {
@@ -61,7 +62,8 @@ const FieldDefinition *SimpleScene::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numSceneFields] = {
     { "brightness", SQLITE_FLOAT }, // named "brightness" for historical reasons - initially only lights used this
-    { "effect", SQLITE_INTEGER }
+    { "effect", SQLITE_INTEGER },
+    { "effectParam", SQLITE_INTEGER }
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
@@ -79,6 +81,7 @@ void SimpleScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uin
   // get the fields
   value = aRow->get<double>(aIndex++);
   effect = (VdcSceneEffect)aRow->get<int>(aIndex++);
+  effectParam = aRow->getWithDefault(aIndex++,(int)0);
 }
 
 
@@ -89,16 +92,18 @@ void SimpleScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex,
   // bind the fields
   aStatement.bind(aIndex++, value);
   aStatement.bind(aIndex++, effect);
+  aStatement.bind(aIndex++, (int)effectParam);
 }
 
 
 // MARK: ===== SimpleScene property access
 
 
-static char lightscene_key;
+static char simplescene_key;
 
 enum {
   effect_key,
+  effectParam_key,
   numSimpleSceneProperties
 };
 
@@ -112,7 +117,8 @@ int SimpleScene::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 PropertyDescriptorPtr SimpleScene::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numSimpleSceneProperties] = {
-    { "effect", apivalue_uint64, effect_key, OKEY(lightscene_key) },
+    { "effect", apivalue_uint64, effect_key, OKEY(simplescene_key) },
+    { "effectParam", apivalue_uint64, effectParam_key, OKEY(simplescene_key) },
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -124,12 +130,15 @@ PropertyDescriptorPtr SimpleScene::getDescriptorByIndex(int aPropIndex, int aDom
 
 bool SimpleScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
-  if (aPropertyDescriptor->hasObjectKey(lightscene_key)) {
+  if (aPropertyDescriptor->hasObjectKey(simplescene_key)) {
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case effect_key:
           aPropValue->setUint8Value(effect);
+          return true;
+        case effectParam_key:
+          aPropValue->setUint32Value(effectParam);
           return true;
       }
     }
@@ -138,6 +147,9 @@ bool SimpleScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
       switch (aPropertyDescriptor->fieldKey()) {
         case effect_key:
           setPVar(effect, (VdcSceneEffect)aPropValue->uint8Value());
+          return true;
+        case effectParam_key:
+          setPVar(effectParam, aPropValue->uint32Value());
           return true;
       }
     }

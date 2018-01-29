@@ -50,6 +50,9 @@ DsScenePtr LightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 #define STANDARD_DIM_CURVE_EXPONENT 4 // standard exponent, usually ok for PWM for LEDs
 
+#define DUMP_CONVERSION_TABLE 0 // set to get a brightness to PWM conversion table on stdout
+
+
 LightBehaviour::LightBehaviour(Device &aDevice) :
   inherited(aDevice),
   // hardware derived parameters
@@ -75,6 +78,20 @@ LightBehaviour::LightBehaviour(Device &aDevice) :
   // add the brightness channel (every light has brightness)
   brightness = BrightnessChannelPtr(new BrightnessChannel(*this));
   addChannel(brightness);
+  #if DUMP_CONVERSION_TABLE
+  // dump a conversion table for HSV -> RGBWA and then back -> HSV, with deltas (dH,dS,dV)
+  printf("B-in;PWM100-out;PWM-4096;B-back\n");
+  for (double b = 0; b<=100; b += 0.05) {
+    double pwm = brightnessToPWM(b, 100);
+    uint16_t pwm4096 = (uint16_t)(pwm*40.96+0.5);
+    double bb = PWMToBrightness(pwm, 100);
+    // dump
+    printf(
+      "%.2f;%.4f;%d;%.2f\n",
+      b, pwm, pwm4096, bb
+    );
+  }
+  #endif // DUMP_CONVERSION_TABLE
 }
 
 
@@ -112,7 +129,7 @@ void LightBehaviour::initMinBrightness(Brightness aMin)
 
 Brightness LightBehaviour::brightnessForHardware()
 {
-  return outputValueAccordingToMode(brightness->getChannelValue(), brightness->getChannelIndex());
+  return outputValueAccordingToMode(brightness->getTransitionalValue(), brightness->getChannelIndex());
 }
 
 
@@ -166,7 +183,8 @@ void LightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     // load brightness channel from scene
     Brightness b = lightScene->value;
     VdcSceneEffect e = lightScene->effect;
-    brightness->setChannelValueIfNotDontCare(lightScene, b, transitionTimeFromSceneEffect(e, true), transitionTimeFromSceneEffect(e, false), true);
+    uint32_t ep = lightScene->effectParam;
+    brightness->setChannelValueIfNotDontCare(lightScene, b, transitionTimeFromSceneEffect(e, ep, true), transitionTimeFromSceneEffect(e, ep, false), true);
   }
   else {
     // only if not light scene, use default loader
@@ -209,14 +227,20 @@ static MLMicroSeconds transitionTimeFromDimTime(uint8_t aDimTime)
 }
 
 
-MLMicroSeconds LightBehaviour::transitionTimeFromSceneEffect(VdcSceneEffect aEffect, bool aDimUp)
+MLMicroSeconds LightBehaviour::transitionTimeFromSceneEffect(VdcSceneEffect aEffect, uint32_t aEffectParam, bool aDimUp)
 {
   uint8_t dimTimeIndex;
   switch (aEffect) {
-    case scene_effect_smooth : dimTimeIndex = 0; break;
-    case scene_effect_slow : dimTimeIndex = 1; break;
-    case scene_effect_custom : dimTimeIndex = 2; break;
-    default: return 0; // no known effect -> just return 0 for transition time
+    case scene_effect_smooth :
+      dimTimeIndex = 0; break;
+    case scene_effect_slow :
+      dimTimeIndex = 1; break;
+    case scene_effect_custom :
+      dimTimeIndex = 2; break;
+    case scene_effect_transition:
+      return aEffectParam*MilliSecond; // transition time is just the effect param (in milliseconds)
+    default:
+      return 0; // no known effect -> just return 0 for transition time
   }
   // dimTimeIndex found, look up actual time
   return transitionTimeFromDimTime(aDimUp ? dimTimeUp[dimTimeIndex] : dimTimeDown[dimTimeIndex]);
@@ -243,7 +267,7 @@ void LightBehaviour::onAtMinBrightness(DsScenePtr aScene)
       // - load scene values for channels
       loadChannelsFromScene(lightScene); // Note: causes log message because channel is set to new value
       // - override brightness with minDim
-      brightness->setChannelValue(brightness->getMinDim(), transitionTimeFromSceneEffect(lightScene->effect, true));
+      brightness->setChannelValue(brightness->getMinDim(), transitionTimeFromSceneEffect(lightScene->effect, lightScene->effectParam, true));
     }
   }
 }
@@ -255,7 +279,18 @@ void LightBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
   LightScenePtr lightScene = boost::dynamic_pointer_cast<LightScene>(aScene);
   if (lightScene && lightScene->effect==scene_effect_alert) {
     // run blink effect
-    blink(4*Second, lightScene, aDoneCB, 2*Second, 50);
+    // - set defaults
+    int rep = 2;
+    MLMicroSeconds period = 2*Second;
+    int onratio = 50;
+    // - can be parametrized: effectParam!=0 -> 0xrroopppp : rr=repetitions, oo=ontime ration, pppp=period in milliseconds
+    uint32_t ep = lightScene->effectParam;
+    if (ep!=0) {
+      rep = (ep>>24) & 0xFF;
+      onratio = (ep>>16) & 0xFF;
+      period = (MLMicroSeconds)(ep & 0xFFFF)*MilliSecond;
+    }
+    blink(rep*period, lightScene, aDoneCB, period, onratio);
     return;
   }
   // none of my effects, let inherited check

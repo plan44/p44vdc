@@ -1141,18 +1141,18 @@ void EnoceanA52004Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
       // - DB0..1 = service command 0=no change, 1=open valve, 2=run init, 3=close valve
       if (serviceState==service_openvalve) {
         // trigger force full open
-        LOG(LOG_NOTICE, "- valve prophylaxis operation: fully opening valve");
-        data |= 0x1<<DB(0,0); // service: open valve
-        data |= 0x9<<DB(1,0); // wake-up-cycle: 300S=5min (close valve then)
+        LOG(LOG_NOTICE, "- valve prophylaxis operation: fully opening valve for 2 min");
+        data |= 100<<DB(3,0); // do not use service, just open to 100%
+        data |= 3<<DB(1,0); // 2 min
         // next is closing
         serviceState = service_closevalve;
         device.needOutgoingUpdate();
       }
       else if (serviceState==service_closevalve) {
         // trigger force fully closed
-        LOG(LOG_NOTICE, "- valve prophylaxis operation: fully closing valve");
-        data |= 0x3<<DB(0,0); // service: close valve
-        data |= 0x9<<DB(1,0); // wake-up-cycle: 300S=5min (return to normal operation then)
+        LOG(LOG_NOTICE, "- valve prophylaxis operation: fully closing valve for 2 min");
+        data |= 0<<DB(3,0); // do not use service, just close to 0%
+        data |= 3<<DB(1,0); // 2 min
         // next is normal operation again
         serviceState = service_idle;
         device.needOutgoingUpdate();
@@ -1162,12 +1162,12 @@ void EnoceanA52004Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
       // Normal operation
       // - wake up cycle: fast in winter, slow in summer
       if (cb->isClimateControlIdle()) {
-        data |= 54<<DB(1,0); // 12 hours
+        data |= 54<<DB(1,0); // Summer: 12 hours
         data |= DBMASK(1,6); // measurement disabled
-        LOG(LOG_NOTICE, "- valve is in IDLE mode (slow updates)");
+        LOG(LOG_NOTICE, "- valve is in IDLE mode (12hr wake cycle)");
       }
       else {
-        data |= 39<<DB(1,0); // 20 min
+        data |= 39<<DB(1,0); // Winter: 20 min
         if (!roomTemp && !feedTemp) {
           // nobody interested in measurements, don't waste battery on performing them
           data |= DBMASK(1,6); // measurement disabled

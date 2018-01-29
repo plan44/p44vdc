@@ -196,6 +196,7 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         // - calculate and start transition
         //   TODO: depending to what channel has changed, take transition time from that channel. For now always using brightness transition time
         transitionTime = cl->transitionTimeToNewBrightness();
+        cl->brightnessTransitionStep(); // init
         cl->colorTransitionStep(); // init
         applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)TRANSITION_STEP_TIME/transitionTime);
       } // if needs update
@@ -225,12 +226,13 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   if (analogIOType==analogio_dimmer) {
     // single channel PWM dimmer
     LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+    bool moreSteps = l->brightnessTransitionStep(aStepSize);
     double w = l->brightnessForHardware();
     double pwm = l->brightnessToPWM(w, 100);
     analogIO->setValue(pwm);
     // next step
-    if (l->brightnessTransitionStep(aStepSize)) {
-      ALOG(LOG_DEBUG, "AnalogIO transitional PWM value: %.2f", w);
+    if (moreSteps) {
+      ALOG(LOG_DEBUG, "AnalogIO transitional brightness value: %.2f", w);
       // not yet complete, schedule next step
       timerTicket = MainLoop::currentMainLoop().executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
@@ -243,6 +245,8 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   else if (analogIOType==analogio_rgbdimmer) {
     // three channel RGB PWM dimmer
     RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+    bool moreSteps = cl->brightnessTransitionStep(aStepSize);
+    if (cl->colorTransitionStep(aStepSize)) moreSteps = true;
     // RGB lamp, get components
     double r, g, b, pwm;
     double w = 0;
@@ -266,7 +270,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     pwm = cl->brightnessToPWM(b, 100);
     analogIO3->setValue(pwm);
     // next step
-    if (cl->colorTransitionStep(aStepSize)) {
+    if (moreSteps) {
       ALOG(LOG_DEBUG, "AnalogIO transitional RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
       // not yet complete, schedule next step
       timerTicket = MainLoop::currentMainLoop().executeOnce(
