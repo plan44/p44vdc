@@ -2471,18 +2471,18 @@ PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPr
 // MARK: ===== dynamic configuration of single devices via JSON
 
 
-ErrorPtr SingleDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription)
+ErrorPtr SingleDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aCategory)
 {
   // base class just creates a unspecific action
-  aAction = DeviceActionPtr(new DeviceAction(*this, aActionId, aDescription, ""));
+  aAction = DeviceActionPtr(new DeviceAction(*this, aActionId, aDescription, "", aCategory));
   return ErrorPtr();
 }
 
 
-ErrorPtr SingleDevice::dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle)
+ErrorPtr SingleDevice::dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle, const string aCategory)
 {
   // base class just creates a unspecific action
-  aAction = DeviceActionPtr(new DeviceAction(*this, aActionId, aDescription, aTitle));
+  aAction = DeviceActionPtr(new DeviceAction(*this, aActionId, aDescription, aTitle, aCategory));
   return ErrorPtr();
 }
 
@@ -2520,18 +2520,20 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
   ErrorPtr err;
   DeviceActionPtr a;
   string desc = aActionId; // default to name
+  string category;
   if (aJSONConfig && aJSONConfig->get("description", o)) desc = o->stringValue();
+  if (aJSONConfig && aJSONConfig->get("category", o)) category = o->stringValue();
   if (aDynamic) {
     // dynamic action
     if (!aJSONConfig || !aJSONConfig->get("title", o)) {
       return TextError::err("Dynamic action must have a title");
     }
     string title = o->stringValue();
-    err = dynamicActionFromJSON(a, aJSONConfig, aActionId, desc, title);
+    err = dynamicActionFromJSON(a, aJSONConfig, aActionId, desc, title, category);
   }
   else {
     // standard action
-    err = actionFromJSON(a, aJSONConfig, aActionId, desc);
+    err = actionFromJSON(a, aJSONConfig, aActionId, desc, category);
   }
   if (!Error::isOK(err) || !a) return err;
   // check for params
