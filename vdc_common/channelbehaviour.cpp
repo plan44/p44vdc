@@ -97,7 +97,7 @@ bool ChannelBehaviour::transitionStep(double aStepSize)
   }
   if (inTransition()) {
     setTransitionProgress(transitionProgress+aStepSize);
-    return true; // still in transition (at least until this step is actually applied)
+    return inTransition(); // transition might be complete with this step
   }
   // no longer in transition
   return false;
@@ -158,8 +158,27 @@ bool ChannelBehaviour::getChannelValueBool()
 double ChannelBehaviour::getTransitionalValue()
 {
   if (inTransition()) {
-    // calculate transitional value
-    return previousChannelValue+transitionProgress*(cachedChannelValue-previousChannelValue);
+    double d = cachedChannelValue-previousChannelValue;
+    if (wrapsAround()) {
+      // wraparound channels - use shorter distance
+      double r = getMax()-getMin();
+      // - find out shorter transition distance
+      double ad = fabs(d);
+      if (ad>r/2) {
+        // more than half the range -> other way around is shorter
+        ad = r-ad; // shorter way
+        d = ad * (d>=0 ? -1 : 1); // opposite sign of original
+      }
+      double res = previousChannelValue+transitionProgress*d;
+      // - wraparound
+      if (res>=getMax()) res -= r;
+      else if (res<getMin()) res += r;
+      return res;
+    }
+    else {
+      // simple non-wrapping transition
+      return previousChannelValue+transitionProgress*d;
+    }
   }
   else {
     // current value is cached value
@@ -258,7 +277,6 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     cachedChannelValue = aNewValue;
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
-    channelLastSync = Never; // cachedChannelValue is no longer applied (does not correspond with actual hardware)
   }
 }
 
@@ -293,7 +311,6 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     cachedChannelValue = newValue;
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
-    channelLastSync = Never; // cachedChannelValue is no longer applied (does not correspond with actual hardware)
   }
   return newValue;
 }
@@ -439,7 +456,7 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
           if (channelLastSync==Never)
             aPropValue->setNull(); // no value known
           else
-            aPropValue->setDoubleValue((double)(MainLoop::now()-channelLastSync)/Second);
+            aPropValue->setDoubleValue((double)(MainLoop::now()-channelLastSync)/Second); // time of last sync (does not necessarily relate to currently visible "value", as this might be a to-be-applied new value already)
           return true;
       }
     }
@@ -450,7 +467,7 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         // - none for now
         // States properties
         case value_key+states_key_offset:
-          setChannelValue(aPropValue->doubleValue(), 0, true); // always apply, no transition time
+          setChannelValue(aPropValue->doubleValue(), output.transitionTime, true); // always apply, default transition time (normally 0, unless set in outputState)
           return true;
       }
     }

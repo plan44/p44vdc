@@ -437,6 +437,17 @@ void DaliComm::daliSend16BitValueAndCommand(DaliAddress aAddress, uint16_t aComm
 }
 
 
+void DaliComm::daliSend3x8BitValueAndCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aValue0, uint8_t aValue1, uint8_t aValue2, DaliCommandStatusCB aStatusCB, int aWithDelay)
+{
+  daliSend(DALICMD_SET_DTR, aValue0, NULL, aWithDelay);
+  daliSend(DALICMD_SET_DTR1, aValue1);
+  daliSend(DALICMD_SET_DTR2, aValue2);
+  aWithDelay = 0; // delay already consumed for setting DTR
+  daliPrepareForCommand(aCommand, aWithDelay);
+  daliSendCommand(aAddress, aCommand, aStatusCB);
+}
+
+
 
 // DALI Query commands (expect answer byte)
 
@@ -450,6 +461,13 @@ void DaliComm::daliSendQuery(DaliAddress aAddress, uint16_t aQueryCommand, DaliQ
 {
   daliPrepareForCommand(aQueryCommand, aWithDelay);
   daliSendAndReceive(dali1FromAddress(aAddress)+1, aQueryCommand, aResultCB, aWithDelay);
+}
+
+
+void DaliComm::daliSendDtrAndQuery(DaliAddress aAddress, uint16_t aQueryCommand, uint8_t aDTRValue, DaliQueryResultCB aResultCB, int aWithDelay)
+{
+  daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay);
+  daliSendQuery(aAddress, aQueryCommand, aResultCB, 0); // delay already consumed for setting DTR
 }
 
 

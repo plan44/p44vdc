@@ -31,7 +31,7 @@ using namespace std;
 namespace p44 {
 
   typedef uint8_t DimmingTime; ///< dimming time with bits 0..3 = mantissa in 6.666mS, bits 4..7 = exponent (# of bits to shift left)
-  typedef double Brightness;
+  typedef double Brightness; ///< 0..100% brightness
 
   class BrightnessChannel : public ChannelBehaviour
   {
@@ -162,7 +162,8 @@ namespace p44 {
     ///   condition is already met to allow saving virtual brightness to scenes)
     void syncBrightnessFromHardware(Brightness aBrightness, bool aAlwaysSync=false);
 
-    /// wrapper to confirm having applied brightness
+    /// Check if brightness change needs to be applied to hardware
+    /// @return true if brightness has pending change
     bool brightnessNeedsApplying() { return brightness->needsApplying(); };
 
     /// step through transitions
@@ -236,8 +237,9 @@ namespace p44 {
 
     /// get transition time in microseconds from given scene effect
     /// @param aEffect the scene effect
+    /// @param aEffectParam parameter for the effect (standard dS scenes do not have it)
     /// @param aDimUp true when dimming up, false when dimming down
-    MLMicroSeconds transitionTimeFromSceneEffect(VdcSceneEffect aEffect, bool aDimUp);
+    MLMicroSeconds transitionTimeFromSceneEffect(VdcSceneEffect aEffect, uint32_t aEffectParam, bool aDimUp);
 
 
     /// get PWM value for brightness (from brightness channel) according to dim curve

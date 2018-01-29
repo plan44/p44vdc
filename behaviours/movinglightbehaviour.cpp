@@ -191,8 +191,8 @@ void MovingLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   // now load moving light specific scene information
   MovingLightScenePtr movingLightScene = boost::dynamic_pointer_cast<MovingLightScene>(aScene);
   if (movingLightScene) {
-    MLMicroSeconds ttUp = transitionTimeFromSceneEffect(movingLightScene->effect, true);
-    MLMicroSeconds ttDown = transitionTimeFromSceneEffect(movingLightScene->effect, false);
+    MLMicroSeconds ttUp = transitionTimeFromSceneEffect(movingLightScene->effect, movingLightScene->effectParam, true);
+    MLMicroSeconds ttDown = transitionTimeFromSceneEffect(movingLightScene->effect, movingLightScene->effectParam, false);
     // prepare next position values in channels
     horizontalPosition->setChannelValueIfNotDontCare(movingLightScene, movingLightScene->hPos, ttUp, ttDown, true);
     verticalPosition->setChannelValueIfNotDontCare(movingLightScene, movingLightScene->vPos, ttUp, ttDown, true);
@@ -217,10 +217,11 @@ void MovingLightBehaviour::saveChannelsToScene(DsScenePtr aScene)
 
 
 
-void MovingLightBehaviour::positionTransitionStep(double aStepSize)
+bool MovingLightBehaviour::positionTransitionStep(double aStepSize)
 {
-  horizontalPosition->transitionStep(aStepSize);
-  verticalPosition->transitionStep(aStepSize);
+  bool moreSteps = horizontalPosition->transitionStep(aStepSize);
+  if (verticalPosition->transitionStep(aStepSize)) moreSteps = true;
+  return moreSteps;
 }
 
 

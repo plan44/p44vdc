@@ -141,6 +141,7 @@ void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       // - calculate and start transition
       //   TODO: depending to what channel has changed, take transition time from that channel. For now always using brightness transition time
       transitionTime = cl->transitionTimeToNewBrightness();
+      cl->brightnessTransitionStep(); // init
       cl->colorTransitionStep(); // init
       applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)TRANSITION_STEP_TIME/transitionTime);
     }
@@ -155,6 +156,8 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
 {
   // RGB, RGBW or RGBWA dimmer
   RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+  bool moreSteps = cl->colorTransitionStep(aStepSize);
+  if (cl->brightnessTransitionStep(aStepSize)) moreSteps = true;
   // RGB lamp, get components for rendering loop
   if (getLedChainVdc().hasWhite()) {
     cl->getRGBW(r, g, b, w, 255); // get brightness per R,G,B,W channel
@@ -166,7 +169,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   // trigger rendering the LEDs soon
   getLedChainVdc().triggerRenderingRange(firstLED, numLEDs);
   // next step
-  if (cl->colorTransitionStep(aStepSize)) {
+  if (moreSteps) {
     ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
     // not yet complete, schedule next step
     transitionTicket = MainLoop::currentMainLoop().executeOnce(

@@ -32,10 +32,10 @@ HomeConnectDeviceCoffeMaker::HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, 
     inherited(aVdcP, aHomeApplicanceInfoRecord)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
-  settings->fireAction = "std.StandBy";
-  settings->leaveHomeAction = "std.StandBy";
-  settings->deepOffAction = "std.StandBy";
-  settings->sleepAction = "std.StandBy";
+  settings->fireAction = "StandBy";
+  settings->leaveHomeAction = "StandBy";
+  settings->deepOffAction = "StandBy";
+  settings->sleepAction = "StandBy";
 
   installSettings(settings);
 }
@@ -98,12 +98,12 @@ bool HomeConnectDeviceCoffeMaker::configureDevice()
   addDefaultPowerOnAction();
   addDefaultStopAction();
 
-  addAction("std.Espresso",          "Espresso",            "Espresso",          35,  60,  5,  40);
-  addAction("std.EspressoMacchiato", "Espresso Macchiato",  "EspressoMacchiato", 40,  60,  10, 50);
-  addAction("std.Coffee",            "Coffee",              "Coffee",            60,  250, 10, 100);
-  addAction("std.Cappuccino",        "Cappuccino",          "Cappuccino",        100, 300, 20, 180);
-  addAction("std.LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 250);
-  addAction("std.CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 200);
+  addAction("Espresso",          "Espresso",            "Espresso",          35,  60,  5,  40);
+  addAction("EspressoMacchiato", "Espresso Macchiato",  "EspressoMacchiato", 40,  60,  10, 50);
+  addAction("Coffee",            "Coffee",              "Coffee",            60,  250, 10, 100);
+  addAction("Cappuccino",        "Cappuccino",          "Cappuccino",        100, 300, 20, 180);
+  addAction("LatteMacchiato",    "Latte Macchiato",     "LatteMacchiato",    200, 400, 20, 250);
+  addAction("CaffeLatte",        "Caffe Latte",         "CaffeLatte",        100, 400, 20, 200);
 
   beanAmountProp = EnumValueDescriptorPtr(new EnumValueDescriptor("BeanAmount", true));
   int i = 0;

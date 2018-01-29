@@ -63,7 +63,7 @@ namespace p44 {
 
     DaliVdc &daliVdc;
 
-    MLTicket dimRepeaterTicket; ///< DALI dimming repeater ticket
+    MLTicket dimRepeaterTicket; ///< DALI dimming and repeater ticket
 
     /// feature set
     bool supportsLED; // supports device type 6/LED features
@@ -71,6 +71,8 @@ namespace p44 {
     bool supportsDT8; // supports device type 8 features
     bool dt8Color; // supports DT 8 color features
     bool dt8CT; // supports DT 8 color temperature features
+    uint8_t dt8RPrimaryColors; // if>0, how many primary coloer channels are supported
+    uint8_t dt8RGBWAFchannels; // if>0, how many RGBWAF channels are supported
 
     /// cached status (call updateStatus() to update these)
     bool isDummy; ///< set if dummy (not found on bus, but known to be part of a composite device)
@@ -86,8 +88,13 @@ namespace p44 {
     uint8_t currentFadeRate; ///< currently set DALI fade rate
     // - DT8 params
     ColorLightMode currentColorMode; ///< current color mode
-    uint16_t currentXorCT; ///< current CIE X or CT
-    uint16_t currentY; ///< current CIE Y
+    uint16_t currentXorCT; ///< current CIE X or CT or Red
+    uint16_t currentY; ///< current CIE Y or Green
+    uint8_t currentR; ///< current Red
+    uint8_t currentG; ///< current Green
+    uint8_t currentB; ///< current Blue
+    uint8_t currentW; ///< current White
+    uint8_t currentA; ///< current Amber
 
   public:
 
@@ -144,7 +151,7 @@ namespace p44 {
     /// @return brightness 0..100%
     Brightness arcpowerToBrightness(int aArcpower);
 
-    /// set transition time for subsequent brightness changes
+    /// set transition time for subsequent brightness or color changes
     /// @param aTransitionTime time for transition
     void setTransitionTime(MLMicroSeconds aTransitionTime);
 
@@ -152,12 +159,17 @@ namespace p44 {
     /// @param aBrightness new brightness to set
     void setBrightness(Brightness aBrightness);
 
-    /// set new color parameters
+    /// set new color parameters as CIE x/y or CT
     /// @param aMode new color mode
     /// @param aCieXorCT CIE X coordinate (0..1) or CT in mired
     /// @param aCieY CIE Y coordinate (0..1)
     /// @return true if parameters have changed
     bool setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY = 0);
+
+    /// set new color parameters in raw RGBWA
+    /// @param aR,aG,aB,aW,aA new values
+    /// @return true if parameters have changed
+    bool setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t aW = 0, uint8_t aA = 0);
 
     /// activate new color parameters
     void activateColorParams();
@@ -204,6 +216,7 @@ namespace p44 {
     void queryXCoordResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
     void queryYCoordResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
     void queryCTResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
+    void queryRGBWAFResponse(StatusCB aCompletedCB, uint16_t aResIndex, uint16_t aResponse16, ErrorPtr aError);
 
     void dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aNow);
 
@@ -280,6 +293,10 @@ namespace p44 {
     typedef Device inherited;
     friend class DaliDeviceCollector;
 
+  protected:
+
+    MLTicket transitionTicket; ///< transition timing ticket
+
   public:
 
     DaliOutputDevice(DaliVdc *aVdcP);
@@ -296,10 +313,26 @@ namespace p44 {
     /// device level API methods (p44 specific, JSON only, for configuring grouped devices)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
+    /// apply all pending channel value updates to the device's hardware
+    /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
+    ///   ChannelBehaviours and check isChannelUpdatePending(), and send new values to the device hardware. After successfully
+    ///   updating the device hardware, channelValueApplied() must be called on the channels that had isChannelUpdatePending().
+    /// @param aCompletedCB if not NULL, must be called when values are applied
+    /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
+    ///   in a single channel (and not switching between color modes etc.)
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_FINAL;
+
   protected:
 
     /// save current brightness as default for DALI dimmer to use after powerup and at failure
     virtual void saveAsDefaultBrightness() = 0;
+
+    /// set transition time for subsequent brightness changes
+    /// @param aTransitionTime time for transition
+    virtual void setTransitionTime(MLMicroSeconds aTransitionTime) = 0;
+
+    /// internal implementation for running even very slow light transitions
+    virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) = 0;
 
   };
 
@@ -352,15 +385,6 @@ namespace p44 {
     ///   false in case it is certain that the device is still connected to this and only this vDC
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
-    /// apply all pending channel value updates to the device's hardware
-    /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
-    ///   ChannelBehaviours and check isChannelUpdatePending(), and send new values to the device hardware. After successfully
-    ///   updating the device hardware, channelValueApplied() must be called on the channels that had isChannelUpdatePending().
-    /// @param aCompletedCB if not NULL, must be called when values are applied
-    /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
-    ///   in a single channel (and not switching between color modes etc.)
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
-
     /// start or stop dimming (optimized DALI version)
     /// @param aChannel the channel to start or stop dimming for
     /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
@@ -411,11 +435,19 @@ namespace p44 {
     /// save current brightness as default for DALI dimmer to use after powerup and at failure
     virtual void saveAsDefaultBrightness() P44_OVERRIDE;
 
+    /// set transition time for subsequent brightness changes
+    /// @param aTransitionTime time for transition
+    virtual void setTransitionTime(MLMicroSeconds aTransitionTime) P44_OVERRIDE;
+
+    /// internal implementation for running even very slow light transitions
+    virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) P44_OVERRIDE;
+
   private:
 
     void daliControllerSynced(StatusCB aCompletedCB, bool aFactoryReset, ErrorPtr aError);
     void checkPresenceResponse(PresenceCB aPresenceResultHandler);
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
+
 
   };
 
@@ -491,15 +523,6 @@ namespace p44 {
     ///   false in case it is certain that the device is still connected to this and only this vDC
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
-    /// apply all pending channel value updates to the device's hardware
-    /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
-    ///   ChannelBehaviours and check isChannelUpdatePending(), and send new values to the device hardware. After successfully
-    ///   updating the device hardware, channelValueApplied() must be called on the channels that had isChannelUpdatePending().
-    /// @param aCompletedCB if not NULL, must be called when values are applied
-    /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
-    ///   in a single channel (and not switching between color modes etc.)
-    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
-
     /// @}
 
     /// @name identification of the addressable entity
@@ -541,6 +564,13 @@ namespace p44 {
 
     /// save current brightness as default for DALI dimmer to use after powerup and at failure
     virtual void saveAsDefaultBrightness() P44_OVERRIDE;
+
+    /// set transition time for subsequent brightness changes
+    /// @param aTransitionTime time for transition
+    virtual void setTransitionTime(MLMicroSeconds aTransitionTime) P44_OVERRIDE;
+
+    /// internal implementation for running even very slow light transitions
+    virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) P44_OVERRIDE;
 
   private:
 

@@ -372,6 +372,7 @@ namespace p44 {
     string actionId; ///< id of the action (key in the container object)
     string actionDescription; ///< a descriptive string for the action (for logs and debugging)
     string actionTitle; ///< for dynamic actions: the title of the action in user's language (assigned by the user by a UI of the device itself, immutable from dS)
+    string actionCategory;
     ValueListPtr actionParams; ///< the parameter descriptions of this action
 
     SingleDevice *singleDeviceP; ///< the single device this action belongs to
@@ -383,7 +384,7 @@ namespace p44 {
     /// @param aId the ID of the action (key in the container)
     /// @param aDescription a description string for the action (for log files primarily)
     /// @param aTitle a user language description/name for the action, usually set by the user via direct device interaction (UI, apps, ...)
-    DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription, const string aTitle = "");
+    DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription, const string aTitle = "", const string aCategory = "");
 
     /// get id
     string getId() { return actionId; };

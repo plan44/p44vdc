@@ -37,6 +37,7 @@ namespace p44 {
     colorLightModeHueSaturation, ///< "hs" - hue & saturation
     colorLightModeXY, ///< "xy" - CIE color space coordinates
     colorLightModeCt, ///< "ct" - Mired color temperature: 153 (6500K) to 500 (2000K)
+    colorLightModeRGBWA, ///< direct RGBWA channels, not directly supported at colorlightbehaviour level, but internally in some devices
   } ColorLightMode;
 
 
@@ -231,7 +232,7 @@ namespace p44 {
     bool isCtOnly() { return ctOnly; }
 
     /// derives the color mode from channel values that need to be applied to hardware
-    /// @return true if mode could be found
+    /// @return true if new mode could be found (which also means that color needs to be applied to HW)
     bool deriveColorMode();
 
     /// derives the values for the not-current color representations' channels
@@ -261,6 +262,28 @@ namespace p44 {
     /// @return textual description of object
     virtual string shortDesc();
 
+    /// @name color services for implementing color lights
+    /// @{
+
+    /// get CIEx,y from current color mode (possibly in transition)
+    /// @param aCieX will receive CIE X component, 0..1
+    /// @param aCieY will receive CIE Y component, 0..1
+    /// @return false if values are not available
+    bool getCIExy(double &aCieX, double &aCieY);
+
+    /// get Color Temperature from current color mode
+    /// @param aCT will receive color temperature in mired
+    /// @return false if values are not available
+    bool getCT(double &aCT);
+
+    /// get Hue+Saturation from current color mode
+    /// @param aHue will receive hue component, 0..360
+    /// @param aSaturation will receive saturation component, 0..100%
+    /// @return false if values are not available
+    bool getHueSaturation(double &aHue, double &aSaturation);
+
+    /// @}
+
   protected:
 
     /// called by applyScene to load channel values from a scene.
@@ -275,7 +298,6 @@ namespace p44 {
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
     /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
     virtual void saveChannelsToScene(DsScenePtr aScene);
-
 
     /// utility function, adjusts channel-level dontCare flags to current color mode
     void adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene);
@@ -307,7 +329,8 @@ namespace p44 {
     /// get RGB colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue will receive the R,G,B values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue
-    void getRGB(double &aRed, double &aGreen, double &aBlue, double aMax);
+    /// @param aNoBrightness if set, RGB is calculated at full brightness
+    void getRGB(double &aRed, double &aGreen, double &aBlue, double aMax, bool aNoBrightness = false);
 
     /// set RGB values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue current R,G,B values to be converted to color channel settings
@@ -317,7 +340,8 @@ namespace p44 {
     /// get RGBW colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue,aWhite will receive the R,G,B,W values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite
-    void getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax);
+    /// @param aNoBrightness if set, RGBW is calculated at full brightness
+    void getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax, bool aNoBrightness = false);
 
     /// set RGBW values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue,aWhite current R,G,B,W values to be converted to color channel settings
@@ -327,7 +351,8 @@ namespace p44 {
     /// get RGBWA colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue,aWhite,aAmber will receive the R,G,B,W,A values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite,aAmber
-    void getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax);
+    /// @param aNoBrightness if set, RGBWA is calculated at full brightness
+    void getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax, bool aNoBrightness = false);
 
     /// set RGBWA values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue,aWhite,aAmber current R,G,B,W,A values to be converted to color channel settings
@@ -343,9 +368,6 @@ namespace p44 {
     /// @param aCW,aWW current CW and WW values
     /// @param aMax max value for aCW,aWW
     void setCWWW(double aCW, double aWW, double aMax);
-
-
-
 
     /// @}
 

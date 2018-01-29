@@ -573,7 +573,9 @@ void EnoceanRpsLeakageDetectorHandler::handleRadioPacket(Esp3PacketPtr aEsp3Pack
   uint8_t data = aEsp3PacketPtr->radioUserData()[0];
   BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
   // smoke alarm status
-  bool leakage = data==0x11;
+  bool leakage =
+    (data==0x11) && // data must be 0x11
+    ((aEsp3PacketPtr->radioStatus() & status_rps_mask)==status_T21+status_NU); // AND NU and T21 must be set
   LOG(LOG_INFO, "Enocean Liquid Leakage Detector %08X reports state: %s", device.getAddress(), leakage ? "LEAKAGE" : "no leakage");
   bb->updateInputState(leakage);
 }

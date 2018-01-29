@@ -243,8 +243,8 @@ void ColorLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   // now load color specific scene information
   ColorLightScenePtr colorLightScene = boost::dynamic_pointer_cast<ColorLightScene>(aScene);
   if (colorLightScene) {
-    MLMicroSeconds ttUp = transitionTimeFromSceneEffect(colorLightScene->effect, true);
-    MLMicroSeconds ttDown = transitionTimeFromSceneEffect(colorLightScene->effect, false);
+    MLMicroSeconds ttUp = transitionTimeFromSceneEffect(colorLightScene->effect, colorLightScene->effectParam, true);
+    MLMicroSeconds ttDown = transitionTimeFromSceneEffect(colorLightScene->effect, colorLightScene->effectParam, false);
     // prepare next color values in channels
     colorMode = colorLightScene->colorMode;
     switch (colorMode) {
@@ -360,7 +360,7 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
 bool ColorLightBehaviour::deriveColorMode()
 {
   // the need to derive the color modes only arises when
-  // colors have changed, so this invalidates the derived channel values
+  // colors (may) have changed, so this invalidates the derived channel values
   derivedValuesComplete = false;
   // check changed channels
   if (!ctOnly) {
@@ -382,7 +382,95 @@ bool ColorLightBehaviour::deriveColorMode()
 }
 
 
+bool ColorLightBehaviour::getCIExy(double &aCieX, double &aCieY)
+{
+  Row3 HSV;
+  Row3 xyV;
+  switch (colorMode) {
+    case colorLightModeHueSaturation:
+      HSV[0] = hue->getTransitionalValue(); // 0..360
+      HSV[1] = saturation->getTransitionalValue()/100; // 0..1
+      HSV[2] = 1;
+      HSVtoxyV(HSV, xyV);
+      aCieX = xyV[0];
+      aCieY = xyV[1];
+      break;
+    case colorLightModeXY:
+      aCieX = cieX->getTransitionalValue();
+      aCieY = cieY->getTransitionalValue();
+      break;
+    case colorLightModeCt:
+      CTtoxyV(ct->getTransitionalValue(), xyV);
+      aCieX = xyV[0];
+      aCieY = xyV[1];
+      break;
+    default:
+      return false; // unknown color mode
+  }
+  return true;
+}
 
+
+bool ColorLightBehaviour::getCT(double &aCT)
+{
+  Row3 HSV;
+  Row3 xyV;
+  switch (colorMode) {
+    case colorLightModeHueSaturation:
+      HSV[0] = hue->getTransitionalValue(); // 0..360
+      HSV[1] = saturation->getTransitionalValue()/100; // 0..1
+      HSV[2] = 1;
+      HSVtoxyV(HSV, xyV);
+      xyVtoCT(xyV, aCT);
+      break;
+    case colorLightModeXY:
+      // missing HSV and ct
+      xyV[0] = cieX->getTransitionalValue();
+      xyV[1] = cieY->getTransitionalValue();
+      xyV[2] = 1;
+      xyVtoCT(xyV, aCT);
+      break;
+    case colorLightModeCt:
+      aCT = ct->getTransitionalValue();
+      break;
+    default:
+      return false; // unknown color mode
+  }
+  return true;
+}
+
+
+bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation)
+{
+  Row3 HSV;
+  Row3 xyV;
+  switch (colorMode) {
+    case colorLightModeHueSaturation:
+      aHue = hue->getTransitionalValue(); // 0..360
+      aSaturation = saturation->getTransitionalValue();
+      break;
+    case colorLightModeXY:
+      xyV[0] = cieX->getTransitionalValue();
+      xyV[1] = cieY->getTransitionalValue();
+      xyV[2] = 1;
+    xyVtoHSV:
+      xyVtoHSV(xyV, HSV);
+      aHue = HSV[0];
+      aSaturation = HSV[1]*100; // 0..100%
+      break;
+    case colorLightModeCt:
+      CTtoxyV(ct->getTransitionalValue(), xyV);
+      goto xyVtoHSV;
+    default:
+      return false; // unknown color mode
+  }
+  return true;
+}
+
+
+
+// Note: altough very similar to the getXXX() above, this one does not operate on transitional values and also
+//       can share some code when calculating two missing modes at once
 void ColorLightBehaviour::deriveMissingColorChannels()
 {
   if (!derivedValuesComplete) {
@@ -394,7 +482,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         // missing CIE and ct
         HSV[0] = hue->getChannelValue(); // 0..360
         HSV[1] = saturation->getChannelValue()/100; // 0..1
-        HSV[2] = brightness->getChannelValue()/100; // 0..1
+        HSV[2] = 1;
         HSVtoxyV(HSV, xyV);
         cieX->syncChannelValue(xyV[0]);
         cieY->syncChannelValue(xyV[1]);
@@ -405,7 +493,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         // missing HSV and ct
         xyV[0] = cieX->getChannelValue();
         xyV[1] = cieY->getChannelValue();
-        xyV[2] = brightness->getChannelValue()/100; // 0..1
+        xyV[2] = 1;
         xyVtoCT(xyV, mired);
         ct->syncChannelValue(mired);
       xyVtoHSV:
@@ -427,7 +515,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
     derivedValuesComplete = true;
     if (DBGLOGENABLED(LOG_DEBUG)) {
       // show all values, plus RGB
-      DBGLOG(LOG_DEBUG, "Color mode = %s, actual and derived channel settings:", colorMode==colorLightModeHueSaturation ? "HSB" : (colorMode==colorLightModeXY ? "CIExy" : (colorMode==colorLightModeCt ? "CT" : "none")));
+      DBGLOG(LOG_DEBUG, "Color mode = %s, actual and derived channel settings:", colorMode==colorLightModeHueSaturation ? "HSV" : (colorMode==colorLightModeXY ? "CIExy" : (colorMode==colorLightModeCt ? "CT" : "none")));
       DBGLOG(LOG_DEBUG, "- HSV : %6.1f, %6.1f, %6.1f [%%, %%, %%]", hue->getChannelValue(), saturation->getChannelValue(), brightness->getChannelValue());
       DBGLOG(LOG_DEBUG, "- xyV : %6.4f, %6.4f, %6.4f [0..1, 0..1, %%]", cieX->getChannelValue(), cieY->getChannelValue(), brightness->getChannelValue());
       DBGLOG(LOG_DEBUG, "- CT  : %6.0f, %6.0f [mired, K]", ct->getChannelValue(), 1E6/ct->getChannelValue());
@@ -460,18 +548,18 @@ void ColorLightBehaviour::appliedColorValues()
 
 bool ColorLightBehaviour::colorTransitionStep(double aStepSize)
 {
-  bool moreSteps = brightness->transitionStep(aStepSize);
+  bool moreSteps = false;
   switch (colorMode) {
     case colorLightModeHueSaturation:
-      hue->transitionStep(aStepSize);
-      saturation->transitionStep(aStepSize);
+      if (hue->transitionStep(aStepSize)) moreSteps = true;
+      if (saturation->transitionStep(aStepSize)) moreSteps = true;
       break;
     case colorLightModeCt:
-      ct->transitionStep(aStepSize);
+      if (ct->transitionStep(aStepSize)) moreSteps = true;
       break;
     case colorLightModeXY:
-      cieX->transitionStep(aStepSize);
-      cieY->transitionStep(aStepSize);
+      if (cieX->transitionStep(aStepSize)) moreSteps = true;
+      if (cieY->transitionStep(aStepSize)) moreSteps = true;
       break;
     default:
       // no color
@@ -565,7 +653,7 @@ static double colorCompScaled(double aColorComp, double aMax)
   return aColorComp;
 }
 
-void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue, double aMax)
+void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue, double aMax, bool aNoBrightness)
 {
   Row3 RGB;
   Row3 xyV;
@@ -576,7 +664,7 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
     case colorLightModeHueSaturation: {
       HSV[0] = hue->getTransitionalValue(); // 0..360
       HSV[1] = saturation->getTransitionalValue()/100; // 0..1
-      HSV[2] = brightness->getTransitionalValue()/100; // 0..1
+      HSV[2] = aNoBrightness ? 1 : brightness->getTransitionalValue()/100; // 0..1
       HSVtoRGB(HSV, RGB);
       break;
     }
@@ -592,7 +680,7 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
       if (RGB[1]>m) m = RGB[1];
       if (RGB[2]>m) m = RGB[2];
       // include actual brightness into scale calculation
-      scale = brightness->getTransitionalValue()/100/m;
+      if (!aNoBrightness) scale = brightness->getTransitionalValue()/100/m;
       break;
     }
     case colorLightModeXY: {
@@ -604,12 +692,12 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
       xyVtoXYZ(xyV, XYZ);
       // convert using calibration for this lamp
       XYZtoRGB(calibration, XYZ, RGB);
-      scale = brightness->getTransitionalValue()/100; // 0..1
+      if (!aNoBrightness) scale = brightness->getTransitionalValue()/100; // 0..1
       break;
     }
     default: {
       // no color, just set R=G=B=brightness
-      RGB[0] = brightness->getTransitionalValue()/100;
+      RGB[0] = aNoBrightness ? 1 : brightness->getTransitionalValue()/100;
       RGB[1] = RGB[0];
       RGB[2] = RGB[0];
       break;
@@ -693,11 +781,11 @@ static void transferFromColor(Row3 &aCol, double aAmount, double &aRed, double &
 
 
 
-void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax)
+void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax, bool aNoBrightness)
 {
   // first get 0..1 RGB
   double r,g,b;
-  getRGB(r, g, b, 1);
+  getRGB(r, g, b, 1, aNoBrightness);
   // transfer as much as possible to the white channel
   double w = transferToColor(whiteRGB, r, g, b);
   // Finally scale as requested
@@ -708,11 +796,11 @@ void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue
 }
 
 
-void RGBColorLightBehaviour::getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax)
+void RGBColorLightBehaviour::getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax, bool aNoBrightness)
 {
   // first get RGBW
   double r,g,b;
-  getRGB(r, g, b, 1);
+  getRGB(r, g, b, 1, aNoBrightness);
   // transfer as much as possible to the white channel
   double w = transferToColor(whiteRGB, r, g, b);
   // then transfer as much as possible to the amber channel

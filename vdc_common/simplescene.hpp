@@ -41,6 +41,7 @@ namespace p44 {
 
     double value; ///< scene value
     VdcSceneEffect effect; ///< scene effect (transition or alert)
+    uint32_t effectParam; ///< parameter for the effect (such as per-scene transition time)
 
     /// @}
 
