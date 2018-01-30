@@ -245,6 +245,7 @@ void SensorBehaviour::invalidateSensorValue(bool aPush)
     // currently valid -> invalidate
     lastUpdate = Never;
     currentValue = 0;
+    BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' reports value no longer available", index, behaviourId.c_str(), getHardwareName().c_str());
     if (aPush) {
       // push invalidation (primitive clients not capable of NULL will at least see value==0)
       pushSensor(true, true);
