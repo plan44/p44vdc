@@ -30,7 +30,35 @@
 
 #if ENABLE_HUE
 
+#include "boost/optional.hpp"
+#include <set>
+
 using namespace p44;
+
+namespace
+{
+  boost::optional<string> getUuid(const string& aResponseXml)
+  {
+    static const string BEGIN_TAG = "<UDN>uuid:";
+    static const string END_TAG = "</UDN>";
+
+    size_t start = aResponseXml.find(BEGIN_TAG);
+    if (start == string::npos) {
+      return boost::none;
+    }
+    start += BEGIN_TAG.size();
+    size_t end = aResponseXml.find(END_TAG, start);
+
+    if (end == string::npos) {
+      return boost::none;
+    }
+
+    string uuid = aResponseXml.substr(start, end - start);
+    LOG(LOG_DEBUG, "UUID from XML: %s", uuid.c_str());
+
+    return uuid;
+  }
+}
 
 
 // MARK: ===== HueApiOperation
@@ -177,8 +205,9 @@ public:
   bool refind;
   SsdpSearchPtr bridgeDetector;
   typedef map<string, string> StringStringMap;
-  StringStringMap bridgeCandiates; ///< possible candidates for hue bridges, key=uuid, value=description URL
-  StringStringMap::iterator currentBridgeCandidate; ///< next candidate for bridge
+  typedef std::set<string> StringsSet;
+  StringsSet bridgeCandiates; ///< possible candidates for hue bridges, value=description URL
+  StringsSet::iterator currentBridgeCandidate; ///< next candidate for bridge
   MLMicroSeconds authTimeWindow;
   StringStringMap authCandidates; ///< bridges to try auth with, key=uuid, value=baseURL
   StringStringMap::iterator currentAuthCandidate; ///< next auth candiate
@@ -278,7 +307,7 @@ public:
       // found, now get description to get baseURL
       // - put it into queue as the only candidate
       bridgeCandiates.clear();
-      bridgeCandiates[aSsdpSearch->uuid.c_str()] = aSsdpSearch->locationURL.c_str();
+      bridgeCandiates.insert(aSsdpSearch->locationURL);
       // process the candidate
       currentBridgeCandidate = bridgeCandiates.begin();
       processCurrentBridgeCandidate();
@@ -291,9 +320,9 @@ public:
     if (Error::isOK(aError)) {
       // check device for possibility of being a hue bridge
       if (aSsdpSearch->server.find("IpBridge")!=string::npos) {
-        LOG(LOG_INFO, "hue bridge candidate device found at %s, server=%s, uuid=%s", aSsdpSearch->locationURL.c_str(), aSsdpSearch->server.c_str(), aSsdpSearch->uuid.c_str());
-        // put into map
-        bridgeCandiates[aSsdpSearch->uuid.c_str()] = aSsdpSearch->locationURL.c_str();
+        LOG(LOG_INFO, "hue bridge candidate device found at %s, server=%s", aSsdpSearch->locationURL.c_str(), aSsdpSearch->server.c_str());
+
+        bridgeCandiates.insert(aSsdpSearch->locationURL);
       }
     }
     else {
@@ -311,7 +340,7 @@ public:
     if (currentBridgeCandidate!=bridgeCandiates.end()) {
       // request description XML
       hueComm.bridgeAPIComm.httpRequest(
-        (currentBridgeCandidate->second).c_str(),
+        currentBridgeCandidate->c_str(),
         boost::bind(&BridgeFinder::handleServiceDescriptionAnswer, this, _1, _2),
         "GET"
       );
@@ -338,13 +367,14 @@ public:
   void handleServiceDescriptionAnswer(const string &aResponse, ErrorPtr aError)
   {
     if (Error::isOK(aError)) {
+      boost::optional<string> uuid = getUuid(aResponse);
       // show
       //FOCUSLOG("Received bridge description:\n%s", aResponse.c_str());
       FOCUSLOG("Received service description XML");
       // TODO: this is poor man's XML scanning, use some real XML parser eventually
       // do some basic checking for model
       size_t i = aResponse.find("<manufacturer>Royal Philips Electronics</manufacturer>");
-      if (i!=string::npos) {
+      if (i!=string::npos && uuid) {
         // is from Philips
         // - check model number
         i = aResponse.find("<modelNumber>929000226503</modelNumber>"); // original 2012 hue bridge, FreeRTOS
@@ -372,7 +402,7 @@ public:
               else {
                 // that's a hue bridge, remember it for trying to authorize
                 FOCUSLOG("- Seems to be a hue bridge at %s", url.c_str());
-                authCandidates[currentBridgeCandidate->first] = url;
+                authCandidates[*uuid] = url;
               }
             }
           }
@@ -548,6 +578,5 @@ void HueComm::refindBridge(HueBridgeFindCB aFindHandler)
   BridgeFinderPtr bridgeFinder = BridgeFinderPtr(new BridgeFinder(*this, aFindHandler));
   bridgeFinder->refindBridge(aFindHandler);
 };
-
 
 #endif // ENABLE_HUE
