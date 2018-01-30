@@ -52,11 +52,7 @@ void HomeConnectDeviceOven::configureDevice(StatusCB aStatusCB)
   targetTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("TargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
 
-  currentTemperatureProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("CurrentTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
-
   deviceProperties->addProperty(targetTemperatureProp);
-  deviceProperties->addProperty(currentTemperatureProp);
 
   deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "PreheatFinished", "Pre-heating finished")));
 
@@ -156,19 +152,6 @@ void HomeConnectDeviceOven::handleEventTypeEvent(const string& aKey)
   if(aKey == "Cooking.Oven.Event.PreheatFinished") {
     deviceEvents->pushEvent("PreheatFinished");
   }
-}
-
-void HomeConnectDeviceOven::handleEventTypeStatus(const string& aKey, JsonObjectPtr aValue)
-{
-  ALOG(LOG_INFO, "Oven Event 'STATUS' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
-
-  if (aKey == "Cooking.Oven.Status.CurrentCavityTemperature") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    currentTemperatureProp->setInt32Value(value);
-    return;
-  }
-
-  inherited::handleEventTypeStatus(aKey, aValue);
 }
 
 void HomeConnectDeviceOven::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aTemperature, ValueDescriptorPtr aDuration)
