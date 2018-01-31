@@ -71,11 +71,6 @@ string HueVdc::hardwareGUID()
 };
 
 
-string HueVdc::modelVersion()
-{
-  return swVersion;
-}
-
 
 string HueVdc::vendorName()
 {
