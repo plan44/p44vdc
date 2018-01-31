@@ -288,7 +288,7 @@ ErrorPtr EnoceanVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
           }
         }
         else {
-          if (usedOffsetMap[addr]!='0') {
+          if (addr>=128 || usedOffsetMap[addr]!='0') {
             respErr = WebError::webErr(400, "invalid or already used base ID offset specifier");
           }
         }

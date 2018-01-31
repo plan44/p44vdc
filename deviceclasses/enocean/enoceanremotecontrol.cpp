@@ -170,7 +170,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         newDev->setFunctionDesc("on/off light");
         // is always updateable (no need to wait for incoming data)
         newDev->setAlwaysUpdateable();
-        // - add standard output behaviour
+        // - add standard light output behaviour
         LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*newDev.get()));
         l->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
         // does not need a channel handler at all, just add behaviour
