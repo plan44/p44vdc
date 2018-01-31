@@ -44,8 +44,8 @@ using namespace p44;
 
 // MARK: ===== ExternalDeviceAction
 
-ExternalDeviceAction::ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle) :
-  inherited(aSingleDevice, aName, aDescription, aTitle),
+ExternalDeviceAction::ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle, const string aCategory) :
+  inherited(aSingleDevice, aName, aDescription, aTitle, aCategory),
   callback(NULL)
 {
 }
@@ -827,18 +827,16 @@ bool ExternalDevice::processControlValue(const string &aName, double aValue)
 
 #if ENABLE_EXTERNAL_SINGLEDEVICE
 
-ErrorPtr ExternalDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription)
+ErrorPtr ExternalDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aCategory)
 {
-  // base class just creates a unspecific action
-  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription, ""));
+  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription, "", aCategory));
   return ErrorPtr();
 }
 
 
-ErrorPtr ExternalDevice::dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle)
+ErrorPtr ExternalDevice::dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle, const string aCategory)
 {
-  // base class just creates a unspecific action
-  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription, aTitle));
+  aAction = DeviceActionPtr(new ExternalDeviceAction(*this, aActionId, aDescription, aTitle, aCategory));
   return ErrorPtr();
 }
 

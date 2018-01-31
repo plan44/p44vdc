@@ -1177,14 +1177,14 @@ namespace p44 {
     /// @param aJSONConfig JSON config object for an action. Implementation can fetch specific params from it
     /// @note other params see DeviceAction constructor
     /// @return ok or parsing error
-    virtual ErrorPtr actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription);
+    virtual ErrorPtr actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aCategory);
 
     /// creates a dynamic device action
     /// @param aAction will be assigned the new dynamic action
     /// @param aJSONConfig JSON config object for an action. Implementation can fetch specific params from it
     /// @note other params see DynamicDeviceAction constructor
     /// @return ok or parsing error
-    virtual ErrorPtr dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle);
+    virtual ErrorPtr dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle, const string aCategory);
 
     /// creates a device action parameter
     /// @param aParameter will be assigned the new dynamic action
