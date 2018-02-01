@@ -22,7 +22,7 @@
 #ifndef __p44utils__httpclient__
 #define __p44utils__httpclient__
 
-#include "p44utils_common.hpp"
+#include "p44vdc_common.hpp"
 
 #if ENABLE_NETATMO_V2
 

@@ -19,9 +19,9 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if ENABLE_NETATMO_V2
-
 #include "httpclient.hpp"
+
+#if ENABLE_NETATMO_V2
 
 // File scope debugging options
 // - Set ALWAYS_DEBUG to 1 to enable DBGLOG output even in non-DEBUG builds of this file
