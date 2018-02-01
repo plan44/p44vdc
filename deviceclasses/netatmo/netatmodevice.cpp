@@ -19,8 +19,8 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "netatmodevice.hpp"
 #include "netatmovdc.hpp"
+#include "netatmodevice.hpp"
 
 
 #if ENABLE_NETATMO_V2

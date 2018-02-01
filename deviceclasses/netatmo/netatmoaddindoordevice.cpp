@@ -18,9 +18,8 @@
 //  You should have received a copy of the GNU General Public License
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
-#include "netatmoaddindoordevice.hpp"
 #include "netatmodeviceenumerator.hpp"
-
+#include "netatmoaddindoordevice.hpp"
 
 #if ENABLE_NETATMO_V2
 

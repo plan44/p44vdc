@@ -22,11 +22,11 @@
 #ifndef __p44vdc__netatmoindoorbasedevice__
 #define __p44vdc__netatmoindoorbasedevice__
 
+#include "p44vdc_common.hpp"
 
 #if ENABLE_NETATMO_V2
 
 #include "netatmodevice.hpp"
-#include "p44vdc_common.hpp"
 
 using namespace std;
 

@@ -102,7 +102,7 @@ namespace p44 {
 
     /// some vdcs can have definitions of parameters, states, and properties changing depending on the device information
     /// @return if true, this vDC should be queried for all actions parameters, states and properties descriptions
-    virtual bool dynamicDefinitions() { return true; } P44_OVERRIDE;// by default dynamic definitions are not used
+    virtual bool dynamicDefinitions() P44_OVERRIDE { return true; };// by default dynamic definitions are not used
 
   private:
 
