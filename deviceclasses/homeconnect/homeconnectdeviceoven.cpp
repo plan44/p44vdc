@@ -45,20 +45,14 @@ HomeConnectDeviceOven::~HomeConnectDeviceOven()
   // TODO Auto-generated destructor stub
 }
 
-bool HomeConnectDeviceOven::configureDevice()
+void HomeConnectDeviceOven::configureDevice(StatusCB aStatusCB)
 {
-  bool ret = inherited::configureDevice();
-
   addProgramNameProperty();
 
   targetTemperatureProp = ValueDescriptorPtr(
       new NumericValueDescriptor("TargetTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
 
-  currentTemperatureProp = ValueDescriptorPtr(
-      new NumericValueDescriptor("CurrentTemperature", valueType_numeric, VALUE_UNIT(valueUnit_celsius, unitScaling_1), 0, 300, 1));
-
   deviceProperties->addProperty(targetTemperatureProp);
-  deviceProperties->addProperty(currentTemperatureProp);
 
   deviceEvents->addEvent(DeviceEventPtr(new DeviceEvent(*this, "PreheatFinished", "Pre-heating finished")));
 
@@ -130,7 +124,7 @@ bool HomeConnectDeviceOven::configureDevice()
 
   deviceActions->addAction(new HomeConnectStopIfNotTimedAction(*this, *operationModeDescriptor, *remainingProgramTime));
 
-  return ret;
+  aStatusCB(Error::ok());
 }
 
 void HomeConnectDeviceOven::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
@@ -160,26 +154,20 @@ void HomeConnectDeviceOven::handleEventTypeEvent(const string& aKey)
   }
 }
 
-void HomeConnectDeviceOven::handleEventTypeStatus(const string& aKey, JsonObjectPtr aValue)
-{
-  ALOG(LOG_INFO, "Oven Event 'STATUS' - item: %s, %s", aKey.c_str(), aValue ? aValue->c_strValue() : "<none>");
-
-  if (aKey == "Cooking.Oven.Status.CurrentCavityTemperature") {
-    int32_t value = (aValue != NULL) ? aValue->int32Value() : 0;
-    currentTemperatureProp->setInt32Value(value);
-    return;
-  }
-
-  inherited::handleEventTypeStatus(aKey, aValue);
-}
-
 void HomeConnectDeviceOven::addAction(const string& aActionName, const string& aDescription, const string& aProgramName, ValueDescriptorPtr aTemperature, ValueDescriptorPtr aDuration)
 {
   HomeConnectProgramBuilder builder("Cooking.Oven.Program.HeatingMode." + aProgramName);
   builder.addOption("Cooking.Oven.Option.SetpointTemperature", "@{Temperature%%0}");
   builder.addOption("BSH.Common.Option.Duration", "@{Duration%%0}");
 
-  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectRunProgramAction(*this, *operationModeDescriptor, aActionName, aDescription, builder.build()));
+  string command = builder.build();
+  HomeConnectActionPtr action = HomeConnectActionPtr(new HomeConnectPowerOnAction(*this,
+                                                                                  aActionName,
+                                                                                  aDescription,
+                                                                                  command,
+                                                                                  command,
+                                                                                  *powerStateDescriptor,
+                                                                                  *operationModeDescriptor));
   action->addParameter(aTemperature);
   action->addParameter(aDuration);
   deviceActions->addAction(action);

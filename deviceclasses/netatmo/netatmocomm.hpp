@@ -32,6 +32,7 @@
 #include "jsonwebclient.hpp"
 #include "serialqueue.hpp"
 #include "httpclient.hpp"
+#include "persistentstorage.hpp"
 
 
 using namespace std;
@@ -91,7 +92,10 @@ namespace p44 {
      AccountStatus accountStatus;
      ErrorPtr error;
 
+     int refreshTokenRetries;
+
      boost::signals2::signal<void(JsonObjectPtr)> dataPollCBs;
+     PersistentStorageWithRowId<string, string, string, string, string> storage;
 
      static const string BASE_URL;
      static const string GET_STATIONS_DATA_URL;
@@ -102,20 +106,24 @@ namespace p44 {
      // basing on api description: 
      // "Do not try to pull data every minute. 
      // Netatmo Weather Station sends its measures to the server every ten minutes"
-     static const MLMicroSeconds NETATMO_POLLING_INTERVAL = (10*Minute);
+     static const MLMicroSeconds POLLING_INTERVAL = (10*Minute);
+     static const int REFRESH_TOKEN_RETRY_MAX = 3;
+
+     static const int API_ERROR_INVALID_TOKEN = 2;
+     static const int API_ERROR_TOKEN_EXPIRED = 3;
 
 
    public:
 
-     NetatmoComm();
+     NetatmoComm(ParamStore &aParamStore,  const string& aRowId);
      virtual ~NetatmoComm() {}
 
      void loadConfigFile(JsonObjectPtr aConfigJson);
-     void setAccessToken(const string& aAccessToken) { accessToken = aAccessToken; }
+     void setAccessToken(const string& aAccessToken);
      string getAccessToken() const { return accessToken; }
-     void setRefreshToken(const string& aRefreshToken) { refreshToken = aRefreshToken; }
+     void setRefreshToken(const string& aRefreshToken);
      string getRefreshToken() const { return refreshToken; }
-     void setUserEmail(const string& aUserEmail) { userEmail = aUserEmail; }
+     void setUserEmail(const string& aUserEmail);
      string getUserEmail() const { return userEmail; }
      AccountStatus getAccountStatus() const { return accountStatus; }
 
@@ -130,11 +138,12 @@ namespace p44 {
      void apiQuery(Query aQuery, HttpCommCB aResponseCB);
 
      void pollCycle();
-     void pollState();
+     void pollStationsData();
+     void pollHomeCoachsData();
 
      void authorizeByEmail(const string& aEmail, const string& aPassword, StatusCB aCompletedCB);
-     bool hasAccessTokenExpired(JsonObjectPtr aJsonResponse);
-     void refreshAccessToken();
+     static bool hasAccessTokenExpired(JsonObjectPtr aJsonResponse);
+     void refreshAccessToken(StatusCB aCompletedCB);
      void gotAccessData(const string& aResponse, ErrorPtr aError, StatusCB aCompletedCB={});
      string getAccountStatusString();
      void updateAccountStatus(ErrorPtr aError);

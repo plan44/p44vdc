@@ -65,10 +65,8 @@ HomeConnectDeviceWasher::~HomeConnectDeviceWasher()
   // TODO Auto-generated destructor stub
 }
 
-bool HomeConnectDeviceWasher::configureDevice()
+void HomeConnectDeviceWasher::configureDevice(StatusCB aStatusCB)
 {
-  bool ret = inherited::configureDevice();
-
   addProgramNameProperty();
   // configure operation mode
   OperationModeConfiguration omConfig = { 0 };
@@ -134,7 +132,7 @@ bool HomeConnectDeviceWasher::configureDevice()
   deviceProperties->addProperty(temperatureProp);
   deviceProperties->addProperty(spinSpeedProp);
 
-  return ret;
+  aStatusCB(Error::ok());
 }
 
 void HomeConnectDeviceWasher::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)
