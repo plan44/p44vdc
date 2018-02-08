@@ -1493,6 +1493,9 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       if (aMessage->get("modelname", o)) {
         externalVdc.modelNameString = o->stringValue();
       }
+      if (aMessage->get("modelversion", o)) {
+        externalVdc.modelVersionString = o->stringValue();
+      }
       // - get icon base name
       if (aMessage->get("iconname", o)) {
         externalVdc.iconBaseName = o->stringValue();
@@ -1632,6 +1635,14 @@ string ExternalVdc::modelName()
     return modelNameString;
   return inherited::modelName();
 }
+
+
+string ExternalVdc::vdcModelVersion() const
+{
+  return modelVersionString;
+};
+
+
 
 
 bool ExternalVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)

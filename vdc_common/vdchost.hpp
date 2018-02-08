@@ -410,7 +410,7 @@ namespace p44 {
 
     /// @return human readable product version string
     /// @note it is important to override this here in vdchost, because would loop otherwise when base class calls vdchost's implementation
-    virtual string modelVersion() P44_OVERRIDE { return productVersion; }
+    virtual string modelVersion() const P44_OVERRIDE { return productVersion; }
 
     /// @return unique ID for the functional model of this entity
     virtual string modelUID() P44_OVERRIDE { return DSUID_P44VDC_MODELUID_UUID; /* using the p44 modelUID namespace UUID itself */ }

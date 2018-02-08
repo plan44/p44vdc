@@ -49,7 +49,7 @@ DsAddressable::~DsAddressable()
 }
 
 
-string DsAddressable::modelVersion()
+string DsAddressable::modelVersion() const
 {
   // Note: it is important to override this at vdchost level, because would loop otherwise
   return getVdcHost().modelVersion();

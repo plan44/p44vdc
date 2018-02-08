@@ -203,7 +203,7 @@ string HueDevice::hardwareGUID()
     return inherited::hardwareGUID();
 }
 
-string HueDevice::modelVersion()
+string HueDevice::modelVersion() const
 {
   return swVersion;
 }

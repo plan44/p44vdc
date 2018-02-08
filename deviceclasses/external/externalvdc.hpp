@@ -331,6 +331,7 @@ namespace p44 {
 
     string iconBaseName; ///< the base icon name
     string modelNameString; ///< the string to be returned by modelName()
+    string modelVersionString; ///< the string to be returned by vdcModelVersion()
     string configUrl; ///< custom value for configURL if not empty
     bool alwaysVisible; ///< visible even if no devices contained
 
@@ -361,8 +362,14 @@ namespace p44 {
     /// @{
 
     /// @return human readable, language independent model name/short description
-    /// @note base class will construct this from global product name and vdcModelSuffix()
+    /// @note when no specific modelNameString is set via external API,
+    ///   base class will construct this from global product name and vdcModelSuffix()
     virtual string modelName() P44_OVERRIDE;
+
+    /// @return human readable model version specific to that vDC, meaning for example a firmware version
+    ///    of external hardware governing the access to a device bus/network such as a hue bridge.
+    ///    If not empty, this will be appended to the modelVersion() string.
+    virtual string vdcModelVersion() const P44_OVERRIDE;
 
     /// @return URL for Web-UI (for access from local LAN)
     virtual string webuiURLString() P44_OVERRIDE;

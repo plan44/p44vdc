@@ -137,7 +137,7 @@ namespace p44 {
     virtual string hardwareGUID() P44_OVERRIDE;
 
     /// @return human readable version string
-    virtual string modelVersion() P44_OVERRIDE;
+    virtual string modelVersion() const P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

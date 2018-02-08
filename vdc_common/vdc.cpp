@@ -256,6 +256,20 @@ string Vdc::vendorName()
 }
 
 
+string Vdc::modelVersion() const
+{
+  string v = vdcModelSuffix();
+  if (v.empty()) {
+    return inherited::modelVersion();
+  }
+  else {
+    return inherited::modelVersion() + " / " + v;
+  }
+}
+
+
+
+
 string Vdc::modelName()
 {
   // derive the descriptive name
