@@ -694,6 +694,7 @@ void HomeConnectDevice::handleEventTypeDisconnected()
 void HomeConnectDevice::handleEventTypeConnected()
 {
   ALOG(LOG_NOTICE, "Device connected");
+  pollState();
 }
 
 void HomeConnectDevice::handleOperationStateChange(const string& aNewValue)
