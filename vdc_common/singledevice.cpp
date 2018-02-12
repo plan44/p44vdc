@@ -1490,7 +1490,6 @@ void StandardActions::addStandardAction(StandardActionPtr aAction)
   standardActions.push_back(aAction);
 }
 
-
 void StandardActions::addToModelUIDHash(string &aHashedString)
 {
   for (StandardActionsVector::iterator pos = standardActions.begin(); pos!=standardActions.end(); ++pos) {
@@ -2613,9 +2612,23 @@ void SingleDevice::autoAddStandardActions()
   for (DeviceActions::ActionsVector::iterator pos = deviceActions->deviceActions.begin(); pos!=deviceActions->deviceActions.end(); ++pos) {
     string id = (*pos)->getId();
     StandardActionPtr a = StandardActionPtr(new StandardAction(*this, "std." + id));
-    a->configureMacro(id, JsonObjectPtr()); // no parameters
+    a->configureMacro(id, getParametersFromActionDefaults(*pos));
     standardActions->addStandardAction(a);
   }
+}
+
+JsonObjectPtr SingleDevice::getParametersFromActionDefaults(DeviceActionPtr aAction)
+{
+  JsonObjectPtr json = JsonObject::newObj();
+  ValueListPtr params = aAction->getActionParams();
+  for(ValueList::ValuesVector::iterator it = params->values.begin(); it < params->values.end(); it++) {
+    JsonApiValuePtr v = new JsonApiValue();
+    if ((*it)->getValue(v)) {
+      json->add((*it)->getName().c_str(), v->jsonObject());
+    }
+  }
+
+  return json;
 }
 
 
