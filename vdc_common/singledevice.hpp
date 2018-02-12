@@ -677,6 +677,8 @@ namespace p44 {
     /// @param aTitle a description/name for the action
     StandardAction(SingleDevice &aSingleDevice, const string aId, const string aTitle = "");
 
+    void updateParameterValue(const string& aName, JsonObjectPtr aValue);
+
   };
   typedef boost::intrusive_ptr<StandardAction> StandardActionPtr;
 
@@ -1219,12 +1221,13 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
 
+    void enableStandardActions();
+
   private:
 
     void invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
     void sceneInvokedActionComplete(ErrorPtr aError);
     ErrorPtr addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfig, const string aActionId, bool aPush);
-    void enableStandardActions();
 
   };
 
