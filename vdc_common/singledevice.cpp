@@ -1481,6 +1481,13 @@ StandardAction::StandardAction(SingleDevice &aSingleDevice, const string aId, co
   actionTitle = aTitle;
 }
 
+void StandardAction::updateParameterValue(const string& aName, JsonObjectPtr aValue)
+{
+  JsonObjectPtr params = boost::dynamic_pointer_cast<JsonApiValue>(storedParams)->jsonObject();
+  params->add(aName.c_str(), aValue);
+
+}
+
 
 // MARK: ===== StandardActions container
 
