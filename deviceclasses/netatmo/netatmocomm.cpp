@@ -178,6 +178,20 @@ void NetatmoComm::setUserEmail(const string& aUserEmail)
 }
 
 
+void NetatmoComm::setClientId(const string& aClientId)
+{
+  clientId = aClientId;
+  storage.save();
+}
+
+
+void NetatmoComm::setClientSecret(const string& aClientSecret)
+{
+  clientSecret = aClientSecret;
+  storage.save();
+}
+
+
 void NetatmoComm::apiQuery(Query aQuery, HttpCommCB aResponseCB)
 {
   if (isConfigured()) {
@@ -246,29 +260,6 @@ void NetatmoComm::pollHomeCoachsData()
 }
 
 
-void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword, StatusCB aCompletedCB)
-{
-  stringstream requestBody;
-
-  requestBody<<"grant_type=password"
-      <<"&username="<<HttpComm::urlEncode(aEmail, false)
-      <<"&password="<<HttpComm::urlEncode(aPassword, false)
-      <<"&client_id="<<clientId
-      <<"&client_secret="<<clientSecret
-      <<"&scope="<<HttpComm::urlEncode("read_station read_homecoach", false);
-
-
-  httpClient.getApi().httpRequest(
-      AUTHENTICATE_URL.c_str(),
-      [=](auto...params){ this->gotAccessData(params..., aCompletedCB); },
-      "POST",
-      requestBody.str().c_str(),
-      "application/x-www-form-urlencoded;charset=UTF-8",
-      -1, true, true);
-
-}
-
-
 void NetatmoComm::refreshAccessToken(StatusCB aCompletedCB)
 {
   if (refreshTokenRetries++ >= REFRESH_TOKEN_RETRY_MAX) {
@@ -330,6 +321,8 @@ void NetatmoComm::disconnect()
   accessToken.clear();
   refreshToken.clear();
   userEmail.clear();
+  clientId.clear();
+  clientSecret.clear();
 
   storage.save();
   accountStatus = AccountStatus::disconnected;

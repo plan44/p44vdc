@@ -32,6 +32,7 @@
 
 #include "utils.hpp"
 #include "netatmodeviceenumerator.hpp"
+#include "boost/range/algorithm_ext/erase.hpp"
 
 
 using namespace p44;
@@ -104,57 +105,33 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
 {
   ErrorPtr respErr;
   if (aMethod=="authenticate") {
-    string accessToken, refreshToken;
 
-    if (netatmoComm->getAccountStatus() != AccountStatus::disconnected) {
-      respErr = TextError::err("Invalid account status");
-    }
+    string authData;
+    respErr = checkStringParam(aParams, "authData", authData);
 
-    if (Error::isOK(respErr)) {
-      respErr = checkStringParam(aParams, "accessToken", accessToken);
-    }
+    if (auto jsonAuthData = JsonObject::objFromText(authData.c_str())) {
+      auto accessToken = jsonutils::getJsonStringValue(jsonAuthData, "access_token");
+      auto refreshToken = jsonutils::getJsonStringValue(jsonAuthData, "refresh_token");
 
-    if (Error::isOK(respErr)) {
-      respErr = checkStringParam(aParams, "refreshToken", refreshToken);
-    }
+      if (accessToken && refreshToken) {
 
-    if( !Error::isOK(respErr) ) {
-      methodCompleted(aRequest, respErr);
-      return respErr;
-    }
-
-    netatmoComm->setAccessToken(accessToken);
-    netatmoComm->setRefreshToken(refreshToken);
-    collectDevices({}, rescanmode_normal);
-
-  } else if (aMethod=="authorizeByEmail") {
-    string mail, password;
-
-    if (netatmoComm->getAccountStatus() != AccountStatus::disconnected) {
-      respErr = TextError::err("Invalid account status");
-    }
-
-    if (Error::isOK(respErr)) {
-      respErr = checkStringParam(aParams, "email", mail);
-    }
-
-    if (Error::isOK(respErr)) {
-      respErr = checkStringParam(aParams, "password", password);
-    }
-
-    if (!Error::isOK(respErr)) {
-      methodCompleted(aRequest, respErr);
-      return respErr;
-    }
-
-    netatmoComm->authorizeByEmail(mail, password, [&](ErrorPtr aError){
-      if (Error::isOK(aError)) {
+        netatmoComm->setAccessToken(*accessToken);
+        netatmoComm->setRefreshToken(*refreshToken);
         collectDevices({}, rescanmode_normal);
+        respErr = Error::ok();
+
+      } else {
+        respErr = TextError::err("Cannot parse authData json");
       }
-    });
+
+    } else {
+      respErr = TextError::err("Cannot create from authData json");
+    }
+
   } else if (aMethod=="disconnect") {
     netatmoComm->disconnect();
     collectDevices({}, rescanmode_normal);
+    respErr = Error::ok();
   } else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }

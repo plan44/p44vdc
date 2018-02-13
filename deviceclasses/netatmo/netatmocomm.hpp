@@ -54,31 +54,26 @@ namespace p44 {
    public:
 
    private:
+     static const string AUTHENTICATE_URL;
+
      HttpClient httpClient;
      string accessToken;
      string refreshToken;
      string userEmail;
+     string clientId;
+     string clientSecret;
 
      AccountStatus accountStatus;
-     ErrorPtr error;
-
      int refreshTokenRetries;
 
      boost::signals2::signal<void(JsonObjectPtr)> dataPollCBs;
      PersistentStorageWithRowId<PersistentParams, string, string, string, string, string> storage;
 
-     static const string AUTHENTICATE_URL;
-     string clientId;
-     string clientSecret;
      // basing on api description: 
      // "Do not try to pull data every minute. 
      // Netatmo Weather Station sends its measures to the server every ten minutes"
      static const MLMicroSeconds POLLING_INTERVAL = (10*Minute);
      static const int REFRESH_TOKEN_RETRY_MAX = 3;
-
-     static const int API_ERROR_INVALID_TOKEN = 2;
-     static const int API_ERROR_TOKEN_EXPIRED = 3;
-
 
    public:
 
@@ -92,6 +87,8 @@ namespace p44 {
      string getRefreshToken() const { return refreshToken; }
      void setUserEmail(const string& aUserEmail);
      string getUserEmail() const { return userEmail; }
+     void setClientId(const string& aClientId);
+     void setClientSecret(const string& aClientSecret);
      AccountStatus getAccountStatus() const { return accountStatus; }
 
      virtual boost::signals2::connection registerCallback(UpdateDataCB aCallback) P44_OVERRIDE;
@@ -108,7 +105,6 @@ namespace p44 {
      void pollStationsData();
      void pollHomeCoachsData();
 
-     void authorizeByEmail(const string& aEmail, const string& aPassword, StatusCB aCompletedCB);
      void refreshAccessToken(StatusCB aCompletedCB);
      void gotAccessData(const string& aResponse, ErrorPtr aError, StatusCB aCompletedCB={});
      void disconnect();
