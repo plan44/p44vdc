@@ -187,6 +187,12 @@ namespace p44 {
     /// @note ssdpUuid and apiToken member variables must be set to the pre-know bridge's parameters before calling this
     void refindBridge(HueBridgeFindCB aFindHandler);
 
+    typedef std::list<std::string> NupnpResult;
+    typedef boost::function<void (NupnpResult)> HueBridgeNupnpFindCB;
+    void findBridgesNupnp(HueBridgeNupnpFindCB aFindHandler);
+
+  private:
+    void gotBridgeNupnpResponse(JsonObjectPtr aResult, ErrorPtr aError, HueBridgeNupnpFindCB aFindHandler);
     /// @}
 
   };

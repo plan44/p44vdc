@@ -35,6 +35,7 @@ using namespace p44;
 namespace {
   const string MODEL_FREE_RTOS = "929000226503";
   const string MODEL_HOMEKIT_LINUX = "BSB002";
+  const string NUPNP_PATH = "https://www.meethue.com/api/nupnp";
 }
 
 // MARK: ===== HueApiOperation
@@ -242,7 +243,7 @@ public:
     if (hueComm.fixedBaseURL.empty()) {
       // actually search for bridge
       keepAlive = BridgeFinderPtr(this);
-      bridgeDetector->startSearch(boost::bind(&BridgeFinder::bridgeRefindHandler, this, _1, _2), uuid.c_str());
+      bridgeDetector->startSearch(boost::bind(&BridgeFinder::bridgeRefindHandler, this, _1, _2, uuid), uuid.c_str());
     }
     else {
       // we have a pre-known base URL for the hue API, use this without any find operation
@@ -270,13 +271,11 @@ public:
 
 
 
-  void bridgeRefindHandler(SsdpSearchPtr aSsdpSearch, ErrorPtr aError)
+  void bridgeRefindHandler(SsdpSearchPtr aSsdpSearch, ErrorPtr aError, const string& aExpectedUuid)
   {
     if (!Error::isOK(aError)) {
-      // could not find bridge, return error
-      callback(ErrorPtr(new HueCommError(HueCommError::UuidNotFound)));
-      keepAlive.reset(); // will delete object if nobody else keeps it
-      return; // done
+      // could not find bridge, try N-UPnP
+      hueComm.findBridgesNupnp(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, aExpectedUuid));
     }
     else {
       // found, now get description to get baseURL
@@ -285,10 +284,9 @@ public:
       bridgeCandiates[aSsdpSearch->locationURL] = aSsdpSearch->uuid;
       // process the candidate
       currentBridgeCandidate = bridgeCandiates.begin();
-      processCurrentBridgeCandidate();
+      processCurrentBridgeCandidate(aExpectedUuid);
     }
   }
-
 
   void bridgeDiscoveryHandler(SsdpSearchPtr aSsdpSearch, ErrorPtr aError)
   {
@@ -303,20 +301,37 @@ public:
     else {
       FOCUSLOG("discovery ended, error = %s (usually: timeout)", aError->description().c_str());
       aSsdpSearch->stopSearch();
-      // now process the results
-      currentBridgeCandidate = bridgeCandiates.begin();
-      processCurrentBridgeCandidate();
+
+      hueComm.findBridgesNupnp(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, string()));
     }
   }
 
+  void nupnpDiscoveryHandler(HueComm::NupnpResult aResult, const string& aExpectedUuid)
+  {
+    for(HueComm::NupnpResult::iterator it = aResult.begin(); it != aResult.end(); it++) {
+      bridgeCandiates["http://" + *it + "/description.xml"] = string();
+    }
 
-  void processCurrentBridgeCandidate()
+    if (refind && bridgeCandiates.empty()) {
+      // could not find bridge, return error
+      callback(ErrorPtr(new HueCommError(HueCommError::UuidNotFound)));
+      keepAlive.reset(); // will delete object if nobody else keeps it
+      return; // done
+
+    }
+    // now process the results
+    currentBridgeCandidate = bridgeCandiates.begin();
+    processCurrentBridgeCandidate(aExpectedUuid);
+  }
+
+
+  void processCurrentBridgeCandidate(const string& aExpectedUuid)
   {
     if (currentBridgeCandidate!=bridgeCandiates.end()) {
       // request description XML
       hueComm.bridgeAPIComm.httpRequest(
         (currentBridgeCandidate->first).c_str(),
-        boost::bind(&BridgeFinder::handleServiceDescriptionAnswer, this, _1, _2),
+        boost::bind(&BridgeFinder::handleServiceDescriptionAnswer, this, _1, _2, aExpectedUuid),
         "GET"
       );
     }
@@ -350,7 +365,18 @@ public:
     }
   }
 
-  void handleServiceDescriptionAnswer(const string &aResponse, ErrorPtr aError)
+  bool isUuidValid(const string& aExpectedUuid)
+  {
+    if (currentBridgeCandidate->second.empty()) {
+      return false;
+    }
+    if (aExpectedUuid.empty()) {
+      return true;
+    }
+    return aExpectedUuid == currentBridgeCandidate->second;
+  }
+
+  void handleServiceDescriptionAnswer(const string &aResponse, ErrorPtr aError, const string& aExpectedUuid)
   {
     if (Error::isOK(aError)) {
       // show
@@ -371,7 +397,7 @@ public:
       if (manufacturer == "Royal Philips Electronics" &&
           (model == MODEL_FREE_RTOS || model == MODEL_HOMEKIT_LINUX) &&
           !urlbase.empty() &&
-          !currentBridgeCandidate->second.empty()) {
+          isUuidValid(aExpectedUuid)) {
         // create the base address for the API
         string url = urlbase + "api";
         if (refind) {
@@ -395,7 +421,7 @@ public:
     }
     // try next
     ++currentBridgeCandidate;
-    processCurrentBridgeCandidate(); // process next, if any
+    processCurrentBridgeCandidate(aExpectedUuid); // process next, if any
   }
 
 
@@ -479,6 +505,7 @@ HueComm::HueComm() :
   apiReady(false),
   lastApiAction(Never)
 {
+  bridgeAPIComm.setServerCertVfyDir("");
   bridgeAPIComm.isMemberVariable();
   // do not wait too long for API responses, but long enough to tolerate some lag in slow bridge or wifi network
   bridgeAPIComm.setTimeout(10*Second);
@@ -559,6 +586,34 @@ void HueComm::refindBridge(HueBridgeFindCB aFindHandler)
   BridgeFinderPtr bridgeFinder = BridgeFinderPtr(new BridgeFinder(*this, aFindHandler));
   bridgeFinder->refindBridge(aFindHandler);
 };
+
+void HueComm::findBridgesNupnp(HueBridgeNupnpFindCB aFindHandler)
+{
+  HueApiOperationPtr op = HueApiOperationPtr(new HueApiOperation(*this, httpMethodGET, NUPNP_PATH.c_str(), NULL, boost::bind(&HueComm::gotBridgeNupnpResponse, this, _1, _2, aFindHandler)));
+  op->setInitiatesAt(lastApiAction+100*MilliSecond); // do not start next command earlier than 100mS after the previous one
+  lastApiAction = MainLoop::currentMainLoop().now(); // remember this operation
+  queueOperation(op);
+  // process operations
+  processOperations();
+
+}
+
+void HueComm::gotBridgeNupnpResponse(JsonObjectPtr aResult, ErrorPtr aError, HueBridgeNupnpFindCB aFindHandler)
+{
+  NupnpResult ret;
+  if (!Error::isOK(aError) || !aResult) {
+    aFindHandler(ret);
+    return;
+  }
+
+  for(int i = 0 ; i < aResult->arrayLength(); i++) {
+    JsonObjectPtr ip = aResult->arrayGet(i)->get("internalipaddress");
+    if (ip) {
+      ret.push_back(ip->stringValue());
+    }
+  }
+  aFindHandler(ret);
+}
 
 
 #endif // ENABLE_HUE
