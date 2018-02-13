@@ -161,6 +161,7 @@ namespace p44 {
     void handleMessage(string aEldatMessage, ErrorPtr aError);
     Tristate processLearn(EldatAddress aSenderAddress, EldatMode aMode, int aRSSI, string aData);
     void dispatchMessage(EldatAddress aSenderAddress, EldatMode aMode, int aRSSI, string aData);
+    ErrorPtr addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
 
   };
 

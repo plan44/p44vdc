@@ -1501,6 +1501,10 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       if (aMessage->get("configurl", o)) {
         externalVdc.configUrl = o->stringValue();
       }
+      // - get default name
+      if (aMessage->get("name", o)) {
+        externalVdc.initializeName(o->stringValue());
+      }
       // - always visible (even when empty)
       if (aMessage->get("alwaysVisible", o)) {
         externalVdc.alwaysVisible = o->boolValue();

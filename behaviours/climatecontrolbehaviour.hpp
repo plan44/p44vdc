@@ -52,7 +52,7 @@ namespace p44 {
 
   #if ENABLE_FCU_SUPPORT
 
-  /// ventilation airflow direction channel states
+  /// FCU operation mode channel states
   typedef enum {
     fcuOperatingMode_off = 0,
     fcuOperatingMode_heat = 1,

@@ -278,7 +278,7 @@ void EnoceanD20601Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     if (dataP[0]==0x00) {
       // Sensor Values message
       if (behaviour) handleBitField(D20601handleposition, behaviour, dataP, datasize);
-      if (temperatureSensor) handleBitField(D20601temperature, behaviour, dataP, datasize);
+      if (temperatureSensor) handleBitField(D20601temperature, temperatureSensor, dataP, datasize);
       if (humiditySensor) handleBitField(D20601humidity, humiditySensor, dataP, datasize);
       if (illuminationSensor) handleBitField(D20601illumination, illuminationSensor, dataP, datasize);
       if (batterySensor) handleBitField(D20601battery, batterySensor, dataP, datasize);
