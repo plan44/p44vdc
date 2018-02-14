@@ -209,6 +209,9 @@ namespace p44 {
     /// @param aResultHandler will be called with the result
     void apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler);
 
+    /// Get a lockdown time
+    MLMicroSeconds calculateLockDownTime();
+
     /// Set a lockdown on communication so no request can be send to the cloud
     /// @param aLockDownTime the time for with the lockdown is in effect
     void setLockDownTime(MLMicroSeconds aLockDownTime);

@@ -40,8 +40,7 @@ using namespace p44;
 const string NetatmoVdc::CONFIG_FILE = "config.json";
 
 NetatmoVdc::NetatmoVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
-  inherited(aInstanceNumber, aVdcHostP, aTag),
-  deviceEnumerator(this, netatmoComm)
+  inherited(aInstanceNumber, aVdcHostP, aTag)
 {
   initializeName("Netatmo Controller");
 }
@@ -74,14 +73,16 @@ bool NetatmoVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResol
 
 void NetatmoVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  netatmoComm = make_unique<NetatmoComm>(getVdcHost().getDsParamStore(), dSUID.getString());
+  deviceEnumerator = make_unique<NetatmoDeviceEnumerator>(this, *netatmoComm);
+
   string filePath = getVdcHost().getConfigDir();
   filePath.append(CONFIG_FILE);
   LOG(LOG_INFO, "Loading configuration from file '%s'", filePath.c_str());
-  netatmoComm.loadConfigFile(JsonObject::objFromFile(filePath.c_str()));
-  // load persistent data
-  load();
+  netatmoComm->loadConfigFile(JsonObject::objFromFile(filePath.c_str()));
+
   // schedule data polling
-  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->netatmoComm.pollCycle(); }, NETATMO_POLLING_START_DELAY);
+  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->netatmoComm->pollCycle(); }, NETATMO_POLLING_START_DELAY);
   // schedule incremental re-collect from time to time
   setPeriodicRecollection(NETATMO_RECOLLECT_INTERVAL, rescanmode_incremental);
   if (aCompletedCB) aCompletedCB(Error::ok());
@@ -105,7 +106,7 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
   if (aMethod=="authenticate") {
     string accessToken, refreshToken;
 
-    if (netatmoComm.getAccountStatus() != NetatmoComm::AccountStatus::disconnected) {
+    if (netatmoComm->getAccountStatus() != NetatmoComm::AccountStatus::disconnected) {
       respErr = TextError::err("Invalid account status");
     }
 
@@ -122,14 +123,14 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
       return respErr;
     }
 
-    netatmoComm.setAccessToken(accessToken);
-    netatmoComm.setRefreshToken(refreshToken);
-    storeDataAndScanForDevices();
+    netatmoComm->setAccessToken(accessToken);
+    netatmoComm->setRefreshToken(refreshToken);
+    collectDevices({}, rescanmode_normal);
 
   } else if (aMethod=="authorizeByEmail") {
     string mail, password;
 
-    if (netatmoComm.getAccountStatus() != NetatmoComm::AccountStatus::disconnected) {
+    if (netatmoComm->getAccountStatus() != NetatmoComm::AccountStatus::disconnected) {
       respErr = TextError::err("Invalid account status");
     }
 
@@ -146,25 +147,20 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
       return respErr;
     }
 
-    netatmoComm.authorizeByEmail(mail, password, [&](ErrorPtr aError){
-      if (Error::isOK(aError)) storeDataAndScanForDevices();
+    netatmoComm->authorizeByEmail(mail, password, [&](ErrorPtr aError){
+      if (Error::isOK(aError)) {
+        collectDevices({}, rescanmode_normal);
+      }
     });
   } else if (aMethod=="disconnect") {
-    netatmoComm.disconnect();
-    storeDataAndScanForDevices();
+    netatmoComm->disconnect();
+    collectDevices({}, rescanmode_normal);
   } else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
 
   if (aRequest) methodCompleted(aRequest, respErr);
   return respErr;
-}
-
-void NetatmoVdc::storeDataAndScanForDevices()
-{
-  markDirty();
-  save();
-  collectDevices({}, rescanmode_normal);
 }
 
 
@@ -175,8 +171,8 @@ void NetatmoVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
 
-  deviceEnumerator.collectDevices([=](auto aError){
-    netatmoComm.pollState();
+  deviceEnumerator->collectDevices([=](auto aError){
+    netatmoComm->pollStationsData();
     if (aCompletedCB) aCompletedCB(aError);
   });
 }
@@ -230,11 +226,11 @@ bool NetatmoVdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case netatmoAccountStatus:{
-          aPropValue->setStringValue(netatmoComm.getAccountStatusString());
+          aPropValue->setStringValue(netatmoComm->getAccountStatusString());
           return true;
         }
         case netatmoUserEmail:{
-          aPropValue->setStringValue(netatmoComm.getUserEmail());
+          aPropValue->setStringValue(netatmoComm->getUserEmail());
           return true;
         }
       }
@@ -242,55 +238,6 @@ bool NetatmoVdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
   }
   // not my field, let base class handle it
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
-}
-
-
-
-///Number of fields in Database
-static const size_t numFields = 3;
-
-
-size_t NetatmoVdc::numFieldDefs()
-{
-  return inherited::numFieldDefs()+numFields;
-}
-
-
-const FieldDefinition *NetatmoVdc::getFieldDef(size_t aIndex)
-{
-  static const FieldDefinition dataDefs[numFields] = {
-    { "accessToken", SQLITE_TEXT },
-    { "refreshToken", SQLITE_TEXT },
-    { "userEmail", SQLITE_TEXT }
-  };
-  if (aIndex<inherited::numFieldDefs())
-    return inherited::getFieldDef(aIndex);
-  aIndex -= inherited::numFieldDefs();
-  if (aIndex<numFields)
-    return &dataDefs[aIndex];
-  return NULL;
-}
-
-
-/// load values from passed row
-void NetatmoVdc::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
-{
-  inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
-  // get the field values
-  netatmoComm.setAccessToken(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  netatmoComm.setRefreshToken(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  netatmoComm.setUserEmail(nonNullCStr(aRow->get<const char *>(aIndex++)));
-}
-
-
-// bind values to passed statement
-void NetatmoVdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
-{
-  inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
-  // bind the fields
-  aStatement.bind(aIndex++, netatmoComm.getAccessToken().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, netatmoComm.getRefreshToken().c_str(), false);
-  aStatement.bind(aIndex++, netatmoComm.getUserEmail().c_str(), false);
 }
 
 

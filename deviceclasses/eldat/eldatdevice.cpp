@@ -28,6 +28,7 @@
 #include "binaryinputbehaviour.hpp"
 #include "sensorbehaviour.hpp"
 #include "outputbehaviour.hpp"
+#include "lightbehaviour.hpp"
 
 
 using namespace p44;
@@ -411,9 +412,6 @@ void EldatDevice::switchTypes(const EldatTypeVariantEntry &aFromVariant, const E
 }
 
 
-
-
-
 // MARK: ===== Eldat buttons
 
 
@@ -508,6 +506,82 @@ void EldatMotionDetector::handleFunction(EldatFunction aFunction)
 }
 
 
+// MARK: ===== Eldat remote control device
+
+
+EldatRemoteControlDevice::EldatRemoteControlDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType) :
+  inherited(aVdcP, aDeviceType)
+{
+}
+
+
+string EldatRemoteControlDevice::modelName()
+{
+  if (eldatDeviceType==eldat_ABlight)
+    return "ELDAT on/off light";
+  else
+    return "ELDAT on/off relay";
+}
+
+
+
+uint8_t EldatRemoteControlDevice::teachInSignal(int8_t aVariant)
+{
+  if (aVariant<4) {
+    // issue simulated buttom press - variant: 0=A, 1=B, 2=C, 3=D
+    if (aVariant<0) return 4; // only query: we have 4 teach-in variants
+    sendFunction('A'+aVariant); // send message
+    return 4;
+  }
+  return inherited::teachInSignal(aVariant);
+}
+
+
+
+void EldatRemoteControlDevice::markUsedSendChannels(string &aUsedSendChannelsMap)
+{
+  int chan = getAddress() & 0x7F;
+  if (chan<aUsedSendChannelsMap.size()) {
+    aUsedSendChannelsMap[chan]='1';
+  }
+}
+
+
+void EldatRemoteControlDevice::sendFunction(EldatFunction aFunction)
+{
+  string cmd = string_format("TXP,%02X,%c", getAddress() & 0x7F, aFunction);
+  getEldatVdc().eldatComm.sendCommand(cmd, boost::bind(&EldatRemoteControlDevice::sentFunction, this, _1, _2));
+}
+
+
+void EldatRemoteControlDevice::sentFunction(string aAnswer, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    ALOG(LOG_ERR, "Error sending message: %s", aError->description().c_str());
+  }
+  else {
+    ALOG(LOG_INFO, "Sending function result: %s", aAnswer.c_str());
+  }
+}
+
+
+void EldatRemoteControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
+{
+  // standard output behaviour
+  if (output) {
+    ChannelBehaviourPtr ch = output->getChannelByType(channeltype_default);
+    if (ch->needsApplying()) {
+      bool on = ch->getChannelValueBool();
+      sendFunction(on ? 'A' : 'B');
+      ch->channelValueApplied();
+    }
+  }
+  inherited::applyChannelValues(aDoneCB, aForDimming);
+}
+
+
+
+
 // MARK: ===== device factory
 
 
@@ -597,6 +671,40 @@ EldatDevicePtr EldatDevice::newDevice(
       newDev->addBehaviour(ib);
       // - motion detector uses two indices (it uses A+B functions)
       aSubDeviceIndex+=2;
+    }
+  }
+  else if (aEldatDeviceType==eldat_ABrelay || aEldatDeviceType==eldat_ABlight) {
+    if (aSubDeviceIndex==aFirstSubDevice) {
+      // Create a ELDAT remote control device
+      newDev = EldatDevicePtr(new EldatRemoteControlDevice(aVdcP, aEldatDeviceType));
+      // assign channel and address
+      newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
+      // set icon name
+      newDev->setIconInfo("eldat", true);
+      // type specifics
+      if (aEldatDeviceType==eldat_ABlight) {
+        // light device scene
+        newDev->installSettings(DeviceSettingsPtr(new LightDeviceSettings(*newDev)));
+        newDev->setFunctionDesc("on/off light");
+        newDev->setColorClass(class_yellow_light);
+        // - add standard light output behaviour
+        LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*newDev.get()));
+        l->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
+        newDev->addBehaviour(l);
+      }
+      else {
+        // standard single-value scene table (SimpleScene)
+        newDev->installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*newDev)));
+        newDev->setFunctionDesc("on/off relay");
+        newDev->setColorClass(class_black_joker);
+        OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*newDev.get()));
+        o->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
+        o->setGroupMembership(group_black_variable, true); // put into joker group by default
+        o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "relay")));
+        newDev->addBehaviour(o);
+      }
+      // count it
+      aSubDeviceIndex++;
     }
   }
   // return device (or empty if none created)

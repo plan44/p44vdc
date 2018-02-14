@@ -32,6 +32,10 @@
 
 using namespace p44;
 
+namespace {
+  const string MODEL_FREE_RTOS = "929000226503";
+  const string MODEL_HOMEKIT_LINUX = "BSB002";
+}
 
 // MARK: ===== HueApiOperation
 
@@ -177,7 +181,7 @@ public:
   bool refind;
   SsdpSearchPtr bridgeDetector;
   typedef map<string, string> StringStringMap;
-  StringStringMap bridgeCandiates; ///< possible candidates for hue bridges, key=uuid, value=description URL
+  StringStringMap bridgeCandiates; ///< possible candidates for hue bridges, key=description URL, value=uuid
   StringStringMap::iterator currentBridgeCandidate; ///< next candidate for bridge
   MLMicroSeconds authTimeWindow;
   StringStringMap authCandidates; ///< bridges to try auth with, key=uuid, value=baseURL
@@ -278,7 +282,7 @@ public:
       // found, now get description to get baseURL
       // - put it into queue as the only candidate
       bridgeCandiates.clear();
-      bridgeCandiates[aSsdpSearch->uuid.c_str()] = aSsdpSearch->locationURL.c_str();
+      bridgeCandiates[aSsdpSearch->locationURL] = aSsdpSearch->uuid;
       // process the candidate
       currentBridgeCandidate = bridgeCandiates.begin();
       processCurrentBridgeCandidate();
@@ -293,7 +297,7 @@ public:
       if (aSsdpSearch->server.find("IpBridge")!=string::npos) {
         LOG(LOG_INFO, "hue bridge candidate device found at %s, server=%s, uuid=%s", aSsdpSearch->locationURL.c_str(), aSsdpSearch->server.c_str(), aSsdpSearch->uuid.c_str());
         // put into map
-        bridgeCandiates[aSsdpSearch->uuid.c_str()] = aSsdpSearch->locationURL.c_str();
+        bridgeCandiates[aSsdpSearch->locationURL] = aSsdpSearch->uuid;
       }
     }
     else {
@@ -311,7 +315,7 @@ public:
     if (currentBridgeCandidate!=bridgeCandiates.end()) {
       // request description XML
       hueComm.bridgeAPIComm.httpRequest(
-        (currentBridgeCandidate->second).c_str(),
+        (currentBridgeCandidate->first).c_str(),
         boost::bind(&BridgeFinder::handleServiceDescriptionAnswer, this, _1, _2),
         "GET"
       );
@@ -334,6 +338,17 @@ public:
     }
   }
 
+  void readUuidFromXml(const string &aXmlResponse)
+  {
+    string uuid;
+    pickTagContents(aXmlResponse, "UDN", uuid);
+
+    static const string PREFIX = "uuid:";
+    size_t i = uuid.find(PREFIX);
+    if (i != string::npos) {
+      currentBridgeCandidate->second = uuid.substr(i + PREFIX.size(), uuid.size() - PREFIX.size());
+    }
+  }
 
   void handleServiceDescriptionAnswer(const string &aResponse, ErrorPtr aError)
   {
@@ -341,41 +356,37 @@ public:
       // show
       //FOCUSLOG("Received bridge description:\n%s", aResponse.c_str());
       FOCUSLOG("Received service description XML");
-      // TODO: this is poor man's XML scanning, use some real XML parser eventually
-      // do some basic checking for model
-      size_t i = aResponse.find("<manufacturer>Royal Philips Electronics</manufacturer>");
-      if (i!=string::npos) {
-        // is from Philips
-        // - check model number
-        i = aResponse.find("<modelNumber>929000226503</modelNumber>"); // original 2012 hue bridge, FreeRTOS
-        if (i==string::npos) i = aResponse.find("<modelNumber>BSB002</modelNumber>"); // hue bridge 2015 with homekit, Linux
-        if (i!=string::npos) {
-          // is the right model
-          // - get base URL
-          string token = "<URLBase>";
-          i = aResponse.find(token);
-          if (i!=string::npos) {
-            i += token.size();
-            size_t e = aResponse.find("</URLBase>", i);
-            if (e!=string::npos) {
-              // create the base address for the API
-              string url = aResponse.substr(i,e-i) + "api";
-              if (refind) {
-                // that's my known hue bridge, save the URL and report success
-                hueComm.baseURL = url; // save it
-                hueComm.apiReady = true; // can use API now
-                FOCUSLOG("pre-known hue Bridge %s found at %s", hueComm.uuid.c_str(), hueComm.baseURL.c_str());
-                callback(ErrorPtr()); // success
-                keepAlive.reset(); // will delete object if nobody else keeps it
-                return; // done
-              }
-              else {
-                // that's a hue bridge, remember it for trying to authorize
-                FOCUSLOG("- Seems to be a hue bridge at %s", url.c_str());
-                authCandidates[currentBridgeCandidate->first] = url;
-              }
-            }
-          }
+
+      string manufacturer;
+      string model;
+      string urlbase;
+      pickTagContents(aResponse, "manufacturer", manufacturer);
+      pickTagContents(aResponse, "modelNumber", model);
+      pickTagContents(aResponse, "URLBase", urlbase);
+
+      if (currentBridgeCandidate->second.empty()) {
+        readUuidFromXml(aResponse);
+      }
+
+      if (manufacturer == "Royal Philips Electronics" &&
+          (model == MODEL_FREE_RTOS || model == MODEL_HOMEKIT_LINUX) &&
+          !urlbase.empty() &&
+          !currentBridgeCandidate->second.empty()) {
+        // create the base address for the API
+        string url = urlbase + "api";
+        if (refind) {
+          // that's my known hue bridge, save the URL and report success
+          hueComm.baseURL = url; // save it
+          hueComm.apiReady = true; // can use API now
+          FOCUSLOG("pre-known hue Bridge %s found at %s", hueComm.uuid.c_str(), hueComm.baseURL.c_str());
+          callback(ErrorPtr()); // success
+          keepAlive.reset(); // will delete object if nobody else keeps it
+          return; // done
+        }
+        else {
+          // that's a hue bridge, remember it for trying to authorize
+          FOCUSLOG("- Seems to be a hue bridge at %s", url.c_str());
+          authCandidates[currentBridgeCandidate->second] = url;
         }
       }
     }

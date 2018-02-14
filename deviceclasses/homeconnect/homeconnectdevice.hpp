@@ -282,7 +282,7 @@ namespace p44 {
     } EventConfiguration;
 
     // The following methods implement common behaviour and should be executed from subclasses overrides.
-    virtual bool configureDevice();
+    virtual void configureDevice(StatusCB aStatusCB) = 0;
     virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush);
     void handleEvent(EventType aEventType, JsonObjectPtr aEventData, ErrorPtr aError);
     virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue);
@@ -326,6 +326,7 @@ namespace p44 {
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
     string createDeviceName(JsonObjectPtr aNetworkJson, JsonObjectPtr aFileJson);
     void addPowerStateAction(const string& aName, const string& aDescription, const string& aParameter);
+    void configurationDone(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError);
 
   };
   

@@ -336,8 +336,81 @@ void EldatVdc::dispatchMessage(EldatAddress aSenderAddress, EldatMode aMode, int
 ErrorPtr EldatVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
-  // for now: NOP, let inherited handle it
-  respErr = inherited::handleMethod(aRequest, aMethod, aParams);
+  if (aMethod=="x-p44-addProfile") {
+    // add new device (without learn-in, usually for remotecontrol-type devices or debugging)
+    respErr = addProfile(aRequest, aParams);
+  }
+  else {
+    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
+  }
+  return respErr;
+}
+
+
+ErrorPtr EldatVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
+{
+  // add an ELDAT profile
+  ErrorPtr respErr;
+  ApiValuePtr o;
+  respErr = checkParam(aParams, "type", o); // ELDAT device type
+  if (Error::isOK(respErr)) {
+    uint32_t e = o->uint32Value();
+    if (e>=eldat_unknown) {
+      respErr = WebError::webErr(400, "unknown eldat device type");
+    }
+    else {
+      EldatDeviceType ety = (EldatDeviceType)e;
+      respErr = checkParam(aParams, "address", o);
+      if (Error::isOK(respErr)) {
+        // remote device address (or sending channel)
+        // if 0x00000000..0xFFFFFEFF : address
+        // if 0xFFFFFF00..0xFFFFFF7F : sending channel
+        // if 0xFFFFFFFF : automatically take next unused sending channel
+        EldatAddress addr = o->uint32Value();
+        if ((addr & 0xFFFFFF00)==0xFFFFFF00) {
+          // automatic sending channel
+          // - get map of already used sending channels
+          string usedSendChannelsMap;
+          usedSendChannelsMap.assign(128,'0');
+          for (EldatDeviceMap::iterator pos = eldatDevices.begin(); pos!=eldatDevices.end(); ++pos) {
+            pos->second->markUsedSendChannels(usedSendChannelsMap);
+          }
+          addr &= 0xFF; // extract channel
+          if (addr==0xFF) {
+            // auto-determine channel
+            for (addr=0; addr<128; addr++) {
+              if (usedSendChannelsMap[addr]=='0') break; // free offset here
+            }
+            if (addr>128) {
+              respErr = WebError::webErr(400, "no more free sending channels");
+            }
+          }
+          else {
+            if (addr>=128 || usedSendChannelsMap[addr]!='0') {
+              respErr = WebError::webErr(400, "invalid or already used send channel specifier");
+            }
+          }
+          // make it reserved address 0xFFFFFFxx
+          addr |= 0xFFFFFF00;
+        }
+        // now create device(s)
+        if (Error::isOK(respErr)) {
+          // create devices as if this was a learn-in
+          int newDevices = EldatDevice::createDevicesFromType(this, addr, ety, 0);
+          if (newDevices<1) {
+            respErr = WebError::webErr(400, "Unknown ELDAT type, no device(s) created");
+          }
+          else {
+            ApiValuePtr r = aRequest->newApiValue();
+            r->setType(apivalue_object);
+            r->add("newDevices", r->newUint64(newDevices));
+            aRequest->sendResult(r);
+            respErr.reset(); // make sure we don't send an extra ErrorOK
+          }
+        }
+      }
+    }
+  }
   return respErr;
 }
 

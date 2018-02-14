@@ -34,7 +34,7 @@ class HomeConnectDeviceDryer: public HomeConnectDevice
 
   EnumValueDescriptorPtr dryingTargetProp;
 
-  virtual bool configureDevice() P44_OVERRIDE;
+  virtual void configureDevice(StatusCB aStatusCB) P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue) P44_OVERRIDE;
 

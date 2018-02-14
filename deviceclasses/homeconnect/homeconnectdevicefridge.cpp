@@ -39,10 +39,8 @@ HomeConnectDeviceFridge::~HomeConnectDeviceFridge()
   // TODO Auto-generated destructor stub
 }
 
-bool HomeConnectDeviceFridge::configureDevice()
+void HomeConnectDeviceFridge::configureDevice(StatusCB aStatusCB)
 {
-  bool ret = inherited::configureDevice();
-  // configure door state
   DoorStateConfiguration dsConfig = { 0 };
   dsConfig.hasOpen = true;
   dsConfig.hasClosed = true;
@@ -77,7 +75,7 @@ bool HomeConnectDeviceFridge::configureDevice()
   builder.setValue("false");
   deviceActions->addAction(HomeConnectActionPtr(new HomeConnectAction(*this, "CancelFridgeSuperMode", "Cancel fridge Super Mode", builder.build())));
 
-  return ret;
+  aStatusCB(Error::ok());
 }
 
 void HomeConnectDeviceFridge::stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush)

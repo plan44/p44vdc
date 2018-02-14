@@ -471,6 +471,14 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       // Pure sensors or binary inputs don't need color config
       return colorClass==class_black_joker && (output || buttons.size()>0) ? yes : no;
     case modelFeature_akmsensor:
+      // current dSS state is that it can only provide function setting for binary input 0
+      if (binaryInputs.size()>0) {
+        BinaryInputBehaviourPtr b = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
+        if (b->getHardwareInputType()==binInpType_none) {
+          return yes; // Input 0 has no predefined function, "akmsensor" can provide setting UI for that
+        }
+      }
+      /* for a better future:
       // Assumption: only devices with binaryinputs that do not have a predefined type need akmsensor
       for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) {
         BinaryInputBehaviourPtr b = boost::dynamic_pointer_cast<BinaryInputBehaviour>(*pos);
@@ -478,6 +486,7 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
           return yes; // input with no predefined functionality, need to be able to configure sensor
         }
       }
+      */
       // no inputs or all inputs have predefined functionality
       return no;
     case modelFeature_akminput:

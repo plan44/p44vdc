@@ -22,6 +22,7 @@
 #ifndef __p44vdc__netatmooutdoordevice__
 #define __p44vdc__netatmooutdoordevice__
 
+#include "p44vdc_common.hpp"
 
 #if ENABLE_NETATMO_V2
 

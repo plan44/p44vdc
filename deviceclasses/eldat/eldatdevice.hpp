@@ -45,6 +45,8 @@ namespace p44 {
     eldat_rocker_reversed, // B-A or D-C rocker
     eldat_button, // single A,B,C or D button
     eldat_motiondetector, // A=motion detected, B=motion no longer detected
+    eldat_ABlight, // relay that goes on on A message, off on B message
+    eldat_ABrelay, // relay that goes on on A message, off on B message
     eldat_unknown
   } EldatDeviceType;
 
@@ -174,7 +176,7 @@ namespace p44 {
     void handleMessage(uint8_t aMode, int aRSSI, string aData);
 
     /// device specific function handling
-    virtual void handleFunction(EldatFunction aFunction) = 0;
+    virtual void handleFunction(EldatFunction aFunction) { /* NOP in base class */ };
 
     /// get the ELDAT sender address identifying the hardware that contains this logical device
     /// @return ELDAT device ID/address
@@ -189,6 +191,10 @@ namespace p44 {
     /// get the Eldat device type
     /// @return Eldat device type
     EldatDeviceType getEldatDeviceType() { return eldatDeviceType; }
+
+    /// mark send channels used by this device
+    /// @param aUsedSendChannelsMap must be passed a string with 128 chars of '0' or '1'.
+    virtual void markUsedSendChannels(string &aUsedSendChannelsMap) { /* NOP in base class */ };
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
@@ -289,6 +295,49 @@ namespace p44 {
     /// device specific function handling
     virtual void handleFunction(EldatFunction aFunction) P44_OVERRIDE;
     
+  };
+
+
+  class EldatRemoteControlDevice : public EldatDevice
+  {
+    typedef EldatDevice inherited;
+
+  public:
+
+    /// constructor
+    /// @param aVdcP the Eldat vDC
+    EldatRemoteControlDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType);
+
+    /// @return human readable model name/short description
+    virtual string modelName() P44_OVERRIDE;
+
+    /// device type identifier
+    /// @return constant identifier for this type of device (one container might contain more than one type)
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "eldat_remotecontrol"; };
+
+    /// @param aVariant -1 to just get number of available teach-in variants. 0..n to send teach-in signal;
+    ///   some devices may have different teach-in signals (like: one for ON, one for OFF).
+    /// @return number of teach-in signal variants the device can send
+    /// @note will be called via UI for devices that need to be learned into remote actors
+    virtual uint8_t teachInSignal(int8_t aVariant) P44_OVERRIDE;
+
+    /// mark send channels used by this device
+    /// @param aUsedSendChannelsMap must be passed a string with 128 chars of '0' or '1'.
+    virtual void markUsedSendChannels(string &aUsedSendChannelsMap) P44_OVERRIDE;
+
+    /// apply channel values
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
+
+  protected:
+
+    /// utility function to send messages (using channel from address LSByte)
+    /// @param aFunction: function A..D
+    void sendFunction(EldatFunction aFunction);
+
+  private:
+
+    void sentFunction(string aAnswer, ErrorPtr aError);
+
   };
 
 

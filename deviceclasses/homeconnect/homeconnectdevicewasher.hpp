@@ -63,7 +63,7 @@ class HomeConnectDeviceWasher: public HomeConnectDevice
   EnumValueDescriptorPtr temperatureProp;
   EnumValueDescriptorPtr spinSpeedProp;
 
-  virtual bool configureDevice() P44_OVERRIDE;
+  virtual void configureDevice(StatusCB aStatusCB) P44_OVERRIDE;
   virtual void stateChanged(DeviceStatePtr aChangedState, DeviceEventsList &aEventsToPush) P44_OVERRIDE;
   virtual void handleEventTypeNotify(const string& aKey, JsonObjectPtr aValue) P44_OVERRIDE;
 
