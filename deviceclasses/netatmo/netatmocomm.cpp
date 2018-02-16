@@ -47,7 +47,7 @@ NetatmoOperation::NetatmoOperation(
     HttpCommCB aResultHandler,
     AuthCallback aAuthCallback
 ) :
-    inherited(aHttpClient, "GET", {}, {}, aResultHandler, aAuthCallback),
+    inherited(aHttpClient, HttpMethod::GET, {}, {}, aResultHandler, aAuthCallback),
     query(aQuery),
     accessToken(aAccessToken)
 {
