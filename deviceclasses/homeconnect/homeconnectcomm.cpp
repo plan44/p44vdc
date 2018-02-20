@@ -424,6 +424,7 @@ HomeConnectComm::HomeConnectComm() :
   developerApi(false), lockdownTicket(0)
 {
   httpAPIComm.isMemberVariable();
+  httpAPIComm.setServerCertVfyDir(""); // Use empty string to not verify server certificate
 }
 
 
