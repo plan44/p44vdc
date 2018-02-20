@@ -33,7 +33,9 @@ using namespace p44;
 AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
   analogIOType(analogio_unknown),
-  timerTicket(0)
+  timerTicket(0),
+  scale(1),
+  offset(0)
 {
   // Config is:
   //  <pin(s) specification>:[<behaviour mode>]
@@ -127,12 +129,17 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     double max = 100;
     double resolution = 1;
     int pollIntervalS = 30;
+    scale = 1;
+    offset = 0;
     // optionally, sensor can specify type, usage, sensor;tt;uu;mi;ma;res
-    sscanf(mode.c_str(), "sensor;%d;%d;%d", &sensorType, &sensorUsage, &pollIntervalS);
+    sscanf(mode.c_str(), "sensor;%d;%d;%d;%lf;%lf", &sensorType, &sensorUsage, &pollIntervalS, &scale, &offset);
     // Analog input as sensor
     analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), false, 0));
-    // - query range
+    // - query native range
     analogIO->getRange(min, max, resolution);
+    min = min*scale+offset;
+    max = max*scale+offset;
+    resolution = resolution*scale;
     // sensor only, standard settings without scene table
     installSettings();
     // single sensor behaviour
@@ -157,7 +164,8 @@ void AnalogIODevice::analogInputPoll(MLTimer &aTimer, MLMicroSeconds aNow)
   if (sensors.size()>0) {
     SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
     if (sb) {
-      sb->updateSensorValue(analogIO->value());
+      // return value with scaling (default==1) and offset (default==0)
+      sb->updateSensorValue(analogIO->value()*scale+offset);
     }
     MainLoop::currentMainLoop().retriggerTimer(aTimer, sb->getUpdateInterval());
   }
@@ -333,6 +341,8 @@ string AnalogIODevice::description()
     string_format_append(s, "\n- Color Dimmer with RGB outputs '%s', '%s', '%s'; White: '%s'", analogIO->getName().c_str(), analogIO2->getName().c_str(), analogIO3->getName().c_str(), analogIO4 ? analogIO4->getName().c_str() : "none");
   if (analogIOType==analogio_valve)
     string_format_append(s, "\nHeating Valve @ '%s'", analogIO->getName().c_str());
+  if (analogIOType==analogio_sensor)
+    string_format_append(s, "\nSensor @ '%s'", analogIO->getName().c_str());
   return s;
 }
 
