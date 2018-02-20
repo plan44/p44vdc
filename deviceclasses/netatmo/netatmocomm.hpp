@@ -31,7 +31,7 @@
 #include "jsonobject.hpp"
 #include "jsonwebclient.hpp"
 #include "serialqueue.hpp"
-#include "web.hpp"
+#include "httpoperation.hpp"
 #include "persistentstorage.hpp"
 
 
@@ -116,9 +116,9 @@ namespace p44 {
 
  };
 
- class NetatmoOperation : public HttpOperation<> {
+ class NetatmoOperation : public HttpOperation {
 
-     using inherited = HttpOperation<>;
+     using inherited = HttpOperation;
 
      static const MLMicroSeconds OP_TIMEOUT = (10*Second);
      static const string BASE_URL;
