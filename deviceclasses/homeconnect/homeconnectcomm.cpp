@@ -32,7 +32,7 @@
 
 using namespace p44;
 
-#define DEVELOPER_BASE_URL "https://developer.home-connect.com"
+#define DEVELOPER_BASE_URL "https://simulator.home-connect.com"
 #define PRODUCTION_BASE_URL "https://api.home-connect.com"
 
 #define OAUTH_TOKEN_PATH "/security/oauth/token"
@@ -424,6 +424,7 @@ HomeConnectComm::HomeConnectComm() :
   developerApi(false), lockdownTicket(0)
 {
   httpAPIComm.isMemberVariable();
+  httpAPIComm.setServerCertVfyDir(""); // Use empty string to not verify server certificate
 }
 
 
