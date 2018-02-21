@@ -258,7 +258,7 @@ string Vdc::vendorName()
 
 string Vdc::modelVersion() const
 {
-  string v = vdcModelSuffix();
+  string v = vdcModelVersion();
   if (v.empty()) {
     return inherited::modelVersion();
   }
