@@ -161,6 +161,15 @@ string ExternalDevice::modelName()
 }
 
 
+string ExternalDevice::modelVersion() const
+{
+  if (!modelVersionString.empty()) {
+    return modelVersionString;
+  }
+  return inherited::modelVersion();
+}
+
+
 string ExternalDevice::vendorName()
 {
   return vendorNameString;
@@ -894,6 +903,10 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   // - get model name
   if (aInitParams->get("modelname", o)) {
     modelNameString = o->stringValue();
+  }
+  // - get model version
+  if (aInitParams->get("modelversion", o)) {
+    modelVersionString = o->stringValue();
   }
   // - get vendor name
   if (aInitParams->get("vendorname", o)) {

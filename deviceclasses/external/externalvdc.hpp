@@ -106,6 +106,7 @@ namespace p44 {
 
     string iconBaseName; ///< the base icon name
     string modelNameString; ///< the string to be returned by modelName()
+    string modelVersionString; ///< the string to be returned by modelVersion()
     string vendorNameString; ///< the vendor name
     string oemModelGUIDString; ///< the OEM model GUID, which is used to match devices with dS database
     string typeIdentifier; ///< the type identifier
@@ -146,6 +147,9 @@ namespace p44 {
 
     /// @return human readable model name/short description
     virtual string modelName() P44_OVERRIDE;
+
+    /// @return human readable version string of the device model
+    virtual string modelVersion() const P44_OVERRIDE;
 
     /// @return Vendor name if known
     virtual string vendorName() P44_OVERRIDE;
