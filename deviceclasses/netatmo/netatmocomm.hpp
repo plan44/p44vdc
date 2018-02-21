@@ -31,38 +31,13 @@
 #include "jsonobject.hpp"
 #include "jsonwebclient.hpp"
 #include "serialqueue.hpp"
-#include "httpclient.hpp"
+#include "httpoperation.hpp"
 #include "persistentstorage.hpp"
 
 
 using namespace std;
 
 namespace p44 {
-
-
-  class NetatmoOperation : public HttpOperation {
-
-      using inherited = HttpOperation;
-
-      static const MLMicroSeconds OP_TIMEOUT = (10*Second);
-
-      string contentType;
-      string streamBuffer;
-
-      virtual void sendRequest() P44_OVERRIDE;
-      virtual void processAnswer(const string& aResponse, ErrorPtr aError) P44_OVERRIDE;
-
-    public:
-      NetatmoOperation(
-          HttpClient &aHttpClient,
-          const string& aMethod,
-          const string& aUrl,
-          const string& aRequestBody,
-          HttpCommCB aResultHandler,
-          const string& aContentType="application/json");
-      virtual ~NetatmoOperation(){}
-  };
-  using NetatmoOperationPtr = boost::intrusive_ptr<NetatmoOperation>;
 
   using UpdateDataCB = boost::function<void(JsonObjectPtr)>;
 
@@ -77,11 +52,6 @@ namespace p44 {
  class NetatmoComm : public INetatmoComm
  {
    public:
-      enum class AccountStatus{
-          disconnected,
-          connected,
-          offline
-      };
 
    private:
      HttpClient httpClient;
@@ -95,11 +65,8 @@ namespace p44 {
      int refreshTokenRetries;
 
      boost::signals2::signal<void(JsonObjectPtr)> dataPollCBs;
-     PersistentStorageWithRowId<string, string, string, string, string> storage;
+     PersistentStorageWithRowId<PersistentParams, string, string, string, string, string> storage;
 
-     static const string BASE_URL;
-     static const string GET_STATIONS_DATA_URL;
-     static const string GET_HOME_COACHS_URL;
      static const string AUTHENTICATE_URL;
      string clientId;
      string clientSecret;
@@ -142,17 +109,42 @@ namespace p44 {
      void pollHomeCoachsData();
 
      void authorizeByEmail(const string& aEmail, const string& aPassword, StatusCB aCompletedCB);
-     static bool hasAccessTokenExpired(JsonObjectPtr aJsonResponse);
      void refreshAccessToken(StatusCB aCompletedCB);
      void gotAccessData(const string& aResponse, ErrorPtr aError, StatusCB aCompletedCB={});
-     string getAccountStatusString();
-     void updateAccountStatus(ErrorPtr aError);
      void disconnect();
+     bool isConfigured() { return !accessToken.empty(); }
 
-   private:
-     boost::optional<string> buildQuery(Query aQuery);
  };
 
+ class NetatmoOperation : public HttpOperation {
+
+     using inherited = HttpOperation;
+
+     static const MLMicroSeconds OP_TIMEOUT = (10*Second);
+     static const string BASE_URL;
+     static const string GET_STATIONS_DATA_URL;
+     static const string GET_HOME_COACHS_URL;
+     
+     const string& accessToken;
+     const NetatmoComm::Query query;
+
+     virtual void sendRequest() P44_OVERRIDE;
+//      virtual void processAnswer(const string& aResponse, ErrorPtr aError) P44_OVERRIDE;
+
+   public:
+     NetatmoOperation(
+         NetatmoComm::Query aQuery,
+         HttpClient &aHttpClient,
+         const string& aAccessToken,
+         HttpCommCB aResultHandler,
+         AuthCallback aAuthCallback={});
+     virtual ~NetatmoOperation(){}
+
+     boost::optional<string> buildQuery(NetatmoComm::Query aQuery);
+     virtual bool isAuthError(ErrorPtr aError) P44_OVERRIDE;
+     virtual OperationPtr finalize() P44_OVERRIDE;
+ };
+ using NetatmoOperationPtr = boost::intrusive_ptr<NetatmoOperation>;
 
 } // namespace p44
 

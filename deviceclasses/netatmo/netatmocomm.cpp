@@ -41,90 +41,96 @@ using namespace p44;
 
 
 NetatmoOperation::NetatmoOperation(
+    NetatmoComm::Query aQuery,
     HttpClient &aHttpClient,
-    const string& aMethod,
-    const string& aUrl,
-    const string& aRequestBody,
+    const string& aAccessToken,
     HttpCommCB aResultHandler,
-    const string& aContentType
+    AuthCallback aAuthCallback
 ) :
-    inherited(aHttpClient, aMethod, aUrl, aRequestBody, aResultHandler),
-    contentType(aContentType)
+    inherited(aHttpClient, HttpMethod::GET, {}, {}, aResultHandler, aAuthCallback),
+    query(aQuery),
+    accessToken(aAccessToken)
 {
-  /*set timeout for every request, look at the explanation at NetatmoOperation::sendRequest*/
   this->setTimeout(OP_TIMEOUT);
 }
 
+
+bool NetatmoOperation::isAuthError(ErrorPtr aError)
+{
+  if (aError &&
+      (aError->getErrorCode()==HTTP_FORBIDDEN_ERR_CODE
+      || aError->getErrorCode()==HTTP_UNAUTHORIZED_ERR_CODE)
+  ) {
+    LOG(LOG_WARNING, "Auth error: '%s'", aError->description().c_str());
+    return true;
+  }
+  return false;
+}
+
+
 void NetatmoOperation::sendRequest()
 {
-  auto httpCallback = [=](const string& aResponse, ErrorPtr aError){
+  if (auto path = buildQuery(query)) {
+    urlPath = *path;
+    httpClient.getApi().clearRequestHeaders();
+    httpClient.getApi().addRequestHeader("Connection", "close");
 
-    if (Error::isOK(aError)){
-      string decoded;
-      streamBuffer += aResponse;
-
-      bool chunked = any_of(
-          httpClient.getHttpApi().responseHeaders->begin(),
-          httpClient.getHttpApi().responseHeaders->end(),
-          [=](auto aElem){ return ((aElem.first == "Transfer-Encoding") && (aElem.second == "chunked")); }
-      );
-
-      if (chunked) {
-        decoded = httputils::decodeChunkData(streamBuffer);
-      } else {
-        decoded = aResponse;
-      }
-
-      /* check if string is valid as json data */
-      if (auto jsonResponse = JsonObject::objFromText(decoded.c_str())){
-        this->processAnswer(decoded, aError);
-      }
-    } else {
-      LOG(LOG_ERR, "NetatmoOperation Response Error: '%s'", aError->description().c_str());
-      inherited::abortOperation(aError);
-    }
-
-  };
-
-  httpClient.getHttpApi().clearRequestHeaders();
-  httpClient.getHttpApi().addRequestHeader("Connection", "close");
-
-  httpClient.getHttpApi().httpRequest(
-      url.c_str(),
-      httpCallback,
-      method.c_str(),
-      requestBody.c_str(),
-      contentType.c_str(),
-      -1,
-      true,
-      true
-  );
+    issueRequest("application/json", true, true);
+  } else {
+    abortOperation(ErrorPtr(new Error(HTTP_FORBIDDEN_ERR_CODE)));
+  }
 }
 
-void NetatmoOperation::processAnswer(const string& aResponse, ErrorPtr aError)
+
+OperationPtr NetatmoOperation::finalize()
 {
   /*if chunked data has been read out, terminate http request*/
-  httpClient.getHttpApi().cancelRequest();
-  inherited::processAnswer(aResponse, aError);
+  httpClient.getApi().cancelRequest();
+  return inherited::finalize();
 }
 
+
+const string NetatmoOperation::BASE_URL = "https://api.netatmo.com";
+const string NetatmoOperation::GET_STATIONS_DATA_URL = "/api/getstationsdata";
+const string NetatmoOperation::GET_HOME_COACHS_URL = "/api/gethomecoachsdata";
+
+
+boost::optional<string> NetatmoOperation::buildQuery(NetatmoComm::Query aQuery)
+{
+    if (accessToken.empty()) {
+      return boost::none;
+    }
+
+  stringstream retUrl;
+  retUrl << BASE_URL;
+
+  switch(aQuery)
+  {
+    case NetatmoComm::Query::getStationsData:     retUrl << GET_STATIONS_DATA_URL; break;
+    case NetatmoComm::Query::getHomeCoachsData:  retUrl << GET_HOME_COACHS_URL; break;
+    default: return boost::none;
+   }
+
+  retUrl << "?access_token=" << accessToken;
+
+  return retUrl.str();
+}
 
 
 // MARK: ===== NetatmoComm
 
-const string NetatmoComm::BASE_URL = "https://api.netatmo.com";
-const string NetatmoComm::GET_STATIONS_DATA_URL = "/api/getstationsdata";
-const string NetatmoComm::GET_HOME_COACHS_URL = "/api/gethomecoachsdata";
+
 const string NetatmoComm::AUTHENTICATE_URL = "https://api.netatmo.com/oauth2/token";
 
 
 NetatmoComm::NetatmoComm(ParamStore &aParamStore,  const string& aRowId) :
     accountStatus(AccountStatus::disconnected),
-    storage(aRowId, "CommSettings", aParamStore,  {"accessToken",   accessToken},
-                                                  {"refreshToken",  refreshToken},
-                                                  {"userEmail",     userEmail},
-                                                  {"clientId",      clientId},
-                                                  {"clientSecret",  clientSecret}),
+    storage(aRowId, "CommSettings", {"accessToken",   accessToken},
+                                    {"refreshToken",  refreshToken},
+                                    {"userEmail",     userEmail},
+                                    {"clientId",      clientId},
+                                    {"clientSecret",  clientSecret},
+                                    aParamStore),
     refreshTokenRetries(0)
 {
   httpClient.isMemberVariable();
@@ -172,61 +178,26 @@ void NetatmoComm::setUserEmail(const string& aUserEmail)
 }
 
 
-boost::optional<string> NetatmoComm::buildQuery(Query aQuery)
-{
-  if (accessToken.empty()) {
-    accountStatus = AccountStatus::disconnected;
-    return boost::none;
-  }
-
-  stringstream retUrl;
-  retUrl << BASE_URL;
-
-  switch(aQuery)
-  {
-    case Query::getStationsData:     retUrl << GET_STATIONS_DATA_URL; break;
-    case Query::getHomeCoachsData:  retUrl << GET_HOME_COACHS_URL; break;
-    default: return boost::none;
-   }
-
-  retUrl << "?access_token=" << accessToken;
-
-  return retUrl.str();
-}
-
-
 void NetatmoComm::apiQuery(Query aQuery, HttpCommCB aResponseCB)
 {
-  if (auto command = buildQuery(aQuery)) {
-
+  if (isConfigured()) {
     auto apiQueryCB = [=](const string& aResponse, ErrorPtr aError){
-      // even when api error occured, http code is 200,
-      // thus error check in json response is needed
-      if (hasAccessTokenExpired(JsonObject::objFromText(aResponse.c_str()))) {
-        refreshAccessToken([=](ErrorPtr aRefreshTokenError){
-          if (Error::isOK(aRefreshTokenError)) {
-            // if refresh token succeeded, retry operation
-            this->apiQuery(aQuery, aResponseCB);
-          } else {
-            // if refreshing failed, call response callback with an error
-            if (aResponseCB) aResponseCB({}, aRefreshTokenError);
-          }
-        });
-      } else {
-        // save an error and set account status
-        updateAccountStatus(aError);
-        if (aResponseCB) aResponseCB(aResponse, aError);
-      }
+      this->accountStatus = updateAccountStatus(aError);
+      if (aResponseCB) aResponseCB(aResponse, aError);
     };
 
     auto op = NetatmoOperationPtr(
-        new NetatmoOperation(httpClient, "GET", command.value(), {}, apiQueryCB)
+        new NetatmoOperation(
+            aQuery,
+            httpClient,
+            accessToken,
+            apiQueryCB,
+            [=](StatusCB aCB){ this->refreshAccessToken(aCB); })
     );
 
-    httpClient.queueOperation(op);
-    httpClient.processOperations();
+    httpClient.enqueueAndProcessOperation(op);
   } else {
-    if (aResponseCB) aResponseCB({}, TextError::err("NetatmoComm::apiQuery: Cannot build query"));
+    if (aResponseCB) aResponseCB({}, TextError::err("apiQuery: No Access Token"));
   }
 }
 
@@ -287,37 +258,14 @@ void NetatmoComm::authorizeByEmail(const string& aEmail, const string& aPassword
       <<"&scope="<<HttpComm::urlEncode("read_station read_homecoach", false);
 
 
-  auto op = NetatmoOperationPtr(
-          new NetatmoOperation(
-              httpClient,
-              "POST",
-              AUTHENTICATE_URL,
-              requestBody.str(),
-              [=](auto...params){ this->gotAccessData(params..., aCompletedCB); },
-              "application/x-www-form-urlencoded;charset=UTF-8"
-          )
-      );
+  httpClient.getApi().httpRequest(
+      AUTHENTICATE_URL.c_str(),
+      [=](auto...params){ this->gotAccessData(params..., aCompletedCB); },
+      "POST",
+      requestBody.str().c_str(),
+      "application/x-www-form-urlencoded;charset=UTF-8",
+      -1, true, true);
 
-      httpClient.queueOperation(op);
-      httpClient.processOperations();
-}
-
-bool NetatmoComm::hasAccessTokenExpired(JsonObjectPtr aJsonResponse)
-{
-  // The response might be {"error":{"code":3,"message":"Access token expired"}}
-  // or {"error":{"code":2,"message":"Invalid access token"}}
-  if (aJsonResponse){
-    if (auto errorJson = aJsonResponse->get("error")){
-      if (auto errMsgJson = errorJson->get("message")){
-        LOG(LOG_ERR, "Response Error: '%s'", errMsgJson->stringValue().c_str());
-      }
-      if (auto errCodeJson = errorJson->get("code")){
-        int errCode = errCodeJson->int32Value();
-        return (errCode == API_ERROR_INVALID_TOKEN || errCode == API_ERROR_TOKEN_EXPIRED);
-      }
-    }
-  }
-  return false;
 }
 
 
@@ -340,38 +288,23 @@ void NetatmoComm::refreshAccessToken(StatusCB aCompletedCB)
         <<"&client_secret="<<clientSecret;
 
     auto refreshAccessTokenCB = [=](const string& aResponse, ErrorPtr aError){
-      this->gotAccessData(aResponse, aError, [=](ErrorPtr aError){
-        if (Error::isOK(aError)){
-          // retry when access token has been renewed
-          MainLoop::currentMainLoop().executeOnce([=](auto...){ if (aCompletedCB) aCompletedCB(aError); });
-        } else {
-          // otherwise retry to refresh token
-          LOG(LOG_ERR, "NetatmoComm::refreshAccessToken '%s'", aError->description().c_str());
-          this->refreshAccessToken(aCompletedCB);
-        }
-      });
+      this->gotAccessData(aResponse, aError, aCompletedCB);
     };
-
-    auto op = NetatmoOperationPtr(
-        new NetatmoOperation(
-            httpClient,
-            "POST",
-            AUTHENTICATE_URL,
-            requestBody.str(),
-            refreshAccessTokenCB,
-            "application/x-www-form-urlencoded;charset=UTF-8"
-        )
-    );
-
-    httpClient.queueOperation(op);
-    httpClient.processOperations();
     
+    httpClient.getApi().httpRequest(
+        AUTHENTICATE_URL.c_str(),
+        refreshAccessTokenCB,
+        "POST",
+        requestBody.str().c_str(),
+        "application/x-www-form-urlencoded;charset=UTF-8");
+
   } else {
     LOG(LOG_ERR, "NetatmoComm::refreshAccessToken no refresh token available");
     if (aCompletedCB) aCompletedCB(TextError::err("No refresh token is available"));
   }
 
 }
+
 
 void NetatmoComm::gotAccessData(const string& aResponse, ErrorPtr aError, StatusCB aCompletedCB)
 {
@@ -386,27 +319,11 @@ void NetatmoComm::gotAccessData(const string& aResponse, ErrorPtr aError, Status
       if (aCompletedCB) aCompletedCB(Error::ok());
       return;
     }
-  }
-  if (aCompletedCB) aCompletedCB(TextError::err("Authentication failure: Data Received '%s'", aResponse.c_str()));
-}
-
-
-void NetatmoComm::updateAccountStatus(ErrorPtr aError)
-{
-  if (Error::isOK(aError)) {
-    accountStatus = AccountStatus::connected;
   } else {
-    if(aError->isDomain(HttpCommError::domain())) {
-      accountStatus = AccountStatus::offline;
-      LOG(LOG_ERR, "HttpCommError %s ", aError->description().c_str());
-    } else if (aError->getErrorCode() == 401 || aError->getErrorCode() == 403) {
-      accountStatus = AccountStatus::disconnected;
-      LOG(LOG_ERR, "Authorization Error %s %d", aError->description().c_str());
-    } else {
-      LOG(LOG_ERR, "Communication Error %s %d", aError->description().c_str());
-    }
+    if (aCompletedCB) aCompletedCB(TextError::err("Authentication failure: Data Received '%s'", aResponse.c_str()));
   }
 }
+
 
 void NetatmoComm::disconnect()
 {
@@ -418,15 +335,5 @@ void NetatmoComm::disconnect()
   accountStatus = AccountStatus::disconnected;
 }
 
-
-string NetatmoComm::getAccountStatusString()
-{
-  switch(accountStatus) {
-    case AccountStatus::connected:        return "connected";
-    case AccountStatus::disconnected:     return "disconnected";
-    case AccountStatus::offline:          return "offline";
-    default:                              return "unknown";
-  }
-}
 
 #endif // ENABLE_NETATMO_V2
