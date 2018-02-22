@@ -31,7 +31,7 @@
 #include "jsonobject.hpp"
 #include "jsonwebclient.hpp"
 #include "serialqueue.hpp"
-#include "web.hpp"
+#include "httpoperation.hpp"
 #include "persistentstorage.hpp"
 
 
@@ -48,6 +48,15 @@ namespace p44 {
       virtual boost::signals2::connection registerCallback(UpdateDataCB aCallback)=0;
   };
 
+  struct NetatmoAccessData {
+      string token;
+      string refreshToken;
+      string userEmail;
+      string clientId;
+      string clientSecret;
+  };
+
+
 
  class NetatmoComm : public INetatmoComm
  {
@@ -57,11 +66,7 @@ namespace p44 {
      static const string AUTHENTICATE_URL;
 
      HttpClient httpClient;
-     string accessToken;
-     string refreshToken;
-     string userEmail;
-     string clientId;
-     string clientSecret;
+     NetatmoAccessData accessData;
 
      AccountStatus accountStatus;
      int refreshTokenRetries;
@@ -80,15 +85,11 @@ namespace p44 {
      NetatmoComm(ParamStore &aParamStore,  const string& aRowId);
      virtual ~NetatmoComm() {}
 
-     void loadConfigFile(JsonObjectPtr aConfigJson);
-     void setAccessToken(const string& aAccessToken);
-     string getAccessToken() const { return accessToken; }
-     void setRefreshToken(const string& aRefreshToken);
-     string getRefreshToken() const { return refreshToken; }
+     void setAccessData(const NetatmoAccessData& aAccessData);
+     string getAccessToken() const { return accessData.token; }
+     string getRefreshToken() const { return accessData.refreshToken; }
      void setUserEmail(const string& aUserEmail);
-     string getUserEmail() const { return userEmail; }
-     void setClientId(const string& aClientId);
-     void setClientSecret(const string& aClientSecret);
+     string getUserEmail() const { return accessData.userEmail; }
      AccountStatus getAccountStatus() const { return accountStatus; }
 
      virtual boost::signals2::connection registerCallback(UpdateDataCB aCallback) P44_OVERRIDE;
@@ -108,13 +109,13 @@ namespace p44 {
      void refreshAccessToken(StatusCB aCompletedCB);
      void gotAccessData(const string& aResponse, ErrorPtr aError, StatusCB aCompletedCB={});
      void disconnect();
-     bool isConfigured() { return !accessToken.empty(); }
+     bool isConfigured() { return !accessData.token.empty(); }
 
  };
 
- class NetatmoOperation : public HttpOperation<> {
+ class NetatmoOperation : public HttpOperation {
 
-     using inherited = HttpOperation<>;
+     using inherited = HttpOperation;
 
      static const MLMicroSeconds OP_TIMEOUT = (10*Second);
      static const string BASE_URL;

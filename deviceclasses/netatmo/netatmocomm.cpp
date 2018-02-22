@@ -47,7 +47,7 @@ NetatmoOperation::NetatmoOperation(
     HttpCommCB aResultHandler,
     AuthCallback aAuthCallback
 ) :
-    inherited(aHttpClient, "GET", {}, {}, aResultHandler, aAuthCallback),
+    inherited(aHttpClient, HttpMethod::GET, {}, {}, aResultHandler, aAuthCallback),
     query(aQuery),
     accessToken(aAccessToken)
 {
@@ -125,11 +125,11 @@ const string NetatmoComm::AUTHENTICATE_URL = "https://api.netatmo.com/oauth2/tok
 
 NetatmoComm::NetatmoComm(ParamStore &aParamStore,  const string& aRowId) :
     accountStatus(AccountStatus::disconnected),
-    storage(aRowId, "CommSettings", {"accessToken",   accessToken},
-                                    {"refreshToken",  refreshToken},
-                                    {"userEmail",     userEmail},
-                                    {"clientId",      clientId},
-                                    {"clientSecret",  clientSecret},
+    storage(aRowId, "CommSettings", {"accessToken",   accessData.token},
+                                    {"refreshToken",  accessData.refreshToken},
+                                    {"userEmail",     accessData.userEmail},
+                                    {"clientId",      accessData.clientId},
+                                    {"clientSecret",  accessData.clientSecret},
                                     aParamStore),
     refreshTokenRetries(0)
 {
@@ -137,57 +137,16 @@ NetatmoComm::NetatmoComm(ParamStore &aParamStore,  const string& aRowId) :
   storage.load();
 }
 
-
-void NetatmoComm::loadConfigFile(JsonObjectPtr aConfigJson)
+void NetatmoComm::setAccessData(const NetatmoAccessData& aAccessData)
 {
-  if (aConfigJson) {
-    if (auto clientIdJson = aConfigJson->get("client_id")){
-      clientId = clientIdJson->stringValue();
-      LOG(LOG_INFO, "CLIENT ID: '%s'", clientId.c_str());
-    }
-
-    if (auto clientSecretJson = aConfigJson->get("client_secret")){
-      clientSecret = clientSecretJson->stringValue();
-      LOG(LOG_INFO, "CLIENT SECRET: '%s'", clientSecret.c_str());
-    }
-  } else {
-    LOG(LOG_ERR, "NetatmoComm error: cannot load configuration");
-  }
-  storage.save();
-}
-
-
-void NetatmoComm::setAccessToken(const string& aAccessToken)
-{
-  accessToken = aAccessToken;
-  storage.save();
-}
-
-
-void NetatmoComm::setRefreshToken(const string& aRefreshToken)
-{
-  refreshToken = aRefreshToken;
+  accessData = aAccessData;
   storage.save();
 }
 
 
 void NetatmoComm::setUserEmail(const string& aUserEmail)
 {
-  userEmail = aUserEmail;
-  storage.save();
-}
-
-
-void NetatmoComm::setClientId(const string& aClientId)
-{
-  clientId = aClientId;
-  storage.save();
-}
-
-
-void NetatmoComm::setClientSecret(const string& aClientSecret)
-{
-  clientSecret = aClientSecret;
+  accessData.userEmail = aUserEmail;
   storage.save();
 }
 
@@ -204,7 +163,7 @@ void NetatmoComm::apiQuery(Query aQuery, HttpCommCB aResponseCB)
         new NetatmoOperation(
             aQuery,
             httpClient,
-            accessToken,
+            accessData.token,
             apiQueryCB,
             [=](StatusCB aCB){ this->refreshAccessToken(aCB); })
     );
@@ -263,20 +222,20 @@ void NetatmoComm::pollHomeCoachsData()
 void NetatmoComm::refreshAccessToken(StatusCB aCompletedCB)
 {
   if (refreshTokenRetries++ >= REFRESH_TOKEN_RETRY_MAX) {
-    LOG(LOG_ERR, "Refresh Access Token not succeded. Account '%s' is going to be disconnected.", userEmail.c_str());
+    LOG(LOG_ERR, "Refresh Access Token not succeded. Account '%s' is going to be disconnected.", accessData.userEmail.c_str());
     disconnect();
     refreshTokenRetries = 0;
     if (aCompletedCB) aCompletedCB(TextError::err("Max retries exceeded for refresh token"));
     return;
   }
 
-  if (!refreshToken.empty()) {
+  if (!accessData.refreshToken.empty()) {
     stringstream requestBody;
 
     requestBody<<"grant_type=refresh_token"
-        <<"&refresh_token="<<refreshToken
-        <<"&client_id="<<clientId
-        <<"&client_secret="<<clientSecret;
+        <<"&refresh_token="<<accessData.refreshToken
+        <<"&client_id="<<accessData.clientId
+        <<"&client_secret="<<accessData.clientSecret;
 
     auto refreshAccessTokenCB = [=](const string& aResponse, ErrorPtr aError){
       this->gotAccessData(aResponse, aError, aCompletedCB);
@@ -301,9 +260,9 @@ void NetatmoComm::gotAccessData(const string& aResponse, ErrorPtr aError, Status
 {
   if(auto jsonResponse = JsonObject::objFromText(aResponse.c_str())) {
     if (auto accessTokenJson = jsonResponse->get("access_token")) {
-      accessToken = accessTokenJson->stringValue();
+      accessData.token = accessTokenJson->stringValue();
       if (auto refreshTokenJson = jsonResponse->get("refresh_token")) {
-        refreshToken = refreshTokenJson->stringValue();
+        accessData.refreshToken = refreshTokenJson->stringValue();
         refreshTokenRetries = 0;
         storage.save();
       }
@@ -318,12 +277,7 @@ void NetatmoComm::gotAccessData(const string& aResponse, ErrorPtr aError, Status
 
 void NetatmoComm::disconnect()
 {
-  accessToken.clear();
-  refreshToken.clear();
-  userEmail.clear();
-  clientId.clear();
-  clientSecret.clear();
-
+  accessData = {};
   storage.save();
   accountStatus = AccountStatus::disconnected;
 }
