@@ -227,6 +227,7 @@ HomeConnectEventMonitor::HomeConnectEventMonitor(HomeConnectComm &aHomeConnectCo
   eventGotID(false)
 {
   sendGetEventRequest();
+  setServerCertVfyDir("");
 }
 
 
