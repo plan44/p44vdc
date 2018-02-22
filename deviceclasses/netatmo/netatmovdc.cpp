@@ -32,12 +32,11 @@
 
 #include "utils.hpp"
 #include "netatmodeviceenumerator.hpp"
+#include "jsonutils.hpp"
 
 
 using namespace p44;
 
-
-const string NetatmoVdc::CONFIG_FILE = "config.json";
 
 NetatmoVdc::NetatmoVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag)
@@ -49,7 +48,6 @@ NetatmoVdc::~NetatmoVdc()
 {
 
 }
-
 
 
 const char *NetatmoVdc::vdcClassIdentifier() const
@@ -67,24 +65,15 @@ bool NetatmoVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResol
 }
 
 
-#define NETATMO_RECOLLECT_INTERVAL (30*Minute)
-
-
-
 void NetatmoVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   netatmoComm = make_unique<NetatmoComm>(getVdcHost().getDsParamStore(), dSUID.getString());
   deviceEnumerator = make_unique<NetatmoDeviceEnumerator>(this, *netatmoComm);
 
-  string filePath = getVdcHost().getConfigDir();
-  filePath.append(CONFIG_FILE);
-  LOG(LOG_INFO, "Loading configuration from file '%s'", filePath.c_str());
-  netatmoComm->loadConfigFile(JsonObject::objFromFile(filePath.c_str()));
-
   // schedule data polling
-  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->netatmoComm->pollCycle(); }, NETATMO_POLLING_START_DELAY);
+  MainLoop::currentMainLoop().executeOnce([&](auto...){ this->netatmoComm->pollCycle(); }, POLLING_START_DELAY);
   // schedule incremental re-collect from time to time
-  setPeriodicRecollection(NETATMO_RECOLLECT_INTERVAL, rescanmode_incremental);
+  setPeriodicRecollection(RECOLLECT_INTERVAL, rescanmode_incremental);
   if (aCompletedCB) aCompletedCB(Error::ok());
 }
 
@@ -104,57 +93,41 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
 {
   ErrorPtr respErr;
   if (aMethod=="authenticate") {
-    string accessToken, refreshToken;
 
-    if (netatmoComm->getAccountStatus() != AccountStatus::disconnected) {
-      respErr = TextError::err("Invalid account status");
-    }
+    string authData;
+    respErr = checkStringParam(aParams, "authData", authData);
 
-    if (Error::isOK(respErr)) {
-      respErr = checkStringParam(aParams, "accessToken", accessToken);
-    }
+    if (auto jsonAuthData = JsonObject::objFromText(authData.c_str())) {
+      auto accessToken = jsonutils::getJsonStringValue(jsonAuthData, "access_token");
+      auto refreshToken = jsonutils::getJsonStringValue(jsonAuthData, "refresh_token");
+      auto clientId = jsonutils::getJsonStringValue(jsonAuthData, "client_id");
+      auto clientSecret = jsonutils::getJsonStringValue(jsonAuthData, "client_secret");
 
-    if (Error::isOK(respErr)) {
-      respErr = checkStringParam(aParams, "refreshToken", refreshToken);
-    }
+      if (accessToken && refreshToken && clientId && clientSecret) {
 
-    if( !Error::isOK(respErr) ) {
-      methodCompleted(aRequest, respErr);
-      return respErr;
-    }
+        NetatmoAccessData accessData;
+        accessData.token = *accessToken;
+        accessData.refreshToken = *refreshToken;
+        accessData.clientId = *clientId;
+        accessData.clientSecret = *clientSecret;
 
-    netatmoComm->setAccessToken(accessToken);
-    netatmoComm->setRefreshToken(refreshToken);
-    collectDevices({}, rescanmode_normal);
+        netatmoComm->setAccessData(accessData);
 
-  } else if (aMethod=="authorizeByEmail") {
-    string mail, password;
-
-    if (netatmoComm->getAccountStatus() != AccountStatus::disconnected) {
-      respErr = TextError::err("Invalid account status");
-    }
-
-    if (Error::isOK(respErr)) {
-      respErr = checkStringParam(aParams, "email", mail);
-    }
-
-    if (Error::isOK(respErr)) {
-      respErr = checkStringParam(aParams, "password", password);
-    }
-
-    if (!Error::isOK(respErr)) {
-      methodCompleted(aRequest, respErr);
-      return respErr;
-    }
-
-    netatmoComm->authorizeByEmail(mail, password, [&](ErrorPtr aError){
-      if (Error::isOK(aError)) {
         collectDevices({}, rescanmode_normal);
+        respErr = Error::ok();
+
+      } else {
+        respErr = TextError::err("Cannot parse authData json");
       }
-    });
+
+    } else {
+      respErr = TextError::err("Cannot create from authData json");
+    }
+
   } else if (aMethod=="disconnect") {
     netatmoComm->disconnect();
     collectDevices({}, rescanmode_normal);
+    respErr = Error::ok();
   } else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
