@@ -476,6 +476,10 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
   // get current color settings
   JsonObjectPtr state = aDeviceInfo->get("state");
   if (state) {
+    o = aDeviceInfo->get("reachable");
+    if (o) {
+      lastReachable = o->boolValue();
+    }
     LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
     if (l) {
       // on with brightness or off
