@@ -35,6 +35,7 @@ HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   bridgeMacAddress(0)
 {
   hueComm.isMemberVariable();
+  hueComm.useNUPnP = getVdcHost().cloudAllowed();
 }
 
 
