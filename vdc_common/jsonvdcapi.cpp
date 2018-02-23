@@ -174,12 +174,20 @@ ErrorPtr VdcJsonApiRequest::sendResult(ApiValuePtr aResult)
 }
 
 
-ErrorPtr VdcJsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData)
+ErrorPtr VdcJsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
 {
   LOG(LOG_INFO, "vdSM <- vDC (JSON) error sent: requestid='%s', error=%d (%s)", requestId().c_str(), aErrorCode, aErrorMessage.c_str());
   JsonApiValuePtr errorData;
-  if (aErrorData)
+  // add the user facing stuff to errorData
+  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
+    errorData = JsonApiValuePtr(new JsonApiValue);
+    errorData->setType(apivalue_object);
+    errorData->add("errorType", errorData->newUint64(aErrorType));
+    errorData->add("userFacingMessage", errorData->newString(aUserFacingMessage));
+  }
+  else if (aErrorData) {
     errorData = boost::dynamic_pointer_cast<JsonApiValue>(aErrorData);
+  }
   return jsonConnection->jsonRpcComm->sendError(requestId().c_str(), aErrorCode, aErrorMessage.size()>0 ? aErrorMessage.c_str() : NULL, errorData ? errorData->jsonObject() : JsonObjectPtr());
 }
 

@@ -194,23 +194,25 @@ namespace p44 {
 
     /// return the request ID as a string
     /// @return request ID as string
-    virtual string requestId() { return string_format("%d", reqId); }
+    virtual string requestId() P44_OVERRIDE { return string_format("%d", reqId); }
 
     /// get the API connection this request originates from
     /// @return API connection
-    virtual VdcApiConnectionPtr connection();
+    virtual VdcApiConnectionPtr connection() P44_OVERRIDE;
 
     /// send a vDC API result (answer for successful method call)
     /// @param aResult the result as a ApiValue. Can be NULL for procedure calls without return value
     /// @result empty or Error object in case of error sending result response
-    virtual ErrorPtr sendResult(ApiValuePtr aResult);
+    virtual ErrorPtr sendResult(ApiValuePtr aResult) P44_OVERRIDE;
 
     /// send a vDC API error (answer for unsuccesful method call)
     /// @param aErrorCode the error code
     /// @param aErrorMessage the error message or NULL to generate a standard text
-    /// @param aErrorData the optional "data" member for the vDC API error object
+    /// @param aErrorData the optional "data" member for the vDC API error object (in JSON only)
+    /// @param aErrorType the optional "errorType"
+    /// @param aUserFacingMessage the optional user facing message
     /// @result empty or Error object in case of error sending error response
-    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr());
+    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr(), VdcErrorType aErrorType = 0, string aUserFacingMessage = "") P44_OVERRIDE;
 
   };
 

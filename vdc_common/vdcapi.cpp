@@ -24,6 +24,50 @@
 using namespace p44;
 
 
+// MARK: ===== VdcApiError
+
+
+void VdcApiError::setFormattedUserFacingMessage(const char *aFmt, va_list aArgs)
+{
+  // now make the string
+  string_format_v(userFacingMessage, true, aFmt, aArgs);
+}
+
+
+void VdcApiError::setUserFacingInfo(uint8_t aErrorType, const char *aFmt, ...)
+{
+  errorType = aErrorType;
+  va_list args;
+  va_start(args, aFmt);
+  setFormattedUserFacingMessage(aFmt, args);
+  va_end(args);
+}
+
+
+VdcApiErrorPtr VdcApiError::userFacingErr(ErrorCode aErrorCode, uint8_t aErrorType, const char *aFmt, ...)
+{
+  VdcApiError *errP = new VdcApiError(aErrorCode);
+  errP->errorType = aErrorType;
+  va_list args;
+  va_start(args, aFmt);
+  errP->setFormattedUserFacingMessage(aFmt, args);
+  va_end(args);
+  return VdcApiErrorPtr(errP);
+}
+
+
+string VdcApiError::description() const
+{
+  string errorText = Error::description();
+  // Append type and user facing message if any
+  if (errorType!=0 || !userFacingMessage.empty()) {
+    string_format_append(errorText, " - type %d - '%s'", errorType, userFacingMessage.c_str());
+  }
+  return errorText;
+}
+
+
+
 // MARK: ===== VdcApiServer
 
 VdcApiServer::VdcApiServer() :
@@ -113,7 +157,14 @@ ApiValuePtr VdcApiConnection::newApiValue()
 ErrorPtr VdcApiRequest::sendError(ErrorPtr aErrorToSend)
 {
   if (!Error::isOK(aErrorToSend)) {
-    return sendError((uint32_t)aErrorToSend->getErrorCode(), aErrorToSend->getErrorMessage());
+    VdcApiErrorPtr ve = boost::dynamic_pointer_cast<VdcApiError>(aErrorToSend);
+    if (ve) {
+      // special VdcApiError, has extra user facing information
+      return sendError((uint32_t)aErrorToSend->getErrorCode(), aErrorToSend->getErrorMessage(), ApiValuePtr(), ve->getErrorType(), ve->getUserFacingMessage());
+    }
+    else {
+      return sendError((uint32_t)aErrorToSend->getErrorCode(), aErrorToSend->getErrorMessage());
+    }
   }
   return ErrorPtr();
 }
