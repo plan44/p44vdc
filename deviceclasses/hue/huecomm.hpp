@@ -137,6 +137,7 @@ namespace p44 {
     string fixedBaseURL; ///< fixed hue API base URL, bypasses any SSDP searches
     string uuid; ///< the UUID for searching the hue bridge via SSDP
     string userName; ///< the user name
+    bool useNUPnP; ///< if set, N-UPnP is used as a fallback to find bridges
 
     /// @}
 

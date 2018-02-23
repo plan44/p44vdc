@@ -87,6 +87,7 @@ VdcHost::VdcHost(bool aWithLocalController) :
   maxApiVersion(0), // no API version limit
   externalDsuid(false),
   storedDsuid(false),
+  allowCloud(false),
   DsAddressable(this),
   collecting(false),
   lastActivity(0),

@@ -274,8 +274,16 @@ public:
   void bridgeRefindHandler(SsdpSearchPtr aSsdpSearch, ErrorPtr aError, const string& aExpectedUuid)
   {
     if (!Error::isOK(aError)) {
-      // could not find bridge, try N-UPnP
-      hueComm.findBridgesNupnp(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, aExpectedUuid));
+      if (hueComm.useNUPnP) {
+        // could not find bridge, try N-UPnP
+        hueComm.findBridgesNupnp(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, aExpectedUuid));
+      }
+      else {
+        // no bridge found
+        callback(ErrorPtr(new HueCommError(HueCommError::UuidNotFound)));
+        keepAlive.reset(); // will delete object if nobody else keeps it
+      }
+      return; // done
     }
     else {
       // found, now get description to get baseURL
@@ -301,8 +309,15 @@ public:
     else {
       FOCUSLOG("discovery ended, error = %s (usually: timeout)", aError->description().c_str());
       aSsdpSearch->stopSearch();
-
-      hueComm.findBridgesNupnp(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, string()));
+      if (hueComm.useNUPnP) {
+        // also try N-UPnP
+        hueComm.findBridgesNupnp(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, string()));
+      }
+      else {
+        // just process the local SSDP results
+        currentBridgeCandidate = bridgeCandiates.begin();
+        processCurrentBridgeCandidate(string());
+      }
     }
   }
 
@@ -353,6 +368,7 @@ public:
     }
   }
 
+
   void readUuidFromXml(const string &aXmlResponse)
   {
     string uuid;
@@ -365,6 +381,7 @@ public:
     }
   }
 
+
   bool isUuidValid(const string& aExpectedUuid)
   {
     if (currentBridgeCandidate->second.empty()) {
@@ -376,6 +393,7 @@ public:
     return aExpectedUuid == currentBridgeCandidate->second;
   }
 
+  
   void handleServiceDescriptionAnswer(const string &aResponse, ErrorPtr aError, const string& aExpectedUuid)
   {
     if (Error::isOK(aError)) {
@@ -503,7 +521,8 @@ HueComm::HueComm() :
   bridgeAPIComm(MainLoop::currentMainLoop()),
   findInProgress(false),
   apiReady(false),
-  lastApiAction(Never)
+  lastApiAction(Never),
+  useNUPnP(false)
 {
   bridgeAPIComm.setServerCertVfyDir("");
   bridgeAPIComm.isMemberVariable();
