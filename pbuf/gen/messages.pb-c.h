@@ -66,6 +66,13 @@ typedef enum _Vdcapi__ResultCode {
   VDCAPI__RESULT_CODE__ERR_NOT_AUTHORIZED = 12
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(VDCAPI__RESULT_CODE)
 } Vdcapi__ResultCode;
+typedef enum _Vdcapi__ErrorType {
+  VDCAPI__ERROR_TYPE__FAILED = 0,
+  VDCAPI__ERROR_TYPE__OVERLOADED = 1,
+  VDCAPI__ERROR_TYPE__DISCONNECTED = 2,
+  VDCAPI__ERROR_TYPE__UNIMPLEMENTED = 3
+    PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(VDCAPI__ERROR_TYPE)
+} Vdcapi__ErrorType;
 
 /* --- messages --- */
 
@@ -111,10 +118,13 @@ struct  _Vdcapi__GenericResponse
   ProtobufCMessage base;
   Vdcapi__ResultCode code;
   char *description;
+  protobuf_c_boolean has_errortype;
+  Vdcapi__ErrorType errortype;
+  char *usermessagetobetranslated;
 };
 #define VDCAPI__GENERIC_RESPONSE__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&vdcapi__generic_response__descriptor) \
-    , VDCAPI__RESULT_CODE__ERR_OK, NULL }
+    , VDCAPI__RESULT_CODE__ERR_OK, NULL, 0,VDCAPI__ERROR_TYPE__FAILED, NULL }
 
 
 /* Vdcapi__Message methods */
@@ -171,6 +181,7 @@ typedef void (*Vdcapi__GenericResponse_Closure)
 
 extern const ProtobufCEnumDescriptor    vdcapi__type__descriptor;
 extern const ProtobufCEnumDescriptor    vdcapi__result_code__descriptor;
+extern const ProtobufCEnumDescriptor    vdcapi__error_type__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__message__descriptor;
 extern const ProtobufCMessageDescriptor vdcapi__generic_response__descriptor;
 
