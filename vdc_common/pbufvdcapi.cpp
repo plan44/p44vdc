@@ -1034,7 +1034,7 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
 }
 
 
-ErrorPtr VdcPbufApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData)
+ErrorPtr VdcPbufApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
 {
   ErrorPtr err;
   // create a message
@@ -1046,10 +1046,14 @@ ErrorPtr VdcPbufApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage,
   msg.message_id = reqId; // use same message id as in method call
   resp.code = VdcPbufApiConnection::internalToPbufError(aErrorCode);
   resp.description = (char *)(aErrorMessage.size()>0 ? aErrorMessage.c_str() : NULL);
+  resp.has_errortype = true;
+  resp.errortype = (Vdcapi__ErrorType)aErrorType;
+  resp.usermessagetobetranslated = (char *)(aUserFacingMessage.size()>0 ? aUserFacingMessage.c_str() : NULL);
   err = pbufConnection->sendMessage(&msg);
   // log (if not just OK)
-  if (aErrorCode!=Error::OK)
-    LOG(LOG_INFO, "vdSM <- vDC (pbuf) error sent: requestid='%d', error=%d (%s)", reqId, aErrorCode, aErrorMessage.c_str());
+  if (aErrorCode!=Error::OK) {
+    LOG(LOG_INFO, "vdSM <- vDC (pbuf) error sent: requestid='%d', error=%d (%s) - type=%d (%s)", reqId, aErrorCode, aErrorMessage.c_str(), aErrorType, aUserFacingMessage.c_str());
+  }
   // done
   return err;
 }
