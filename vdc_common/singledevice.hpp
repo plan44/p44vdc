@@ -392,6 +392,8 @@ namespace p44 {
     /// get action title
     string getActionTitle() { return actionTitle; };
 
+    ValueListPtr getActionParams() { return actionParams; }
+
     /// add parameter
     /// @param aValueDesc a value descriptor object.
     /// @param aMandatory if set, parameter must be explicitly specified
@@ -1225,6 +1227,7 @@ namespace p44 {
     void sceneInvokedActionComplete(ErrorPtr aError);
     ErrorPtr addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfig, const string aActionId, bool aPush);
     void enableStandardActions();
+    JsonObjectPtr getParametersFromActionDefaults(DeviceActionPtr aAction);
 
   };
 
