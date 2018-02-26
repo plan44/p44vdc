@@ -32,15 +32,48 @@ using namespace std;
 
 namespace p44 {
 
+  class VdcApiError;
+  typedef boost::intrusive_ptr<VdcApiError> VdcApiErrorPtr;
+
+  typedef uint8_t VdcErrorType;
 
   class VdcApiError : public Error
   {
+    VdcErrorType errorType; ///< the error type (see Vdcapi__ErrorType protobuf enum) as a hint for user faced error processing
+    string userFacingMessage; ///< a user facing message, which might also be the key into a translation database
+
   public:
     typedef ErrorCode ErrorCodes;
 
     static const char *domain() { return "VdcApi"; }
-    virtual const char *getErrorDomain() const { return VdcApiError::domain(); };
-    VdcApiError(ErrorCode aError) : Error(aError) {};
+    virtual const char *getErrorDomain() const P44_OVERRIDE { return VdcApiError::domain(); };
+    VdcApiError(ErrorCode aError) : Error(aError), errorType(0) {};
+    VdcApiError(ErrorCode aError, const string &aMsg, VdcErrorType aErrorType, const string &aUsrMsg) :
+      Error(aError, aMsg), errorType(aErrorType), userFacingMessage(aUsrMsg) {};
+
+    VdcErrorType getErrorType() const { return errorType; };
+    string getUserFacingMessage() const { return userFacingMessage; };
+
+    /// set userFacingMessage
+    /// @param aFmt error message format string
+    /// @param aArgs argument list for formatting
+    void setFormattedUserFacingMessage(const char *aFmt, va_list aArgs);
+
+    /// set user faced error info
+    /// @param aErrorType the type of user facing error, see Vdcapi__ErrorType enum
+    /// @param aFmt formatting string for the user facing error
+    void setUserFacingInfo(VdcErrorType aErrorType, const char *aFmt, ...) __printflike(3,4);
+
+    /// factory function to create a user facing VdcApiError
+    /// @param aErrorCode the technical error code (usually a http-like error code)
+    /// @param aErrorType the type of user facing error, see Vdcapi__ErrorType enum
+    /// @param aFmt formatting string for the user facing error
+    static VdcApiErrorPtr userFacingErr(ErrorCode aErrorCode, VdcErrorType aErrorType, const char *aFmt, ...) __printflike(3,4);
+
+    /// get the description of the error
+    /// @return a description string. If an error message was not set, a standard string with the error domain and number will be shown
+    virtual string description() const P44_OVERRIDE;
+
   };
 
 
@@ -201,9 +234,11 @@ namespace p44 {
     /// send a vDC API error (answer for unsuccesful method call)
     /// @param aErrorCode the error code
     /// @param aErrorMessage the error message or NULL to generate a standard text
-    /// @param aErrorData the optional "data" member for the vDC API error object
+    /// @param aErrorData the optional "data" member for the vDC API error object (in JSON only)
+    /// @param aErrorType the optional "errorType"
+    /// @param aUserFacingMessage the optional user facing message
     /// @result empty or Error object in case of error sending error response
-    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr()) = 0;
+    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr(), VdcErrorType aErrorType = 0, string aUserFacingMessage = "") = 0;
 
     /// send p44utils::Error object as vDC API error
     /// @param aErrorToSend From this error object, getErrorCode() and description() will be used as "code" and "message" members

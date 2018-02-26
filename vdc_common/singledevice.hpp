@@ -392,6 +392,8 @@ namespace p44 {
     /// get action title
     string getActionTitle() { return actionTitle; };
 
+    ValueListPtr getActionParams() { return actionParams; }
+
     /// add parameter
     /// @param aValueDesc a value descriptor object.
     /// @param aMandatory if set, parameter must be explicitly specified

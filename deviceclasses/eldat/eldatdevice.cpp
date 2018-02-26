@@ -36,11 +36,13 @@ using namespace p44;
 
 // MARK: ===== EldatDevice
 
+#define INVALID_RSSI (-999)
+
 EldatDevice::EldatDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType) :
   Device(aVdcP),
   eldatDeviceType(aDeviceType),
   lastMessageTime(Never),
-  lastRSSI(-999)
+  lastRSSI(INVALID_RSSI)
 {
   iconBaseName = "eldat";
   groupColoredIcon = true;
@@ -165,6 +167,39 @@ void EldatDevice::checkPresence(PresenceCB aPresenceResultHandler)
 }
 
 
+#define BEST_RSSI (-60) // opState should be 100% above this
+#define WORST_RSSI (-110)  // opState should be 1% below this
+
+
+int EldatDevice::opStateLevel()
+{
+  int opState = -1;
+  if (lastRSSI>INVALID_RSSI) {
+    // first judge from last RSSI
+    opState = 1+(lastRSSI-WORST_RSSI)*99/(BEST_RSSI-WORST_RSSI); // 1..100 range
+    if (opState<1) opState = 1;
+    else if (opState>100) opState = 100;
+  }
+  return opState;
+}
+
+
+string EldatDevice::getOpStateText()
+{
+  string t;
+  if (lastRSSI>INVALID_RSSI) {
+    string_format_append(t, "%ddBm (", lastRSSI);
+    format_duration_append(t, (MainLoop::now()-lastMessageTime)/Second, 2);
+    t += " ago)";
+  }
+  else {
+    t += "unseen";
+  }
+  return t;
+}
+
+
+
 void EldatDevice::handleMessage(EldatMode aMode, int aRSSI, string aData)
 {
   // remember last message time
@@ -241,13 +276,13 @@ bool EldatDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
       switch (aPropertyDescriptor->fieldKey()) {
         case messageage_key:
           // Note lastMessageTime is set to now at startup, so additionally check lastRSSI
-          if (lastMessageTime==Never || lastRSSI<=-999)
+          if (lastMessageTime==Never || lastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
             aPropValue->setDoubleValue((double)(MainLoop::now()-lastMessageTime)/Second);
           return true;
         case rssi_key:
-          if (lastRSSI<=-999)
+          if (lastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
             aPropValue->setInt32Value(lastRSSI);

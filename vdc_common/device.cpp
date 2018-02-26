@@ -808,6 +808,14 @@ void Device::scheduleVanish(bool aForgetParams, MLMicroSeconds aDelay)
 }
 
 
+bool Device::announce(VdcApiResponseCB aResponseHandler)
+{
+  ApiValuePtr params = getVdcHost().getSessionConnection()->newApiValue();
+  params->setType(apivalue_object);
+  // include link to vdc for device announcements
+  params->add("vdc_dSUID", params->newBinary(vdcP->getDsUid().getBinary()));
+  return sendRequest("announcedevice", params, aResponseHandler);
+}
 
 
 static SceneNo mainSceneForArea(int aArea)

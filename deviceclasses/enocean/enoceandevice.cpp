@@ -34,7 +34,6 @@
 #include "enoceanvld.hpp"
 #include "enoceanremotecontrol.hpp"
 
-
 using namespace p44;
 
 
@@ -49,6 +48,8 @@ EnoceanChannelHandler::EnoceanChannelHandler(EnoceanDevice &aDevice) :
 
 // MARK: ===== EnoceanDevice
 
+#define INVALID_RSSI (-999)
+
 EnoceanDevice::EnoceanDevice(EnoceanVdc *aVdcP) :
   Device(aVdcP),
   eeProfile(eep_profile_unknown),
@@ -62,7 +63,7 @@ EnoceanDevice::EnoceanDevice(EnoceanVdc *aVdcP) :
   iconBaseName = "enocean";
   groupColoredIcon = true;
   lastPacketTime = MainLoop::now(); // consider packet received at time of creation (to avoid devices starting inactive)
-  lastRSSI = -999; // not valid
+  lastRSSI = INVALID_RSSI; // not valid
   lastRepeaterCount = 0; // dummy
 }
 
@@ -296,16 +297,63 @@ void EnoceanDevice::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 }
 
 
-void EnoceanDevice::checkPresence(PresenceCB aPresenceResultHandler)
+bool EnoceanDevice::isAlive()
 {
-  bool present = true;
+  bool alive = true;
   for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
     if (!(*pos)->isAlive()) {
-      present = false; // one channel not alive -> device not present
+      alive = false; // one channel not alive -> device not present
       break;
     }
   }
-  aPresenceResultHandler(present);
+  return alive;
+}
+
+
+void EnoceanDevice::checkPresence(PresenceCB aPresenceResultHandler)
+{
+  aPresenceResultHandler(isAlive());
+}
+
+
+#define BEST_RSSI (-50) // opState should be 100% above this
+#define WORST_RSSI (-90)  // opState should be 1% below this
+
+int EnoceanDevice::opStateLevel()
+{
+  int opState = -1;
+  if (lastRSSI>INVALID_RSSI) {
+    // first judge from last RSSI
+    opState = 1+(lastRSSI-WORST_RSSI)*99/(BEST_RSSI-WORST_RSSI); // 1..100 range
+    if (opState<1) opState = 1;
+    else if (opState>100) opState = 100;
+  }
+  // also check alive status
+  if (!isAlive()) {
+    opState = 0;
+  }
+  return opState;
+}
+
+
+string EnoceanDevice::getOpStateText()
+{
+  string t;
+  if (!isAlive()) {
+    t += "timeout, ";
+  }
+  if (lastRSSI>INVALID_RSSI) {
+    string_format_append(t, "%ddBm (", lastRSSI);
+    if (lastRepeaterCount>0) {
+      string_format_append(t, "%d Rep., ", lastRepeaterCount);
+    }
+    format_duration_append(t, (MainLoop::now()-lastPacketTime)/Second, 2);
+    t += " ago)";
+  }
+  else {
+    t += "unseen";
+  }
+  return t;
 }
 
 
@@ -527,19 +575,19 @@ bool EnoceanDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
       switch (aPropertyDescriptor->fieldKey()) {
         case packetage_key:
           // Note lastPacketTime is set to now at startup, so additionally check lastRSSI
-          if (lastPacketTime==Never || lastRSSI<=-999)
+          if (lastPacketTime==Never || lastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
             aPropValue->setDoubleValue((double)(MainLoop::now()-lastPacketTime)/Second);
           return true;
         case rssi_key:
-          if (lastRSSI<=-999)
+          if (lastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
             aPropValue->setInt32Value(lastRSSI);
           return true;
         case repeaterCount_key:
-          if (lastRSSI<=-999)
+          if (lastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
             aPropValue->setUint8Value(lastRepeaterCount);

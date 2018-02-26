@@ -116,6 +116,7 @@ namespace p44 {
     uint64_t mac; ///< MAC address as found at startup
 
     string ifNameForConn; ///< the name of the network interface to use for getting IP and connectivity status
+    bool allowCloud; ///< if not set, vdcs are forbidden to use cloud-based services such as N-UPnP that are not actively/obviously configured by the user him/herself
 
     DsDeviceMap dSDevices; ///< available devices by API-exposed ID (dSUID or derived dsid)
     DsParamStore dsParamStore; ///< the database for storing dS device parameters
@@ -236,6 +237,12 @@ namespace p44 {
     /// @param aMaxApiVersion max API version to support, 0 = all implemented versions
     void setMaxApiVersion(int aMaxApiVersion) { maxApiVersion = aMaxApiVersion; };
 
+    /// Enable or forbid use of cloud services not explicitly configured or obviously expected by user (such as N-UPnP)
+    /// @param aAllow true to allow cloud services
+    void setAllowCloud(bool aAllow) { allowCloud = aAllow; };
+
+    /// @return true if not explicitly configured cloud services are allowed, false otherwise
+    bool cloudAllowed() { return allowCloud; };
 
     /// Set directory for loading device icons
     /// @param aIconDir  full path to directory to load device icons from. Empty string or NULL means "no icons"
@@ -410,7 +417,7 @@ namespace p44 {
 
     /// @return human readable product version string
     /// @note it is important to override this here in vdchost, because would loop otherwise when base class calls vdchost's implementation
-    virtual string modelVersion() P44_OVERRIDE { return productVersion; }
+    virtual string modelVersion() const P44_OVERRIDE { return productVersion; }
 
     /// @return unique ID for the functional model of this entity
     virtual string modelUID() P44_OVERRIDE { return DSUID_P44VDC_MODELUID_UUID; /* using the p44 modelUID namespace UUID itself */ }

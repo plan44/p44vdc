@@ -106,7 +106,7 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
   if (aMethod=="authenticate") {
     string accessToken, refreshToken;
 
-    if (netatmoComm->getAccountStatus() != NetatmoComm::AccountStatus::disconnected) {
+    if (netatmoComm->getAccountStatus() != AccountStatus::disconnected) {
       respErr = TextError::err("Invalid account status");
     }
 
@@ -130,7 +130,7 @@ ErrorPtr NetatmoVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
   } else if (aMethod=="authorizeByEmail") {
     string mail, password;
 
-    if (netatmoComm->getAccountStatus() != NetatmoComm::AccountStatus::disconnected) {
+    if (netatmoComm->getAccountStatus() != AccountStatus::disconnected) {
       respErr = TextError::err("Invalid account status");
     }
 
@@ -226,7 +226,7 @@ bool NetatmoVdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case netatmoAccountStatus:{
-          aPropValue->setStringValue(netatmoComm->getAccountStatusString());
+          aPropValue->setStringValue(toString(netatmoComm->getAccountStatus()));
           return true;
         }
         case netatmoUserEmail:{

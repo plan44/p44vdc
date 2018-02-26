@@ -473,7 +473,8 @@ const ProtobufCMessageDescriptor vdcapi__message__descriptor =
   NULL,NULL,NULL    /* reserved[123] */
 };
 static const Vdcapi__ResultCode vdcapi__generic_response__code__default_value = VDCAPI__RESULT_CODE__ERR_OK;
-static const ProtobufCFieldDescriptor vdcapi__generic_response__field_descriptors[2] =
+static const Vdcapi__ErrorType vdcapi__generic_response__error_type__default_value = VDCAPI__ERROR_TYPE__FAILED;
+static const ProtobufCFieldDescriptor vdcapi__generic_response__field_descriptors[4] =
 {
   {
     "code",
@@ -499,15 +500,41 @@ static const ProtobufCFieldDescriptor vdcapi__generic_response__field_descriptor
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "errorType",
+    3,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_ENUM,
+    offsetof(Vdcapi__GenericResponse, has_errortype),
+    offsetof(Vdcapi__GenericResponse, errortype),
+    &vdcapi__error_type__descriptor,
+    &vdcapi__generic_response__error_type__default_value,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "userMessageToBeTranslated",
+    4,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_STRING,
+    0,   /* quantifier_offset */
+    offsetof(Vdcapi__GenericResponse, usermessagetobetranslated),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned vdcapi__generic_response__field_indices_by_name[] = {
   0,   /* field[0] = code */
   1,   /* field[1] = description */
+  2,   /* field[2] = errorType */
+  3,   /* field[3] = userMessageToBeTranslated */
 };
 static const ProtobufCIntRange vdcapi__generic_response__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 2 }
+  { 0, 4 }
 };
 const ProtobufCMessageDescriptor vdcapi__generic_response__descriptor =
 {
@@ -517,7 +544,7 @@ const ProtobufCMessageDescriptor vdcapi__generic_response__descriptor =
   "Vdcapi__GenericResponse",
   "vdcapi",
   sizeof(Vdcapi__GenericResponse),
-  2,
+  4,
   vdcapi__generic_response__field_descriptors,
   vdcapi__generic_response__field_indices_by_name,
   1,  vdcapi__generic_response__number_ranges,
@@ -646,5 +673,37 @@ const ProtobufCEnumDescriptor vdcapi__result_code__descriptor =
   vdcapi__result_code__enum_values_by_name,
   1,
   vdcapi__result_code__value_ranges,
+  NULL,NULL,NULL,NULL   /* reserved[1234] */
+};
+const ProtobufCEnumValue vdcapi__error_type__enum_values_by_number[4] =
+{
+  { "FAILED", "VDCAPI__ERROR_TYPE__FAILED", 0 },
+  { "OVERLOADED", "VDCAPI__ERROR_TYPE__OVERLOADED", 1 },
+  { "DISCONNECTED", "VDCAPI__ERROR_TYPE__DISCONNECTED", 2 },
+  { "UNIMPLEMENTED", "VDCAPI__ERROR_TYPE__UNIMPLEMENTED", 3 },
+};
+static const ProtobufCIntRange vdcapi__error_type__value_ranges[] = {
+{0, 0},{0, 4}
+};
+const ProtobufCEnumValueIndex vdcapi__error_type__enum_values_by_name[4] =
+{
+  { "DISCONNECTED", 2 },
+  { "FAILED", 0 },
+  { "OVERLOADED", 1 },
+  { "UNIMPLEMENTED", 3 },
+};
+const ProtobufCEnumDescriptor vdcapi__error_type__descriptor =
+{
+  PROTOBUF_C__ENUM_DESCRIPTOR_MAGIC,
+  "vdcapi.ErrorType",
+  "ErrorType",
+  "Vdcapi__ErrorType",
+  "vdcapi",
+  4,
+  vdcapi__error_type__enum_values_by_number,
+  4,
+  vdcapi__error_type__enum_values_by_name,
+  1,
+  vdcapi__error_type__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };

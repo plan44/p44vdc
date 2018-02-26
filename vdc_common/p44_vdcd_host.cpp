@@ -82,10 +82,16 @@ ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
 
 
 
-ErrorPtr P44JsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData)
+ErrorPtr P44JsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
 {
+  ErrorPtr err;
   LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error sent: error=%d (%s)", aErrorCode, aErrorMessage.c_str());
-  ErrorPtr err = ErrorPtr(new Error(aErrorCode, aErrorMessage));
+  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
+    err = VdcApiErrorPtr(new VdcApiError(aErrorCode, aErrorMessage, aErrorType, aUserFacingMessage));
+  }
+  else {
+    err = ErrorPtr(new Error(aErrorCode, aErrorMessage)); // re-pack into error object
+  }
   P44VdcHost::sendCfgApiResponse(jsonComm, JsonObjectPtr(), err);
   return ErrorPtr();
 }
@@ -335,6 +341,11 @@ void P44VdcHost::sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult
     response->add("error", JsonObject::newInt32((int32_t)aError->getErrorCode()));
     response->add("errormessage", JsonObject::newString(aError->getErrorMessage()));
     response->add("errordomain", JsonObject::newString(aError->getErrorDomain()));
+    VdcApiErrorPtr ve = boost::dynamic_pointer_cast<VdcApiError>(aError);
+    if (ve) {
+      response->add("errortype", JsonObject::newInt32(ve->getErrorType()));
+      response->add("userfacingmessage", JsonObject::newString(ve->getUserFacingMessage()));
+    }
   }
   else {
     // no error, return result (if any)

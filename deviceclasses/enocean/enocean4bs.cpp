@@ -562,15 +562,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
 };
 
 
-
-// MARK: ===== Enocean4BSDevice
-
-
-Enocean4BSDevice::Enocean4BSDevice(EnoceanVdc *aVdcP) :
-  inherited(aVdcP)
-{
-}
-
+// MARK: ===== 4BS profile variants
 
 static const char *indoorText = "indoor temperature";
 static const char *outdoorText = "outdoor temperature";
@@ -653,6 +645,16 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   { 29, 0x01A50402, 0, indoorText, NULL },
   { 0, 0, 0, NULL, NULL } // terminator
 };
+
+
+
+// MARK: ===== Enocean4BSDevice
+
+
+Enocean4BSDevice::Enocean4BSDevice(EnoceanVdc *aVdcP) :
+  inherited(aVdcP)
+{
+}
 
 
 const ProfileVariantEntry *Enocean4BSDevice::profileVariantsTable()

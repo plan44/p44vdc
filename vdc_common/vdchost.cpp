@@ -87,6 +87,7 @@ VdcHost::VdcHost(bool aWithLocalController) :
   maxApiVersion(0), // no API version limit
   externalDsuid(false),
   storedDsuid(false),
+  allowCloud(false),
   DsAddressable(this),
   collecting(false),
   lastActivity(0),
@@ -1200,11 +1201,7 @@ void VdcHost::announceNext()
       // mark device as being in process of getting announced
       dev->announcing = MainLoop::now();
       // call announce method
-      ApiValuePtr params = getSessionConnection()->newApiValue();
-      params->setType(apivalue_object);
-      // include link to vdc for device announcements
-      params->add("vdc_dSUID", params->newBinary(dev->vdcP->getDsUid().getBinary()));
-      if (!dev->sendRequest("announcedevice", params, boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
+      if (!dev->announce(boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
         LOG(LOG_ERR, "Could not send device announcement message for %s %s", dev->entityType(), dev->shortDesc().c_str());
         dev->announcing = Never; // not registering
       }
