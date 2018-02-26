@@ -316,6 +316,10 @@ namespace p44 {
     virtual bool setStringValue(const string aValue) P44_FINAL P44_OVERRIDE;
     bool setStringValueCaseInsensitive(const string& aValue);
 
+    /// static factory method: create a EnumValueDescriptor and add list of strings as simple enums
+    /// (first string corresponds to enum value 0, next to 1, etc.)
+    /// @param aName name of the EnumValue
+    /// @param aValues vector of strings representing the enum values in order 0...n
     static EnumValueDescriptorPtr create(const char* aName, std::vector<const char*> aValues);
 
   protected:
