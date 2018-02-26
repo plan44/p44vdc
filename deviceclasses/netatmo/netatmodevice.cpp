@@ -294,7 +294,7 @@ string NetatmoDevice::hardwareGUID()
 }
 
 
-string NetatmoDevice::modelVersion()
+string NetatmoDevice::modelName()
 {
   return netatmoFw;
 }
