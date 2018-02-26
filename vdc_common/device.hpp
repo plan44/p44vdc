@@ -358,6 +358,7 @@ namespace p44 {
     /// @param aDelay how long to wait until deleting the device
     void scheduleVanish(bool aForgetParams, MLMicroSeconds aDelay = 0);
 
+    bool announce(VdcApiResponseCB aResponseHandler);
 
     /// @}
 

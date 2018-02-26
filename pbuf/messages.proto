@@ -95,7 +95,41 @@ enum ResultCode {
     ERR_NOT_AUTHORIZED = 12;
 }
 
+enum ErrorType {
+
+    // Something went wrong. This is the usual error type.
+    FAILED = 0;
+
+    /// The call failed because of a temporary lack of resources.
+    /// This could be space resources
+    /// (out of memory, out of disk space) or time resources
+    /// (request queue overflow, operation
+    /// timed out).
+    ///
+    /// The operation might work if tried again,
+    /// but it should NOT be repeated immediately as this
+    /// may simply exacerbate the problem.
+    OVERLOADED = 1;
+
+    /// The call required communication over a connection that has been lost.
+    /// The caller will need to try again.
+    DISCONNECTED = 2;
+
+    // The requested method is not implemented. The caller may wish to revert to a fallback
+    // approach based on other methods.
+    UNIMPLEMENTED = 3;
+}
+
 message GenericResponse {
     required ResultCode code = 1 [ default = ERR_OK ];
     optional string description = 2;
+
+    /// How shall the caller recover?
+    optional ErrorType errorType = 3 [ default = FAILED ];
+
+    /// Error message intended for user.
+    /// Frontends shall present a generic error message to user if empty.
+    /// Can be multiline with markdown formatting
+    /// Message will be translated in dss using vdc catalog.
+    optional string userMessageToBeTranslated = 4;
 }

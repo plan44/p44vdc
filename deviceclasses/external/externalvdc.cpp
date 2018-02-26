@@ -161,6 +161,15 @@ string ExternalDevice::modelName()
 }
 
 
+string ExternalDevice::modelVersion() const
+{
+  if (!modelVersionString.empty()) {
+    return modelVersionString;
+  }
+  return inherited::modelVersion();
+}
+
+
 string ExternalDevice::vendorName()
 {
   return vendorNameString;
@@ -895,6 +904,10 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("modelname", o)) {
     modelNameString = o->stringValue();
   }
+  // - get model version
+  if (aInitParams->get("modelversion", o)) {
+    modelVersionString = o->stringValue();
+  }
   // - get vendor name
   if (aInitParams->get("vendorname", o)) {
     vendorNameString = o->stringValue();
@@ -1493,6 +1506,9 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       if (aMessage->get("modelname", o)) {
         externalVdc.modelNameString = o->stringValue();
       }
+      if (aMessage->get("modelversion", o)) {
+        externalVdc.modelVersionString = o->stringValue();
+      }
       // - get icon base name
       if (aMessage->get("iconname", o)) {
         externalVdc.iconBaseName = o->stringValue();
@@ -1632,6 +1648,14 @@ string ExternalVdc::modelName()
     return modelNameString;
   return inherited::modelName();
 }
+
+
+string ExternalVdc::vdcModelVersion() const
+{
+  return modelVersionString;
+};
+
+
 
 
 bool ExternalVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)

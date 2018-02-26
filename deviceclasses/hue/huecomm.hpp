@@ -137,6 +137,7 @@ namespace p44 {
     string fixedBaseURL; ///< fixed hue API base URL, bypasses any SSDP searches
     string uuid; ///< the UUID for searching the hue bridge via SSDP
     string userName; ///< the user name
+    bool useNUPnP; ///< if set, N-UPnP is used as a fallback to find bridges
 
     /// @}
 
@@ -187,6 +188,12 @@ namespace p44 {
     /// @note ssdpUuid and apiToken member variables must be set to the pre-know bridge's parameters before calling this
     void refindBridge(HueBridgeFindCB aFindHandler);
 
+    typedef std::list<std::string> NupnpResult;
+    typedef boost::function<void (NupnpResult)> HueBridgeNupnpFindCB;
+    void findBridgesNupnp(HueBridgeNupnpFindCB aFindHandler);
+
+  private:
+    void gotBridgeNupnpResponse(JsonObjectPtr aResult, ErrorPtr aError, HueBridgeNupnpFindCB aFindHandler);
     /// @}
 
   };

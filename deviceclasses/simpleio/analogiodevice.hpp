@@ -57,6 +57,8 @@ namespace p44 {
     AnalogIoType analogIOType;
 
     MLTicket timerTicket; // for output transitions and input poll
+    double scale; ///< scaling factor for analog sensors (native value will be multiplied by this)
+    double offset; ///< offset for analog sensors (reported value = native*scale+offset)
 
   public:
     AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig);

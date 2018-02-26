@@ -33,29 +33,80 @@
 using namespace p44;
 
 
-// MARK: ===== VLD device specifications
+// MARK: ===== special extraction functions
 
+
+// strange irregular fan speed scale as used in A5-10-01,02,04,07,08 and 09
+static void currentClampHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  // extract 8-bit value
+  if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
+    double value = EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+    if (aDataP[0] & 0x40) {
+      // divisor by 10 is active
+      value = value / 10;
+    }
+    sb->updateSensorValue(value);
+  }
+}
+
+
+// MARK: ===== sensor mapping table for generic EnoceanSensorHandler
 
 using namespace EnoceanSensors;
 
-
-// TODO: %%% no real profiles yet"
 const p44::EnoceanSensorDescriptor enoceanVLDdescriptors[] = {
-  // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max,MSB,     LSB,  updateIv,aliveSignIv, handler,     typeText
+  // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max, MSB,     LSB,   updateIv,aliveSignIv, handler,              typeText
+
+  // D2-32 AC current clamps
+  // D2-32-00: single phase current clamp
+  { 0, 0x32, 0x00, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler, "Current" },
+  // D2-32-01: two phase current clamp
+  // - separate devices
+  { 0, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler, "Current1" },
+  { 0, 0x32, 0x01, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler, "Current2" },
+  // - both in one device
+  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler, "Current1" },
+  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler, "Current2" },
+  // D2-32-02: three phase current clamp
+  // - separate devices
+  { 0, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler, "Current1" },
+  { 0, 0x32, 0x02, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler, "Current2" },
+  { 0, 0x32, 0x02, 2, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler, "Current3" },
+  // - all three in one device
+  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler, "Current1" },
+  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler, "Current2" },
+  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler, "Current3" },
 
   // terminator
   { 0, 0,    0,    0, class_black_joker,  group_black_variable,          behaviour_undefined, 0, usage_undefined, 0, 0, 0, 0, 0, 0, NULL /* NULL for extractor function terminates list */, NULL },
 };
 
 
+// MARK: ===== VLD profile variants
+
+
+static const ProfileVariantEntry profileVariantsVLD[] = {
+  // current clamp alternatives
+  {  1, 0x00D23201, 0, "two separate current sensor devices", NULL },
+  {  1, 0x01D23201, 0, "single device with two current sensors", NULL },
+  {  2, 0x00D23202, 0, "three separate current sensor devices", NULL },
+  {  2, 0x01D23202, 0, "single device with three current sensors", NULL },
+  { 0, 0, 0, NULL, NULL } // terminator
+};
 
 
 // MARK: ===== EnoceanVLDDevice
 
-
 EnoceanVLDDevice::EnoceanVLDDevice(EnoceanVdc *aVdcP) :
   inherited(aVdcP)
 {
+}
+
+
+const ProfileVariantEntry *EnoceanVLDDevice::profileVariantsTable()
+{
+  return profileVariantsVLD;
 }
 
 
@@ -84,8 +135,7 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
   else
   {
     // check table based sensors, might create more than one device
-// TODO: %%% no real profiles yet"
-//    newDev = EnoceanSensorHandler::newDevice(aVdcP, createVLDDeviceFunc, enoceanVLDdescriptors, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
+    newDev = EnoceanSensorHandler::newDevice(aVdcP, createVLDDeviceFunc, enoceanVLDdescriptors, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
   return newDev;
 }
@@ -327,23 +377,6 @@ void EnoceanD20601ButtonHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 string EnoceanD20601ButtonHandler::shortDesc()
 {
   return "Window Handle Button";
-}
-
-
-
-
-// MARK: ===== EnoceanVLDDevice profile variants
-
-
-//static const ProfileVariantEntry profileVariantsVLD[] = {
-//  { 0, 0, 0, NULL } // terminator
-//};
-
-
-const ProfileVariantEntry *EnoceanVLDDevice::profileVariantsTable()
-{
-  return NULL; // none for now
-  // return profileVariantsVLD;
 }
 
 

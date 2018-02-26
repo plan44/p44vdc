@@ -108,6 +108,9 @@ namespace p44 {
     ///   Will be appended to product name to create modelName() for vdcs
     virtual string vdcModelSuffix() const P44_OVERRIDE { return "hue"; }
 
+    /// @return human readable model version specific to that vDC
+    virtual string vdcModelVersion() const P44_OVERRIDE { return swVersion; };
+
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - uuid:UUUUUUU = UUID
     /// - http:xxxx = API

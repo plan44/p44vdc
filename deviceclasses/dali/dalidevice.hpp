@@ -413,6 +413,15 @@ namespace p44 {
     /// @return OEM GUID in URN format to identify OEM hardware MODEL as uniquely as possible
     virtual string oemModelGUID() P44_OVERRIDE;
 
+    /// Get an indication how good/critical the operation state of the device is (such as lamp failure or reachability on the bus)
+    /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
+    virtual int opStateLevel() P44_OVERRIDE;
+
+    /// Get short text to describe the operation state (such as lamp failure or reachability on the bus)
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getOpStateText() P44_OVERRIDE;
+
+
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
     /// - if aWithData is set, binary PNG icon data for given resolution prefix is returned
@@ -542,6 +551,14 @@ namespace p44 {
 
     /// @return OEM GUID in URN format to identify OEM hardware MODEL as uniquely as possible
     virtual string oemModelGUID() P44_OVERRIDE;
+
+    /// Get an indication how good/critical the operation state of the device is (such as lamp failure or reachability on the bus)
+    /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
+    virtual int opStateLevel() P44_OVERRIDE;
+
+    /// Get short text to describe the operation state (such as lamp failure or reachability on the bus)
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getOpStateText() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

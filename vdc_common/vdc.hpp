@@ -320,6 +320,18 @@ namespace p44 {
     /// @return human readable model name/short description
     virtual string vdcModelSuffix() const = 0;
 
+    /// @return human readable version string of vDC model
+    /// @note vDC implementation always uses the base class implementation returns version string of vdc host by default.
+    ///   Derived device classes should return version information for the actual device,
+    ///   if available from device hardware.
+    ///   Do not derive modelVersion() in vDCs, but override Vdc::vdcModelVersion() instead.
+    virtual string modelVersion() const P44_FINAL;
+
+    /// @return human readable model version specific to that vDC, meaning for example a firmware version
+    ///    of external hardware governing the access to a device bus/network such as a hue bridge.
+    ///    If not empty, this will be appended to the modelVersion() string.
+    virtual string vdcModelVersion() const { return ""; };
+
     /// @return unique ID for the functional model of this entity
     virtual string modelUID() P44_OVERRIDE;
 

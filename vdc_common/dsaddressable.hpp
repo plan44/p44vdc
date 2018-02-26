@@ -199,9 +199,12 @@ namespace p44 {
     /// @return human readable, language independent model name/short description
     virtual string modelName() = 0;
 
-    /// @return human readable version string
-    /// @note base class implementation returns version string of vdc host by default
-    virtual string modelVersion();
+    /// @return human readable version string of the device or vDC model
+    /// @note base class implementation returns version string of vdc host by default.
+    ///   Derived device classes should return version information for the actual device,
+    ///   if available from device hardware.
+    ///   Do not derive modelVersion() in vDCs, but override Vdc::vdcModelVersion() instead.
+    virtual string modelVersion() const;
 
     /// @return human readable display Id (such as serial number or similar, device instance identifying string)
     /// @note this is intended as a way to show the user the hardwareGUID in a more readable, possibly beautified manner.
@@ -284,6 +287,14 @@ namespace p44 {
     /// Get short text for a "first glance" status of the device
     /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
     virtual string getStatusText() { return ""; };
+
+    /// Get an indication how good/critical the operation state of the device is (such as radio strenght, battery level)
+    /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
+    virtual int opStateLevel() { return -1; }; // unknown operating state by default
+
+    /// Get short text to describe the operation state (such as radio RSSI, critical battery level, etc.)
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getOpStateText() { return ""; };
 
     /// @}
 

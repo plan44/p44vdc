@@ -1113,6 +1113,30 @@ string DaliSingleControllerDevice::getExtraInfo()
 }
 
 
+int DaliSingleControllerDevice::opStateLevel()
+{
+  return !daliController->lampFailure && daliController->isPresent ? 100 : 0;
+}
+
+
+string DaliSingleControllerDevice::getOpStateText()
+{
+  string t;
+  string sep;
+  if (daliController->lampFailure) {
+    t += "lamp failure";
+    sep = ", ";
+  }
+  if (!daliController->isPresent) {
+    t += sep + "not present";
+    sep = ", ";
+  }
+  return t;
+}
+
+
+
+
 void DaliSingleControllerDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // - sync cached channel values from actual device
@@ -1424,6 +1448,65 @@ bool DaliCompositeDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
   // done
   return true; // simple identification, callback will not be called
 }
+
+
+int DaliCompositeDevice::opStateLevel()
+{
+  int l = 100;
+  for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
+    if (dimmers[idx]) {
+      if (dimmers[idx]->isDummy) {
+        l = 20; // not seen on last bus scan, might be glitch
+      }
+      if (!dimmers[idx]->isPresent) {
+        l = 40; // not completely fatal, might recover on next ping
+      }
+      if (dimmers[idx]->lampFailure) {
+        l = 0;
+      }
+    }
+  }
+  return l;
+}
+
+
+string DaliCompositeDevice::getOpStateText()
+{
+  bool missing = false;
+  bool failure = false;
+  bool incomplete = false;
+  for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
+    if (dimmers[idx]) {
+      if (!dimmers[idx]->isPresent) {
+        missing = true;
+      }
+      if (dimmers[idx]->lampFailure) {
+        failure = true;
+      }
+      if (dimmers[idx]->isDummy) {
+        incomplete = true;
+      }
+    }
+  }
+  string t;
+  string sep;
+  if (failure) {
+    t += "lamp failure";
+    sep = ", ";
+  }
+  if (missing) {
+    t += sep + "not present";
+    sep = ", ";
+  }
+  if (incomplete) {
+    t += sep + "incomplete";
+    sep = ", ";
+  }
+  return t;
+}
+
+
+
 
 
 bool DaliCompositeDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
