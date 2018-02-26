@@ -1230,7 +1230,6 @@ namespace p44 {
     void invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError);
     void sceneInvokedActionComplete(ErrorPtr aError);
     ErrorPtr addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfig, const string aActionId, bool aPush);
-    JsonObjectPtr getParametersFromActionDefaults(DeviceActionPtr aAction);
 
   };
 
