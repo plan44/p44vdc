@@ -180,7 +180,7 @@ namespace p44 {
 
     /// @return human readable version string
     /// @note base class implementation returns version string of vdc host by default
-    virtual string modelVersion() P44_OVERRIDE;
+    virtual string modelVersion() const P44_OVERRIDE;
 
     /// @return Vendor name if known
     virtual string vendorName() P44_OVERRIDE;
