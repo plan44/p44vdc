@@ -147,6 +147,7 @@ namespace p44 {
     string modelGuid; ///< the model guid for the device
     string vendor; ///< the vendor of this device
     string gtin;
+    bool isConnected;
 
     HomeConnectEventMonitorPtr eventMonitor; ///< event monitor
 
@@ -230,6 +231,8 @@ namespace p44 {
 
     /// @return OEM model GUID in URN format to identify the OEM product MODEL hardware as uniquely as possible
     virtual string oemModelGUID() P44_OVERRIDE;
+
+    virtual bool isPublicDS() P44_OVERRIDE { return isConnected; };
 
     bool isKnownDevice();
 
