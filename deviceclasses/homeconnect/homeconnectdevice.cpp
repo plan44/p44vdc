@@ -688,11 +688,13 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
 
 void HomeConnectDevice::handleEventTypeDisconnected()
 {
+  reportVanished();
   ALOG(LOG_NOTICE, "Device disconnected");
 }
 
 void HomeConnectDevice::handleEventTypeConnected()
 {
+  announce({});
   ALOG(LOG_NOTICE, "Device connected");
   pollState();
 }
