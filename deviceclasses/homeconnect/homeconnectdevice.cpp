@@ -230,7 +230,8 @@ string HomeConnectSettingBuilder::build()
 
 
 HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-  inherited(aVdcP)
+  inherited(aVdcP),
+  isConnected(false)
 {
   // home connect appliances are single devices
   setColorClass(class_white_singledevices);
@@ -255,6 +256,9 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
     modelGuid = o->stringValue();
   if (aHomeApplicanceInfoRecord->get("brand", o))
     vendor = o->stringValue();
+
+  if (aHomeApplicanceInfoRecord->get("connected", o))
+    isConnected = o->boolValue();
 
   string dir = getVdcHost().getConfigDir();
 
@@ -688,11 +692,15 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
 
 void HomeConnectDevice::handleEventTypeDisconnected()
 {
+  reportVanished();
+  isConnected = false;
   ALOG(LOG_NOTICE, "Device disconnected");
 }
 
 void HomeConnectDevice::handleEventTypeConnected()
 {
+  isConnected = true;
+  announce({});
   ALOG(LOG_NOTICE, "Device connected");
   pollState();
 }
