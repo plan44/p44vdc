@@ -574,9 +574,6 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   {  1, 0x01A52001, 0, "heating valve (with temperature sensor)", NULL },
   {  1, 0x02A52001, 0, "heating valve with binary output adjustment (e.g. MD10-FTL)", NULL },
   {  1, 0x03A52001, 0, "heating valve in self-regulation mode", NULL },
-  // heating valve alternatives
-  {  1, 0x00A52004, 0, "heating valve", NULL },
-  {  1, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
   // room panel alternatives for set point
   {  2, 0x00A51006, 0, "standard profile", NULL },
   {  2, 0x01A51006, 0, "set point interpreted as 0..40°C (e.g. FTR55D)", NULL },
@@ -643,6 +640,9 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   { 29, 0x01A50401, 0, outdoorText, NULL },
   { 29, 0x00A50402, 0, outdoorText, NULL }, // outdoor is default!
   { 29, 0x01A50402, 0, indoorText, NULL },
+  // heating valve alternatives
+  {  30, 0x00A52004, 0, "heating valve", NULL },
+  {  30, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
   { 0, 0, 0, NULL, NULL } // terminator
 };
 
