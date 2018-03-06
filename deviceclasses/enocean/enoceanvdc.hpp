@@ -142,7 +142,7 @@ namespace p44 {
     void handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);
     void handleTestRadioPacket(StatusCB aCompletedCB, Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);
 
-    Tristate processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, bool aSmartAck);
+    Tristate processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, bool aSmartAck, Esp3PacketPtr aLearnPacket);
 
     ErrorPtr addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aParams);

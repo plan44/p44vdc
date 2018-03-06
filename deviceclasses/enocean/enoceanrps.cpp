@@ -532,8 +532,8 @@ void EnoceanRpsSmokeDetectorHandler::handleRadioPacket(Esp3PacketPtr aEsp3Packet
   uint8_t data = aEsp3PacketPtr->radioUserData()[0];
   BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
   if (isBatteryStatus) {
-    // battery status channel
-    bool lowBat = (data & 0x30)==0x30;
+    // battery status channel (member field of EnoceanChannelHandler, influences opStateLevel())
+    lowBat = (data & 0x30)==0x30;
     LOG(LOG_INFO, "Enocean Smoke Detector %08X reports state: Battery %s", device.getAddress(), lowBat ? "LOW" : "ok");
     bb->updateInputState(lowBat);
   }

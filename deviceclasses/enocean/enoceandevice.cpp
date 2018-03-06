@@ -41,9 +41,25 @@ using namespace p44;
 
 EnoceanChannelHandler::EnoceanChannelHandler(EnoceanDevice &aDevice) :
   device(aDevice),
-  dsChannelIndex(0)
+  dsChannelIndex(0),
+  lowBat(false)
 {
 }
+
+
+int EnoceanChannelHandler::opStateLevel()
+{
+  if (!isAlive()) return 0; /* completely offline, operation not possible */
+  if (lowBat) return 20; /* low battery, operation critical */
+  return 100;
+}
+
+string EnoceanChannelHandler::getOpStateText()
+{
+  if (lowBat) return "low battery";
+  return "";
+}
+
 
 
 // MARK: ===== EnoceanDevice
@@ -277,12 +293,20 @@ void EnoceanDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 }
 
 
+void EnoceanDevice::updateRadioMetrics(Esp3PacketPtr aEsp3PacketPtr)
+{
+  if (aEsp3PacketPtr) {
+    lastPacketTime = MainLoop::now();
+    lastRSSI = aEsp3PacketPtr->radioDBm();
+    lastRepeaterCount = aEsp3PacketPtr->radioRepeaterCount();
+  }
+}
+
+
 void EnoceanDevice::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 {
   ALOG(LOG_INFO, "now starts processing EnOcean packet:\n%s", aEsp3PacketPtr->description().c_str());
-  lastPacketTime = MainLoop::now();
-  lastRSSI = aEsp3PacketPtr->radioDBm();
-  lastRepeaterCount = aEsp3PacketPtr->radioRepeaterCount();
+  updateRadioMetrics(aEsp3PacketPtr);
   // pass to every channel
   for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
     (*pos)->handleRadioPacket(aEsp3PacketPtr);
@@ -316,8 +340,8 @@ void EnoceanDevice::checkPresence(PresenceCB aPresenceResultHandler)
 }
 
 
-#define BEST_RSSI (-50) // opState should be 100% above this
-#define WORST_RSSI (-90)  // opState should be 1% below this
+#define BEST_RSSI (-65) // opState should be 100% above this
+#define WORST_RSSI (-95)  // opState should be 1% below this
 
 int EnoceanDevice::opStateLevel()
 {
@@ -327,10 +351,11 @@ int EnoceanDevice::opStateLevel()
     opState = 1+(lastRSSI-WORST_RSSI)*99/(BEST_RSSI-WORST_RSSI); // 1..100 range
     if (opState<1) opState = 1;
     else if (opState>100) opState = 100;
-  }
-  // also check alive status
-  if (!isAlive()) {
-    opState = 0;
+    // also check opstate from channels
+    for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+      int chOpState = (*pos)->opStateLevel();
+      if (chOpState<opState) opState = chOpState; // lowest channel state determines overall state
+    }
   }
   return opState;
 }
@@ -352,6 +377,13 @@ string EnoceanDevice::getOpStateText()
   }
   else {
     t += "unseen";
+  }
+  // append info from enocean handlers
+  for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+    string ht = (*pos)->getOpStateText();
+    if (!ht.empty()) {
+      t += ", " + ht;
+    }
   }
   return t;
 }
@@ -639,7 +671,7 @@ EnoceanDevicePtr EnoceanDevice::newDevice(
 }
 
 
-int EnoceanDevice::createDevicesFromEEP(EnoceanVdc *aVdcP, EnoceanAddress aAddress, EnoceanProfile aProfile, EnoceanManufacturer aManufacturer, bool aSmartAck)
+int EnoceanDevice::createDevicesFromEEP(EnoceanVdc *aVdcP, EnoceanAddress aAddress, EnoceanProfile aProfile, EnoceanManufacturer aManufacturer, bool aSmartAck, Esp3PacketPtr aLearnPacket)
 {
   EnoceanSubDevice subDeviceIndex = 0; // start at index zero
   int numDevices = 0; // number of devices
@@ -656,6 +688,8 @@ int EnoceanDevice::createDevicesFromEEP(EnoceanVdc *aVdcP, EnoceanAddress aAddre
       // could not create a device for subDeviceIndex
       break; // -> done
     }
+    // set new devices' radio metrics from learn telegram
+    newDev->updateRadioMetrics(aLearnPacket);
     // created device
     numDevices++;
     // - add it to the container

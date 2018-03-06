@@ -32,10 +32,12 @@ using namespace p44;
 // MARK: ===== Enocean1BSDevice
 
 Enocean1BSDevice::Enocean1BSDevice(EnoceanVdc *aVdcP) :
-inherited(aVdcP)
+  inherited(aVdcP)
 {
 }
 
+
+#define CONTACT_UPDATE_INTERVAL (15*Minute)
 
 EnoceanDevicePtr Enocean1BSDevice::newDevice(
   EnoceanVdc *aVdcP,
@@ -67,7 +69,7 @@ EnoceanDevicePtr Enocean1BSDevice::newDevice(
       SingleContactHandlerPtr newHandler = SingleContactHandlerPtr(new SingleContactHandler(*newDev.get(), !(EEP_VARIANT(aEEProfile)==1)));
       // create the behaviour
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"contact"));
-      bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, 15*Minute);
+      bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, CONTACT_UPDATE_INTERVAL);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName(newHandler->shortDesc());
       newHandler->behaviour = bb;
@@ -123,6 +125,17 @@ void SingleContactHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     }
   }
 }
+
+
+bool SingleContactHandler::isAlive()
+{
+  // check if gotten no message for longer than aliveSignInterval*factor
+  if (MainLoop::now()-device.getLastPacketTime() < CONTACT_UPDATE_INTERVAL*TIMEOUT_FACTOR_FOR_INACTIVE)
+    return true;
+  // timed out
+  return false;
+}
+
 
 
 string SingleContactHandler::shortDesc()

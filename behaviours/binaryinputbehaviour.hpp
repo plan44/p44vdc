@@ -112,6 +112,11 @@ namespace p44 {
     /// @return true if behaviour has a defined (non-NULL) state
     virtual bool hasDefinedState() P44_OVERRIDE;
 
+    /// get currently known state
+    /// @return current state.
+    /// @note The return value only has a meaning if hasDefinedState() returns true
+    InputState getCurrentState() { return currentState; }
+
     /// Get short text for a "first glance" status of the behaviour
     /// @return string, really short, intended to be shown as a narrow column in a list
     virtual string getStatusText() P44_OVERRIDE;
