@@ -188,6 +188,12 @@ MLMicroSeconds BinaryInputBehaviour::getSourceLastUpdate()
 }
 
 
+int BinaryInputBehaviour::getSourceOpLevel()
+{
+  return device.opStateLevel();
+}
+
+
 // MARK: ===== persistence implementation
 
 

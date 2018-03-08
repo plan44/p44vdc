@@ -190,6 +190,9 @@ namespace p44 {
     /// get time of last update
     virtual MLMicroSeconds getSourceLastUpdate() P44_OVERRIDE;
 
+    /// get operation level (how good/critical the operation state of the underlying device is)
+    virtual int getSourceOpLevel() P44_OVERRIDE;
+
     /// @}
 
 

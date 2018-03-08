@@ -312,6 +312,12 @@ MLMicroSeconds SensorBehaviour::getSourceLastUpdate()
 }
 
 
+int SensorBehaviour::getSourceOpLevel()
+{
+  return device.opStateLevel();
+}
+
+
 
 // MARK: ===== persistence implementation
 

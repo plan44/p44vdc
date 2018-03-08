@@ -479,19 +479,53 @@ ErrorPtr EvaluatorDevice::evaluateDouble(string &aExpression, double &aResult)
 
 ErrorPtr EvaluatorDevice::valueLookup(const string aName, double &aValue)
 {
-  ValueSourcesMap::iterator pos = valueMap.find(aName);
-  if (pos==valueMap.end()) {
-    return TextError::err("Undefined variable '%s'", aName.c_str());
-  }
-  // value found, get it
-  if (pos->second->getSourceLastUpdate()==Never) {
-    // no value known yet
-    return TextError::err("Variable '%s' has no known value yet", aName.c_str());
+  // values can be simple sensor names, or sensor names with sub-field specifications:
+  // sensor               returns the value of the sensor
+  // sensor.valid         returns 1 if sensor has a valid value, 0 otherwise
+  // sensor.oplevel       returns the operation level of the sensor (0..100%)
+  // sensor.age           returns the age of the sensor value in seconds
+  string subfield;
+  string name;
+  size_t i = aName.find('.');
+  if (i!=string::npos) {
+    subfield = aName.substr(i+1);
+    name = aName.substr(0,i);
   }
   else {
-    aValue = pos->second->getSourceValue();
+    name = aName;
   }
-  return ErrorPtr();
+  ValueSourcesMap::iterator pos = valueMap.find(name);
+  if (pos==valueMap.end()) {
+    return TextError::err("Undefined variable '%s'", name.c_str());
+  }
+  // value found
+  if (subfield.empty()) {
+    // value itself is requested
+    if (pos->second->getSourceLastUpdate()!=Never) {
+      aValue = pos->second->getSourceValue();
+      return ErrorPtr();
+    }
+  }
+  else if (subfield=="valid") {
+    aValue = pos->second->getSourceLastUpdate()!=Never ? 1 : 0;
+    return ErrorPtr();
+  }
+  else if (subfield=="oplevel") {
+    aValue = pos->second->getSourceOpLevel();
+    if (aValue>=0) return ErrorPtr();
+    // otherwise: no known value
+  }
+  else if (subfield=="age") {
+    if (pos->second->getSourceLastUpdate()!=Never) {
+      aValue = ((double)(MainLoop::now()-pos->second->getSourceLastUpdate()))/Second;
+      return ErrorPtr();
+    }
+  }
+  else {
+    return TextError::err("Unknown subfield '%s' for value '%s'", subfield.c_str(), name.c_str());
+  }
+  // no value (yet)
+  return TextError::err("'%s' has no known value yet", aName.c_str());
 }
 
 
