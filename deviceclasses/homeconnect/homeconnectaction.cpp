@@ -106,6 +106,11 @@ ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, const string aName,
 
 void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError)
 {
+  if (aError && aError->isDomain(WebError::domain()) && (aError->getErrorCode() == 204)) {
+    aError = Error::ok();
+    LOG(LOG_DEBUG, "204 - no content is OK for us");
+  }
+
   if (aCompletedCB) aCompletedCB(aError);
 }
 
