@@ -36,8 +36,6 @@
 #include "binaryinputbehaviour.hpp"
 #include "sensorbehaviour.hpp"
 
-#include "expressions.hpp"
-
 using namespace p44;
 
 
@@ -216,29 +214,28 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     checkResult->add("valueDefs", valueDefs);
     // Conditions
     ApiValuePtr cond;
-    double v;
-    ErrorPtr err;
+    ExpressionValue res;
     // - on condition (or calculation for sensors)
     cond = checkResult->newObject();
-    err = evaluateDouble(evaluatorSettings()->onCondition, v);
-    if (Error::isOK(err)) {
-      cond->add("result", cond->newDouble(v));
-      LOG(LOG_INFO, "- onCondition '%s' -> %f", evaluatorSettings()->onCondition.c_str(), v);
+    res = calcEvaluatorExpression(evaluatorSettings()->onCondition);
+    if (res.isOk()) {
+      cond->add("result", cond->newDouble(res.v));
+      LOG(LOG_INFO, "- onCondition '%s' -> %f", evaluatorSettings()->onCondition.c_str(), res.v);
     }
     else {
-      cond->add("error", cond->newString(err->getErrorMessage()));
+      cond->add("error", cond->newString(res.err->getErrorMessage()));
     }
     checkResult->add("onCondition", cond);
     if (evaluatorType!=evaluator_sensor || evaluatorType!=evaluator_internalsensor) {
       // - off condition
       cond = checkResult->newObject();
-      err = evaluateDouble(evaluatorSettings()->offCondition, v);
-      if (Error::isOK(err)) {
-        cond->add("result", cond->newDouble(v));
-        LOG(LOG_INFO, "- offCondition '%s' -> %f", evaluatorSettings()->offCondition.c_str(), v);
+      res = calcEvaluatorExpression(evaluatorSettings()->offCondition);
+      if (res.isOk()) {
+        cond->add("result", cond->newDouble(res.v));
+        LOG(LOG_INFO, "- offCondition '%s' -> %f", evaluatorSettings()->offCondition.c_str(), res.v);
       }
       else {
-        cond->add("error", cond->newString(err->getErrorMessage()));
+        cond->add("error", cond->newString(res.err->getErrorMessage()));
       }
       checkResult->add("offCondition", cond);
     }
@@ -344,17 +341,16 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState)
 {
   if (evaluatorType==evaluator_sensor || evaluatorType==evaluator_internalsensor) {
     // just update the sensor value
-    double v = 0;
-    ErrorPtr err = evaluateDouble(evaluatorSettings()->onCondition, v);
-    if (Error::isOK(err)) {
-      AFOCUSLOG("===== sensor expression result: '%s' = %f", evaluatorSettings()->onCondition.c_str(), v);
+    ExpressionValue res = calcEvaluatorExpression(evaluatorSettings()->onCondition);
+    if (res.isOk()) {
+      AFOCUSLOG("===== sensor expression result: '%s' = %f", evaluatorSettings()->onCondition.c_str(), res.v);
       SensorBehaviourPtr s = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
       if (s) {
-        s->updateSensorValue(v);
+        s->updateSensorValue(res.v);
       }
     }
     else {
-      ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.c_str(), err->description().c_str());
+      ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.c_str(), res.err->description().c_str());
     }
   }
   else {
@@ -457,27 +453,26 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState)
 Tristate EvaluatorDevice::evaluateBoolean(string aExpression)
 {
   AFOCUSLOG("----- Starting expression evaluation: '%s'", aExpression.c_str());
-  double v = 0;
-  ErrorPtr err = evaluateDouble(aExpression, v);
-  if (Error::isOK(err)) {
+  ExpressionValue res = calcEvaluatorExpression(aExpression);
+  if (res.isOk()) {
     // evaluation successful
-    AFOCUSLOG("===== expression result: '%s' = %f = %s", aExpression.c_str(), v, v>0 ? "true" : "false");
-    return v>0 ? yes : no;
+    AFOCUSLOG("===== expression result: '%s' = %f = %s", aExpression.c_str(), res.v, res.v>0 ? "true" : "false");
+    return res.v>0 ? yes : no;
   }
   else {
-    ALOG(LOG_INFO,"Expression '%s' evaluation error: %s", aExpression.c_str(), err->description().c_str());
+    ALOG(LOG_INFO,"Expression '%s' evaluation error: %s", aExpression.c_str(), res.err->description().c_str());
     return undefined;
   }
 }
 
 
-ErrorPtr EvaluatorDevice::evaluateDouble(string &aExpression, double &aResult)
+ExpressionValue EvaluatorDevice::calcEvaluatorExpression(string &aExpression)
 {
-  return evaluateExpression(aExpression, aResult, boost::bind(&EvaluatorDevice::valueLookup, this, _1, _2));
+  return evaluateExpression(aExpression, boost::bind(&EvaluatorDevice::valueLookup, this, _1), NULL);
 }
 
 
-ErrorPtr EvaluatorDevice::valueLookup(const string aName, double &aValue)
+ExpressionValue EvaluatorDevice::valueLookup(const string aName)
 {
   // values can be simple sensor names, or sensor names with sub-field specifications:
   // sensor               returns the value of the sensor
@@ -496,36 +491,33 @@ ErrorPtr EvaluatorDevice::valueLookup(const string aName, double &aValue)
   }
   ValueSourcesMap::iterator pos = valueMap.find(name);
   if (pos==valueMap.end()) {
-    return TextError::err("Undefined variable '%s'", name.c_str());
+    return ExpressionError::errValue(ExpressionError::NotFound, "Undefined sensor '%s'", name.c_str());
   }
   // value found
   if (subfield.empty()) {
     // value itself is requested
     if (pos->second->getSourceLastUpdate()!=Never) {
-      aValue = pos->second->getSourceValue();
-      return ErrorPtr();
+      return ExpressionValue(pos->second->getSourceValue());
     }
   }
   else if (subfield=="valid") {
-    aValue = pos->second->getSourceLastUpdate()!=Never ? 1 : 0;
-    return ErrorPtr();
+    return ExpressionValue(pos->second->getSourceLastUpdate()!=Never ? 1 : 0);
   }
   else if (subfield=="oplevel") {
-    aValue = pos->second->getSourceOpLevel();
-    if (aValue>=0) return ErrorPtr();
+    int lvl = pos->second->getSourceOpLevel();
+    if (lvl>=0) return ExpressionValue(lvl);
     // otherwise: no known value
   }
   else if (subfield=="age") {
     if (pos->second->getSourceLastUpdate()!=Never) {
-      aValue = ((double)(MainLoop::now()-pos->second->getSourceLastUpdate()))/Second;
-      return ErrorPtr();
+      return ExpressionValue(((double)(MainLoop::now()-pos->second->getSourceLastUpdate()))/Second);
     }
   }
   else {
-    return TextError::err("Unknown subfield '%s' for value '%s'", subfield.c_str(), name.c_str());
+    return ExpressionError::errValue(ExpressionError::NotFound, "Unknown subfield '%s' for value '%s'", subfield.c_str(), name.c_str());
   }
   // no value (yet)
-  return TextError::err("'%s' has no known value yet", aName.c_str());
+  return ExpressionError::errValue(ExpressionError::Null, "'%s' has no known value yet", aName.c_str());
 }
 
 

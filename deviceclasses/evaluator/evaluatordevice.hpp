@@ -23,6 +23,7 @@
 #define __p44vdc__evaluatordevice__
 
 #include "device.hpp"
+#include "expressions.hpp"
 
 #if ENABLE_EVALUATORS
 
@@ -184,8 +185,8 @@ namespace p44 {
     /// expression evaluation
 
     Tristate evaluateBoolean(string aExpression);
-    ErrorPtr evaluateDouble(string &aExpression, double &aResult);
-    ErrorPtr valueLookup(const string aName, double &aValue);
+    ExpressionValue calcEvaluatorExpression(string &aExpression);
+    ExpressionValue valueLookup(const string aName);
 
   };
   typedef boost::intrusive_ptr<EvaluatorDevice> EvaluatorDevicePtr;
