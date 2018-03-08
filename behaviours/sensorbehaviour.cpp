@@ -151,7 +151,13 @@ string SensorBehaviour::getSensorUnitText()
 
 string SensorBehaviour::getSensorRange()
 {
-  int fracDigits = (int)(-log(resolution)/log(10)+0.99);
+  if (min==max) {
+    return ""; // undefined range
+  }
+  int fracDigits = 2; // default if no resolution defined
+  if (resolution!=0) {
+    fracDigits = (int)(-log(resolution)/log(10)+0.99);
+  }
   if (fracDigits<0) fracDigits=0;
   return string_format("%0.*f..%0.*f", fracDigits, min, fracDigits, max);
 }
@@ -160,7 +166,10 @@ string SensorBehaviour::getSensorRange()
 string SensorBehaviour::getStatusText()
 {
   if (hasDefinedState()) {
-    int fracDigits = (int)(-log(resolution)/log(10)+0.99);
+    int fracDigits = 2; // default if no resolution defined
+    if (resolution!=0) {
+      fracDigits = (int)(-log(resolution)/log(10)+0.99);
+    }
     if (fracDigits<0) fracDigits=0;
     return string_format("%0.*f %s", fracDigits, currentValue, getSensorUnitText().c_str());
   }
@@ -468,12 +477,15 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           aPropValue->setStringValue(valueUnitName(getSensorUnit(), true));
           return true;
         case min_key+descriptions_key_offset:
+          if (min==max) return false;
           aPropValue->setDoubleValue(min);
           return true;
         case max_key+descriptions_key_offset:
+          if (min==max) return false;
           aPropValue->setDoubleValue(max);
           return true;
         case resolution_key+descriptions_key_offset:
+          if (resolution==0) return false;
           aPropValue->setDoubleValue(resolution);
           return true;
         case updateInterval_key+descriptions_key_offset:

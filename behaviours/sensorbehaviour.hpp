@@ -47,11 +47,11 @@ namespace p44 {
     /// @{
     VdcSensorType sensorType; ///< type and physical unit of sensor
     VdcUsageHint sensorUsage; ///< usage for sensor (if known)
-    double min; ///< minimum value (corresponding to aEngineeringValue==0)
-    double max; ///< max value
-    double resolution; ///< change per LSB of sensor engineering value
+    double min; ///< minimum value (corresponding to aEngineeringValue==0). If min==max, range is not known, and min is invalid
+    double max; ///< max value.  If min==max, range is not known, and max is invalid
+    double resolution; ///< change per LSB of sensor engineering value. If resolution==0, resolution is not known
     MLMicroSeconds updateInterval; ///< approximate time resolution of the sensor (how fast the sensor can track values)
-    MLMicroSeconds aliveSignInterval; ///< how often the sensor reports a value minimally (if it does not report for longer than that, it can be considered out of order)
+    MLMicroSeconds aliveSignInterval; ///< how often the sensor reports a value minimally (if it does not report for longer than that, it can be considered out of order). Can be 0 for sensors from which no regular update can be expected at all
     /// @}
 
     /// @name persistent settings
