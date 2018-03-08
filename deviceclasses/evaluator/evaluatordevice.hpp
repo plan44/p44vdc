@@ -72,11 +72,15 @@ namespace p44 {
       evaluator_unknown,
       evaluator_rocker, ///< output is a simulated two-way rocket button
       evaluator_input, ///< output is a dS binary input signal
-      evaluator_internal ///< the device is not published to dS, can only be used as input for other evaluators 
+      evaluator_internalinput, ///< the device is not published to dS, can only be used as input for other evaluators
+      evaluator_sensor, ///< output is a dS sensor value
+      evaluator_internalsensor ///< the device is not published to dS, can only be used as input for other evaluators
     } EvaluatorType;
 
     EvaluatorType evaluatorType;
     string evaluatorID;
+    VdcSensorType sensorType;
+    VdcUsageHint sensorUsage;
 
     /// active value sources
     typedef map<string, ValueSource *> ValueSourcesMap;
@@ -130,6 +134,9 @@ namespace p44 {
     /// @return textual description of object
     virtual string description() P44_OVERRIDE;
 
+    /// get the type of evaluator
+    /// @return string type name ("rocker", "input"...)
+    string getEvaluatorType();
 
     /// @name identification of the addressable entity
     /// @{
