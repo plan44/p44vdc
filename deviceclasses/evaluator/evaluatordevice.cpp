@@ -91,7 +91,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     colorClass = class_black_joker;
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"evalresult"));
-    b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
+    b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     b->setHardwareName("evaluation result");
     addBehaviour(b);
   }
@@ -342,16 +342,21 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState)
   if (evaluatorType==evaluator_sensor || evaluatorType==evaluator_internalsensor) {
     // just update the sensor value
     ExpressionValue res = calcEvaluatorExpression(evaluatorSettings()->onCondition);
-    if (res.isOk()) {
-      AFOCUSLOG("===== sensor expression result: '%s' = %f", evaluatorSettings()->onCondition.c_str(), res.v);
-      SensorBehaviourPtr s = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
-      if (s) {
+    // protect against state updates triggering evaluation again via cyclic references
+    SensorBehaviourPtr s = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
+    if (s) {
+      evaluating = true;
+      if (res.isOk()) {
+        AFOCUSLOG("===== sensor expression result: '%s' = %f", evaluatorSettings()->onCondition.c_str(), res.v);
         s->updateSensorValue(res.v);
       }
+      else {
+        ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.c_str(), res.err->description().c_str());
+        s->invalidateSensorValue();
+      }
     }
-    else {
-      ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.c_str(), res.err->description().c_str());
-    }
+    // done reporting, critical phase is over
+    evaluating = false;
   }
   else {
     // evaluate binary state and report it

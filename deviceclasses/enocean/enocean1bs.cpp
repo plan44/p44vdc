@@ -69,7 +69,7 @@ EnoceanDevicePtr Enocean1BSDevice::newDevice(
       SingleContactHandlerPtr newHandler = SingleContactHandlerPtr(new SingleContactHandler(*newDev.get(), !(EEP_VARIANT(aEEProfile)==1)));
       // create the behaviour
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"contact"));
-      bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, CONTACT_UPDATE_INTERVAL);
+      bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, CONTACT_UPDATE_INTERVAL, CONTACT_UPDATE_INTERVAL*3);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName(newHandler->shortDesc());
       newHandler->behaviour = bb;

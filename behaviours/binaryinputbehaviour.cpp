@@ -31,12 +31,13 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
   minPushInterval(200*MilliSecond),
   changesOnlyInterval(15*Minute), // report unchanged state updates max once every 15 minutes
   // state
+  invalidatorTicket(0),
   lastUpdate(Never),
   lastPush(Never),
   currentState(false)
 {
-  // set dummy default hardware default configuration
-  setHardwareInputConfig(binInpType_none, usage_undefined, true, 15*Second);
+  // set dummy default hardware default configuration (no known alive sign interval!)
+  setHardwareInputConfig(binInpType_none, usage_undefined, true, 15*Second, 0);
 }
 
 
@@ -70,12 +71,14 @@ const char *inputTypeIds[numVdcSensorTypes] = {
 
 
 
-void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval)
+void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval)
 {
   hardwareInputType = aInputType;
   inputUsage = aUsage;
   reportsChanges = aReportsChanges;
   updateInterval = aUpdateInterval;
+  aliveSignInterval = aAliveSignInterval;
+  armInvalidator();
   // set default input mode to hardware type
   configuredInputType = hardwareInputType;
 }
@@ -95,12 +98,23 @@ InputState BinaryInputBehaviour::maxExtendedValue()
 }
 
 
+void BinaryInputBehaviour::armInvalidator()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
+  if (aliveSignInterval!=Never) {
+    // this sensor can time out, schedule invalidation
+    invalidatorTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&BinaryInputBehaviour::invalidateInputState, this), aliveSignInterval);
+  }
+}
+
+
 void BinaryInputBehaviour::updateInputState(InputState aNewState)
 {
   if (aNewState>maxExtendedValue()) aNewState = maxExtendedValue(); // make sure state does not exceed expectation
   // always update age, even if value itself may not have changed
   MLMicroSeconds now = MainLoop::now();
   lastUpdate = now;
+  armInvalidator();
   bool changedState = aNewState!=currentState;
   if (changedState) {
     // input state change is considered a (regular!) user action, have it checked globally first
@@ -267,6 +281,7 @@ enum {
   inputUsage_key,
   reportsChanges_key,
   updateInterval_key,
+  aliveSignInterval_key,
   numDescProperties
 };
 
@@ -279,6 +294,7 @@ const PropertyDescriptorPtr BinaryInputBehaviour::getDescDescriptorByIndex(int a
     { "inputUsage", apivalue_uint64, inputUsage_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "inputType", apivalue_bool, reportsChanges_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "updateInterval", apivalue_double, updateInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
+    { "aliveSignInterval", apivalue_double, aliveSignInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -348,6 +364,9 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
           return true;
         case updateInterval_key+descriptions_key_offset:
           aPropValue->setDoubleValue((double)updateInterval/Second);
+          return true;
+        case aliveSignInterval_key+descriptions_key_offset:
+          aPropValue->setDoubleValue((double)aliveSignInterval/Second);
           return true;
         // Settings properties
         case group_key+settings_key_offset:
@@ -425,7 +444,7 @@ string BinaryInputBehaviour::description()
 {
   string s = string_format("%s behaviour", shortDesc().c_str());
   string_format_append(s, "\n- binary input type: %d, reportsChanges=%d, interval: %lld mS", hardwareInputType, reportsChanges, updateInterval/MilliSecond);
-  string_format_append(s, "\n- minimal interval between pushes: %lld mS", minPushInterval/MilliSecond);
+  string_format_append(s, "\n- minimal interval between pushes: %lld mS, aliveSignInterval: %lld mS", minPushInterval/MilliSecond, aliveSignInterval/MilliSecond);
   s.append(inherited::description());
   return s;
 }

@@ -1885,7 +1885,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     installSettings();
     // - create one binary input
     BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
-    ib->setHardwareInputConfig(binInpType_motion, usage_undefined, true, Never);
+    ib->setHardwareInputConfig(binInpType_motion, usage_undefined, true, Never, Never);
     ib->setHardwareName("motion");
     addBehaviour(ib);
   }
@@ -1895,7 +1895,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     installSettings();
     // - create one binary input
     BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
-    ib->setHardwareInputConfig(binInpType_light, usage_undefined, true, Never);
+    ib->setHardwareInputConfig(binInpType_light, usage_undefined, true, Never, Never);
     ib->setHardwareName("light");
     addBehaviour(ib);
   }
@@ -1905,7 +1905,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     installSettings();
     // - create one binary input
     BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
-    ib->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
+    ib->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     ib->setHardwareName("input");
     addBehaviour(ib);
   }

@@ -994,7 +994,7 @@ static const p44::EnoceanSensorDescriptor A52004roomTemp =
 static const p44::EnoceanSensorDescriptor A52004feedTemp =
   { 0, 0x20, 0x04, 0, class_blue_climate, group_blue_heating,            behaviour_sensor,      sensorType_temperature, usage_undefined, 20, 80, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, "feed temperature" };
 static const p44::EnoceanSensorDescriptor A52004setpointTemp =
-  { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_user, 10, 30, DB(2,7), DB(2,0), 5, 0, &stdSensorHandler, setPointText }; // user action quickly forwarded, but not regularily transmitted
+  { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_user, 10, 30, DB(2,7), DB(2,0), 5, Never, &stdSensorHandler, setPointText }; // user action quickly forwarded, but not regularily transmitted
 static const p44::EnoceanSensorDescriptor A52004lowBatInput =
   { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 0,  1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  "Low Battery" };
 

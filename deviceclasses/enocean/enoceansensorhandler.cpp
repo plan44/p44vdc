@@ -279,7 +279,7 @@ DsBehaviourPtr EnoceanSensorHandler::newSensorBehaviour(const EnoceanSensorDescr
     }
     case behaviour_binaryinput: {
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*aDevice.get(),nonNullCStr(aId)));
-      bb->setHardwareInputConfig((DsBinaryInputType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, true, aSensorDescriptor.updateInterval*Second);
+      bb->setHardwareInputConfig((DsBinaryInputType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, true, aSensorDescriptor.updateInterval*Second, aSensorDescriptor.aliveSignInterval*Second);
       bb->setGroup(aSensorDescriptor.channelGroup);
       bb->setHardwareName(aSensorDescriptor.typeText);
       return bb;

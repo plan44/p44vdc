@@ -40,6 +40,8 @@ namespace p44 {
     typedef DsBehaviour inherited;
     friend class Device;
 
+    MLTicket invalidatorTicket;
+
   protected:
 
     /// @name behaviour description, constants or variables
@@ -227,6 +229,10 @@ namespace p44 {
     virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+  private:
+
+    void armInvalidator();
 
   };
   typedef boost::intrusive_ptr<SensorBehaviour> SensorBehaviourPtr;

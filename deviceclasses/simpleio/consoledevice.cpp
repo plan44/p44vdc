@@ -117,7 +117,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::binaryInputHandler, this, _1, _2));
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"siminput"));
-    b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
+    b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     addBehaviour(b);
   }
   else if (consoleIoType==consoleio_sensor) {
@@ -157,7 +157,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     addBehaviour(sb);
     // - create low battery binary input
     BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
-    bb->setHardwareInputConfig(binInpType_lowBattery, usage_room, true, 100*Second);
+    bb->setHardwareInputConfig(binInpType_lowBattery, usage_room, true, 100*Second, Never);
     bb->setGroup(group_blue_heating);
     bb->setHardwareName("Simulated Low Battery Indicator");
     addBehaviour(bb);

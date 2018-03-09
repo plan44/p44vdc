@@ -99,7 +99,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     digitalInput->setInputChangedHandler(boost::bind(&DigitalIODevice::inputHandler, this, _1), INPUT_DEBOUNCE_TIME, 0); // edge detection if possible, mainloop idle poll otherwise
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
-    b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
+    b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     b->setHardwareName("digitalin");
     addBehaviour(b);
   }

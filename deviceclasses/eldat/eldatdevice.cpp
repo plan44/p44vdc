@@ -701,7 +701,7 @@ EldatDevicePtr EldatDevice::newDevice(
       newDev->setColorClass(class_black_joker);
       // Create one input behaviour
       BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
-      ib->setHardwareInputConfig(binInpType_motion, usage_room, true, 0);
+      ib->setHardwareInputConfig(binInpType_motion, usage_room, true, Never, Never);
       ib->setHardwareName("detector");
       newDev->addBehaviour(ib);
       // - motion detector uses two indices (it uses A+B functions)
