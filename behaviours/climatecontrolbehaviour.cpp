@@ -114,41 +114,65 @@ FanCoilUnitScene::FanCoilUnitScene(SceneDeviceSettings &aSceneDeviceSettings, Sc
 
 void FanCoilUnitScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
-  // set the base class scene defaults
+  // set the base class scene defaults (NOT SimpleScene, so all sceneCmds are invoke, and no areas!)
   inherited::setDefaultSceneValues(aSceneNo);
-  // simple fixed defaults
-  // - heating scenes 0..5 set operating mode to heating
-  // - cooling scenes 6..11 set operating mode to cooling
-  if (aSceneNo>=0 && aSceneNo<=5) {
-    // heating energy level
-    powerState = aSceneNo!=0; // Scene 0 also turns off the device
-    operationMode = fcuOperatingMode_heat;
-  }
-  else if (aSceneNo>=6 && aSceneNo<=11) {
-    powerState = true;
-    operationMode = fcuOperatingMode_cool;
-  }
-  else if (aSceneNo==30) {
-    powerState = false;
-    operationMode = fcuOperatingMode_off;
-  }
-  else if (aSceneNo==40) {
-    powerState = true;
-    operationMode = fcuOperatingMode_fan;
-  }
-  else if (aSceneNo==41) {
-    powerState = true;
-    operationMode = fcuOperatingMode_dry;
-  }
-  else if (aSceneNo==42) {
-    powerState = true;
-    operationMode = fcuOperatingMode_auto;
-  }
-  else {
-    // all others: dontcare, but generally off
-    powerState = false;
-    operationMode = fcuOperatingMode_off;
-    setDontCare(true);
+  // All scenes are "invoke" or "off"  type, no specific scene commands needed
+  // - heating scenes set operating mode to heating (off scene sets powerState to false, on scenes to true)
+  // - cooling scenes set operating mode to cooling (off scene sets powerState to false, on scenes to true)
+  switch (aSceneNo) {
+    case CLIMATE_HEAT_TEMP_OFF:
+      // heating off
+      powerState = false;
+      operationMode = fcuOperatingMode_heat;
+      sceneCmd = scene_cmd_off;
+      break;
+    case CLIMATE_HEAT_TEMP_COMFORT:
+    case CLIMATE_HEAT_TEMP_ECO:
+    case CLIMATE_HEAT_TEMP_NOTUSED:
+    case CLIMATE_HEAT_TEMP_NIGHT:
+    case CLIMATE_HEAT_TEMP_HOLIDAY:
+      // heating on
+      powerState = true;
+      operationMode = fcuOperatingMode_heat;
+      break;
+    case CLIMATE_COOL_TEMP_OFF:
+      // cooling off
+      powerState = false;
+      operationMode = fcuOperatingMode_cool;
+      sceneCmd = scene_cmd_off;
+      break;
+    case CLIMATE_COOL_TEMP_COMFORT:
+    case CLIMATE_COOL_TEMP_ECO:
+    case CLIMATE_COOL_TEMP_NOTUSED:
+    case CLIMATE_COOL_TEMP_NIGHT:
+    case CLIMATE_COOL_TEMP_HOLIDAY:
+      // cooling on
+      powerState = true;
+      operationMode = fcuOperatingMode_cool;
+      break;
+    case CLIMATE_DISABLE:
+      powerState = false;
+      operationMode = fcuOperatingMode_off;
+      sceneCmd = scene_cmd_off;
+      break;
+    case CLIMATE_FAN_ONLY:
+      powerState = true;
+      operationMode = fcuOperatingMode_fan;
+      break;
+    case CLIMATE_DRY:
+      powerState = true;
+      operationMode = fcuOperatingMode_dry;
+      break;
+    case CLIMATE_AUTOMATIC:
+      powerState = true;
+      operationMode = fcuOperatingMode_auto;
+      break;
+    default:
+      // all others: dontcare, but generally off
+      powerState = false;
+      operationMode = fcuOperatingMode_off;
+      setDontCare(true);
+      break;
   }
   markClean(); // default values are always clean
 }
