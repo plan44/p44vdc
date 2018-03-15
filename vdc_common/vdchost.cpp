@@ -812,6 +812,103 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
 }
 
 
+// MARK: ===== notification delivery
+
+
+NotificationGroup::NotificationGroup(VdcPtr aVdc, DsAddressablePtr aFirstMember) :
+  vdc(aVdc)
+{
+  if (aFirstMember) {
+    members.push_back(aFirstMember);
+  }
+}
+
+
+
+void VdcHost::addTargetToAudience(NotificationAudience &aAudience, DsAddressablePtr aTarget)
+{
+  VdcPtr vdc;
+  DevicePtr dev = boost::dynamic_pointer_cast<Device>(aTarget);
+  if (dev) {
+    // is a device, associated with a vDC
+    vdc = dev->vdcP;
+  }
+  // search for notification group for this vdc (for devices, vdc!=NULL) or none (for other addressables, vdc==NULL)
+  for (NotificationAudience::iterator pos = aAudience.begin(); pos!=aAudience.end(); ++pos) {
+    if (pos->vdc==vdc) {
+      // vdc group already exists, add device
+      pos->members.push_back(dev);
+      return;
+    }
+  }
+  // vdc group does not yet exist, create it
+  aAudience.push_back(NotificationGroup(vdc, dev));
+  return;
+}
+
+
+
+ErrorPtr VdcHost::addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &aDsuid)
+{
+  DsAddressablePtr a = addressableForDsUid(aDsuid);
+  if (a) {
+    addTargetToAudience(aAudience, a);
+    return ErrorPtr();
+  }
+  else {
+    return Error::err<VdcApiError>(404, "missing/invalid dSUID");
+  }
+}
+
+
+ErrorPtr VdcHost::addToAudienceByItemSpec(NotificationAudience &aAudience, string &aItemSpec)
+{
+  DsAddressablePtr a = addressableForItemSpec(aItemSpec);
+  if (a) {
+    addTargetToAudience(aAudience, a);
+    return ErrorPtr();
+  }
+  else {
+    return Error::err<VdcApiError>(404, "missing/invalid itemSpec");
+  }
+}
+
+
+void VdcHost::addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZoneID aZone, DsGroup aGroup)
+{
+  // Zone 0 = all zones
+  // group_undefined (0) = all groups
+  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+    Device *devP = pos->second.get();
+    if (
+      (aZone==0 || devP->getZoneID()==aZone) &&
+      (aGroup==group_undefined || (devP->output && devP->output->isMember(aGroup)))
+    ) {
+      addTargetToAudience(aAudience, DsAddressablePtr(devP));
+    }
+  }
+}
+
+
+
+void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+{
+  // TODO: allow vdcs to handle groups in an optimized way
+  // For now, notification is just passed to all targets
+  for (NotificationAudience::iterator gpos = aAudience.begin(); gpos!=aAudience.end(); ++gpos) {
+    if (gpos->vdc) {
+      LOG(LOG_NOTICE, "=== Delivering notifications for devices in vDC %s", gpos->vdc->shortDesc().c_str());
+    }
+    else {
+      LOG(LOG_NOTICE, "=== Delivering notifications for non-devices");
+    }
+    for (DsAddressablesList::iterator apos = gpos->members.begin(); apos!=gpos->members.end(); ++apos) {
+      (*apos)->handleNotification(aApiConnection, aNotification, aParams);
+    }
+  }
+}
+
+
 
 // MARK: ===== vDC API
 
@@ -867,17 +964,13 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
       respErr = byeHandler(aRequest, aParams);
     }
     else {
-      if (!activeSessionConnection) {
-        // all following methods must have an active session
-        respErr = Error::err<VdcApiError>(401, "no vDC session - cannot call method");
+      if (activeSessionConnection) {
+        // session active
+        respErr = handleMethodForParams(aRequest, aMethod, aParams);
       }
       else {
-        // session active - all commands need dSUID parameter
-        DsUid dsuid;
-        if (Error::isOK(respErr = checkDsuidParam(aParams, "dSUID", dsuid))) {
-          // operation method
-          respErr = handleMethodForDsUid(aRequest, aMethod, dsuid, aParams);
-        }
+        // all following methods must have an active session
+        respErr = Error::err<VdcApiError>(401, "no vDC session - cannot call method");
       }
     }
   }
@@ -885,32 +978,10 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
     // Notifications
     // Note: out of session, notifications are simply ignored
     if (activeSessionConnection) {
-      // Notifications can be adressed to one or multiple dSUIDs
-      // Notes
-      // - for protobuf API, dSUID is always an array (as it is a repeated field in protobuf)
-      // - for JSON API, caller may provide an array or a single dSUID.
-      ApiValuePtr o;
-      respErr = checkParam(aParams, "dSUID", o);
-      if (Error::isOK(respErr)) {
-        DsUid dsuid;
-        // can be single dSUID or array of dSUIDs
-        if (o->isType(apivalue_array)) {
-          // array of dSUIDs
-          for (int i=0; i<o->arrayLength(); i++) {
-            ApiValuePtr e = o->arrayGet(i);
-            dsuid.setAsBinary(e->binaryValue());
-            handleNotificationForDsUid(aApiConnection, aMethod, dsuid, aParams);
-          }
-        }
-        else {
-          // single dSUID
-          dsuid.setAsBinary(o->binaryValue());
-          handleNotificationForDsUid(aApiConnection, aMethod, dsuid, aParams);
-        }
-      }
+      respErr = handleNotificationForParams(aApiConnection, aMethod, aParams);
     }
     else {
-      LOG(LOG_DEBUG, "Received notification '%s' out of session -> ignored", aMethod.c_str());
+      LOG(LOG_INFO, "Received notification '%s' out of session -> ignored", aMethod.c_str());
     }
   }
   // check status
@@ -1006,41 +1077,38 @@ ErrorPtr VdcHost::byeHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 
 
 
-DsAddressablePtr VdcHost::addressableForParams(const DsUid &aDsUid, ApiValuePtr aParams)
+DsAddressablePtr VdcHost::addressableForItemSpec(const string &aItemSpec)
 {
-  if (aDsUid.empty()) {
-    // not addressing by dSUID, check for alternative addressing methods
-    ApiValuePtr o = aParams->get("x-p44-itemSpec");
-    if (o) {
-      string query = o->stringValue();
-      if(query.find("vdc:")==0) {
-        // starts with "vdc:" -> look for vdc by implementationId (vdcClassIdentifier()) and instance no
-        query.erase(0, 4); // remove "vdc:" prefix
-        // ccccccc[:ii] cccc=vdcClassIdentifier(), ii=instance
-        size_t i=query.find(':');
-        int instanceNo = 1; // default to first instance
-        if (i!=string::npos) {
-          // with instance number
-          instanceNo = atoi(query.c_str()+i+1);
-          query.erase(i); // cut off :iii part
-        }
-        for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
-          VdcPtr c = pos->second;
-          if (
-            strcmp(c->vdcClassIdentifier(), query.c_str())==0 &&
-            c->getInstanceNumber()==instanceNo
-          ) {
-            // found - return this vDC container
-            return c;
-          }
-        }
-      }
-      // x-p44-query specified, but nothing found
-      return DsAddressablePtr();
+  string query = aItemSpec;
+  if(query.find("vdc:")==0) {
+    // starts with "vdc:" -> look for vdc by implementationId (vdcClassIdentifier()) and instance no
+    query.erase(0, 4); // remove "vdc:" prefix
+    // ccccccc[:ii] cccc=vdcClassIdentifier(), ii=instance
+    size_t i=query.find(':');
+    int instanceNo = 1; // default to first instance
+    if (i!=string::npos) {
+      // with instance number
+      instanceNo = atoi(query.c_str()+i+1);
+      query.erase(i); // cut off :iii part
     }
-    // empty dSUID but no special query: default to vdchost itself (root object)
-    return DsAddressablePtr(this);
+    for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+      VdcPtr c = pos->second;
+      if (
+        strcmp(c->vdcClassIdentifier(), query.c_str())==0 &&
+        c->getInstanceNumber()==instanceNo
+      ) {
+        // found - return this vDC container
+        return c;
+      }
+    }
   }
+  // nothing found
+  return DsAddressablePtr();
+}
+
+
+DsAddressablePtr VdcHost::addressableForDsUid(const DsUid &aDsUid)
+{
   // not special query, not empty dSUID
   if (aDsUid==getDsUid()) {
     // my own dSUID: vdc-host is addressed
@@ -1066,38 +1134,112 @@ DsAddressablePtr VdcHost::addressableForParams(const DsUid &aDsUid, ApiValuePtr 
 }
 
 
-
-ErrorPtr VdcHost::handleMethodForDsUid(VdcApiRequestPtr aRequest, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams)
+ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams)
 {
-  DsAddressablePtr addressable = addressableForParams(aDsUid, aParams);
-  if (addressable) {
-    // check special case of device remove command - we must execute this because device should not try to remove itself
-    DevicePtr dev = boost::dynamic_pointer_cast<Device>(addressable);
-    if (dev && aMethod=="remove") {
-      return removeHandler(aRequest, dev);
+  ErrorPtr respErr;
+  // Notifications can be adressed to one or multiple dSUIDs explicitly, or sent to a zone_id/group pair
+  // Notes
+  // - for protobuf API, dSUID is always an array (as it is a repeated field in protobuf)
+  // - for JSON API, caller may provide an array or a single dSUID.
+  // - only if no explicit dSUID is provided, zoneId and group parameters are evaluated
+  // collect a list of addressables for this notification
+  NotificationAudience audience;
+  bool audienceOk = false;
+  // - check if there is a dSUID or a non-empty array of dSUIDs
+  if (aParams) {
+    ApiValuePtr o = aParams->get("dSUID");
+    if (o) {
+      // dSUID parameter found
+      DsUid dsuid;
+      if (o->isType(apivalue_array)) {
+        // array of dSUIDs
+        for (int i=0; i<o->arrayLength(); i++) {
+          audienceOk = true; // non-empty array is a valid audience specification
+          ApiValuePtr e = o->arrayGet(i);
+          dsuid.setAsBinary(e->binaryValue());
+          respErr = addToAudienceByDsuid(audience, dsuid);
+          if (!Error::isOK(respErr)) {
+            respErr->prefixMessage("Ignored target for notification '%s': ", aMethod.c_str());
+            LOG(LOG_INFO, "%s", respErr->description().c_str());
+          }
+        }
+        respErr.reset();
+      }
+      else {
+        dsuid.setAsBinary(o->binaryValue());
+        respErr = addToAudienceByDsuid(audience, dsuid);
+        audienceOk = true; // non-empty dSUID valid audience specification
+      }
     }
-    // non-device addressable or not remove -> just let addressable handle the method itself
-    return addressable->handleMethod(aRequest, aMethod, aParams);
+    if (audience.empty() && (o = aParams->get("x-p44-itemSpec"))) {
+      string itemSpec = o->stringValue();
+      respErr = addToAudienceByItemSpec(audience, itemSpec);
+      audienceOk = true; // non-empty itemSpec is valid audience specification
+    }
+    if (audience.empty()) {
+      // evaluate zone_id/group
+      o = aParams->get("zone_id");
+      if (o) {
+        DsZoneID zone = o->uint16Value();
+        o = aParams->get("group");
+        if (o) {
+          audienceOk = true; // zone_id/group is valid audience spec
+          DsGroup group = (DsGroup)o->uint16Value();
+          addToAudienceByZoneAndGroup(audience, zone, group);
+        }
+      }
+    }
+  }
+  if (!audienceOk) {
+    respErr = Error::err<VdcApiError>(400, "notification needs dSUID, itemSpec or zone_id/group parameters");
   }
   else {
-    LOG(LOG_WARNING, "Target entity %s not found for method '%s'", aDsUid.getString().c_str(), aMethod.c_str());
-    return Error::err<VdcApiError>(404, "unknown dSUID");
+    // we have an audience, start delivery process
+    deliverToAudience(audience, aApiConnection, aMethod, aParams);
   }
+  return respErr;
 }
 
 
 
-void VdcHost::handleNotificationForDsUid(VdcApiConnectionPtr aApiConnection, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams)
+ErrorPtr VdcHost::handleMethodForParams(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
-  DsAddressablePtr addressable = addressableForParams(aDsUid, aParams);
-  if (addressable) {
-    addressable->handleNotification(aApiConnection, aMethod, aParams);
+  DsUid dsuid;
+  ErrorPtr respErr;
+  if (Error::isOK(respErr = checkDsuidParam(aParams, "dSUID", dsuid))) {
+    DsAddressablePtr addressable;
+    if (dsuid.empty()) {
+      // not addressing by dSUID, check for alternative addressing methods
+      ApiValuePtr o = aParams->get("x-p44-itemSpec");
+      if (o) {
+        string itemSpec = o->stringValue();
+        addressable = addressableForItemSpec(itemSpec);
+      }
+      else {
+        // default to vdchost
+        addressable = DsAddressablePtr(this);
+      }
+    }
+    else {
+      // by dSUID
+      addressable = addressableForDsUid(dsuid);
+    }
+    if (addressable) {
+      // check special case of device remove command - we must execute this because device should not try to remove itself
+      DevicePtr dev = boost::dynamic_pointer_cast<Device>(addressable);
+      if (dev && aMethod=="remove") {
+        return removeHandler(aRequest, dev);
+      }
+      // non-device addressable or not remove -> just let addressable handle the method itself
+      return addressable->handleMethod(aRequest, aMethod, aParams);
+    }
+    else {
+      LOG(LOG_WARNING, "Target entity %s not found for method '%s'", dsuid.getString().c_str(), aMethod.c_str());
+      return Error::err<VdcApiError>(404, "unknown target (missing/invalid dSUID or itemSpec)");
+    }
   }
-  else {
-    LOG(LOG_WARNING, "Target entity %s not found for notification '%s'", aDsUid.getString().c_str(), aMethod.c_str());
-  }
+  return respErr;
 }
-
 
 
 // MARK: ===== vDC level methods and notifications
