@@ -325,13 +325,13 @@ namespace p44 {
     /// @return error in case aItemSpec does not address valid notification target
     ErrorPtr addToAudienceByItemSpec(NotificationAudience &aAudience, string &aItemSpec);
 
-    /// Add a notification targets selected by matching zone and group
+    /// Add notification targets selected by matching zone and group
     /// @param aAudience the audience
     /// @param aZone the zone to broadcast to (0 for entire appartment)
     /// @param aGroup the group to broadcast to (group_undefined for all groups)
     void addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZoneID aZone, DsGroup aGroup);
 
-    /// Add a notification targets selected by matching zone and group
+    /// deliver notifications to audience
     /// @param aAudience the audience
     /// @param aApiConnection the API connection where the notification originates from
     /// @param aNotification the name of the notification
