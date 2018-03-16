@@ -837,12 +837,12 @@ void VdcHost::addTargetToAudience(NotificationAudience &aAudience, DsAddressable
   for (NotificationAudience::iterator pos = aAudience.begin(); pos!=aAudience.end(); ++pos) {
     if (pos->vdc==vdc) {
       // vdc group already exists, add device
-      pos->members.push_back(dev);
+      pos->members.push_back(aTarget);
       return;
     }
   }
   // vdc group does not yet exist, create it
-  aAudience.push_back(NotificationGroup(vdc, dev));
+  aAudience.push_back(NotificationGroup(vdc, aTarget));
   return;
 }
 
@@ -897,10 +897,10 @@ void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectio
   // For now, notification is just passed to all targets
   for (NotificationAudience::iterator gpos = aAudience.begin(); gpos!=aAudience.end(); ++gpos) {
     if (gpos->vdc) {
-      LOG(LOG_NOTICE, "=== Delivering notifications for devices in vDC %s", gpos->vdc->shortDesc().c_str());
+      LOG(LOG_INFO, "=== Delivering notification '%s' to %lu devices in vDC %s", aNotification.c_str(), gpos->members.size(), gpos->vdc->shortDesc().c_str());
     }
     else {
-      LOG(LOG_NOTICE, "=== Delivering notifications for non-devices");
+      LOG(LOG_INFO, "=== Delivering notification '%s' to %lu non-devices", aNotification.c_str(), gpos->members.size());
     }
     for (DsAddressablesList::iterator apos = gpos->members.begin(); apos!=gpos->members.end(); ++apos) {
       (*apos)->handleNotification(aApiConnection, aNotification, aParams);
