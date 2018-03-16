@@ -251,7 +251,7 @@ bool SensorBehaviour::pushSensor(bool aChanged, bool aAlways)
         lastPush = now;
         return true;
       }
-      else {
+      else if (device.isPublicDS()) {
         BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
       }
     }

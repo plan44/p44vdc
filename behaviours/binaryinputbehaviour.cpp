@@ -131,6 +131,9 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
       if (pushBehaviourState()) {
         lastPush = now;
       }
+      else if (device.isPublicDS()) {
+        BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
+      }
     }
   }
   // notify listeners
