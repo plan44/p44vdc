@@ -33,10 +33,9 @@ using namespace p44;
 
 // - hue: brightness: Brightness of the light. This is a scale from the minimum brightness the light is capable of, 1,
 //   to the maximum capable brightness, 254. 0 does not turn off the light
-// - dS: non-off brightness: 0.4..100
+// - dS: non-off brightness: 0.39..100
 // Using equation hue = ds*HUEAPI_FACTOR_BRIGHTNESS + HUEAPI_OFFSET_BRIGHTNESS
 // describing a straight line trough points (DS_BRIGHTNESS_STEP,1) and (100,254)
-#define DS_BRIGHTNESS_STEP (100.0/255.0)
 #define HUEAPI_FACTOR_BRIGHTNESS ((254.0-1)/(100-DS_BRIGHTNESS_STEP))
 #define HUEAPI_OFFSET_BRIGHTNESS (1.0-DS_BRIGHTNESS_STEP*HUEAPI_FACTOR_BRIGHTNESS)
 
@@ -87,7 +86,7 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool 
     LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
     l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
     l->setHardwareName(string_format("monochrome light #%s", lightID.c_str()));
-    l->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness is roughly 1/256
+    l->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness
     addBehaviour(l);
   }
   // derive the dSUID

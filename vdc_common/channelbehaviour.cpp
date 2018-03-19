@@ -243,6 +243,10 @@ void ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aN
 
 void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime, bool aAlwaysApply)
 {
+  // round to resolution
+  if (enforceResolution() && getResolution()>0) {
+    aNewValue = round(aNewValue/getResolution())*getResolution();
+  }
   // make sure new value is within bounds
   if (wrapsAround()) {
     // In wrap-around mode, the max value is considered identical to the min value, so already REACHING it must wrap around

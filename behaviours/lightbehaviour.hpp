@@ -33,6 +33,8 @@ namespace p44 {
   typedef uint8_t DimmingTime; ///< dimming time with bits 0..3 = mantissa in 6.666mS, bits 4..7 = exponent (# of bits to shift left)
   typedef double Brightness; ///< 0..100% brightness
 
+  #define DS_BRIGHTNESS_STEP (100.0/255.0) ///< default step size for brightness (from historical 0..255 8bit dS brightness)
+
   class BrightnessChannel : public ChannelBehaviour
   {
     typedef ChannelBehaviour inherited;
@@ -41,8 +43,8 @@ namespace p44 {
   public:
     BrightnessChannel(OutputBehaviour &aOutput) : inherited(aOutput, "brightness")
     {
-      resolution = 1.0/256*100; // light defaults to historic dS 1/256 of full scale resolution
-      minDim = getMin()+1; // min dimming level defaults to one unit above zero
+      resolution = DS_BRIGHTNESS_STEP; // light defaults to historic dS scale resolution
+      minDim = getMin()+resolution; // min dimming level defaults to one resolution step above zero
     };
 
     void setDimMin(double aMinDim) { minDim = aMinDim; };
