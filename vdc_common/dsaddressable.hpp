@@ -75,6 +75,10 @@ namespace p44 {
     /// @return true if addressable is public
     virtual bool isPublicDS() { return true; }; // base class assumes that all devices are public
 
+    /// check if this instance (device or vdc) has been announced
+    /// @return true if device has been announced
+    bool isAnnounced() { return announced != Never; }
+
     /// the real (always modern, 34 hex) dSUID
     const DsUid &getDsUid() { return dSUID; };
 
