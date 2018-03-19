@@ -1336,23 +1336,23 @@ void VdcHost::announceNext()
     DevicePtr dev = pos->second;
     if (
       dev->isPublicDS() && // only public ones
-      (dev->vdcP->announced!=Never) && // class container must have already completed an announcement
-      dev->announced==Never &&
-      (dev->announcing==Never || MainLoop::now()>dev->announcing+ANNOUNCE_RETRY_TIMEOUT)
+      (dev->vdcP->isAnnounced()) && // class container must have already completed an announcement...
+      !dev->isAnnounced() && // ...but not yet device...
+      (dev->announcing==Never || MainLoop::now()>dev->announcing+ANNOUNCE_RETRY_TIMEOUT) // ...and not too soon after last attempt to announce
     ) {
       // mark device as being in process of getting announced
       dev->announcing = MainLoop::now();
       // call announce method
       if (!dev->announce(boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
         LOG(LOG_ERR, "Could not send device announcement message for %s %s", dev->entityType(), dev->shortDesc().c_str());
-        dev->announcing = Never; // not registering
+        dev->announcing = Never; // not announcing
       }
       else {
         LOG(LOG_NOTICE, "Sent device announcement for %s %s", dev->entityType(), dev->shortDesc().c_str());
       }
       // schedule a retry
       announcementTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_TIMEOUT);
-      // done for now, continues after ANNOUNCE_TIMEOUT or when registration acknowledged
+      // done for now, continues after ANNOUNCE_TIMEOUT or when announcement acknowledged
       return;
     }
   }
