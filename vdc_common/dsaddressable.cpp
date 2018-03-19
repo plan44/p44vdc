@@ -85,7 +85,7 @@ void DsAddressable::initializeName(const string &aName)
 
 void DsAddressable::reportVanished()
 {
-  if (announced!=Never) {
+  if (isAnnounced()) {
     // report to vDC API client that the device is now offline
     sendRequest("vanish", ApiValuePtr());
   }
@@ -225,7 +225,7 @@ void DsAddressable::methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError)
 
 bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain, int aApiVersion, bool aDeletedProperty)
 {
-  if (announced!=Never) {
+  if (isAnnounced()) {
     // device is announced: push can take place
     if (aPropertyQuery) {
       if (aDeletedProperty) {

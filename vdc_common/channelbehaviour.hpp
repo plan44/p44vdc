@@ -90,6 +90,7 @@ namespace p44 {
     virtual double getDimPerMS() { return (getMax()-getMin())/FULL_SCALE_DIM_TIME_MS; }; ///< value to step up or down per Millisecond when dimming, or 0 for non-dimmable channels (default = 7sec for full scale)
     virtual double getMinDim() { return getMin(); }; ///< dimming min value defaults to same value as min
     virtual bool wrapsAround() { return false; }; ///< if true, channel is considered to wrap around, meaning max being the same value as min, and dimming never stopping but wrapping around. Off by default
+    virtual bool enforceResolution() { return true; }; ///< if true, actual channel value will always be rounded to resolution of the channel
 
     /// @}
 
