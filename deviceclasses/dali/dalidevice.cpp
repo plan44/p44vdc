@@ -1242,8 +1242,8 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
   bool moreSteps = false;
   ColorLightBehaviourPtr cl;
   if (aWithColor) {
-    moreSteps = cl->colorTransitionStep(aStepSize);
     cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(output);
+    moreSteps = cl->colorTransitionStep(aStepSize);
     neednewbrightness = l->brightness->inTransition(); // could be color transition only
     RGBColorLightBehaviourPtr rgbl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
     if (rgbl) {
@@ -1276,16 +1276,15 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
       needactivation = daliController->setRGBWAParams(r, g, b, w, a);
     }
     else {
-      // DALI controller is either non-color or understands Cie or Ct directly
-      // now apply to light according to mode
+      // DALI controller understands Cie and/or Ct directly
       if (daliController->dt8Color && (cl->colorMode!=colorLightModeCt || !daliController->dt8CT)) {
-        // controller needs CieX/Y (and can't do CT natively)
+        // color is requested or CT is requested but controller cannot do CT natively -> send CieX/Y
         double cieX, cieY;
         cl->getCIExy(cieX, cieY); // transitional values calculated from actually changed original channels transitioning
         needactivation = daliController->setColorParams(colorLightModeXY, cieX, cieY);
       }
       else {
-        // controller can do CT natively (maybe only that, then colors will be mapped to CT as well)
+        // CT is requested and controller can do CT natively, or color is requested but controller can ONLY do CT
         double mired;
         cl->getCT(mired); // transitional value calculated from actually changed original channels transitioning
         needactivation = daliController->setColorParams(colorLightModeCt, mired);
@@ -1885,7 +1884,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     installSettings();
     // - create one binary input
     BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
-    ib->setHardwareInputConfig(binInpType_motion, usage_undefined, true, Never);
+    ib->setHardwareInputConfig(binInpType_motion, usage_undefined, true, Never, Never);
     ib->setHardwareName("motion");
     addBehaviour(ib);
   }
@@ -1895,7 +1894,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     installSettings();
     // - create one binary input
     BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
-    ib->setHardwareInputConfig(binInpType_light, usage_undefined, true, Never);
+    ib->setHardwareInputConfig(binInpType_light, usage_undefined, true, Never, Never);
     ib->setHardwareName("light");
     addBehaviour(ib);
   }
@@ -1905,7 +1904,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     installSettings();
     // - create one binary input
     BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
-    ib->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
+    ib->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     ib->setHardwareName("input");
     addBehaviour(ib);
   }

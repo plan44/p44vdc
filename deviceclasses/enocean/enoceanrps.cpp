@@ -178,7 +178,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       // - Input0: 0: window closed (Handle down position), 1: window fully open, 2: window tilted
       EnoceanRpsWindowHandleHandlerPtr newHandler = EnoceanRpsWindowHandleHandlerPtr(new EnoceanRpsWindowHandleHandler(*newDev.get()));
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
-      bb->setHardwareInputConfig(binInpType_windowHandle, usage_undefined, true, Never);
+      bb->setHardwareInputConfig(binInpType_windowHandle, usage_undefined, true, Never, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Window open/tilted");
       newHandler->isERP2 = EEP_TYPE(functionProfile)==0x01;
@@ -207,7 +207,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       // - Input0: 1: card inserted, 0: card extracted
       EnoceanRpsCardKeyHandlerPtr newHandler = EnoceanRpsCardKeyHandlerPtr(new EnoceanRpsCardKeyHandler(*newDev.get()));
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"card"));
-      bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
+      bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Card inserted");
       newHandler->isServiceCardDetector = false;
@@ -218,7 +218,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         // - Input1: 1: card is service card, 0: card is guest card
         EnoceanRpsCardKeyHandlerPtr newHandler = EnoceanRpsCardKeyHandlerPtr(new EnoceanRpsCardKeyHandler(*newDev.get()));
         BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"service"));
-        bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
+        bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
         bb->setGroup(group_black_variable); // joker by default
         bb->setHardwareName("Service card");
         newHandler->isServiceCardDetector = true;
@@ -249,7 +249,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       // - 1: Leakage: 0: no leakage
       newHandler = EnoceanRpsLeakageDetectorHandlerPtr(new EnoceanRpsLeakageDetectorHandler(*newDev.get()));
       bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"leakage"));
-      bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never); // generic because dS does not have a binary sensor function for leakage yet
+      bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never); // generic because dS does not have a binary sensor function for leakage yet
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Leakage detector");
       newHandler->behaviour = bb;
@@ -279,7 +279,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       // - Alarm: 1: Alarm, 0: no Alarm
       newHandler = EnoceanRpsSmokeDetectorHandlerPtr(new EnoceanRpsSmokeDetectorHandler(*newDev.get()));
       bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
-      bb->setHardwareInputConfig(binInpType_smoke, usage_room, true, Never);
+      bb->setHardwareInputConfig(binInpType_smoke, usage_room, true, Never, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Smoke alarm");
       newHandler->behaviour = bb;
@@ -288,7 +288,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       // - Low Battery: 1: battery low, 0: battery OK
       newHandler = EnoceanRpsSmokeDetectorHandlerPtr(new EnoceanRpsSmokeDetectorHandler(*newDev.get()));
       bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
-      bb->setHardwareInputConfig(binInpType_lowBattery, usage_room, true, Never);
+      bb->setHardwareInputConfig(binInpType_lowBattery, usage_room, true, Never, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Low battery");
       newHandler->behaviour = bb;
@@ -532,8 +532,8 @@ void EnoceanRpsSmokeDetectorHandler::handleRadioPacket(Esp3PacketPtr aEsp3Packet
   uint8_t data = aEsp3PacketPtr->radioUserData()[0];
   BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
   if (isBatteryStatus) {
-    // battery status channel
-    bool lowBat = (data & 0x30)==0x30;
+    // battery status channel (member field of EnoceanChannelHandler, influences opStateLevel())
+    lowBat = (data & 0x30)==0x30;
     LOG(LOG_INFO, "Enocean Smoke Detector %08X reports state: Battery %s", device.getAddress(), lowBat ? "LOW" : "ok");
     bb->updateInputState(lowBat);
   }

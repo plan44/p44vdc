@@ -149,8 +149,6 @@ EnoceanSensorHandler::EnoceanSensorHandler(EnoceanDevice &aDevice) :
 
 
 
-#define TIMEOUT_FACTOR_FOR_INACTIVE 4
-
 bool EnoceanSensorHandler::isAlive()
 {
   if (sensorChannelDescriptorP->aliveSignInterval<=0)
@@ -281,7 +279,7 @@ DsBehaviourPtr EnoceanSensorHandler::newSensorBehaviour(const EnoceanSensorDescr
     }
     case behaviour_binaryinput: {
       BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*aDevice.get(),nonNullCStr(aId)));
-      bb->setHardwareInputConfig((DsBinaryInputType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, true, aSensorDescriptor.updateInterval*Second);
+      bb->setHardwareInputConfig((DsBinaryInputType)aSensorDescriptor.behaviourParam, aSensorDescriptor.usage, true, aSensorDescriptor.updateInterval*Second, aSensorDescriptor.aliveSignInterval*Second);
       bb->setGroup(aSensorDescriptor.channelGroup);
       bb->setHardwareName(aSensorDescriptor.typeText);
       return bb;
@@ -304,6 +302,15 @@ void EnoceanSensorHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     if (sensorChannelDescriptorP && sensorChannelDescriptorP->bitFieldHandler) {
       // call bit field handler, will pass result to behaviour
       handleBitField(*sensorChannelDescriptorP, behaviour, aEsp3PacketPtr->radioUserData(), (int)aEsp3PacketPtr->radioUserDataLength());
+      if (sensorChannelDescriptorP->behaviourType==behaviour_binaryinput && sensorChannelDescriptorP->behaviourParam==binInpType_lowBattery) {
+        // auto-update global lowBat flag from lowBattery type inputs
+        BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
+        if (bb && bb->hasDefinedState()) lowBat = bb->getCurrentState()!=0;
+      }
+      else if (sensorChannelDescriptorP->behaviourType==behaviour_sensor && sensorChannelDescriptorP->behaviourParam==sensorType_supplyVoltage) {
+        SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(behaviour);
+        if (sb && sb->hasDefinedState()) lowBat = sb->getCurrentValue()<sb->getMax()*0.8; // assume low bat at 80% of max supply voltage
+      }
     }
   }
 }

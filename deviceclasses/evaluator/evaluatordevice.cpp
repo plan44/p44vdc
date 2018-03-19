@@ -34,8 +34,7 @@
 
 #include "buttonbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
-
-#include "expressions.hpp"
+#include "sensorbehaviour.hpp"
 
 using namespace p44;
 
@@ -58,8 +57,12 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     evaluatorType = evaluator_rocker;
   else if (aEvaluatorConfig=="input")
     evaluatorType = evaluator_input;
-  else if (aEvaluatorConfig=="internal")
-    evaluatorType = evaluator_internal;
+  else if (aEvaluatorConfig=="internal" || aEvaluatorConfig=="internalinput") // "internal" must be still recognized for backwards compatibility with existing settings!
+    evaluatorType = evaluator_internalinput;
+  else if (sscanf(aEvaluatorConfig.c_str(), "sensor:%d:%d", &sensorType, &sensorUsage)==2)
+    evaluatorType = evaluator_sensor;
+  else if (sscanf(aEvaluatorConfig.c_str(), "internalsensor:%d:%d", &sensorType, &sensorUsage)==2)
+    evaluatorType = evaluator_internalsensor;
   else {
     LOG(LOG_ERR, "unknown evaluator type: %s", aEvaluatorConfig.c_str());
   }
@@ -83,14 +86,23 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     b->setGroup(group_black_variable); // pre-configure for app button
     addBehaviour(b);
   }
-  else if (evaluatorType==evaluator_input || evaluatorType==evaluator_internal) {
+  else if (evaluatorType==evaluator_input || evaluatorType==evaluator_internalinput) {
     // Standard device settings without scene table (internal differs only from not getting announced with vdsm)
     colorClass = class_black_joker;
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"evalresult"));
-    b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never);
+    b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     b->setHardwareName("evaluation result");
     addBehaviour(b);
+  }
+  else if (evaluatorType==evaluator_sensor  || evaluatorType==evaluator_internalsensor) {
+    // Standard device settings without scene table (internal differs only from not getting announced with vdsm)
+    colorClass = class_black_joker;
+    // - create one sensor
+    SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this,"evalresult"));
+    s->setHardwareSensorConfig(sensorType, sensorUsage, 0, 0, 0, 100*MilliSecond, 0);
+    s->setHardwareName("evaluation result");
+    addBehaviour(s);
   }
   deriveDsUid();
 }
@@ -108,7 +120,7 @@ bool EvaluatorDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 bool EvaluatorDevice::isPublicDS()
 {
   // public if it's not an internal-only evaluator
-  return evaluatorType!=evaluator_internal;
+  return evaluatorType!=evaluator_internalinput && evaluatorType!=evaluator_internalsensor;
 }
 
 
@@ -145,6 +157,9 @@ string EvaluatorDevice::modelName()
   switch (evaluatorType) {
     case evaluator_rocker: return "evaluated up/down button";
     case evaluator_input: return "evaluated input";
+    case evaluator_internalinput: return "internal on/off signal";
+    case evaluator_sensor: return "evaluated sensor";
+    case evaluator_internalsensor: return "internal sensor value";
     default: break;
   }
   return "";
@@ -199,30 +214,31 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     checkResult->add("valueDefs", valueDefs);
     // Conditions
     ApiValuePtr cond;
-    double v;
-    ErrorPtr err;
-    // - on condition
+    ExpressionValue res;
+    // - on condition (or calculation for sensors)
     cond = checkResult->newObject();
-    err = evaluateDouble(evaluatorSettings()->onCondition, v);
-    if (Error::isOK(err)) {
-      cond->add("result", cond->newDouble(v));
-      LOG(LOG_INFO, "- onCondition '%s' -> %f", evaluatorSettings()->onCondition.c_str(), v);
+    res = calcEvaluatorExpression(evaluatorSettings()->onCondition);
+    if (res.isOk()) {
+      cond->add("result", cond->newDouble(res.v));
+      LOG(LOG_INFO, "- onCondition '%s' -> %f", evaluatorSettings()->onCondition.c_str(), res.v);
     }
     else {
-      cond->add("error", cond->newString(err->getErrorMessage()));
+      cond->add("error", cond->newString(res.err->getErrorMessage()));
     }
     checkResult->add("onCondition", cond);
-    // - off condition
-    cond = checkResult->newObject();
-    err = evaluateDouble(evaluatorSettings()->offCondition, v);
-    if (Error::isOK(err)) {
-      cond->add("result", cond->newDouble(v));
-      LOG(LOG_INFO, "- offCondition '%s' -> %f", evaluatorSettings()->offCondition.c_str(), v);
+    if (evaluatorType!=evaluator_sensor || evaluatorType!=evaluator_internalsensor) {
+      // - off condition
+      cond = checkResult->newObject();
+      res = calcEvaluatorExpression(evaluatorSettings()->offCondition);
+      if (res.isOk()) {
+        cond->add("result", cond->newDouble(res.v));
+        LOG(LOG_INFO, "- offCondition '%s' -> %f", evaluatorSettings()->offCondition.c_str(), res.v);
+      }
+      else {
+        cond->add("error", cond->newString(res.err->getErrorMessage()));
+      }
+      checkResult->add("offCondition", cond);
     }
-    else {
-      cond->add("error", cond->newString(err->getErrorMessage()));
-    }
-    checkResult->add("offCondition", cond);
     // return the result
     aRequest->sendResult(checkResult);
     return ErrorPtr();
@@ -323,97 +339,118 @@ void EvaluatorDevice::changedConditions()
 
 void EvaluatorDevice::evaluateConditions(Tristate aRefState)
 {
-  // evaluate state and report it
-  Tristate prevState = currentState;
-  bool decisionMade = false;
-  MLMicroSeconds now = MainLoop::currentMainLoop().now();
-  MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
-  if (!decisionMade && aRefState!=yes) {
-    // off or unknown: check for switching on
-    Tristate on = evaluateBoolean(evaluatorSettings()->onCondition);
-    ALOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.c_str(), on==undefined ? "<undefined>" : (on==yes ? "true -> switching ON" : "false"));
-    if (on!=yes) {
-      // not met now -> reset if we are currently timing this condition
-      if (onConditionMet) conditionMetSince = Never;
-    }
-    else {
-      if (!onConditionMet || conditionMetSince==Never) {
-        // we see this condition newly met now
-        onConditionMet = true; // seen ON condition met
-        conditionMetSince = now;
-      }
-      // check timing
-      MLMicroSeconds metAt = conditionMetSince+evaluatorSettings()->minOnTime;
-      if (now>=metAt) {
-        // condition met long enough
-        currentState = yes;
-        decisionMade = true;
-      }
-      else {
-        // condition not met long enough yet, need to re-check later
-        ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-        evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState), metAt);
-        return;
-      }
-    }
-  }
-  if (!decisionMade && aRefState!=no) {
-    // on or unknown: check for switching off
-    Tristate off = evaluateBoolean(evaluatorSettings()->offCondition);
-    ALOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.c_str(), off==undefined ? "<undefined>" : (off==yes ? "true -> switching OFF" : "false"));
-    if (off!=yes) {
-      // not met now -> reset if we are currently timing this condition
-      if (!onConditionMet) conditionMetSince = Never;
-    }
-    else {
-      if (onConditionMet || conditionMetSince==Never) {
-        // we see this condition newly met now
-        onConditionMet = false; // seen OFF condition met
-        conditionMetSince = now;
-      }
-      // check timing
-      MLMicroSeconds metAt = conditionMetSince+evaluatorSettings()->minOffTime;
-      if (now>=metAt) {
-        // condition met long enough
-        currentState = no;
-        decisionMade = true;
-      }
-      else {
-        // condition not met long enough yet, need to re-check later
-        ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-        evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState), metAt);
-        return;
-      }
-    }
-  }
-  if (decisionMade && currentState!=undefined) {
+  if (evaluatorType==evaluator_sensor || evaluatorType==evaluator_internalsensor) {
+    // just update the sensor value
+    ExpressionValue res = calcEvaluatorExpression(evaluatorSettings()->onCondition);
     // protect against state updates triggering evaluation again via cyclic references
-    evaluating = true;
-    // report it
-    switch (evaluatorType) {
-      case evaluator_input :
-      case evaluator_internal :
-      {
-        BinaryInputBehaviourPtr b = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
-        if (b) {
-          b->updateInputState(currentState==yes);
-        }
-        break;
+    SensorBehaviourPtr s = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
+    if (s) {
+      evaluating = true;
+      if (res.isOk()) {
+        AFOCUSLOG("===== sensor expression result: '%s' = %f", evaluatorSettings()->onCondition.c_str(), res.v);
+        s->updateSensorValue(res.v);
       }
-      case evaluator_rocker : {
-        if (currentState!=prevState) {
-          // virtually click up or down button
-          ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[currentState==no ? 0 : 1]);
-          if (b) {
-            b->sendClick(ct_tip_1x);
-          }
-        }
-        break;
+      else {
+        ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.c_str(), res.err->description().c_str());
+        s->invalidateSensorValue();
       }
-      default: break;
     }
     // done reporting, critical phase is over
     evaluating = false;
+  }
+  else {
+    // evaluate binary state and report it
+    Tristate prevState = currentState;
+    bool decisionMade = false;
+    MLMicroSeconds now = MainLoop::currentMainLoop().now();
+    MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
+    if (!decisionMade && aRefState!=yes) {
+      // off or unknown: check for switching on
+      Tristate on = evaluateBoolean(evaluatorSettings()->onCondition);
+      ALOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.c_str(), on==undefined ? "<undefined>" : (on==yes ? "true -> switching ON" : "false"));
+      if (on!=yes) {
+        // not met now -> reset if we are currently timing this condition
+        if (onConditionMet) conditionMetSince = Never;
+      }
+      else {
+        if (!onConditionMet || conditionMetSince==Never) {
+          // we see this condition newly met now
+          onConditionMet = true; // seen ON condition met
+          conditionMetSince = now;
+        }
+        // check timing
+        MLMicroSeconds metAt = conditionMetSince+evaluatorSettings()->minOnTime;
+        if (now>=metAt) {
+          // condition met long enough
+          currentState = yes;
+          decisionMade = true;
+        }
+        else {
+          // condition not met long enough yet, need to re-check later
+          ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
+          evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState), metAt);
+          return;
+        }
+      }
+    }
+    if (!decisionMade && aRefState!=no) {
+      // on or unknown: check for switching off
+      Tristate off = evaluateBoolean(evaluatorSettings()->offCondition);
+      ALOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.c_str(), off==undefined ? "<undefined>" : (off==yes ? "true -> switching OFF" : "false"));
+      if (off!=yes) {
+        // not met now -> reset if we are currently timing this condition
+        if (!onConditionMet) conditionMetSince = Never;
+      }
+      else {
+        if (onConditionMet || conditionMetSince==Never) {
+          // we see this condition newly met now
+          onConditionMet = false; // seen OFF condition met
+          conditionMetSince = now;
+        }
+        // check timing
+        MLMicroSeconds metAt = conditionMetSince+evaluatorSettings()->minOffTime;
+        if (now>=metAt) {
+          // condition met long enough
+          currentState = no;
+          decisionMade = true;
+        }
+        else {
+          // condition not met long enough yet, need to re-check later
+          ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
+          evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState), metAt);
+          return;
+        }
+      }
+    }
+    if (decisionMade && currentState!=undefined) {
+      // protect against state updates triggering evaluation again via cyclic references
+      evaluating = true;
+      // report it
+      switch (evaluatorType) {
+        case evaluator_input :
+        case evaluator_internalinput :
+        {
+          BinaryInputBehaviourPtr b = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
+          if (b) {
+            b->updateInputState(currentState==yes);
+          }
+          break;
+        }
+        case evaluator_rocker : {
+          if (currentState!=prevState) {
+            // virtually click up or down button
+            ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[currentState==no ? 0 : 1]);
+            if (b) {
+              b->sendClick(ct_tip_1x);
+            }
+          }
+          break;
+        }
+        default: break;
+      }
+      // done reporting, critical phase is over
+      evaluating = false;
+    }
   }
 }
 
@@ -421,41 +458,71 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState)
 Tristate EvaluatorDevice::evaluateBoolean(string aExpression)
 {
   AFOCUSLOG("----- Starting expression evaluation: '%s'", aExpression.c_str());
-  double v = 0;
-  ErrorPtr err = evaluateDouble(aExpression, v);
-  if (Error::isOK(err)) {
+  ExpressionValue res = calcEvaluatorExpression(aExpression);
+  if (res.isOk()) {
     // evaluation successful
-    AFOCUSLOG("===== expression result: '%s' = %f = %s", aExpression.c_str(), v, v>0 ? "true" : "false");
-    return v>0 ? yes : no;
+    AFOCUSLOG("===== expression result: '%s' = %f = %s", aExpression.c_str(), res.v, res.v>0 ? "true" : "false");
+    return res.v>0 ? yes : no;
   }
   else {
-    ALOG(LOG_INFO,"Expression '%s' evaluation error: %s", aExpression.c_str(), err->description().c_str());
+    ALOG(LOG_INFO,"Expression '%s' evaluation error: %s", aExpression.c_str(), res.err->description().c_str());
     return undefined;
   }
 }
 
 
-ErrorPtr EvaluatorDevice::evaluateDouble(string &aExpression, double &aResult)
+ExpressionValue EvaluatorDevice::calcEvaluatorExpression(string &aExpression)
 {
-  return evaluateExpression(aExpression, aResult, boost::bind(&EvaluatorDevice::valueLookup, this, _1, _2));
+  return evaluateExpression(aExpression, boost::bind(&EvaluatorDevice::valueLookup, this, _1), NULL);
 }
 
 
-ErrorPtr EvaluatorDevice::valueLookup(const string aName, double &aValue)
+ExpressionValue EvaluatorDevice::valueLookup(const string aName)
 {
-  ValueSourcesMap::iterator pos = valueMap.find(aName);
-  if (pos==valueMap.end()) {
-    return TextError::err("Undefined variable '%s'", aName.c_str());
-  }
-  // value found, get it
-  if (pos->second->getSourceLastUpdate()==Never) {
-    // no value known yet
-    return TextError::err("Variable '%s' has no known value yet", aName.c_str());
+  // values can be simple sensor names, or sensor names with sub-field specifications:
+  // sensor               returns the value of the sensor
+  // sensor.valid         returns 1 if sensor has a valid value, 0 otherwise
+  // sensor.oplevel       returns the operation level of the sensor (0..100%)
+  // sensor.age           returns the age of the sensor value in seconds
+  string subfield;
+  string name;
+  size_t i = aName.find('.');
+  if (i!=string::npos) {
+    subfield = aName.substr(i+1);
+    name = aName.substr(0,i);
   }
   else {
-    aValue = pos->second->getSourceValue();
+    name = aName;
   }
-  return ErrorPtr();
+  ValueSourcesMap::iterator pos = valueMap.find(name);
+  if (pos==valueMap.end()) {
+    return ExpressionError::errValue(ExpressionError::NotFound, "Undefined sensor '%s'", name.c_str());
+  }
+  // value found
+  if (subfield.empty()) {
+    // value itself is requested
+    if (pos->second->getSourceLastUpdate()!=Never) {
+      return ExpressionValue(pos->second->getSourceValue());
+    }
+  }
+  else if (subfield=="valid") {
+    return ExpressionValue(pos->second->getSourceLastUpdate()!=Never ? 1 : 0);
+  }
+  else if (subfield=="oplevel") {
+    int lvl = pos->second->getSourceOpLevel();
+    if (lvl>=0) return ExpressionValue(lvl);
+    // otherwise: no known value
+  }
+  else if (subfield=="age") {
+    if (pos->second->getSourceLastUpdate()!=Never) {
+      return ExpressionValue(((double)(MainLoop::now()-pos->second->getSourceLastUpdate()))/Second);
+    }
+  }
+  else {
+    return ExpressionError::errValue(ExpressionError::NotFound, "Unknown subfield '%s' for value '%s'", subfield.c_str(), name.c_str());
+  }
+  // no value (yet)
+  return ExpressionError::errValue(ExpressionError::Null, "'%s' has no known value yet", aName.c_str());
 }
 
 
@@ -481,9 +548,24 @@ string EvaluatorDevice::description()
   return s;
 }
 
+
+string EvaluatorDevice::getEvaluatorType()
+{
+  switch (evaluatorType) {
+    case evaluator_unknown: return "unknown";
+    case evaluator_rocker: return "rocker";
+    case evaluator_input: return "input";
+    case evaluator_internalinput: return "internalinput";
+    case evaluator_sensor: return "sensor";
+    case evaluator_internalsensor: return "internalsensor";
+  }
+}
+
+
 // MARK: ===== property access
 
 enum {
+  evaluatorType_key,
   valueDefs_key,
   onCondition_key,
   offCondition_key,
@@ -510,6 +592,7 @@ int EvaluatorDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescript
 PropertyDescriptorPtr EvaluatorDevice::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numProperties] = {
+    { "x-p44-evaluatorType", apivalue_string, evaluatorType_key, OKEY(evaluatorDevice_key) },
     { "x-p44-valueDefs", apivalue_string, valueDefs_key, OKEY(evaluatorDevice_key) },
     { "x-p44-onCondition", apivalue_string, onCondition_key, OKEY(evaluatorDevice_key) },
     { "x-p44-offCondition", apivalue_string, offCondition_key, OKEY(evaluatorDevice_key) },
@@ -538,6 +621,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
+        case evaluatorType_key: aPropValue->setStringValue(getEvaluatorType()); return true;
         case valueDefs_key: aPropValue->setStringValue(evaluatorSettings()->valueDefs); return true;
         case onCondition_key: aPropValue->setStringValue(evaluatorSettings()->onCondition); return true;
         case offCondition_key: aPropValue->setStringValue(evaluatorSettings()->offCondition); return true;

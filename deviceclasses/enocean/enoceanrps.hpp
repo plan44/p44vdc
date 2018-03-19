@@ -45,11 +45,11 @@ namespace p44 {
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "enocean_rps"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_rps"; };
 
     /// get table of profile variants
     /// @return NULL or pointer to a list of profile variants
-    virtual const ProfileVariantEntry *profileVariantsTable();
+    virtual const ProfileVariantEntry *profileVariantsTable() P44_OVERRIDE;
 
 
     /// factory: (re-)create logical device from address|channel|profile|manufacturer tuple
@@ -89,11 +89,11 @@ namespace p44 {
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
     
     void setButtonState(bool aPressed);
     
@@ -114,11 +114,11 @@ namespace p44 {
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<EnoceanRpsWindowHandleHandler> EnoceanRpsWindowHandleHandlerPtr;
@@ -138,11 +138,11 @@ namespace p44 {
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<EnoceanRpsCardKeyHandler> EnoceanRpsCardKeyHandlerPtr;
@@ -162,11 +162,11 @@ namespace p44 {
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<EnoceanRpsSmokeDetectorHandler> EnoceanRpsSmokeDetectorHandlerPtr;
@@ -183,11 +183,11 @@ namespace p44 {
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<EnoceanRpsLeakageDetectorHandler> EnoceanRpsLeakageDetectorHandlerPtr;

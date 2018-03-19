@@ -89,6 +89,9 @@ namespace p44 {
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
     virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
 
+    /// check if channel is alive (for regularily sending sensors: has received life sign within timeout window)
+    virtual bool isAlive();
+
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
     virtual string shortDesc();

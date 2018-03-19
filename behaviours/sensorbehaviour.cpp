@@ -30,13 +30,14 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   minPushInterval(30*Second), // do not push more often than every 2 seconds
   changesOnlyInterval(0), // report every sensor update (even if value unchanged)
   // state
+  invalidatorTicket(0),
   lastUpdate(Never),
   lastPush(Never),
   currentValue(0),
   contextId(-1)
 {
-  // set dummy default hardware default configuration
-  setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 100, 1, 15*Second, 20*Minute);
+  // set dummy default hardware default configuration (no known alive sign interval!)
+  setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 100, 1, 15*Second, 0);
 }
 
 
@@ -124,6 +125,7 @@ void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint 
   resolution = aResolution;
   updateInterval = aUpdateInterval;
   aliveSignInterval = aAliveSignInterval;
+  armInvalidator();
   // default only, devices once created will have this as a persistent setting
   changesOnlyInterval = aDefaultChangesOnlyInterval;
 }
@@ -151,7 +153,13 @@ string SensorBehaviour::getSensorUnitText()
 
 string SensorBehaviour::getSensorRange()
 {
-  int fracDigits = (int)(-log(resolution)/log(10)+0.99);
+  if (min==max) {
+    return ""; // undefined range
+  }
+  int fracDigits = 2; // default if no resolution defined
+  if (resolution!=0) {
+    fracDigits = (int)(-log(resolution)/log(10)+0.99);
+  }
   if (fracDigits<0) fracDigits=0;
   return string_format("%0.*f..%0.*f", fracDigits, min, fracDigits, max);
 }
@@ -160,7 +168,10 @@ string SensorBehaviour::getSensorRange()
 string SensorBehaviour::getStatusText()
 {
   if (hasDefinedState()) {
-    int fracDigits = (int)(-log(resolution)/log(10)+0.99);
+    int fracDigits = 2; // default if no resolution defined
+    if (resolution!=0) {
+      fracDigits = (int)(-log(resolution)/log(10)+0.99);
+    }
     if (fracDigits<0) fracDigits=0;
     return string_format("%0.*f %s", fracDigits, currentValue, getSensorUnitText().c_str());
   }
@@ -183,12 +194,23 @@ void SensorBehaviour::updateEngineeringValue(long aEngineeringValue, bool aPush,
 }
 
 
+void SensorBehaviour::armInvalidator()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
+  if (aliveSignInterval!=Never) {
+    // this sensor can time out, schedule invalidation
+    invalidatorTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&SensorBehaviour::invalidateSensorValue, this, true), aliveSignInterval);
+  }
+}
+
+
 void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool aPush, int32_t aContextId, const char *aContextMsg)
 {
   MLMicroSeconds now = MainLoop::now();
   bool changedValue = false;
   // always update age, even if value itself may not have changed
   lastUpdate = now;
+  armInvalidator();
   // update context
   if (contextId!=aContextId) {
     contextId = aContextId;
@@ -229,7 +251,7 @@ bool SensorBehaviour::pushSensor(bool aChanged, bool aAlways)
         lastPush = now;
         return true;
       }
-      else {
+      else if (device.isPublicDS()) {
         BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
       }
     }
@@ -300,6 +322,12 @@ double SensorBehaviour::getSourceValue()
 MLMicroSeconds SensorBehaviour::getSourceLastUpdate()
 {
   return getLastUpdateTimestamp();
+}
+
+
+int SensorBehaviour::getSourceOpLevel()
+{
+  return device.opStateLevel();
 }
 
 
@@ -468,12 +496,15 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           aPropValue->setStringValue(valueUnitName(getSensorUnit(), true));
           return true;
         case min_key+descriptions_key_offset:
+          if (min==max) return false;
           aPropValue->setDoubleValue(min);
           return true;
         case max_key+descriptions_key_offset:
+          if (min==max) return false;
           aPropValue->setDoubleValue(max);
           return true;
         case resolution_key+descriptions_key_offset:
+          if (resolution==0) return false;
           aPropValue->setDoubleValue(resolution);
           return true;
         case updateInterval_key+descriptions_key_offset:
@@ -548,7 +579,7 @@ string SensorBehaviour::description()
 {
   string s = string_format("%s behaviour", shortDesc().c_str());
   string_format_append(s, "\n- sensor type: %d, min: %0.1f, max: %0.1f, resolution: %0.3f, interval: %lld mS", sensorType, min, max, resolution, updateInterval/MilliSecond);
-  string_format_append(s, "\n- minimal interval between pushes: %lld mS", minPushInterval/MilliSecond);
+  string_format_append(s, "\n- minimal interval between pushes: %lld mS, aliveSignInterval: %lld mS", minPushInterval/MilliSecond, aliveSignInterval/MilliSecond);
   s.append(inherited::description());
   return s;
 }

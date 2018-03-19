@@ -557,7 +557,7 @@ ZfDevicePtr ZfDevice::newDevice(
       newDev->setColorClass(class_black_joker);
       // Create one input behaviour
       BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"contact"));
-      ib->setHardwareInputConfig(binInpType_none, usage_room, true, 0);
+      ib->setHardwareInputConfig(binInpType_none, usage_room, true, Never, Never);
       ib->setHardwareName("contact");
       newDev->addBehaviour(ib);
       // count it

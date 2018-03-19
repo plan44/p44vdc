@@ -621,8 +621,8 @@ string DsAddressable::shortDesc()
   // short description is dSUID...
   string s = dSUID.getString();
   // ...and user-set name, if any
-  if (!name.empty())
-    string_format_append(s, " (%s)", name.c_str());
+  if (!getName().empty())
+    string_format_append(s, " (%s)", getName().c_str());
   return s;
 }
 

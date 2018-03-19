@@ -65,6 +65,9 @@ namespace p44 {
     /// get last update
     virtual MLMicroSeconds getSourceLastUpdate() = 0;
 
+    /// get operation level (how good/critical the operation state of the underlying device is)
+    virtual int getSourceOpLevel() = 0;
+
     /// add listener
     /// @param aCallback will be called when value has changed, or disappears
     /// @param aListener unique identification of the listener (usually its memory address)

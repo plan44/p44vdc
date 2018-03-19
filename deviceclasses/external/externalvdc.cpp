@@ -1146,6 +1146,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       VdcUsageHint usage = usage_undefined;
       DsGroup group = defaultGroup; // default group for input is same as primary default
       MLMicroSeconds updateInterval = Never; // unknown
+      MLMicroSeconds aliveSignInterval = Never; // no guaranteed alive sign interval
       string inputName;
       string id;
       // - optional params
@@ -1154,10 +1155,11 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("usage", o3)) usage = (VdcUsageHint)o3->int32Value();
       if (o2->get("group", o3)) group = (DsGroup)o3->int32Value();
       if (o2->get("updateinterval", o3)) updateInterval = o3->doubleValue()*Second;
+      if (o2->get("alivesigninterval", o3)) aliveSignInterval = o3->doubleValue()*Second;
       if (o2->get("hardwarename", o3)) inputName = o3->stringValue(); else inputName = string_format("input_ty%d", inputType);
       // - create behaviour
       BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this, id)); // automatic id if not specified
-      ib->setHardwareInputConfig(inputType, usage, true, updateInterval);
+      ib->setHardwareInputConfig(inputType, usage, true, updateInterval, aliveSignInterval);
       ib->setGroup(group);
       ib->setHardwareName(inputName);
       addBehaviour(ib);
@@ -1176,7 +1178,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       double max = 100;
       double resolution = 1;
       MLMicroSeconds updateInterval = 5*Second; // assume mostly up-to-date
-      MLMicroSeconds aliveSignInterval = 0; // no guaranteed alive sign interval
+      MLMicroSeconds aliveSignInterval = Never; // no guaranteed alive sign interval
       MLMicroSeconds changesOnlyInterval = 5*Minute; // report same value again only after >=5min
       string sensorName;
       string id;

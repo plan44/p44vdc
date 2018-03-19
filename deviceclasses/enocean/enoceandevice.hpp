@@ -54,6 +54,8 @@ namespace p44 {
 
   typedef boost::intrusive_ptr<EnoceanChannelHandler> EnoceanChannelHandlerPtr;
 
+  #define TIMEOUT_FACTOR_FOR_INACTIVE 4
+
   /// single EnOcean device channel, abstract class
   class EnoceanChannelHandler : public P44Obj
   {
@@ -68,6 +70,8 @@ namespace p44 {
     /// private constructor
     /// @note create new channels using factory static methods of specialized subclasses
     EnoceanChannelHandler(EnoceanDevice &aDevice);
+
+    bool lowBat; ///< this can be set by handlers to indicate low battery status (will be reported via opStateLevel/opStateText
 
   public:
 
@@ -88,6 +92,14 @@ namespace p44 {
 
     /// check if channel is alive (for regularily sending sensors: has received life sign within timeout window)
     virtual bool isAlive() { return true; } // assume alive by default
+
+    /// Get an indication how good/critical the operation state of this channel is (usually: battery level indicator)
+    /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
+    virtual int opStateLevel();
+
+    /// Get short text to describe the operation state (such as radio RSSI, critical battery level, etc.)
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getOpStateText();
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
@@ -132,8 +144,8 @@ namespace p44 {
     bool pendingDeviceUpdate; ///< set when update to the device is pending
 
     MLMicroSeconds lastPacketTime; ///< time when device received last packet (or device was created)
-    int16_t lastRSSI; ///< RSSI of last packet received
-    uint8_t lastRepeaterCount; ///< last packet's repeater count
+    int16_t lastRSSI; ///< RSSI of last packet received (including learn telegram)
+    uint8_t lastRepeaterCount; ///< last packet's repeater count (including learn telegram)
 
   public:
 
@@ -206,13 +218,15 @@ namespace p44 {
     /// @param aProfile the EPP
     /// @param aManufacturer the manufacturer code
     /// @param aSmartAck set if creating devices as part of a smart-ack learn-in
+    /// @param aLearnPacket if this is a learn-in process, the learn packet (NULL if devices are recreated from DB)
     /// @return number of devices created
     static int createDevicesFromEEP(
       EnoceanVdc *aVdcP,
       EnoceanAddress aAddress,
       EnoceanProfile aProfile,
       EnoceanManufacturer aManufacturer,
-      bool aSmartAck
+      bool aSmartAck,
+      Esp3PacketPtr aLearnPacket
     );
     
 
@@ -257,6 +271,10 @@ namespace p44 {
 
     /// @return manufacturer code
     EnoceanManufacturer getEEManufacturer();
+
+    /// update device's radio metrics (last packet time, RSSI, repeater count) from packet
+    /// @param aEsp3PacketPtr packet
+    void updateRadioMetrics(Esp3PacketPtr aEsp3PacketPtr);
 
     /// device specific radio packet handling
     /// @note base class implementation passes packet to all registered channels

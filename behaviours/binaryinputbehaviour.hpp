@@ -38,6 +38,8 @@ namespace p44 {
     typedef DsBehaviour inherited;
     friend class Device;
 
+    MLTicket invalidatorTicket;
+
   protected:
 
     /// @name behaviour description, constants or variables
@@ -47,6 +49,7 @@ namespace p44 {
     VdcUsageHint inputUsage; ///< the input type when device has hardwired functions
     bool reportsChanges; ///< set if the input detects changes without polling
     MLMicroSeconds updateInterval;
+    MLMicroSeconds aliveSignInterval; ///< how often the input reports its state minimally (if it does not report for longer than that, it can be considered out of order). Can be 0 for inputs from which no regular update can be expected at all
     /// @}
 
     /// @name persistent settings
@@ -81,9 +84,11 @@ namespace p44 {
     ///   to be polled to get the input state. (At this time, this is descriptive only, and has no functionality within p44vdc)
     /// @param aUpdateInterval how often an update can be expected from this input. If 0, this means that no minimal
     ///   update interval can be expected.
+    /// @param aAliveSignInterval how often the input will send an update in all cases. If 0, this means that no regular
+    ///   update interval can be expected.
     /// @note this must be called once before the device gets added to the device container. Implementation might
     ///   also derive default values for settings from this information.
-    void setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval);
+    void setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval);
 
     /// get the hardware input type
     /// @return the type of the input
@@ -112,6 +117,11 @@ namespace p44 {
     /// @return true if behaviour has a defined (non-NULL) state
     virtual bool hasDefinedState() P44_OVERRIDE;
 
+    /// get currently known state
+    /// @return current state.
+    /// @note The return value only has a meaning if hasDefinedState() returns true
+    InputState getCurrentState() { return currentState; }
+
     /// Get short text for a "first glance" status of the behaviour
     /// @return string, really short, intended to be shown as a narrow column in a list
     virtual string getStatusText() P44_OVERRIDE;
@@ -128,6 +138,9 @@ namespace p44 {
 
     /// get time of last update
     virtual MLMicroSeconds getSourceLastUpdate() P44_OVERRIDE;
+
+    /// get operation level (how good/critical the operation state of the underlying device is)
+    virtual int getSourceOpLevel() P44_OVERRIDE;
 
     /// @}
 
@@ -170,6 +183,10 @@ namespace p44 {
     virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+  private:
+
+    void armInvalidator();
 
   };
   typedef boost::intrusive_ptr<BinaryInputBehaviour> BinaryInputBehaviourPtr;

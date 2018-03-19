@@ -95,6 +95,18 @@ namespace p44 {
   typedef boost::intrusive_ptr<VdcHost> VdcHostPtr;
   typedef map<DsUid, VdcPtr> VdcMap;
   typedef map<DsUid, DevicePtr> DsDeviceMap;
+  typedef list<DsAddressablePtr> DsAddressablesList;
+
+  class NotificationGroup
+  {
+    friend class VdcHost;
+
+    NotificationGroup(VdcPtr aVdc, DsAddressablePtr aFirstMember);
+
+    VdcPtr vdc; ///< the vDC that might be able to handle a notification for all (device)members together. NULL if members can also be vdcs or vdchost.
+    DsAddressablesList members; ///< list of addressables (devices only if vdc is not NULL
+  };
+  typedef list<NotificationGroup> NotificationAudience;
 
 
   /// container for all devices hosted by this application
@@ -293,6 +305,43 @@ namespace p44 {
     /// @param aValueSourceID internal, persistent ID of the value source
     ValueSource *getValueSourceById(string aValueSourceID);
 
+    /// @name notification delivery
+    /// @{
+
+    /// Add a addressable to a notification audience
+    /// @param aAudience the audience
+    /// @param aTarget the addressable to be added
+    void addTargetToAudience(NotificationAudience &aAudience, DsAddressablePtr aTarget);
+
+    /// Add a notification target by dSUID to a notification audience
+    /// @param aAudience the audience
+    /// @param aDsuid the dSUID to be added
+    /// @return error in case dSUID is not address valid notification target
+    ErrorPtr addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &aDsuid);
+
+    /// Add a notification target by x-p44-itemSpec to a notification audience
+    /// @param aAudience the audience
+    /// @param aItemSpec alternative item specification, in case there is no dSUID
+    /// @return error in case aItemSpec does not address valid notification target
+    ErrorPtr addToAudienceByItemSpec(NotificationAudience &aAudience, string &aItemSpec);
+
+    /// Add notification targets selected by matching zone and group
+    /// @param aAudience the audience
+    /// @param aZone the zone to broadcast to (0 for entire appartment)
+    /// @param aGroup the group to broadcast to (group_undefined for all groups)
+    void addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZoneID aZone, DsGroup aGroup);
+
+    /// deliver notifications to audience
+    /// @param aAudience the audience
+    /// @param aApiConnection the API connection where the notification originates from
+    /// @param aNotification the name of the notification
+    /// @param aParams the parameters of the notification
+    void deliverToAudience(NotificationAudience &aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
+
+    /// @}
+
+
+
     /// @name global status
     /// @{
 
@@ -304,11 +353,9 @@ namespace p44 {
     /// @return true if device this vdchost is running on has a usable IP address
     bool isNetworkConnected();
 
-
     /// get IPv4 address relevant for connection status
     /// @return IPv4 as a 32-bit int, or 0 if none found
     uint32_t getIpV4Address();
-
 
     /// @}
 
@@ -509,9 +556,10 @@ namespace p44 {
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
     // method and notification dispatching
-    ErrorPtr handleMethodForDsUid(VdcApiRequestPtr aRequest, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams);
-    void handleNotificationForDsUid(VdcApiConnectionPtr aApiConnection, const string &aMethod, const DsUid &aDsUid, ApiValuePtr aParams);
-    DsAddressablePtr addressableForParams(const DsUid &aDsUid, ApiValuePtr aParams);
+    ErrorPtr handleMethodForParams(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    ErrorPtr handleNotificationForParams(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams);
+    DsAddressablePtr addressableForDsUid(const DsUid &aDsUid);
+    DsAddressablePtr addressableForItemSpec(const string &aItemSpec);
 
   private:
 

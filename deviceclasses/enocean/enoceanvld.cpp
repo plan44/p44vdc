@@ -331,7 +331,13 @@ void EnoceanD20601Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       if (temperatureSensor) handleBitField(D20601temperature, temperatureSensor, dataP, datasize);
       if (humiditySensor) handleBitField(D20601humidity, humiditySensor, dataP, datasize);
       if (illuminationSensor) handleBitField(D20601illumination, illuminationSensor, dataP, datasize);
-      if (batterySensor) handleBitField(D20601battery, batterySensor, dataP, datasize);
+      if (batterySensor) {
+        handleBitField(D20601battery, batterySensor, dataP, datasize);
+        SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(batterySensor);
+        if (sb && sb->hasDefinedState()) {
+          lowBat = sb->getCurrentValue()<20; // consider <=20% == low Battery
+        }
+      }
       if (burglaryAlarmInput) handleBitField(D20601burglaryAlarm, burglaryAlarmInput, dataP, datasize);
       if (protectionAlarmInput) handleBitField(D20601protectionAlarm, protectionAlarmInput, dataP, datasize);
       if (motionInput) handleBitField(D20601motion, motionInput, dataP, datasize);

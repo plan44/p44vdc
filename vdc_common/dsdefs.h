@@ -92,8 +92,11 @@ typedef enum {
   PRESET_OFF_40 = 38,     ///< preset 40
   PRESET_41 = 39,         ///< preset 41
   AUTO_OFF = 40,          ///< slow motion off (1 minute down to 0)
+  CLIMATE_FAN_ONLY = 40,  ///< climate control: Fan only mode
   ALERT_S = 41,           ///< Alert scene (blinking on, but don't care new from dSS 1.11.0 onwards)
+  CLIMATE_DRY = 41,       ///< climate control: dry only mode (reduce humidity, to temperature change)
   AREA_1_DEC = 42,        ///< area 1 decrement value
+  CLIMATE_AUTOMATIC = 42, ///< climate control: automatic mode (FCU device decides about operating mode)
   AUDIO_PREV_TITLE = 42,  ///< audio: Previous Title
   AREA_1_INC = 43,        ///< area 1 increment value
   AUDIO_NEXT_TITLE = 43,  ///< audio: Next Title

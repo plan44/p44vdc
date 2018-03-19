@@ -77,6 +77,9 @@ LedChainVdc::LedChainVdc(int aInstanceNumber, const string aChainSpec, VdcHost *
     if (chaintype=="SK6812") {
       ledType = LEDChainComm::ledtype_sk6812;
     }
+    else if (chaintype=="P9823") {
+      ledType = LEDChainComm::ledtype_p9823;
+    }
     // there might be a LED device name
     keyAndValue(rest, ledChainDevice, rest, ':');
   }
