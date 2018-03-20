@@ -49,6 +49,8 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   onConditionMet(false),
   evaluating(false),
   evaluateTicket(0),
+  timedtest(false),
+  testlaterTicket(0),
   valueParseTicket(0)
 {
   // Config is:
@@ -108,6 +110,15 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
 }
 
 
+EvaluatorDevice::~EvaluatorDevice()
+{
+  forgetValueDefs();
+  MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
+  MainLoop::currentMainLoop().cancelExecutionTicket(testlaterTicket);
+  MainLoop::currentMainLoop().cancelExecutionTicket(valueParseTicket);
+}
+
+
 bool EvaluatorDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Nothing to do to identify for now
@@ -121,12 +132,6 @@ bool EvaluatorDevice::isPublicDS()
 {
   // public if it's not an internal-only evaluator
   return evaluatorType!=evaluator_internalinput && evaluatorType!=evaluator_internalsensor;
-}
-
-
-EvaluatorDevice::~EvaluatorDevice()
-{
-  forgetValueDefs();
 }
 
 
@@ -307,6 +312,10 @@ void EvaluatorDevice::parseValueDefs()
     // schedule a re-parse later
     valueParseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EvaluatorDevice::parseValueDefs, this), REPARSE_DELAY);
   }
+  else {
+    // run an evaluation to possibly start timers
+    evaluateConditions(currentState, false);
+  }
 }
 
 
@@ -322,7 +331,7 @@ void EvaluatorDevice::dependentValueNotification(ValueSource &aValueSource, Valu
       ALOG(LOG_WARNING, "value source '%s' is part of cyclic reference -> not evaluating any further", aValueSource.getSourceName().c_str());
     }
     else {
-      evaluateConditions(currentState);
+      evaluateConditions(currentState, false);
     }
   }
 }
@@ -332,13 +341,57 @@ void EvaluatorDevice::changedConditions()
 {
   conditionMetSince = Never;
   onConditionMet = false;
-  evaluateConditions(undefined);
+  evaluateConditions(undefined, false);
+}
+
+
+#define MIN_RETRIGGER_SECONDS 10
+
+ExpressionValue EvaluatorDevice::evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs)
+{
+  if (aName=="testlater" && aArgs.size()>=2 && aArgs.size()<=3) {
+    // testlater(seconds, timedtest [, retrigger])   return "invalid" now, re-evaluate after given seconds and return value of test then. If repeat is true then, the timer will be re-scheduled
+    bool retrigger = false;
+    if (aArgs.size()>=3) retrigger = aArgs[2].isOk() && aArgs[2].v>0;
+    if (!timedtest || retrigger) {
+      // (re-)setup timer
+      double secs = aArgs[0].v;
+      if (retrigger && secs<MIN_RETRIGGER_SECONDS) {
+        // prevent too frequent re-triggering that could eat up too much cpu
+        ALOG(LOG_WARNING, "testlater() requests too fast retriggering (%.1f seconds), allowed minimum is %.1f seconds", secs, (double)MIN_RETRIGGER_SECONDS);
+        secs = MIN_RETRIGGER_SECONDS;
+      }
+      ALOG(LOG_INFO, "testlater() function schedules re-evaluation in %.1f seconds", secs);
+      MainLoop::currentMainLoop().executeTicketOnce(testlaterTicket, boost::bind(&EvaluatorDevice::evaluateConditionsLater, this), secs*Second);
+    }
+    if (timedtest) {
+      // evaluation runs because timer has expired, return test result
+      return ExpressionValue(aArgs[1].v);
+    }
+    else {
+      // timer not yet expired, return undefined
+      return ExpressionError::errValue(ExpressionError::Null, "testlater() not yet ready");
+    }
+  }
+  // no such function
+  return ExpressionError::errValue(ExpressionError::NotFound, "not found"); // just signals caller to try builtin functions
+}
+
+
+void EvaluatorDevice::evaluateConditionsLater()
+{
+  // important: passed reference state must be current state of NOW (not of when the timer was triggered!)
+  evaluateConditions(currentState, true);
 }
 
 
 
-void EvaluatorDevice::evaluateConditions(Tristate aRefState)
+void EvaluatorDevice::evaluateConditions(Tristate aRefState, bool aTimedTest)
 {
+  timedtest = aTimedTest;
+  if (timedtest) {
+    ALOG(LOG_INFO, "testlater() timer expired - now re-evaluating");
+  }
   if (evaluatorType==evaluator_sensor || evaluatorType==evaluator_internalsensor) {
     // just update the sensor value
     ExpressionValue res = calcEvaluatorExpression(evaluatorSettings()->onCondition);
@@ -364,9 +417,12 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState)
     bool decisionMade = false;
     MLMicroSeconds now = MainLoop::currentMainLoop().now();
     MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
+    // always evaluate both conditions because they could contain testlater() calls that need to be triggered
+    Tristate on = evaluateBoolean(evaluatorSettings()->onCondition);
+    Tristate off = evaluateBoolean(evaluatorSettings()->offCondition);
+    // now derive decision
     if (!decisionMade && aRefState!=yes) {
       // off or unknown: check for switching on
-      Tristate on = evaluateBoolean(evaluatorSettings()->onCondition);
       ALOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.c_str(), on==undefined ? "<undefined>" : (on==yes ? "true -> switching ON" : "false"));
       if (on!=yes) {
         // not met now -> reset if we are currently timing this condition
@@ -388,14 +444,13 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState)
         else {
           // condition not met long enough yet, need to re-check later
           ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-          evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState), metAt);
+          evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState, aTimedTest), metAt);
           return;
         }
       }
     }
     if (!decisionMade && aRefState!=no) {
       // on or unknown: check for switching off
-      Tristate off = evaluateBoolean(evaluatorSettings()->offCondition);
       ALOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.c_str(), off==undefined ? "<undefined>" : (off==yes ? "true -> switching OFF" : "false"));
       if (off!=yes) {
         // not met now -> reset if we are currently timing this condition
@@ -417,7 +472,7 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState)
         else {
           // condition not met long enough yet, need to re-check later
           ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-          evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState), metAt);
+          evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState, aTimedTest), metAt);
           return;
         }
       }
@@ -473,7 +528,11 @@ Tristate EvaluatorDevice::evaluateBoolean(string aExpression)
 
 ExpressionValue EvaluatorDevice::calcEvaluatorExpression(string &aExpression)
 {
-  return evaluateExpression(aExpression, boost::bind(&EvaluatorDevice::valueLookup, this, _1), NULL);
+  return evaluateExpression(
+    aExpression,
+    boost::bind(&EvaluatorDevice::valueLookup, this, _1),
+    boost::bind(&EvaluatorDevice::evaluateFunction, this, _1, _2)
+  );
 }
 
 
