@@ -19,17 +19,15 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "vdchost.hpp"
-
-#include "vdc.hpp"
-
-#include <string.h>
-
-#include "device.hpp"
-
 #include "macaddress.hpp"
 
+#include "vdchost.hpp"
+#include "vdc.hpp"
+#include "device.hpp"
+
 #include "jsonvdcapi.hpp" // need it for the case of no vDC api, as default
+
+#include "outputbehaviour.hpp"
 
 #if ENABLE_LOCAL_BEHAVIOUR
 // for local behaviour
