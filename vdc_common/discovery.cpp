@@ -436,7 +436,7 @@ void DiscoveryManager::startAdvertising(AvahiService *aService)
 void DiscoveryManager::advertiseDS(
   VdcHostPtr aVdcHost,
   bool aNoAuto,
-  int aWebPort, int aSshPort,
+  int aWebPort, const string aWebPath, int aSshPort,
   DsUidPtr aAuxVdsmDsUid, int aAuxVdsmPort, bool aAuxVdsmRunning, AuxVdsmStatusHandler aAuxVdsmStatusHandler, bool aNotAuxiliary
 ) {
   ErrorPtr err;
@@ -447,6 +447,7 @@ void DiscoveryManager::advertiseDS(
   vdcHost = aVdcHost;
   noAuto = aNoAuto;
   publishWebPort = aWebPort;
+  publishWebPath = aWebPath;
   publishSshPort = aSshPort;
   #if ENABLE_AUXVDSM
   auxVdsmPort = aAuxVdsmPort;
@@ -521,6 +522,7 @@ void DiscoveryManager::startAdvertisingDS(AvahiService *aService)
     int avahiErr;
     if (publishWebPort) {
       // - web UI
+      string txt_path = string_format("path=%s", publishWebPath.c_str());
       if ((avahiErr = avahi_add_service(
         aService,
         dSEntryGroup,
@@ -531,7 +533,8 @@ void DiscoveryManager::startAdvertisingDS(AvahiService *aService)
         NULL, // no domain
         NULL, // no host
         publishWebPort, // web port
-        NULL // no TXT records
+        publishWebPath.empty() ? NULL : txt_path.c_str(), // possibly, path TXT record
+        NULL // TXT record terminator
       ))<0) {
         LOG(LOG_ERR, "avahi: failed to add _http._tcp service: %s", avahi_strerror(avahiErr));
         goto fail;
