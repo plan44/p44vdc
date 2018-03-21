@@ -174,8 +174,8 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
 bool HueDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   const char *iconname = NULL;
-  if (output) {
-    switch (output->getOutputFunction()) {
+  if (getOutput()) {
+    switch (getOutput()->getOutputFunction()) {
       case outputFunction_colordimmer: iconname = "hue"; break;
       case outputFunction_ctdimmer: iconname = "hue_ct"; break;
       default: iconname = "hue_lux"; break;
@@ -305,14 +305,14 @@ void HueDevice::reapplyTimerHandler()
 bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway)
 {
   // Update of light state needed
-  LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+  LightBehaviourPtr l = getOutput<LightBehaviour>();
   if (l) {
     if (!aAnyway && !needsToApplyChannels()) {
       // NOP for this call
       channelValuesSent(l, aDoneCB, JsonObjectPtr(), ErrorPtr());
       return false; // no changes
     }
-    ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(l);
+    ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
     MLMicroSeconds transitionTime = 0; // undefined so far
     // build hue API light state
     string url = string_format("/lights/%s/state", lightID.c_str());
@@ -479,7 +479,7 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
     if (o) {
       lastReachable = o->boolValue();
     }
-    LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+    LightBehaviourPtr l = getOutput<LightBehaviour>();
     if (l) {
       // on with brightness or off
       o = state->get("on");

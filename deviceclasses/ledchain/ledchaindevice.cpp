@@ -132,7 +132,7 @@ void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   // abort previous transition
   MainLoop::currentMainLoop().cancelExecutionTicket(transitionTicket);
   // full color device
-  RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+  RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
   if (cl) {
     if (needsToApplyChannels()) {
       // needs update
@@ -155,7 +155,7 @@ void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
 {
   // RGB, RGBW or RGBWA dimmer
-  RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+  RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
   bool moreSteps = cl->colorTransitionStep(aStepSize);
   if (cl->brightnessTransitionStep(aStepSize)) moreSteps = true;
   // RGB lamp, get components for rendering loop

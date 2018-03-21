@@ -996,7 +996,7 @@ ErrorPtr DaliOutputDevice::handleMethod(VdcApiRequestPtr aRequest, const string 
 
 void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+  LightBehaviourPtr l = getOutput<LightBehaviour>();
   bool withColor = false;
   if (l && needsToApplyChannels()) {
     // abort previous transition
@@ -1007,7 +1007,7 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       l->brightnessTransitionStep(); // init brightness transition
     }
     // see if we also need a color transition
-    ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(output);
+    ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
     if (cl && cl->deriveColorMode()) {
       // colors will change as well
       cl->colorTransitionStep(); // init color transition
@@ -1147,7 +1147,7 @@ void DaliSingleControllerDevice::initializeDevice(StatusCB aCompletedCB, bool aF
 void DaliSingleControllerDevice::daliControllerSynced(StatusCB aCompletedCB, bool aFactoryReset, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
-    RGBColorLightBehaviourPtr rgbl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+    RGBColorLightBehaviourPtr rgbl = getOutput<RGBColorLightBehaviour>();
     if (rgbl) {
       // save raw RGB(WA)
       if (daliController->dt8RGBWAFchannels>3) {
@@ -1164,15 +1164,15 @@ void DaliSingleControllerDevice::daliControllerSynced(StatusCB aCompletedCB, boo
         rgbl->setRGB(daliController->currentR, daliController->currentG, daliController->currentB, 255);
       }
       // color tone is set, now sync back current brightness, as RGBWA values are not absolute, but relative to brightness
-      output->getChannelByIndex(0)->syncChannelValue(daliController->currentBrightness);
+      getOutput()->getChannelByIndex(0)->syncChannelValue(daliController->currentBrightness);
     }
     else {
       // save brightness now
-      output->getChannelByIndex(0)->syncChannelValue(daliController->currentBrightness);
+      getOutput()->getChannelByIndex(0)->syncChannelValue(daliController->currentBrightness);
       // initialize the light behaviour with the minimal dimming level
-      LightBehaviourPtr l = boost::static_pointer_cast<LightBehaviour>(output);
+      LightBehaviourPtr l = getOutput<LightBehaviour>();
       l->initMinBrightness(daliController->minBrightness);
-      ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(output);
+      ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
       if (cl) {
         // also synchronize color information
         cl->colorMode = daliController->currentColorMode;
@@ -1236,16 +1236,16 @@ void DaliSingleControllerDevice::disconnectableHandler(bool aForgetParams, Disco
 
 void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize)
 {
-  LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+  LightBehaviourPtr l = getOutput<LightBehaviour>();
   bool needactivation = false;
   bool neednewbrightness = true; // assume brightness change, if color only, this will be cleared in color handling code below
   bool moreSteps = false;
   ColorLightBehaviourPtr cl;
   if (aWithColor) {
-    cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(output);
+    cl = getOutput<ColorLightBehaviour>();
     moreSteps = cl->colorTransitionStep(aStepSize);
     neednewbrightness = l->brightness->inTransition(); // could be color transition only
-    RGBColorLightBehaviourPtr rgbl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+    RGBColorLightBehaviourPtr rgbl = getOutput<RGBColorLightBehaviour>();
     if (rgbl) {
       // DALI controller needs direct RGBWA(F)
       double r=0,g=0,b=0,w=0,a=0;
@@ -1510,7 +1510,7 @@ string DaliCompositeDevice::getOpStateText()
 
 bool DaliCompositeDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+  RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
   if (getIcon(cl->isCtOnly() ? "dali_ct" : "dali_color", aIcon, aWithData, aResolutionPrefix))
     return true;
   else
@@ -1581,7 +1581,7 @@ void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryR
     aDimmerIndex++; // next
   }
   // all updated (not necessarily successfully) if we land here
-  RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+  RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
   double r = dimmers[dimmer_red] ? dimmers[dimmer_red]->currentBrightness : 0;
   double g = dimmers[dimmer_green] ? dimmers[dimmer_green]->currentBrightness : 0;
   double b = dimmers[dimmer_blue] ? dimmers[dimmer_blue]->currentBrightness : 0;
@@ -1668,7 +1668,7 @@ void DaliCompositeDevice::disconnectableHandler(bool aForgetParams, DisconnectCB
 
 void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize)
 {
-  RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+  RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
   bool moreSteps = cl->colorTransitionStep(aStepSize);
   if (cl->brightnessTransitionStep(aStepSize)) moreSteps = true;
   // RGB lamp, get components
@@ -2024,14 +2024,14 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
             case input_button:
             case input_rocker:
             {
-              ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[inpindex]);
+              ButtonBehaviourPtr bb = getButton(inpindex);
               bb->buttonAction(true);
               releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::buttonReleased, this, inpindex), BUTTON_RELEASE_TIMEOUT);
               break;
             }
             case input_pulse:
             {
-              BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[inpindex]);
+              BinaryInputBehaviourPtr ib = getInput(inpindex);
               ib->updateInputState(1);
               releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::inputReleased, this, inpindex), INPUT_RELEASE_TIMEOUT);
               break;
@@ -2041,7 +2041,7 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
             case input_bistable:
             default:
             {
-              BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[inpindex]);
+              BinaryInputBehaviourPtr ib = getInput(inpindex);
               ib->updateInputState(on ? 1 : 0);
               break;
             }
@@ -2060,7 +2060,7 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
 void DaliInputDevice::buttonReleased(int aButtonNo)
 {
   releaseTicket = 0;
-  ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[aButtonNo]);
+  ButtonBehaviourPtr bb = getButton(aButtonNo);
   bb->buttonAction(false);
 }
 
@@ -2069,7 +2069,7 @@ void DaliInputDevice::buttonReleased(int aButtonNo)
 void DaliInputDevice::inputReleased(int aInputNo)
 {
   releaseTicket = 0;
-  BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[aInputNo]);
+  BinaryInputBehaviourPtr ib = getInput(aInputNo);
   ib->updateInputState(0);
 }
 

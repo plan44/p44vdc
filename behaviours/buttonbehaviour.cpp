@@ -447,8 +447,8 @@ bool ButtonBehaviour::isLocalButtonEnabled()
 
 bool ButtonBehaviour::isOutputOn()
 {
-  if (device.output) {
-    ChannelBehaviourPtr ch = device.output->getChannelByType(channeltype_default);
+  if (device.getOutput()) {
+    ChannelBehaviourPtr ch = device.getOutput()->getChannelByType(channeltype_default);
     if (ch) {
       return ch->getChannelValue()>0; // on if channel is above zero
     }
@@ -474,8 +474,8 @@ void ButtonBehaviour::localSwitchOutput()
     dir = isOutputOn() ? -1 : 1;
   }
   // actually switch output
-  if (device.output) {
-    ChannelBehaviourPtr ch = device.output->getChannelByType(channeltype_default);
+  if (device.getOutput()) {
+    ChannelBehaviourPtr ch = device.getOutput()->getChannelByType(channeltype_default);
     if (ch) {
       ch->setChannelValue(dir>0 ? ch->getMax() : ch->getMin());
       device.requestApplyingChannels(NULL, false);
@@ -842,12 +842,12 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
             // also change group in button1
             BLOG(LOG_NOTICE,"paired button group changed in button0 -> also changed in button1");
-            if (device.buttons.size()>1) device.buttons[1]->setGroup((DsGroup)aPropValue->int32Value());
+            ButtonBehaviourPtr bb = device.getButton(1); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
           }
           else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
             // also change group in button0
             BLOG(LOG_NOTICE,"paired button group changed in button1 -> also changed in button0");
-            if (device.buttons.size()>0) device.buttons[0]->setGroup((DsGroup)aPropValue->int32Value());
+            ButtonBehaviourPtr bb = device.getButton(0); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
           }
           return true;
         case mode_key+settings_key_offset: {
@@ -865,12 +865,12 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
             // also change function in button1
             BLOG(LOG_NOTICE,"paired button function changed in button0 -> also changed in button1");
-            if (device.buttons.size()>1) boost::static_pointer_cast<ButtonBehaviour>(device.buttons[1])->setFunction((DsButtonFunc)aPropValue->int32Value());
+            ButtonBehaviourPtr bb = device.getButton(1); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
           }
           else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
             // also change function in button0
             BLOG(LOG_NOTICE,"paired button function changed in button1 -> also changed in button0");
-            if (device.buttons.size()>0) boost::static_pointer_cast<ButtonBehaviour>(device.buttons[0])->setFunction((DsButtonFunc)aPropValue->int32Value());
+            ButtonBehaviourPtr bb = device.getButton(0); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
           }
           return true;
         case channel_key+settings_key_offset:

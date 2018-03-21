@@ -153,7 +153,7 @@ Device &DsScene::getDevice()
 
 OutputBehaviourPtr DsScene::getOutputBehaviour()
 {
-  return sceneDeviceSettings.device.output;
+  return sceneDeviceSettings.device.getOutput();
 }
 
 
@@ -576,7 +576,7 @@ void SceneDeviceSettings::loadScenesFromFiles()
   levelids[0] = "vdsd_" + device.getDsUid().getString();
   levelids[1] = string(device.deviceTypeIdentifier()) + "_device";
   levelids[2] = string_format("%s_%d_class", device.deviceClass().c_str(), device.deviceClassVersion());
-  levelids[3] = string(device.output->behaviourTypeIdentifier()) + "_behaviour";
+  levelids[3] = string(device.getOutput()->behaviourTypeIdentifier()) + "_behaviour";
   levelids[4] = device.vdcP->vdcClassIdentifier();
   for(int i=0; i<numLevels; ++i) {
     // try to open config file

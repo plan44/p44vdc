@@ -396,7 +396,7 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState, bool aTimedTest)
     // just update the sensor value
     ExpressionValue res = calcEvaluatorExpression(evaluatorSettings()->onCondition);
     // protect against state updates triggering evaluation again via cyclic references
-    SensorBehaviourPtr s = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
+    SensorBehaviourPtr s = getSensor(0);
     if (s) {
       evaluating = true;
       if (res.isOk()) {
@@ -485,7 +485,7 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState, bool aTimedTest)
         case evaluator_input :
         case evaluator_internalinput :
         {
-          BinaryInputBehaviourPtr b = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
+          BinaryInputBehaviourPtr b = getInput(0);
           if (b) {
             b->updateInputState(currentState==yes);
           }
@@ -494,7 +494,7 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState, bool aTimedTest)
         case evaluator_rocker : {
           if (currentState!=prevState) {
             // virtually click up or down button
-            ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[currentState==no ? 0 : 1]);
+            ButtonBehaviourPtr b = getButton(currentState==no ? 0 : 1);
             if (b) {
               b->sendClick(ct_tip_1x);
             }

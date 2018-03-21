@@ -28,10 +28,12 @@
 #include "jsonvdcapi.hpp" // need it for the case of no vDC api, as default
 
 #include "outputbehaviour.hpp"
+#include "sensorbehaviour.hpp"
+#include "binaryinputbehaviour.hpp"
+#include "buttonbehaviour.hpp"
 
 #if ENABLE_LOCAL_BEHAVIOUR
 // for local behaviour
-#include "buttonbehaviour.hpp"
 #include "lightbehaviour.hpp"
 #endif
 
@@ -779,7 +781,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
       }
       else {
         // call scene or start dimming
-        LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(dev->output);
+        LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(dev->getOutput());
         if (l) {
           // - figure out direction if not already known
           if (localDimDirection==0 && l->brightness->getLastSync()!=Never) {
@@ -880,7 +882,7 @@ void VdcHost::addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZon
     Device *devP = pos->second.get();
     if (
       (aZone==0 || devP->getZoneID()==aZone) &&
-      (aGroup==group_undefined || (devP->output && devP->output->isMember(aGroup)))
+      (aGroup==group_undefined || (devP->getOutput() && devP->getOutput()->isMember(aGroup)))
     ) {
       addTargetToAudience(aAudience, DsAddressablePtr(devP));
     }

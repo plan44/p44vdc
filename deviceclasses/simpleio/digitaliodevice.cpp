@@ -148,7 +148,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
 
 void DigitalIODevice::buttonHandler(bool aNewState, MLMicroSeconds aTimestamp)
 {
-	ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[0]);
+	ButtonBehaviourPtr b = getButton(0);
 	if (b) {
 		b->buttonAction(aNewState);
 	}
@@ -157,7 +157,7 @@ void DigitalIODevice::buttonHandler(bool aNewState, MLMicroSeconds aTimestamp)
 
 void DigitalIODevice::inputHandler(bool aNewState)
 {
-  BinaryInputBehaviourPtr b = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
+  BinaryInputBehaviourPtr b = getInput(0);
   if (b) {
     b->updateInputState(aNewState);
   }
@@ -166,8 +166,8 @@ void DigitalIODevice::inputHandler(bool aNewState)
 
 void DigitalIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  LightBehaviourPtr lightBehaviour = boost::dynamic_pointer_cast<LightBehaviour>(output);
-  ShadowBehaviourPtr shadowBehaviour = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+  LightBehaviourPtr lightBehaviour = getOutput<LightBehaviour>();
+  ShadowBehaviourPtr shadowBehaviour = getOutput<ShadowBehaviour>();
   if (lightBehaviour) {
     // light
     if (lightBehaviour->brightnessNeedsApplying()) {
@@ -180,9 +180,9 @@ void DigitalIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     shadowBehaviour->applyBlindChannels(boost::bind(&DigitalIODevice::changeMovement, *this, _1, _2), aDoneCB, aForDimming);
     return;
   }
-  else if (output) {
+  else if (getOutput()) {
     // simple switch output, activates at 50% of possible output range
-    ChannelBehaviourPtr ch = output->getChannelByIndex(0);
+    ChannelBehaviourPtr ch = getOutput()->getChannelByIndex(0);
     if (ch->needsApplying()) {
       indicatorOutput->set(ch->getChannelValueBool());
       ch->channelValueApplied();
@@ -194,7 +194,7 @@ void DigitalIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 
 void DigitalIODevice::syncChannelValues(SimpleCB aDoneCB)
 {
-  ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+  ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
   if (sb) {
     sb->syncBlindState();
   }
@@ -205,7 +205,7 @@ void DigitalIODevice::syncChannelValues(SimpleCB aDoneCB)
 void DigitalIODevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
 {
   // start dimming
-  ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+  ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
   if (sb) {
     // no channel check, there's only global dimming of the blind, no separate position/angle
     sb->dimBlind(boost::bind(&DigitalIODevice::changeMovement, *this, _1, _2), aDimMode);
