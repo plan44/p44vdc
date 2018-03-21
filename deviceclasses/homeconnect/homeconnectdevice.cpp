@@ -298,22 +298,25 @@ HomeConnectDevicePtr HomeConnectDevice::createHomeConenctDevice(HomeConnectVdc *
     string ty = o->stringValue();
 
     if (ty=="CoffeeMaker") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceCoffeMaker(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceCoffeMaker(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="Oven") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceOven(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceOven(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="Dishwasher") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceDishWasher(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceDishWasher(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="Washer") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceWasher(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceWasher(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="Dryer") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceDryer(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceDryer(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="FridgeFreezer") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceFridge(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceFridge(aVdcP, aHomeApplicanceInfoRecord));
+    }
+    else {
+      LOG(LOG_NOTICE, "Unknown device type '%s'", ty.c_str());
     }
   }
 
