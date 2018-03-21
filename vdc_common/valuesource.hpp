@@ -56,16 +56,24 @@ namespace p44 {
     /// destructor
     ~ValueSource();
 
+    /// get id - unique at least in the vdhost's scope
+    /// @return id string, not containing = or : characters
+    virtual string getSourceId() = 0;
+
     /// get descriptive name (for using in selection lists)
+    /// @return descriptive name string
     virtual string getSourceName() = 0;
 
     /// get value
+    /// @return the current value
     virtual double getSourceValue() = 0;
 
     /// get last update
+    /// @return the timestamp of when the source was last updated. Never means that there is no current value
     virtual MLMicroSeconds getSourceLastUpdate() = 0;
 
     /// get operation level (how good/critical the operation state of the underlying device is)
+    /// @return the operation level (0..100) of the value source
     virtual int getSourceOpLevel() = 0;
 
     /// add listener

@@ -178,6 +178,12 @@ string BinaryInputBehaviour::getStatusText()
 // MARK: ===== value source implementation
 
 
+string BinaryInputBehaviour::getSourceId()
+{
+  return string_format("%s_I%s", device.getDsUid().getString().c_str(), getId().c_str());
+}
+
+
 string BinaryInputBehaviour::getSourceName()
 {
   // get device name or dSUID for context

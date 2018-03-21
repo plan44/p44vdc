@@ -183,6 +183,9 @@ namespace p44 {
     /// @name ValueSource interface
     /// @{
 
+    /// get id - unique at least in the vdhost's scope
+    virtual string getSourceId() P44_OVERRIDE;
+
     /// get descriptive name identifying the source within the entire vdc host (for using in selection lists)
     virtual string getSourceName() P44_OVERRIDE;
 

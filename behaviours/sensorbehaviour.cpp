@@ -298,6 +298,12 @@ bool SensorBehaviour::hasDefinedState()
 // MARK: ===== value source implementation
 
 
+string SensorBehaviour::getSourceId()
+{
+  return string_format("%s_S%s", device.getDsUid().getString().c_str(), getId().c_str());
+}
+
+
 string SensorBehaviour::getSourceName()
 {
   // get device name or dSUID for context
