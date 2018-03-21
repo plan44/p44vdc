@@ -1314,7 +1314,7 @@ void VdcHost::announceNext()
     ) {
       // mark device as being in process of getting announced
       vdc->announcing = MainLoop::now();
-      // call announcevdc method (need to construct here, because dSUID must be sent as vdcdSUID)
+      // send announcevdc request
       ApiValuePtr params = getSessionConnection()->newApiValue();
       params->setType(apivalue_object);
       params->add("dSUID", params->newBinary(vdc->getDsUid().getBinary()));
@@ -1342,8 +1342,12 @@ void VdcHost::announceNext()
     ) {
       // mark device as being in process of getting announced
       dev->announcing = MainLoop::now();
-      // call announce method
-      if (!dev->announce(boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
+      // send announcedevice request
+      ApiValuePtr params = getVdcHost().getSessionConnection()->newApiValue();
+      params->setType(apivalue_object);
+      // include link to vdc for device announcements
+      params->add("vdc_dSUID", params->newBinary(dev->vdcP->getDsUid().getBinary()));
+      if (!dev->sendRequest("announcedevice", params, boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
         LOG(LOG_ERR, "Could not send device announcement message for %s %s", dev->entityType(), dev->shortDesc().c_str());
         dev->announcing = Never; // not announcing
       }
