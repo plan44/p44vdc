@@ -700,7 +700,7 @@ void HomeConnectDevice::handleEventTypeDisconnected()
 void HomeConnectDevice::handleEventTypeConnected()
 {
   isConnected = true;
-  announce({});
+  announce(NULL);
   ALOG(LOG_NOTICE, "Device connected");
   pollState();
 }
