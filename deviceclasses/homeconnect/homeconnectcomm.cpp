@@ -224,7 +224,8 @@ HomeConnectEventMonitor::HomeConnectEventMonitor(HomeConnectComm &aHomeConnectCo
   homeConnectComm(aHomeConnectComm),
   urlPath(aUrlPath),
   eventCB(aEventCB),
-  eventGotID(false)
+  eventGotID(false),
+  ticket(0)
 {
   sendGetEventRequest();
   setServerCertVfyDir("");
@@ -233,6 +234,7 @@ HomeConnectEventMonitor::HomeConnectEventMonitor(HomeConnectComm &aHomeConnectCo
 
 HomeConnectEventMonitor::~HomeConnectEventMonitor()
 {
+  MainLoop::currentMainLoop().cancelExecutionTicket(ticket);
   
 }
 
@@ -264,7 +266,7 @@ void HomeConnectEventMonitor::sendGetEventRequest()
   } else {
     LOG(LOG_WARNING, "Event stream, Api not ready yet wait 15s");
     // not ready yet - schedule restart
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
+    ticket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
   }
 }
 
@@ -301,14 +303,14 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
       LOG(LOG_WARNING, "HomeConnect Event stream Error 429 : locking down communication!");
       homeConnectComm.setLockDownTime(homeConnectComm.calculateLockDownTime() * Second);
     } else {
-      MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
+      ticket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
     }
     return;
   }
 
   if (aResponse.empty()) {
     // end of stream - schedule restart
-    MainLoop::currentMainLoop().executeOnce(
+    ticket = MainLoop::currentMainLoop().executeOnce(
         boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this),
         EVENT_STREAM_RESTART_DELAY);
     return;
@@ -412,7 +414,7 @@ void HomeConnectEventMonitor::apiQueryDone(JsonObjectPtr aResult, ErrorPtr aErro
 {
   LOG(LOG_WARNING, "Api request finished, try to reopen the event channel");
   // the request was done, try to open event channel again
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), 1*Second);
+  ticket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), 1*Second);
 }
 
 

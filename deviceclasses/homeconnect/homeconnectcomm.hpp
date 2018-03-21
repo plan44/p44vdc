@@ -124,6 +124,7 @@ namespace p44 {
     string eventTypeString;
     string eventData;
     bool eventGotID;
+    MLTicket ticket;
 
   public:
 
