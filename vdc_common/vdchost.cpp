@@ -1370,6 +1370,7 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
     LOG(LOG_NOTICE, "Announcement for %s %s acknowledged by vdSM", aAddressable->entityType(), aAddressable->shortDesc().c_str());
     aAddressable->announced = MainLoop::now();
     aAddressable->announcing = Never; // not announcing any more
+    aAddressable->announcementAcknowledged(); // give instance opportunity to do things following an announcement
   }
   // cancel retry timer
   MainLoop::currentMainLoop().cancelExecutionTicket(announcementTicket);
