@@ -272,6 +272,7 @@ void EvaluatorDevice::parseValueDefs()
   MainLoop::currentMainLoop().cancelExecutionTicket(valueParseTicket);
   forgetValueDefs(); // forget previous mappings
   string &valueDefs = evaluatorSettings()->valueDefs;
+  string newValueDefs; // re-created value defs using sensor ids rather than indices, for migration
   // syntax:
   //  <valuealias>:<valuesourceid> [, <valuealias>:valuesourceid> ...]
   ALOG(LOG_INFO, "Parsing variable definitions");
@@ -294,19 +295,28 @@ void EvaluatorDevice::parseValueDefs()
         // - add source to my map
         valueMap[valuealias] = vs;
         LOG(LOG_INFO, "- Variable '%s' connected to source '%s'", valuealias.c_str(), vs->getSourceName().c_str());
+        string_format_append(newValueDefs, "%s:%s", valuealias.c_str(), vs->getSourceId().c_str());
       }
       else {
         ALOG(LOG_WARNING, "Value source id '%s' not found -> variable '%s' currently undefined", valuesourceid.c_str(), valuealias.c_str());
+        string_format_append(newValueDefs, "%s:%s", valuealias.c_str(), valuesourceid.c_str());
         foundall = false;
       }
       // skip delimiters
       i = valueDefs.find_first_not_of(", \t\n\r", e2);
       if (i==string::npos) i = valueDefs.size();
+      newValueDefs += valueDefs.substr(e2,i-e2);
     }
     else {
       ALOG(LOG_ERR, "missing ':' in value definition");
       break;
     }
+  }
+  // migrate old definitions (when re-created definitions are not equal to stored ones)
+  // Note: even migrate partially, when not all defs could be resolved yet
+  if (evaluatorSettings()->valueDefs!=newValueDefs) {
+    ALOG(LOG_NOTICE, "Migrating definitions to new id (rather than index) based form");
+    evaluatorSettings()->setPVar(evaluatorSettings()->valueDefs, newValueDefs);
   }
   if (!foundall) {
     // schedule a re-parse later
