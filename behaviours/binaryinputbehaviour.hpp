@@ -77,6 +77,8 @@ namespace p44 {
     ///   If empty string is passed, an id will be auto-generated (at setHardwareInputConfig())
     BinaryInputBehaviour(Device &aDevice, const string aId);
 
+    virtual ~BinaryInputBehaviour();
+
     /// initialisation of hardware-specific constants for this binary input
     /// @param aInputType the input type (also called sensor function in classic dS)
     /// @param aUsage how this input is normally used (indoor/outdoor etc.)

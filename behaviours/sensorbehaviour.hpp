@@ -82,6 +82,8 @@ namespace p44 {
     ///   If empty string is passed, an id will be auto-generated from the sensor type (after setHardwareSensorConfig() is called)
     SensorBehaviour(Device &aDevice, const string aId);
 
+    virtual ~SensorBehaviour();
+
     /// initialisation of hardware-specific constants for this sensor
     /// @param aType the sensor type (Note: not the same as dS sensor types, needs mapping)
     /// @param aUsage how this input is normally used (indoor/outdoor etc.)

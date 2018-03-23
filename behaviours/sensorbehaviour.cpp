@@ -41,6 +41,12 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
 }
 
 
+SensorBehaviour::~SensorBehaviour()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
+}
+
+
 
 // The value units corresponding with the sensor type
 const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
