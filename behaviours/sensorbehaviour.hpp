@@ -116,8 +116,9 @@ namespace p44 {
     // - defaults for settings
     MLMicroSeconds pushIntvl; ///< default setting for minPushInterval, 0 = use global default
     MLMicroSeconds chgOnlyIntvl; ///< default setting for changesOnlyInterval, 0 = none
-    // - push delivery
-    double trigDelta; ///< the minimal relative change to trigger a out-of-period push. 0=disabled
+    // - SOD (send on delta) push delivery
+    double trigDelta; ///< the minimal absolute or relative change to trigger a out-of-period push. 0=disabled
+    bool trigRel; ///< if set, the trigDelta is a relative value (as a factor of the previous value)
     double trigMin; ///< the minimal absolute value needed to activate delta triggering
     MLMicroSeconds trigIntvl; ///< how soon after a previous push a extra trigger may occur
   } SensorBehaviourProfile;

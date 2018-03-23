@@ -77,7 +77,7 @@ double WindowEvaluator::evaluate(EvaluationType aEvaluationType)
   double divisor = 0;
   int count = 0;
   for (DataPointsList::iterator pos = dataPoints.begin(); pos != dataPoints.end(); ++pos) {
-    MLMicroSeconds lastTs;
+    MLMicroSeconds lastTs = Never;
     switch (aEvaluationType) {
       case eval_max: {
         if (count==0 || pos->value>result) result = pos->value;
@@ -216,20 +216,19 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
 
 static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
   // indoor context
-  { .type = sensorType_temperature, .usage = usage_room,         .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute,    .trigDelta = 0.5, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_humidity, .usage = usage_room,            .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 2, .trigMin =   -1, .trigIntvl = 1*Second /* = "immediate" */ },
+  { .type = sensorType_temperature, .usage = usage_room,         .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute,    .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
+  { .type = sensorType_humidity, .usage = usage_room,            .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 2, .trigRel = false, .trigMin =   -1, .trigIntvl = 1*Second /* = "immediate" */ },
   { .type = sensorType_illumination, .usage = usage_room,        .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute,    .evalWin = 5*Minute, .avgWin = 10*Second, .evalType = WindowEvaluator::eval_timeweighted_average },
   { .type = sensorType_gas_CO2, .usage = usage_room,             .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
   { .type = sensorType_gas_CO, .usage = usage_room,              .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
   // outdoor context
-  { .type = sensorType_temperature, .usage = usage_outdoors,     .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute,    .trigDelta = 0.5, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_humidity, .usage = usage_outdoors,        .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 2, .trigMin = -1, .trigIntvl = 1*Second /* = "immediate" */ },
+  { .type = sensorType_temperature, .usage = usage_outdoors,     .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute,    .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
+  { .type = sensorType_humidity, .usage = usage_outdoors,        .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 2, .trigRel = false, .trigMin = -1, .trigIntvl = 1*Second /* = "immediate" */ },
   { .type = sensorType_illumination, .usage = usage_outdoors,    .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute,    .evalWin = 10*Minute, .avgWin = 20*Second, .evalType = WindowEvaluator::eval_timeweighted_average },
   { .type = sensorType_air_pressure, .usage = usage_outdoors,    .pushIntvl = 15*Minute, .chgOnlyIntvl = 60*Minute },
-  // FIXME: trigger condition in solution concept say +/10% for trigger condition, but of what? Of previous value? Not very stable at small speeds. Using 10% of 5m/s = 0.5m/S for now
-  { .type = sensorType_wind_speed, .usage = usage_outdoors,      .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 0.5, .trigMin = -1, .trigIntvl = 1*Minute,    .evalWin = 10*Minute, .avgWin = 1*Minute, .evalType = WindowEvaluator::eval_timeweighted_average },
-  { .type = sensorType_wind_direction, .usage = usage_outdoors,  .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 20, .trigMin = -1, .trigIntvl = 1*Minute,     .evalWin = 10*Minute, .avgWin = 1*Minute, .evalType = WindowEvaluator::eval_timeweighted_average },
-  { .type = sensorType_gust_speed, .usage = usage_outdoors,      .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 0.5, .trigMin = 5, .trigIntvl = 3*Second,     .evalWin = 10*Minute, .avgWin = 3*Second, .evalType = WindowEvaluator::eval_max },
+  { .type = sensorType_wind_speed, .usage = usage_outdoors,      .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 0.1, .trigRel = true, .trigMin = -1, .trigIntvl = 1*Minute,    .evalWin = 10*Minute, .avgWin = 1*Minute, .evalType = WindowEvaluator::eval_timeweighted_average },
+  { .type = sensorType_wind_direction, .usage = usage_outdoors,  .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 20, .trigRel = false, .trigMin = -1, .trigIntvl = 1*Minute,    .evalWin = 10*Minute, .avgWin = 1*Minute, .evalType = WindowEvaluator::eval_timeweighted_average },
+  { .type = sensorType_gust_speed, .usage = usage_outdoors,      .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute,    .trigDelta = 0.1, .trigRel = true, .trigMin = 5, .trigIntvl = 3*Second,     .evalWin = 10*Minute, .avgWin = 3*Second, .evalType = WindowEvaluator::eval_max },
   // FIXME: rule says "accumulation", but as long as sensors deliver intensity in mm/h, it is in fact a window average over an hour
   { .type = sensorType_precipitation, .usage = usage_outdoors,   .pushIntvl = 60*Minute, .chgOnlyIntvl = 60*Minute,    .evalWin = 60*Minute, .avgWin = 2*Minute, .evalType = WindowEvaluator::eval_timeweighted_average },
 
@@ -378,6 +377,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
       aValue = filter->evaluate(profileP->evalType);
       // re-evaluate changed flag after filtering
       if (fabs(aValue - currentValue) > resolution/2) changedValue = true;
+      BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' calculates %s filtered value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
     }
     // anyway, assign new current value
     currentValue = aValue;
@@ -414,9 +414,9 @@ bool SensorBehaviour::pushSensor(bool aAlways)
         // Trigger interval is over -> push if conditions are met
         doPush =
           currentValue>profileP->trigMin &&
-          fabs(currentValue-lastPushedValue)>=profileP->trigDelta;
+          fabs(currentValue-lastPushedValue)>=(profileP->trigRel ? fabs(currentValue*profileP->trigDelta) : profileP->trigDelta);
         if (doPush) {
-          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets trigger conditions to push earlier than normal interval", index, behaviourId.c_str(), getHardwareName().c_str());
+          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets send-on-delta conditions to push earlier than normal interval", index, behaviourId.c_str(), getHardwareName().c_str());
         }
       }
     }
