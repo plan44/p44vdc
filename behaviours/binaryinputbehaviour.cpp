@@ -41,6 +41,12 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
 }
 
 
+BinaryInputBehaviour::~BinaryInputBehaviour()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
+}
+
+
 const char *inputTypeIds[numVdcSensorTypes] = {
   "generic", ///< no system function
   "presence", ///< Presence
