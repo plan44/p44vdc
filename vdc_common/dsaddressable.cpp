@@ -193,6 +193,17 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       return handleMethod(aRequest, methodName, params);
     }
   }
+  else if (aMethod=="loglevel") {
+    // via genericRequest
+    ApiValuePtr o;
+    if (Error::isOK(respErr = checkParam(aParams, "value", o))) {
+      int newLevel = o->int32Value();
+      int oldLevel = LOGLEVEL;
+      SETLOGLEVEL(newLevel);
+      LOG(LOG_WARNING, "\n\n========== changed log level from %d to %d ===============", oldLevel, newLevel);
+      respErr = Error::ok(); // return OK as generic response
+    }
+  }
   else {
     respErr = Error::err<VdcApiError>(405, "unknown method '%s'", aMethod.c_str());
   }

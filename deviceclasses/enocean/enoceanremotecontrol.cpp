@@ -258,8 +258,8 @@ EnoceanRelayControlDevice::EnoceanRelayControlDevice(EnoceanVdc *aVdcP, uint8_t 
 void EnoceanRelayControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // standard output behaviour
-  if (output) {
-    ChannelBehaviourPtr ch = output->getChannelByType(channeltype_default);
+  if (getOutput()) {
+    ChannelBehaviourPtr ch = getOutput()->getChannelByType(channeltype_default);
     if (ch->needsApplying()) {
       bool up = ch->getChannelValueBool();
       buttonAction(false, up, true);
@@ -298,7 +298,7 @@ EnoceanBlindControlDevice::EnoceanBlindControlDevice(EnoceanVdc *aVdcP, uint8_t 
 
 void EnoceanBlindControlDevice::syncChannelValues(SimpleCB aDoneCB)
 {
-  ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+  ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
   if (sb) {
     sb->syncBlindState();
   }
@@ -310,7 +310,7 @@ void EnoceanBlindControlDevice::syncChannelValues(SimpleCB aDoneCB)
 void EnoceanBlindControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // shadow behaviour
-  ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+  ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
   if (sb) {
     // ask shadow behaviour to start movement sequence
     sb->applyBlindChannels(boost::bind(&EnoceanBlindControlDevice::changeMovement, this, _1, _2), aDoneCB, aForDimming);
@@ -324,7 +324,7 @@ void EnoceanBlindControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDi
 void EnoceanBlindControlDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
 {
   // start dimming
-  ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+  ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
   if (sb) {
     // no channel check, there's only global dimming of the blind, no separate position/angle
     sb->dimBlind(boost::bind(&EnoceanBlindControlDevice::changeMovement, this, _1, _2), aDimMode);
@@ -422,8 +422,8 @@ uint8_t EnoceanSEHeatTubeDevice::teachInSignal(int8_t aVariant)
 void EnoceanSEHeatTubeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // standard output behaviour
-  if (output) {
-    ChannelBehaviourPtr ch = output->getChannelByType(channeltype_default);
+  if (getOutput()) {
+    ChannelBehaviourPtr ch = getOutput()->getChannelByType(channeltype_default);
     if (ch->needsApplying()) {
       int lvl  = ch->getChannelValue();
       setPowerState(lvl, true);

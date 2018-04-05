@@ -161,12 +161,10 @@ AnalogIODevice::~AnalogIODevice()
 
 void AnalogIODevice::analogInputPoll(MLTimer &aTimer, MLMicroSeconds aNow)
 {
-  if (sensors.size()>0) {
-    SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
-    if (sb) {
-      // return value with scaling (default==1) and offset (default==0)
-      sb->updateSensorValue(analogIO->value()*scale+offset);
-    }
+  SensorBehaviourPtr sb = getSensor(0);
+  if (sb) {
+    // return value with scaling (default==1) and offset (default==0)
+    sb->updateSensorValue(analogIO->value()*scale+offset);
     MainLoop::currentMainLoop().retriggerTimer(aTimer, sb->getUpdateInterval());
   }
 }
@@ -184,7 +182,7 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   // generic device, show changed channels
   if (analogIOType==analogio_dimmer) {
     // single channel PWM dimmer
-    LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+    LightBehaviourPtr l = getOutput<LightBehaviour>();
     if (l && l->brightnessNeedsApplying()) {
       transitionTime = l->transitionTimeToNewBrightness();
       l->brightnessTransitionStep(); // init
@@ -195,7 +193,7 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   }
   else if (analogIOType==analogio_rgbdimmer) {
     // three channel RGB PWM dimmer
-    RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+    RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     if (cl) {
       if (needsToApplyChannels()) {
         // needs update
@@ -233,7 +231,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   // generic device, show changed channels
   if (analogIOType==analogio_dimmer) {
     // single channel PWM dimmer
-    LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+    LightBehaviourPtr l = getOutput<LightBehaviour>();
     bool moreSteps = l->brightnessTransitionStep(aStepSize);
     double w = l->brightnessForHardware();
     double pwm = l->brightnessToPWM(w, 100);
@@ -252,7 +250,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   }
   else if (analogIOType==analogio_rgbdimmer) {
     // three channel RGB PWM dimmer
-    RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+    RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     bool moreSteps = cl->brightnessTransitionStep(aStepSize);
     if (cl->colorTransitionStep(aStepSize)) moreSteps = true;
     // RGB lamp, get components

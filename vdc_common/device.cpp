@@ -153,7 +153,7 @@ void Device::addToModelUIDHash(string &aHashedString)
   string_format_append(aHashedString, "%s:%d:", deviceTypeIdentifier().c_str(), colorClass);
   // behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
-  for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
+  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
   if (output) aHashedString += output->behaviourTypeIdentifier();
   // model features
@@ -166,7 +166,7 @@ void Device::addToModelUIDHash(string &aHashedString)
 Device::~Device()
 {
   buttons.clear();
-  binaryInputs.clear();
+  inputs.clear();
   sensors.clear();
   output.reset();
 }
@@ -252,20 +252,20 @@ DsClass Device::getDominantColorClass()
     }
   }
   // if no or undefined output, check input colors
-  if (group==group_undefined && buttons.size()>0) {
+  if (group==group_undefined) {
     // second priority: color of first button
-    ButtonBehaviourPtr btn = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[0]);
-    group =  btn->buttonGroup;
+    ButtonBehaviourPtr btn = getButton(0);
+    if (btn) group = btn->buttonGroup;
   }
-  if (group==group_undefined && sensors.size()>0) {
+  if (group==group_undefined) {
     // third priority: color of first sensor
-    SensorBehaviourPtr sns = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
-    group =  sns->sensorGroup;
+    SensorBehaviourPtr sns = getSensor(0);
+    if (sns) group = sns->sensorGroup;
   }
-  if (group==group_undefined && binaryInputs.size()>0) {
+  if (group==group_undefined) {
     // fourth priority: color of first binary input
-    BinaryInputBehaviourPtr bin = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
-    group =  bin->binInputGroup;
+    BinaryInputBehaviourPtr bin = getInput(0);
+    if (bin) group = bin->binInputGroup;
   }
   // Return color class the dominant group belongs to
   DsClass cl = colorClassFromGroup(group);
@@ -319,7 +319,7 @@ void Device::installSettings(DeviceSettingsPtr aDeviceSettings)
 }
 
 
-
+// MARK: ===== behaviours
 
 void Device::addBehaviour(DsBehaviourPtr aBehaviour)
 {
@@ -330,7 +330,7 @@ void Device::addBehaviour(DsBehaviourPtr aBehaviour)
         bvP = &buttons;
         goto addbehaviour;
       case behaviour_binaryinput:
-        bvP = &binaryInputs;
+        bvP = &inputs;
         goto addbehaviour;
       case behaviour_sensor:
         bvP = &sensors;
@@ -377,6 +377,54 @@ void Device::addBehaviour(DsBehaviourPtr aBehaviour)
     LOG(LOG_ERR, "Device::addBehaviour: NULL behaviour passed");
   }
 }
+
+
+static DsBehaviourPtr getFromBehaviourVector(BehaviourVector &aBV, int aIndex, const string &aId)
+{
+  if (aIndex==Device::by_id_or_index) {
+    if (isdigit(*aId.c_str())) {
+      sscanf(aId.c_str(), "%d", &aIndex);
+    }
+  }
+  if (aIndex>=0) {
+    // directly by index
+    if (aIndex<aBV.size()) {
+      return aBV[aIndex];
+    }
+  }
+  else if (aIndex!=Device::by_index && !aId.empty()) {
+    for (BehaviourVector::iterator pos = aBV.begin(); pos != aBV.end(); ++pos) {
+      if ((*pos)->getId()==aId) {
+        return *pos;
+      }
+    }
+  }
+  // not found
+  return DsBehaviourPtr();
+}
+
+
+
+ButtonBehaviourPtr Device::getButton(int aIndex, const string aId)
+{
+  return boost::dynamic_pointer_cast<ButtonBehaviour>(getFromBehaviourVector(buttons, aIndex, aId));
+}
+
+
+SensorBehaviourPtr Device::getSensor(int aIndex, const string aId)
+{
+  return boost::dynamic_pointer_cast<SensorBehaviour>(getFromBehaviourVector(sensors, aIndex, aId));
+}
+
+
+BinaryInputBehaviourPtr Device::getInput(int aIndex, const string aId)
+{
+  return boost::dynamic_pointer_cast<BinaryInputBehaviour>(getFromBehaviourVector(inputs, aIndex, aId));
+}
+
+
+
+
 
 // MARK: ===== model features
 
@@ -460,7 +508,7 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_twowayconfig: {
       // devices with one button that has combinables>1 can possibly be combined and thus need this modelfeature to show the UI
       if (buttons.size()!=1) return no; // none or multiple buttons in this device -> not combinable
-      ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[0]);
+      ButtonBehaviourPtr b = getButton(0);
       return b->combinables>1 ? yes : no;
     }
     case modelFeature_highlevel:
@@ -472,8 +520,8 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       return colorClass==class_black_joker && (output || buttons.size()>0) ? yes : no;
     case modelFeature_akmsensor:
       // current dSS state is that it can only provide function setting for binary input 0
-      if (binaryInputs.size()>0) {
-        BinaryInputBehaviourPtr b = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
+      if (inputs.size()>0) {
+        BinaryInputBehaviourPtr b = getInput(0);
         if (b->getHardwareInputType()==binInpType_none) {
           return yes; // Input 0 has no predefined function, "akmsensor" can provide setting UI for that
         }
@@ -805,16 +853,6 @@ void Device::hasVanished(bool aForgetParams)
 void Device::scheduleVanish(bool aForgetParams, MLMicroSeconds aDelay)
 {
   MainLoop::currentMainLoop().executeOnce(boost::bind(&Device::hasVanished, this, aForgetParams), aDelay);
-}
-
-
-bool Device::announce(VdcApiResponseCB aResponseHandler)
-{
-  ApiValuePtr params = getVdcHost().getSessionConnection()->newApiValue();
-  params->setType(apivalue_object);
-  // include link to vdc for device announcements
-  params->add("vdc_dSUID", params->newBinary(vdcP->getDsUid().getBinary()));
-  return sendRequest("announcedevice", params, aResponseHandler);
 }
 
 
@@ -1581,7 +1619,7 @@ ErrorPtr Device::load()
   }
   // load the behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->load();
-  for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) (*pos)->load();
+  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->load();
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->load();
   if (output) output->load();
   // load settings from files
@@ -1598,7 +1636,7 @@ ErrorPtr Device::save()
   if (!Error::isOK(err)) ALOG(LOG_ERR,"Error saving settings: %s", err->description().c_str());
   // save the behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->save();
-  for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) (*pos)->save();
+  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->save();
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->save();
   if (output) output->save();
   return ErrorPtr();
@@ -1610,7 +1648,7 @@ bool Device::isDirty()
   // check the device settings
   if (deviceSettings && deviceSettings->isDirty()) return true;
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) if ((*pos)->isDirty()) return true;
-  for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) if ((*pos)->isDirty()) return true;
+  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) if ((*pos)->isDirty()) return true;
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) if ((*pos)->isDirty()) return true;
   if (output && output->isDirty()) return true;
   return false;
@@ -1622,7 +1660,7 @@ void Device::markClean()
   // check the device settings
   if (deviceSettings) deviceSettings->markClean();
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->markClean();
-  for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) (*pos)->markClean();
+  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->markClean();
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->markClean();
   if (output) output->save();
 }
@@ -1634,7 +1672,7 @@ ErrorPtr Device::forget()
   if (deviceSettings) deviceSettings->deleteFromStore();
   // delete the behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->forget();
-  for (BehaviourVector::iterator pos = binaryInputs.begin(); pos!=binaryInputs.end(); ++pos) (*pos)->forget();
+  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->forget();
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->forget();
   if (output) output->forget();
   return ErrorPtr();
@@ -1695,7 +1733,7 @@ enum {
 };
 
 
-const int numBehaviourArrays = 4; // buttons, binaryInputs, Sensors, Channels
+const int numBehaviourArrays = 4; // buttons, inputs, Sensors, Channels
 const int numDeviceProperties = numDeviceFieldKeys+3*numBehaviourArrays;
 
 
@@ -1729,7 +1767,7 @@ int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
     return (int)buttons.size();
   }
   else if (aParentDescriptor->hasObjectKey(device_inputs_key)) {
-    return (int)binaryInputs.size();
+    return (int)inputs.size();
   }
   else if (aParentDescriptor->hasObjectKey(device_sensors_key)) {
     return (int)sensors.size();
@@ -1820,7 +1858,7 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
       id = buttons[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_inputs_key)) {
-      id = binaryInputs[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
+      id = inputs[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_sensors_key)) {
       id = sensors[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
@@ -1907,7 +1945,7 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aProperty
     return buttons[aPropertyDescriptor->fieldKey()];
   }
   else if (aPropertyDescriptor->hasObjectKey(device_inputs_key)) {
-    return binaryInputs[aPropertyDescriptor->fieldKey()];
+    return inputs[aPropertyDescriptor->fieldKey()];
   }
   else if (aPropertyDescriptor->hasObjectKey(device_sensors_key)) {
     return sensors[aPropertyDescriptor->fieldKey()];
@@ -2051,7 +2089,7 @@ string Device::description()
 {
   string s = inherited::description(); // DsAdressable
   if (buttons.size()>0) string_format_append(s, "\n- Buttons: %lu", buttons.size());
-  if (binaryInputs.size()>0) string_format_append(s, "\n- Binary Inputs: %lu", binaryInputs.size());
+  if (inputs.size()>0) string_format_append(s, "\n- Binary Inputs: %lu", inputs.size());
   if (sensors.size()>0) string_format_append(s, "\n- Sensors: %lu", sensors.size());
   if (numChannels()>0) string_format_append(s, "\n- Output Channels: %d", numChannels());
   return s;
@@ -2067,8 +2105,8 @@ string Device::getStatusText()
   if (s.empty() && sensors.size()>0) {
     s = sensors[0]->getStatusText();
   }
-  if (s.empty() && binaryInputs.size()>0) {
-    s = binaryInputs[0]->getStatusText();
+  if (s.empty() && inputs.size()>0) {
+    s = inputs[0]->getStatusText();
   }
   return s;
 }

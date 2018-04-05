@@ -509,11 +509,12 @@ ErrorPtr ExternalDevice::processInputJson(char aInputType, JsonObjectPtr aParams
   else if (aParams->get("id", o)) {
     // access by id
     string id = o->stringValue();
+    DsBehaviourPtr bhv;
     switch (aInputType) {
-      case 'B': index = behaviourIndexById(buttons, id); break;
-      case 'I': index = behaviourIndexById(binaryInputs, id); break;
-      case 'S': index = behaviourIndexById(sensors, id); break;
-      case 'C': index = channelIndexById(output, id); break;
+      case 'B': bhv = getButton(by_id, id); if (bhv) { index = (int)bhv->getIndex(); } break;
+      case 'I': bhv = getInput(by_id, id); if (bhv) { index = (int)bhv->getIndex(); } break;
+      case 'S': bhv = getSensor(by_id, id); if (bhv) { index = (int)bhv->getIndex(); } break;
+      case 'C': index = channelIndexById(getOutput(), id); break;
     }
   }
   if (index<0) {
@@ -537,36 +538,30 @@ ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double a
 {
   switch (aInputType) {
     case 'B': {
-      if (aIndex<buttons.size()) {
-        ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[aIndex]);
-        if (bb) {
-          if (aValue>2) {
-            // simulate a keypress of defined length in milliseconds
-            bb->buttonAction(true);
-            MainLoop::currentMainLoop().executeOnce(boost::bind(&ExternalDevice::releaseButton, this, bb), aValue*MilliSecond);
-          }
-          else {
-            bb->buttonAction(aValue!=0);
-          }
+      ButtonBehaviourPtr bb = getButton(aIndex);
+      if (bb) {
+        if (aValue>2) {
+          // simulate a keypress of defined length in milliseconds
+          bb->buttonAction(true);
+          MainLoop::currentMainLoop().executeOnce(boost::bind(&ExternalDevice::releaseButton, this, bb), aValue*MilliSecond);
+        }
+        else {
+          bb->buttonAction(aValue!=0);
         }
       }
       break;
     }
     case 'I': {
-      if (aIndex<binaryInputs.size()) {
-        BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[aIndex]);
-        if (ib) {
-          ib->updateInputState(aValue!=0);
-        }
+      BinaryInputBehaviourPtr ib = getInput(aIndex);
+      if (ib) {
+        ib->updateInputState(aValue!=0);
       }
       break;
     }
     case 'S': {
-      if (aIndex<sensors.size()) {
-        SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[aIndex]);
-        if (sb) {
-          sb->updateSensorValue(aValue);
-        }
+      SensorBehaviourPtr sb = getSensor(aIndex);
+      if (sb) {
+        sb->updateSensorValue(aValue);
       }
       break;
     }
@@ -576,7 +571,7 @@ ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double a
         cb->syncChannelValue(aValue, true);
         // check for shadow end contact reporting
         if (aIndex==0) {
-          ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+          ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
           if (sb) {
             if (aValue>=cb->getMax())
               sb->endReached(true); // reached top
@@ -585,7 +580,7 @@ ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double a
           }
         }
         // check for color mode
-        ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(output);
+        ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
         if (cl) {
           DsChannelType ct = cb->getChannelType();
           switch (ct) {
@@ -707,14 +702,14 @@ bool ExternalDevice::prepareSceneCall(DsScenePtr aScene)
 void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // special behaviour for shadow behaviour
-  ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+  ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
   if (sb && useMovement) {
     // ask shadow behaviour to start movement sequence on default channel
     sb->applyBlindChannels(boost::bind(&ExternalDevice::changeChannelMovement, this, 0, _1, _2), aDoneCB, aForDimming);
   }
   else {
     // check for special color light handling
-    ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(output);
+    ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
     if (cl) {
       // derive color mode from changed channel values
       // Note: external device cannot make use of colormode for now, but correct mode is important for saving scenes
@@ -726,7 +721,7 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       if (cb->needsApplying()) {
         // get value and apply mode
         double chval = cb->getChannelValue();
-        chval = output->outputValueAccordingToMode(chval, i);
+        chval = getOutput()->outputValueAccordingToMode(chval, i);
         // send channel value message
         if (deviceConnector->simpletext) {
           string m = string_format("C%d=%lf", i, chval);
@@ -753,7 +748,7 @@ void ExternalDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMod
 {
   if (aChannel) {
     // start dimming
-    ShadowBehaviourPtr sb = boost::dynamic_pointer_cast<ShadowBehaviour>(output);
+    ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
     if (sb && useMovement) {
       // no channel check, there's only global dimming of the blind, no separate position/angle
       sb->dimBlind(boost::bind(&ExternalDevice::changeChannelMovement, this, 0, _1, _2), aDimMode);
@@ -1092,12 +1087,12 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   if (defaultGroup==group_undefined) defaultGroup = group_black_variable;
   if (colorClass==class_undefined) colorClass = colorClassFromGroup(defaultGroup);
   // check for groups definition, will override anything set so far
-  if (aInitParams->get("groups", o) && output) {
-    output->resetGroupMembership(); // clear all
+  if (aInitParams->get("groups", o) && getOutput()) {
+    getOutput()->resetGroupMembership(); // clear all
     for (int i=0; i<o->arrayLength(); i++) {
       JsonObjectPtr o2 = o->arrayGet(i);
       DsGroup g = (DsGroup)o2->int32Value();
-      output->setGroupMembership(g, true);
+      getOutput()->setGroupMembership(g, true);
     }
   }
   // check for buttons

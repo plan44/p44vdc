@@ -174,6 +174,10 @@ namespace p44 {
     /// @return index of this behaviour in one of the owning device's behaviour lists
     size_t getIndex() { return index; };
 
+    /// get the identifier (unique within this device instance)
+    /// @return behaviour id string
+    string getId() { return behaviourId; };
+
     /// get the behaviour ID
     /// @param aApiVersion the API version to get the ID for. APIs before v3 always return the behaviour index as a numeric string
     /// @return the behaviour ID, which must be unique within the device and must always allow to re-find the same behaviour

@@ -234,7 +234,7 @@ void P44VdcHost::selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, Indicat
 string P44VdcHost::webuiURLString()
 {
   if (webUiPort)
-    return string_format("http://%s:%d", ipv4ToString(getIpV4Address()).c_str(), webUiPort);
+    return string_format("http://%s:%d%s", ipv4ToString(getIpV4Address()).c_str(), webUiPort, webUiPath.c_str());
   else
     return inherited::webuiURLString();
 }
@@ -485,19 +485,6 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
         setUserActionMonitor(boost::bind(&P44VdcHost::identifyHandler, this, aJsonComm, _1));
         learnIdentifyTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&P44VdcHost::identifyHandler, this, aJsonComm, DevicePtr()), seconds*Second);
       }
-    }
-    else if (method=="logLevel") {
-      // get or set logging level for vdcd
-      JsonObjectPtr o = aRequest->get("value");
-      if (o) {
-        // set new value first
-        int newLevel = o->int32Value();
-        int oldLevel = LOGLEVEL;
-        SETLOGLEVEL(newLevel);
-        LOG(LOG_WARNING, "\n\n========== changed log level from %d to %d ===============", oldLevel, newLevel);
-      }
-      // anyway: return current value
-      sendCfgApiResponse(aJsonComm, JsonObject::newInt32(LOGLEVEL), ErrorPtr());
     }
     else {
       err = Error::err<P44VdcError>(400, "unknown method");

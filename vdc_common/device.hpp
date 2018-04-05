@@ -39,6 +39,9 @@ namespace p44 {
   typedef vector<DsBehaviourPtr> BehaviourVector;
 
   typedef boost::intrusive_ptr<OutputBehaviour> OutputBehaviourPtr;
+  typedef boost::intrusive_ptr<SensorBehaviour> SensorBehaviourPtr;
+  typedef boost::intrusive_ptr<BinaryInputBehaviour> BinaryInputBehaviourPtr;
+  typedef boost::intrusive_ptr<ButtonBehaviour> ButtonBehaviourPtr;
 
 
   /// descriptor for device configuration
@@ -93,18 +96,15 @@ namespace p44 {
     friend class SceneDeviceSettings;
     friend class ButtonBehaviour;
 
+    BehaviourVector buttons; ///< buttons and switches (user interaction)
+    BehaviourVector inputs; ///< binary inputs (not for user interaction)
+    BehaviourVector sensors; ///< sensors (measurements)
+    OutputBehaviourPtr output; ///< the output (if any)
+
   protected:
 
     /// the class container
     Vdc *vdcP;
-
-    /// @name behaviours
-    /// @{
-    BehaviourVector buttons; ///< buttons and switches (user interaction)
-    BehaviourVector binaryInputs; ///< binary inputs (not for user interaction)
-    BehaviourVector sensors; ///< sensors (measurements)
-    OutputBehaviourPtr output; ///< the output (if any)
-    /// @}
 
     /// device global parameters (for all behaviours), in particular the scene table
     /// @note devices assign this with a derived class which is specialized
@@ -318,10 +318,30 @@ namespace p44 {
     /// @param aDeviceSettings specific device settings, if NULL, standard minimal settings will be used
     void installSettings(DeviceSettingsPtr aDeviceSettings = DeviceSettingsPtr());
 
+
     /// add a behaviour and set its index
     /// @param aBehaviour a newly created behaviour, will get added to the correct button/binaryInput/sensor/output
     ///   array, given the correct index value, and the behaviour id will be made unique if needed by appending an index
     void addBehaviour(DsBehaviourPtr aBehaviour);
+
+    enum {
+      by_id = -1, ///< aID string is only interpreted as id
+      by_index = -2, ///< aID string is only interpreted as index
+      by_id_or_index = -3, ///< if aId is a number, treat it as index, otherwise as id
+    };
+
+    /// @param aId string id of the behaviour. If aByIndex is by_id_and_index, can also be a decimal string representing the index
+    /// @param aIndex if>=0, the index of the behaviour to get. Otherwise, by_id_only or by_id_and_index specify how to treat aId
+    /// @return NULL or the behaviourPtr of the addressed behaviour
+    ButtonBehaviourPtr getButton(int aIndex, const string aId = "");
+    SensorBehaviourPtr getSensor(int aIndex, const string aId = "");
+    BinaryInputBehaviourPtr getInput(int aIndex, const string aId = "");
+
+    /// get specifically subtyped output behaviour
+    /// @return the output behaviour or NULL if there is no output of the specified type
+    template <typename T = OutputBehaviour> boost::intrusive_ptr<T> getOutput() {
+      return boost::dynamic_pointer_cast<T>(output);
+    }
 
     /// get scenes
     /// @return NULL if device has no scenes, scene device settings otherwise 
@@ -357,8 +377,6 @@ namespace p44 {
     ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
     /// @param aDelay how long to wait until deleting the device
     void scheduleVanish(bool aForgetParams, MLMicroSeconds aDelay = 0);
-
-    bool announce(VdcApiResponseCB aResponseHandler);
 
     /// @}
 

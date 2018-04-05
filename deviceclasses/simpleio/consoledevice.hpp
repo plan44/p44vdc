@@ -98,7 +98,7 @@ namespace p44 {
 	private:
 
     void buttonHandler(int aButtonIndex, bool aState, MLMicroSeconds aTimestamp);
-    void sensorHandler(int aButtonIndex, bool aState, MLMicroSeconds aTimestamp);
+    void sensorHandler(int aSensorIndex, bool aState, MLMicroSeconds aTimestamp);
     void binaryInputHandler(bool aState, MLMicroSeconds aTimeStamp);
     void sensorValueHandler(double aValue, MLMicroSeconds aTimeStamp);
     void sensorJitter(bool aState, MLMicroSeconds aTimeStamp);

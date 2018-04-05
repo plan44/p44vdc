@@ -469,7 +469,7 @@ string ZfButtonDevice::modelName()
 void ZfButtonDevice::processPacket(ZfPacketPtr aPacket)
 {
   if (aPacket->opCode==1) {
-    ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[0]);
+    ButtonBehaviourPtr bb = getButton(0);
     // pressing button now
     // - data==00 means "pressed", 01 means "released"
     bb->buttonAction(aPacket->data==00);
@@ -496,7 +496,7 @@ string ZfSimpleContact::modelName()
 void ZfSimpleContact::processPacket(ZfPacketPtr aPacket)
 {
   if (aPacket->opCode==1) {
-    BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
+    BinaryInputBehaviourPtr ib = getInput(0);
     if (ib) {
       // - data==00 means "pressed", 01 means "released"
       ib->updateInputState(aPacket->data==00);

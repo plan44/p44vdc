@@ -150,6 +150,7 @@ namespace p44 {
     VdcHostPtr vdcHost;
     bool noAuto;
     int publishWebPort;
+    string publishWebPath;
     int publishSshPort;
     #if ENABLE_AUXVDSM
     // - an optionally running auxiliary vdsm
@@ -209,6 +210,9 @@ namespace p44 {
     /// @note can be called repeatedly to update information
     /// @param aVdcHost the device container to be published
     /// @param aNoAuto if set, the published vdsm or vdc will not be automatically connected (only when explicitly whitelisted)
+    /// @param aWebPort if set, a _http._tcp service will be published as well
+    /// @param aWebPath the web path to publish (when aWebPort is set)
+    /// @param aSshPort if set, a _ssh._tcp service will be published as well
     /// @param aAuxVdsmDsUid if not NULL, discovery manager will also manage advertising of the vdsm
     /// @param aAuxVdsmPort port to connect the vdsm from ds485p
     /// @param aAuxVdsmRunning must be true if the auxiliary vdsm is running right now, false if not.
@@ -217,10 +221,20 @@ namespace p44 {
     void advertiseDS(
       VdcHostPtr aVdcHost,
       bool aNoAuto,
-      int aWebPort,
+      int aWebPort, const string aWebPath,
       int aSshPort,
       DsUidPtr aAuxVdsmDsUid, int aAuxVdsmPort, bool aAuxVdsmRunning, AuxVdsmStatusHandler aAuxVdsmStatusHandler, bool aNotAuxiliary
     );
+
+    /// FIXME: remove, once other vdcs have been updated to the new signature
+    /// backwards compatible method without the aWebPath parameter
+    void advertiseDS(
+      VdcHostPtr aVdcHost,
+      bool aNoAuto,
+      int aWebPort,
+      int aSshPort,
+      DsUidPtr aAuxVdsmDsUid, int aAuxVdsmPort, bool aAuxVdsmRunning, AuxVdsmStatusHandler aAuxVdsmStatusHandler, bool aNotAuxiliary
+    ) { advertiseDS(aVdcHost, aNoAuto, aWebPort, "", aSshPort, aAuxVdsmDsUid, aAuxVdsmPort, aAuxVdsmRunning, aAuxVdsmStatusHandler, aNotAuxiliary); }
 
     /// Stop advertising DS service(s)
     void stopAdvertisingDS();

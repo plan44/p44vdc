@@ -213,7 +213,7 @@ string ConsoleDevice::modelName()
 
 void ConsoleDevice::buttonHandler(int aButtonIndex, bool aState, MLMicroSeconds aTimestamp)
 {
-	ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[aButtonIndex]);
+	ButtonBehaviourPtr b = getButton(aButtonIndex);
 	if (b) {
 		b->buttonAction(aState);
 	}
@@ -224,13 +224,13 @@ void ConsoleDevice::sensorHandler(int aButtonIndex, bool aState, MLMicroSeconds 
 {
   if (aState) {
     // pressed
-    SensorBehaviourPtr s = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
+    SensorBehaviourPtr s = getSensor(0);
     if (s) {
       double v = s->getCurrentValue();
       if (aButtonIndex==0)
         v -= s->getResolution(); // down
       else
-        v += s->getResolution(); // down
+        v += s->getResolution(); // up
       // limit
       if (v>s->getMax()) v = s->getMax();
       if (v<s->getMin()) v = s->getMin();
@@ -246,7 +246,7 @@ void ConsoleDevice::sensorHandler(int aButtonIndex, bool aState, MLMicroSeconds 
 void ConsoleDevice::binaryInputHandler(bool aState, MLMicroSeconds aTimeStamp)
 {
   // TODO: assuming SINGLE binary input per device here - fix it when we need to simulate multi-input devices
-	BinaryInputBehaviourPtr b = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
+	BinaryInputBehaviourPtr b = getInput(0);
 	if (b) {
 		b->updateInputState(aState);
 	}
@@ -258,7 +258,7 @@ void ConsoleDevice::sensorJitter(bool aState, MLMicroSeconds aTimeStamp)
 {
   if (aState) {
     // pressed, make a small random sensor value change
-    SensorBehaviourPtr s = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
+    SensorBehaviourPtr s = getSensor(0);
     if (s) {
       double val = s->getCurrentValue();
       double inc = (s->getMax()-s->getMin())/2560*(random() & 0xFF); // change 1/10 of the range max
@@ -276,7 +276,7 @@ void ConsoleDevice::sensorJitter(bool aState, MLMicroSeconds aTimeStamp)
 void ConsoleDevice::sensorValueHandler(double aValue, MLMicroSeconds aTimeStamp)
 {
   // TODO: assuming SINGLE sensor per device here - fix it when we need to simulate multi-sensor devices
-	SensorBehaviourPtr s = boost::dynamic_pointer_cast<SensorBehaviour>(sensors[0]);
+	SensorBehaviourPtr s = getSensor(0);
 	if (s) {
 		s->updateSensorValue(aValue);
 	}
