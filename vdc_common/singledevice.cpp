@@ -2626,8 +2626,13 @@ ErrorPtr SingleDevice::standardActionsFromJSON(JsonObjectPtr aJSONConfig)
 
 void SingleDevice::autoAddStandardActions()
 {
+  autoAddStandardActions(deviceActions->deviceActions);
+}
+
+void SingleDevice::autoAddStandardActions(const DeviceActions::ActionsVector& aDeviceActions)
+{
   enableStandardActions(); // must behave as a single device with standard actions
-  for (DeviceActions::ActionsVector::iterator pos = deviceActions->deviceActions.begin(); pos!=deviceActions->deviceActions.end(); ++pos) {
+  for (DeviceActions::ActionsVector::const_iterator pos = aDeviceActions.begin(); pos!=aDeviceActions.end(); ++pos) {
     string id = (*pos)->getId();
     StandardActionPtr a = StandardActionPtr(new StandardAction(*this, "std." + id));
     a->configureMacro(id, getParametersFromActionDefaults(*pos));
