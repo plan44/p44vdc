@@ -66,7 +66,10 @@ void WindowEvaluator::addValue(double aValue, MLMicroSeconds aTimeStamp)
     }
   }
   // accumulation of value in previous datapoint complete (or none available at all)
-  dataPoints.push_back({ .value = aValue, .timestamp = aTimeStamp });
+  DataPoint dp;
+  dp.value = aValue;
+  dp.timestamp = aTimeStamp;
+  dataPoints.push_back(dp);
   subDataPoints = 1;
 }
 
@@ -219,26 +222,29 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
 
 
 static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
+  // type                      usage           evalWin    avgWin     evalType                                    pushIntvl  chgOnlyIntvl  trigDelta  trigRel  trigMin trigIntvl
+  // ------------------------  -------------   ---------  ---------  ------------------------------------------- ---------  ------------  ---------  -------  ------- --------------------------
   // indoor context
-  { .type = sensorType_temperature,    .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute, .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_humidity,       .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 2,   .trigRel = false, .trigMin =   -1, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_illumination,   .usage = usage_room,     .evalWin = 5*Minute,  .avgWin = 10*Second, .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_gas_CO2,        .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_gas_CO,         .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
+  { sensorType_temperature,    usage_room,     0,         0,         WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_room,     0,         0,         WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_room,     5*Minute,  10*Second, WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_gas_CO2,        usage_room,     0,         0,         WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_gas_CO,         usage_room,     0,         0,         WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
   // outdoor context
-  { .type = sensorType_temperature,    .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute, .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_humidity,       .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 2,   .trigRel = false, .trigMin = -1,   .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_illumination,   .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 20*Second, .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_air_pressure,   .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 15*Minute, .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_wind_speed,     .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 1*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 0.1, .trigRel = true,  .trigMin = -1,   .trigIntvl = 1*Minute },
-  { .type = sensorType_wind_direction, .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 1*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 20,  .trigRel = false, .trigMin = -1,   .trigIntvl = 1*Minute },
-  { .type = sensorType_gust_speed,     .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 3*Second,  .evalType = WindowEvaluator::eval_max,                  .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 0.1, .trigRel = true,  .trigMin = 5,    .trigIntvl = 3*Second },
+  { sensorType_temperature,    usage_outdoors, 0,         0,         WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_outdoors, 0,         0,         WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_outdoors, 10*Minute, 20*Second, WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_air_pressure,   usage_outdoors, 0,         0,         WindowEvaluator::eval_none,                 15*Minute, 60*Minute,    0,         false,   0,      0 },
+  { sensorType_wind_speed,     usage_outdoors, 10*Minute, 1*Minute,  WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    0.1,       true,    -1,     1*Minute },
+  { sensorType_wind_direction, usage_outdoors, 10*Minute, 1*Minute,  WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    20,        false,   -1,     1*Minute },
+  { sensorType_gust_speed,     usage_outdoors, 10*Minute, 3*Second,  WindowEvaluator::eval_max,                  10*Minute, 60*Minute,    0.1,       true,    5,      3*Second /* = "immediate" */},
   // FIXME: rule says "accumulation", but as long as sensors deliver intensity in mm/h, it is in fact a window average over an hour
-  { .type = sensorType_precipitation,  .usage = usage_outdoors, .evalWin = 60*Minute, .avgWin = 2*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 60*Minute, .chgOnlyIntvl = 60*Minute },
+  { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,  WindowEvaluator::eval_timeweighted_average, 60*Minute, 60*Minute,    0,         false,   0,      0 },
 
   // terminator
-  { .type = sensorType_none }
+  { sensorType_none,           usage_undefined,0,         0,         WindowEvaluator::eval_none,                 0,         0,            0,         false,   0,      0 },
 };
+
 
 
 
