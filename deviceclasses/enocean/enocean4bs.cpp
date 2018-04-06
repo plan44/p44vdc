@@ -150,6 +150,19 @@ static void windowStateHandler(const struct EnoceanSensorDescriptor &aSensorDesc
     bb->updateInputState(status==0 ? 0 : (status==1 ? 2 : 1));
   }
 }
+// window closed (0), open (1), tilted (2) tri-state binary input in A5-14-09/0A
+static void reversedWindowStateHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  // A5-14-09/0A have 0=closed, 1=tilted, 2=reserved/invalid, 3=open
+  uint8_t status = (uint8_t)EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
+    // 00->2 (tilted), 01->0 (closed), 10/11->1 (open)
+    bb->updateInputState(status==0 ? 2 : (status==1 ? 0 : 1));
+  }
+}
+
+
+
 
 
 // two-range illumination sensor in A5-06-05
@@ -545,12 +558,21 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
   { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
   // A5-14-09: Window state, 0=closed, 1=open, 2=tilted
+  // - standard mount
   { 0, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &windowStateHandler, windowText },
   { 0, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  // - reverse mount (value 2 and 0 swapped)
+  { 1, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &reversedWindowStateHandler, windowText },
+  { 1, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
   // A5-14-0A: Window state + vibration, 0=closed, 1=open, 2=tilted
+  // - standard mount
   { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &windowStateHandler, windowText },
   { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
   { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  // - reverse mount (value 2 and 0 swapped)
+  { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &reversedWindowStateHandler, windowText },
+  { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
+  { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
 
   // A5-30-03: generic temperature + 4 digital inputs
   // - variant for Afriso water sensor with Wake==0 -> water detected
@@ -643,6 +665,12 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   // heating valve alternatives
   {  30, 0x00A52004, 0, "heating valve", NULL },
   {  30, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
+  // A5-14-09 reverse mount alternative
+  {  31, 0x00A51409, 0, "window state - regular mounting position", NULL },
+  {  31, 0x01A51409, 0, "window state - upside down mounting position", NULL },
+  // A5-14-0A reverse mount alternative
+  {  32, 0x00A5140A, 0, "window state - regular mounting position", NULL },
+  {  32, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
   { 0, 0, 0, NULL, NULL } // terminator
 };
 

@@ -198,7 +198,7 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   // generic device, show changed channels
   if (olaType==ola_dimmer) {
     // single channel dimmer
-    LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+    LightBehaviourPtr l = getOutput<LightBehaviour>();
     if (l && l->brightnessNeedsApplying()) {
       transitionTime = l->transitionTimeToNewBrightness();
       l->brightnessTransitionStep(); // init
@@ -209,9 +209,9 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   }
   else if (olaType==ola_fullcolordimmer) {
     // RGB, RGBW or RGBWA dimmer
-    RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
+    RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     if (cl) {
-      MovingLightBehaviourPtr ml = boost::dynamic_pointer_cast<MovingLightBehaviour>(output);
+      MovingLightBehaviourPtr ml = getOutput<MovingLightBehaviour>();
       if (needsToApplyChannels()) {
         // needs update
         // - derive (possibly new) color mode from changed channels
@@ -238,7 +238,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   // generic device, show changed channels
   if (olaType==ola_dimmer) {
     // single channel dimmer
-    LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+    LightBehaviourPtr l = getOutput<LightBehaviour>();
     bool moreSteps = l->brightnessTransitionStep(aStepSize);
     double w = l->brightnessForHardware()*255/100;
     setDMXChannel(whiteChannel,(DmxValue)w);
@@ -259,8 +259,8 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   }
   else if (olaType==ola_fullcolordimmer) {
     // RGB, RGBW or RGBWA dimmer
-    RGBColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(output);
-    MovingLightBehaviourPtr ml = boost::dynamic_pointer_cast<MovingLightBehaviour>(output);
+    RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
+    MovingLightBehaviourPtr ml = getOutput<MovingLightBehaviour>();
     bool moreSteps = cl->brightnessTransitionStep(aStepSize);
     if (cl->colorTransitionStep(aStepSize)) moreSteps = true;
     if (ml && ml->positionTransitionStep(aStepSize)) moreSteps = true;

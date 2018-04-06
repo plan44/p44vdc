@@ -423,6 +423,11 @@ BinaryInputBehaviourPtr Device::getInput(int aIndex, const string aId)
 }
 
 
+OutputBehaviourPtr Device::getOutput()
+{
+  return output;
+}
+
 
 
 
