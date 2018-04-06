@@ -703,7 +703,7 @@ void HomeConnectDevice::handleEventTypeDisconnected()
 void HomeConnectDevice::handleEventTypeConnected()
 {
   isConnected = true;
-  announce(NULL);
+  vdcP->scheduleRecollect(rescanmode_normal, Second);
   ALOG(LOG_NOTICE, "Device connected");
   pollState();
 }
