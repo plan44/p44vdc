@@ -63,7 +63,7 @@ namespace p44 {
     typedef ColorChannel inherited;
 
   public:
-    HueChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hue") { resolution = 0.1; /* 0.1 degree */ };
+    explicit HueChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hue") { resolution = 0.1; /* 0.1 degree */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_hue; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_degree, unitScaling_1); };
