@@ -292,7 +292,7 @@ void SparkIoDevice::presenceStateReceived(PresenceCB aPresenceResultHandler, Jso
 
 void SparkIoDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  SparkLightBehaviourPtr sl = boost::dynamic_pointer_cast<SparkLightBehaviour>(output);
+  SparkLightBehaviourPtr sl = getOutput<SparkLightBehaviour>();
   if (sl) {
     if (!needsToApplyChannels()) {
       // NOP for this call
@@ -367,7 +367,7 @@ void SparkIoDevice::channelValuesReceived(SimpleCB aDoneCB, JsonObjectPtr aJsonR
 {
   if (Error::isOK(aError) && aJsonResponse) {
     JsonObjectPtr o = aJsonResponse->get("return_value");
-    SparkLightBehaviourPtr sl = boost::dynamic_pointer_cast<SparkLightBehaviour>(output);
+    SparkLightBehaviourPtr sl = getOutput<SparkLightBehaviour>();
     if (o && sl) {
       uint32_t state = o->int32Value();
       uint8_t mode = (state>>24) & 0xFF;

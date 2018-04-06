@@ -94,12 +94,15 @@ namespace p44 {
     bool onConditionMet; ///< true: conditionMetSince relates to ON-condition, false: conditionMetSince relates to OFF-condition
     MLTicket evaluateTicket;
     bool evaluating; ///< protection against cyclic references
+    MLTicket testlaterTicket;
+    bool timedtest; ///< set when current evaluation is triggered by timer
 
     EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(deviceSettings); };
 
   public:
 
     EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID, const string &aEvaluatorConfig);
+
     virtual ~EvaluatorDevice();
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
@@ -179,7 +182,9 @@ namespace p44 {
     void parseValueDefs();
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
-    void evaluateConditions(Tristate aRefState);
+    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
+    void evaluateConditions(Tristate aRefState, bool aTimedTest);
+    void evaluateConditionsLater();
     void changedConditions();
 
     /// expression evaluation

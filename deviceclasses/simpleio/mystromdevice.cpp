@@ -131,7 +131,7 @@ void MyStromDevice::initialStateReceived(StatusCB aCompletedCB, bool aFactoryRes
   if (Error::isOK(aError) && aJsonResponse) {
     JsonObjectPtr o = aJsonResponse->get("relay");
     if (o) {
-      output->getChannelByIndex(0)->syncChannelValue(o->boolValue() ? 100 : 0);
+      getOutput()->getChannelByIndex(0)->syncChannelValue(o->boolValue() ? 100 : 0);
     }
   }
   // set up regular polling
@@ -160,7 +160,7 @@ void MyStromDevice::stateReceived(JsonObjectPtr aJsonResponse, ErrorPtr aError)
     }
     o = aJsonResponse->get("relay");
     if (o) {
-      output->getChannelByIndex(0)->syncChannelValueBool(o->boolValue());
+      getOutput()->getChannelByIndex(0)->syncChannelValueBool(o->boolValue());
     }
   }
   // schedule next poll
@@ -182,7 +182,7 @@ void MyStromDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   bool sendState = false;
   bool newState;
-  LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(output);
+  LightBehaviourPtr l = getOutput<LightBehaviour>();
   if (l) {
     // light
     if (l->brightnessNeedsApplying()) {
@@ -193,7 +193,7 @@ void MyStromDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   }
   else {
     // standard output
-    ChannelBehaviourPtr ch = output->getChannelByIndex(0);
+    ChannelBehaviourPtr ch = getOutput()->getChannelByIndex(0);
     if (ch->needsApplying()) {
       sendState = true;
       newState = ch->getChannelValueBool();
@@ -212,7 +212,7 @@ void MyStromDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 void MyStromDevice::channelValuesSent(SimpleCB aDoneCB, string aResponse, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
-    output->getChannelByIndex(0)->channelValueApplied();
+    getOutput()->getChannelByIndex(0)->channelValueApplied();
     // sample the state and power
     sampleState();
   }
@@ -238,7 +238,7 @@ void MyStromDevice::channelValuesReceived(SimpleCB aDoneCB, JsonObjectPtr aJsonR
   if (Error::isOK(aError) && aJsonResponse) {
     JsonObjectPtr o = aJsonResponse->get("relay");
     if (o) {
-      output->getChannelByIndex(0)->syncChannelValueBool(o->boolValue());
+      getOutput()->getChannelByIndex(0)->syncChannelValueBool(o->boolValue());
     }
   }
   // done

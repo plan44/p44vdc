@@ -41,6 +41,13 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
 }
 
 
+BinaryInputBehaviour::~BinaryInputBehaviour()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
+}
+
+
+
 const char *inputTypeIds[numVdcSensorTypes] = {
   "generic", ///< no system function
   "presence", ///< Presence
@@ -176,6 +183,12 @@ string BinaryInputBehaviour::getStatusText()
 
 
 // MARK: ===== value source implementation
+
+
+string BinaryInputBehaviour::getSourceId()
+{
+  return string_format("%s_I%s", device.getDsUid().getString().c_str(), getId().c_str());
+}
 
 
 string BinaryInputBehaviour::getSourceName()

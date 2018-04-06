@@ -492,7 +492,7 @@ void EldatButtonDevice::handleFunction(EldatFunction aFunction)
   ) {
     buttonNo = 1;
   }
-  ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[buttonNo]);
+  ButtonBehaviourPtr bb = getButton(buttonNo);
   // now handle
   if (!pressedTicket) {
     // pressing button now
@@ -509,7 +509,7 @@ void EldatButtonDevice::handleFunction(EldatFunction aFunction)
 void EldatButtonDevice::buttonReleased(int aButtonNo)
 {
   pressedTicket = 0;
-  ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(buttons[aButtonNo]);
+  ButtonBehaviourPtr bb = getButton(aButtonNo);
   bb->buttonAction(false);
 }
 
@@ -534,7 +534,7 @@ string EldatMotionDetector::modelName()
 void EldatMotionDetector::handleFunction(EldatFunction aFunction)
 {
   // A = detector on, B = detector off
-  BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(binaryInputs[0]);
+  BinaryInputBehaviourPtr ib = getInput(0);
   if (ib) {
     ib->updateInputState(aFunction=='A' ? 1 : 0);
   }
@@ -603,8 +603,8 @@ void EldatRemoteControlDevice::sentFunction(string aAnswer, ErrorPtr aError)
 void EldatRemoteControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // standard output behaviour
-  if (output) {
-    ChannelBehaviourPtr ch = output->getChannelByType(channeltype_default);
+  if (getOutput()) {
+    ChannelBehaviourPtr ch = getOutput()->getChannelByType(channeltype_default);
     if (ch->needsApplying()) {
       bool on = ch->getChannelValueBool();
       sendFunction(on ? 'A' : 'B');

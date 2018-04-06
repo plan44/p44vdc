@@ -1145,6 +1145,11 @@ namespace p44 {
     /// automatically add all device actions as standard actions
     void autoAddStandardActions();
 
+
+    /// create Standard Actions based on Actions
+    /// @param aDeviceActions - vector of Actions which will be a basis for Standard Action
+    void autoAddStandardActions(const DeviceActions::ActionsVector& aDeviceActions);
+
     /// dynamically configure dynamic action (add/change/remove)
     /// @note this can be used by device implementations for adding/changing dynamic actions while device is operational.
     /// @param aJSONConfig JSON config object for creating or updating an action. If NULL or null json object, action will be deleted

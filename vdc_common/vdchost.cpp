@@ -28,10 +28,12 @@
 #include "jsonvdcapi.hpp" // need it for the case of no vDC api, as default
 
 #include "outputbehaviour.hpp"
+#include "sensorbehaviour.hpp"
+#include "binaryinputbehaviour.hpp"
+#include "buttonbehaviour.hpp"
 
 #if ENABLE_LOCAL_BEHAVIOUR
 // for local behaviour
-#include "buttonbehaviour.hpp"
 #include "lightbehaviour.hpp"
 #endif
 
@@ -779,7 +781,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
       }
       else {
         // call scene or start dimming
-        LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(dev->output);
+        LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(dev->getOutput());
         if (l) {
           // - figure out direction if not already known
           if (localDimDirection==0 && l->brightness->getLastSync()!=Never) {
@@ -880,7 +882,7 @@ void VdcHost::addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZon
     Device *devP = pos->second.get();
     if (
       (aZone==0 || devP->getZoneID()==aZone) &&
-      (aGroup==group_undefined || (devP->output && devP->output->isMember(aGroup)))
+      (aGroup==group_undefined || (devP->getOutput() && devP->getOutput()->isMember(aGroup)))
     ) {
       addTargetToAudience(aAudience, DsAddressablePtr(devP));
     }
@@ -1312,7 +1314,7 @@ void VdcHost::announceNext()
     ) {
       // mark device as being in process of getting announced
       vdc->announcing = MainLoop::now();
-      // call announcevdc method (need to construct here, because dSUID must be sent as vdcdSUID)
+      // send announcevdc request
       ApiValuePtr params = getSessionConnection()->newApiValue();
       params->setType(apivalue_object);
       params->add("dSUID", params->newBinary(vdc->getDsUid().getBinary()));
@@ -1340,8 +1342,12 @@ void VdcHost::announceNext()
     ) {
       // mark device as being in process of getting announced
       dev->announcing = MainLoop::now();
-      // call announce method
-      if (!dev->announce(boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
+      // send announcedevice request
+      ApiValuePtr params = getVdcHost().getSessionConnection()->newApiValue();
+      params->setType(apivalue_object);
+      // include link to vdc for device announcements
+      params->add("vdc_dSUID", params->newBinary(dev->vdcP->getDsUid().getBinary()));
+      if (!dev->sendRequest("announcedevice", params, boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
         LOG(LOG_ERR, "Could not send device announcement message for %s %s", dev->entityType(), dev->shortDesc().c_str());
         dev->announcing = Never; // not announcing
       }
@@ -1364,6 +1370,7 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
     LOG(LOG_NOTICE, "Announcement for %s %s acknowledged by vdSM", aAddressable->entityType(), aAddressable->shortDesc().c_str());
     aAddressable->announced = MainLoop::now();
     aAddressable->announcing = Never; // not announcing any more
+    aAddressable->announcementAcknowledged(); // give instance opportunity to do things following an announcement
   }
   // cancel retry timer
   MainLoop::currentMainLoop().cancelExecutionTicket(announcementTicket);
@@ -1502,15 +1509,15 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
       if (vs) {
-        aApiObjectValue->add(string_format("%s_S%zu",dev->getDsUid().getString().c_str(), b->getIndex()), aApiObjectValue->newString(vs->getSourceName().c_str()));
+        aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
       }
     }
     // Inputs
-    for (BehaviourVector::iterator pos2 = dev->binaryInputs.begin(); pos2!=dev->binaryInputs.end(); ++pos2) {
+    for (BehaviourVector::iterator pos2 = dev->inputs.begin(); pos2!=dev->inputs.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
       if (vs) {
-        aApiObjectValue->add(string_format("%s_I%zu",dev->getDsUid().getString().c_str(), b->getIndex()), aApiObjectValue->newString(vs->getSourceName().c_str()));
+        aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
       }
     }
   }
@@ -1533,18 +1540,15 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
       DevicePtr dev = pos->second;
       const char *p = aValueSourceID.c_str()+i+1;
       if (*p) {
+        // first character is type: I=Input, S=Sensor
         char ty = *p++;
-        // scan index
-        int idx = 0;
-        if (sscanf(p, "%d", &idx)==1) {
-          if (ty=='S' && idx<dev->sensors.size()) {
-            // sensor
-            valueSource = dynamic_cast<ValueSource *>(dev->sensors[idx].get());
-          }
-          else if (ty=='I' && idx<dev->binaryInputs.size()) {
-            // input
-            valueSource = dynamic_cast<ValueSource *>(dev->binaryInputs[idx].get());
-          }
+        DsBehaviourPtr bhv;
+        switch (ty) {
+          case 'S' : bhv = dev->getSensor(Device::by_id_or_index, string(p)); break;
+          case 'I' : bhv = dev->getInput(Device::by_id_or_index, string(p)); break;
+        }
+        if (bhv) {
+          valueSource = dynamic_cast<ValueSource *>(bhv.get());
         }
       }
     }

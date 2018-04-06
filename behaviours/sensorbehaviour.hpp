@@ -32,6 +32,99 @@ using namespace std;
 namespace p44 {
 
 
+  class WindowEvaluator : public P44Obj
+  {
+    typedef struct {
+      double value; ///< value of the datapoint (might be updated while accumulating)
+      MLMicroSeconds timestamp; ///< time when datapoint's value became final (when accumulating average, this is the time of the last added sub-datapoint)
+    } DataPoint;
+
+    typedef std::list<DataPoint> DataPointsList;
+
+    // settings
+    MLMicroSeconds windowTime;
+    MLMicroSeconds dataPointAvgTime;
+
+    // state
+    DataPointsList dataPoints;
+    int subDataPoints; ///< number of values currently added into last datapoint
+
+  public:
+
+    typedef enum {
+      eval_none, ///< no evaluation, disabled
+      eval_average, ///< average over data points added within window time
+      eval_timeweighted_average, ///< average over data points, but weighting them by the time passed since last data point (assuming datapoints are averages over past time anyway)
+      eval_max ///< maximum within the window time
+    } EvaluationType;
+
+    /// @param aWindowTime width (timespan) of evaluation window
+    /// @param aDataPointAvgTime within that timespan, new values reported will be averaged into a single datapoint
+    WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointAvgTime);
+
+    /// Add a new value to the evaluator. Depending on
+    /// @param aValue the value to add
+    /// @param aTimeStamp the timestamp, must be increasing for every call, default==Never==now
+    void addValue(double aValue, MLMicroSeconds aTimeStamp = Never);
+
+    /// Get the current evaluation result
+    /// @param aEvaluationType the type of evaluation to perform
+    /// @note will return 0 when no datapoints are accumulated at all
+    double evaluate(EvaluationType aEvaluationType);
+
+  };
+  typedef boost::intrusive_ptr<WindowEvaluator> WindowEvaluatorPtr;
+
+
+  /// Requirement: Evaluated values are sent on every internal evaluation interval if they differ from the previously sent value.
+  /// Solution (existing in vDCs since ever):
+  /// - "minPushInterval" : approximately represents the "evaluation interval" - values are not delivered more often than this
+  ///   The default for this was 30 seconds for all sensors until now, will now be set depending on the sensor type/usage
+
+  /// Requirement: An evaluated value is sent after the longest update interval is reached, even if the value does not differ from the one previously sent.
+  ///   This serves as a heartbeat signal of the sensor besides providing measurement values.
+  /// Solution (existing in vDCs since ever):
+  /// - "aliveSignInterval" : represents the "longest update interval" in the hartbeat sense. As long as the sensor is operating
+  ///   correctly, it will push updates at least in this interval.
+  ///   This cannot be statically defined per sensor type, because this is a property of the actual sensor hardware that
+  ///   cannot be changed. vdcs do *report* this interval for the sensor, if it is known and does apply (there are many
+  ///   energy harvesting sensors which do not report anything regularly).
+  /// - "changesOnlyInterval" : also represents the "longest update interval" in the sense that a *unchanged* sensor report
+  ///   from the hardware is NOT pushed again during this interval, even if the "minPushInterval" would allow so.
+  ///   This is a setting with a default value of 0.
+
+  /// Requirement: To be able to catch fast changes, some sensor types are allowed to report a value immediately
+  ///   if a certain delta to the previously sent value is reached.
+  /// Solution (being implemented March 2018):
+  ///   the sensor will be automatically assigned a profile depending on the sensor type, defining three parameters
+  ///   - triggerDelta the difference between current value and last pushed value that must be met
+  ///   - triggerMinValue the minimum absolute value the current value must have
+  ///   - triggerInterval the minimum interval between the last push and a delta-triggered push
+
+
+  /// the parameter profile how to evaluate and report a particular sensor type
+  typedef struct {
+    // identification
+    VdcSensorType type; ///< the sensor type these parameters apply to
+    VdcUsageHint usage; ///< the sensor usage these parameters apply to
+    // parameters
+    // - evaluation
+    MLMicroSeconds evalWin; ///< evaluation window size (time)
+    MLMicroSeconds avgWin; ///< subdatapoint accumulating time
+    WindowEvaluator::EvaluationType evalType; ///< type of evaluation
+
+    // - defaults for settings
+    MLMicroSeconds pushIntvl; ///< default setting for minPushInterval, 0 = use global default
+    MLMicroSeconds chgOnlyIntvl; ///< default setting for changesOnlyInterval, 0 = none
+    // - SOD (send on delta) push delivery
+    double trigDelta; ///< the minimal absolute or relative change to trigger a out-of-period push. 0=disabled
+    bool trigRel; ///< if set, the trigDelta is a relative value (as a factor of the previous value)
+    double trigMin; ///< the minimal absolute value needed to activate delta triggering
+    MLMicroSeconds trigIntvl; ///< how soon after a previous push a extra trigger may occur
+  } SensorBehaviourProfile;
+
+
+
   /// Implements the behaviour of a digitalSTROM Sensor. In particular it manages and throttles
   /// pushing updates to the dS upstream, to avoid jitter in hardware reported values to flood
   /// the system with unneded update messages
@@ -54,6 +147,7 @@ namespace p44 {
     double resolution; ///< change per LSB of sensor engineering value. If resolution==0, resolution is not known
     MLMicroSeconds updateInterval; ///< approximate time resolution of the sensor (how fast the sensor can track values)
     MLMicroSeconds aliveSignInterval; ///< how often the sensor reports a value minimally (if it does not report for longer than that, it can be considered out of order). Can be 0 for sensors from which no regular update can be expected at all
+    const SensorBehaviourProfile *profileP; ///< the sensor behaviour profile, can be NULL for simple forwarding without special processing
     /// @}
 
     /// @name persistent settings
@@ -61,16 +155,21 @@ namespace p44 {
     DsGroup sensorGroup; ///< group this sensor belongs to
     MLMicroSeconds minPushInterval; ///< minimum time between pushes (even if we have more frequent hardware sensor updates)
     MLMicroSeconds changesOnlyInterval; ///< time span during which only actual value changes are reported. After this interval, next hardware sensor update, even without value change, will cause a push)
+    #if ENABLE_RRDB
+    string rrdconfig; ///< the rrd config for creating a rrdb file to log sensor data into
+    #endif
     /// @}
 
 
     /// @name internal volatile state
     /// @{
     double currentValue; ///< current sensor value
+    double lastPushedValue; ///< last pushed value (for delta triggering)
     MLMicroSeconds lastUpdate; ///< time of last update from hardware
     MLMicroSeconds lastPush; ///< time of last push
     int32_t contextId; ///< context ID for the value - <0 = none
     string contextMsg; ///< context message for the value - empty=none
+    WindowEvaluatorPtr filter; ///< filter
     /// @}
 
 
@@ -81,6 +180,8 @@ namespace p44 {
     /// @param aId the string ID for that sensor.
     ///   If empty string is passed, an id will be auto-generated from the sensor type (after setHardwareSensorConfig() is called)
     SensorBehaviour(Device &aDevice, const string aId);
+
+    virtual ~SensorBehaviour();
 
     /// initialisation of hardware-specific constants for this sensor
     /// @param aType the sensor type (Note: not the same as dS sensor types, needs mapping)
@@ -157,12 +258,11 @@ namespace p44 {
     void updateEngineeringValue(long aEngineeringValue, bool aPush = true, int32_t aContextId = -1, const char *aContextMsg = NULL);
 
     /// pushes the current sensor state
-    /// @param aChanged if set, the state is considered changed, which means it is always pushed, unless last push was less than minPushInterval ago
     /// @param aAlways if set, the state even pushed when last push is more recent than minPushInterval
     /// @note this can be used for sensor values that are more often updated than is of interest for upstream,
     ///   to only occasionally push an update. For that, use updateSensorValue() with aPush==false
     /// @return true if state was actually pushed (all conditions met and vDC API connected)
-    bool pushSensor(bool aChanged, bool aAlways = false);
+    bool pushSensor(bool aAlways = false);
 
     /// @}
 
@@ -182,6 +282,9 @@ namespace p44 {
 
     /// @name ValueSource interface
     /// @{
+
+    /// get id - unique at least in the vdhost's scope
+    virtual string getSourceId() P44_OVERRIDE;
 
     /// get descriptive name identifying the source within the entire vdc host (for using in selection lists)
     virtual string getSourceName() P44_OVERRIDE;

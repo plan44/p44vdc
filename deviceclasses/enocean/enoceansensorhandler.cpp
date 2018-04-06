@@ -309,7 +309,7 @@ void EnoceanSensorHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       }
       else if (sensorChannelDescriptorP->behaviourType==behaviour_sensor && sensorChannelDescriptorP->behaviourParam==sensorType_supplyVoltage) {
         SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(behaviour);
-        if (sb && sb->hasDefinedState()) lowBat = sb->getCurrentValue()<sb->getMax()*0.8; // assume low bat at 80% of max supply voltage
+        if (sb && sb->hasDefinedState()) lowBat = sb->getCurrentValue()<2.6; // assume CR2032 type battery, which goes down to 2V but 2.6 is already indicating "low"
       }
     }
   }

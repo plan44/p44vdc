@@ -21,23 +21,122 @@
 
 #include "sensorbehaviour.hpp"
 
+#if ENABLE_RRDB
+#include "rrd.h"
+#endif
+
 using namespace p44;
+
+
+// MARK: ===== WindowEvaluator
+
+
+WindowEvaluator::WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointAvgTime) :
+  windowTime(aWindowTime),
+  dataPointAvgTime(aDataPointAvgTime)
+{
+}
+
+
+
+
+void WindowEvaluator::addValue(double aValue, MLMicroSeconds aTimeStamp)
+{
+  if (aTimeStamp==Never) aTimeStamp = MainLoop::now();
+  // clean away outdated datapoints
+  while (!dataPoints.empty()) {
+    if (dataPoints.front().timestamp<aTimeStamp-windowTime) {
+      // this one is outdated (lies more than windowTime in the past), remove it
+      dataPoints.pop_front();
+    }
+    else {
+      break;
+    }
+  }
+  // add new value
+  if (!dataPoints.empty()) {
+    // check if we should accumulate into last existing datapoint
+    DataPoint &last = dataPoints.back();
+    if (aTimeStamp-last.timestamp<dataPointAvgTime) {
+      // still accumulating
+      last.value = (last.value*subDataPoints + aValue) / (subDataPoints+1);
+      last.timestamp = aTimeStamp;
+      subDataPoints++;
+      return; // done
+    }
+  }
+  // accumulation of value in previous datapoint complete (or none available at all)
+  dataPoints.push_back({ .value = aValue, .timestamp = aTimeStamp });
+  subDataPoints = 1;
+}
+
+
+double WindowEvaluator::evaluate(EvaluationType aEvaluationType)
+{
+  double result = 0;
+  double divisor = 0;
+  int count = 0;
+  for (DataPointsList::iterator pos = dataPoints.begin(); pos != dataPoints.end(); ++pos) {
+    MLMicroSeconds lastTs = Never;
+    switch (aEvaluationType) {
+      case eval_max: {
+        if (count==0 || pos->value>result) result = pos->value;
+        divisor = 1;
+        break;
+      }
+      case eval_timeweighted_average: {
+        if (count==0) {
+          // the first datapoint's time weight reaches back to beginning of window
+          lastTs = dataPoints.back().timestamp-windowTime;
+        }
+        MLMicroSeconds timeWeight = pos->timestamp-lastTs;
+        result += pos->value*timeWeight;
+        divisor += timeWeight;
+        // next datapoint's time weight will reach back to this datapoint's time
+        lastTs = pos->timestamp;
+        break;
+      }
+      case eval_average:
+      default: {
+        result += pos->value;
+        divisor++;
+        break;
+      }
+    }
+    count++;
+  }
+  return divisor ? result/divisor : 0;
+}
+
+
+
+
+
+// MARK: ===== SensorBehaviour
 
 SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
+  profileP(NULL), // the profile
   // persistent settings
   sensorGroup(group_black_variable), // default to joker
-  minPushInterval(30*Second), // do not push more often than every 2 seconds
+  minPushInterval(30*Second), // default unless sensor type profile sets another value
   changesOnlyInterval(0), // report every sensor update (even if value unchanged)
   // state
   invalidatorTicket(0),
   lastUpdate(Never),
   lastPush(Never),
   currentValue(0),
+  lastPushedValue(0),
   contextId(-1)
 {
   // set dummy default hardware default configuration (no known alive sign interval!)
   setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 100, 1, 15*Second, 0);
+}
+
+
+SensorBehaviour::~SensorBehaviour()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
 }
 
 
@@ -115,6 +214,31 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
 };
 
 
+static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
+  // indoor context
+  { .type = sensorType_temperature,    .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute, .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
+  { .type = sensorType_humidity,       .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 2,   .trigRel = false, .trigMin =   -1, .trigIntvl = 1*Second /* = "immediate" */ },
+  { .type = sensorType_illumination,   .usage = usage_room,     .evalWin = 5*Minute,  .avgWin = 10*Second, .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
+  { .type = sensorType_gas_CO2,        .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
+  { .type = sensorType_gas_CO,         .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
+  // outdoor context
+  { .type = sensorType_temperature,    .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute, .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
+  { .type = sensorType_humidity,       .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 2,   .trigRel = false, .trigMin = -1,   .trigIntvl = 1*Second /* = "immediate" */ },
+  { .type = sensorType_illumination,   .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 20*Second, .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
+  { .type = sensorType_air_pressure,   .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 15*Minute, .chgOnlyIntvl = 60*Minute },
+  { .type = sensorType_wind_speed,     .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 1*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 0.1, .trigRel = true,  .trigMin = -1,   .trigIntvl = 1*Minute },
+  { .type = sensorType_wind_direction, .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 1*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 20,  .trigRel = false, .trigMin = -1,   .trigIntvl = 1*Minute },
+  { .type = sensorType_gust_speed,     .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 3*Second,  .evalType = WindowEvaluator::eval_max,                  .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 0.1, .trigRel = true,  .trigMin = 5,    .trigIntvl = 3*Second },
+  // FIXME: rule says "accumulation", but as long as sensors deliver intensity in mm/h, it is in fact a window average over an hour
+  { .type = sensorType_precipitation,  .usage = usage_outdoors, .evalWin = 60*Minute, .avgWin = 2*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 60*Minute, .chgOnlyIntvl = 60*Minute },
+
+  // terminator
+  { .type = sensorType_none }
+};
+
+
+
+
 
 void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval)
 {
@@ -126,8 +250,22 @@ void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint 
   updateInterval = aUpdateInterval;
   aliveSignInterval = aAliveSignInterval;
   armInvalidator();
+  profileP = NULL;
   // default only, devices once created will have this as a persistent setting
-  changesOnlyInterval = aDefaultChangesOnlyInterval;
+  changesOnlyInterval = aDefaultChangesOnlyInterval; // default in case sensor profile does not override this
+  // look for sensor behaviour profile
+  const SensorBehaviourProfile *sbpP = sensorBehaviourProfiles;
+  while (sbpP->type!=sensorType_none) {
+    if (sensorType==sbpP->type && sensorUsage==sbpP->usage) {
+      // sensor type/usage has a behaviour profile, use it
+      LOG(LOG_INFO, "Activated sensor processing/filtering profile for '%s' (usage %d)", sensorTypeIds[sensorType], sensorUsage);
+      profileP = sbpP;
+      // get settings defaults
+      if (profileP->pushIntvl>0) minPushInterval = profileP->pushIntvl;
+      if (profileP->chgOnlyIntvl>0) changesOnlyInterval = profileP->chgOnlyIntvl;
+    }
+    ++sbpP; // next
+  }
 }
 
 
@@ -228,11 +366,25 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
     LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", contextId, contextMsg.c_str());
   }
   if (changedValue) {
+    // check for averaging
+    if (profileP && profileP->evalType!=WindowEvaluator::eval_none) {
+      // process values through filter
+      if (!filter) {
+        // need a filter, create it
+        filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->avgWin));
+      }
+      filter->addValue(aValue, now);
+      aValue = filter->evaluate(profileP->evalType);
+      // re-evaluate changed flag after filtering
+      if (fabs(aValue - currentValue) > resolution/2) changedValue = true;
+      BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' calculates %s filtered value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
+    }
+    // anyway, assign new current value
     currentValue = aValue;
   }
   // possibly push
   if (aPush) {
-    pushSensor(changedValue);
+    pushSensor();
   }
   // notify listeners
   notifyListeners(changedValue ? valueevent_changed : valueevent_confirmed);
@@ -240,20 +392,44 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
 
 
 
-bool SensorBehaviour::pushSensor(bool aChanged, bool aAlways)
+bool SensorBehaviour::pushSensor(bool aAlways)
 {
   MLMicroSeconds now = MainLoop::now();
-  if (aChanged || now>lastPush+changesOnlyInterval) {
-    // changed value or last push with same value long enough ago
-    if (aAlways || lastPush==Never || now>lastPush+minPushInterval) {
-      // push the new value
-      if (pushBehaviourState()) {
-        lastPush = now;
-        return true;
+  bool doPush = aAlways || lastPush==Never; // always push if asked for or when there's no previous value
+  if (!doPush) {
+    // Note: when we get here, lastPush and lastPushedValue are always valid
+    bool changed = currentValue!=lastPushedValue;
+    if (now>lastPush+minPushInterval) {
+      // Minimal push interval is over -> push...
+      // - if value has changed or
+      // - changesOnlyInterval has been exceeded
+      doPush =
+        changed || // when changed
+        now>lastPush+changesOnlyInterval || // when interval for reporting anyway has passed
+        (aliveSignInterval>0 && now>lastUpdate+aliveSignInterval); // and in case sensor declares a heartbeat interval
+    }
+    else if (profileP) {
+      // Minimal push interval is NOT over, check extra trigger conditions
+      if (profileP->trigDelta>0 && now>lastPush+profileP->trigIntvl) {
+        // Trigger interval is over -> push if conditions are met
+        doPush =
+          currentValue>profileP->trigMin &&
+          fabs(currentValue-lastPushedValue)>=(profileP->trigRel ? fabs(currentValue*profileP->trigDelta) : profileP->trigDelta);
+        if (doPush) {
+          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets send-on-delta conditions to push earlier than normal interval", index, behaviourId.c_str(), getHardwareName().c_str());
+        }
       }
-      else if (device.isPublicDS()) {
-        BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
-      }
+    }
+  }
+  if (doPush) {
+    // push the new value
+    if (pushBehaviourState()) {
+      lastPush = now;
+      lastPushedValue = currentValue;
+      return true;
+    }
+    else if (device.isPublicDS()) {
+      BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
     }
   }
   return false;
@@ -270,7 +446,7 @@ void SensorBehaviour::invalidateSensorValue(bool aPush)
     BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' reports value no longer available", index, behaviourId.c_str(), getHardwareName().c_str());
     if (aPush) {
       // push invalidation (primitive clients not capable of NULL will at least see value==0)
-      pushSensor(true, true);
+      pushSensor(true);
     }
     // notify listeners
     notifyListeners(valueevent_changed);
@@ -296,6 +472,12 @@ bool SensorBehaviour::hasDefinedState()
 
 
 // MARK: ===== value source implementation
+
+
+string SensorBehaviour::getSourceId()
+{
+  return string_format("%s_S%s", device.getDsUid().getString().c_str(), getId().c_str());
+}
 
 
 string SensorBehaviour::getSourceName()
