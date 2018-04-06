@@ -124,6 +124,7 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   // state
   #if ENABLE_RRDB
   loggingReady(false),
+  lastRrdUpdate(Never),
   #endif
   invalidatorTicket(0),
   lastUpdate(Never),
@@ -396,7 +397,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   notifyListeners(changedValue ? valueevent_changed : valueevent_confirmed);
   // possibly log value
   #if ENABLE_RRDB
-  logSensorValue(aValue, currentValue, lastPushedValue);
+  logSensorValue(now, aValue, currentValue, lastPushedValue);
   #endif
 }
 
@@ -535,8 +536,9 @@ typedef int (*RrdFunc)(int, char **);
 static int rrd_call(RrdFunc aFunc, ArgsVector &aArgs)
 {
   char **argsArrayP = new char*[aArgs.size()+1];
+  LOG(LOG_DEBUG, "rrd_call:");
   for (int i=0; i<aArgs.size(); ++i) {
-    DBGLOG(LOG_INFO, "- %s", aArgs[i].c_str());
+    LOG(LOG_DEBUG, "- %s", aArgs[i].c_str());
     argsArrayP[i] = (char *)aArgs[i].c_str();
   }
   argsArrayP[aArgs.size()] = NULL;
@@ -544,6 +546,7 @@ static int rrd_call(RrdFunc aFunc, ArgsVector &aArgs)
   rrd_clear_error();
   int ret = aFunc((int)aArgs.size(), argsArrayP);
   delete[] argsArrayP;
+  LOG(LOG_DEBUG, "rrd_call returns: %d", ret);
   return ret;
 }
 
@@ -564,7 +567,7 @@ static string rrdminmax(double aMin, double aMax)
 }
 
 
-void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, double aPushedValue)
+void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue)
 {
   if (!loggingReady && !rrdbconfig.empty() && rrdbfile.empty()) {
     // configured but not yet prepared to log
@@ -579,12 +582,19 @@ void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, d
     bool autoRRA = false;
     bool autoStep = true;
     bool autoUpdate = true;
+    long step = 1;
     while (nextPart(p, arg, ' ')) {
       arg = trimWhiteSpace(arg);
       // catch special "macros"
       if (arg=="--step") {
         // there is a custom --step, prevent auto-generating one
         autoStep = false;
+        // scan step value
+        string stp;
+        if (!nextPart(p, stp, ' ')) break;
+        sscanf(stp.c_str(), "%ld", &step);
+        // also forward --step argument (no autostep)
+        cfgArgs.push_back(stp);
       }
       else if (arg=="auto") {
         // fully automatic sample of the current (possibly filtered) value, with standard RRAs
@@ -651,24 +661,26 @@ void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, d
       args.push_back("--start"); args.push_back("now"); // start now
       // possibly automatic --step option
       if (autoStep) {
-        // use step from sensor's update interval (but not faster than once in a minute)
-        args.push_back("--step"); args.push_back(string_format("%lld", updateInterval>Minute ? updateInterval/Second : 60)); // use sensor's native interval if known, 1min otherwise
+        step = updateInterval>15*Second ? updateInterval/Second : 15;
+        // use step from sensor's update interval (but not faster than once in 15 seconds)
+        args.push_back("--step"); args.push_back(string_format("%ld", step)); // use sensor's native interval if known, 15sec otherwise
       }
       // possibly automatic datasources
+      long heartbeat = aliveSignInterval ? aliveSignInterval/Second : step*5;
       if (autoRaw) {
-        args.push_back(string_format("DS:%s_R:GAUGE:%lld:%s", dsname.c_str(), aliveSignInterval ? aliveSignInterval/Second : 60*60, rrdminmax(min, max).c_str()));
+        args.push_back(string_format("DS:%s_R:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
       }
       if (autoFiltered) {
-        args.push_back(string_format("DS:%s_F:GAUGE:%lld:%s", dsname.c_str(), profileP && profileP->evalWin ? profileP->evalWin/Second : (aliveSignInterval ? aliveSignInterval/Second : 60*60), rrdminmax(min, max).c_str()));
+        args.push_back(string_format("DS:%s_F:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
       }
       if (autoPushed) {
-        args.push_back(string_format("DS:%s_P:GAUGE:%lld:%s", dsname.c_str(), aliveSignInterval ? aliveSignInterval/Second : 60*60, rrdminmax(min, max).c_str()));
+        args.push_back(string_format("DS:%s_P:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
       }
       if (autoRRA) {
-        // now RRAs
-        args.push_back(string_format("RRA:AVERAGE:0.5:1:7d")); // 1:1 samples for a week
-        args.push_back(string_format("RRA:AVERAGE:0.5:1h:3M")); // hourly datapoints for 3 months
-        args.push_back(string_format("RRA:AVERAGE:0.5:6h:3y")); // quarter day for 3 years
+        // now RRAs: RRA:AVERAGE:xff:steps:rows
+        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 1l, 7*24*3600/step)); // 1:1 samples for a week
+        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 3600/step, 30*24*3600*step/3600)); // hourly datapoints for 1 months (30 days)
+        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 24*3600/step, 2*365*24*3600*step/24/3600)); // daily for 2 years
       }
       // now add explicit config
       args.insert(args.end(), cfgArgs.begin(), cfgArgs.end());
@@ -677,6 +689,7 @@ void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, d
       if (ret==0) {
         BLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", rrdbfile.c_str());
         loggingReady = true;
+        lastRrdUpdate = aTimeStamp; // creation counts as update, make sure we don't immediately try to send first update afterwards
       }
       else {
         BLOG(LOG_ERR, "rrd: cannot create rrd file '%s': %s", rrdbfile.c_str(), rrd_get_error());
@@ -689,13 +702,16 @@ void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, d
     }
   }
   // now actually log into file
-  if (loggingReady) {
+  if (loggingReady && lastRrdUpdate<aTimeStamp-10*Second) {
+    lastRrdUpdate = aTimeStamp;
     ArgsVector args;
     args.push_back("rrdupdate");
     args.push_back(rrdbfile);
     string ud = rrdbupdate;
     // substitute values for placeholders
     size_t i;
+    i = ud.find("%T");
+    if (i!=string::npos) ud.replace(i, 2, string_format("%lld", aTimeStamp/Second).c_str());
     // - raw (considered unknown when sensor is invalid)
     i = ud.find("%R");
     if (i!=string::npos) ud.replace(i, 2, rrdval(aRawValue, lastUpdate!=Never).c_str());

@@ -173,6 +173,7 @@ namespace p44 {
     WindowEvaluatorPtr filter; ///< filter
     #if ENABLE_RRDB
     bool loggingReady; ///< if set, logging is ready
+    MLMicroSeconds lastRrdUpdate; ///< set when rrd was last updated
     string rrdbfile; ///< if set, this is a currently active and initialized rrd database file and can be written to
     string rrdbupdate; ///< the update string with %R, %F and %P placeholders for raw, filtered and pushed values
     #endif
@@ -343,7 +344,7 @@ namespace p44 {
 
     void armInvalidator();
     #if ENABLE_RRDB
-    void logSensorValue(double aRawValue, double aProcessedValue, double aPushedValue);
+    void logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue);
     #endif
 
   };
