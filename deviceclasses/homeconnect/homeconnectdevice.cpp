@@ -108,7 +108,7 @@ string HomeConnectProgramBuilder::build()
 
     ss << "\"options\":[";
 
-    for(map<string, string>::iterator it = options.begin(); it != options.end(); it++)
+    for(map<string, string>::iterator it = options.begin(); it != options.end(); ++it)
     {
       ss << "{ \"key\":\"" << it->first << "\",\"value\":" << it->second << "},";
     }

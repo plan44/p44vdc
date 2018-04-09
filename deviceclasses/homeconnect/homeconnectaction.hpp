@@ -59,7 +59,7 @@ namespace p44 {
 
   private:
 
-    ErrorPtr valueLookup(ApiValuePtr aParams, const string aName, string &aValue);
+    ErrorPtr valueLookup(ApiValuePtr aParams, const string& aName, string &aValue);
     void apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError);
     
   };

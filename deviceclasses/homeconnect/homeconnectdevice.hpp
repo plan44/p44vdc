@@ -45,7 +45,7 @@ namespace p44 {
 
   public:
 
-    HomeConnectDeviceSettings(Device &aDevice) :
+    explicit HomeConnectDeviceSettings(Device &aDevice) :
       inherited(aDevice) {};
 
     /// factory method to create the correct subclass type of DsScene
@@ -110,7 +110,7 @@ namespace p44 {
 
     map<string, string> options;
   public:
-    HomeConnectProgramBuilder(const string& aProgramName);
+    explicit HomeConnectProgramBuilder(const string& aProgramName);
 
     HomeConnectProgramBuilder& addOption(const string& aKey, const string& aValue) {  options[aKey] = aValue; return *this; }
 
@@ -127,7 +127,7 @@ namespace p44 {
     string value;
 
   public:
-    HomeConnectSettingBuilder(const string& aSettingName);
+    explicit HomeConnectSettingBuilder(const string& aSettingName);
 
     HomeConnectSettingBuilder& setValue(const string& aValue) { value = aValue; return *this; }
     string build();
