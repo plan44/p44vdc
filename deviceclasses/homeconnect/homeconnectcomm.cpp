@@ -39,7 +39,11 @@ using namespace p44;
 
 // MARK: ===== HomeConnectApiOperation
 
-HomeConnectApiOperation::HomeConnectApiOperation(HomeConnectComm &aHomeConnectComm, const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler) :
+HomeConnectApiOperation::HomeConnectApiOperation(HomeConnectComm &aHomeConnectComm,
+                                                 const string& aMethod,
+                                                 const string& aUrlPath,
+                                                 JsonObjectPtr aData,
+                                                 HomeConnectApiResultCB aResultHandler) :
   homeConnectComm(aHomeConnectComm),
   method(aMethod),
   urlPath(aUrlPath),
@@ -463,7 +467,7 @@ void HomeConnectComm::apiQuery(const char* aUrlPath, HomeConnectApiResultCB aRes
 }
 
 
-void HomeConnectComm::apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler)
+void HomeConnectComm::apiAction(const string& aMethod, const string& aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler)
 {
   if (!isLockDown()) {
     HomeConnectApiOperationPtr op = HomeConnectApiOperationPtr(new HomeConnectApiOperation(*this, aMethod, aUrlPath, aData, aResultHandler));

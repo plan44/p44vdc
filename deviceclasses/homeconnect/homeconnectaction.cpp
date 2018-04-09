@@ -92,7 +92,7 @@ void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 }
 
 
-ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, const string aName, string &aValue)
+ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, const string& aName, string &aValue)
 {
   ApiValuePtr v = aParams->get(aName);
   if (v) {

@@ -47,7 +47,7 @@ namespace p44 {
 
     static const char *domain() { return "HomeConnectComm"; }
     virtual const char *getErrorDomain() const { return HomeConnectCommError::domain(); };
-    HomeConnectCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    explicit HomeConnectCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
   };
 
 
@@ -83,7 +83,11 @@ namespace p44 {
 
   public:
 
-    HomeConnectApiOperation(HomeConnectComm &aHomeConnectComm, const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler);
+    HomeConnectApiOperation(HomeConnectComm &aHomeConnectComm,
+                            const string& aMethod,
+                            const string& aUrlPath,
+                            JsonObjectPtr aData,
+                            HomeConnectApiResultCB aResultHandler);
     virtual ~HomeConnectApiOperation();
 
     virtual bool initiate();
@@ -208,7 +212,7 @@ namespace p44 {
     /// @param aUrlPath the path to append to the API base URL (including leading slash if not empty)
     /// @param aData the data for the action to perform (JSON body of the request)
     /// @param aResultHandler will be called with the result
-    void apiAction(const string aMethod, const string aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler);
+    void apiAction(const string& aMethod, const string& aUrlPath, JsonObjectPtr aData, HomeConnectApiResultCB aResultHandler);
 
     /// Get a lockdown time
     MLMicroSeconds calculateLockDownTime();
