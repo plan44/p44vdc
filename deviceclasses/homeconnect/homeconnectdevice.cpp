@@ -248,9 +248,10 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
 
   if (aHomeApplicanceInfoRecord->get("brand", o)) {
     model = o->stringValue();
-    if (aHomeApplicanceInfoRecord->get("vib", o))
+    if (aHomeApplicanceInfoRecord->get("vib", o)) {
       vib = o->stringValue();
       model += " " + vib;
+    }
   }
   if (aHomeApplicanceInfoRecord->get("enumber", o))
     modelGuid = o->stringValue();
