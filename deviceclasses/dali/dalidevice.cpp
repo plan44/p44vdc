@@ -1454,6 +1454,9 @@ int DaliCompositeDevice::opStateLevel()
   int l = 100;
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (dimmers[idx]) {
+      if (dimmers[idx]->deviceInfo && dimmers[idx]->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) {
+        l = 90; // is not a recommended device, does not have unique ID
+      }
       if (dimmers[idx]->isDummy) {
         l = 20; // not seen on last bus scan, might be glitch
       }
@@ -1474,8 +1477,12 @@ string DaliCompositeDevice::getOpStateText()
   bool missing = false;
   bool failure = false;
   bool incomplete = false;
+  bool noUniqueId = false;
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (dimmers[idx]) {
+      if (dimmers[idx]->deviceInfo && dimmers[idx]->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) {
+        noUniqueId = true;
+      }
       if (!dimmers[idx]->isPresent) {
         missing = true;
       }
@@ -1499,6 +1506,10 @@ string DaliCompositeDevice::getOpStateText()
   }
   if (incomplete) {
     t += sep + "incomplete";
+    sep = ", ";
+  }
+  if (noUniqueId) {
+    t += sep + "Missing S/N";
     sep = ", ";
   }
   return t;

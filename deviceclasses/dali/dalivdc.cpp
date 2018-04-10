@@ -151,6 +151,8 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     #endif
   }
   // start collecting, allow quick scan when not exhaustively collecting (will still use full scan when bus collisions are detected)
+  // Note: only in rescanmode_exhaustive, existing short addresses might get reassigned. In all other cases, only devices with no short
+  //   address yet at all will be assigned a short address.
   daliComm->daliFullBusScan(boost::bind(&DaliVdc::deviceListReceived, this, aCompletedCB, _1, _2, _3), !(aRescanFlags & rescanmode_exhaustive));
 }
 
