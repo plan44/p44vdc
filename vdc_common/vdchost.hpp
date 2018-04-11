@@ -124,6 +124,7 @@ namespace p44 {
     friend class LocalController;
 
     bool externalDsuid; ///< set when dSUID is set to a external value (usually UUIDv1 based)
+    int vdcHostInstance; ///< instance number of this vdc host (defaults to 0, can be set to >0 to have multiple vdchost on the same host/mac address)
     bool storedDsuid; ///< set when using stored (DB persisted) dSUID that is not equal to default dSUID 
     uint64_t mac; ///< MAC address as found at startup
 
@@ -237,9 +238,10 @@ namespace p44 {
     /// Set how dSUIDs are generated
     /// @param aExternalDsUid if specified, this is used directly as dSUID for the device container
     /// @param aIfNameForMAC if specified, this network interface is used to obtain the MAC address for creating the dSUID from
+    /// @param aInstance defaults to 0, can be set to >0 to have multiple vdchost instances based on the same host/MAC-address
     /// @note Must be set before any other activity in the device container, in particular before
     ///   any class containers are added to the device container
-    void setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC);
+    void setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC, int aInstance=0);
 
     /// Set network interface to use for determining IP address and checking for being available for network connections
     /// @param aIfNameForConnections name of the network device, empty string to use default interface
