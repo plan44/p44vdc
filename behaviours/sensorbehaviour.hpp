@@ -43,24 +43,29 @@ namespace p44 {
 
     // state
     DataPointsList dataPoints;
-    int subDataPoints; ///< number of values currently added into last datapoint
+    MLMicroSeconds collStart; ///< start of current datapoint collection
+    double collDivisor; ///< divisor for collection of current datapoint
 
   public:
-
-    // settings
-    MLMicroSeconds windowTime;
-    MLMicroSeconds dataPointAvgTime;
 
     typedef enum {
       eval_none, ///< no evaluation, disabled
       eval_average, ///< average over data points added within window time
       eval_timeweighted_average, ///< average over data points, but weighting them by the time passed since last data point (assuming datapoints are averages over past time anyway)
-      eval_max ///< maximum within the window time
+      eval_max, ///< maximum within the window time
+      eval_min ///< minimum within the window time
     } EvaluationType;
 
+    // settings
+    MLMicroSeconds windowTime;
+    MLMicroSeconds dataPointCollTime;
+    EvaluationType evalType;
+
+    /// create a sliding window evaluator
     /// @param aWindowTime width (timespan) of evaluation window
-    /// @param aDataPointAvgTime within that timespan, new values reported will be averaged into a single datapoint
-    WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointAvgTime);
+    /// @param aDataPointCollTime within that timespan, new values reported will be collected into a single datapoint
+    /// @param aEvalType the type of evaluation to perform
+    WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime, EvaluationType aEvalType);
 
     /// Add a new value to the evaluator. Depending on
     /// @param aValue the value to add
@@ -70,7 +75,7 @@ namespace p44 {
     /// Get the current evaluation result
     /// @param aEvaluationType the type of evaluation to perform
     /// @note will return 0 when no datapoints are accumulated at all
-    double evaluate(EvaluationType aEvaluationType);
+    double evaluate();
 
   };
   typedef boost::intrusive_ptr<WindowEvaluator> WindowEvaluatorPtr;
@@ -110,7 +115,7 @@ namespace p44 {
     // parameters
     // - evaluation
     MLMicroSeconds evalWin; ///< evaluation window size (time)
-    MLMicroSeconds avgWin; ///< subdatapoint accumulating time
+    MLMicroSeconds collWin; ///< subdatapoint collection time
     WindowEvaluator::EvaluationType evalType; ///< type of evaluation
 
     // - defaults for settings

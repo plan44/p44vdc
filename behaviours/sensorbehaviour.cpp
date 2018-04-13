@@ -31,9 +31,10 @@ using namespace p44;
 // MARK: ===== WindowEvaluator
 
 
-WindowEvaluator::WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointAvgTime) :
+WindowEvaluator::WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime, EvaluationType aEvalType) :
   windowTime(aWindowTime),
-  dataPointAvgTime(aDataPointAvgTime)
+  dataPointCollTime(aDataPointCollTime),
+  evalType(aEvalType)
 {
 }
 
@@ -55,35 +56,72 @@ void WindowEvaluator::addValue(double aValue, MLMicroSeconds aTimeStamp)
   }
   // add new value
   if (!dataPoints.empty()) {
-    // check if we should accumulate into last existing datapoint
+    // check if we should collect into last existing datapoint
     DataPoint &last = dataPoints.back();
-    if (aTimeStamp-last.timestamp<dataPointAvgTime) {
-      // still accumulating
-      last.value = (last.value*subDataPoints + aValue) / (subDataPoints+1);
-      last.timestamp = aTimeStamp;
-      subDataPoints++;
+    if (collStart+dataPointCollTime>aTimeStamp) {
+      // still in collection time window (from start of datapoint collection
+      switch (evalType) {
+        case eval_max: {
+          if (aValue>last.value) last.value = aValue;
+          break;
+        }
+        case eval_min: {
+          if (aValue<last.value) last.value = aValue;
+          break;
+        }
+        case eval_timeweighted_average: {
+          MLMicroSeconds timeWeight = aTimeStamp-last.timestamp; // between last subdatapoint collected into this datapoint and new timestamp
+          if (collDivisor<=0 || timeWeight<=0) { // 0 or negative timeweight should not happen, safety only!
+            // first section
+            last.value = (last.value + aValue)/2;
+            collDivisor = timeWeight;
+          }
+          else {
+            double v = (last.value*collDivisor + aValue*timeWeight);
+            collDivisor += timeWeight;
+            last.value = v/collDivisor;
+          }
+          break;
+        }
+        case eval_average:
+        default: {
+          if (collDivisor<=0) collDivisor = 1;
+          double v = (last.value*collDivisor+aValue);
+          collDivisor++;
+          last.value = v/collDivisor;
+          break;
+        }
+      }
+      last.timestamp = aTimeStamp; // timestamp represents most recent sample in datapoint
       return; // done
     }
   }
   // accumulation of value in previous datapoint complete (or none available at all)
+  // -> start new datapoint
   DataPoint dp;
   dp.value = aValue;
   dp.timestamp = aTimeStamp;
   dataPoints.push_back(dp);
-  subDataPoints = 1;
+  collStart = aTimeStamp;
+  collDivisor = 0;
 }
 
 
-double WindowEvaluator::evaluate(EvaluationType aEvaluationType)
+double WindowEvaluator::evaluate()
 {
   double result = 0;
   double divisor = 0;
   int count = 0;
   for (DataPointsList::iterator pos = dataPoints.begin(); pos != dataPoints.end(); ++pos) {
     MLMicroSeconds lastTs = Never;
-    switch (aEvaluationType) {
+    switch (evalType) {
       case eval_max: {
         if (count==0 || pos->value>result) result = pos->value;
+        divisor = 1;
+        break;
+      }
+      case eval_min: {
+        if (count==0 || pos->value<result) result = pos->value;
         divisor = 1;
         break;
       }
@@ -222,27 +260,27 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
 
 
 static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
-  // type                      usage           evalWin    avgWin     evalType                                    pushIntvl  chgOnlyIntvl  trigDelta  trigRel  trigMin trigIntvl
-  // ------------------------  -------------   ---------  ---------  ------------------------------------------- ---------  ------------  ---------  -------  ------- --------------------------
+  // type                      usage           evalWin    collWin          evalType                                    pushIntvl  chgOnlyIntvl  trigDelta  trigRel  trigMin trigIntvl
+  // ------------------------  -------------   ---------  --------------   ------------------------------------------- ---------  ------------  ---------  -------  ------- --------------------------
   // indoor context
-  { sensorType_temperature,    usage_room,     0,         0,         WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
-  { sensorType_humidity,       usage_room,     0,         0,         WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
-  { sensorType_illumination,   usage_room,     5*Minute,  10*Second, WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
-  { sensorType_gas_CO2,        usage_room,     0,         0,         WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
-  { sensorType_gas_CO,         usage_room,     0,         0,         WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_temperature,    usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_room,     0,         0,               WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_room,     5*Minute,  10*Second,       WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_gas_CO2,        usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_gas_CO,         usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
   // outdoor context
-  { sensorType_temperature,    usage_outdoors, 0,         0,         WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
-  { sensorType_humidity,       usage_outdoors, 0,         0,         WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
-  { sensorType_illumination,   usage_outdoors, 10*Minute, 20*Second, WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
-  { sensorType_air_pressure,   usage_outdoors, 0,         0,         WindowEvaluator::eval_none,                 15*Minute, 60*Minute,    0,         false,   0,      0 },
-  { sensorType_wind_speed,     usage_outdoors, 10*Minute, 1*Minute,  WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    0.1,       true,    -1,     1*Minute },
-  { sensorType_wind_direction, usage_outdoors, 10*Minute, 1*Minute,  WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    20,        false,   -1,     1*Minute },
-  { sensorType_gust_speed,     usage_outdoors, 10*Minute, 3*Second,  WindowEvaluator::eval_max,                  10*Minute, 60*Minute,    0.1,       true,    5,      3*Second /* = "immediate" */},
+  { sensorType_temperature,    usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_outdoors, 10*Minute, 20*Second,       WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_air_pressure,   usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 15*Minute, 60*Minute,    0,         false,   0,      0 },
+  { sensorType_wind_speed,     usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    0.1,       true,    -1,     1*Minute },
+  { sensorType_wind_direction, usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    20,        false,   -1,     1*Minute },
+  { sensorType_gust_speed,     usage_outdoors, 3*Second,  200*MilliSecond, WindowEvaluator::eval_max,                  10*Minute, 60*Minute,    0.1,       true,    5,      3*Second /* = "immediate" */},
   // FIXME: rule says "accumulation", but as long as sensors deliver intensity in mm/h, it is in fact a window average over an hour
-  { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,  WindowEvaluator::eval_timeweighted_average, 60*Minute, 60*Minute,    0,         false,   0,      0 },
+  { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,        WindowEvaluator::eval_timeweighted_average, 60*Minute, 60*Minute,    0,         false,   0,      0 },
 
   // terminator
-  { sensorType_none,           usage_undefined,0,         0,         WindowEvaluator::eval_none,                 0,         0,            0,         false,   0,      0 },
+  { sensorType_none,           usage_undefined,0,         0,               WindowEvaluator::eval_none,                 0,         0,            0,         false,   0,      0 },
 };
 
 
@@ -381,10 +419,10 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
       // process values through filter
       if (!filter) {
         // need a filter, create it
-        filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->avgWin));
+        filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->collWin, profileP->evalType));
       }
       filter->addValue(aValue, now);
-      double v = filter->evaluate(profileP->evalType);
+      double v = filter->evaluate();
       // re-evaluate changed flag after filtering
       if (fabs(v - currentValue) > resolution/2) changedValue = true;
       BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' calculates %s filtered value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
