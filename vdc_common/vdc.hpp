@@ -76,6 +76,8 @@ namespace p44 {
     typedef DsAddressable inherited;
     typedef PersistentParams inheritedParams;
 
+    friend class VdcHost;
+
     int instanceNumber; ///< the instance number identifying this instance among other instances of this class
     int tag; ///< tag used to in self test failures for showing on LEDs
     MLTicket pairTicket; ///< used for pairing
@@ -173,10 +175,6 @@ namespace p44 {
     /// set user assignable name
     /// @param aName name of the addressable entity
     virtual void setName(const string &aName) P44_OVERRIDE;
-
-    /// vdc level methods
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-
 
     /// @}
 
@@ -287,8 +285,6 @@ namespace p44 {
     /// @param aRetryDelay how long to wait between retries
     /// @param aAddDelay how long to wait between adding devices
     void identifyAndAddDevices(DeviceList aToBeAddedDevices, StatusCB aCompletedCB, int aMaxRetries = 0, MLMicroSeconds aRetryDelay = 0, MLMicroSeconds aAddDelay = 0);
-
-
 
 		/// @}
 
@@ -409,6 +405,31 @@ namespace p44 {
     ///   Note that this is mutually exclusive with aIncremental (as incremental scan does not remove any devices,
     ///   and thus cannot remove any settings, either)
     virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) = 0;
+
+
+    /// called to let vdc handle vdc-level methods
+    /// @param aMethod the method
+    /// @param aRequest the request to be passed to answering methods
+    /// @param aParams the parameters object
+    /// @return NULL if method implementation has or will take care of sending a reply (but make sure it
+    ///   actually does, otherwise API clients will hang or run into timeouts)
+    ///   Returning any Error object, even if ErrorOK, will cause a generic response to be returned.
+    /// @note the parameters object always contains the dSUID parameter which has been
+    ///   used already to route the method call to this device.
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+
+
+    /// @name grouped delivery of notification to devices
+    /// @{
+
+    /// deliver notifications to audience
+    /// @param aAudience the audience (list of devices in this vDC that should receive the notification
+    /// @param aApiConnection the API connection where the notification originates from
+    /// @param aNotification the name of the notification
+    /// @param aParams the parameters of the notification
+    void deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
+
+    /// @}
 
 
   private:

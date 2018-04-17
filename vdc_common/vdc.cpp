@@ -53,6 +53,39 @@ Vdc::~Vdc()
 }
 
 
+void Vdc::addVdcToVdcHost()
+{
+  // derive dSUID first, as it will be mapped by dSUID in the device container
+  deriveDsUid();
+  // add to container
+  getVdcHost().addVdc(VdcPtr(this));
+}
+
+
+
+void Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
+{
+  // done
+  aCompletedCB(ErrorPtr()); // default to error-free initialisation
+}
+
+
+void Vdc::selfTest(StatusCB aCompletedCB)
+{
+  // by default, assume everything ok
+  aCompletedCB(ErrorPtr());
+}
+
+
+const char *Vdc::getPersistentDataDir()
+{
+  return getVdcHost().getPersistentDataDir();
+}
+
+
+
+/// MARK: ===== Identification
+
 
 string Vdc::modelUID()
 {
@@ -91,135 +124,9 @@ void Vdc::setName(const string &aName)
 }
 
 
-ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
-{
-  ErrorPtr respErr;
-  if (aMethod=="scanDevices") {
-    // vDC API v2c addition, only via genericRequest
-    // (re)collect devices of this particular vDC
-    bool incremental = true;
-    bool exhaustive = false;
-    bool clear = false;
-    RescanMode mode = rescanmode_none;
-    checkBoolParam(aParams, "incremental", incremental);
-    checkBoolParam(aParams, "exhaustive", exhaustive);
-    checkBoolParam(aParams, "clearconfig", clear);
-    if (exhaustive)
-      mode |= rescanmode_exhaustive;
-    else if (incremental)
-      mode |= rescanmode_incremental;
-    else
-      mode |= rescanmode_normal;
-    if (clear) mode |= rescanmode_clearsettings;
-    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), mode);
-  }
-  else if (aMethod=="pair") {
-    // only via genericRequest
-    // (re)collect devices of this particular vDC
-    Tristate establish = undefined; // default to pair or unpair
-    ApiValuePtr o = aParams->get("establish");
-    if (o && !o->isNull()) {
-      establish = o->boolValue() ? yes : no;
-    }
-    bool disableProximityCheck = false; // default to proximity check enabled (if technology can detect proximity)
-    checkBoolParam(aParams, "disableProximityCheck", disableProximityCheck);
-    int timeout = 30; // default to 30 seconds timeout
-    o = aParams->get("timeout");
-    if (o) {
-      timeout = o->int32Value();
-    }
-    // actually run the pairing process
-    performPair(aRequest, establish, disableProximityCheck, timeout*Second);
-  }
-  else {
-    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
-  }
-  return respErr;
-}
-
-
-void Vdc::performPair(VdcApiRequestPtr aRequest, Tristate aEstablish, bool aDisableProximityCheck, MLMicroSeconds aTimeout)
-{
-  // anyway - first stop any device-wide learn that might still be running on this or other vdcs
-  MainLoop::currentMainLoop().cancelExecutionTicket(pairTicket);
-  getVdcHost().stopLearning();
-  if (aTimeout<=0) {
-    // calling with timeout==0 means aborting learn (which has already happened by now)
-    // - confirm with OK
-    ALOG(LOG_NOTICE, "- pairing aborted");
-    aRequest->sendStatus(Error::err<VdcApiError>(404, "pairing/unpairing aborted"));
-    return;
-  }
-  // start new pairing
-  ALOG(LOG_NOTICE, "Starting single vDC pairing");
-  pairTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::pairingTimeout, this, aRequest), aTimeout);
-  getVdcHost().learnHandler = boost::bind(&Vdc::pairingEvent, this, aRequest, _1, _2);
-  setLearnMode(true, aDisableProximityCheck, aEstablish);
-}
-
-
-void Vdc::pairingEvent(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError)
-{
-  MainLoop::currentMainLoop().cancelExecutionTicket(pairTicket);
-  if (Error::isOK(aError)) {
-    if (aLearnIn) {
-      // learned in something
-      ALOG(LOG_NOTICE, "- pairing established");
-      aRequest->sendStatus(Error::ok());
-    }
-    else {
-      // learned out something
-      ALOG(LOG_NOTICE, "- pairing removed");
-      aRequest->sendStatus(Error::err<VdcApiError>(410, "device unpaired"));
-    }
-  }
-  else {
-    aRequest->sendError(aError);
-  }
-}
-
-
-void Vdc::pairingTimeout(VdcApiRequestPtr aRequest)
-{
-  getVdcHost().stopLearning();
-  ALOG(LOG_NOTICE, "- timeout: no pairing or unpairing occurred");
-  aRequest->sendStatus(Error::err<VdcApiError>(404, "timeout, no (un)pairing event occurred"));
-}
-
-
-void Vdc::addVdcToVdcHost()
-{
-  // derive dSUID first, as it will be mapped by dSUID in the device container 
-  deriveDsUid();
-  // add to container
-  getVdcHost().addVdc(VdcPtr(this));
-}
-
-
-
-void Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
-{
-  // done
-	aCompletedCB(ErrorPtr()); // default to error-free initialisation
-}
-
-
-void Vdc::selfTest(StatusCB aCompletedCB)
-{
-  // by default, assume everything ok
-  aCompletedCB(ErrorPtr());
-}
-
-
-const char *Vdc::getPersistentDataDir()
-{
-	return getVdcHost().getPersistentDataDir();
-}
-
-
 int Vdc::getInstanceNumber() const
 {
-	return instanceNumber;
+  return instanceNumber;
 }
 
 
@@ -268,8 +175,6 @@ string Vdc::modelVersion() const
 }
 
 
-
-
 string Vdc::modelName()
 {
   // derive the descriptive name
@@ -292,6 +197,121 @@ string Vdc::modelName()
   }
   while ((i = n.find("%S"))!=string::npos) { n.replace(i, 2, s); }
   return n;
+}
+
+
+
+/// MARK: ===== grouped delivery of notification to devices (for scene/group optimizations)
+
+
+void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+{
+  // fallback: just let every device handle notification individually
+  for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
+    (*apos)->handleNotification(aApiConnection, aNotification, aParams);
+  }
+}
+
+
+
+
+/// MARK: ===== handle vdc level methods
+
+ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
+{
+  ErrorPtr respErr;
+  if (aMethod=="scanDevices") {
+    // vDC API v2c addition, only via genericRequest
+    // (re)collect devices of this particular vDC
+    bool incremental = true;
+    bool exhaustive = false;
+    bool clear = false;
+    RescanMode mode = rescanmode_none;
+    checkBoolParam(aParams, "incremental", incremental);
+    checkBoolParam(aParams, "exhaustive", exhaustive);
+    checkBoolParam(aParams, "clearconfig", clear);
+    if (exhaustive)
+      mode |= rescanmode_exhaustive;
+    else if (incremental)
+      mode |= rescanmode_incremental;
+    else
+      mode |= rescanmode_normal;
+    if (clear) mode |= rescanmode_clearsettings;
+    collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), mode);
+  }
+  else if (aMethod=="pair") {
+    // only via genericRequest
+    // (re)collect devices of this particular vDC
+    Tristate establish = undefined; // default to pair or unpair
+    ApiValuePtr o = aParams->get("establish");
+    if (o && !o->isNull()) {
+      establish = o->boolValue() ? yes : no;
+    }
+    bool disableProximityCheck = false; // default to proximity check enabled (if technology can detect proximity)
+    checkBoolParam(aParams, "disableProximityCheck", disableProximityCheck);
+    int timeout = 30; // default to 30 seconds timeout
+    o = aParams->get("timeout");
+    if (o) {
+      timeout = o->int32Value();
+    }
+    // actually run the pairing process
+    performPair(aRequest, establish, disableProximityCheck, timeout*Second);
+  }
+  else {
+    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
+  }
+  return respErr;
+}
+
+
+/// MARK: ===== paring
+
+void Vdc::performPair(VdcApiRequestPtr aRequest, Tristate aEstablish, bool aDisableProximityCheck, MLMicroSeconds aTimeout)
+{
+  // anyway - first stop any device-wide learn that might still be running on this or other vdcs
+  MainLoop::currentMainLoop().cancelExecutionTicket(pairTicket);
+  getVdcHost().stopLearning();
+  if (aTimeout<=0) {
+    // calling with timeout==0 means aborting learn (which has already happened by now)
+    // - confirm with OK
+    ALOG(LOG_NOTICE, "- pairing aborted");
+    aRequest->sendStatus(Error::err<VdcApiError>(404, "pairing/unpairing aborted"));
+    return;
+  }
+  // start new pairing
+  ALOG(LOG_NOTICE, "Starting single vDC pairing");
+  pairTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::pairingTimeout, this, aRequest), aTimeout);
+  getVdcHost().learnHandler = boost::bind(&Vdc::pairingEvent, this, aRequest, _1, _2);
+  setLearnMode(true, aDisableProximityCheck, aEstablish);
+}
+
+
+void Vdc::pairingEvent(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError)
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(pairTicket);
+  if (Error::isOK(aError)) {
+    if (aLearnIn) {
+      // learned in something
+      ALOG(LOG_NOTICE, "- pairing established");
+      aRequest->sendStatus(Error::ok());
+    }
+    else {
+      // learned out something
+      ALOG(LOG_NOTICE, "- pairing removed");
+      aRequest->sendStatus(Error::err<VdcApiError>(410, "device unpaired"));
+    }
+  }
+  else {
+    aRequest->sendError(aError);
+  }
+}
+
+
+void Vdc::pairingTimeout(VdcApiRequestPtr aRequest)
+{
+  getVdcHost().stopLearning();
+  ALOG(LOG_NOTICE, "- timeout: no pairing or unpairing occurred");
+  aRequest->sendStatus(Error::err<VdcApiError>(404, "timeout, no (un)pairing event occurred"));
 }
 
 
