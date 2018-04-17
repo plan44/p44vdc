@@ -451,6 +451,12 @@ namespace p44 {
     /// internal implementation for running even very slow light transitions
     virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) P44_OVERRIDE;
 
+    /// let device implementation prepare for (and possibly reject) optimized set
+    /// @param aDeliveryState can be inspected to see the scene or dim parameters
+    /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
+    ///    executed without optimisation
+    virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
+
   private:
 
     void processUpdatedParams(ErrorPtr aError);
@@ -589,6 +595,12 @@ namespace p44 {
 
     /// internal implementation for running even very slow light transitions
     virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) P44_OVERRIDE;
+
+    /// let device implementation prepare for (and possibly reject) optimized set
+    /// @param aDeliveryState can be inspected to see the scene or dim parameters
+    /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
+    ///    executed without optimisation
+    virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE { return false; /* for now: no optimisation for composite devices */}
 
   private:
 

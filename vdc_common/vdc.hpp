@@ -69,6 +69,41 @@ namespace p44 {
   typedef std::vector<DevicePtr> DeviceVector;
   typedef std::list<DevicePtr> DeviceList;
 
+
+  typedef enum {
+    ntfy_undefined,
+    ntfy_none,
+    ntfy_callscene,
+    ntfy_dimchannel
+  } NotificationType;
+
+
+  /// container for tracking notification delivery and optimisation
+  class NotificationDeliveryState : public P44Obj
+  {
+    friend class Device;
+    friend class Vdc;
+
+    NotificationDeliveryState() :
+      callType(ntfy_undefined),
+      optimizedType(ntfy_undefined),
+      contentsHash(0)
+    {};
+
+    DsAddressablesList audience; ///< remaining devices to be prepared
+    string affectedDevicesHash; ///< binary string hash, represents the set of affected devices, to be matched against known sets for optimisation
+    DeviceList affectedDevices; ///< the list of devices that are included in the hash
+    uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene) or channels (for dimming)
+
+  public:
+    NotificationType callType; ///< type of notification as originally called
+    ApiValuePtr callParams; ///< the notification parameters
+    NotificationType optimizedType; ///< the type that results (callScene might result in dimming...)
+  };
+  typedef boost::intrusive_ptr<NotificationDeliveryState> NotificationDeliveryStatePtr;
+
+
+
   /// This is the base class for a "class" (usually: type of hardware) of virtual devices.
   /// In dS terminology, this object represents a vDC (virtual device connector).
   class Vdc : public PersistentParams, public DsAddressable
@@ -360,6 +395,13 @@ namespace p44 {
 
     /// @}
 
+    /// @name Implementation methods for native scene and grouped dimming support
+    /// @{
+
+
+    /// @}
+
+
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
@@ -433,6 +475,10 @@ namespace p44 {
 
 
   private:
+
+    void prepareNextNotification(NotificationDeliveryStatePtr aDeliveryState);
+    void notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, NotificationType aNotificationToApply);
+    void executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState);
 
     void collectedDevices(StatusCB aCompletedCB, ErrorPtr aError);
     void schedulePeriodicRecollecting();

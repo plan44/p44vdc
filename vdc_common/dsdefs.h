@@ -155,6 +155,10 @@ typedef enum {
   MAX_SCENE_NO                                    ///< currently last known scene number
 } DsSceneNumber;
 
+typedef uint8_t SceneNo; ///< scene number
+
+typedef uint8_t SceneArea; ///< area number, 0=no area
+
 typedef uint16_t DsZoneID; ///< digitalSTROM Zone ID (= room ID)
 
 

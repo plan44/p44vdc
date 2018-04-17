@@ -63,7 +63,6 @@ DiscoveryManager &DiscoveryManager::sharedDiscoveryManager()
 DiscoveryManager::DiscoveryManager() :
   simple_poll(NULL),
   service(NULL),
-  serviceBrowser(NULL),
   dSEntryGroup(NULL),
   debugServiceBrowser(NULL),
   dmState(dm_disabled),
@@ -266,8 +265,8 @@ void DiscoveryManager::serviceStarted()
       FOCUSLOG("avahi: failed to create debug service browser: %s", avahi_strerror(avahi_service_errno(service)));
     }
   }
-  // start advertisement if needed
-  startAdvertisingDS(service);
+  // try to (re)start advertisement
+  startAdvertisingDS(service); // will try when dmState requests so
 }
 
 

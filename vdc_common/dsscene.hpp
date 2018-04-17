@@ -32,12 +32,6 @@ using namespace std;
 
 namespace p44 {
 
-  /// scene number
-  typedef uint8_t SceneNo;
-
-  /// area this scene applies to (usually derives from SceneNo, 0 if scene is not an area scene)
-  typedef uint8_t SceneArea;
-
   /// scene commands
   typedef enum {
     scene_cmd_none, ///< no command, reserved scene
@@ -199,6 +193,11 @@ namespace p44 {
     /// Set default scene values for a specified scene number
     /// @param aSceneNo the scene number to set default values
     virtual void setDefaultSceneValues(SceneNo aSceneNo);
+
+    /// scene contents hash
+    /// @return a hash value of the scene contents (NOT including the scene number!)
+    /// @note is allowed to return different values for same scene contents on different platforms
+    virtual uint64_t sceneHash();
 
   protected:
 

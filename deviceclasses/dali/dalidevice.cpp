@@ -862,7 +862,7 @@ void DaliBusDeviceGroup::addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice)
 {
   // add the ID to the mix
   LOG(LOG_NOTICE, "- DALI bus device with shortaddr %d is grouped in DALI group %d", aDaliBusDevice->deviceInfo->shortAddress, deviceInfo->shortAddress & DaliGroupMask);
-  aDaliBusDevice->dSUID.xorDsUidIntoMix(mixID);
+  aDaliBusDevice->dSUID.xorDsUidIntoMix(mixID, false);
   // if this is the first valid device, use it as master
   if (groupMaster==DaliBroadcast && !aDaliBusDevice->isDummy) {
     // this is the master device
@@ -1362,6 +1362,17 @@ void DaliSingleControllerDevice::setTransitionTime(MLMicroSeconds aTransitionTim
 }
 
 
+bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
+{
+  // TODO: use more precise criteria wether notification is optimizable or not
+  return
+    daliController && !daliController->isGrouped() && // do not optimize already grouped devices!
+    (aDeliveryState->optimizedType==ntfy_callscene ||
+    aDeliveryState->optimizedType==ntfy_dimchannel); // dimming and scenes considered optimizable for now
+}
+
+
+
 
 void DaliSingleControllerDevice::deriveDsUid()
 {
@@ -1778,7 +1789,7 @@ void DaliCompositeDevice::deriveDsUid()
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (dimmers[idx]) {
       // use this dimmer's dSUID as part of the mix
-      dimmers[idx]->dSUID.xorDsUidIntoMix(mixID);
+      dimmers[idx]->dSUID.xorDsUidIntoMix(mixID, false);
     }
   }
   // use xored ID as base for creating UUIDv5 in vdcNamespace

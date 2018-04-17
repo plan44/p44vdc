@@ -47,25 +47,30 @@ namespace p44 {
 
     /// Set default scene values for a specified scene number
     /// @param aSceneNo the scene number to set default values
-    virtual void setDefaultSceneValues(SceneNo aSceneNo);
+    virtual void setDefaultSceneValues(SceneNo aSceneNo) P44_OVERRIDE;
 
     // scene values implementation
-    virtual double sceneValue(int aOutputIndex);
-    virtual void setSceneValue(int aOutputIndex, double aValue);
+    virtual double sceneValue(int aOutputIndex) P44_OVERRIDE;
+    virtual void setSceneValue(int aOutputIndex, double aValue) P44_OVERRIDE;
+
+    /// scene contents hash
+    /// @return a hash value of the scene contents (NOT including the scene number!)
+    /// @note is allowed to return different values for same scene contents on different platforms
+    virtual uint64_t sceneHash() P44_OVERRIDE;
 
   protected:
 
     // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<SimpleScene> SimpleScenePtr;
@@ -97,16 +102,16 @@ namespace p44 {
   protected:
 
     // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<SimpleCmdScene> SimpleCmdScenePtr;
@@ -124,7 +129,7 @@ namespace p44 {
     /// factory method to create the correct subclass type of DsScene
     /// @param aSceneNo the scene number to create a scene object for.
     /// @note setDefaultSceneValues() must be called to set default scene values
-    virtual DsScenePtr newDefaultScene(SceneNo aSceneNo);
+    virtual DsScenePtr newDefaultScene(SceneNo aSceneNo) P44_OVERRIDE;
     
   };
   

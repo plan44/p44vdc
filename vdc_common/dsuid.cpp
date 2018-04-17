@@ -20,6 +20,7 @@
 //
 
 #include "dsuid.hpp"
+#include "fnv.hpp"
 
 #ifdef __APPLE__
 // OpenSSL is deprecated since 10.7 and not available in OSX 10.10 and later any more: using CommonCrypto instead
@@ -364,9 +365,20 @@ bool DsUid::operator< (const DsUid &aDsUid) const
 // MARK: ===== utilities
 
 
-void DsUid::xorDsUidIntoMix(string &aMix)
+void DsUid::xorDsUidIntoMix(string &aMix, bool aHashSubDeviceIndex)
 {
   string b = getBinary(); // will always be of size dsuidBytes
+  if (aHashSubDeviceIndex && idBytes==dsuidBytes) {
+    // add a fnv hash over the complete dsuid including subdevice index into the last 4 bytes
+    // (this reduces collision probability when mixing multiple subdevices from the same device)
+    Fnv32 fnv;
+    fnv.addBytes(b.size(), (uint8_t *)b.c_str());
+    uint32_t h = fnv.getHash();
+    for (size_t i=dsuidBytes-4; i<dsuidBytes; i++) {
+      b[i] = b[i] ^ (h&0xFF);
+      h = h>>8;
+    }
+  }
   if (aMix.empty()) {
     aMix = b;
   }

@@ -25,6 +25,7 @@
 #include "outputbehaviour.hpp"
 #include "simplescene.hpp"
 #include "jsonvdcapi.hpp"
+#include "fnv.hpp"
 
 using namespace p44;
 
@@ -164,6 +165,22 @@ void DsScene::setDefaultSceneValues(SceneNo aSceneNo)
   sceneArea = 0; // no area scene by default
   markClean(); // default values are always clean
 }
+
+
+uint64_t DsScene::sceneHash()
+{
+  // generic base class implementation: hash over all values and all flags.
+  // Subclasses might override or replace this with better methods
+  Fnv64 hash;
+  for (int i=0; i<numSceneValues(); i++) {
+    double v = sceneValue(i);
+    hash.addBytes(sizeof(v), (uint8_t *)&v); // is platform dependent, but does not matter - this is for caching only
+    uint32_t f = sceneValueFlags(i);
+    hash.addBytes(sizeof(f), (uint8_t *)&f); // is platform dependent, but does not matter - this is for caching only
+  }
+  return hash.getHash();
+}
+
 
 
 

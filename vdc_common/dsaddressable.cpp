@@ -290,16 +290,16 @@ void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultOb
 
 
 
-void DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams)
+void DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  if (aMethod=="ping") {
+  if (aNotification=="ping") {
     // issue device ping (which will issue a pong when device is reachable)
     ALOG(LOG_INFO, "ping -> checking presence...");
     checkPresence(boost::bind(&DsAddressable::presenceResultHandler, this, _1));
   }
   else {
     // unknown notification
-    ALOG(LOG_WARNING, "unknown notification '%s'", aMethod.c_str());
+    ALOG(LOG_WARNING, "unknown notification '%s'", aNotification.c_str());
   }
 }
 

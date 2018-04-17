@@ -27,6 +27,7 @@
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
 #define FOCUSLOGLEVEL 7
 
+#include "fnv.hpp"
 
 #include "device.hpp"
 
@@ -679,27 +680,10 @@ ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel
 
 
 
-void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams)
+void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   ErrorPtr err;
-  if (aMethod=="callScene") {
-    // call scene
-    ApiValuePtr o;
-    if (Error::isOK(err = checkParam(aParams, "scene", o))) {
-      SceneNo sceneNo = (SceneNo)o->int32Value();
-      bool force = false;
-      // check for force flag
-      if (Error::isOK(err = checkParam(aParams, "force", o))) {
-        force = o->boolValue();
-        // now call
-        callScene(sceneNo, force);
-      }
-    }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "callScene error: %s", err->description().c_str());
-    }
-  }
-  else if (aMethod=="saveScene") {
+  if (aNotification=="saveScene") {
     // save scene
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
@@ -711,7 +695,7 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       ALOG(LOG_WARNING, "saveScene error: %s", err->description().c_str());
     }
   }
-  else if (aMethod=="undoScene") {
+  else if (aNotification=="undoScene") {
     // save scene
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
@@ -723,7 +707,7 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       ALOG(LOG_WARNING, "undoScene error: %s", err->description().c_str());
     }
   }
-  else if (aMethod=="setLocalPriority") {
+  else if (aNotification=="setLocalPriority") {
     // set local priority
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
@@ -735,7 +719,7 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       ALOG(LOG_WARNING, "setLocalPriority error: %s", err->description().c_str());
     }
   }
-  else if (aMethod=="setControlValue") {
+  else if (aNotification=="setControlValue") {
     // set control value
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "name", o))) {
@@ -756,7 +740,7 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       ALOG(LOG_WARNING, "setControlValue error: %s", err->description().c_str());
     }
   }
-  else if (aMethod=="callSceneMin") {
+  else if (aNotification=="callSceneMin") {
     // switch device on with minimum output level if not already on (=prepare device for dimming from zero)
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
@@ -768,31 +752,7 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       ALOG(LOG_WARNING, "callSceneMin error: %s", err->description().c_str());
     }
   }
-  else if (aMethod=="dimChannel") {
-    // start or stop dimming a channel
-    ApiValuePtr o;
-    ChannelBehaviourPtr channel;
-    if (Error::isOK(err = checkChannel(aParams, channel))) {
-      if (Error::isOK(err = checkParam(aParams, "mode", o))) {
-        // mode
-        int mode = o->int32Value();
-        int area = 0;
-        o = aParams->get("area");
-        if (o) {
-          area = o->int32Value();
-        }
-        // start/stop dimming
-        dimChannelForArea(channel, mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
-      }
-      else {
-        err = Error::err<VdcApiError>(400, "Need to specify channel(type) or channelId");
-      }
-    }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "dimChannel error: %s", err->description().c_str());
-    }
-  }
-  else if (aMethod=="setOutputChannelValue") {
+  else if (aNotification=="setOutputChannelValue") {
     // set output channel value (alias for setProperty outputStates)
     ApiValuePtr o;
     ChannelBehaviourPtr channel;
@@ -823,13 +783,13 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       ALOG(LOG_WARNING, "setOutputChannelValue error: %s", err->description().c_str());
     }
   }
-  else if (aMethod=="identify") {
+  else if (aNotification=="identify") {
     // identify to user
     ALOG(LOG_NOTICE, "Identify");
     identifyToUser();
   }
   else {
-    inherited::handleNotification(aApiConnection, aMethod, aParams);
+    inherited::handleNotification(aApiConnection, aNotification, aParams);
   }
 }
 
@@ -885,157 +845,103 @@ static SceneNo offSceneForArea(int aArea)
 }
 
 
-
-// MARK: ===== dimming
-
-// dS Dimming rule for Light:
-//  Rule 4 All devices which are turned on and not in local priority state take part in the dimming process.
+// MARK: ===== optimized notification delivery
 
 
-// implementation of "dimChannel" vDC API command and legacy dimming
-// Note: ensures dimming only continues for at most aAutoStopAfter
-void Device::dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
+void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliveryStatePtr aDeliveryState)
 {
-  if (!aChannel) return;
-  LOG(LOG_DEBUG, "dimChannelForArea: aChannel=%s, aDimMode=%d, aArea=%d", aChannel->getName(), aDimMode, aArea);
-  // check basic dimmability (e.g. avoid dimming brightness for lights that are off)
-  if (aDimMode!=dimmode_stop && !(output->canDim(aChannel))) {
-    LOG(LOG_DEBUG, "- behaviour does not allow dimming channel '%s' now (e.g. because light is off)", aChannel->getName());
-    return;
-  }
-  // check area if any
-  if (aArea>0) {
-    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
-    if (scenes) {
-      // check area first
-      SceneNo areaScene = mainSceneForArea(aArea);
-      DsScenePtr scene = scenes->getScene(areaScene);
-      if (scene->isDontCare()) {
-        LOG(LOG_DEBUG, "- area main scene(%d) is dontCare -> suppress dimChannel for Area %d", areaScene, aArea);
-        return; // not in this area, suppress dimming
+  ErrorPtr err;
+  if (aDeliveryState->callType==ntfy_callscene) {
+    // call scene
+    ApiValuePtr o;
+    if (Error::isOK(err = checkParam(aDeliveryState->callParams, "scene", o))) {
+      SceneNo sceneNo = (SceneNo)o->int32Value();
+      bool force = false;
+      // check for force flag
+      if (Error::isOK(err = checkParam(aDeliveryState->callParams, "force", o))) {
+        force = o->boolValue();
+        // prepare scene call
+        callScenePrepare(aPreparedCB, sceneNo, force);
+        return;
       }
     }
-  }
-  else {
-    // non-area dimming: suppress if device is in local priority
-    // Note: aArea can be set -1 to override local priority checking, for example when using method for identify purposes
-    if (aArea==0 && output->hasLocalPriority()) {
-      LOG(LOG_DEBUG, "- Non-area dimming, localPriority set -> suppressed");
-      return; // local priority active, suppress dimming
+    if (!Error::isOK(err)) {
+      ALOG(LOG_WARNING, "callScene error: %s", err->description().c_str());
     }
   }
-  // always give device chance to stop, even if no dimming is in progress
-  if (aDimMode==dimmode_stop) {
-    stopSceneActions();
-  }
-  // requested dimming this device, no area suppress active
-  if (aDimMode!=currentDimMode || aChannel!=currentDimChannel) {
-    // mode changes
-    if (aDimMode!=dimmode_stop) {
-      // start or change direction
-      if (currentDimMode==dimmode_stop) {
-        // start dimming from stopped state: install timeout
-        dimTimeoutTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Device::dimAutostopHandler, this, aChannel), aAutoStopAfter);
+  else if (aDeliveryState->callType==ntfy_dimchannel) {
+    // start or stop dimming a channel
+    ApiValuePtr o;
+    ChannelBehaviourPtr channel;
+    if (Error::isOK(err = checkChannel(aDeliveryState->callParams, channel))) {
+      if (Error::isOK(err = checkParam(aDeliveryState->callParams, "mode", o))) {
+        // mode
+        int mode = o->int32Value();
+        int area = 0;
+        o = aDeliveryState->callParams->get("area");
+        if (o) {
+          area = o->int32Value();
+        }
+        // prepare starting or stopping dimming
+        dimChannelForAreaPrepare(aPreparedCB, channel, mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
+        return;
       }
       else {
-        // change dimming direction or channel
-        // - stop previous dimming operation
-        dimChannel(currentDimChannel, dimmode_stop);
-        // - start new
-        MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, aAutoStopAfter);
+        err = Error::err<VdcApiError>(400, "Need to specify channel(type) or channelId");
       }
     }
-    else {
-      // stop
-      MainLoop::currentMainLoop().cancelExecutionTicket(dimTimeoutTicket);
-    }
-    // actually execute
-    dimChannel(aChannel, aDimMode);
-    currentDimMode = aDimMode;
-    currentDimChannel = aChannel;
-    // save for possibly needed restart of area dimming
-    areaDimmed = aArea;
-    areaDimMode = aDimMode;
-  }
-  else {
-    // same dim mode, just retrigger if dimming right now
-    if (aDimMode!=dimmode_stop) {
-      MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, aAutoStopAfter);
+    if (!Error::isOK(err)) {
+      ALOG(LOG_WARNING, "dimChannel error: %s", err->description().c_str());
     }
   }
+  aPreparedCB(ntfy_none);
 }
 
 
 
-// autostop handler (for both dimChannel and legacy dimming)
-void Device::dimAutostopHandler(ChannelBehaviourPtr aChannel)
+void Device::executePreparedOperation(bool aDoApply)
 {
-  // timeout: stop dimming immediately
-  dimTimeoutTicket = 0;
-  dimChannel(aChannel, dimmode_stop);
-  currentDimMode = dimmode_stop; // stopped now
+  if (preparedScene) {
+    callSceneExecutePrepared(aDoApply);
+    preparedDim = false; // calling scene always cancels prepared dimming
+  }
+  else if (preparedDim) {
+    dimChannelExecutePrepared(aDoApply);
+  }
 }
 
 
 
-#define DIM_STEP_INTERVAL_MS 300.0
-#define DIM_STEP_INTERVAL (DIM_STEP_INTERVAL_MS*MilliSecond)
-
-// actual dimming implementation, usually overridden by subclasses to provide more optimized/precise dimming
-void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
+bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 {
-  if (aChannel) {
-    ALOG(LOG_INFO,
-      "dimChannel (generic): channel '%s' %s",
-      aChannel->getName(), aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
-    );
-    // Simple base class implementation just increments/decrements channel values periodically (and skips steps when applying values is too slow)
-    if (aDimMode==dimmode_stop) {
-      // stop dimming
-      isDimming = false;
-      MainLoop::currentMainLoop().cancelExecutionTicket(dimHandlerTicket);
-    }
-    else {
-      // start dimming
-      // make sure the start point is calculated if needed
-      aChannel->getChannelValueCalculated();
-      aChannel->setNeedsApplying(0); // force re-applying start point, no transition time
-      // calculate increment
-      double increment = (aDimMode==dimmode_up ? DIM_STEP_INTERVAL_MS : -DIM_STEP_INTERVAL_MS) * aChannel->getDimPerMS();
-      // start ticking
-      isDimming = true;
-      // wait for all apply operations to really complete before starting to dim
-      SimpleCB dd = boost::bind(&Device::dimDoneHandler, this, aChannel, increment, MainLoop::now()+10*MilliSecond);
-      waitForApplyComplete(boost::bind(&Device::requestApplyingChannels, this, dd, false, false));
+  bool include = false;
+  if (aDeliveryState->optimizedType==ntfy_callscene) {
+    if (!preparedScene) return false; // no prepared scene -> not part of optimized set
+    if (prepareForOptimizedSet(aDeliveryState)) {
+      // content hash must represent the contents of the called scenes in all affected devices
+      Fnv64 sh(preparedScene->sceneHash());
+      if (sh.getHash()==0) return false; // scene not hashable -> not part of optimized set
+      sh.addString(dSUID.getBinary()); // add device dSUID to make it "mixable" (i.e. combine into one hash via XOR in any order)
+      aDeliveryState->contentsHash ^= sh.getHash(); // mix
+      include = true;
     }
   }
-}
-
-
-void Device::dimHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNow)
-{
-  // increment channel value
-  aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL);
-  // apply to hardware
-  requestApplyingChannels(boost::bind(&Device::dimDoneHandler, this, aChannel, aIncrement, aNow+DIM_STEP_INTERVAL), true); // apply in dimming mode
-}
-
-
-void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNextDimAt)
-{
-  // keep up with actual dim time
-  MLMicroSeconds now = MainLoop::now();
-  while (aNextDimAt<now) {
-    // missed this step - simply increment channel and target time, but do not cause re-apply
-    LOG(LOG_DEBUG, "dimChannel: applyChannelValues() was too slow while dimming channel=%d -> skipping next dim step", aChannel->getChannelType());
-    aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL);
-    aNextDimAt += DIM_STEP_INTERVAL;
+  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    if (!preparedDim) return false; // no prepared scene -> not part of optimized set
+    if (prepareForOptimizedSet(aDeliveryState)) {
+      include = true;
+    }
   }
-  if (isDimming) {
-    // now schedule next inc/update step
-    dimHandlerTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&Device::dimHandler, this, aChannel, aIncrement, _2), aNextDimAt);
+  if (include) {
+    // the device must be added to the device hash
+    dSUID.xorDsUidIntoMix(aDeliveryState->affectedDevicesHash, true); // subdevice-safe mixing
+    aDeliveryState->affectedDevices.push_back(DevicePtr(this));
+    return true;
   }
+  // by default: no optimisation
+  return false;
 }
+
 
 
 // MARK: ===== high level serialized hardware access
@@ -1284,14 +1190,202 @@ void Device::updatingChannelsComplete()
 }
 
 
+// MARK: ===== dimming
+
+// dS Dimming rule for Light:
+//  Rule 4 All devices which are turned on and not in local priority state take part in the dimming process.
+
+
+void Device::dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
+{
+  // convenience helper
+  dimChannelForAreaPrepare(boost::bind(&Device::executePreparedOperation, this, _1), aChannel, aDimMode, aArea, aAutoStopAfter);
+}
+
+
+// implementation of "dimChannel" vDC API command and legacy dimming
+// Note: ensures dimming only continues for at most aAutoStopAfter
+void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
+{
+  if (!aChannel) { aPreparedCB(ntfy_none); return; } // no channel, no dimming
+  LOG(LOG_DEBUG, "dimChannelForArea: aChannel=%s, aDimMode=%d, aArea=%d", aChannel->getName(), aDimMode, aArea);
+  // check basic dimmability (e.g. avoid dimming brightness for lights that are off)
+  if (aDimMode!=dimmode_stop && !(output->canDim(aChannel))) {
+    LOG(LOG_DEBUG, "- behaviour does not allow dimming channel '%s' now (e.g. because light is off)", aChannel->getName());
+    aPreparedCB(ntfy_none); // cannot dim
+    return;
+  }
+  // check area if any
+  if (aArea>0) {
+    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+    if (scenes) {
+      // check area first
+      SceneNo areaScene = mainSceneForArea(aArea);
+      DsScenePtr scene = scenes->getScene(areaScene);
+      if (scene->isDontCare()) {
+        LOG(LOG_DEBUG, "- area main scene(%d) is dontCare -> suppress dimChannel for Area %d", areaScene, aArea);
+        aPreparedCB(ntfy_none); // not in this area, suppress dimming
+        return;
+      }
+    }
+  }
+  else {
+    // non-area dimming: suppress if device is in local priority
+    // Note: aArea can be set -1 to override local priority checking, for example when using method for identify purposes
+    if (aArea==0 && output->hasLocalPriority()) {
+      LOG(LOG_DEBUG, "- Non-area dimming, localPriority set -> suppressed");
+      aPreparedCB(ntfy_none); // local priority active, suppress dimming
+      return;
+    }
+  }
+  // always give device chance to stop, even if no dimming is in progress
+  if (aDimMode==dimmode_stop) {
+    stopSceneActions();
+  }
+  // requested dimming this device, no area suppress active
+  if (aDimMode!=currentDimMode || aChannel!=currentDimChannel) {
+    // mode changes
+    if (aDimMode!=dimmode_stop) {
+      // start or change direction
+      if (currentDimMode==dimmode_stop) {
+        // start dimming from stopped state: install timeout
+        dimTimeoutTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Device::dimAutostopHandler, this, aChannel), aAutoStopAfter);
+      }
+      else {
+        // change dimming direction or channel
+        // - stop previous dimming operation
+        dimChannel(currentDimChannel, dimmode_stop);
+        // - start new
+        MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, aAutoStopAfter);
+      }
+    }
+    else {
+      // stop
+      MainLoop::currentMainLoop().cancelExecutionTicket(dimTimeoutTicket);
+    }
+    // fully prepared now
+    // - save parameters for executing dimming now
+    currentDimMode = aDimMode;
+    currentDimChannel = aChannel;
+    areaDimmed = aArea;
+    areaDimMode = aDimMode;
+    preparedDim = true;
+    aPreparedCB(ntfy_dimchannel); // needs to start or stop dimming
+    return;
+  }
+  else {
+    // same dim mode, just retrigger if dimming right now
+    if (aDimMode!=dimmode_stop) {
+      MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, aAutoStopAfter);
+    }
+    aPreparedCB(ntfy_none); // no change in dimming
+    return;
+  }
+}
+
+
+void Device::dimChannelExecutePrepared(bool aDoApply)
+{
+  if (preparedDim) {
+    if (aDoApply) dimChannel(currentDimChannel, currentDimMode);
+    preparedDim = false;
+  }
+}
+
+
+
+
+
+// autostop handler (for both dimChannel and legacy dimming)
+void Device::dimAutostopHandler(ChannelBehaviourPtr aChannel)
+{
+  // timeout: stop dimming immediately
+  dimTimeoutTicket = 0;
+  dimChannel(aChannel, dimmode_stop);
+  currentDimMode = dimmode_stop; // stopped now
+}
+
+
+
+#define DIM_STEP_INTERVAL_MS 300.0
+#define DIM_STEP_INTERVAL (DIM_STEP_INTERVAL_MS*MilliSecond)
+
+
+// actual dimming implementation, possibly overridden by subclasses to provide more optimized/precise dimming
+void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
+{
+  if (aChannel) {
+    ALOG(LOG_INFO,
+      "dimChannel (generic): channel '%s' %s",
+      aChannel->getName(), aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
+    );
+    // Simple base class implementation just increments/decrements channel values periodically (and skips steps when applying values is too slow)
+    if (aDimMode==dimmode_stop) {
+      // stop dimming
+      isDimming = false;
+      MainLoop::currentMainLoop().cancelExecutionTicket(dimHandlerTicket);
+    }
+    else {
+      // start dimming
+      // make sure the start point is calculated if needed
+      aChannel->getChannelValueCalculated();
+      aChannel->setNeedsApplying(0); // force re-applying start point, no transition time
+      // calculate increment
+      double increment = (aDimMode==dimmode_up ? DIM_STEP_INTERVAL_MS : -DIM_STEP_INTERVAL_MS) * aChannel->getDimPerMS();
+      // start ticking
+      isDimming = true;
+      // wait for all apply operations to really complete before starting to dim
+      SimpleCB dd = boost::bind(&Device::dimDoneHandler, this, aChannel, increment, MainLoop::now()+10*MilliSecond);
+      waitForApplyComplete(boost::bind(&Device::requestApplyingChannels, this, dd, false, false));
+    }
+  }
+}
+
+
+void Device::dimHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNow)
+{
+  // increment channel value
+  aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL);
+  // apply to hardware
+  requestApplyingChannels(boost::bind(&Device::dimDoneHandler, this, aChannel, aIncrement, aNow+DIM_STEP_INTERVAL), true); // apply in dimming mode
+}
+
+
+void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNextDimAt)
+{
+  // keep up with actual dim time
+  MLMicroSeconds now = MainLoop::now();
+  while (aNextDimAt<now) {
+    // missed this step - simply increment channel and target time, but do not cause re-apply
+    LOG(LOG_DEBUG, "dimChannel: applyChannelValues() was too slow while dimming channel=%d -> skipping next dim step", aChannel->getChannelType());
+    aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL);
+    aNextDimAt += DIM_STEP_INTERVAL;
+  }
+  if (isDimming) {
+    // now schedule next inc/update step
+    dimHandlerTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&Device::dimHandler, this, aChannel, aIncrement, _2), aNextDimAt);
+  }
+}
+
 
 // MARK: ===== scene operations
 
+
 void Device::callScene(SceneNo aSceneNo, bool aForce)
 {
+  // convenience method for calling scenes on single devices
+  callScenePrepare(boost::bind(&Device::executePreparedOperation, this, _1), aSceneNo, aForce);
+}
+
+
+
+void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce)
+{
   // see if we have a scene table at all
+  preparedScene.reset(); // clear possibly previously prepared scene
+  preparedDim = false; // no dimming prepared
   SceneDeviceSettingsPtr scenes = getScenes();
-  if (scenes) {
+  if (output && scenes) {
     DsScenePtr scene = scenes->getScene(aSceneNo);
     SceneCmd cmd = scene->sceneCmd;
     SceneArea area = scene->sceneArea;
@@ -1301,93 +1395,176 @@ void Device::callScene(SceneNo aSceneNo, bool aForce)
       if (dimTimeoutTicket) {
         // timer still running (continue received in time) -> reschedule dimmer timeout to keep dimming
         MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, LEGACY_DIM_STEP_TIMEOUT);
+        aPreparedCB(ntfy_dimchannel);
+        return;
       }
       else if (areaDimmed!=0 && areaDimMode!=dimmode_stop) {
         // continue received too late, already stopped -> restart dimming
         ALOG(LOG_DEBUG, "Area scene dimming continue received too late -> restarting dimming, will not be smooth");
-        dimChannelForArea(getChannelByIndex(0), areaDimMode, areaDimmed, LEGACY_DIM_STEP_TIMEOUT);
+        dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), areaDimMode, areaDimmed, LEGACY_DIM_STEP_TIMEOUT);
+        return;
       }
       // - otherwise: NOP
+      aPreparedCB(ntfy_none);
       return;
     }
     // first check legacy (inc/dec scene) dimming
     if (cmd==scene_cmd_increment) {
-      if (!prepareSceneCall(scene)) return;
-      dimChannelForArea(getChannelByIndex(0), dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT);
+      if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
+      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT);
       return;
     }
     else if (cmd==scene_cmd_decrement) {
-      if (!prepareSceneCall(scene)) return;
-      dimChannelForArea(getChannelByIndex(0), dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT);
+      if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
+      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT);
       return;
     }
     else if (cmd==scene_cmd_stop) {
-      if (!prepareSceneCall(scene)) return;
-      dimChannelForArea(getChannelByIndex(0), dimmode_stop, area, 0);
+      if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
+      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_stop, area, 0);
       return;
     }
     // we get here only if callScene is not legacy dimming
-    ALOG(LOG_NOTICE, "CallScene(%d) (non-dimming!):", aSceneNo);
+    ALOG(LOG_NOTICE, "CallScene(%d) (non-dimming!)", aSceneNo);
     // make sure dimming stops for any non-dimming scene call
     if (currentDimMode!=dimmode_stop) {
       // any non-dimming scene call stops dimming
       LOG(LOG_NOTICE, "- interrupts dimming in progress");
-      dimChannelForArea(currentDimChannel, dimmode_stop, area, 0);
+      dimChannelForAreaPrepare(boost::bind(&Device::callSceneDimStop, this, aPreparedCB, scene, aForce), currentDimChannel, dimmode_stop, area, 0);
+      return;
     }
-    // filter area scene calls via area main scene's (area x on, Tx_S1) dontCare flag
-    if (area) {
-      LOG(LOG_INFO, "- callScene(%d): is area #%d scene", aSceneNo, area);
-      // check if device is in area (criteria used is dontCare flag OF THE AREA ON SCENE (other don't care flags are irrelevant!)
-      DsScenePtr areamainscene = scenes->getScene(mainSceneForArea(area));
-      if (areamainscene->isDontCare()) {
-        LOG(LOG_INFO, "- area main scene(%d) is dontCare -> suppress", areamainscene->sceneNo);
-        return; // not in this area, suppress callScene entirely
+    else {
+      // directly proceed
+      callScenePrepare2(aPreparedCB, scene, aForce);
+      return;
+    }
+  }
+  aPreparedCB(ntfy_none); // no scenes or no output
+}
+
+
+void Device::callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce)
+{
+  dimChannelExecutePrepared(true);
+  callScenePrepare2(aPreparedCB, aScene, aForce);
+}
+
+
+void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce)
+{
+  SceneArea area = aScene->sceneArea;
+  SceneNo sceneNo = aScene->sceneNo;
+  // filter area scene calls via area main scene's (area x on, Tx_S1) dontCare flag
+  if (area) {
+    LOG(LOG_INFO, "- callScene(%d): is area #%d scene", sceneNo, area);
+    // check if device is in area (criteria used is dontCare flag OF THE AREA ON SCENE (other don't care flags are irrelevant!)
+    DsScenePtr areamainscene = getScenes()->getScene(mainSceneForArea(area));
+    if (areamainscene->isDontCare()) {
+      LOG(LOG_INFO, "- area main scene(%d) is dontCare -> suppress", areamainscene->sceneNo);
+      aPreparedCB(ntfy_none); // not in this area, suppress callScene entirely
+      return;
+    }
+    // call applies, if it is a off scene, it resets localPriority
+    if (aScene->sceneCmd==scene_cmd_off) {
+      // area is switched off -> end local priority
+      LOG(LOG_INFO, "- is area off scene -> ends localPriority now");
+      output->setLocalPriority(false);
+    }
+  }
+  if (!aScene->isDontCare()) {
+    // Scene found and dontCare not set, check details
+    // - check and update local priority
+    if (!area && output->hasLocalPriority()) {
+      // non-area scene call, but device is in local priority
+      if (!aForce && !aScene->ignoresLocalPriority()) {
+        // not forced nor localpriority ignored, localpriority prevents applying non-area scene
+        LOG(LOG_DEBUG, "- Non-area scene, localPriority set, scene does not ignore local prio and not forced -> suppressed");
+        aPreparedCB(ntfy_none); // suppress scene call entirely
+        return;
       }
-      // call applies, if it is a off scene, it resets localPriority
-      if (scene->sceneCmd==scene_cmd_off) {
-        // area is switched off -> end local priority
-        LOG(LOG_INFO, "- is area off scene -> ends localPriority now");
+      else {
+        // forced or scene ignores local priority, scene is applied anyway, and also clears localPriority
         output->setLocalPriority(false);
       }
     }
-    if (!scene->isDontCare()) {
-      // Scene found and dontCare not set, check details
-      // - check and update local priority
-      if (!area && output->hasLocalPriority()) {
-        // non-area scene call, but device is in local priority
-        if (!aForce && !scene->ignoresLocalPriority()) {
-          // not forced nor localpriority ignored, localpriority prevents applying non-area scene
-          LOG(LOG_DEBUG, "- Non-area scene, localPriority set, scene does not ignore local prio and not forced -> suppressed");
-          return; // suppress scene call entirely
-        }
-        else {
-          // forced or scene ignores local priority, scene is applied anyway, and also clears localPriority
-          output->setLocalPriority(false);
-        }
-      }
-      // - make sure we have the lastState pseudo-scene for undo
-      if (!previousState) {
-        previousState = scenes->newUndoStateScene();
-      }
-      // we remember the scene for which these are undo values in sceneNo of the pseudo scene
-      // (but without actually re-configuring the scene according to that number!)
-      previousState->sceneNo = aSceneNo;
-      // - now capture current values and then apply to output
-      if (output) {
-        // Non-dimming scene: have output save its current state into the previousState pseudo scene
-        // Note: the actual updating might happen later (when the hardware responds) but
-        //   implementations must make sure access to the hardware is serialized such that
-        //   the values are captured before values from applyScene() below are applied.
-        output->captureScene(previousState, true, boost::bind(&Device::outputUndoStateSaved,this,output,scene)); // apply only after capture is complete
-      } // if output
-    } // not dontCare
-    else {
-      // Scene is dontCare
-      // - possibly still do other scene actions now, although scene was not applied
-      performSceneActions(scene, boost::bind(&Device::sceneActionsComplete, this, scene));
+    // - make sure we have the lastState pseudo-scene for undo
+    if (!previousState) {
+      previousState = getScenes()->newUndoStateScene();
     }
-  } // device with scenes
+    // we remember the scene for which these are undo values in sceneNo of the pseudo scene
+    // (but without actually re-configuring the scene according to that number!)
+    previousState->sceneNo = sceneNo;
+    // - now capture current values and then apply to output
+    if (output) {
+      // Non-dimming scene: have output save its current state into the previousState pseudo scene
+      // Note: the actual updating might happen later (when the hardware responds) but
+      //   implementations must make sure access to the hardware is serialized such that
+      //   the values are captured before values from applyScene() below are applied.
+      output->captureScene(previousState, true, boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
+    } // if output
+  } // not dontCare
+  else {
+    // Scene is dontCare
+    // - do not include in apply
+    aPreparedCB(ntfy_none);
+    // - but possibly still do other scene actions now, although scene was not applied
+    performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aScene));
+  }
 }
+
+
+// scene call preparation continues after current state has been captured for this output
+void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
+{
+  // now let device level implementation prepare for scene call and decide if normal apply should follow
+  if (prepareSceneCall(aScene)) {
+    // this scene should be applied, keep it ready for callSceneExecute()
+    preparedScene = aScene;
+    aPreparedCB(ntfy_callscene);
+  }
+  else {
+    ALOG(LOG_DEBUG, "Device level prepareSceneCall() returns false -> no more actions");
+    preparedScene.reset();
+    aPreparedCB(ntfy_none);
+  }
+}
+
+
+
+void Device::callSceneExecutePrepared(bool aDoApply)
+{
+  if (preparedScene) {
+    // apply scene logically
+    if (aDoApply && output->performApplyScene(preparedScene)) {
+      // prepare for apply
+      if (prepareSceneApply(preparedScene)) {
+        // now apply values to hardware
+        requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, preparedScene), false);
+      }
+    }
+    else {
+      // no apply to hardware needed, directly proceed to actions
+      sceneValuesApplied(preparedScene);
+    }
+    preparedScene.reset();
+  }
+}
+
+
+void Device::sceneValuesApplied(DsScenePtr aScene)
+{
+  // now perform scene special actions such as blinking
+  performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aScene));
+}
+
+
+void Device::sceneActionsComplete(DsScenePtr aScene)
+{
+  // scene actions are now complete
+  ALOG(LOG_INFO, "Scene actions for callScene(%d) complete -> now in final state", aScene->sceneNo);
+}
+
+
 
 
 void Device::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
@@ -1422,50 +1599,6 @@ bool Device::prepareSceneApply(DsScenePtr aScene)
   // base class - just complete
   return true;
 }
-
-
-
-
-// deferred applying of state, after current state has been captured for this output
-void Device::outputUndoStateSaved(DsBehaviourPtr aOutput, DsScenePtr aScene)
-{
-  if (prepareSceneCall(aScene)) {
-    OutputBehaviourPtr output = boost::dynamic_pointer_cast<OutputBehaviour>(aOutput);
-    if (output) {
-      // apply scene logically
-      if (output->performApplyScene(aScene)) {
-        // prepare for apply
-        if (prepareSceneApply(aScene)) {
-          // now apply values to hardware
-          requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aScene), false);
-        }
-      }
-      else {
-        // no apply to hardware needed, directly proceed to actions
-        sceneValuesApplied(aScene);
-      }
-    }
-  }
-  else {
-     ALOG(LOG_DEBUG, "Device level prepareSceneCall() returns false -> no more actions");
-  }
-}
-
-
-void Device::sceneValuesApplied(DsScenePtr aScene)
-{
-  // now perform scene special actions such as blinking
-  performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aScene));
-}
-
-
-void Device::sceneActionsComplete(DsScenePtr aScene)
-{
-  // scene actions are now complete
-  ALOG(LOG_INFO, "Scene actions for callScene(%d) complete -> now in final state", aScene->sceneNo);
-}
-
-
 
 
 void Device::undoScene(SceneNo aSceneNo)

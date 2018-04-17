@@ -19,8 +19,15 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "device.hpp"
+// File scope debugging options
+// - Set ALWAYS_DEBUG to 1 to enable DBGLOG output even in non-DEBUG builds of this file
+#define ALWAYS_DEBUG 0
+// - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
+//   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
+#define FOCUSLOGLEVEL 6
 
+
+#include "device.hpp"
 #include "vdc.hpp"
 
 using namespace p44;
@@ -203,14 +210,145 @@ string Vdc::modelName()
 
 /// MARK: ===== grouped delivery of notification to devices (for scene/group optimizations)
 
+//
+//ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel)
+//{
+//  ChannelBehaviourPtr ch;
+//  ApiValuePtr o;
+//  aChannel.reset();
+//  if ((o = aParams->get("channel"))) {
+//    aChannel = getChannelByType(o->int32Value());
+//  }
+//  else if ((o = aParams->get("channelId"))) {
+//    aChannel = getChannelById(o->stringValue());
+//  }
+//  if (!aChannel) {
+//    return Error::err<VdcApiError>(400, "Need to specify channel(type) or channelId");
+//  }
+//  return ErrorPtr();
+//}
+//
+//
+
 
 void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  // fallback: just let every device handle notification individually
-  for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
-    (*apos)->handleNotification(aApiConnection, aNotification, aParams);
+  ErrorPtr err;
+  if (aNotification=="callScene") {
+    // call scene
+    NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState);
+    nds->audience = aAudience;
+    nds->callType = ntfy_callscene;
+    nds->callParams = aParams;
+    nds->optimizedType = ntfy_undefined; // first device will decide (callScene might become dimChannel)
+    prepareNextNotification(nds);
+    return;
+  }
+  else if (aNotification=="dimChannel") {
+    // start or stop dimming a channel
+    NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState);
+    nds->audience = aAudience;
+    nds->callType = ntfy_dimchannel;
+    nds->callParams = aParams;
+    nds->optimizedType = ntfy_dimchannel; // dimchannel will always remain dimchannel
+    prepareNextNotification(nds);
+    return;
+  }
+  else {
+    // not a specially handled/optimized notification: just let every device handle it individually
+    for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
+      (*apos)->handleNotification(aApiConnection, aNotification, aParams);
+    }
   }
 }
+
+
+void Vdc::prepareNextNotification(NotificationDeliveryStatePtr aDeliveryState)
+{
+  if (aDeliveryState->audience.empty()) {
+    // preparation complete, now process affected devices
+    executePreparedNotification(aDeliveryState);
+  }
+  else {
+    // need to prepare next device
+    DevicePtr dev = boost::dynamic_pointer_cast<Device>(aDeliveryState->audience.front());
+    if (dev) {
+      dev->notificationPrepare(boost::bind(&Vdc::notificationPrepared, this, aDeliveryState, _1), aDeliveryState);
+    }
+  }
+}
+
+
+void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, NotificationType aNotificationToApply)
+{
+  // front device in audience is now prepared
+  DevicePtr dev = boost::dynamic_pointer_cast<Device>(aDeliveryState->audience.front());
+  aDeliveryState->audience.pop_front(); // processed, remove from list
+  if (aNotificationToApply!=ntfy_none) {
+    // this notification should be applied
+    if (aDeliveryState->optimizedType==ntfy_undefined) {
+      // first to-be-applied notification determines actual type
+      aDeliveryState->optimizedType = aNotificationToApply;
+    }
+    if (aDeliveryState->optimizedType!=aNotificationToApply || !dev->addToOptimizedSet(aDeliveryState)) {
+      // different notification type than others in set or otherwise not optimizable -> just execute and apply right now
+      dev->executePreparedOperation(true);
+    }
+  }
+  // break caller chain by going via mainloop
+  MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::prepareNextNotification, this, aDeliveryState));
+}
+
+
+#define MIN_DEVICES_TO_OPTIMIZE 2 // do not optimize sets with less than this number of devices
+
+void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState)
+{
+  if (aDeliveryState->affectedDevices.size()>0) {
+    AFOCUSLOG("%lu affected devices with hash=%s, contentsHash=%016llX", aDeliveryState->affectedDevices.size(), binaryToHexString(aDeliveryState->affectedDevicesHash).c_str(), aDeliveryState->contentsHash);
+    bool appliedFromCache = false;
+    if (aDeliveryState->affectedDevices.size()>=MIN_DEVICES_TO_OPTIMIZE) {
+      if (false /* found this notification type in affected devices cache */) {
+        // TODO: increment cache line use count
+        if (false /* cache entry already has a native scene/group identifier attached */) {
+          // native scene/group already assigned, check if still valid
+          if (false /* native scene contents is not stale (as per sceneContentsHash comparison) */) {
+            // TODO: apply vdc-level scene or group
+            appliedFromCache = true;
+          }
+          else {
+            // native scene contents is stale, actual scene has changed
+            // TODO: set flag to update native scene after applying new values conventionally
+            //   Note: might need a mechanism to do that after physical values have actually been applied
+          }
+        }
+        else {
+          // affected device set known in cache, but no native scene/group installed yet
+          // TODO: update usage count statistics to find out if we should add a native scene/group
+          if (false /* statistics indicate we should add native scene/group */) {
+            // TODO: set flag to create native scene/group after applying new values conventionally
+          }
+        }
+      }
+      else {
+        // set of affected devices not yet in cache
+        // TODO: add cache entry depending on statistics, number of devices and number of already existing cache entries, possibly kicking out lower scoring entries
+      }
+    }
+    // now let all devices either finish the operation or apply it (in case no cached operation was applied on vdc level)
+    // Note: if appliedFromCache is set, actual apply operation was done via a scene/group call already.
+    //   Still, all devices must be notified to update their software state
+    for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+      (*pos)->executePreparedOperation(!appliedFromCache);
+    }
+    // update or create scenes/groups
+    if (false /* flags set above indicate we must create/update scenes/groups */) {
+      // TODO: trigger scene/group creation/updates
+      // TODO: update persistent DB entries with scene/group identifiers
+    }
+  }
+}
+
 
 
 
