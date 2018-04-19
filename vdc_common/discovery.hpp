@@ -153,21 +153,13 @@ namespace p44 {
     // state of dS advertising / scanning
     enum {
       dm_disabled, // not set up, cannot be started
-      dm_setup, // set up, but not yet requested to start
-      dm_requeststart, // requested to be started
+      dm_setup, // set up, but not yet requested to start an advertisement
+      dm_requeststart, // set up and requested to start advertising
       dm_starting, // waiting for pusblishing to happen
       dm_started, // published
-      dm_previously_not_detected_master, // in previous scan, we did NOT see a master, and also not (yet) in current scan
-      dm_previously_detected_master, // in previous scan, we did see a master, but not (yet) in current scan
-      dm_detected_master, // at least one master vdsm has been detected
-      dm_lost_vdsm, // just lost a vdsm, re-discovering what is on the network
-      dm_auxvdsm_needs_change, // need for auxiliary vdsm run state change (needs to be started or stopped)
     } dmState;
 
-    MLTicket pollTicket;
-    MLTicket rescanTicket;
-    MLTicket evaluateTicket;
-
+    MLTicket pollTicket; // timer for avahi polling
 
     // private constructor, use sharedDiscoveryManager() to obtain singleton
     DiscoveryManager();

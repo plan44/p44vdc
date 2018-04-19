@@ -70,8 +70,6 @@ DiscoveryManager::DiscoveryManager() :
   noAuto(false),
   publishWebPort(0),
   publishSshPort(0),
-  rescanTicket(0),
-  evaluateTicket(0),
   pollTicket(0)
 {
   // register a cleanup handler
@@ -239,9 +237,6 @@ void DiscoveryManager::startService()
 
 void DiscoveryManager::stopService()
 {
-  // stop the timers
-  MainLoop::currentMainLoop().cancelExecutionTicket(rescanTicket);
-  MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
   // stop advertising
   stopAdvertisingDS();
   if (debugServiceBrowser) {
@@ -271,12 +266,16 @@ void DiscoveryManager::serviceStarted()
       FOCUSLOG("avahi: failed to create debug service browser: %s", avahi_strerror(avahi_service_errno(service)));
     }
   }
+  // start advertisement if needed
+  startAdvertisingDS(service);
 }
 
 
 void DiscoveryManager::restartService()
 {
+  bool wasAdvertising = dmState>=dm_requeststart;
   stopService();
+  if (wasAdvertising) dmState = dm_requeststart; // make sure advertising comes up again if it was running or requested before
   LOG(LOG_WARNING, "discovery: stopped avahi service - restarting in %lld Seconds", SERVICES_RESTART_DELAY/Second);
   MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), SERVICES_RESTART_DELAY);
 }
@@ -305,6 +304,7 @@ void DiscoveryManager::server_callback(AvahiServer *s, AvahiServerState state)
   // Avahi server state has changed
   switch (state) {
     case AVAHI_SERVER_RUNNING: {
+      LOG(LOG_INFO, "avahi: server running");
       // The server has started up successfully and registered its hostname
       // - create services that are set up to get published
       startAdvertising(s);
@@ -366,13 +366,11 @@ void DiscoveryManager::client_callback(AvahiClient *c, AvahiClientState state)
   // Avahi server state has changed
   switch (state) {
     case AVAHI_CLIENT_S_RUNNING: {
+      LOG(LOG_INFO, "avahi: client reports server running");
       // The client reports that server has started up successfully and registered its hostname
       // - create services that are set up to get published
       startAdvertising(c);
       break;
-    }
-    case AVAHI_CLIENT_S_COLLISION: {
-      // fall through to AVAHI_SERVER_REGISTERING
     }
     case AVAHI_CLIENT_S_REGISTERING: {
       // drop service registration, will be recreated once server is running
@@ -383,6 +381,9 @@ void DiscoveryManager::client_callback(AvahiClient *c, AvahiClientState state)
         avahi_entry_group_reset(eg);
       }
       break;
+    }
+    case AVAHI_CLIENT_S_COLLISION: {
+      // fall through to AVAHI_CLIENT_FAILURE
     }
     case AVAHI_CLIENT_FAILURE: {
       LOG(LOG_ERR, "avahi: service failure: %s", avahi_strerror(avahi_client_errno(c)));
