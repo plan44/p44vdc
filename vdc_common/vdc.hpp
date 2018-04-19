@@ -41,9 +41,11 @@ namespace p44 {
       NoDevice, ///< no device could be identified
       Initialize, ///< initialisation failed
       Collecting, ///< is busy collecting devices already, new collection request irgnored
+      AddAction, ///< optimizer suggests to add a native action
+      StaleAction, ///< optimizer has detected stale action
     } ErrorCodes;
     
-    static const char *domain() { return "DeviceClass"; }
+    static const char *domain() { return "Vdc"; }
     virtual const char *getErrorDomain() const { return VdcError::domain(); };
     VdcError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
   };
@@ -74,7 +76,8 @@ namespace p44 {
     ntfy_undefined,
     ntfy_none,
     ntfy_callscene,
-    ntfy_dimchannel
+    ntfy_dimchannel,
+    numNotificationTypes
   } NotificationType;
 
 
@@ -87,13 +90,17 @@ namespace p44 {
     NotificationDeliveryState() :
       callType(ntfy_undefined),
       optimizedType(ntfy_undefined),
-      contentsHash(0)
+      contentId(0),
+      contentsHash(0),
+      actionVariant(0)
     {};
 
     DsAddressablesList audience; ///< remaining devices to be prepared
     string affectedDevicesHash; ///< binary string hash, represents the set of affected devices, to be matched against known sets for optimisation
     DeviceList affectedDevices; ///< the list of devices that are included in the hash
-    uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene) or channels (for dimming)
+    int contentId; ///< this represents the ID of the content, such a scene number
+    uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
+    int actionVariant; ///< variant/parameter for the action (such as dim up/down/stop)
 
   public:
     NotificationType callType; ///< type of notification as originally called
@@ -101,6 +108,39 @@ namespace p44 {
     NotificationType optimizedType; ///< the type that results (callScene might result in dimming...)
   };
   typedef boost::intrusive_ptr<NotificationDeliveryState> NotificationDeliveryStatePtr;
+
+
+  class OptimizerEntry : public P44Obj
+  {
+    friend class Vdc;
+
+    OptimizerEntry() :
+      type(ntfy_undefined),
+      numberOfDevices(0),
+      numCalls(0),
+      lastUse(Never),
+      contentId(0),
+      contentsHash(0)
+    {};
+
+    // identification
+    NotificationType type; ///< type of notification
+    int numberOfDevices; ///< number of affected devices (for evaluating importance of optimizing that)
+    string affectedDevicesHash; ///< binary string hash, represents the set of affected devices
+    int contentId; ///< this represents the ID of the content, such a scene number
+    uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
+
+    // native action
+    string nativeActionId; ///< the identifier for the native action (e.g. scene or group name)
+
+    // statistics
+    long numCalls; ///< overall number of calls for this entry
+    MLMicroSeconds lastUse; ///< time of last use
+
+  };
+  typedef boost::intrusive_ptr<OptimizerEntry> OptimizerEntryPtr;
+  typedef std::list<OptimizerEntryPtr> OptimizerEntryList;
+
 
 
 
@@ -127,6 +167,11 @@ namespace p44 {
     RescanMode rescanMode; ///< mode to use for periodic rescan
     MLTicket rescanTicket; ///< rescan ticket
     bool collecting; ///< currently collecting
+
+    /// notification optimizing
+    OptimizerEntryList optimizerCache;
+    long totalOptimizableCalls;
+
 
     ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all
 
@@ -398,6 +443,12 @@ namespace p44 {
     /// @name Implementation methods for native scene and grouped dimming support
     /// @{
 
+    /// execute native action (scene call, dimming operation)
+    /// @param aStatusCB must be called to return status. Must return NULL when action was applied.
+    ///   Can return Error::OK to signal action was not applied and request device-by-device apply.
+    /// @param aNativeActionId the ID of the native action (scene, group) that must be used
+    /// @param aDeliveryState can be inspected to obtain details about the affected devices, actionVariant etc.
+    virtual void callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState);
 
     /// @}
 
@@ -479,6 +530,7 @@ namespace p44 {
     void prepareNextNotification(NotificationDeliveryStatePtr aDeliveryState);
     void notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, NotificationType aNotificationToApply);
     void executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState);
+    void finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
 
     void collectedDevices(StatusCB aCompletedCB, ErrorPtr aError);
     void schedulePeriodicRecollecting();

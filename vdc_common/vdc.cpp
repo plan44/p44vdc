@@ -48,7 +48,8 @@ Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   rescanInterval(Never),
   rescanMode(rescanmode_incremental),
   rescanTicket(0),
-  collecting(false)
+  collecting(false),
+  totalOptimizableCalls(0)
 {
 }
 
@@ -210,25 +211,13 @@ string Vdc::modelName()
 
 /// MARK: ===== grouped delivery of notification to devices (for scene/group optimizations)
 
-//
-//ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel)
-//{
-//  ChannelBehaviourPtr ch;
-//  ApiValuePtr o;
-//  aChannel.reset();
-//  if ((o = aParams->get("channel"))) {
-//    aChannel = getChannelByType(o->int32Value());
-//  }
-//  else if ((o = aParams->get("channelId"))) {
-//    aChannel = getChannelById(o->stringValue());
-//  }
-//  if (!aChannel) {
-//    return Error::err<VdcApiError>(400, "Need to specify channel(type) or channelId");
-//  }
-//  return ErrorPtr();
-//}
-//
-//
+
+static const char *NotificationNames[numNotificationTypes] = {
+  "undefined",
+  "none",
+  "callScene",
+  "dimChannel"
+};
 
 
 void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
@@ -301,54 +290,136 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
 
 
 #define MIN_DEVICES_TO_OPTIMIZE 2 // do not optimize sets with less than this number of devices
+#define MIN_CALLS_BEFORE_OPTIMIZING 3 // do not optimize calls before they have repeated this number of times
 
 void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState)
 {
   if (aDeliveryState->affectedDevices.size()>0) {
-    AFOCUSLOG("%lu affected devices with hash=%s, contentsHash=%016llX", aDeliveryState->affectedDevices.size(), binaryToHexString(aDeliveryState->affectedDevicesHash).c_str(), aDeliveryState->contentsHash);
-    bool appliedFromCache = false;
+    totalOptimizableCalls++;
+    AFOCUSLOG(
+      "notification #%ld affects %lu optimizable devices for '%s' with hash=%s, contentId=%d, contentsHash=%016llX",
+      totalOptimizableCalls,
+      aDeliveryState->affectedDevices.size(),
+      NotificationNames[aDeliveryState->optimizedType],
+      binaryToHexString(aDeliveryState->affectedDevicesHash).c_str(),
+      aDeliveryState->contentId,
+      aDeliveryState->contentsHash
+    );
+    OptimizerEntryPtr entry;
     if (aDeliveryState->affectedDevices.size()>=MIN_DEVICES_TO_OPTIMIZE) {
-      if (false /* found this notification type in affected devices cache */) {
-        // TODO: increment cache line use count
-        if (false /* cache entry already has a native scene/group identifier attached */) {
-          // native scene/group already assigned, check if still valid
-          if (false /* native scene contents is not stale (as per sceneContentsHash comparison) */) {
-            // TODO: apply vdc-level scene or group
-            appliedFromCache = true;
-          }
-          else {
-            // native scene contents is stale, actual scene has changed
-            // TODO: set flag to update native scene after applying new values conventionally
-            //   Note: might need a mechanism to do that after physical values have actually been applied
+      // search for cache entry
+      for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
+        OptimizerEntryPtr e = *pos;
+        if (e->type==aDeliveryState->callType) {
+          // correct call type
+          if (e->affectedDevicesHash==aDeliveryState->affectedDevicesHash) {
+            // same set of affected devices
+            if (e->contentId==aDeliveryState->contentId) {
+              // match
+              AFOCUSLOG("- found cache entry with %ld calls already", e->numCalls);
+              entry = e;
+              break;
+            }
           }
         }
+      }
+      if (!entry) {
+        AFOCUSLOG("- creating new cache entry");
+        entry = OptimizerEntryPtr(new OptimizerEntry);
+        entry->type = aDeliveryState->callType;
+        entry->affectedDevicesHash = aDeliveryState->affectedDevicesHash;
+        entry->contentId = aDeliveryState->contentId;
+        entry->contentsHash = aDeliveryState->contentsHash;
+        entry->numberOfDevices = aDeliveryState->affectedDevices.size();
+        // TODO: limit number of entries, kick out least used ones
+        optimizerCache.push_back(entry);
+      }
+      // count the call
+      entry->numCalls++;
+      entry->lastUse = MainLoop::now();
+      // can we already use the entry?
+      if (!entry->nativeActionId.empty()) {
+        // cache entry already has a native action identifier attached
+        AFOCUSLOG("- native action already exists: '%s'", entry->nativeActionId.c_str());
+        if (entry->contentsHash==aDeliveryState->contentsHash) {
+          // content has not changed since native action was last updated -> we can use it!
+          AFOCUSLOG("- content hash matches -> calling native action now (variant %d)", aDeliveryState->actionVariant);
+          callNativeAction(boost::bind(&Vdc::finalizePreparedNotification, this, entry, aDeliveryState, _1), entry->nativeActionId, aDeliveryState);
+          return;
+        }
         else {
-          // affected device set known in cache, but no native scene/group installed yet
-          // TODO: update usage count statistics to find out if we should add a native scene/group
-          if (false /* statistics indicate we should add native scene/group */) {
-            // TODO: set flag to create native scene/group after applying new values conventionally
-          }
+          AFOCUSLOG("- content hash mismatch -> cannot be called now, must be updated later");
+          finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::StaleAction, "Stale native action '%s'", entry->nativeActionId.c_str()));
+          return;
         }
       }
       else {
-        // set of affected devices not yet in cache
-        // TODO: add cache entry depending on statistics, number of devices and number of already existing cache entries, possibly kicking out lower scoring entries
+        // affected device set/contentId has no native scene/group installed yet
+        AFOCUSLOG("- no native action assigned yet -> checking statistics to see if we should add one");
+        if (entry->numCalls>MIN_CALLS_BEFORE_OPTIMIZING) {
+          ALOG(LOG_NOTICE, "- call seems to be frequent enough -> execute normally and then add native action for it");
+          finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::AddAction, "Request adding native action"));
+          return;
+        }
+        else {
+          // not adding action, we'll wait and see if this call repeats enough to do so
+          AFOCUSLOG("- not imporant enough -> just execute normally now");
+          finalizePreparedNotification(entry, aDeliveryState, Error::ok());
+          return;
+        }
       }
-    }
-    // now let all devices either finish the operation or apply it (in case no cached operation was applied on vdc level)
-    // Note: if appliedFromCache is set, actual apply operation was done via a scene/group call already.
-    //   Still, all devices must be notified to update their software state
-    for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
-      (*pos)->executePreparedOperation(!appliedFromCache);
-    }
-    // update or create scenes/groups
-    if (false /* flags set above indicate we must create/update scenes/groups */) {
-      // TODO: trigger scene/group creation/updates
-      // TODO: update persistent DB entries with scene/group identifiers
     }
   }
 }
 
+
+
+void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
+{
+  AFOCUSLOG("Finalizing notification call with status: %s", Error::text(aError).c_str());
+  bool notAppliedYet = aError!=NULL; // any error, including Error::OK, means that notification was NOT applied yet
+  // now let all devices either finish the operation or apply it (in case no cached operation was applied on vdc level)
+  // Note: if notAppliedYet is not set, actual apply operation was done via a native action call already.
+  //   Still, all devices must be notified to update their software state
+  for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+    (*pos)->executePreparedOperation(notAppliedYet);
+  }
+  // check if we need to update or create native actions
+  if (Error::isError(aError, VdcError::domain(), VdcError::AddAction)) {
+    // TODO: add native action
+    ALOG(LOG_ERR, "Adding native action not yet implemented");
+    // TODO: update persistent DB entries
+  }
+  else if (Error::isError(aError, VdcError::domain(), VdcError::StaleAction)) {
+    // TODO: update native action contents
+    ALOG(LOG_ERR, "Updating native action contents not yet implemented");
+    // TODO: update persistent DB entries
+  }
+  if (FOCUSLOGENABLED) {
+    // show current statistics
+    AFOCUSLOG("========= Optimizer statistics after %ld optimizable calls", totalOptimizableCalls);
+    for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
+      OptimizerEntryPtr oe = *pos;
+      FOCUSLOG(
+        "%c '%s' called %ld times, last %lld seconds ago, contentId=%d, numdevices=%d, nativeAction='%s'",
+        oe==aEntry ? '*' : '-', // mark entry used in current call
+        NotificationNames[oe->type],
+        oe->numCalls,
+        (MainLoop::now()-oe->lastUse)/Second,
+        oe->contentId,
+        oe->numberOfDevices,
+        oe->nativeActionId.c_str()
+      );
+    }
+  }
+}
+
+
+void Vdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState)
+{
+  // base class does not support native actions
+  aStatusCB(TextError::err("Native action '%s' not supported", aNativeActionId.c_str()));
+}
 
 
 

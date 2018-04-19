@@ -923,6 +923,7 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
       if (sh.getHash()==0) return false; // scene not hashable -> not part of optimized set
       sh.addString(dSUID.getBinary()); // add device dSUID to make it "mixable" (i.e. combine into one hash via XOR in any order)
       aDeliveryState->contentsHash ^= sh.getHash(); // mix
+      aDeliveryState->contentId = preparedScene->sceneNo; // to re-identify the scene (the contents might have changed...)
       include = true;
     }
   }
@@ -930,6 +931,8 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
     if (!preparedDim) return false; // no prepared scene -> not part of optimized set
     if (prepareForOptimizedSet(aDeliveryState)) {
       include = true;
+      aDeliveryState->contentId = 0; // no different content ids
+      aDeliveryState->actionVariant = currentDimMode; // to actually apply the dim mode to the optimized group later
     }
   }
   if (include) {
