@@ -1946,6 +1946,10 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   else {
     ALOG(LOG_ERR, "unknown device type");
   }
+  // mark used groups/scenes
+  for (int i=0; i<numAddresses; i++) {
+    daliVdc().markUsed(baseAddress+i, true);
+  }
 }
 
 
@@ -1977,6 +1981,9 @@ void DaliInputDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
   if (daliInputDeviceRowID) {
     if(daliVdc().db.executef("DELETE FROM inputDevices WHERE rowid=%lld", daliInputDeviceRowID)!=SQLITE_OK) {
       ALOG(LOG_ERR, "deleting DALI input device: %s", daliVdc().db.error()->description().c_str());
+    }
+    for (int i=0; i<numAddresses; i++) {
+      daliVdc().markUsed(baseAddress+i, false);
     }
   }
   // disconnection is immediate, so we can call inherited right now

@@ -126,6 +126,7 @@ namespace p44 {
   const DaliAddress DaliGroup = 0x80; // marks group address
   const DaliAddress DaliBroadcast = 0xFF; // all devices on the bus
   const DaliAddress DaliAddressMask = 0x3F; // address mask
+  const DaliAddress DaliAddressTypeMask = 0xC0; // address type
   const DaliAddress DaliGroupMask = 0x0F; // group address mask
   // - pseudo-address for scene numbers
   const DaliAddress DaliScene = 0x40; // marks scene number

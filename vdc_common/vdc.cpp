@@ -1273,7 +1273,7 @@ void OptimizerEntry::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
   // bind fields
   aStatement.bind(aIndex++, type);
   aStatement.bind(aIndex++, numberOfDevices);
-  aStatement.bind(aIndex++, affectedDevicesHash.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, binaryToHexString(affectedDevicesHash).c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, contentId);
   aStatement.bind(aIndex++, (long long)contentsHash);
   aStatement.bind(aIndex++, nativeActionId.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
