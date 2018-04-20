@@ -110,18 +110,15 @@ namespace p44 {
   typedef boost::intrusive_ptr<NotificationDeliveryState> NotificationDeliveryStatePtr;
 
 
-  class OptimizerEntry : public P44Obj
+  class OptimizerEntry : public P44Obj, public PersistentParams
   {
+    typedef PersistentParams inheritedParams;
     friend class Vdc;
 
-    OptimizerEntry() :
-      type(ntfy_undefined),
-      numberOfDevices(0),
-      numCalls(0),
-      lastUse(Never),
-      contentId(0),
-      contentsHash(0)
-    {};
+    OptimizerEntry();
+    virtual ~OptimizerEntry();
+
+  public:
 
     // identification
     NotificationType type; ///< type of notification
@@ -132,16 +129,38 @@ namespace p44 {
 
     // native action
     string nativeActionId; ///< the identifier for the native action (e.g. scene or group name)
+    MLMicroSeconds lastNativeChange; ///< last time when native action was updated (to prevent too many updates too quickly)
 
     // statistics
-    long numCalls; ///< overall number of calls for this entry
-    MLMicroSeconds lastUse; ///< time of last use
+    long numCalls; ///< overall number of calls for this entry (persistent for entries with assigned native action)
+    MLMicroSeconds lastUse; ///< time of last use (
+
+    // @return number of previous calls, weighted down by time of last use
+    long timeWeightedCallCount();
+
+  protected:
+
+    // persistence implementation
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<OptimizerEntry> OptimizerEntryPtr;
   typedef std::list<OptimizerEntryPtr> OptimizerEntryList;
 
 
+  /// Optimizer modes
+  typedef enum {
+    opt_unavailable = 0, ///< read-only: vdc does not support optimisation at all
+    opt_disabled = 1, ///< optimisation disabled
+    opt_frozen = 2, ///< just use already established optimisations as-is, but do not update or add new ones (no writes to device or DB)
+    opt_update = 3, ///< use already established optimisations and update contents (e.g. changed scenes), but do not add new ones
+    opt_auto = 4, ///< automatically add native actions for frequently used operations
+    opt_reset = 5 ///< write-only: reset the optimization cache.
+  } OptimizerMode;
 
 
   /// This is the base class for a "class" (usually: type of hardware) of virtual devices.
@@ -157,10 +176,9 @@ namespace p44 {
     int tag; ///< tag used to in self test failures for showing on LEDs
     MLTicket pairTicket; ///< used for pairing
 
-    /// generic vdc flag word
-    int vdcFlags;
-    /// default dS zone ID
-    DsZoneID defaultZoneID;
+    /// Settings
+    int vdcFlags; ///< generic vdc flag word
+    DsZoneID defaultZoneID; ///< default dS zone ID
 
     /// periodic rescan, collecting
     MLMicroSeconds rescanInterval; ///< rescan interval, 0 if none
@@ -169,15 +187,15 @@ namespace p44 {
     bool collecting; ///< currently collecting
 
     /// notification optimizing
-    OptimizerEntryList optimizerCache;
-    long totalOptimizableCalls;
-
+    OptimizerEntryList optimizerCache; ///< the current optimizer cache
+    long totalOptimizableCalls; ///< total of optimizable calls
 
     ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all
 
   protected:
   
     DeviceVector devices; ///< the devices of this class
+    OptimizerMode optimizerMode; ///< the optimizer mode
 
   public:
 
@@ -443,12 +461,35 @@ namespace p44 {
     /// @name Implementation methods for native scene and grouped dimming support
     /// @{
 
+    /// this is called once for every native action in use, after startup after existing cache entries have been
+    /// read from persistent storage. This allows vDC implementations to know which native scenes/groups are
+    /// in use by the optimizer without needing private bookkeeping.
+    /// @param aNativeActionId a ID of a native action that is in use by the optimizer
+    virtual ErrorPtr announceNativeAction(const string aNativeActionId) { /* NOP in base class */ };
+
     /// execute native action (scene call, dimming operation)
     /// @param aStatusCB must be called to return status. Must return NULL when action was applied.
     ///   Can return Error::OK to signal action was not applied and request device-by-device apply.
     /// @param aNativeActionId the ID of the native action (scene, group) that must be used
     /// @param aDeliveryState can be inspected to obtain details about the affected devices, actionVariant etc.
     virtual void callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState);
+
+    /// create/reserve new native action
+    /// @param aStatusCB must be called to return status. If not ok, aOptimizerEntry must not be changed.
+    /// @param aOptimizerEntry the optimizer entry. If a new action is created, the nativeActionId must be updated to the new actionid.
+    ///   If creating the native action causes configuration changes in the native device, lastNativeChange should be updated, too.
+    /// @param aDeliveryState can be inspected to obtain details such as list of affected devices etc.
+    virtual void createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState);
+
+    /// update native action
+    /// @param aStatusCB must be called to return status.
+    /// @param aOptimizerEntry the optimizer entry. If configuration has changed in the native device, lastNativeChange should be updated.
+    /// @param aDeliveryState can be inspected to obtain details such as list of affected devices etc.
+    virtual void updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState);
+
+    /// free native action
+    /// @param aNativeActionId a ID of a native action that should be removed
+    virtual ErrorPtr freeNativeAction(const string aNativeActionId) { /* NOP in base class */ };
 
     /// @}
 
@@ -531,6 +572,10 @@ namespace p44 {
     void notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, NotificationType aNotificationToApply);
     void executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState);
     void finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
+    void preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
+    void clearOptimizerCache();
+    ErrorPtr loadOptimizerCache();
+    ErrorPtr saveOptimizerCache();
 
     void collectedDevices(StatusCB aCompletedCB, ErrorPtr aError);
     void schedulePeriodicRecollecting();

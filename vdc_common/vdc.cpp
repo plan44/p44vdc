@@ -42,6 +42,7 @@ Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inheritedParams(aVdcHostP->getDsParamStore()),
   instanceNumber(aInstanceNumber),
   defaultZoneID(0),
+  optimizerMode(opt_unavailable), // no optimisation by default
   vdcFlags(0),
   tag(aTag),
   pairTicket(0),
@@ -279,8 +280,8 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
       // first to-be-applied notification determines actual type
       aDeliveryState->optimizedType = aNotificationToApply;
     }
-    if (aDeliveryState->optimizedType!=aNotificationToApply || !dev->addToOptimizedSet(aDeliveryState)) {
-      // different notification type than others in set or otherwise not optimizable -> just execute and apply right now
+    if (optimizerMode<=opt_disabled || aDeliveryState->optimizedType!=aNotificationToApply || !dev->addToOptimizedSet(aDeliveryState)) {
+      // optimisation off, different notification type than others in set, or otherwise not optimizable -> just execute and apply right now
       dev->executePreparedOperation(true);
     }
   }
@@ -323,50 +324,67 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
           }
         }
       }
-      if (!entry) {
+      if (!entry && optimizerMode==opt_auto) {
         AFOCUSLOG("- creating new cache entry");
         entry = OptimizerEntryPtr(new OptimizerEntry);
         entry->type = aDeliveryState->callType;
         entry->affectedDevicesHash = aDeliveryState->affectedDevicesHash;
         entry->contentId = aDeliveryState->contentId;
         entry->contentsHash = aDeliveryState->contentsHash;
-        entry->numberOfDevices = aDeliveryState->affectedDevices.size();
+        entry->numberOfDevices = (int)aDeliveryState->affectedDevices.size();
         // TODO: limit number of entries, kick out least used ones
         optimizerCache.push_back(entry);
       }
-      // count the call
-      entry->numCalls++;
-      entry->lastUse = MainLoop::now();
-      // can we already use the entry?
-      if (!entry->nativeActionId.empty()) {
-        // cache entry already has a native action identifier attached
-        AFOCUSLOG("- native action already exists: '%s'", entry->nativeActionId.c_str());
-        if (entry->contentsHash==aDeliveryState->contentsHash) {
-          // content has not changed since native action was last updated -> we can use it!
-          AFOCUSLOG("- content hash matches -> calling native action now (variant %d)", aDeliveryState->actionVariant);
-          callNativeAction(boost::bind(&Vdc::finalizePreparedNotification, this, entry, aDeliveryState, _1), entry->nativeActionId, aDeliveryState);
-          return;
+      if (entry) {
+        // count the call (but not in freezed mode, as it would mess up statistic)
+        if (optimizerMode>opt_frozen) {
+          // fade down old counts
+          entry->numCalls = entry->timeWeightedCallCount()+1;
+          entry->lastUse = MainLoop::now();
+        }
+        // can we already use the entry?
+        if (!entry->nativeActionId.empty()) {
+          // cache entry already has a native action identifier attached
+          AFOCUSLOG("- native action already exists: '%s'", entry->nativeActionId.c_str());
+          if (entry->contentsHash==aDeliveryState->contentsHash) {
+            // content has not changed since native action was last updated -> we can use it!
+            ALOG(LOG_NOTICE, "Optimzed %s: calling native %s '%s' (variant %d)", NotificationNames[aDeliveryState->callType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), aDeliveryState->actionVariant);
+            callNativeAction(boost::bind(&Vdc::finalizePreparedNotification, this, entry, aDeliveryState, _1), entry->nativeActionId, aDeliveryState);
+            return;
+          }
+          else {
+            if (optimizerMode>=opt_update) {
+              AFOCUSLOG("- content hash mismatch -> cannot be called now, must be updated later");
+              finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::StaleAction, "Stale native action '%s'", entry->nativeActionId.c_str()));
+            }
+            else {
+              AFOCUSLOG("- content hash mismatch in frozen mode -> just execute normally now");
+              finalizePreparedNotification(entry, aDeliveryState, Error::ok());
+            }
+            return;
+          }
         }
         else {
-          AFOCUSLOG("- content hash mismatch -> cannot be called now, must be updated later");
-          finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::StaleAction, "Stale native action '%s'", entry->nativeActionId.c_str()));
-          return;
+          // affected device set/contentId has no native scene/group installed yet
+          AFOCUSLOG("- no native action assigned yet -> checking statistics to see if we should add one");
+          if (optimizerMode==opt_auto && entry->timeWeightedCallCount()>MIN_CALLS_BEFORE_OPTIMIZING) {
+            ALOG(LOG_INFO, "Optimizer: %s for these devices has occurred repeatedly (weighted: %ld times) -> optimzing it using native action", NotificationNames[aDeliveryState->optimizedType], entry->timeWeightedCallCount());
+            finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::AddAction, "Request adding native action"));
+            return;
+          }
+          else {
+            // not adding action, we'll wait and see if this call repeats enough to do so
+            AFOCUSLOG("- not imporant enough -> just execute normally now");
+            finalizePreparedNotification(entry, aDeliveryState, Error::ok());
+            return;
+          }
         }
       }
       else {
-        // affected device set/contentId has no native scene/group installed yet
-        AFOCUSLOG("- no native action assigned yet -> checking statistics to see if we should add one");
-        if (entry->numCalls>MIN_CALLS_BEFORE_OPTIMIZING) {
-          ALOG(LOG_NOTICE, "- call seems to be frequent enough -> execute normally and then add native action for it");
-          finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::AddAction, "Request adding native action"));
-          return;
-        }
-        else {
-          // not adding action, we'll wait and see if this call repeats enough to do so
-          AFOCUSLOG("- not imporant enough -> just execute normally now");
-          finalizePreparedNotification(entry, aDeliveryState, Error::ok());
-          return;
-        }
+        // no cache entry,
+        AFOCUSLOG("- not cache entry -> just execute normally now");
+        finalizePreparedNotification(entry, aDeliveryState, Error::ok());
+        return;
       }
     }
   }
@@ -386,24 +404,38 @@ void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDel
   }
   // check if we need to update or create native actions
   if (Error::isError(aError, VdcError::domain(), VdcError::AddAction)) {
-    // TODO: add native action
-    ALOG(LOG_ERR, "Adding native action not yet implemented");
-    // TODO: update persistent DB entries
+    // create native action for this set of devices
+    createNativeAction(boost::bind(&Vdc::preparedNotificationComplete, this, aEntry, aDeliveryState, _1), aEntry, aDeliveryState);
+    aEntry->markDirty();
+    return;
   }
   else if (Error::isError(aError, VdcError::domain(), VdcError::StaleAction)) {
-    // TODO: update native action contents
-    ALOG(LOG_ERR, "Updating native action contents not yet implemented");
-    // TODO: update persistent DB entries
+    // update native action contents
+    updateNativeAction(boost::bind(&Vdc::preparedNotificationComplete, this, aEntry, aDeliveryState, _1), aEntry, aDeliveryState);
+    aEntry->contentsHash = aDeliveryState->contentsHash; // update hash
+    aEntry->markDirty();
+    return;
   }
-  if (FOCUSLOGENABLED) {
+  else {
+    // nothing to do at vdc implementation level
+    preparedNotificationComplete(aEntry, aDeliveryState, ErrorPtr());
+    return;
+  }
+}
+
+
+void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
+{
+  if (FOCUSLOGENABLED && optimizerMode>opt_disabled) {
     // show current statistics
     AFOCUSLOG("========= Optimizer statistics after %ld optimizable calls", totalOptimizableCalls);
     for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
       OptimizerEntryPtr oe = *pos;
       FOCUSLOG(
-        "%c '%s' called %ld times, last %lld seconds ago, contentId=%d, numdevices=%d, nativeAction='%s'",
+        "%c '%s' called %ld times (weighted, raw=%ld), last %lld seconds ago, contentId=%d, numdevices=%d, nativeAction='%s'",
         oe==aEntry ? '*' : '-', // mark entry used in current call
         NotificationNames[oe->type],
+        oe->timeWeightedCallCount(),
         oe->numCalls,
         (MainLoop::now()-oe->lastUse)/Second,
         oe->contentId,
@@ -419,6 +451,32 @@ void Vdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, Not
 {
   // base class does not support native actions
   aStatusCB(TextError::err("Native action '%s' not supported", aNativeActionId.c_str()));
+}
+
+
+void Vdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
+{
+  aStatusCB(TextError::err("createNativeAction not implemented yet"));
+}
+
+
+void Vdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
+{
+  aStatusCB(TextError::err("updateNativeAction not implemented yet"));
+}
+
+
+
+void Vdc::clearOptimizerCache()
+{
+  for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
+    if (!((*pos)->nativeActionId.empty())) {
+      freeNativeAction((*pos)->nativeActionId);
+      (*pos)->deleteFromStore(); // also delete from store
+    }
+  }
+  optimizerCache.clear();
+  ALOG(LOG_WARNING, "Optimizer cache cleared");
 }
 
 
@@ -551,6 +609,7 @@ void Vdc::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 
 void Vdc::collectedDevices(StatusCB aCompletedCB, ErrorPtr aError)
 {
+  // call back
   if (aCompletedCB) aCompletedCB(aError);
   collecting = false;
   // now schedule periodic recollect
@@ -762,14 +821,77 @@ void Vdc::identifyAndAddDevicesCB(DeviceList aToBeAddedDevices, StatusCB aComple
 
 // MARK: ===== persistent vdc level params
 
+ErrorPtr Vdc::loadOptimizerCache()
+{
+  ErrorPtr err;
+
+  // create a template
+  OptimizerEntryPtr newEntry = OptimizerEntryPtr(new OptimizerEntry());
+  // get the query
+  sqlite3pp::query *queryP = newEntry->newLoadAllQuery(NULL);
+  if (queryP==NULL) {
+    // real error preparing query
+    err = newEntry->paramStore.error();
+  }
+  else {
+    for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
+      // got record
+      int index = 0;
+      newEntry->loadFromRow(row, index, NULL);
+      optimizerCache.push_back(newEntry);
+      // - fresh object for next row
+      newEntry = OptimizerEntryPtr(new OptimizerEntry());
+    }
+    delete queryP; queryP = NULL;
+  }
+  return err;
+}
+
+
+ErrorPtr Vdc::saveOptimizerCache()
+{
+  ErrorPtr err;
+
+  // if any of the active entries is dirty, all of them need to be save (to keep relative call statistics)
+  bool needsSave = false;
+  for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
+    if (!(*pos)->nativeActionId.empty() && (*pos)->isDirty()) {
+      needsSave = true;
+      break;
+    }
+  }
+  if (needsSave) {
+    // save all entries with native actions, not only the dirty ones (statistics coherence)
+    for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
+      if (!(*pos)->nativeActionId.empty()) {
+        (*pos)->markDirty();
+        err = (*pos)->saveToStore(dSUID.getString().c_str(), true); // multiple instances allowed, it's a *list*!
+        if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving optimizer entry: %s", err->description().c_str());
+      }
+    }
+  }
+  return err;
+}
+
+
+
 
 ErrorPtr Vdc::load()
 {
   ErrorPtr err;
-  // load the vdc settings
+  // load the vdc settings (collecting phase is already over by now)
   err = loadFromStore(dSUID.getString().c_str());
   if (!Error::isOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->description().c_str());
   loadSettingsFromFiles();
+  // load the optimizer cache
+  err = loadOptimizerCache();
+  if (!Error::isOK(err)) ALOG(LOG_ERR,"Error loading optimizer cache: %s", err->description().c_str());
+  // announce groups and scenes used by optimizer
+  for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
+    if (!(*pos)->nativeActionId.empty()) {
+      announceNativeAction((*pos)->nativeActionId);
+    }
+  }
   return ErrorPtr();
 }
 
@@ -779,6 +901,8 @@ ErrorPtr Vdc::save()
   ErrorPtr err;
   // save the vdc settings
   err = saveToStore(dSUID.getString().c_str(), false); // only one record per vdc
+  // load the optimizer cache
+  err = saveOptimizerCache();
   return ErrorPtr();
 }
 
@@ -787,6 +911,7 @@ ErrorPtr Vdc::forget()
 {
   // delete the vdc settings
   deleteFromStore();
+  clearOptimizerCache();
   return ErrorPtr();
 }
 
@@ -813,8 +938,8 @@ void Vdc::loadSettingsFromFiles()
 
 // MARK: ===== property access
 
-static char deviceclass_key;
-static char device_container_key;
+static char vdc_key;
+static char devices_container_key;
 static char capabilities_container_key;
 static char device_key;
 
@@ -825,33 +950,34 @@ enum {
   devices_key,
   instancenumber_key,
   rescanModes_key,
-  numClassContainerProperties
+  optimizerMode_key,
+  numVdcProperties
 };
 
 
 enum {
   capability_metering_key,
   capability_dynamicdefinitions_key,
-  numCapabilities
+  numVdcCapabilities
 };
 
 
 
 int Vdc::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor->hasObjectKey(device_container_key)) {
+  if (aParentDescriptor->hasObjectKey(devices_container_key)) {
     return (int)devices.size();
   }
   else if (aParentDescriptor->hasObjectKey(capabilities_container_key)) {
-    return numCapabilities;
+    return numVdcCapabilities;
   }
-  return inherited::numProps(aDomain, aParentDescriptor)+numClassContainerProperties;
+  return inherited::numProps(aDomain, aParentDescriptor)+numVdcProperties;
 }
 
 
 PropertyDescriptorPtr Vdc::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor->hasObjectKey(device_container_key)) {
+  if (aParentDescriptor->hasObjectKey(devices_container_key)) {
     // accessing one of the devices by numeric index
     return getDescriptorByNumericName(
       aPropMatch, aStartIndex, aDomain, aParentDescriptor,
@@ -885,7 +1011,7 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
 {
   if (aParentDescriptor->hasObjectKey(capabilities_container_key)) {
     // capabilities level
-    static const PropertyDescription capability_props[numClassContainerProperties] = {
+    static const PropertyDescription capability_props[numVdcCapabilities] = {
       { "metering", apivalue_bool, capability_metering_key, OKEY(capabilities_container_key) },
       { "dynamicDefinitions", apivalue_bool, capability_dynamicdefinitions_key, OKEY(capabilities_container_key) },
     };
@@ -894,13 +1020,14 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
   }
   else {
     // vdc level
-    static const PropertyDescription properties[numClassContainerProperties] = {
-      { "zoneID", apivalue_uint64, defaultzone_key, OKEY(deviceclass_key) },
+    static const PropertyDescription properties[numVdcProperties] = {
+      { "zoneID", apivalue_uint64, defaultzone_key, OKEY(vdc_key) },
       { "capabilities", apivalue_object+propflag_container, capabilities_key, OKEY(capabilities_container_key) },
-      { "implementationId", apivalue_string, implementationId_key, OKEY(deviceclass_key) },
-      { "x-p44-devices", apivalue_object+propflag_container+propflag_nowildcard, devices_key, OKEY(device_container_key) },
-      { "x-p44-instanceNo", apivalue_uint64, instancenumber_key, OKEY(deviceclass_key) },
-      { "x-p44-rescanModes", apivalue_uint64, rescanModes_key, OKEY(deviceclass_key) }
+      { "implementationId", apivalue_string, implementationId_key, OKEY(vdc_key) },
+      { "x-p44-devices", apivalue_object+propflag_container+propflag_nowildcard, devices_key, OKEY(devices_container_key) },
+      { "x-p44-instanceNo", apivalue_uint64, instancenumber_key, OKEY(vdc_key) },
+      { "x-p44-rescanModes", apivalue_uint64, rescanModes_key, OKEY(vdc_key) },
+      { "x-p44-optimizerMode", apivalue_uint64, optimizerMode_key, OKEY(vdc_key) }
     };
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)
@@ -914,7 +1041,7 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
 
 bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
-  if (aPropertyDescriptor->hasObjectKey(deviceclass_key)) {
+  if (aPropertyDescriptor->hasObjectKey(vdc_key)) {
     // vdc level properties
     if (aMode==access_read) {
       // read
@@ -931,6 +1058,10 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
         case rescanModes_key:
           aPropValue->setUint32Value(getRescanModes());
           return true;
+        case optimizerMode_key:
+          if (optimizerMode==opt_unavailable) return false; // do not show the property at all
+          aPropValue->setUint32Value(optimizerMode);
+          return true;
       }
     }
     else {
@@ -939,6 +1070,21 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
         case defaultzone_key:
           setPVar(defaultZoneID, (DsZoneID)aPropValue->int32Value());
           return true;
+        case optimizerMode_key: {
+          if (optimizerMode==opt_unavailable) return false; // property not writable
+          OptimizerMode m = (OptimizerMode)aPropValue->int32Value();
+          if (m==opt_reset) {
+            clearOptimizerCache();
+            return true;
+          }
+          else if (m>opt_unavailable && m<opt_reset) {
+            setPVar(optimizerMode, m);
+            return true;
+          }
+          else {
+            return false;
+          }
+        }
       }
     }
   }
@@ -967,7 +1113,7 @@ const char *Vdc::tableName()
 
 // data field definitions
 
-static const size_t numFields = 3;
+static const size_t numFields = 4;
 
 size_t Vdc::numFieldDefs()
 {
@@ -980,7 +1126,8 @@ const FieldDefinition *Vdc::getFieldDef(size_t aIndex)
   static const FieldDefinition dataDefs[numFields] = {
     { "vdcFlags", SQLITE_INTEGER },
     { "vdcName", SQLITE_TEXT },
-    { "defaultZoneID", SQLITE_INTEGER }
+    { "defaultZoneID", SQLITE_INTEGER },
+    { "optimizerMode", SQLITE_INTEGER }
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -999,6 +1146,11 @@ void Vdc::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *a
   vdcFlags = aRow->get<int>(aIndex++);
   setName(nonNullCStr(aRow->get<const char *>(aIndex++)));
   defaultZoneID = aRow->getCasted<DsZoneID, int>(aIndex++);
+  // read optimizer mode only for vdcs that support it
+  if (optimizerMode!=opt_unavailable) {
+    optimizerMode = aRow->getCastedWithDefault<OptimizerMode, int>(aIndex, optimizerMode);
+  }
+  aIndex++;
 }
 
 
@@ -1010,6 +1162,7 @@ void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const c
   aStatement.bind(aIndex++, vdcFlags);
   aStatement.bind(aIndex++, getAssignedName().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, defaultZoneID);
+  aStatement.bind(aIndex++, optimizerMode);
 }
 
 // MARK: ===== description/shortDesc/status
@@ -1038,6 +1191,112 @@ string Vdc::getStatusText()
 }
 
 
+// MARK: ===== OptimizerEntry
+
+
+OptimizerEntry::OptimizerEntry() :
+  inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
+  type(ntfy_undefined),
+  numberOfDevices(0),
+  numCalls(0),
+  lastUse(Never),
+  lastNativeChange(Never),
+  contentId(0),
+  contentsHash(0)
+{
+}
+
+
+OptimizerEntry::~OptimizerEntry()
+{
+}
+
+
+const char *OptimizerEntry::tableName()
+{
+  return "VdcOptimizer";
+}
+
+
+// data field definitions
+
+static const size_t numOptimizerEntryFields = 9;
+
+size_t OptimizerEntry::numFieldDefs()
+{
+  return inheritedParams::numFieldDefs()+numOptimizerEntryFields;
+}
+
+
+const FieldDefinition *OptimizerEntry::getFieldDef(size_t aIndex)
+{
+  static const FieldDefinition dataDefs[numOptimizerEntryFields] = {
+    { "type", SQLITE_INTEGER },
+    { "numberOfDevices", SQLITE_INTEGER },
+    { "affectedDevicesHash", SQLITE_TEXT },
+    { "contentId", SQLITE_INTEGER },
+    { "contentsHash", SQLITE_INTEGER },
+    { "nativeActionId", SQLITE_TEXT },
+    { "numCalls", SQLITE_INTEGER },
+    { "lastUse", SQLITE_INTEGER },
+    { "lastNativeChange", SQLITE_INTEGER }
+  };
+  if (aIndex<inheritedParams::numFieldDefs())
+    return inheritedParams::getFieldDef(aIndex);
+  aIndex -= inheritedParams::numFieldDefs();
+  if (aIndex<numOptimizerEntryFields)
+    return &dataDefs[aIndex];
+  return NULL;
+}
+
+
+void OptimizerEntry::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
+{
+  inheritedParams::loadFromRow(aRow, aIndex, aCommonFlagsP);
+  // get fields
+  type = aRow->getCastedWithDefault<NotificationType, int>(aIndex++, ntfy_undefined);
+  numberOfDevices = aRow->get<int>(aIndex++);
+  affectedDevicesHash = hexToBinaryString(nonNullCStr(aRow->get<const char *>(aIndex++)), false);
+  contentId = aRow->get<int>(aIndex++);
+  contentsHash = aRow->getCasted<uint64_t, long long>(aIndex++);
+  nativeActionId = nonNullCStr(aRow->get<const char *>(aIndex++));
+  numCalls = aRow->getCasted<long,int>(aIndex++);
+  // timestamps are stored as unix timestamps
+  lastUse = MainLoop::unixTimeToMainLoopTime(aRow->getCasted<uint64_t, long long>(aIndex++));
+  lastNativeChange = MainLoop::unixTimeToMainLoopTime(aRow->getCasted<uint64_t, long long>(aIndex++));
+}
+
+
+void OptimizerEntry::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
+{
+  inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  // bind fields
+  aStatement.bind(aIndex++, type);
+  aStatement.bind(aIndex++, numberOfDevices);
+  aStatement.bind(aIndex++, affectedDevicesHash.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, contentId);
+  aStatement.bind(aIndex++, (long long)contentsHash);
+  aStatement.bind(aIndex++, nativeActionId.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, (int)numCalls);
+  // timestamps are stored as unix timestamps
+  aStatement.bind(aIndex++, (long long)MainLoop::mainLoopTimeToUnixTime(lastUse));
+  aStatement.bind(aIndex++, (long long)MainLoop::mainLoopTimeToUnixTime(lastNativeChange));
+}
+
+
+#define CALL_COUNT_FADE_TIMEOUT (5*24*Hour) // call count is reduced to 0 over 5 days
+
+long OptimizerEntry::timeWeightedCallCount()
+{
+  if (lastUse!=Never) {
+    MLMicroSeconds age = MainLoop::now()-lastUse;
+    if (age>CALL_COUNT_FADE_TIMEOUT) return 0; // completely faded away already
+    return numCalls-(long)((uint64_t)numCalls*age/CALL_COUNT_FADE_TIMEOUT);
+  }
+  else {
+    return numCalls;
+  }
+}
 
 
 
