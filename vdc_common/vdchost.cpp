@@ -509,7 +509,6 @@ void VdcHost::deviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNe
 // MARK: ===== adding/removing devices
 
 
-// add a new device, replaces possibly existing one based on dSUID
 bool VdcHost::addDevice(DevicePtr aDevice)
 {
   if (!aDevice)
@@ -518,7 +517,7 @@ bool VdcHost::addDevice(DevicePtr aDevice)
   DsDeviceMap::iterator pos = dSDevices.find(aDevice->getDsUid());
   if (pos!=dSDevices.end()) {
     LOG(LOG_INFO, "- device %s already registered, not added again",aDevice->shortDesc().c_str());
-    // first break call chain that triggered deletion, keep aDevice living until then
+    // first unwind call chain that triggered deletion, keep aDevice living until then
     MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::duplicateIgnored, this, aDevice));
     return false; // duplicate dSUID, not added
   }
