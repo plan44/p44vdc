@@ -44,6 +44,8 @@ using namespace p44;
 DaliComm::DaliComm(MainLoop &aMainLoop) :
 	inherited(aMainLoop),
   runningProcedures(0),
+  retriedReads(0),
+  retriedWrites(0),
   closeAfterIdleTime(Never),
   connectionTimeoutTicket(0),
   expectedBridgeResponses(0),
@@ -146,10 +148,11 @@ void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, Se
     uint8_t resp2 = aOperation->getDataP()[1];
     if (resp1==RESP_CODE_DATA || resp1==RESP_CODE_DATA_RETRIED) {
       FOCUSLOG("DALI bridge response: DATA            (%02X)      %02X    - %d pending responses%s", resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_DATA_RETRIED ? ", RETRIED" : "");
-
+      if (resp1==RESP_CODE_DATA_RETRIED) retriedReads++;
     }
     else {
       FOCUSLOG("DALI bridge response: %s (%02X %02X)         - %d pending responses%s", bridgeAckText(resp1, resp2), resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_ACK_RETRIED ? ", RETRIED" : "");
+      if (resp1==RESP_CODE_ACK_RETRIED) retriedWrites++;
     }
     if (aBridgeResultHandler) {
       aBridgeResultHandler(resp1, resp2, aError);
@@ -331,6 +334,9 @@ ssize_t DaliComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
 void DaliComm::reset(DaliCommandStatusCB aStatusCB)
 {
   // this first reset command should also consume extra bytes left over from previous use use delay to make sure commands are NOT buffered and extra bytes from unsynced bridge will be catched here
+  FOCUSLOG("Before reset: retriedWrites=%ld, retriedReads=%ld (will be cleared to 0 now)", retriedWrites, retriedReads);
+  retriedWrites = 0;
+  retriedReads = 0;
   sendBridgeCommand(CMD_CODE_RESET, 0, 0, boost::bind(&DaliComm::resetIssued, this, aStatusCB, _1, _2, _3), 100*MilliSecond);
 }
 
@@ -373,7 +379,7 @@ void DaliComm::daliSendDirectPower(DaliAddress aAddress, uint8_t aPower, DaliCom
 }
 
 
-void DaliComm::daliPrepareForCommand(uint16_t &aCommand, int &aWithDelay)
+void DaliComm::daliPrepareForCommand(DaliCommand &aCommand, int &aWithDelay)
 {
   if (aCommand & 0xFF00) {
     // command has a device type
@@ -387,14 +393,14 @@ void DaliComm::daliPrepareForCommand(uint16_t &aCommand, int &aWithDelay)
 
 
 
-void DaliComm::daliSendCommand(DaliAddress aAddress, uint16_t aCommand, DaliCommandStatusCB aStatusCB, int aWithDelay)
+void DaliComm::daliSendCommand(DaliAddress aAddress, DaliCommand aCommand, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
   daliPrepareForCommand(aCommand, aWithDelay);
   daliSend(dali1FromAddress(aAddress)+1, aCommand, aStatusCB, aWithDelay);
 }
 
 
-void DaliComm::daliSendDtrAndCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
+void DaliComm::daliSendDtrAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
   daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay); // apply delay to DTR setting command
   aWithDelay = 0; // delay already consumed for setting DTR
@@ -411,14 +417,14 @@ void DaliComm::daliSendTwice(uint8_t aDali1, uint8_t aDali2, DaliCommandStatusCB
   sendBridgeCommand(CMD_CODE_2SEND16, aDali1, aDali2, boost::bind(&DaliComm::daliCommandStatusHandler, this, aStatusCB, _1, _2, _3), aWithDelay);
 }
 
-void DaliComm::daliSendConfigCommand(DaliAddress aAddress, uint16_t aCommand, DaliCommandStatusCB aStatusCB, int aWithDelay)
+void DaliComm::daliSendConfigCommand(DaliAddress aAddress, DaliCommand aCommand, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
   daliPrepareForCommand(aCommand, aWithDelay);
   daliSendTwice(dali1FromAddress(aAddress)+1, aCommand, aStatusCB, aWithDelay);
 }
 
 
-void DaliComm::daliSendDtrAndConfigCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
+void DaliComm::daliSendDtrAndConfigCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
   daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay);
   aWithDelay = 0; // delay already consumed for setting DTR
@@ -427,7 +433,7 @@ void DaliComm::daliSendDtrAndConfigCommand(DaliAddress aAddress, uint16_t aComma
 }
 
 
-void DaliComm::daliSend16BitValueAndCommand(DaliAddress aAddress, uint16_t aCommand, uint16_t aValue16, DaliCommandStatusCB aStatusCB, int aWithDelay)
+void DaliComm::daliSend16BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint16_t aValue16, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
   daliSend(DALICMD_SET_DTR1, aValue16>>8, NULL, aWithDelay); // MSB->DTR1 - apply delay to DTR1 setting command
   daliSend(DALICMD_SET_DTR, aValue16&0xFF); // LSB->DTR
@@ -437,7 +443,7 @@ void DaliComm::daliSend16BitValueAndCommand(DaliAddress aAddress, uint16_t aComm
 }
 
 
-void DaliComm::daliSend3x8BitValueAndCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aValue0, uint8_t aValue1, uint8_t aValue2, DaliCommandStatusCB aStatusCB, int aWithDelay)
+void DaliComm::daliSend3x8BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aValue0, uint8_t aValue1, uint8_t aValue2, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
   daliSend(DALICMD_SET_DTR, aValue0, NULL, aWithDelay);
   daliSend(DALICMD_SET_DTR1, aValue1);
@@ -457,21 +463,21 @@ void DaliComm::daliSendAndReceive(uint8_t aDali1, uint8_t aDali2, DaliQueryResul
 }
 
 
-void DaliComm::daliSendQuery(DaliAddress aAddress, uint16_t aQueryCommand, DaliQueryResultCB aResultCB, int aWithDelay)
+void DaliComm::daliSendQuery(DaliAddress aAddress, DaliCommand aQueryCommand, DaliQueryResultCB aResultCB, int aWithDelay)
 {
   daliPrepareForCommand(aQueryCommand, aWithDelay);
   daliSendAndReceive(dali1FromAddress(aAddress)+1, aQueryCommand, aResultCB, aWithDelay);
 }
 
 
-void DaliComm::daliSendDtrAndQuery(DaliAddress aAddress, uint16_t aQueryCommand, uint8_t aDTRValue, DaliQueryResultCB aResultCB, int aWithDelay)
+void DaliComm::daliSendDtrAndQuery(DaliAddress aAddress, DaliCommand aQueryCommand, uint8_t aDTRValue, DaliQueryResultCB aResultCB, int aWithDelay)
 {
   daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay);
   daliSendQuery(aAddress, aQueryCommand, aResultCB, 0); // delay already consumed for setting DTR
 }
 
 
-void DaliComm::daliSend16BitQuery(DaliAddress aAddress, uint16_t aQueryCommand, Dali16BitValueQueryResultCB aResult16CB, int aWithDelay)
+void DaliComm::daliSend16BitQuery(DaliAddress aAddress, DaliCommand aQueryCommand, Dali16BitValueQueryResultCB aResult16CB, int aWithDelay)
 {
   daliPrepareForCommand(aQueryCommand, aWithDelay);
   daliSendQuery(aAddress, aQueryCommand, boost::bind(&DaliComm::msbOf16BitQueryReceived, this, aAddress, aResult16CB, _1, _2, _3), aWithDelay);
@@ -510,7 +516,7 @@ void DaliComm::lsbOf16BitQueryReceived(uint16_t aResult16, Dali16BitValueQueryRe
 }
 
 
-void DaliComm::daliSendDtrAnd16BitQuery(DaliAddress aAddress, uint16_t aQueryCommand, uint8_t aDTRValue, Dali16BitValueQueryResultCB aResultCB, int aWithDelay)
+void DaliComm::daliSendDtrAnd16BitQuery(DaliAddress aAddress, DaliCommand aQueryCommand, uint8_t aDTRValue, Dali16BitValueQueryResultCB aResultCB, int aWithDelay)
 {
   daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay);
   daliSend16BitQuery(aAddress, aQueryCommand, aResultCB, 0); // delay already consumed for setting DTR
@@ -624,6 +630,7 @@ private:
   numCycles(aNumCycles)
   {
     daliComm.startProcedure();
+    FOCUSLOG("Before R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
     LOG(LOG_DEBUG, "DALI bus address %d - doing %d R/W tests to DTR...", busAddress, aNumCycles);
     // start with 0x55 pattern
     dtrValue = 0;
@@ -664,11 +671,13 @@ private:
     daliComm.endProcedure();
     if (numErrors>0) {
       LOG(LOG_ERR, "Unreliable data access for DALI bus address %d - %d of %d R/W tests have failed!", busAddress, numErrors, numCycles);
+      FOCUSLOG("After failed R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
       if (callback) callback(Error::err<DaliCommError>(DaliCommError::DataUnreliable, "DALI R/W tests: %d of %d failed", numErrors, numCycles));
     }
     else {
       // everything is fine
       LOG(LOG_DEBUG, "DALI bus address %d - all %d test cycles OK", busAddress, numCycles);
+      FOCUSLOG("After succesful R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
       if (callback) callback(ErrorPtr());
     }
     // done, delete myself
@@ -856,7 +865,9 @@ private:
         aError = Error::err<DaliCommError>(DaliCommError::AddressesMissing, "Devices with no short address -> need scan for those");
       }
     }
+    FOCUSLOG("After scanBus complete: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
     daliComm.endProcedure();
+    // call back
     callback(activeDevicesPtr, unreliableDevicesPtr, aError);
     // done, delete myself
     delete this;
@@ -1194,8 +1205,9 @@ private:
   {
     // terminate
     daliComm.daliSend(DALICMD_TERMINATE, 0x00);
-    // callback
     daliComm.endProcedure();
+    FOCUSLOG("After scanBus complete: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
+    // callback
     callback(foundDevicesPtr, DaliComm::ShortAddressListPtr(), aError);
     // done, delete myself
     delete this;
