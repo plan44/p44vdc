@@ -282,7 +282,7 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
     }
     if (optimizerMode<=opt_disabled || aDeliveryState->optimizedType!=aNotificationToApply || !dev->addToOptimizedSet(aDeliveryState)) {
       // optimisation off, different notification type than others in set, or otherwise not optimizable -> just execute and apply right now
-      dev->executePreparedOperation(true);
+      dev->executePreparedOperation(NULL, true);
     }
   }
   // break caller chain by going via mainloop
@@ -399,8 +399,19 @@ void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDel
   // now let all devices either finish the operation or apply it (in case no cached operation was applied on vdc level)
   // Note: if notAppliedYet is not set, actual apply operation was done via a native action call already.
   //   Still, all devices must be notified to update their software state
+  // note: we let all devices do this in parallel, continue when last device reports done
+  aDeliveryState->pendingCount = aDeliveryState->affectedDevices.size(); // must be set before calling executePreparedOperation() the first time
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
-    (*pos)->executePreparedOperation(notAppliedYet);
+    (*pos)->executePreparedOperation(boost::bind(&Vdc::preparedDeviceExecuted, this, aEntry, aDeliveryState, aError), notAppliedYet);
+  }
+}
+
+
+void Vdc::preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
+{
+  if (--aDeliveryState->pendingCount>0) {
+    AFOCUSLOG("waiting for all affected devices to confirm apply: %d/%d remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
+    return; // not all confirmed yet
   }
   // check if we need to update or create native actions
   if (Error::isError(aError, VdcError::domain(), VdcError::AddAction)) {

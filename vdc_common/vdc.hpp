@@ -92,7 +92,8 @@ namespace p44 {
       optimizedType(ntfy_undefined),
       contentId(0),
       contentsHash(0),
-      actionVariant(0)
+      actionVariant(0),
+      pendingCount(0)
     {};
 
     DsAddressablesList audience; ///< remaining devices to be prepared
@@ -106,6 +107,9 @@ namespace p44 {
     NotificationType callType; ///< type of notification as originally called
     ApiValuePtr callParams; ///< the notification parameters
     NotificationType optimizedType; ///< the type that results (callScene might result in dimming...)
+
+  private:
+    int pendingCount; ///< count used to count completed devices in some operations
   };
   typedef boost::intrusive_ptr<NotificationDeliveryState> NotificationDeliveryStatePtr;
 
@@ -571,6 +575,7 @@ namespace p44 {
     void prepareNextNotification(NotificationDeliveryStatePtr aDeliveryState);
     void notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, NotificationType aNotificationToApply);
     void executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState);
+    void preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void clearOptimizerCache();

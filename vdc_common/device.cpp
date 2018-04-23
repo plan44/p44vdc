@@ -899,15 +899,18 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
 
 
 
-void Device::executePreparedOperation(bool aDoApply)
+void Device::executePreparedOperation(SimpleCB aDoneCB, bool aDoApply)
 {
   if (preparedScene) {
-    callSceneExecutePrepared(aDoApply);
+    callSceneExecutePrepared(aDoneCB, aDoApply);
     preparedDim = false; // calling scene always cancels prepared dimming
+    return;
   }
   else if (preparedDim) {
-    dimChannelExecutePrepared(aDoApply);
+    dimChannelExecutePrepared(aDoneCB, aDoApply);
+    return;
   }
+  if (aDoneCB) aDoneCB();
 }
 
 
@@ -1202,7 +1205,7 @@ void Device::updatingChannelsComplete()
 void Device::dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
 {
   // convenience helper
-  dimChannelForAreaPrepare(boost::bind(&Device::executePreparedOperation, this, _1), aChannel, aDimMode, aArea, aAutoStopAfter);
+  dimChannelForAreaPrepare(boost::bind(&Device::executePreparedOperation, this, SimpleCB(), _1), aChannel, aDimMode, aArea, aAutoStopAfter);
 }
 
 
@@ -1287,12 +1290,13 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
 }
 
 
-void Device::dimChannelExecutePrepared(bool aDoApply)
+void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
 {
   if (preparedDim) {
     if (aDoApply) dimChannel(currentDimChannel, currentDimMode);
     preparedDim = false;
   }
+  if (aDoneCB) aDoneCB();
 }
 
 
@@ -1377,7 +1381,7 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
 void Device::callScene(SceneNo aSceneNo, bool aForce)
 {
   // convenience method for calling scenes on single devices
-  callScenePrepare(boost::bind(&Device::executePreparedOperation, this, _1), aSceneNo, aForce);
+  callScenePrepare(boost::bind(&Device::executePreparedOperation, this, SimpleCB(), _1), aSceneNo, aForce);
 }
 
 
@@ -1448,7 +1452,7 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
 
 void Device::callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce)
 {
-  dimChannelExecutePrepared(true);
+  dimChannelExecutePrepared(NULL, true);
   callScenePrepare2(aPreparedCB, aScene, aForce);
 }
 
@@ -1511,7 +1515,7 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
     // - do not include in apply
     aPreparedCB(ntfy_none);
     // - but possibly still do other scene actions now, although scene was not applied
-    performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aScene));
+    performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, SimpleCB(), aScene));
   }
 }
 
@@ -1534,37 +1538,43 @@ void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
 
 
 
-void Device::callSceneExecutePrepared(bool aDoApply)
+void Device::callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
 {
   if (preparedScene) {
+    DsScenePtr scene = preparedScene;
+    preparedScene.reset();
     // apply scene logically
-    if (aDoApply && output->performApplyScene(preparedScene)) {
+    if (aDoApply && output->performApplyScene(scene)) {
       // prepare for apply
-      if (prepareSceneApply(preparedScene)) {
+      if (prepareSceneApply(scene)) {
         // now apply values to hardware
-        requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, preparedScene), false);
+        requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aDoneCB, scene), false);
+        return;
       }
     }
     else {
       // no apply to hardware needed, directly proceed to actions
-      sceneValuesApplied(preparedScene);
+      sceneValuesApplied(aDoneCB, scene);
+      return;
     }
-    preparedScene.reset();
   }
+  // callback not passed to another methods -> done -> call it now
+  if (aDoneCB) aDoneCB();
 }
 
 
-void Device::sceneValuesApplied(DsScenePtr aScene)
+void Device::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene)
 {
   // now perform scene special actions such as blinking
-  performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aScene));
+  performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aDoneCB, aScene));
 }
 
 
-void Device::sceneActionsComplete(DsScenePtr aScene)
+void Device::sceneActionsComplete(SimpleCB aDoneCB, DsScenePtr aScene)
 {
   // scene actions are now complete
   ALOG(LOG_INFO, "Scene actions for callScene(%d) complete -> now in final state", aScene->sceneNo);
+  if (aDoneCB) aDoneCB();
 }
 
 
