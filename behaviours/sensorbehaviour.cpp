@@ -31,9 +31,10 @@ using namespace p44;
 // MARK: ===== WindowEvaluator
 
 
-WindowEvaluator::WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointAvgTime) :
+WindowEvaluator::WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime, EvaluationType aEvalType) :
   windowTime(aWindowTime),
-  dataPointAvgTime(aDataPointAvgTime)
+  dataPointCollTime(aDataPointCollTime),
+  evalType(aEvalType)
 {
 }
 
@@ -55,32 +56,72 @@ void WindowEvaluator::addValue(double aValue, MLMicroSeconds aTimeStamp)
   }
   // add new value
   if (!dataPoints.empty()) {
-    // check if we should accumulate into last existing datapoint
+    // check if we should collect into last existing datapoint
     DataPoint &last = dataPoints.back();
-    if (aTimeStamp-last.timestamp<dataPointAvgTime) {
-      // still accumulating
-      last.value = (last.value*subDataPoints + aValue) / (subDataPoints+1);
-      last.timestamp = aTimeStamp;
-      subDataPoints++;
+    if (collStart+dataPointCollTime>aTimeStamp) {
+      // still in collection time window (from start of datapoint collection
+      switch (evalType) {
+        case eval_max: {
+          if (aValue>last.value) last.value = aValue;
+          break;
+        }
+        case eval_min: {
+          if (aValue<last.value) last.value = aValue;
+          break;
+        }
+        case eval_timeweighted_average: {
+          MLMicroSeconds timeWeight = aTimeStamp-last.timestamp; // between last subdatapoint collected into this datapoint and new timestamp
+          if (collDivisor<=0 || timeWeight<=0) { // 0 or negative timeweight should not happen, safety only!
+            // first section
+            last.value = (last.value + aValue)/2;
+            collDivisor = timeWeight;
+          }
+          else {
+            double v = (last.value*collDivisor + aValue*timeWeight);
+            collDivisor += timeWeight;
+            last.value = v/collDivisor;
+          }
+          break;
+        }
+        case eval_average:
+        default: {
+          if (collDivisor<=0) collDivisor = 1;
+          double v = (last.value*collDivisor+aValue);
+          collDivisor++;
+          last.value = v/collDivisor;
+          break;
+        }
+      }
+      last.timestamp = aTimeStamp; // timestamp represents most recent sample in datapoint
       return; // done
     }
   }
   // accumulation of value in previous datapoint complete (or none available at all)
-  dataPoints.push_back({ .value = aValue, .timestamp = aTimeStamp });
-  subDataPoints = 1;
+  // -> start new datapoint
+  DataPoint dp;
+  dp.value = aValue;
+  dp.timestamp = aTimeStamp;
+  dataPoints.push_back(dp);
+  collStart = aTimeStamp;
+  collDivisor = 0;
 }
 
 
-double WindowEvaluator::evaluate(EvaluationType aEvaluationType)
+double WindowEvaluator::evaluate()
 {
   double result = 0;
   double divisor = 0;
   int count = 0;
   for (DataPointsList::iterator pos = dataPoints.begin(); pos != dataPoints.end(); ++pos) {
     MLMicroSeconds lastTs = Never;
-    switch (aEvaluationType) {
+    switch (evalType) {
       case eval_max: {
         if (count==0 || pos->value>result) result = pos->value;
+        divisor = 1;
+        break;
+      }
+      case eval_min: {
+        if (count==0 || pos->value<result) result = pos->value;
         divisor = 1;
         break;
       }
@@ -122,6 +163,10 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   minPushInterval(30*Second), // default unless sensor type profile sets another value
   changesOnlyInterval(0), // report every sensor update (even if value unchanged)
   // state
+  #if ENABLE_RRDB
+  loggingReady(false),
+  lastRrdUpdate(Never),
+  #endif
   invalidatorTicket(0),
   lastUpdate(Never),
   lastPush(Never),
@@ -215,26 +260,29 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
 
 
 static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
+  // type                      usage           evalWin    collWin          evalType                                    pushIntvl  chgOnlyIntvl  trigDelta  trigRel  trigMin trigIntvl
+  // ------------------------  -------------   ---------  --------------   ------------------------------------------- ---------  ------------  ---------  -------  ------- --------------------------
   // indoor context
-  { .type = sensorType_temperature,    .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute, .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_humidity,       .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 2,   .trigRel = false, .trigMin =   -1, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_illumination,   .usage = usage_room,     .evalWin = 5*Minute,  .avgWin = 10*Second, .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_gas_CO2,        .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_gas_CO,         .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
+  { sensorType_temperature,    usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_room,     0,         0,               WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_room,     5*Minute,  10*Second,       WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_gas_CO2,        usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_gas_CO,         usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
   // outdoor context
-  { .type = sensorType_temperature,    .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute, .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_humidity,       .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 2,   .trigRel = false, .trigMin = -1,   .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_illumination,   .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 20*Second, .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_air_pressure,   .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 15*Minute, .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_wind_speed,     .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 1*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 0.1, .trigRel = true,  .trigMin = -1,   .trigIntvl = 1*Minute },
-  { .type = sensorType_wind_direction, .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 1*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 20,  .trigRel = false, .trigMin = -1,   .trigIntvl = 1*Minute },
-  { .type = sensorType_gust_speed,     .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 3*Second,  .evalType = WindowEvaluator::eval_max,                  .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 0.1, .trigRel = true,  .trigMin = 5,    .trigIntvl = 3*Second },
+  { sensorType_temperature,    usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_outdoors, 10*Minute, 20*Second,       WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_air_pressure,   usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 15*Minute, 60*Minute,    0,         false,   0,      0 },
+  { sensorType_wind_speed,     usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    0.1,       true,    -1,     1*Minute },
+  { sensorType_wind_direction, usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    20,        false,   -1,     1*Minute },
+  { sensorType_gust_speed,     usage_outdoors, 3*Second,  200*MilliSecond, WindowEvaluator::eval_max,                  10*Minute, 60*Minute,    0.1,       true,    5,      3*Second /* = "immediate" */},
   // FIXME: rule says "accumulation", but as long as sensors deliver intensity in mm/h, it is in fact a window average over an hour
-  { .type = sensorType_precipitation,  .usage = usage_outdoors, .evalWin = 60*Minute, .avgWin = 2*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 60*Minute, .chgOnlyIntvl = 60*Minute },
+  { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,        WindowEvaluator::eval_timeweighted_average, 60*Minute, 60*Minute,    0,         false,   0,      0 },
 
   // terminator
-  { .type = sensorType_none }
+  { sensorType_none,           usage_undefined,0,         0,               WindowEvaluator::eval_none,                 0,         0,            0,         false,   0,      0 },
 };
+
 
 
 
@@ -371,16 +419,19 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
       // process values through filter
       if (!filter) {
         // need a filter, create it
-        filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->avgWin));
+        filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->collWin, profileP->evalType));
       }
       filter->addValue(aValue, now);
-      aValue = filter->evaluate(profileP->evalType);
+      double v = filter->evaluate();
       // re-evaluate changed flag after filtering
-      if (fabs(aValue - currentValue) > resolution/2) changedValue = true;
-      BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' calculates %s filtered value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
+      if (fabs(v - currentValue) > resolution/2) changedValue = true;
+      BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' calculates %s filtered value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
+      currentValue = v;
     }
-    // anyway, assign new current value
-    currentValue = aValue;
+    else {
+      // just assign new current value
+      currentValue = aValue;
+    }
   }
   // possibly push
   if (aPush) {
@@ -388,6 +439,10 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   }
   // notify listeners
   notifyListeners(changedValue ? valueevent_changed : valueevent_confirmed);
+  // possibly log value
+  #if ENABLE_RRDB
+  logSensorValue(now, aValue, currentValue, lastPushedValue);
+  #endif
 }
 
 
@@ -414,9 +469,9 @@ bool SensorBehaviour::pushSensor(bool aAlways)
         // Trigger interval is over -> push if conditions are met
         doPush =
           currentValue>profileP->trigMin &&
-          fabs(currentValue-lastPushedValue)>=(profileP->trigRel ? fabs(currentValue*profileP->trigDelta) : profileP->trigDelta);
+          fabs(currentValue-lastPushedValue)>=(profileP->trigRel ? fabs(lastPushedValue*profileP->trigDelta) : profileP->trigDelta);
         if (doPush) {
-          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets send-on-delta conditions to push earlier than normal interval", index, behaviourId.c_str(), getHardwareName().c_str());
+          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets SOD conditions (%0.3f ->%0.3f %s) to push now", index, behaviourId.c_str(), getHardwareName().c_str(), lastPushedValue, currentValue, getSensorUnitText().c_str());
         }
       }
     }
@@ -512,6 +567,215 @@ int SensorBehaviour::getSourceOpLevel()
   return device.opStateLevel();
 }
 
+#if ENABLE_RRDB
+
+// MARK: ===== RRD sensor value logging
+
+
+
+typedef std::vector<string> ArgsVector;
+
+typedef int (*RrdFunc)(int, char **);
+
+static int rrd_call(RrdFunc aFunc, ArgsVector &aArgs)
+{
+  char **argsArrayP = new char*[aArgs.size()+1];
+  LOG(LOG_DEBUG, "rrd_call:");
+  for (int i=0; i<aArgs.size(); ++i) {
+    LOG(LOG_DEBUG, "- %s", aArgs[i].c_str());
+    argsArrayP[i] = (char *)aArgs[i].c_str();
+  }
+  argsArrayP[aArgs.size()] = NULL;
+  optind = opterr = 0; /* Because rrdtool uses getopt() */
+  rrd_clear_error();
+  int ret = aFunc((int)aArgs.size(), argsArrayP);
+  delete[] argsArrayP;
+  LOG(LOG_DEBUG, "rrd_call returns: %d", ret);
+  return ret;
+}
+
+
+static string rrdval(double aVal, bool aValid)
+{
+  if (aValid)
+    return string_format("%f", aVal);
+  else
+    return "U";
+}
+
+
+static string rrdminmax(double aMin, double aMax)
+{
+  bool valid = aMin!=aMax;
+  return rrdval(aMin, valid) + ":" + rrdval(aMax, valid);
+}
+
+
+void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue)
+{
+  if (!loggingReady && !rrdbconfig.empty() && rrdbfile.empty()) {
+    // configured but not yet prepared to log
+    // Note: not ready and rrdbfile NOT empty means that we could not start logging due to a problem (-> no op)
+    // always need to parse config first to get update statement, maybe to (re-)create file
+    ArgsVector cfgArgs;
+    const char *p = rrdbconfig.c_str();
+    string arg;
+    bool autoRaw = false;
+    bool autoFiltered = false;
+    bool autoPushed = false;
+    bool autoRRA = false;
+    bool autoStep = true;
+    bool autoUpdate = true;
+    long step = 1;
+    while (nextPart(p, arg, ' ')) {
+      arg = trimWhiteSpace(arg);
+      // catch special "macros"
+      if (arg=="--step") {
+        // there is a custom --step, prevent auto-generating one
+        autoStep = false;
+        // scan step value
+        string stp;
+        if (!nextPart(p, stp, ' ')) break;
+        sscanf(stp.c_str(), "%ld", &step);
+        // also forward --step argument (no autostep)
+        cfgArgs.push_back(stp);
+      }
+      else if (arg=="auto") {
+        // fully automatic sample of the current (possibly filtered) value, with standard RRAs
+        autoFiltered = true;
+        autoRRA = true;
+      }
+      else if (arg=="autods") {
+        // fully automatic datasource, but no rra
+        autoFiltered = true;
+      }
+      else if (arg=="autorra") {
+        // automatic "reasonable" RRAs
+        autoRRA = true;
+      }
+      else if (arg.substr(0,7)=="autods:") {
+        // automatic datasources
+        // Syntax autods:[R][F][P]  for raw, filtered, pushed
+        autoRaw = arg.find("R",7)!=string::npos;
+        autoFiltered = arg.find("F",7)!=string::npos;
+        autoPushed = arg.find("P",7)!=string::npos;
+      }
+      else if (arg.substr(0,7)=="update:") {
+        // update statement in case no autods is in use (any autods use will create a update string automatically)
+        // Syntax update:<rrdb update string with %R, %F and %P placeholders>
+        autoUpdate = false;
+        rrdbupdate = arg.substr(7); // rest of string is considered update string
+      }
+      else {
+        // is regular RRD create argument, use as-is
+        cfgArgs.push_back(arg);
+      }
+    }
+    // in any case, we need the update statement
+    loggingReady = true; // assume true
+    if (autoUpdate) {
+      rrdbupdate = "N";
+      if (autoRaw) rrdbupdate += ":%R";
+      if (autoFiltered) rrdbupdate += ":%F";
+      if (autoPushed) rrdbupdate += ":%P";
+      if (rrdbupdate.size()<4) {
+        BLOG(LOG_WARNING, "Cannot create RRD update string, missing 'auto..' or 'update' config");
+        rrdbupdate = "";
+        loggingReady = false; // no point in trying
+      }
+    }
+    // use or create rrd file
+    rrdbfile = Application::sharedApplication()->dataPath(rrdbpath);
+    if (rrdbpath.empty() || rrdbfile[rrdbfile.size()-1]=='/') {
+      // auto-generate filename
+      pathstring_format_append(rrdbfile, "Log_%s.rrd", getSourceId().c_str());
+    }
+    struct stat st;
+    if (loggingReady && stat(rrdbfile.c_str(), &st)<0 && errno==ENOENT) {
+      // does not exist yet, create new
+      loggingReady = false; // not any more, only if we succeed in creating new file it'll get set again
+      string dsname = string_format("%.17s", sensorTypeIds[sensorType]); // 19 chars max for RRD data sources, we need 2 for suffix
+      // at this spoint, cfgArgs vector contains explicitly specified RRD args from config
+      // - now create the actual
+      ArgsVector args;
+      // command and filename
+      args.push_back("rrdcreate");
+      args.push_back(rrdbfile);
+      // always start from now
+      args.push_back("--start"); args.push_back("now"); // start now
+      // possibly automatic --step option
+      if (autoStep) {
+        step = updateInterval>15*Second ? updateInterval/Second : 15;
+        // use step from sensor's update interval (but not faster than once in 15 seconds)
+        args.push_back("--step"); args.push_back(string_format("%ld", step)); // use sensor's native interval if known, 15sec otherwise
+      }
+      // possibly automatic datasources
+      long heartbeat = aliveSignInterval ? aliveSignInterval/Second : step*5;
+      if (autoRaw) {
+        args.push_back(string_format("DS:%s_R:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
+      }
+      if (autoFiltered) {
+        args.push_back(string_format("DS:%s_F:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
+      }
+      if (autoPushed) {
+        args.push_back(string_format("DS:%s_P:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
+      }
+      if (autoRRA) {
+        // now RRAs: RRA:AVERAGE:xff:steps:rows
+        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 1l, 7*24*3600/step)); // 1:1 samples for a week
+        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 3600/step, 30*24*3600*step/3600)); // hourly datapoints for 1 months (30 days)
+        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 24*3600/step, 2*365*24*3600*step/24/3600)); // daily for 2 years
+      }
+      // now add explicit config
+      args.insert(args.end(), cfgArgs.begin(), cfgArgs.end());
+      // create the rrd file from config
+      int ret = rrd_call(rrd_create, args);
+      if (ret==0) {
+        BLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", rrdbfile.c_str());
+        loggingReady = true;
+        lastRrdUpdate = aTimeStamp; // creation counts as update, make sure we don't immediately try to send first update afterwards
+      }
+      else {
+        BLOG(LOG_ERR, "rrd: cannot create rrd file '%s': %s", rrdbfile.c_str(), rrd_get_error());
+      }
+    }
+    else {
+      // file apparently already exists
+      BLOG(LOG_INFO, "rrd: using existing file '%s'", rrdbfile.c_str());
+      loggingReady = true;
+    }
+  }
+  // now actually log into file
+  if (loggingReady && lastRrdUpdate<aTimeStamp-10*Second) {
+    lastRrdUpdate = aTimeStamp;
+    ArgsVector args;
+    args.push_back("rrdupdate");
+    args.push_back(rrdbfile);
+    string ud = rrdbupdate;
+    // substitute values for placeholders
+    size_t i;
+    i = ud.find("%T");
+    if (i!=string::npos) ud.replace(i, 2, string_format("%lld", aTimeStamp/Second).c_str());
+    // - raw (considered unknown when sensor is invalid)
+    i = ud.find("%R");
+    if (i!=string::npos) ud.replace(i, 2, rrdval(aRawValue, lastUpdate!=Never).c_str());
+    // - filtered (considered unknown when sensor is invalid)
+    i = ud.find("%F");
+    if (i!=string::npos) ud.replace(i, 2, rrdval(aProcessedValue, lastUpdate!=Never).c_str());
+    // - filtered (considered unknown when pushed within aliveSignInterval)
+    i = ud.find("%P");
+    if (i!=string::npos) ud.replace(i, 2, rrdval(aPushedValue, lastPush!=Never && lastPush+aliveSignInterval>lastUpdate).c_str());
+    args.push_back(ud);
+    int ret = rrd_call(rrd_update, args);
+    if (ret!=0) {
+      BLOG(LOG_WARNING, "rrd: could not update rrd data for file '%s': %s", rrdbfile.c_str(), rrd_get_error());
+      loggingReady = false; // back to not initialized, might work again after recreating file
+    }
+  }
+}
+
+#endif // ENABLE_RRDB
+
 
 
 // MARK: ===== persistence implementation
@@ -526,7 +790,12 @@ const char *SensorBehaviour::tableName()
 
 // data field definitions
 
+
+#if ENABLE_RRDB
+static const size_t numFields = 5;
+#else
 static const size_t numFields = 3;
+#endif
 
 size_t SensorBehaviour::numFieldDefs()
 {
@@ -540,6 +809,10 @@ const FieldDefinition *SensorBehaviour::getFieldDef(size_t aIndex)
     { "dsGroup", SQLITE_INTEGER }, // Note: don't call a SQL field "group"!
     { "minPushInterval", SQLITE_INTEGER },
     { "changesOnlyInterval", SQLITE_INTEGER },
+    #if ENABLE_RRDB
+    { "rrdbConfig", SQLITE_TEXT },
+    { "rrdbPath", SQLITE_TEXT },
+    #endif
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
@@ -558,6 +831,10 @@ void SensorBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
   aRow->getCastedIfNotNull<DsGroup, int>(aIndex++, sensorGroup);
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minPushInterval);
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, changesOnlyInterval);
+  #if ENABLE_RRDB
+  aRow->getIfNotNull(aIndex++, rrdbconfig);
+  aRow->getIfNotNull(aIndex++, rrdbpath);
+  #endif
 }
 
 
@@ -569,6 +846,10 @@ void SensorBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
   aStatement.bind(aIndex++, sensorGroup);
   aStatement.bind(aIndex++, (long long int)minPushInterval);
   aStatement.bind(aIndex++, (long long int)changesOnlyInterval);
+  #if ENABLE_RRDB
+  aStatement.bind(aIndex++, rrdbconfig.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, rrdbpath.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  #endif
 }
 
 
@@ -589,6 +870,9 @@ enum {
   resolution_key,
   updateInterval_key,
   aliveSignInterval_key,
+  #if ENABLE_RRDB
+  rrdbFile_key,
+  #endif
   numDescProperties
 };
 
@@ -606,6 +890,9 @@ const PropertyDescriptorPtr SensorBehaviour::getDescDescriptorByIndex(int aPropI
     { "resolution", apivalue_double, resolution_key+descriptions_key_offset, OKEY(sensor_key) },
     { "updateInterval", apivalue_double, updateInterval_key+descriptions_key_offset, OKEY(sensor_key) },
     { "aliveSignInterval", apivalue_double, aliveSignInterval_key+descriptions_key_offset, OKEY(sensor_key) },
+    #if ENABLE_RRDB
+    { "x-p44-rrdFile", apivalue_string, rrdbFile_key+descriptions_key_offset, OKEY(sensor_key) },
+    #endif
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -617,6 +904,10 @@ enum {
   group_key,
   minPushInterval_key,
   changesOnlyInterval_key,
+  #if ENABLE_RRDB
+  rrdbPath_key,
+  rrdbConfig_key,
+  #endif
   numSettingsProperties
 };
 
@@ -628,6 +919,10 @@ const PropertyDescriptorPtr SensorBehaviour::getSettingsDescriptorByIndex(int aP
     { "group", apivalue_uint64, group_key+settings_key_offset, OKEY(sensor_key) },
     { "minPushInterval", apivalue_double, minPushInterval_key+settings_key_offset, OKEY(sensor_key) },
     { "changesOnlyInterval", apivalue_double, changesOnlyInterval_key+settings_key_offset, OKEY(sensor_key) },
+    #if ENABLE_RRDB
+    { "x-p44-rrdFilePath", apivalue_string, rrdbPath_key+settings_key_offset, OKEY(sensor_key) },
+    { "x-p44-rrdConfig", apivalue_string, rrdbConfig_key+settings_key_offset, OKEY(sensor_key) },
+    #endif
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -695,6 +990,12 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case aliveSignInterval_key+descriptions_key_offset:
           aPropValue->setDoubleValue((double)aliveSignInterval/Second);
           return true;
+        #if ENABLE_RRDB
+        case rrdbFile_key+descriptions_key_offset:
+          if (rrdbfile.empty()) return false; // only visible if there actually IS a file
+          aPropValue->setStringValue(rrdbfile);
+          return true;
+        #endif
         // Settings properties
         case group_key+settings_key_offset:
           aPropValue->setUint16Value(sensorGroup);
@@ -705,6 +1006,14 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case changesOnlyInterval_key+settings_key_offset:
           aPropValue->setDoubleValue((double)changesOnlyInterval/Second);
           return true;
+        #if ENABLE_RRDB
+        case rrdbPath_key+settings_key_offset:
+          aPropValue->setStringValue(rrdbpath);
+          return true;
+        case rrdbConfig_key+settings_key_offset:
+          aPropValue->setStringValue(rrdbconfig);
+          return true;
+        #endif
         // States properties
         case value_key+states_key_offset:
           // value
@@ -745,6 +1054,18 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case changesOnlyInterval_key+settings_key_offset:
           setPVar(changesOnlyInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
+        #if ENABLE_RRDB
+        case rrdbPath_key+settings_key_offset:
+          if (setPVar(rrdbpath, aPropValue->stringValue())) {
+            rrdbfile.clear(); // force re-setup of rrdb logging
+          }
+          return true;
+        case rrdbConfig_key+settings_key_offset:
+          if (setPVar(rrdbconfig, aPropValue->stringValue())) {
+            rrdbfile.clear(); // force re-setup of rrdb logging
+          }
+          return true;
+        #endif
       }
     }
   }

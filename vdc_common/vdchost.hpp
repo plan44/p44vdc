@@ -74,7 +74,7 @@ namespace p44 {
     rescanmode_none = 0, ///< for reporting supported modes, if no rescan (from UI) is supported
     rescanmode_incremental = 0x01, ///< incremental rescan
     rescanmode_normal = 0x02, ///< normal rescan
-    rescanmode_exhaustive = 0x04, ///< exhaustive rescan
+    rescanmode_exhaustive = 0x04, ///< exhaustive rescan, should only be used as last resort recovery, as it might cause change of addressing schemes etc.
     rescanmode_clearsettings = 0x08 ///< clear settings (not for incremental)
   };
   typedef uint8_t RescanMode;
@@ -124,6 +124,7 @@ namespace p44 {
     friend class LocalController;
 
     bool externalDsuid; ///< set when dSUID is set to a external value (usually UUIDv1 based)
+    int vdcHostInstance; ///< instance number of this vdc host (defaults to 0, can be set to >0 to have multiple vdchost on the same host/mac address)
     bool storedDsuid; ///< set when using stored (DB persisted) dSUID that is not equal to default dSUID 
     uint64_t mac; ///< MAC address as found at startup
 
@@ -237,9 +238,10 @@ namespace p44 {
     /// Set how dSUIDs are generated
     /// @param aExternalDsUid if specified, this is used directly as dSUID for the device container
     /// @param aIfNameForMAC if specified, this network interface is used to obtain the MAC address for creating the dSUID from
+    /// @param aInstance defaults to 0, can be set to >0 to have multiple vdchost instances based on the same host/MAC-address
     /// @note Must be set before any other activity in the device container, in particular before
     ///   any class containers are added to the device container
-    void setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC);
+    void setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC, int aInstance=0);
 
     /// Set network interface to use for determining IP address and checking for being available for network connections
     /// @param aIfNameForConnections name of the network device, empty string to use default interface
@@ -369,8 +371,11 @@ namespace p44 {
     /// - if rescanmode_incremental is set, search is only made for additional new devices. Disappeared devices
     ///   might not get detected this way.
     /// - if rescanmode_exhaustive is set, device search is made exhaustive (may include longer lasting procedures to
-    ///   recollect lost devices, assign bus addresses etc.). Without this flag set, device search should
-    ///   still be complete under normal conditions, but might sacrifice corner case detection for speed.
+    ///   recollect lost devices, assign bus addresses etc.). Without this flag set, device search will
+    ///   still be complete under normal conditions, but might not find all devices when the subsystem is in a
+    ///   state that needs recovery operations (such as resolving addressing conflicts etc). Exhaustive search
+    ///   should be used with care, as it *might* cause addressing changes that *might* also cause dSUID changes
+    ///   in case of devices which do not have a stable unique ID.
     /// - if rescanmode_clearsettings is set, persistent settings of currently known devices will be deleted before
     ///   re-scanning for devices, which means devices will have default settings after collecting.
     ///   Note that this is mutually exclusive with aIncremental (as incremental scan does not remove any devices,

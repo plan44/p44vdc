@@ -1683,7 +1683,7 @@ string ExternalVdc::webuiURLString()
 
 void ExternalVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
-  // we have no real collecting process (devices just connect when possibl),
+  // we have no real collecting process (devices just connect when possible),
   // but we force all devices to re-connect when a exhaustive collect is requested (mainly for debug purposes)
   if (aRescanFlags & rescanmode_exhaustive) {
     // remove all, so they will need to reconnect

@@ -150,6 +150,19 @@ static void windowStateHandler(const struct EnoceanSensorDescriptor &aSensorDesc
     bb->updateInputState(status==0 ? 0 : (status==1 ? 2 : 1));
   }
 }
+// window closed (0), open (1), tilted (2) tri-state binary input in A5-14-09/0A
+static void reversedWindowStateHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+{
+  // A5-14-09/0A have 0=closed, 1=tilted, 2=reserved/invalid, 3=open
+  uint8_t status = (uint8_t)EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
+    // 00->2 (tilted), 01->0 (closed), 10/11->1 (open)
+    bb->updateInputState(status==0 ? 2 : (status==1 ? 0 : 1));
+  }
+}
+
+
+
 
 
 // two-range illumination sensor in A5-06-05
@@ -545,12 +558,21 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
   { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
   // A5-14-09: Window state, 0=closed, 1=open, 2=tilted
+  // - standard mount
   { 0, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &windowStateHandler, windowText },
   { 0, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  // - reverse mount (value 2 and 0 swapped)
+  { 1, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &reversedWindowStateHandler, windowText },
+  { 1, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
   // A5-14-0A: Window state + vibration, 0=closed, 1=open, 2=tilted
+  // - standard mount
   { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &windowStateHandler, windowText },
   { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
   { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  // - reverse mount (value 2 and 0 swapped)
+  { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &reversedWindowStateHandler, windowText },
+  { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
+  { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
 
   // A5-30-03: generic temperature + 4 digital inputs
   // - variant for Afriso water sensor with Wake==0 -> water detected
@@ -643,6 +665,12 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   // heating valve alternatives
   {  30, 0x00A52004, 0, "heating valve", NULL },
   {  30, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
+  // A5-14-09 reverse mount alternative
+  {  31, 0x00A51409, 0, "window state - regular mounting position", NULL },
+  {  31, 0x01A51409, 0, "window state - upside down mounting position", NULL },
+  // A5-14-0A reverse mount alternative
+  {  32, 0x00A5140A, 0, "window state - regular mounting position", NULL },
+  {  32, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
   { 0, 0, 0, NULL, NULL } // terminator
 };
 
@@ -1216,22 +1244,24 @@ string EnoceanA52004Handler::shortDesc()
 // configuration for A5-13-0X sensor channels
 // - A5-13-01 telegram
 static const p44::EnoceanSensorDescriptor A513dawnSensor =
-  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 999, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, illumText };
+  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 999, DB(3,7), DB(3,0), 10, 40*60, &stdSensorHandler, illumText };
 static const p44::EnoceanSensorDescriptor A513outdoorTemp =
-  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_temperature, usage_outdoors, -40, 80, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, tempText };
+  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_temperature, usage_outdoors, -40, 80, DB(2,7), DB(2,0), 10*60, 40*60, &stdSensorHandler, tempText };
 static const p44::EnoceanSensorDescriptor A513windSpeed =
-  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_wind_speed, usage_outdoors, 0, 70, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, "wind speed" };
+  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_wind_speed, usage_outdoors, 0, 70, DB(1,7), DB(1,0), 20, 40*60, &stdSensorHandler, "wind speed" };
+static const p44::EnoceanSensorDescriptor A513gustSpeed =
+  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_gust_speed, usage_outdoors, 0, 70, DB(1,7), DB(1,0), 3, 40*60, &stdSensorHandler, "gust speed" };
 static const p44::EnoceanSensorDescriptor A513dayIndicator =
-  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_none,  usage_outdoors, 1,  0, DB(0,2), DB(0,2), 100, 40*60, &stdInputHandler,  "Day indicator" };
+  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_none,  usage_outdoors, 1,  0, DB(0,2), DB(0,2), 30, 40*60, &stdInputHandler,  "Day indicator" };
 static const p44::EnoceanSensorDescriptor A513rainIndicator =
-  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_rain,  usage_outdoors, 0,  1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  "Rain indicator" };
+  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_rain,  usage_outdoors, 0,  1, DB(0,1), DB(0,1), 30, 40*60, &stdInputHandler,  "Rain indicator" };
 // - A5-13-02 telegram
 static const p44::EnoceanSensorDescriptor A513sunWest =
-  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, "Sun west" };
+  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(3,7), DB(3,0), 30, 40*60, &stdSensorHandler, "Sun west" };
 static const p44::EnoceanSensorDescriptor A513sunSouth =
-  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, "Sun south" };
+  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(2,7), DB(2,0), 30, 40*60, &stdSensorHandler, "Sun south" };
 static const p44::EnoceanSensorDescriptor A513sunEast =
-  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, "Sun east" };
+  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(1,7), DB(1,0), 30, 40*60, &stdSensorHandler, "Sun east" };
 
 EnoceanA5130XHandler::EnoceanA5130XHandler(EnoceanDevice &aDevice) :
   inherited(aDevice)
@@ -1279,6 +1309,8 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
       newDev->addBehaviour(newHandler->outdoorTemp);
       newHandler->windSpeed = EnoceanSensorHandler::newSensorBehaviour(A513windSpeed, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->windSpeed);
+      newHandler->gustSpeed = EnoceanSensorHandler::newSensorBehaviour(A513gustSpeed, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->gustSpeed);
       newHandler->dayIndicator = EnoceanSensorHandler::newSensorBehaviour(A513dayIndicator, newDev, "daylight");
       newDev->addBehaviour(newHandler->dayIndicator);
       newHandler->rainIndicator = EnoceanSensorHandler::newSensorBehaviour(A513rainIndicator, newDev, NULL); // automatic id
@@ -1340,6 +1372,7 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         if (behaviour) handleBitField(A513dawnSensor, behaviour, dataP, datasize);
         if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize);
         if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize);
+        if (gustSpeed) handleBitField(A513gustSpeed, gustSpeed, dataP, datasize);
         if (dayIndicator) handleBitField(A513dayIndicator, dayIndicator, dataP, datasize);
         if (rainIndicator) handleBitField(A513rainIndicator, rainIndicator, dataP, datasize);
         break;

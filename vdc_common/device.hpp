@@ -339,9 +339,12 @@ namespace p44 {
 
     /// get specifically subtyped output behaviour
     /// @return the output behaviour or NULL if there is no output of the specified type
-    template <typename T = OutputBehaviour> boost::intrusive_ptr<T> getOutput() {
+    template <typename T> boost::intrusive_ptr<T> getOutput() {
       return boost::dynamic_pointer_cast<T>(output);
     }
+
+    /// get basic output behaviour
+    OutputBehaviourPtr getOutput();
 
     /// get scenes
     /// @return NULL if device has no scenes, scene device settings otherwise 
