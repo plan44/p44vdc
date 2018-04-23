@@ -1364,9 +1364,10 @@ void DaliSingleControllerDevice::setTransitionTime(MLMicroSeconds aTransitionTim
 
 bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 {
-  // TODO: use more precise criteria wether notification is optimizable or not
+  // TODO: use more precise criteria whether notification is optimizable or not
   return
     daliController && !daliController->isGrouped() && // do not optimize already grouped devices!
+    !daliController->supportsDT8 && // FIXME: exclude DT8 for now until we can test color scenes with a sample device
     (aDeliveryState->optimizedType==ntfy_callscene ||
     aDeliveryState->optimizedType==ntfy_dimchannel); // dimming and scenes considered optimizable for now
 }
