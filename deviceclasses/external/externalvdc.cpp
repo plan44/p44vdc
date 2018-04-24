@@ -744,21 +744,21 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 }
 
 
-void ExternalDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
+void ExternalDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply)
 {
   if (aChannel) {
     // start dimming
     ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
-    if (sb && useMovement) {
+    if (sb && useMovement && aDoApply) {
       // no channel check, there's only global dimming of the blind, no separate position/angle
       sb->dimBlind(boost::bind(&ExternalDevice::changeChannelMovement, this, 0, _1, _2), aDimMode);
     }
-    else if (useMovement) {
+    else if (useMovement && aDoApply) {
       // not shadow, but still use movement for dimming
       changeChannelMovement(aChannel->getChannelIndex(), NULL, aDimMode);
     }
     else {
-      inherited::dimChannel(aChannel, aDimMode);
+      inherited::dimChannel(aChannel, aDimMode, aDoApply);
     }
   }
 }

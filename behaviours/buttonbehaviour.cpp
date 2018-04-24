@@ -499,11 +499,11 @@ void ButtonBehaviour::localDim(bool aStart)
         dimmingUp = !dimmingUp; // change direction
         dm = dimmingUp ? dimmode_up : dimmode_down;
       }
-      device.dimChannel(channel, dm);
+      device.dimChannel(channel, dm, true);
     }
     else {
       // just stop
-      device.dimChannel(channel, dimmode_stop);
+      device.dimChannel(channel, dimmode_stop, true);
     }
   }
 }

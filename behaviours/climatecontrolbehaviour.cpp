@@ -446,7 +446,7 @@ void ClimateControlBehaviour::saveChannelsToScene(DsScenePtr aScene)
 
 // apply scene
 // - execute special climate commands
-bool ClimateControlBehaviour::applyScene(DsScenePtr aScene)
+bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene)
 {
   // check the special hardwired scenes
   if (climateDeviceKind==climatedevice_simple && isMember(group_roomtemperature_control)) {
@@ -479,7 +479,7 @@ bool ClimateControlBehaviour::applyScene(DsScenePtr aScene)
     }
   }
   // other type of scene, let base class handle it
-  return inherited::applyScene(aScene);
+  return inherited::performApplySceneToChannels(aScene);
 }
 
 

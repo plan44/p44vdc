@@ -321,11 +321,11 @@ void EnoceanBlindControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDi
 
 
 // optimized blinds dimming implementation
-void EnoceanBlindControlDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
+void EnoceanBlindControlDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply)
 {
   // start dimming
   ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
-  if (sb) {
+  if (sb && aDoApply) {
     // no channel check, there's only global dimming of the blind, no separate position/angle
     sb->dimBlind(boost::bind(&EnoceanBlindControlDevice::changeMovement, this, _1, _2), aDimMode);
   }
