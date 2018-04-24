@@ -115,6 +115,18 @@ Device::Device(Vdc *aVdcP) :
 }
 
 
+Device::~Device()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(dimTimeoutTicket);
+  MainLoop::currentMainLoop().cancelExecutionTicket(dimHandlerTicket);
+  MainLoop::currentMainLoop().cancelExecutionTicket(serializerWatchdogTicket);
+  buttons.clear();
+  inputs.clear();
+  sensors.clear();
+  output.reset();
+}
+
+
 void Device::identificationDone(IdentifyDeviceCB aIdentifyCB, ErrorPtr aError, Device *aActualDevice)
 {
   if (Error::isOK(aError) && !aActualDevice) aActualDevice = this;
@@ -161,15 +173,6 @@ void Device::addToModelUIDHash(string &aHashedString)
   for (int f=0; f<numModelFeatures; f++) {
     aHashedString += hasModelFeature((DsModelFeatures)f)==yes ? 'T' : 'F';
   }
-}
-
-
-Device::~Device()
-{
-  buttons.clear();
-  inputs.clear();
-  sensors.clear();
-  output.reset();
 }
 
 
@@ -898,6 +901,13 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
 }
 
 
+void Device::optimizerRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState)
+{
+  if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    dimRepeatPrepare(aDeliveryState);
+  }
+}
+
 
 void Device::executePreparedOperation(SimpleCB aDoneCB, bool aDoApply)
 {
@@ -907,6 +917,7 @@ void Device::executePreparedOperation(SimpleCB aDoneCB, bool aDoApply)
     return;
   }
   else if (preparedDim) {
+    // also call if not prepared any more, can be repetition to stop dimming
     dimChannelExecutePrepared(aDoneCB, aDoApply);
     return;
   }
@@ -936,6 +947,10 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
       include = true;
       aDeliveryState->contentId = 0; // no different content ids
       aDeliveryState->actionVariant = currentDimMode; // to actually apply the dim mode to the optimized group later
+      if (currentDimMode!=dimmode_stop) {
+        aDeliveryState->repeatVariant = dimmode_stop; // auto-stop
+        aDeliveryState->repeatAfter = currentAutoStopTime; // after this time
+      }
     }
   }
   if (include) {
@@ -1253,21 +1268,11 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     // mode changes
     if (aDimMode!=dimmode_stop) {
       // start or change direction
-      if (currentDimMode==dimmode_stop) {
-        // start dimming from stopped state: install timeout
-        dimTimeoutTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Device::dimAutostopHandler, this, aChannel), aAutoStopAfter);
+      if (currentDimMode!=dimmode_stop) {
+        // changed dimming direction or channel without having stopped first
+        // - stop previous dimming operation here
+        dimChannel(currentDimChannel, dimmode_stop, true);
       }
-      else {
-        // change dimming direction or channel
-        // - stop previous dimming operation
-        dimChannel(currentDimChannel, dimmode_stop);
-        // - start new
-        MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, aAutoStopAfter);
-      }
-    }
-    else {
-      // stop
-      MainLoop::currentMainLoop().cancelExecutionTicket(dimTimeoutTicket);
     }
     // fully prepared now
     // - save parameters for executing dimming now
@@ -1275,6 +1280,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     currentDimChannel = aChannel;
     areaDimmed = aArea;
     areaDimMode = aDimMode;
+    currentAutoStopTime = aAutoStopAfter;
     preparedDim = true;
     aPreparedCB(ntfy_dimchannel); // needs to start or stop dimming
     return;
@@ -1282,7 +1288,12 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
   else {
     // same dim mode, just retrigger if dimming right now
     if (aDimMode!=dimmode_stop) {
-      MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, aAutoStopAfter);
+      currentAutoStopTime = aAutoStopAfter;
+      // if we have a local timer running, reschedule it
+      MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, currentAutoStopTime);
+      // also indicate to optimizer it must reschedule its repeater
+      aPreparedCB(ntfy_retrigger); // retrigger repeater
+      return;
     }
     aPreparedCB(ntfy_none); // no change in dimming
     return;
@@ -1290,10 +1301,35 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
 }
 
 
+void Device::dimRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState)
+{
+  // we get here ONLY during optimized dimming.
+  // This means that this is a request to put device back into non-dimming state
+  if (currentDimMode!=dimmode_stop) {
+    // prepare to go back to stop state
+    // (without applying to hardware, but possibly device-specific dimChannel() methods fetching actual dim state from hardware)
+    currentDimMode = dimmode_stop;
+    currentAutoStopTime = Never;
+    preparedDim = true;
+  }
+}
+
+
 void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
 {
   if (preparedDim) {
-    if (aDoApply) dimChannel(currentDimChannel, currentDimMode);
+    // call actual dimming method, which will update state in all cases, but start/stop dimming only when not already done (aDoApply)
+    dimChannel(currentDimChannel, currentDimMode, aDoApply);
+    if (aDoApply) {
+      if (currentDimMode!=dimmode_stop) {
+        // starting
+        MainLoop::currentMainLoop().executeTicketOnce(dimTimeoutTicket, boost::bind(&Device::dimAutostopHandler, this, currentDimChannel), currentAutoStopTime);
+      }
+      else {
+        // stopping
+        MainLoop::currentMainLoop().cancelExecutionTicket(dimTimeoutTicket);
+      }
+    }
     preparedDim = false;
   }
   if (aDoneCB) aDoneCB();
@@ -1308,7 +1344,7 @@ void Device::dimAutostopHandler(ChannelBehaviourPtr aChannel)
 {
   // timeout: stop dimming immediately
   dimTimeoutTicket = 0;
-  dimChannel(aChannel, dimmode_stop);
+  dimChannel(aChannel, dimmode_stop, true);
   currentDimMode = dimmode_stop; // stopped now
 }
 
@@ -1319,7 +1355,7 @@ void Device::dimAutostopHandler(ChannelBehaviourPtr aChannel)
 
 
 // actual dimming implementation, possibly overridden by subclasses to provide more optimized/precise dimming
-void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
+void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply)
 {
   if (aChannel) {
     ALOG(LOG_INFO,
@@ -1334,16 +1370,21 @@ void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
     }
     else {
       // start dimming
-      // make sure the start point is calculated if needed
-      aChannel->getChannelValueCalculated();
-      aChannel->setNeedsApplying(0); // force re-applying start point, no transition time
-      // calculate increment
-      double increment = (aDimMode==dimmode_up ? DIM_STEP_INTERVAL_MS : -DIM_STEP_INTERVAL_MS) * aChannel->getDimPerMS();
-      // start ticking
       isDimming = true;
-      // wait for all apply operations to really complete before starting to dim
-      SimpleCB dd = boost::bind(&Device::dimDoneHandler, this, aChannel, increment, MainLoop::now()+10*MilliSecond);
-      waitForApplyComplete(boost::bind(&Device::requestApplyingChannels, this, dd, false, false));
+      if (aDoApply) {
+        // make sure the start point is calculated if needed
+        aChannel->getChannelValueCalculated();
+        aChannel->setNeedsApplying(0); // force re-applying start point, no transition time
+        // calculate increment
+        double increment = (aDimMode==dimmode_up ? DIM_STEP_INTERVAL_MS : -DIM_STEP_INTERVAL_MS) * aChannel->getDimPerMS();
+        // start dimming
+        // ...but setup callback to wait first for all apply operations to really complete before
+        SimpleCB dd = boost::bind(&Device::dimDoneHandler, this, aChannel, increment, MainLoop::now()+10*MilliSecond);
+        waitForApplyComplete(boost::bind(&Device::requestApplyingChannels, this, dd, false, false));
+      }
+      else {
+        ALOG(LOG_WARNING, "generic dimChannel() without apply -> unlikely (optimized generic dimming??)");
+      }
     }
   }
 }
@@ -1399,15 +1440,8 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
     // check special scene commands first
     if (cmd==scene_cmd_area_continue) {
       // area dimming continuation
-      if (dimTimeoutTicket) {
-        // timer still running (continue received in time) -> reschedule dimmer timeout to keep dimming
-        MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, LEGACY_DIM_STEP_TIMEOUT);
-        aPreparedCB(ntfy_dimchannel);
-        return;
-      }
-      else if (areaDimmed!=0 && areaDimMode!=dimmode_stop) {
-        // continue received too late, already stopped -> restart dimming
-        ALOG(LOG_DEBUG, "Area scene dimming continue received too late -> restarting dimming, will not be smooth");
+      if (areaDimmed!=0 && areaDimMode!=dimmode_stop) {
+        // continue or restart area dimming
         dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), areaDimMode, areaDimmed, LEGACY_DIM_STEP_TIMEOUT);
         return;
       }
@@ -1506,7 +1540,7 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
       // Non-dimming scene: have output save its current state into the previousState pseudo scene
       // Note: the actual updating might happen later (when the hardware responds) but
       //   implementations must make sure access to the hardware is serialized such that
-      //   the values are captured before values from applyScene() below are applied.
+      //   the values are captured before values from performApplySceneToChannels() below are applied.
       output->captureScene(previousState, true, boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
     } // if output
   } // not dontCare
@@ -1544,16 +1578,24 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
     DsScenePtr scene = preparedScene;
     preparedScene.reset();
     // apply scene logically
-    if (aDoApply && output->performApplyScene(scene)) {
-      // prepare for apply
+    if (output->applySceneToChannels(scene)) {
+      // prepare for apply, load channel values (we need them loaded even if actual apply works via optimizer)
       if (prepareSceneApply(scene)) {
         // now apply values to hardware
-        requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aDoneCB, scene), false);
-        return;
+        if (aDoApply) {
+          // normally apply channel values to hardware
+          requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aDoneCB, scene), false);
+          return;
+        }
+        else {
+          // just consider channels already applied (e.g. by vdc-level native action)
+          sceneValuesApplied(aDoneCB, scene);
+          return;
+        }
       }
     }
     else {
-      // no apply to hardware needed, directly proceed to actions
+      // no apply to channels or hardware needed, directly proceed to actions
       sceneValuesApplied(aDoneCB, scene);
       return;
     }
@@ -1622,7 +1664,7 @@ void Device::undoScene(SceneNo aSceneNo)
     // scene found, now apply it to the output (if any)
     if (output) {
       // now apply the pseudo state
-      output->performApplyScene(previousState);
+      output->applySceneToChannels(previousState);
       // apply the values now, not dimming
       if (prepareSceneApply(previousState)) {
         requestApplyingChannels(NULL, false);

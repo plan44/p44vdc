@@ -170,7 +170,7 @@ namespace p44 {
     virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex);
 
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
-    /// @param aScene the scene that was called (if not dontCare, applyScene() has already been called)
+    /// @param aScene the scene that was called (if not dontCare, performApplySceneToChannels() has already been called)
     /// @param aDoneCB will be called when scene actions have completed (but not necessarily when stopped by stopSceneActions())
     virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB) { if (aDoneCB) aDoneCB(); /* NOP in base class */ };
 
@@ -179,13 +179,14 @@ namespace p44 {
     ///   cannot mess up things.
     virtual void stopSceneActions() { /* NOP in base class */ };
 
-    /// perform applying Scene
+    /// perform applying Scene to channels
     /// @param aScene the scene to apply
     /// @return true if apply is complete, i.e. everything ready to apply to hardware outputs.
     ///   false if scene cannot be applied to hardware (not yet, or maybe not at all); applying to hardware, if
     ///   needed at all, will be triggered otherwise.
-    /// @note this is a OutputBehaviour level wrapper and preparator for behaviour-specific applyScene().
-    bool performApplyScene(DsScenePtr aScene);
+    /// @note applying to channels is first and separate step from applying channels to hardware
+    /// @note this is a OutputBehaviour level wrapper and preparator for behaviour-specific performApplySceneToChannels().
+    bool applySceneToChannels(DsScenePtr aScene);
 
     /// capture current state into passed scene object
     /// @param aScene the scene object to update
@@ -243,9 +244,9 @@ namespace p44 {
     ///   only dimChannel method must be used.
     /// @note base class' implementation provides applying the scene values to channels.
     ///   Derived classes may implement handling of hard-wired behaviour specific scenes.
-    virtual bool applyScene(DsScenePtr aScene);
+    virtual bool performApplySceneToChannels(DsScenePtr aScene);
 
-    /// called by applyScene to load channel values from a scene.
+    /// called by performApplySceneToChannels() to load channel values from a scene.
     /// @param aScene the scene to load channel values from
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.

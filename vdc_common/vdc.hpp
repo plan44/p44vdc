@@ -72,11 +72,14 @@ namespace p44 {
   typedef std::list<DevicePtr> DeviceList;
 
 
+  /// notification types
+  /// @note: only add new ones at the end, these are persisted in optimizer cache!
   typedef enum {
     ntfy_undefined,
     ntfy_none,
     ntfy_callscene,
     ntfy_dimchannel,
+    ntfy_retrigger, ///< just retrigger the repeater
     numNotificationTypes
   } NotificationType;
 
@@ -93,23 +96,26 @@ namespace p44 {
       contentId(0),
       contentsHash(0),
       actionVariant(0),
+      repeatAfter(Never),
+      repeatVariant(0),
       pendingCount(0)
     {};
 
     DsAddressablesList audience; ///< remaining devices to be prepared
     string affectedDevicesHash; ///< binary string hash, represents the set of affected devices, to be matched against known sets for optimisation
-    DeviceList affectedDevices; ///< the list of devices that are included in the hash
     int contentId; ///< this represents the ID of the content, such a scene number
     uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
-    int actionVariant; ///< variant/parameter for the action (such as dim up/down/stop)
+    NotificationType callType; ///< type of notification as originally called
 
   public:
-    NotificationType callType; ///< type of notification as originally called
-    ApiValuePtr callParams; ///< the notification parameters
-    NotificationType optimizedType; ///< the type that results (callScene might result in dimming...)
 
-  private:
-    int pendingCount; ///< count used to count completed devices in some operations
+    DeviceList affectedDevices; ///< the list of devices that are included in the hash
+    size_t pendingCount; ///< count used to count completed devices in some operations on affectedDevices
+    ApiValuePtr callParams; ///< the notification parameters
+    int actionVariant; ///< variant/parameter for the action (such as dim up/down/stop)
+    MLMicroSeconds repeatAfter; ///< if>0: native action is repeated after this time with variant repeatVariant
+    int repeatVariant; ///< variant/parameter for the action when repeating it (such as dim stop)
+    NotificationType optimizedType; ///< the type that results (callScene might result in dimming...)
   };
   typedef boost::intrusive_ptr<NotificationDeliveryState> NotificationDeliveryStatePtr;
 
@@ -193,6 +199,7 @@ namespace p44 {
     /// notification optimizing
     OptimizerEntryList optimizerCache; ///< the current optimizer cache
     long totalOptimizableCalls; ///< total of optimizable calls
+    MLTicket optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
 
     ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all
 
@@ -465,11 +472,16 @@ namespace p44 {
     /// @name Implementation methods for native scene and grouped dimming support
     /// @{
 
+    /// this is called to check if optimizer should be used for a particular set of devices
+    /// @param aDeliveryState can be inspected to obtain details about the affected devices, actionVariant etc.
+    /// @return true if optimizer should be used with this notification call (other factors can still prevent it)
+    virtual bool shouldUseOptimizerFor(NotificationDeliveryStatePtr aDeliveryState);
+
     /// this is called once for every native action in use, after startup after existing cache entries have been
     /// read from persistent storage. This allows vDC implementations to know which native scenes/groups are
     /// in use by the optimizer without needing private bookkeeping.
     /// @param aNativeActionId a ID of a native action that is in use by the optimizer
-    virtual ErrorPtr announceNativeAction(const string aNativeActionId) { /* NOP in base class */ };
+    virtual ErrorPtr announceNativeAction(const string aNativeActionId) { return ErrorPtr(); /* NOP in base class */ };
 
     /// execute native action (scene call, dimming operation)
     /// @param aStatusCB must be called to return status. Must return NULL when action was applied.
@@ -493,7 +505,7 @@ namespace p44 {
 
     /// free native action
     /// @param aNativeActionId a ID of a native action that should be removed
-    virtual ErrorPtr freeNativeAction(const string aNativeActionId) { /* NOP in base class */ };
+    virtual ErrorPtr freeNativeAction(const string aNativeActionId) { return ErrorPtr(); /* NOP in base class */ };
 
     /// @}
 
@@ -576,6 +588,9 @@ namespace p44 {
     void notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, NotificationType aNotificationToApply);
     void executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState);
     void preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
+    void repeatPreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState);
+    void finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState);
+    void repeatedNotificationComplete();
     void finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void clearOptimizerCache();

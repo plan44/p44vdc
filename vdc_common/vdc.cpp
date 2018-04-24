@@ -50,7 +50,8 @@ Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   rescanMode(rescanmode_incremental),
   rescanTicket(0),
   collecting(false),
-  totalOptimizableCalls(0)
+  totalOptimizableCalls(0),
+  optimizedCallRepeaterTicket(0)
 {
 }
 
@@ -59,6 +60,7 @@ Vdc::~Vdc()
 {
   MainLoop::currentMainLoop().cancelExecutionTicket(rescanTicket);
   MainLoop::currentMainLoop().cancelExecutionTicket(pairTicket);
+  MainLoop::currentMainLoop().cancelExecutionTicket(optimizedCallRepeaterTicket);
 }
 
 
@@ -217,7 +219,8 @@ static const char *NotificationNames[numNotificationTypes] = {
   "undefined",
   "none",
   "callScene",
-  "dimChannel"
+  "dimChannel",
+  "retrigger"
 };
 
 
@@ -274,7 +277,14 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
   // front device in audience is now prepared
   DevicePtr dev = boost::dynamic_pointer_cast<Device>(aDeliveryState->audience.front());
   aDeliveryState->audience.pop_front(); // processed, remove from list
-  if (aNotificationToApply!=ntfy_none) {
+  if (aNotificationToApply==ntfy_retrigger) {
+    // nothing to apply, retrigger repeat when it is running
+    if (optimizedCallRepeaterTicket && dev->currentAutoStopTime!=Never) {
+      AFOCUSLOG("- retriggering repeater for another %.2f seconds", (double)(dev->currentAutoStopTime)/Second);
+      MainLoop::currentMainLoop().rescheduleExecutionTicket(optimizedCallRepeaterTicket, dev->currentAutoStopTime);
+    }
+  }
+  else if (aNotificationToApply!=ntfy_none) {
     // this notification should be applied
     if (aDeliveryState->optimizedType==ntfy_undefined) {
       // first to-be-applied notification determines actual type
@@ -290,8 +300,21 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
 }
 
 
-#define MIN_DEVICES_TO_OPTIMIZE 2 // do not optimize sets with less than this number of devices
 #define MIN_CALLS_BEFORE_OPTIMIZING 3 // do not optimize calls before they have repeated this number of times
+
+#if DEBUG
+  #define MIN_DEVICES_TO_OPTIMIZE 2 // do not optimize sets with less than this number of devices
+#else
+  #define MIN_DEVICES_TO_OPTIMIZE 5 // do not optimize sets with less than this number of devices
+#endif
+
+bool Vdc::shouldUseOptimizerFor(NotificationDeliveryStatePtr aDeliveryState)
+{
+  // simple base class strategy: at least MIN_DEVICES_TO_OPTIMIZE devices must be involved.
+  // derived classes can use refined strategy more suitable for the hardware
+  return aDeliveryState->affectedDevices.size()>=MIN_DEVICES_TO_OPTIMIZE;
+}
+
 
 void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState)
 {
@@ -307,12 +330,12 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
       aDeliveryState->contentsHash
     );
     OptimizerEntryPtr entry;
-    if (aDeliveryState->affectedDevices.size()>=MIN_DEVICES_TO_OPTIMIZE) {
+    if (shouldUseOptimizerFor(aDeliveryState)) {
       // search for cache entry
       for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
         OptimizerEntryPtr e = *pos;
-        if (e->type==aDeliveryState->callType) {
-          // correct call type
+        if (e->type==aDeliveryState->optimizedType) {
+          // correct optimized type
           if (e->affectedDevicesHash==aDeliveryState->affectedDevicesHash) {
             // same set of affected devices
             if (e->contentId==aDeliveryState->contentId) {
@@ -327,7 +350,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
       if (!entry && optimizerMode==opt_auto) {
         AFOCUSLOG("- creating new cache entry");
         entry = OptimizerEntryPtr(new OptimizerEntry);
-        entry->type = aDeliveryState->callType;
+        entry->type = aDeliveryState->optimizedType;
         entry->affectedDevicesHash = aDeliveryState->affectedDevicesHash;
         entry->contentId = aDeliveryState->contentId;
         entry->contentsHash = aDeliveryState->contentsHash;
@@ -335,61 +358,98 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
         // TODO: limit number of entries, kick out least used ones
         optimizerCache.push_back(entry);
       }
-      if (entry) {
-        // count the call (but not in freezed mode, as it would mess up statistic)
-        if (optimizerMode>opt_frozen) {
-          // fade down old counts
-          entry->numCalls = entry->timeWeightedCallCount()+1;
-          entry->lastUse = MainLoop::now();
-        }
-        // can we already use the entry?
-        if (!entry->nativeActionId.empty()) {
-          // cache entry already has a native action identifier attached
-          AFOCUSLOG("- native action already exists: '%s'", entry->nativeActionId.c_str());
-          if (entry->contentsHash==aDeliveryState->contentsHash) {
-            // content has not changed since native action was last updated -> we can use it!
-            ALOG(LOG_NOTICE, "Optimzed %s: calling native %s '%s' (variant %d)", NotificationNames[aDeliveryState->callType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), aDeliveryState->actionVariant);
-            callNativeAction(boost::bind(&Vdc::finalizePreparedNotification, this, entry, aDeliveryState, _1), entry->nativeActionId, aDeliveryState);
-            return;
+    }
+    if (entry) {
+      // count the call (but not in freezed mode, as it would mess up statistic)
+      if (optimizerMode>opt_frozen) {
+        // fade down old counts
+        entry->numCalls = entry->timeWeightedCallCount()+1;
+        entry->lastUse = MainLoop::now();
+      }
+      // can we already use the entry?
+      if (!entry->nativeActionId.empty()) {
+        // cache entry already has a native action identifier attached
+        AFOCUSLOG("- native action already exists: '%s'", entry->nativeActionId.c_str());
+        if (entry->contentsHash==aDeliveryState->contentsHash) {
+          // content has not changed since native action was last updated -> we can use it!
+          ALOG(LOG_NOTICE, "Optimzed %s: calling native %s '%s' (variant %d)", NotificationNames[aDeliveryState->optimizedType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), aDeliveryState->actionVariant);
+          if (aDeliveryState->repeatAfter!=Never) {
+            AFOCUSLOG("- action scheduled to repeat in %.2f seconds", (double)(aDeliveryState->repeatAfter)/Second);
+            MainLoop::currentMainLoop().executeTicketOnce(optimizedCallRepeaterTicket, boost::bind(&Vdc::repeatPreparedNotification, this, entry, aDeliveryState), aDeliveryState->repeatAfter);
           }
           else {
-            if (optimizerMode>=opt_update) {
-              AFOCUSLOG("- content hash mismatch -> cannot be called now, must be updated later");
-              finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::StaleAction, "Stale native action '%s'", entry->nativeActionId.c_str()));
+            // cancel possibly running repeater ticket
+            if (optimizedCallRepeaterTicket) {
+              AFOCUSLOG("- cancelling repeating previous action");
+              MainLoop::currentMainLoop().cancelExecutionTicket(optimizedCallRepeaterTicket);
             }
-            else {
-              AFOCUSLOG("- content hash mismatch in frozen mode -> just execute normally now");
-              finalizePreparedNotification(entry, aDeliveryState, Error::ok());
-            }
-            return;
           }
+          callNativeAction(boost::bind(&Vdc::finalizePreparedNotification, this, entry, aDeliveryState, _1), entry->nativeActionId, aDeliveryState);
+          return;
         }
         else {
-          // affected device set/contentId has no native scene/group installed yet
-          AFOCUSLOG("- no native action assigned yet -> checking statistics to see if we should add one");
-          if (optimizerMode==opt_auto && entry->timeWeightedCallCount()>MIN_CALLS_BEFORE_OPTIMIZING) {
-            ALOG(LOG_INFO, "Optimizer: %s for these devices has occurred repeatedly (weighted: %ld times) -> optimzing it using native action", NotificationNames[aDeliveryState->optimizedType], entry->timeWeightedCallCount());
-            finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::AddAction, "Request adding native action"));
-            return;
+          if (optimizerMode>=opt_update) {
+            AFOCUSLOG("- content hash mismatch -> cannot be called now, must be updated later");
+            finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::StaleAction, "Stale native action '%s'", entry->nativeActionId.c_str()));
           }
           else {
-            // not adding action, we'll wait and see if this call repeats enough to do so
-            AFOCUSLOG("- not imporant enough -> just execute normally now");
+            AFOCUSLOG("- content hash mismatch in frozen mode -> just execute normally now");
             finalizePreparedNotification(entry, aDeliveryState, Error::ok());
-            return;
           }
+          return;
         }
       }
       else {
-        // no cache entry,
-        AFOCUSLOG("- not cache entry -> just execute normally now");
-        finalizePreparedNotification(entry, aDeliveryState, Error::ok());
-        return;
+        // affected device set/contentId has no native scene/group installed yet
+        AFOCUSLOG("- no native action assigned yet -> checking statistics to see if we should add one");
+        if (optimizerMode==opt_auto && entry->timeWeightedCallCount()>MIN_CALLS_BEFORE_OPTIMIZING) {
+          ALOG(LOG_INFO, "Optimizer: %s for these devices has occurred repeatedly (weighted: %ld times) -> optimzing it using native action", NotificationNames[aDeliveryState->optimizedType], entry->timeWeightedCallCount());
+          finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::AddAction, "Request adding native action"));
+          return;
+        }
+        else {
+          // not adding action, we'll wait and see if this call repeats enough to do so
+          AFOCUSLOG("- not imporant enough -> just execute normally now");
+          finalizePreparedNotification(entry, aDeliveryState, Error::ok());
+          return;
+        }
       }
+    }
+    else {
+      // no cache entry (because optimizer off or not enough devices in affected set
+      AFOCUSLOG("- no cache entry (optimizer off or set of devices not suitable for optimization) -> just execute normally now");
+      finalizePreparedNotification(entry, aDeliveryState, Error::ok()); // non-null but OK error means that we have nothing applied yet
+      return;
     }
   }
 }
 
+
+void Vdc::repeatPreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState)
+{
+  // this is called to repeat an action after a timeout (usually, dim autostop)
+  optimizedCallRepeaterTicket = 0;
+  // - reconfigure for repetition and prevent another repetition
+  aDeliveryState->actionVariant = aDeliveryState->repeatVariant;
+  aDeliveryState->repeatAfter = Never;
+  // - prepare affected devices for repeat
+  for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+    (*pos)->optimizerRepeatPrepare(aDeliveryState);
+  }
+  // - call the native action again
+  AFOCUSLOG("- scheduled repeat of action %s", aEntry->nativeActionId.c_str());
+  callNativeAction(boost::bind(&Vdc::finalizeRepeatedNotification, this, aEntry, aDeliveryState), aEntry->nativeActionId, aDeliveryState);
+}
+
+
+void Vdc::finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState)
+{
+  AFOCUSLOG("Finalizing repeated notification call");
+  // let all devices know operation has repeated
+  for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+    (*pos)->executePreparedOperation(NULL, false);
+  }
+}
 
 
 void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
@@ -410,7 +470,7 @@ void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDel
 void Vdc::preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
   if (--aDeliveryState->pendingCount>0) {
-    AFOCUSLOG("waiting for all affected devices to confirm apply: %d/%d remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
+    AFOCUSLOG("waiting for all affected devices to confirm apply: %zu/%lu remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
     return; // not all confirmed yet
   }
   // check if we need to update or create native actions
