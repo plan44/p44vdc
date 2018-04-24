@@ -39,7 +39,7 @@ DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   daliComm->setBridgeEventHandler(boost::bind(&DaliVdc::daliEventHandler, this, _1, _2, _3));
   #endif
   // set default optimisation mode
-  optimizerMode = opt_auto;
+  optimizerMode = opt_disabled; // FIXME: once we are confident, make opt_auto the default
 }
 
 
