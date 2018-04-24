@@ -31,7 +31,8 @@ using namespace p44;
 DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
   usedDaliScenesMask(0),
-  usedDaliGroupsMask(0)
+  usedDaliGroupsMask(0),
+  groupDimTicket(0)
 {
   daliComm = DaliCommPtr(new 	DaliComm(MainLoop::currentMainLoop()));
   #if ENABLE_DALI_INPUTS
@@ -41,6 +42,11 @@ DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   optimizerMode = opt_auto;
 }
 
+
+DaliVdc::~DaliVdc()
+{
+  MainLoop::currentMainLoop().cancelExecutionTicket(groupDimTicket);
+}
 
 
 // vDC name
@@ -655,7 +661,6 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                 deviceFound = true;
                 // determine free group No
                 if (groupNo<0) {
-                  uint16_t groupMask=0;
                   sqlite3pp::query qry(db);
                   for (groupNo=0; groupNo<16; ++groupNo) {
                     if ((usedDaliGroupsMask & (1<<groupNo))==0) {
@@ -835,7 +840,7 @@ static DaliAddress daliAddressFromActionId(const string aNativeActionId)
     // native group
     return DaliGroup+(no & DaliGroupMask);
   }
-  return DaliBroadcast; // no valid action ID
+  return NoDaliAddress; // no valid action ID
 }
 
 
@@ -863,20 +868,81 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
 {
   // base class does not support native actions
   DaliAddress a = daliAddressFromActionId(aNativeActionId);
-  if (aDeliveryState->callType==ntfy_callscene) {
-    // TODO: call native scene
-    // - broadcast: DALICMD_GO_TO_SCENE
-  }
-  else {
-    // TODO: dim group
-    // - in all affected devices: check fade rate (usually: already ok, so no time wasted)
-    // - to group address: DALICMD_UP / DALICMD_DOWN or send DALIVALUE_MASK to stop
-    // - if stop, cancel repeater
-    // - if not stop, schedule repeater
-    // see DaliBusDevice::dim(), possibly factor out some stuff so we can share it
+  if (a!=NoDaliAddress) {
+    if (aDeliveryState->optimizedType==ntfy_callscene) {
+      MainLoop::currentMainLoop().cancelExecutionTicket(groupDimTicket); // just safety, should be cancelled already
+      // Broadcast scene call: DALICMD_GO_TO_SCENE
+      daliComm->daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask), boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+      return;
+    }
+    else {
+      // Dim group
+      // - get mode
+      VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
+      ALOG(LOG_INFO,
+        "optimized group dimming (DALI): 'brightness' %s",
+        dm==dimmode_stop ? "STOPS dimming" : (dm==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
+      );
+      // - prepare dimming in all affected devices, i.e. check fade rate (usually: already ok, so no time wasted)
+      // note: we let all devices do this in parallel, continue when last device reports done
+      aDeliveryState->pendingCount = aDeliveryState->affectedDevices.size(); // must be set before calling executePreparedOperation() the first time
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
+        if (dev && dev->daliController) {
+          // prepare
+          dev->daliController->dimPrepare(dm, dev->getChannelByType(channeltype_brightness)->getDimPerMS(), boost::bind(&DaliVdc::groupDimPrepared, this, aStatusCB, a, aDeliveryState, _1));
+        }
+      }
+      return;
+    }
   }
   aStatusCB(TextError::err("Native action '%s' (DaliAddress 0x%02X) not YET supported", aNativeActionId.c_str(), a)); // causes normal execution
 }
+
+
+void DaliVdc::groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    ALOG(LOG_WARNING, "Error while preparing device for group dimming: %s", aError->description().c_str());
+  }
+  if (--aDeliveryState->pendingCount>0) {
+    AFOCUSLOG("waiting for all affected devices to confirm dim preparation: %d/%d remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
+    return; // not all confirmed yet
+  }
+  // now issue dimming command to group
+  VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
+  if (dm==dimmode_stop) {
+    // stop dimming
+    // - cancel repeater ticket
+    MainLoop::currentMainLoop().cancelExecutionTicket(groupDimTicket);
+    // - send MASK to group
+    daliComm->daliSendDirectPower(aDaliAddress, DALIVALUE_MASK, boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+    return;
+  }
+  else {
+    // start dimming right now
+    MainLoop::currentMainLoop().executeTicketOnce(groupDimTicket, boost::bind(&DaliVdc::groupDimRepeater, this, aDaliAddress, dm==dimmode_up ? DALICMD_UP : DALICMD_DOWN, _1));
+    // confirm action
+    nativeActionDone(aStatusCB, aError);
+    return;
+  }
+}
+
+
+void DaliVdc::groupDimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLTimer &aTimer)
+{
+  daliComm->daliSendCommand(aDaliAddress, aCommand);
+  MainLoop::currentMainLoop().retriggerTimer(aTimer, 200*MilliSecond);
+}
+
+
+void DaliVdc::nativeActionDone(StatusCB aStatusCB, ErrorPtr aError)
+{
+  AFOCUSLOG("DALI Native action done with status: %s", Error::text(aError).c_str());
+  if (aStatusCB) aStatusCB(aError);
+}
+
+
 
 
 void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
@@ -897,6 +963,7 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
     for (int g=0; g<16; g++) {
       if ((usedDaliGroupsMask & (1<<g))==0) {
         a = DaliGroup + g;
+        break;
       }
     }
   }
@@ -904,41 +971,54 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
     markUsed(a, true);
     aOptimizerEntry->nativeActionId = actionIdFromDaliAddress(a);
     aOptimizerEntry->lastNativeChange = MainLoop::now();
-    LOG(LOG_WARNING,"DaliVdc: dummy action '%s' created (DaliAddress=0x%02X) - reservation only for now", aOptimizerEntry->nativeActionId.c_str(), a);
-    if (aDeliveryState->callType==ntfy_callscene) {
-      // - cancel dim repeater
-      // TODO: make sure no old scene settings remain:
-      // - broadcast: DALICMD_REMOVE_FROM_SCENE
-      // TODO: have all lights load their current level into DTR
-      // - broadcast: DALICMD_STORE_ACTUAL_LEVEL_IN_DTR
-      // TODO: now store scene values
-      // - for each affected device: DALICMD_STORE_DTR_AS_SCENE
+    LOG(LOG_INFO,"DaliVdc: creating action '%s' (DaliAddress=0x%02X)", aOptimizerEntry->nativeActionId.c_str(), a);
+    if (aDeliveryState->optimizedType==ntfy_callscene) {
+      // make sure no old scene settings remain in any device -> broadcast DALICMD_REMOVE_FROM_SCENE
+      daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(a&DaliSceneMask));
+      // now update this scene's values
+      updateNativeAction(aStatusCB, aOptimizerEntry, aDeliveryState);
+      return;
     }
-    else if (aDeliveryState->callType==ntfy_dimchannel) {
-      // - cancel dim repeater
-      // TODO: make sure no old group settings remain:
-      // - broadcast: DALICMD_REMOVE_FROM_GROUP
-      // TODO: now create new group
-      // - for each affected device: DALICMD_ADD_TO_GROUP
+    else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+      // Make sure no old group settings remain -> broadcast DALICMD_REMOVE_FROM_GROUP
+      daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_GROUP+(a&DaliGroupMask));
+      // now create new group -> for each affected device sent DALICMD_ADD_TO_GROUP
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
+        if (dev && dev->daliController) {
+          daliComm->daliSendConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_ADD_TO_GROUP+(a&DaliGroupMask));
+        }
+      }
     }
+    aOptimizerEntry->lastNativeChange = MainLoop::now();
     aStatusCB(ErrorPtr());
     return;
   }
-  aStatusCB(TextError::err("cannot create new DALI native action"));
+  aStatusCB(TextError::err("cannot create new DALI native action for type=%d", (int)aOptimizerEntry->type));
 }
 
 
 void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
 {
-  if (aDeliveryState->callType==ntfy_callscene) {
-    // TODO: have all lights load their current level into DTR
-    // - broadcast: DALICMD_STORE_ACTUAL_LEVEL_IN_DTR
-    // TODO: now store scene values
-    // - for each affected device: DALICMD_STORE_DTR_AS_SCENE
+  DaliAddress a = daliAddressFromActionId(aOptimizerEntry->nativeActionId);
+  if ((a&DaliScene) && aDeliveryState->optimizedType==ntfy_callscene) {
+    // now store scene values -> for each affected device send DALICMD_STORE_DTR_AS_SCENE
+    for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+      DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
+      if (dev && dev->daliController) {
+        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
+        if (l) {
+          uint8_t power = dev->daliController->brightnessToArcpower(l->brightnessForHardware());
+          daliComm->daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_SCENE+(a&DaliSceneMask), power);
+        }
+      }
+    }
+    // done
+    aOptimizerEntry->lastNativeChange = MainLoop::now();
+    aStatusCB(ErrorPtr());
+    return;
   }
-  // FIXME: send ok
-  aStatusCB(TextError::err("updateNativeAction not implemented yet"));
-  aOptimizerEntry->lastNativeChange = MainLoop::now();
+  aStatusCB(TextError::err("cannot update DALI native action for type=%d", (int)aOptimizerEntry->type));
 }
 
 

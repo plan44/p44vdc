@@ -797,7 +797,43 @@ Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower)
 }
 
 
-// optimized DALI dimming implementation
+
+
+
+// MARK: ===== Optimized DALI dimming implementation
+
+
+
+void DaliBusDevice::dimPrepare(VdcDimMode aDimMode, double aDimPerMS, StatusCB aCompletedCB)
+{
+  if (!isDummy && !aDimMode==dimmode_stop) {
+    // - configure new fade rate if current does not match
+    if (aDimPerMS!=currentDimPerMS) {
+      currentDimPerMS = aDimPerMS;
+      //   Fade rate: R = 506/SQRT(2^X) [steps/second] -> x = ln2((506/R)^2) : R=44 [steps/sec] -> x = 7
+      double h = 506.0/(currentDimPerMS*1000);
+      h = log(h*h)/log(2);
+      uint8_t fr = h>0 ? (uint8_t)h : 0;
+      LOG(LOG_DEBUG, "DaliDevice: new dimming rate = %f steps/second, calculated FADE_RATE setting = %f (rounded %d)", currentDimPerMS*1000, h, fr);
+      if (fr!=currentFadeRate) {
+        LOG(LOG_INFO, "DaliDevice shortaddr %d: setting DALI FADE_RATE to %d for dimming at %f steps/second", deviceInfo->shortAddress, fr, currentDimPerMS*1000);
+        currentFadeRate = fr;
+        daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_RATE, fr, boost::bind(&DaliBusDevice::dimPrepared, this, aCompletedCB, _1));
+        return;
+      }
+    }
+  }
+  if (aCompletedCB) aCompletedCB(ErrorPtr());
+}
+
+
+void DaliBusDevice::dimPrepared(StatusCB aCompletedCB, ErrorPtr aError)
+{
+  if (aCompletedCB) aCompletedCB(aError);
+}
+
+
+
 void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
 {
   if (isDummy) return;
@@ -808,34 +844,25 @@ void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
     daliVdc.daliComm->daliSendDirectPower(deviceInfo->shortAddress, DALIVALUE_MASK);
   }
   else {
-    // start dimming
-    // - configure new fade rate if current does not match
-    if (aDimPerMS!=currentDimPerMS) {
-      currentDimPerMS = aDimPerMS;
-      //   Fade rate: R = 506/SQRT(2^X) [steps/second] -> x = ln2((506/R)^2) : R=44 [steps/sec] -> x = 7
-      double h = 506.0/(currentDimPerMS*1000);
-      h = log(h*h)/log(2);
-      uint8_t fr = h>0 ? (uint8_t)h : 0;
-      LOG(LOG_DEBUG, "DaliDevice: new dimming rate = %f Steps/second, calculated FADE_RATE setting = %f (rounded %d)", currentDimPerMS*1000, h, fr);
-      if (fr!=currentFadeRate) {
-        LOG(LOG_DEBUG, "DaliDevice: setting DALI FADE_RATE to %d", fr);
-        daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_RATE, fr);
-        currentFadeRate = fr;
-      }
-    }
-    // - use repeated UP and DOWN commands
-    dimRepeater(deviceInfo->shortAddress, aDimMode==dimmode_up ? DALICMD_UP : DALICMD_DOWN, MainLoop::now());
+    // prepare dimming and then call dimRepeater
+    dimPrepare(aDimMode, aDimPerMS, boost::bind(&DaliBusDevice::dimStart, this, deviceInfo->shortAddress, aDimMode==dimmode_up ? DALICMD_UP : DALICMD_DOWN));
   }
 }
 
 
-void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aNow)
+void DaliBusDevice::dimStart(DaliAddress aDaliAddress, DaliCommand aCommand)
+{
+  MainLoop::currentMainLoop().executeTicketOnce(dimRepeaterTicket, boost::bind(&DaliBusDevice::dimRepeater, this, aDaliAddress, aCommand, _1));
+}
+
+
+void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, DaliCommand aCommand, MLTimer &aTimer)
 {
   daliVdc.daliComm->daliSendCommand(aDaliAddress, aCommand);
   // schedule next command
   // - DALI UP and DOWN run 200mS, but can be repeated earlier
   //   Note: DALI bus speed limits commands to 120Bytes/sec max, i.e. about 20 per 200mS, i.e. max 10 lamps dimming
-  dimRepeaterTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&DaliBusDevice::dimRepeater, this, aDaliAddress, aCommand, _2), aNow+200*MilliSecond);
+  MainLoop::currentMainLoop().retriggerTimer(aTimer, 200*MilliSecond);
 }
 
 
@@ -1319,18 +1346,21 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
 
 
 // optimized DALI dimming implementation
-void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
+void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply)
 {
   // start dimming
   if (aChannel) {
     if (aChannel->getChannelType()==channeltype_brightness) {
       // start dimming
-      ALOG(LOG_INFO,
-        "dimChannel (DALI): channel '%s' (brightness) %s",
-        aChannel->getName(),
-        aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
-      );
-      daliController->dim(aDimMode, aChannel->getDimPerMS());
+      if (aDoApply) {
+        ALOG(LOG_INFO,
+          "dimChannel (DALI): channel '%s' %s",
+          aChannel->getName(),
+          aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
+        );
+        daliController->dim(aDimMode, aChannel->getDimPerMS());
+      }
+      // in all cases, we need to query current brightness after dimming
       if (aDimMode==dimmode_stop) {
         // retrieve end status
         daliController->updateParams(boost::bind(&DaliSingleControllerDevice::dimEndStateRetrieved, this, _1));
@@ -1338,7 +1368,7 @@ void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDim
     }
     else {
       // not my channel, use generic implementation
-      inherited::dimChannel(aChannel, aDimMode);
+      inherited::dimChannel(aChannel, aDimMode, aDoApply);
     }
   }
 }
@@ -1364,12 +1394,23 @@ void DaliSingleControllerDevice::setTransitionTime(MLMicroSeconds aTransitionTim
 
 bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 {
-  // TODO: use more precise criteria whether notification is optimizable or not
-  return
-    daliController && !daliController->isGrouped() && // do not optimize already grouped devices!
-    !daliController->supportsDT8 && // FIXME: exclude DT8 for now until we can test color scenes with a sample device
-    (aDeliveryState->optimizedType==ntfy_callscene ||
-    aDeliveryState->optimizedType==ntfy_dimchannel); // dimming and scenes considered optimizable for now
+  // check general exclude reasons
+  if (
+    !daliController || // safety - need a controller to optimize
+    daliController->isGrouped() || // already grouped devices cannot be optimized
+    daliController->supportsDT8 // FIXME: exclude DT8 for now until we can test color scenes with a sample device
+  ) {
+    return false;
+  }
+  // check notification-specific conditions
+  if (aDeliveryState->optimizedType==ntfy_callscene) {
+    // scenes are generally optimizable
+    return true;
+  }
+  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    // only brightness dimming optimizable for now
+    return currentDimChannel && currentDimChannel->getChannelType()==channeltype_brightness;
+  }
 }
 
 

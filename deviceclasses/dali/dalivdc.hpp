@@ -70,12 +70,16 @@ namespace p44 {
     uint16_t usedDaliGroupsMask; ///< bitmask of DALI groups in use by optimizer or manually created composite devices
     uint16_t usedDaliScenesMask; ///< bitmask of DALI scenes in use by optimizer or input devices
 
+    MLTicket groupDimTicket; ///< timer for group dimming
+
     #if ENABLE_DALI_INPUTS
     DaliInputDeviceList inputDevices;
     #endif
 
   public:
     DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
+
+    virtual ~DaliVdc();
 
 		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
@@ -171,7 +175,6 @@ namespace p44 {
     void loadLocallyUsedGroupsAndScenes();
     void markUsed(DaliAddress aSceneOrGroup, bool aUsed);
 
-
     ErrorPtr groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr daliScan(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
@@ -183,6 +186,10 @@ namespace p44 {
     void testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
     void testRW(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte);
     void testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+
+    void groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
+    void groupDimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLTimer &aTimer);
+    void nativeActionDone(StatusCB aStatusCB, ErrorPtr aError);
 
     #if ENABLE_DALI_INPUTS
     void daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2);
