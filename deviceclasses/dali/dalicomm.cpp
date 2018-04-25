@@ -138,6 +138,12 @@ void DaliComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t 
 
 void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, SerialOperationReceivePtr aOperation, ErrorPtr aError)
 {
+  // check for operation timeout
+  if (Error::isError(aError, OQError::domain(), OQError::TimedOut)) {
+    // receive operation has timed out
+    LOG(LOG_ERR, "DALI operation timed out - indicates problem with bridge");
+    return;
+  }
   if (expectedBridgeResponses>0) expectedBridgeResponses--;
   if (expectedBridgeResponses<BUFFERED_BRIDGE_RESPONSES_LOW) {
     responsesInSequence = false; // allow buffered sends without waiting for answers again
@@ -152,7 +158,12 @@ void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, Se
     }
     else {
       FOCUSLOG("DALI bridge response: %s (%02X %02X)         - %d pending responses%s", bridgeAckText(resp1, resp2), resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_ACK_RETRIED ? ", RETRIED" : "");
-      if (resp1==RESP_CODE_ACK_RETRIED) retriedWrites++;
+      if (resp1==RESP_CODE_ACK_RETRIED) {
+        if (resp2==ACK_TIMEOUT || resp2==ACK_FRAME_ERR)
+          retriedReads++; // read ACKs
+        else
+          retriedWrites++; // count others as write ACKs
+      }
     }
     if (aBridgeResultHandler) {
       aBridgeResultHandler(resp1, resp2, aError);
@@ -207,7 +218,7 @@ void DaliComm::sendBridgeCommand(uint8_t aCmd, uint8_t aDali1, uint8_t aDali2, D
     recOp->inSequence = responsesInSequence;
     FOCUSLOG("DALI bridge command:  %s (%02X)      %02X %02X - %d pending responses - %s", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, expectedBridgeResponses, responsesInSequence ? "sent when no more responses pending" : "sent as soon as possible");
   }
-  recOp->setTimeout(20*Second); // large timeout, because it can really take time until all expected answers are received
+  recOp->setTimeout(120*Second); // large timeout, because it can really take time until all expected answers are received, or DEH2 network/serial load might disturb timing for a longer while
   // set callback
   // - for recOp to obtain result or get error
   recOp->setCompletionCallback(boost::bind(&DaliComm::bridgeResponseHandler, this, aResultCB, recOp, _1));
