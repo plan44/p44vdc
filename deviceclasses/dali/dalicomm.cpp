@@ -793,15 +793,29 @@ private:
       }
     }
     if (aQueryState==dqs_random_l || aNoOrTimeout) {
-      // - collision already detected (dqs_random_l set above) -> query complete for this short address
-      // - or last byte of existing device checked (dqs_random_l reached sequentially) -> do data test when this check was ok (isYes)
-      // - or timeout -> could be device without random address support, do data test unless collision detected
+      // We get here in two cases:
+      // a) isYes==true: querying this short address existence and collisions on it is complete
+      //    (all queries up to dqs_random_l done or skipped because of a frame error)
+      // b) isYes==false: the current query had a timeout
+      // This can mean:
+      // - if the current query is one of the random address readouts:
+      //   - isYes==true: there is at least one device at this short address -> do R/W tests
+      //     Note: do R/W tests even in case of possible collision, because we can't be sure
+      //     it's REALLY a collision.
+      //   - isYes==false, but we have no collision found yet on the bus in this scan -> do R/W tests
+      //     Note: this means we had a timeout on one of the random address readouts, which might be
+      //     caused by not fully compatible devices with no random address at all, such as some DMX/DALI
+      //     converters. Doing the R/W test in this case will reveal if this could still be a usable device.
+      //     Note that because we don't do R/W-tests when we think there are bus collision, such a
+      //     nonconforming device might only be detected when the bus is free of collisions.
+      // - otherwise:
+      //   - no device at this short address (or a severely broken one)
       if (aQueryState!=dqs_controlgear && (isYes || !probablyCollision)) {
-        // do a data reliability test now (quick 3 byte 0,0x55,0xAA only, unless loglevel>=6)
+        // Device at this shortaddress: do a data reliability test now (quick 3 byte 0,0x55,0xAA only, unless loglevel>=6)
         DaliBusDataTester::daliBusTestData(daliComm, boost::bind(&DaliBusScanner::nextDevice ,this, true, _1), shortAddress, LOGLEVEL>=LOG_INFO ? 9 : 3);
         return;
       }
-      // none found here, just test next
+      // No device found at this shortaddress -> just test next address
       nextDevice(false, ErrorPtr());
     }
     else {
@@ -817,7 +831,7 @@ private:
       if (Error::isOK(aError)) {
         // this short address has a device which has passed the test
         activeDevicesPtr->push_back(shortAddress);
-        LOG(LOG_INFO, "- detected DALI device at short address %d", shortAddress);
+        LOG(LOG_INFO, "- detected reliably communicating DALI device at short address %d", shortAddress);
       }
       else {
         unreliableDevicesPtr->push_back(shortAddress);
