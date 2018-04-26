@@ -128,9 +128,6 @@ namespace p44 {
   typedef boost::intrusive_ptr<ServiceBrowser> ServiceBrowserPtr;
 
 
-
-  typedef boost::function<void (bool aShouldRun)> AuxVdsmStatusHandler;
-
   /// Implements service announcement and discovery (via avahi) for vdc host and (if configured) a associated vdsm
   class DiscoveryManager : public P44Obj
   {
@@ -152,35 +149,17 @@ namespace p44 {
     int publishWebPort;
     string publishWebPath;
     int publishSshPort;
-    #if ENABLE_AUXVDSM
-    // - an optionally running auxiliary vdsm
-    DsUidPtr auxVdsmDsUid;
-    int auxVdsmPort;
-    bool auxVdsmRunning;
-    bool vdsmAuxiliary;
-    MLMicroSeconds masterLastSeen;
-    AuxVdsmStatusHandler auxVdsmStatusHandler;
-    #endif // ENABLE_AUXVDSM
-
 
     // state of dS advertising / scanning
     enum {
       dm_disabled, // not set up, cannot be started
-      dm_setup, // set up, but not yet requested to start
-      dm_requeststart, // requested to be started
+      dm_setup, // set up, but not yet requested to start an advertisement
+      dm_requeststart, // set up and requested to start advertising
       dm_starting, // waiting for pusblishing to happen
       dm_started, // published
-      dm_previously_not_detected_master, // in previous scan, we did NOT see a master, and also not (yet) in current scan
-      dm_previously_detected_master, // in previous scan, we did see a master, but not (yet) in current scan
-      dm_detected_master, // at least one master vdsm has been detected
-      dm_lost_vdsm, // just lost a vdsm, re-discovering what is on the network
-      dm_auxvdsm_needs_change, // need for auxiliary vdsm run state change (needs to be started or stopped)
     } dmState;
 
-    MLTicket pollTicket;
-    MLTicket rescanTicket;
-    MLTicket evaluateTicket;
-
+    MLTicket pollTicket; // timer for avahi polling
 
     // private constructor, use sharedDiscoveryManager() to obtain singleton
     DiscoveryManager();
@@ -209,32 +188,26 @@ namespace p44 {
     /// advertise p44vdc (or the vdsm, if same platform hosts a auxiliary vdsm and no master vdsm is found)
     /// @note can be called repeatedly to update information
     /// @param aVdcHost the device container to be published
-    /// @param aNoAuto if set, the published vdsm or vdc will not be automatically connected (only when explicitly whitelisted)
+    /// @param aNoAuto if set, the published vdc will not be automatically connected (only when explicitly whitelisted)
     /// @param aWebPort if set, a _http._tcp service will be published as well
     /// @param aWebPath the web path to publish (when aWebPort is set)
     /// @param aSshPort if set, a _ssh._tcp service will be published as well
-    /// @param aAuxVdsmDsUid if not NULL, discovery manager will also manage advertising of the vdsm
-    /// @param aAuxVdsmPort port to connect the vdsm from ds485p
-    /// @param aAuxVdsmRunning must be true if the auxiliary vdsm is running right now, false if not.
-    /// @param aAuxVdsmStatusHandler will be called when discovery detects or looses master vdsm
-    /// @param aNotAuxiliary if set, vdsm will always run and will not include the "auxiliary" TXT record in the advertisement
     void advertiseDS(
       VdcHostPtr aVdcHost,
       bool aNoAuto,
       int aWebPort, const string aWebPath,
-      int aSshPort,
-      DsUidPtr aAuxVdsmDsUid, int aAuxVdsmPort, bool aAuxVdsmRunning, AuxVdsmStatusHandler aAuxVdsmStatusHandler, bool aNotAuxiliary
+      int aSshPort
     );
 
-    /// FIXME: remove, once other vdcs have been updated to the new signature
-    /// backwards compatible method without the aWebPath parameter
+    /// FIXME: remove, once other vdcs have been updated to the new signature.
+    /// backwards compatible method without the aWebPath parameter and still having dummy auxvdms params
     void advertiseDS(
       VdcHostPtr aVdcHost,
       bool aNoAuto,
       int aWebPort,
       int aSshPort,
-      DsUidPtr aAuxVdsmDsUid, int aAuxVdsmPort, bool aAuxVdsmRunning, AuxVdsmStatusHandler aAuxVdsmStatusHandler, bool aNotAuxiliary
-    ) { advertiseDS(aVdcHost, aNoAuto, aWebPort, "", aSshPort, aAuxVdsmDsUid, aAuxVdsmPort, aAuxVdsmRunning, aAuxVdsmStatusHandler, aNotAuxiliary); }
+      DsUidPtr aDUMMYAuxVdsmDsUid, int aDUMMYAuxVdsmPort, bool aDUMMYAuxVdsmRunning, void *aDUMMYAuxVdsmStatusHandler, bool aDUMMYNotAuxiliary
+    ) { advertiseDS(aVdcHost, aNoAuto, aWebPort, "", aSshPort); }
 
     /// Stop advertising DS service(s)
     void stopAdvertisingDS();
@@ -259,12 +232,6 @@ namespace p44 {
     void startAdvertisingDS(AvahiService *aService);
     void restartAdvertising();
 
-    #if ENABLE_AUXVDSM
-    void startBrowsingVdms(AvahiService *aService);
-    void rescanVdsms(AvahiService *aService);
-    void evaluateState();
-    #endif
-
     // callbacks
     static void avahi_log(AvahiLogLevel level, const char *txt);
     #if USE_AVAHI_CORE
@@ -283,12 +250,6 @@ namespace p44 {
     static void avahi_debug_browse_callback(AvahiServiceBrowser *b, AvahiIfIndex interface, AvahiProtocol protocol, AvahiBrowserEvent event, const char *name, const char *type, const char *domain, AVAHI_GCC_UNUSED AvahiLookupResultFlags flags, void* userdata);
     void debug_browse_callback(AvahiServiceBrowser *b, AvahiIfIndex interface, AvahiProtocol protocol, AvahiBrowserEvent event, const char *name, const char *type, const char *domain, AVAHI_GCC_UNUSED AvahiLookupResultFlags flags);
 
-    #if ENABLE_AUXVDSM
-    static void avahi_browse_callback(AvahiServiceBrowser *b, AvahiIfIndex interface, AvahiProtocol protocol, AvahiBrowserEvent event, const char *name, const char *type, const char *domain, AVAHI_GCC_UNUSED AvahiLookupResultFlags flags, void* userdata);
-    static void avahi_resolve_callback(AvahiServiceResolver *r, AvahiIfIndex interface, AvahiProtocol protocol, AvahiResolverEvent event, const char *name, const char *type, const char *domain, const char *host_name, const AvahiAddress *a, uint16_t port, AvahiStringList *txt, AvahiLookupResultFlags flags, void* userdata);
-    void browse_callback(AvahiServiceBrowser *b, AvahiIfIndex interface, AvahiProtocol protocol, AvahiBrowserEvent event, const char *name, const char *type, const char *domain, AVAHI_GCC_UNUSED AvahiLookupResultFlags flags);
-    void resolve_callback(AvahiServiceResolver *r, AvahiIfIndex interface, AvahiProtocol protocol, AvahiResolverEvent event, const char *name, const char *type, const char *domain, const char *host_name, const AvahiAddress *a, uint16_t port, AvahiStringList *txt, AvahiLookupResultFlags flags);
-    #endif
   };
 
   typedef boost::intrusive_ptr<DiscoveryManager> DiscoveryManagerPtr;

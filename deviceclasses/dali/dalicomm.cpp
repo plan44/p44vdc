@@ -775,6 +775,7 @@ private:
     }
     else if (Error::isOK(aError) && !aNoOrTimeout) {
       // no error, no timeout
+      LOG(LOG_DEBUG, "Short address %d returns 0x%02X for queryState %d (0=controlgear, 1..3=random address H/M/L)", shortAddress, aResponse, (int)aQueryState);
       isYes = true;
       if (aQueryState==dqs_controlgear && aResponse!=DALIANSWER_YES) {
         // not entirely correct answer, also indicates collision
@@ -928,7 +929,7 @@ private:
 
   void shortAddrListReceived(DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError)
   {
-    bool missingAddrs = aError && aError->isError(DaliCommError::domain(), DaliCommError::AddressesMissing);
+    bool missingAddrs = Error::isError(aError, DaliCommError::domain(), DaliCommError::AddressesMissing);
     // Strategy:
     // - when short scan reports devices with no short address, trigger a random binary serach FOR THOSE ONLY (case: new devices)
     // - when short scan reports another error: just report back, UNLESS unconditional full scan is requested

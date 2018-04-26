@@ -35,28 +35,17 @@
 using namespace p44;
 
 
-#define VDSM_SERVICE_TYPE "_ds-vdsm._tcp"
 #define VDC_SERVICE_TYPE "_ds-vdc._tcp"
 #define DS485P_SERVICE_TYPE "_ds-ds485p._tcp"
 #define DSS_SERVICE_TYPE "_dssweb._tcp"
 #define HTTP_SERVICE_TYPE "_http._tcp"
 #define SSH_SERVICE_TYPE "_ssh._tcp"
 
-#define VDSM_ROLE_MASTER "master"
-#define VDSM_ROLE_AUXILIARY "auxiliary"
-#define VDSM_ROLE_COLLECTING "collecting"
-#define VDSM_ROLE_COLLECTABLE "collectable"
 #define VDSM_VDC_ROLE_NOAUTO "noauto"
 
 #define INITIAL_STARTUP_DELAY (8*Second) // how long to wait before trying to start avahi server for the first time
 #define STARTUP_RETRY_DELAY (30*Second) // how long to wait before retrying to start avahi server when failed because of missing network
 #define SERVICES_RESTART_DELAY (2*Minute) // how long to wait before restarting the server (after a problem that caused calling restartServer())
-#define VDSM_RESCAN_DELAY (20*Minute) // how often to start a complete rescan anyway (even if no vdsm is lost)
-#define VDSM_LOST_RESCAN_DELAY (10*Second) // how fast to start a rescan after a vdsm has been lost
-#define RESCAN_EVALUATION_DELAY (10*Second) // how long to browse until re-evaluating state
-#define INITIAL_EVALUATION_DELAY (30*Second) // how long to browse until evaluating state for the first time (only when no auxvdsm is running)
-#define REEVALUATION_DELAY (30*Second) // how long to browse until reevaluating state (only when no auxvdsm is running)
-#define MIN_SWITCHBACK_TO_AUXVDSM_DELAY (10*Minute) // how long it will take to switch back from using master vdsm to using auxvdsm AGAIN.
 
 // MARK: ===== DiscoveryManager
 
@@ -78,16 +67,9 @@ DiscoveryManager::DiscoveryManager() :
   dSEntryGroup(NULL),
   debugServiceBrowser(NULL),
   dmState(dm_disabled),
-  #if ENABLE_AUXVDSM
-  auxVdsmRunning(false),
-  vdsmAuxiliary(true),
-  masterLastSeen(Never),
-  #endif
   noAuto(false),
   publishWebPort(0),
   publishSshPort(0),
-  rescanTicket(0),
-  evaluateTicket(0),
   pollTicket(0)
 {
   // register a cleanup handler
@@ -255,9 +237,6 @@ void DiscoveryManager::startService()
 
 void DiscoveryManager::stopService()
 {
-  // stop the timers
-  MainLoop::currentMainLoop().cancelExecutionTicket(rescanTicket);
-  MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
   // stop advertising
   stopAdvertisingDS();
   if (debugServiceBrowser) {
@@ -287,12 +266,16 @@ void DiscoveryManager::serviceStarted()
       FOCUSLOG("avahi: failed to create debug service browser: %s", avahi_strerror(avahi_service_errno(service)));
     }
   }
+  // start advertisement if needed
+  startAdvertisingDS(service);
 }
 
 
 void DiscoveryManager::restartService()
 {
+  bool wasAdvertising = dmState>=dm_requeststart;
   stopService();
+  if (wasAdvertising) dmState = dm_requeststart; // make sure advertising comes up again if it was running or requested before
   LOG(LOG_WARNING, "discovery: stopped avahi service - restarting in %lld Seconds", SERVICES_RESTART_DELAY/Second);
   MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), SERVICES_RESTART_DELAY);
 }
@@ -321,6 +304,7 @@ void DiscoveryManager::server_callback(AvahiServer *s, AvahiServerState state)
   // Avahi server state has changed
   switch (state) {
     case AVAHI_SERVER_RUNNING: {
+      LOG(LOG_INFO, "avahi: server running");
       // The server has started up successfully and registered its hostname
       // - create services that are set up to get published
       startAdvertising(s);
@@ -382,13 +366,11 @@ void DiscoveryManager::client_callback(AvahiClient *c, AvahiClientState state)
   // Avahi server state has changed
   switch (state) {
     case AVAHI_CLIENT_S_RUNNING: {
+      LOG(LOG_INFO, "avahi: client reports server running");
       // The client reports that server has started up successfully and registered its hostname
       // - create services that are set up to get published
       startAdvertising(c);
       break;
-    }
-    case AVAHI_CLIENT_S_COLLISION: {
-      // fall through to AVAHI_SERVER_REGISTERING
     }
     case AVAHI_CLIENT_S_REGISTERING: {
       // drop service registration, will be recreated once server is running
@@ -399,6 +381,9 @@ void DiscoveryManager::client_callback(AvahiClient *c, AvahiClientState state)
         avahi_entry_group_reset(eg);
       }
       break;
+    }
+    case AVAHI_CLIENT_S_COLLISION: {
+      // fall through to AVAHI_CLIENT_FAILURE
     }
     case AVAHI_CLIENT_FAILURE: {
       LOG(LOG_ERR, "avahi: service failure: %s", avahi_strerror(avahi_client_errno(c)));
@@ -430,14 +415,13 @@ void DiscoveryManager::startAdvertising(AvahiService *aService)
 
 
 
-// MARK: ===== dS advertising and vdSM scanning
+// MARK: ===== dS advertising
 
 
 void DiscoveryManager::advertiseDS(
   VdcHostPtr aVdcHost,
   bool aNoAuto,
-  int aWebPort, const string aWebPath, int aSshPort,
-  DsUidPtr aAuxVdsmDsUid, int aAuxVdsmPort, bool aAuxVdsmRunning, AuxVdsmStatusHandler aAuxVdsmStatusHandler, bool aNotAuxiliary
+  int aWebPort, const string aWebPath, int aSshPort
 ) {
   ErrorPtr err;
 
@@ -449,13 +433,6 @@ void DiscoveryManager::advertiseDS(
   publishWebPort = aWebPort;
   publishWebPath = aWebPath;
   publishSshPort = aSshPort;
-  #if ENABLE_AUXVDSM
-  auxVdsmPort = aAuxVdsmPort;
-  auxVdsmDsUid = aAuxVdsmDsUid;
-  auxVdsmRunning = aAuxVdsmRunning;
-  auxVdsmStatusHandler = aAuxVdsmStatusHandler;
-  vdsmAuxiliary = !aNotAuxiliary;
-  #endif // ENABLE_AUXVDSM
   // start advertising now
   dmState = dm_setup; // set up for advertising
   restartAdvertising();
@@ -476,20 +453,11 @@ void DiscoveryManager::stopAdvertisingDS()
   if (dSEntryGroup) {
     avahi_entry_group_free(dSEntryGroup);
     dSEntryGroup = NULL;
-    #if ENABLE_AUXVDSM
-    LOG(LOG_NOTICE, "discovery: unpublished %s service.", auxVdsmRunning ? "vdSM" : "vDC");
-    #else
     LOG(LOG_NOTICE, "discovery: unpublished vDC service.");
-    #endif
   }
-  #if ENABLE_AUXVDSM
-  if (serviceBrowser) {
-    avahi_service_browser_free(serviceBrowser);
-    serviceBrowser = NULL;
-  }
-  #endif // ENABLE_AUXVDSM
-  if (dmState>dm_setup)
+  if (dmState>dm_setup) {
     dmState = dm_setup;
+  }
 }
 
 
@@ -559,57 +527,26 @@ void DiscoveryManager::startAdvertisingDS(AvahiService *aService)
       }
     }
     if (vdcHost->vdcApiServer) {
-      // only publish in case vdc does have a vDC API configured at all
-      #if ENABLE_AUXVDSM
-      // - advertise the auxiliary vdsm if it is running, vdc host itself otherwise
-      if (auxVdsmRunning && auxVdsmDsUid) {
-        // The auxiliary vdsm is running, advertise it to the network
-        // - create the vdsm dsuid TXT record
-        string txt_dsuid = string_format("dSUID=%s", auxVdsmDsUid->getString().c_str());
-        if ((avahiErr = avahi_add_service(
-          aService,
-          dSEntryGroup,
-          AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, // all interfaces and protocols (as enabled at server level)
-          (AvahiPublishFlags)0, // no flags
-          descriptiveName.c_str(),
-          VDSM_SERVICE_TYPE, // vdsm
-          NULL, // no domain
-          NULL, // no host
-          auxVdsmPort, // auxiliary vdsm's ds485 port
-          txt_dsuid.c_str(), // TXT record for the auxiliary vdsm's dSUID
-          VDSM_ROLE_COLLECTABLE, // TXT record signalling this vdsm may be collected by ds485p
-          vdsmAuxiliary ? VDSM_ROLE_AUXILIARY : NULL, // TXT record signalling this vdsm is auxiliary
-          noAuto ? VDSM_VDC_ROLE_NOAUTO : NULL, // noauto flag or early TXT terminator
-          NULL // TXT record terminator
-        ))<0) {
-          LOG(LOG_ERR, "avahi: failed to add _ds-vdsm._tcp service: %s", avahi_strerror(avahiErr));
-          goto fail;
-        }
-      }
-      else
-      #endif // ENABLE_AUXVDSM
-      {
-        // The auxiliary vdsm is NOT running or not present at all, advertise the vdc host (p44vdc) to the network
-        int vdcPort = 0;
-        sscanf(vdcHost->vdcApiServer->getPort(), "%d", &vdcPort);
-        string txt_dsuid = string_format("dSUID=%s", vdcHost->getDsUid().getString().c_str());
-        if ((avahiErr = avahi_add_service(
-          aService,
-          dSEntryGroup,
-          AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, // all interfaces and protocols (as enabled at server level)
-          (AvahiPublishFlags)0, // no flags
-          descriptiveName.c_str(),
-          VDC_SERVICE_TYPE, // vdc
-          NULL, // no domain
-          NULL, // no host
-          vdcPort, // the vdc API host port
-          txt_dsuid.c_str(), // TXT record for the vdc host's dSUID
-          noAuto ? VDSM_VDC_ROLE_NOAUTO : NULL, // noauto flag or early TXT terminator
-          NULL // TXT record terminator
-        ))<0) {
-          LOG(LOG_ERR, "avahi: failed to add _ds-vdc._tcp service: %s", avahi_strerror(avahiErr));
-          goto fail;
-        }
+      // advertise the vdc host (p44vdc) to the network
+      int vdcPort = 0;
+      sscanf(vdcHost->vdcApiServer->getPort(), "%d", &vdcPort);
+      string txt_dsuid = string_format("dSUID=%s", vdcHost->getDsUid().getString().c_str());
+      if ((avahiErr = avahi_add_service(
+        aService,
+        dSEntryGroup,
+        AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, // all interfaces and protocols (as enabled at server level)
+        (AvahiPublishFlags)0, // no flags
+        descriptiveName.c_str(),
+        VDC_SERVICE_TYPE, // vdc
+        NULL, // no domain
+        NULL, // no host
+        vdcPort, // the vdc API host port
+        txt_dsuid.c_str(), // TXT record for the vdc host's dSUID
+        noAuto ? VDSM_VDC_ROLE_NOAUTO : NULL, // noauto flag or early TXT terminator
+        NULL // TXT record terminator
+      ))<0) {
+        LOG(LOG_ERR, "avahi: failed to add _ds-vdc._tcp service: %s", avahi_strerror(avahiErr));
+        goto fail;
       }
     } // has vDC API
     else if (!publishWebPort && !publishSshPort) {
@@ -659,16 +596,9 @@ void DiscoveryManager::avahi_ds_entry_group_callback(AvahiService *aService, Ava
   // entry group state has changed
   switch (state) {
     case AVAHI_ENTRY_GROUP_ESTABLISHED: {
-      if (dmState<dm_started)
+      if (dmState<dm_started) {
         dmState = dm_started;
-      #if ENABLE_AUXVDSM
-      // start scanning for master vdsms
-      if (auxVdsmDsUid) {
-        // We have an auxiliary vdsm we need to monitor
-        // - create browser to look out for master vdsms
-        startBrowsingVdms(aService);
       }
-      #endif
       LOG(LOG_NOTICE, "discovery: successfully published services as '%s'.", vdcHost->publishedDescription().c_str());
       break;
     }
@@ -689,216 +619,6 @@ void DiscoveryManager::avahi_ds_entry_group_callback(AvahiService *aService, Ava
   }
 }
 
-
-// MARK: ===== Auxiliary vDSM handling
-
-#if ENABLE_AUXVDSM
-
-void DiscoveryManager::startBrowsingVdms(AvahiService *aService)
-{
-  // Note: may NOT use global "service" var, because this can be called from within server callback, which might be called before avahi_server_new() returns
-  // stop previous, if any
-  if (serviceBrowser) {
-    avahi_service_browser_free(serviceBrowser);
-  }
-  // demote "vdsm found" state to "vdsm found in last scan"
-  if (dmState==dm_detected_master)
-    dmState = dm_previously_detected_master;
-  else if (dmState==dm_previously_detected_master)
-    dmState = dm_previously_not_detected_master;
-  // start scanning
-  serviceBrowser = avahi_service_browser_new(aService, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, VDSM_SERVICE_TYPE, NULL, (AvahiLookupFlags)0, avahi_browse_callback, this);
-  if (!serviceBrowser) {
-    LOG(LOG_ERR, "Failed to create service browser for vdsms: %s", avahi_strerror(avahi_service_errno(aService)));
-  }
-  if (auxVdsmDsUid && !auxVdsmRunning) {
-    // if no auxiliary vdsm is running now, schedule a check to detect if we've found no master vdsms (otherwise, only FINDING a master is relevant)
-    MainLoop::currentMainLoop().executeTicketOnce(evaluateTicket, boost::bind(&DiscoveryManager::evaluateState, this), INITIAL_EVALUATION_DELAY);
-  }
-  // schedule a rescan now and then
-  MainLoop::currentMainLoop().executeTicketOnce(rescanTicket, boost::bind(&DiscoveryManager::rescanVdsms, this, aService), VDSM_RESCAN_DELAY);
-}
-
-
-void DiscoveryManager::rescanVdsms(AvahiService *aService)
-{
-  FOCUSLOG("rescanVdsms: restart browsing for vdsms now");
-  // - restart browsing
-  startBrowsingVdms(aService);
-  // - schedule an evaluation in a while
-  MainLoop::currentMainLoop().executeTicketOnce(evaluateTicket, boost::bind(&DiscoveryManager::evaluateState, this), RESCAN_EVALUATION_DELAY);
-}
-
-
-void DiscoveryManager::evaluateState()
-{
-  MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
-  FOCUSLOG("evaluateState: auxVdsmRunning=%d, dmState=%d, sessionConnection=%d", auxVdsmRunning, (int)dmState, vdcHost->getSessionConnection()!=NULL);
-  if (dmState>=dm_started && auxVdsmDsUid) {
-    // avahi up and we are managing an auxiliary vdsm
-    if (auxVdsmRunning) {
-      // we have a auxiliary vdsm running and must decide whether to shut it down now
-      if (dmState==dm_detected_master) {
-        // most recent scan did detect at least one master vdsm running
-        if (vdsmAuxiliary) {
-          // our vdsm is auxiliary -> let master vdsm take over
-          LOG(LOG_WARNING, "***** Detected master vdsm -> shut down auxiliary vdsm");
-          if (auxVdsmStatusHandler) auxVdsmStatusHandler(false);
-          dmState = dm_auxvdsm_needs_change; // prevent re-triggering change
-        }
-      }
-    }
-    else {
-      // we don't have a auxiliary vdsm running and must decide whether we should start one
-      // - only start auxiliary vdsm if our vdc API is not connected
-      if (!vdcHost->getSessionConnection()) {
-        // no active session
-        if (
-          (
-            dmState!=dm_detected_master &&
-            dmState!=dm_previously_detected_master &&
-            dmState!=dm_auxvdsm_needs_change &&
-            (masterLastSeen==Never || MainLoop::currentMainLoop().now()-masterLastSeen>MIN_SWITCHBACK_TO_AUXVDSM_DELAY)
-          ) ||
-          !vdsmAuxiliary
-        ) {
-          // ...and we haven't detected a master vdsm recently or our vdsm is not auxiliary (but meant to run all the time)
-          LOG(LOG_WARNING, "***** Detected no master vdsm, and vdc has no connection, or vdsm is not auxiliary -> need local vdsm");
-          if (auxVdsmStatusHandler) auxVdsmStatusHandler(true);
-          dmState = dm_auxvdsm_needs_change; // prevent re-triggering change
-        }
-      }
-      else {
-        // as long as we have a connection, apparently a vdsm is taking care, so we don't need the aux vdsm
-        // - but check again in a while
-        MainLoop::currentMainLoop().executeTicketOnce(evaluateTicket, boost::bind(&DiscoveryManager::evaluateState, this), REEVALUATION_DELAY);
-      }
-    }
-  }
-}
-
-
-void DiscoveryManager::avahi_browse_callback(AvahiServiceBrowser *b, AvahiIfIndex interface, AvahiProtocol protocol, AvahiBrowserEvent event, const char *name, const char *type, const char *domain, AVAHI_GCC_UNUSED AvahiLookupResultFlags flags, void* userdata)
-{
-  DiscoveryManager *discoveryManager = static_cast<DiscoveryManager*>(userdata);
-  discoveryManager->browse_callback(b, interface, protocol, event, name, type, domain, flags);
-}
-
-
-void DiscoveryManager::browse_callback(AvahiServiceBrowser *b, AvahiIfIndex interface, AvahiProtocol protocol, AvahiBrowserEvent event, const char *name, const char *type, const char *domain, AVAHI_GCC_UNUSED AvahiLookupResultFlags flags)
-{
-  // Called whenever a new services becomes available on the LAN or is removed from the LAN
-  // - may use global "service" var, because browsers are no set up within server/client callbacks, but only afterwards, when "service" is defined
-  switch (event) {
-    case AVAHI_BROWSER_FAILURE:
-      LOG(LOG_ERR, "avahi: browser failure: %s", avahi_strerror(avahi_service_errno(service)));
-      restartService();
-      break;
-    case AVAHI_BROWSER_NEW:
-      LOG(LOG_DEBUG, "avahi: BROWSER_NEW: service '%s' of type '%s' in domain '%s'", name, type, domain);
-      // Note: local vdsm record (my own) is ignored
-      if (strcmp(type, VDSM_SERVICE_TYPE)==0 && (flags & AVAHI_LOOKUP_RESULT_LOCAL)==0) {
-        // new vdsm found. Only for vdsms, we need to resolve to get the TXT records in order to see if we've found a master vdsm
-        LOG(LOG_INFO, "discovery: vdsm '%s' detected", name);
-        // Note: the returned resolver object can be ignored, it is freed in the callback
-        //   if the server terminates before the callback has been executed, the server deletes the resolver.
-        if (!(avahi_service_resolver_new(service, interface, protocol, name, type, domain, AVAHI_PROTO_UNSPEC, (AvahiLookupFlags)0, avahi_resolve_callback, this))) {
-          LOG(LOG_ERR, "avahi: failed to resolve service '%s': %s", name, avahi_strerror(avahi_service_errno(service)));
-          break;
-        }
-      }
-      break;
-    case AVAHI_BROWSER_REMOVE:
-      LOG(LOG_DEBUG, "avahi: BROWSER_REMOVE: service '%s' of type '%s' in domain '%s'", name, type, domain);
-      if (strcmp(type, VDSM_SERVICE_TYPE)==0) {
-        // a vdsm has disappeared
-        LOG(dmState==dm_lost_vdsm ? LOG_INFO : LOG_NOTICE, "discovery: vdsm '%s' no longer online", name);
-        // loosing a vdsm does not necessarily mean we have lost the MASTER vdsm, but
-        // - if we've lost the master now, this is also the time we've last seen it (or at least only a short time after that)
-        // - if what we've lost here is not the master, this implies the master is still present and we've "seen" it now
-        // We don't know which is the case at this point, but either way, if we had a master detected before, updating masterLastSeen is correct
-        if (dmState==dm_detected_master) {
-          masterLastSeen = MainLoop::currentMainLoop().now();
-        }
-        // we have lost a vdsm (but we don't know if it's master) -> we need to rescan in a while (unless another master appears in the meantime)
-        dmState = dm_lost_vdsm;
-        MainLoop::currentMainLoop().executeTicketOnce(rescanTicket, boost::bind(&DiscoveryManager::rescanVdsms, this, service), VDSM_LOST_RESCAN_DELAY);
-      }
-      break;
-    case AVAHI_BROWSER_ALL_FOR_NOW:
-      LOG(LOG_DEBUG, "avahi: BROWSER_ALL_FOR_NOW");
-      break;
-    case AVAHI_BROWSER_CACHE_EXHAUSTED:
-      LOG(LOG_DEBUG, "avahi: BROWSER_CACHE_EXHAUSTED");
-      break;
-  }
-}
-
-
-void DiscoveryManager::avahi_resolve_callback(AvahiServiceResolver *r, AvahiIfIndex interface, AvahiProtocol protocol, AvahiResolverEvent event, const char *name, const char *type, const char *domain, const char *host_name, const AvahiAddress *a, uint16_t port, AvahiStringList *txt, AvahiLookupResultFlags flags, void* userdata)
-{
-  DiscoveryManager *discoveryManager = static_cast<DiscoveryManager*>(userdata);
-  discoveryManager->resolve_callback(r, interface, protocol, event, name, type, domain, host_name, a, port, txt, flags);
-}
-
-
-void DiscoveryManager::resolve_callback(AvahiServiceResolver *r, AvahiIfIndex interface, AvahiProtocol protocol, AvahiResolverEvent event, const char *name, const char *type, const char *domain, const char *host_name, const AvahiAddress *a, uint16_t port, AvahiStringList *txt, AvahiLookupResultFlags flags)
-{
-  switch (event) {
-    case AVAHI_RESOLVER_FAILURE:
-      FOCUSLOG("avahi: failed to resolve service '%s' of type '%s' in domain '%s': %s", name, type, domain, avahi_strerror(avahi_service_errno(service)));
-      break;
-    case AVAHI_RESOLVER_FOUND: {
-      char addrtxt[AVAHI_ADDRESS_STR_MAX];
-      avahi_address_snprint(addrtxt, sizeof(addrtxt), a);
-      FOCUSLOG("avahi: resolved service '%s' of type '%s' in domain '%s' at %s:", name, type, domain, addrtxt);
-      // Note: as we only start resolving for vdsms, this should be a vdsm
-      if (FOCUSLOGENABLED) {
-        // display full info
-        char *txttxt;
-        txttxt = avahi_string_list_to_string(txt);
-        FOCUSLOG(
-          "- avahi resolver returns: %s:%u (%s)\n"
-          "- TXT=%s\n"
-          "- cookie is %u\n"
-          "- is_local: %i\n"
-          "- wide_area: %i\n"
-          "- multicast: %i\n"
-          "- cached: %i",
-          host_name, port, addrtxt,
-          txttxt,
-          avahi_string_list_get_service_cookie(txt),
-          !!(flags & AVAHI_LOOKUP_RESULT_LOCAL),
-          !!(flags & AVAHI_LOOKUP_RESULT_WIDE_AREA),
-          !!(flags & AVAHI_LOOKUP_RESULT_MULTICAST),
-          !!(flags & AVAHI_LOOKUP_RESULT_CACHED)
-        );
-        avahi_free(txttxt);
-      }
-      // check if this is a master vdsm
-      if (strcmp(type, VDSM_SERVICE_TYPE)==0) {
-        // is indeed a vdsm
-        if (avahi_string_list_find(txt, VDSM_ROLE_MASTER)) {
-          // there IS a master vdsm
-          LOG(dmState==dm_detected_master || dmState==dm_previously_detected_master ? LOG_INFO : LOG_NOTICE,
-            "discovery: detected presence of master vdsm '%s' at %s%s",
-            name,
-            addrtxt,
-            vdsmAuxiliary ? "" : " (but this vdsm is NOT auxiliary, so it will always run)"
-          );
-          // fresh confirmation of having at least one master vdsm in the network
-          dmState = dm_detected_master;
-          masterLastSeen = MainLoop::currentMainLoop().now();
-          evaluateState();
-        }
-      }
-      break;
-    }
-  }
-  avahi_service_resolver_free(r);
-}
-
-#endif // ENABLE_AUXVDSM
 
 
 // MARK: ==== Debug http browser

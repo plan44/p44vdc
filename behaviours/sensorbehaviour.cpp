@@ -31,9 +31,10 @@ using namespace p44;
 // MARK: ===== WindowEvaluator
 
 
-WindowEvaluator::WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointAvgTime) :
+WindowEvaluator::WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime, EvaluationType aEvalType) :
   windowTime(aWindowTime),
-  dataPointAvgTime(aDataPointAvgTime)
+  dataPointCollTime(aDataPointCollTime),
+  evalType(aEvalType)
 {
 }
 
@@ -55,32 +56,72 @@ void WindowEvaluator::addValue(double aValue, MLMicroSeconds aTimeStamp)
   }
   // add new value
   if (!dataPoints.empty()) {
-    // check if we should accumulate into last existing datapoint
+    // check if we should collect into last existing datapoint
     DataPoint &last = dataPoints.back();
-    if (aTimeStamp-last.timestamp<dataPointAvgTime) {
-      // still accumulating
-      last.value = (last.value*subDataPoints + aValue) / (subDataPoints+1);
-      last.timestamp = aTimeStamp;
-      subDataPoints++;
+    if (collStart+dataPointCollTime>aTimeStamp) {
+      // still in collection time window (from start of datapoint collection
+      switch (evalType) {
+        case eval_max: {
+          if (aValue>last.value) last.value = aValue;
+          break;
+        }
+        case eval_min: {
+          if (aValue<last.value) last.value = aValue;
+          break;
+        }
+        case eval_timeweighted_average: {
+          MLMicroSeconds timeWeight = aTimeStamp-last.timestamp; // between last subdatapoint collected into this datapoint and new timestamp
+          if (collDivisor<=0 || timeWeight<=0) { // 0 or negative timeweight should not happen, safety only!
+            // first section
+            last.value = (last.value + aValue)/2;
+            collDivisor = timeWeight;
+          }
+          else {
+            double v = (last.value*collDivisor + aValue*timeWeight);
+            collDivisor += timeWeight;
+            last.value = v/collDivisor;
+          }
+          break;
+        }
+        case eval_average:
+        default: {
+          if (collDivisor<=0) collDivisor = 1;
+          double v = (last.value*collDivisor+aValue);
+          collDivisor++;
+          last.value = v/collDivisor;
+          break;
+        }
+      }
+      last.timestamp = aTimeStamp; // timestamp represents most recent sample in datapoint
       return; // done
     }
   }
   // accumulation of value in previous datapoint complete (or none available at all)
-  dataPoints.push_back({ .value = aValue, .timestamp = aTimeStamp });
-  subDataPoints = 1;
+  // -> start new datapoint
+  DataPoint dp;
+  dp.value = aValue;
+  dp.timestamp = aTimeStamp;
+  dataPoints.push_back(dp);
+  collStart = aTimeStamp;
+  collDivisor = 0;
 }
 
 
-double WindowEvaluator::evaluate(EvaluationType aEvaluationType)
+double WindowEvaluator::evaluate()
 {
   double result = 0;
   double divisor = 0;
   int count = 0;
   for (DataPointsList::iterator pos = dataPoints.begin(); pos != dataPoints.end(); ++pos) {
     MLMicroSeconds lastTs = Never;
-    switch (aEvaluationType) {
+    switch (evalType) {
       case eval_max: {
         if (count==0 || pos->value>result) result = pos->value;
+        divisor = 1;
+        break;
+      }
+      case eval_min: {
+        if (count==0 || pos->value<result) result = pos->value;
         divisor = 1;
         break;
       }
@@ -124,6 +165,7 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   // state
   #if ENABLE_RRDB
   loggingReady(false),
+  lastRrdUpdate(Never),
   #endif
   invalidatorTicket(0),
   lastUpdate(Never),
@@ -218,26 +260,29 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
 
 
 static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
+  // type                      usage           evalWin    collWin          evalType                                    pushIntvl  chgOnlyIntvl  trigDelta  trigRel  trigMin trigIntvl
+  // ------------------------  -------------   ---------  --------------   ------------------------------------------- ---------  ------------  ---------  -------  ------- --------------------------
   // indoor context
-  { .type = sensorType_temperature,    .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute, .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_humidity,       .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 2,   .trigRel = false, .trigMin =   -1, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_illumination,   .usage = usage_room,     .evalWin = 5*Minute,  .avgWin = 10*Second, .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_gas_CO2,        .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_gas_CO,         .usage = usage_room,     .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
+  { sensorType_temperature,    usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_room,     0,         0,               WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_room,     5*Minute,  10*Second,       WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_gas_CO2,        usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_gas_CO,         usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
   // outdoor context
-  { .type = sensorType_temperature,    .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute, .trigDelta = 0.5, .trigRel = false, .trigMin = -100, .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_humidity,       .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 30*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 2,   .trigRel = false, .trigMin = -1,   .trigIntvl = 1*Second /* = "immediate" */ },
-  { .type = sensorType_illumination,   .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 20*Second, .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 5*Minute,  .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_air_pressure,   .usage = usage_outdoors, .evalWin = 0,         .avgWin = 0,         .evalType = WindowEvaluator::eval_none,                 .pushIntvl = 15*Minute, .chgOnlyIntvl = 60*Minute },
-  { .type = sensorType_wind_speed,     .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 1*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 0.1, .trigRel = true,  .trigMin = -1,   .trigIntvl = 1*Minute },
-  { .type = sensorType_wind_direction, .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 1*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 20,  .trigRel = false, .trigMin = -1,   .trigIntvl = 1*Minute },
-  { .type = sensorType_gust_speed,     .usage = usage_outdoors, .evalWin = 10*Minute, .avgWin = 3*Second,  .evalType = WindowEvaluator::eval_max,                  .pushIntvl = 10*Minute, .chgOnlyIntvl = 60*Minute, .trigDelta = 0.1, .trigRel = true,  .trigMin = 5,    .trigIntvl = 3*Second },
+  { sensorType_temperature,    usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_outdoors, 10*Minute, 20*Second,       WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_air_pressure,   usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 15*Minute, 60*Minute,    0,         false,   0,      0 },
+  { sensorType_wind_speed,     usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    0.1,       true,    -1,     1*Minute },
+  { sensorType_wind_direction, usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    20,        false,   -1,     1*Minute },
+  { sensorType_gust_speed,     usage_outdoors, 3*Second,  200*MilliSecond, WindowEvaluator::eval_max,                  10*Minute, 60*Minute,    0.1,       true,    5,      3*Second /* = "immediate" */},
   // FIXME: rule says "accumulation", but as long as sensors deliver intensity in mm/h, it is in fact a window average over an hour
-  { .type = sensorType_precipitation,  .usage = usage_outdoors, .evalWin = 60*Minute, .avgWin = 2*Minute,  .evalType = WindowEvaluator::eval_timeweighted_average, .pushIntvl = 60*Minute, .chgOnlyIntvl = 60*Minute },
+  { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,        WindowEvaluator::eval_timeweighted_average, 60*Minute, 60*Minute,    0,         false,   0,      0 },
 
   // terminator
-  { .type = sensorType_none }
+  { sensorType_none,           usage_undefined,0,         0,               WindowEvaluator::eval_none,                 0,         0,            0,         false,   0,      0 },
 };
+
 
 
 
@@ -374,10 +419,10 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
       // process values through filter
       if (!filter) {
         // need a filter, create it
-        filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->avgWin));
+        filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->collWin, profileP->evalType));
       }
       filter->addValue(aValue, now);
-      double v = filter->evaluate(profileP->evalType);
+      double v = filter->evaluate();
       // re-evaluate changed flag after filtering
       if (fabs(v - currentValue) > resolution/2) changedValue = true;
       BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' calculates %s filtered value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
@@ -396,7 +441,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   notifyListeners(changedValue ? valueevent_changed : valueevent_confirmed);
   // possibly log value
   #if ENABLE_RRDB
-  logSensorValue(aValue, currentValue, lastPushedValue);
+  logSensorValue(now, aValue, currentValue, lastPushedValue);
   #endif
 }
 
@@ -535,8 +580,9 @@ typedef int (*RrdFunc)(int, char **);
 static int rrd_call(RrdFunc aFunc, ArgsVector &aArgs)
 {
   char **argsArrayP = new char*[aArgs.size()+1];
+  LOG(LOG_DEBUG, "rrd_call:");
   for (int i=0; i<aArgs.size(); ++i) {
-    DBGLOG(LOG_INFO, "- %s", aArgs[i].c_str());
+    LOG(LOG_DEBUG, "- %s", aArgs[i].c_str());
     argsArrayP[i] = (char *)aArgs[i].c_str();
   }
   argsArrayP[aArgs.size()] = NULL;
@@ -544,6 +590,7 @@ static int rrd_call(RrdFunc aFunc, ArgsVector &aArgs)
   rrd_clear_error();
   int ret = aFunc((int)aArgs.size(), argsArrayP);
   delete[] argsArrayP;
+  LOG(LOG_DEBUG, "rrd_call returns: %d", ret);
   return ret;
 }
 
@@ -564,7 +611,7 @@ static string rrdminmax(double aMin, double aMax)
 }
 
 
-void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, double aPushedValue)
+void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue)
 {
   if (!loggingReady && !rrdbconfig.empty() && rrdbfile.empty()) {
     // configured but not yet prepared to log
@@ -579,12 +626,19 @@ void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, d
     bool autoRRA = false;
     bool autoStep = true;
     bool autoUpdate = true;
+    long step = 1;
     while (nextPart(p, arg, ' ')) {
       arg = trimWhiteSpace(arg);
       // catch special "macros"
       if (arg=="--step") {
         // there is a custom --step, prevent auto-generating one
         autoStep = false;
+        // scan step value
+        string stp;
+        if (!nextPart(p, stp, ' ')) break;
+        sscanf(stp.c_str(), "%ld", &step);
+        // also forward --step argument (no autostep)
+        cfgArgs.push_back(stp);
       }
       else if (arg=="auto") {
         // fully automatic sample of the current (possibly filtered) value, with standard RRAs
@@ -651,24 +705,26 @@ void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, d
       args.push_back("--start"); args.push_back("now"); // start now
       // possibly automatic --step option
       if (autoStep) {
-        // use step from sensor's update interval (but not faster than once in a minute)
-        args.push_back("--step"); args.push_back(string_format("%lld", updateInterval>Minute ? updateInterval/Second : 60)); // use sensor's native interval if known, 1min otherwise
+        step = updateInterval>15*Second ? updateInterval/Second : 15;
+        // use step from sensor's update interval (but not faster than once in 15 seconds)
+        args.push_back("--step"); args.push_back(string_format("%ld", step)); // use sensor's native interval if known, 15sec otherwise
       }
       // possibly automatic datasources
+      long heartbeat = aliveSignInterval ? aliveSignInterval/Second : step*5;
       if (autoRaw) {
-        args.push_back(string_format("DS:%s_R:GAUGE:%lld:%s", dsname.c_str(), aliveSignInterval ? aliveSignInterval/Second : 60*60, rrdminmax(min, max).c_str()));
+        args.push_back(string_format("DS:%s_R:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
       }
       if (autoFiltered) {
-        args.push_back(string_format("DS:%s_F:GAUGE:%lld:%s", dsname.c_str(), profileP && profileP->evalWin ? profileP->evalWin/Second : (aliveSignInterval ? aliveSignInterval/Second : 60*60), rrdminmax(min, max).c_str()));
+        args.push_back(string_format("DS:%s_F:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
       }
       if (autoPushed) {
-        args.push_back(string_format("DS:%s_P:GAUGE:%lld:%s", dsname.c_str(), aliveSignInterval ? aliveSignInterval/Second : 60*60, rrdminmax(min, max).c_str()));
+        args.push_back(string_format("DS:%s_P:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
       }
       if (autoRRA) {
-        // now RRAs
-        args.push_back(string_format("RRA:AVERAGE:0.5:1:7d")); // 1:1 samples for a week
-        args.push_back(string_format("RRA:AVERAGE:0.5:1h:3M")); // hourly datapoints for 3 months
-        args.push_back(string_format("RRA:AVERAGE:0.5:6h:3y")); // quarter day for 3 years
+        // now RRAs: RRA:AVERAGE:xff:steps:rows
+        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 1l, 7*24*3600/step)); // 1:1 samples for a week
+        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 3600/step, 30*24*3600*step/3600)); // hourly datapoints for 1 months (30 days)
+        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 24*3600/step, 2*365*24*3600*step/24/3600)); // daily for 2 years
       }
       // now add explicit config
       args.insert(args.end(), cfgArgs.begin(), cfgArgs.end());
@@ -677,6 +733,7 @@ void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, d
       if (ret==0) {
         BLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", rrdbfile.c_str());
         loggingReady = true;
+        lastRrdUpdate = aTimeStamp; // creation counts as update, make sure we don't immediately try to send first update afterwards
       }
       else {
         BLOG(LOG_ERR, "rrd: cannot create rrd file '%s': %s", rrdbfile.c_str(), rrd_get_error());
@@ -689,13 +746,16 @@ void SensorBehaviour::logSensorValue(double aRawValue, double aProcessedValue, d
     }
   }
   // now actually log into file
-  if (loggingReady) {
+  if (loggingReady && lastRrdUpdate<aTimeStamp-10*Second) {
+    lastRrdUpdate = aTimeStamp;
     ArgsVector args;
     args.push_back("rrdupdate");
     args.push_back(rrdbfile);
     string ud = rrdbupdate;
     // substitute values for placeholders
     size_t i;
+    i = ud.find("%T");
+    if (i!=string::npos) ud.replace(i, 2, string_format("%lld", aTimeStamp/Second).c_str());
     // - raw (considered unknown when sensor is invalid)
     i = ud.find("%R");
     if (i!=string::npos) ud.replace(i, 2, rrdval(aRawValue, lastUpdate!=Never).c_str());

@@ -86,6 +86,7 @@ VdcHost::VdcHost(bool aWithLocalController) :
   networkConnected(true), // start with the assumption of a connected network
   maxApiVersion(0), // no API version limit
   externalDsuid(false),
+  vdcHostInstance(0),
   storedDsuid(false),
   allowCloud(false),
   DsAddressable(this),
@@ -172,8 +173,9 @@ void VdcHost::setName(const string &aName)
 
 
 
-void VdcHost::setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC)
+void VdcHost::setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC, int aInstance)
 {
+  vdcHostInstance = aInstance;
   if (!aIfNameForMAC.empty()) {
     // use MAC from specific interface
     mac = macAddress(aIfNameForMAC.c_str());
@@ -343,8 +345,9 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // Log start message
   LOG(LOG_NOTICE,
-    "\n\n\n*** starting initialisation of vcd host '%s'\n*** dSUID (%s) = %s, MAC: %s, IP = %s\n",
+    "\n\n\n*** starting initialisation of vcd host '%s' (Instance #%d)\n*** dSUID (%s) = %s, MAC: %s, IP = %s\n",
     publishedDescription().c_str(),
+    vdcHostInstance,
     externalDsuid ? "external" : "MAC-derived",
     shortDesc().c_str(),
     macAddressToString(mac, ':').c_str(),
@@ -506,7 +509,6 @@ void VdcHost::deviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNe
 // MARK: ===== adding/removing devices
 
 
-// add a new device, replaces possibly existing one based on dSUID
 bool VdcHost::addDevice(DevicePtr aDevice)
 {
   if (!aDevice)
@@ -515,7 +517,7 @@ bool VdcHost::addDevice(DevicePtr aDevice)
   DsDeviceMap::iterator pos = dSDevices.find(aDevice->getDsUid());
   if (pos!=dSDevices.end()) {
     LOG(LOG_INFO, "- device %s already registered, not added again",aDevice->shortDesc().c_str());
-    // first break call chain that triggered deletion, keep aDevice living until then
+    // first unwind call chain that triggered deletion, keep aDevice living until then
     MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::duplicateIgnored, this, aDevice));
     return false; // duplicate dSUID, not added
   }
@@ -1569,7 +1571,9 @@ ErrorPtr VdcHost::loadAndFixDsUID()
     // single vDC per MAC-Adress scenario: generate UUIDv5 with name = macaddress
     // - calculate UUIDv5 based dSUID
     DsUid vdcNamespace(DSUID_VDC_NAMESPACE_UUID);
-    dSUID.setNameInSpace(mac ? macAddressToString(mac,0) : "UnknownMACAddress", vdcNamespace);
+    string m = mac ? macAddressToString(mac,0) : "UnknownMACAddress";
+    if (vdcHostInstance>0) string_format_append(m, "_%d", vdcHostInstance); // add-in instance number
+    dSUID.setNameInSpace(m, vdcNamespace);
   }
   DsUid originalDsUid = dSUID;
   // load the vdc host settings, which might override the default dSUID

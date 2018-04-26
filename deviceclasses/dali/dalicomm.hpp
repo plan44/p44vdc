@@ -383,7 +383,11 @@ namespace p44 {
 
     /// Scan the bus for devices by random address search
     /// @param aResultCB callback receiving a list<int> of available short addresses on the bus
-    /// @param aFullScanOnlyIfNeeded
+    /// @param aFullScanOnlyIfNeeded if set, a full scan will only happen when address conflicts or missing
+    ///   short addresses are detected during quick scan, and scanning will never cause existing short address
+    ///   assignments to change (but new addresses might be assigned to devices w/o short address). This means
+    ///   that addressing conflicts cannot be resolved in this mode, but also that short addresse based dSUIDs are
+    ///   not in danger of getting changed/mixed up. Therefore, this is the recommended mode for most scan situations.
     /// @note detects short address conflicts and devices without short address, assigns new short addresses as needed
     void daliFullBusScan(DaliBusScanCB aResultCB, bool aFullScanOnlyIfNeeded);
 

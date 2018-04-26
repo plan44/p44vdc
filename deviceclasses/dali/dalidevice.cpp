@@ -1146,6 +1146,14 @@ void DaliSingleControllerDevice::initializeDevice(StatusCB aCompletedCB, bool aF
 
 void DaliSingleControllerDevice::daliControllerSynced(StatusCB aCompletedCB, bool aFactoryReset, ErrorPtr aError)
 {
+  processUpdatedParams(aError);
+  // continue with initialisation in superclasses
+  inherited::initializeDevice(aCompletedCB, aFactoryReset);
+}
+
+
+void DaliSingleControllerDevice::processUpdatedParams(ErrorPtr aError)
+{
   if (Error::isOK(aError)) {
     RGBColorLightBehaviourPtr rgbl = getOutput<RGBColorLightBehaviour>();
     if (rgbl) {
@@ -1191,11 +1199,7 @@ void DaliSingleControllerDevice::daliControllerSynced(StatusCB aCompletedCB, boo
   else {
     LOG(LOG_ERR, "DaliDevice: error getting state/params from dimmer: %s", aError->description().c_str());
   }
-  // continue with initialisation in superclasses
-  inherited::initializeDevice(aCompletedCB, aFactoryReset);
 }
-
-
 
 
 
@@ -1327,6 +1331,10 @@ void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDim
         aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
       );
       daliController->dim(aDimMode, aChannel->getDimPerMS());
+      if (aDimMode==dimmode_stop) {
+        // retrieve end status
+        daliController->updateParams(boost::bind(&DaliSingleControllerDevice::dimEndStateRetrieved, this, _1));
+      }
     }
     else {
       // not my channel, use generic implementation
@@ -1335,6 +1343,11 @@ void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDim
   }
 }
 
+
+void DaliSingleControllerDevice::dimEndStateRetrieved(ErrorPtr aError)
+{
+  processUpdatedParams(aError);
+}
 
 
 void DaliSingleControllerDevice::saveAsDefaultBrightness()
@@ -1454,6 +1467,9 @@ int DaliCompositeDevice::opStateLevel()
   int l = 100;
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (dimmers[idx]) {
+      if (dimmers[idx]->deviceInfo && dimmers[idx]->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) {
+        l = 90; // is not a recommended device, does not have unique ID
+      }
       if (dimmers[idx]->isDummy) {
         l = 20; // not seen on last bus scan, might be glitch
       }
@@ -1474,8 +1490,12 @@ string DaliCompositeDevice::getOpStateText()
   bool missing = false;
   bool failure = false;
   bool incomplete = false;
+  bool noUniqueId = false;
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (dimmers[idx]) {
+      if (dimmers[idx]->deviceInfo && dimmers[idx]->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) {
+        noUniqueId = true;
+      }
       if (!dimmers[idx]->isPresent) {
         missing = true;
       }
@@ -1499,6 +1519,10 @@ string DaliCompositeDevice::getOpStateText()
   }
   if (incomplete) {
     t += sep + "incomplete";
+    sep = ", ";
+  }
+  if (noUniqueId) {
+    t += sep + "Missing S/N";
     sep = ", ";
   }
   return t;

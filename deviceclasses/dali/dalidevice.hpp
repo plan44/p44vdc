@@ -453,10 +453,11 @@ namespace p44 {
 
   private:
 
+    void processUpdatedParams(ErrorPtr aError);
+    void dimEndStateRetrieved(ErrorPtr aError);
     void daliControllerSynced(StatusCB aCompletedCB, bool aFactoryReset, ErrorPtr aError);
     void checkPresenceResponse(PresenceCB aPresenceResultHandler);
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
-
 
   };
 

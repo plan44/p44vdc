@@ -206,6 +206,7 @@ namespace p44 {
     // Note: using base class' behaviour pointer for first sensor = dawn sensor
     DsBehaviourPtr outdoorTemp;
     DsBehaviourPtr windSpeed;
+    DsBehaviourPtr gustSpeed;
     DsBehaviourPtr dayIndicator;
     DsBehaviourPtr rainIndicator;
     DsBehaviourPtr sunWest;

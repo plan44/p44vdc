@@ -195,8 +195,11 @@ namespace p44 {
     /// - if rescanmode_incremental is set, search is only made for additional new devices. Disappeared devices
     ///   might not get detected this way.
     /// - if rescanmode_exhaustive is set, device search is made exhaustive (may include longer lasting procedures to
-    ///   recollect lost devices, assign bus addresses etc.). Without this flag set, device search should
-    ///   still be complete under normal conditions, but might sacrifice corner case detection for speed.
+    ///   recollect lost devices, assign bus addresses etc.). Without this flag set, device search will
+    ///   still be complete under normal conditions, but might not find all devices when the subsystem is in a
+    ///   state that needs recovery operations (such as resolving addressing conflicts etc). Exhaustive search
+    ///   should be used with care, as it *might* cause addressing changes that *might* also cause dSUID changes
+    ///   in case of devices which do not have a stable unique ID.
     /// - if rescanmode_clearsettings is set, persistent settings of currently known devices will be deleted before
     ///   re-scanning for devices, which means devices will have default settings after collecting.
     ///   Note that this is mutually exclusive with aIncremental (as incremental scan does not remove any devices,
@@ -396,8 +399,11 @@ namespace p44 {
     /// - if rescanmode_incremental is set, search is only made for additional new devices. Disappeared devices
     ///   might not get detected this way.
     /// - if rescanmode_exhaustive is set, device search is made exhaustive (may include longer lasting procedures to
-    ///   recollect lost devices, assign bus addresses etc.). Without this flag set, device search should
-    ///   still be complete under normal conditions, but might sacrifice corner case detection for speed.
+    ///   recollect lost devices, assign bus addresses etc.). Without this flag set, device search will
+    ///   still be complete under normal conditions, but might not find all devices when the subsystem is in a
+    ///   state that needs recovery operations (such as resolving addressing conflicts etc). Exhaustive search
+    ///   should be used with care, as it *might* cause addressing changes that *might* also cause dSUID changes
+    ///   in case of devices which do not have a stable unique ID.
     /// - if rescanmode_clearsettings is set, persistent settings of currently known devices will be deleted before
     ///   re-scanning for devices, which means devices will have default settings after collecting.
     ///   Note that this is mutually exclusive with aIncremental (as incremental scan does not remove any devices,
