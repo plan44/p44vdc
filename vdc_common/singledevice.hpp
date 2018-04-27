@@ -1253,6 +1253,11 @@ namespace p44 {
   /// @param aJSONConfig JSON config object for a value descriptor (used as parameter)
   ErrorPtr parseValueDesc(ValueDescriptorPtr &aValueDesc, JsonObjectPtr aJSONConfig, const string aParamName);
 
+  /// function that fills enum value descriptor with values provided in JSON
+  /// @param aValues Json object that contains enum values (as array)
+  /// @param aEnumDesc descriptor to be filled with JSON data
+  void fillEnumDescriptor(JsonObject& aValues, EnumValueDescriptor& aEnumDesc);
+
 
 
 } // namespace p44

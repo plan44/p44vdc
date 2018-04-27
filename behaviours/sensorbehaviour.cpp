@@ -216,7 +216,7 @@ const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
   VALUE_UNIT(valueUnit_watt, unitScaling_1), ///< Generated power in W
   VALUE_UNIT(valueUnit_watthour, unitScaling_kilo), ///< Generated energy in kWh
   VALUE_UNIT(valueUnit_liter, unitScaling_1), ///< Water quantity in liters
-  VALUE_UNIT(valueUnit_literpersecond, unitScaling_1), ///< Water flow rate in liters/second
+  VALUE_UNIT(valueUnit_literpermin, unitScaling_1), ///< Water flow rate in liters/minute
   VALUE_UNIT(valueUnit_meter, unitScaling_1), ///< Length in meters
   VALUE_UNIT(valueUnit_gram, unitScaling_1), ///< mass in grams
   VALUE_UNIT(valueUnit_second, unitScaling_1), ///< time in seconds
@@ -252,7 +252,7 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
   "generated_power", ///< Generated power in W
   "generated_energy", ///< Generated energy in kWh
   "water_quantity", ///< Water quantity in liters
-  "water_flow", ///< Water flow rate in liters/second
+  "water_flow", ///< Water flow rate in liters/minute
   "length", ///< Length in meters
   "mass", ///< mass in grams
   "time", ///< duration in seconds
