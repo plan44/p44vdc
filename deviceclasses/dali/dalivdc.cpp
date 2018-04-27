@@ -137,8 +137,8 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 int DaliVdc::getRescanModes() const
 {
-  // normal and incremental make sense, no exhaustive mode
-  return rescanmode_incremental+rescanmode_normal+rescanmode_exhaustive;
+  // incremental, normal, exhaustive (resolving conflicts) and enumerate (clearing short addrs before scan) are available.
+  return rescanmode_incremental+rescanmode_normal+rescanmode_exhaustive+rescanmode_reenumerate;
 }
 
 
@@ -149,6 +149,7 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // clear the cache, we want fresh info from the devices!
     deviceInfoCache.clear();
     #if ENABLE_DALI_INPUTS
+    // - add the DALI input devices from config
     inputDevices.clear();
     sqlite3pp::query qry(db);
     if (qry.prepare("SELECT daliInputConfig, daliBaseAddr, rowid FROM inputDevices")==SQLITE_OK) {
@@ -160,6 +161,12 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
       }
     }
     #endif
+  }
+  // wipe bus addresses
+  if (aRescanFlags & rescanmode_reenumerate) {
+    // first reset ALL short addresses on the bus
+    LOG(LOG_WARNING, "DALI Bus short address re-enumeration requested -> all short addresses will be re-assigned now (dSUIDs might change)!");
+    daliComm->daliSendDtrAndConfigCommand(DaliBroadcast, DALICMD_STORE_DTR_AS_SHORT_ADDRESS, DALIVALUE_MASK);
   }
   // start collecting, allow quick scan when not exhaustively collecting (will still use full scan when bus collisions are detected)
   // Note: only in rescanmode_exhaustive, existing short addresses might get reassigned. In all other cases, only devices with no short
