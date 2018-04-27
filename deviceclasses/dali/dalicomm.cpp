@@ -581,15 +581,18 @@ uint8_t DaliComm::dali1FromAddress(DaliAddress aAddress)
 
 DaliAddress DaliComm::addressFromDaliResponse(uint8_t aResponse)
 {
+  // 1111111x = broadcast
+  // 0AAAAAAx = short address
+  // 100AAAAx = group address
   aResponse &= 0xFE; // mask out direct arc bit
   if (aResponse==0xFE) {
     return DaliBroadcast; // broadcast
   }
-  else if ((aResponse & 0xC0)==0x80) {
-    return ((aResponse>>1) & DaliGroupMask) + DaliGroup;
-  }
-  else if ((aResponse & 0xC0)==0x00) {
+  else if ((aResponse & 0x80)==0x00) {
     return (aResponse>>1) & DaliAddressMask; // device short address
+  }
+  else if ((aResponse & 0xE0)==0x80) {
+    return ((aResponse>>1) & DaliGroupMask) + DaliGroup;
   }
   else {
     return NoDaliAddress; // is not a DALI address
