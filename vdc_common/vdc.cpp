@@ -563,11 +563,16 @@ ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, Api
     // (re)collect devices of this particular vDC
     bool incremental = true;
     bool exhaustive = false;
+    bool reenumerate = false;
     bool clear = false;
     RescanMode mode = rescanmode_none;
     checkBoolParam(aParams, "incremental", incremental);
-    checkBoolParam(aParams, "exhaustive", exhaustive);
-    checkBoolParam(aParams, "clearconfig", clear);
+    // prevent more dangerous scans from vDC API
+    if (aRequest->connection()!=getVdcHost().getSessionConnection()) {
+      checkBoolParam(aParams, "exhaustive", exhaustive);
+      checkBoolParam(aParams, "reenumerate", reenumerate);
+      checkBoolParam(aParams, "clearconfig", clear);
+    }
     if (exhaustive)
       mode |= rescanmode_exhaustive;
     else if (incremental)
@@ -575,6 +580,7 @@ ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, Api
     else
       mode |= rescanmode_normal;
     if (clear) mode |= rescanmode_clearsettings;
+    if (reenumerate) mode |= rescanmode_reenumerate;
     collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), mode);
   }
   else if (aMethod=="pair") {
