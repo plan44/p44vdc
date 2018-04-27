@@ -2799,20 +2799,25 @@ ErrorPtr p44::parseValueDesc(ValueDescriptorPtr &aValueDesc, JsonObjectPtr aJSON
       if (!aJSONConfig->get("values", o) || !o->isType(json_type_array))
         return TextError::err("Need to specify enumeration 'values' array");
       EnumValueDescriptor *en = new EnumValueDescriptor(aParamName);
-      for (int i=0; i<o->arrayLength(); i++) {
-        string e = o->arrayGet(i)->stringValue();
-        bool isdefault = false;
-        if (e.size()>0 && e[0]=='!') {
-          isdefault = true;
-          e.erase(0,1);
-        }
-        en->addEnum(e.c_str(), i, isdefault);
-      }
+      fillEnumDescriptor(*o, *en);
       aValueDesc = ValueDescriptorPtr(en);
       break;
     }
   }
   return ErrorPtr();
+}
+
+void p44::fillEnumDescriptor(JsonObject& aValues, EnumValueDescriptor& aEnumDesc)
+{
+  for (int i=0; i<aValues.arrayLength(); i++) {
+    string e = aValues.arrayGet(i)->stringValue();
+    bool isdefault = false;
+    if (e.size()>0 && e[0]=='!') {
+      isdefault = true;
+      e.erase(0,1);
+    }
+    aEnumDesc.addEnum(e.c_str(), i, isdefault);
+  }
 }
 
 

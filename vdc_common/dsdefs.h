@@ -456,7 +456,7 @@ typedef enum {
   sensorType_generated_power = 25, ///< Generated power in W
   sensorType_generated_energy = 26, ///< Generated energy in kWh
   sensorType_water_quantity = 27, ///< Water quantity in liters
-  sensorType_water_flowrate = 28, ///< Water flow rate in liters/second
+  sensorType_water_flowrate = 28, ///< Water flow rate in liters/minute
   sensorType_length = 29, ///< Length in meters
   sensorType_mass = 30, ///< mass in grams
   sensorType_duration = 31, ///< time in seconds
