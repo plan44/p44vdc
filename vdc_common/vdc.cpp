@@ -905,7 +905,7 @@ ErrorPtr Vdc::loadOptimizerCache()
   // create a template
   OptimizerEntryPtr newEntry = OptimizerEntryPtr(new OptimizerEntry());
   // get the query
-  sqlite3pp::query *queryP = newEntry->newLoadAllQuery(NULL);
+  sqlite3pp::query *queryP = newEntry->newLoadAllQuery(dSUID.getString().c_str());
   if (queryP==NULL) {
     // real error preparing query
     err = newEntry->paramStore.error();
