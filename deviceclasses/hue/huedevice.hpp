@@ -43,6 +43,7 @@ namespace p44 {
   class HueDevice : public Device
   {
     typedef Device inherited;
+    friend class HueVdc;
 
     string lightID; ///< the ID as used in the hue bridge
     string uniqueID; ///< the unique light ID (which is available in v1.4 and later APIs)
@@ -166,10 +167,15 @@ namespace p44 {
 
   protected:
 
-    void deriveDsUid();
+    /// let device implementation prepare for (and possibly reject) optimized set
+    /// @param aDeliveryState can be inspected to see the scene or dim parameters
+    /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
+    ///    executed without optimisation
+    virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
 
   private:
 
+    void deriveDsUid();
     void deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, JsonObjectPtr aDeviceInfo, ErrorPtr aError);
     void presenceStateReceived(PresenceCB aPresenceResultHandler, JsonObjectPtr aDeviceInfo, ErrorPtr aError);
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);

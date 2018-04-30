@@ -189,6 +189,20 @@ bool HueDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolu
 
 
 
+bool HueDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
+{
+  // in general, we don't optimize for APIs before 1.11
+  if (!hueVdc().has_1_11_api) return false;
+  // TODO: we only optimize scenes for now, not dimming
+  if (aDeliveryState->optimizedType==ntfy_callscene) {
+    // scenes are generally optimizable
+    return true;
+  }
+  return false;
+}
+
+
+
 string HueDevice::modelName()
 {
   return hueModel;

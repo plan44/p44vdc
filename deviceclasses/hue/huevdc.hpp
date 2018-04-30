@@ -72,9 +72,19 @@ namespace p44 {
     /// @{
 
     uint64_t bridgeMacAddress; ///< the mac address of this hue bridge
-    string swVersion;
+    string swVersion; ///< bridge software version
+    string apiVersion; ///< bridge API version
+    bool has_1_11_api; ///< set if bridge has at least 1.11 API
 
     /// @}
+
+    /// @name internal state
+    /// @{
+
+    int numOptimizerScenes; ///< how many scenes are in use by the optimizer
+
+    /// @}
+
 
 
   public:
@@ -109,7 +119,7 @@ namespace p44 {
     virtual string vdcModelSuffix() const P44_OVERRIDE { return "hue"; }
 
     /// @return human readable model version specific to that vDC
-    virtual string vdcModelVersion() const P44_OVERRIDE { return swVersion; };
+    virtual string vdcModelVersion() const P44_OVERRIDE { return apiVersion.empty() ? swVersion : swVersion + "/" + apiVersion; };
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - uuid:UUUUUUU = UUID
@@ -138,6 +148,42 @@ namespace p44 {
     /// @param aEvent the event to handle
     virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
 
+    /// @name Implementation methods for native scene and grouped dimming support
+    /// @{
+
+    /// this is called once for every native action in use, after startup after existing cache entries have been
+    /// read from persistent storage. This allows vDC implementations to know which native scenes/groups are
+    /// in use by the optimizer without needing private bookkeeping.
+    /// @param aNativeActionId a ID of a native action that is in use by the optimizer
+    virtual ErrorPtr announceNativeAction(const string aNativeActionId) P44_OVERRIDE;
+
+    /// execute native action (scene call, dimming operation)
+    /// @param aStatusCB must be called to return status. Must return NULL when action was applied.
+    ///   Can return Error::OK to signal action was not applied and request device-by-device apply.
+    /// @param aNativeActionId the ID of the native action (scene, group) that must be used
+    /// @param aDeliveryState can be inspected to obtain details about the affected devices, actionVariant etc.
+    virtual void callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
+
+    /// create/reserve new native action
+    /// @param aStatusCB must be called to return status. If not ok, aOptimizerEntry must not be changed.
+    /// @param aOptimizerEntry the optimizer entry. If a new action is created, the nativeActionId must be updated to the new actionid.
+    ///   If creating the native action causes configuration changes in the native device, lastNativeChange should be updated, too.
+    /// @param aDeliveryState can be inspected to obtain details such as list of affected devices etc.
+    virtual void createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
+
+    /// update native action
+    /// @param aStatusCB must be called to return status.
+    /// @param aOptimizerEntry the optimizer entry. If configuration has changed in the native device, lastNativeChange should be updated.
+    /// @param aDeliveryState can be inspected to obtain details such as list of affected devices etc.
+    virtual void updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
+
+    /// free native action
+    /// @param aNativeActionId a ID of a native action that should be removed
+    virtual ErrorPtr freeNativeAction(const string aNativeActionId) P44_OVERRIDE;
+
+    /// @}
+
+
   private:
 
     void refindBridge(StatusCB aCompletedCB);
@@ -146,8 +192,12 @@ namespace p44 {
     void learnedInComplete(ErrorPtr aError);
     void queryBridgeAndLights(StatusCB aCollectedHandler);
     void gotBridgeConfig(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError);
+    void collectedScenesHandler(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError);
     void collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError);
-
+    void nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState, JsonObjectPtr aResult, ErrorPtr aError);
+    void nativeActionUpdated(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState, JsonObjectPtr aResult, ErrorPtr aError);
+    void nativeActionDeleted(JsonObjectPtr aResult, ErrorPtr aError);
+    void nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPtr aError);
   };
 
 } // namespace p44
