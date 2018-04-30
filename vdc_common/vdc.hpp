@@ -481,6 +481,8 @@ namespace p44 {
     /// read from persistent storage. This allows vDC implementations to know which native scenes/groups are
     /// in use by the optimizer without needing private bookkeeping.
     /// @param aNativeActionId a ID of a native action that is in use by the optimizer
+    /// @return if an error is returned, this means the aNativeActionId is invalid and must no longer be used
+    ///    (vdc will remove the native action from its cache)
     virtual ErrorPtr announceNativeAction(const string aNativeActionId) { return ErrorPtr(); /* NOP in base class */ };
 
     /// execute native action (scene call, dimming operation)

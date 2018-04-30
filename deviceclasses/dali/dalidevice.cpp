@@ -1411,6 +1411,7 @@ bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStat
     // only brightness dimming optimizable for now
     return currentDimChannel && currentDimChannel->getChannelType()==channeltype_brightness;
   }
+  return false;
 }
 
 

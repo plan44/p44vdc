@@ -873,7 +873,6 @@ ErrorPtr DaliVdc::announceNativeAction(const string aNativeActionId)
 
 void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState)
 {
-  // base class does not support native actions
   DaliAddress a = daliAddressFromActionId(aNativeActionId);
   if (a!=NoDaliAddress) {
     if (aDeliveryState->optimizedType==ntfy_callscene) {

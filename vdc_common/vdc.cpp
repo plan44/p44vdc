@@ -372,7 +372,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
         AFOCUSLOG("- native action already exists: '%s'", entry->nativeActionId.c_str());
         if (entry->contentsHash==aDeliveryState->contentsHash) {
           // content has not changed since native action was last updated -> we can use it!
-          ALOG(LOG_NOTICE, "Optimzed %s: calling native %s '%s' (variant %d)", NotificationNames[aDeliveryState->optimizedType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), aDeliveryState->actionVariant);
+          ALOG(LOG_NOTICE, "Optimzed %s: calling native %s '%s' (variant %d)", NotificationNames[aDeliveryState->callType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), aDeliveryState->actionVariant);
           if (aDeliveryState->repeatAfter!=Never) {
             AFOCUSLOG("- action scheduled to repeat in %.2f seconds", (double)(aDeliveryState->repeatAfter)/Second);
             MainLoop::currentMainLoop().executeTicketOnce(optimizedCallRepeaterTicket, boost::bind(&Vdc::repeatPreparedNotification, this, entry, aDeliveryState), aDeliveryState->repeatAfter);
@@ -476,12 +476,14 @@ void Vdc::preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryS
   // check if we need to update or create native actions
   if (Error::isError(aError, VdcError::domain(), VdcError::AddAction)) {
     // create native action for this set of devices
+    ALOG(LOG_NOTICE, "Creating native action for '%s' (variant %d)", NotificationNames[aDeliveryState->optimizedType], aDeliveryState->actionVariant);
     createNativeAction(boost::bind(&Vdc::preparedNotificationComplete, this, aEntry, aDeliveryState, _1), aEntry, aDeliveryState);
     aEntry->markDirty();
     return;
   }
   else if (Error::isError(aError, VdcError::domain(), VdcError::StaleAction)) {
     // update native action contents
+    ALOG(LOG_NOTICE, "Updating native action '%s' for '%s' (variant %d)", aEntry->nativeActionId.c_str(), NotificationNames[aDeliveryState->optimizedType], aDeliveryState->actionVariant);
     updateNativeAction(boost::bind(&Vdc::preparedNotificationComplete, this, aEntry, aDeliveryState, _1), aEntry, aDeliveryState);
     aEntry->contentsHash = aDeliveryState->contentsHash; // update hash
     aEntry->markDirty();
@@ -497,6 +499,9 @@ void Vdc::preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryS
 
 void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
+  if (!Error::isOK(aError)) {
+    ALOG(LOG_WARNING, "Creating or updating native action has failed: %s", Error::text(aError).c_str());
+  }
   if (FOCUSLOGENABLED && optimizerMode>opt_disabled) {
     // show current statistics
     AFOCUSLOG("========= Optimizer statistics after %ld optimizable calls", totalOptimizableCalls);
@@ -966,7 +971,11 @@ ErrorPtr Vdc::load()
   // announce groups and scenes used by optimizer
   for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
     if (!(*pos)->nativeActionId.empty()) {
-      announceNativeAction((*pos)->nativeActionId);
+      ErrorPtr announceErr = announceNativeAction((*pos)->nativeActionId);
+      if (!Error::isOK(announceErr)) {
+        ALOG(LOG_WARNING,"Native action '%s' is no longer valid - removed (%s)", (*pos)->nativeActionId.c_str(), err->description().c_str());
+        (*pos)->nativeActionId = ""; // erase it, repeated use of that entry will re-create a native action later
+      }
     }
   }
   return ErrorPtr();
