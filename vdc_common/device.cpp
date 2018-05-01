@@ -863,6 +863,8 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       // check for force flag
       if (Error::isOK(err = checkParam(aDeliveryState->callParams, "force", o))) {
         force = o->boolValue();
+        // set the channel type as actionParam
+        aDeliveryState->actionParam = channeltype_brightness; // legacy dimming is ALWAYS brightness
         // prepare scene call
         callScenePrepare(aPreparedCB, sceneNo, force);
         return;
@@ -885,6 +887,8 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         if (o) {
           area = o->int32Value();
         }
+        // set the channel type as actionParam
+        aDeliveryState->actionParam = channel->getChannelType();
         // prepare starting or stopping dimming
         dimChannelForAreaPrepare(aPreparedCB, channel, mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
         return;
@@ -1579,9 +1583,9 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
     preparedScene.reset();
     // apply scene logically
     if (output->applySceneToChannels(scene)) {
-      // prepare for apply, load channel values (we need them loaded even if actual apply works via optimizer)
+      // prepare for apply (but do NOT yet apply!) on device hardware level)
       if (prepareSceneApply(scene)) {
-        // now apply values to hardware
+        // now we can apply values to hardware
         if (aDoApply) {
           // normally apply channel values to hardware
           requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aDoneCB, scene), false);

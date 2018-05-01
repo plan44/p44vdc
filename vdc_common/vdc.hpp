@@ -43,6 +43,7 @@ namespace p44 {
       Collecting, ///< is busy collecting devices already, new collection request irgnored
       AddAction, ///< optimizer suggests to add a native action
       StaleAction, ///< optimizer has detected stale action
+      NoMoreActions, ///< cannot add another native action because there would be too many
     } ErrorCodes;
     
     static const char *domain() { return "Vdc"; }
@@ -95,6 +96,7 @@ namespace p44 {
       optimizedType(ntfy_undefined),
       contentId(0),
       contentsHash(0),
+      actionParam(0),
       actionVariant(0),
       repeatAfter(Never),
       repeatVariant(0),
@@ -112,7 +114,8 @@ namespace p44 {
     DeviceList affectedDevices; ///< the list of devices that are included in the hash
     size_t pendingCount; ///< count used to count completed devices in some operations on affectedDevices
     ApiValuePtr callParams; ///< the notification parameters
-    int actionVariant; ///< variant/parameter for the action (such as dim up/down/stop)
+    int actionParam; ///< parameter for the action (such as dim channel)
+    int actionVariant; ///< variant of the action (such as dim up/down/stop)
     MLMicroSeconds repeatAfter; ///< if>0: native action is repeated after this time with variant repeatVariant
     int repeatVariant; ///< variant/parameter for the action when repeating it (such as dim stop)
     NotificationType optimizedType; ///< the type that results (callScene might result in dimming...)
@@ -184,7 +187,7 @@ namespace p44 {
 
     int instanceNumber; ///< the instance number identifying this instance among other instances of this class
     int tag; ///< tag used to in self test failures for showing on LEDs
-    MLTicket pairTicket; ///< used for pairing
+    MLTicketGuard pairTicket; ///< used for pairing
 
     /// Settings
     int vdcFlags; ///< generic vdc flag word
@@ -193,13 +196,13 @@ namespace p44 {
     /// periodic rescan, collecting
     MLMicroSeconds rescanInterval; ///< rescan interval, 0 if none
     RescanMode rescanMode; ///< mode to use for periodic rescan
-    MLTicket rescanTicket; ///< rescan ticket
+    MLTicketGuard rescanTicket; ///< rescan ticket
     bool collecting; ///< currently collecting
 
     /// notification optimizing
     OptimizerEntryList optimizerCache; ///< the current optimizer cache
     long totalOptimizableCalls; ///< total of optimizable calls
-    MLTicket optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
+    MLTicketGuard optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
 
     ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all
 
@@ -594,7 +597,8 @@ namespace p44 {
     void finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState);
     void repeatedNotificationComplete();
     void finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
-    void preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
+    void createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
+    void preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, bool aChanged, ErrorPtr aError);
     void clearOptimizerCache();
     ErrorPtr loadOptimizerCache();
     ErrorPtr saveOptimizerCache();

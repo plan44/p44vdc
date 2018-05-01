@@ -652,6 +652,7 @@ namespace p44 {
 
     /// let device implementation prepare for (and possibly reject) optimized set
     /// @param aDeliveryState can be inspected to see the scene or dim parameters
+    ///   (optimizedType, actionParam, actionVariant are already set)
     /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
     ///    executed without optimisation
     virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) { return false; /* not optimizable by default */ };
