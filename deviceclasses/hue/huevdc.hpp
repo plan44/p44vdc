@@ -82,6 +82,8 @@ namespace p44 {
     /// @{
 
     int numOptimizerScenes; ///< how many scenes are in use by the optimizer
+    int numOptimizerGroups; ///< how many groups are in use by the optimizer
+    MLTicketGuard groupDimTicket; ///< for group dimming repeater
 
     /// @}
 
@@ -90,6 +92,7 @@ namespace p44 {
   public:
 
     HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
+    virtual ~HueVdc();
 
     HueComm hueComm;
 
@@ -197,6 +200,7 @@ namespace p44 {
     void nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState, JsonObjectPtr aResult, ErrorPtr aError);
     void nativeActionUpdated(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState, JsonObjectPtr aResult, ErrorPtr aError);
     void nativeActionDeleted(JsonObjectPtr aResult, ErrorPtr aError);
+    void groupDimRepeater(JsonObjectPtr aDimState, int aTransitionTime, MLTimer &aTimer);
     void nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPtr aError);
   };
 

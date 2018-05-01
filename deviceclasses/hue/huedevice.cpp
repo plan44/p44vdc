@@ -198,9 +198,34 @@ bool HueDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliverySta
     // scenes are generally optimizable
     return true;
   }
+  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    // only brightness, saturation and hue dimming is optimizable for now
+    return
+      currentDimChannel && // actually prepared for dimming
+      (currentDimChannel->getChannelType()==channeltype_brightness ||
+       currentDimChannel->getChannelType()==channeltype_hue ||
+       currentDimChannel->getChannelType()==channeltype_saturation);
+  }
   return false;
 }
 
+
+// optimized DALI dimming implementation
+void HueDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply)
+{
+  if (aDoApply) {
+    // not optimized: use generic dimming
+    inherited::dimChannel(aChannel, aDimMode, aDoApply);
+  }
+  else {
+    // part of optimized vdc level dimming: just retrieve dim end state
+    if (aDimMode==dimmode_stop) {
+      // retrieve status at end of dimming
+      // Note: does not work when called immediately - so we delay that a bit
+      MainLoop::currentMainLoop().executeOnce(boost::bind(&HueDevice::syncChannelValues, this, SimpleCB()), 3*Second);
+    }
+  }
+}
 
 
 string HueDevice::modelName()

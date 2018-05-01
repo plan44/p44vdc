@@ -34,11 +34,17 @@ HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   hueComm(),
   bridgeMacAddress(0),
   numOptimizerScenes(0),
+  numOptimizerGroups(0),
   has_1_11_api(false)
 {
   hueComm.isMemberVariable();
   hueComm.useNUPnP = getVdcHost().cloudAllowed();
   optimizerMode = opt_disabled; // optimizer disabled by default, but available
+}
+
+
+HueVdc::~HueVdc()
+{
 }
 
 
@@ -551,31 +557,100 @@ static string hueSceneIdFromActionId(const string aNativeActionId)
 }
 
 
+static string hueGroupIdFromActionId(const string aNativeActionId)
+{
+  if (aNativeActionId.substr(0,10)=="hue_group_") {
+    return aNativeActionId.substr(10); // rest is hue bridge group ID (number)
+  }
+  return "";
+}
 
 
 ErrorPtr HueVdc::announceNativeAction(const string aNativeActionId)
 {
-  // just count to see how many
-  numOptimizerScenes++;
+  if (!hueSceneIdFromActionId(aNativeActionId).empty()) {
+    // just count to see how many
+    numOptimizerScenes++;
+  }
+  else if (!hueGroupIdFromActionId(aNativeActionId).empty()) {
+    // just count to see how many
+    numOptimizerGroups++;
+  }
   return ErrorPtr();
 }
 
 
 void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState)
 {
-  string sceneId = hueSceneIdFromActionId(aNativeActionId);
-  if (!sceneId.empty()) {
-    JsonObjectPtr setGroupState = JsonObject::newObj();
-    // PUT /api/<username>/groups/<groupid>/action
-    // { "scene": "AB34EF5"}
-    setGroupState->add("scene", JsonObject::newString(sceneId));
-    hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
-    return;
-
-
+  string hueActionId;
+  if (aDeliveryState->optimizedType==ntfy_callscene) {
+    hueActionId = hueSceneIdFromActionId(aNativeActionId);
+    if (!hueActionId.empty()) {
+      groupDimTicket.cancel(); // just safety, should be cancelled already
+      JsonObjectPtr setGroupState = JsonObject::newObj();
+      // PUT /api/<username>/groups/<groupid>/action
+      // { "scene": "AB34EF5"}
+      setGroupState->add("scene", JsonObject::newString(hueActionId));
+      hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
+      return;
+    }
+  }
+  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    hueActionId = hueGroupIdFromActionId(aNativeActionId);
+    if (!hueActionId.empty()) {
+      // Dim group
+      // - get params
+      VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
+      DsChannelType channelType = aDeliveryState->actionParam;
+      // - prepare call
+      JsonObjectPtr setGroupState = JsonObject::newObj();
+      // PUT /api/<username>/groups/<groupid>/action
+      // { "bri_inc": 254, "transitiontime":70 }
+      int tt = 0;
+      switch (channelType) {
+        case channeltype_brightness:
+          setGroupState->add("bri_inc", JsonObject::newInt32(dm*254));
+          tt = FULL_SCALE_DIM_TIME_MS/100; // unit is 100mS
+          break;
+        case channeltype_saturation:
+          setGroupState->add("sat_inc", JsonObject::newInt32(dm*254));
+          tt = FULL_SCALE_DIM_TIME_MS/100; // unit is 100mS
+          break;
+        case channeltype_hue:
+          // hue must be done in smaller steps, otherwise color change is not along hue, but travels accross less saturated center of the HS wheel
+          setGroupState->add("hue_inc", JsonObject::newInt32(dm*6553));
+          tt = FULL_SCALE_DIM_TIME_MS/100/15; // 1/15 of full scale, unit is 100mS
+          if (dm==dimmode_stop) {
+            groupDimTicket.cancel();
+          }
+          else {
+            setGroupState->add("transitiontime", JsonObject::newInt32(tt));
+            MainLoop::currentMainLoop().executeTicketOnce(groupDimTicket, boost::bind(&HueVdc::groupDimRepeater, this, setGroupState, tt, _1));
+            aStatusCB(ErrorPtr());
+          }
+          break;
+        default:
+          aStatusCB(TextError::err("Channel type %d dimming not supported", channelType)); // causes normal execution
+          return;
+      }
+      if (dm!=dimmode_stop) {
+        setGroupState->add("transitiontime", JsonObject::newInt32(tt));
+      }
+      hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
+      return;
+    }
   }
   aStatusCB(TextError::err("Native action '%s' not supported", aNativeActionId.c_str())); // causes normal execution
 }
+
+
+void HueVdc::groupDimRepeater(JsonObjectPtr aDimState, int aTransitionTime, MLTimer &aTimer)
+{
+  hueComm.apiAction(httpMethodPUT, "/groups/0/action", aDimState, NULL);
+  MainLoop::currentMainLoop().executeTicketOnce(groupDimTicket, boost::bind(&HueVdc::groupDimRepeater, this, aDimState, aTransitionTime, _1), aTransitionTime*Second/10);
+}
+
+
 
 
 void HueVdc::nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPtr aError)
@@ -593,14 +668,19 @@ void HueVdc::nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPt
 
 
 
-#define MAX_OPTIMIZER_SCENES 16
+#define MAX_OPTIMIZER_SCENES 20
+#define MAX_OPTIMIZER_GROUPS 5
 
 void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
 {
   ErrorPtr err;
   if (aOptimizerEntry->type==ntfy_callscene) {
     // need a free scene
-    if (numOptimizerScenes<MAX_OPTIMIZER_SCENES) {
+    if (numOptimizerScenes>=MAX_OPTIMIZER_SCENES) {
+      // too many already
+      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer scenes (%d) already exist", MAX_OPTIMIZER_SCENES);
+    }
+    else {
       // create a new scene
       JsonObjectPtr newScene = JsonObject::newObj();
       // POST /api/<username>/scenes
@@ -619,7 +699,35 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       return;
     }
   }
-  aStatusCB(TextError::err("cannot create new hue native action for type=%d", (int)aOptimizerEntry->type));
+  else if (aOptimizerEntry->type==ntfy_dimchannel) {
+    // need a free group
+    if (numOptimizerGroups>=MAX_OPTIMIZER_SCENES) {
+      // too many already
+      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer groups (%d) already exist", MAX_OPTIMIZER_GROUPS);
+    }
+    else {
+      // create a new group
+      JsonObjectPtr newGroup = JsonObject::newObj();
+      // POST /api/<username>/scenes
+      // {"name":"thename", "lights":["1","2"], "recycle":false }
+      string groupName = "digitalSTROM-DimGroup";
+      JsonObjectPtr lights = JsonObject::newArray();
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
+        lights->arrayAppend(JsonObject::newString(dev->lightID));
+        groupName += ":" + dev->lightID;
+      }
+      newGroup->add("name", JsonObject::newString(groupName));
+      newGroup->add("lights", lights);
+      hueComm.apiAction(httpMethodPOST, "/groups", newGroup, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
+      return;
+    }
+
+  }
+  else {
+    err = TextError::err("cannot create new hue native action for type=%d", (int)aOptimizerEntry->type);
+  }
+  aStatusCB(err);
 }
 
 
@@ -631,16 +739,24 @@ void HueVdc::nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
     if (s) {
       JsonObjectPtr i = s->get("id");
       if (i) {
-        // successfully created scene
-        numOptimizerScenes++;
-        aOptimizerEntry->nativeActionId = "hue_scene_" + i->stringValue();
+        if (aOptimizerEntry->type==ntfy_callscene) {
+          // successfully created scene
+          numOptimizerScenes++;
+          aOptimizerEntry->nativeActionId = "hue_scene_" + i->stringValue();
+          LOG(LOG_INFO,"HueVdc: created new hue scene '%s'", aOptimizerEntry->nativeActionId.c_str());
+        }
+        else if (aOptimizerEntry->type==ntfy_dimchannel) {
+          // successfully created group
+          numOptimizerGroups++;
+          aOptimizerEntry->nativeActionId = "hue_group_" + i->stringValue();
+          LOG(LOG_INFO,"HueVdc: created new hue group '%s'", aOptimizerEntry->nativeActionId.c_str());
+        }
         aOptimizerEntry->lastNativeChange = MainLoop::now();
-        LOG(LOG_INFO,"HueVdc: created new hue scene '%s'", aOptimizerEntry->nativeActionId.c_str());
         aStatusCB(ErrorPtr()); // success
         return;
       }
     }
-    aError = TextError::err("creation of hue scene did not return a id -> failed");
+    aError = TextError::err("creation of hue scene/group did not return a id -> failed");
   }
   aStatusCB(aError); // failure of some sort
 }
@@ -692,10 +808,14 @@ void HueVdc::nativeActionUpdated(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
 
 ErrorPtr HueVdc::freeNativeAction(const string aNativeActionId)
 {
-  string sceneId = hueSceneIdFromActionId(aNativeActionId);
-  if (!sceneId.empty()) {
-    // is a scene
-    string url = "/scenes/" + sceneId;
+  string id;
+  if (!(id = hueSceneIdFromActionId(aNativeActionId)).empty()) {
+    // is a scene, delete it
+    string url = "/scenes/" + id;
+    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionDeleted, this, _1, _2));
+  }
+  else if (!(id = hueGroupIdFromActionId(aNativeActionId)).empty()) {
+    string url = "/groups/" + id;
     hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionDeleted, this, _1, _2));
   }
   return ErrorPtr();
@@ -707,7 +827,12 @@ void HueVdc::nativeActionDeleted(JsonObjectPtr aResult, ErrorPtr aError)
   if (Error::isOK(aError)) {
     // [{"success":"/scenes/3T2SvsxvwteNNys deleted"}]
     JsonObjectPtr s = HueComm::getSuccessItem(aResult,0);
-    if (!s) {
+    if (s) {
+      if (s->stringValue().find("/scenes/")!=string::npos)
+        numOptimizerScenes--;
+      else if (s->stringValue().find("/groups/")!=string::npos)
+        numOptimizerGroups--;
+    } else {
       aError = TextError::err("delete of hue scene did not return a success item -> failed");
     }
   }

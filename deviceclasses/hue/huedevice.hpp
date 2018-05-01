@@ -111,6 +111,18 @@ namespace p44 {
     ///   false in case it is certain that the device is still connected to this and only this vDC
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
+    /// start or stop dimming (optimized hue version)
+    /// @param aChannel the channel to start or stop dimming for
+    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDoApply only if set to true, dimming must be started/stopped in hardware. Otherwise
+    ///   the actual operation has been done already by another means (such as native group/scene call on the harware level)
+    ///   and must NOT be repeated.
+    ///   However, in all cases internal state must be updated to reflect the finalized operation
+    /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
+    ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
+    ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
+    virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply) P44_OVERRIDE;
+
     /// apply all pending channel value updates to the device's hardware
     /// @param aDoneCB will called when values are applied
     /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
@@ -169,6 +181,7 @@ namespace p44 {
 
     /// let device implementation prepare for (and possibly reject) optimized set
     /// @param aDeliveryState can be inspected to see the scene or dim parameters
+    ///   (optimizedType, actionParam, actionVariant are already set)
     /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
     ///    executed without optimisation
     virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
