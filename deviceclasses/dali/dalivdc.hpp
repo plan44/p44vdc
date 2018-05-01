@@ -70,7 +70,7 @@ namespace p44 {
     uint16_t usedDaliGroupsMask; ///< bitmask of DALI groups in use by optimizer or manually created composite devices
     uint16_t usedDaliScenesMask; ///< bitmask of DALI scenes in use by optimizer or input devices
 
-    MLTicket groupDimTicket; ///< timer for group dimming
+    MLTicketGuard groupDimTicket; ///< timer for group dimming
 
     #if ENABLE_DALI_INPUTS
     DaliInputDeviceList inputDevices;

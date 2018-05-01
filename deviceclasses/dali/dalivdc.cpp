@@ -31,8 +31,7 @@ using namespace p44;
 DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
   usedDaliScenesMask(0),
-  usedDaliGroupsMask(0),
-  groupDimTicket(0)
+  usedDaliGroupsMask(0)
 {
   daliComm = DaliCommPtr(new 	DaliComm(MainLoop::currentMainLoop()));
   #if ENABLE_DALI_INPUTS
@@ -45,7 +44,6 @@ DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 
 DaliVdc::~DaliVdc()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(groupDimTicket);
 }
 
 
@@ -876,12 +874,12 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
   DaliAddress a = daliAddressFromActionId(aNativeActionId);
   if (a!=NoDaliAddress) {
     if (aDeliveryState->optimizedType==ntfy_callscene) {
-      MainLoop::currentMainLoop().cancelExecutionTicket(groupDimTicket); // just safety, should be cancelled already
+      groupDimTicket.cancel(); // just safety, should be cancelled already
       // Broadcast scene call: DALICMD_GO_TO_SCENE
       daliComm->daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask), boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
       return;
     }
-    else {
+    else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
       // Dim group
       // - get mode
       VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
@@ -902,7 +900,7 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
       return;
     }
   }
-  aStatusCB(TextError::err("Native action '%s' (DaliAddress 0x%02X) not YET supported", aNativeActionId.c_str(), a)); // causes normal execution
+  aStatusCB(TextError::err("Native action '%s' (DaliAddress 0x%02X) not supported", aNativeActionId.c_str(), a)); // causes normal execution
 }
 
 
@@ -973,7 +971,13 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
       }
     }
   }
-  if (a!=NoDaliAddress) {
+  else {
+    err = TextError::err("cannot create new DALI native action for type=%d", (int)aOptimizerEntry->type);
+  }
+  if (a==NoDaliAddress) {
+    err = Error::err<VdcError>(VdcError::NoMoreActions, "DALI: no free scene or group available");
+  }
+  else {
     markUsed(a, true);
     aOptimizerEntry->nativeActionId = actionIdFromDaliAddress(a);
     aOptimizerEntry->lastNativeChange = MainLoop::now();
@@ -997,10 +1001,8 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
       }
     }
     aOptimizerEntry->lastNativeChange = MainLoop::now();
-    aStatusCB(ErrorPtr());
-    return;
   }
-  aStatusCB(TextError::err("cannot create new DALI native action for type=%d", (int)aOptimizerEntry->type));
+  aStatusCB(err);
 }
 
 
