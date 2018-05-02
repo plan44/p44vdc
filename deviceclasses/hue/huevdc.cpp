@@ -735,7 +735,7 @@ void HueVdc::nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
 {
   if (Error::isOK(aError)) {
     // [{ "success": { "id": "Abc123Def456Ghi" } }]
-    JsonObjectPtr s = HueComm::getSuccessItem(aResult);
+    JsonObjectPtr s = HueComm::getSuccessItem(aResult, 0);
     if (s) {
       JsonObjectPtr i = s->get("id");
       if (i) {
@@ -792,15 +792,11 @@ void HueVdc::nativeActionUpdated(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
 {
   if (Error::isOK(aError)) {
     // [{ "success": { "id": "Abc123Def456Ghi" } }]
-    JsonObjectPtr s = HueComm::getSuccessItem(aResult,0);
-    if (s) {
-      // TODO: details checks - for now just assume update has worked when we get a "success" item here
-      aOptimizerEntry->lastNativeChange = MainLoop::now();
-      LOG(LOG_INFO,"HueVdc: updated new hue scene");
-      aStatusCB(ErrorPtr()); // success
-      return;
-    }
-    aError = TextError::err("update of hue scene did not return a success item -> failed");
+    // TODO: details checks - for now just assume update has worked when request did not produce an error
+    aOptimizerEntry->lastNativeChange = MainLoop::now();
+    LOG(LOG_INFO,"HueVdc: updated new hue scene");
+    aStatusCB(ErrorPtr()); // success
+    return;
   }
   aStatusCB(aError); // failure of some sort
 }
@@ -827,14 +823,12 @@ void HueVdc::nativeActionDeleted(JsonObjectPtr aResult, ErrorPtr aError)
   if (Error::isOK(aError)) {
     // [{"success":"/scenes/3T2SvsxvwteNNys deleted"}]
     JsonObjectPtr s = HueComm::getSuccessItem(aResult,0);
-    if (s) {
-      if (s->stringValue().find("/scenes/")!=string::npos)
-        numOptimizerScenes--;
-      else if (s->stringValue().find("/groups/")!=string::npos)
-        numOptimizerGroups--;
-    } else {
-      aError = TextError::err("delete of hue scene did not return a success item -> failed");
-    }
+    if (s && s->stringValue().find("/scenes/")!=string::npos)
+      numOptimizerScenes--;
+    else if (s && s->stringValue().find("/groups/")!=string::npos)
+      numOptimizerGroups--;
+    else
+      aError = TextError::err("delete of hue action did not return group/scene delete confirmation -> failed");
   }
   if (!Error::isOK(aError)) {
     ALOG(LOG_WARNING, "could not delete native action: %s", Error::text(aError).c_str());
