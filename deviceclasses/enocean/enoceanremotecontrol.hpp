@@ -51,6 +51,8 @@ namespace p44 {
   {
     typedef EnoceanDevice inherited;
 
+    MLTicket teachInTimer;
+
   public:
 
     /// constructor
@@ -107,6 +109,8 @@ namespace p44 {
   {
     typedef EnoceanRemoteControlDevice inherited;
 
+    MLTicket buttonTimer;
+
   public:
 
     /// constructor
@@ -133,6 +137,7 @@ namespace p44 {
 
     int movingDirection; ///< currently moving direction 0=stopped, -1=moving down, +1=moving up
     MLTicket commandTicket;
+    MLTicket sequenceTicket;
 
   public:
 

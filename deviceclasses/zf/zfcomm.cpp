@@ -164,7 +164,6 @@ ZfComm::ZfComm(MainLoop &aMainLoop) :
 
 ZfComm::~ZfComm()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(aliveCheckTicket);
 }
 
 

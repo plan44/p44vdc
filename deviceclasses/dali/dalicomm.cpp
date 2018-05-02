@@ -47,8 +47,6 @@ DaliComm::DaliComm(MainLoop &aMainLoop) :
   retriedReads(0),
   retriedWrites(0),
   closeAfterIdleTime(Never),
-  connectionTimeoutTicket(0),
-  expectedBridgeResponses(0),
   responsesInSequence(false),
   sendEdgeAdj(DEFAULT_SENDING_EDGE_ADJUSTMENT),
   samplePointAdj(DEFAULT_SAMPLING_POINT_ADJUSTMENT)
@@ -183,9 +181,9 @@ void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, Se
 void DaliComm::sendBridgeCommand(uint8_t aCmd, uint8_t aDali1, uint8_t aDali2, DaliBridgeResultCB aResultCB, int aWithDelay)
 {
   // reset connection closing timeout
-  MainLoop::currentMainLoop().cancelExecutionTicket(connectionTimeoutTicket);
+  connectionTimeoutTicket.cancel();
   if (closeAfterIdleTime!=Never) {
-    connectionTimeoutTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliComm::connectionTimeout, this), closeAfterIdleTime);
+    connectionTimeoutTicket.executeOnce(boost::bind(&DaliComm::connectionTimeout, this), closeAfterIdleTime);
   }
   // create sending operation
   SerialOperationSendPtr sendOp = SerialOperationSendPtr(new SerialOperationSend);
@@ -939,6 +937,7 @@ class DaliFullBusScanner : public P44Obj
   DaliComm::ShortAddressListPtr usedShortAddrsPtr;
   DaliComm::ShortAddressListPtr conflictedShortAddrsPtr;
   DaliAddress newAddress;
+  MLTicket delayTicket;
 public:
   static void fullBusScan(DaliComm &aDaliComm, DaliComm::DaliBusScanCB aResultCB, bool aFullScanOnlyIfNeeded)
   {
@@ -1000,7 +999,7 @@ private:
     // start search at lowest address
     restarts = 0;
     // - as specs say DALICMD_RANDOMISE might need 100mS until new random addresses are ready, wait a little before actually starting
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliFullBusScanner::newSearchUpFrom, this, 0), 150*MilliSecond);
+    delayTicket.executeOnce(boost::bind(&DaliFullBusScanner::newSearchUpFrom, this, 0), 150*MilliSecond);
   };
 
 
@@ -1152,7 +1151,7 @@ private:
       if (restarts<MAX_RESTARTS) {
         LOG(LOG_NOTICE, "- restarting complete scan after a delay");
         restarts++;
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliFullBusScanner::startScan, this), RESCAN_RETRY_DELAY);
+        delayTicket.executeOnce(boost::bind(&DaliFullBusScanner::startScan, this), RESCAN_RETRY_DELAY);
         return;
       }
       else {

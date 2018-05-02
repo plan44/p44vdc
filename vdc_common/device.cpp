@@ -99,8 +99,6 @@ namespace p44 { namespace DeviceConfigurations {
 Device::Device(Vdc *aVdcP) :
   progMode(false),
   isDimming(false),
-  dimHandlerTicket(0),
-  dimTimeoutTicket(0),
   currentDimMode(dimmode_stop),
   areaDimmed(0),
   areaDimMode(dimmode_stop),
@@ -109,17 +107,13 @@ Device::Device(Vdc *aVdcP) :
   colorClass(class_black_joker),
   applyInProgress(false),
   missedApplyAttempts(0),
-  updateInProgress(false),
-  serializerWatchdogTicket(0)
+  updateInProgress(false)
 {
 }
 
 
 Device::~Device()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(dimTimeoutTicket);
-  MainLoop::currentMainLoop().cancelExecutionTicket(dimHandlerTicket);
-  MainLoop::currentMainLoop().cancelExecutionTicket(serializerWatchdogTicket);
   buttons.clear();
   inputs.clear();
   sensors.clear();
@@ -820,7 +814,7 @@ void Device::hasVanished(bool aForgetParams)
 
 void Device::scheduleVanish(bool aForgetParams, MLMicroSeconds aDelay)
 {
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&Device::hasVanished, this, aForgetParams), aDelay);
+  vanishTicket.executeOnce(boost::bind(&Device::hasVanished, this, aForgetParams), aDelay);
 }
 
 
@@ -1018,8 +1012,8 @@ void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForD
     AFOCUSLOG("ready, calling applyChannelValues()");
     #if SERIALIZER_WATCHDOG
     // - start watchdog
-    MainLoop::currentMainLoop().executeTicketOnce(serializerWatchdogTicket, boost::bind(&Device::serializerWatchdog, this), 10*Second); // new
-    FOCUSLOG("+++++ Serializer watchdog started for apply with ticket #%ld", serializerWatchdogTicket);
+    serializerWatchdogTicket.executeOnce(boost::bind(&Device::serializerWatchdog, this), 10*Second); // new
+    FOCUSLOG("+++++ Serializer watchdog started for apply with ticket #%ld", (MLTicketNo)serializerWatchdogTicket);
     #endif
     // - start applying
     appliedOrSupersededCB = aAppliedOrSupersededCB;
@@ -1065,7 +1059,7 @@ void Device::forkDoneCB(SimpleCB aOriginalCB, SimpleCB aNewCallback)
 void Device::serializerWatchdog()
 {
   #if SERIALIZER_WATCHDOG
-  FOCUSLOG("##### Serializer watchdog ticket #%ld expired", serializerWatchdogTicket);
+  FOCUSLOG("##### Serializer watchdog ticket #%ld expired", (MLTicketNo)serializerWatchdogTicket);
   serializerWatchdogTicket = 0;
   if (applyInProgress) {
     ALOG(LOG_WARNING, "##### Serializer watchdog force-ends apply with %d missed attempts", missedApplyAttempts);
@@ -1106,8 +1100,8 @@ void Device::applyingChannelsComplete()
   AFOCUSLOG("applyingChannelsComplete entered");
   #if SERIALIZER_WATCHDOG
   if (serializerWatchdogTicket) {
-    FOCUSLOG("----- Serializer watchdog ticket #%ld cancelled - apply complete", serializerWatchdogTicket);
-    MainLoop::currentMainLoop().cancelExecutionTicket(serializerWatchdogTicket); // cancel watchdog
+    FOCUSLOG("----- Serializer watchdog ticket #%ld cancelled - apply complete", (MLTicketNo)serializerWatchdogTicket);
+    serializerWatchdogTicket.cancel(); // cancel watchdog
   }
   #endif
   applyInProgress = false;
@@ -1179,8 +1173,8 @@ void Device::requestUpdatingChannels(SimpleCB aUpdatedOrCachedCB)
     updateInProgress = true;
     #if SERIALIZER_WATCHDOG
     // - start watchdog
-    MainLoop::currentMainLoop().executeTicketOnce(serializerWatchdogTicket, boost::bind(&Device::serializerWatchdog, this), SERIALIZER_WATCHDOG_TIMEOUT);
-    FOCUSLOG("+++++ Serializer watchdog started for update with ticket #%ld", serializerWatchdogTicket);
+    serializerWatchdogTicket.executeOnce(boost::bind(&Device::serializerWatchdog, this), SERIALIZER_WATCHDOG_TIMEOUT);
+    FOCUSLOG("+++++ Serializer watchdog started for update with ticket #%ld", (MLTicketNo)serializerWatchdogTicket);
     #endif
     // - trigger querying hardware
     syncChannelValues(boost::bind(&Device::updatingChannelsComplete, this));
@@ -1192,8 +1186,8 @@ void Device::updatingChannelsComplete()
 {
   #if SERIALIZER_WATCHDOG
   if (serializerWatchdogTicket) {
-    FOCUSLOG("----- Serializer watchdog ticket #%ld cancelled - update complete", serializerWatchdogTicket);
-    MainLoop::currentMainLoop().cancelExecutionTicket(serializerWatchdogTicket); // cancel watchdog
+    FOCUSLOG("----- Serializer watchdog ticket #%ld cancelled - update complete", (MLTicketNo)serializerWatchdogTicket);
+    serializerWatchdogTicket.cancel(); // cancel watchdog
   }
   #endif
   if (updateInProgress) {
@@ -1327,11 +1321,11 @@ void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
     if (aDoApply) {
       if (currentDimMode!=dimmode_stop) {
         // starting
-        MainLoop::currentMainLoop().executeTicketOnce(dimTimeoutTicket, boost::bind(&Device::dimAutostopHandler, this, currentDimChannel), currentAutoStopTime);
+        dimTimeoutTicket.executeOnce(boost::bind(&Device::dimAutostopHandler, this, currentDimChannel), currentAutoStopTime);
       }
       else {
         // stopping
-        MainLoop::currentMainLoop().cancelExecutionTicket(dimTimeoutTicket);
+        dimTimeoutTicket.cancel();
       }
     }
     preparedDim = false;
@@ -1370,7 +1364,7 @@ void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool 
     if (aDimMode==dimmode_stop) {
       // stop dimming
       isDimming = false;
-      MainLoop::currentMainLoop().cancelExecutionTicket(dimHandlerTicket);
+      dimHandlerTicket.cancel();
     }
     else {
       // start dimming
@@ -1415,7 +1409,7 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
   }
   if (isDimming) {
     // now schedule next inc/update step
-    dimHandlerTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&Device::dimHandler, this, aChannel, aIncrement, _2), aNextDimAt);
+    dimHandlerTicket.executeOnceAt(boost::bind(&Device::dimHandler, this, aChannel, aIncrement, _2), aNextDimAt);
   }
 }
 

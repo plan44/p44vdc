@@ -83,7 +83,8 @@ namespace p44 {
 
     int numOptimizerScenes; ///< how many scenes are in use by the optimizer
     int numOptimizerGroups; ///< how many groups are in use by the optimizer
-    MLTicketGuard groupDimTicket; ///< for group dimming repeater
+    MLTicket groupDimTicket; ///< for group dimming repeater
+    MLTicket refindTicket; ///< for delayed bridge re-find
 
     /// @}
 

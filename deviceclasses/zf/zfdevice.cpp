@@ -451,8 +451,7 @@ void ZfDevice::switchTypes(const ZfTypeVariantEntry &aFromVariant, const ZfTypeV
 
 
 ZfButtonDevice::ZfButtonDevice(ZfVdc *aVdcP, ZfDeviceType aDeviceType) :
-  inherited(aVdcP, aDeviceType),
-  pressedTicket(0)
+  inherited(aVdcP, aDeviceType)
 {
 }
 

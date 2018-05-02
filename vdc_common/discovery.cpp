@@ -68,8 +68,7 @@ DiscoveryManager::DiscoveryManager() :
   dmState(dm_disabled),
   noAuto(false),
   publishWebPort(0),
-  publishSshPort(0),
-  pollTicket(0)
+  publishSshPort(0)
 {
   // register a cleanup handler
   MainLoop::currentMainLoop().registerCleanupHandler(boost::bind(&DiscoveryManager::stop, this));
@@ -97,7 +96,7 @@ DiscoveryManager::~DiscoveryManager()
 void DiscoveryManager::stop()
 {
   // unregister idle handler
-  MainLoop::currentMainLoop().cancelExecutionTicket(pollTicket);
+  pollTicket.cancel();
   // stop service
   stopService();
   // stop polling
@@ -127,9 +126,9 @@ ErrorPtr DiscoveryManager::start(
   }
   if (Error::isOK(err)) {
     // start polling
-    MainLoop::currentMainLoop().executeTicketOnce(pollTicket, boost::bind(&DiscoveryManager::avahi_poll, this, _1));
+    pollTicket.executeOnce(boost::bind(&DiscoveryManager::avahi_poll, this, _1));
     // prepare service
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), INITIAL_STARTUP_DELAY);
+    startupTicket.executeOnce(boost::bind(&DiscoveryManager::startService, this), INITIAL_STARTUP_DELAY);
   }
   return err;
 }
@@ -158,7 +157,7 @@ void DiscoveryManager::startService()
     if (vdcHost && !vdcHost->isNetworkConnected()) {
       // TODO: checking IPv4 only at this time, need to add IPv6 later
       LOG(LOG_WARNING, "discovery: device has no IP address -> retry later");
-      MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
+      startupTicket.executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
       return;
     }
     #if USE_AVAHI_CORE
@@ -191,7 +190,7 @@ void DiscoveryManager::startService()
       if (avahiErr==AVAHI_ERR_NO_NETWORK) {
         // no network to publish to - might be that it is not yet up, try again later
         LOG(LOG_WARNING, "avahi: no network available to publish services now -> retry later");
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
+        startupTicket.executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
         return;
       }
       else {
@@ -213,7 +212,7 @@ void DiscoveryManager::startService()
       if (avahiErr==AVAHI_ERR_NO_NETWORK || avahiErr==AVAHI_ERR_NO_DAEMON) {
         // no network or no daemon to publish to - might be that it is not yet up, try again later
         LOG(LOG_WARNING, "avahi: daemon or network not available to publish services now -> retry later");
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
+        startupTicket.executeOnce(boost::bind(&DiscoveryManager::startService, this), STARTUP_RETRY_DELAY);
         return;
       }
       else {
@@ -276,7 +275,7 @@ void DiscoveryManager::restartService()
   stopService();
   if (wasAdvertising) dmState = dm_requeststart; // make sure advertising comes up again if it was running or requested before
   LOG(LOG_WARNING, "discovery: stopped avahi service - restarting in %lld Seconds", SERVICES_RESTART_DELAY/Second);
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&DiscoveryManager::startService, this), SERVICES_RESTART_DELAY);
+  startupTicket.executeOnce(boost::bind(&DiscoveryManager::startService, this), SERVICES_RESTART_DELAY);
 }
 
 

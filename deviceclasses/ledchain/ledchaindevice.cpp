@@ -38,7 +38,6 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, uint16_t aFirstLED, uint16_t 
   inherited(aVdcP),
   firstLED(aFirstLED),
   numLEDs(aNumLEDs),
-  transitionTicket(0),
   startSoftEdge(0),
   endSoftEdge(0),
   r(0), g(0), b(0)
@@ -130,7 +129,7 @@ void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   MLMicroSeconds transitionTime = 0;
   // abort previous transition
-  MainLoop::currentMainLoop().cancelExecutionTicket(transitionTicket);
+  transitionTicket.cancel();
   // full color device
   RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
   if (cl) {
@@ -172,7 +171,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   if (moreSteps) {
     ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
     // not yet complete, schedule next step
-    transitionTicket = MainLoop::currentMainLoop().executeOnce(
+    transitionTicket.executeOnce(
       boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
       TRANSITION_STEP_TIME
     );

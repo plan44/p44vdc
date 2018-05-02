@@ -252,7 +252,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
         // we already have real device info for this device, or know the device does not have any
         // -> have it processed (but via mainloop to avoid stacking up recursions here)
         LOG(LOG_INFO, "Using cached device info for device at shortAddress %d", addr);
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::deviceInfoValid, this, aBusDevices, aNextDev, aCompletedCB, pos->second));
+        MainLoop::currentMainLoop().executeNow(boost::bind(&DaliVdc::deviceInfoValid, this, aBusDevices, aNextDev, aCompletedCB, pos->second));
         return;
       }
       else {
@@ -734,7 +734,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         }
         // - re-collect devices to find groups and composites now, but only after a second, starting from main loop, not from here
         StatusCB cb = boost::bind(&DaliVdc::groupCollected, this, aRequest);
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
+        recollectDelayTicket.executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
       }
     }
   }
@@ -780,7 +780,7 @@ ErrorPtr DaliVdc::ungroupDevice(DalioutputDevicePtr aDevice, VdcApiRequestPtr aR
   aDevice->hasVanished(true); // delete parameters
   // - re-collect devices to find groups and composites now, but only after a second, starting from main loop, not from here
   StatusCB cb = boost::bind(&DaliVdc::groupCollected, this, aRequest);
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
+  recollectDelayTicket.executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
   return respErr;
 }
 
@@ -918,14 +918,14 @@ void DaliVdc::groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, Not
   if (dm==dimmode_stop) {
     // stop dimming
     // - cancel repeater ticket
-    MainLoop::currentMainLoop().cancelExecutionTicket(groupDimTicket);
+    groupDimTicket.cancel();
     // - send MASK to group
     daliComm->daliSendDirectPower(aDaliAddress, DALIVALUE_MASK, boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
     return;
   }
   else {
     // start dimming right now
-    MainLoop::currentMainLoop().executeTicketOnce(groupDimTicket, boost::bind(&DaliVdc::groupDimRepeater, this, aDaliAddress, dm==dimmode_up ? DALICMD_UP : DALICMD_DOWN, _1));
+    groupDimTicket.executeOnce(boost::bind(&DaliVdc::groupDimRepeater, this, aDaliAddress, dm==dimmode_up ? DALICMD_UP : DALICMD_DOWN, _1));
     // confirm action
     nativeActionDone(aStatusCB, aError);
     return;

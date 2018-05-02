@@ -51,7 +51,6 @@ using namespace p44;
 
 DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   daliVdc(aDaliVdc),
-  dimRepeaterTicket(0),
   isDummy(false),
   isPresent(false),
   lampFailure(false),
@@ -837,7 +836,7 @@ void DaliBusDevice::dimPrepared(StatusCB aCompletedCB, ErrorPtr aError)
 void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
 {
   if (isDummy) return;
-  MainLoop::currentMainLoop().cancelExecutionTicket(dimRepeaterTicket); // stop any previous dimming activity
+  dimRepeaterTicket.cancel(); // stop any previous dimming activity
   // Use DALI UP/DOWN dimming commands
   if (aDimMode==dimmode_stop) {
     // stop dimming - send MASK
@@ -852,7 +851,7 @@ void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
 
 void DaliBusDevice::dimStart(DaliAddress aDaliAddress, DaliCommand aCommand)
 {
-  MainLoop::currentMainLoop().executeTicketOnce(dimRepeaterTicket, boost::bind(&DaliBusDevice::dimRepeater, this, aDaliAddress, aCommand, _1));
+  dimRepeaterTicket.executeOnce(boost::bind(&DaliBusDevice::dimRepeater, this, aDaliAddress, aCommand, _1));
 }
 
 
@@ -985,8 +984,7 @@ void DaliBusDeviceGroup::deriveDsUid()
 
 
 DaliOutputDevice::DaliOutputDevice(DaliVdc *aVdcP) :
-  Device((Vdc *)aVdcP),
-  transitionTicket(0)
+  Device((Vdc *)aVdcP)
 {
   // DALI output devices are always light (in this implementation, at least)
   setColorClass(class_yellow_light);
@@ -1027,7 +1025,7 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   bool withColor = false;
   if (l && needsToApplyChannels()) {
     // abort previous transition
-    MainLoop::currentMainLoop().cancelExecutionTicket(transitionTicket);
+    transitionTicket.cancel();
     // brightness transition time is relevant for the whole transition
     MLMicroSeconds transitionTime = l->transitionTimeToNewBrightness();
     if (l->brightnessNeedsApplying()) {
@@ -1335,7 +1333,7 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
   // now schedule next step (if any)
   if (moreSteps) {
     // not yet complete, schedule next step
-    transitionTicket = MainLoop::currentMainLoop().executeOnce(
+    transitionTicket.executeOnce(
       boost::bind(&DaliSingleControllerDevice::applyChannelValueSteps, this, aForDimming, aWithColor, aStepSize),
       SLOW_TRANSITION_STEP_TIME
     );
@@ -1792,7 +1790,7 @@ void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithCol
   if (dimmers[dimmer_amber]) dimmers[dimmer_amber]->setBrightness(a);
   if (moreSteps) {
     // not yet complete, schedule next step
-    transitionTicket = MainLoop::currentMainLoop().executeOnce(
+    transitionTicket.executeOnce(
       boost::bind(&DaliCompositeDevice::applyChannelValueSteps, this, aForDimming, aWithColor, aStepSize),
       SLOW_TRANSITION_STEP_TIME
     );
@@ -1897,8 +1895,7 @@ string DaliCompositeDevice::description()
 
 DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, DaliAddress aBaseAddress) :
   inherited(aVdcP),
-  daliInputDeviceRowID(0),
-  releaseTicket(0)
+  daliInputDeviceRowID(0)
 {
   baseAddress = aBaseAddress;
   numAddresses = 1;
@@ -2111,14 +2108,14 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
             {
               ButtonBehaviourPtr bb = getButton(inpindex);
               bb->buttonAction(true);
-              releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::buttonReleased, this, inpindex), BUTTON_RELEASE_TIMEOUT);
+              releaseTicket.executeOnce(boost::bind(&DaliInputDevice::buttonReleased, this, inpindex), BUTTON_RELEASE_TIMEOUT);
               break;
             }
             case input_pulse:
             {
               BinaryInputBehaviourPtr ib = getInput(inpindex);
               ib->updateInputState(1);
-              releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::inputReleased, this, inpindex), INPUT_RELEASE_TIMEOUT);
+              releaseTicket.executeOnce(boost::bind(&DaliInputDevice::inputReleased, this, inpindex), INPUT_RELEASE_TIMEOUT);
               break;
             }
             case input_motion:

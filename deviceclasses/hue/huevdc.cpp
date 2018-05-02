@@ -203,7 +203,7 @@ void HueVdc::refindBridge(StatusCB aCompletedCB)
   if (!getVdcHost().isNetworkConnected()) {
     // TODO: checking IPv4 only at this time, need to add IPv6 later
     ALOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), REFIND_RETRY_DELAY);
+    refindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), REFIND_RETRY_DELAY);
     return;
   }
   // actually refind
@@ -252,7 +252,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
       ALOG(LOG_NOTICE, "Could not access bridge API at %s - revert to finding bridge by UUID", bridgeApiURL.c_str());
       bridgeApiURL.clear();
       // retry searching by uuid
-      MainLoop::currentMainLoop().executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), 500*MilliSecond);
+      refindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), 500*MilliSecond);
       return;
     }
     else {
@@ -625,7 +625,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
           }
           else {
             setGroupState->add("transitiontime", JsonObject::newInt32(tt));
-            MainLoop::currentMainLoop().executeTicketOnce(groupDimTicket, boost::bind(&HueVdc::groupDimRepeater, this, setGroupState, tt, _1));
+            groupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, setGroupState, tt, _1));
             aStatusCB(ErrorPtr());
           }
           break;
@@ -647,7 +647,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
 void HueVdc::groupDimRepeater(JsonObjectPtr aDimState, int aTransitionTime, MLTimer &aTimer)
 {
   hueComm.apiAction(httpMethodPUT, "/groups/0/action", aDimState, NULL);
-  MainLoop::currentMainLoop().executeTicketOnce(groupDimTicket, boost::bind(&HueVdc::groupDimRepeater, this, aDimState, aTransitionTime, _1), aTransitionTime*Second/10);
+  groupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, aDimState, aTransitionTime, _1), aTransitionTime*Second/10);
 }
 
 

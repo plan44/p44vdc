@@ -39,8 +39,7 @@ using namespace p44;
 
 MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
-  myStromComm(MainLoop::currentMainLoop()),
-  powerPollTicket(0)
+  myStromComm(MainLoop::currentMainLoop())
 {
   myStromComm.isMemberVariable();
   // config must be: mystromdevicehost[:token]:(light|relay)
@@ -94,7 +93,6 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
 
 MyStromDevice::~MyStromDevice()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(powerPollTicket);
 }
 
 
@@ -135,7 +133,7 @@ void MyStromDevice::initialStateReceived(StatusCB aCompletedCB, bool aFactoryRes
     }
   }
   // set up regular polling
-  powerPollTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&MyStromDevice::sampleState, this), 1*Second);
+  powerPollTicket.executeOnce(boost::bind(&MyStromDevice::sampleState, this), 1*Second);
   // anyway, consider initialized
   inherited::initializeDevice(aCompletedCB, aFactoryReset);
 }
@@ -143,10 +141,10 @@ void MyStromDevice::initialStateReceived(StatusCB aCompletedCB, bool aFactoryRes
 
 void MyStromDevice::sampleState()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(powerPollTicket);
+  powerPollTicket.cancel();
   if (!myStromApiQuery(boost::bind(&MyStromDevice::stateReceived, this, _1, _2), "report")) {
     // error, try again later (after pausing 10 normal poll periods)
-    powerPollTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&MyStromDevice::sampleState, this), 10*STATE_POLL_INTERVAL);
+    powerPollTicket.executeOnce(boost::bind(&MyStromDevice::sampleState, this), 10*STATE_POLL_INTERVAL);
   }
 }
 
@@ -164,7 +162,7 @@ void MyStromDevice::stateReceived(JsonObjectPtr aJsonResponse, ErrorPtr aError)
     }
   }
   // schedule next poll
-  powerPollTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&MyStromDevice::sampleState, this), STATE_POLL_INTERVAL);
+  powerPollTicket.executeOnce(boost::bind(&MyStromDevice::sampleState, this), STATE_POLL_INTERVAL);
 }
 
 

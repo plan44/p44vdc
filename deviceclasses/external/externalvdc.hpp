@@ -128,8 +128,9 @@ namespace p44 {
     bool noConfirmAction; ///< if set, device implementation is not expected to use
     #endif
 
-
     SimpleCB syncedCB; ///< will be called when device confirms "SYNC" message with "SYNCED" response
+
+    MLTicket buttonReleaseTicket; ///< for automatically releasing buttons
 
   public:
 

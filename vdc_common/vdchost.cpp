@@ -94,8 +94,6 @@ VdcHost::VdcHost(bool aWithLocalController) :
   lastActivity(0),
   lastPeriodicRun(0),
   learningMode(false),
-  announcementTicket(0),
-  periodicTaskTicket(0),
   localDimDirection(0), // undefined
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
   mainLoopStatsCounter(0),
@@ -386,7 +384,7 @@ void VdcHost::vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::
   // anyway, initialize next
   aNextVdc++;
   // ...but unwind stack first, let mainloop call next init
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::initializeNextVdc, this, aCompletedCB, aFactoryReset, aNextVdc));
+  MainLoop::currentMainLoop().executeNow(boost::bind(&VdcHost::initializeNextVdc, this, aCompletedCB, aFactoryReset, aNextVdc));
 }
 
 
@@ -398,7 +396,7 @@ void VdcHost::startRunning()
   //   but will post network lost event if we do NOT have a connection now.
   isNetworkConnected();
   // start periodic tasks needed during normal running like announcement checking and saving parameters
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, vdcHostP, _2), 1*Second);
+  periodicTaskTicket.executeOnce(boost::bind(&VdcHost::periodicTask, vdcHostP, _2), 1*Second);
   #if ENABLE_LOCALCONTROLLER
   if (localController) localController->startRunning();
   #endif
@@ -518,7 +516,7 @@ bool VdcHost::addDevice(DevicePtr aDevice)
   if (pos!=dSDevices.end()) {
     LOG(LOG_INFO, "- device %s already registered, not added again",aDevice->shortDesc().c_str());
     // first unwind call chain that triggered deletion, keep aDevice living until then
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::duplicateIgnored, this, aDevice));
+    MainLoop::currentMainLoop().executeNow(boost::bind(&VdcHost::duplicateIgnored, this, aDevice));
     return false; // duplicate dSUID, not added
   }
   // set for given dSUID in the container-wide map of devices
@@ -669,7 +667,7 @@ bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
 void VdcHost::periodicTask(MLMicroSeconds aNow)
 {
   // cancel any pending executions
-  MainLoop::currentMainLoop().cancelExecutionTicket(periodicTaskTicket);
+  periodicTaskTicket.cancel();
   // prevent during activity as saving DB might affect performance
   if (
     (aNow>lastActivity+ACTIVITY_PAUSE_INTERVAL) || // some time passed after last activity or...
@@ -709,7 +707,7 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
     }
   }
   // schedule next run
-  periodicTaskTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::periodicTask, this, _2), PERIODIC_TASK_INTERVAL);
+  periodicTaskTicket.executeOnce(boost::bind(&VdcHost::periodicTask, this, _2), PERIODIC_TASK_INTERVAL);
 }
 
 
@@ -1277,7 +1275,7 @@ void VdcHost::removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aRequest, 
 void VdcHost::resetAnnouncing()
 {
   // end pending announcement
-  MainLoop::currentMainLoop().cancelExecutionTicket(announcementTicket);
+  announcementTicket.cancel();
   // end all device sessions
   for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
     DevicePtr dev = pos->second;
@@ -1297,7 +1295,7 @@ void VdcHost::resetAnnouncing()
 /// start announcing all not-yet announced entities to the vdSM
 void VdcHost::startAnnouncing()
 {
-  if (!collecting && announcementTicket==0 && activeSessionConnection) {
+  if (!collecting && !announcementTicket && activeSessionConnection) {
     announceNext();
   }
 }
@@ -1307,7 +1305,7 @@ void VdcHost::announceNext()
 {
   if (collecting) return; // prevent announcements during collect.
   // cancel re-announcing
-  MainLoop::currentMainLoop().cancelExecutionTicket(announcementTicket);
+  announcementTicket.cancel();
   // announce vdcs first
   for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
     VdcPtr vdc = pos->second;
@@ -1331,7 +1329,7 @@ void VdcHost::announceNext()
         LOG(LOG_NOTICE, "Sent vdc announcement for %s %s", vdc->entityType(), vdc->shortDesc().c_str());
       }
       // schedule a retry
-      announcementTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_TIMEOUT);
+      announcementTicket.executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_TIMEOUT);
       // done for now, continues after ANNOUNCE_TIMEOUT or when registration acknowledged
       return;
     }
@@ -1360,7 +1358,7 @@ void VdcHost::announceNext()
         LOG(LOG_NOTICE, "Sent device announcement for %s %s", dev->entityType(), dev->shortDesc().c_str());
       }
       // schedule a retry
-      announcementTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_TIMEOUT);
+      announcementTicket.executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_TIMEOUT);
       // done for now, continues after ANNOUNCE_TIMEOUT or when announcement acknowledged
       return;
     }
@@ -1378,9 +1376,9 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
     aAddressable->announcementAcknowledged(); // give instance opportunity to do things following an announcement
   }
   // cancel retry timer
-  MainLoop::currentMainLoop().cancelExecutionTicket(announcementTicket);
+  announcementTicket.cancel();
   // try next announcement, after a pause
-  announcementTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_PAUSE);
+  announcementTicket.executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_PAUSE);
 }
 
 

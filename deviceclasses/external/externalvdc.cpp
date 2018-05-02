@@ -543,7 +543,7 @@ ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double a
         if (aValue>2) {
           // simulate a keypress of defined length in milliseconds
           bb->buttonAction(true);
-          MainLoop::currentMainLoop().executeOnce(boost::bind(&ExternalDevice::releaseButton, this, bb), aValue*MilliSecond);
+          buttonReleaseTicket.executeOnce(boost::bind(&ExternalDevice::releaseButton, this, bb), aValue*MilliSecond);
         }
         else {
           bb->buttonAction(aValue!=0);

@@ -48,7 +48,6 @@ ButtonBehaviour::ButtonBehaviour(Device &aDevice, const string aId) :
   actionId(0),
   buttonPressed(false),
   lastAction(Never),
-  buttonStateMachineTicket(0),
   callsPresent(false),
   buttonActionMode(buttonActionMode_none),
   buttonActionId(0),
@@ -125,7 +124,7 @@ void ButtonBehaviour::resetStateMachine()
   holdRepeats = 0;
   dimmingUp = false;
   timerRef = Never;
-  MainLoop::currentMainLoop().cancelExecutionTicket(buttonStateMachineTicket);
+  buttonStateMachineTicket.cancel();
 }
 
 
@@ -213,13 +212,13 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
           sendClick(ct_hold_start);
           // schedule hold repeats
           holdRepeats = 0;
-          MainLoop::currentMainLoop().executeTicketOnce(buttonStateMachineTicket, boost::bind(&ButtonBehaviour::dimRepeat, this), t_dim_repeat_time);
+          buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::dimRepeat, this), t_dim_repeat_time);
         }
         else {
           // button just released
           BFOCUSLOG("stopped dimming - sending ct_hold_end");
           sendClick(ct_hold_end);
-          MainLoop::currentMainLoop().cancelExecutionTicket(buttonStateMachineTicket);
+          buttonStateMachineTicket.cancel();
         }
       }
     }
@@ -239,7 +238,7 @@ void ButtonBehaviour::dimRepeat()
   holdRepeats++;
   if (holdRepeats<max_hold_repeats) {
     // schedule next repeat
-    buttonStateMachineTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&ButtonBehaviour::dimRepeat, this), t_dim_repeat_time);
+    buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::dimRepeat, this), t_dim_repeat_time);
   }
 }
 
@@ -248,7 +247,7 @@ void ButtonBehaviour::dimRepeat()
 // standard button state machine
 void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSeconds aNow)
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(buttonStateMachineTicket);
+  buttonStateMachineTicket.cancel();
   MLMicroSeconds timeSinceRef = aNow-timerRef;
 
   BFOCUSLOG("button state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
@@ -423,7 +422,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
   BFOCUSLOG(" -->                       exit state %s with %sfurther timing needed", stateNames[state], timerRef!=Never ? "" : "NO ");
   if (timerRef!=Never) {
     // need timing, schedule calling again
-    buttonStateMachineTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&ButtonBehaviour::checkStandardStateMachine, this, false, _2), 10*MilliSecond);
+    buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::checkStandardStateMachine, this, false, _2), 10*MilliSecond);
   }
 }
 

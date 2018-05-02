@@ -56,7 +56,7 @@ uint8_t EnoceanRemoteControlDevice::teachInSignal(int8_t aVariant)
     bool right = aVariant & 0x2;
     bool up = !(aVariant & 0x1);
     buttonAction(right, up, true); // press
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanRemoteControlDevice::sendSwitchBeaconRelease, this, right, up), TEACH_IN_TIME);
+    teachInTimer.executeOnce(boost::bind(&EnoceanRemoteControlDevice::sendSwitchBeaconRelease, this, right, up), TEACH_IN_TIME);
     return 4;
   }
   return inherited::teachInSignal(aVariant);
@@ -263,7 +263,7 @@ void EnoceanRelayControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDi
     if (ch->needsApplying()) {
       bool up = ch->getChannelValueBool();
       buttonAction(false, up, true);
-      MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanRelayControlDevice::sendReleaseTelegram, this, aDoneCB, up), BUTTON_PRESS_TIME);
+      buttonTimer.executeOnce(boost::bind(&EnoceanRelayControlDevice::sendReleaseTelegram, this, aDoneCB, up), BUTTON_PRESS_TIME);
       ch->channelValueApplied();
       return; // sendReleaseTelegram will call aDoneCB
     }
@@ -278,7 +278,7 @@ void EnoceanRelayControlDevice::sendReleaseTelegram(SimpleCB aDoneCB, bool aUp)
   buttonAction(false, aUp, false);
   // schedule callback if set
   if (aDoneCB) {
-    MainLoop::currentMainLoop().executeOnce(boost::bind(aDoneCB), BUTTON_PRESS_PAUSE_TIME);
+    buttonTimer.executeOnce(boost::bind(aDoneCB), BUTTON_PRESS_PAUSE_TIME);
   }
 }
 
@@ -289,8 +289,7 @@ void EnoceanRelayControlDevice::sendReleaseTelegram(SimpleCB aDoneCB, bool aUp)
 
 EnoceanBlindControlDevice::EnoceanBlindControlDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep) :
   inherited(aVdcP, aDsuidIndexStep),
-  movingDirection(0),
-  commandTicket(0)
+  movingDirection(0)
 {
 };
 
@@ -348,7 +347,7 @@ void EnoceanBlindControlDevice::changeMovement(SimpleCB aDoneCB, int aNewDirecti
       if (commandTicket) {
         // start button still pressed
         // - cancel releasing it after logpress time
-        MainLoop::currentMainLoop().cancelExecutionTicket(commandTicket);
+        commandTicket.cancel();
         // - but release it right now
         buttonAction(false, previousDirection>0, false);
         // - and exit normally to confirm done immediately
@@ -358,7 +357,7 @@ void EnoceanBlindControlDevice::changeMovement(SimpleCB aDoneCB, int aNewDirecti
         // this will not change anything, otherwise the movement will stop
         // - press button
         buttonAction(false, previousDirection>0, true);
-        commandTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanBlindControlDevice::sendReleaseTelegram, this, aDoneCB), SHORTPRESS_TIME);
+        commandTicket.executeOnce(boost::bind(&EnoceanBlindControlDevice::sendReleaseTelegram, this, aDoneCB), SHORTPRESS_TIME);
         // callback only later when button is released
         return;
       }
@@ -368,7 +367,7 @@ void EnoceanBlindControlDevice::changeMovement(SimpleCB aDoneCB, int aNewDirecti
       // - press button
       buttonAction(false, movingDirection>0, true);
       // - release latest after blind has entered permanent move mode (but maybe earlier)
-      commandTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanBlindControlDevice::sendReleaseTelegram, this, SimpleCB()), LONGPRESS_TIME);
+      commandTicket.executeOnce(boost::bind(&EnoceanBlindControlDevice::sendReleaseTelegram, this, SimpleCB()), LONGPRESS_TIME);
       // - but as movement has actualy started, exit normally to confirm done immediately
     }
   }
@@ -384,7 +383,7 @@ void EnoceanBlindControlDevice::sendReleaseTelegram(SimpleCB aDoneCB)
   buttonAction(false, false, false);
   // schedule callback if set
   if (aDoneCB) {
-    MainLoop::currentMainLoop().executeOnce(boost::bind(aDoneCB), PAUSE_TIME);
+    sequenceTicket.executeOnce(boost::bind(aDoneCB), PAUSE_TIME);
   }
 }
 
@@ -393,8 +392,7 @@ void EnoceanBlindControlDevice::sendReleaseTelegram(SimpleCB aDoneCB)
 
 
 EnoceanSEHeatTubeDevice::EnoceanSEHeatTubeDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep) :
-  inherited(aVdcP, aDsuidIndexStep),
-  applyRepeatTicket(0)
+  inherited(aVdcP, aDsuidIndexStep)
 {
 }
 
@@ -436,7 +434,7 @@ void EnoceanSEHeatTubeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimm
 
 void EnoceanSEHeatTubeDevice::setPowerState(int aLevel, bool aInitial)
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(applyRepeatTicket);
+  applyRepeatTicket.cancel();
   // send the manufacturer specific telegram for setting power state:
   //   DB3 = 0x00, DB2 = power, DB1 = ((Channel << 2) & 0xFC) | 0x01, DB0 = 0x40
   //   power can be Off = 0x00, Power1 = 0x55, Power2 = 0xAA, Power3 = 0xFF
@@ -456,7 +454,7 @@ void EnoceanSEHeatTubeDevice::setPowerState(int aLevel, bool aInitial)
   getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
   // repeat non-zero power state level
   if (pwr!=0x00) {
-    applyRepeatTicket = MainLoop::currentMainLoop().executeOnce(
+    applyRepeatTicket.executeOnce(
       boost::bind(&EnoceanSEHeatTubeDevice::setPowerState, this, aLevel, false),
       aInitial ? 1*Second : 2 * Minute // quickly send mode a second time to compensate for bug in Tube FW, then repeat every 2 mins
     );

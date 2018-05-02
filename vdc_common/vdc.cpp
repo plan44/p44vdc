@@ -294,7 +294,7 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
     }
   }
   // break caller chain by going via mainloop
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::prepareNextNotification, this, aDeliveryState));
+  MainLoop::currentMainLoop().executeNow(boost::bind(&Vdc::prepareNextNotification, this, aDeliveryState));
 }
 
 
@@ -374,7 +374,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
           ALOG(LOG_NOTICE, "Optimized %s: executing %s using native action '%s' (variant %d)", NotificationNames[aDeliveryState->callType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), aDeliveryState->actionVariant);
           if (aDeliveryState->repeatAfter!=Never) {
             AFOCUSLOG("- action scheduled to repeat in %.2f seconds", (double)(aDeliveryState->repeatAfter)/Second);
-            MainLoop::currentMainLoop().executeTicketOnce(optimizedCallRepeaterTicket, boost::bind(&Vdc::repeatPreparedNotification, this, entry, aDeliveryState), aDeliveryState->repeatAfter);
+            optimizedCallRepeaterTicket.executeOnce(boost::bind(&Vdc::repeatPreparedNotification, this, entry, aDeliveryState), aDeliveryState->repeatAfter);
           }
           else {
             // cancel possibly running repeater ticket
@@ -708,7 +708,7 @@ void Vdc::performPair(VdcApiRequestPtr aRequest, Tristate aEstablish, bool aDisa
   }
   // start new pairing
   ALOG(LOG_NOTICE, "Starting single vDC pairing");
-  pairTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::pairingTimeout, this, aRequest), aTimeout);
+  pairTicket.executeOnce(boost::bind(&Vdc::pairingTimeout, this, aRequest), aTimeout);
   getVdcHost().learnHandler = boost::bind(&Vdc::pairingEvent, this, aRequest, _1, _2);
   setLearnMode(true, aDisableProximityCheck, aEstablish);
 }
@@ -781,7 +781,7 @@ void Vdc::collectedDevices(StatusCB aCompletedCB, ErrorPtr aError)
 void Vdc::scheduleRecollect(RescanMode aRescanMode, MLMicroSeconds aDelay)
 {
   rescanTicket.cancel();
-  rescanTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::initiateRecollect, this, aRescanMode), aDelay);
+  rescanTicket.executeOnce(boost::bind(&Vdc::initiateRecollect, this, aRescanMode), aDelay);
 }
 
 
@@ -790,7 +790,7 @@ void Vdc::schedulePeriodicRecollecting()
 {
   rescanTicket.cancel();
   if (rescanInterval!=Never) {
-    rescanTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::initiateRecollect, this, rescanMode), rescanInterval);
+    rescanTicket.executeOnce(boost::bind(&Vdc::initiateRecollect, this, rescanMode), rescanInterval);
   }
 }
 
@@ -890,12 +890,12 @@ void Vdc::identifyDeviceCB(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, i
     // report this error into the log
     LOG(LOG_WARNING, "device identification failed: %s -> retrying %d times", aError->description().c_str(), aMaxRetries);
     aMaxRetries--;
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::identifyDevice, this, aNewDevice, aIdentifyCB, aMaxRetries, aRetryDelay), aRetryDelay);
+    identifyTicket.executeOnce(boost::bind(&Vdc::identifyDevice, this, aNewDevice, aIdentifyCB, aMaxRetries, aRetryDelay), aRetryDelay);
     return;
   }
   // no retries left, give up
   // Note: break handler chain to make sure initial trigger (such as http request callback) terminates BEFORE device gets deleted
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&Vdc::identifyDeviceFailed, this, aNewDevice, aError, aIdentifyCB));
+  MainLoop::currentMainLoop().executeNow(boost::bind(&Vdc::identifyDeviceFailed, this, aNewDevice, aError, aIdentifyCB));
 }
 
 
@@ -979,7 +979,7 @@ void Vdc::identifyAndAddDevicesCB(DeviceList aToBeAddedDevices, StatusCB aComple
 {
   // even without add delay, it's important to defer this call to avoid stacking up calls along aToBeAddedDevices
   // Note: only now, remove the device from the list, which should deallocate it if it has not been added to the vdc(host) by now.
-  MainLoop::currentMainLoop().executeOnce(
+  identifyTicket.executeOnce(
     boost::bind(&Vdc::identifyAndAddDevices, this, aToBeAddedDevices, aCompletedCB, aMaxRetries, aRetryDelay, aAddDelay),
     aAddDelay
   );

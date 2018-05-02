@@ -187,7 +187,7 @@ namespace p44 {
 
     int instanceNumber; ///< the instance number identifying this instance among other instances of this class
     int tag; ///< tag used to in self test failures for showing on LEDs
-    MLTicketGuard pairTicket; ///< used for pairing
+    MLTicket pairTicket; ///< used for pairing
 
     /// Settings
     int vdcFlags; ///< generic vdc flag word
@@ -196,13 +196,14 @@ namespace p44 {
     /// periodic rescan, collecting
     MLMicroSeconds rescanInterval; ///< rescan interval, 0 if none
     RescanMode rescanMode; ///< mode to use for periodic rescan
-    MLTicketGuard rescanTicket; ///< rescan ticket
+    MLTicket rescanTicket; ///< rescan ticket
+    MLTicket identifyTicket; ///< identification ticket
     bool collecting; ///< currently collecting
 
     /// notification optimizing
     OptimizerEntryList optimizerCache; ///< the current optimizer cache
     long totalOptimizableCalls; ///< total of optimizable calls
-    MLTicketGuard optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
+    MLTicket optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
     bool delivering; ///< set while the delivery/optimization process is running
 
     ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all

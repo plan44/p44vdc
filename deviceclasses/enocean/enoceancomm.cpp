@@ -1044,8 +1044,6 @@ const char *EnoceanComm::manufacturerName(EnoceanManufacturer aManufacturerCode)
 
 EnoceanComm::EnoceanComm(MainLoop &aMainLoop) :
 	inherited(aMainLoop),
-  aliveCheckTicket(0),
-  cmdTimeoutTicket(0),
   apiVersion(0),
   appVersion(0),
   myAddress(0),
@@ -1056,8 +1054,6 @@ EnoceanComm::EnoceanComm(MainLoop &aMainLoop) :
 
 EnoceanComm::~EnoceanComm()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(aliveCheckTicket);
-  MainLoop::currentMainLoop().cancelExecutionTicket(cmdTimeoutTicket);
 }
 
 
@@ -1102,7 +1098,7 @@ void EnoceanComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aE
     }
     serialComm->closeConnection();
     // retry initializing later
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanComm::initializeInternal, this, aCompletedCB, aRetriesLeft), ENOCEAN_INIT_RETRY_INTERVAL);
+    aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::initializeInternal, this, aCompletedCB, aRetriesLeft), ENOCEAN_INIT_RETRY_INTERVAL);
   }
   else {
     // no more retries, just return
@@ -1146,7 +1142,7 @@ void EnoceanComm::idbaseReceived(StatusCB aCompletedCB, int aRetriesLeft, Esp3Pa
   // completed successfully
   if (aCompletedCB) aCompletedCB(aError);
   // schedule first alive check quickly
-  aliveCheckTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), 2*Second);
+  aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), 2*Second);
 }
 
 
@@ -1203,13 +1199,12 @@ void EnoceanComm::aliveCheckResponse(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aErr
   if (!Error::isOK(aError)) {
     // alive check failed, try to recover EnOcean interface
     LOG(LOG_ERR, "EnoceanComm: alive check of EnOcean module failed -> restarting module");
-    // - cancel alive checks for now
-    MainLoop::currentMainLoop().cancelExecutionTicket(aliveCheckTicket);
     // - close the connection
     serialComm->closeConnection();
     // - do a hardware reset of the module if possible
     if (enoceanResetPin) enoceanResetPin->set(true); // reset
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanComm::resetDone, this), 2*Second);
+    // - using alive check ticket for reset sequence
+    aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::resetDone, this), 2*Second);
   }
   else {
     // response received, should be answer to CO_RD_VERSION
@@ -1218,7 +1213,7 @@ void EnoceanComm::aliveCheckResponse(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aErr
       FOCUSLOG("Alive check received packet after sending CO_RD_VERSION, but hat wrong data length (%zu instead of 33)", aEsp3PacketPtr->dataLength());
     }
     // also schedule the next alive check
-    aliveCheckTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), ENOCEAN_ESP3_ALIVECHECK_INTERVAL);
+    aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), ENOCEAN_ESP3_ALIVECHECK_INTERVAL);
   }
 }
 
@@ -1228,7 +1223,7 @@ void EnoceanComm::resetDone()
   LOG(LOG_NOTICE, "EnoceanComm: releasing enocean reset");
   if (enoceanResetPin) enoceanResetPin->set(false); // release reset
   // wait a little, then re-open connection
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanComm::reopenConnection, this), 2*Second);
+  aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::reopenConnection, this), 2*Second);
 }
 
 
@@ -1237,7 +1232,7 @@ void EnoceanComm::reopenConnection()
   LOG(LOG_NOTICE, "EnoceanComm: re-opening connection");
 	serialComm->requestConnection(); // re-open connection
   // restart alive checks, not too soon after reset
-  aliveCheckTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), 10*Second);
+  aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), 10*Second);
 }
 
 
@@ -1300,7 +1295,7 @@ void EnoceanComm::dispatchPacket(Esp3PacketPtr aPacket)
   else if (pt==pt_response) {
     // This is a command response
     // - stop timeout
-    MainLoop::currentMainLoop().cancelExecutionTicket(cmdTimeoutTicket);
+    cmdTimeoutTicket.cancel();
     // - this is a command response
     if (cmdQueue.empty() || cmdQueue.front().commandPacket) {
       // received unexpected answer
@@ -1406,7 +1401,7 @@ void EnoceanComm::checkCmdQueue()
     cmdQueue.pop_front();
     cmdQueue.push_front(cmd);
     // schedule timeout
-    cmdTimeoutTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EnoceanComm::cmdTimeout, this), ENOCEAN_ESP3_COMMAND_TIMEOUT);
+    cmdTimeoutTicket.executeOnce(boost::bind(&EnoceanComm::cmdTimeout, this), ENOCEAN_ESP3_COMMAND_TIMEOUT);
   }
 }
 

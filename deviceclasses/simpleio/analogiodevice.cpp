@@ -33,7 +33,6 @@ using namespace p44;
 AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
   analogIOType(analogio_unknown),
-  timerTicket(0),
   scale(1),
   offset(0)
 {
@@ -147,14 +146,13 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     sb->setHardwareSensorConfig((VdcSensorType)sensorType, (VdcUsageHint)sensorUsage, min, max, resolution, pollIntervalS*Second, pollIntervalS*Second);
     addBehaviour(sb);
     // install polling for it
-    timerTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&AnalogIODevice::analogInputPoll, this, _1, _2));
+    timerTicket.executeOnce(boost::bind(&AnalogIODevice::analogInputPoll, this, _1, _2));
   }
 	deriveDsUid();
 }
 
 AnalogIODevice::~AnalogIODevice()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(timerTicket);
 }
 
 
@@ -178,7 +176,7 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   MLMicroSeconds transitionTime = 0;
   // abort previous transition
-  MainLoop::currentMainLoop().cancelExecutionTicket(timerTicket);
+  timerTicket.cancel();
   // generic device, show changed channels
   if (analogIOType==analogio_dimmer) {
     // single channel PWM dimmer
@@ -240,7 +238,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     if (moreSteps) {
       ALOG(LOG_DEBUG, "AnalogIO transitional brightness value: %.2f", w);
       // not yet complete, schedule next step
-      timerTicket = MainLoop::currentMainLoop().executeOnce(
+      timerTicket.executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
         TRANSITION_STEP_TIME
       );
@@ -279,7 +277,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     if (moreSteps) {
       ALOG(LOG_DEBUG, "AnalogIO transitional RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
       // not yet complete, schedule next step
-      timerTicket = MainLoop::currentMainLoop().executeOnce(
+      timerTicket.executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
         TRANSITION_STEP_TIME
       );

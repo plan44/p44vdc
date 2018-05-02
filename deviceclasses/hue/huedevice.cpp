@@ -62,7 +62,6 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool 
   lightID(aLightID),
   uniqueID(aUniqueID),
   reapplyMode(reapply_once),
-  reapplyTicket(0),
   lastReachable(true) // assume reachable unless actively determined otherwise (via ping)
 {
   // hue devices are lights
@@ -210,7 +209,7 @@ bool HueDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliverySta
 }
 
 
-// optimized DALI dimming implementation
+// optimized hue dimming implementation
 void HueDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply)
 {
   if (aDoApply) {
@@ -222,7 +221,7 @@ void HueDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bo
     if (aDimMode==dimmode_stop) {
       // retrieve status at end of dimming
       // Note: does not work when called immediately - so we delay that a bit
-      MainLoop::currentMainLoop().executeOnce(boost::bind(&HueDevice::syncChannelValues, this, SimpleCB()), 3*Second);
+      dimTicket.executeOnce(boost::bind(&HueDevice::syncChannelValues, this, SimpleCB()), 3*Second);
     }
   }
 }
@@ -313,13 +312,13 @@ void HueDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aDisconne
 
 void HueDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(reapplyTicket);
+  reapplyTicket.cancel();
   reapplyCount = 0;
   if (applyLightState(aDoneCB, aForDimming, false)) {
     // actually applied something, schedule reapply if enabled and not dimming
     if (!aForDimming && reapplyMode!=reapply_none) {
       // initially re-apply shortly after
-      reapplyTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), INITIAL_REAPPLY_DELAY);
+      reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), INITIAL_REAPPLY_DELAY);
     }
   }
 }
@@ -334,7 +333,7 @@ void HueDevice::reapplyTimerHandler()
   applyLightState(NULL, false, true);
   if (reapplyMode==reapply_periodic) {
     // re-apply periodically -> schedule next
-    reapplyTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), PERIODIC_REAPPLY_INTERVAL);
+    reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), PERIODIC_REAPPLY_INTERVAL);
   }
 }
 

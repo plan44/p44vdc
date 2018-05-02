@@ -177,7 +177,7 @@ void DigitalIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   }
   else if (shadowBehaviour) {
     // ask shadow behaviour to start movement sequence
-    shadowBehaviour->applyBlindChannels(boost::bind(&DigitalIODevice::changeMovement, *this, _1, _2), aDoneCB, aForDimming);
+    shadowBehaviour->applyBlindChannels(boost::bind(&DigitalIODevice::changeMovement, this, _1, _2), aDoneCB, aForDimming);
     return;
   }
   else if (getOutput()) {
@@ -208,7 +208,7 @@ void DigitalIODevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMo
   ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
   if (sb && aDoApply) {
     // no channel check, there's only global dimming of the blind, no separate position/angle
-    sb->dimBlind(boost::bind(&DigitalIODevice::changeMovement, *this, _1, _2), aDimMode);
+    sb->dimBlind(boost::bind(&DigitalIODevice::changeMovement, this, _1, _2), aDimMode);
   } else {
     inherited::dimChannel(aChannel, aDimMode, aDoApply);
   }

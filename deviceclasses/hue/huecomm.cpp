@@ -199,15 +199,13 @@ public:
   BridgeFinder(HueComm &aHueComm, HueComm::HueBridgeFindCB aFindHandler) :
     callback(aFindHandler),
     hueComm(aHueComm),
-    startedAuth(Never),
-    retryLoginTicket(0)
+    startedAuth(Never)
   {
     bridgeDetector = SsdpSearchPtr(new SsdpSearch(MainLoop::currentMainLoop()));
   }
 
   virtual ~BridgeFinder()
   {
-    MainLoop::currentMainLoop().cancelExecutionTicket(retryLoginTicket);
   }
 
   void findNewBridge(const char *aDeviceType, MLMicroSeconds aAuthTimeWindow, HueComm::HueBridgeFindCB aFindHandler)
@@ -463,7 +461,7 @@ public:
       // done with all candidates (or find aborted in hueComm)
       if (authCandidates.size()>0 && MainLoop::now()<startedAuth+authTimeWindow && hueComm.findInProgress) {
         // we have still candidates and time to do a retry in a second, and find is not aborted
-        retryLoginTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&BridgeFinder::attemptPairingWithCandidates, this), 1*Second);
+        retryLoginTicket.executeOnce(boost::bind(&BridgeFinder::attemptPairingWithCandidates, this), 1*Second);
         return;
       }
       else {

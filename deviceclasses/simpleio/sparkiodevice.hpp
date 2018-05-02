@@ -162,6 +162,7 @@ namespace p44 {
     string sparkCoreToken;
     JsonWebClient sparkCloudComm;
     int apiVersion;
+    MLTicket retryTicket;
 
   public:
     SparkIoDevice(StaticVdc *aVdcP, const string &aDeviceConfig);

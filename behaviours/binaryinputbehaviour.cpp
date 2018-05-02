@@ -31,7 +31,6 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
   minPushInterval(200*MilliSecond),
   changesOnlyInterval(15*Minute), // report unchanged state updates max once every 15 minutes
   // state
-  invalidatorTicket(0),
   lastUpdate(Never),
   lastPush(Never),
   currentState(false)
@@ -43,7 +42,6 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
 
 BinaryInputBehaviour::~BinaryInputBehaviour()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
 }
 
 
@@ -107,10 +105,10 @@ InputState BinaryInputBehaviour::maxExtendedValue()
 
 void BinaryInputBehaviour::armInvalidator()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
+  invalidatorTicket.cancel();
   if (aliveSignInterval!=Never) {
     // this sensor can time out, schedule invalidation
-    invalidatorTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&BinaryInputBehaviour::invalidateInputState, this), aliveSignInterval);
+    invalidatorTicket.executeOnce(boost::bind(&BinaryInputBehaviour::invalidateInputState, this), aliveSignInterval);
   }
 }
 

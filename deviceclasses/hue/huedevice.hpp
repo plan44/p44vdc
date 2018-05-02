@@ -66,6 +66,7 @@ namespace p44 {
 
     bool lastReachable; ///< updated when pinged, used for opStateLevel
 
+    MLTicket dimTicket;
 
   public:
     HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool aCTOnly, const string &aUniqueID);

@@ -64,7 +64,6 @@ LedChainVdc::LedChainVdc(int aInstanceNumber, const string aChainSpec, VdcHost *
   Vdc(aInstanceNumber, aVdcHostP, aTag),
   renderStart(0),
   renderEnd(0),
-  renderTicket(0),
   maxOutValue(128) // by default, allow only half of max intensity (for full intensity a ~200 LED chain needs 70W power supply!)
 {
   // parse chain specification
@@ -122,7 +121,7 @@ void LedChainVdc::triggerRenderingRange(uint16_t aFirst, uint16_t aNum)
     if (aFirst+aNum>renderEnd) renderEnd = aFirst+aNum;
   }
   if (!renderTicket) {
-    renderTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&LedChainVdc::render, this), MIN_RENDER_INTERVAL);
+    renderTicket.executeOnce(boost::bind(&LedChainVdc::render, this), MIN_RENDER_INTERVAL);
   }
 }
 

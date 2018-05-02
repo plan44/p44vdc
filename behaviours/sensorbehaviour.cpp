@@ -167,7 +167,6 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   loggingReady(false),
   lastRrdUpdate(Never),
   #endif
-  invalidatorTicket(0),
   lastUpdate(Never),
   lastPush(Never),
   currentValue(0),
@@ -181,7 +180,6 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
 
 SensorBehaviour::~SensorBehaviour()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
 }
 
 
@@ -382,10 +380,10 @@ void SensorBehaviour::updateEngineeringValue(long aEngineeringValue, bool aPush,
 
 void SensorBehaviour::armInvalidator()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
+  invalidatorTicket.cancel();
   if (aliveSignInterval!=Never) {
     // this sensor can time out, schedule invalidation
-    invalidatorTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&SensorBehaviour::invalidateSensorValue, this, true), aliveSignInterval);
+    invalidatorTicket.executeOnce(boost::bind(&SensorBehaviour::invalidateSensorValue, this, true), aliveSignInterval);
   }
 }
 

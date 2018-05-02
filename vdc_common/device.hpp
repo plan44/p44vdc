@@ -131,8 +131,9 @@ namespace p44 {
     uint8_t areaDimmed; ///< last dimmed area (so continue know which dimming command to re-start in case it comes late)
     VdcDimMode areaDimMode; ///< last area dim mode
     MLTicket dimHandlerTicket; ///< for standard dimming
+    MLTicket vanishTicket; ///< for self-vanishing
 
-
+    // prepared operations
     DsScenePtr preparedScene; ///< set if this scene must be applied at executePreparedOperation()
     bool preparedDim; ///< set if currentDimMode/currentDimChannel must be applied at executePreparedOperation()
 
