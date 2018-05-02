@@ -48,6 +48,7 @@ Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   rescanInterval(Never),
   rescanMode(rescanmode_incremental),
   collecting(false),
+  delivering(false),
   totalOptimizableCalls(0)
 {
 }
@@ -221,6 +222,7 @@ static const char *NotificationNames[numNotificationTypes] = {
 void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   ErrorPtr err;
+  delivering = true;
   if (aNotification=="callScene") {
     // call scene
     NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState);
@@ -247,6 +249,7 @@ void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aA
       (*apos)->handleNotification(aApiConnection, aNotification, aParams);
     }
   }
+  delivering = false;
 }
 
 
@@ -418,6 +421,8 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
       return;
     }
   }
+  // no affected devices
+  delivering = false;
 }
 
 
@@ -592,6 +597,8 @@ void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDel
       );
     }
   }
+  // now done delivering
+  delivering = false;
 }
 
 
@@ -790,8 +797,15 @@ void Vdc::schedulePeriodicRecollecting()
 
 void Vdc::initiateRecollect(RescanMode aRescanMode)
 {
-  ALOG(LOG_NOTICE, "starting in-operation recollect");
-  collectDevices(boost::bind(&Vdc::recollectDone, this), aRescanMode);
+  if (delivering) {
+    ALOG(LOG_NOTICE, "busy processing notification: postponed in-operation recollect");
+    schedulePeriodicRecollecting();
+  }
+  else {
+    ALOG(LOG_NOTICE, "starting in-operation recollect");
+    collectDevices(boost::bind(&Vdc::recollectDone, this), aRescanMode);
+    // end of collect will schedule periodic recollect again
+  }
 }
 
 

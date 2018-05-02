@@ -203,6 +203,7 @@ namespace p44 {
     OptimizerEntryList optimizerCache; ///< the current optimizer cache
     long totalOptimizableCalls; ///< total of optimizable calls
     MLTicketGuard optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
+    bool delivering; ///< set while the delivery/optimization process is running
 
     ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all
 
