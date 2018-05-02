@@ -621,12 +621,14 @@ string EvaluatorDevice::description()
 string EvaluatorDevice::getEvaluatorType()
 {
   switch (evaluatorType) {
-    case evaluator_unknown: return "unknown";
     case evaluator_rocker: return "rocker";
     case evaluator_input: return "input";
     case evaluator_internalinput: return "internalinput";
     case evaluator_sensor: return "sensor";
     case evaluator_internalsensor: return "internalsensor";
+    case evaluator_unknown:
+    default:
+      return "unknown";
   }
 }
 
