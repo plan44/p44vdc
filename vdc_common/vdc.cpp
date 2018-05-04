@@ -210,6 +210,13 @@ string Vdc::modelName()
 /// MARK: ===== grouped delivery of notification to devices (for scene/group optimizations)
 
 
+NotificationDeliveryState::~NotificationDeliveryState()
+{
+  // report to vDC
+  vdc.notificationDeliveryComplete(*this);
+}
+
+
 static const char *NotificationNames[numNotificationTypes] = {
   "undefined",
   "none",
@@ -221,26 +228,24 @@ static const char *NotificationNames[numNotificationTypes] = {
 
 void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  ErrorPtr err;
-  delivering = true;
   if (aNotification=="callScene") {
     // call scene
-    NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState);
+    NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState(*this));
     nds->audience = aAudience;
     nds->callType = ntfy_callscene;
     nds->callParams = aParams;
     nds->optimizedType = ntfy_undefined; // first device will decide (callScene might become dimChannel)
-    prepareNextNotification(nds);
+    queueDelivery(nds);
     return;
   }
   else if (aNotification=="dimChannel") {
     // start or stop dimming a channel
-    NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState);
+    NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState(*this));
     nds->audience = aAudience;
     nds->callType = ntfy_dimchannel;
     nds->callParams = aParams;
     nds->optimizedType = ntfy_dimchannel; // dimchannel will always remain dimchannel
-    prepareNextNotification(nds);
+    queueDelivery(nds);
     return;
   }
   else {
@@ -249,7 +254,42 @@ void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aA
       (*apos)->handleNotification(aApiConnection, aNotification, aParams);
     }
   }
+}
+
+
+void Vdc::queueDelivery(NotificationDeliveryStatePtr aDeliveryState)
+{
+  if (delivering) {
+    // queue for when current delivery is done
+    pendingDeliveries.push_back(aDeliveryState);
+    ALOG(LOG_INFO, "delivery of '%s' queued, because previous delivery still running - now %lu queued deliveries", NotificationNames[aDeliveryState->callType], pendingDeliveries.size());
+  }
+  else {
+    // optimization - start right now
+    ALOG(LOG_NOTICE, "===== starting delivery of '%s' directly", NotificationNames[aDeliveryState->callType]);
+    delivering = true;
+    prepareNextNotification(aDeliveryState);
+  }
+}
+
+
+void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryStateBeingDeleted)
+{
+  // this is called from aDeliveryStateBeingDeleted destructor, and signals delivery really complete
   delivering = false;
+  ALOG(LOG_NOTICE, "===== delivery of '%s' complete", NotificationNames[aDeliveryStateBeingDeleted.callType]);
+  // check for pending deliveries
+  if (pendingDeliveries.size()>0) {
+    // get next from queue
+    NotificationDeliveryStatePtr nds = pendingDeliveries.front();
+    // - remove from queue, only passed smart pointer keeps the object now. This is important
+    //   because we rely on the NotificationDeliveryState's destructor to call us back here when done!
+    pendingDeliveries.pop_front();
+    // - now start
+    ALOG(LOG_NOTICE, "===== starting delivery of '%s' from queue", NotificationNames[nds->callType]);
+    delivering = true;
+    prepareNextNotification(nds);
+  }
 }
 
 
@@ -422,7 +462,6 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
     }
   }
   // no affected devices
-  delivering = false;
 }
 
 
@@ -597,8 +636,6 @@ void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDel
       );
     }
   }
-  // now done delivering
-  delivering = false;
 }
 
 

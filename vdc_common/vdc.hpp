@@ -81,17 +81,19 @@ namespace p44 {
     ntfy_callscene,
     ntfy_dimchannel,
     ntfy_retrigger, ///< just retrigger the repeater
+    ntfy_generic, ///< generic notification, not optimized/optimizable
     numNotificationTypes
   } NotificationType;
 
 
   /// container for tracking notification delivery and optimisation
-  class NotificationDeliveryState : public P44Obj
+  class NotificationDeliveryState P44_FINAL: public P44Obj
   {
     friend class Device;
     friend class Vdc;
 
-    NotificationDeliveryState() :
+    NotificationDeliveryState(Vdc &aVdc) :
+      vdc(aVdc),
       callType(ntfy_undefined),
       optimizedType(ntfy_undefined),
       contentId(0),
@@ -102,6 +104,10 @@ namespace p44 {
       repeatVariant(0),
       pendingCount(0)
     {};
+
+    ~NotificationDeliveryState();
+
+    Vdc &vdc;
 
     DsAddressablesList audience; ///< remaining devices to be prepared
     string affectedDevicesHash; ///< binary string hash, represents the set of affected devices, to be matched against known sets for optimisation
@@ -121,9 +127,10 @@ namespace p44 {
     NotificationType optimizedType; ///< the type that results (callScene might result in dimming...)
   };
   typedef boost::intrusive_ptr<NotificationDeliveryState> NotificationDeliveryStatePtr;
+  typedef std::list<NotificationDeliveryStatePtr> NotificationDeliveryStateList;
 
 
-  class OptimizerEntry : public P44Obj, public PersistentParams
+  class OptimizerEntry P44_FINAL: public P44Obj, public PersistentParams
   {
     typedef PersistentParams inheritedParams;
     friend class Vdc;
@@ -184,6 +191,7 @@ namespace p44 {
     typedef PersistentParams inheritedParams;
 
     friend class VdcHost;
+    friend class NotificationDeliveryState;
 
     int instanceNumber; ///< the instance number identifying this instance among other instances of this class
     int tag; ///< tag used to in self test failures for showing on LEDs
@@ -201,6 +209,7 @@ namespace p44 {
     bool collecting; ///< currently collecting
 
     /// notification optimizing
+    NotificationDeliveryStateList pendingDeliveries; ///< pending deliveries
     OptimizerEntryList optimizerCache; ///< the current optimizer cache
     long totalOptimizableCalls; ///< total of optimizable calls
     MLTicket optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
@@ -601,6 +610,8 @@ namespace p44 {
     void finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, bool aChanged, ErrorPtr aError);
+    void notificationDeliveryComplete(NotificationDeliveryState &aDeliveryStateBeingDeleted);
+    void queueDelivery(NotificationDeliveryStatePtr aDeliveryState);
     void clearOptimizerCache();
     ErrorPtr loadOptimizerCache();
     ErrorPtr saveOptimizerCache();
