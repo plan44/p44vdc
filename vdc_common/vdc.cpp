@@ -262,11 +262,11 @@ void Vdc::queueDelivery(NotificationDeliveryStatePtr aDeliveryState)
   if (delivering) {
     // queue for when current delivery is done
     pendingDeliveries.push_back(aDeliveryState);
-    ALOG(LOG_INFO, "delivery of '%s' queued, because previous delivery still running - now %lu queued deliveries", NotificationNames[aDeliveryState->callType], pendingDeliveries.size());
+    ALOG(LOG_INFO, "'%s' delivery queued (previous delivery still running) - now %lu queued deliveries", NotificationNames[aDeliveryState->callType], pendingDeliveries.size());
   }
   else {
     // optimization - start right now
-    ALOG(LOG_NOTICE, "===== starting delivery of '%s' directly", NotificationNames[aDeliveryState->callType]);
+    ALOG(LOG_INFO, "===== '%s' delivery to %lu devices starts now", NotificationNames[aDeliveryState->callType], aDeliveryState->audience.size());
     delivering = true;
     prepareNextNotification(aDeliveryState);
   }
@@ -277,7 +277,7 @@ void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryState
 {
   // this is called from aDeliveryStateBeingDeleted destructor, and signals delivery really complete
   delivering = false;
-  ALOG(LOG_NOTICE, "===== delivery of '%s' complete", NotificationNames[aDeliveryStateBeingDeleted.callType]);
+  ALOG(LOG_INFO, "===== '%s' delivery complete", NotificationNames[aDeliveryStateBeingDeleted.callType]);
   // check for pending deliveries
   if (pendingDeliveries.size()>0) {
     // get next from queue
@@ -286,7 +286,7 @@ void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryState
     //   because we rely on the NotificationDeliveryState's destructor to call us back here when done!
     pendingDeliveries.pop_front();
     // - now start
-    ALOG(LOG_NOTICE, "===== starting delivery of '%s' from queue", NotificationNames[nds->callType]);
+    ALOG(LOG_INFO, "===== '%s' queued delivery to %ld devices starts now", NotificationNames[nds->callType], nds->audience.size());
     delivering = true;
     prepareNextNotification(nds);
   }
