@@ -123,8 +123,7 @@ private:
     vdcHost(aVdcHost),
     button(aButton),
     redLED(aRedLED),
-    greenLED(aGreenLED),
-    errorReportTicket(0)
+    greenLED(aGreenLED)
   {
     // start testing
     nextVdc = vdcHost.vdcs.begin();
