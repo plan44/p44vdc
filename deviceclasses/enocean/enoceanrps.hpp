@@ -82,6 +82,26 @@ namespace p44 {
     /// private constructor, create new channels using factory static method
     EnoceanRpsButtonHandler(EnoceanDevice &aDevice);
 
+    /// handle radio packet related to this channel
+    /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
+
+    /// short (text without LFs!) description of object, mainly for referencing it in log messages
+    /// @return textual description of object
+    virtual string shortDesc() P44_OVERRIDE;
+  };
+  typedef boost::intrusive_ptr<EnoceanRpsButtonHandler> EnoceanRpsButtonHandlerPtr;
+
+
+  /// single EnOcean rocker button channel
+  class EnoceanRpsRockerHandler : public EnoceanChannelHandler
+  {
+    typedef EnoceanChannelHandler inherited;
+    friend class EnoceanRPSDevice;
+
+    /// private constructor, create new channels using factory static method
+    EnoceanRpsRockerHandler(EnoceanDevice &aDevice);
+
     bool pressed; ///< true if currently pressed, false if released, index: 0=on/down button, 1=off/up button
     int switchIndex; ///< which switch within the device (A..D)
     bool isRockerUp; ///< set if rocker up side of switch
@@ -96,9 +116,8 @@ namespace p44 {
     virtual string shortDesc() P44_OVERRIDE;
     
     void setButtonState(bool aPressed);
-    
   };
-  typedef boost::intrusive_ptr<EnoceanRpsButtonHandler> EnoceanRpsButtonHandlerPtr;
+  typedef boost::intrusive_ptr<EnoceanRpsRockerHandler> EnoceanRpsRockerHandlerPtr;
 
 
   /// single EnOcean window handle channel
@@ -110,8 +129,6 @@ namespace p44 {
     /// private constructor, create new channels using factory static method
     EnoceanRpsWindowHandleHandler(EnoceanDevice &aDevice);
 
-    bool isERP2; ///< set if protocol is ERP2
-
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
     virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
@@ -119,7 +136,6 @@ namespace p44 {
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
     virtual string shortDesc() P44_OVERRIDE;
-
   };
   typedef boost::intrusive_ptr<EnoceanRpsWindowHandleHandler> EnoceanRpsWindowHandleHandlerPtr;
 
@@ -143,14 +159,13 @@ namespace p44 {
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
     virtual string shortDesc() P44_OVERRIDE;
-
   };
   typedef boost::intrusive_ptr<EnoceanRpsCardKeyHandler> EnoceanRpsCardKeyHandlerPtr;
 
 
 
-  /// single EnOcean smoke detector handler
-  class EnoceanRpsSmokeDetectorHandler : public EnoceanChannelHandler
+  /// single EnOcean wind and smoke detector handler
+  class EnoceanRpsWindSmokeDetectorHandler : public EnoceanChannelHandler
   {
     typedef EnoceanChannelHandler inherited;
     friend class EnoceanRPSDevice;
@@ -158,7 +173,7 @@ namespace p44 {
     bool isBatteryStatus; ///< set if this represents the battery status (otherwise, it's the alarm status)
 
     /// private constructor, create new channels using factory static method
-    EnoceanRpsSmokeDetectorHandler(EnoceanDevice &aDevice);
+    EnoceanRpsWindSmokeDetectorHandler(EnoceanDevice &aDevice);
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
@@ -167,9 +182,8 @@ namespace p44 {
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
     virtual string shortDesc() P44_OVERRIDE;
-
   };
-  typedef boost::intrusive_ptr<EnoceanRpsSmokeDetectorHandler> EnoceanRpsSmokeDetectorHandlerPtr;
+  typedef boost::intrusive_ptr<EnoceanRpsWindSmokeDetectorHandler> EnoceanRpsWindSmokeDetectorHandlerPtr;
 
 
   /// single EnOcean liquid leakage detector handler
@@ -188,7 +202,6 @@ namespace p44 {
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
     virtual string shortDesc() P44_OVERRIDE;
-
   };
   typedef boost::intrusive_ptr<EnoceanRpsLeakageDetectorHandler> EnoceanRpsLeakageDetectorHandlerPtr;
 
