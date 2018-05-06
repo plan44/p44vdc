@@ -334,7 +334,7 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
       // process if complete
       if (simPacket->isComplete()) {
         LOG(LOG_DEBUG, "Simulated Enocean Packet:\n%s", simPacket->description().c_str());
-        if (simPacket->packetType()==pt_radio) {
+        if (simPacket->packetType()==pt_radio_erp1) {
           handleRadioPacket(simPacket, ErrorPtr());
         }
         else if (simPacket->packetType()==pt_event_message) {

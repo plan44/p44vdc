@@ -54,13 +54,15 @@ namespace p44 {
 
 
   typedef enum {
-    pt_radio = 0x01, // Radio telegram
+    pt_radio_erp1 = 0x01, // Radio telegram (ERP1)
     pt_response = 0x02, // Response to any packet
     pt_radio_sub_tel = 0x03, // Radio subtelegram
     pt_event_message = 0x04, // Event message
     pt_common_cmd = 0x05, // Common command
     pt_smart_ack_command = 0x06, // Smart Ack command
     pt_remote_man_command = 0x07, // Remote management command
+    pt_radio_message = 0x09, // Radio message
+    pt_radio_erp2 = 0x0A, // Radio telegram (ERP2, 902 and 928 MHz Japan/USA/Canada only)
     pt_manufacturer_specific_cmd_first = 0x80, // first manufacturer specific command
     pt_manufacturer_specific_cmd_last = 0xFF // last manufacturer specific command
   } PacketType;

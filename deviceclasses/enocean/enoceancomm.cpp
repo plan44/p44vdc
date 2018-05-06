@@ -385,7 +385,7 @@ uint8_t Esp3Packet::radioRepeaterCount()
 
 size_t Esp3Packet::radioUserDataLength()
 {
-  if (packetType()!=pt_radio) return 0; // no data
+  if (packetType()!=pt_radio_erp1) return 0; // no data
   int bytes = (int)dataLength(); // start with actual length
   bytes -= 1; // RORG byte
   bytes -= 1; // one status byte
@@ -396,7 +396,7 @@ size_t Esp3Packet::radioUserDataLength()
 
 void Esp3Packet::setRadioUserDataLength(size_t aSize)
 {
-  if (packetType()!=pt_radio) return; // is not radio packet
+  if (packetType()!=pt_radio_erp1) return; // is not radio packet
   // add extra length needed for fixed fields in radio packet
   aSize += 1; // RORG byte
   aSize += 1; // one status byte
@@ -460,7 +460,7 @@ void Esp3Packet::initForRorg(RadioOrg aRadioOrg, size_t aVLDsize)
 {
   clear(); // init
   // set as radio telegram
-  setPacketType(pt_radio);
+  setPacketType(pt_radio_erp1);
   // radio telegrams always have 7 fields of optional data
   setOptDataLength(7);
   // depending on radio org, set payload size
@@ -505,7 +505,7 @@ void Esp3Packet::initForRorg(RadioOrg aRadioOrg, size_t aVLDsize)
 
 RadioOrg Esp3Packet::eepRorg()
 {
-  if (packetType()!=pt_radio) return rorg_invalid; // no radio
+  if (packetType()!=pt_radio_erp1) return rorg_invalid; // no radio
   uint8_t *d = data();
   if (!d || dataLength()<1) return rorg_invalid; // no RORG
   return (RadioOrg)d[0]; // this is the RORG byte
@@ -792,7 +792,7 @@ string Esp3Packet::description()
 {
   if (isComplete()) {
     string t;
-    if (packetType()==pt_radio) {
+    if (packetType()==pt_radio_erp1) {
       // ESP3 radio packet
       t = string_format(
         "ESP3 RADIO rorg=0x%02X,  sender=0x%08X, status=0x%02X\n"
@@ -844,7 +844,7 @@ string Esp3Packet::description()
     string_format_append(t, "\n- %3zu data bytes: ", dataLength());
     for (int i=0; i<dataLength(); i++)
       string_format_append(t, "%02X ", data()[i]);
-    if (packetType()==pt_radio) {
+    if (packetType()==pt_radio_erp1) {
       string_format_append(t, "\n- %3zu opt  bytes: ", optDataLength());
       for (int i=0; i<optDataLength(); i++)
         string_format_append(t, "%02X ", optData()[i]);
@@ -1282,7 +1282,7 @@ void EnoceanComm::dispatchPacket(Esp3PacketPtr aPacket)
 {
   // dispatch the packet
   PacketType pt = aPacket->packetType();
-  if (pt==pt_radio) {
+  if (pt==pt_radio_erp1) {
     // incoming radio packet
     if (radioPacketHandler) {
       // call the handler
