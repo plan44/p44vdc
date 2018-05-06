@@ -72,8 +72,7 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
   redChannel(dmxNone),
   greenChannel(dmxNone),
   blueChannel(dmxNone),
-  amberChannel(dmxNone),
-  transitionTicket(0)
+  amberChannel(dmxNone)
 {
   // evaluate config
   string config = aDeviceConfig;
