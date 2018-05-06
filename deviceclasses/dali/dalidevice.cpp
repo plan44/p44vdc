@@ -805,7 +805,7 @@ Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower)
 
 void DaliBusDevice::dimPrepare(VdcDimMode aDimMode, double aDimPerMS, StatusCB aCompletedCB)
 {
-  if (!isDummy && !aDimMode==dimmode_stop) {
+  if (!isDummy && aDimMode!=dimmode_stop) {
     // - configure new fade rate if current does not match
     if (aDimPerMS!=currentDimPerMS) {
       currentDimPerMS = aDimPerMS;
