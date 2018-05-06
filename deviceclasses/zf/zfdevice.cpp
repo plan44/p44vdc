@@ -471,7 +471,7 @@ void ZfButtonDevice::processPacket(ZfPacketPtr aPacket)
     ButtonBehaviourPtr bb = getButton(0);
     // pressing button now
     // - data==00 means "pressed", 01 means "released"
-    bb->buttonAction(aPacket->data==00);
+    bb->updateButtonState(aPacket->data==00);
   }
 }
 

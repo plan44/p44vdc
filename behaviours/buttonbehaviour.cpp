@@ -99,9 +99,9 @@ string ButtonBehaviour::getAutoId()
 
 
 
-void ButtonBehaviour::buttonAction(bool aPressed)
+void ButtonBehaviour::updateButtonState(bool aPressed)
 {
-  BLOG(LOG_NOTICE, "Button[%zu] %s '%s' was %s", index, behaviourId.c_str(), getHardwareName().c_str(), aPressed ? "pressed" : "released");
+  BLOG(LOG_NOTICE, "Button[%zu] %s '%s' reports %s", index, behaviourId.c_str(), getHardwareName().c_str(), aPressed ? "pressed" : "released");
   bool stateChanged = aPressed!=buttonPressed;
   buttonPressed = aPressed; // remember new state
   // check which statemachine to use

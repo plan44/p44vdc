@@ -2107,7 +2107,7 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
             case input_rocker:
             {
               ButtonBehaviourPtr bb = getButton(inpindex);
-              bb->buttonAction(true);
+              bb->updateButtonState(true);
               releaseTicket.executeOnce(boost::bind(&DaliInputDevice::buttonReleased, this, inpindex), BUTTON_RELEASE_TIMEOUT);
               break;
             }
@@ -2143,7 +2143,7 @@ void DaliInputDevice::buttonReleased(int aButtonNo)
 {
   releaseTicket = 0;
   ButtonBehaviourPtr bb = getButton(aButtonNo);
-  bb->buttonAction(false);
+  bb->updateButtonState(false);
 }
 
 

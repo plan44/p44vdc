@@ -131,9 +131,9 @@ namespace p44 {
     /// @name interface towards actual device hardware (or simulation)
     /// @{
 
-    /// button action occurred
-    /// @param aPressed true if action is button pressed, false if action is button released
-    void buttonAction(bool aPressed);
+    /// report current button state (can be repeated with same state)
+    /// @param aPressed true if button is currently pressed, false if button is currently released
+    void updateButtonState(bool aPressed);
 
     /// send direct action
     /// @param aActionMode the mode how to send the action

@@ -150,7 +150,7 @@ void DigitalIODevice::buttonHandler(bool aNewState, MLMicroSeconds aTimestamp)
 {
 	ButtonBehaviourPtr b = getButton(0);
 	if (b) {
-		b->buttonAction(aNewState);
+		b->updateButtonState(aNewState);
 	}
 }
 

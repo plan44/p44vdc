@@ -542,11 +542,11 @@ ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double a
       if (bb) {
         if (aValue>2) {
           // simulate a keypress of defined length in milliseconds
-          bb->buttonAction(true);
+          bb->updateButtonState(true);
           buttonReleaseTicket.executeOnce(boost::bind(&ExternalDevice::releaseButton, this, bb), aValue*MilliSecond);
         }
         else {
-          bb->buttonAction(aValue!=0);
+          bb->updateButtonState(aValue!=0);
         }
       }
       break;
@@ -609,7 +609,7 @@ ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double a
 
 void ExternalDevice::releaseButton(ButtonBehaviourPtr aButtonBehaviour)
 {
-  aButtonBehaviour->buttonAction(false);
+  aButtonBehaviour->updateButtonState(false);
 }
 
 

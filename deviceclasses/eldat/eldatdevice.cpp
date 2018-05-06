@@ -495,7 +495,7 @@ void EldatButtonDevice::handleFunction(EldatFunction aFunction)
   // now handle
   if (!pressedTicket) {
     // pressing button now
-    bb->buttonAction(true);
+    bb->updateButtonState(true);
   }
   else {
     // cancel current ticket
@@ -509,7 +509,7 @@ void EldatButtonDevice::buttonReleased(int aButtonNo)
 {
   pressedTicket = 0;
   ButtonBehaviourPtr bb = getButton(aButtonNo);
-  bb->buttonAction(false);
+  bb->updateButtonState(false);
 }
 
 
