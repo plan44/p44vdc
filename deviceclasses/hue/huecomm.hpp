@@ -53,7 +53,7 @@ namespace p44 {
 
     static const char *domain() { return "HueComm"; }
     virtual const char *getErrorDomain() const { return HueCommError::domain(); };
-    HueCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    explicit HueCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
   };
 
 
