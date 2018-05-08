@@ -167,6 +167,25 @@ void DsScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
+bool DsScene::preciseUndoImportant()
+{
+  // by default, only alarm scenes are likely to be undone at all, and thus should precisely capture previous output state
+  // (for other scenes, capturing the last-known cached output state is sufficient, and much less expensive)
+  return
+    sceneNo==PANIC ||
+    sceneNo==ALARM1 ||
+    sceneNo==FIRE ||
+    sceneNo==SMOKE ||
+    sceneNo==WATER ||
+    sceneNo==GAS ||
+    sceneNo==ALARM2 ||
+    sceneNo==ALARM3 ||
+    sceneNo==ALARM4;
+}
+
+
+
+
 uint64_t DsScene::sceneHash()
 {
   // generic base class implementation: hash over all values and all flags.

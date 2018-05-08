@@ -1463,12 +1463,10 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
       else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_stop, area, 0);
       return;
     }
-    // we get here only if callScene is not legacy dimming
-    ALOG(LOG_NOTICE, "CallScene(%d) (non-dimming!)", aSceneNo);
     // make sure dimming stops for any non-dimming scene call
     if (currentDimMode!=dimmode_stop) {
       // any non-dimming scene call stops dimming
-      LOG(LOG_NOTICE, "- interrupts dimming in progress");
+      ALOG(LOG_NOTICE, "CallScene(%d) interrupts dimming in progress", aSceneNo);
       dimChannelForAreaPrepare(boost::bind(&Device::callSceneDimStop, this, aPreparedCB, scene, aForce), currentDimChannel, dimmode_stop, area, 0);
       return;
     }
@@ -1493,6 +1491,7 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
 {
   SceneArea area = aScene->sceneArea;
   SceneNo sceneNo = aScene->sceneNo;
+  ALOG(LOG_INFO, "Evaluating CallScene(%d)", sceneNo);
   // filter area scene calls via area main scene's (area x on, Tx_S1) dontCare flag
   if (area) {
     LOG(LOG_INFO, "- callScene(%d): is area #%d scene", sceneNo, area);
@@ -1526,6 +1525,8 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
         output->setLocalPriority(false);
       }
     }
+    // we get here only if callScene is actually affecting this device
+    ALOG(LOG_NOTICE, "affected by CallScene(%d)", sceneNo);
     // - make sure we have the lastState pseudo-scene for undo
     if (!previousState) {
       previousState = getScenes()->newUndoStateScene();
@@ -1536,10 +1537,13 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
     // - now capture current values and then apply to output
     if (output) {
       // Non-dimming scene: have output save its current state into the previousState pseudo scene
+      // Note: we only ask updating from device for scenes that are likely to be undone, and thus important
+      //   to capture perfectly. For all others, it is sufficient to just capture the cached output channel
+      //   values and not waste time with expensive queries to device hardware.
       // Note: the actual updating might happen later (when the hardware responds) but
-      //   implementations must make sure access to the hardware is serialized such that
+      //   if so, implementations must make sure access to the hardware is serialized such that
       //   the values are captured before values from performApplySceneToChannels() below are applied.
-      output->captureScene(previousState, true, boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
+      output->captureScene(previousState, aScene->preciseUndoImportant() , boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
     } // if output
   } // not dontCare
   else {

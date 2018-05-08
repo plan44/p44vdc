@@ -194,10 +194,19 @@ namespace p44 {
     /// @param aSceneNo the scene number to set default values
     virtual void setDefaultSceneValues(SceneNo aSceneNo);
 
+    /// indicator about how important precise undo is after calling this scene
+    /// @note actually asking devices about their current state can be very expensive and should
+    ///   be avoided when possible. In most cases, the cached output values are correct.
+    ///   Exceptions are devices that have local/separate controls that can change the output
+    ///   without the vDC knowing about. On the other hand, undo is a very unlikely operation
+    ///   for most scenes (in practice, only Alarm-type global scenes are undone)
+    virtual bool preciseUndoImportant();
+
     /// scene contents hash
     /// @return a hash value of the scene contents (NOT including the scene number!)
     /// @note is allowed to return different values for same scene contents on different platforms
     virtual uint64_t sceneHash();
+
 
   protected:
 
