@@ -36,6 +36,9 @@ using namespace p44;
 // default vdc modelname template
 #define DEFAULT_MODELNAME_TEMPLATE "%M %m"
 
+#define DEFAULT_MIN_CALLS_BEFORE_OPTIMIZING 3 // do not optimize calls before they have repeated this number of times
+#define DEFAULT_MIN_DEVICES_FOR_OPTIMIZING 5 // do not optimize sets with less than this number of devices
+
 
 Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aVdcHostP),
@@ -49,7 +52,9 @@ Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   rescanMode(rescanmode_incremental),
   collecting(false),
   delivering(false),
-  totalOptimizableCalls(0)
+  totalOptimizableCalls(0),
+  minCallsBeforeOptimizing(DEFAULT_MIN_CALLS_BEFORE_OPTIMIZING),
+  minDevicesForOptimizing(DEFAULT_MIN_DEVICES_FOR_OPTIMIZING)
 {
 }
 
@@ -338,19 +343,11 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
 }
 
 
-#define MIN_CALLS_BEFORE_OPTIMIZING 3 // do not optimize calls before they have repeated this number of times
-
-#if DEBUG
-  #define MIN_DEVICES_TO_OPTIMIZE 2 // do not optimize sets with less than this number of devices
-#else
-  #define MIN_DEVICES_TO_OPTIMIZE 5 // do not optimize sets with less than this number of devices
-#endif
-
 bool Vdc::shouldUseOptimizerFor(NotificationDeliveryStatePtr aDeliveryState)
 {
   // simple base class strategy: at least MIN_DEVICES_TO_OPTIMIZE devices must be involved.
   // derived classes can use refined strategy more suitable for the hardware
-  return aDeliveryState->affectedDevices.size()>=MIN_DEVICES_TO_OPTIMIZE;
+  return aDeliveryState->affectedDevices.size()>=minDevicesForOptimizing;
 }
 
 
@@ -441,7 +438,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
       else {
         // affected device set/contentId has no native scene/group installed yet
         AFOCUSLOG("- no native action assigned yet -> checking statistics to see if we should add one");
-        if (optimizerMode==opt_auto && entry->timeWeightedCallCount()>MIN_CALLS_BEFORE_OPTIMIZING) {
+        if (optimizerMode==opt_auto && entry->timeWeightedCallCount()>minCallsBeforeOptimizing) {
           ALOG(LOG_NOTICE, "Optimizer: %s for these devices has occurred repeatedly (weighted: %ld times) -> optimzing it using native action", NotificationNames[aDeliveryState->optimizedType], entry->timeWeightedCallCount());
           finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::AddAction, "Request adding native action"));
           return;
@@ -1160,6 +1157,8 @@ enum {
   instancenumber_key,
   rescanModes_key,
   optimizerMode_key,
+  minDevicesForOptimizing_key,
+  minCallsBeforeOptimizing_key,
   numVdcProperties
 };
 
@@ -1236,7 +1235,9 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
       { "x-p44-devices", apivalue_object+propflag_container+propflag_nowildcard, devices_key, OKEY(devices_container_key) },
       { "x-p44-instanceNo", apivalue_uint64, instancenumber_key, OKEY(vdc_key) },
       { "x-p44-rescanModes", apivalue_uint64, rescanModes_key, OKEY(vdc_key) },
-      { "x-p44-optimizerMode", apivalue_uint64, optimizerMode_key, OKEY(vdc_key) }
+      { "x-p44-optimizerMode", apivalue_uint64, optimizerMode_key, OKEY(vdc_key) },
+      { "x-p44-minDevicesForOptimizing", apivalue_uint64, minDevicesForOptimizing_key, OKEY(vdc_key) },
+      { "x-p44-minCallsBeforeOptimizing", apivalue_uint64, minCallsBeforeOptimizing_key, OKEY(vdc_key) }
     };
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)
@@ -1271,6 +1272,14 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
           if (optimizerMode==opt_unavailable) return false; // do not show the property at all
           aPropValue->setUint32Value(optimizerMode);
           return true;
+        case minCallsBeforeOptimizing_key:
+          if (optimizerMode==opt_unavailable) return false; // do not show the property at all
+          aPropValue->setUint32Value(minCallsBeforeOptimizing);
+          return true;
+        case minDevicesForOptimizing_key:
+          if (optimizerMode==opt_unavailable) return false; // do not show the property at all
+          aPropValue->setUint32Value(minDevicesForOptimizing);
+          return true;
       }
     }
     else {
@@ -1294,6 +1303,14 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
             return false;
           }
         }
+        case minCallsBeforeOptimizing_key:
+          if (optimizerMode==opt_unavailable) return false; // property not writable
+          setPVar(minCallsBeforeOptimizing, aPropValue->int32Value());
+          return true;
+        case minDevicesForOptimizing_key:
+          if (optimizerMode==opt_unavailable) return false; // property not writable
+          setPVar(minDevicesForOptimizing, aPropValue->int32Value());
+          return true;
       }
     }
   }
@@ -1322,7 +1339,7 @@ const char *Vdc::tableName()
 
 // data field definitions
 
-static const size_t numFields = 4;
+static const size_t numFields = 6;
 
 size_t Vdc::numFieldDefs()
 {
@@ -1336,7 +1353,9 @@ const FieldDefinition *Vdc::getFieldDef(size_t aIndex)
     { "vdcFlags", SQLITE_INTEGER },
     { "vdcName", SQLITE_TEXT },
     { "defaultZoneID", SQLITE_INTEGER },
-    { "optimizerMode", SQLITE_INTEGER }
+    { "optimizerMode", SQLITE_INTEGER },
+    { "minCallsBeforeOptimizing", SQLITE_INTEGER },
+    { "minDevicesForOptimizing", SQLITE_INTEGER }
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1357,9 +1376,11 @@ void Vdc::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *a
   defaultZoneID = aRow->getCasted<DsZoneID, int>(aIndex++);
   // read optimizer mode only for vdcs that support it
   if (optimizerMode!=opt_unavailable) {
-    optimizerMode = aRow->getCastedWithDefault<OptimizerMode, int>(aIndex, optimizerMode);
+    optimizerMode = aRow->getCastedWithDefault<OptimizerMode, int>(aIndex++, optimizerMode);
   }
   aIndex++;
+  aRow->getIfNotNull(aIndex++, minCallsBeforeOptimizing);
+  aRow->getIfNotNull(aIndex++, minDevicesForOptimizing);
 }
 
 
@@ -1372,6 +1393,8 @@ void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const c
   aStatement.bind(aIndex++, getAssignedName().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, defaultZoneID);
   aStatement.bind(aIndex++, optimizerMode);
+  aStatement.bind(aIndex++, minCallsBeforeOptimizing);
+  aStatement.bind(aIndex++, minDevicesForOptimizing);
 }
 
 // MARK: ===== description/shortDesc/status

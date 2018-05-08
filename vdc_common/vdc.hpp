@@ -221,6 +221,8 @@ namespace p44 {
   
     DeviceVector devices; ///< the devices of this class
     OptimizerMode optimizerMode; ///< the optimizer mode
+    int minDevicesForOptimizing; ///< how many devices are needed for optimized scenes/dimming
+    int minCallsBeforeOptimizing; ///< how many calls before optimizer tries creating scene/group
 
   public:
 
