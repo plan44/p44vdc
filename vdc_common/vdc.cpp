@@ -264,6 +264,8 @@ void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aA
 
 void Vdc::queueDelivery(NotificationDeliveryStatePtr aDeliveryState)
 {
+  // starting a new callScene or dimChannel must make sure no delayed output state saving (native scene update) is still pending
+  cancelNativeActionUpdate();
   if (delivering) {
     // queue for when current delivery is done
     pendingDeliveries.push_back(aDeliveryState);
@@ -522,8 +524,8 @@ void Vdc::preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryS
   else if (Error::isError(aError, VdcError::domain(), VdcError::StaleAction)) {
     // update native action contents
     ALOG(LOG_NOTICE, "Updating native action '%s' for '%s' (variant %d)", aEntry->nativeActionId.c_str(), NotificationNames[aDeliveryState->optimizedType], aDeliveryState->actionVariant);
+    aEntry->contentsHash = aDeliveryState->contentsHash; // prepare new hash BEFORE - delayed updates might want to reset it in updateNativeAction()
     updateNativeAction(boost::bind(&Vdc::preparedNotificationComplete, this, aEntry, aDeliveryState, true, _1), aEntry, aDeliveryState); // is a change of the entry
-    aEntry->contentsHash = aDeliveryState->contentsHash; // update hash
     return;
   }
   else {

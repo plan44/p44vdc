@@ -875,6 +875,17 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
   if (a!=NoDaliAddress) {
     if (aDeliveryState->optimizedType==ntfy_callscene) {
       groupDimTicket.cancel(); // just safety, should be cancelled already
+      // set fade time according to scene transition time (usually: already ok, so no time wasted)
+      // note: dalicomm will make sure the fade time adjustments are sent before the scene call
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
+        if (dev && dev->daliController) {
+          LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
+          if (l) {
+            dev->daliController->setTransitionTime(l->transitionTimeToNewBrightness());
+          }
+        }
+      }
       // Broadcast scene call: DALICMD_GO_TO_SCENE
       daliComm->daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask), boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
       return;
@@ -1011,12 +1022,13 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
   DaliAddress a = daliAddressFromActionId(aOptimizerEntry->nativeActionId);
   if ((a&DaliScene) && aDeliveryState->optimizedType==ntfy_callscene) {
     // now store scene values -> for each affected device send DALICMD_STORE_DTR_AS_SCENE
+    // Note: we can do this immediately even if transitions might be running, because we store the locally known scene values
     for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
       DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
       if (dev && dev->daliController) {
         LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
         if (l) {
-          uint8_t power = dev->daliController->brightnessToArcpower(l->brightnessForHardware());
+          uint8_t power = dev->daliController->brightnessToArcpower(l->brightnessForHardware(true)); // non-transitional, final
           daliComm->daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_SCENE+(a&DaliSceneMask), power);
         }
       }

@@ -661,7 +661,7 @@ void DaliBusDevice::setTransitionTime(MLMicroSeconds aTransitionTime)
       LOG(LOG_DEBUG, "DaliDevice: new transition time = %.1f mS, calculated FADE_TIME setting = %f (rounded %d)", (double)aTransitionTime/MilliSecond, h, (int)tr);
     }
     if (tr!=currentFadeTime || currentTransitionTime==Infinite) {
-      LOG(LOG_DEBUG, "DaliDevice: setting DALI FADE_TIME to %d", (int)tr);
+      LOG(LOG_INFO, "DaliDevice %d: setting DALI FADE_TIME to %d (for transition time %.1f mS)", deviceInfo->shortAddress, (int)tr, deviceInfo->shortAddress);
       daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_TIME, tr);
       currentFadeTime = tr;
     }
@@ -1402,8 +1402,9 @@ bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStat
   }
   // check notification-specific conditions
   if (aDeliveryState->optimizedType==ntfy_callscene) {
-    // scenes are generally optimizable
-    return true;
+    // scenes are generally optimizable unless transition time is really slow and must be executed in multiple steps
+    LightBehaviourPtr l = getOutput<LightBehaviour>();
+    if (l) return l->transitionTimeToNewBrightness()<=MAX_SINGLE_STEP_TRANSITION_TIME;
   }
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
     // only brightness dimming optimizable for now

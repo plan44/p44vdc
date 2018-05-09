@@ -519,11 +519,21 @@ namespace p44 {
     /// @param aStatusCB must be called to return status.
     /// @param aOptimizerEntry the optimizer entry. If configuration has changed in the native device, lastNativeChange should be updated.
     /// @param aDeliveryState can be inspected to obtain details such as list of affected devices etc.
+    /// @note the implementation might need to delay the update to make sure transition times of affected devices have passed.
+    ///    When this happens, the aStatusCB call must not be substantially delayed (seconds, minutes), otherwise it would block
+    ///    further notifications. Instead, aStatusCB should be called immediately while the actual update can happen
+    ///    later. Furthermore, such a delayed update must be abortable via cancelNativeActionUpdate().
     virtual void updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState);
+
+    /// this is called to make sure no delayed scene update is still pending before posting another scene call (causing output changes
+    /// and possibly saving wrong scene values).
+    /// @note this method might be called multiple times, and possibly also without a preceeding updateNativeAction() call.
+    virtual void cancelNativeActionUpdate() {};
 
     /// free native action
     /// @param aNativeActionId a ID of a native action that should be removed
     virtual ErrorPtr freeNativeAction(const string aNativeActionId) { return ErrorPtr(); /* NOP in base class */ };
+
 
     /// @}
 

@@ -589,7 +589,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
       groupDimTicket.cancel(); // just safety, should be cancelled already
       JsonObjectPtr setGroupState = JsonObject::newObj();
       // PUT /api/<username>/groups/<groupid>/action
-      // { "scene": "AB34EF5"}
+      // { "scene": "AB34EF5", "transitiontime":60 }
       setGroupState->add("scene", JsonObject::newString(hueActionId));
       hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
       return;
@@ -687,11 +687,18 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       // {"name":"thename", "lights":["1","2"], "recycle":false }
       string sceneName = string_format("digitalSTROM-Scene_%d", aOptimizerEntry->contentId);
       JsonObjectPtr lights = JsonObject::newArray();
+      // transition time is per scene for hue. Use longest transition time among devices
+      MLMicroSeconds longestTransition = 0;
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
         lights->arrayAppend(JsonObject::newString(dev->lightID));
         sceneName += ":" + dev->lightID;
+        // find longest transition
+        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
+        MLMicroSeconds tt = l->transitionTimeToNewBrightness();
+        if (tt>longestTransition) longestTransition = tt;
       }
+      newScene->add("transitiontime", JsonObject::newInt64(longestTransition*10/Second));
       newScene->add("name", JsonObject::newString(sceneName));
       newScene->add("lights", lights);
       newScene->add("recycle", JsonObject::newBool(false));
@@ -744,6 +751,7 @@ void HueVdc::nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
           numOptimizerScenes++;
           aOptimizerEntry->nativeActionId = "hue_scene_" + i->stringValue();
           LOG(LOG_INFO,"HueVdc: created new hue scene '%s'", aOptimizerEntry->nativeActionId.c_str());
+          // TODO: if hue scene saves transitional values, we might need to call updateNativeAction() here
         }
         else if (aOptimizerEntry->type==ntfy_dimchannel) {
           // successfully created group
@@ -774,13 +782,23 @@ void HueVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       // PUT /api/<username>/scenes/<sceneid>
       // {"lights":["1","2"], "storelightstate":true }
       JsonObjectPtr lights = JsonObject::newArray();
+      MLMicroSeconds longestTransition = 0;
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
+        // collect id to update
         lights->arrayAppend(JsonObject::newString(dev->lightID));
+        // find longest transition
+        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
+        MLMicroSeconds tt = l->transitionTimeToNewBrightness();
+        if (tt>longestTransition) longestTransition = tt;
       }
+      updatedScene->add("transitiontime", JsonObject::newInt64(longestTransition*10/Second));
       updatedScene->add("storelightstate", JsonObject::newBool(true));
-      string url = "/scenes/" + sceneId;
-      hueComm.apiAction(httpMethodPUT, url.c_str(), updatedScene, boost::bind(&HueVdc::nativeActionUpdated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
+      // actually perform scene update only after transitions are all complete (50% safety margin)
+      uint64_t newHash = aOptimizerEntry->contentsHash; // remember the correct hash for the case we can execute the delayed update
+      aOptimizerEntry->contentsHash = 0; // reset for now, scene is not up-to-date yet
+      delayedSceneUpdateTicket.executeOnce(boost::bind(&HueVdc::performNativeSceneUpdate, this, newHash, sceneId, updatedScene, aDeliveryState->affectedDevices, aOptimizerEntry), longestTransition*3/2);
+      aStatusCB(ErrorPtr());
       return;
     }
   }
@@ -788,17 +806,35 @@ void HueVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
 }
 
 
-void HueVdc::nativeActionUpdated(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState, JsonObjectPtr aResult, ErrorPtr aError)
+void HueVdc::cancelNativeActionUpdate()
+{
+  // the lights will change, do not update the scene
+  delayedSceneUpdateTicket.cancel();
+}
+
+
+void HueVdc::performNativeSceneUpdate(uint64_t aNewHash, string aSceneId, JsonObjectPtr aSceneUpdate, DeviceList aAffectedDevices, OptimizerEntryPtr aOptimizerEntry)
+{
+  // actually post update
+  string url = "/scenes/" + aSceneId;
+  hueComm.apiAction(httpMethodPUT, url.c_str(), aSceneUpdate, boost::bind(&HueVdc::nativeActionUpdated, this, aNewHash, aOptimizerEntry, _1, _2));
+  return;
+}
+
+
+
+void HueVdc::nativeActionUpdated(uint64_t aNewHash, OptimizerEntryPtr aOptimizerEntry, JsonObjectPtr aResult, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
     // [{ "success": { "id": "Abc123Def456Ghi" } }]
     // TODO: details checks - for now just assume update has worked when request did not produce an error
     aOptimizerEntry->lastNativeChange = MainLoop::now();
     LOG(LOG_INFO,"HueVdc: updated new hue scene");
-    aStatusCB(ErrorPtr()); // success
-    return;
+    // done, update entry
+    aOptimizerEntry->contentsHash = aNewHash;
+    aOptimizerEntry->lastNativeChange = MainLoop::now();
+    aOptimizerEntry->markDirty();
   }
-  aStatusCB(aError); // failure of some sort
 }
 
 

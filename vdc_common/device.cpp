@@ -578,6 +578,17 @@ bool Device::needsToApplyChannels()
 }
 
 
+void Device::allChannelsApplied(bool aAnyway)
+{
+  for (int i=0; i<numChannels(); i++) {
+    ChannelBehaviourPtr ch = getChannelByIndex(i, true);
+    if (ch) {
+      ch->channelValueApplied(aAnyway);
+    }
+  }
+}
+
+
 ChannelBehaviourPtr Device::getChannelByIndex(int aChannelIndex, bool aPendingApplyOnly)
 {
   if (!output) return ChannelBehaviourPtr();
@@ -1590,7 +1601,10 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
           return;
         }
         else {
-          // just consider channels already applied (e.g. by vdc-level native action)
+          // just consider all channels already applied (e.g. by vdc-level native action)
+          // - confirm having applied channels (normally, actual device-level apply would do that)
+          allChannelsApplied();
+          // - consider scene applied
           sceneValuesApplied(aDoneCB, scene);
           return;
         }
@@ -2271,6 +2285,7 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
     aMode==access_write // ...got a non-preload write
   ) {
     // apply new channel values to hardware, not dimming
+    vdcP->cancelNativeActionUpdate(); // still delayed native scene updates must be cancelled before changing channel values
     requestApplyingChannels(NULL, false);
   }
   return inherited::writtenProperty(aMode, aPropertyDescriptor, aDomain, aContainer);

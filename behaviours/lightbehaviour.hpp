@@ -153,10 +153,11 @@ namespace p44 {
     virtual double outputValueAccordingToMode(double aChannelValue, int aChannelIndex) P44_OVERRIDE;
 
     /// return the brightness to be applied to hardware
+    /// @param aFinal if set, the final value (not transitional) will be used
     /// @return brightness
     /// @note this is to allow lights to have switching behaviour - when brightness channel value is
     ///   above onThreshold, brightnessForHardware() will return the max channel value and 0 otherwise.
-    Brightness brightnessForHardware();
+    Brightness brightnessForHardware(bool aFinal = false);
 
     /// sync channel brightness from actual hardware value
     /// @param aBrightness current brightness value read back from hardware

@@ -526,6 +526,10 @@ namespace p44 {
     /// @return true if any channel needs to be applied to hardware
     bool needsToApplyChannels();
 
+    /// confirms all channels applied to hardware
+    /// @param aAnyWay if true, lastSent state will be set even for channels that were not in needsApplying() state
+    void allChannelsApplied(bool aAnyway = false);
+
     /// get channel by index
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @param aPendingApplyOnly if true, only channels with pending values to be applied are returned

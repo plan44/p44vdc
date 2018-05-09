@@ -85,6 +85,7 @@ namespace p44 {
     int numOptimizerGroups; ///< how many groups are in use by the optimizer
     MLTicket groupDimTicket; ///< for group dimming repeater
     MLTicket refindTicket; ///< for delayed bridge re-find
+    MLTicket delayedSceneUpdateTicket; ///< timer for delayed native scene update
 
     /// @}
 
@@ -181,6 +182,11 @@ namespace p44 {
     /// @param aDeliveryState can be inspected to obtain details such as list of affected devices etc.
     virtual void updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
 
+    /// this is called to make sure no delayed scene update is still pending before posting another scene call (causing output changes
+    /// and possibly saving wrong scene values).
+    /// @note this method might be called multiple times, and possibly also without a preceeding updateNativeAction() call.
+    virtual void cancelNativeActionUpdate() P44_OVERRIDE;
+
     /// free native action
     /// @param aNativeActionId a ID of a native action that should be removed
     virtual ErrorPtr freeNativeAction(const string aNativeActionId) P44_OVERRIDE;
@@ -199,7 +205,8 @@ namespace p44 {
     void collectedScenesHandler(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError);
     void collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError);
     void nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState, JsonObjectPtr aResult, ErrorPtr aError);
-    void nativeActionUpdated(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState, JsonObjectPtr aResult, ErrorPtr aError);
+    void performNativeSceneUpdate(uint64_t aNewHash, string aSceneId, JsonObjectPtr aSceneUpdate, DeviceList aAffectedDevices, OptimizerEntryPtr aOptimizerEntry);
+    void nativeActionUpdated(uint64_t aNewHash, OptimizerEntryPtr aOptimizerEntry, JsonObjectPtr aResult, ErrorPtr aError);
     void nativeActionDeleted(JsonObjectPtr aResult, ErrorPtr aError);
     void groupDimRepeater(JsonObjectPtr aDimState, int aTransitionTime, MLTimer &aTimer);
     void nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPtr aError);
