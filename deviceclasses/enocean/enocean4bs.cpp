@@ -897,22 +897,35 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
     // prepare 4BS packet (create packet if none created already)
     uint32_t data;
     Enocean4BSDevice::prepare4BSpacket(aEsp3PacketPtr, data);
-    // check for pending service cycle
-    if (cb->shouldRunProphylaxis() && serviceState==service_idle) {
+    // check for pending service operation
+    ClimateControlBehaviour::ValveService vs = cb->pendingServiceOperation();
+    if (vs!=ClimateControlBehaviour::vs_none && serviceState==service_idle) {
       // needs to initiate a prophylaxis cycle (only if not already one running)
-      serviceState = service_openvalve; // first fully open
+      switch(vs) {
+        case ClimateControlBehaviour::vs_prophylaxis : serviceState = service_openandclosevalve; break; // open and then close
+        case ClimateControlBehaviour::vs_fullyopen : serviceState = service_openvalve; break; // only open
+        case ClimateControlBehaviour::vs_fullyclose : serviceState = service_closevalve; break; // only close, like end of open/close
+        default: break;
+      }
     }
     if (serviceState!=service_idle) {
       // process pending service steps
       // - DB(1,0) set to 1 = service operation
       data |= DBMASK(1,0); // service on
-      if (serviceState==service_openvalve) {
+      if (serviceState==service_openandclosevalve || serviceState==service_openvalve) {
         // trigger force full open
         LOG(LOG_NOTICE, "- valve prophylaxis operation: fully opening valve");
         data |= DBMASK(1,5); // service: open
-        // next is closing
-        serviceState = service_closevalve;
-        device.needOutgoingUpdate();
+        if (serviceState==service_openandclosevalve) {
+          // next is closing
+          serviceState = service_closevalve;
+          device.needOutgoingUpdate();
+        }
+        else {
+          // already done
+          serviceState = service_idle;
+          device.needOutgoingUpdate();
+        }
       }
       else if (serviceState==service_closevalve) {
         // trigger force fully closed
@@ -1161,22 +1174,35 @@ void EnoceanA52004Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
     // prepare 4BS packet (create packet if none created already)
     uint32_t data;
     Enocean4BSDevice::prepare4BSpacket(aEsp3PacketPtr, data);
-    // check for pending service cycle
-    if (cb->shouldRunProphylaxis() && serviceState==service_idle) {
+    // check for pending service operation
+    ClimateControlBehaviour::ValveService vs = cb->pendingServiceOperation();
+    if (vs!=ClimateControlBehaviour::vs_none && serviceState==service_idle) {
       // needs to initiate a prophylaxis cycle (only if not already one running)
-      serviceState = service_openvalve; // first fully open
+      switch(vs) {
+        case ClimateControlBehaviour::vs_prophylaxis : serviceState = service_openandclosevalve; break; // open and then close
+        case ClimateControlBehaviour::vs_fullyopen : serviceState = service_openvalve; break; // only open
+        case ClimateControlBehaviour::vs_fullyclose : serviceState = service_closevalve; break; // only close, like end of open/close
+        default: break;
+      }
     }
     if (serviceState!=service_idle) {
       // process pending service steps
       // - DB0..1 = service command 0=no change, 1=open valve, 2=run init, 3=close valve
-      if (serviceState==service_openvalve) {
+      if (serviceState==service_openandclosevalve || serviceState==service_openvalve) {
         // trigger force full open
         LOG(LOG_NOTICE, "- valve prophylaxis operation: fully opening valve for 2 min");
         data |= 100<<DB(3,0); // do not use service, just open to 100%
         data |= 3<<DB(1,0); // 2 min
-        // next is closing
-        serviceState = service_closevalve;
-        device.needOutgoingUpdate();
+        if (serviceState==service_openandclosevalve) {
+          // next is closing
+          serviceState = service_closevalve;
+          device.needOutgoingUpdate();
+        }
+        else {
+          // already done
+          serviceState = service_idle;
+          device.needOutgoingUpdate();
+        }
       }
       else if (serviceState==service_closevalve) {
         // trigger force fully closed

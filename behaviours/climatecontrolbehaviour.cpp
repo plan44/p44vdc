@@ -75,6 +75,14 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
       sceneCmd = scene_cmd_climatecontrol_valve_prophylaxis;
       sceneArea = 0; // not an area scene any more
       break;
+    case CLIMATE_VALVE_OPEN:
+      sceneCmd = scene_cmd_climatecontrol_valve_service_open;
+      sceneArea = 0; // not an area scene any more
+      break;
+    case CLIMATE_VALVE_CLOSE:
+      sceneCmd = scene_cmd_climatecontrol_valve_service_close;
+      sceneArea = 0; // not an area scene any more
+      break;
     default:
       break;
   }
@@ -287,7 +295,7 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
   heatingSystemType(hstype_unknown),
   climateControlIdle(false), // assume valve active
   climateModeHeating(true),  // assume heating enabled
-  runProphylaxis(false), // no run scheduled
+  valveService(vs_none), // no valve service operation pending
   zoneTemperatureUpdated(Never),
   zoneTemperature(0),
   zoneTemperatureSetPointUpdated(Never),
@@ -462,7 +470,15 @@ bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene)
         return true;
       case scene_cmd_climatecontrol_valve_prophylaxis:
         // valve prophylaxis
-        runProphylaxis = true;
+        valveService = vs_prophylaxis;
+        return true;
+      case scene_cmd_climatecontrol_valve_service_open:
+        // valve service
+        valveService = vs_fullyopen;
+        return true;
+      case scene_cmd_climatecontrol_valve_service_close:
+        // valve service
+        valveService = vs_fullyclose;
         return true;
       case scene_cmd_climatecontrol_mode_heating:
         // switch to heating mode

@@ -62,6 +62,8 @@ namespace p44 {
     scene_cmd_climatecontrol_disable, ///< climate control: switch to system disabled (summer mode)
     scene_cmd_climatecontrol_enable, ///< climate control: switch to system enabled (winter mode)
     scene_cmd_climatecontrol_valve_prophylaxis, ///< climate control: Valve prophylaxis
+    scene_cmd_climatecontrol_valve_service_open, ///< climate control: fully open valve for service
+    scene_cmd_climatecontrol_valve_service_close, ///< climate control: fully close valve for service
     scene_cmd_climatecontrol_mode_heating, ///< climate control: Switch to heating mode
     scene_cmd_climatecontrol_mode_cooling, ///< climate control: Swicth to cooling mode
     scene_cmd_climatecontrol_mode_passive_cooling ///< climate control: Switch to passive cooling mode

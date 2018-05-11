@@ -90,6 +90,7 @@ namespace p44 {
     enum {
       service_idle,
       service_openvalve,
+      service_openandclosevalve,
       service_closevalve,
       service_finish
     } serviceState;
@@ -144,6 +145,7 @@ namespace p44 {
     enum {
       service_idle,
       service_openvalve,
+      service_openandclosevalve,
       service_closevalve,
       service_finish
     } serviceState;

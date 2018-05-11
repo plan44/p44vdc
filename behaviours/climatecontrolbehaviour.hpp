@@ -195,6 +195,15 @@ namespace p44 {
   {
     typedef OutputBehaviour inherited;
 
+  public:
+
+    typedef enum {
+      vs_none,
+      vs_prophylaxis,
+      vs_fullyopen,
+      vs_fullyclose,
+    } ValveService;
+
   protected:
 
     /// @name hardware derived parameters (constant during operation)
@@ -227,9 +236,11 @@ namespace p44 {
     /// @name internal volatile state
     /// @{
 
-    /// if set, a valve phrophylaxis run is performed on next occasion. Flag automatically resets afterwards.
-    /// @note this flag is not exposed as a property, but can be set by callScene(31=prophylaxis)
-    bool runProphylaxis;
+    /// if set to other than vs_none, a valve service/phrophylaxis operation is performed on next occasion.
+    /// Automatically resets to vs_none afterwards.
+    /// @note this flag is not exposed as a property, but can be set by special scene calls
+    ///   (CLIMATE_VALVE_PROPHYLAXIS, CLIMATE_VALVE_OPEN, CLIMATE_VALVE_CLOSE)
+    ValveService valveService;
 
     MLMicroSeconds zoneTemperatureUpdated; ///< time of when zoneTemperature was last updated from processControlValue
     double zoneTemperature; ///< current zone (room) temperature
@@ -261,9 +272,9 @@ namespace p44 {
     /// @return true if device should be in heating mode
     bool isClimateModeHeating() { return climateModeHeating; };
 
-    /// @return true if device should run a prophylaxis cycle
-    /// @note automatically resets the internal flag when queried
-    bool shouldRunProphylaxis() { if (runProphylaxis) { runProphylaxis=false; return true; } else return false; };
+    /// @return something other than vs_none when the device should run a service operation
+    /// @note automatically resets the internal state to vs_none
+    ValveService pendingServiceOperation() { ValveService s=valveService; valveService = vs_none; return s; };
 
 
     /// get temperature information needed for regulation
