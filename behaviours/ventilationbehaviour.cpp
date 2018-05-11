@@ -59,10 +59,10 @@ static const DefaultVentilationSceneParams defaultGroupScenes[NUMGROUPSCENES+1] 
   {  0,         DONT_CARE, DONT_CARE, scene_cmd_off       }, // 3 : stage 30
   {  0,         DONT_CARE, DONT_CARE, scene_cmd_off       }, // 4 : stage 40
   {  25,        DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 5 : stage 1
-  {  25,        0,         100,       scene_cmd_invoke    }, // 6 : stage 11
-  {  25,        0,         100,       scene_cmd_invoke    }, // 7 : stage 21
-  {  25,        1,         100,       scene_cmd_invoke    }, // 8 : stage 31
-  {  25,        2,         100,       scene_cmd_invoke    }, // 9 : stage 41
+  {  100,       DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 6 : boost (time limited 100%)
+  {  25,        DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 7 : calm mode
+  {  AUTO,      DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 8 : auto flow intensity
+  {  DONT_CARE, DONT_CARE, AUTO,      scene_cmd_invoke    }, // 9 : auto louver position (swing mode)
   {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_none      }, // 10 : none (area stepping continue)
   {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_decrement }, // 11 : decrement main channel (airflow intensity)
   {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_increment }, // 12 : increment main channel (airflow intensity)
@@ -86,11 +86,11 @@ static const DefaultVentilationSceneParams defaultGroupScenes[NUMGROUPSCENES+1] 
   {  75,        2,         100,       scene_cmd_invoke    }, // 30 : stage 43
   {  100,       2,         100,       scene_cmd_invoke    }, // 31 : stage 44
   {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_none      }, // 32 : reserved
-  {  AUTO,      DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 33 : stage auto flow intensity
+  {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_none      }, // 33 : reserved
   {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_none      }, // 34 : reserved
-  {  DONT_CARE, DONT_CARE, AUTO,      scene_cmd_invoke    }, // 35 : stage auto louver position (swing mode)
-  {  25,        DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 36 : noise reduction
-  {  100,       DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 37 : boost
+  {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_none      }, // 35 : reserved
+  {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_none      }, // 36 : reserved
+  {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_none      }, // 37 : reserved
   // all other group scenes equal or higher
   {  DONT_CARE, DONT_CARE, DONT_CARE, scene_cmd_invoke    }, // 38..63 : reserved
 };
