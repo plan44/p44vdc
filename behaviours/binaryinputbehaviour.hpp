@@ -39,6 +39,7 @@ namespace p44 {
     friend class Device;
 
     MLTicket invalidatorTicket;
+    MLTicket debounceTicket;
 
   protected:
 
@@ -192,6 +193,7 @@ namespace p44 {
   private:
 
     void armInvalidator();
+    void reportFinalState();
 
   };
   typedef boost::intrusive_ptr<BinaryInputBehaviour> BinaryInputBehaviourPtr;
