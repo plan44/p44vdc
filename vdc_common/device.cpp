@@ -1245,6 +1245,10 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     aPreparedCB(ntfy_none); // cannot dim
     return;
   }
+  // always update which area was the last requested to be dimmed for this device (even if device is not in the area)
+  // (otherwise, dimming of a previously dimmed area might get restarted by a T1234_CONT for another area)
+  areaDimmed = aArea;
+  areaDimMode = dimmode_stop; // but do not assume dimming before we've checked the area dontCare flags
   // check area if any
   if (aArea>0) {
     SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
@@ -1258,6 +1262,8 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
         return;
       }
     }
+    // dimMode does affect the area, update
+    areaDimMode = aDimMode;
   }
   else {
     // non-area dimming: suppress if device is in local priority
@@ -1287,8 +1293,6 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     // - save parameters for executing dimming now
     currentDimMode = aDimMode;
     currentDimChannel = aChannel;
-    areaDimmed = aArea;
-    areaDimMode = aDimMode;
     currentAutoStopTime = aAutoStopAfter;
     preparedDim = true;
     aPreparedCB(ntfy_dimchannel); // needs to start or stop dimming
