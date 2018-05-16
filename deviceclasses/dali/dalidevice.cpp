@@ -661,7 +661,7 @@ void DaliBusDevice::setTransitionTime(MLMicroSeconds aTransitionTime)
       LOG(LOG_DEBUG, "DaliDevice: new transition time = %.1f mS, calculated FADE_TIME setting = %f (rounded %d)", (double)aTransitionTime/MilliSecond, h, (int)tr);
     }
     if (tr!=currentFadeTime || currentTransitionTime==Infinite) {
-      LOG(LOG_INFO, "DaliDevice %d: setting DALI FADE_TIME to %d (for transition time %.1f mS)", deviceInfo->shortAddress, (int)tr, deviceInfo->shortAddress);
+      LOG(LOG_INFO, "DaliDevice %d: setting DALI FADE_TIME from %d to %d (for transition time %.1f mS)", deviceInfo->shortAddress, currentFadeTime, (int)tr, (double)aTransitionTime/MilliSecond);
       daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_TIME, tr);
       currentFadeTime = tr;
     }
