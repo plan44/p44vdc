@@ -428,6 +428,17 @@ OutputBehaviourPtr Device::getOutput()
 
 
 
+void Device::announcementAcknowledged()
+{
+  // Push current values of all sensors and inputs
+  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) {
+    if ((*pos)->hasDefinedState()) (*pos)->pushBehaviourState();
+  }
+  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) {
+    if ((*pos)->hasDefinedState()) (*pos)->pushBehaviourState();
+  }
+}
+
 
 // MARK: ===== model features
 

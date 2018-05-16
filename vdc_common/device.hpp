@@ -193,7 +193,8 @@ namespace p44 {
     /// utility: confirm identification
     void identificationOK(IdentifyDeviceCB aIdentifyCB, Device *aActualDevice = NULL);
 
-
+    /// called when vdsm acknowledges announcement of this device.
+    virtual void announcementAcknowledged() P44_OVERRIDE;
 
     /// load parameters from persistent DB
     /// @note this is usually called from the device container when device is added (detected), before initializeDevice() and after identifyDevice()
