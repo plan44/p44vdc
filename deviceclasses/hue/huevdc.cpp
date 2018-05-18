@@ -750,14 +750,14 @@ void HueVdc::nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
           // successfully created scene
           numOptimizerScenes++;
           aOptimizerEntry->nativeActionId = "hue_scene_" + i->stringValue();
-          LOG(LOG_INFO,"HueVdc: created new hue scene '%s'", aOptimizerEntry->nativeActionId.c_str());
+          ALOG(LOG_INFO,"created new hue scene '%s'", aOptimizerEntry->nativeActionId.c_str());
           // TODO: if hue scene saves transitional values, we might need to call updateNativeAction() here
         }
         else if (aOptimizerEntry->type==ntfy_dimchannel) {
           // successfully created group
           numOptimizerGroups++;
           aOptimizerEntry->nativeActionId = "hue_group_" + i->stringValue();
-          LOG(LOG_INFO,"HueVdc: created new hue group '%s'", aOptimizerEntry->nativeActionId.c_str());
+          ALOG(LOG_INFO,"created new hue group '%s'", aOptimizerEntry->nativeActionId.c_str());
         }
         aOptimizerEntry->lastNativeChange = MainLoop::now();
         aStatusCB(ErrorPtr()); // success
@@ -829,7 +829,7 @@ void HueVdc::nativeActionUpdated(uint64_t aNewHash, OptimizerEntryPtr aOptimizer
     // [{ "success": { "id": "Abc123Def456Ghi" } }]
     // TODO: details checks - for now just assume update has worked when request did not produce an error
     aOptimizerEntry->lastNativeChange = MainLoop::now();
-    LOG(LOG_INFO,"HueVdc: updated new hue scene");
+    ALOG(LOG_INFO,"updated hue scene");
     // done, update entry
     aOptimizerEntry->contentsHash = aNewHash;
     aOptimizerEntry->lastNativeChange = MainLoop::now();

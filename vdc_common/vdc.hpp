@@ -94,6 +94,7 @@ namespace p44 {
 
     NotificationDeliveryState(Vdc &aVdc) :
       vdc(aVdc),
+      delivering(false),
       callType(ntfy_undefined),
       optimizedType(ntfy_undefined),
       contentId(0),
@@ -109,6 +110,7 @@ namespace p44 {
 
     Vdc &vdc;
 
+    bool delivering; ///< set when delivery is actually underway (and must report completion when deleted). Repeated actions are not "delivering"
     DsAddressablesList audience; ///< remaining devices to be prepared
     string affectedDevicesHash; ///< binary string hash, represents the set of affected devices, to be matched against known sets for optimisation
     int contentId; ///< this represents the ID of the content, such a scene number

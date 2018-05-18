@@ -992,7 +992,7 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
     markUsed(a, true);
     aOptimizerEntry->nativeActionId = actionIdFromDaliAddress(a);
     aOptimizerEntry->lastNativeChange = MainLoop::now();
-    LOG(LOG_INFO,"DaliVdc: creating action '%s' (DaliAddress=0x%02X)", aOptimizerEntry->nativeActionId.c_str(), a);
+    ALOG(LOG_INFO,"creating action '%s' (DaliAddress=0x%02X)", aOptimizerEntry->nativeActionId.c_str(), a);
     if (aDeliveryState->optimizedType==ntfy_callscene) {
       // make sure no old scene settings remain in any device -> broadcast DALICMD_REMOVE_FROM_SCENE
       daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(a&DaliSceneMask));
@@ -1034,6 +1034,7 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
       }
     }
     // done
+    ALOG(LOG_INFO,"updated DALI scene #%d", a&DaliSceneMask);
     aOptimizerEntry->lastNativeChange = MainLoop::now();
     aStatusCB(ErrorPtr());
     return;

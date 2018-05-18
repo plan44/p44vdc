@@ -217,8 +217,11 @@ string Vdc::modelName()
 
 NotificationDeliveryState::~NotificationDeliveryState()
 {
-  // report to vDC
-  vdc.notificationDeliveryComplete(*this);
+  // if this delivery was executing, report completion to vDC
+  if (delivering) {
+    delivering = false;
+    vdc.notificationDeliveryComplete(*this);
+  }
 }
 
 
@@ -275,6 +278,7 @@ void Vdc::queueDelivery(NotificationDeliveryStatePtr aDeliveryState)
     // optimization - start right now
     ALOG(LOG_INFO, "===== '%s' delivery to %lu devices starts now", NotificationNames[aDeliveryState->callType], aDeliveryState->audience.size());
     delivering = true;
+    aDeliveryState->delivering = true;
     prepareNextNotification(aDeliveryState);
   }
 }
@@ -295,6 +299,7 @@ void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryState
     // - now start
     ALOG(LOG_INFO, "===== '%s' queued delivery to %ld devices starts now", NotificationNames[nds->callType], nds->audience.size());
     delivering = true;
+    nds->delivering = true;
     prepareNextNotification(nds);
   }
 }
@@ -413,7 +418,16 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
           ALOG(LOG_NOTICE, "Optimized %s: executing %s using native action '%s' (variant %d)", NotificationNames[aDeliveryState->callType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), aDeliveryState->actionVariant);
           if (aDeliveryState->repeatAfter!=Never) {
             AFOCUSLOG("- action scheduled to repeat in %.2f seconds", (double)(aDeliveryState->repeatAfter)/Second);
-            optimizedCallRepeaterTicket.executeOnce(boost::bind(&Vdc::repeatPreparedNotification, this, entry, aDeliveryState), aDeliveryState->repeatAfter);
+            // Note: it is essential to create a new delivery state here, otherwise the original notification cannot complete (coupled to object lifetime)
+            NotificationDeliveryStatePtr rep = NotificationDeliveryStatePtr(new NotificationDeliveryState(*this));
+            // shallow copy only, this deliveryState is only used for callNativeAction() and is considered already prepared
+            rep->contentId = aDeliveryState->contentId;
+            rep->affectedDevices = aDeliveryState->affectedDevices;
+            rep->optimizedType = aDeliveryState->optimizedType;
+            rep->actionParam = aDeliveryState->actionParam;
+            rep->actionVariant = aDeliveryState->repeatVariant; // is a varied repetition of the original notification
+            // Note: not copied because not needed: audience, hashes, callType, actionParams
+            optimizedCallRepeaterTicket.executeOnce(boost::bind(&Vdc::repeatPreparedNotification, this, entry, rep), aDeliveryState->repeatAfter);
           }
           else {
             // cancel possibly running repeater ticket
@@ -468,9 +482,6 @@ void Vdc::repeatPreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliv
 {
   // this is called to repeat an action after a timeout (usually, dim autostop)
   optimizedCallRepeaterTicket = 0;
-  // - reconfigure for repetition and prevent another repetition
-  aDeliveryState->actionVariant = aDeliveryState->repeatVariant;
-  aDeliveryState->repeatAfter = Never;
   // - prepare affected devices for repeat
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
     (*pos)->optimizerRepeatPrepare(aDeliveryState);
