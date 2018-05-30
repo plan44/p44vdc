@@ -198,10 +198,15 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
     ApiValuePtr o;
     if (Error::isOK(respErr = checkParam(aParams, "value", o))) {
       int newLevel = o->int32Value();
-      int oldLevel = LOGLEVEL;
-      SETLOGLEVEL(newLevel);
-      LOG(LOG_WARNING, "\n\n========== changed log level from %d to %d ===============", oldLevel, newLevel);
-      respErr = Error::ok(); // return OK as generic response
+      if (newLevel>=0 && newLevel<=7) {
+        int oldLevel = LOGLEVEL;
+        SETLOGLEVEL(newLevel);
+        LOG(newLevel, "\n\n========== changed log level from %d to %d ===============", oldLevel, newLevel);
+        respErr = Error::ok(); // return OK as generic response
+      }
+      else {
+        respErr = Error::err<VdcApiError>(405, "invalid log level %d", newLevel);
+      }
     }
   }
   else {
@@ -290,16 +295,16 @@ void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultOb
 
 
 
-void DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams)
+void DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  if (aMethod=="ping") {
+  if (aNotification=="ping") {
     // issue device ping (which will issue a pong when device is reachable)
     ALOG(LOG_INFO, "ping -> checking presence...");
     checkPresence(boost::bind(&DsAddressable::presenceResultHandler, this, _1));
   }
   else {
     // unknown notification
-    ALOG(LOG_WARNING, "unknown notification '%s'", aMethod.c_str());
+    ALOG(LOG_WARNING, "unknown notification '%s'", aNotification.c_str());
   }
 }
 

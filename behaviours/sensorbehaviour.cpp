@@ -167,7 +167,6 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   loggingReady(false),
   lastRrdUpdate(Never),
   #endif
-  invalidatorTicket(0),
   lastUpdate(Never),
   lastPush(Never),
   currentValue(0),
@@ -181,7 +180,6 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
 
 SensorBehaviour::~SensorBehaviour()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
 }
 
 
@@ -382,10 +380,10 @@ void SensorBehaviour::updateEngineeringValue(long aEngineeringValue, bool aPush,
 
 void SensorBehaviour::armInvalidator()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
+  invalidatorTicket.cancel();
   if (aliveSignInterval!=Never) {
     // this sensor can time out, schedule invalidation
-    invalidatorTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&SensorBehaviour::invalidateSensorValue, this, true), aliveSignInterval);
+    invalidatorTicket.executeOnce(boost::bind(&SensorBehaviour::invalidateSensorValue, this, true), aliveSignInterval);
   }
 }
 
@@ -611,7 +609,7 @@ static string rrdminmax(double aMin, double aMax)
 }
 
 
-void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue)
+void SensorBehaviour::prepareLogging()
 {
   if (!loggingReady && !rrdbconfig.empty() && rrdbfile.empty()) {
     // configured but not yet prepared to log
@@ -733,7 +731,7 @@ void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue
       if (ret==0) {
         BLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", rrdbfile.c_str());
         loggingReady = true;
-        lastRrdUpdate = aTimeStamp; // creation counts as update, make sure we don't immediately try to send first update afterwards
+        lastRrdUpdate = MainLoop::currentMainLoop().now(); // creation counts as update, make sure we don't immediately try to send first update afterwards
       }
       else {
         BLOG(LOG_ERR, "rrd: cannot create rrd file '%s': %s", rrdbfile.c_str(), rrd_get_error());
@@ -745,6 +743,13 @@ void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue
       loggingReady = true;
     }
   }
+}
+
+
+void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue)
+{
+  // make sure logging is prepared
+  prepareLogging();
   // now actually log into file
   if (loggingReady && lastRrdUpdate<aTimeStamp-10*Second) {
     lastRrdUpdate = aTimeStamp;
@@ -762,9 +767,9 @@ void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue
     // - filtered (considered unknown when sensor is invalid)
     i = ud.find("%F");
     if (i!=string::npos) ud.replace(i, 2, rrdval(aProcessedValue, lastUpdate!=Never).c_str());
-    // - filtered (considered unknown when pushed within aliveSignInterval)
+    // - pushed (considered unknown when never pushed, or last state pushed must have been NULL because of invalidation)
     i = ud.find("%P");
-    if (i!=string::npos) ud.replace(i, 2, rrdval(aPushedValue, lastPush!=Never && lastPush+aliveSignInterval>lastUpdate).c_str());
+    if (i!=string::npos) ud.replace(i, 2, rrdval(aPushedValue, lastPush!=Never && lastUpdate!=Never).c_str());
     args.push_back(ud);
     int ret = rrd_call(rrd_update, args);
     if (ret!=0) {
@@ -834,6 +839,8 @@ void SensorBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
   #if ENABLE_RRDB
   aRow->getIfNotNull(aIndex++, rrdbconfig);
   aRow->getIfNotNull(aIndex++, rrdbpath);
+  // make sure logging is ready (if enabled at all)
+  prepareLogging();
   #endif
 }
 

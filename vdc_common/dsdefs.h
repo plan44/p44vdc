@@ -44,13 +44,17 @@ typedef enum {
   CLIMATE_HEAT_TEMP_HOLIDAY = 5,    ///< climate control: temperature holiday/vacation, heating mode
   AREA_1_ON = 6,                    ///< area 1 on / audio: reserved
   CLIMATE_COOL_PASSIVE_ON = 6,      ///< climate control: passive cooling mode, on
+  VENTILATION_BOOST = 6,            ///< ventilation: boost (full power for limited time)
   AREA_2_ON = 7,                    ///< area 2 on
+  VENTILATION_CALM = 7,             ///< ventilation: calm (noise reduction)
   AUDIO_REPEAT_OFF = 7,             ///< audio: Repeat off
   CLIMATE_COOL_PASSIVE_OFF = 7,     ///< climate control: passive cooling mode, off
   AREA_3_ON = 8,                    ///< area 3 on
+  VENTILATION_AUTO_FLOW = 8,        ///< ventilation: automatic air flow intensity
   AUDIO_REPEAT_1 = 8,               ///< audio: Repeat 1
   CLIMATE_RESERVED = 8,             ///< climate control: reserved (was once used as MANUAL mode)
   AREA_4_ON = 9,                    ///< area 4 on
+  VENTILATION_AUTO_LOUVER = 9,      ///< ventilation: automatic louver position / swing mode
   AUDIO_REPEAT_ALL = 9,             ///< audio: Repeat all
   CLIMATE_COOL_TEMP_OFF = 9,        ///< climate control: temperature off, cooling mode
   T1234_CONT = 10,                  ///< area 1-4 increment/decrement continue
@@ -84,7 +88,9 @@ typedef enum {
   PRESET_44 = 31,         ///< preset 44
   CLIMATE_VALVE_PROPHYLAXIS = 31, ///< climate control: valve prophylaxis
   PRESET_OFF_10 = 32,     ///< preset 10
+  CLIMATE_VALVE_OPEN = 32, ///< climate control: fully open valve (service, prophylaxis)
   PRESET_11 = 33,         ///< preset 11
+  CLIMATE_VALVE_CLOSE = 33, ///< climate control: fully close valve (service, prophylaxis)
   PRESET_OFF_20 = 34,     ///< preset 20
   PRESET_21 = 35,         ///< preset 21
   PRESET_OFF_30 = 36,     ///< preset 30
@@ -152,8 +158,13 @@ typedef enum {
   NO_RAIN = (START_APARTMENT_SCENES + 25),        ///< 89 - No Rain
   HAIL = (START_APARTMENT_SCENES + 26),           ///< 90 - Hail
   NO_HAIL = (START_APARTMENT_SCENES + 27),        ///< 91 - No Hail
+  POLLUTION = (START_APARTMENT_SCENES + 28),      ///< 92 - Pollution
   MAX_SCENE_NO                                    ///< currently last known scene number
 } DsSceneNumber;
+
+typedef uint8_t SceneNo; ///< scene number
+
+typedef uint8_t SceneArea; ///< area number, 0=no area
 
 typedef uint16_t DsZoneID; ///< digitalSTROM Zone ID (= room ID)
 
@@ -297,8 +308,8 @@ typedef enum {
   channeltype_power_state = 19, ///< FCU custom channel: power state
   channeltype_airflow_louver_auto = 20, ///< louver automatic mode (0=off, >0=on)
   channeltype_airflow_intensity_auto = 21, ///< airflow intensity automatic mode (0=off, >0=on)
-  channeltype_water_temperature = 22,
-  channeltype_water_flow = 23,
+  channeltype_water_temperature = 22, ///< water temperature
+  channeltype_water_flow = 23, ///< water flow rate
 
   channeltype_custom_first = 192, ///< first device-specific channel
   channeltype_custom_last = 239, ///< last device-specific channel

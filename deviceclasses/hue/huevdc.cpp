@@ -32,10 +32,19 @@ using namespace p44;
 HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag),
   hueComm(),
-  bridgeMacAddress(0)
+  bridgeMacAddress(0),
+  numOptimizerScenes(0),
+  numOptimizerGroups(0),
+  has_1_11_api(false)
 {
   hueComm.isMemberVariable();
   hueComm.useNUPnP = getVdcHost().cloudAllowed();
+  optimizerMode = opt_disabled; // optimizer disabled by default, but available
+}
+
+
+HueVdc::~HueVdc()
+{
 }
 
 
@@ -194,7 +203,7 @@ void HueVdc::refindBridge(StatusCB aCompletedCB)
   if (!getVdcHost().isNetworkConnected()) {
     // TODO: checking IPv4 only at this time, need to add IPv6 later
     ALOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), REFIND_RETRY_DELAY);
+    refindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), REFIND_RETRY_DELAY);
     return;
   }
   // actually refind
@@ -243,7 +252,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
       ALOG(LOG_NOTICE, "Could not access bridge API at %s - revert to finding bridge by UUID", bridgeApiURL.c_str());
       bridgeApiURL.clear();
       // retry searching by uuid
-      MainLoop::currentMainLoop().executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), 500*MilliSecond);
+      refindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), 500*MilliSecond);
       return;
     }
     else {
@@ -456,6 +465,14 @@ void HueVdc::gotBridgeConfig(StatusCB aCollectedHandler, JsonObjectPtr aResult, 
     if (aResult->get("swversion", o)) {
       swVersion = o->stringValue();
     }
+    if (aResult->get("apiversion", o)) {
+      apiVersion = o->stringValue();
+      // check features this version has
+      int maj = 0, min = 0, patch = 0;
+      if (sscanf(apiVersion.c_str(), "%d.%d.%d", &maj, &min, &patch)==3) {
+        has_1_11_api = maj>1 || (maj==1 && min>=11);
+      }
+    }
     // get name
     if (aResult->get("name", o)) {
       if (getAssignedName().empty()) {
@@ -464,10 +481,21 @@ void HueVdc::gotBridgeConfig(StatusCB aCollectedHandler, JsonObjectPtr aResult, 
       }
     }
   }
+  if (has_1_11_api) {
+    // query scenes (in parallel to lights!)
+    ALOG(LOG_INFO, "Querying hue bridge for available scenes...");
+    hueComm.apiQuery("/scenes", boost::bind(&HueVdc::collectedScenesHandler, this, aCollectedHandler, _1, _2));
+  }
   // Note: can be used to incrementally search additional lights
-  // issue lights query
+  // - issue lights query
   ALOG(LOG_INFO, "Querying hue bridge for available lights...");
   hueComm.apiQuery("/lights", boost::bind(&HueVdc::collectedLightsHandler, this, aCollectedHandler, _1, _2));
+}
+
+
+void HueVdc::collectedScenesHandler(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError)
+{
+  ALOG(LOG_INFO, "hue bridge reports scenes = \n%s", aResult ? aResult->c_strValue() : "<none>");
 }
 
 
@@ -515,6 +543,334 @@ void HueVdc::collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aR
   // collect phase done
   if (aCollectedHandler) aCollectedHandler(ErrorPtr());
 }
+
+
+// MARK: ===== Native actions (groups and scenes on vDC level)
+
+
+static string hueSceneIdFromActionId(const string aNativeActionId)
+{
+  if (aNativeActionId.substr(0,10)=="hue_scene_") {
+    return aNativeActionId.substr(10); // rest is hue bridge scene ID
+  }
+  return "";
+}
+
+
+static string hueGroupIdFromActionId(const string aNativeActionId)
+{
+  if (aNativeActionId.substr(0,10)=="hue_group_") {
+    return aNativeActionId.substr(10); // rest is hue bridge group ID (number)
+  }
+  return "";
+}
+
+
+ErrorPtr HueVdc::announceNativeAction(const string aNativeActionId)
+{
+  if (!hueSceneIdFromActionId(aNativeActionId).empty()) {
+    // just count to see how many
+    numOptimizerScenes++;
+  }
+  else if (!hueGroupIdFromActionId(aNativeActionId).empty()) {
+    // just count to see how many
+    numOptimizerGroups++;
+  }
+  return ErrorPtr();
+}
+
+
+void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState)
+{
+  string hueActionId;
+  if (aDeliveryState->optimizedType==ntfy_callscene) {
+    hueActionId = hueSceneIdFromActionId(aNativeActionId);
+    if (!hueActionId.empty()) {
+      groupDimTicket.cancel(); // just safety, should be cancelled already
+      JsonObjectPtr setGroupState = JsonObject::newObj();
+      // PUT /api/<username>/groups/<groupid>/action
+      // { "scene": "AB34EF5", "transitiontime":60 }
+      setGroupState->add("scene", JsonObject::newString(hueActionId));
+      hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
+      return;
+    }
+  }
+  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    hueActionId = hueGroupIdFromActionId(aNativeActionId);
+    if (!hueActionId.empty()) {
+      // Dim group
+      // - get params
+      VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
+      DsChannelType channelType = aDeliveryState->actionParam;
+      // - prepare call
+      JsonObjectPtr setGroupState = JsonObject::newObj();
+      // PUT /api/<username>/groups/<groupid>/action
+      // { "bri_inc": 254, "transitiontime":70 }
+      int tt = 0;
+      switch (channelType) {
+        case channeltype_brightness:
+          setGroupState->add("bri_inc", JsonObject::newInt32(dm*254));
+          tt = FULL_SCALE_DIM_TIME_MS/100; // unit is 100mS
+          break;
+        case channeltype_saturation:
+          setGroupState->add("sat_inc", JsonObject::newInt32(dm*254));
+          tt = FULL_SCALE_DIM_TIME_MS/100; // unit is 100mS
+          break;
+        case channeltype_hue:
+          // hue must be done in smaller steps, otherwise color change is not along hue, but travels accross less saturated center of the HS wheel
+          setGroupState->add("hue_inc", JsonObject::newInt32(dm*6553));
+          tt = FULL_SCALE_DIM_TIME_MS/100/15; // 1/15 of full scale, unit is 100mS
+          if (dm==dimmode_stop) {
+            groupDimTicket.cancel();
+          }
+          else {
+            setGroupState->add("transitiontime", JsonObject::newInt32(tt));
+            groupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, setGroupState, tt, _1));
+            aStatusCB(ErrorPtr());
+          }
+          break;
+        default:
+          aStatusCB(TextError::err("Channel type %d dimming not supported", channelType)); // causes normal execution
+          return;
+      }
+      if (dm!=dimmode_stop) {
+        setGroupState->add("transitiontime", JsonObject::newInt32(tt));
+      }
+      hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
+      return;
+    }
+  }
+  aStatusCB(TextError::err("Native action '%s' not supported", aNativeActionId.c_str())); // causes normal execution
+}
+
+
+void HueVdc::groupDimRepeater(JsonObjectPtr aDimState, int aTransitionTime, MLTimer &aTimer)
+{
+  hueComm.apiAction(httpMethodPUT, "/groups/0/action", aDimState, NULL);
+  groupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, aDimState, aTransitionTime, _1), aTransitionTime*Second/10);
+}
+
+
+
+
+void HueVdc::nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    // [{"success":{"/groups/1/action/scene", "value": "AB34EF5"}}]
+    JsonObjectPtr s = HueComm::getSuccessItem(aResult,0);
+    if (!s) {
+      aError = TextError::err("call of scene (group set state) did not return a success item -> failed");
+    }
+  }
+  AFOCUSLOG("hue Native action done with status: %s", Error::text(aError).c_str());
+  if (aStatusCB) aStatusCB(aError);
+}
+
+
+
+#define MAX_OPTIMIZER_SCENES 20
+#define MAX_OPTIMIZER_GROUPS 5
+
+void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
+{
+  ErrorPtr err;
+  if (aOptimizerEntry->type==ntfy_callscene) {
+    // need a free scene
+    if (numOptimizerScenes>=MAX_OPTIMIZER_SCENES) {
+      // too many already
+      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer scenes (%d) already exist", MAX_OPTIMIZER_SCENES);
+    }
+    else {
+      // create a new scene
+      JsonObjectPtr newScene = JsonObject::newObj();
+      // POST /api/<username>/scenes
+      // {"name":"thename", "lights":["1","2"], "recycle":false }
+      string sceneName = string_format("digitalSTROM-Scene_%d", aOptimizerEntry->contentId);
+      JsonObjectPtr lights = JsonObject::newArray();
+      // transition time is per scene for hue. Use longest transition time among devices
+      MLMicroSeconds longestTransition = 0;
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
+        lights->arrayAppend(JsonObject::newString(dev->lightID));
+        sceneName += ":" + dev->lightID;
+        // find longest transition
+        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
+        MLMicroSeconds tt = l->transitionTimeToNewBrightness();
+        if (tt>longestTransition) longestTransition = tt;
+      }
+      newScene->add("transitiontime", JsonObject::newInt64(longestTransition*10/Second));
+      newScene->add("name", JsonObject::newString(sceneName));
+      newScene->add("lights", lights);
+      newScene->add("recycle", JsonObject::newBool(false));
+      hueComm.apiAction(httpMethodPOST, "/scenes", newScene, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
+      return;
+    }
+  }
+  else if (aOptimizerEntry->type==ntfy_dimchannel) {
+    // need a free group
+    if (numOptimizerGroups>=MAX_OPTIMIZER_SCENES) {
+      // too many already
+      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer groups (%d) already exist", MAX_OPTIMIZER_GROUPS);
+    }
+    else {
+      // create a new group
+      JsonObjectPtr newGroup = JsonObject::newObj();
+      // POST /api/<username>/scenes
+      // {"name":"thename", "lights":["1","2"], "recycle":false }
+      string groupName = "digitalSTROM-DimGroup";
+      JsonObjectPtr lights = JsonObject::newArray();
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
+        lights->arrayAppend(JsonObject::newString(dev->lightID));
+        groupName += ":" + dev->lightID;
+      }
+      newGroup->add("name", JsonObject::newString(groupName));
+      newGroup->add("lights", lights);
+      hueComm.apiAction(httpMethodPOST, "/groups", newGroup, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
+      return;
+    }
+
+  }
+  else {
+    err = TextError::err("cannot create new hue native action for type=%d", (int)aOptimizerEntry->type);
+  }
+  aStatusCB(err);
+}
+
+
+void HueVdc::nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState, JsonObjectPtr aResult, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    // [{ "success": { "id": "Abc123Def456Ghi" } }]
+    JsonObjectPtr s = HueComm::getSuccessItem(aResult, 0);
+    if (s) {
+      JsonObjectPtr i = s->get("id");
+      if (i) {
+        if (aOptimizerEntry->type==ntfy_callscene) {
+          // successfully created scene
+          numOptimizerScenes++;
+          aOptimizerEntry->nativeActionId = "hue_scene_" + i->stringValue();
+          ALOG(LOG_INFO,"created new hue scene '%s'", aOptimizerEntry->nativeActionId.c_str());
+          // TODO: if hue scene saves transitional values, we might need to call updateNativeAction() here
+        }
+        else if (aOptimizerEntry->type==ntfy_dimchannel) {
+          // successfully created group
+          numOptimizerGroups++;
+          aOptimizerEntry->nativeActionId = "hue_group_" + i->stringValue();
+          ALOG(LOG_INFO,"created new hue group '%s'", aOptimizerEntry->nativeActionId.c_str());
+        }
+        aOptimizerEntry->lastNativeChange = MainLoop::now();
+        aStatusCB(ErrorPtr()); // success
+        return;
+      }
+    }
+    aError = TextError::err("creation of hue scene/group did not return a id -> failed");
+  }
+  aStatusCB(aError); // failure of some sort
+}
+
+
+void HueVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
+{
+  ErrorPtr err;
+  if (aOptimizerEntry->type==ntfy_callscene) {
+    string sceneId = hueSceneIdFromActionId(aOptimizerEntry->nativeActionId);
+    if (!sceneId.empty()) {
+      string sceneId = aOptimizerEntry->nativeActionId.substr(10); // rest is hue bridge scene ID
+      // update all lights in the scene with current values
+      JsonObjectPtr updatedScene = JsonObject::newObj();
+      // PUT /api/<username>/scenes/<sceneid>
+      // {"lights":["1","2"], "storelightstate":true }
+      JsonObjectPtr lights = JsonObject::newArray();
+      MLMicroSeconds longestTransition = 0;
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
+        // collect id to update
+        lights->arrayAppend(JsonObject::newString(dev->lightID));
+        // find longest transition
+        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
+        MLMicroSeconds tt = l->transitionTimeToNewBrightness();
+        if (tt>longestTransition) longestTransition = tt;
+      }
+      updatedScene->add("transitiontime", JsonObject::newInt64(longestTransition*10/Second));
+      updatedScene->add("storelightstate", JsonObject::newBool(true));
+      // actually perform scene update only after transitions are all complete (50% safety margin)
+      uint64_t newHash = aOptimizerEntry->contentsHash; // remember the correct hash for the case we can execute the delayed update
+      aOptimizerEntry->contentsHash = 0; // reset for now, scene is not up-to-date yet
+      delayedSceneUpdateTicket.executeOnce(boost::bind(&HueVdc::performNativeSceneUpdate, this, newHash, sceneId, updatedScene, aDeliveryState->affectedDevices, aOptimizerEntry), longestTransition*3/2);
+      aStatusCB(ErrorPtr());
+      return;
+    }
+  }
+  aStatusCB(TextError::err("cannot update hue native action for type=%d", (int)aOptimizerEntry->type));
+}
+
+
+void HueVdc::cancelNativeActionUpdate()
+{
+  // the lights will change, do not update the scene
+  delayedSceneUpdateTicket.cancel();
+}
+
+
+void HueVdc::performNativeSceneUpdate(uint64_t aNewHash, string aSceneId, JsonObjectPtr aSceneUpdate, DeviceList aAffectedDevices, OptimizerEntryPtr aOptimizerEntry)
+{
+  // actually post update
+  string url = "/scenes/" + aSceneId;
+  hueComm.apiAction(httpMethodPUT, url.c_str(), aSceneUpdate, boost::bind(&HueVdc::nativeActionUpdated, this, aNewHash, aOptimizerEntry, _1, _2));
+  return;
+}
+
+
+
+void HueVdc::nativeActionUpdated(uint64_t aNewHash, OptimizerEntryPtr aOptimizerEntry, JsonObjectPtr aResult, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    // [{ "success": { "id": "Abc123Def456Ghi" } }]
+    // TODO: details checks - for now just assume update has worked when request did not produce an error
+    aOptimizerEntry->lastNativeChange = MainLoop::now();
+    ALOG(LOG_INFO,"updated hue scene");
+    // done, update entry
+    aOptimizerEntry->contentsHash = aNewHash;
+    aOptimizerEntry->lastNativeChange = MainLoop::now();
+    aOptimizerEntry->markDirty();
+  }
+}
+
+
+ErrorPtr HueVdc::freeNativeAction(const string aNativeActionId)
+{
+  string id;
+  if (!(id = hueSceneIdFromActionId(aNativeActionId)).empty()) {
+    // is a scene, delete it
+    string url = "/scenes/" + id;
+    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionDeleted, this, _1, _2));
+  }
+  else if (!(id = hueGroupIdFromActionId(aNativeActionId)).empty()) {
+    string url = "/groups/" + id;
+    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionDeleted, this, _1, _2));
+  }
+  return ErrorPtr();
+}
+
+
+void HueVdc::nativeActionDeleted(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    // [{"success":"/scenes/3T2SvsxvwteNNys deleted"}]
+    JsonObjectPtr s = HueComm::getSuccessItem(aResult,0);
+    if (s && s->stringValue().find("/scenes/")!=string::npos)
+      numOptimizerScenes--;
+    else if (s && s->stringValue().find("/groups/")!=string::npos)
+      numOptimizerGroups--;
+    else
+      aError = TextError::err("delete of hue action did not return group/scene delete confirmation -> failed");
+  }
+  if (!Error::isOK(aError)) {
+    ALOG(LOG_WARNING, "could not delete native action: %s", Error::text(aError).c_str());
+  }
+}
+
 
 
 

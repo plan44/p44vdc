@@ -178,6 +178,13 @@ namespace p44 {
     /// @param aBrightness new brightness to set, <0 to save current brightness
     void setDefaultBrightness(Brightness aBrightness);
 
+    /// prepare dimming (=adjust fade rate if needed)
+    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDimPerMS dim speed in brightness value per millsecond
+    /// @param aCompletedCB is called when device is ready for dimming
+    /// @note this is used by optimized group dimming
+    void dimPrepare(VdcDimMode aDimMode, double aDimPerMS, StatusCB aCompletedCB);
+
     /// start or stop optimized DALI dimming
     /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @param aDimPerMS dim speed in brightness value per millsecond
@@ -218,7 +225,9 @@ namespace p44 {
     void queryCTResponse(StatusCB aCompletedCB, uint16_t aResponse16, ErrorPtr aError);
     void queryRGBWAFResponse(StatusCB aCompletedCB, uint16_t aResIndex, uint16_t aResponse16, ErrorPtr aError);
 
-    void dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aNow);
+    void dimPrepared(StatusCB aCompletedCB, ErrorPtr aError);
+    void dimStart(DaliAddress aDaliAddress, DaliCommand aCommand);
+    void dimRepeater(DaliAddress aDaliAddress, DaliCommand aCommand, MLTimer &aTimer);
 
     void queryStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
 
@@ -388,10 +397,14 @@ namespace p44 {
     /// start or stop dimming (optimized DALI version)
     /// @param aChannel the channel to start or stop dimming for
     /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDoApply only if set to true, dimming must be started/stopped in hardware. Otherwise
+    ///   the actual operation has been done already by another means (such as native group/scene call on the harware level)
+    ///   and must NOT be repeated.
+    ///   However, in all cases internal state must be updated to reflect the finalized operation
     /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
-    virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode) P44_OVERRIDE;
+    virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply) P44_OVERRIDE;
 
     /// @}
 
@@ -450,6 +463,13 @@ namespace p44 {
 
     /// internal implementation for running even very slow light transitions
     virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) P44_OVERRIDE;
+
+    /// let device implementation prepare for (and possibly reject) optimized set
+    /// @param aDeliveryState can be inspected to see the scene or dim parameters
+    ///   (optimizedType, actionParam, actionVariant are already set)
+    /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
+    ///    executed without optimisation
+    virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
 
   private:
 
@@ -589,6 +609,12 @@ namespace p44 {
 
     /// internal implementation for running even very slow light transitions
     virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) P44_OVERRIDE;
+
+    /// let device implementation prepare for (and possibly reject) optimized set
+    /// @param aDeliveryState can be inspected to see the scene or dim parameters
+    /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
+    ///    executed without optimisation
+    virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE { return false; /* for now: no optimisation for composite devices */}
 
   private:
 

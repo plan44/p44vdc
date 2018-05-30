@@ -62,7 +62,6 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool 
   lightID(aLightID),
   uniqueID(aUniqueID),
   reapplyMode(reapply_once),
-  reapplyTicket(0),
   lastReachable(true) // assume reachable unless actively determined otherwise (via ping)
 {
   // hue devices are lights
@@ -189,6 +188,45 @@ bool HueDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolu
 
 
 
+bool HueDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
+{
+  // in general, we don't optimize for APIs before 1.11
+  if (!hueVdc().has_1_11_api) return false;
+  // TODO: we only optimize scenes for now, not dimming
+  if (aDeliveryState->optimizedType==ntfy_callscene) {
+    // scenes are generally optimizable
+    return true;
+  }
+  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    // only brightness, saturation and hue dimming is optimizable for now
+    return
+      currentDimChannel && // actually prepared for dimming
+      (currentDimChannel->getChannelType()==channeltype_brightness ||
+       currentDimChannel->getChannelType()==channeltype_hue ||
+       currentDimChannel->getChannelType()==channeltype_saturation);
+  }
+  return false;
+}
+
+
+// optimized hue dimming implementation
+void HueDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply)
+{
+  if (aDoApply) {
+    // not optimized: use generic dimming
+    inherited::dimChannel(aChannel, aDimMode, aDoApply);
+  }
+  else {
+    // part of optimized vdc level dimming: just retrieve dim end state
+    if (aDimMode==dimmode_stop) {
+      // retrieve status at end of dimming
+      // Note: does not work when called immediately - so we delay that a bit
+      dimTicket.executeOnce(boost::bind(&HueDevice::syncChannelValues, this, SimpleCB()), 3*Second);
+    }
+  }
+}
+
+
 string HueDevice::modelName()
 {
   return hueModel;
@@ -274,13 +312,13 @@ void HueDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aDisconne
 
 void HueDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(reapplyTicket);
+  reapplyTicket.cancel();
   reapplyCount = 0;
   if (applyLightState(aDoneCB, aForDimming, false)) {
     // actually applied something, schedule reapply if enabled and not dimming
     if (!aForDimming && reapplyMode!=reapply_none) {
       // initially re-apply shortly after
-      reapplyTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), INITIAL_REAPPLY_DELAY);
+      reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), INITIAL_REAPPLY_DELAY);
     }
   }
 }
@@ -295,7 +333,7 @@ void HueDevice::reapplyTimerHandler()
   applyLightState(NULL, false, true);
   if (reapplyMode==reapply_periodic) {
     // re-apply periodically -> schedule next
-    reapplyTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), PERIODIC_REAPPLY_INTERVAL);
+    reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), PERIODIC_REAPPLY_INTERVAL);
   }
 }
 

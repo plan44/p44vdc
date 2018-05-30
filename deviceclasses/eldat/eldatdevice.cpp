@@ -451,8 +451,7 @@ void EldatDevice::switchTypes(const EldatTypeVariantEntry &aFromVariant, const E
 
 
 EldatButtonDevice::EldatButtonDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType) :
-  inherited(aVdcP, aDeviceType),
-  pressedTicket(0)
+  inherited(aVdcP, aDeviceType)
 {
 }
 
@@ -496,13 +495,13 @@ void EldatButtonDevice::handleFunction(EldatFunction aFunction)
   // now handle
   if (!pressedTicket) {
     // pressing button now
-    bb->buttonAction(true);
+    bb->updateButtonState(true);
   }
   else {
     // cancel current ticket
-    MainLoop::currentMainLoop().cancelExecutionTicket(pressedTicket);
+    pressedTicket.cancel();
   }
-  pressedTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EldatButtonDevice::buttonReleased, this, buttonNo), BUTTON_RELEASE_TIMEOUT);
+  pressedTicket.executeOnce(boost::bind(&EldatButtonDevice::buttonReleased, this, buttonNo), BUTTON_RELEASE_TIMEOUT);
 }
 
 
@@ -510,7 +509,7 @@ void EldatButtonDevice::buttonReleased(int aButtonNo)
 {
   pressedTicket = 0;
   ButtonBehaviourPtr bb = getButton(aButtonNo);
-  bb->buttonAction(false);
+  bb->updateButtonState(false);
 }
 
 

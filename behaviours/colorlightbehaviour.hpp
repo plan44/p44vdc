@@ -63,7 +63,7 @@ namespace p44 {
     typedef ColorChannel inherited;
 
   public:
-    HueChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hue") { resolution = 0.1; /* 0.1 degree */ };
+    explicit HueChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hue") { resolution = 0.1; /* 0.1 degree */ };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_hue; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_degree, unitScaling_1); };
@@ -286,7 +286,7 @@ namespace p44 {
 
   protected:
 
-    /// called by applyScene to load channel values from a scene.
+    /// called by performApplySceneToChannels() to load channel values from a scene.
     /// @param aScene the scene to load channel values from
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.

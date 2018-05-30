@@ -122,7 +122,6 @@ public:
 
 EldatComm::EldatComm(MainLoop &aMainLoop) :
 	inherited(aMainLoop),
-  aliveCheckTicket(0),
   usbPid(0),
   appVersion(0)
 {
@@ -133,7 +132,6 @@ EldatComm::EldatComm(MainLoop &aMainLoop) :
 
 EldatComm::~EldatComm()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(aliveCheckTicket);
 }
 
 
@@ -171,7 +169,7 @@ void EldatComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aErr
     serialComm->setDTR(false); // should cause reset
     serialComm->closeConnection(); // also close and re-open later
     // retry initializing later
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&EldatComm::initializeInternal, this, aCompletedCB, aRetriesLeft), ELDAT_INIT_RETRY_INTERVAL);
+    aliveCheckTicket.executeOnce(boost::bind(&EldatComm::initializeInternal, this, aCompletedCB, aRetriesLeft), ELDAT_INIT_RETRY_INTERVAL);
   }
   else {
     // no more retries, just return
@@ -206,7 +204,7 @@ void EldatComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, string 
   // completed successfully
   if (aCompletedCB) aCompletedCB(aError);
   // schedule first alive check quickly
-  aliveCheckTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EldatComm::aliveCheck, this), 2*Second);
+  aliveCheckTicket.executeOnce(boost::bind(&EldatComm::aliveCheck, this), 2*Second);
 }
 
 
@@ -224,10 +222,9 @@ void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
   if (!Error::isOK(aError)) {
     // alive check failed, try to recover ELDAT interface
     LOG(LOG_ERR, "EldatComm: alive check of ELDAT module failed -> restarting module");
-    // - cancel alive checks for now
-    MainLoop::currentMainLoop().cancelExecutionTicket(aliveCheckTicket);
     serialComm->setDTR(false); // release DTR, this should reset the ELDAT interface
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&EldatComm::resetDone, this), 2*Second);
+    // - using alive check ticket for reset sequence
+    aliveCheckTicket.executeOnce(boost::bind(&EldatComm::resetDone, this), 2*Second);
   }
   else {
     // response received, should be ID
@@ -235,7 +232,7 @@ void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
       FOCUSLOG("Alive check received answer after sending 'ID?', but got unexpected answer '%s'", aAnswer.c_str());
     }
     // also schedule the next alive check
-    aliveCheckTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EldatComm::aliveCheck, this), ELDAT_ALIVECHECK_INTERVAL);
+    aliveCheckTicket.executeOnce(boost::bind(&EldatComm::aliveCheck, this), ELDAT_ALIVECHECK_INTERVAL);
   }
 }
 
@@ -245,7 +242,7 @@ void EldatComm::resetDone()
   LOG(LOG_NOTICE, "EldatComm: re-asserting DTR");
   serialComm->setDTR(true); // should restart the ELDAT interface
   // wait a little, then re-open connection
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&EldatComm::reopenConnection, this), 2*Second);
+  aliveCheckTicket.executeOnce(boost::bind(&EldatComm::reopenConnection, this), 2*Second);
 }
 
 
@@ -254,7 +251,7 @@ void EldatComm::reopenConnection()
   LOG(LOG_NOTICE, "EldatComm: re-opening connection");
 	serialComm->requestConnection(); // re-open connection
   // restart alive checks, not too soon after reset
-  aliveCheckTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EldatComm::aliveCheck, this), 10*Second);
+  aliveCheckTicket.executeOnce(boost::bind(&EldatComm::aliveCheck, this), 10*Second);
 }
 
 

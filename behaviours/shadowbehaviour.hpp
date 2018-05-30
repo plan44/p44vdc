@@ -262,6 +262,7 @@ namespace p44 {
     MovementChangeCB movementCB; ///< routine to call to change movement
     MLMicroSeconds referenceTime; ///< if not Never, time when last movement was started
     MLTicket movingTicket;
+    MLTicket sequenceTicket;
     bool runIntoEnd; ///< if set, move is expected to run into end contact, so no timer will be set up
     bool updateMoveTimeAtEndReached; ///< if set (only makes sense with hasEndContacts), difference between reference time and now will update open or close time
     SimpleCB endContactMoveAppliedCB; ///< callback to trigger when end contacts stop movement
@@ -326,7 +327,7 @@ namespace p44 {
     virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex);
 
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
-    /// @param aScene the scene that was called (if not dontCare, applyScene() has already been called)
+    /// @param aScene the scene that was called (if not dontCare, performApplySceneToChannels() has already been called)
     /// @param aDoneCB will be called when scene actions have completed (but not necessarily when stopped by stopSceneActions())
     virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB);
 
@@ -352,7 +353,7 @@ namespace p44 {
 
   protected:
 
-    /// called by applyScene to load channel values from a scene.
+    /// called by performApplySceneToChannels() to load channel values from a scene.
     /// @param aScene the scene to load channel values from
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.

@@ -117,7 +117,7 @@ namespace p44 {
 
   protected:
 
-    /// called by applyScene to load channel values from a scene.
+    /// called by performApplySceneToChannels() to load channel values from a scene.
     /// @param aScene the scene to load channel values from
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
@@ -162,6 +162,7 @@ namespace p44 {
     string sparkCoreToken;
     JsonWebClient sparkCloudComm;
     int apiVersion;
+    MLTicket retryTicket;
 
   public:
     SparkIoDevice(StaticVdc *aVdcP, const string &aDeviceConfig);

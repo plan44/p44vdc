@@ -542,11 +542,11 @@ ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double a
       if (bb) {
         if (aValue>2) {
           // simulate a keypress of defined length in milliseconds
-          bb->buttonAction(true);
-          MainLoop::currentMainLoop().executeOnce(boost::bind(&ExternalDevice::releaseButton, this, bb), aValue*MilliSecond);
+          bb->updateButtonState(true);
+          buttonReleaseTicket.executeOnce(boost::bind(&ExternalDevice::releaseButton, this, bb), aValue*MilliSecond);
         }
         else {
-          bb->buttonAction(aValue!=0);
+          bb->updateButtonState(aValue!=0);
         }
       }
       break;
@@ -609,7 +609,7 @@ ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double a
 
 void ExternalDevice::releaseButton(ButtonBehaviourPtr aButtonBehaviour)
 {
-  aButtonBehaviour->buttonAction(false);
+  aButtonBehaviour->updateButtonState(false);
 }
 
 
@@ -744,21 +744,21 @@ void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 }
 
 
-void ExternalDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
+void ExternalDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply)
 {
   if (aChannel) {
     // start dimming
     ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
-    if (sb && useMovement) {
+    if (sb && useMovement && aDoApply) {
       // no channel check, there's only global dimming of the blind, no separate position/angle
       sb->dimBlind(boost::bind(&ExternalDevice::changeChannelMovement, this, 0, _1, _2), aDimMode);
     }
-    else if (useMovement) {
+    else if (useMovement && aDoApply) {
       // not shadow, but still use movement for dimming
       changeChannelMovement(aChannel->getChannelIndex(), NULL, aDimMode);
     }
     else {
-      inherited::dimChannel(aChannel, aDimMode);
+      inherited::dimChannel(aChannel, aDimMode, aDoApply);
     }
   }
 }

@@ -434,7 +434,7 @@ Tristate AudioBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 #define AUTO_OFF_FADE_STEPSIZE 5
 
 // apply scene
-bool AudioBehaviour::applyScene(DsScenePtr aScene)
+bool AudioBehaviour::performApplySceneToChannels(DsScenePtr aScene)
 {
   // check special actions (commands) for audio scenes
   AudioScenePtr audioScene = boost::dynamic_pointer_cast<AudioScene>(aScene);
@@ -461,7 +461,7 @@ bool AudioBehaviour::applyScene(DsScenePtr aScene)
     }
   } // if audio scene
   // perform standard apply (loading channels)
-  return inherited::applyScene(aScene);
+  return inherited::performApplySceneToChannels(aScene);
 }
 
 

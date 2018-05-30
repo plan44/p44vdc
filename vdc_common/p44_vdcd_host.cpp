@@ -123,8 +123,7 @@ private:
     vdcHost(aVdcHost),
     button(aButton),
     redLED(aRedLED),
-    greenLED(aGreenLED),
-    errorReportTicket(0)
+    greenLED(aGreenLED)
   {
     // start testing
     nextVdc = vdcHost.vdcs.begin();
@@ -160,7 +159,7 @@ private:
       int numBlinks = nextVdc->second->getTag();
       redLED->blinkFor(300*MilliSecond*numBlinks, 300*MilliSecond, 50);
       // call myself again later
-      errorReportTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&SelfTestRunner::containerTested, this, aError), 300*MilliSecond*numBlinks+2*Second);
+      errorReportTicket.executeOnce(boost::bind(&SelfTestRunner::containerTested, this, aError), 300*MilliSecond*numBlinks+2*Second);
       // also install button responder
       button->setButtonHandler(boost::bind(&SelfTestRunner::errorAcknowledged, this), false); // report only release
     }
@@ -179,7 +178,7 @@ private:
     // stop error morse
     redLED->steadyOff();
     greenLED->steadyOff();
-    MainLoop::currentMainLoop().cancelExecutionTicket(errorReportTicket);
+    errorReportTicket.cancel();
     // test next (if any)
     ++nextVdc;
     testNextContainer();
@@ -214,7 +213,6 @@ private:
 
 P44VdcHost::P44VdcHost(bool aWithLocalController) :
   inherited(aWithLocalController),
-  learnIdentifyTicket(0),
   webUiPort(0)
 {
 }
@@ -446,7 +444,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
       if (seconds==0) {
         // end learning prematurely
         stopLearning();
-        MainLoop::currentMainLoop().cancelExecutionTicket(learnIdentifyTicket);
+        learnIdentifyTicket.cancel();
         // - close still running learn request
         if (learnIdentifyRequest) {
           learnIdentifyRequest->closeConnection();
@@ -459,7 +457,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
         // start learning
         learnIdentifyRequest = aJsonComm; // remember so we can cancel it when we receive a separate cancel request
         startLearning(boost::bind(&P44VdcHost::learnHandler, this, aJsonComm, _1, _2), disableProximity);
-        learnIdentifyTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&P44VdcHost::learnHandler, this, aJsonComm, false, Error::err<P44VdcError>(408, "learn timeout")), seconds*Second);
+        learnIdentifyTicket.executeOnce(boost::bind(&P44VdcHost::learnHandler, this, aJsonComm, false, Error::err<P44VdcError>(408, "learn timeout")), seconds*Second);
       }
     }
     else if (method=="identify") {
@@ -470,7 +468,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
       if (seconds==0) {
         // end reporting user activity
         setUserActionMonitor(NULL);
-        MainLoop::currentMainLoop().cancelExecutionTicket(learnIdentifyTicket);
+        learnIdentifyTicket.cancel();
         // - close still running identify request
         if (learnIdentifyRequest) {
           learnIdentifyRequest->closeConnection();
@@ -483,7 +481,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
         // wait for next user activity
         learnIdentifyRequest = aJsonComm; // remember so we can cancel it when we receive a separate cancel request
         setUserActionMonitor(boost::bind(&P44VdcHost::identifyHandler, this, aJsonComm, _1));
-        learnIdentifyTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&P44VdcHost::identifyHandler, this, aJsonComm, DevicePtr()), seconds*Second);
+        learnIdentifyTicket.executeOnce(boost::bind(&P44VdcHost::identifyHandler, this, aJsonComm, DevicePtr()), seconds*Second);
       }
     }
     else {
@@ -496,7 +494,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
 
 void P44VdcHost::learnHandler(JsonCommPtr aJsonComm, bool aLearnIn, ErrorPtr aError)
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(learnIdentifyTicket);
+  learnIdentifyTicket.cancel();
   stopLearning();
   sendCfgApiResponse(aJsonComm, JsonObject::newBool(aLearnIn), aError);
   learnIdentifyRequest.reset();
@@ -505,7 +503,7 @@ void P44VdcHost::learnHandler(JsonCommPtr aJsonComm, bool aLearnIn, ErrorPtr aEr
 
 void P44VdcHost::identifyHandler(JsonCommPtr aJsonComm, DevicePtr aDevice)
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(learnIdentifyTicket);
+  learnIdentifyTicket.cancel();
   if (aDevice) {
     sendCfgApiResponse(aJsonComm, JsonObject::newString(aDevice->getDsUid().getString()), ErrorPtr());
     // end monitor mode

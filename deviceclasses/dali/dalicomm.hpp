@@ -126,12 +126,16 @@ namespace p44 {
   const DaliAddress DaliGroup = 0x80; // marks group address
   const DaliAddress DaliBroadcast = 0xFF; // all devices on the bus
   const DaliAddress DaliAddressMask = 0x3F; // address mask
+  const DaliAddress DaliAddressTypeMask = 0xC0; // address type
   const DaliAddress DaliGroupMask = 0x0F; // group address mask
   // - pseudo-address for scene numbers
   const DaliAddress DaliScene = 0x40; // marks scene number
   const DaliAddress DaliSceneMask = 0x0F; // scene number mask
   // - pseudo-address for "no address"
   const DaliAddress NoDaliAddress = 0xC0; // not an address (but a command)
+
+  /// abstracted DALI command (possibly including a DT prefix)
+  typedef uint16_t DaliCommand;
 
 
   /// DALI device information record
@@ -206,6 +210,10 @@ namespace p44 {
 
   public:
 
+    // statistics
+    long retriedReads;
+    long retriedWrites;
+
     DaliComm(MainLoop &aMainLoop);
     virtual ~DaliComm();
 
@@ -266,14 +274,14 @@ namespace p44 {
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendCommand(DaliAddress aAddress, uint16_t aCommand, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendCommand(DaliAddress aAddress, DaliCommand aCommand, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
 
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aDTRValue the value to be sent to DTR before executing aCommand
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendDtrAndCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendDtrAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
 
     /// Send two byte DALI bus command twice within 100ms
     /// @param aDali1 first DALI byte
@@ -287,14 +295,14 @@ namespace p44 {
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendConfigCommand(DaliAddress aAddress, uint16_t aCommand, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendConfigCommand(DaliAddress aAddress, DaliCommand aCommand, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
 
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aDTRValue the value to be sent to DTR before executing aCommand
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendDtrAndConfigCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendDtrAndConfigCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
 
     /// callback function for daliSendXXX methods returning data
     typedef boost::function<void (bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError, bool aRetried)> DaliQueryResultCB;
@@ -310,13 +318,13 @@ namespace p44 {
     /// @param aQueryCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aResultCB result callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendQuery(DaliAddress aAddress, uint16_t aQueryCommand, DaliQueryResultCB aResultCB, int aWithDelay = -1);
+    void daliSendQuery(DaliAddress aAddress, DaliCommand aQueryCommand, DaliQueryResultCB aResultCB, int aWithDelay = -1);
 
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aQueryCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aResultCB result callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendDtrAndQuery(DaliAddress aAddress, uint16_t aQueryCommand, uint8_t aDTRValue, DaliQueryResultCB aResultCB, int aWithDelay = -1);
+    void daliSendDtrAndQuery(DaliAddress aAddress, DaliCommand aQueryCommand, uint8_t aDTRValue, DaliQueryResultCB aResultCB, int aWithDelay = -1);
 
     /// callback function for daliSendDTXXX methods returning data
     typedef boost::function<void (uint16_t a16BitResult, ErrorPtr aError)> Dali16BitValueQueryResultCB;
@@ -326,21 +334,21 @@ namespace p44 {
     /// @param aValue16 a 16-bit value to be put into DTR1 (MSB) and DTR (LSB) before sending the command
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSend16BitValueAndCommand(DaliAddress aAddress, uint16_t aCommand, uint16_t aValue16, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSend16BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint16_t aValue16, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
 
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aValue0,1,2 3 8-bit values to be put into DTR, DTR1, DTR2 before sending the command
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSend3x8BitValueAndCommand(DaliAddress aAddress, uint16_t aCommand, uint8_t aValue0, uint8_t aValue1, uint8_t aValue2, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSend3x8BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aValue0, uint8_t aValue1, uint8_t aValue2, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
 
     /// Send DALI query for 16-bit value, when MSB is returned by query and LSB is returned in DTR
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aQueryCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aResultCB result callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSend16BitQuery(DaliAddress aAddress, uint16_t aQueryCommand, Dali16BitValueQueryResultCB aResultCB, int aWithDelay = -1);
+    void daliSend16BitQuery(DaliAddress aAddress, DaliCommand aQueryCommand, Dali16BitValueQueryResultCB aResultCB, int aWithDelay = -1);
 
     /// Send DALI query for 16-bit value, when MSB is returned by query and LSB is returned in DTR
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
@@ -348,7 +356,7 @@ namespace p44 {
     /// @param aDTRValue the value to be sent to DTR before executing aQueryCommand
     /// @param aResultCB result callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendDtrAnd16BitQuery(DaliAddress aAddress, uint16_t aQueryCommand, uint8_t aDTRValue, Dali16BitValueQueryResultCB aResultCB, int aWithDelay = -1);
+    void daliSendDtrAnd16BitQuery(DaliAddress aAddress, DaliCommand aQueryCommand, uint8_t aDTRValue, Dali16BitValueQueryResultCB aResultCB, int aWithDelay = -1);
 
     /// helper to check daliSendQuery() callback response for a DALI YES answer
     static bool isYes(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr &aError, bool aCollisionIsYes);
@@ -429,7 +437,7 @@ namespace p44 {
 
     void resetIssued(DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
 
-    void daliPrepareForCommand(uint16_t &aCommand, int &aWithDelay);
+    void daliPrepareForCommand(DaliCommand &aCommand, int &aWithDelay);
     void msbOf16BitQueryReceived(DaliAddress aAddress, Dali16BitValueQueryResultCB aResult16CB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
     void lsbOf16BitQueryReceived(uint16_t aResult16, Dali16BitValueQueryResultCB aResult16CB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
 

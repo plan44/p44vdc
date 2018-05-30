@@ -192,7 +192,9 @@ namespace p44 {
     /// a UUIDv5 based new dSUID
     /// @param aMix binary string which already contains a single dSUID, a mix, or is empty. If initially empty,
     ///   aMix will be set to getBinary(), otherwise it will be set to a bytewise XOR of getBinary and aMix
-    void xorDsUidIntoMix(string &aMix);
+    /// @param aHashSubDeviceIndex mix the subdevice index into the dsuid binary bits to avoid collisions
+    ///   among subdevices. Should be set when mix may contain multiple subdevices of the same device.
+    void xorDsUidIntoMix(string &aMix, bool aHashSubDeviceIndex);
 
     /// @}
   };

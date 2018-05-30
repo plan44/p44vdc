@@ -51,7 +51,6 @@ using namespace p44;
 
 DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   daliVdc(aDaliVdc),
-  dimRepeaterTicket(0),
   isDummy(false),
   isPresent(false),
   lampFailure(false),
@@ -662,7 +661,7 @@ void DaliBusDevice::setTransitionTime(MLMicroSeconds aTransitionTime)
       LOG(LOG_DEBUG, "DaliDevice: new transition time = %.1f mS, calculated FADE_TIME setting = %f (rounded %d)", (double)aTransitionTime/MilliSecond, h, (int)tr);
     }
     if (tr!=currentFadeTime || currentTransitionTime==Infinite) {
-      LOG(LOG_DEBUG, "DaliDevice: setting DALI FADE_TIME to %d", (int)tr);
+      LOG(LOG_INFO, "DaliDevice %d: setting DALI FADE_TIME from %d to %d (for transition time %.1f mS)", deviceInfo->shortAddress, currentFadeTime, (int)tr, (double)aTransitionTime/MilliSecond);
       daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_TIME, tr);
       currentFadeTime = tr;
     }
@@ -797,18 +796,16 @@ Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower)
 }
 
 
-// optimized DALI dimming implementation
-void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
+
+
+
+// MARK: ===== Optimized DALI dimming implementation
+
+
+
+void DaliBusDevice::dimPrepare(VdcDimMode aDimMode, double aDimPerMS, StatusCB aCompletedCB)
 {
-  if (isDummy) return;
-  MainLoop::currentMainLoop().cancelExecutionTicket(dimRepeaterTicket); // stop any previous dimming activity
-  // Use DALI UP/DOWN dimming commands
-  if (aDimMode==dimmode_stop) {
-    // stop dimming - send MASK
-    daliVdc.daliComm->daliSendDirectPower(deviceInfo->shortAddress, DALIVALUE_MASK);
-  }
-  else {
-    // start dimming
+  if (!isDummy && aDimMode!=dimmode_stop) {
     // - configure new fade rate if current does not match
     if (aDimPerMS!=currentDimPerMS) {
       currentDimPerMS = aDimPerMS;
@@ -816,26 +813,55 @@ void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
       double h = 506.0/(currentDimPerMS*1000);
       h = log(h*h)/log(2);
       uint8_t fr = h>0 ? (uint8_t)h : 0;
-      LOG(LOG_DEBUG, "DaliDevice: new dimming rate = %f Steps/second, calculated FADE_RATE setting = %f (rounded %d)", currentDimPerMS*1000, h, fr);
+      LOG(LOG_DEBUG, "DaliDevice: new dimming rate = %f steps/second, calculated FADE_RATE setting = %f (rounded %d)", currentDimPerMS*1000, h, fr);
       if (fr!=currentFadeRate) {
-        LOG(LOG_DEBUG, "DaliDevice: setting DALI FADE_RATE to %d", fr);
-        daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_RATE, fr);
+        LOG(LOG_INFO, "DaliDevice shortaddr %d: setting DALI FADE_RATE to %d for dimming at %f steps/second", deviceInfo->shortAddress, fr, currentDimPerMS*1000);
         currentFadeRate = fr;
+        daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_RATE, fr, boost::bind(&DaliBusDevice::dimPrepared, this, aCompletedCB, _1));
+        return;
       }
     }
-    // - use repeated UP and DOWN commands
-    dimRepeater(deviceInfo->shortAddress, aDimMode==dimmode_up ? DALICMD_UP : DALICMD_DOWN, MainLoop::now());
+  }
+  if (aCompletedCB) aCompletedCB(ErrorPtr());
+}
+
+
+void DaliBusDevice::dimPrepared(StatusCB aCompletedCB, ErrorPtr aError)
+{
+  if (aCompletedCB) aCompletedCB(aError);
+}
+
+
+
+void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
+{
+  if (isDummy) return;
+  dimRepeaterTicket.cancel(); // stop any previous dimming activity
+  // Use DALI UP/DOWN dimming commands
+  if (aDimMode==dimmode_stop) {
+    // stop dimming - send MASK
+    daliVdc.daliComm->daliSendDirectPower(deviceInfo->shortAddress, DALIVALUE_MASK);
+  }
+  else {
+    // prepare dimming and then call dimRepeater
+    dimPrepare(aDimMode, aDimPerMS, boost::bind(&DaliBusDevice::dimStart, this, deviceInfo->shortAddress, aDimMode==dimmode_up ? DALICMD_UP : DALICMD_DOWN));
   }
 }
 
 
-void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLMicroSeconds aNow)
+void DaliBusDevice::dimStart(DaliAddress aDaliAddress, DaliCommand aCommand)
+{
+  dimRepeaterTicket.executeOnce(boost::bind(&DaliBusDevice::dimRepeater, this, aDaliAddress, aCommand, _1));
+}
+
+
+void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, DaliCommand aCommand, MLTimer &aTimer)
 {
   daliVdc.daliComm->daliSendCommand(aDaliAddress, aCommand);
   // schedule next command
   // - DALI UP and DOWN run 200mS, but can be repeated earlier
   //   Note: DALI bus speed limits commands to 120Bytes/sec max, i.e. about 20 per 200mS, i.e. max 10 lamps dimming
-  dimRepeaterTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&DaliBusDevice::dimRepeater, this, aDaliAddress, aCommand, _2), aNow+200*MilliSecond);
+  MainLoop::currentMainLoop().retriggerTimer(aTimer, 200*MilliSecond);
 }
 
 
@@ -862,7 +888,7 @@ void DaliBusDeviceGroup::addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice)
 {
   // add the ID to the mix
   LOG(LOG_NOTICE, "- DALI bus device with shortaddr %d is grouped in DALI group %d", aDaliBusDevice->deviceInfo->shortAddress, deviceInfo->shortAddress & DaliGroupMask);
-  aDaliBusDevice->dSUID.xorDsUidIntoMix(mixID);
+  aDaliBusDevice->dSUID.xorDsUidIntoMix(mixID, false);
   // if this is the first valid device, use it as master
   if (groupMaster==DaliBroadcast && !aDaliBusDevice->isDummy) {
     // this is the master device
@@ -958,8 +984,7 @@ void DaliBusDeviceGroup::deriveDsUid()
 
 
 DaliOutputDevice::DaliOutputDevice(DaliVdc *aVdcP) :
-  Device((Vdc *)aVdcP),
-  transitionTicket(0)
+  Device((Vdc *)aVdcP)
 {
   // DALI output devices are always light (in this implementation, at least)
   setColorClass(class_yellow_light);
@@ -1000,7 +1025,7 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   bool withColor = false;
   if (l && needsToApplyChannels()) {
     // abort previous transition
-    MainLoop::currentMainLoop().cancelExecutionTicket(transitionTicket);
+    transitionTicket.cancel();
     // brightness transition time is relevant for the whole transition
     MLMicroSeconds transitionTime = l->transitionTimeToNewBrightness();
     if (l->brightnessNeedsApplying()) {
@@ -1115,7 +1140,9 @@ string DaliSingleControllerDevice::getExtraInfo()
 
 int DaliSingleControllerDevice::opStateLevel()
 {
-  return !daliController->lampFailure && daliController->isPresent ? 100 : 0;
+  if (daliController->lampFailure || !daliController->isPresent) return 0;
+  if (daliController->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) return 70; // is not a recommended device, does not have unique ID
+  return 100; // everything's fine
 }
 
 
@@ -1129,6 +1156,10 @@ string DaliSingleControllerDevice::getOpStateText()
   }
   if (!daliController->isPresent) {
     t += sep + "not present";
+    sep = ", ";
+  }
+  if (daliController->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) {
+    t += sep + "Missing S/N";
     sep = ", ";
   }
   return t;
@@ -1308,7 +1339,7 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
   // now schedule next step (if any)
   if (moreSteps) {
     // not yet complete, schedule next step
-    transitionTicket = MainLoop::currentMainLoop().executeOnce(
+    transitionTicket.executeOnce(
       boost::bind(&DaliSingleControllerDevice::applyChannelValueSteps, this, aForDimming, aWithColor, aStepSize),
       SLOW_TRANSITION_STEP_TIME
     );
@@ -1319,18 +1350,21 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
 
 
 // optimized DALI dimming implementation
-void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode)
+void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply)
 {
   // start dimming
   if (aChannel) {
     if (aChannel->getChannelType()==channeltype_brightness) {
       // start dimming
-      ALOG(LOG_INFO,
-        "dimChannel (DALI): channel '%s' (brightness) %s",
-        aChannel->getName(),
-        aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
-      );
-      daliController->dim(aDimMode, aChannel->getDimPerMS());
+      if (aDoApply) {
+        ALOG(LOG_INFO,
+          "dimChannel (DALI): channel '%s' %s",
+          aChannel->getName(),
+          aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
+        );
+        daliController->dim(aDimMode, aChannel->getDimPerMS());
+      }
+      // in all cases, we need to query current brightness after dimming
       if (aDimMode==dimmode_stop) {
         // retrieve end status
         daliController->updateParams(boost::bind(&DaliSingleControllerDevice::dimEndStateRetrieved, this, _1));
@@ -1338,7 +1372,7 @@ void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDim
     }
     else {
       // not my channel, use generic implementation
-      inherited::dimChannel(aChannel, aDimMode);
+      inherited::dimChannel(aChannel, aDimMode, aDoApply);
     }
   }
 }
@@ -1360,6 +1394,31 @@ void DaliSingleControllerDevice::setTransitionTime(MLMicroSeconds aTransitionTim
 {
   daliController->setTransitionTime(aTransitionTime);
 }
+
+
+bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
+{
+  // check general exclude reasons
+  if (
+    !daliController || // safety - need a controller to optimize
+    daliController->isGrouped() || // already grouped devices cannot be optimized
+    daliController->supportsDT8 // FIXME: exclude DT8 for now until we can test color scenes with a sample device
+  ) {
+    return false;
+  }
+  // check notification-specific conditions
+  if (aDeliveryState->optimizedType==ntfy_callscene) {
+    // scenes are generally optimizable unless transition time is really slow and must be executed in multiple steps
+    LightBehaviourPtr l = getOutput<LightBehaviour>();
+    if (l) return l->transitionTimeToNewBrightness()<=MAX_SINGLE_STEP_TRANSITION_TIME;
+  }
+  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    // only brightness dimming optimizable for now
+    return currentDimChannel && currentDimChannel->getChannelType()==channeltype_brightness;
+  }
+  return false;
+}
+
 
 
 
@@ -1468,7 +1527,7 @@ int DaliCompositeDevice::opStateLevel()
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (dimmers[idx]) {
       if (dimmers[idx]->deviceInfo && dimmers[idx]->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) {
-        l = 90; // is not a recommended device, does not have unique ID
+        l = 70; // is not a recommended device, does not have unique ID
       }
       if (dimmers[idx]->isDummy) {
         l = 20; // not seen on last bus scan, might be glitch
@@ -1738,7 +1797,7 @@ void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithCol
   if (dimmers[dimmer_amber]) dimmers[dimmer_amber]->setBrightness(a);
   if (moreSteps) {
     // not yet complete, schedule next step
-    transitionTicket = MainLoop::currentMainLoop().executeOnce(
+    transitionTicket.executeOnce(
       boost::bind(&DaliCompositeDevice::applyChannelValueSteps, this, aForDimming, aWithColor, aStepSize),
       SLOW_TRANSITION_STEP_TIME
     );
@@ -1778,7 +1837,7 @@ void DaliCompositeDevice::deriveDsUid()
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (dimmers[idx]) {
       // use this dimmer's dSUID as part of the mix
-      dimmers[idx]->dSUID.xorDsUidIntoMix(mixID);
+      dimmers[idx]->dSUID.xorDsUidIntoMix(mixID, false);
     }
   }
   // use xored ID as base for creating UUIDv5 in vdcNamespace
@@ -1843,8 +1902,7 @@ string DaliCompositeDevice::description()
 
 DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, DaliAddress aBaseAddress) :
   inherited(aVdcP),
-  daliInputDeviceRowID(0),
-  releaseTicket(0)
+  daliInputDeviceRowID(0)
 {
   baseAddress = aBaseAddress;
   numAddresses = 1;
@@ -1935,6 +1993,10 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   else {
     ALOG(LOG_ERR, "unknown device type");
   }
+  // mark used groups/scenes
+  for (int i=0; i<numAddresses; i++) {
+    daliVdc().markUsed(baseAddress+i, true);
+  }
 }
 
 
@@ -1966,6 +2028,9 @@ void DaliInputDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
   if (daliInputDeviceRowID) {
     if(daliVdc().db.executef("DELETE FROM inputDevices WHERE rowid=%lld", daliInputDeviceRowID)!=SQLITE_OK) {
       ALOG(LOG_ERR, "deleting DALI input device: %s", daliVdc().db.error()->description().c_str());
+    }
+    for (int i=0; i<numAddresses; i++) {
+      daliVdc().markUsed(baseAddress+i, false);
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -2049,15 +2114,15 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
             case input_rocker:
             {
               ButtonBehaviourPtr bb = getButton(inpindex);
-              bb->buttonAction(true);
-              releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::buttonReleased, this, inpindex), BUTTON_RELEASE_TIMEOUT);
+              bb->updateButtonState(true);
+              releaseTicket.executeOnce(boost::bind(&DaliInputDevice::buttonReleased, this, inpindex), BUTTON_RELEASE_TIMEOUT);
               break;
             }
             case input_pulse:
             {
               BinaryInputBehaviourPtr ib = getInput(inpindex);
               ib->updateInputState(1);
-              releaseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliInputDevice::inputReleased, this, inpindex), INPUT_RELEASE_TIMEOUT);
+              releaseTicket.executeOnce(boost::bind(&DaliInputDevice::inputReleased, this, inpindex), INPUT_RELEASE_TIMEOUT);
               break;
             }
             case input_motion:
@@ -2085,7 +2150,7 @@ void DaliInputDevice::buttonReleased(int aButtonNo)
 {
   releaseTicket = 0;
   ButtonBehaviourPtr bb = getButton(aButtonNo);
-  bb->buttonAction(false);
+  bb->updateButtonState(false);
 }
 
 

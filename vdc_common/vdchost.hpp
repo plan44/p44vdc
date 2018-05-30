@@ -75,7 +75,8 @@ namespace p44 {
     rescanmode_incremental = 0x01, ///< incremental rescan
     rescanmode_normal = 0x02, ///< normal rescan
     rescanmode_exhaustive = 0x04, ///< exhaustive rescan, should only be used as last resort recovery, as it might cause change of addressing schemes etc.
-    rescanmode_clearsettings = 0x08 ///< clear settings (not for incremental)
+    rescanmode_clearsettings = 0x08, ///< clear settings (not for incremental)
+    rescanmode_reenumerate = 0x10, ///< allow or actively trigger complete re-enumeration of bus device addresses
   };
   typedef uint8_t RescanMode;
 
@@ -417,7 +418,7 @@ namespace p44 {
     /// @{
 
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @}
 

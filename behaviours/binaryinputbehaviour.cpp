@@ -28,10 +28,9 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
   // persistent settings
   binInputGroup(group_black_variable),
   configuredInputType(binInpType_none),
-  minPushInterval(200*MilliSecond),
+  minPushInterval(2*Second), // don't push more often than every 2 seconds
   changesOnlyInterval(15*Minute), // report unchanged state updates max once every 15 minutes
   // state
-  invalidatorTicket(0),
   lastUpdate(Never),
   lastPush(Never),
   currentState(false)
@@ -43,7 +42,6 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
 
 BinaryInputBehaviour::~BinaryInputBehaviour()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
 }
 
 
@@ -107,10 +105,10 @@ InputState BinaryInputBehaviour::maxExtendedValue()
 
 void BinaryInputBehaviour::armInvalidator()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(invalidatorTicket);
+  invalidatorTicket.cancel();
   if (aliveSignInterval!=Never) {
     // this sensor can time out, schedule invalidation
-    invalidatorTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&BinaryInputBehaviour::invalidateInputState, this), aliveSignInterval);
+    invalidatorTicket.executeOnce(boost::bind(&BinaryInputBehaviour::invalidateInputState, this), aliveSignInterval);
   }
 }
 
@@ -129,12 +127,13 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
     // Note: even if global identify handler processes this, still report state changes (otherwise upstream could get out of sync)
   }
   BLOG(changedState ? LOG_NOTICE : LOG_INFO, "BinaryInput[%zu] %s '%s' reports %s state = %d", index, behaviourId.c_str(), getHardwareName().c_str(), changedState ? "NEW" : "same", aNewState);
-  // in all cases, forward binary input state changes
+  // in all cases, binary input state changes must be forwarded long term
+  // (but minPushInterval must "debounce" rapid intermediate changes)
   if (changedState || now>lastPush+changesOnlyInterval) {
     // changed state or no update sent for more than changesOnlyInterval
     currentState = aNewState;
     if (lastPush==Never || now>lastPush+minPushInterval) {
-      // push the new value
+      // push the new value right now
       if (pushBehaviourState()) {
         lastPush = now;
       }
@@ -142,9 +141,27 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
         BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
       }
     }
+    else if (changedState) {
+      // cannot be pushed now, but final state of the input must be reported later
+      BLOG(LOG_NOTICE, "- input changes too quickly, push of final state will be pushed after minPushInterval");
+      if (!debounceTicket) {
+        debounceTicket.executeOnceAt(boost::bind(&BinaryInputBehaviour::reportFinalState, this), lastPush+minPushInterval);
+      }
+    }
   }
   // notify listeners
   notifyListeners(changedState ? valueevent_changed : valueevent_confirmed);
+}
+
+
+void BinaryInputBehaviour::reportFinalState()
+{
+  // push the current value (after awaiting minPushInterval)
+  debounceTicket.cancel();
+  if (pushBehaviourState()) {
+    BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' now pushes current state (%d) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentState);
+    lastPush = MainLoop::currentMainLoop().now();
+  }
 }
 
 

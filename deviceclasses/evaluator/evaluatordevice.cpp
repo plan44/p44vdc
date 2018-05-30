@@ -48,10 +48,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   conditionMetSince(Never),
   onConditionMet(false),
   evaluating(false),
-  evaluateTicket(0),
-  timedtest(false),
-  testlaterTicket(0),
-  valueParseTicket(0)
+  timedtest(false)
 {
   // Config is:
   //  <behaviour mode>
@@ -113,9 +110,6 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
 EvaluatorDevice::~EvaluatorDevice()
 {
   forgetValueDefs();
-  MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
-  MainLoop::currentMainLoop().cancelExecutionTicket(testlaterTicket);
-  MainLoop::currentMainLoop().cancelExecutionTicket(valueParseTicket);
 }
 
 
@@ -269,7 +263,7 @@ void EvaluatorDevice::forgetValueDefs()
 
 void EvaluatorDevice::parseValueDefs()
 {
-  MainLoop::currentMainLoop().cancelExecutionTicket(valueParseTicket);
+  valueParseTicket.cancel();
   forgetValueDefs(); // forget previous mappings
   string &valueDefs = evaluatorSettings()->valueDefs;
   string newValueDefs; // re-created value defs using sensor ids rather than indices, for migration
@@ -320,7 +314,7 @@ void EvaluatorDevice::parseValueDefs()
   }
   if (!foundall) {
     // schedule a re-parse later
-    valueParseTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&EvaluatorDevice::parseValueDefs, this), REPARSE_DELAY);
+    valueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::parseValueDefs, this), REPARSE_DELAY);
   }
   else {
     // run an evaluation to possibly start timers
@@ -372,7 +366,7 @@ ExpressionValue EvaluatorDevice::evaluateFunction(const string &aName, const Fun
         secs = MIN_RETRIGGER_SECONDS;
       }
       ALOG(LOG_INFO, "testlater() function schedules re-evaluation in %.1f seconds", secs);
-      MainLoop::currentMainLoop().executeTicketOnce(testlaterTicket, boost::bind(&EvaluatorDevice::evaluateConditionsLater, this), secs*Second);
+      testlaterTicket.executeOnce(boost::bind(&EvaluatorDevice::evaluateConditionsLater, this), secs*Second);
     }
     if (timedtest) {
       // evaluation runs because timer has expired, return test result
@@ -426,7 +420,7 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState, bool aTimedTest)
     Tristate prevState = currentState;
     bool decisionMade = false;
     MLMicroSeconds now = MainLoop::currentMainLoop().now();
-    MainLoop::currentMainLoop().cancelExecutionTicket(evaluateTicket);
+    evaluateTicket.cancel();
     // always evaluate both conditions because they could contain testlater() calls that need to be triggered
     Tristate on = evaluateBoolean(evaluatorSettings()->onCondition);
     Tristate off = evaluateBoolean(evaluatorSettings()->offCondition);
@@ -454,7 +448,7 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState, bool aTimedTest)
         else {
           // condition not met long enough yet, need to re-check later
           ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-          evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState, aTimedTest), metAt);
+          evaluateTicket.executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState, aTimedTest), metAt);
           return;
         }
       }
@@ -482,7 +476,7 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState, bool aTimedTest)
         else {
           // condition not met long enough yet, need to re-check later
           ALOG(LOG_INFO, "- condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-          evaluateTicket = MainLoop::currentMainLoop().executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState, aTimedTest), metAt);
+          evaluateTicket.executeOnceAt(boost::bind(&EvaluatorDevice::evaluateConditions, this, aRefState, aTimedTest), metAt);
           return;
         }
       }
@@ -621,12 +615,14 @@ string EvaluatorDevice::description()
 string EvaluatorDevice::getEvaluatorType()
 {
   switch (evaluatorType) {
-    case evaluator_unknown: return "unknown";
     case evaluator_rocker: return "rocker";
     case evaluator_input: return "input";
     case evaluator_internalinput: return "internalinput";
     case evaluator_sensor: return "sensor";
     case evaluator_internalsensor: return "internalsensor";
+    case evaluator_unknown:
+    default:
+      return "unknown";
   }
 }
 

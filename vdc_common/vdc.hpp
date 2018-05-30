@@ -41,9 +41,12 @@ namespace p44 {
       NoDevice, ///< no device could be identified
       Initialize, ///< initialisation failed
       Collecting, ///< is busy collecting devices already, new collection request irgnored
+      AddAction, ///< optimizer suggests to add a native action
+      StaleAction, ///< optimizer has detected stale action
+      NoMoreActions, ///< cannot add another native action because there would be too many
     } ErrorCodes;
     
-    static const char *domain() { return "DeviceClass"; }
+    static const char *domain() { return "Vdc"; }
     virtual const char *getErrorDomain() const { return VdcError::domain(); };
     VdcError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
   };
@@ -69,6 +72,119 @@ namespace p44 {
   typedef std::vector<DevicePtr> DeviceVector;
   typedef std::list<DevicePtr> DeviceList;
 
+
+  /// notification types
+  /// @note: only add new ones at the end, these are persisted in optimizer cache!
+  typedef enum {
+    ntfy_undefined,
+    ntfy_none,
+    ntfy_callscene,
+    ntfy_dimchannel,
+    ntfy_retrigger, ///< just retrigger the repeater
+    ntfy_generic, ///< generic notification, not optimized/optimizable
+    numNotificationTypes
+  } NotificationType;
+
+
+  /// container for tracking notification delivery and optimisation
+  class NotificationDeliveryState P44_FINAL: public P44Obj
+  {
+    friend class Device;
+    friend class Vdc;
+
+    NotificationDeliveryState(Vdc &aVdc) :
+      vdc(aVdc),
+      delivering(false),
+      callType(ntfy_undefined),
+      optimizedType(ntfy_undefined),
+      contentId(0),
+      contentsHash(0),
+      actionParam(0),
+      actionVariant(0),
+      repeatAfter(Never),
+      repeatVariant(0),
+      pendingCount(0)
+    {};
+
+    ~NotificationDeliveryState();
+
+    Vdc &vdc;
+
+    bool delivering; ///< set when delivery is actually underway (and must report completion when deleted). Repeated actions are not "delivering"
+    DsAddressablesList audience; ///< remaining devices to be prepared
+    string affectedDevicesHash; ///< binary string hash, represents the set of affected devices, to be matched against known sets for optimisation
+    int contentId; ///< this represents the ID of the content, such a scene number
+    uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
+    NotificationType callType; ///< type of notification as originally called
+
+  public:
+
+    DeviceList affectedDevices; ///< the list of devices that are included in the hash
+    size_t pendingCount; ///< count used to count completed devices in some operations on affectedDevices
+    ApiValuePtr callParams; ///< the notification parameters
+    int actionParam; ///< parameter for the action (such as dim channel)
+    int actionVariant; ///< variant of the action (such as dim up/down/stop)
+    MLMicroSeconds repeatAfter; ///< if>0: native action is repeated after this time with variant repeatVariant
+    int repeatVariant; ///< variant/parameter for the action when repeating it (such as dim stop)
+    NotificationType optimizedType; ///< the type that results (callScene might result in dimming...)
+  };
+  typedef boost::intrusive_ptr<NotificationDeliveryState> NotificationDeliveryStatePtr;
+  typedef std::list<NotificationDeliveryStatePtr> NotificationDeliveryStateList;
+
+
+  class OptimizerEntry P44_FINAL: public P44Obj, public PersistentParams
+  {
+    typedef PersistentParams inheritedParams;
+    friend class Vdc;
+
+    OptimizerEntry();
+    virtual ~OptimizerEntry();
+
+  public:
+
+    // identification
+    NotificationType type; ///< type of notification
+    int numberOfDevices; ///< number of affected devices (for evaluating importance of optimizing that)
+    string affectedDevicesHash; ///< binary string hash, represents the set of affected devices
+    int contentId; ///< this represents the ID of the content, such a scene number
+    uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
+
+    // native action
+    string nativeActionId; ///< the identifier for the native action (e.g. scene or group name)
+    MLMicroSeconds lastNativeChange; ///< last time when native action was updated (to prevent too many updates too quickly)
+
+    // statistics
+    long numCalls; ///< overall number of calls for this entry (persistent for entries with assigned native action)
+    MLMicroSeconds lastUse; ///< time of last use (
+
+    // @return number of previous calls, weighted down by time of last use
+    long timeWeightedCallCount();
+
+  protected:
+
+    // persistence implementation
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<OptimizerEntry> OptimizerEntryPtr;
+  typedef std::list<OptimizerEntryPtr> OptimizerEntryList;
+
+
+  /// Optimizer modes
+  typedef enum {
+    opt_unavailable = 0, ///< read-only: vdc does not support optimisation at all
+    opt_disabled = 1, ///< optimisation disabled
+    opt_frozen = 2, ///< just use already established optimisations as-is, but do not update or add new ones (no writes to device or DB)
+    opt_update = 3, ///< use already established optimisations and update contents (e.g. changed scenes), but do not add new ones
+    opt_auto = 4, ///< automatically add native actions for frequently used operations
+    opt_reset = 5 ///< write-only: reset the optimization cache.
+  } OptimizerMode;
+
+
   /// This is the base class for a "class" (usually: type of hardware) of virtual devices.
   /// In dS terminology, this object represents a vDC (virtual device connector).
   class Vdc : public PersistentParams, public DsAddressable
@@ -76,26 +192,39 @@ namespace p44 {
     typedef DsAddressable inherited;
     typedef PersistentParams inheritedParams;
 
+    friend class VdcHost;
+    friend class NotificationDeliveryState;
+
     int instanceNumber; ///< the instance number identifying this instance among other instances of this class
     int tag; ///< tag used to in self test failures for showing on LEDs
     MLTicket pairTicket; ///< used for pairing
 
-    /// generic vdc flag word
-    int vdcFlags;
-    /// default dS zone ID
-    DsZoneID defaultZoneID;
+    /// Settings
+    int vdcFlags; ///< generic vdc flag word
+    DsZoneID defaultZoneID; ///< default dS zone ID
 
     /// periodic rescan, collecting
     MLMicroSeconds rescanInterval; ///< rescan interval, 0 if none
     RescanMode rescanMode; ///< mode to use for periodic rescan
     MLTicket rescanTicket; ///< rescan ticket
+    MLTicket identifyTicket; ///< identification ticket
     bool collecting; ///< currently collecting
+
+    /// notification optimizing
+    NotificationDeliveryStateList pendingDeliveries; ///< pending deliveries
+    OptimizerEntryList optimizerCache; ///< the current optimizer cache
+    long totalOptimizableCalls; ///< total of optimizable calls
+    MLTicket optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
+    bool delivering; ///< set while the delivery/optimization process is running
 
     ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all
 
   protected:
   
     DeviceVector devices; ///< the devices of this class
+    OptimizerMode optimizerMode; ///< the optimizer mode
+    int minDevicesForOptimizing; ///< how many devices are needed for optimized scenes/dimming
+    int minCallsBeforeOptimizing; ///< how many calls before optimizer tries creating scene/group
 
   public:
 
@@ -173,10 +302,6 @@ namespace p44 {
     /// set user assignable name
     /// @param aName name of the addressable entity
     virtual void setName(const string &aName) P44_OVERRIDE;
-
-    /// vdc level methods
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-
 
     /// @}
 
@@ -288,8 +413,6 @@ namespace p44 {
     /// @param aAddDelay how long to wait between adding devices
     void identifyAndAddDevices(DeviceList aToBeAddedDevices, StatusCB aCompletedCB, int aMaxRetries = 0, MLMicroSeconds aRetryDelay = 0, MLMicroSeconds aAddDelay = 0);
 
-
-
 		/// @}
 
 
@@ -364,6 +487,59 @@ namespace p44 {
 
     /// @}
 
+    /// @name Implementation methods for native scene and grouped dimming support
+    /// @{
+
+    /// this is called to check if optimizer should be used for a particular set of devices
+    /// @param aDeliveryState can be inspected to obtain details about the affected devices, actionVariant etc.
+    /// @return true if optimizer should be used with this notification call (other factors can still prevent it)
+    virtual bool shouldUseOptimizerFor(NotificationDeliveryStatePtr aDeliveryState);
+
+    /// this is called once for every native action in use, after startup after existing cache entries have been
+    /// read from persistent storage. This allows vDC implementations to know which native scenes/groups are
+    /// in use by the optimizer without needing private bookkeeping.
+    /// @param aNativeActionId a ID of a native action that is in use by the optimizer
+    /// @return if an error is returned, this means the aNativeActionId is invalid and must no longer be used
+    ///    (vdc will remove the native action from its cache)
+    virtual ErrorPtr announceNativeAction(const string aNativeActionId) { return ErrorPtr(); /* NOP in base class */ };
+
+    /// execute native action (scene call, dimming operation)
+    /// @param aStatusCB must be called to return status. Must return NULL when action was applied.
+    ///   Can return Error::OK to signal action was not applied and request device-by-device apply.
+    /// @param aNativeActionId the ID of the native action (scene, group) that must be used
+    /// @param aDeliveryState can be inspected to obtain details about the affected devices, actionVariant etc.
+    virtual void callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState);
+
+    /// create/reserve new native action
+    /// @param aStatusCB must be called to return status. If not ok, aOptimizerEntry must not be changed.
+    /// @param aOptimizerEntry the optimizer entry. If a new action is created, the nativeActionId must be updated to the new actionid.
+    ///   If creating the native action causes configuration changes in the native device, lastNativeChange should be updated, too.
+    /// @param aDeliveryState can be inspected to obtain details such as list of affected devices etc.
+    virtual void createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState);
+
+    /// update native action
+    /// @param aStatusCB must be called to return status.
+    /// @param aOptimizerEntry the optimizer entry. If configuration has changed in the native device, lastNativeChange should be updated.
+    /// @param aDeliveryState can be inspected to obtain details such as list of affected devices etc.
+    /// @note the implementation might need to delay the update to make sure transition times of affected devices have passed.
+    ///    When this happens, the aStatusCB call must not be substantially delayed (seconds, minutes), otherwise it would block
+    ///    further notifications. Instead, aStatusCB should be called immediately while the actual update can happen
+    ///    later. Furthermore, such a delayed update must be abortable via cancelNativeActionUpdate().
+    virtual void updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState);
+
+    /// this is called to make sure no delayed scene update is still pending before posting another scene call (causing output changes
+    /// and possibly saving wrong scene values).
+    /// @note this method might be called multiple times, and possibly also without a preceeding updateNativeAction() call.
+    virtual void cancelNativeActionUpdate() {};
+
+    /// free native action
+    /// @param aNativeActionId a ID of a native action that should be removed
+    virtual ErrorPtr freeNativeAction(const string aNativeActionId) { return ErrorPtr(); /* NOP in base class */ };
+
+
+    /// @}
+
+
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
@@ -411,7 +587,48 @@ namespace p44 {
     virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) = 0;
 
 
+    /// called to let vdc handle vdc-level methods
+    /// @param aMethod the method
+    /// @param aRequest the request to be passed to answering methods
+    /// @param aParams the parameters object
+    /// @return NULL if method implementation has or will take care of sending a reply (but make sure it
+    ///   actually does, otherwise API clients will hang or run into timeouts)
+    ///   Returning any Error object, even if ErrorOK, will cause a generic response to be returned.
+    /// @note the parameters object always contains the dSUID parameter which has been
+    ///   used already to route the method call to this device.
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+
+
+    /// @name grouped delivery of notification to devices
+    /// @{
+
+    /// deliver notifications to audience
+    /// @param aAudience the audience (list of devices in this vDC that should receive the notification
+    /// @param aApiConnection the API connection where the notification originates from
+    /// @param aNotification the name of the notification
+    /// @param aParams the parameters of the notification
+    void deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
+
+    /// @}
+
+
   private:
+
+    void prepareNextNotification(NotificationDeliveryStatePtr aDeliveryState);
+    void notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, NotificationType aNotificationToApply);
+    void executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState);
+    void preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
+    void repeatPreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState);
+    void finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState);
+    void repeatedNotificationComplete();
+    void finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
+    void createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
+    void preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, bool aChanged, ErrorPtr aError);
+    void notificationDeliveryComplete(NotificationDeliveryState &aDeliveryStateBeingDeleted);
+    void queueDelivery(NotificationDeliveryStatePtr aDeliveryState);
+    void clearOptimizerCache();
+    ErrorPtr loadOptimizerCache();
+    ErrorPtr saveOptimizerCache();
 
     void collectedDevices(StatusCB aCompletedCB, ErrorPtr aError);
     void schedulePeriodicRecollecting();

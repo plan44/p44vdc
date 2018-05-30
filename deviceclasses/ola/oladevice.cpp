@@ -72,8 +72,7 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
   redChannel(dmxNone),
   greenChannel(dmxNone),
   blueChannel(dmxNone),
-  amberChannel(dmxNone),
-  transitionTicket(0)
+  amberChannel(dmxNone)
 {
   // evaluate config
   string config = aDeviceConfig;
@@ -194,7 +193,7 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   MLMicroSeconds transitionTime = 0;
   // abort previous transition
-  MainLoop::currentMainLoop().cancelExecutionTicket(transitionTicket);
+  transitionTicket.cancel();
   // generic device, show changed channels
   if (olaType==ola_dimmer) {
     // single channel dimmer
@@ -246,7 +245,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     if (moreSteps) {
       ALOG(LOG_DEBUG, "transitional DMX512 value %d=%d", whiteChannel, (int)w);
       // not yet complete, schedule next step
-      transitionTicket = MainLoop::currentMainLoop().executeOnce(
+      transitionTicket.executeOnce(
         boost::bind(&OlaDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
         TRANSITION_STEP_TIME
       );
@@ -306,7 +305,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
         hPosChannel, (int)h, vPosChannel, (int)v
       );
       // not yet complete, schedule next step
-      transitionTicket = MainLoop::currentMainLoop().executeOnce(
+      transitionTicket.executeOnce(
         boost::bind(&OlaDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
         TRANSITION_STEP_TIME
       );

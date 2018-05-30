@@ -160,6 +160,7 @@ namespace p44 {
     } dmState;
 
     MLTicket pollTicket; // timer for avahi polling
+    MLTicket startupTicket; // timer for startup delay
 
     // private constructor, use sharedDiscoveryManager() to obtain singleton
     DiscoveryManager();

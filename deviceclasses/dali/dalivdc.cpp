@@ -29,14 +29,22 @@ using namespace p44;
 
 
 DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
-  Vdc(aInstanceNumber, aVdcHostP, aTag)
+  Vdc(aInstanceNumber, aVdcHostP, aTag),
+  usedDaliScenesMask(0),
+  usedDaliGroupsMask(0)
 {
   daliComm = DaliCommPtr(new 	DaliComm(MainLoop::currentMainLoop()));
   #if ENABLE_DALI_INPUTS
   daliComm->setBridgeEventHandler(boost::bind(&DaliVdc::daliEventHandler, this, _1, _2, _3));
   #endif
+  // set default optimisation mode
+  optimizerMode = opt_disabled; // FIXME: once we are confident, make opt_auto the default
 }
 
+
+DaliVdc::~DaliVdc()
+{
+}
 
 
 // vDC name
@@ -115,6 +123,7 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 	string databaseName = getPersistentDataDir();
 	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), DALI_SCHEMA_VERSION, DALI_SCHEMA_MIN_VERSION, aFactoryReset);
+  loadLocallyUsedGroupsAndScenes();
 	aCompletedCB(error); // return status of DB init
 }
 
@@ -126,8 +135,8 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 int DaliVdc::getRescanModes() const
 {
-  // normal and incremental make sense, no exhaustive mode
-  return rescanmode_incremental+rescanmode_normal+rescanmode_exhaustive;
+  // incremental, normal, exhaustive (resolving conflicts) and enumerate (clearing short addrs before scan) are available.
+  return rescanmode_incremental+rescanmode_normal+rescanmode_exhaustive+rescanmode_reenumerate;
 }
 
 
@@ -138,6 +147,7 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // clear the cache, we want fresh info from the devices!
     deviceInfoCache.clear();
     #if ENABLE_DALI_INPUTS
+    // - add the DALI input devices from config
     inputDevices.clear();
     sqlite3pp::query qry(db);
     if (qry.prepare("SELECT daliInputConfig, daliBaseAddr, rowid FROM inputDevices")==SQLITE_OK) {
@@ -149,6 +159,12 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
       }
     }
     #endif
+  }
+  // wipe bus addresses
+  if (aRescanFlags & rescanmode_reenumerate) {
+    // first reset ALL short addresses on the bus
+    LOG(LOG_WARNING, "DALI Bus short address re-enumeration requested -> all short addresses will be re-assigned now (dSUIDs might change)!");
+    daliComm->daliSendDtrAndConfigCommand(DaliBroadcast, DALICMD_STORE_DTR_AS_SHORT_ADDRESS, DALIVALUE_MASK);
   }
   // start collecting, allow quick scan when not exhaustively collecting (will still use full scan when bus collisions are detected)
   // Note: only in rescanmode_exhaustive, existing short addresses might get reassigned. In all other cases, only devices with no short
@@ -236,7 +252,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
         // we already have real device info for this device, or know the device does not have any
         // -> have it processed (but via mainloop to avoid stacking up recursions here)
         LOG(LOG_INFO, "Using cached device info for device at shortAddress %d", addr);
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::deviceInfoValid, this, aBusDevices, aNextDev, aCompletedCB, pos->second));
+        MainLoop::currentMainLoop().executeNow(boost::bind(&DaliVdc::deviceInfoValid, this, aBusDevices, aNextDev, aCompletedCB, pos->second));
         return;
       }
       else {
@@ -248,7 +264,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
     // all done successfully, complete bus info now available in aBusDevices
     // - look for dimmers that are to be addressed as a group
     DaliBusDeviceListPtr dimmerDevices = DaliBusDeviceListPtr(new DaliBusDeviceList());
-    uint16_t groupsInUse = 0; // groups in use
+    uint16_t groupsInUse = 0; // groups in use for configured groups
     while (aBusDevices->size()>0) {
       // get first remaining
       DaliBusDevicePtr busDevice = aBusDevices->front();
@@ -304,7 +320,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
           if (qry.prepare(sql.c_str())==SQLITE_OK) {
             // we know that we found at least one dimmer of this group on the bus, so we'll instantiate
             // the group (even if some dimmers might be missing)
-            groupsInUse |= 1<<groupNo; // flag used
+            groupsInUse |= 1<<groupNo; // groups in use for configured groups (optimizer groups excluded! Important because single-dimmers will get removed from groups in this mask later!)
             DaliBusDeviceGroupPtr daliGroup = DaliBusDeviceGroupPtr(new DaliBusDeviceGroup(*this, groupNo));
             for (sqlite3pp::query::iterator j = qry.begin(); j != qry.end(); ++j) {
               DsUid dimmerUID(nonNullCStr(i->get<const char *>(0)));
@@ -436,9 +452,9 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
   // remaining devices are single channel or DT8 dimmer devices
   for (DaliBusDeviceList::iterator pos = singleDevices.begin(); pos!=singleDevices.end(); ++pos) {
     DaliBusDevicePtr daliBusDevice = *pos;
-    // simple single-dimmer device
+    // single-dimmer (simple or DT8) device
     DaliSingleControllerDevicePtr daliSingleControllerDevice(new DaliSingleControllerDevice(this));
-    // - set whiteDimmer (gives device info to calculate dSUID)
+    // - set daliController (gives device info to calculate dSUID)
     daliSingleControllerDevice->daliController = daliBusDevice;
     // - add it to our collection (if not already there)
     simpleIdentifyAndAddDevice(daliSingleControllerDevice);
@@ -650,27 +666,9 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                 deviceFound = true;
                 // determine free group No
                 if (groupNo<0) {
-                  uint16_t groupMask=0;
                   sqlite3pp::query qry(db);
-                  if (qry.prepare("SELECT DISTINCT groupNo FROM compositeDevices WHERE dimmerType='GRP'")==SQLITE_OK) {
-                    for (sqlite3pp::query::iterator i = qry.begin(); i!=qry.end(); ++i) {
-                      // this is a DALI group in use
-                      groupMask |= (1<<(i->get<int>(0)));
-                    }
-                  }
-                  #if ENABLE_DALI_INPUTS
-                  if (qry.prepare("SELECT DISTINCT daliBaseAddr FROM inputDevices")==SQLITE_OK) {
-                    for (sqlite3pp::query::iterator i = qry.begin(); i!=qry.end(); ++i) {
-                      DaliAddress a = i->get<int>(0);
-                      if (a & DaliGroup) {
-                        // this is a DALI group in use by an input device
-                        groupMask |= (1<<(a & DaliGroupMask));
-                      }
-                    }
-                  }
-                  #endif
                   for (groupNo=0; groupNo<16; ++groupNo) {
-                    if ((groupMask & (1<<groupNo))==0) {
+                    if ((usedDaliGroupsMask & (1<<groupNo))==0) {
                       // group number is free - use it
                       break;
                     }
@@ -682,6 +680,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                   }
                 }
                 // - create DB entry for DALI group member
+                markUsed(DaliGroup+groupNo, true);
                 if (db.executef(
                   "INSERT OR REPLACE INTO compositeDevices (dimmerUID, dimmerType, groupNo) VALUES ('%q','GRP',%d)",
                   memberUID.getString().c_str(),
@@ -735,7 +734,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         }
         // - re-collect devices to find groups and composites now, but only after a second, starting from main loop, not from here
         StatusCB cb = boost::bind(&DaliVdc::groupCollected, this, aRequest);
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
+        recollectDelayTicket.executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
       }
     }
   }
@@ -763,6 +762,7 @@ ErrorPtr DaliVdc::ungroupDevice(DalioutputDevicePtr aDevice, VdcApiRequestPtr aR
     DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(aDevice);
     if (dev) {
       int groupNo = dev->daliController->deviceInfo->shortAddress & DaliGroupMask;
+      markUsed(DaliGroup+groupNo, false);
       if(db.executef(
         "DELETE FROM compositeDevices WHERE dimmerType='GRP' AND groupNo=%d",
         groupNo
@@ -780,7 +780,7 @@ ErrorPtr DaliVdc::ungroupDevice(DalioutputDevicePtr aDevice, VdcApiRequestPtr aR
   aDevice->hasVanished(true); // delete parameters
   // - re-collect devices to find groups and composites now, but only after a second, starting from main loop, not from here
   StatusCB cb = boost::bind(&DaliVdc::groupCollected, this, aRequest);
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
+  recollectDelayTicket.executeOnce(boost::bind(&DaliVdc::recollectDevices, this, cb), 1*Second);
   return respErr;
 }
 
@@ -792,6 +792,265 @@ void DaliVdc::groupCollected(VdcApiRequestPtr aRequest)
   // devices re-collected, return ok (empty response)
   aRequest->sendResult(ApiValuePtr());
 }
+
+
+// MARK: ===== management of used groups and scenes
+
+void DaliVdc::markUsed(DaliAddress aSceneOrGroup, bool aUsed)
+{
+  if ((aSceneOrGroup&DaliAddressTypeMask)==DaliScene) {
+    uint16_t m = 1<<(aSceneOrGroup & DaliSceneMask);
+    if (aUsed) usedDaliScenesMask |= m; else usedDaliScenesMask &= ~m;
+  }
+  else if ((aSceneOrGroup&DaliAddressTypeMask)==DaliGroup) {
+    uint16_t m = 1<<(aSceneOrGroup & DaliGroupMask);
+    if (aUsed) usedDaliGroupsMask |= m; else usedDaliGroupsMask &= ~m;
+  }
+}
+
+
+void DaliVdc::loadLocallyUsedGroupsAndScenes()
+{
+  usedDaliGroupsMask = 0;
+  usedDaliScenesMask = 0;
+  sqlite3pp::query qry(db);
+  if (qry.prepare("SELECT DISTINCT groupNo FROM compositeDevices WHERE dimmerType='GRP'")==SQLITE_OK) {
+    for (sqlite3pp::query::iterator i = qry.begin(); i!=qry.end(); ++i) {
+      // this is a DALI group in use
+      markUsed(DaliGroup+i->get<int>(0), true);
+    }
+  }
+  #if ENABLE_DALI_INPUTS
+  if (qry.prepare("SELECT DISTINCT daliBaseAddr FROM inputDevices")==SQLITE_OK) {
+    for (sqlite3pp::query::iterator i = qry.begin(); i!=qry.end(); ++i) {
+      markUsed(i->get<int>(0), true); // mark scenes and groups
+    }
+  }
+  #endif
+}
+
+
+
+
+// MARK: ===== Native actions (groups and scenes on vDC level)
+
+static DaliAddress daliAddressFromActionId(const string aNativeActionId)
+{
+  int no = -1;
+  if (sscanf(aNativeActionId.c_str(), "DALI_scene_%d", &no)==1) {
+    // native scene
+    return DaliScene+(no & DaliSceneMask);
+  }
+  else if (sscanf(aNativeActionId.c_str(), "DALI_group_%d", &no)==1) {
+    // native group
+    return DaliGroup+(no & DaliGroupMask);
+  }
+  return NoDaliAddress; // no valid action ID
+}
+
+
+static string actionIdFromDaliAddress(DaliAddress aDaliAddress)
+{
+  if ((aDaliAddress&DaliAddressTypeMask)==DaliScene) {
+    return string_format("DALI_scene_%d", aDaliAddress & DaliSceneMask);
+  }
+  else if ((aDaliAddress&DaliAddressTypeMask)==DaliGroup) {
+    return string_format("DALI_group_%d", aDaliAddress & DaliGroupMask);
+  }
+  return "";
+}
+
+
+ErrorPtr DaliVdc::announceNativeAction(const string aNativeActionId)
+{
+  DaliAddress a = daliAddressFromActionId(aNativeActionId);
+  markUsed(a, true);
+  return ErrorPtr();
+}
+
+
+void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState)
+{
+  DaliAddress a = daliAddressFromActionId(aNativeActionId);
+  if (a!=NoDaliAddress) {
+    if (aDeliveryState->optimizedType==ntfy_callscene) {
+      groupDimTicket.cancel(); // just safety, should be cancelled already
+      // set fade time according to scene transition time (usually: already ok, so no time wasted)
+      // note: dalicomm will make sure the fade time adjustments are sent before the scene call
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
+        if (dev && dev->daliController) {
+          LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
+          if (l) {
+            dev->daliController->setTransitionTime(l->transitionTimeToNewBrightness());
+          }
+        }
+      }
+      // Broadcast scene call: DALICMD_GO_TO_SCENE
+      daliComm->daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask), boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+      return;
+    }
+    else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+      // Dim group
+      // - get mode
+      VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
+      ALOG(LOG_INFO,
+        "optimized group dimming (DALI): 'brightness' %s",
+        dm==dimmode_stop ? "STOPS dimming" : (dm==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
+      );
+      // - prepare dimming in all affected devices, i.e. check fade rate (usually: already ok, so no time wasted)
+      // note: we let all devices do this in parallel, continue when last device reports done
+      aDeliveryState->pendingCount = aDeliveryState->affectedDevices.size(); // must be set before calling executePreparedOperation() the first time
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
+        if (dev && dev->daliController) {
+          // prepare
+          dev->daliController->dimPrepare(dm, dev->getChannelByType(channeltype_brightness)->getDimPerMS(), boost::bind(&DaliVdc::groupDimPrepared, this, aStatusCB, a, aDeliveryState, _1));
+        }
+      }
+      return;
+    }
+  }
+  aStatusCB(TextError::err("Native action '%s' (DaliAddress 0x%02X) not supported", aNativeActionId.c_str(), a)); // causes normal execution
+}
+
+
+void DaliVdc::groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    ALOG(LOG_WARNING, "Error while preparing device for group dimming: %s", aError->description().c_str());
+  }
+  if (--aDeliveryState->pendingCount>0) {
+    AFOCUSLOG("waiting for all affected devices to confirm dim preparation: %d/%d remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
+    return; // not all confirmed yet
+  }
+  // now issue dimming command to group
+  VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
+  if (dm==dimmode_stop) {
+    // stop dimming
+    // - cancel repeater ticket
+    groupDimTicket.cancel();
+    // - send MASK to group
+    daliComm->daliSendDirectPower(aDaliAddress, DALIVALUE_MASK, boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+    return;
+  }
+  else {
+    // start dimming right now
+    groupDimTicket.executeOnce(boost::bind(&DaliVdc::groupDimRepeater, this, aDaliAddress, dm==dimmode_up ? DALICMD_UP : DALICMD_DOWN, _1));
+    // confirm action
+    nativeActionDone(aStatusCB, aError);
+    return;
+  }
+}
+
+
+void DaliVdc::groupDimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLTimer &aTimer)
+{
+  daliComm->daliSendCommand(aDaliAddress, aCommand);
+  MainLoop::currentMainLoop().retriggerTimer(aTimer, 200*MilliSecond);
+}
+
+
+void DaliVdc::nativeActionDone(StatusCB aStatusCB, ErrorPtr aError)
+{
+  AFOCUSLOG("DALI Native action done with status: %s", Error::text(aError).c_str());
+  if (aStatusCB) aStatusCB(aError);
+}
+
+
+
+
+void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
+{
+  ErrorPtr err;
+  DaliAddress a = NoDaliAddress;
+  if (aOptimizerEntry->type==ntfy_callscene) {
+    // need a free scene
+    for (int s=0; s<16; s++) {
+      if ((usedDaliScenesMask & (1<<s))==0) {
+        a = DaliScene + s;
+        break;
+      }
+    }
+  }
+  else if (aOptimizerEntry->type==ntfy_dimchannel) {
+    // need a free group
+    for (int g=0; g<16; g++) {
+      if ((usedDaliGroupsMask & (1<<g))==0) {
+        a = DaliGroup + g;
+        break;
+      }
+    }
+  }
+  else {
+    err = TextError::err("cannot create new DALI native action for type=%d", (int)aOptimizerEntry->type);
+  }
+  if (a==NoDaliAddress) {
+    err = Error::err<VdcError>(VdcError::NoMoreActions, "DALI: no free scene or group available");
+  }
+  else {
+    markUsed(a, true);
+    aOptimizerEntry->nativeActionId = actionIdFromDaliAddress(a);
+    aOptimizerEntry->lastNativeChange = MainLoop::now();
+    ALOG(LOG_INFO,"creating action '%s' (DaliAddress=0x%02X)", aOptimizerEntry->nativeActionId.c_str(), a);
+    if (aDeliveryState->optimizedType==ntfy_callscene) {
+      // make sure no old scene settings remain in any device -> broadcast DALICMD_REMOVE_FROM_SCENE
+      daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(a&DaliSceneMask));
+      // now update this scene's values
+      updateNativeAction(aStatusCB, aOptimizerEntry, aDeliveryState);
+      return;
+    }
+    else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+      // Make sure no old group settings remain -> broadcast DALICMD_REMOVE_FROM_GROUP
+      daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_GROUP+(a&DaliGroupMask));
+      // now create new group -> for each affected device sent DALICMD_ADD_TO_GROUP
+      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+        DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
+        if (dev && dev->daliController) {
+          daliComm->daliSendConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_ADD_TO_GROUP+(a&DaliGroupMask));
+        }
+      }
+    }
+    aOptimizerEntry->lastNativeChange = MainLoop::now();
+  }
+  aStatusCB(err);
+}
+
+
+void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
+{
+  DaliAddress a = daliAddressFromActionId(aOptimizerEntry->nativeActionId);
+  if ((a&DaliScene) && aDeliveryState->optimizedType==ntfy_callscene) {
+    // now store scene values -> for each affected device send DALICMD_STORE_DTR_AS_SCENE
+    // Note: we can do this immediately even if transitions might be running, because we store the locally known scene values
+    for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+      DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
+      if (dev && dev->daliController) {
+        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
+        if (l) {
+          uint8_t power = dev->daliController->brightnessToArcpower(l->brightnessForHardware(true)); // non-transitional, final
+          daliComm->daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_SCENE+(a&DaliSceneMask), power);
+        }
+      }
+    }
+    // done
+    ALOG(LOG_INFO,"updated DALI scene #%d", a&DaliSceneMask);
+    aOptimizerEntry->lastNativeChange = MainLoop::now();
+    aStatusCB(ErrorPtr());
+    return;
+  }
+  aStatusCB(TextError::err("cannot update DALI native action for type=%d", (int)aOptimizerEntry->type));
+}
+
+
+ErrorPtr DaliVdc::freeNativeAction(const string aNativeActionId)
+{
+  DaliAddress a = daliAddressFromActionId(aNativeActionId);
+  markUsed(a, false);
+  // Nothing more to do here, keep group or scene as-is, will not be called until re-used
+  return ErrorPtr();
+}
+
 
 
 
@@ -871,6 +1130,7 @@ DaliInputDevicePtr DaliVdc::addInputDevice(const string aConfig, DaliAddress aDa
   DaliInputDevicePtr newDev = DaliInputDevicePtr(new DaliInputDevice(this, aConfig, aDaliBaseAddress));
   // add to container if device was created
   if (newDev) {
+    markUsed(aDaliBaseAddress, true); // mark scene or group used
     // add to container
     simpleIdentifyAndAddDevice(newDev);
   }

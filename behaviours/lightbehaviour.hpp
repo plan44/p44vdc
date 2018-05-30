@@ -153,10 +153,11 @@ namespace p44 {
     virtual double outputValueAccordingToMode(double aChannelValue, int aChannelIndex) P44_OVERRIDE;
 
     /// return the brightness to be applied to hardware
+    /// @param aFinal if set, the final value (not transitional) will be used
     /// @return brightness
     /// @note this is to allow lights to have switching behaviour - when brightness channel value is
     ///   above onThreshold, brightnessForHardware() will return the max channel value and 0 otherwise.
-    Brightness brightnessForHardware();
+    Brightness brightnessForHardware(bool aFinal = false);
 
     /// sync channel brightness from actual hardware value
     /// @param aBrightness current brightness value read back from hardware
@@ -194,12 +195,12 @@ namespace p44 {
     /// @param aScene the scene to apply to output channels
     /// @return true if apply is complete, i.e. everything ready to apply to hardware outputs.
     ///   false if scene cannot yet be applied to hardware, and will be performed later
-    /// @note this derived class' applyScene only implements special hard-wired behaviour specific scenes
+    /// @note this derived class' performApplySceneToChannels only implements special hard-wired behaviour specific scenes
     ///   basic scene apply functionality is provided by base class' implementation already.
-    virtual bool applyScene(DsScenePtr aScene) P44_OVERRIDE;
+    virtual bool performApplySceneToChannels(DsScenePtr aScene) P44_OVERRIDE;
 
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
-    /// @param aScene the scene that was called (if not dontCare, applyScene() has already been called)
+    /// @param aScene the scene that was called (if not dontCare, performApplySceneToChannels() has already been called)
     /// @param aDoneCB will be called when scene actions have completed (but not necessarily when stopped by stopSceneActions())
     virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB) P44_OVERRIDE;
 
@@ -270,7 +271,7 @@ namespace p44 {
 
   protected:
 
-    /// called by applyScene to load channel values from a scene.
+    /// called by performApplySceneToChannels() to load channel values from a scene.
     /// @param aScene the scene to load channel values from
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.

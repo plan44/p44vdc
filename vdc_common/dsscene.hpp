@@ -32,12 +32,6 @@ using namespace std;
 
 namespace p44 {
 
-  /// scene number
-  typedef uint8_t SceneNo;
-
-  /// area this scene applies to (usually derives from SceneNo, 0 if scene is not an area scene)
-  typedef uint8_t SceneArea;
-
   /// scene commands
   typedef enum {
     scene_cmd_none, ///< no command, reserved scene
@@ -68,6 +62,8 @@ namespace p44 {
     scene_cmd_climatecontrol_disable, ///< climate control: switch to system disabled (summer mode)
     scene_cmd_climatecontrol_enable, ///< climate control: switch to system enabled (winter mode)
     scene_cmd_climatecontrol_valve_prophylaxis, ///< climate control: Valve prophylaxis
+    scene_cmd_climatecontrol_valve_service_open, ///< climate control: fully open valve for service
+    scene_cmd_climatecontrol_valve_service_close, ///< climate control: fully close valve for service
     scene_cmd_climatecontrol_mode_heating, ///< climate control: Switch to heating mode
     scene_cmd_climatecontrol_mode_cooling, ///< climate control: Swicth to cooling mode
     scene_cmd_climatecontrol_mode_passive_cooling ///< climate control: Switch to passive cooling mode
@@ -199,6 +195,20 @@ namespace p44 {
     /// Set default scene values for a specified scene number
     /// @param aSceneNo the scene number to set default values
     virtual void setDefaultSceneValues(SceneNo aSceneNo);
+
+    /// indicator about how important precise undo is after calling this scene
+    /// @note actually asking devices about their current state can be very expensive and should
+    ///   be avoided when possible. In most cases, the cached output values are correct.
+    ///   Exceptions are devices that have local/separate controls that can change the output
+    ///   without the vDC knowing about. On the other hand, undo is a very unlikely operation
+    ///   for most scenes (in practice, only Alarm-type global scenes are undone)
+    virtual bool preciseUndoImportant();
+
+    /// scene contents hash
+    /// @return a hash value of the scene contents (NOT including the scene number!)
+    /// @note is allowed to return different values for same scene contents on different platforms
+    virtual uint64_t sceneHash();
+
 
   protected:
 

@@ -295,7 +295,6 @@ ShadowBehaviour::ShadowBehaviour(Device &aDevice) :
   angleCloseTime(1),
   // volatile state
   referenceTime(Never),
-  movingTicket(0),
   blindState(blind_idle),
   movingUp(false),
   runIntoEnd(false),
@@ -485,7 +484,7 @@ void ShadowBehaviour::stop(SimpleCB aApplyDoneCB)
       blindState = blind_stopping;
     }
     BLOG(LOG_INFO, "Stopping all movement%s", blindState==blind_stopping_before_apply ? " before applying" : "");
-    MainLoop::currentMainLoop().cancelExecutionTicket(movingTicket);
+    movingTicket.cancel();
     movementCB(boost::bind(&ShadowBehaviour::stopped, this, aApplyDoneCB, true), 0);
   }
   else {
@@ -503,7 +502,7 @@ void ShadowBehaviour::endReached(bool aTop)
   if (hasEndContacts) {
     BLOG(LOG_INFO, "reports %s actually reached", aTop ? "top (fully rolled in)" : "bottom (fully extended)");
     // cancel timeouts that might want to stop movement
-    MainLoop::currentMainLoop().cancelExecutionTicket(movingTicket);
+    movingTicket.cancel();
     // check for updating full range time
     if (updateMoveTimeAtEndReached) {
       // ran full range, update time
@@ -541,7 +540,7 @@ void ShadowBehaviour::stopped(SimpleCB aApplyDoneCB, bool delay)
   FOCUSLOG("- calculated current blind position=%.1f%%, angle=%.1f", referencePosition, referenceAngle);
 
   if (delay) {
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&ShadowBehaviour::processStopped, this, aApplyDoneCB), stopDelayTime*Second);
+    sequenceTicket.executeOnce(boost::bind(&ShadowBehaviour::processStopped, this, aApplyDoneCB), stopDelayTime*Second);
   }
   else {
     processStopped(aApplyDoneCB);
@@ -562,7 +561,7 @@ void ShadowBehaviour::processStopped(SimpleCB aApplyDoneCB)
       break;
     case blind_stopping_before_turning:
       // after blind movement, always re-apply angle
-      MainLoop::currentMainLoop().executeOnce(boost::bind(&ShadowBehaviour::applyAngle, this, aApplyDoneCB), POSITION_TO_ANGLE_DELAY);
+      sequenceTicket.executeOnce(boost::bind(&ShadowBehaviour::applyAngle, this, aApplyDoneCB), POSITION_TO_ANGLE_DELAY);
       break;
     default:
       // end of sequence
@@ -758,7 +757,7 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
       aApplyDoneCB = NULL;
     }
     FOCUSLOG("- move started, scheduling stop in %.3f Seconds", (double)aStopIn/Second);
-    movingTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&ShadowBehaviour::endMove, this, remaining, aApplyDoneCB), aStopIn);
+    movingTicket.executeOnce(boost::bind(&ShadowBehaviour::endMove, this, remaining, aApplyDoneCB), aStopIn);
   }
 }
 
@@ -785,7 +784,7 @@ void ShadowBehaviour::movePaused(MLMicroSeconds aRemainingMoveTime, SimpleCB aAp
   // must update reference values between segments as well, otherwise estimate will include pause
   moveTimerStop();
   // schedule next segment
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&ShadowBehaviour::startMoving, this, aRemainingMoveTime, aApplyDoneCB), INTER_SHORT_MOVE_DELAY);
+  sequenceTicket.executeOnce(boost::bind(&ShadowBehaviour::startMoving, this, aRemainingMoveTime, aApplyDoneCB), INTER_SHORT_MOVE_DELAY);
 }
 
 
@@ -841,7 +840,7 @@ void ShadowBehaviour::identifyToUser()
   VdcDimMode dimMode = position->getChannelValue()>50 ? dimmode_down : dimmode_up;
   // move a little
   device.dimChannelForArea(device.getChannelByIndex(0), dimMode, -1, IDENTITY_MOVE_TIME);
-  MainLoop::currentMainLoop().executeOnce(boost::bind(&ShadowBehaviour::reverseIdentify, this, dimMode==dimmode_up ? dimmode_down : dimmode_up), IDENTITY_MOVE_TIME*2);
+  sequenceTicket.executeOnce(boost::bind(&ShadowBehaviour::reverseIdentify, this, dimMode==dimmode_up ? dimmode_down : dimmode_up), IDENTITY_MOVE_TIME*2);
 }
 
 

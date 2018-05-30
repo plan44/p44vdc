@@ -80,6 +80,9 @@ namespace p44 {
   /// @}
 
 
+  /// Handler for scene/dim preparation
+  typedef boost::function<void (NotificationType aNotificationToApply)> PreparedCB;
+
 
   /// base class representing a virtual digitalSTROM device.
   /// For each type of subsystem (EnOcean, DALI, ...) this class is subclassed to implement
@@ -88,6 +91,7 @@ namespace p44 {
   {
     typedef DsAddressable inherited;
 
+    friend class Vdc;
     friend class VdcHost;
     friend class VdcCollector;
     friend class DsBehaviour;
@@ -113,7 +117,7 @@ namespace p44 {
 
     // volatile r/w properties
     bool progMode; ///< if set, device is in programming mode
-    DsScenePtr previousState; ///< a pseudo scene which holds the device state before the last applyScene() call, used to do undoScene()
+    DsScenePtr previousState; ///< a pseudo scene which holds the device state before the last performApplySceneToChannels() call, used to do undoScene()
 
     // variables set by concrete devices (=hardware dependent)
     DsClass colorClass; ///< basic color of the device (can be black)
@@ -121,11 +125,17 @@ namespace p44 {
     // volatile internal state
     MLTicket dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
     VdcDimMode currentDimMode; ///< current dimming in progress
+    MLMicroSeconds currentAutoStopTime; ///< time after which dimming must stop
     ChannelBehaviourPtr currentDimChannel; ///< currently dimmed channel (if dimming in progress)
-    MLTicket dimHandlerTicket; ///< for standard dimming
     bool isDimming; ///< if set, dimming is in progress
     uint8_t areaDimmed; ///< last dimmed area (so continue know which dimming command to re-start in case it comes late)
     VdcDimMode areaDimMode; ///< last area dim mode
+    MLTicket dimHandlerTicket; ///< for standard dimming
+    MLTicket vanishTicket; ///< for self-vanishing
+
+    // prepared operations
+    DsScenePtr preparedScene; ///< set if this scene must be applied at executePreparedOperation()
+    bool preparedDim; ///< set if currentDimMode/currentDimChannel must be applied at executePreparedOperation()
 
     // hardware access serializer/pacer
     SimpleCB appliedOrSupersededCB; ///< will be called when values are either applied or ignored because a subsequent change is already pending
@@ -151,6 +161,9 @@ namespace p44 {
     ///   by a more specialized subclass if needed, AFTER accessing some device APIs etc. So the constructor must make the
     ///   device ready for identifyDevice(), but nothing else.
     Device(Vdc *aVdcP);
+
+    /// destructor
+    virtual ~Device();
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     /// @param aIdentifyCB must be called when the identification or setup is not instant, but can only be confirmed later. In this
@@ -180,7 +193,8 @@ namespace p44 {
     /// utility: confirm identification
     void identificationOK(IdentifyDeviceCB aIdentifyCB, Device *aActualDevice = NULL);
 
-
+    /// called when vdsm acknowledges announcement of this device.
+    virtual void announcementAcknowledged() P44_OVERRIDE;
 
     /// load parameters from persistent DB
     /// @note this is usually called from the device container when device is added (detected), before initializeDevice() and after identifyDevice()
@@ -227,9 +241,6 @@ namespace p44 {
     /// @note at the time aDisconnectResultHandler is called, the only owner left for the device object might be the
     ///   aDevice argument to the DisconnectCB handler.
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler);
-
-    /// destructor
-    virtual ~Device();
 
     /// @}
 
@@ -400,15 +411,29 @@ namespace p44 {
 
     /// called to let device handle device-level notification
     /// @param aApiConnection this is the API connection from which the notification originates
-    /// @param aMethod the notification
+    /// @param aNotification the notification
     /// @param aParams the parameters object
+    /// @note callScene and dimChannel notifications are handled separately at the vDC level and dispatched
+    ///    using special xxPrepare() and xxExecute() methods.
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this device.
-    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
-    /// call scene on this device
+    /// convenience method to call scene on this device
     /// @param aSceneNo the scene to call.
+    /// @param aForce if set, the scene overrides possibly active localPriority
+    /// @note this method internally uses callScenePrepare/callSceneExecute.
+    ///    It is exposed as directly calling scenes might be useful for special purposes/debugging
     void callScene(SceneNo aSceneNo, bool aForce);
+
+    /// convenience method to start or stop dimming a channel of this device.
+    /// @param aChannel the channel to start or stop dimming for
+    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aArea the area (1..4, 0=room) to restrict dimming to. Can be -1 to override local priority
+    /// @param aAutoStopAfter max dimming time, dimming will stop when this time has passed
+    /// @note this method internally uses dimChannelForAreaPrepare/dimChannelForAreaExecute.
+    ///    It is exposed as directly controlling dimming might be useful for special purposes (e.g. identify)
+    void dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
 
     /// undo scene call on this device (i.e. revert outputs to values present immediately before calling that scene)
     /// @param aSceneNo the scene call to undo (needs to be specified to prevent undoing the wrong scene)
@@ -422,17 +447,6 @@ namespace p44 {
     /// @param aScene the updated scene object that should be stored
     /// @note only updates the scene if aScene is marked dirty
     void updateSceneIfDirty(DsScenePtr aScene);
-
-
-    /// start or stop dimming channel of this device.
-    /// @param aChannel the channel to start or stop dimming for
-    /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
-    /// @param aArea the area (1..4, 0=room) to restrict dimming to. Can be -1 to override local priority
-    /// @param aAutoStopAfter max dimming time, dimming will stop when this time has passed
-    /// @note this method is internally used to implement vDC API dimChannel and dim-related scene calls, but
-    ///    it is exposed as directly controlling dimming might be useful for other purposes (e.g. identify)
-    void dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
-
 
     /// Process a named control value. The type, group membership and settings of the device determine if at all,
     /// and if, how the value affects physical outputs of the device or general device operation
@@ -482,6 +496,10 @@ namespace p44 {
     /// start or stop dimming channel of this device. Usually implemented in device specific manner in subclasses.
     /// @param aChannel the channel to start or stop dimming for
     /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
+    /// @param aDoApply only if set to true, dimming must be started/stopped in hardware. Otherwise
+    ///   the actual operation has been done already by another means (such as native group/scene call on the harware level)
+    ///   and must NOT be repeated.
+    ///   However, in all cases internal state must be updated to reflect the finalized operation
     /// @note unlike the vDC API "dimChannel" command, which must be repeated for dimming operations >5sec, this
     ///   method MUST NOT terminate dimming automatically except when reaching the minimum or maximum level
     ///   available for the device. Dimming timeouts are implemented at the device level and cause calling
@@ -489,7 +507,7 @@ namespace p44 {
     /// @note this method can rely on a clean start-stop sequence in all cases, which means it will be called once to
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
-    virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode);
+    virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply);
 
     /// identify the device to the user
     /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
@@ -508,6 +526,10 @@ namespace p44 {
 
     /// @return true if any channel needs to be applied to hardware
     bool needsToApplyChannels();
+
+    /// confirms all channels applied to hardware
+    /// @param aAnyWay if true, lastSent state will be set even for channels that were not in needsApplying() state
+    void allChannelsApplied(bool aAnyway = false);
 
     /// get channel by index
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
@@ -565,7 +587,7 @@ namespace p44 {
     virtual bool prepareSceneApply(DsScenePtr aScene);
 
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
-    /// @param aScene the scene that was called (if not dontCare, applyScene() has already been called)
+    /// @param aScene the scene that was called (if not dontCare, performApplySceneToChannels() has already been called)
     /// @param aDoneCB will be called when scene actions have completed (but not necessarily when stopped by stopSceneActions())
     /// @note base class implementation just calls performSceneActions() on output
     /// @note this is called after scene values have been applied already (or as only action if dontCare has prevented applying values)
@@ -598,6 +620,52 @@ namespace p44 {
     virtual void syncChannelValues(SimpleCB aDoneCB) { if (aDoneCB) aDoneCB(); /* assume caches up-to-date */ };
     
     /// @}
+
+    /// @name group-optimized notifications for calling scenes and dimming
+    /// @{
+
+    /// prepare (possibly) optimized notification delivery
+    /// @param aDeliveryState
+
+    /// prepare calling scene on this device
+    /// @param aDeliveryState must be inspected to obtain the notification parameters
+    /// @param aPreparedCB must be called to signal if scene call will actually cause a change in this device.
+    ///   This can be used by vdc level optimizers to build groups and call hardware native scenes/groups.
+    /// @note returning true with aPreparedCB means that callSceneExecute() can be called to actually make the scene change happen
+    ///   However, when the vdc uses scene optimisation, the vDC might NOT call callSceneExecute(), but execute
+    ///   the scene via a group/scene mechanism on the vDC level.
+    void notificationPrepare(PreparedCB aPreparedCB, NotificationDeliveryStatePtr aDeliveryState);
+
+    /// this is called before optimizer repeats a native operation and adjusts state such that
+    /// next executePreparedOperation will do the right
+    /// @param aDeliveryState can be inspected to see the action being repeated
+    void optimizerRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState);
+
+    /// start and/or finalize a operation prepared with callScenePrepare/dimChannelForAreaPrepare
+    /// @param aDoneCB called when operation is complete
+    /// @param aDoApply only if set to true, operation must be applied to the hardware. Otherwise
+    ///   the actual applying has been done already by another means (such as native group/scene call on the harware level)
+    ///   and must NOT be re-applied.
+    ///   However, in all cases internal state must be updated to reflect the finalized operation
+    void executePreparedOperation(SimpleCB aDoneCB, bool aDoApply);
+
+    /// let this device add itself to the list of devices that can received grouped/optimized scene/dim calls, if applicable
+    /// @param aDeliveryState if the device supports optimized calls, it must update the delivery state hashes
+    ///   and add itself to the list of affected devices
+    /// @return false if device does not support optimization (on a call-by-call basis, might support
+    ///   it for some scenes but not for others).
+    bool addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState);
+
+    /// let device implementation prepare for (and possibly reject) optimized set
+    /// @param aDeliveryState can be inspected to see the scene or dim parameters
+    ///   (optimizedType, actionParam, actionVariant are already set)
+    /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
+    ///    executed without optimisation
+    virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) { return false; /* not optimizable by default */ };
+
+    /// @}
+
+
 
     /// @name device configurations
     /// @{
@@ -644,14 +712,21 @@ namespace p44 {
     DsGroupMask behaviourGroups();
 
     ErrorPtr checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel);
+    void callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce);
+    void callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
+    void callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
+    void callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply);
+    void dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
+    void dimRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState);
+    void dimChannelExecutePrepared(SimpleCB aDoneCB, bool aDoApply);
+    void outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene);
 
+    void sceneActionsComplete(SimpleCB aDoneCB, DsScenePtr aScene);
     void dimAutostopHandler(ChannelBehaviourPtr aChannel);
     void dimHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNow);
     void dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNextDimAt);
     void outputSceneValueSaved(DsScenePtr aScene);
-    void outputUndoStateSaved(DsBehaviourPtr aOutput, DsScenePtr aScene);
-    void sceneValuesApplied(DsScenePtr aScene);
-    void sceneActionsComplete(DsScenePtr aScene);
+    void sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene);
 
     void applyingChannelsComplete();
     void updatingChannelsComplete();

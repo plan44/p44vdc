@@ -271,17 +271,17 @@ void OutputBehaviour::saveChannelsToScene(DsScenePtr aScene)
 
 
 
-bool OutputBehaviour::performApplyScene(DsScenePtr aScene)
+bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene)
 {
   if (aScene) {
-    return applyScene(aScene); // actually apply
+    return performApplySceneToChannels(aScene); // actually apply
   }
   return false; // no scene to apply
 }
 
 
 
-bool OutputBehaviour::applyScene(DsScenePtr aScene)
+bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene)
 {
   // scenes with invoke functionality will apply channel values by default
   SceneCmd cmd = aScene->sceneCmd;

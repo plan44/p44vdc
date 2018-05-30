@@ -215,7 +215,7 @@ void ConsoleDevice::buttonHandler(int aButtonIndex, bool aState, MLMicroSeconds 
 {
 	ButtonBehaviourPtr b = getButton(aButtonIndex);
 	if (b) {
-		b->buttonAction(aState);
+		b->updateButtonState(aState);
 	}
 }
 

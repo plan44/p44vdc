@@ -373,9 +373,9 @@ void EnoceanD20601ButtonHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
   ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(behaviour);
   if (bb) {
     if (buttonActivity==1)
-      bb->buttonAction(true); // pressed
+      bb->updateButtonState(true); // pressed
     else if (buttonActivity==2)
-      bb->buttonAction(false); // released
+      bb->updateButtonState(false); // released
   }
 }
 

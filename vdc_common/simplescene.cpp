@@ -6,8 +6,9 @@
 //  Copyright (c) 2014-2017 plan44.ch. All rights reserved.
 //
 
-#include "simplescene.hpp"
+#include "fnv.hpp"
 
+#include "simplescene.hpp"
 #include "outputbehaviour.hpp"
 
 // MARK: ===== SimpleScene
@@ -39,6 +40,17 @@ void SimpleScene::setSceneValue(int aOutputIndex, double aValue)
     setPVar(value, aValue);
   }
 }
+
+
+uint64_t SimpleScene::sceneHash()
+{
+  // generic implementation: hash over all values and all flags, plus simplescene specific effect/effectparam
+  Fnv64 hash(inherited::sceneHash());
+  hash.addBytes(sizeof(effect), (uint8_t *)&effect); // is platform dependent, but does not matter - this is for caching only
+  hash.addBytes(sizeof(effectParam), (uint8_t *)&effectParam); // is platform dependent, but does not matter - this is for caching only
+  return hash.getHash();
+}
+
 
 
 // MARK: ===== Scene persistence

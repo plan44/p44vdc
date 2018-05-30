@@ -349,6 +349,7 @@ namespace p44 {
 
     void armInvalidator();
     #if ENABLE_RRDB
+    void prepareLogging();
     void logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue);
     #endif
 

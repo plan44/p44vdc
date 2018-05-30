@@ -330,7 +330,7 @@ void SparkIoDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       // posting might fail if done too early
       if (!sparkApiCall(boost::bind(&SparkIoDevice::channelValuesSent, this, sl, aDoneCB, _1, _2), args)) {
         // retry after a while
-        MainLoop::currentMainLoop().executeOnce(boost::bind(&SparkIoDevice::applyChannelValues, this, aDoneCB, aForDimming), 1*Second);
+        retryTicket.executeOnce(boost::bind(&SparkIoDevice::applyChannelValues, this, aDoneCB, aForDimming), 1*Second);
       }
     }
     else {
