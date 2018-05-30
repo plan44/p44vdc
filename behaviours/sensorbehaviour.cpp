@@ -1065,11 +1065,13 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case rrdbPath_key+settings_key_offset:
           if (setPVar(rrdbpath, aPropValue->stringValue())) {
             rrdbfile.clear(); // force re-setup of rrdb logging
+            prepareLogging();
           }
           return true;
         case rrdbConfig_key+settings_key_offset:
           if (setPVar(rrdbconfig, aPropValue->stringValue())) {
             rrdbfile.clear(); // force re-setup of rrdb logging
+            prepareLogging();
           }
           return true;
         #endif
