@@ -246,8 +246,10 @@ namespace p44 {
   };
 
   typedef boost::intrusive_ptr<ChannelBehaviour> ChannelBehaviourPtr;
-
   typedef vector<ChannelBehaviourPtr> ChannelBehaviourVector;
+
+
+  // MARK: ===== generic channel implementations
 
 
   /// index value channel
@@ -328,6 +330,23 @@ namespace p44 {
     void setMax(double aMax) { max = aMax; };
   };
   typedef boost::intrusive_ptr<DialChannel> DialChannelPtr;
+
+
+  // MARK: ===== specific purpose channel implementations
+
+  /// Power state channel
+  class PowerStateChannel : public IndexChannel
+  {
+    typedef IndexChannel inherited;
+
+  public:
+    PowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { setNumIndices(numDsPowerStates); }; ///< see DsPowerState enum
+
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_power_state; }; ///< the dS channel type
+    virtual const char *getName() P44_OVERRIDE { return "power state"; };
+
+  };
+  typedef boost::intrusive_ptr<PowerStateChannel> PowerStateChannelPtr;
 
 
 } // namespace p44

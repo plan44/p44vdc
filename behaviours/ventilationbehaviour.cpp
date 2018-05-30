@@ -386,11 +386,10 @@ void VentilationBehaviour::saveChannelsToScene(DsScenePtr aScene)
 
 // apply scene
 // - execute special climate commands
-bool VentilationBehaviour::performApplySceneToChannels(DsScenePtr aScene)
+bool VentilationBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd)
 {
   // check the special hardwired scenes
-  SceneCmd sceneCmd = aScene->sceneCmd;
-  switch (sceneCmd) {
+  switch (aSceneCmd) {
     case scene_cmd_off:
     case scene_cmd_min:
     case scene_cmd_max:
@@ -404,7 +403,7 @@ bool VentilationBehaviour::performApplySceneToChannels(DsScenePtr aScene)
       break;
   }
   // other type of scene, let base class handle it
-  return inherited::performApplySceneToChannels(aScene);
+  return inherited::performApplySceneToChannels(aScene, aSceneCmd);
 }
 
 

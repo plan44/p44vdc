@@ -274,23 +274,25 @@ void OutputBehaviour::saveChannelsToScene(DsScenePtr aScene)
 bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene)
 {
   if (aScene) {
-    return performApplySceneToChannels(aScene); // actually apply
+    return performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
   }
   return false; // no scene to apply
 }
 
 
 
-bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene)
+bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd)
 {
   // scenes with invoke functionality will apply channel values by default
-  SceneCmd cmd = aScene->sceneCmd;
+  if (aSceneCmd==scene_cmd_none) {
+    aSceneCmd = aScene->sceneCmd;
+  }
   if (
-    cmd==scene_cmd_invoke ||
-    cmd==scene_cmd_off ||
-    cmd==scene_cmd_slow_off ||
-    cmd==scene_cmd_min ||
-    cmd==scene_cmd_max
+    aSceneCmd==scene_cmd_invoke ||
+    aSceneCmd==scene_cmd_off ||
+    aSceneCmd==scene_cmd_slow_off ||
+    aSceneCmd==scene_cmd_min ||
+    aSceneCmd==scene_cmd_max
   ) {
     // apply stored scene value(s) to channels
     loadChannelsFromScene(aScene);
@@ -299,7 +301,7 @@ bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene)
   }
   else {
     // no channel changes
-    LOG(LOG_INFO, "- Scene(%d): no invoke/off/min/max (but cmd=%d) -> no channels loaded", aScene->sceneNo, aScene->sceneCmd);
+    LOG(LOG_INFO, "- Scene(%d): no invoke/off/min/max (but cmd=%d) -> no channels loaded", aScene->sceneNo, aSceneCmd);
     return false;
   }
 }

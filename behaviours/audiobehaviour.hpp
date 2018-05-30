@@ -56,21 +56,6 @@ namespace p44 {
   typedef boost::intrusive_ptr<AudioVolumeChannel> AudioVolumeChannelPtr;
 
 
-  /// Audio power state channel
-  class AudioPowerStateChannel : public IndexChannel
-  {
-    typedef IndexChannel inherited;
-
-  public:
-    AudioPowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { setNumIndices(numDsAudioPowerStates); }; ///< see DsAudioPowerState enum
-
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_power_state; }; ///< the dS channel type
-    virtual const char *getName() P44_OVERRIDE { return "powerstate"; };
-
-  };
-  typedef boost::intrusive_ptr<AudioPowerStateChannel> AudioPowerStateChannelPtr;
-
-
   /// Audio content source channel
   class AudioContentSourceChannel : public IndexChannel
   {
@@ -100,7 +85,7 @@ namespace p44 {
     /// @{
 
     uint32_t contentSource; ///< the index of a content source, e.g. a song/sound effect from a list
-    DsAudioPowerState powerState; ///< the power state of the audio device
+    DsPowerState powerState; ///< the power state of the audio device
 
     /// @}
 
@@ -200,7 +185,7 @@ namespace p44 {
     /// the volume channel
     AudioVolumeChannelPtr volume;
     /// the power state channel
-    AudioPowerStateChannelPtr powerState;
+    PowerStateChannelPtr powerState;
     /// the content source channel
     AudioContentSourceChannelPtr contentSource;
 
@@ -221,11 +206,12 @@ namespace p44 {
 
     /// apply scene to output channels
     /// @param aScene the scene to apply to output channels
+    /// @param aSceneCmd This will be used instead of the scenecommand stored in the scene. This
     /// @return true if apply is complete, i.e. everything ready to apply to hardware outputs.
     ///   false if scene cannot yet be applied to hardware, and will be performed later
     /// @note this derived class' performApplySceneToChannels() only implements special hard-wired behaviour specific scenes
     ///   basic scene apply functionality is provided by base class' implementation already.
-    virtual bool performApplySceneToChannels(DsScenePtr aScene) P44_OVERRIDE;
+    virtual bool performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd) P44_OVERRIDE;
 
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
     /// @param aScene the scene that was called (if not dontCare, performApplySceneToChannels() has already been called)

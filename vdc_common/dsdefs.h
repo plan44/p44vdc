@@ -326,13 +326,15 @@ typedef enum {
 typedef uint8_t DsChannelType;
 
 
-/// audio channel power states
+/// Power state channel values (audio, FCU...)
 typedef enum {
-  dsAudioPower_deep_off = 0,
-  dsAudioPower_power_save = 1,
-  dsAudioPower_on = 2,
-  numDsAudioPowerStates
-} DsAudioPowerState;
+  powerState_off = 0, ///< "normal" off (no standby, just off)
+  powerState_on = 1, ///< "normal" on
+  powerState_forcedOff = 2, ///< also "local off" (climate: turned off locally/by user e.g. to silence a device, but will turn on when global building protection requires it)
+  powerState_standby = 3, ///< also "power save" (audio: off, but ready for quick start)
+  numDsPowerStates
+} DsPowerState;
+
 
 /// ventilation airflow direction channel states
 typedef enum {
