@@ -273,7 +273,7 @@ static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
   { sensorType_air_pressure,   usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 15*Minute, 60*Minute,    0,         false,   0,      0 },
   { sensorType_wind_speed,     usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    0.1,       true,    -1,     1*Minute },
   { sensorType_wind_direction, usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    20,        false,   -1,     1*Minute },
-  { sensorType_gust_speed,     usage_outdoors, 3*Second,  200*MilliSecond, WindowEvaluator::eval_max,                  10*Minute, 60*Minute,    0.1,       true,    5,      3*Second /* = "immediate" */},
+  { sensorType_gust_speed,     usage_outdoors, 3*Second,  200*MilliSecond, WindowEvaluator::eval_max,                  10*Minute, 60*Minute,    0.1,       true,    5,      1*Second /* = "immediate" */},
   // FIXME: rule says "accumulation", but as long as sensors deliver intensity in mm/h, it is in fact a window average over an hour
   { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,        WindowEvaluator::eval_timeweighted_average, 60*Minute, 60*Minute,    0,         false,   0,      0 },
 
@@ -469,7 +469,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
           currentValue>profileP->trigMin &&
           fabs(currentValue-lastPushedValue)>=(profileP->trigRel ? fabs(lastPushedValue*profileP->trigDelta) : profileP->trigDelta);
         if (doPush) {
-          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets SOD conditions (%0.3f ->%0.3f %s) to push now", index, behaviourId.c_str(), getHardwareName().c_str(), lastPushedValue, currentValue, getSensorUnitText().c_str());
+          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets SOD conditions (%0.3f -> %0.3f %s) to push now", index, behaviourId.c_str(), getHardwareName().c_str(), lastPushedValue, currentValue, getSensorUnitText().c_str());
         }
       }
     }
@@ -719,14 +719,25 @@ void SensorBehaviour::prepareLogging()
         args.push_back(string_format("DS:%s_P:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
       }
       if (autoRRA) {
-        // now RRAs: RRA:AVERAGE:xff:steps:rows
-        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 1l, 7*24*3600/step)); // 1:1 samples for a week
-        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 3600/step, 30*24*3600*step/3600)); // hourly datapoints for 1 months (30 days)
-        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 24*3600/step, 2*365*24*3600*step/24/3600)); // daily for 2 years
+        // choose correct consolidation function
+        string consolidationFunc = "AVERAGE";
+        if (profileP) {
+          if (profileP->evalType==WindowEvaluator::eval_max) consolidationFunc = "MAX";
+          else if (profileP->evalType==WindowEvaluator::eval_min) consolidationFunc = "MIN";
+        }
+        // now RRAs: RRA:consolidationFunc:xff:steps:rows
+        args.push_back(string_format("RRA:%s:0.5:%ld:%ld", consolidationFunc.c_str(), 1l, 7*24*3600/step)); // 1:1 samples for a week (with autostep: unless updateInterval is <15 sec, see above)
+        args.push_back(string_format("RRA:%s:0.5:%ld:%ld", consolidationFunc.c_str(), 3600/step, 30*24*3600*step/3600)); // hourly datapoints for 1 months (30 days)
+        args.push_back(string_format("RRA:%s:0.5:%ld:%ld", consolidationFunc.c_str(), 24*3600/step, 2*365*24*3600*step/24/3600)); // daily for 2 years
       }
       // now add explicit config
       args.insert(args.end(), cfgArgs.begin(), cfgArgs.end());
       // create the rrd file from config
+      if (LOGENABLED(LOG_INFO)) {
+        string a;
+        for (int i=0; i<args.size(); ++i) a += args[i] + ' ';
+        BLOG(LOG_INFO, "rrd: creating new RRD with args: %s", a.c_str());
+      }
       int ret = rrd_call(rrd_create, args);
       if (ret==0) {
         BLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", rrdbfile.c_str());
