@@ -64,8 +64,6 @@ namespace p44 {
     int reapplyCount;
     MLTicket reapplyTicket;
 
-    bool lastReachable; ///< updated when pinged, used for opStateLevel
-
     MLTicket dimTicket;
 
   public:
@@ -154,14 +152,6 @@ namespace p44 {
 
     /// @return human readable version string
     virtual string modelVersion() const P44_OVERRIDE;
-
-    /// Get an indication how good/critical the operation state of the device is (such as radio strenght, battery level)
-    /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
-    virtual int opStateLevel() P44_OVERRIDE;
-
-    /// Get short text to describe the operation state (such as radio RSSI, critical battery level, etc.)
-    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
-    virtual string getOpStateText() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

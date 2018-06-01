@@ -39,7 +39,9 @@ using namespace p44;
 DsAddressable::DsAddressable(VdcHost *aVdcHostP) :
   vdcHostP(aVdcHostP),
   announced(Never),
-  announcing(Never)
+  announcing(Never),
+  present(true), // by default, consider addressable present
+  lastPresenceUpdate(Never)
 {
 }
 
@@ -300,7 +302,7 @@ void DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const
   if (aNotification=="ping") {
     // issue device ping (which will issue a pong when device is reachable)
     ALOG(LOG_INFO, "ping -> checking presence...");
-    checkPresence(boost::bind(&DsAddressable::presenceResultHandler, this, _1));
+    checkPresence(boost::bind(&DsAddressable::pingResultHandler, this, _1));
   }
   else {
     // unknown notification
@@ -326,8 +328,11 @@ bool DsAddressable::sendRequest(const char *aMethod, ApiValuePtr aParams, VdcApi
 
 
 
-void DsAddressable::presenceResultHandler(bool aIsPresent)
+void DsAddressable::pingResultHandler(bool aIsPresent)
 {
+  // update the state
+  updatePresenceState(aIsPresent);
+  // send pong
   if (aIsPresent) {
     // send back Pong notification
     ALOG(LOG_INFO, "is present -> sending pong");
@@ -340,13 +345,34 @@ void DsAddressable::presenceResultHandler(bool aIsPresent)
 
 
 
+void DsAddressable::updatePresenceState(bool aPresent, bool aPush)
+{
+  lastPresenceUpdate = MainLoop::now();
+  if (aPresent!=present || lastPresenceUpdate==Never) {
+    // change in presence
+    present = aPresent;
+    ALOG(LOG_NOTICE, "changes to %s", aPresent ? "PRESENT" : "OFFLINE");
+    // push change in presence
+    VdcApiConnectionPtr api = getVdcHost().getSessionConnection();
+    if (aPush && api) {
+      ApiValuePtr query = api->newApiValue();
+      query->setType(apivalue_object);
+      ApiValuePtr subQuery = query->newValue(apivalue_object);
+      subQuery->add("present", subQuery->newValue(apivalue_null));
+      pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
+    }
+  }
+}
+
+
+
 // MARK: ===== interaction with subclasses
 
 
 void DsAddressable::checkPresence(PresenceCB aPresenceResultHandler)
 {
-  // base class just assumes being present
-  aPresenceResultHandler(true);
+  // base class just confirms current state
+  aPresenceResultHandler(present);
 }
 
 
@@ -375,6 +401,7 @@ enum {
   deviceIcon16_key,
   iconName_key,
   name_key,
+  present_key,
   numDsAddressableProperties
 };
 
@@ -411,7 +438,8 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     { "x-p44-opStateText", apivalue_string, opStateText_key, OKEY(dsAddressable_key) },
     { "deviceIcon16", apivalue_binary, deviceIcon16_key, OKEY(dsAddressable_key) },
     { "deviceIconName", apivalue_string, iconName_key, OKEY(dsAddressable_key) },
-    { "name", apivalue_string, name_key, OKEY(dsAddressable_key) }
+    { "name", apivalue_string, name_key, OKEY(dsAddressable_key) },
+    { "present", apivalue_bool+propflag_needsreadprep, present_key, OKEY(dsAddressable_key) }
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -419,6 +447,31 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
   aPropIndex -= n; // rebase to 0 for my own first property
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
+
+
+#define MIN_PRESENCE_SAMPLE_INTERVAL (15*Second)
+
+void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+{
+  if (aPropertyDescriptor->hasObjectKey(dsAddressable_key) && aPropertyDescriptor->fieldKey()==present_key) {
+    // update status in case
+    if (lastPresenceUpdate+MIN_PRESENCE_SAMPLE_INTERVAL<MainLoop::now()) {
+      // request update from device
+      checkPresence(boost::bind(&DsAddressable::presenceSampleHandler, this, aPreparedCB, _1));
+      return;
+    }
+  }
+  // nothing to do here, let inherited handle it
+  inherited::prepareAccess(aMode, aPropertyDescriptor, aPreparedCB);
+}
+
+
+void DsAddressable::presenceSampleHandler(StatusCB aPreparedCB, bool aIsPresent)
+{
+  updatePresenceState(aIsPresent, false);
+  aPreparedCB(ErrorPtr());
+}
+
 
 
 bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
@@ -453,6 +506,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case deviceIcon16_key: { string icon; if (getDeviceIcon(icon, true, "icon16")) { aPropValue->setBinaryValue(icon); return true; } else return false; }
         case iconName_key: { string iconName; if (getDeviceIcon(iconName, false, "icon16")) { aPropValue->setStringValue(iconName); return true; } else return false; }
         case name_key: aPropValue->setStringValue(getName()); return true;
+        case present_key: aPropValue->setBoolValue(present); return true;
       }
       return true;
     }

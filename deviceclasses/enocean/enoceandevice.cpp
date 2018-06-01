@@ -296,6 +296,7 @@ void EnoceanDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 void EnoceanDevice::updateRadioMetrics(Esp3PacketPtr aEsp3PacketPtr)
 {
   if (aEsp3PacketPtr) {
+    updatePresenceState(true); // when we get a telegram, we know device is present now
     lastPacketTime = MainLoop::now();
     lastRSSI = aEsp3PacketPtr->radioDBm();
     lastRepeaterCount = aEsp3PacketPtr->radioRepeaterCount();

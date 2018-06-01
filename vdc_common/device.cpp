@@ -2210,7 +2210,10 @@ void Device::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aProp
   if (aPropertyDescriptor->hasObjectKey(device_configurations_key)) {
     // have device create these
     getDeviceConfigurations(cachedConfigurations, aPreparedCB);
+    return;
   }
+  // nothing to do here, let inherited handle it
+  inherited::prepareAccess(aMode, aPropertyDescriptor, aPreparedCB);
 }
 
 
