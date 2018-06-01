@@ -108,7 +108,7 @@ string HomeConnectProgramBuilder::build()
 
     ss << "\"options\":[";
 
-    for(map<string, string>::iterator it = options.begin(); it != options.end(); it++)
+    for(map<string, string>::iterator it = options.begin(); it != options.end(); ++it)
     {
       ss << "{ \"key\":\"" << it->first << "\",\"value\":" << it->second << "},";
     }
@@ -230,7 +230,8 @@ string HomeConnectSettingBuilder::build()
 
 
 HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-  inherited(aVdcP)
+  inherited(aVdcP),
+  isConnected(false)
 {
   // home connect appliances are single devices
   setColorClass(class_white_singledevices);
@@ -247,14 +248,18 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
 
   if (aHomeApplicanceInfoRecord->get("brand", o)) {
     model = o->stringValue();
-    if (aHomeApplicanceInfoRecord->get("vib", o))
+    if (aHomeApplicanceInfoRecord->get("vib", o)) {
       vib = o->stringValue();
       model += " " + vib;
+    }
   }
   if (aHomeApplicanceInfoRecord->get("enumber", o))
     modelGuid = o->stringValue();
   if (aHomeApplicanceInfoRecord->get("brand", o))
     vendor = o->stringValue();
+
+  if (aHomeApplicanceInfoRecord->get("connected", o))
+    isConnected = o->boolValue();
 
   string dir = getVdcHost().getConfigDir();
 
@@ -294,22 +299,25 @@ HomeConnectDevicePtr HomeConnectDevice::createHomeConenctDevice(HomeConnectVdc *
     string ty = o->stringValue();
 
     if (ty=="CoffeeMaker") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceCoffeMaker(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceCoffeMaker(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="Oven") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceOven(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceOven(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="Dishwasher") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceDishWasher(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceDishWasher(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="Washer") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceWasher(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceWasher(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="Dryer") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceDryer(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceDryer(aVdcP, aHomeApplicanceInfoRecord));
     }
     else if (ty=="FridgeFreezer") {
-      retVal = static_cast<HomeConnectDevicePtr>(new HomeConnectDeviceFridge(aVdcP, aHomeApplicanceInfoRecord));
+      retVal = HomeConnectDevicePtr(new HomeConnectDeviceFridge(aVdcP, aHomeApplicanceInfoRecord));
+    }
+    else {
+      LOG(LOG_NOTICE, "Unknown device type '%s'", ty.c_str());
     }
   }
 
@@ -688,11 +696,15 @@ void HomeConnectDevice::handleEventTypeStatus(const string& aKey, JsonObjectPtr 
 
 void HomeConnectDevice::handleEventTypeDisconnected()
 {
+  reportVanished();
+  isConnected = false;
   ALOG(LOG_NOTICE, "Device disconnected");
 }
 
 void HomeConnectDevice::handleEventTypeConnected()
 {
+  isConnected = true;
+  vdcP->scheduleRecollect(rescanmode_normal, Second);
   ALOG(LOG_NOTICE, "Device connected");
   pollState();
 }

@@ -92,7 +92,7 @@ void HomeConnectAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 }
 
 
-ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, const string aName, string &aValue)
+ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, const string& aName, string &aValue)
 {
   ApiValuePtr v = aParams->get(aName);
   if (v) {
@@ -106,6 +106,11 @@ ErrorPtr HomeConnectAction::valueLookup(ApiValuePtr aParams, const string aName,
 
 void HomeConnectAction::apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError)
 {
+  if (aError && aError->isDomain(WebError::domain()) && (aError->getErrorCode() == 204)) {
+    aError = Error::ok();
+    LOG(LOG_DEBUG, "204 - no content is OK for us");
+  }
+
   if (aCompletedCB) aCompletedCB(aError);
 }
 
@@ -151,7 +156,7 @@ void HomeConnectActionWithOperationMode::runActionWhenReady(ApiValuePtr aParams,
     LOG(LOG_DEBUG, "Device is not ready, reschedule action but call completed callback anyway");
     if (aCompletedCB) aCompletedCB(Error::ok());
     aCompletedCB.clear();
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::runActionWhenReady, this, aParams, aCompletedCB, aActionCommand, aRetriesLeft), RESCHEDULE_INTERVAL);
+    runActionTicket.executeOnce(boost::bind(&HomeConnectPowerOnAction::runActionWhenReady, this, aParams, aCompletedCB, aActionCommand, aRetriesLeft), RESCHEDULE_INTERVAL);
     return;
   }
 

@@ -59,7 +59,7 @@ namespace p44 {
 
   private:
 
-    ErrorPtr valueLookup(ApiValuePtr aParams, const string aName, string &aValue);
+    ErrorPtr valueLookup(ApiValuePtr aParams, const string& aName, string &aValue);
     void apiCommandSent(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError);
     
   };
@@ -92,6 +92,7 @@ namespace p44 {
     static const unsigned int RETRY_COUNT = 10;
 
     EnumValueDescriptor& operationMode;
+    MLTicket runActionTicket;
 
     void runActionWhenReady(ApiValuePtr aParams, StatusCB aCompletedCB, const string& aActionCommand, unsigned int aRetriesLeft);
 
