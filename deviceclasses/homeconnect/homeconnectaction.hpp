@@ -92,6 +92,7 @@ namespace p44 {
     static const unsigned int RETRY_COUNT = 10;
 
     EnumValueDescriptor& operationMode;
+    MLTicket runActionTicket;
 
     void runActionWhenReady(ApiValuePtr aParams, StatusCB aCompletedCB, const string& aActionCommand, unsigned int aRetriesLeft);
 

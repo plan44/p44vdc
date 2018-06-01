@@ -228,8 +228,7 @@ HomeConnectEventMonitor::HomeConnectEventMonitor(HomeConnectComm &aHomeConnectCo
   homeConnectComm(aHomeConnectComm),
   urlPath(aUrlPath),
   eventCB(aEventCB),
-  eventGotID(false),
-  ticket(0)
+  eventGotID(false)
 {
   sendGetEventRequest();
   setServerCertVfyDir("");
@@ -270,7 +269,7 @@ void HomeConnectEventMonitor::sendGetEventRequest()
   } else {
     LOG(LOG_WARNING, "Event stream, Api not ready yet wait 15s");
     // not ready yet - schedule restart
-    ticket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
+    ticket.executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
   }
 }
 
@@ -307,16 +306,14 @@ void HomeConnectEventMonitor::processEventData(const string &aResponse, ErrorPtr
       LOG(LOG_WARNING, "HomeConnect Event stream Error 429 : locking down communication!");
       homeConnectComm.setLockDownTime(homeConnectComm.calculateLockDownTime() * Second);
     } else {
-      ticket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
+      ticket.executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
     }
     return;
   }
 
   if (aResponse.empty()) {
     // end of stream - schedule restart
-    ticket = MainLoop::currentMainLoop().executeOnce(
-        boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this),
-        EVENT_STREAM_RESTART_DELAY);
+    ticket.executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), EVENT_STREAM_RESTART_DELAY);
     return;
   }
 
@@ -418,7 +415,7 @@ void HomeConnectEventMonitor::apiQueryDone(JsonObjectPtr aResult, ErrorPtr aErro
 {
   LOG(LOG_WARNING, "Api request finished, try to reopen the event channel");
   // the request was done, try to open event channel again
-  ticket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), 1*Second);
+  ticket.executeOnce(boost::bind(&HomeConnectEventMonitor::sendGetEventRequest, this), 1*Second);
 }
 
 
@@ -427,8 +424,9 @@ void HomeConnectEventMonitor::apiQueryDone(JsonObjectPtr aResult, ErrorPtr aErro
 HomeConnectComm::HomeConnectComm() :
   inherited(MainLoop::currentMainLoop()),
   httpAPIComm(MainLoop::currentMainLoop()),
-  findInProgress(false), apiReady(false),
-  developerApi(false), lockdownTicket(0)
+  findInProgress(false),
+  apiReady(false),
+  developerApi(false)
 {
   httpAPIComm.isMemberVariable();
   httpAPIComm.setServerCertVfyDir(""); // Use empty string to not verify server certificate
@@ -514,7 +512,7 @@ void HomeConnectComm::setLockDownTime(MLMicroSeconds aLockDownTime)
   cancelLockDown();
 
   LOG(LOG_INFO, "Set lock down for %i s", (int)(aLockDownTime / Second));
-  lockdownTicket = MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectComm::setLockDownTimeExpired, this), aLockDownTime);
+  lockdownTicket.executeOnce(boost::bind(&HomeConnectComm::setLockDownTimeExpired, this), aLockDownTime);
 }
 
 
@@ -527,9 +525,9 @@ void HomeConnectComm::setLockDownTimeExpired()
 void HomeConnectComm::cancelLockDown()
 {
   // check and cancel potential previous lockdown
-  if (lockdownTicket != 0) {
+  if (lockdownTicket) {
     LOG(LOG_INFO, "Cancel previous lockdown");
-    MainLoop::currentMainLoop().cancelExecutionTicket(lockdownTicket);
+    lockdownTicket.cancel();
   }
 }
 
