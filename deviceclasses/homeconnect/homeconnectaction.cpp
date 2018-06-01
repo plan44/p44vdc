@@ -156,7 +156,7 @@ void HomeConnectActionWithOperationMode::runActionWhenReady(ApiValuePtr aParams,
     LOG(LOG_DEBUG, "Device is not ready, reschedule action but call completed callback anyway");
     if (aCompletedCB) aCompletedCB(Error::ok());
     aCompletedCB.clear();
-    MainLoop::currentMainLoop().executeOnce(boost::bind(&HomeConnectPowerOnAction::runActionWhenReady, this, aParams, aCompletedCB, aActionCommand, aRetriesLeft), RESCHEDULE_INTERVAL);
+    runActionTicket.executeOnce(boost::bind(&HomeConnectPowerOnAction::runActionWhenReady, this, aParams, aCompletedCB, aActionCommand, aRetriesLeft), RESCHEDULE_INTERVAL);
     return;
   }
 

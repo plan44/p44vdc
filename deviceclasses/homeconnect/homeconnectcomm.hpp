@@ -228,7 +228,7 @@ namespace p44 {
     void cancelLockDown();
 
     // check if the lockdown is in effect
-    bool isLockDown() { return (lockdownTicket != 0); }
+    bool isLockDown() { return lockdownTicket; }
 
     /// @}
 
