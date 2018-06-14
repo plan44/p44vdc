@@ -179,6 +179,7 @@ namespace p44 {
     ErrorPtr groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr daliScan(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
+    void bridgeCmdSent(VdcApiRequestPtr aRequest, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
 
     typedef boost::shared_ptr<std::string> StringPtr;
     void daliScanNext(VdcApiRequestPtr aRequest, DaliAddress aShortAddress, StringPtr aResult);
