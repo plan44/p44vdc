@@ -1097,6 +1097,7 @@ EnoceanComm::~EnoceanComm()
 }
 
 
+
 void EnoceanComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, const char *aEnoceanResetPinName)
 {
   LOG(LOG_DEBUG, "EnoceanComm::setConnectionSpecification: %s", aConnectionSpec);
@@ -1467,6 +1468,223 @@ void EnoceanComm::cmdTimeout()
 }
 
 #endif // ENABLE_ENOCEAN
+
+
+
+#if ENABLE_ENOCEAN_SECURE
+
+// MARK ===== Secure messages
+
+
+void EnoceanComm::secExperiment()
+{
+  const string privkey = hexToBinaryString("80 06 5B 35 45 85 99 FD CE 99 5C 87 1C 0B DA 61", true);
+
+  uint16_t rlc = 0xE7A2; // we KNOW this is the right one for these:
+  string cyphertexts[8];
+
+  cyphertexts[0] = hexToBinaryString("01 59 AE 36", true); // rocker press LU = A0
+  cyphertexts[1] = hexToBinaryString("02 7E F5 0F", true); // rocker release LU = A0
+
+  cyphertexts[2] = hexToBinaryString("0D 06 CA C1", true); // rocker press LL = A1
+  cyphertexts[3] = hexToBinaryString("0B EE DC 0E", true); // rocker release LL = A1
+
+  cyphertexts[4] = hexToBinaryString("09 09 C3 78", true); // rocker press RU = B0
+  cyphertexts[5] = hexToBinaryString("0B 70 5D 30", true); // rocker release RU = B0
+
+  cyphertexts[6] = hexToBinaryString("01 0C 4A F0", true); // rocker press RL = B1
+  cyphertexts[7] = hexToBinaryString("0F 34 ED D3", true); // rocker release RL = B1
+
+  for (int i=0; i<2; i++) {
+    string md;
+    LOG(LOG_NOTICE, "\nRLC START=0x%04X", rlc);
+    for (int ci=0; ci<8; ci++) {
+      uint32_t rlc2 = rlc+ci;
+      string decdata = decryptData(privkey, rlc2, cyphertexts[ci]);
+      string md = "\x30"; md += cyphertexts[ci][0]; md += (char)((rlc2>>8)&0xFF); md += (char)(rlc2&0xFF);
+      uint32_t cmac = calcCMAC(privkey, 3, md);
+      LOG(LOG_NOTICE, "- RLC=0x%04X, rawdata=%s, decdata=%s, cmac=%08X", rlc2, binaryToHexString(cyphertexts[ci], ' ').c_str(), binaryToHexString(decdata, ' ').c_str(), cmac);
+    }
+    rlc++;
+  }
+}
+
+
+// SUCCESS:
+// ========
+
+
+// All 4 keys in dual rocker pressed and released once:
+//  uint16_t rlc = 0xE7A2; // we KNOW this is the right one for these:
+//  string cyphertexts[8];
+//
+//  cyphertexts[0] = hexToBinaryString("01 59 AE 36", true); // rocker press LU = A0
+//  cyphertexts[1] = hexToBinaryString("02 7E F5 0F", true); // rocker release LU = A0
+//
+//  cyphertexts[2] = hexToBinaryString("0D 06 CA C1", true); // rocker press LL = A1
+//  cyphertexts[3] = hexToBinaryString("0B EE DC 0E", true); // rocker release LL = A1
+//
+//  cyphertexts[4] = hexToBinaryString("09 09 C3 78", true); // rocker press RU = B0
+//  cyphertexts[5] = hexToBinaryString("0B 70 5D 30", true); // rocker release RU = B0
+//
+//  cyphertexts[6] = hexToBinaryString("01 0C 4A F0", true); // rocker press RL = B1
+//  cyphertexts[7] = hexToBinaryString("0F 34 ED D3", true); // rocker release RL = B1
+
+// Decoding: NOTE: only lower nibble of data byte is actually valid data, upper nibble is garbage (although D2-03-00 says it should be 0)
+//  [2018-06-20 11:44:27.063   143mS N] RLC START=0xE7A2
+//  [2018-06-20 11:44:27.065     2mS N] - RLC=0xE7A2, rawdata=01 59 AE 36, decdata=6E 58 55 BA, cmac=0059AE36  0xXE = A0 pressed
+//  [2018-06-20 11:44:27.066     0mS N] - RLC=0xE7A3, rawdata=02 7E F5 0F, decdata=EF 96 91 C9, cmac=007EF50F  0xXF = released
+//  [2018-06-20 11:44:27.067     0mS N] - RLC=0xE7A4, rawdata=0D 06 CA C1, decdata=7D 98 9D F3, cmac=0006CAC1  0xXD = A1 pressed
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A5, rawdata=0B EE DC 0E, decdata=4F BB 09 07, cmac=00EEDC0E  0xXF = released
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A6, rawdata=09 09 C3 78, decdata=DC B5 C8 92, cmac=0009C378  0xXC = B0 pressed
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A7, rawdata=0B 70 5D 30, decdata=0F A9 BF 6C, cmac=00705D30  0xXF = released
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A8, rawdata=01 0C 4A F0, decdata=EB D0 0B F9, cmac=000C4AF0  0xXB = B1 pressed
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A9, rawdata=0F 34 ED D3, decdata=FF D8 C1 21, cmac=0034EDD3  0xXF = released
+
+
+static string AES128(const string aKey, const string aData, bool aPadding)
+{
+  // single block AES128 (aes-128-ecb, "electronic code book")
+  EVP_CIPHER_CTX ctx;
+  EVP_CIPHER_CTX_init(&ctx);
+  if (EVP_EncryptInit_ex (&ctx, EVP_aes_128_ecb(), NULL, (uint8_t *)aKey.c_str(), NULL)) {
+    EVP_CIPHER_CTX_set_padding(&ctx, aPadding);
+    uint8_t buffer[1024];
+    if (aData.size()>1024) return 0;
+    uint8_t *pointer = buffer;
+    int outlen;
+    if (EVP_EncryptUpdate (&ctx, pointer, &outlen, (uint8_t *)aData.c_str(), (int)aData.length())) {
+      pointer += outlen;
+      if (EVP_EncryptFinal_ex(&ctx, pointer, &outlen)) {
+        pointer += outlen;
+        string aes128((char *)buffer, pointer-buffer);
+        LOG(LOG_DEBUG, "AES128-ECB = %s", binaryToHexString(aes128, ' ').c_str());
+        return aes128;
+      }
+      else {
+        LOG(LOG_ERR, "EVP_EncryptFinal_ex failed");
+        // error final
+      }
+    }
+    else {
+      // error update
+      LOG(LOG_ERR, "EVP_EncryptUpdate failed");
+    }
+  }
+  else {
+    LOG(LOG_ERR, "EVP_EncryptInit_ex failed");
+  }
+  return "";
+}
+
+
+static string AESSubkey(const string aKey, int aSubkeyIndex)
+{
+  string zero; for (int i=0; i<16; i++) zero += '\x00';
+  string L = AES128(aKey, zero, false);
+  string K1;
+  for (int i=0; i<L.size(); i++) {
+    K1 += (uint8_t)((((uint8_t)L[i]<<1)+(i<15 && (((uint8_t)L[i+1]&0x80)!=0 ? 0x01 : 0)))&0xFF);
+  }
+  if ((L[0] & 0x80) != 0) K1[0] ^= 0x87; // const_Rb
+  LOG(LOG_DEBUG, "K1 = %s", binaryToHexString(K1, ' ').c_str());
+  if (aSubkeyIndex==1) return K1;
+  // K2
+  string K2;
+  for (int i=0; i<K1.size(); i++) {
+    K2 += (uint8_t)((((uint8_t)K1[i]<<1)+(i<15 && (((uint8_t)K1[i+1]&0x80)!=0 ? 0x01 : 0)))&0xFF);
+  }
+  if ((K1[0] & 0x80) != 0) K2[0] ^= 0x87; // const_Rb
+  LOG(LOG_DEBUG, "K2 = %s", binaryToHexString(K2, ' ').c_str());
+  return K2;
+}
+
+
+
+
+
+string EnoceanComm::decryptData(const string aPrivateKey, uint32_t aRLC, const string aData)
+{
+  // VAES
+  const string pubkey = hexToBinaryString("34 10 de 8f 1a ba 3e ff 9f 5a 11 71 72 ea ca bd", true);
+  LOG(LOG_DEBUG, "RLC        = 0x%08X", aRLC);
+  LOG(LOG_DEBUG, "PUBKEY     = %s", binaryToHexString(pubkey, ' ').c_str());
+  int numRLCbytes = 2;
+  string aesInp;
+  for (size_t pkidx=0; pkidx<pubkey.size(); pkidx++) {
+    if (--numRLCbytes >= 0) {
+      aesInp += ((uint8_t)pubkey[pkidx] ^ (uint8_t)((aRLC>>(numRLCbytes*8))&0xFF));
+    }
+    else {
+      aesInp += (uint8_t)pubkey[pkidx];
+    }
+  }
+  LOG(LOG_DEBUG, "PUBKEY^RLC = %s", binaryToHexString(aesInp, ' ').c_str());
+  // single block AES128 (aes-128-ecb, "electronic code book")
+  string encKey = AES128(aPrivateKey, aesInp, false);
+  if (!encKey.empty()) {
+    // actually en/decrypt now
+    string outdata;
+    for (int i=0; i<encKey.size(); i++) {
+      if (i>=aData.size()) break;
+      outdata += ((uint8_t)encKey[i] ^ (uint8_t)aData[i]);
+    }
+    LOG(LOG_DEBUG, "Data = %s", binaryToHexString(aData, ' ').c_str());
+    LOG(LOG_DEBUG, "Decrypted data = %s", binaryToHexString(outdata, ' ').c_str());
+    return outdata;
+  }
+  return "";
+}
+
+
+uint32_t EnoceanComm::calcCMAC(const string aPrivateKey, int aMACBytes, const string aData)
+{
+  if (aData.size()>16) {
+    // TODO: multiple blocks
+    return 0;
+  }
+  string subkey;
+  string paddedData = aData;
+  if (paddedData.size()<16) {
+    // Pad with binary 1000....000
+    if (paddedData.size()<16) paddedData+=0x80;
+    while (paddedData.size()<16) paddedData+='\x00';
+    // get subkey
+    subkey = AESSubkey(aPrivateKey, 2); // K2
+  }
+  else {
+    subkey = AESSubkey(aPrivateKey, 1); // K1;
+  }
+  LOG(LOG_DEBUG, "padded Data = %s", binaryToHexString(paddedData, ' ').c_str());
+  LOG(LOG_DEBUG, "SUBKEY      = %s", binaryToHexString(subkey, ' ').c_str());
+  // EXOR with subkey
+  for (int i=0; i<16; i++) {
+    paddedData[i] = paddedData[i] ^ subkey[i];
+  }
+  LOG(LOG_DEBUG, "data^SUBKEY = %s", binaryToHexString(paddedData, ' ').c_str());
+  // single block AES128 (aes-128-ecb, "electronic code book")
+  string cmacData = AES128(aPrivateKey, paddedData, false);
+  if (!cmacData.empty()) {
+    LOG(LOG_DEBUG, "AES128-ECB(data^SUBKEY) = %s", binaryToHexString(cmacData, ' ').c_str());
+    uint32_t cmac = 0;
+    for (int i=0; i<aMACBytes; i++) {
+      cmac <<= 8;
+      cmac |= (uint8_t)cmacData[i]&0xFF;
+    }
+    LOG(LOG_DEBUG, "CMAC = 0x%08X", cmac);
+    return cmac;
+  }
+  return 0;
+}
+
+
+
+
+#endif // ENABLE_ENOCEAN_SECURE
+
+
+
+
 
 
 

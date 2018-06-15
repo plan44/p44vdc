@@ -29,6 +29,14 @@
 #include "serialqueue.hpp"
 #include "digitalio.hpp"
 
+#if ENABLE_ENOCEAN_SECURE
+  #warning "WORK IN PROGRESS"
+  #include <openssl/evp.h>
+  #include <openssl/err.h>
+  #include <openssl/ssl.h>
+#endif
+
+
 using namespace std;
 
 namespace p44 {
@@ -529,6 +537,17 @@ namespace p44 {
     /// @param aConfirmCode confirm code, see SA_RESPONSECODE_xxx
     /// @param aResponseTime for learn-in (SA_RESPONSECODE_LEARNED), how fast the mailbox will be ready for device to claim it
     void smartAckRespondToLearn(uint8_t aConfirmCode, MLMicroSeconds aResponseTime = 0);
+
+    #if ENABLE_ENOCEAN_SECURE
+
+    // experimental, WIP
+    static string decryptData(const string aPrivateKey, uint32_t aRLC, const string aData);
+    static uint32_t calcCMAC(const string aPrivateKey, int aMACBytes, const string aData);
+
+    static void secExperiment();
+
+
+    #endif
 
   protected:
 
