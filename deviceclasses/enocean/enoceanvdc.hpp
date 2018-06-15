@@ -95,6 +95,9 @@ namespace p44 {
     ///   Will be appended to product name to create modelName() for vdcs
     virtual string vdcModelSuffix() const P44_OVERRIDE { return "EnOcean"; }
 
+    /// @return human readable model version specific to that vDC
+    virtual string vdcModelVersion() const P44_OVERRIDE;
+
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - enoceanaddress:XXXXXXXX = 8 hex digits enOcean device address
     virtual string hardwareGUID() P44_OVERRIDE { return string_format("enoceanaddress:%08X", enoceanComm.modemAddress()); };

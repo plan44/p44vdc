@@ -53,6 +53,20 @@ bool EnoceanVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResol
 }
 
 
+string EnoceanVdc::vdcModelVersion() const
+{
+  uint32_t v = enoceanComm.modemAppVersion();
+  uint32_t a = enoceanComm.modemApiVersion();
+  if (v==0) return inherited::vdcModelVersion();
+  return string_format(
+    "%d.%d.%d.%d/%d.%d.%d.%d",
+    (v>>24)&0xFF, (v>>16)&0xFF, (v>>8)&0xFF, v&0xFF, 
+    (a>>24)&0xFF, (a>>16)&0xFF, (a>>8)&0xFF, a&0xFF
+  );
+};
+
+
+
 
 // MARK: ===== DB and initialisation
 
