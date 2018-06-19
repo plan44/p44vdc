@@ -501,17 +501,10 @@ void ClimateControlBehaviour::saveChannelsToScene(DsScenePtr aScene)
 bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd)
 {
   // check the special hardwired scenes
-  if (climateDeviceKind==climatedevice_simple && isMember(group_roomtemperature_control)) {
+  if (climateDeviceKind==climatedevice_simple) {
     // simple climate control device
+    // - scene commands that are independent of group
     switch (aSceneCmd) {
-      case scene_cmd_climatecontrol_enable:
-        // switch to winter mode
-        climateControlIdle = false;
-        return true;
-      case scene_cmd_climatecontrol_disable:
-        // switch to summer mode
-        climateControlIdle = true;
-        return true;
       case scene_cmd_climatecontrol_valve_prophylaxis:
         // valve prophylaxis
         valveService = vs_prophylaxis;
@@ -524,20 +517,50 @@ bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene, Sce
         // valve service
         valveService = vs_fullyclose;
         return true;
-      case scene_cmd_climatecontrol_mode_heating:
-      case scene_cmd_climatecontrol_mode_protective_heating:
-        // switch to heating mode
-        climateModeHeating = true;
-        return true;
-      case scene_cmd_climatecontrol_mode_cooling:
-      case scene_cmd_climatecontrol_mode_protective_cooling:
-      case scene_cmd_climatecontrol_mode_passive_cooling:
-        // switch to cooling mode (active or passive)
-        climateModeHeating = false;
-        return true;
       default:
-        // all other scene calls are suppressed in group_roomtemperature_control
-        return false;
+        // group specific or default handling
+        break;
+    }
+    if (isMember(group_roomtemperature_control)) {
+      // scene commands active in room temperature (group 48) only
+      switch (aSceneCmd) {
+        case scene_cmd_climatecontrol_enable:
+          // switch to winter mode
+          climateControlIdle = false;
+          return true;
+        case scene_cmd_climatecontrol_disable:
+          // switch to summer mode
+          climateControlIdle = true;
+          return true;
+        case scene_cmd_climatecontrol_mode_heating:
+        case scene_cmd_climatecontrol_mode_protective_heating:
+          // switch to heating mode
+          climateModeHeating = true;
+          return true;
+        case scene_cmd_climatecontrol_mode_cooling:
+        case scene_cmd_climatecontrol_mode_protective_cooling:
+        case scene_cmd_climatecontrol_mode_passive_cooling:
+          // switch to cooling mode (active or passive)
+          climateModeHeating = false;
+          return true;
+        default:
+          // all other scene calls are suppressed in group_roomtemperature_control
+          return false;
+      }
+    }
+    else {
+      // scene commands active in other groups
+      switch (aSceneCmd) {
+        case scene_cmd_climatecontrol_mode_heating:
+        case scene_cmd_climatecontrol_mode_protective_heating:
+        case scene_cmd_climatecontrol_mode_cooling:
+        case scene_cmd_climatecontrol_mode_protective_cooling:
+        case scene_cmd_climatecontrol_mode_passive_cooling:
+          // treat these normally, just invoke power level
+          aSceneCmd = scene_cmd_invoke;
+        default:
+          break;
+      }
     }
   }
   #if ENABLE_FCU_SUPPORT
