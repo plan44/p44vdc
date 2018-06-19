@@ -443,8 +443,10 @@ Tristate ClimateControlBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
       // only for heating valve devices
       return climateDeviceKind==climatedevice_simple ? yes : no;
     case modelFeature_outmodegeneric:
-      return no;
+      if (climateDeviceKind==climatedevice_fancoilunit) return no; // FCU output cannot be disabled
+      else goto use_default;
     default:
+    use_default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
   }
