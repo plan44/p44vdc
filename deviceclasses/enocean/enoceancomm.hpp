@@ -471,19 +471,19 @@ namespace p44 {
 
     /// get modem application version
     /// @return modem application version in 0xmmbbaaBB (mm=main version, bb=beta/minor, aa=alpha/revision, BB=build)
-    uint32_t modemAppVersion() { return appVersion; }
+    uint32_t modemAppVersion() const { return appVersion; }
 
     /// get modem API version
     /// @return modem API version in 0xmmbbaaBB (mm=main version, bb=beta/minor, aa=alpha/revision, BB=build)
-    uint32_t modemApiVersion() { return apiVersion; }
+    uint32_t modemApiVersion() const { return apiVersion; }
 
     /// get modem Enocean chip ID (enocean address)
     /// @return modem enocean address
-    EnoceanAddress modemAddress() { return myAddress; }
+    EnoceanAddress modemAddress() const { return myAddress; }
 
     /// get modem Enocean chip ID (enocean address)
     /// @return modem ID base address
-    EnoceanAddress idBase() { return myIdBase; }
+    EnoceanAddress idBase() const { return myIdBase; }
 
     /// derived implementation: deliver bytes to the ESP3 parser
     /// @param aNumBytes number of bytes ready for accepting
