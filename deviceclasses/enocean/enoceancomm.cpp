@@ -897,6 +897,206 @@ string Esp3Packet::description()
 }
 
 
+// MARK: ===== Security operations (AES128, CMAC)
+
+#if ENABLE_ENOCEAN_SECURE
+
+
+bool Esp3Packet::AES128(const AES128Block &aKey, const AES128Block &aData, AES128Block &aAES128)
+{
+  // single block AES128 (aes-128-ecb, "electronic code book")
+  EVP_CIPHER_CTX ctx;
+  EVP_CIPHER_CTX_init(&ctx);
+  if (EVP_EncryptInit_ex (&ctx, EVP_aes_128_ecb(), NULL, aKey, NULL)) {
+    EVP_CIPHER_CTX_set_padding(&ctx, false); // no padding
+    uint8_t *pointer = aAES128;
+    int outlen;
+    if (EVP_EncryptUpdate (&ctx, pointer, &outlen, aData, AES128BlockLen)) {
+      pointer += outlen;
+      if (EVP_EncryptFinal_ex(&ctx, pointer, &outlen)) {
+        pointer += outlen;
+        return true;
+      }
+      else {
+        DBGLOG(LOG_ERR, "EVP_EncryptFinal_ex failed");
+      }
+    }
+    else {
+      DBGLOG(LOG_ERR, "EVP_EncryptUpdate failed");
+    }
+  }
+  else {
+    DBGLOG(LOG_ERR, "EVP_EncryptInit_ex failed");
+  }
+  return false;
+}
+
+
+void Esp3Packet::VAEScrypt(const AES128Block &aKey, uint32_t aRLC, int aRLCSize, const uint8_t *aDataIn, uint8_t *aDataOut, size_t aDataSize)
+{
+  // VAES
+  // - fixed publickey
+  static const AES128Block publicKey = { 0x34, 0x10, 0xde, 0x8f, 0x1a, 0xba, 0x3e, 0xff, 0x9f, 0x5a, 0x11, 0x71, 0x72, 0xea, 0xca, 0xbd };
+  // - start chain with zero crypt key
+  AES128Block cryptKey;
+  memset(&cryptKey, 0, AES128BlockLen);
+  // - for every block
+  while (aDataSize>0) {
+    AES128Block aesInp;
+    // AES input: publickey XOR rlc XOR last block's cryptKey
+    int rlcbytes = aRLCSize;
+    for (int i=0; i<AES128BlockLen; i++) {
+      aesInp[i] = publicKey[i] ^ cryptKey[i]; // public key XOR last block's cryptKey
+      if (--rlcbytes >= 0) {
+        aesInp[i] ^= ((aRLC>>(rlcbytes*8))&0xFF); // .. XOR rlc
+      }
+    }
+    // calculate (en/de)crypt key for next block
+    AES128(aKey, aesInp, cryptKey);
+    // actually en/decrypt now
+    for (int i=0; i<AES128BlockLen; i++) {
+      *aDataOut++ = cryptKey[i] ^ *aDataIn++;
+      // count and end en/decryption
+      if (--aDataSize==0) break;
+    }
+  }
+}
+
+
+void Esp3Packet::deriveSubkeys(const AES128Block &aKey, AES128Block &aSubkey1, AES128Block &aSubkey2)
+{
+  AES128Block zero;
+  memset(&zero, 0, AES128BlockLen);
+  AES128Block L;
+  AES128(aKey, zero, L);
+  // Subkey K1
+  for (int i=0; i<AES128BlockLen; i++) {
+    aSubkey1[i] = ((L[i]<<1)+(i<AES128BlockLen-1 && ((L[i+1]&0x80)!=0 ? 0x01 : 0)))&0xFF;
+  }
+  if ((L[0] & 0x80) != 0) aSubkey1[0] ^= 0x87; // const_Rb
+  // Subkey K2
+  for (int i=0; i<AES128BlockLen; i++) {
+    aSubkey2[i] = ((aSubkey1[i]<<1)+(i<AES128BlockLen-1 && ((aSubkey1[i+1]&0x80)!=0 ? 0x01 : 0)))&0xFF;
+  }
+  if ((aSubkey1[0] & 0x80) != 0) aSubkey2[0] ^= 0x87; // const_Rb
+}
+
+
+uint32_t Esp3Packet::calcCMAC(const AES128Block &aKey, const AES128Block &aSubKey1, const AES128Block &aSubKey2, uint32_t aRLC, int aRLCSize, int aMACBytes, uint8_t aFirstByte, const uint8_t *aData, size_t aDataSize)
+{
+  uint8_t db;
+  // check for extra first byte (in addition to aData)
+  if (aFirstByte) {
+    // use given first byte
+    db = aFirstByte;
+    aDataSize++;
+  }
+  else {
+    // fetch first byte from data
+    db = *aData++;
+  }
+  // include RLC in aDataSize
+  aDataSize += aRLCSize;
+  // aDataSize is now overall data size to process in CMAC, including optional extra first byte and including RLC
+  AES128Block aesInp;
+  AES128Block resBlock;
+  memset(&resBlock, 0, AES128BlockLen);
+  bool padded = false;
+  while (aDataSize>0) {
+    // AES input is result of previous block XOR data
+    for (int i=0; i<AES128BlockLen; i++) {
+      if (aDataSize>0) {
+        // we still have data
+        aesInp[i] = resBlock[i] ^ db;
+        // get next byte
+        aDataSize--; // processed this byte
+        if (aDataSize>aRLCSize) {
+          // real data
+          db = *aData++;
+        }
+        else if (aDataSize>0){
+          // rlc
+          db = ((aRLC>>((aDataSize-1)*8))&0xFF);
+        }
+      }
+      else {
+        // no more data, pad data with 0b1000...000
+        aesInp[i] = resBlock[i]; // still include the result from previous block
+        if (!padded) aesInp[i] ^= 0x80; // first padding byte, use 0x80 instead of 0x00 (which means NOP here)
+        padded = true; // now we have started padding
+      }
+    }
+    // now we have a full AES block
+    // - if this is the last block, we need to add the subkey now
+    if (aDataSize==0) {
+      for (int i=0; i<AES128BlockLen; i++) {
+        aesInp[i] ^= padded ? aSubKey2[i] : aSubKey1[i];
+      }
+    }
+    // - do the AES now
+    AES128(aKey, aesInp, resBlock);
+  }
+  // now resBlock contains the CMAC
+  uint32_t cmac = 0;
+  for (int i=0; i<aMACBytes; i++) {
+    cmac <<= 8;
+    cmac |= (uint8_t)resBlock[i]&0xFF;
+  }
+  return cmac;
+}
+
+
+#if ENABLE_ENOCEAN_SECURE_EXPERIMENTS
+
+void EnoceanComm::secExperiment()
+{
+  Esp3Packet::AES128Block privkey;
+  memcpy(privkey, hexToBinaryString("80 06 5B 35 45 85 99 FD CE 99 5C 87 1C 0B DA 61", true).c_str(), Esp3Packet::AES128BlockLen);
+
+  uint16_t rlc = 0xE7A2; // we KNOW this is the right one for these:
+  string cyphertexts[8];
+
+  cyphertexts[0] = hexToBinaryString("01 59 AE 36", true); // rocker press LU = A0
+  cyphertexts[1] = hexToBinaryString("02 7E F5 0F", true); // rocker release LU = A0
+
+  cyphertexts[2] = hexToBinaryString("0D 06 CA C1", true); // rocker press LL = A1
+  cyphertexts[3] = hexToBinaryString("0B EE DC 0E", true); // rocker release LL = A1
+
+  cyphertexts[4] = hexToBinaryString("09 09 C3 78", true); // rocker press RU = B0
+  cyphertexts[5] = hexToBinaryString("0B 70 5D 30", true); // rocker release RU = B0
+
+  cyphertexts[6] = hexToBinaryString("01 0C 4A F0", true); // rocker press RL = B1
+  cyphertexts[7] = hexToBinaryString("0F 34 ED D3", true); // rocker release RL = B1
+
+  Esp3Packet::AES128Block subkey1;
+  Esp3Packet::AES128Block subkey2;
+  Esp3Packet::deriveSubkeys(privkey, subkey1, subkey2);
+
+  LOG(LOG_INFO, "SUBKEY1      = %s", binaryToHexString(string((const char *)subkey1, Esp3Packet::AES128BlockLen), ' ').c_str());
+  LOG(LOG_INFO, "SUBKEY2      = %s", binaryToHexString(string((const char *)subkey2, Esp3Packet::AES128BlockLen), ' ').c_str());
+
+  for (int i=0; i<2; i++) {
+    string md;
+    LOG(LOG_NOTICE, "\nRLC START=0x%04X", rlc);
+    for (int ci=0; ci<8; ci++) {
+      uint32_t rlc2 = rlc+ci;
+      uint8_t *decodedData = (uint8_t *)malloc(cyphertexts[ci].size());
+      Esp3Packet::VAEScrypt(privkey, rlc2, 2, (uint8_t *)cyphertexts[ci].c_str(), decodedData, cyphertexts[ci].size());
+      string decdata((char *)decodedData, cyphertexts[ci].size());
+      free(decodedData);
+      uint32_t cmac = Esp3Packet::calcCMAC(privkey, subkey1, subkey2, rlc2, 2, 3, 0x30, (uint8_t *)cyphertexts[ci].c_str(), 1 /* cyphertexts[ci].size() */);
+      LOG(LOG_NOTICE, "- RLC=0x%04X, rawdata=%s, decdata=%s, cmac=%08X", rlc2, binaryToHexString(cyphertexts[ci], ' ').c_str(), binaryToHexString(decdata, ' ').c_str(), cmac);
+    }
+    rlc++;
+  }
+}
+
+#endif
+
+#endif // ENABLE_ENOCEAN_SECURE
+
+
+
 
 // MARK: ===== CRC8 calculation
 
@@ -1471,75 +1671,10 @@ void EnoceanComm::cmdTimeout()
 
 
 
-#if ENABLE_ENOCEAN_SECURE
+#if ENABLE_ENOCEAN_SECURE_EXPERIMENTS
 
-// MARK ===== Secure messages
+// MARK ===== Secure messages EXPERIMENTS
 
-
-void EnoceanComm::secExperiment()
-{
-  const string privkey = hexToBinaryString("80 06 5B 35 45 85 99 FD CE 99 5C 87 1C 0B DA 61", true);
-
-  uint16_t rlc = 0xE7A2; // we KNOW this is the right one for these:
-  string cyphertexts[8];
-
-  cyphertexts[0] = hexToBinaryString("01 59 AE 36", true); // rocker press LU = A0
-  cyphertexts[1] = hexToBinaryString("02 7E F5 0F", true); // rocker release LU = A0
-
-  cyphertexts[2] = hexToBinaryString("0D 06 CA C1", true); // rocker press LL = A1
-  cyphertexts[3] = hexToBinaryString("0B EE DC 0E", true); // rocker release LL = A1
-
-  cyphertexts[4] = hexToBinaryString("09 09 C3 78", true); // rocker press RU = B0
-  cyphertexts[5] = hexToBinaryString("0B 70 5D 30", true); // rocker release RU = B0
-
-  cyphertexts[6] = hexToBinaryString("01 0C 4A F0", true); // rocker press RL = B1
-  cyphertexts[7] = hexToBinaryString("0F 34 ED D3", true); // rocker release RL = B1
-
-  for (int i=0; i<2; i++) {
-    string md;
-    LOG(LOG_NOTICE, "\nRLC START=0x%04X", rlc);
-    for (int ci=0; ci<8; ci++) {
-      uint32_t rlc2 = rlc+ci;
-      string decdata = decryptData(privkey, rlc2, cyphertexts[ci]);
-      string md = "\x30"; md += cyphertexts[ci][0]; md += (char)((rlc2>>8)&0xFF); md += (char)(rlc2&0xFF);
-      uint32_t cmac = calcCMAC(privkey, 3, md);
-      LOG(LOG_NOTICE, "- RLC=0x%04X, rawdata=%s, decdata=%s, cmac=%08X", rlc2, binaryToHexString(cyphertexts[ci], ' ').c_str(), binaryToHexString(decdata, ' ').c_str(), cmac);
-    }
-    rlc++;
-  }
-}
-
-
-// SUCCESS:
-// ========
-
-
-// All 4 keys in dual rocker pressed and released once:
-//  uint16_t rlc = 0xE7A2; // we KNOW this is the right one for these:
-//  string cyphertexts[8];
-//
-//  cyphertexts[0] = hexToBinaryString("01 59 AE 36", true); // rocker press LU = A0
-//  cyphertexts[1] = hexToBinaryString("02 7E F5 0F", true); // rocker release LU = A0
-//
-//  cyphertexts[2] = hexToBinaryString("0D 06 CA C1", true); // rocker press LL = A1
-//  cyphertexts[3] = hexToBinaryString("0B EE DC 0E", true); // rocker release LL = A1
-//
-//  cyphertexts[4] = hexToBinaryString("09 09 C3 78", true); // rocker press RU = B0
-//  cyphertexts[5] = hexToBinaryString("0B 70 5D 30", true); // rocker release RU = B0
-//
-//  cyphertexts[6] = hexToBinaryString("01 0C 4A F0", true); // rocker press RL = B1
-//  cyphertexts[7] = hexToBinaryString("0F 34 ED D3", true); // rocker release RL = B1
-
-// Decoding: NOTE: only lower nibble of data byte is actually valid data, upper nibble is garbage (although D2-03-00 says it should be 0)
-//  [2018-06-20 11:44:27.063   143mS N] RLC START=0xE7A2
-//  [2018-06-20 11:44:27.065     2mS N] - RLC=0xE7A2, rawdata=01 59 AE 36, decdata=6E 58 55 BA, cmac=0059AE36  0xXE = A0 pressed
-//  [2018-06-20 11:44:27.066     0mS N] - RLC=0xE7A3, rawdata=02 7E F5 0F, decdata=EF 96 91 C9, cmac=007EF50F  0xXF = released
-//  [2018-06-20 11:44:27.067     0mS N] - RLC=0xE7A4, rawdata=0D 06 CA C1, decdata=7D 98 9D F3, cmac=0006CAC1  0xXD = A1 pressed
-//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A5, rawdata=0B EE DC 0E, decdata=4F BB 09 07, cmac=00EEDC0E  0xXF = released
-//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A6, rawdata=09 09 C3 78, decdata=DC B5 C8 92, cmac=0009C378  0xXC = B0 pressed
-//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A7, rawdata=0B 70 5D 30, decdata=0F A9 BF 6C, cmac=00705D30  0xXF = released
-//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A8, rawdata=01 0C 4A F0, decdata=EB D0 0B F9, cmac=000C4AF0  0xXB = B1 pressed
-//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A9, rawdata=0F 34 ED D3, decdata=FF D8 C1 21, cmac=0034EDD3  0xXF = released
 
 
 static string AES128(const string aKey, const string aData, bool aPadding)
@@ -1678,9 +1813,76 @@ uint32_t EnoceanComm::calcCMAC(const string aPrivateKey, int aMACBytes, const st
 }
 
 
+void EnoceanComm::secExperiment_OLD()
+{
+  const string privkey = hexToBinaryString("80 06 5B 35 45 85 99 FD CE 99 5C 87 1C 0B DA 61", true);
+
+  uint16_t rlc = 0xE7A2; // we KNOW this is the right one for these:
+  string cyphertexts[8];
+
+  cyphertexts[0] = hexToBinaryString("01 59 AE 36", true); // rocker press LU = A0
+  cyphertexts[1] = hexToBinaryString("02 7E F5 0F", true); // rocker release LU = A0
+
+  cyphertexts[2] = hexToBinaryString("0D 06 CA C1", true); // rocker press LL = A1
+  cyphertexts[3] = hexToBinaryString("0B EE DC 0E", true); // rocker release LL = A1
+
+  cyphertexts[4] = hexToBinaryString("09 09 C3 78", true); // rocker press RU = B0
+  cyphertexts[5] = hexToBinaryString("0B 70 5D 30", true); // rocker release RU = B0
+
+  cyphertexts[6] = hexToBinaryString("01 0C 4A F0", true); // rocker press RL = B1
+  cyphertexts[7] = hexToBinaryString("0F 34 ED D3", true); // rocker release RL = B1
+
+  LOG(LOG_INFO, "SUBKEY1      = %s", binaryToHexString(AESSubkey(privkey, 1), ' ').c_str());
+  LOG(LOG_INFO, "SUBKEY2      = %s", binaryToHexString(AESSubkey(privkey, 2), ' ').c_str());
+
+  for (int i=0; i<2; i++) {
+    string md;
+    LOG(LOG_NOTICE, "\nRLC START=0x%04X", rlc);
+    for (int ci=0; ci<8; ci++) {
+      uint32_t rlc2 = rlc+ci;
+      string decdata = decryptData(privkey, rlc2, cyphertexts[ci]);
+      string md = "\x30"; md += cyphertexts[ci][0]; md += (char)((rlc2>>8)&0xFF); md += (char)(rlc2&0xFF);
+      uint32_t cmac = calcCMAC(privkey, 3, md);
+      LOG(LOG_NOTICE, "- RLC=0x%04X, rawdata=%s, decdata=%s, cmac=%08X", rlc2, binaryToHexString(cyphertexts[ci], ' ').c_str(), binaryToHexString(decdata, ' ').c_str(), cmac);
+    }
+    rlc++;
+  }
+}
 
 
-#endif // ENABLE_ENOCEAN_SECURE
+// SUCCESS:
+// ========
+
+
+// All 4 keys in dual rocker pressed and released once:
+//  uint16_t rlc = 0xE7A2; // we KNOW this is the right one for these:
+//  string cyphertexts[8];
+//
+//  cyphertexts[0] = hexToBinaryString("01 59 AE 36", true); // rocker press LU = A0
+//  cyphertexts[1] = hexToBinaryString("02 7E F5 0F", true); // rocker release LU = A0
+//
+//  cyphertexts[2] = hexToBinaryString("0D 06 CA C1", true); // rocker press LL = A1
+//  cyphertexts[3] = hexToBinaryString("0B EE DC 0E", true); // rocker release LL = A1
+//
+//  cyphertexts[4] = hexToBinaryString("09 09 C3 78", true); // rocker press RU = B0
+//  cyphertexts[5] = hexToBinaryString("0B 70 5D 30", true); // rocker release RU = B0
+//
+//  cyphertexts[6] = hexToBinaryString("01 0C 4A F0", true); // rocker press RL = B1
+//  cyphertexts[7] = hexToBinaryString("0F 34 ED D3", true); // rocker release RL = B1
+
+// Decoding: NOTE: only lower nibble of data byte is actually valid data, upper nibble is garbage (although D2-03-00 says it should be 0)
+//  [2018-06-20 11:44:27.063   143mS N] RLC START=0xE7A2
+//  [2018-06-20 11:44:27.065     2mS N] - RLC=0xE7A2, rawdata=01 59 AE 36, decdata=6E 58 55 BA, cmac=0059AE36  0xXE = A0 pressed
+//  [2018-06-20 11:44:27.066     0mS N] - RLC=0xE7A3, rawdata=02 7E F5 0F, decdata=EF 96 91 C9, cmac=007EF50F  0xXF = released
+//  [2018-06-20 11:44:27.067     0mS N] - RLC=0xE7A4, rawdata=0D 06 CA C1, decdata=7D 98 9D F3, cmac=0006CAC1  0xXD = A1 pressed
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A5, rawdata=0B EE DC 0E, decdata=4F BB 09 07, cmac=00EEDC0E  0xXF = released
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A6, rawdata=09 09 C3 78, decdata=DC B5 C8 92, cmac=0009C378  0xXC = B0 pressed
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A7, rawdata=0B 70 5D 30, decdata=0F A9 BF 6C, cmac=00705D30  0xXF = released
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A8, rawdata=01 0C 4A F0, decdata=EB D0 0B F9, cmac=000C4AF0  0xXB = B1 pressed
+//  [2018-06-20 11:44:27.068     0mS N] - RLC=0xE7A9, rawdata=0F 34 ED D3, decdata=FF D8 C1 21, cmac=0034EDD3  0xXF = released
+
+
+#endif // ENABLE_ENOCEAN_SECURE_EXPERIMENTS
 
 
 

@@ -211,6 +211,7 @@ namespace p44 {
       ps_complete
     } PacketState;
 
+
   private:
     // packet contents
     uint8_t header[6]; ///< the ESP3 header
@@ -226,11 +227,15 @@ namespace p44 {
     Esp3Packet();
     virtual ~Esp3Packet();
 
+    /// @name ESP3 CRC8
+    /// @{
+
     /// add one byte to a ESP3 CRC8
     /// @param aByte the byte to add
     /// @param aCRCValue the current CRC
     /// @return updated CRC
     static uint8_t addToCrc8(uint8_t aByte, uint8_t aCRCValue);
+
     /// calculate ESP3 CRC8 over a range of bytes
     /// @param aDataP data buffer
     /// @param aNumBytes number of bytes
@@ -238,9 +243,53 @@ namespace p44 {
     /// @return updated CRC
     static uint8_t crc8(uint8_t *aDataP, size_t aNumBytes, uint8_t aCRCValue = 0);
 
+    /// @}
+
+    #if ENABLE_ENOCEAN_SECURE
+    /// @name EnOcean Security
+    /// @{
+
+    #if DEBUG
+    #define ENABLE_ENOCEAN_SECURE_EXPERIMENTS 1
+    #endif
+
+
+    static const int AES128BlockLen = 16;
+    typedef uint8_t AES128Block[AES128BlockLen];
+
+    /// perform basic AES128 without padding on a single block
+    /// @param aKey the key to use
+    /// @param aData the data block
+    /// @param aAES128 the AES128 result block
+    /// @return false if there was a problem with AES calculation (OpenSSL returning error code)
+    static bool AES128(const AES128Block &aKey, const AES128Block &aData, AES128Block &aAES128);
+
+    /// calculate subkeys needed for CMAC calculation
+    /// @param aKey the key to use
+    /// @param aSubkey1 returns Subkey1
+    /// @param aSubkey2 returns Subkey2
+    static void deriveSubkeys(const AES128Block &aKey, AES128Block &aSubkey1, AES128Block &aSubkey2);
+
+    /// encrypt or decrypt with VAES
+    /// @param aKey the key to use
+    /// @param aRLC the RLC to use
+    /// @param aRLCSize the number of RLC bytes to use (0=none)
+    /// @param aDataIn input data
+    /// @param aDataOut output data
+    /// @param aDataSize size of data
+    static void VAEScrypt(const AES128Block &aKey, uint32_t aRLC, int aRLCSize, const uint8_t *aDataIn, uint8_t *aDataOut, size_t aDataSize);
+
+    /// calculate CMAC
+    static uint32_t calcCMAC(const AES128Block &aKey, const AES128Block &aSubKey1, const AES128Block &aSubKey2, uint32_t aRLC, int aRLCSize, int aMACBytes, uint8_t aFirstByte, const uint8_t *aData, size_t aDataSize);
+
+    /// @}
+    #endif // ENABLE_ENOCEAN_SECURE
+
+
     /// clear the packet so that we can re-start accepting bytes and looking for packet start or
     /// start filling in information for creating an outgoing packet
     void clear();
+
     /// clear only the payload data/optdata (implicitly happens at setDataLength() and setOptDataLength()
     void clearData();
 
@@ -538,14 +587,14 @@ namespace p44 {
     /// @param aResponseTime for learn-in (SA_RESPONSECODE_LEARNED), how fast the mailbox will be ready for device to claim it
     void smartAckRespondToLearn(uint8_t aConfirmCode, MLMicroSeconds aResponseTime = 0);
 
-    #if ENABLE_ENOCEAN_SECURE
+    #if ENABLE_ENOCEAN_SECURE_EXPERIMENTS
 
     // experimental, WIP
     static string decryptData(const string aPrivateKey, uint32_t aRLC, const string aData);
     static uint32_t calcCMAC(const string aPrivateKey, int aMACBytes, const string aData);
 
+    static void secExperiment_OLD();
     static void secExperiment();
-
 
     #endif
 
