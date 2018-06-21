@@ -39,6 +39,9 @@ namespace p44 {
 
   typedef std::multimap<EnoceanAddress, EnoceanDevicePtr> EnoceanDeviceMap;
 
+  #if ENABLE_ENOCEAN_SECURE
+  typedef std::map<EnoceanAddress, EnOceanSecurityPtr> EnoceanSecurityMap;
+  #endif
 
   /// persistence for enocean device container
   class EnoceanPersistence : public SQLite3Persistence
@@ -65,6 +68,11 @@ namespace p44 {
     EnoceanDeviceMap enoceanDevices; ///< local map linking EnoceanDeviceID to devices
 
 		EnoceanPersistence db;
+
+    #if ENABLE_ENOCEAN_SECURE
+    EnoceanSecurityMap securityInfos; ///< local map of active security contexts
+    #endif
+
 
   public:
 
@@ -139,13 +147,46 @@ namespace p44 {
     /// @param aDevice device to remove (possibly only part of a multi-function physical device)
     virtual void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;
 
+
+    /// get security info for given sender
+    /// @param aSender enocean device address
+    /// @param aCreateNew create new security info for the sender if there is none present already
+    /// @note this method has a dummy implementation when ENABLE_ENOCEAN_SECURE is not set
+    /// @return the security info
+    EnOceanSecurityPtr securityInfoForSender(EnoceanAddress aSender, bool aCreateNew);
+
+    #if ENABLE_ENOCEAN_SECURE
+
+    /// load the security infos from DB
+    void loadSecurityInfos();
+
+    /// save the security info record
+    /// @param aSecurityInfo the security info
+    /// @param aEnoceanAddrss the address the info belongs to
+    /// @param aRLConly only update the RLC
+    /// @param aOnlyIfNeeded only save when RLC or time difference demands it (but saving flash write cycles)
+    /// @return true if successfully saved
+    bool saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aEnoceanAddress, bool aRLCOnly, bool aOnlyIfNeeded);
+
+    /// remove unused security info in case aDevice is the last subdevice of the physical enocean device
+    /// @param aDevice the enocean device that is now being deleted
+    void removeUnusedSecurity(EnoceanDevice &aDevice);
+
+    /// drop (forget) security info for given sender
+    /// @param aSender enocean device address
+    /// @return true if successfully deleted
+    bool dropSecurityInfoForSender(EnoceanAddress aSender);
+
+
+    #endif
+
   private:
 
     void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);
     void handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);
     void handleTestRadioPacket(StatusCB aCompletedCB, Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);
 
-    Tristate processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, bool aSmartAck, Esp3PacketPtr aLearnPacket);
+    Tristate processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, bool aSmartAck, Esp3PacketPtr aLearnPacket, EnOceanSecurityPtr aSecurityInfo);
 
     ErrorPtr addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aParams);

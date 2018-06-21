@@ -74,8 +74,9 @@ string EnoceanVdc::vdcModelVersion() const
 //  1..3 : development versions
 //  4 : first actually used schema
 //  5 : subdevice indices of 2-way enocean buttons must be adjusted (now 2-spaced to leave room for single button mode)
+//  6 : added additional table for secure device info
 #define ENOCEAN_SCHEMA_MIN_VERSION 4 // minimally supported version, anything older will be deleted
-#define ENOCEAN_SCHEMA_VERSION 5 // current version
+#define ENOCEAN_SCHEMA_VERSION 6 // current version
 
 string EnoceanPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
@@ -105,6 +106,20 @@ string EnoceanPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
     // reached version 5
     aToVersion = 5;
   }
+  else if (aFromVersion==5) {
+    // V5->V6: add security info table
+    sql =
+			"CREATE TABLE secureDevices ("
+			" enoceanAddress INTEGER,"
+      " slf INTEGER,"
+      " rlc INTEGER,"
+      " key BLOB,"
+      " teachInInfo INTEGER,"
+      " PRIMARY KEY (enoceanAddress)"
+			");";
+    // reached version 6
+    aToVersion = 6;
+  }
   return sql;
 }
 
@@ -119,6 +134,10 @@ void EnoceanVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     aCompletedCB(error); // return status of DB init
   }
   else {
+    #if ENABLE_ENOCEAN_SECURE
+    // load the security infos, to be ready for secure communication from the very start
+    loadSecurityInfos();
+    #endif
     // start communication
     enoceanComm.initialize(aCompletedCB);
   }
@@ -181,11 +200,17 @@ bool EnoceanVdc::addKnownDevice(EnoceanDevicePtr aEnoceanDevice)
   if (simpleIdentifyAndAddDevice(aEnoceanDevice)) {
     // not a duplicate, actually added - add to my own list
     enoceanDevices.insert(make_pair(aEnoceanDevice->getAddress(), aEnoceanDevice));
+    #if ENABLE_ENOCEAN_SECURE
+    // set device security info if available
+    EnOceanSecurityPtr sec = securityInfoForSender(aEnoceanDevice->getAddress(), false);
+    if (sec) {
+      aEnoceanDevice->setSecurity(sec);
+    }
+    #endif
     return true;
   }
   return false;
 }
-
 
 
 bool EnoceanVdc::addAndRememberDevice(EnoceanDevicePtr aEnoceanDevice)
@@ -312,7 +337,7 @@ ErrorPtr EnoceanVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
       // now create device(s)
       if (Error::isOK(respErr)) {
         // create devices as if this was a learn-in
-        int newDevices = EnoceanDevice::createDevicesFromEEP(this, addr, eep, manufacturer_unknown, true, Esp3PacketPtr()); // signalling smartAck suppresses teach-in responses that make no sense here
+        int newDevices = EnoceanDevice::createDevicesFromEEP(this, addr, eep, manufacturer_unknown, true, Esp3PacketPtr(), NULL); // signalling smartAck suppresses teach-in responses that make no sense here
         if (newDevices<1) {
           respErr = WebError::webErr(400, "Unknown EEP specification, no device(s) created");
         }
@@ -366,6 +391,142 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 }
 
 
+// MARK: ===== Security info handling
+
+#if ENABLE_ENOCEAN_SECURE
+
+EnOceanSecurityPtr EnoceanVdc::securityInfoForSender(EnoceanAddress aSender, bool aCreateNew)
+{
+  EnoceanSecurityMap::iterator pos = securityInfos.find(aSender);
+  if (pos==securityInfos.end()) {
+    if (!aCreateNew) return EnOceanSecurityPtr(); // none
+    // create new
+    EnOceanSecurityPtr sec = EnOceanSecurityPtr(new EnOceanSecurity);
+    securityInfos[aSender] = sec;
+    // - link all existing devices to this security info
+    for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aSender); pos!=enoceanDevices.upper_bound(aSender); ++pos) {
+      pos->second->setSecurity(sec);
+    }
+    return sec;
+  }
+  return pos->second;
+}
+
+
+bool EnoceanVdc::dropSecurityInfoForSender(EnoceanAddress aSender)
+{
+  securityInfos.erase(aSender);
+  // also delete from db
+  if (db.executef("DELETE FROM secureDevices WHERE enoceanAddress=%d", aSender)!=SQLITE_OK) {
+    ALOG(LOG_ERR, "Error deleting security info for device %08X: %s", aSender, db.error()->description().c_str());
+    return false;
+  }
+  ALOG(LOG_INFO, "Deleted security info for device %08X", aSender);
+  return true;
+}
+
+
+void EnoceanVdc::removeUnusedSecurity(EnoceanDevice &aDevice)
+{
+  bool otherSubdevices = false;
+  for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aDevice.getAddress()); pos!=enoceanDevices.upper_bound(aDevice.getAddress()); ++pos) {
+    // check subdevice index
+    if (pos->second!=&aDevice) {
+      otherSubdevices = true;
+      break;
+    }
+  }
+  if (!otherSubdevices) {
+    // this is the last subdevice for this address -> forget security info
+    dropSecurityInfoForSender(aDevice.getAddress());
+  }
+}
+
+
+void EnoceanVdc::loadSecurityInfos()
+{
+  securityInfos.clear();
+  sqlite3pp::query qry(db);
+  MLMicroSeconds now = MainLoop::now();
+  if (qry.prepare("SELECT enoceanAddress, slf, rlc, key, teachInInfo FROM secureDevices")==SQLITE_OK) {
+    for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
+      EnOceanSecurityPtr sec = EnOceanSecurityPtr(new EnOceanSecurity);
+      // get info from DB
+      int idx = 0;
+      EnoceanAddress addr = i->get<int>(idx++);
+      sec->securityLevelFormat = i->get<int>(idx++);
+      sec->rollingCounter = i->get<int>(idx++);
+      memcpy(sec->privateKey, i->get<const void *>(idx++), EnOceanSecurity::AES128BlockLen);
+      sec->teachInInfo = i->get<int>(idx++);
+      // derived values
+      sec->lastSavedRLC = sec->rollingCounter; // this value is saved
+      sec->lastSave = now;
+      sec->deriveSubkeysFromPrivateKey();
+      // store in list
+      securityInfos[addr] = sec;
+    }
+  }
+  ALOG(LOG_INFO, "loaded security info for %lu devices", securityInfos.size());
+}
+
+
+#define MIN_RLC_DISTANCE_FOR_SAVE 100 // a flash write every 50 clicks (press+release) seems ok
+
+bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aEnoceanAddress, bool aRLCOnly, bool aOnlyIfNeeded)
+{
+  if (aOnlyIfNeeded) {
+    // avoid too many saves
+    uint32_t d = aSecurityInfo->rlcDistance(aSecurityInfo->rollingCounter, aSecurityInfo->lastSavedRLC);
+    if (d<MIN_RLC_DISTANCE_FOR_SAVE) {
+      LOG(LOG_DEBUG, "Not saving because RLC distance (%u) is not high enough", d);
+      return true; // not saved, but ok
+    }
+  }
+  if (aRLCOnly) {
+    if (db.executef(
+      "UPDATE secureDevices SET rlc=%d WHERE enoceanAddress=%d",
+      aSecurityInfo->rollingCounter,
+      aEnoceanAddress
+    )!=SQLITE_OK) {
+      ALOG(LOG_ERR, "Error updating RLC for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
+      return false;
+    }
+  }
+  else {
+    sqlite3pp::command cmd(db);
+    if (cmd.prepare("INSERT OR REPLACE INTO secureDevices (enoceanAddress, slf, rlc, key, teachInInfo) VALUES (?,?,?,?,?)")!=SQLITE_OK) {
+      ALOG(LOG_ERR, "Error preparing SQL for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
+      return false;
+    }
+    else {
+      int idx = 1; // SQLite parameter indexes are 1-based!
+      cmd.bind(idx++, (int)aEnoceanAddress);
+      cmd.bind(idx++, aSecurityInfo->securityLevelFormat);
+      cmd.bind(idx++, (int)aSecurityInfo->rollingCounter);
+      cmd.bind(idx++, aSecurityInfo->privateKey, EnOceanSecurity::AES128BlockLen, true); // is static
+      cmd.bind(idx++, aSecurityInfo->teachInInfo);
+      if (cmd.execute()!=SQLITE_OK) {
+        ALOG(LOG_ERR, "Error saving security info for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
+      }
+    }
+  }
+  // saved
+  aSecurityInfo->lastSavedRLC = aSecurityInfo->rollingCounter;
+  aSecurityInfo->lastSave = MainLoop::now();
+  ALOG(LOG_INFO, "Saved/updated security info for device %08X", aEnoceanAddress);
+  return true;
+}
+
+#else
+
+// dummy when no real security is implemented
+EnOceanSecurityPtr EnoceanVdc::securityInfoForSender(EnoceanAddress aSender, bool aCreateNew)
+{
+  return NULL;
+}
+
+#endif
+
 
 // MARK: ===== learn and unlearn devices
 
@@ -376,7 +537,7 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 // -50 = for v2 bridge 223: very close to device, about 10-20cm
 // -55 = for v2 bridge 223: within approx one meter of the TCM310
 
-Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, bool aSmartAck, Esp3PacketPtr aLearnPacket)
+Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, bool aSmartAck, Esp3PacketPtr aLearnPacket, EnOceanSecurityPtr aSecurityInfo)
 {
   // no learn/unlearn actions detected so far
   // - check if we know that device address already. If so, it is a learn-out
@@ -386,7 +547,7 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
     if  (onlyEstablish!=no && aTeachInfoType!=no) {
       // neither our side nor the info in the telegram insists on learn-out, so we can learn-in
       // - create devices from EEP
-      int numNewDevices = EnoceanDevice::createDevicesFromEEP(this, aDeviceAddress, aEEProfile, aManufacturer, aSmartAck, aLearnPacket);
+      int numNewDevices = EnoceanDevice::createDevicesFromEEP(this, aDeviceAddress, aEEProfile, aManufacturer, aSmartAck, aLearnPacket, aSecurityInfo);
       if (numNewDevices>0) {
         // successfully learned at least one device
         // - confirm smart ack FIRST (before reporting end-of-learn!)
@@ -432,14 +593,102 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
 
 void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)
 {
+  EnoceanAddress sender = aEsp3PacketPtr->radioSender();
   if (aError) {
     LOG(LOG_INFO, "Radio packet error: %s", aError->description().c_str());
     return;
   }
   // suppress radio packets send by one of my secondary IDs
-  if ((aEsp3PacketPtr->radioSender() & 0xFFFFFF80) == enoceanComm.idBase()) {
-    LOG(LOG_DEBUG, "Suppressed radio packet coming from one of my own base IDs: %0X", aEsp3PacketPtr->radioSender());
+  if ((sender & 0xFFFFFF80) == enoceanComm.idBase()) {
+    LOG(LOG_DEBUG, "Suppressed radio packet coming from one of my own base IDs: %08X", sender);
     return;
+  }
+  // check encrypted packets
+  EnOceanSecurityPtr sec;
+  RadioOrg rorg = aEsp3PacketPtr->eepRorg();
+  #if ENABLE_ENOCEAN_SECURE
+  if (rorg==rorg_SEC_TEACHIN) {
+    LOG(LOG_NOTICE, "Secure teach-in packet received from %08X", sender);
+    bool known = enoceanDevices.find(sender)!=enoceanDevices.end();
+    // allow creating new security info records in learning mode or for known devices (=upgrade to secure mode)
+    sec = securityInfoForSender(sender, learningMode || known);
+    if (sec) {
+      Tristate res = sec->processTeachInMsg(aEsp3PacketPtr, NULL); // TODO: pass in PSK once we have one
+      // TODO: for bidirectional teach-in, generate and send back my own teach-in message
+      if (res==yes) {
+        // complete secure teach-in info found
+        if ((sec->teachInInfo & 0x07)==0x01) {
+          // bidirectional teach-in requested - send immediately because it must occur not later than 500mS after receiving teach-in (750mS device side timeout)
+          LOG(LOG_NOTICE, "- Device %08X requests bidirectional secure teach-in, sending response now", sender);
+          for (int seg=0; seg<2; seg++) {
+            Esp3PacketPtr secTeachInResponse = sec->teachInMessage(seg);
+            secTeachInResponse->setRadioDestination(sender);
+            enoceanComm.sendPacket(secTeachInResponse);
+            LOG(LOG_DEBUG, "Sent secure teach-in response segment #%d:\n%s", seg, secTeachInResponse->description().c_str());
+          }
+        }
+        if (!learningMode) {
+          // just refreshing or adding security info outside of actually adding/removing device
+          LOG(LOG_NOTICE, "- Device %08X upgraded to EnOcean security or refreshed security info", sender);
+          saveSecurityInfo(sec, sender, false, false);
+        }
+        else {
+          // actual secure teach-in (or out)
+          // - check type
+          if ((sec->teachInInfo & 0x06)==0x04) {
+            // PTM implicit teach-in (PTM: bit2=1, INFO: bit1==0, bit0==X)
+            LOG(LOG_NOTICE, "- is implicit PTM learn in");
+            // process as F6-02-01 dual rocker (altough the pseudo-profile is called D2-03-00)
+            Tristate lrn = processLearn(sender, 0xF60201, manufacturer_unknown, undefined, false, aEsp3PacketPtr, sec);
+            if (lrn!=undefined) {
+              if (lrn==yes) {
+                // learned in, must save security info
+                saveSecurityInfo(sec, sender, false, false);
+              }
+              // implicit learn (in or out) done
+              learningMode = false;
+            }
+          }
+        }
+      }
+      else if (res==no) {
+        // invalid secure teach-in, discard info
+        dropSecurityInfoForSender(sender);
+      }
+    }
+    else {
+      LOG(LOG_NOTICE, "- secure teach in ignored (no known device and not in learn mode");
+    }
+    // no other processing for rorg_SEC_TEACHIN
+    return;
+  }
+  else {
+    // not secure teach-in, just look up from existing security infos
+    sec = securityInfoForSender(sender, false);
+  }
+  // unwrap secure telegrams, if any
+  if (sec) {
+    // security context for that device exists -> only encrypted messages are allowed
+    Esp3PacketPtr unpackedMsg = sec->unpackSecureMessage(aEsp3PacketPtr);
+    if (!unpackedMsg) {
+      LOG(LOG_NOTICE, "Ignoring invalid packet for secure device (not secure or not authenticated):\n%s", aEsp3PacketPtr->description().c_str());
+      return;
+    }
+    LOG(LOG_INFO, "Received and unpacked secure radio packet, original is:\n%s", aEsp3PacketPtr->description().c_str());
+    aEsp3PacketPtr = unpackedMsg;
+    rorg = unpackedMsg->eepRorg();
+    LOG(LOG_DEBUG, "Unpacked secure radio packet resulting:\n%s", aEsp3PacketPtr->description().c_str());
+    // check if we need to save the security context
+    saveSecurityInfo(sec, sender, true, true);
+  }
+  else
+  #endif
+  {
+    // no security context for this device
+    if (rorg==rorg_SEC || rorg==rorg_SEC_ENCAPS) {
+      LOG(LOG_NOTICE, "Secure packet received from sender w/o security info available -> ignored:\n%s", aEsp3PacketPtr->description().c_str());
+      return;
+    }
   }
   // check learning mode
   if (learningMode) {
@@ -447,8 +696,8 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     // detect implicit (RPS) learn in only with sufficient radio strength (or explicit override of that check),
     // explicit ones are always recognized
     if (aEsp3PacketPtr->radioHasTeachInfo(disableProximityCheck ? 0 : MIN_LEARN_DBM, false)) {
-      LOG(LOG_NOTICE, "Learn mode enabled: processing EnOcean learn packet: %s", aEsp3PacketPtr->description().c_str());
-      Tristate lrn = processLearn(aEsp3PacketPtr->radioSender(), aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer(), aEsp3PacketPtr->teachInfoType(), false, aEsp3PacketPtr);
+      LOG(LOG_NOTICE, "Learn mode enabled: processing EnOcean learn packet:\n%s", aEsp3PacketPtr->description().c_str());
+      Tristate lrn = processLearn(sender, aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer(), aEsp3PacketPtr->teachInfoType(), false, aEsp3PacketPtr, sec);
       // check for UTE, may need confirmation
       if (aEsp3PacketPtr->eepRorg()==rorg_UTE) {
         uint8_t db6 = aEsp3PacketPtr->radioUserData()[0]; // DB6 (in EEP specs order)
@@ -459,7 +708,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
             (db6 & 0x80) | // keep uni-/bidirectional bit
             (lrn==yes ? 0x10 : (lrn==no ? 0x20 : 0x00)); // learn-in/learn-out status feedback
           // set destination
-          aEsp3PacketPtr->setRadioDestination(aEsp3PacketPtr->radioSender());
+          aEsp3PacketPtr->setRadioDestination(sender);
           // now send
           LOG(LOG_INFO, "Sending UTE teach-in response for EEP %06X", EEP_PURE(aEsp3PacketPtr->eepProfile()));
           enoceanComm.sendCommand(aEsp3PacketPtr, NULL);
@@ -472,13 +721,13 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
       }
     } // learn action
     else {
-      LOG(LOG_INFO, "Learn mode enabled: Received non-learn EnOcean packet -> ignored: %s", aEsp3PacketPtr->description().c_str());
+      LOG(LOG_INFO, "Learn mode enabled: Received non-learn EnOcean packet -> ignored:\n%s", aEsp3PacketPtr->description().c_str());
     }
   }
   else {
     // not learning mode, dispatch packet to all devices known for that address
     bool reachedDevice = false;
-    for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aEsp3PacketPtr->radioSender()); pos!=enoceanDevices.upper_bound(aEsp3PacketPtr->radioSender()); ++pos) {
+    for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(sender); pos!=enoceanDevices.upper_bound(sender); ++pos) {
       if (aEsp3PacketPtr->radioHasTeachInfo(MIN_LEARN_DBM, false) && aEsp3PacketPtr->eepRorg()!=rorg_RPS) {
         // learning packet in non-learn mode -> report as non-regular user action, might be attempt to identify a device
         // Note: RPS devices are excluded because for these all telegrams are regular user actions.
@@ -493,7 +742,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
       reachedDevice = true;
     }
     if (!reachedDevice) {
-      LOG(LOG_INFO, "Received EnOcean packet not directed to any known device -> ignored: %s", aEsp3PacketPtr->description().c_str());
+      LOG(LOG_INFO, "Received EnOcean packet not directed to any known device -> ignored:\n%s", aEsp3PacketPtr->description().c_str());
     }
   }
 }
@@ -551,7 +800,8 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
       }
       // try to process
       // Note: processLearn will always confirm the SA_CONFIRM_LEARN event (even if failing)
-      processLearn(deviceAddress, profile, manufacturer, undefined, true, aEsp3PacketPtr); // smart ack
+      EnOceanSecurityPtr sec = securityInfoForSender(deviceAddress, false);
+      processLearn(deviceAddress, profile, manufacturer, undefined, true, aEsp3PacketPtr, sec); // smart ack
     }
     else {
       LOG(LOG_WARNING, "Received SA_CONFIRM_LEARN while not in learning mode -> rejecting");
