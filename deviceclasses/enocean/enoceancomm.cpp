@@ -1352,9 +1352,9 @@ void EnoceanComm::dispatchPacket(Esp3PacketPtr aPacket)
         // pass packet and response status
         callback(aPacket, aPacket->responseStatus());
       }
-      // check if more commands in queue to be sent
-      checkCmdQueue();
     }
+    // check if more commands in queue to be sent
+    checkCmdQueue();
   }
   else if (pt==pt_event_message) {
     // This is a event
