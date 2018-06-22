@@ -524,11 +524,6 @@ namespace p44 {
     /// @name static EnOcean crypto routines
     /// @{
 
-    #if DEBUG
-    #define ENABLE_ENOCEAN_SECURE_EXPERIMENTS 1
-    #endif
-
-
     /// perform basic AES128 without padding on a single block
     /// @param aKey the key to use
     /// @param aData the data block
@@ -681,18 +676,6 @@ namespace p44 {
     /// @param aConfirmCode confirm code, see SA_RESPONSECODE_xxx
     /// @param aResponseTime for learn-in (SA_RESPONSECODE_LEARNED), how fast the mailbox will be ready for device to claim it
     void smartAckRespondToLearn(uint8_t aConfirmCode, MLMicroSeconds aResponseTime = 0);
-
-
-    #if ENABLE_ENOCEAN_SECURE_EXPERIMENTS
-
-    // experimental, WIP
-    static string decryptData(const string aPrivateKey, uint32_t aRLC, const string aData);
-    static uint32_t calcCMAC(const string aPrivateKey, int aMACBytes, const string aData);
-
-    static void secExperiment_OLD();
-    static void secExperiment();
-
-    #endif
 
   protected:
 
