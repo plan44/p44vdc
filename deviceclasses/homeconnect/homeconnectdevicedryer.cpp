@@ -28,8 +28,13 @@
 
 namespace p44 {
 
+namespace
+{
+  static const string DRYER_CONFIG_FILE_NAME = HOMECONNECT_CONFIG_FILE_NAME_BASE + "Dryer";
+}
+
 HomeConnectDeviceDryer::HomeConnectDeviceDryer(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-    inherited(aVdcP, aHomeApplicanceInfoRecord)
+    inherited(aVdcP, aHomeApplicanceInfoRecord, DRYER_CONFIG_FILE_NAME)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
   settings->fireAction = "Stop";

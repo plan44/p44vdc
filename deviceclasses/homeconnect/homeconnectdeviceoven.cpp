@@ -28,8 +28,13 @@
 
 namespace p44 {
 
+namespace
+{
+  static const string OVEN_CONFIG_FILE_NAME = HOMECONNECT_CONFIG_FILE_NAME_BASE + "Oven";
+}
+
 HomeConnectDeviceOven::HomeConnectDeviceOven(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-    inherited(aVdcP, aHomeApplicanceInfoRecord)
+    inherited(aVdcP, aHomeApplicanceInfoRecord, OVEN_CONFIG_FILE_NAME)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
   settings->fireAction = "StandBy";

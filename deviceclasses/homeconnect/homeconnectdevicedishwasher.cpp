@@ -29,8 +29,13 @@
 
 namespace p44 {
 
+namespace
+{
+  static const string DISHWASHER_CONFIG_FILE_NAME = HOMECONNECT_CONFIG_FILE_NAME_BASE + "Dishwasher";
+}
+
 HomeConnectDeviceDishWasher::HomeConnectDeviceDishWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-    inherited(aVdcP, aHomeApplicanceInfoRecord)
+    inherited(aVdcP, aHomeApplicanceInfoRecord, DISHWASHER_CONFIG_FILE_NAME)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
   settings->fireAction = "PowerOff";

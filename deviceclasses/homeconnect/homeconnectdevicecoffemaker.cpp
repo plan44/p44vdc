@@ -28,8 +28,13 @@
 
 namespace p44 {
 
+namespace
+{
+  static const string COFFEEMAKER_CONFIG_FILE_NAME = HOMECONNECT_CONFIG_FILE_NAME_BASE + "CoffeeMaker";
+}
+
 HomeConnectDeviceCoffeMaker::HomeConnectDeviceCoffeMaker(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-    inherited(aVdcP, aHomeApplicanceInfoRecord)
+    inherited(aVdcP, aHomeApplicanceInfoRecord, COFFEEMAKER_CONFIG_FILE_NAME)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
   settings->fireAction = "StandBy";

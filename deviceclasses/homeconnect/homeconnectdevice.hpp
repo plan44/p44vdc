@@ -120,6 +120,8 @@ namespace p44 {
 
   };
 
+  static const string HOMECONNECT_CONFIG_FILE_NAME_BASE = "singledevicesettings_homeconnect_";
+
   class HomeConnectSettingBuilder
   {
   private:
@@ -167,7 +169,7 @@ namespace p44 {
     ValueDescriptorPtr programProgress;
     ValueDescriptorPtr elapsedProgramTime;
 
-    HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord);
+    HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord, const string& aDefaultConfigFile);
     virtual ~HomeConnectDevice();
   public:
 
