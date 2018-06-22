@@ -102,6 +102,7 @@ Device::Device(Vdc *aVdcP) :
   currentDimMode(dimmode_stop),
   areaDimmed(0),
   areaDimMode(dimmode_stop),
+  preparedDim(false),
   vdcP(aVdcP),
   DsAddressable(&aVdcP->getVdcHost()),
   colorClass(class_black_joker),
