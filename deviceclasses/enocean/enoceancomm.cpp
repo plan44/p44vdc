@@ -1466,12 +1466,12 @@ void EnOceanSecurity::deriveSubkeys(const AES128Block &aKey, AES128Block &aSubke
   for (int i=0; i<AES128BlockLen; i++) {
     aSubkey1[i] = ((L[i]<<1)+(i<AES128BlockLen-1 && ((L[i+1]&0x80)!=0 ? 0x01 : 0)))&0xFF;
   }
-  if ((L[0] & 0x80) != 0) aSubkey1[0] ^= 0x87; // const_Rb
+  if ((L[0] & 0x80) != 0) aSubkey1[AES128BlockLen-1] ^= 0x87; // const_Rb
   // Subkey K2
   for (int i=0; i<AES128BlockLen; i++) {
     aSubkey2[i] = ((aSubkey1[i]<<1)+(i<AES128BlockLen-1 && ((aSubkey1[i+1]&0x80)!=0 ? 0x01 : 0)))&0xFF;
   }
-  if ((aSubkey1[0] & 0x80) != 0) aSubkey2[0] ^= 0x87; // const_Rb
+  if ((aSubkey1[0] & 0x80) != 0) aSubkey2[AES128BlockLen-1] ^= 0x87; // const_Rb
 }
 
 
