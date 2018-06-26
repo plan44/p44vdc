@@ -255,6 +255,10 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
               FOCUSLOG("- property '%s' access with preparation complete -> unpreparing", propDesc->name());
               finishAccess(aMode, propDesc);
             }
+            if (aMode==access_write && !wildcard) {
+              // stop iterating after writing to non-wildcard item (because insertable containers would create multiple items otherwise)
+              propIndex = PROPINDEX_NONE;
+            }
           } // actual access, not preparation
         }
         else {
