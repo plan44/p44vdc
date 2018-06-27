@@ -196,7 +196,7 @@ ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotEx
     // create new zone descriptor on the fly
     zone = ZoneDescriptorPtr(new ZoneDescriptor);
     zone->zoneID = aZoneId;
-    zone->zoneName = string_format("Zone #%d", aZoneId);
+    zone->zoneName = aZoneId==0 ? "[global]" : string_format("Zone #%d", aZoneId);
     zone->markClean(); // not modified yet, no need to save
     zones.push_back(zone);
   }
@@ -230,6 +230,8 @@ ErrorPtr ZoneList::load()
       newZone = ZoneDescriptorPtr(new ZoneDescriptor());
     }
     delete queryP; queryP = NULL;
+    // make sure we have a global (appartment) zone
+    getZoneById(0);
   }
   return err;
 }
@@ -262,7 +264,7 @@ PropertyDescriptorPtr ZoneList::getDescriptorByIndex(int aPropIndex, int aDomain
 {
   if (aPropIndex<zones.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("%hd", zones[aPropIndex]->zoneID);
+    descP->propertyName = string_format("%hu", zones[aPropIndex]->zoneID);
     descP->propertyType = apivalue_object;
     descP->deletable = zones[aPropIndex]->deviceCount<=0; // zone is deletable when no device uses it
     descP->propertyFieldKey = aPropIndex;
@@ -285,7 +287,7 @@ PropertyDescriptorPtr ZoneList::getDescriptorByName(string aPropMatch, int &aSta
     descP->propertyFieldKey = zones.size(); // new zone will be appended, so index is current size
     descP->propertyObjectKey = OKEY(zonelist_key);
     DsZoneID newId = 0;
-    if (sscanf(aPropMatch.c_str(), "%hd", &newId)!=1) {
+    if (sscanf(aPropMatch.c_str(), "%hu", &newId)!=1) {
       // not a valid zone ID, generate one
       newId = 22000; // arbitrary start number for locally generated zones
       while (getZoneById(newId, false)) {
@@ -409,7 +411,7 @@ void SceneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 }
 
 
-// MARK: ===== ZoneDescriptor property access implementation
+// MARK: ===== SceneDescriptor property access implementation
 
 enum {
   sceneName_key,
