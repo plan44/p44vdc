@@ -228,8 +228,7 @@ string HomeConnectSettingBuilder::build()
 //    }
 //  }
 
-
-HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
+HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord, const string& aDefaultConfigFile) :
   inherited(aVdcP),
   isConnected(false)
 {
@@ -263,11 +262,19 @@ HomeConnectDevice::HomeConnectDevice(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeA
 
   string dir = getVdcHost().getConfigDir();
 
-  string fn = dir  + "singledevicesettings_homeconnect_" + vib + ".json";
+  string fn = dir  + HOMECONNECT_CONFIG_FILE_NAME_BASE + vib + ".json";
   JsonObjectPtr config = JsonObject::objFromFile(fn.c_str());
   if (!config) {
-    ALOG(LOG_WARNING, "Cannot read configuration file: '%s'", fn.c_str());
-    return;
+    ALOG(LOG_NOTICE, "Cannot read configuration file: '%s'. Will try to load default settings.", fn.c_str());
+
+    fn = dir + aDefaultConfigFile + ".json";
+    config = JsonObject::objFromFile(fn.c_str());
+
+    if (!config) {
+      ALOG(LOG_WARNING, "Cannot read default configuration file: '%s'.", fn.c_str());
+      return;
+    }
+
   }
 
   ALOG(LOG_DEBUG, "Configuration file read successfully: '%s'", fn.c_str());

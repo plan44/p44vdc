@@ -28,8 +28,13 @@
 
 namespace p44 {
 
+namespace
+{
+  static const string FRIDGEFREEZER_CONFIG_FILE_NAME = HOMECONNECT_CONFIG_FILE_NAME_BASE + "FridgeFreezer";
+}
+
 HomeConnectDeviceFridge::HomeConnectDeviceFridge(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-    inherited(aVdcP, aHomeApplicanceInfoRecord)
+    inherited(aVdcP, aHomeApplicanceInfoRecord, FRIDGEFREEZER_CONFIG_FILE_NAME)
 {
   installSettings(new HomeConnectDeviceSettings(*this));
 }

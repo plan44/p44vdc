@@ -51,8 +51,13 @@ const char* HomeConnectDeviceWasher::spinSpeedNames[spinSpeed_Num] = {
   "RPM1600"
   };
 
+namespace
+{
+  static const string WASHER_CONFIG_FILE_NAME = HOMECONNECT_CONFIG_FILE_NAME_BASE + "Washer";
+}
+
 HomeConnectDeviceWasher::HomeConnectDeviceWasher(HomeConnectVdc *aVdcP, JsonObjectPtr aHomeApplicanceInfoRecord) :
-    inherited(aVdcP, aHomeApplicanceInfoRecord)
+    inherited(aVdcP, aHomeApplicanceInfoRecord, WASHER_CONFIG_FILE_NAME)
 {
   HomeConnectDeviceSettingsPtr settings = new HomeConnectDeviceSettings(*this);
   settings->fireAction = "Stop";
