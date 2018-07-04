@@ -98,7 +98,12 @@ namespace p44 {
     MLTicket evaluateTicket;
     bool evaluating; ///< protection against cyclic references
     MLTicket testlaterTicket;
-    bool timedtest; ///< set when current evaluation is triggered by timer
+    typedef enum {
+      evalmode_normal, ///< normal evaluation
+      evalmode_initial, ///< initial evaluator run
+      evalmode_timed, ///< timed evaluation (testlater()...)
+    } EvalMode;
+    EvalMode evalMode; ///< evaluation mode
 
     HttpCommPtr httpAction; ///< in case evaluator uses http actions
 
@@ -188,7 +193,7 @@ namespace p44 {
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
-    void evaluateConditions(Tristate aRefState, bool aTimedTest);
+    void evaluateConditions(Tristate aRefState, EvalMode aEvalMode);
     void evaluateConditionsLater();
     void changedConditions();
     ErrorPtr executeAction(Tristate aState);
