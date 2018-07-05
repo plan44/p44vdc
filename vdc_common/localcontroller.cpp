@@ -28,6 +28,7 @@
 
 #include "localcontroller.hpp"
 
+#include "outputbehaviour.hpp"
 #include "buttonbehaviour.hpp"
 
 
@@ -38,22 +39,172 @@ using namespace p44;
 // MARK: ===== ZoneDescriptor
 
 ZoneDescriptor::ZoneDescriptor() :
-  inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
-  deviceCount(0)
+  inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore())
 {
 }
 
 
 ZoneDescriptor::~ZoneDescriptor()
 {
-
 }
 
 
 void ZoneDescriptor::usedByDevice(DevicePtr aDevice, bool aInUse)
 {
-  deviceCount += (aInUse ? 1 : -1);
+  for (DeviceList::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+    if (*pos==aDevice) {
+      if (aInUse) return; // already here -> NOP
+      // not in use any more, remove it
+      devices.erase(pos);
+      return;
+    }
+  }
+  // not yet in my list
+  if (aInUse) {
+    devices.push_back(aDevice);
+  }
 }
+
+
+static const SceneKindDescriptor roomScenes[] = {
+  { ROOM_OFF, scene_room|scene_preset|scene_off , "off"},
+  { ROOM_ON, scene_room|scene_preset, "preset 1" },
+  { PRESET_2, scene_room|scene_preset, "preset 2" },
+  { PRESET_3, scene_room|scene_preset, "preset 3" },
+  { PRESET_4, scene_room|scene_preset, "preset 4" },
+  { AREA_1_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 1 off" },
+  { AREA_1_ON, scene_room|scene_preset|scene_area|scene_extended, "area 1 on" },
+  { AREA_2_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 2 off" },
+  { AREA_2_ON, scene_room|scene_preset|scene_area|scene_extended, "area 1 on" },
+  { AREA_3_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 3 off" },
+  { AREA_3_ON, scene_room|scene_preset|scene_area|scene_extended, "area 1 on" },
+  { AREA_4_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 3 off" },
+  { AREA_4_ON, scene_room|scene_preset|scene_area|scene_extended, "area 1 on" },
+  { PRESET_OFF_10, scene_room|scene_preset|scene_off|scene_extended, "off 10" },
+  { PRESET_11, scene_room|scene_preset|scene_extended, "preset 11" },
+  { PRESET_12, scene_room|scene_preset|scene_extended, "preset 12" },
+  { PRESET_13, scene_room|scene_preset|scene_extended, "preset 13" },
+  { PRESET_14, scene_room|scene_preset|scene_extended, "preset 14" },
+  { PRESET_OFF_20, scene_room|scene_preset|scene_off|scene_extended, "off 20" },
+  { PRESET_21, scene_room|scene_preset|scene_extended, "preset 21" },
+  { PRESET_22, scene_room|scene_preset|scene_extended, "preset 22" },
+  { PRESET_23, scene_room|scene_preset|scene_extended, "preset 23" },
+  { PRESET_24, scene_room|scene_preset|scene_extended, "preset 24" },
+  { PRESET_OFF_30, scene_room|scene_preset|scene_off|scene_extended, "off 30" },
+  { PRESET_31, scene_room|scene_preset|scene_extended, "preset 31" },
+  { PRESET_32, scene_room|scene_preset|scene_extended, "preset 32" },
+  { PRESET_33, scene_room|scene_preset|scene_extended, "preset 33" },
+  { PRESET_34, scene_room|scene_preset|scene_extended, "preset 34" },
+  { PRESET_OFF_40, scene_room|scene_preset|scene_off, "off 40" },
+  { PRESET_41, scene_room|scene_preset|scene_extended, "preset 41" },
+  { PRESET_42, scene_room|scene_preset|scene_extended, "preset 42" },
+  { PRESET_43, scene_room|scene_preset|scene_extended, "preset 43" },
+  { PRESET_44, scene_room|scene_preset|scene_extended, "preset 44" },
+  { INVALID_SCENE_NO, 0, NULL } // terminator
+};
+
+
+static const SceneKindDescriptor globalScenes[] = {
+  { AUTO_STANDBY, scene_global, "auto-standby" },
+  { STANDBY, scene_global, "standby" },
+  { DEEP_OFF, scene_global, "deep off" },
+  { SLEEPING, scene_global, "sleeping" },
+  { WAKE_UP, scene_global, "wakeup" },
+  { PRESENT, scene_global, "present" },
+  { ABSENT, scene_global, "absent" },
+  { ZONE_ACTIVE, scene_global, "zone active" },
+  { BELL1, scene_global, "bell 1" },
+  { BELL2, scene_global|scene_extended, "bell 2" },
+  { BELL3, scene_global|scene_extended, "bell 3" },
+  { BELL4, scene_global|scene_extended, "bell 4" },
+  { PANIC, scene_global, "panic" },
+  { ALARM1, scene_global, "alarm 1" },
+  { ALARM2, scene_global|scene_extended, "alarm 2" },
+  { ALARM3, scene_global|scene_extended, "alarm 3" },
+  { ALARM4, scene_global|scene_extended, "alarm 4" },
+  { FIRE, scene_global, "fire" },
+  { SMOKE, scene_global, "smoke" },
+  { WATER, scene_global, "water" },
+  { GAS, scene_global, "gas" },
+  { WIND, scene_global, "wind" },
+  { NO_WIND, scene_global, "no wind" },
+  { RAIN, scene_global, "rain" },
+  { NO_RAIN, scene_global, "no rain" },
+  { HAIL, scene_global, "hail" },
+  { NO_HAIL, scene_global, "no hail" },
+  { POLLUTION, scene_global, "pollution" },
+  { INVALID_SCENE_NO, 0 } // terminator
+};
+
+
+
+DsGroupMask ZoneDescriptor::getZoneGroups(bool aStandardOnly)
+{
+  DsGroupMask zoneGroups = 0;
+  if (zoneID==zoneId_global) {
+    return 0; // groups are not relevant in zone0
+  }
+  else {
+    for (DeviceList::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+      OutputBehaviourPtr o = (*pos)->getOutput();
+      if (o) {
+        zoneGroups |= o->groupMemberships();
+      }
+    }
+    if (aStandardOnly) {
+      // only use groups with standard room scenes
+      zoneGroups &= (
+        group_yellow_light |
+        group_grey_shadow |
+        group_blue_heating |
+        group_cyan_audio |
+        group_blue_cooling |
+        group_blue_ventilation
+      );
+    }
+    return zoneGroups;
+  }
+}
+
+
+SceneIdsVector ZoneDescriptor::getZoneScenes(DsGroup aForGroup, SceneKind aWantFlags, SceneKind aDontWantFlags)
+{
+  SceneIdsVector zoneScenes;
+  // create list of scenes
+  const SceneKindDescriptor *sceneKindP = NULL;
+  if (zoneID==zoneId_global) {
+    // global scenes
+    aWantFlags |= scene_global;
+    aDontWantFlags |= scene_room;
+    sceneKindP = globalScenes;
+  }
+  else {
+    // room scenes
+    aWantFlags |= scene_room;
+    aDontWantFlags |= scene_global;
+    sceneKindP = roomScenes;
+  }
+  while (sceneKindP && sceneKindP->no!=INVALID_SCENE_NO) {
+    if (
+      (sceneKindP->kind & aWantFlags)==aWantFlags &&
+      (sceneKindP->kind & aDontWantFlags)==0
+    ) {
+      // create identifier for it
+      SceneIdentifier si(*sceneKindP, zoneID, aForGroup);
+      // look up in user-defined scenes
+      SceneDescriptorPtr userscene = LocalController::sharedLocalController()->localScenes.getScene(si);
+      if (userscene) {
+        si.name = userscene->getSceneName();
+      }
+      else {
+        si.name = sceneKindP->defaultName;
+      }
+      zoneScenes.push_back(si);
+    }
+  }
+  return zoneScenes;
+}
+
 
 
 // MARK: ===== ZoneDescriptor persistence
@@ -139,8 +290,6 @@ enum {
 
 static char zonedescriptor_key;
 
-
-
 int ZoneDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   return numZoneProperties;
@@ -151,7 +300,7 @@ PropertyDescriptorPtr ZoneDescriptor::getDescriptorByIndex(int aPropIndex, int a
 {
   static const PropertyDescription properties[numZoneProperties] = {
     { "name", apivalue_string, zoneName_key, OKEY(zonedescriptor_key) },
-    { "devices", apivalue_uint64, deviceCount_key, OKEY(zonedescriptor_key) },
+    { "deviceCount", apivalue_uint64, deviceCount_key, OKEY(zonedescriptor_key) },
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
@@ -167,7 +316,7 @@ bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case zoneName_key: aPropValue->setStringValue(zoneName); return true;
-        case deviceCount_key: aPropValue->setUint32Value(deviceCount); return true;
+        case deviceCount_key: aPropValue->setUint64Value(devices.size()); return true;
       }
     }
     else {
@@ -266,7 +415,7 @@ PropertyDescriptorPtr ZoneList::getDescriptorByIndex(int aPropIndex, int aDomain
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyName = string_format("%hu", zones[aPropIndex]->zoneID);
     descP->propertyType = apivalue_object;
-    descP->deletable = zones[aPropIndex]->deviceCount<=0; // zone is deletable when no device uses it
+    descP->deletable = zones[aPropIndex]->devices.size()==0; // zone is deletable when no device uses it
     descP->propertyFieldKey = aPropIndex;
     descP->propertyObjectKey = OKEY(zonelist_key);
     return descP;
@@ -325,6 +474,83 @@ PropertyContainerPtr ZoneList::getContainer(const PropertyDescriptorPtr &aProper
 
 
 
+// MARK: ===== SceneIdentifier
+
+SceneIdentifier::SceneIdentifier()
+{
+  sceneKindP = NULL;
+  sceneNo = INVALID_SCENE_NO;
+  zoneID = scene_global;
+  group = group_undefined;
+}
+
+
+SceneIdentifier::SceneIdentifier(const SceneKindDescriptor &aSceneKind, DsZoneID aZone, DsGroup aGroup)
+{
+  sceneKindP = &aSceneKind;
+  sceneNo = sceneKindP->no;
+  zoneID = aZone;
+  group = aGroup;
+}
+
+
+SceneIdentifier::SceneIdentifier(SceneNo aNo, DsZoneID aZone, DsGroup aGroup)
+{
+  sceneNo = aNo;
+  zoneID = aZone;
+  group = aGroup;
+  deriveSceneKind();
+}
+
+
+SceneIdentifier::SceneIdentifier(const string aStringId)
+{
+  uint16_t tmpSceneNo = INVALID_SCENE_NO;
+  uint16_t tmpZoneID = scene_global;
+  uint16_t tmpGroup = group_undefined;
+  sscanf(aStringId.c_str(), "%hu_%hu_%hu", &tmpSceneNo, &tmpZoneID, &tmpGroup);
+  sceneNo = tmpSceneNo;
+  zoneID = tmpZoneID;
+  group = (DsGroup)tmpGroup;
+  deriveSceneKind();
+}
+
+
+string SceneIdentifier::stringId() const
+{
+  return string_format("%hu_%hu_%hu", (uint16_t)sceneNo, (uint16_t)zoneID, (uint16_t)group);
+}
+
+
+string SceneIdentifier::getName() const
+{
+  if (name.empty()) {
+    return sceneKindP ? sceneKindP->defaultName : string_format("scene %d", sceneNo);
+  }
+  else {
+    return name;
+  }
+}
+
+
+
+
+bool SceneIdentifier::deriveSceneKind()
+{
+  const SceneKindDescriptor *sk = sceneNo>=START_APARTMENT_SCENES ? globalScenes : roomScenes;
+  while (sk->no<MAX_SCENE_NO) {
+    if (sk->no==sceneNo) {
+      sceneKindP = sk;
+      return true;
+    }
+    sk++;
+  }
+  sceneKindP = NULL; // unknown
+  return false;
+}
+
+
+
 // MARK: ===== SceneDescriptor
 
 SceneDescriptor::SceneDescriptor() :
@@ -348,7 +574,7 @@ const char *SceneDescriptor::tableName()
 
 // primary key field definitions
 
-static const size_t numSceneKeys = 1;
+static const size_t numSceneKeys = 3;
 
 size_t SceneDescriptor::numKeyDefs()
 {
@@ -359,7 +585,9 @@ size_t SceneDescriptor::numKeyDefs()
 const FieldDefinition *SceneDescriptor::getKeyDef(size_t aIndex)
 {
   static const FieldDefinition keyDefs[numSceneKeys] = {
-    { "sceneNo", SQLITE_INTEGER }, // uniquely identifies this zone
+    { "sceneNo", SQLITE_INTEGER },
+    { "sceneZone", SQLITE_INTEGER },
+    { "sceneGroup", SQLITE_INTEGER },
   };
   if (aIndex<numSceneKeys)
     return &keyDefs[aIndex];
@@ -394,10 +622,13 @@ const FieldDefinition *SceneDescriptor::getFieldDef(size_t aIndex)
 void SceneDescriptor::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
 {
   inheritedParams::loadFromRowWithoutParentId(aRow, aIndex, aCommonFlagsP);
-  // get zoneID
-  sceneNo = (DsSceneNumber)aRow->getWithDefault(aIndex++, 0);
+  // get key fields
+  sceneId.sceneNo = aRow->getCastedWithDefault<SceneNo, int>(aIndex++, 0);
+  sceneId.zoneID = aRow->getCastedWithDefault<DsZoneID, int>(aIndex++, 0);
+  sceneId.group = aRow->getCastedWithDefault<DsGroup, int>(aIndex++, group_undefined);
+  sceneId.deriveSceneKind();
   // the name
-  sceneName = nonNullCStr(aRow->get<const char *>(aIndex++));
+  sceneId.name = nonNullCStr(aRow->get<const char *>(aIndex++));
 }
 
 
@@ -405,16 +636,21 @@ void SceneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // - my own id
-  aStatement.bind(aIndex++, sceneNo);
+  aStatement.bind(aIndex++, sceneId.sceneNo);
+  aStatement.bind(aIndex++, sceneId.zoneID);
+  aStatement.bind(aIndex++, sceneId.group);
   // - title
-  aStatement.bind(aIndex++, sceneName.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, sceneId.name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
 // MARK: ===== SceneDescriptor property access implementation
 
 enum {
+  sceneNo_key,
   sceneName_key,
+  sceneZoneID_key,
+  sceneGroup_key,
   numSceneProperties
 };
 
@@ -431,7 +667,10 @@ int SceneDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescript
 PropertyDescriptorPtr SceneDescriptor::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numSceneProperties] = {
-    { "name", apivalue_string, zoneName_key, OKEY(scenedescriptor_key) }
+    { "sceneNo", apivalue_uint64, sceneNo_key, OKEY(scenedescriptor_key) },
+    { "name", apivalue_string, sceneName_key, OKEY(scenedescriptor_key) },
+    { "zoneID", apivalue_uint64, sceneZoneID_key, OKEY(scenedescriptor_key) },
+    { "group", apivalue_uint64, sceneGroup_key, OKEY(scenedescriptor_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
@@ -446,12 +685,15 @@ bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
   if (aPropertyDescriptor->hasObjectKey(scenedescriptor_key)) {
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
-        case sceneName_key: aPropValue->setStringValue(sceneName); return true;
+        case sceneNo_key: aPropValue->setUint16Value(getSceneNo()); return true;
+        case sceneName_key: aPropValue->setStringValue(getSceneName()); return true;
+        case sceneZoneID_key: aPropValue->setUint16Value(sceneId.zoneID); return true;
+        case sceneGroup_key: aPropValue->setUint8Value(sceneId.group); return true;
       }
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
-        case zoneName_key: setPVar(sceneName, aPropValue->stringValue()); return true;
+        case sceneName_key: setPVar(sceneId.name, aPropValue->stringValue()); return true;
       }
     }
   }
@@ -462,22 +704,26 @@ bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 // MARK: ===== SceneList
 
 
-SceneDescriptorPtr SceneList::getSceneByNo(DsSceneNumber aSceneNo, bool aCreateNewIfNotExisting)
+SceneDescriptorPtr SceneList::getScene(const SceneIdentifier &aSceneId, bool aCreateNewIfNotExisting, size_t *aSceneIndexP)
 {
   SceneDescriptorPtr scene;
-  for (ScenesVector::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
-    if ((*pos)->sceneNo==aSceneNo) {
-      scene = *pos;
+  for (int i = 0; i<scenes.size(); ++i) {
+    SceneDescriptorPtr sc = scenes[i];
+    if (sc->sceneId.sceneNo==aSceneId.sceneNo && sc->sceneId.zoneID==aSceneId.zoneID && sc->sceneId.group==aSceneId.group) {
+      scene = sc;
+      if (aSceneIndexP) *aSceneIndexP = i;
       break;
     }
   }
-  if (!scene && aCreateNewIfNotExisting) {
-    // create new scene descriptor on the fly
+  if (!scene && aCreateNewIfNotExisting && aSceneId.sceneNo<MAX_SCENE_NO) {
+    // create new scene descriptor
     scene = SceneDescriptorPtr(new SceneDescriptor);
-    scene->sceneNo = aSceneNo;
-    scene->sceneName = string_format("Scene #%d", aSceneNo);
-    scene->markClean(); // not modified yet, no need to save
-    scenes.push_back(scene);
+    scene->sceneId = aSceneId;
+    if (scene->sceneId.deriveSceneKind()) {
+      scene->markClean(); // not modified yet, no need to save
+      if (aSceneIndexP) *aSceneIndexP = scenes.size();
+      scenes.push_back(scene);
+    }
   }
   return scene;
 }
@@ -521,7 +767,7 @@ ErrorPtr SceneList::save()
   // save all elements (only dirty ones will be actually stored to DB)
   for (ScenesVector::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->sceneNo, err->description().c_str());
+    if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->sceneId.sceneNo, err->description().c_str());
   }
   return err;
 }
@@ -541,7 +787,7 @@ PropertyDescriptorPtr SceneList::getDescriptorByIndex(int aPropIndex, int aDomai
 {
   if (aPropIndex<scenes.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("%u", scenes[aPropIndex]->sceneNo);
+    descP->propertyName = scenes[aPropIndex]->getStringID();
     descP->propertyType = apivalue_object;
     descP->deletable = true; // scene is deletable
     descP->propertyFieldKey = aPropIndex;
@@ -556,19 +802,16 @@ PropertyDescriptorPtr SceneList::getDescriptorByName(string aPropMatch, int &aSt
 {
   PropertyDescriptorPtr p = inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
   if (!p && aMode==access_write && isNamedPropSpec(aPropMatch)) {
-    // writing to non-existing scene -> insert new scene
+    // writing to non-existing scene -> try to insert new scene
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyName = aPropMatch;
     descP->propertyType = apivalue_object;
     descP->deletable = true; // new scenes are deletable
-    descP->propertyFieldKey = scenes.size(); // new zone will be appended, so index is current size
     descP->propertyObjectKey = OKEY(scenelist_key);
-    uint16_t newSceneNo = MAX_SCENE_NO;
-    if (sscanf(aPropMatch.c_str(), "%hd", &newSceneNo)==1) {
-      if (newSceneNo<MAX_SCENE_NO) {
-        getSceneByNo((DsSceneNumber)newSceneNo, true);
-      }
+    size_t si;
+    if (getScene(SceneIdentifier(aPropMatch), true, &si)) {
       // valid new scene
+      descP->propertyFieldKey = si; // the scene's index
       p = descP;
     }
   }
@@ -611,9 +854,13 @@ LocalController::LocalController(VdcHost &aVdcHost) :
 
 LocalController::~LocalController()
 {
-
 }
 
+
+LocalControllerPtr LocalController::sharedLocalController()
+{
+  return VdcHost::sharedVdcHost()->getLocalController();
+}
 
 
 void LocalController::processGlobalEvent(VdchostEvent aActivity)

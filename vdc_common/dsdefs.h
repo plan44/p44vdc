@@ -159,7 +159,8 @@ typedef enum {
   HAIL = (START_APARTMENT_SCENES + 26),           ///< 90 - Hail
   NO_HAIL = (START_APARTMENT_SCENES + 27),        ///< 91 - No Hail
   POLLUTION = (START_APARTMENT_SCENES + 28),      ///< 92 - Pollution
-  MAX_SCENE_NO                                    ///< currently last known scene number
+  MAX_SCENE_NO,                                   ///< currently known number of scenes
+  INVALID_SCENE_NO = MAX_SCENE_NO                 ///< marker for invalid scene
 } DsSceneNumber;
 
 typedef uint8_t SceneNo; ///< scene number
@@ -167,7 +168,9 @@ typedef uint8_t SceneNo; ///< scene number
 typedef uint8_t SceneArea; ///< area number, 0=no area
 
 typedef uint16_t DsZoneID; ///< digitalSTROM Zone ID (= room ID)
-
+typedef enum {
+  zoneId_global = 0 ///< global (appartment, all rooms) zone
+};
 
 /// color/class
 typedef enum {

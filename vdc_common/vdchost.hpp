@@ -94,8 +94,13 @@ namespace p44 {
 
   class VdcHost;
   typedef boost::intrusive_ptr<VdcHost> VdcHostPtr;
+  #if ENABLE_LOCALCONTROLLER
+  typedef boost::intrusive_ptr<LocalController> LocalControllerPtr;
+  #endif
   typedef map<DsUid, VdcPtr> VdcMap;
   typedef map<DsUid, DevicePtr> DsDeviceMap;
+  typedef vector<DevicePtr> DeviceVector;
+  typedef list<DevicePtr> DeviceList;
   typedef list<DsAddressablePtr> DsAddressablesList;
 
   class NotificationGroup
@@ -177,7 +182,7 @@ namespace p44 {
     VdcApiConnectionPtr activeSessionConnection;
 
     #if ENABLE_LOCALCONTROLLER
-    LocalController *localController;
+    LocalControllerPtr localController;
     #endif
 
   public:
@@ -188,6 +193,13 @@ namespace p44 {
     /// VdcHost is a singleton, get access to it
     /// @return vdc host
     static VdcHostPtr sharedVdcHost();
+
+    #if ENABLE_LOCALCONTROLLER
+
+    /// @return local controller, will create one if not existing
+    LocalControllerPtr getLocalController();
+
+    #endif
 
     /// the list of containers by API-exposed ID (dSUID or derived dsid)
     VdcMap vdcs;

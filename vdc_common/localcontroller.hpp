@@ -32,9 +32,43 @@ using namespace std;
 
 namespace p44 {
 
-  class ZoneDescriptor;
   class ZoneList;
   class VdcHost;
+
+  class ZoneDescriptor;
+  typedef boost::intrusive_ptr<ZoneDescriptor> ZoneDescriptorPtr;
+
+  class SceneDescriptor;
+  typedef boost::intrusive_ptr<SceneDescriptor> SceneDescriptorPtr;
+  typedef vector<SceneDescriptorPtr> ScenesVector;
+
+  class SceneIdentifier;
+  typedef vector<SceneIdentifier> SceneIdsVector;
+
+  class GroupDescriptor;
+  typedef boost::intrusive_ptr<SceneDescriptor> GroupDescriptorPtr;
+  typedef vector<GroupDescriptorPtr> GroupsVector;
+
+
+  /// Scene kind flags
+  enum {
+    // scope
+    scene_global = 0x01, ///< set for global scenes
+    scene_room = 0x02, ///< set for room scenes
+    scene_area = 0x04, ///< set for area scenes (together with scene_room)
+    // type
+    scene_preset = 0x10, ///< preset
+    scene_off = 0x20, ///< off (together with scene_preset)
+    scene_extended = 0x40, ///< extended
+  };
+  typedef uint8_t SceneKind;
+
+  /// Scene kind
+  typedef struct {
+    SceneNo no;
+    SceneKind kind;
+    const char *defaultName;
+  } SceneKindDescriptor;
 
 
   /// zone descriptor
@@ -47,7 +81,8 @@ namespace p44 {
 
     DsZoneID zoneID; ///< global dS zone ID, zero = "all" zone
     string zoneName; ///< the name of the zone
-    uint32_t deviceCount; ///< number of devices using this zone
+
+    DeviceList devices; ///< devices in this zone
 
   public:
 
@@ -64,6 +99,17 @@ namespace p44 {
 
     /// register as in-use or non-in-use-any-more by a device
     void usedByDevice(DevicePtr aDevice, bool aInUse);
+
+    /// get the scenes relevant for this zone
+    /// @param aForGroup the group for the scene
+    /// @param aWantFlags scene must have at least these flags
+    /// @param aDontWantFlags scene must not have these flags
+    /// @return a vector of SceneIdentifier objects
+    SceneIdsVector getZoneScenes(DsGroup aForGroup, SceneKind aWantFlags, SceneKind aDontWantFlags = scene_extended|scene_area);
+
+    /// get the groups relevant for this zone
+    /// @param aStandardOnly if set, only groups with standard room scenes will be reported for non-global zones
+    DsGroupMask getZoneGroups(bool aStandardOnly);
 
   protected:
 
@@ -82,7 +128,6 @@ namespace p44 {
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   };
-  typedef boost::intrusive_ptr<ZoneDescriptor> ZoneDescriptorPtr;
 
 
   /// zone list
@@ -122,6 +167,39 @@ namespace p44 {
   typedef boost::intrusive_ptr<ZoneList> ZoneListPtr;
 
 
+  /// scene identifier
+  /// lightweight, usually temporary identifier for a scene that *could* be used
+  class SceneIdentifier
+  {
+  public:
+
+    // identification
+    SceneNo sceneNo;
+    DsZoneID zoneID;
+    DsGroup group;
+    // name
+    const SceneKindDescriptor* sceneKindP; ///< the scene kind
+    string name;
+
+    SceneIdentifier();
+    SceneIdentifier(const SceneKindDescriptor &aSceneKind, DsZoneID aZone, DsGroup aGroup);
+    SceneIdentifier(SceneNo aNo, DsZoneID aZone, DsGroup aGroup);
+    SceneIdentifier(const string aStringId);
+
+    /// derive scene kind from scene number
+    /// @return true if this is a valid scene and scene kind could be assigned
+    bool deriveSceneKind();
+
+    /// get the scene's ID
+    /// @return a string ID uniquely defining this scene in this localcontroller (zone, group, sceneNo)
+    string stringId() const;
+
+    /// get the scene's name
+    string getName() const;
+
+  };
+
+
   /// scene descriptor
   /// holds information about scene (global scope)
   class SceneDescriptor : public PropertyContainer, public PersistentParams
@@ -130,8 +208,7 @@ namespace p44 {
     typedef PersistentParams inheritedParams;
     friend class SceneList;
 
-    DsSceneNumber sceneNo; ///< global dS scene ID
-    string sceneName; ///< the user facing name of the scene
+    SceneIdentifier sceneId; ///< the scene identification
 
   public:
 
@@ -139,12 +216,24 @@ namespace p44 {
     virtual ~SceneDescriptor();
 
     /// get the name
-    /// @return name of this zone
-    string getName() const { return sceneName; };
+    /// @return name of this scene (if no name was set, the default name will be returned)
+    string getSceneName() const { return sceneId.getName(); };
 
     /// get the dS scene number
-    /// @return ID of this scene
-    int getSceneNo() const { return sceneNo; };
+    /// @return scene number (INVALID_SCENE_NO in case of invalid scene (no kind found)
+    int getSceneNo() const { return sceneId.sceneNo; };
+
+    /// get the Zone ID
+    /// @return zone ID (0 for global scenes)
+    DsZoneID getZoneID() const { return sceneId.zoneID; };
+
+    /// get the dS group number
+    /// @return group number
+    DsGroup getGroup() const { return sceneId.group; };
+
+    /// get the scene's ID
+    /// @return a string ID uniquely defining this scene in this localcontroller (zone, group, sceneNo)
+    string getStringID() const { return sceneId.stringId(); }
 
   protected:
 
@@ -163,7 +252,6 @@ namespace p44 {
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   };
-  typedef boost::intrusive_ptr<SceneDescriptor> SceneDescriptorPtr;
 
 
   /// scene list
@@ -174,8 +262,6 @@ namespace p44 {
 
   public:
 
-    typedef vector<SceneDescriptorPtr> ScenesVector;
-
     ScenesVector scenes;
 
     /// load zones
@@ -184,11 +270,8 @@ namespace p44 {
     /// save zones
     ErrorPtr save();
 
-    /// get zone by ID
-    /// @param aZoneId zone to look up
-    /// @param aCreateNewIfNotExisting if true, a zone is created on the fly when none exists for the given ID
-    /// @return zone or NULL if zoneID is not known (and none created)
-    SceneDescriptorPtr getSceneByNo(DsSceneNumber aSceneNo, bool aCreateNewIfNotExisting = false);
+    /// get scene by identifier
+    SceneDescriptorPtr getScene(const SceneIdentifier &aSceneId, bool aCreateNewIfNotExisting = false, size_t *aSceneIndexP = NULL);
 
   protected:
 
@@ -209,6 +292,7 @@ namespace p44 {
   class LocalController : public PropertyContainer
   {
     typedef PropertyContainer inherited;
+    friend class ZoneDescriptor;
 
     VdcHost &vdcHost; ///< local reference to vdc host
 
@@ -219,6 +303,9 @@ namespace p44 {
 
     LocalController(VdcHost &aVdcHost);
     virtual ~LocalController();
+
+    /// @return local controller, will create one if not existing
+    static LocalControllerPtr sharedLocalController();
 
     /// @name following vdchost activity
     /// @{
@@ -262,11 +349,6 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
 
   };
-  typedef boost::intrusive_ptr<LocalController> LocalControllerPtr;
-
-
-
-
 
 
 } // namespace p44

@@ -97,9 +97,6 @@ VdcHost::VdcHost(bool aWithLocalController) :
   localDimDirection(0), // undefined
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
   mainLoopStatsCounter(0),
-  #if ENABLE_LOCALCONTROLLER
-  localController(NULL),
-  #endif
   productName(DEFAULT_PRODUCT_NAME)
 {
   // remember singleton's address
@@ -108,8 +105,8 @@ VdcHost::VdcHost(bool aWithLocalController) :
   mac = macAddress();
   #if ENABLE_LOCALCONTROLLER
   if (aWithLocalController) {
-    localController = new LocalController(*this);
-    localController->isMemberVariable();
+    // force creation
+    getLocalController();
   }
   #endif
 }
@@ -118,7 +115,7 @@ VdcHost::VdcHost(bool aWithLocalController) :
 VdcHost::~VdcHost()
 {
   #if ENABLE_LOCALCONTROLLER
-  if (localController) delete localController;
+  if (localController) localController.reset();
   #endif
 }
 
@@ -127,6 +124,19 @@ VdcHostPtr VdcHost::sharedVdcHost()
 {
   return VdcHostPtr(sharedVdcHostP);
 }
+
+
+#if ENABLE_LOCALCONTROLLER
+
+LocalControllerPtr VdcHost::getLocalController()
+{
+  if (!localController) {
+    localController = LocalControllerPtr(new LocalController(*this));
+  }
+  return localController;
+}
+
+#endif // ENABLE_LOCALCONTROLLER
 
 
 void VdcHost::setEventMonitor(VdchostEventCB aEventCB)

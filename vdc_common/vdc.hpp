@@ -69,8 +69,6 @@ namespace p44 {
 
   class Vdc;
   typedef boost::intrusive_ptr<Vdc> VdcPtr;
-  typedef std::vector<DevicePtr> DeviceVector;
-  typedef std::list<DevicePtr> DeviceList;
 
 
   /// notification types

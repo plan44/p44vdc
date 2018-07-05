@@ -55,7 +55,7 @@ namespace p44 {
     /// @{
     VdcOutputMode outputMode; ///< the mode of the output. Can be outputmode_default to have device to use its preferred (or only possible) mode
     bool pushChanges; ///< if set, local changes to output will be pushed upstreams
-    uint64_t outputGroups; ///< mask for group memberships (0..63)
+    DsGroupMask outputGroups; ///< mask for group memberships (0..63)
     /// @}
 
 
@@ -155,6 +155,10 @@ namespace p44 {
     /// @param aGroup color number to check
     /// @return true if device is member of this group
     bool isMember(DsGroup aGroup);
+
+    /// get group membership bits
+    /// @return mask of bits, set bit numbers corresponds to DsGroup numbers the output is member of
+    DsGroupMask groupMemberships() const { return outputGroups; };
 
     /// set group membership
     /// @param aGroup group number to set or remove
