@@ -168,7 +168,7 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
   }
   // start collecting, allow quick scan when not exhaustively collecting (will still use full scan when bus collisions are detected)
   // Note: only in rescanmode_exhaustive, existing short addresses might get reassigned. In all other cases, only devices with no short
-  //   address yet at all will be assigned a short address.
+  //   address at all, will be assigned a short address.
   daliComm->daliFullBusScan(boost::bind(&DaliVdc::deviceListReceived, this, aCompletedCB, _1, _2, _3), !(aRescanFlags & rescanmode_exhaustive));
 }
 
@@ -178,7 +178,7 @@ void DaliVdc::removeLightDevices(bool aForget)
 {
   DeviceVector::iterator pos = devices.begin();
   while (pos!=devices.end()) {
-    DalioutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
+    DaliOutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
     if (dev) {
       // inform upstream about these devices going offline now (if API connection is up at all at this time)
       dev->reportVanished();
@@ -202,7 +202,7 @@ void DaliVdc::recollectDevices(StatusCB aCompletedCB)
 
   // remove DALI scannable output devices (but not inputs)
   removeLightDevices(false);
-  // no scan used, just use the cache
+  // no scan needed, just use the cache
   // - create a Dali bus device for every cached devInf
   DaliBusDeviceListPtr busDevices(new DaliBusDeviceList);
   for (DaliDeviceInfoMap::iterator pos = deviceInfoCache.begin(); pos!=deviceInfoCache.end(); ++pos) {
@@ -525,6 +525,10 @@ ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod,
     // diagnostics: direct DALI commands
     respErr = daliCmd(aRequest, aParams);
   }
+  else if (aMethod=="x-p44-daliSummary") {
+    // summary: returns documentation about devices on bus, reliability, device assignments etc.
+    respErr = daliSummary(aRequest, aParams);
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
@@ -659,6 +663,143 @@ void DaliVdc::bridgeCmdSent(VdcApiRequestPtr aRequest, uint8_t aResp1, uint8_t a
 }
 
 
+// create summary/inventory of entire bus
+
+ErrorPtr DaliVdc::daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
+{
+  ApiValuePtr p = aParams->get("addr");
+  if (p) {
+    // quick info about a single bus address
+    ApiValuePtr singleAddrSummary = aRequest->newApiValue();
+    singleAddrSummary->setType(apivalue_object);
+    daliAddressSummary(p->uint8Value(), singleAddrSummary);
+    aRequest->sendResult(singleAddrSummary);
+  }
+  else {
+//    #if DEBUG
+//    DaliComm::ShortAddressListPtr l = DaliComm::ShortAddressListPtr(new DaliComm::ShortAddressList);
+//    for (int i=51; i<64; i++) l->push_back(i);
+//    daliSummaryScanDone(aRequest, l, NULL, ErrorPtr());
+//    return ErrorPtr();
+//    #warning "ugly hack!!!"
+//    #endif
+    // want info about entire bus - do a raw bus scan to learn what devices are there
+    daliComm->daliBusScan(boost::bind(&DaliVdc::daliSummaryScanDone, this, aRequest, _1, _2, _3));
+  }
+  return ErrorPtr(); // already sent response or callback will send response
+}
+
+
+void DaliVdc::daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    aRequest->sendError(aError);
+    return;
+  }
+  ApiValuePtr summary = aRequest->newApiValue();
+  summary->setType(apivalue_object);
+  if (aShortAddressListPtr) {
+    // reliably accessible addresses
+    for (DaliComm::ShortAddressList::iterator pos = aShortAddressListPtr->begin(); pos!=aShortAddressListPtr->end(); ++pos) {
+      ApiValuePtr busAddrInfo = summary->newObject();
+      daliAddressSummary(*pos, busAddrInfo);
+      // add to summary
+      summary->add(string_format("%d",*pos), busAddrInfo);
+    }
+  }
+  if (aUnreliableShortAddressListPtr) {
+    for (DaliComm::ShortAddressList::iterator pos = aUnreliableShortAddressListPtr->begin(); pos!=aUnreliableShortAddressListPtr->end(); ++pos) {
+      ApiValuePtr busAddrInfo = summary->newObject();
+      busAddrInfo->add("scanStateText", busAddrInfo->newString("unreliable/conflict"));
+      busAddrInfo->add("scanState", busAddrInfo->newUint64(0));
+      // add to summary
+      summary->add(string_format("%d",*pos), busAddrInfo);
+    }
+  }
+  // return
+  aRequest->sendResult(summary);
+}
+
+
+void DaliVdc::daliAddressSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo)
+{
+  // check for being part of a scanned device
+  if (daliBusDeviceSummary(aDaliAddress, aInfo)) {
+    // full info available
+    aInfo->add("scanStateText", aInfo->newString("scanned"));
+    aInfo->add("scanState", aInfo->newUint64(100));
+  }
+  else {
+    // not a scanned device
+    aInfo->add("scanStateText", aInfo->newString("not yet scanned"));
+    aInfo->add("scanState", aInfo->newUint64(50));
+    // but we might have cached device info
+    DaliDeviceInfoMap::iterator ipos = deviceInfoCache.find(aDaliAddress);
+    if (ipos!=deviceInfoCache.end()) {
+      daliInfoSummary(ipos->second, aInfo);
+    }
+  }
+}
+
+
+bool DaliVdc::daliBusDeviceSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo)
+{
+  for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+    DaliOutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
+    if (dev) {
+      if (dev->daliBusDeviceSummary(aDaliAddress, aInfo)) {
+        // found
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+
+bool DaliVdc::daliInfoSummary(DaliDeviceInfoPtr aDeviceInfo, ApiValuePtr aInfo)
+{
+  if (!aDeviceInfo) return false;
+  string devInfStatus;
+  switch (aDeviceInfo->devInfStatus) {
+    case DaliDeviceInfo::devinf_none:
+      devInfStatus = "no stable serial";
+      break;
+    case DaliDeviceInfo::devinf_needsquery:
+      devInfStatus = "not queried yet";
+      break;
+    #if OLD_BUGGY_CHKSUM_COMPATIBLE
+    // devinfo itself is solid, just must not be used for dSUID for backwards compatibility reasons
+    case DaliDeviceInfo::devinf_notForID:
+    case DaliDeviceInfo::devinf_maybe:
+    #endif
+    case DaliDeviceInfo::devinf_solid:
+      devInfStatus = "stable serial";
+      // serial
+      aInfo->add("serialNo", aInfo->newUint64(aDeviceInfo->serialNo));
+      if (aDeviceInfo->oem_serialNo!=0) {
+        aInfo->add("OEM_serialNo", aInfo->newUint64(aDeviceInfo->oem_serialNo));
+      }
+      goto gtin;
+    case DaliDeviceInfo::devinf_only_gtin:
+      devInfStatus = "GTIN, but no serial";
+    gtin:
+      // GTIN
+      aInfo->add("GTIN", aInfo->newUint64(aDeviceInfo->gtin));
+      if (aDeviceInfo->oem_gtin!=0) {
+        aInfo->add("OEM_GTIN", aInfo->newUint64(aDeviceInfo->oem_gtin));
+      }
+      // firmware versions
+      aInfo->add("versionMajor", aInfo->newUint64(aDeviceInfo->fw_version_major));
+      aInfo->add("versionMinor", aInfo->newUint64(aDeviceInfo->fw_version_minor));
+      break;
+  }
+  aInfo->add("devInfStatus", aInfo->newString(devInfStatus));
+  aInfo->add("reliableId", aInfo->newBool(aDeviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid));
+  return true;
+}
+
+
 
 // MARK: ===== composite device creation
 
@@ -684,7 +825,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         // search for this device
         for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
           // only non-composite DALI devices can be grouped at all
-          DalioutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
+          DaliOutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
           if (dev && dev->daliTechnicalType()!=dalidevice_composite && dev->getDsUid() == memberUID) {
             // found this device
             // - check type of grouping
@@ -770,7 +911,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 }
 
 
-ErrorPtr DaliVdc::ungroupDevice(DalioutputDevicePtr aDevice, VdcApiRequestPtr aRequest)
+ErrorPtr DaliVdc::ungroupDevice(DaliOutputDevicePtr aDevice, VdcApiRequestPtr aRequest)
 {
   ErrorPtr respErr;
   if (aDevice->daliTechnicalType()==dalidevice_composite) {

@@ -63,6 +63,7 @@ namespace p44 {
   {
     typedef Vdc inherited;
     friend class DaliInputDevice;
+    friend class DaliBusDevice;
 
 		DaliPersistence db;
     DaliDeviceInfoMap deviceInfoCache;
@@ -111,7 +112,7 @@ namespace p44 {
     /// @param aDevice the device to ungroup
     /// @param aRequest the API request that causes the ungroup, will be sent an OK when ungrouping is complete
     /// @return error if not successful
-    ErrorPtr ungroupDevice(DalioutputDevicePtr aDevice, VdcApiRequestPtr aRequest);
+    ErrorPtr ungroupDevice(DaliOutputDevicePtr aDevice, VdcApiRequestPtr aRequest);
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -180,6 +181,12 @@ namespace p44 {
     ErrorPtr daliScan(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     void bridgeCmdSent(VdcApiRequestPtr aRequest, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
+
+    ErrorPtr daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
+    void daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
+    void daliAddressSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo);
+    bool daliBusDeviceSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo);
+    bool daliInfoSummary(DaliDeviceInfoPtr aDeviceInfo, ApiValuePtr aInfo);
 
     typedef boost::shared_ptr<std::string> StringPtr;
     void daliScanNext(VdcApiRequestPtr aRequest, DaliAddress aShortAddress, StringPtr aResult);

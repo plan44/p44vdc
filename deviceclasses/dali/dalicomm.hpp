@@ -123,6 +123,7 @@ namespace p44 {
 
   /// abstracted DALI bus address
   typedef uint8_t DaliAddress;
+  const DaliAddress DaliSingle = 0x00; // dali single address
   const DaliAddress DaliGroup = 0x80; // marks group address
   const DaliAddress DaliBroadcast = 0xFF; // all devices on the bus
   const DaliAddress DaliAddressMask = 0x3F; // address mask

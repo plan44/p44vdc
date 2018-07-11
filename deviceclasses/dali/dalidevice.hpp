@@ -43,7 +43,7 @@ namespace p44 {
 
   typedef boost::intrusive_ptr<DaliBusDevice> DaliBusDevicePtr;
   typedef boost::intrusive_ptr<DaliBusDeviceGroup> DaliBusDeviceGroupPtr;
-  typedef boost::intrusive_ptr<DaliOutputDevice> DalioutputDevicePtr;
+  typedef boost::intrusive_ptr<DaliOutputDevice> DaliOutputDevicePtr;
   typedef boost::intrusive_ptr<DaliSingleControllerDevice> DaliSingleControllerDevicePtr;
   typedef boost::intrusive_ptr<DaliCompositeDevice> DaliCompositeDevicePtr;
   typedef boost::intrusive_ptr<DaliInputDevice> DaliInputDevicePtr;
@@ -71,7 +71,7 @@ namespace p44 {
     bool supportsDT8; // supports device type 8 features
     bool dt8Color; // supports DT 8 color features
     bool dt8CT; // supports DT 8 color temperature features
-    uint8_t dt8RPrimaryColors; // if>0, how many primary coloer channels are supported
+    uint8_t dt8PrimaryColors; // if>0, how many primary color channels are supported
     uint8_t dt8RGBWAFchannels; // if>0, how many RGBWAF channels are supported
 
     /// cached status (call updateStatus() to update these)
@@ -203,6 +203,15 @@ namespace p44 {
     void getGroupMemberShip(DaliGroupsCB aDaliGroupsCB, DaliAddress aShortAddress);
 
 
+    /// check if this device belongs to a particular DALI address (for diagnosis and DALI bus summary)
+    /// @param aDaliAddress the DALI address to check
+    /// @return true if aDaliAddress represents this busdevice or is a (group) member of it
+    virtual bool belongsToShortAddr(DaliAddress aDaliAddress) const;
+
+    /// add bus device level info to summary information
+    /// @param aInfo ApiValue object, info fields will be added to it
+    virtual void daliBusDeviceSummary(ApiValuePtr aInfo) const;
+
   private:
 
     void registerDeviceType(uint8_t aDeviceType);
@@ -280,6 +289,13 @@ namespace p44 {
     /// @note reading info from single master dimmer, not group
     virtual uint8_t addressForQuery() P44_OVERRIDE { return groupMaster; };
 
+    /// check if this device belongs to a particular DALI address
+    virtual bool belongsToShortAddr(DaliAddress aDaliAddres) const P44_OVERRIDE;
+
+    /// add bus device level info to summary information
+    /// @param aInfo ApiValue object, info fields will be added to it
+    virtual void daliBusDeviceSummary(ApiValuePtr aInfo) const P44_OVERRIDE;
+
   private:
 
     void initNextGroupMember(StatusCB aCompletedCB, DaliComm::ShortAddressList::iterator aNextMember);
@@ -331,6 +347,16 @@ namespace p44 {
     ///   in a single channel (and not switching between color modes etc.)
     virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_FINAL;
 
+    /// check if aDaliAddress is a bus device of this device, and if so, return info about it
+    /// @param aDaliAddress the dali address to check
+    /// @param aInfo ApiValue object, info fields will be added to it
+    /// @return true if aDaliAddress is a bus device of this device
+    virtual bool daliBusDeviceSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo) const = 0;
+
+    /// return information about all bus devices related to this device
+    /// @param aInfo ApiValue object, info fields will be added to it
+    virtual void daliDeviceSummary(ApiValuePtr aInfo) const = 0;
+
   protected:
 
     /// save current brightness as default for DALI dimmer to use after powerup and at failure
@@ -342,6 +368,9 @@ namespace p44 {
 
     /// internal implementation for running even very slow light transitions
     virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) = 0;
+
+    /// add dS device level context summary (but no *bus* device level info)
+    virtual void daliDeviceContextSummary(ApiValuePtr aInfo) const;
 
   };
 
@@ -451,6 +480,16 @@ namespace p44 {
 
     /// derive the dSUID from collected device info
     void deriveDsUid();
+
+    /// check if aDaliAddress is a bus device of this device, and if so, return info about it
+    /// @param aDaliAddress the dali address to check
+    /// @param aInfo ApiValue object, info fields will be added to it
+    /// @return true if aDaliAddress is a bus device of this device
+    virtual bool daliBusDeviceSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo) const P44_OVERRIDE;
+
+    /// return information about all bus devices related to this device
+    /// @param aInfo ApiValue object, info fields will be added to it
+    virtual void daliDeviceSummary(ApiValuePtr aInfo) const P44_OVERRIDE;
 
   protected:
 
@@ -597,6 +636,16 @@ namespace p44 {
 
     /// derive the dSUID from collected device info
     void deriveDsUid();
+
+    /// check if aDaliAddress is a bus device of this device, and if so, return info about it
+    /// @param aDaliAddress the dali address to check
+    /// @param aInfo ApiValue object, info fields will be added to it
+    /// @return true if aDaliAddress is a bus device of this device
+    virtual bool daliBusDeviceSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo) const P44_OVERRIDE;
+
+    /// return information about all bus devices related to this device
+    /// @param aInfo ApiValue object, info fields will be added to it
+    virtual void daliDeviceSummary(ApiValuePtr aInfo) const P44_OVERRIDE;
 
   protected:
 
