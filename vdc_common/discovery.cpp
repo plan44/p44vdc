@@ -532,7 +532,7 @@ void DiscoveryManager::startAdvertisingDS(AvahiService *aService)
       if ((avahiErr = avahi_add_service(
         aService,
         dSEntryGroup,
-        AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, // all interfaces and protocols (as enabled at server level)
+        AVAHI_IF_UNSPEC, AVAHI_PROTO_INET, // use only IPv4 protocol - IPv6 is not yet supported by vdSM
         (AvahiPublishFlags)0, // no flags
         descriptiveName.c_str(),
         VDC_SERVICE_TYPE, // vdc
