@@ -32,6 +32,14 @@ using namespace std;
 namespace p44 {
 
 
+  typedef enum {
+    eval_none, ///< no evaluation, disabled
+    eval_average, ///< average over data points added within window time
+    eval_timeweighted_average, ///< average over data points, but weighting them by the time passed since last data point (assuming datapoints are averages over past time anyway)
+    eval_max, ///< maximum within the window time
+    eval_min ///< minimum within the window time
+  } EvaluationType;
+
   class WindowEvaluator : public P44Obj
   {
     typedef struct {
@@ -47,14 +55,6 @@ namespace p44 {
     double collDivisor; ///< divisor for collection of current datapoint
 
   public:
-
-    typedef enum {
-      eval_none, ///< no evaluation, disabled
-      eval_average, ///< average over data points added within window time
-      eval_timeweighted_average, ///< average over data points, but weighting them by the time passed since last data point (assuming datapoints are averages over past time anyway)
-      eval_max, ///< maximum within the window time
-      eval_min ///< minimum within the window time
-    } EvaluationType;
 
     // settings
     MLMicroSeconds windowTime;
@@ -100,11 +100,19 @@ namespace p44 {
 
   /// Requirement: To be able to catch fast changes, some sensor types are allowed to report a value immediately
   ///   if a certain delta to the previously sent value is reached.
-  /// Solution (being implemented March 2018):
+  /// Solution (being implemented June 2018):
   ///   the sensor will be automatically assigned a profile depending on the sensor type, defining three parameters
-  ///   - triggerDelta the difference between current value and last pushed value that must be met
-  ///   - triggerMinValue the minimum absolute value the current value must have
-  ///   - triggerInterval the minimum interval between the last push and a delta-triggered push
+  ///   - trigDelta the difference between current value and last pushed value (absolute or relative, see TrigMode)
+  ///   - trigMin the minimum value the current value or the delta (in relative mode) must reach to trigger push
+  ///   - trigIntvl the minimum interval between the last push and a delta-triggered push
+
+
+  enum {
+    tr_absolute = 0x00, ///< trigDelta is absolute value, trigMin is minimal current value needed for trigger to be active
+    tr_relative = 0x01, ///< trigDelta is relative to current value, trigMin is minimal delta value needed for trigger to be active
+    tr_unipolar = 0x02, ///< trigDelta positive means trigger is active only for increasing value, negative only for decreasing value
+  };
+  typedef uint8_t TrigMode;
 
 
   /// the parameter profile how to evaluate and report a particular sensor type
@@ -116,15 +124,15 @@ namespace p44 {
     // - evaluation
     MLMicroSeconds evalWin; ///< evaluation window size (time)
     MLMicroSeconds collWin; ///< subdatapoint collection time
-    WindowEvaluator::EvaluationType evalType; ///< type of evaluation
+    EvaluationType evalType; ///< type of evaluation
 
     // - defaults for settings
     MLMicroSeconds pushIntvl; ///< default setting for minPushInterval, 0 = use global default
     MLMicroSeconds chgOnlyIntvl; ///< default setting for changesOnlyInterval, 0 = none
     // - SOD (send on delta) push delivery
     double trigDelta; ///< the minimal absolute or relative change to trigger a out-of-period push. 0=disabled
-    bool trigRel; ///< if set, the trigDelta is a relative value (as a factor of the previous value)
-    double trigMin; ///< the minimal absolute value needed to activate delta triggering
+    TrigMode trigMode;  ///< SOD trigger mode
+    double trigMin; ///< for tr_absolute: minimal absolute value needed to activate delta triggering; for tr_relative: the minimal absolute delta needed
     MLMicroSeconds trigIntvl; ///< how soon after a previous push a extra trigger may occur
   } SensorBehaviourProfile;
 

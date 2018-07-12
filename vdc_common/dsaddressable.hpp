@@ -61,6 +61,9 @@ namespace p44 {
     MLMicroSeconds announced; ///< set when last announced to the vdSM
     MLMicroSeconds announcing; ///< set when announcement has been started (but not yet confirmed)
 
+    bool present; ///< current presence status
+    MLMicroSeconds lastPresenceUpdate; ///< when presence state was last updated
+
   protected:
     VdcHost *vdcHostP;
 
@@ -192,11 +195,20 @@ namespace p44 {
     /// @name interaction with subclasses, actually representing physical I/O
     /// @{
 
+    /// Callback to deliver status from checkPresence()
+    /// @param aPresent the new presence state
     typedef boost::function<void (bool aPresent)> PresenceCB;
 
-    /// check presence of this addressable
+    /// trigger re-checking presence state of this addressable, possibly involving hardware access
     /// @param aPresenceResultHandler will be called to report presence status
     virtual void checkPresence(PresenceCB aPresenceResultHandler);
+
+    /// explictly update presence state from device level.
+    /// @param aPresent the new presence state
+    /// @param aPush if set, change in presence state will be pushed
+    /// @note This can be called from device level implementation at any time to update the
+    ///   presence state when it is detected as part of another operation
+    void updatePresenceState(bool aPresent, bool aPush = true);
 
     /// @}
 
@@ -363,13 +375,15 @@ namespace p44 {
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
+    virtual void prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB);
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
 
   private:
 
     void propertyAccessed(VdcApiRequestPtr aRequest, ApiValuePtr aResultObject, ErrorPtr aError);
     void pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultObject, ErrorPtr aError);
-    void presenceResultHandler(bool aIsPresent);
+    void pingResultHandler(bool aIsPresent);
+    void presenceSampleHandler(StatusCB aPreparedCB, bool aIsPresent);
 
   };
   typedef boost::intrusive_ptr<DsAddressable> DsAddressablePtr;

@@ -204,6 +204,10 @@ void EnoceanDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResul
   if(getEnoceanVdc().db.executef("DELETE FROM knownDevices WHERE enoceanAddress=%d AND subdevice=%d", getAddress(), getSubDevice())!=SQLITE_OK) {
     ALOG(LOG_ERR, "Error deleting device: %s", getEnoceanVdc().db.error()->description().c_str());
   }
+  #if ENABLE_ENOCEAN_SECURE
+  // clear security info if no subdevices are left
+  getEnoceanVdc().removeUnusedSecurity(*this);
+  #endif
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);
 }
@@ -296,6 +300,7 @@ void EnoceanDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 void EnoceanDevice::updateRadioMetrics(Esp3PacketPtr aEsp3PacketPtr)
 {
   if (aEsp3PacketPtr) {
+    updatePresenceState(true); // when we get a telegram, we know device is present now
     lastPacketTime = MainLoop::now();
     lastRSSI = aEsp3PacketPtr->radioDBm();
     lastRepeaterCount = aEsp3PacketPtr->radioRepeaterCount();
@@ -393,6 +398,17 @@ string EnoceanDevice::getOpStateText()
 string EnoceanDevice::description()
 {
   string s = inherited::description();
+  #if ENABLE_ENOCEAN_SECURE
+  if (secureDevice()) {
+    string_format_append(s,
+      "\n- With secured communication:%s%s%s%s",
+      securityInfo->securityLevelFormat & 0xC0 ? " RLC" : "",
+      securityInfo->securityLevelFormat & 0x20 ? "-TX" : "",
+      securityInfo->securityLevelFormat & 0x18 ? " MAC" : "",
+      securityInfo->securityLevelFormat & 0x07 ? " DATA_ENC" : ""
+    );
+  }
+  #endif
   string_format_append(s, "\n- Enocean Address = 0x%08X, subDevice=%d", enoceanAddress, subDevice);
   const char *mn = EnoceanComm::manufacturerName(eeManufacturer);
   string_format_append(s,
@@ -671,7 +687,7 @@ EnoceanDevicePtr EnoceanDevice::newDevice(
 }
 
 
-int EnoceanDevice::createDevicesFromEEP(EnoceanVdc *aVdcP, EnoceanAddress aAddress, EnoceanProfile aProfile, EnoceanManufacturer aManufacturer, bool aSmartAck, Esp3PacketPtr aLearnPacket)
+int EnoceanDevice::createDevicesFromEEP(EnoceanVdc *aVdcP, EnoceanAddress aAddress, EnoceanProfile aProfile, EnoceanManufacturer aManufacturer, bool aSmartAck, Esp3PacketPtr aLearnPacket, EnOceanSecurityPtr aSecurityInfo)
 {
   EnoceanSubDevice subDeviceIndex = 0; // start at index zero
   int numDevices = 0; // number of devices
@@ -688,6 +704,10 @@ int EnoceanDevice::createDevicesFromEEP(EnoceanVdc *aVdcP, EnoceanAddress aAddre
       // could not create a device for subDeviceIndex
       break; // -> done
     }
+    #if ENABLE_ENOCEAN_SECURE
+    // set the device's security info (if any)
+    newDev->setSecurity(aSecurityInfo);
+    #endif
     // set new devices' radio metrics from learn telegram
     newDev->updateRadioMetrics(aLearnPacket);
     // created device

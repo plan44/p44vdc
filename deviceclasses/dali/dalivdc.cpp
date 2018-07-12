@@ -597,37 +597,65 @@ ErrorPtr DaliVdc::daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
   string cmd;
-  ApiValuePtr addr;
-  respErr = checkParam(aParams, "addr", addr);
-  if (Error::isOK(respErr)) {
-    DaliAddress shortAddress = addr->int8Value();
-    respErr = checkStringParam(aParams, "cmd", cmd);
+  ApiValuePtr p = aParams->get("bridgecmd");
+  if (p) {
+    // direct bridge command as 3 byte hex string
+    // bb1122 (bb=bridge command, 11=first DALI, 22=second DALI
+    cmd = hexToBinaryString(p->stringValue().c_str(), true, 3);
+    if (cmd.size()!=3) {
+      respErr = WebError::webErr(500, "bridgecmd must be 3 hex bytes");
+    }
+    else {
+      daliComm->sendBridgeCommand(cmd[0], cmd[1], cmd[2], boost::bind(&DaliVdc::bridgeCmdSent, this, aRequest, _1, _2, _3));
+    }
+  }
+  else {
+    // abstracted commands
+    respErr = checkParam(aParams, "addr", p);
     if (Error::isOK(respErr)) {
-      // command
-      if (cmd=="max") {
-        daliComm->daliSendDirectPower(shortAddress, 0xFE);
-      }
-      else if (cmd=="min") {
-        daliComm->daliSendDirectPower(shortAddress, 0x01);
-      }
-      else if (cmd=="off") {
-        daliComm->daliSendDirectPower(shortAddress, 0x00);
-      }
-      else if (cmd=="pulse") {
-        daliComm->daliSendDirectPower(shortAddress, 0xFE);
-        daliComm->daliSendDirectPower(shortAddress, 0x01, NULL, 1200*MilliSecond);
-      }
-      else {
-        respErr = WebError::webErr(500, "unknown cmd");
-      }
+      DaliAddress shortAddress = p->int8Value();
+      respErr = checkStringParam(aParams, "cmd", cmd);
       if (Error::isOK(respErr)) {
-        // send ok
-        aRequest->sendResult(ApiValuePtr());
+        // command
+        if (cmd=="max") {
+          daliComm->daliSendDirectPower(shortAddress, 0xFE);
+        }
+        else if (cmd=="min") {
+          daliComm->daliSendDirectPower(shortAddress, 0x01);
+        }
+        else if (cmd=="off") {
+          daliComm->daliSendDirectPower(shortAddress, 0x00);
+        }
+        else if (cmd=="pulse") {
+          daliComm->daliSendDirectPower(shortAddress, 0xFE);
+          daliComm->daliSendDirectPower(shortAddress, 0x01, NULL, 1200*MilliSecond);
+        }
+        else {
+          respErr = WebError::webErr(500, "unknown cmd");
+        }
+        if (Error::isOK(respErr)) {
+          // send ok
+          aRequest->sendResult(ApiValuePtr());
+        }
       }
     }
   }
   // done
   return respErr;
+}
+
+
+void DaliVdc::bridgeCmdSent(VdcApiRequestPtr aRequest, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    ApiValuePtr answer = aRequest->newApiValue();
+    answer->setType(apivalue_string);
+    answer->setStringValue(string_format("%02X %02X", aResp1, aResp2));
+    aRequest->sendResult(answer);
+  }
+  else {
+    aRequest->sendError(aError);
+  }
 }
 
 

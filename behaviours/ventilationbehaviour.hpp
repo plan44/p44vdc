@@ -246,11 +246,12 @@ namespace p44 {
 
     /// apply scene to output channels
     /// @param aScene the scene to apply to output channels
+    /// @param aSceneCmd This will be used instead of the scenecommand stored in the scene. This
     /// @return true if apply is complete, i.e. everything ready to apply to hardware outputs.
     ///   false if scene cannot yet be applied to hardware, and/or will be performed later/separately
     /// @note this derived class' performApplySceneToChannels() only implements special hard-wired behaviour specific scenes,
     ///   basic scene apply functionality is provided by base class' implementation already.
-    virtual bool performApplySceneToChannels(DsScenePtr aScene) P44_OVERRIDE;
+    virtual bool performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd) P44_OVERRIDE;
 
     /// @}
 

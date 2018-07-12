@@ -65,7 +65,9 @@ namespace p44 {
     scene_cmd_climatecontrol_valve_service_open, ///< climate control: fully open valve for service
     scene_cmd_climatecontrol_valve_service_close, ///< climate control: fully close valve for service
     scene_cmd_climatecontrol_mode_heating, ///< climate control: Switch to heating mode
+    scene_cmd_climatecontrol_mode_protective_heating, ///< climate control: Switch to building proctecting only heating mode
     scene_cmd_climatecontrol_mode_cooling, ///< climate control: Swicth to cooling mode
+    scene_cmd_climatecontrol_mode_protective_cooling, ///< climate control: Switch to building proctecting only cooling mode
     scene_cmd_climatecontrol_mode_passive_cooling ///< climate control: Switch to passive cooling mode
   } SceneCmd;
   

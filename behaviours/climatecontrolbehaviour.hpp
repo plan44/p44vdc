@@ -76,19 +76,6 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "FCU operation mode"; };
   };
 
-
-  class FcuPowerStateChannel : public FlagChannel
-  {
-    typedef FlagChannel inherited;
-
-  public:
-    FcuPowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { };
-
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_power_state; }; ///< the dS channel type
-    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "FCU power state"; };
-  };
-
   #endif // ENABLE_FCU_SUPPORT
 
 
@@ -138,7 +125,7 @@ namespace p44 {
     /// @name FanCoilUnitScene specific values
     /// @{
 
-    bool powerState; ///< power on/off
+    DsPowerState powerState; ///< power state
     FcuOperationMode operationMode; ///< operation mode
     //double targetTempOffset; ///< ??? maybe
 
@@ -247,11 +234,19 @@ namespace p44 {
     MLMicroSeconds zoneTemperatureSetPointUpdated; ///< time of when zoneSetPoint was last updated from processControlValue
     double zoneTemperatureSetPoint; ///< current zone(room) temperature set point
 
+    /// Automatic wake from forced off:
+    /// -  0 : none
+    /// -  1 : heating case: when temperature falls below current set temperature
+    /// - -1 : cooling case: when temperature rises above current set temperature
+    int forcedOffWakeMode;
+    /// the scene to call on forceOff Wake
+    SceneNo forceOffWakeSceneNo;
+
     /// @}
 
     /// channels
     ChannelBehaviourPtr powerLevel; // Valve only
-    FlagChannelPtr powerState; // FCU only
+    PowerStateChannelPtr powerState; // FCU only
     IndexChannelPtr operationMode; // FCU only
 
   public:
@@ -306,11 +301,12 @@ namespace p44 {
 
     /// apply scene to output channels
     /// @param aScene the scene to apply to output channels
+    /// @param aSceneCmd This will be used instead of the scenecommand stored in the scene. This
     /// @return true if apply is complete, i.e. everything ready to apply to hardware outputs.
     ///   false if scene cannot yet be applied to hardware, and/or will be performed later/separately
     /// @note this derived class' performApplySceneToChannels() only implements special hard-wired behaviour specific scenes,
     ///   basic scene apply functionality is provided by base class' implementation already.
-    virtual bool performApplySceneToChannels(DsScenePtr aScene) P44_OVERRIDE;
+    virtual bool performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd) P44_OVERRIDE;
 
     /// @}
 
@@ -358,6 +354,10 @@ namespace p44 {
     virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+  private:
+
+    bool checkForcedOffWake();
 
 
   };

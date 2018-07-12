@@ -24,6 +24,7 @@
 
 #include "device.hpp"
 #include "expressions.hpp"
+#include "httpcomm.hpp"
 
 #if ENABLE_EVALUATORS
 
@@ -46,6 +47,7 @@ namespace p44 {
     string offCondition; ///< expression that must evaluate to true for output to get inactive
     MLMicroSeconds minOnTime; ///< how long the on condition must be present before triggering the result change
     MLMicroSeconds minOffTime; ///< how long the on condition must be present before triggering the result change
+    string action; ///< (additional) action to fire when evaluator changes state
 
   protected:
 
@@ -74,6 +76,7 @@ namespace p44 {
       evaluator_rocker, ///< output is a simulated two-way rocket button
       evaluator_input, ///< output is a dS binary input signal
       evaluator_internalinput, ///< the device is not published to dS, can only be used as input for other evaluators
+      evaluator_internalaction, ///< the device is not published to dS, but can trigger an action
       evaluator_sensor, ///< output is a dS sensor value
       evaluator_internalsensor ///< the device is not published to dS, can only be used as input for other evaluators
     } EvaluatorType;
@@ -95,7 +98,14 @@ namespace p44 {
     MLTicket evaluateTicket;
     bool evaluating; ///< protection against cyclic references
     MLTicket testlaterTicket;
-    bool timedtest; ///< set when current evaluation is triggered by timer
+    typedef enum {
+      evalmode_normal, ///< normal evaluation
+      evalmode_initial, ///< initial evaluator run
+      evalmode_timed, ///< timed evaluation (testlater()...)
+    } EvalMode;
+    EvalMode evalMode; ///< evaluation mode
+
+    HttpCommPtr httpAction; ///< in case evaluator uses http actions
 
     EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(deviceSettings); };
 
@@ -183,15 +193,18 @@ namespace p44 {
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
-    void evaluateConditions(Tristate aRefState, bool aTimedTest);
+    void evaluateConditions(Tristate aRefState, EvalMode aEvalMode);
     void evaluateConditionsLater();
     void changedConditions();
+    ErrorPtr executeAction(Tristate aState);
+    void httpActionDone(const string &aResponse, ErrorPtr aError);
 
     /// expression evaluation
 
     Tristate evaluateBoolean(string aExpression);
     ExpressionValue calcEvaluatorExpression(string &aExpression);
     ExpressionValue valueLookup(const string aName);
+    ExpressionValue actionValueLookup(Tristate aCurrentState, const string aName);
 
   };
   typedef boost::intrusive_ptr<EvaluatorDevice> EvaluatorDevicePtr;

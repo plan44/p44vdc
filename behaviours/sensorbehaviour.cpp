@@ -258,27 +258,27 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
 
 
 static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
-  // type                      usage           evalWin    collWin          evalType                                    pushIntvl  chgOnlyIntvl  trigDelta  trigRel  trigMin trigIntvl
-  // ------------------------  -------------   ---------  --------------   ------------------------------------------- ---------  ------------  ---------  -------  ------- --------------------------
+  // type                      usage           evalWin    collWin          evalType                   pushIntvl  chgOnlyIntvl  trigDelta  trigMode                    trigMin trigIntvl
+  // ------------------------  -------------   ---------  --------------   -------------------------  ---------  ------------  ---------  --------------------------  ------- --------------------------
   // indoor context
-  { sensorType_temperature,    usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
-  { sensorType_humidity,       usage_room,     0,         0,               WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
-  { sensorType_illumination,   usage_room,     5*Minute,  10*Second,       WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
-  { sensorType_gas_CO2,        usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
-  { sensorType_gas_CO,         usage_room,     0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0,         false,   0,      0 },
+  { sensorType_temperature,    usage_room,     0,         0,               eval_none,                 5*Minute,  60*Minute,    0.5,       tr_absolute,                -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_room,     0,         0,               eval_none,                 30*Minute, 60*Minute,    2,         tr_absolute,                -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_room,     5*Minute,  10*Second,       eval_timeweighted_average, 5*Minute,  60*Minute,    0,         tr_absolute,                0,      0 },
+  { sensorType_gas_CO2,        usage_room,     0,         0,               eval_none,                 5*Minute,  60*Minute,    0,         tr_absolute,                0,      0 },
+  { sensorType_gas_CO,         usage_room,     0,         0,               eval_none,                 5*Minute,  60*Minute,    0,         tr_absolute,                0,      0 },
   // outdoor context
-  { sensorType_temperature,    usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 5*Minute,  60*Minute,    0.5,       false,   -100,   1*Second /* = "immediate" */ },
-  { sensorType_humidity,       usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 30*Minute, 60*Minute,    2,         false,   -1,     1*Second /* = "immediate" */ },
-  { sensorType_illumination,   usage_outdoors, 10*Minute, 20*Second,       WindowEvaluator::eval_timeweighted_average, 5*Minute,  60*Minute,    0,         false,   0,      0 },
-  { sensorType_air_pressure,   usage_outdoors, 0,         0,               WindowEvaluator::eval_none,                 15*Minute, 60*Minute,    0,         false,   0,      0 },
-  { sensorType_wind_speed,     usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    0.1,       true,    -1,     1*Minute },
-  { sensorType_wind_direction, usage_outdoors, 10*Minute, 1*Minute,        WindowEvaluator::eval_timeweighted_average, 10*Minute, 60*Minute,    20,        false,   -1,     1*Minute },
-  { sensorType_gust_speed,     usage_outdoors, 3*Second,  200*MilliSecond, WindowEvaluator::eval_max,                  10*Minute, 60*Minute,    0.1,       true,    5,      3*Second /* = "immediate" */},
+  { sensorType_temperature,    usage_outdoors, 0,         0,               eval_none,                 5*Minute,  60*Minute,    0.5,       tr_absolute,                -100,   1*Second /* = "immediate" */ },
+  { sensorType_humidity,       usage_outdoors, 0,         0,               eval_none,                 30*Minute, 60*Minute,    2,         tr_absolute,                -1,     1*Second /* = "immediate" */ },
+  { sensorType_illumination,   usage_outdoors, 10*Minute, 20*Second,       eval_timeweighted_average, 5*Minute,  60*Minute,    0,         tr_absolute,                0,      0 },
+  { sensorType_air_pressure,   usage_outdoors, 0,         0,               eval_none,                 15*Minute, 60*Minute,    0,         tr_absolute,                0,      0 },
+  { sensorType_wind_speed,     usage_outdoors, 10*Minute, 1*Minute,        eval_timeweighted_average, 10*Minute, 60*Minute,    0.1,       tr_relative,                0.1,    1*Minute },
+  { sensorType_wind_direction, usage_outdoors, 10*Minute, 1*Minute,        eval_timeweighted_average, 10*Minute, 60*Minute,    20,        tr_absolute,                -1,     1*Minute },
+  { sensorType_gust_speed,     usage_outdoors, 3*Second,  200*MilliSecond, eval_max,                  10*Minute, 60*Minute,    0.1,       tr_relative|tr_unipolar,    0.1,    1*Second /* = "immediate" */},
   // FIXME: rule says "accumulation", but as long as sensors deliver intensity in mm/h, it is in fact a window average over an hour
-  { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,        WindowEvaluator::eval_timeweighted_average, 60*Minute, 60*Minute,    0,         false,   0,      0 },
+  { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,        eval_timeweighted_average, 60*Minute, 60*Minute,    0,         tr_absolute,   0,      0 },
 
   // terminator
-  { sensorType_none,           usage_undefined,0,         0,               WindowEvaluator::eval_none,                 0,         0,            0,         false,   0,      0 },
+  { sensorType_none,           usage_undefined,0,         0,               eval_none,                 0,         0,            0,         tr_absolute,   0,      0 },
 };
 
 
@@ -413,7 +413,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   }
   if (changedValue) {
     // check for averaging
-    if (profileP && profileP->evalType!=WindowEvaluator::eval_none) {
+    if (profileP && profileP->evalType!=eval_none) {
       // process values through filter
       if (!filter) {
         // need a filter, create it
@@ -463,13 +463,31 @@ bool SensorBehaviour::pushSensor(bool aAlways)
     }
     else if (profileP) {
       // Minimal push interval is NOT over, check extra trigger conditions
-      if (profileP->trigDelta>0 && now>lastPush+profileP->trigIntvl) {
+      if (profileP->trigDelta!=0 && now>lastPush+profileP->trigIntvl) {
         // Trigger interval is over -> push if conditions are met
-        doPush =
-          currentValue>profileP->trigMin &&
-          fabs(currentValue-lastPushedValue)>=(profileP->trigRel ? fabs(lastPushedValue*profileP->trigDelta) : profileP->trigDelta);
+        double nowDelta = currentValue-lastPushedValue;
+        double minDelta;
+        if (profileP->trigMode&tr_relative) {
+          // relative mode: delta is relative to last pushed value, trigMin indicates minimal absolute DELTA value
+          minDelta = lastPushedValue*profileP->trigDelta;
+          doPush = fabs(nowDelta) > profileP->trigMin;
+        }
+        else {
+          // absolute mode: delta is absolute, trigMin indicates minimal CURRENT value
+          minDelta = profileP->trigDelta;
+          doPush = currentValue > profileP->trigMin;
+        }
         if (doPush) {
-          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets SOD conditions (%0.3f ->%0.3f %s) to push now", index, behaviourId.c_str(), getHardwareName().c_str(), lastPushedValue, currentValue, getSensorUnitText().c_str());
+          if (profileP->trigMode&tr_unipolar) {
+            // unipolar check: deltas must have same sign
+            doPush = (minDelta<0)==(nowDelta<0);
+          }
+          if (doPush) {
+            doPush = fabs(nowDelta)>fabs(minDelta);
+          }
+        }
+        if (doPush) {
+          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets SOD conditions (%0.3f -> %0.3f %s) to push now", index, behaviourId.c_str(), getHardwareName().c_str(), lastPushedValue, currentValue, getSensorUnitText().c_str());
         }
       }
     }
@@ -719,14 +737,25 @@ void SensorBehaviour::prepareLogging()
         args.push_back(string_format("DS:%s_P:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
       }
       if (autoRRA) {
-        // now RRAs: RRA:AVERAGE:xff:steps:rows
-        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 1l, 7*24*3600/step)); // 1:1 samples for a week
-        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 3600/step, 30*24*3600*step/3600)); // hourly datapoints for 1 months (30 days)
-        args.push_back(string_format("RRA:AVERAGE:0.5:%ld:%ld", 24*3600/step, 2*365*24*3600*step/24/3600)); // daily for 2 years
+        // choose correct consolidation function
+        string consolidationFunc = "AVERAGE";
+        if (profileP) {
+          if (profileP->evalType==eval_max) consolidationFunc = "MAX";
+          else if (profileP->evalType==eval_min) consolidationFunc = "MIN";
+        }
+        // now RRAs: RRA:consolidationFunc:xff:steps:rows
+        args.push_back(string_format("RRA:%s:0.5:%ld:%ld", consolidationFunc.c_str(), 1l, 7*24*3600/step)); // 1:1 samples for a week (with autostep: unless updateInterval is <15 sec, see above)
+        args.push_back(string_format("RRA:%s:0.5:%ld:%ld", consolidationFunc.c_str(), 3600/step, 30*24*3600*step/3600)); // hourly datapoints for 1 months (30 days)
+        args.push_back(string_format("RRA:%s:0.5:%ld:%ld", consolidationFunc.c_str(), 24*3600/step, 2*365*24*3600*step/24/3600)); // daily for 2 years
       }
       // now add explicit config
       args.insert(args.end(), cfgArgs.begin(), cfgArgs.end());
       // create the rrd file from config
+      if (LOGENABLED(LOG_INFO)) {
+        string a;
+        for (int i=0; i<args.size(); ++i) a += args[i] + ' ';
+        BLOG(LOG_INFO, "rrd: creating new RRD with args: %s", a.c_str());
+      }
       int ret = rrd_call(rrd_create, args);
       if (ret==0) {
         BLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", rrdbfile.c_str());
@@ -1065,11 +1094,13 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case rrdbPath_key+settings_key_offset:
           if (setPVar(rrdbpath, aPropValue->stringValue())) {
             rrdbfile.clear(); // force re-setup of rrdb logging
+            prepareLogging();
           }
           return true;
         case rrdbConfig_key+settings_key_offset:
           if (setPVar(rrdbconfig, aPropValue->stringValue())) {
             rrdbfile.clear(); // force re-setup of rrdb logging
+            prepareLogging();
           }
           return true;
         #endif

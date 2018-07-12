@@ -29,6 +29,14 @@
 #include "serialqueue.hpp"
 #include "digitalio.hpp"
 
+#if ENABLE_ENOCEAN_SECURE
+  #warning "WORK IN PROGRESS"
+  #include <openssl/evp.h>
+  #include <openssl/err.h>
+  #include <openssl/ssl.h>
+#endif
+
+
 using namespace std;
 
 namespace p44 {
@@ -81,7 +89,8 @@ namespace p44 {
     rorg_SM_REC = 0xA7, ///< Smart Ack Reclaim
     rorg_SYS_EX = 0xC5, ///< Remote Management
     rorg_SEC = 0x30, ///< Secure telegram
-    rorg_SEC_ENCAPS = 0x31 ///< Secure telegram with R-ORG encapsulation
+    rorg_SEC_ENCAPS = 0x31, ///< Secure telegram with R-ORG encapsulation
+    rorg_SEC_TEACHIN = 0x35 ///< Secure teach-in
   } RadioOrg;
 
 
@@ -203,6 +212,7 @@ namespace p44 {
       ps_complete
     } PacketState;
 
+
   private:
     // packet contents
     uint8_t header[6]; ///< the ESP3 header
@@ -218,11 +228,15 @@ namespace p44 {
     Esp3Packet();
     virtual ~Esp3Packet();
 
+    /// @name ESP3 CRC8
+    /// @{
+
     /// add one byte to a ESP3 CRC8
     /// @param aByte the byte to add
     /// @param aCRCValue the current CRC
     /// @return updated CRC
     static uint8_t addToCrc8(uint8_t aByte, uint8_t aCRCValue);
+
     /// calculate ESP3 CRC8 over a range of bytes
     /// @param aDataP data buffer
     /// @param aNumBytes number of bytes
@@ -230,9 +244,13 @@ namespace p44 {
     /// @return updated CRC
     static uint8_t crc8(uint8_t *aDataP, size_t aNumBytes, uint8_t aCRCValue = 0);
 
+    /// @}
+
+
     /// clear the packet so that we can re-start accepting bytes and looking for packet start or
     /// start filling in information for creating an outgoing packet
     void clear();
+
     /// clear only the payload data/optdata (implicitly happens at setDataLength() and setOptDataLength()
     void clearData();
 
@@ -422,6 +440,135 @@ namespace p44 {
   };
 
 
+  #if ENABLE_ENOCEAN_SECURE
+
+  const uint8_t maxTeachInDataSize = 32;
+  typedef struct {
+    uint8_t teachInData[maxTeachInDataSize]; ///< accumulated teach-in data (excluding TEACH_IN_INFO)
+    uint8_t numTeachInBytes; ///< number of bytes already accumulated
+    uint8_t segmentIndex; ///< current segment index
+  } SecureTeachInData;
+
+
+  class EnOceanSecurity : public P44Obj
+  {
+    typedef P44Obj inherited;
+
+  public:
+
+    static const int AES128BlockLen = 16;
+    typedef uint8_t AES128Block[AES128BlockLen];
+
+    uint8_t securityLevelFormat; ///< copy of the SLF byte from the teach-in
+    uint8_t teachInInfo; ///< copy of the TEACH_IN_INFO byte
+    AES128Block privateKey; ///< private key established at teach-in
+    AES128Block subKey1; ///< subkey1 derived from private key
+    AES128Block subKey2; ///< subkey2 derived from private key
+    uint32_t rollingCounter; ///< RLC
+
+    // persistence management
+    uint32_t lastSavedRLC; ///< last saved RLC
+    MLMicroSeconds lastSave; ///< when was the RLC saved last time
+
+  private:
+
+    SecureTeachInData *teachInP; ///< data needed during secure teach-in
+
+    /// size of RLC
+    /// @return size of RLC in bytes, 0 if none in use
+    uint8_t rlcSize();
+
+    /// check if a new RLC is within the allowed window relative to the old RLC
+    /// @param aRLC RLC to check (must be later)
+    /// @return true if RLC is within the window
+    bool rlcInWindow(uint32_t aRLC);
+
+    /// increment RLC with proper wraparound
+    /// @param aIncrement how much to increment (signed)
+    void incrementRlc(int aIncrement=1);
+
+    /// size of MAC
+    /// @return size of MAC in bytes, 0 if none in use
+    uint8_t macSize();
+
+
+  public:
+    EnOceanSecurity();
+    virtual ~EnOceanSecurity();
+
+    /// process a secure teach-in message
+    /// @param aTeachInMsg a R-ORG TS (0x32) message to process (possibly only a segment)
+    /// @return yes when security info is now complete, no when processing has failed and undefined when more segments are needed
+    Tristate processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Block *aPskP=NULL);
+
+    /// create a secure teach-in message for aEnoceanAddress
+    /// @param aSegment the segment to create (0,1)
+    /// @return teach-in message
+    /// @note need to set destination and sender addresses afterwards
+    Esp3PacketPtr teachInMessage(int aSegment);
+
+    /// decrypt message
+    /// @param aSecureMsg a R-ORG S (0x30 or 0x31) secure message to unpack (e.g. check CMAC, decrypt, map to RPS)
+    /// @return the unpacked message, or NULL if no successful unpack was possible (or aSecureMsg was not a R-ORG S)
+    Esp3PacketPtr unpackSecureMessage(Esp3PacketPtr aSecureMsg);
+
+    /// derive subkeys1 and 2 from private key
+    void deriveSubkeysFromPrivateKey();
+
+    /// distance between new and old RLC
+    /// @param aNewRLC the newer RLC
+    /// @param aOldRLC the older RLC
+    /// @return distance between the two, considering wraparound
+    uint32_t rlcDistance(uint32_t aNewRLC, uint32_t aOldRLC);
+
+    /// @name static EnOcean crypto routines
+    /// @{
+
+    /// perform basic AES128 without padding on a single block
+    /// @param aKey the key to use
+    /// @param aData the data block
+    /// @param aAES128 the AES128 result block
+    /// @return false if there was a problem with AES calculation (OpenSSL returning error code)
+    static bool AES128(const AES128Block &aKey, const AES128Block &aData, AES128Block &aAES128);
+
+    /// calculate subkeys needed for CMAC calculation
+    /// @param aKey the key to use
+    /// @param aSubkey1 returns Subkey1
+    /// @param aSubkey2 returns Subkey2
+    static void deriveSubkeys(const AES128Block &aKey, AES128Block &aSubkey1, AES128Block &aSubkey2);
+
+    /// encrypt or decrypt with VAES
+    /// @param aKey the key to use
+    /// @param aRLC the RLC to use
+    /// @param aRLCSize the number of RLC bytes to use (0=none)
+    /// @param aDataIn input data
+    /// @param aDataOut output data
+    /// @param aDataSize size of data
+    static void VAEScrypt(const AES128Block &aKey, uint32_t aRLC, int aRLCSize, const uint8_t *aDataIn, uint8_t *aDataOut, size_t aDataSize);
+
+    /// calculate CMAC
+    /// @param aKey the key to use
+    /// @param aSubKey1 the subkey1 (K1) to use - for messages having an integer number of complete blocks
+    /// @param aSubKey2 the subkey2 (K2) to use - for messages ending with a partial block
+    /// @param aRLC the rolling counter (RLC)
+    /// @param aRLCBytes RLC size in bytes
+    /// @param aMACBytes MAC size in bytes
+    /// @param aFirstByte if not 0, this is used as the first byte included into the CMAC (intended to include not transmitted RORGs)
+    /// @param aData data buffer
+    /// @param aDataSize size in bytes of data at aData
+    static uint32_t calcCMAC(const AES128Block &aKey, const AES128Block &aSubKey1, const AES128Block &aSubKey2, uint32_t aRLC, int aRLCBytes, int aMACBytes, uint8_t aFirstByte, const uint8_t *aData, size_t aDataSize);
+
+    /// @}
+  };
+  typedef boost::intrusive_ptr<EnOceanSecurity> EnOceanSecurityPtr;
+
+  #else
+
+  typedef void *EnOceanSecurityPtr; // dummy definition to allow passing as parameter
+
+  #endif // ENABLE_ENOCEAN_SECURE
+
+
 
   typedef boost::function<void (Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)> ESPPacketCB;
 
@@ -471,19 +618,19 @@ namespace p44 {
 
     /// get modem application version
     /// @return modem application version in 0xmmbbaaBB (mm=main version, bb=beta/minor, aa=alpha/revision, BB=build)
-    uint32_t modemAppVersion() { return appVersion; }
+    uint32_t modemAppVersion() const { return appVersion; }
 
     /// get modem API version
     /// @return modem API version in 0xmmbbaaBB (mm=main version, bb=beta/minor, aa=alpha/revision, BB=build)
-    uint32_t modemApiVersion() { return apiVersion; }
+    uint32_t modemApiVersion() const { return apiVersion; }
 
     /// get modem Enocean chip ID (enocean address)
     /// @return modem enocean address
-    EnoceanAddress modemAddress() { return myAddress; }
+    EnoceanAddress modemAddress() const { return myAddress; }
 
     /// get modem Enocean chip ID (enocean address)
     /// @return modem ID base address
-    EnoceanAddress idBase() { return myIdBase; }
+    EnoceanAddress idBase() const { return myIdBase; }
 
     /// derived implementation: deliver bytes to the ESP3 parser
     /// @param aNumBytes number of bytes ready for accepting

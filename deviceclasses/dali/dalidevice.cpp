@@ -1141,7 +1141,7 @@ string DaliSingleControllerDevice::getExtraInfo()
 int DaliSingleControllerDevice::opStateLevel()
 {
   if (daliController->lampFailure || !daliController->isPresent) return 0;
-  if (daliController->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) return 70; // is not a recommended device, does not have unique ID
+  if (daliController->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) return 50; // is not a recommended device, does not have unique ID
   return 100; // everything's fine
 }
 
@@ -1152,10 +1152,6 @@ string DaliSingleControllerDevice::getOpStateText()
   string sep;
   if (daliController->lampFailure) {
     t += "lamp failure";
-    sep = ", ";
-  }
-  if (!daliController->isPresent) {
-    t += sep + "not present";
     sep = ", ";
   }
   if (daliController->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) {
@@ -1555,9 +1551,6 @@ string DaliCompositeDevice::getOpStateText()
       if (dimmers[idx]->deviceInfo && dimmers[idx]->deviceInfo->devInfStatus!=DaliDeviceInfo::devinf_solid) {
         noUniqueId = true;
       }
-      if (!dimmers[idx]->isPresent) {
-        missing = true;
-      }
       if (dimmers[idx]->lampFailure) {
         failure = true;
       }
@@ -1570,10 +1563,6 @@ string DaliCompositeDevice::getOpStateText()
   string sep;
   if (failure) {
     t += "lamp failure";
-    sep = ", ";
-  }
-  if (missing) {
-    t += sep + "not present";
     sep = ", ";
   }
   if (incomplete) {

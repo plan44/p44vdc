@@ -147,6 +147,10 @@ namespace p44 {
     int16_t lastRSSI; ///< RSSI of last packet received (including learn telegram)
     uint8_t lastRepeaterCount; ///< last packet's repeater count (including learn telegram)
 
+    #if ENABLE_ENOCEAN_SECURE
+    EnOceanSecurityPtr securityInfo; ///< security info. If this is set, the device must NOT respond to non-secure packets!
+    #endif
+
   public:
 
     /// constructor, create device in container
@@ -219,6 +223,8 @@ namespace p44 {
     /// @param aManufacturer the manufacturer code
     /// @param aSmartAck set if creating devices as part of a smart-ack learn-in
     /// @param aLearnPacket if this is a learn-in process, the learn packet (NULL if devices are recreated from DB)
+    /// @param aSecurityInfo the associated security info. If set, the created devices will become secure devices
+    //    (and will not receive unencrypted radio packets)
     /// @return number of devices created
     static int createDevicesFromEEP(
       EnoceanVdc *aVdcP,
@@ -226,7 +232,8 @@ namespace p44 {
       EnoceanProfile aProfile,
       EnoceanManufacturer aManufacturer,
       bool aSmartAck,
-      Esp3PacketPtr aLearnPacket
+      Esp3PacketPtr aLearnPacket,
+      EnOceanSecurityPtr aSecurityInfo
     );
     
 
@@ -297,6 +304,21 @@ namespace p44 {
     /// mark base offsets in use by this device
     /// @param aUsedOffsetsMap must be passed a string with 128 chars of '0' or '1'.
     virtual void markUsedBaseOffsets(string &aUsedOffsetsMap) { /* NOP in base class */ };
+
+    #if ENABLE_ENOCEAN_SECURE
+
+    /// set security info
+    /// @param aSecurityInfo set secure info for this device
+    /// @note if security info is set, the device will not get any non-secure radio packets any more
+    void setSecurity(EnOceanSecurityPtr aSecurityInfo) { securityInfo = aSecurityInfo; };
+
+    /// check for secure device
+    /// @return true if this device has security info (i.e. MUST NOT accept any insecure packets)
+    bool secureDevice() { return securityInfo!=NULL; }
+
+    #endif
+
+
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object

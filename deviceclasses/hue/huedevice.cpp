@@ -61,8 +61,7 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool 
   inherited(aVdcP),
   lightID(aLightID),
   uniqueID(aUniqueID),
-  reapplyMode(reapply_once),
-  lastReachable(true) // assume reachable unless actively determined otherwise (via ping)
+  reapplyMode(reapply_once)
 {
   // hue devices are lights
   setColorClass(class_yellow_light);
@@ -247,18 +246,6 @@ string HueDevice::modelVersion() const
 }
 
 
-int HueDevice::opStateLevel()
-{
-  return lastReachable ? 100 : 20; // not reachable not necessarily means totally not working
-}
-
-
-string HueDevice::getOpStateText()
-{
-  return lastReachable ? "OK" : "not reachable";
-}
-
-
 void HueDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
   // query the device
@@ -277,7 +264,6 @@ void HueDevice::presenceStateReceived(PresenceCB aPresenceResultHandler, JsonObj
       // Note: 2012 hue bridge firmware always returns 1 for this.
       JsonObjectPtr o = state->get("reachable");
       reachable = o && o->boolValue();
-      lastReachable = reachable;
     }
   }
   aPresenceResultHandler(reachable);
@@ -515,7 +501,7 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
   if (state) {
     o = aDeviceInfo->get("reachable");
     if (o) {
-      lastReachable = o->boolValue();
+      updatePresenceState(o->boolValue());
     }
     LightBehaviourPtr l = getOutput<LightBehaviour>();
     if (l) {

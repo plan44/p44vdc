@@ -473,6 +473,7 @@ void Esp3Packet::initForRorg(RadioOrg aRadioOrg, size_t aVLDsize)
       setRadioUserDataLength(4);
       break;
     case rorg_VLD:
+    case rorg_SEC_TEACHIN:
       if (aVLDsize>14) aVLDsize=14; // limit to max
       else if (aVLDsize<1) aVLDsize=1; // limit to min
       setRadioUserDataLength(aVLDsize);
@@ -897,7 +898,6 @@ string Esp3Packet::description()
 }
 
 
-
 // MARK: ===== CRC8 calculation
 
 static u_int8_t CRC8Table[256] = {
@@ -1066,6 +1066,482 @@ const char *EnoceanComm::manufacturerName(EnoceanManufacturer aManufacturerCode)
 }
 
 
+// MARK: ===== EnOcean Security
+
+#if ENABLE_ENOCEAN_SECURE
+
+#define RLC_WINDOW_SIZE 128 // defined in the "Security of Enocean Networks" spec, pg 27
+
+EnOceanSecurity::EnOceanSecurity() :
+securityLevelFormat(0),
+teachInInfo(0),
+rollingCounter(0),
+lastSavedRLC(0),
+lastSave(Never),
+teachInP(NULL)
+{
+  memset(&privateKey, 0, AES128BlockLen);
+  memset(&subKey1, 0, AES128BlockLen);
+  memset(&subKey2, 0, AES128BlockLen);
+}
+
+EnOceanSecurity::~EnOceanSecurity()
+{
+  if (teachInP) delete teachInP;
+}
+
+
+void EnOceanSecurity::deriveSubkeysFromPrivateKey()
+{
+  deriveSubkeys(privateKey, subKey1, subKey2);
+}
+
+
+uint8_t EnOceanSecurity::rlcSize()
+{
+  uint8_t rlcAlgo = (securityLevelFormat>>6) & 0x03;
+  uint8_t rlcBytes = 0;
+  if (rlcAlgo==1) rlcBytes = 2; // 16 bit RLC
+  else if (rlcAlgo==2) rlcBytes = 3; // 24 bit RLC
+  return rlcBytes;
+}
+
+
+void EnOceanSecurity::incrementRlc(int aIncrement)
+{
+  rollingCounter += aIncrement;
+  // mask
+  rollingCounter &= (0xFFFFFFFF>>((4-rlcSize())*8));
+}
+
+
+uint32_t EnOceanSecurity::rlcDistance(uint32_t aNewRLC, uint32_t aOldRLC)
+{
+  return (aNewRLC-aOldRLC) & (0xFFFFFFFF>>((4-rlcSize())*8));
+}
+
+
+bool EnOceanSecurity::rlcInWindow(uint32_t aRLC)
+{
+  return rlcDistance(aRLC, rollingCounter)<=RLC_WINDOW_SIZE;
+}
+
+
+
+uint8_t EnOceanSecurity::macSize()
+{
+  uint8_t macAlgo = (securityLevelFormat>>3) & 0x03;
+  uint8_t macBytes = 0;
+  if (macAlgo==1) macBytes = 3; // 24 bit MAC
+  else if (macAlgo==2) macBytes = 4; // 32 bit MAC
+  return macBytes;
+}
+
+
+#define KEY_BYTES_IN_SEGMENT0 4
+
+Esp3PacketPtr EnOceanSecurity::teachInMessage(int aSegment)
+{
+  Esp3PacketPtr tim = Esp3PacketPtr(new Esp3Packet);
+  if (aSegment==0) {
+    int rlcSz = rlcSize();
+    tim->initForRorg(rorg_SEC_TEACHIN, 2+rlcSz+KEY_BYTES_IN_SEGMENT0);
+    uint8_t *d = tim->radioUserData();
+    int i=0;
+    // R-ORG TS | TEACH_IN_INFO | SLF | RLC | KEY (KEY_BYTES_IN_SEGMENT0 bytes)
+    d[i++] = teachInInfo;
+    d[i++] = securityLevelFormat;
+    while (rlcSz>0) {
+      rlcSz--;
+      d[i++] = (rollingCounter>>(8*rlcSz))&0xFF;
+    }
+    // KEY_BYTES_IN_SEGMENT0 bytes of key
+    for (int j=0; j<KEY_BYTES_IN_SEGMENT0; j++) {
+      d[i++] = privateKey[j];
+    }
+  }
+  else if (aSegment==1) {
+    tim->initForRorg(rorg_SEC_TEACHIN, 1+AES128BlockLen-KEY_BYTES_IN_SEGMENT0);
+    uint8_t *d = tim->radioUserData();
+    int i=0;
+    // R-ORG TS | TEACH_IN_INFO | KEY (rest of bytes)
+    d[i++] = 0x40; // TEACH_IN_INFO for segment 1
+    // rest of key
+    for (int j=KEY_BYTES_IN_SEGMENT0; j<AES128BlockLen; j++) {
+      d[i++] = privateKey[j];
+    }
+  }
+  else {
+    return Esp3PacketPtr(); // no other segments
+  }
+  // ready
+  return tim;
+}
+
+
+Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Block *aPskP)
+{
+  if (aTeachInMsg->eepRorg()!=rorg_SEC_TEACHIN) return no; // not a secure teach-in message
+  // R-ORG TS | TEACH_IN_INFO | SLF | RLC | KEY
+  size_t l = aTeachInMsg->radioUserDataLength(); // length w/o R-ORG-TS
+  uint8_t *dataP = aTeachInMsg->radioUserData();
+  if (l<2) return no; // invalid message: need at least TEACH_IN_INFO and one byte of other info (SLF or message continuation)
+  // - first byte is always TEACH_IN_INFO
+  uint8_t ti = *dataP++; l--;
+  uint8_t sidx = (ti>>6) & 0x03; // IDX
+  if (sidx==0) {
+    // IDX=0, new teach-in begins
+    if (teachInP) delete teachInP;
+    teachInP = new SecureTeachInData;
+    teachInInfo = ti;
+    teachInP->numTeachInBytes = 0;
+    teachInP->segmentIndex = 0;
+  }
+  else {
+    // IDX>0, is an additional segment
+    if (!teachInP || sidx-teachInP->segmentIndex!=1) {
+      // not started teach-in or segment out of order
+      return no;
+    }
+    teachInP->segmentIndex = sidx;
+  }
+  // accumulate bytes
+  while (l>0) {
+    if (teachInP->numTeachInBytes>=maxTeachInDataSize) return no; // too much teach-in data
+    teachInP->teachInData[teachInP->numTeachInBytes++] = *dataP++; l--;
+  }
+  // check if all segments received
+  uint8_t numSegments = (teachInInfo>>4) & 0x03;
+  if (teachInP->segmentIndex+1>=numSegments) {
+    // all teach-in data accumulated
+    int b = teachInP->numTeachInBytes;
+    int idx = 0; // start with SLF
+    // - get SLF
+    securityLevelFormat = teachInP->teachInData[idx++]; b--;
+    // - RLC and key
+    if (teachInInfo & 0x08) {
+      // teach-in data is encrypted by preshared key (PSK)
+      if (!aPskP) return no; // we don't have a PSK, cannot decrypt
+      uint8_t di[maxTeachInDataSize];
+      memcpy(di, &teachInP->teachInData[idx], b); // copy encrypted version
+      VAEScrypt(*aPskP, 0x0000, 2, di, &teachInP->teachInData[idx], b); // decrypt
+    }
+    // - RLC if set
+    rollingCounter = 0; // init with zero
+    for (int i=0; i<rlcSize(); i++) {
+      if (b<=0) return no; // not enough bytes
+      rollingCounter = (rollingCounter<<8) + teachInP->teachInData[idx++]; b--;
+    }
+    // - private key
+    for (int i=0; i<AES128BlockLen; i++) {
+      if (b<=0) return no; // not enough bytes
+      privateKey[i] = teachInP->teachInData[idx++]; b--;
+    }
+    // - derive subkeys
+    deriveSubkeysFromPrivateKey();
+    // Security info is now complete
+    delete teachInP; teachInP = NULL;
+    return yes;
+  }
+  return undefined; // not yet complete
+}
+
+
+// D2-03-00 pseudo-profile data mapping to RPS data/status
+
+static uint16_t ptmMapping[16] = {
+  // format is 0xDDSS (DD=data, SS=status)
+  0, 0, 0, 0, 0, // 0..4 are undefined
+  0x1730, // 5: A1+B0 pressed
+  0x7020, // 6: 3 or 4 buttony pressed
+  0x3730, // 7: A0+B0 pressed
+  0x1020, // 8: no buttons pressed but energy bow pressed
+  0x1530, // 9: A1+B1 pressed
+  0x3530, // 10: A0+B1 pressed
+  0x5030, // 11: B1 pressed
+  0x7030, // 12: B0 pressed
+  0x1030, // 13: A1 pressed
+  0x3030, // 14: A0 pressed
+  0x0020  // 15: released
+};
+
+
+Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
+{
+  RadioOrg org = aSecureMsg->eepRorg();
+  if (org!=rorg_SEC_ENCAPS && org!=rorg_SEC) {
+    LOG(LOG_WARNING, "Non-secure radio packet seemingly coming from %08X, but device is secure -> ignored", aSecureMsg->radioSender());
+    return Esp3PacketPtr(); // none
+  }
+  if (teachInP) {
+    LOG(LOG_NOTICE, "Incomplete security info for %08X -> packet ignored", aSecureMsg->radioSender());
+    return Esp3PacketPtr(); // none
+  }
+  // something to decrypt
+  size_t n = aSecureMsg->radioUserDataLength();
+  uint8_t *d = aSecureMsg->radioUserData();
+  // check for CMAC
+  uint32_t cmac_sent = 0;
+  uint8_t macsz = macSize();
+  if (macsz>0) {
+    // there is a MAC
+    if (macsz>n) {
+      return Esp3PacketPtr(); // not enough data
+    }
+    n -= macsz;
+    for (int i=0; i<macsz; i++) {
+      cmac_sent = (cmac_sent<<8) | d[n+i];
+    }
+  }
+  // check for transmitted RLC
+  uint8_t rlcsz = rlcSize();
+  bool transmittedRlc = securityLevelFormat & 0x20;
+  if (transmittedRlc) {
+    uint32_t rlc = 0;
+    // RLC_TX set -> RLC is in the message
+    if (rlcsz>n) {
+      return Esp3PacketPtr(); // not enough data
+    }
+    n -= rlcsz;
+    for (int i=0; i<rlcsz; i++) {
+      rlc = (rlc<<8) | d[n+i];
+    }
+    // transmitted RLC must be higher than last known
+    if (!rlcInWindow(rlc)) {
+      LOG(LOG_INFO, "Transmitted RLC is not within allowed window of %d", RLC_WINDOW_SIZE);
+      return Esp3PacketPtr(); // invalid CMAC
+    }
+    // update RLC
+    rollingCounter = rlc;
+  }
+  // verify CMAC
+  if (macsz) {
+    int rlcRetries = RLC_WINDOW_SIZE;
+    while(true) {
+      if (rlcRetries<=0) {
+        LOG(LOG_INFO, "No matching CMAC %X found within RLC window of %d", cmac_sent, RLC_WINDOW_SIZE);
+        return Esp3PacketPtr(); // invalid CMAC
+      }
+      // calc CMAC
+      uint32_t cmac_calc = calcCMAC(privateKey, subKey1, subKey2, rollingCounter, rlcsz, macsz, org==rorg_SEC ? rorg_SEC : 0, d, n);
+      if (cmac_calc==cmac_sent) {
+        // CMAC matches
+        break;
+      }
+      // no match
+      if (transmittedRlc) {
+        LOG(LOG_INFO, "No CMAC %X match with transmitted RLC %X", cmac_sent, rollingCounter);
+        return Esp3PacketPtr(); // invalid CMAC
+      }
+      LOG(LOG_DEBUG, "No matching CMAC %X for current RLC, check next RLC in window", cmac_sent);
+      incrementRlc();
+      rlcRetries--;
+    }
+  }
+  // check decryption: n bytes at d
+  if (n==0) {
+    LOG(LOG_INFO, "packet has no payload");
+    return Esp3PacketPtr(); // invalid CMAC
+  }
+  uint8_t encMode = securityLevelFormat & 0x07;
+  Esp3PacketPtr outMsg = Esp3PacketPtr(new Esp3Packet);
+  uint8_t *outd = new uint8_t[n];
+  if (encMode==0) {
+    // plain data, just copy
+    memcpy(outd, d, n);
+  }
+  else if (encMode==3) {
+    VAEScrypt(privateKey, rollingCounter, rlcsz, d, outd, n);
+  }
+  else {
+    // TODO: support other modes
+    LOG(LOG_WARNING, "encrypted radio package with unsupported encryption mode %d", encMode);
+  }
+  d = outd;
+  // - now that we have decoded the payload: increment RLC for next packet
+  incrementRlc();
+  // - set radio org and data
+  if (org==rorg_SEC_ENCAPS) {
+    // use encapsulated org and 1:1 data
+    outMsg->initForRorg((RadioOrg)d[0], n-1);
+    d++; n--;
+    if (n>outMsg->radioUserDataLength())
+      n = outMsg->radioUserDataLength();
+    for (int i=0; i<n; i++) {
+      outMsg->radioUserData()[i] = *d++;
+    }
+    outMsg->setRadioStatus(aSecureMsg->radioStatus());
+  }
+  else {
+    // must be implicit D2-03-00 PTM - map it to F6-02-01
+    outMsg->initForRorg(rorg_RPS, 0);
+    uint16_t ptmData = ptmMapping[*d & 0x0F];
+    // - set data
+    outMsg->radioUserData()[0] = (ptmData>>8) & 0xFF;
+    // - set status
+    outMsg->setRadioStatus(ptmData&0xFF);
+  }
+  // - copy sender
+  outMsg->setRadioSender(aSecureMsg->radioSender());
+  // - copy optdata (7 bytes)
+  memcpy(outMsg->optData(), aSecureMsg->optData(), 7);
+  // - update security level
+  outMsg->setRadioSecurityLevel(1 + (macsz ? 2 : 0) + (encMode ? 1 : 0)); // 2=decrypted, 3=authenticated, 4=both
+  // done, return the decrypted message
+  delete[] outd;
+  outMsg->finalize();
+  return outMsg;
+}
+
+
+
+bool EnOceanSecurity::AES128(const AES128Block &aKey, const AES128Block &aData, AES128Block &aAES128)
+{
+  // single block AES128 (aes-128-ecb, "electronic code book")
+  EVP_CIPHER_CTX ctx;
+  EVP_CIPHER_CTX_init(&ctx);
+  if (EVP_EncryptInit_ex (&ctx, EVP_aes_128_ecb(), NULL, aKey, NULL)) {
+    EVP_CIPHER_CTX_set_padding(&ctx, false); // no padding
+    uint8_t *pointer = aAES128;
+    int outlen;
+    if (EVP_EncryptUpdate (&ctx, pointer, &outlen, aData, AES128BlockLen)) {
+      pointer += outlen;
+      if (EVP_EncryptFinal_ex(&ctx, pointer, &outlen)) {
+        pointer += outlen;
+        return true;
+      }
+      else {
+        DBGLOG(LOG_ERR, "EVP_EncryptFinal_ex failed");
+      }
+    }
+    else {
+      DBGLOG(LOG_ERR, "EVP_EncryptUpdate failed");
+    }
+  }
+  else {
+    DBGLOG(LOG_ERR, "EVP_EncryptInit_ex failed");
+  }
+  return false;
+}
+
+
+void EnOceanSecurity::VAEScrypt(const AES128Block &aKey, uint32_t aRLC, int aRLCSize, const uint8_t *aDataIn, uint8_t *aDataOut, size_t aDataSize)
+{
+  // VAES
+  // - fixed publickey
+  static const AES128Block publicKey = { 0x34, 0x10, 0xde, 0x8f, 0x1a, 0xba, 0x3e, 0xff, 0x9f, 0x5a, 0x11, 0x71, 0x72, 0xea, 0xca, 0xbd };
+  // - start chain with zero crypt key
+  AES128Block cryptKey;
+  memset(&cryptKey, 0, AES128BlockLen);
+  // - for every block
+  while (aDataSize>0) {
+    AES128Block aesInp;
+    // AES input: publickey XOR rlc XOR last block's cryptKey
+    int rlcbytes = aRLCSize;
+    for (int i=0; i<AES128BlockLen; i++) {
+      aesInp[i] = publicKey[i] ^ cryptKey[i]; // public key XOR last block's cryptKey
+      if (--rlcbytes >= 0) {
+        aesInp[i] ^= ((aRLC>>(rlcbytes*8))&0xFF); // .. XOR rlc
+      }
+    }
+    // calculate (en/de)crypt key for next block
+    AES128(aKey, aesInp, cryptKey);
+    // actually en/decrypt now
+    for (int i=0; i<AES128BlockLen; i++) {
+      *aDataOut++ = cryptKey[i] ^ *aDataIn++;
+      // count and end en/decryption
+      if (--aDataSize==0) break;
+    }
+  }
+}
+
+
+void EnOceanSecurity::deriveSubkeys(const AES128Block &aKey, AES128Block &aSubkey1, AES128Block &aSubkey2)
+{
+  AES128Block zero;
+  memset(&zero, 0, AES128BlockLen);
+  AES128Block L;
+  AES128(aKey, zero, L);
+  // Subkey K1
+  for (int i=0; i<AES128BlockLen; i++) {
+    aSubkey1[i] = ((L[i]<<1)+(i<AES128BlockLen-1 && ((L[i+1]&0x80)!=0 ? 0x01 : 0)))&0xFF;
+  }
+  if ((L[0] & 0x80) != 0) aSubkey1[AES128BlockLen-1] ^= 0x87; // const_Rb
+  // Subkey K2
+  for (int i=0; i<AES128BlockLen; i++) {
+    aSubkey2[i] = ((aSubkey1[i]<<1)+(i<AES128BlockLen-1 && ((aSubkey1[i+1]&0x80)!=0 ? 0x01 : 0)))&0xFF;
+  }
+  if ((aSubkey1[0] & 0x80) != 0) aSubkey2[AES128BlockLen-1] ^= 0x87; // const_Rb
+}
+
+
+uint32_t EnOceanSecurity::calcCMAC(const AES128Block &aKey, const AES128Block &aSubKey1, const AES128Block &aSubKey2, uint32_t aRLC, int aRLCBytes, int aMACBytes, uint8_t aFirstByte, const uint8_t *aData, size_t aDataSize)
+{
+  uint8_t db;
+  // check for extra first byte (in addition to aData)
+  if (aFirstByte) {
+    // use given first byte
+    db = aFirstByte;
+    aDataSize++;
+  }
+  else {
+    // fetch first byte from data
+    db = *aData++;
+  }
+  // include RLC in aDataSize
+  aDataSize += aRLCBytes;
+  // aDataSize is now overall data size to process in CMAC, including optional extra first byte and including RLC
+  AES128Block aesInp;
+  AES128Block resBlock;
+  memset(&resBlock, 0, AES128BlockLen);
+  bool padded = false;
+  while (aDataSize>0) {
+    // AES input is result of previous block XOR data
+    for (int i=0; i<AES128BlockLen; i++) {
+      if (aDataSize>0) {
+        // we still have data
+        aesInp[i] = resBlock[i] ^ db;
+        // get next byte
+        aDataSize--; // processed this byte
+        if (aDataSize>aRLCBytes) {
+          // real data
+          db = *aData++;
+        }
+        else if (aDataSize>0){
+          // rlc
+          db = ((aRLC>>((aDataSize-1)*8))&0xFF);
+        }
+      }
+      else {
+        // no more data, pad data with 0b1000...000
+        aesInp[i] = resBlock[i]; // still include the result from previous block
+        if (!padded) aesInp[i] ^= 0x80; // first padding byte, use 0x80 instead of 0x00 (which means NOP here)
+        padded = true; // now we have started padding
+      }
+    }
+    // now we have a full AES block
+    // - if this is the last block, we need to add the subkey now
+    if (aDataSize==0) {
+      for (int i=0; i<AES128BlockLen; i++) {
+        aesInp[i] ^= padded ? aSubKey2[i] : aSubKey1[i];
+      }
+    }
+    // - do the AES now
+    AES128(aKey, aesInp, resBlock);
+  }
+  // now resBlock contains the CMAC
+  uint32_t cmac = 0;
+  for (int i=0; i<aMACBytes; i++) {
+    cmac <<= 8;
+    cmac |= (uint8_t)resBlock[i]&0xFF;
+  }
+  return cmac;
+}
+
+
+#endif // ENABLE_ENOCEAN_SECURE
+
+
 
 // MARK: ===== EnOcean communication handler
 
@@ -1095,6 +1571,7 @@ EnoceanComm::EnoceanComm(MainLoop &aMainLoop) :
 EnoceanComm::~EnoceanComm()
 {
 }
+
 
 
 void EnoceanComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, const char *aEnoceanResetPinName)
@@ -1352,9 +1829,9 @@ void EnoceanComm::dispatchPacket(Esp3PacketPtr aPacket)
         // pass packet and response status
         callback(aPacket, aPacket->responseStatus());
       }
-      // check if more commands in queue to be sent
-      checkCmdQueue();
     }
+    // check if more commands in queue to be sent
+    checkCmdQueue();
   }
   else if (pt==pt_event_message) {
     // This is a event
@@ -1467,6 +1944,10 @@ void EnoceanComm::cmdTimeout()
 }
 
 #endif // ENABLE_ENOCEAN
+
+
+
+
 
 
 

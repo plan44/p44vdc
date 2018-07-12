@@ -186,6 +186,7 @@ void EldatComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, string 
   if (Error::isOK(aError)) {
     uint16_t vid;
     if (sscanf(aAnswer.c_str(), "ID,%hX,%hX,%hX", &vid, &usbPid, &appVersion)==3) {
+      LOG(LOG_INFO, "ELDAT module info (ID): vid=0x%04hX, usbPid=0x%04hX, version=0x%04hX", vid, usbPid, appVersion);
       if (vid!=ELDAT_VID) {
         initError(aCompletedCB, 0, ErrorPtr(new EldatCommError(EldatCommErrorCompatibility, string_format("Invalid Vendor ID 0x%04hX", vid))));
         return;

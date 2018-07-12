@@ -31,7 +31,7 @@ using namespace p44;
 AudioScene::AudioScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo),
   contentSource(0),
-  powerState(dsAudioPower_deep_off)
+  powerState(powerState_off)
 {
 }
 
@@ -53,7 +53,7 @@ void AudioScene::setSceneValue(int aChannelIndex, double aValue)
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
     case channeltype_p44_audio_content_source: setPVar(contentSource, (uint32_t)aValue); break;
-    case channeltype_power_state: setPVar(powerState, (DsAudioPowerState)aValue); break;
+    case channeltype_power_state: setPVar(powerState, (DsPowerState)aValue); break;
     default: inherited::setSceneValue(aChannelIndex, aValue); break;
   }
 }
@@ -110,7 +110,7 @@ void AudioScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
   contentSource = aRow->get<int>(aIndex++);
-  powerState = (DsAudioPowerState)aRow->get<int>(aIndex++);
+  powerState = (DsPowerState)aRow->get<int>(aIndex++);
 }
 
 
@@ -234,16 +234,16 @@ void AudioScene::setDefaultSceneValues(SceneNo aSceneNo)
       psi = true;
       break;
     case STANDBY:
-      powerState = dsAudioPower_power_save;
+      powerState = powerState_standby;
       sci = true;
       break;
     case DEEP_OFF:
-      powerState = dsAudioPower_deep_off;
+      powerState = powerState_off;
       sci = true;
       break;
     case SLEEPING:
     case ABSENT:
-      powerState = dsAudioPower_power_save;
+      powerState = powerState_standby;
       sci = true;
       break;
     case GAS:
@@ -275,7 +275,7 @@ void AudioScene::setDefaultSceneValues(SceneNo aSceneNo)
     (aSceneNo==ROOM_ON) // main on
   ) {
     // powerstate follows volume
-    powerState = value>0 ? dsAudioPower_on : dsAudioPower_deep_off;
+    powerState = value>0 ? powerState_on : powerState_off;
     // fixvol for mute scenes
     if (value==0) {
       globalSceneFlags |= audioflags_fixvol;
@@ -404,7 +404,7 @@ AudioBehaviour::AudioBehaviour(Device &aDevice) :
   volume = AudioVolumeChannelPtr(new AudioVolumeChannel(*this));
   addChannel(volume);
   // - power state
-  powerState = AudioPowerStateChannelPtr(new AudioPowerStateChannel(*this));
+  powerState = PowerStateChannelPtr(new PowerStateChannel(*this));
   addChannel(powerState);
   // - content source
   contentSource = AudioContentSourceChannelPtr(new AudioContentSourceChannel(*this));
@@ -434,7 +434,7 @@ Tristate AudioBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 #define AUTO_OFF_FADE_STEPSIZE 5
 
 // apply scene
-bool AudioBehaviour::performApplySceneToChannels(DsScenePtr aScene)
+bool AudioBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd)
 {
   // check special actions (commands) for audio scenes
   AudioScenePtr audioScene = boost::dynamic_pointer_cast<AudioScene>(aScene);
@@ -444,8 +444,7 @@ bool AudioBehaviour::performApplySceneToChannels(DsScenePtr aScene)
     // Note: some of the audio special commands are handled at the applyChannelValues() level
     //   in the device, using sceneContextForApply().
     // Now check for the commands that can be handled at the behaviour level
-    SceneCmd sceneCmd = audioScene->sceneCmd;
-    switch (sceneCmd) {
+    switch (aSceneCmd) {
       case scene_cmd_audio_mute:
         unmuteVolume = volume->getChannelValue(); ///< save current volume
         volume->setChannelValue(0); // mute
@@ -454,14 +453,15 @@ bool AudioBehaviour::performApplySceneToChannels(DsScenePtr aScene)
         volume->setChannelValue(unmuteVolume>0 ? unmuteVolume : 1); // restore value known before last mute, but at least non-zero
         return true; // don't let inherited load channels, just request apply
       case scene_cmd_slow_off:
-        // TODO: %%% implement it
+        // TODO: %%% implement it. For now, just invoke
+        aSceneCmd = scene_cmd_invoke;
         break;
       default:
         break;
     }
   } // if audio scene
   // perform standard apply (loading channels)
-  return inherited::performApplySceneToChannels(aScene);
+  return inherited::performApplySceneToChannels(aScene, aSceneCmd);
 }
 
 
@@ -472,7 +472,7 @@ void AudioBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     // load channels from scene
     // - volume: ds-audio says: "If the flag is not set, the volume setting of the previously set scene
     //   will be taken over unchanged unless the device was off before the scene call."
-    if ((powerState->getChannelValue()!=dsAudioPower_on) || knownPaused || audioScene->hasFixVol()) {
+    if ((powerState->getChannelValue()!=powerState_on) || knownPaused || audioScene->hasFixVol()) {
       // device was off or paused before, or fixvol is set
       volume->setChannelValueIfNotDontCare(aScene, audioScene->value, 0, 0, true); // always apply
     }
@@ -494,7 +494,7 @@ void AudioBehaviour::saveChannelsToScene(DsScenePtr aScene)
     // save channels from scene
     audioScene->setPVar(audioScene->value, volume->getChannelValue());
     audioScene->setSceneValueFlags(volume->getChannelIndex(), valueflags_dontCare, false);
-    audioScene->setPVar(audioScene->powerState, (DsAudioPowerState)powerState->getChannelValue());
+    audioScene->setPVar(audioScene->powerState, (DsPowerState)powerState->getChannelValue());
     audioScene->setSceneValueFlags(powerState->getChannelIndex(), valueflags_dontCare, false);
     audioScene->setPVar(audioScene->contentSource, (uint32_t)contentSource->getChannelValue());
     audioScene->setSceneValueFlags(contentSource->getChannelIndex(), valueflags_dontCare, false);
@@ -513,7 +513,7 @@ bool AudioBehaviour::canDim(ChannelBehaviourPtr aChannel)
 {
   // only devices that are on can be dimmed (volume changed)
   if (aChannel->getChannelType()==channeltype_audio_volume) {
-    return powerState->getChannelValue()==dsAudioPower_on; // dimmable if on
+    return powerState->getChannelValue()==powerState_on; // dimmable if on
   }
   else {
     // other audio channels cannot be dimmed anyway

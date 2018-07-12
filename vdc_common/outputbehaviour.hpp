@@ -234,6 +234,9 @@ namespace p44 {
 
     /// apply scene to output channels and other state variables
     /// @param aScene the scene to apply to output channels
+    /// @param aSceneCmd This will be used instead of the scenecommand stored in the scene. This
+    ///   allows subclass implementations evaluating specialized scene commands, and then passing
+    ///   more generic scene commands to inherited implementation.
     /// @return true if apply is complete, i.e. everything ready to apply to hardware outputs.
     ///   false if scene cannot be applied to hardware (not yet, or maybe not at all); applying to hardware, if
     ///   needed at all, will be triggered otherwise.
@@ -244,7 +247,7 @@ namespace p44 {
     ///   only dimChannel method must be used.
     /// @note base class' implementation provides applying the scene values to channels.
     ///   Derived classes may implement handling of hard-wired behaviour specific scenes.
-    virtual bool performApplySceneToChannels(DsScenePtr aScene);
+    virtual bool performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd);
 
     /// called by performApplySceneToChannels() to load channel values from a scene.
     /// @param aScene the scene to load channel values from
