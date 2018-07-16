@@ -536,7 +536,7 @@ ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod,
 }
 
 
-// MARK: ===== DALI bus diagnostics
+// MARK: ===== DALI bus diagnostics and summary
 
 
 // scan bus, return status string
@@ -696,11 +696,13 @@ void DaliVdc::daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddr
     aRequest->sendError(aError);
     return;
   }
+  u_int64_t listedDevices = 0;
   ApiValuePtr summary = aRequest->newApiValue();
   summary->setType(apivalue_object);
   if (aShortAddressListPtr) {
     // reliably accessible addresses
     for (DaliComm::ShortAddressList::iterator pos = aShortAddressListPtr->begin(); pos!=aShortAddressListPtr->end(); ++pos) {
+      listedDevices |= (1ll<<(*pos));
       ApiValuePtr busAddrInfo = summary->newObject();
       daliAddressSummary(*pos, busAddrInfo);
       // add to summary
@@ -708,7 +710,9 @@ void DaliVdc::daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddr
     }
   }
   if (aUnreliableShortAddressListPtr) {
+    // unreliably accessible addresses, which means something is probably connected, but not usable
     for (DaliComm::ShortAddressList::iterator pos = aUnreliableShortAddressListPtr->begin(); pos!=aUnreliableShortAddressListPtr->end(); ++pos) {
+      listedDevices |= (1<<(*pos));
       ApiValuePtr busAddrInfo = summary->newObject();
       busAddrInfo->add("scanStateText", busAddrInfo->newString("unreliable/conflict"));
       busAddrInfo->add("scanState", busAddrInfo->newUint64(0));
@@ -716,18 +720,34 @@ void DaliVdc::daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddr
       summary->add(string_format("%d",*pos), busAddrInfo);
     }
   }
+  // check all other addresses to show devices that the vdc knows and expects, but are not there
+  for (DaliAddress a=0; a<DALI_MAXDEVICES; ++a) {
+    if (listedDevices & (1ll<<a)) continue; // already listed
+    // there might still be a device knowing about that bus address
+    ApiValuePtr busAddrInfo = summary->newObject();
+    if (daliAddressSummary(a, busAddrInfo)) {
+      // override some info
+      busAddrInfo->add("scanStateText", busAddrInfo->newString("missing"));
+      busAddrInfo->add("scanState", busAddrInfo->newUint64(0));
+      busAddrInfo->add("opStateText", busAddrInfo->newString("missing"));
+      busAddrInfo->add("opState", busAddrInfo->newUint64(0));
+      // add to summary
+      summary->add(string_format("%d", a), busAddrInfo);
+    }
+  }
   // return
   aRequest->sendResult(summary);
 }
 
 
-void DaliVdc::daliAddressSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo)
+bool DaliVdc::daliAddressSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo)
 {
   // check for being part of a scanned device
   if (daliBusDeviceSummary(aDaliAddress, aInfo)) {
     // full info available
     aInfo->add("scanStateText", aInfo->newString("scanned"));
     aInfo->add("scanState", aInfo->newUint64(100));
+    return true;
   }
   else {
     // not a scanned device
@@ -736,9 +756,10 @@ void DaliVdc::daliAddressSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo)
     // but we might have cached device info
     DaliDeviceInfoMap::iterator ipos = deviceInfoCache.find(aDaliAddress);
     if (ipos!=deviceInfoCache.end()) {
-      daliInfoSummary(ipos->second, aInfo);
+      return daliInfoSummary(ipos->second, aInfo);
     }
   }
+  return false;
 }
 
 

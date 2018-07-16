@@ -184,7 +184,7 @@ namespace p44 {
 
     ErrorPtr daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     void daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
-    void daliAddressSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo);
+    bool daliAddressSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo);
     bool daliBusDeviceSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo);
     bool daliInfoSummary(DaliDeviceInfoPtr aDeviceInfo, ApiValuePtr aInfo);
 
