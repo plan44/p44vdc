@@ -48,6 +48,7 @@ DaliComm::DaliComm(MainLoop &aMainLoop) :
   retriedWrites(0),
   closeAfterIdleTime(Never),
   responsesInSequence(false),
+  expectedBridgeResponses(0),
   sendEdgeAdj(DEFAULT_SENDING_EDGE_ADJUSTMENT),
   samplePointAdj(DEFAULT_SAMPLING_POINT_ADJUSTMENT)
 {
@@ -342,10 +343,12 @@ ssize_t DaliComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
 
 void DaliComm::reset(DaliCommandStatusCB aStatusCB)
 {
-  // this first reset command should also consume extra bytes left over from previous use use delay to make sure commands are NOT buffered and extra bytes from unsynced bridge will be catched here
-  FOCUSLOG("Before reset: retriedWrites=%ld, retriedReads=%ld (will be cleared to 0 now)", retriedWrites, retriedReads);
+  // this first reset command should also consume extra bytes left over from previous use
+  // use delay to make sure commands are NOT buffered and extra bytes from unsynced bridge will be catched here
+  FOCUSLOG("Before reset: retriedWrites=%ld, retriedReads=%ld, expectedBridgeResponses=%d (will be cleared to 0 now)", retriedWrites, retriedReads, expectedBridgeResponses);
   retriedWrites = 0;
   retriedReads = 0;
+  expectedBridgeResponses = 0;
   sendBridgeCommand(CMD_CODE_RESET, 0, 0, boost::bind(&DaliComm::resetIssued, this, aStatusCB, _1, _2, _3), 100*MilliSecond);
 }
 
