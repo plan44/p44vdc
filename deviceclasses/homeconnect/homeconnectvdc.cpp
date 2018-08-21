@@ -180,11 +180,14 @@ void HomeConnectVdc::deviceListReceived(StatusCB aCompletedCB, JsonObjectPtr aRe
         JsonObjectPtr ha = has->arrayGet(i);
         JsonObjectPtr brandJson = ha->get("brand");
         // filter only Siemens devices
-        if (brandJson && brandJson->stringValue() == "Siemens") {
-          // create device (might be a dummy if ha.type is not yet supported)
-          HomeConnectDevicePtr newDev =  HomeConnectDevice::createHomeConenctDevice(this, ha);
-          if(newDev && newDev->isKnownDevice()) {
-            newDevices.push_back(newDev);
+        if (brandJson) {
+          string brand = brandJson->stringValue();
+          if (lowerCase(brand) == "siemens") {
+            // create device (might be a dummy if ha.type is not yet supported)
+            HomeConnectDevicePtr newDev =  HomeConnectDevice::createHomeConenctDevice(this, ha);
+            if(newDev && newDev->isKnownDevice()) {
+              newDevices.push_back(newDev);
+            }
           }
         }
       }
