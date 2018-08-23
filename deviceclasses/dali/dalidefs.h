@@ -130,8 +130,17 @@
 #define DALIVALUE_MASK 0xFF
 
 // DALI memory banks
-#define DALIMEM_BANK0_MINBYTES 0x0F
-#define DALIMEM_BANK1_MINBYTES 0x10
+#define DALIMEM_BANK_HDRBYTES 3
+#define DALIMEM_BANK0_MINBYTES 0x0F // minimum number of bytes in a valid Bank0
+#define DALIMEM_BANK0_MINBYTES_v2_0 0x1B // minimum number of bytes in a >=v2.0 Bank0
+#define DALIMEM_BANK1_MINBYTES 0x10 // minimum number of bytes in a valid Bank1
+#define DALIMEM_BANK1_MINBYTES_v2_0 0x11 // minimum number of bytes in a >=v2.0 Bank1
+
+// DALI standard version byte encoding
+#define DALI_STD_VERS_MAJOR(b) ((b>>2)&0x3F)
+#define DALI_STD_VERS_MINOR(b) (b&0x03)
+#define DALI_STD_VERS_BYTE(maj,min) ((maj<<2)+min)
+#define DALI_STD_VERS_NONEIS0(b) (b==0xFF ? 0 : b) // FF means no version, we store that as 0
 
 
 #endif

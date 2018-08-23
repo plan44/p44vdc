@@ -162,13 +162,16 @@ namespace p44 {
     /// short address
     DaliAddress shortAddress;
     // DALI device information
-    long long gtin; /// < 48 bit global trade identification number (GTIN / EAN)
+    uint8_t vers_101; ///< version of the IEC 62386-101 standard used, byte encoded, see DALI_STD_VERS_* macros
+    uint8_t vers_102; ///< version of the IEC 62386-102 standard used for all control gear in this bus unit, byte encoded, see DALI_STD_VERS_* macros
+    uint8_t vers_103; ///< version of the IEC 62386-103 standard used for all control devices in this bus unit, byte encoded, see DALI_STD_VERS_* macros
+    uint64_t gtin; /// < 48 bit global trade identification number (GTIN / EAN)
     uint8_t fw_version_major; /// < major firmware version
     uint8_t fw_version_minor; /// < minor firmware version
-    long long serialNo; /// < unique serial number
+    uint64_t serialNo; /// < unique serial number
     // OEM product information
-    long long oem_gtin; /// < 48 bit global trade identification number of OEM product (GTIN / EAN)
-    long long oem_serialNo; /// < unique serial number
+    uint64_t oem_gtin; /// < 48 bit global trade identification number of OEM product (GTIN / EAN)
+    uint64_t oem_serialNo; /// < unique serial number
     /// text description
     string description();
     /// status of device info
@@ -420,9 +423,10 @@ namespace p44 {
     /// @param aBank memory bank to read
     /// @param aOffset offset to start reading
     /// @param aNumBytes number of bytes to read
+    /// @param aMemory optional existing memory vector to append to
     /// @note reading none or less data than requested is not considered an error - aMemoryVectorPtr param in callback will
     ///   just return the number of bytes that could be read; check its size to make sure expected result was returned
-    void daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint8_t aNumBytes);
+    void daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint16_t aNumBytes, DaliComm::MemoryVectorPtr aMemory = NULL);
 
     /// callback function for daliReadDeviceInfo
     typedef boost::function<void (DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError)> DaliDeviceInfoCB;
