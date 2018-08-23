@@ -1592,14 +1592,23 @@ private:
       }
       // OEM GTIN: bytes 0x03..0x08, MSB first
       deviceInfo->oem_gtin = 0;
+      bool allFF = true;
+      uint8_t b;
       for (int i=0x03; i<=0x08; i++) {
-        deviceInfo->oem_gtin = (deviceInfo->oem_gtin << 8) + (*aBank1Data)[i];
+        b = (*aBank1Data)[i];
+        if (b!=0xFF) allFF = false;
+        deviceInfo->oem_gtin = (deviceInfo->oem_gtin << 8) + b;
       }
+      if (allFF) deviceInfo->oem_gtin = 0; // all FF means no OEM GTIN
       // Serial: bytes 0x09..0x0C
       deviceInfo->oem_serialNo = 0;
+      allFF = true;
       for (int i=0x09; i<=0x0C; i++) {
-        deviceInfo->oem_serialNo = (deviceInfo->oem_serialNo << 8) + (*aBank1Data)[i];
+        b = (*aBank1Data)[i];
+        if (b!=0xFF) allFF = false;
+        deviceInfo->oem_serialNo = (deviceInfo->oem_serialNo << 8) + b;
       }
+      if (allFF) deviceInfo->oem_serialNo = 0; // all FF means no OEM GTIN
       // check for extra data device may have
       int extraBytes = (*aBank1Data)[0]+1-DALIMEM_BANK1_MINBYTES;
       if (extraBytes>0) {
