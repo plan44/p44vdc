@@ -10,7 +10,7 @@
 void   vdcapi__vdsm__request_hello__init
                      (Vdcapi__VdsmRequestHello         *message)
 {
-  static Vdcapi__VdsmRequestHello init_value = VDCAPI__VDSM__REQUEST_HELLO__INIT;
+  static const Vdcapi__VdsmRequestHello init_value = VDCAPI__VDSM__REQUEST_HELLO__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__request_hello__get_packed_size
@@ -47,13 +47,15 @@ void   vdcapi__vdsm__request_hello__free_unpacked
                      (Vdcapi__VdsmRequestHello *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__request_hello__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdc__response_hello__init
                      (Vdcapi__VdcResponseHello         *message)
 {
-  static Vdcapi__VdcResponseHello init_value = VDCAPI__VDC__RESPONSE_HELLO__INIT;
+  static const Vdcapi__VdcResponseHello init_value = VDCAPI__VDC__RESPONSE_HELLO__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdc__response_hello__get_packed_size
@@ -90,13 +92,15 @@ void   vdcapi__vdc__response_hello__free_unpacked
                      (Vdcapi__VdcResponseHello *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdc__response_hello__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdc__send_announce_device__init
                      (Vdcapi__VdcSendAnnounceDevice         *message)
 {
-  static Vdcapi__VdcSendAnnounceDevice init_value = VDCAPI__VDC__SEND_ANNOUNCE_DEVICE__INIT;
+  static const Vdcapi__VdcSendAnnounceDevice init_value = VDCAPI__VDC__SEND_ANNOUNCE_DEVICE__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdc__send_announce_device__get_packed_size
@@ -133,13 +137,15 @@ void   vdcapi__vdc__send_announce_device__free_unpacked
                      (Vdcapi__VdcSendAnnounceDevice *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdc__send_announce_device__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdc__send_announce_vdc__init
                      (Vdcapi__VdcSendAnnounceVdc         *message)
 {
-  static Vdcapi__VdcSendAnnounceVdc init_value = VDCAPI__VDC__SEND_ANNOUNCE_VDC__INIT;
+  static const Vdcapi__VdcSendAnnounceVdc init_value = VDCAPI__VDC__SEND_ANNOUNCE_VDC__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdc__send_announce_vdc__get_packed_size
@@ -176,13 +182,15 @@ void   vdcapi__vdc__send_announce_vdc__free_unpacked
                      (Vdcapi__VdcSendAnnounceVdc *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdc__send_announce_vdc__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdc__send_vanish__init
                      (Vdcapi__VdcSendVanish         *message)
 {
-  static Vdcapi__VdcSendVanish init_value = VDCAPI__VDC__SEND_VANISH__INIT;
+  static const Vdcapi__VdcSendVanish init_value = VDCAPI__VDC__SEND_VANISH__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdc__send_vanish__get_packed_size
@@ -219,13 +227,15 @@ void   vdcapi__vdc__send_vanish__free_unpacked
                      (Vdcapi__VdcSendVanish *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdc__send_vanish__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdc__send_identify__init
                      (Vdcapi__VdcSendIdentify         *message)
 {
-  static Vdcapi__VdcSendIdentify init_value = VDCAPI__VDC__SEND_IDENTIFY__INIT;
+  static const Vdcapi__VdcSendIdentify init_value = VDCAPI__VDC__SEND_IDENTIFY__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdc__send_identify__get_packed_size
@@ -262,13 +272,15 @@ void   vdcapi__vdc__send_identify__free_unpacked
                      (Vdcapi__VdcSendIdentify *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdc__send_identify__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__send_bye__init
                      (Vdcapi__VdsmSendBye         *message)
 {
-  static Vdcapi__VdsmSendBye init_value = VDCAPI__VDSM__SEND_BYE__INIT;
+  static const Vdcapi__VdsmSendBye init_value = VDCAPI__VDSM__SEND_BYE__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__send_bye__get_packed_size
@@ -305,13 +317,15 @@ void   vdcapi__vdsm__send_bye__free_unpacked
                      (Vdcapi__VdsmSendBye *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__send_bye__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__send_remove__init
                      (Vdcapi__VdsmSendRemove         *message)
 {
-  static Vdcapi__VdsmSendRemove init_value = VDCAPI__VDSM__SEND_REMOVE__INIT;
+  static const Vdcapi__VdsmSendRemove init_value = VDCAPI__VDSM__SEND_REMOVE__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__send_remove__get_packed_size
@@ -348,13 +362,15 @@ void   vdcapi__vdsm__send_remove__free_unpacked
                      (Vdcapi__VdsmSendRemove *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__send_remove__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__property_value__init
                      (Vdcapi__PropertyValue         *message)
 {
-  static Vdcapi__PropertyValue init_value = VDCAPI__PROPERTY_VALUE__INIT;
+  static const Vdcapi__PropertyValue init_value = VDCAPI__PROPERTY_VALUE__INIT;
   *message = init_value;
 }
 size_t vdcapi__property_value__get_packed_size
@@ -391,13 +407,15 @@ void   vdcapi__property_value__free_unpacked
                      (Vdcapi__PropertyValue *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__property_value__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__property_element__init
                      (Vdcapi__PropertyElement         *message)
 {
-  static Vdcapi__PropertyElement init_value = VDCAPI__PROPERTY_ELEMENT__INIT;
+  static const Vdcapi__PropertyElement init_value = VDCAPI__PROPERTY_ELEMENT__INIT;
   *message = init_value;
 }
 size_t vdcapi__property_element__get_packed_size
@@ -434,13 +452,15 @@ void   vdcapi__property_element__free_unpacked
                      (Vdcapi__PropertyElement *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__property_element__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__request_get_property__init
                      (Vdcapi__VdsmRequestGetProperty         *message)
 {
-  static Vdcapi__VdsmRequestGetProperty init_value = VDCAPI__VDSM__REQUEST_GET_PROPERTY__INIT;
+  static const Vdcapi__VdsmRequestGetProperty init_value = VDCAPI__VDSM__REQUEST_GET_PROPERTY__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__request_get_property__get_packed_size
@@ -477,13 +497,15 @@ void   vdcapi__vdsm__request_get_property__free_unpacked
                      (Vdcapi__VdsmRequestGetProperty *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__request_get_property__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdc__response_get_property__init
                      (Vdcapi__VdcResponseGetProperty         *message)
 {
-  static Vdcapi__VdcResponseGetProperty init_value = VDCAPI__VDC__RESPONSE_GET_PROPERTY__INIT;
+  static const Vdcapi__VdcResponseGetProperty init_value = VDCAPI__VDC__RESPONSE_GET_PROPERTY__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdc__response_get_property__get_packed_size
@@ -520,13 +542,15 @@ void   vdcapi__vdc__response_get_property__free_unpacked
                      (Vdcapi__VdcResponseGetProperty *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdc__response_get_property__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__request_set_property__init
                      (Vdcapi__VdsmRequestSetProperty         *message)
 {
-  static Vdcapi__VdsmRequestSetProperty init_value = VDCAPI__VDSM__REQUEST_SET_PROPERTY__INIT;
+  static const Vdcapi__VdsmRequestSetProperty init_value = VDCAPI__VDSM__REQUEST_SET_PROPERTY__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__request_set_property__get_packed_size
@@ -563,13 +587,15 @@ void   vdcapi__vdsm__request_set_property__free_unpacked
                      (Vdcapi__VdsmRequestSetProperty *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__request_set_property__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__request_generic_request__init
                      (Vdcapi__VdsmRequestGenericRequest         *message)
 {
-  static Vdcapi__VdsmRequestGenericRequest init_value = VDCAPI__VDSM__REQUEST_GENERIC_REQUEST__INIT;
+  static const Vdcapi__VdsmRequestGenericRequest init_value = VDCAPI__VDSM__REQUEST_GENERIC_REQUEST__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__request_generic_request__get_packed_size
@@ -606,13 +632,15 @@ void   vdcapi__vdsm__request_generic_request__free_unpacked
                      (Vdcapi__VdsmRequestGenericRequest *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__request_generic_request__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__send_ping__init
                      (Vdcapi__VdsmSendPing         *message)
 {
-  static Vdcapi__VdsmSendPing init_value = VDCAPI__VDSM__SEND_PING__INIT;
+  static const Vdcapi__VdsmSendPing init_value = VDCAPI__VDSM__SEND_PING__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__send_ping__get_packed_size
@@ -649,13 +677,15 @@ void   vdcapi__vdsm__send_ping__free_unpacked
                      (Vdcapi__VdsmSendPing *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__send_ping__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdc__send_pong__init
                      (Vdcapi__VdcSendPong         *message)
 {
-  static Vdcapi__VdcSendPong init_value = VDCAPI__VDC__SEND_PONG__INIT;
+  static const Vdcapi__VdcSendPong init_value = VDCAPI__VDC__SEND_PONG__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdc__send_pong__get_packed_size
@@ -692,13 +722,15 @@ void   vdcapi__vdc__send_pong__free_unpacked
                      (Vdcapi__VdcSendPong *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdc__send_pong__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdc__send_push_notification__init
                      (Vdcapi__VdcSendPushNotification         *message)
 {
-  static Vdcapi__VdcSendPushNotification init_value = VDCAPI__VDC__SEND_PUSH_NOTIFICATION__INIT;
+  static const Vdcapi__VdcSendPushNotification init_value = VDCAPI__VDC__SEND_PUSH_NOTIFICATION__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdc__send_push_notification__get_packed_size
@@ -735,13 +767,15 @@ void   vdcapi__vdc__send_push_notification__free_unpacked
                      (Vdcapi__VdcSendPushNotification *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdc__send_push_notification__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__notification_call_scene__init
                      (Vdcapi__VdsmNotificationCallScene         *message)
 {
-  static Vdcapi__VdsmNotificationCallScene init_value = VDCAPI__VDSM__NOTIFICATION_CALL_SCENE__INIT;
+  static const Vdcapi__VdsmNotificationCallScene init_value = VDCAPI__VDSM__NOTIFICATION_CALL_SCENE__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__notification_call_scene__get_packed_size
@@ -778,13 +812,15 @@ void   vdcapi__vdsm__notification_call_scene__free_unpacked
                      (Vdcapi__VdsmNotificationCallScene *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__notification_call_scene__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__notification_save_scene__init
                      (Vdcapi__VdsmNotificationSaveScene         *message)
 {
-  static Vdcapi__VdsmNotificationSaveScene init_value = VDCAPI__VDSM__NOTIFICATION_SAVE_SCENE__INIT;
+  static const Vdcapi__VdsmNotificationSaveScene init_value = VDCAPI__VDSM__NOTIFICATION_SAVE_SCENE__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__notification_save_scene__get_packed_size
@@ -821,13 +857,15 @@ void   vdcapi__vdsm__notification_save_scene__free_unpacked
                      (Vdcapi__VdsmNotificationSaveScene *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__notification_save_scene__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__notification_undo_scene__init
                      (Vdcapi__VdsmNotificationUndoScene         *message)
 {
-  static Vdcapi__VdsmNotificationUndoScene init_value = VDCAPI__VDSM__NOTIFICATION_UNDO_SCENE__INIT;
+  static const Vdcapi__VdsmNotificationUndoScene init_value = VDCAPI__VDSM__NOTIFICATION_UNDO_SCENE__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__notification_undo_scene__get_packed_size
@@ -864,13 +902,15 @@ void   vdcapi__vdsm__notification_undo_scene__free_unpacked
                      (Vdcapi__VdsmNotificationUndoScene *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__notification_undo_scene__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__notification_set_local_prio__init
                      (Vdcapi__VdsmNotificationSetLocalPrio         *message)
 {
-  static Vdcapi__VdsmNotificationSetLocalPrio init_value = VDCAPI__VDSM__NOTIFICATION_SET_LOCAL_PRIO__INIT;
+  static const Vdcapi__VdsmNotificationSetLocalPrio init_value = VDCAPI__VDSM__NOTIFICATION_SET_LOCAL_PRIO__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__notification_set_local_prio__get_packed_size
@@ -907,13 +947,15 @@ void   vdcapi__vdsm__notification_set_local_prio__free_unpacked
                      (Vdcapi__VdsmNotificationSetLocalPrio *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__notification_set_local_prio__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__notification_call_min_scene__init
                      (Vdcapi__VdsmNotificationCallMinScene         *message)
 {
-  static Vdcapi__VdsmNotificationCallMinScene init_value = VDCAPI__VDSM__NOTIFICATION_CALL_MIN_SCENE__INIT;
+  static const Vdcapi__VdsmNotificationCallMinScene init_value = VDCAPI__VDSM__NOTIFICATION_CALL_MIN_SCENE__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__notification_call_min_scene__get_packed_size
@@ -950,13 +992,15 @@ void   vdcapi__vdsm__notification_call_min_scene__free_unpacked
                      (Vdcapi__VdsmNotificationCallMinScene *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__notification_call_min_scene__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__notification_identify__init
                      (Vdcapi__VdsmNotificationIdentify         *message)
 {
-  static Vdcapi__VdsmNotificationIdentify init_value = VDCAPI__VDSM__NOTIFICATION_IDENTIFY__INIT;
+  static const Vdcapi__VdsmNotificationIdentify init_value = VDCAPI__VDSM__NOTIFICATION_IDENTIFY__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__notification_identify__get_packed_size
@@ -993,13 +1037,15 @@ void   vdcapi__vdsm__notification_identify__free_unpacked
                      (Vdcapi__VdsmNotificationIdentify *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__notification_identify__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__notification_set_control_value__init
                      (Vdcapi__VdsmNotificationSetControlValue         *message)
 {
-  static Vdcapi__VdsmNotificationSetControlValue init_value = VDCAPI__VDSM__NOTIFICATION_SET_CONTROL_VALUE__INIT;
+  static const Vdcapi__VdsmNotificationSetControlValue init_value = VDCAPI__VDSM__NOTIFICATION_SET_CONTROL_VALUE__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__notification_set_control_value__get_packed_size
@@ -1036,13 +1082,15 @@ void   vdcapi__vdsm__notification_set_control_value__free_unpacked
                      (Vdcapi__VdsmNotificationSetControlValue *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__notification_set_control_value__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__notification_dim_channel__init
                      (Vdcapi__VdsmNotificationDimChannel         *message)
 {
-  static Vdcapi__VdsmNotificationDimChannel init_value = VDCAPI__VDSM__NOTIFICATION_DIM_CHANNEL__INIT;
+  static const Vdcapi__VdsmNotificationDimChannel init_value = VDCAPI__VDSM__NOTIFICATION_DIM_CHANNEL__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__notification_dim_channel__get_packed_size
@@ -1079,13 +1127,15 @@ void   vdcapi__vdsm__notification_dim_channel__free_unpacked
                      (Vdcapi__VdsmNotificationDimChannel *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__notification_dim_channel__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__vdsm__notification_set_output_channel_value__init
                      (Vdcapi__VdsmNotificationSetOutputChannelValue         *message)
 {
-  static Vdcapi__VdsmNotificationSetOutputChannelValue init_value = VDCAPI__VDSM__NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE__INIT;
+  static const Vdcapi__VdsmNotificationSetOutputChannelValue init_value = VDCAPI__VDSM__NOTIFICATION_SET_OUTPUT_CHANNEL_VALUE__INIT;
   *message = init_value;
 }
 size_t vdcapi__vdsm__notification_set_output_channel_value__get_packed_size
@@ -1122,6 +1172,8 @@ void   vdcapi__vdsm__notification_set_output_channel_value__free_unpacked
                      (Vdcapi__VdsmNotificationSetOutputChannelValue *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__vdsm__notification_set_output_channel_value__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }

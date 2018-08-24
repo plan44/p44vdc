@@ -10,7 +10,7 @@
 void   vdcapi__message__init
                      (Vdcapi__Message         *message)
 {
-  static Vdcapi__Message init_value = VDCAPI__MESSAGE__INIT;
+  static const Vdcapi__Message init_value = VDCAPI__MESSAGE__INIT;
   *message = init_value;
 }
 size_t vdcapi__message__get_packed_size
@@ -47,13 +47,15 @@ void   vdcapi__message__free_unpacked
                      (Vdcapi__Message *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__message__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
 void   vdcapi__generic_response__init
                      (Vdcapi__GenericResponse         *message)
 {
-  static Vdcapi__GenericResponse init_value = VDCAPI__GENERIC_RESPONSE__INIT;
+  static const Vdcapi__GenericResponse init_value = VDCAPI__GENERIC_RESPONSE__INIT;
   *message = init_value;
 }
 size_t vdcapi__generic_response__get_packed_size
@@ -90,6 +92,8 @@ void   vdcapi__generic_response__free_unpacked
                      (Vdcapi__GenericResponse *message,
                       ProtobufCAllocator *allocator)
 {
+  if(!message)
+    return;
   assert(message->base.descriptor == &vdcapi__generic_response__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
@@ -551,7 +555,7 @@ const ProtobufCMessageDescriptor vdcapi__generic_response__descriptor =
   (ProtobufCMessageInit) vdcapi__generic_response__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-const ProtobufCEnumValue vdcapi__type__enum_values_by_number[25] =
+static const ProtobufCEnumValue vdcapi__type__enum_values_by_number[25] =
 {
   { "GENERIC_RESPONSE", "VDCAPI__TYPE__GENERIC_RESPONSE", 1 },
   { "VDSM_REQUEST_HELLO", "VDCAPI__TYPE__VDSM_REQUEST_HELLO", 2 },
@@ -582,7 +586,7 @@ const ProtobufCEnumValue vdcapi__type__enum_values_by_number[25] =
 static const ProtobufCIntRange vdcapi__type__value_ranges[] = {
 {1, 0},{8, 6},{0, 25}
 };
-const ProtobufCEnumValueIndex vdcapi__type__enum_values_by_name[25] =
+static const ProtobufCEnumValueIndex vdcapi__type__enum_values_by_name[25] =
 {
   { "GENERIC_RESPONSE", 0 },
   { "VDC_RESPONSE_GET_PROPERTY", 4 },
@@ -625,7 +629,7 @@ const ProtobufCEnumDescriptor vdcapi__type__descriptor =
   vdcapi__type__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };
-const ProtobufCEnumValue vdcapi__result_code__enum_values_by_number[13] =
+static const ProtobufCEnumValue vdcapi__result_code__enum_values_by_number[13] =
 {
   { "ERR_OK", "VDCAPI__RESULT_CODE__ERR_OK", 0 },
   { "ERR_MESSAGE_UNKNOWN", "VDCAPI__RESULT_CODE__ERR_MESSAGE_UNKNOWN", 1 },
@@ -644,7 +648,7 @@ const ProtobufCEnumValue vdcapi__result_code__enum_values_by_number[13] =
 static const ProtobufCIntRange vdcapi__result_code__value_ranges[] = {
 {0, 0},{0, 13}
 };
-const ProtobufCEnumValueIndex vdcapi__result_code__enum_values_by_name[13] =
+static const ProtobufCEnumValueIndex vdcapi__result_code__enum_values_by_name[13] =
 {
   { "ERR_FORBIDDEN", 5 },
   { "ERR_INCOMPATIBLE_API", 2 },
@@ -675,7 +679,7 @@ const ProtobufCEnumDescriptor vdcapi__result_code__descriptor =
   vdcapi__result_code__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };
-const ProtobufCEnumValue vdcapi__error_type__enum_values_by_number[4] =
+static const ProtobufCEnumValue vdcapi__error_type__enum_values_by_number[4] =
 {
   { "FAILED", "VDCAPI__ERROR_TYPE__FAILED", 0 },
   { "OVERLOADED", "VDCAPI__ERROR_TYPE__OVERLOADED", 1 },
@@ -685,7 +689,7 @@ const ProtobufCEnumValue vdcapi__error_type__enum_values_by_number[4] =
 static const ProtobufCIntRange vdcapi__error_type__value_ranges[] = {
 {0, 0},{0, 4}
 };
-const ProtobufCEnumValueIndex vdcapi__error_type__enum_values_by_name[4] =
+static const ProtobufCEnumValueIndex vdcapi__error_type__enum_values_by_name[4] =
 {
   { "DISCONNECTED", 2 },
   { "FAILED", 0 },
