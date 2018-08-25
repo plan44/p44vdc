@@ -69,8 +69,9 @@ bool DaliVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResoluti
 //  1 : first version
 //  2 : added groupNo (0..15) for DALI groups
 //  3 : added support for input devices
+//  4 : added dali2ScanLock to keep compatibility with old installations that might have scanned DALI 2.x devices as 1.0
 #define DALI_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
-#define DALI_SCHEMA_VERSION 3 // current version
+#define DALI_SCHEMA_VERSION 4 // current version
 
 string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
@@ -98,6 +99,11 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
       ");"
     );
     sql.append(inputDevicesTable);
+		// - add dali2ScanLock to globs table and set it to 0 (this is a fresh installation)
+    sql.append(
+      "ALTER TABLE globs ADD dali2ScanLock INTEGER;"
+      "UPDATE globs SET dali2ScanLock=0;" // not locked
+    );
     // reached final version in one step
     aToVersion = DALI_SCHEMA_VERSION;
   }
@@ -114,6 +120,14 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
     // reached version 3
     aToVersion = 3;
   }
+  else if (aFromVersion==3) {
+    // V3->V4: added dali2ScanLock
+    sql =
+      "ALTER TABLE globs ADD dali2ScanLock INTEGER;"
+      "UPDATE globs SET dali2ScanLock=1;"; // this is an upgrade: LOCKED!
+    // reached version 4
+    aToVersion = 4;
+  }
   return sql;
 }
 
@@ -123,8 +137,18 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 	string databaseName = getPersistentDataDir();
 	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), DALI_SCHEMA_VERSION, DALI_SCHEMA_MIN_VERSION, aFactoryReset);
+  // load dali2ScanLock
+  sqlite3pp::query qry(db);
+  if (qry.prepare("SELECT dali2ScanLock FROM globs")==SQLITE_OK) {
+    sqlite3pp::query::iterator i = qry.begin();
+    if (i!=qry.end()) {
+      daliComm->dali2ScanLock = i->get<bool>(0);
+    }
+  }
+  // update map of groups and scenes used by manually configured groups and scene-listening input devices
   loadLocallyUsedGroupsAndScenes();
-	aCompletedCB(error); // return status of DB init
+  // return status of DB init
+	aCompletedCB(error);
 }
 
 
@@ -159,6 +183,13 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
       }
     }
     #endif
+  }
+  if (aRescanFlags & (rescanmode_exhaustive|rescanmode_reenumerate)) {
+    // user is actively risking addressing changes, so we can enable DALI 2.0 scanning from now on
+    if (daliComm->dali2ScanLock) {
+      daliComm->dali2ScanLock = false;
+      db.execute("UPDATE globs SET dali2ScanLock=0");
+    }
   }
   // wipe bus addresses
   if (aRescanFlags & rescanmode_reenumerate) {

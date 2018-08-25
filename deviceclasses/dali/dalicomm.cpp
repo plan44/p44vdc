@@ -44,6 +44,7 @@ using namespace p44;
 DaliComm::DaliComm(MainLoop &aMainLoop) :
 	inherited(aMainLoop),
   runningProcedures(0),
+  dali2ScanLock(false),
   retriedReads(0),
   retriedWrites(0),
   closeAfterIdleTime(Never),
@@ -1387,9 +1388,43 @@ private:
   {
     daliComm.startProcedure();
     retries = 0;
+    readVersion();
+  }
+
+  void readVersion()
+  {
     dali2 = false;
+    deviceInfo.reset(new DaliDeviceInfo);
+    deviceInfo->shortAddress = busAddress;
+    deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // no info yet
+    daliComm.daliSendQuery(busAddress, DALICMD_QUERY_VERSION_NUMBER, boost::bind(&DaliDeviceInfoReader::handleVersion, this, _1, _2, _3));
+    return;
+  }
+
+  void handleVersion(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+  {
+    if (Error::isOK(aError) && !aNoOrTimeout) {
+      if (aResponse==1) {
+        // IEC 62386-102:2009 says the response to QUERY_VERSION_NUMBER is 1 (meaning DALI 1.0)
+        deviceInfo->vers_102 = DALI_STD_VERS_BYTE(1, 0);
+      }
+      else {
+        // IEC 62386-102:2014 says the response is content of bank0 offset 0x16 (6 bits major, 2 bits minor version)
+        deviceInfo->vers_102 = DALI_STD_VERS_NONEIS0(aResponse);
+      }
+      dali2 = deviceInfo->vers_102>=DALI_STD_VERS_BYTE(2, 0);
+      if (dali2 && daliComm.dali2ScanLock) {
+        // this looks like a DALI 2 device, but scanning is locked to ensure backwards compatibility
+        dali2 = false;
+        LOG(LOG_WARNING, "DALI shortaddress %d is a DALI 2 device, but DALI 2 serialno scanning is disabled for backwards compatibility. Force-Rescan to enable DALI 2 scanning", busAddress);
+      }
+    }
+    else {
+      LOG(LOG_WARNING, "DALI shortaddress %d did not respond to QUERY_VERSION_NUMBER -> probably bad", busAddress);
+    }
     readBank0();
   }
+
 
   void readBank0()
   {
@@ -1403,9 +1438,6 @@ private:
 
   void handleBank0Header(DaliComm::MemoryVectorPtr aBank0Data, ErrorPtr aError)
   {
-    deviceInfo.reset(new DaliDeviceInfo);
-    deviceInfo->shortAddress = busAddress;
-    deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // no info yet
     if (aError) {
       return complete(aError);
     }
@@ -1432,13 +1464,14 @@ private:
 
   void handleBank0Data(DaliComm::MemoryVectorPtr aBank0Data, ErrorPtr aError)
   {
-    deviceInfo.reset(new DaliDeviceInfo);
-    deviceInfo->shortAddress = busAddress;
-    deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // no info yet
     if (aError) {
       return complete(aError);
     }
-    if (aBank0Data->size()>=DALIMEM_BANK0_MINBYTES) {
+    if (aBank0Data->size()<DALIMEM_BANK0_MINBYTES) {
+      // not enough bytes
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "Not enough device info bytes in bank0 at shortAddress %d", busAddress));
+    }
+    else {
       // sum up starting with checksum itself, result must be 0x00 in the end
       for (int i=0x01; i<aBank0Data->size(); i++) {
         bankChecksum += (*aBank0Data)[i];
@@ -1456,16 +1489,18 @@ private:
         return complete(Error::err<DaliCommError>(DaliCommError::BadChecksum, "bad DALI memory bank 0 checksum at shortAddress %d", busAddress));
       }
       // correct data per checksum
+      if (dali2 && aBank0Data->size()<DALIMEM_BANK0_MINBYTES_v2_0) {
+        LOG(LOG_ERR, "DALI shortaddress %d claims being DALI 2 but has not enough readable bytes (%lu/%d) in bank 0", busAddress, aBank0Data->size(), DALIMEM_BANK0_MINBYTES_v2_0);
+        return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "Not enough bytes for a DALI 2 device in bank0 at shortAddress %d", busAddress));
+      }
+      // enough data
       deviceInfo->devInfStatus = DaliDeviceInfo::devinf_solid; // assume solid info present
       // get standard version if available
-      if (aBank0Data->size()>=DALIMEM_BANK0_MINBYTES_v2_0) {
-        // we have the standard versions, save them
+      if (dali2 && aBank0Data->size()>=DALIMEM_BANK0_MINBYTES_v2_0) {
+        // we have DALI2 with standard version numbers
+        // Note: vers_102 decides about scanning for DALI2 infos at all and is retrieved with QUERY_VERSION_NUMBER above, not saved again here!
         deviceInfo->vers_101 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x15]);
-        deviceInfo->vers_102 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x16]);
         deviceInfo->vers_103 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x17]);
-        dali2 =
-          deviceInfo->vers_101>=DALI_STD_VERS_BYTE(2, 0) &&
-          (deviceInfo->vers_102>=DALI_STD_VERS_BYTE(2, 0) || deviceInfo->vers_103>=DALI_STD_VERS_BYTE(2, 0));
       }
       // check plausibility of GTIN/Version/SN data
       // Know bad signatures we must catch:
@@ -1478,7 +1513,7 @@ private:
       uint8_t numFFs = 0;
       uint8_t maxSame = 0;
       uint8_t sameByte = 0;
-      int idLastByte = dali2 ? 0x12 : 0x0E; // 2.0 has longer ID field
+      int idLastByte = dali2 ? 0x12 : 0x0E; // >=2.0 has longer ID field
       for (int i=0x03; i<=idLastByte; i++) {
         uint8_t b = (*aBank0Data)[i];
         if(b==0xFF) {
@@ -1587,10 +1622,6 @@ private:
         return complete(ErrorPtr());
       }
     }
-    else {
-      // not enough bytes
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "Not enough bytes read from bank0 at shortAddress %d", busAddress));
-    }
   };
 
 
@@ -1661,7 +1692,7 @@ private:
       // OEM Serial: bytes 0x09..0x0C for <DALI 2.0
       //             bytes 0x09..0x10 for >=DALI 2.0
       allFF = true;
-      int serialLastByte = dali2 ? 0x10 : 0x0C; // 2.0 has longer ID field
+      int serialLastByte = dali2 ? 0x10 : 0x0C; // >=2.0 has longer ID field
       for (int i=0x0B; i<=serialLastByte; i++) {
         b = (*aBank1Data)[i];
         if (b!=0xFF) allFF = false;

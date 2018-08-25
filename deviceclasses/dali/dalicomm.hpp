@@ -218,6 +218,8 @@ namespace p44 {
     long retriedReads;
     long retriedWrites;
 
+    bool dali2ScanLock; ///< if set, scanner will interpret memory bank 0 as DALI 1.0 (because there is no real backwards compatibility between 1.0 and 2.0)
+
     DaliComm(MainLoop &aMainLoop);
     virtual ~DaliComm();
 
