@@ -1432,7 +1432,7 @@ private:
     maxBank = 0; // all devices must have a bank 0, rest is optional
     // Note: official checksum algorithm is: 0-byte2-byte3...byteLast, check with checksum+byte2+byte3...byteLast==0
     bankChecksum = 0;
-    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Header, this, _1, _2), busAddress, 0, 0, DALIMEM_BANK_HDRBYTES, NULL);
+    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Header, this, _1, _2), busAddress, 0, 0, DALIMEM_BANK_HDRBYTES, DaliComm::MemoryVectorPtr());
   };
 
 
@@ -1629,7 +1629,7 @@ private:
   void readBank1()
   {
     bankChecksum = 0;
-    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Header, this, _1, _2), busAddress, 1, 0, DALIMEM_BANK_HDRBYTES, NULL);
+    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Header, this, _1, _2), busAddress, 1, 0, DALIMEM_BANK_HDRBYTES, DaliComm::MemoryVectorPtr());
   }
 
 

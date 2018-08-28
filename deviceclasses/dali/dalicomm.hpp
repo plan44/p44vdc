@@ -428,7 +428,7 @@ namespace p44 {
     /// @param aMemory optional existing memory vector to append to
     /// @note reading none or less data than requested is not considered an error - aMemoryVectorPtr param in callback will
     ///   just return the number of bytes that could be read; check its size to make sure expected result was returned
-    void daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint16_t aNumBytes, DaliComm::MemoryVectorPtr aMemory = NULL);
+    void daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint16_t aNumBytes, DaliComm::MemoryVectorPtr aMemory = DaliComm::MemoryVectorPtr());
 
     /// callback function for daliReadDeviceInfo
     typedef boost::function<void (DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError)> DaliDeviceInfoCB;
