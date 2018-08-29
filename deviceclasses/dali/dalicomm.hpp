@@ -101,7 +101,7 @@ namespace p44 {
       BridgeUnknown,
       DALIFrame,
       MissingData,
-      BadChecksum,
+      BadData,
       InvalidAnswer,
       AddressesMissing,
       AddressCollisions,
@@ -414,11 +414,19 @@ namespace p44 {
     void daliBusTestData(StatusCB aResultCB, DaliAddress aAddress, uint8_t aNumCycles);
 
 
-    typedef boost::shared_ptr<std::vector<uint8_t> > MemoryVectorPtr;
+    /// a single DALI bank memory cell
+    typedef struct MemoryCell {
+      uint8_t b; ///< the byte value of the cell
+      bool no; ///< if set, the value of the cell is NO (timeout when accessing)
+      MemoryCell(uint8_t aB, bool aNo = false) : b(aB), no(aNo) {};
+    } MemoryCell;
+    /// a series of DALI memory cells
+    typedef std::vector<MemoryCell> MemoryVector;
+    typedef boost::shared_ptr<std::vector<MemoryCell> > MemoryVectorPtr;
 
     /// callback function for daliReadMemory
-
     typedef boost::function<void (MemoryVectorPtr aMemoryVectorPtr, ErrorPtr aError)> DaliReadMemoryCB;
+
     /// Read DALI memory
     /// @param aResultCB callback receiving the data read as a vector<uint8_t>
     /// @param aAddress short address of device to read

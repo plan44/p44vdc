@@ -498,15 +498,15 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
 void DaliVdc::deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::iterator aNextDev, StatusCB aCompletedCB, DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError)
 {
   bool missingData = aError && aError->isError(DaliCommError::domain(), DaliCommError::MissingData);
-  bool badChecksum = aError && aError->isError(DaliCommError::domain(), DaliCommError::BadChecksum);
-  if (!Error::isOK(aError) && !missingData && !badChecksum) {
+  bool badData = aError && aError->isError(DaliCommError::domain(), DaliCommError::BadData);
+  if (!Error::isOK(aError) && !missingData && !badData) {
     // real fatal error, can't continue
     LOG(LOG_ERR, "Error reading device info: %s",aError->description().c_str());
     return aCompletedCB(aError);
   }
   // no error, or error but due to missing or bad data -> device exists and possibly still has ok device info
   if (missingData) { LOG(LOG_INFO, "Device at shortAddress %d is missing all or some device info data",aDaliDeviceInfoPtr->shortAddress); }
-  if (badChecksum) { LOG(LOG_INFO, "Device at shortAddress %d has checksum errors at least in one info bank",aDaliDeviceInfoPtr->shortAddress); }
+  if (badData) { LOG(LOG_INFO, "Device at shortAddress %d has bad data in at least in one info bank",aDaliDeviceInfoPtr->shortAddress); }
   // update entry in the cache
   // Note: callback always gets a deviceInfo back, possibly with devinf_none if device does not have devInf at all (or garbage)
   //   So, assigning this here will make sure no entries with devinf_needsquery will remain.

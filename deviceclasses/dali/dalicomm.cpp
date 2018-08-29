@@ -1268,7 +1268,6 @@ class DaliMemoryReader : public P44Obj
   int bytesToRead;
   int retries;
   uint8_t currentOffset;
-  typedef std::vector<uint8_t> MemoryVector;
 public:
   static void readMemory(DaliComm &aDaliComm, DaliComm::DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint16_t aNumBytes, DaliComm::MemoryVectorPtr aMemory)
   {
@@ -1282,7 +1281,7 @@ private:
     busAddress(aAddress),
     memory(aMemory)
   {
-    if (!memory) memory = DaliComm::MemoryVectorPtr(new MemoryVector);
+    if (!memory) memory = DaliComm::MemoryVectorPtr(new DaliComm::MemoryVector);
     daliComm.startProcedure();
     LOG(LOG_INFO, "DALI bus address %d - reading %d bytes from bank %d at offset %d:", busAddress, aNumBytes, aBank, aOffset);
     // set DTR1 = bank
@@ -1307,9 +1306,20 @@ private:
   // handle scan result
   void handleResponse(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError, bool aRetried)
   {
-    if (!Error::isOK(aError) || aNoOrTimeout) {
+    if (!Error::isOK(aError)) {
+      // error
       if (retries++<DALI_MAX_MEMREAD_RETRIES) {
         // restart reading explicitly at current offset
+        startReading();
+        return;
+      }
+    }
+    else if (aNoOrTimeout) {
+      // no response, means NO DATA
+      memory->push_back(DaliComm::MemoryCell(0xFF, true));
+      // restart at next location
+      currentOffset++;
+      if (--bytesToRead>0) {
         startReading();
         return;
       }
@@ -1323,7 +1333,7 @@ private:
       }
       // byte received, append to vector
       retries = 0;
-      memory->push_back(aResponse);
+      memory->push_back(DaliComm::MemoryCell(aResponse));
       currentOffset++;
       if (--bytesToRead>0) {
         // more bytes to read
@@ -1331,13 +1341,18 @@ private:
         return;
       }
     }
-    // read done, timeout or error, return memory to callback
+    // read done or error, return memory to callback
     daliComm.endProcedure();
     if (LOGENABLED(LOG_INFO)) {
       // dump data
       int o=0;
-      for (MemoryVector::iterator pos = memory->begin(); pos!=memory->end(); ++pos, ++o) {
-        LOG(LOG_INFO, "- %03d/0x%02X : 0x%02X/%03d", o, o, *pos, *pos);
+      for (DaliComm::MemoryVector::iterator pos = memory->begin(); pos!=memory->end(); ++pos, ++o) {
+        if (pos->no) {
+          LOG(LOG_INFO, "- %03d/0x%02X : NO (timeout)", o, o);
+        }
+        else {
+          LOG(LOG_INFO, "- %03d/0x%02X : 0x%02X/%03d", o, o, pos->b, pos->b);
+        }
       }
     }
     callback(memory, aError);
@@ -1362,7 +1377,7 @@ void DaliComm::daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, 
 // MARK: ===== DALI device info reading
 
 #define DALI_MAX_BANKREAD_RETRIES 3 // how many times reading bank will be tried in case of checksum error
-
+#define DALI2_MAX_BANK0_REREADS 3 // re-read 3 times at most
 
 class DaliDeviceInfoReader : public P44Obj
 {
@@ -1441,25 +1456,47 @@ private:
     if (aError) {
       return complete(aError);
     }
-    if (aBank0Data->size()==DALIMEM_BANK_HDRBYTES) {
-      // valid header
-      maxBank = (*aBank0Data)[2]; // this is the highest bank number implemented in this device
+    if (!(*aBank0Data)[2].no) {
+      maxBank = (*aBank0Data)[2].b; // this is the highest bank number implemented in this device
       LOG(LOG_INFO, "- highest available DALI memory bank = %d", maxBank);
-      uint16_t n = (*aBank0Data)[0]+1; // last available location + 1 = number of bytes in bank 0
-      LOG(LOG_INFO, "- number of bytes available in bank0 = %d/0x%x", n, n);
-      if (n<DALIMEM_BANK0_MINBYTES) {
-        return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at shortAddress %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK0_MINBYTES));
-      }
-      // append actual bank contents
-      DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Data, this, _1, _2), busAddress, 0, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank0Data);
-      return;
     }
-    else {
-      // not enough header bytes
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at shortAddress %d has not enough header bytes", busAddress));
+    if ((*aBank0Data)[0].no) {
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at shortAddress %d does not exist", busAddress));
     }
+    uint16_t n = (*aBank0Data)[0].b+1; // last available location + 1 = number of bytes in bank 0
+    LOG(LOG_INFO, "- number of bytes available in bank0 = %d/0x%x", n, n);
+    if (n<DALIMEM_BANK0_MINBYTES || (dali2 && n<DALIMEM_BANK0_MINBYTES_v2_0)) {
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at shortAddress %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK0_MINBYTES));
+    }
+    // no need to read more than what we need for dali2, because there's no checksum, anyway
+    if (dali2 && n>DALIMEM_BANK0_MINBYTES_v2_0) n = DALIMEM_BANK0_MINBYTES_v2_0;
+    // append actual bank contents
+    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Data, this, _1, _2), busAddress, 0, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank0Data);
+    return;
   }
 
+
+  void handleBank0Verify(DaliComm::MemoryVectorPtr aOriginalBank0Data, DaliComm::MemoryVectorPtr aGTINSerialAgain, ErrorPtr aError)
+  {
+    if (Error::isOK(aError)) {
+      for (int i=DALIMEM_BANK_HDRBYTES; i<=0x12; i++) {
+        if ((*aOriginalBank0Data)[i].b!=(*aGTINSerialAgain)[i-DALIMEM_BANK_HDRBYTES].b) {
+          if (retries++<DALI2_MAX_BANK0_REREADS) {
+            // try again
+            LOG(LOG_WARNING, "DALI2 bank 0 GTIN/Serial bytes differ when re-read at offset 0x%02x at bus address %d -> retrying", i, busAddress);
+            readBank0();
+            return;
+          }
+          // to many retries
+          LOG(LOG_ERR, "DALI shortaddress %d Bank 0 cannot be read reliably", busAddress);
+          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "DALI memory bank 0 cannot be reliably read at shortAddress %d", busAddress));
+        }
+      }
+      // verified, make sure we don't re-read
+      retries = DALI2_MAX_BANK0_REREADS; // no more retries
+    }
+    handleBank0Data(aOriginalBank0Data, aError);
+  }
 
 
   void handleBank0Data(DaliComm::MemoryVectorPtr aBank0Data, ErrorPtr aError)
@@ -1467,14 +1504,21 @@ private:
     if (aError) {
       return complete(aError);
     }
-    if (aBank0Data->size()<DALIMEM_BANK0_MINBYTES) {
-      // not enough bytes
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "Not enough device info bytes in bank0 at shortAddress %d", busAddress));
+    if (dali2) {
+      if (retries<DALI2_MAX_BANK0_REREADS) {
+        // DALI2: no checksum, so read crucial bytes (GTIN, serial) again to make sure
+        DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Verify, this, aBank0Data, _1, _2), busAddress, 0, DALIMEM_BANK_HDRBYTES, 0x12+1-DALIMEM_BANK_HDRBYTES, DaliComm::MemoryVectorPtr());
+        return;
+      }
+      // offset 1 should be NO
+      if (!(*aBank0Data)[1].no) {
+        LOG(LOG_WARNING, "DALI2 bank 0 should return NO for offset 1, but returned 0x%x at bus address %d", (*aBank0Data)[1].b, busAddress);
+      }
     }
     else {
-      // sum up starting with checksum itself, result must be 0x00 in the end
+      // DALI 1: sum up starting with checksum (offset 0x01) itself, result must be 0x00 in the end
       for (int i=0x01; i<aBank0Data->size(); i++) {
-        bankChecksum += (*aBank0Data)[i];
+        bankChecksum += (*aBank0Data)[i].b;
       }
       if (bankChecksum!=0x00) {
         // - check retries
@@ -1486,141 +1530,143 @@ private:
         }
         // - report error
         LOG(LOG_ERR, "DALI shortaddress %d Bank 0 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
-        return complete(Error::err<DaliCommError>(DaliCommError::BadChecksum, "bad DALI memory bank 0 checksum at shortAddress %d", busAddress));
+        return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 0 checksum at shortAddress %d", busAddress));
       }
-      // correct data per checksum
-      if (dali2 && aBank0Data->size()<DALIMEM_BANK0_MINBYTES_v2_0) {
-        LOG(LOG_ERR, "DALI shortaddress %d claims being DALI 2 but has not enough readable bytes (%lu/%d) in bank 0", busAddress, aBank0Data->size(), DALIMEM_BANK0_MINBYTES_v2_0);
-        return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "Not enough bytes for a DALI 2 device in bank0 at shortAddress %d", busAddress));
+    }
+    // we have verified (re-read or checksummed) data
+    deviceInfo->devInfStatus = DaliDeviceInfo::devinf_solid; // assume solid info present
+    // get standard version if available
+    if (dali2 && aBank0Data->size()>=DALIMEM_BANK0_MINBYTES_v2_0) {
+      // we have DALI2 with standard version numbers
+      // Note: vers_102 decides about scanning for DALI2 infos at all and is retrieved with QUERY_VERSION_NUMBER above, not saved again here!
+      deviceInfo->vers_101 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x15].b);
+      deviceInfo->vers_103 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x17].b);
+    }
+    // check plausibility of GTIN/Version/SN data
+    // Know bad signatures we must catch:
+    // - Meanwell:
+    //   all 01 or 05
+    // - linealight.com/i-LÈD/eral LED-FGI332:
+    //   71 01 01 FF 02 FF FF FF 01 4B 00 00 FF FF (6*FF, 3 of them consecutive, unfortunately gtin checkdigit by accident ok)
+    uint8_t refByte = 0;
+    uint8_t numSame = 1; // we always have one "consecutive" number of bytes
+    uint8_t numFFs = 0;
+    uint8_t maxSame = 0;
+    uint8_t sameByte = 0;
+    int idLastByte = dali2 ? 0x12 : 0x0E; // >=2.0 has longer ID field
+    for (int i=0x03; i<=idLastByte; i++) {
+      if ((*aBank0Data)[i].no) {
+        LOG(LOG_ERR, "DALI shortaddress %d Bank 0 has missing byte (timeout) at offset 0x%02X -> invalid GTIN/Serial data", busAddress, i);
+        deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+        break;
       }
-      // enough data
-      deviceInfo->devInfStatus = DaliDeviceInfo::devinf_solid; // assume solid info present
-      // get standard version if available
-      if (dali2 && aBank0Data->size()>=DALIMEM_BANK0_MINBYTES_v2_0) {
-        // we have DALI2 with standard version numbers
-        // Note: vers_102 decides about scanning for DALI2 infos at all and is retrieved with QUERY_VERSION_NUMBER above, not saved again here!
-        deviceInfo->vers_101 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x15]);
-        deviceInfo->vers_103 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x17]);
+      uint8_t b = (*aBank0Data)[i].b;
+      if(b==0xFF) {
+        numFFs++; // count 0xFFs as suspect values
       }
-      // check plausibility of GTIN/Version/SN data
-      // Know bad signatures we must catch:
-      // - Meanwell:
-      //   all 01 or 05
-      // - linealight.com/i-LÈD/eral LED-FGI332:
-      //   71 01 01 FF 02 FF FF FF 01 4B 00 00 FF FF (6*FF, 3 of them consecutive, unfortunately gtin checkdigit by accident ok)
-      uint8_t refByte = 0;
-      uint8_t numSame = 1; // we always have one "consecutive" number of bytes
-      uint8_t numFFs = 0;
-      uint8_t maxSame = 0;
-      uint8_t sameByte = 0;
-      int idLastByte = dali2 ? 0x12 : 0x0E; // >=2.0 has longer ID field
-      for (int i=0x03; i<=idLastByte; i++) {
-        uint8_t b = (*aBank0Data)[i];
-        if(b==0xFF) {
-          numFFs++; // count 0xFFs as suspect values
+      if(b==refByte) {
+        numSame++; // count consecutively equal bytes
+        if (numSame>maxSame) {
+          maxSame = numSame;
+          sameByte = b;
         }
-        if(b==refByte) {
-          numSame++; // count consecutively equal bytes
-          if (numSame>maxSame) {
-            maxSame = numSame;
-            sameByte = b;
+      }
+      else {
+        refByte = b;
+        numSame = 1; // first byte in a possible row of "consecutive" ones = the reference byte
+      }
+    }
+    if (maxSame>=10 || (numFFs>=6 && maxSame>=3)) {
+      // this is tuned heuristics: >=6 FFs total plus >=3 consecutive equal non-zeros are considered suspect (because linealight.com/i-LÈD/eral LED-FGI332 has that)
+      LOG(LOG_ERR, "DALI shortaddress %d Bank 0 has %d consecutive bytes of 0x%02X and %d bytes of 0xFF  - indicates invalid GTIN/Serial data -> ignoring", busAddress, maxSame, sameByte, numFFs);
+      deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+    }
+    // GTIN: bytes 0x03..0x08, MSB first
+    // All 0xFF is official DALI for "no GTIN"
+    deviceInfo->gtin = 0;
+    bool allFF = true;
+    uint8_t b;
+    for (int i=0x03; i<=0x08; i++) {
+      b = (*aBank0Data)[i].b;
+      if (b!=0xFF) allFF = false;
+      if ((*aBank0Data)[i].no) b = 0; // consider missing bytes as zeroes
+      deviceInfo->gtin = (deviceInfo->gtin << 8) + b;
+    }
+    if (allFF) deviceInfo->gtin = 0; // all FF means no GTIN
+    // Firmware version
+    deviceInfo->fw_version_major = (*aBank0Data)[0x09].b;
+    deviceInfo->fw_version_minor = (*aBank0Data)[0x0A].b;
+    // Serial: bytes 0x0B..0x0E for <DALI 2.0
+    //         bytes 0x0B..0x12 for >=DALI 2.0
+    deviceInfo->serialNo = 0;
+    allFF = true;
+    int serialLastByte = dali2 ? 0x12 : 0x0E; // 2.0 has longer ID field
+    for (int i=0x0B; i<=serialLastByte; i++) {
+      b = (*aBank0Data)[i].b;
+      if (b!=0xFF) allFF = false;
+      if ((*aBank0Data)[i].no) b = 0; // consider missing bytes as zeroes
+      deviceInfo->serialNo = (deviceInfo->serialNo << 8) + (*aBank0Data)[i].b;
+    }
+    if (allFF) deviceInfo->serialNo = 0; // all FF means no serial number
+    // now some more plausibility checks at the GTIN/serial level
+    if (deviceInfo->gtin==0) {
+      deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // no usable GTIN, consider devinf invalid
+    }
+    else if (gtinCheckDigit(deviceInfo->gtin)!=0) {
+      // invalid GTIN
+      LOG(LOG_ERR, "DALI shortaddress %d has invalid GTIN=%lld/0x%llX (wrong check digit) -> ignoring", busAddress, deviceInfo->gtin, deviceInfo->gtin);
+      deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+    }
+    else {
+      // GTIN by itself looks ok
+      if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
+        // GTIN has not been ruled out before -> seems valid
+        int i=0;
+        while (DALI_GTIN_blacklist[i]!=0) {
+          if (deviceInfo->gtin==DALI_GTIN_blacklist[i]) {
+            // found in blacklist, invalidate serial
+            LOG(LOG_ERR, "GTIN %lld of DALI shortaddress %d is blacklisted because it is known to have invalid serial -> invalidating serial", deviceInfo->gtin, busAddress);
+            deviceInfo->serialNo = 0; // reset, make invalid for check below
+            break;
           }
+          i++;
+        }
+      }
+      if (deviceInfo->serialNo==0) {
+        if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
+          // if everything else is ok, except for a missing serial number, consider GTIN valid
+          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_only_gtin;
+          LOG(LOG_WARNING, "DALI shortaddress %d has no serial number but valid GTIN -> just using GTIN", busAddress);
         }
         else {
-          refByte = b;
-          numSame = 1; // first byte in a possible row of "consecutive" ones = the reference byte
+          // was not solid before, consider completely invalid
+          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none;
         }
       }
-      if (maxSame>=10 || (numFFs>=6 && maxSame>=3)) {
-        // this is tuned heuristics: >=6 FFs total plus >=3 consecutive equal non-zeros are considered suspect (because linealight.com/i-LÈD/eral LED-FGI332 has that)
-        LOG(LOG_ERR, "DALI shortaddress %d Bank 0 has %d consecutive bytes of 0x%02X and %d bytes of 0xFF  - indicates invalid GTIN/Serial data -> ignoring", busAddress, maxSame, sameByte, numFFs);
-        deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+    }
+    // Note: before 2015-02-27, we had a bug which caused the last extra byte not being read, so the checksum reached zero
+    // only if the last byte was 0. We also passed the if checksum was 0xFF, because our reference devices always had 0x01 in
+    // the last byte, and I assumed missing by 1 was the result of not precise enough specs or a bug in the device.
+    #if OLD_BUGGY_CHKSUM_COMPATIBLE
+    if (!dali2 && bankChecksum==0 && deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
+      // by specs, this is a correct checksum, and a seemingly solid device info
+      // - now check if the buggy checker would have passed it, too (which is when last byte is 0x01 or 0x00)
+      uint8_t lastByte = (*aBank0Data)[aBank0Data->size()-1].b;
+      if (lastByte!=0x00 && lastByte!=0x01) {
+        // this bank 0 data would not have passed the buggy checker
+        deviceInfo->devInfStatus = DaliDeviceInfo::devinf_maybe; // might be usable to identify device, but needs backwards compatibility checking
       }
-      // GTIN: bytes 0x03..0x08, MSB first
-      // All 0xFF is official DALI for "no GTIN"
-      deviceInfo->gtin = 0;
-      bool allFF = true;
-      uint8_t b;
-      for (int i=0x03; i<=0x08; i++) {
-        b = (*aBank0Data)[i];
-        if (b!=0xFF) allFF = false;
-        deviceInfo->gtin = (deviceInfo->gtin << 8) + b;
-      }
-      if (allFF) deviceInfo->gtin = 0; // all FF means no GTIN
-      // Firmware version
-      deviceInfo->fw_version_major = (*aBank0Data)[0x09];
-      deviceInfo->fw_version_minor = (*aBank0Data)[0x0A];
-      // Serial: bytes 0x0B..0x0E for <DALI 2.0
-      //         bytes 0x0B..0x12 for >=DALI 2.0
-      deviceInfo->serialNo = 0;
-      allFF = true;
-      int serialLastByte = dali2 ? 0x12 : 0x0E; // 2.0 has longer ID field
-      for (int i=0x0B; i<=serialLastByte; i++) {
-        b = (*aBank0Data)[i];
-        if (b!=0xFF) allFF = false;
-        deviceInfo->serialNo = (deviceInfo->serialNo << 8) + (*aBank0Data)[i];
-      }
-      if (allFF) deviceInfo->serialNo = 0; // all FF means no serial number
-      // now some more plausibility checks at the GTIN/serial level
-      if (deviceInfo->gtin==0) {
-        deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // no usable GTIN, consider devinf invalid
-      }
-      else if (gtinCheckDigit(deviceInfo->gtin)!=0) {
-        // invalid GTIN
-        LOG(LOG_ERR, "DALI shortaddress %d has invalid GTIN=%lld/0x%llX (wrong check digit) -> ignoring", busAddress, deviceInfo->gtin, deviceInfo->gtin);
-        deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
-      }
-      else {
-        // GTIN by itself looks ok
-        if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
-          // GTIN has not been ruled out before -> seems valid
-          int i=0;
-          while (DALI_GTIN_blacklist[i]!=0) {
-            if (deviceInfo->gtin==DALI_GTIN_blacklist[i]) {
-              // found in blacklist, invalidate serial
-              LOG(LOG_ERR, "GTIN %lld of DALI shortaddress %d is blacklisted because it is known to have invalid serial -> invalidating serial", deviceInfo->gtin, busAddress);
-              deviceInfo->serialNo = 0; // reset, make invalid for check below
-              break;
-            }
-            i++;
-          }
-        }
-        if (deviceInfo->serialNo==0) {
-          if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
-            // if everything else is ok, except for a missing serial number, consider GTIN valid
-            deviceInfo->devInfStatus = DaliDeviceInfo::devinf_only_gtin;
-            LOG(LOG_WARNING, "DALI shortaddress %d has no serial number but valid GTIN -> just using GTIN", busAddress);
-          }
-          else {
-            // was not solid before, consider completely invalid
-            deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none;
-          }
-        }
-      }
-      // Note: before 2015-02-27, we had a bug which caused the last extra byte not being read, so the checksum reached zero
-      // only if the last byte was 0. We also passed the if checksum was 0xFF, because our reference devices always had 0x01 in
-      // the last byte, and I assumed missing by 1 was the result of not precise enough specs or a bug in the device.
-      #if OLD_BUGGY_CHKSUM_COMPATIBLE
-      if (bankChecksum==0 && deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
-        // by specs, this is a correct checksum, and a seemingly solid device info
-        // - now check if the buggy checker would have passed it, too (which is when last byte is 0x01 or 0x00)
-        uint8_t lastByte = (*aBank0Data)[aBank0Data->size()-1];
-        if (lastByte!=0x00 && lastByte!=0x01) {
-          // this bank 0 data would not have passed the buggy checker
-          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_maybe; // might be usable to identify device, but needs backwards compatibility checking
-        }
-      }
-      #endif
-      // done with bank0
-      if (maxBank>0) {
-        // now read OEM info from bank1
-        retries = 0;
-        readBank1();
-      }
-      else {
-        // device does not have bank1, so we are complete
-        return complete(ErrorPtr());
-      }
+    }
+    #endif
+    // done with bank0
+    if (maxBank>0) {
+      // now read OEM info from bank1
+      retries = 0;
+      readBank1();
+    }
+    else {
+      // device does not have bank1, so we are complete
+      return complete(ErrorPtr());
     }
   };
 
@@ -1638,21 +1684,18 @@ private:
     if (aError) {
       return complete(aError);
     }
-    if (aBank1Data->size()==DALIMEM_BANK_HDRBYTES) {
-      // valid header
-      uint16_t n = (*aBank1Data)[0]+1; // last available location + 1 = number of bytes in bank 1
-      LOG(LOG_INFO, "- number of bytes available in bank1 = %d/0x%X", n, n);
-      if (n<DALIMEM_BANK1_MINBYTES) {
-        return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at shortAddress %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK1_MINBYTES));
-      }
-      // append actual bank contents
-      DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Data, this, _1, _2), busAddress, 0, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank1Data);
-      return;
-    }
-    else {
-      // not enough header bytes
+    if ((*aBank1Data)[0].no) {
       return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at shortAddress %d has not enough header bytes", busAddress));
     }
+    // valid byte count
+    uint16_t n = (*aBank1Data)[0].b+1; // last available location + 1 = number of bytes in bank 1
+    LOG(LOG_INFO, "- number of bytes available in bank1 = %d/0x%X", n, n);
+    if (n<DALIMEM_BANK1_MINBYTES) {
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at shortAddress %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK1_MINBYTES));
+    }
+    // append actual bank contents
+    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Data, this, _1, _2), busAddress, 0, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank1Data);
+    return;
   }
 
 
@@ -1663,29 +1706,32 @@ private:
     }
     if (aBank1Data->size()>=DALIMEM_BANK1_MINBYTES) {
       // sum up starting with checksum itself, result must be 0x00 in the end
-      for (int i=0x01; i<aBank1Data->size(); i++) {
-        bankChecksum += (*aBank1Data)[i];
-      }
-      if (bankChecksum!=0x00) {
-        // - check retries
-        if (retries++<DALI_MAX_BANKREAD_RETRIES) {
-          // retry reading bank 0 info
-          LOG(LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank1 info from shortAddress %d -> retrying", bankChecksum, retries, busAddress);
-          readBank1();
-          return;
+      if (!dali2) {
+        // only DALI 1 does have checksums
+        for (int i=0x01; i<aBank1Data->size(); i++) {
+          bankChecksum += (*aBank1Data)[i].b;
         }
-        // - report error
-        LOG(LOG_ERR, "DALI shortaddress %d Bank 1 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
-        return complete(Error::err<DaliCommError>(DaliCommError::BadChecksum, "bad DALI memory bank 1 checksum at shortAddress %d", busAddress));
+        if (bankChecksum!=0x00) {
+          // - check retries
+          if (retries++<DALI_MAX_BANKREAD_RETRIES) {
+            // retry reading bank 0 info
+            LOG(LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank1 info from shortAddress %d -> retrying", bankChecksum, retries, busAddress);
+            readBank1();
+            return;
+          }
+          // - report error
+          LOG(LOG_ERR, "DALI shortaddress %d Bank 1 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
+          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 1 checksum at shortAddress %d", busAddress));
+        }
       }
-      // correct data per checksum
       // OEM GTIN: bytes 0x03..0x08, MSB first
       deviceInfo->oem_gtin = 0;
       bool allFF = true;
       uint8_t b;
       for (int i=0x03; i<=0x08; i++) {
-        b = (*aBank1Data)[i];
+        b = (*aBank1Data)[i].b;
         if (b!=0xFF) allFF = false;
+        if ((*aBank1Data)[i].no) b = 0; // consider missing bytes as zeroes
         deviceInfo->oem_gtin = (deviceInfo->oem_gtin << 8) + b;
       }
       if (allFF) deviceInfo->oem_gtin = 0; // all FF means no OEM GTIN
@@ -1694,8 +1740,9 @@ private:
       allFF = true;
       int serialLastByte = dali2 ? 0x10 : 0x0C; // >=2.0 has longer ID field
       for (int i=0x0B; i<=serialLastByte; i++) {
-        b = (*aBank1Data)[i];
+        b = (*aBank1Data)[i].b;
         if (b!=0xFF) allFF = false;
+        if ((*aBank1Data)[i].no) b = 0; // consider missing bytes as zeroes
         deviceInfo->oem_serialNo = (deviceInfo->oem_serialNo << 8) + b;
       }
       if (allFF) deviceInfo->oem_serialNo = 0; // all FF means no OEM GTIN
