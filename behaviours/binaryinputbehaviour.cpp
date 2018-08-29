@@ -136,6 +136,7 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
       // push the new value right now
       if (pushBehaviourState()) {
         lastPush = now;
+        debounceTicket.cancel(); // pushed now, no need to push later
       }
       else if (device.isPublicDS()) {
         BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
