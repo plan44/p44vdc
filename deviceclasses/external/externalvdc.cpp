@@ -23,12 +23,20 @@
 
 #if ENABLE_EXTERNAL
 
-#include "movinglightbehaviour.hpp"
 #include "shadowbehaviour.hpp"
-#include "climatecontrolbehaviour.hpp"
-#include "ventilationbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
 #include "sensorbehaviour.hpp"
+#include "colorlightbehaviour.hpp"
+#include "climatecontrolbehaviour.hpp"
+
+#if ENABLE_EXTERNAL_EXOTIC
+  #include "movinglightbehaviour.hpp"
+#endif
+
+#if ENABLE_FCU_SUPPORT
+  #include "ventilationbehaviour.hpp"
+#endif
+
 
 #if ENABLE_EXTERNAL_SINGLEDEVICE
   #include "jsonvdcapi.hpp"
@@ -36,9 +44,6 @@
 
 using namespace p44;
 
-#ifndef ENABLE_FCU_SUPPORT
-  #define ENABLE_FCU_SUPPORT 1
-#endif
 
 #if ENABLE_EXTERNAL_SINGLEDEVICE
 
@@ -474,17 +479,6 @@ ErrorPtr ExternalDevice::processSimpleMessage(string aMessageType, string aValue
 }
 
 
-static int behaviourIndexById(BehaviourVector &aBV, const string aId)
-{
-  for (int i=0; i<aBV.size(); i++) {
-    if (aId==aBV[i]->getApiId(3)) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-
 static int channelIndexById(OutputBehaviourPtr aOB, const string aId)
 {
   ChannelBehaviourPtr cb = aOB->getChannelById(aId);
@@ -613,6 +607,9 @@ void ExternalDevice::releaseButton(ButtonBehaviourPtr aButtonBehaviour)
 }
 
 
+
+#if ENABLE_EXTERNAL_EXOTIC
+
 // MARK: ===== device configurations
 
 
@@ -652,6 +649,7 @@ ErrorPtr ExternalDevice::switchConfiguration(const string aConfigurationId)
   return inherited::switchConfiguration(aConfigurationId); // unknown profile at this level
 }
 
+#endif // ENABLE_EXTERNAL_EXOTIC
 
 
 // MARK: ===== output control
@@ -983,6 +981,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     l->setHardwareName(hardwareName);
     addBehaviour(l);
   }
+  #if ENABLE_EXTERNAL_EXOTIC
   else if (outputType=="movinglight") {
     if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
     // - use moving light settings, which include a color+position scene table
@@ -992,6 +991,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     ml->setHardwareName(hardwareName);
     addBehaviour(ml);
   }
+  #endif // ENABLE_EXTERNAL_EXOTIC
   else if (outputType=="heatingvalve") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
     // - valve needs climate control scene table (ClimateControlScene)
@@ -1197,6 +1197,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       addBehaviour(sb);
     }
   }
+  #if ENABLE_EXTERNAL_EXOTIC
   // device configurations
   if (aInitParams->get("currentConfigId", o)) {
     configurationId = o->stringValue();
@@ -1214,6 +1215,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       configurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, description)));
     }
   }
+  #endif // ENABLE_EXTERNAL_EXOTIC
   #if ENABLE_EXTERNAL_SINGLEDEVICE
   // create actions/states/events and properties from JSON
   if (aInitParams->get("noconfirmaction", o)) noConfirmAction = o->boolValue();
