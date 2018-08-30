@@ -81,11 +81,13 @@ void Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 }
 
 
+#if SELFTESTING_ENABLED
 void Vdc::selfTest(StatusCB aCompletedCB)
 {
   // by default, assume everything ok
   aCompletedCB(ErrorPtr());
 }
+#endif
 
 
 const char *Vdc::getPersistentDataDir()

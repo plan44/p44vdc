@@ -826,6 +826,8 @@ void EnoceanVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck,
 }
 
 
+#if SELFTESTING_ENABLED
+
 // MARK: ===== Self test
 
 void EnoceanVdc::selfTest(StatusCB aCompletedCB)
@@ -857,6 +859,8 @@ void EnoceanVdc::handleTestRadioPacket(StatusCB aCompletedCB, Esp3PacketPtr aEsp
   // - still waiting
   LOG(LOG_NOTICE, "- enocean test: still waiting for RPS telegram in learn distance");
 }
+
+#endif // SELFTESTING_ENABLED
 
 #endif // ENABLE_ENOCEAN
 

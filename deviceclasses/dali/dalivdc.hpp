@@ -90,9 +90,11 @@ namespace p44 {
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
+    #if SELFTESTING_ENABLED
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error
     virtual void selfTest(StatusCB aCompletedCB) P44_OVERRIDE;
+    #endif
 
     /// get supported rescan modes for this vDC
     /// @return a combination of rescanmode_xxx bits
@@ -192,13 +194,15 @@ namespace p44 {
     void daliScanNext(VdcApiRequestPtr aRequest, DaliAddress aShortAddress, StringPtr aResult);
     void handleDaliScanResult(VdcApiRequestPtr aRequest, DaliAddress aShortAddress, StringPtr aResult, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
 
-    void testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
-    void testRW(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte);
-    void testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
-
     void groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void groupDimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLTimer &aTimer);
     void nativeActionDone(StatusCB aStatusCB, ErrorPtr aError);
+
+    #if SELFTESTING_ENABLED
+    void testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
+    void testRW(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte);
+    void testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    #endif
 
     #if ENABLE_DALI_INPUTS
     void daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2);

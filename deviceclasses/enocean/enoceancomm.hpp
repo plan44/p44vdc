@@ -30,7 +30,6 @@
 #include "digitalio.hpp"
 
 #if ENABLE_ENOCEAN_SECURE
-  #warning "WORK IN PROGRESS"
   #include <openssl/evp.h>
   #include <openssl/err.h>
   #include <openssl/ssl.h>

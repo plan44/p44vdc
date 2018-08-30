@@ -85,9 +85,11 @@ namespace p44 {
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
+    #if SELFTESTING_ENABLED
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error
     virtual void selfTest(StatusCB aCompletedCB) P44_OVERRIDE;
+    #endif
 
     /// scan for (collect) devices and add them to the vdc
     virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;

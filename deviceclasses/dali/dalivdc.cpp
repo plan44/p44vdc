@@ -1274,6 +1274,7 @@ ErrorPtr DaliVdc::freeNativeAction(const string aNativeActionId)
 
 
 
+#if SELFTESTING_ENABLED
 
 // MARK: ===== Self test
 
@@ -1341,6 +1342,10 @@ void DaliVdc::testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint
     aCompletedCB(aError);
   }
 }
+
+#endif // SELFTESTING_ENABLED
+
+
 
 #if ENABLE_DALI_INPUTS
 
