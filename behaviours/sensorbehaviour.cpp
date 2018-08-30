@@ -496,7 +496,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
     }
     if (!doPush && changed) {
       // we have a pending change, but rules don't allow to push now. Make sure final state gets pushed later
-      BLOG(LOG_NOTICE, "- sensor changes too quickly, cannot push update now, but final state will be pushed after minPushInterval");
+      BLOG(LOG_INFO, "- sensor changes too quickly, cannot push update now, but final state will be pushed after minPushInterval");
       if (!updateTicket) {
         updateTicket.executeOnceAt(boost::bind(&SensorBehaviour::reportFinalValue, this), lastPush+minPushInterval);
       }
@@ -523,7 +523,7 @@ void SensorBehaviour::reportFinalValue()
   // push the current value (after awaiting minPushInterval)
   updateTicket.cancel();
   if (pushBehaviourState()) {
-    BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentValue, getSensorUnitText().c_str());
+    BLOG(LOG_INFO, "Sensor[%zu] %s '%s' now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentValue, getSensorUnitText().c_str());
     lastPush = MainLoop::currentMainLoop().now();
   }
 }
