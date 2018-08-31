@@ -45,11 +45,6 @@ namespace p44 {
   class SceneIdentifier;
   typedef vector<SceneIdentifier> SceneIdsVector;
 
-  class GroupDescriptor;
-  typedef boost::intrusive_ptr<SceneDescriptor> GroupDescriptorPtr;
-  typedef vector<GroupDescriptorPtr> GroupsVector;
-
-
   /// Scene kind flags
   enum {
     // scope
@@ -67,8 +62,26 @@ namespace p44 {
   typedef struct {
     SceneNo no;
     SceneKind kind;
-    const char *defaultName;
+    const char *actionName;
   } SceneKindDescriptor;
+
+
+  /// Group kind flags
+  enum {
+    group_standard = 0x01, ///< standard group with direct scene calls
+    group_application = 0x02, ///< joker
+    group_controller = 0x04, ///< group (and scene calls) are managed by a contoller (such as heating, etc.)
+    group_global = 0x08, ///< global group like security and access
+    group_domain = 0x10, ///< group is a control domain (building, flat, ...)
+  };
+  typedef uint8_t GroupKind;
+
+  /// Global group info
+  typedef struct {
+    DsGroup no;
+    GroupKind kind;
+    const char *name;
+  } GroupDescriptor;
 
 
   /// zone descriptor
@@ -82,7 +95,7 @@ namespace p44 {
     DsZoneID zoneID; ///< global dS zone ID, zero = "all" zone
     string zoneName; ///< the name of the zone
 
-    DeviceList devices; ///< devices in this zone
+    DeviceVector devices; ///< devices in this zone
 
   public:
 
@@ -102,21 +115,28 @@ namespace p44 {
 
     /// get the scenes relevant for this zone
     /// @param aForGroup the group for the scene
-    /// @param aWantFlags scene must have at least these flags
-    /// @param aDontWantFlags scene must not have these flags
+    /// @param aRequiredKinds scene must have at least these kind flags
+    /// @param aForbiddenKinds scene may not have these kind flags
     /// @return a vector of SceneIdentifier objects
-    SceneIdsVector getZoneScenes(DsGroup aForGroup, SceneKind aWantFlags, SceneKind aDontWantFlags = scene_extended|scene_area);
+    SceneIdsVector getZoneScenes(DsGroup aForGroup, SceneKind aRequiredKinds, SceneKind aForbiddenKinds);
 
     /// get the groups relevant for this zone
     /// @param aStandardOnly if set, only groups with standard room scenes will be reported for non-global zones
     DsGroupMask getZoneGroups(bool aStandardOnly);
 
+    /// @return number of devices in this zone
+    size_t devicesInZone() const;
+
   protected:
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual void prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual void finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
     virtual const char *tableName() P44_OVERRIDE;
@@ -197,6 +217,12 @@ namespace p44 {
     /// get the scene's name
     string getName() const;
 
+    /// get the action name (describing what this scene kind is form, such as "presetXY", "off" etc.)
+    string getActionName() const;
+
+    /// get the scene's kind flags
+    SceneKind getKindFlags() { return sceneKindP ? sceneKindP->kind : 0; };
+
   };
 
 
@@ -218,6 +244,10 @@ namespace p44 {
     /// get the name
     /// @return name of this scene (if no name was set, the default name will be returned)
     string getSceneName() const { return sceneId.getName(); };
+
+    /// get the action name
+    /// @return action name of this scene
+    string getActionName() const { return sceneId.getActionName(); };
 
     /// get the dS scene number
     /// @return scene number (INVALID_SCENE_NO in case of invalid scene (no kind found)
@@ -328,6 +358,15 @@ namespace p44 {
     /// @param aDevice that will be removed
     void deviceRemoved(DevicePtr aDevice);
 
+    /// device changes zone
+    /// @param aDevice that will change zone or has changed zone
+    /// @param aFromZone current zone
+    /// @param aToZone new zone
+    void deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, DsZoneID aToZone);
+
+    /// @return total number of devices
+    size_t totalDevices() const;
+
     /// vdchost has started running normally
     void startRunning();
 
@@ -339,7 +378,11 @@ namespace p44 {
 
     /// @}
 
+    /// get info (name, kind) about a group
+    static const GroupDescriptor* groupInfo(DsGroup aGroup);
 
+    // localcontroller specific method handling
+    bool handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams);
 
   protected:
 

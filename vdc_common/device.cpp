@@ -31,6 +31,10 @@
 
 #include "device.hpp"
 
+#if ENABLE_LOCALCONTROLLER
+  #include "localcontroller.hpp"
+#endif
+
 #include "buttonbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
 #include "outputbehaviour.hpp"
@@ -178,6 +182,27 @@ DsZoneID Device::getZoneID()
   }
   return 0; // not assigned to a zone
 }
+
+
+void Device::setZoneID(DsZoneID aZoneId)
+{
+  if (deviceSettings) {
+    #if ENABLE_LOCALCONTROLLER
+    // must report changes of zone usage to local controller
+    DsZoneID previousZone = getZoneID();
+    if (deviceSettings->setPVar(deviceSettings->zoneID, aZoneId)) {
+      LocalControllerPtr lc = getVdcHost().getLocalController();
+      if (lc) {
+        lc->deviceChangesZone(DevicePtr(this), previousZone, aZoneId);
+      }
+    }
+    #else
+    deviceSettings->setPVar(deviceSettings->zoneID, aZoneId);
+    #endif
+  }
+}
+
+
 
 
 string Device::vendorName()
@@ -2259,9 +2284,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         case zoneID_key:
-          if (deviceSettings) {
-            deviceSettings->setPVar(deviceSettings->zoneID, (DsZoneID)aPropValue->int32Value());
-          }
+          setZoneID(aPropValue->int32Value());
           return true;
         case progMode_key:
           progMode = aPropValue->boolValue();

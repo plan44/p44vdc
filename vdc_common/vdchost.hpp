@@ -195,10 +195,8 @@ namespace p44 {
     static VdcHostPtr sharedVdcHost();
 
     #if ENABLE_LOCALCONTROLLER
-
-    /// @return local controller, will create one if not existing
+    /// @return local controller, might be NULL if local controller is not enabled (but compiled in)
     LocalControllerPtr getLocalController();
-
     #endif
 
     /// the list of containers by API-exposed ID (dSUID or derived dsid)
@@ -470,6 +468,9 @@ namespace p44 {
     /// @param aDevice a device object which has a valid dSUID
     /// @param aForget if set, parameters stored for the device will be deleted
     void removeDevice(DevicePtr aDevice, bool aForget);
+
+    /// @param aDeviceList will receive pointers to all devices
+    void createDeviceList(DeviceVector &aDeviceList);
 
     /// @}
 

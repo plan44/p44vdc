@@ -318,6 +318,11 @@ namespace p44 {
     /// @return a zoneID, can be 0 if device is not assigned to a zone (yet)
     DsZoneID getZoneID();
 
+    /// set the zoneID (room) for this device
+    /// @param aZoneId the new zoneId to set
+    /// @note when localcontroller is enabled, this will inform zones of the change
+    void setZoneID(DsZoneID aZoneId);
+
     /// set user assignable name
     /// @param aName name of the addressable entity
     virtual void setName(const string &aName) P44_OVERRIDE;

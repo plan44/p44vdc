@@ -105,8 +105,8 @@ VdcHost::VdcHost(bool aWithLocalController) :
   mac = macAddress();
   #if ENABLE_LOCALCONTROLLER
   if (aWithLocalController) {
-    // force creation
-    getLocalController();
+    // create it
+    localController = LocalControllerPtr(new LocalController(*this));
   }
   #endif
 }
@@ -127,16 +127,11 @@ VdcHostPtr VdcHost::sharedVdcHost()
 
 
 #if ENABLE_LOCALCONTROLLER
-
 LocalControllerPtr VdcHost::getLocalController()
 {
-  if (!localController) {
-    localController = LocalControllerPtr(new LocalController(*this));
-  }
   return localController;
 }
-
-#endif // ENABLE_LOCALCONTROLLER
+#endif
 
 
 void VdcHost::setEventMonitor(VdchostEventCB aEventCB)
@@ -1402,6 +1397,15 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
 
 ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
 {
+  #if ENABLE_LOCALCONTROLLER
+  if (localController) {
+    ErrorPtr lcErr;
+    if (localController->handleLocalControllerMethod(lcErr, aRequest, aMethod, aParams)) {
+      // local controller did or will handle the method
+      return lcErr;
+    }
+  }
+  #endif
   return inherited::handleMethod(aRequest, aMethod, aParams);
 }
 
@@ -1467,7 +1471,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByName(string aPropMatch, int &aStar
       OKEY(vdc_obj)
     );
   }
-  // None of the containers within Device - let base class handle Device-Level properties
+  // None of the containers within vdc host - let base class handle root-Level properties
   return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
 }
 
@@ -1514,6 +1518,16 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
   // not my field, let base class handle it
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
+
+
+void VdcHost::createDeviceList(DeviceVector &aDeviceList)
+{
+  aDeviceList.clear();
+  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+    aDeviceList.push_back(pos->second);
+  }
+}
+
 
 
 // MARK: ===== value sources
