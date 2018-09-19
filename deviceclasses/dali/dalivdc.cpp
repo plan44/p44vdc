@@ -844,6 +844,10 @@ bool DaliVdc::daliInfoSummary(DaliDeviceInfoPtr aDeviceInfo, ApiValuePtr aInfo)
       // firmware versions
       aInfo->add("versionMajor", aInfo->newUint64(aDeviceInfo->fw_version_major));
       aInfo->add("versionMinor", aInfo->newUint64(aDeviceInfo->fw_version_minor));
+      // DALI standard versions
+      if (aDeviceInfo->vers_101) aInfo->add("version_101", aInfo->newString(string_format("%d.%d", DALI_STD_VERS_MAJOR(aDeviceInfo->vers_101), DALI_STD_VERS_MINOR(aDeviceInfo->vers_101))));
+      if (aDeviceInfo->vers_102) aInfo->add("version_102", aInfo->newString(string_format("%d.%d", DALI_STD_VERS_MAJOR(aDeviceInfo->vers_102), DALI_STD_VERS_MINOR(aDeviceInfo->vers_102))));
+      if (aDeviceInfo->vers_103) aInfo->add("version_103", aInfo->newString(string_format("%d.%d", DALI_STD_VERS_MAJOR(aDeviceInfo->vers_103), DALI_STD_VERS_MINOR(aDeviceInfo->vers_103))));
       break;
   }
   aInfo->add("devInfStatus", aInfo->newString(devInfStatus));
