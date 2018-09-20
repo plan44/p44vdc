@@ -643,11 +643,11 @@ namespace p44 {
 
     /// start and/or finalize a operation prepared with callScenePrepare/dimChannelForAreaPrepare
     /// @param aDoneCB called when operation is complete
-    /// @param aDoApply only if set to true, operation must be applied to the hardware. Otherwise
+    /// @param aWhatToApply only if not set to ntfy_none, operation must be applied to the hardware. Otherwise
     ///   the actual applying has been done already by another means (such as native group/scene call on the harware level)
     ///   and must NOT be re-applied.
     ///   However, in all cases internal state must be updated to reflect the finalized operation
-    void executePreparedOperation(SimpleCB aDoneCB, bool aDoApply);
+    void executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatToApply);
 
     /// let this device add itself to the list of devices that can received grouped/optimized scene/dim calls, if applicable
     /// @param aDeliveryState if the device supports optimized calls, it must update the delivery state hashes
@@ -715,10 +715,10 @@ namespace p44 {
     void callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce);
     void callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
     void callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
-    void callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply);
+    void callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);
     void dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
     void dimRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState);
-    void dimChannelExecutePrepared(SimpleCB aDoneCB, bool aDoApply);
+    void dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);
     void outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene);
 
     void sceneActionsComplete(SimpleCB aDoneCB, DsScenePtr aScene);

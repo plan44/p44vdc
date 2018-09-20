@@ -344,7 +344,7 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
     }
     if (optimizerMode<=opt_disabled || aDeliveryState->optimizedType!=aNotificationToApply || !dev->addToOptimizedSet(aDeliveryState)) {
       // optimisation off, different notification type than others in set, or otherwise not optimizable -> just execute and apply right now
-      dev->executePreparedOperation(NULL, true);
+      dev->executePreparedOperation(NULL, aNotificationToApply);
     }
   }
   // break caller chain by going via mainloop
@@ -499,7 +499,7 @@ void Vdc::finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDel
   AFOCUSLOG("Finalizing repeated notification call");
   // let all devices know operation has repeated
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
-    (*pos)->executePreparedOperation(NULL, false);
+    (*pos)->executePreparedOperation(NULL, ntfy_none);
   }
 }
 
@@ -517,7 +517,7 @@ void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDel
   // note: we let all devices do this in parallel, continue when last device reports done
   aDeliveryState->pendingCount = aDeliveryState->affectedDevices.size(); // must be set before calling executePreparedOperation() the first time
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
-    (*pos)->executePreparedOperation(boost::bind(&Vdc::preparedDeviceExecuted, this, aEntry, aDeliveryState, aError), notAppliedYet);
+    (*pos)->executePreparedOperation(boost::bind(&Vdc::preparedDeviceExecuted, this, aEntry, aDeliveryState, aError), notAppliedYet ? aEntry->type : ntfy_none);
   }
 }
 

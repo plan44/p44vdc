@@ -930,16 +930,15 @@ void Device::optimizerRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState)
 }
 
 
-void Device::executePreparedOperation(SimpleCB aDoneCB, bool aDoApply)
+void Device::executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
   if (preparedScene) {
-    callSceneExecutePrepared(aDoneCB, aDoApply);
+    callSceneExecutePrepared(aDoneCB, aWhatToApply);
     preparedDim = false; // calling scene always cancels prepared dimming
     return;
   }
   else if (preparedDim) {
-    // also call if not prepared any more, can be repetition to stop dimming
-    dimChannelExecutePrepared(aDoneCB, aDoApply);
+    dimChannelExecutePrepared(aDoneCB, aWhatToApply);
     return;
   }
   if (aDoneCB) aDoneCB();
@@ -1340,12 +1339,12 @@ void Device::dimRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState)
 }
 
 
-void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
+void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
   if (preparedDim) {
     // call actual dimming method, which will update state in all cases, but start/stop dimming only when not already done (aDoApply)
-    dimChannel(currentDimChannel, currentDimMode, aDoApply);
-    if (aDoApply) {
+    dimChannel(currentDimChannel, currentDimMode, aWhatToApply!=ntfy_none);
+    if (aWhatToApply!=ntfy_none) {
       if (currentDimMode!=dimmode_stop) {
         // starting
         dimTimeoutTicket.executeOnce(boost::bind(&Device::dimAutostopHandler, this, currentDimChannel), currentAutoStopTime);
@@ -1509,7 +1508,7 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
 
 void Device::callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce)
 {
-  dimChannelExecutePrepared(NULL, true);
+  dimChannelExecutePrepared(NULL, ntfy_dimchannel);
   callScenePrepare2(aPreparedCB, aScene, aForce);
 }
 
@@ -1601,7 +1600,7 @@ void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
 
 
 
-void Device::callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
+void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
   if (preparedScene) {
     DsScenePtr scene = preparedScene;
@@ -1611,7 +1610,7 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
       // prepare for apply (but do NOT yet apply!) on device hardware level)
       if (prepareSceneApply(scene)) {
         // now we can apply values to hardware
-        if (aDoApply) {
+        if (aWhatToApply!=ntfy_none) {
           // normally apply channel values to hardware
           requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aDoneCB, scene), false);
           return;
