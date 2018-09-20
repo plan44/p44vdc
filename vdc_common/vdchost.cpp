@@ -948,10 +948,10 @@ void VdcHost::vdcApiConnectionStatusHandler(VdcApiConnectionPtr aApiConnection, 
       resetAnnouncing(); // stop possibly ongoing announcing
       activeSessionConnection.reset();
       postEvent(vdchost_vdcapi_disconnected);
-      LOG(LOG_NOTICE, "vDC API session ends because connection closed ");
+      LOG(LOG_NOTICE, "=== vDC API session ends because connection closed");
     }
     else {
-      LOG(LOG_NOTICE, "vDC API connection (not yet in session) closed ");
+      LOG(LOG_NOTICE, "=== vDC API connection (not yet in session) closed");
     }
   }
 }
@@ -1075,6 +1075,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 
 ErrorPtr VdcHost::byeHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 {
+  LOG(LOG_NOTICE, "=== vDC API connection will close due to 'bye' command");
   // always confirm Bye, even out-of-session, so using aJsonRpcComm directly to answer (jsonSessionComm might not be ready)
   aRequest->sendResult(ApiValuePtr());
   // close after send
