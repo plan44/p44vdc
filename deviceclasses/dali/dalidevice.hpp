@@ -321,6 +321,7 @@ namespace p44 {
   protected:
 
     MLTicket transitionTicket; ///< transition timing ticket
+    MLTicket outputSyncTicket; ///< output value sync-back ticket
 
   public:
 
@@ -435,6 +436,15 @@ namespace p44 {
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
     virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply) P44_OVERRIDE;
 
+    /// is called when scene values are applied, either via applyChannelValues or via optimized calls
+    /// @param aDoneCB called when all tasks following applying the scene are done
+    /// @param aScene the scene that was called
+    /// @param aIndirectly if true, applyChannelValues was NOT used to apply the scene, but STILL some other mechanism
+    ///   such as optimized group call has changed outputs. device implementation might need to sync back hardware state in this case.
+    /// @note aIndirectly is NOT set when there was no output change at all and applyChannelValues() was therefore not called.
+    /// @note if derived in subclass, base class' implementation should normally be called as this triggers scene actions
+    virtual void sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndirectly) P44_FINAL;
+
     /// @}
 
     /// @name identification of the addressable entity
@@ -513,7 +523,7 @@ namespace p44 {
   private:
 
     void processUpdatedParams(ErrorPtr aError);
-    void dimEndStateRetrieved(ErrorPtr aError);
+    void outputChangeEndStateRetrieved(ErrorPtr aError);
     void daliControllerSynced(StatusCB aCompletedCB, bool aFactoryReset, ErrorPtr aError);
     void checkPresenceResponse(PresenceCB aPresenceResultHandler);
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);

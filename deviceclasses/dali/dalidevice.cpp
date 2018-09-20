@@ -1448,7 +1448,7 @@ void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDim
       // in all cases, we need to query current brightness after dimming
       if (aDimMode==dimmode_stop) {
         // retrieve end status
-        daliController->updateParams(boost::bind(&DaliSingleControllerDevice::dimEndStateRetrieved, this, _1));
+        daliController->updateParams(boost::bind(&DaliSingleControllerDevice::outputChangeEndStateRetrieved, this, _1));
       }
     }
     else {
@@ -1459,7 +1459,18 @@ void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDim
 }
 
 
-void DaliSingleControllerDevice::dimEndStateRetrieved(ErrorPtr aError)
+void DaliSingleControllerDevice::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndirectly)
+{
+  if (aIndirectly) {
+    // some values were applied indirectly (e.g. optimized group/scene), need to read back from hardware into
+    // Note: delay to make sure operation has completed (usually)
+    outputSyncTicket.executeOnce(boost::bind(&DaliBusDevice::updateParams, daliController, StatusCB()), 3*Second);
+  }
+  inherited::sceneValuesApplied(aDoneCB, aScene, aIndirectly);
+}
+
+
+void DaliSingleControllerDevice::outputChangeEndStateRetrieved(ErrorPtr aError)
 {
   processUpdatedParams(aError);
 }
@@ -1651,7 +1662,6 @@ int DaliCompositeDevice::opStateLevel()
 
 string DaliCompositeDevice::getOpStateText()
 {
-  bool missing = false;
   bool failure = false;
   bool incomplete = false;
   bool noUniqueId = false;

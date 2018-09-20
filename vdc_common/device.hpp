@@ -612,6 +612,15 @@ namespace p44 {
     ///   Device::requestApplyingChannels() provides an implementation that serializes calls to applyChannelValues and syncChannelValues
     virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) { if (aDoneCB) aDoneCB(); /* just call completed in base class */ };
 
+    /// is called when scene values are applied, either via applyChannelValues or via optimized calls
+    /// @param aDoneCB called when all tasks following applying the scene are done
+    /// @param aScene the scene that was called
+    /// @param aIndirectly if true, applyChannelValues was NOT used to apply the scene, but STILL some other mechanism
+    ///   such as optimized group call has changed outputs. device implementation might need to sync back hardware state in this case.
+    /// @note aIndirectly is NOT set when there was no output change at all and applyChannelValues() was therefore not called.
+    /// @note if derived in subclass, base class' implementation should normally be called as this triggers scene actions
+    virtual void sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndirectly);
+
     /// synchronize channel values by reading them back from the device's hardware (if possible)
     /// @param aDoneCB will be called when values are updated with actual hardware values
     /// @note this method is only called at startup and before saving scenes to make sure changes done to the outputs directly (e.g. using
@@ -726,7 +735,6 @@ namespace p44 {
     void dimHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNow);
     void dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNextDimAt);
     void outputSceneValueSaved(DsScenePtr aScene);
-    void sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene);
 
     void applyingChannelsComplete();
     void updatingChannelsComplete();

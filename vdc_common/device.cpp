@@ -1612,22 +1612,22 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatTo
         // now we can apply values to hardware
         if (aWhatToApply!=ntfy_none) {
           // normally apply channel values to hardware
-          requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aDoneCB, scene), false);
+          requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aDoneCB, scene, false), false);
           return;
         }
         else {
           // just consider all channels already applied (e.g. by vdc-level native action)
           // - confirm having applied channels (normally, actual device-level apply would do that)
           allChannelsApplied();
-          // - consider scene applied
-          sceneValuesApplied(aDoneCB, scene);
+          // - consider scene applied but indirectly
+          sceneValuesApplied(aDoneCB, scene, true);
           return;
         }
       }
     }
     else {
       // no apply to channels or hardware needed, directly proceed to actions
-      sceneValuesApplied(aDoneCB, scene);
+      sceneValuesApplied(aDoneCB, scene, false);
       return;
     }
   }
@@ -1636,7 +1636,7 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatTo
 }
 
 
-void Device::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene)
+void Device::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndirectly)
 {
   // now perform scene special actions such as blinking
   performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aDoneCB, aScene));
