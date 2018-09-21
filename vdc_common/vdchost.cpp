@@ -724,18 +724,23 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
 // MARK: ===== local operation mode
 
 
-void VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
+bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
   #if ENABLE_LOCALCONTROLLER
-  if (!localController || !localController->processButtonClick(aButtonBehaviour, aClickType))
-  #endif
-  {
-    // not handled by local controller
-    if (!activeSessionConnection) {
-      // not connected to a vdSM, handle clicks locally
-      handleClickLocally(aButtonBehaviour, aClickType);
+  if (localController) {
+    if (localController->processButtonClick(aButtonBehaviour, aClickType)) {
+      LOG(LOG_NOTICE, "localcontroller has handled clicktype %d from Button[%zu] '%s' in %s", aClickType, aButtonBehaviour.index, aButtonBehaviour.getHardwareName().c_str(), aButtonBehaviour.device.shortDesc().c_str());
+      return true; // handled
     }
   }
+  #endif
+  // not handled by local controller
+  if (!activeSessionConnection) {
+    // not connected to a vdSM, handle clicks locally
+    handleClickLocally(aButtonBehaviour, aClickType);
+    return true; // handled
+  }
+  return false; // not handled
 }
 
 

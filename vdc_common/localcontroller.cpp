@@ -28,6 +28,8 @@
 
 #include "localcontroller.hpp"
 
+#include "jsonvdcapi.hpp"
+
 #include "outputbehaviour.hpp"
 #include "buttonbehaviour.hpp"
 
@@ -35,6 +37,18 @@
 #if ENABLE_LOCALCONTROLLER
 
 using namespace p44;
+
+
+// MARK: ===== ZoneState
+
+ZoneState::ZoneState() :
+  lastGlobalScene(INVALID_SCENE_NO),
+  lastDim(dimmode_stop),
+  lastLightScene(INVALID_SCENE_NO)
+{
+  for (SceneArea i=0; i<=num_areas; ++i) lightOn[i] = false;
+}
+
 
 // MARK: ===== ZoneDescriptor
 
@@ -952,6 +966,269 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
 bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
   FOCUSLOG("processButtonClick: clicktype=%d, device = %s", (int)aClickType, aButtonBehaviour.shortDesc().c_str());
+  // defaults
+  DsGroup group = aButtonBehaviour.buttonGroup;
+  DsChannelType channel = channeltype_default;
+  DsZoneID zoneID = zoneId_global;
+  // possible actions
+  bool doDim = false;
+  SceneNo sceneToCall = INVALID_SCENE_NO;
+  // determine what to do
+  VdcDimMode direction = dimmode_stop; // none known
+  switch (aButtonBehaviour.buttonMode) {
+    case buttonMode_standard:
+    case buttonMode_turbo:
+      direction = dimmode_stop;
+      break;
+    case buttonMode_rockerDown_pairWith0:
+    case buttonMode_rockerDown_pairWith1:
+    case buttonMode_rockerDown_pairWith2:
+    case buttonMode_rockerDown_pairWith3:
+      direction = dimmode_down;
+      break;
+    case buttonMode_rockerUp_pairWith0:
+    case buttonMode_rockerUp_pairWith1:
+    case buttonMode_rockerUp_pairWith2:
+    case buttonMode_rockerUp_pairWith3:
+      direction = dimmode_up;
+      break;
+    case buttonMode_inactive:
+    default:
+      return true; // button inactive or unknown -> NOP, but handled
+  }
+  // evaluate function
+  int area = 0;
+  bool global = false;
+  SceneNo sceneOffclick = INVALID_SCENE_NO;
+  SceneNo scene1click = INVALID_SCENE_NO;
+  SceneNo scene2click = INVALID_SCENE_NO;
+  SceneNo scene3click = INVALID_SCENE_NO;
+  SceneNo scene4click = INVALID_SCENE_NO;
+  if (group==group_black_variable) {
+    switch (aButtonBehaviour.buttonFunc) {
+      case buttonFunc_alarm:
+        scene1click = ALARM1;
+        global = true;
+        break;
+      case buttonFunc_panic:
+        scene1click = PANIC;
+        global = true;
+        break;
+      case buttonFunc_leave:
+        scene1click = ABSENT;
+        global = true;
+        break;
+      case buttonFunc_doorbell:
+        scene1click = BELL1;
+        global = true;
+        break;
+      default:
+        break;
+    }
+  }
+  else {
+    switch (aButtonBehaviour.buttonFunc) {
+      case buttonFunc_area1_preset0x:
+        area = 1;
+        scene1click = AREA_1_ON;
+        sceneOffclick = AREA_1_OFF;
+        goto preset0x;
+      case buttonFunc_area2_preset0x:
+        area = 2;
+        scene1click = AREA_2_ON;
+        sceneOffclick = AREA_2_OFF;
+        goto preset0x;
+      case buttonFunc_area3_preset0x:
+        area = 3;
+        scene1click = AREA_3_ON;
+        sceneOffclick = AREA_3_OFF;
+        goto preset0x;
+      case buttonFunc_area4_preset0x:
+        area = 4;
+        scene1click = AREA_4_ON;
+        sceneOffclick = AREA_4_OFF;
+        goto preset0x;
+      case buttonFunc_area1_preset1x:
+        area = 1;
+        scene1click = AREA_1_ON;
+        sceneOffclick = AREA_1_OFF;
+        goto preset1x;
+      case buttonFunc_area2_preset2x:
+        area = 2;
+        scene1click = AREA_2_ON;
+        sceneOffclick = AREA_2_OFF;
+        goto preset2x;
+      case buttonFunc_area3_preset3x:
+        area = 3;
+        scene1click = AREA_3_ON;
+        sceneOffclick = AREA_3_OFF;
+        goto preset3x;
+      case buttonFunc_area4_preset4x:
+        area = 4;
+        scene1click = AREA_4_ON;
+        sceneOffclick = AREA_4_OFF;
+        goto preset4x;
+      case buttonFunc_room_preset0x:
+        scene1click = ROOM_ON;
+        sceneOffclick = ROOM_OFF;
+      preset0x:
+        scene2click = PRESET_2;
+        scene3click = PRESET_3;
+        scene4click = PRESET_4;
+        break;
+      case buttonFunc_room_preset1x:
+        scene1click = PRESET_11;
+        sceneOffclick = ROOM_OFF;
+      preset1x:
+        scene2click = PRESET_12;
+        scene3click = PRESET_13;
+        scene4click = PRESET_14;
+        break;
+      case buttonFunc_room_preset2x:
+        scene1click = PRESET_21;
+        sceneOffclick = ROOM_OFF;
+      preset2x:
+        scene2click = PRESET_22;
+        scene3click = PRESET_23;
+        scene4click = PRESET_24;
+        break;
+      case buttonFunc_room_preset3x:
+        scene1click = PRESET_31;
+        sceneOffclick = ROOM_OFF;
+      preset3x:
+        scene2click = PRESET_32;
+        scene3click = PRESET_33;
+        scene4click = PRESET_34;
+        break;
+      case buttonFunc_room_preset4x:
+        scene1click = PRESET_41;
+        sceneOffclick = ROOM_OFF;
+      preset4x:
+        scene2click = PRESET_42;
+        scene3click = PRESET_43;
+        scene4click = PRESET_44;
+        break;
+      default:
+        break;
+    }
+  }
+  if (global) {
+    // global scene
+    zoneID = zoneId_global;
+    group = group_undefined;
+    direction = dimmode_up; // always "on"
+    switch (aClickType) {
+      case ct_tip_1x:
+      case ct_click_1x:
+        sceneToCall = scene1click;
+        break;
+      default:
+        return true; // unknown click -> ignore, but handled
+    }
+  }
+  else {
+    // room scene
+    zoneID = aButtonBehaviour.device.getZoneID();
+    channel = aButtonBehaviour.buttonChannel;
+    ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
+    if (!zone) return false; // button in a non-local zone, cannot handle
+    if (group!=group_yellow_light) return true; // NOP because we don't support anything except light for now, but handled
+    // evaluate click
+    if (aClickType==ct_hold_start) {
+      // start dimming if not off (or rocker)
+      if (direction==dimmode_stop) {
+        // single button, no explicit direction
+        if (!zone->zoneState.lightOn[area]) {
+          // TODO: start deep off detection sequence
+          return true; // NOP, handled
+        }
+        // use inverse of last dim
+        direction = zone->zoneState.lastDim==dimmode_up ? dimmode_down : dimmode_up;
+      }
+      zone->zoneState.lastDim = direction;
+      doDim = true;
+    }
+    else if (aClickType==ct_hold_end) {
+      // stop dimming
+      direction = dimmode_stop;
+      doDim = true;
+    }
+    else {
+      // - not hold or release
+      SceneNo sceneOnClick = INVALID_SCENE_NO;
+      switch (aClickType) {
+        case ct_tip_1x:
+        case ct_click_1x:
+          sceneOnClick = scene1click;
+          break;
+        case ct_tip_2x:
+        case ct_click_2x:
+          sceneOnClick = scene2click;
+          direction = dimmode_up;
+          break;
+        case ct_tip_3x:
+        case ct_click_3x:
+          sceneOnClick = scene3click;
+          direction = dimmode_up;
+          break;
+        case ct_tip_4x:
+          sceneOnClick = scene4click;
+          direction = dimmode_up;
+          break;
+        default:
+          return true; // unknown click -> ignore, but handled
+      }
+      if (direction==dimmode_stop) {
+        // single button, no explicit direction
+        direction = zone->zoneState.lightOn[area] ? dimmode_down : dimmode_up;
+      }
+      // local
+      if (direction==dimmode_up) {
+        // calling a preset
+        sceneToCall = sceneOnClick;
+        zone->zoneState.lightOn[area] = true;
+      }
+      else {
+        // calling an off scene
+        sceneToCall = sceneOffclick;
+        zone->zoneState.lightOn[area] = false;
+      }
+      if (sceneToCall!=INVALID_SCENE_NO) {
+        zone->zoneState.lastLightScene = sceneToCall;
+      }
+    }
+    // now perform actions
+    if (doDim || sceneToCall!=INVALID_SCENE_NO) {
+      // deliver
+      NotificationAudience audience;
+      vdcHost.addToAudienceByZoneAndGroup(audience, zoneID, group);
+      JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
+      params->setType(apivalue_object);
+      // - define audience
+      params->add("zone_id", params->newUint64(zoneID));
+      params->add("group", params->newUint64(group));
+      string method;
+      if (doDim) {
+        // { "notification":"dimChannel", "zone_id":0, "group":1, "mode":1, "channelId":0, "area":0 }
+        method = "dimChannel";
+        params->add("mode", params->newInt64(direction));
+        params->add("channelId", params->newUint64(channel));
+        params->add("area", params->newUint64(area));
+      }
+      else if (sceneToCall!=INVALID_SCENE_NO) {
+        // { "notification":"callScene", "zone_id":0, "group":1, "scene":5, "force":false }
+        method = "callScene";
+        params->add("scene", params->newUint64(sceneToCall));
+        params->add("force", params->newBool(false));
+      }
+      else {
+        return true; // NOP, but handled
+      }
+      // - deliver
+      vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
+      return true;
+    }
+  }
   return false; // not handled so far
 }
 

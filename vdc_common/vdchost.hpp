@@ -433,7 +433,10 @@ namespace p44 {
     /// @}
 
     /// have button clicks checked for local handling
-    void checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
+    /// @param aButtonBehaviour the button behaviour that generated the click
+    /// @param aClickType the type of click
+    /// @return true if locally handled
+    bool checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object

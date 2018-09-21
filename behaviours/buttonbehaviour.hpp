@@ -28,6 +28,8 @@ using namespace std;
 
 namespace p44 {
 
+  class LocalController;
+  
   /// Implements the behaviour of a digitalSTROM button, in particular the
   /// state machine which generates the different click types for the dS upstream
   /// from button press + button release events.
@@ -38,7 +40,8 @@ namespace p44 {
     typedef DsBehaviour inherited;
 
     friend class Device;
-    friend class VdcHost; // for local mode
+    friend class VdcHost; // for simple local mode
+    friend class LocalController; // for full standalone mode
 
   public:
 

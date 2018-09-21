@@ -166,11 +166,19 @@ typedef enum {
 typedef uint8_t SceneNo; ///< scene number
 
 typedef uint8_t SceneArea; ///< area number, 0=no area
+typedef enum {
+  no_area = 0,
+  area_1 = 1,
+  area_2 = 2,
+  area_3 = 3,
+  area_4 = 4,
+  num_areas = 4 ///< number of areas (excluding global)
+} DsArea;
 
 typedef uint16_t DsZoneID; ///< digitalSTROM Zone ID (= room ID)
 typedef enum {
   zoneId_global = 0 ///< global (appartment, all rooms) zone
-};
+} DsZones;
 
 /// color/class
 typedef enum {

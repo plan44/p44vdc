@@ -517,7 +517,7 @@ void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDel
   // note: we let all devices do this in parallel, continue when last device reports done
   aDeliveryState->pendingCount = aDeliveryState->affectedDevices.size(); // must be set before calling executePreparedOperation() the first time
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
-    (*pos)->executePreparedOperation(boost::bind(&Vdc::preparedDeviceExecuted, this, aEntry, aDeliveryState, aError), notAppliedYet ? aEntry->type : ntfy_none);
+    (*pos)->executePreparedOperation(boost::bind(&Vdc::preparedDeviceExecuted, this, aEntry, aDeliveryState, aError), notAppliedYet ? aDeliveryState->optimizedType : ntfy_none);
   }
 }
 

@@ -34,6 +34,7 @@ namespace p44 {
 
   class ZoneList;
   class VdcHost;
+  class LocalController;
 
   class ZoneDescriptor;
   typedef boost::intrusive_ptr<ZoneDescriptor> ZoneDescriptorPtr;
@@ -84,6 +85,23 @@ namespace p44 {
   } GroupDescriptor;
 
 
+  /// zone state
+  class ZoneState
+  {
+  public:
+
+    // global state
+    SceneNo lastGlobalScene; ///< last global scene called
+
+    // Light state
+    VdcDimMode lastDim; ///< last dimming direction in this room
+    SceneNo lastLightScene; ///< last light scene called
+    bool lightOn[5]; ///< set if light is on in this zone and area
+
+    ZoneState();
+  };
+
+
   /// zone descriptor
   /// holds information about a zone
   class ZoneDescriptor : public PropertyContainer, public PersistentParams
@@ -91,11 +109,14 @@ namespace p44 {
     typedef PropertyContainer inherited;
     typedef PersistentParams inheritedParams;
     friend class ZoneList;
+    friend class LocalController;
 
     DsZoneID zoneID; ///< global dS zone ID, zero = "all" zone
     string zoneName; ///< the name of the zone
 
     DeviceVector devices; ///< devices in this zone
+
+    ZoneState zoneState; ///< current state of the zone
 
   public:
 
@@ -314,7 +335,6 @@ namespace p44 {
 
   };
   typedef boost::intrusive_ptr<SceneList> SceneListPtr;
-
 
 
   /// local controller
