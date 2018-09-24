@@ -461,7 +461,7 @@ void DaliBusDevice::initializeFeatures(StatusCB aCompletedCB)
 void DaliBusDevice::updateParams(StatusCB aCompletedCB)
 {
   if (isDummy) {
-    aCompletedCB(ErrorPtr());
+    if (aCompletedCB) aCompletedCB(ErrorPtr());
     return;
   }
   // query actual arc power level
@@ -510,7 +510,7 @@ void DaliBusDevice::queryMinLevelResponse(StatusCB aCompletedCB, bool aNoOrTimeo
     );
     return;
   }
-  aCompletedCB(aError);
+  if (aCompletedCB) aCompletedCB(aError);
 }
 
 
@@ -569,7 +569,7 @@ void DaliBusDevice::queryColorStatusResponse(StatusCB aCompletedCB, bool aNoOrTi
     }
   }
   // no more queries
-  aCompletedCB(aError);
+  if (aCompletedCB) aCompletedCB(aError);
 }
 
 
@@ -590,7 +590,7 @@ void DaliBusDevice::queryXCoordResponse(StatusCB aCompletedCB, uint16_t aRespons
       return;
     }
   }
-  aCompletedCB(aError);
+  if (aCompletedCB) aCompletedCB(aError);
 }
 
 
@@ -600,7 +600,7 @@ void DaliBusDevice::queryYCoordResponse(StatusCB aCompletedCB, uint16_t aRespons
     currentY = aResponse16;
     LOG(LOG_INFO, "DaliBusDevice: DT8 - is in CIE X/Y color mode, X=%.3f, Y=%.3f", (double)currentXorCT/65536, (double)currentY/65536);
   }
-  aCompletedCB(aError);
+  if (aCompletedCB) aCompletedCB(aError);
 }
 
 
@@ -615,7 +615,7 @@ void DaliBusDevice::queryCTResponse(StatusCB aCompletedCB, uint16_t aResponse16,
       LOG(LOG_INFO, "DaliBusDevice: DT8 - is in Tunable White mode, CT=%hd mired", currentXorCT);
     }
   }
-  aCompletedCB(aError);
+  if (aCompletedCB) aCompletedCB(aError);
 }
 
 
@@ -649,7 +649,7 @@ void DaliBusDevice::queryRGBWAFResponse(StatusCB aCompletedCB, uint16_t aResInde
     );
     return;
   }
-  aCompletedCB(aError);
+  if (aCompletedCB) aCompletedCB(aError);
 }
 
 

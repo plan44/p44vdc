@@ -79,13 +79,15 @@ namespace p44 {
     bool isPresent; ///< set if present
     bool lampFailure; ///< set if lamp has failure
 
-    /// cached parameters (call updateParams() to update these)
-    Brightness currentBrightness; ///< current brightness
-    Brightness minBrightness; ///< currently set minimal brightness
+    /// cached transition parameters (updated in setTransitionTime() and dimPrepare())
     MLMicroSeconds currentTransitionTime; ///< currently set transition time
     uint8_t currentFadeTime; ///< currently set DALI fade time
     double currentDimPerMS; ///< current dim steps per second
     uint8_t currentFadeRate; ///< currently set DALI fade rate
+
+    /// cached parameters (call updateParams() to update these)
+    Brightness currentBrightness; ///< current brightness
+    Brightness minBrightness; ///< currently set minimal brightness
     // - DT8 params
     ColorLightMode currentColorMode; ///< current color mode
     uint16_t currentXorCT; ///< current CIE X or CT or Red
