@@ -547,6 +547,10 @@ ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod,
     // add a DALI based input device
     respErr = addDaliInput(aRequest, aParams);
   }
+  else if (aMethod=="x-p44-daliInputAddrs") {
+    // get list of available DALI input addresses (groups, scenes)
+    respErr = getDaliInputAddrs(aRequest, aParams);
+  }
   #endif
   else if (aMethod=="x-p44-daliScan") {
     // diagnostics: scan the entire DALI bus
@@ -1413,6 +1417,33 @@ ErrorPtr DaliVdc::addDaliInput(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
     }
   }
   return respErr;
+}
+
+
+ErrorPtr DaliVdc::getDaliInputAddrs(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
+{
+  ApiValuePtr resp = aRequest->newApiValue();
+  resp->setType(apivalue_array);
+  // available groups
+  for (int g=0; g<16; g++) {
+    if ((usedDaliGroupsMask & (1<<g))==0) {
+      ApiValuePtr grp = resp->newObject();
+      grp->add("name", resp->newString(string_format("DALI group %d",g)));
+      grp->add("addr", resp->newUint64(DaliGroup|g));
+      resp->arrayAppend(grp);
+    }
+  }
+  // available scenes
+  for (int s=0; s<16; s++) {
+    if ((usedDaliScenesMask & (1<<s))==0) {
+      ApiValuePtr scn = resp->newObject();
+      scn->add("name", resp->newString(string_format("DALI scene %d",s)));
+      scn->add("addr", resp->newUint64(DaliScene|s));
+      resp->arrayAppend(scn);
+    }
+  }
+  aRequest->sendResult(resp);
+  return ErrorPtr();
 }
 
 

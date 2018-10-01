@@ -208,6 +208,7 @@ namespace p44 {
     void daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2);
     DaliInputDevicePtr addInputDevice(const string aConfig, DaliAddress aDaliBaseAddress);
     ErrorPtr addDaliInput(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
+    ErrorPtr getDaliInputAddrs(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     #endif
 
   };
