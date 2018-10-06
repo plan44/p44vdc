@@ -865,13 +865,16 @@ void VdcHost::addTargetToAudience(NotificationAudience &aAudience, DsAddressable
 
 ErrorPtr VdcHost::addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &aDsuid)
 {
+  if (aDsuid.empty()) {
+    return Error::err<VdcApiError>(415, "missing/invalid dSUID");
+  }
   DsAddressablePtr a = addressableForDsUid(aDsuid);
   if (a) {
     addTargetToAudience(aAudience, a);
     return ErrorPtr();
   }
   else {
-    return Error::err<VdcApiError>(404, "missing/invalid dSUID");
+    return Error::err<VdcApiError>(404, "unknown dSUID");
   }
 }
 
@@ -950,7 +953,9 @@ void VdcHost::vdcApiConnectionStatusHandler(VdcApiConnectionPtr aApiConnection, 
   }
   else {
     // error or connection closed
-    LOG(LOG_ERR, "vDC API connection closing, reason: %s", aError->description().c_str());
+    if (!aError->isError(SocketCommError::domain(), SocketCommError::HungUp)) {
+      LOG(LOG_ERR, "vDC API connection closing due to error: %s", aError->description().c_str());
+    }
     // - close if not already closed
     aApiConnection->closeConnection();
     if (aApiConnection==activeSessionConnection) {
@@ -1033,6 +1038,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
     if (version<VDC_API_VERSION_MIN || version>maxversion) {
       // incompatible version
       respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d..%d", version, VDC_API_VERSION_MIN, maxversion);
+      LOG(LOG_WARNING, "=== hello rejected: %s", respErr->description().c_str());
     }
     else {
       // API version ok, save it
@@ -1070,6 +1076,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         else {
           // not ok to start new session, reject
           respErr = Error::err<VdcApiError>(503, "this vDC already has an active session with vdSM %s",connectedVdsm.getString().c_str());
+          LOG(LOG_WARNING, "=== hello rejected: %s", respErr->description().c_str());
           aRequest->sendError(respErr);
           // close after send
           aRequest->connection()->closeAfterSend();
@@ -1175,7 +1182,7 @@ ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection
         for (int i=0; i<o->arrayLength(); i++) {
           audienceOk = true; // non-empty array is a valid audience specification
           ApiValuePtr e = o->arrayGet(i);
-          dsuid.setAsBinary(e->binaryValue());
+          if (!dsuid.setAsBinary(e->binaryValue())) dsuid.clear();
           respErr = addToAudienceByDsuid(audience, dsuid);
           if (!Error::isOK(respErr)) {
             respErr->prefixMessage("Ignored target for notification '%s': ", aMethod.c_str());
@@ -1185,7 +1192,8 @@ ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection
         respErr.reset();
       }
       else {
-        dsuid.setAsBinary(o->binaryValue());
+        // single dSUIDs
+        if (!dsuid.setAsBinary(o->binaryValue())) dsuid.clear();
         respErr = addToAudienceByDsuid(audience, dsuid);
         audienceOk = true; // non-empty dSUID valid audience specification
       }
@@ -1235,7 +1243,7 @@ ErrorPtr VdcHost::handleMethodForParams(VdcApiRequestPtr aRequest, const string 
         addressable = addressableForItemSpec(itemSpec);
       }
       else {
-        // default to vdchost
+        // default to vdchost (allows start accessing a vdchost by getProperty without knowing a dSUID in the first place)
         addressable = DsAddressablePtr(this);
       }
     }
