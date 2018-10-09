@@ -592,7 +592,7 @@ RadioOrg Esp3Packet::eepRorg()
 //  Req  Manufacturer|   EEP No.    |dBm |    Repeater ID    |       Sender ID       |     |
 
 
-// UTE Teach-In Query (note: byte numbering is in radioUserData() buffer order, actual 4BS byte numbering is reversed!)
+// UTE Teach-In Query (note: byte numbering is in radioUserData() buffer order, actual VLD byte numbering is reversed!)
 //
 //           D[0]              |    D[1]   |    D[2]   |   D[3]    |    D[4]   |    D[5]   |    D[6]
 //  7    6     5  4    3 2 1 0 | 765432310 | 765432310 | 76543 210 | 765432310 | 765432310 | 765432310

@@ -387,10 +387,10 @@ namespace p44 {
     /// @return NULL or pointer to a list of profile variants
     virtual const ProfileVariantEntry *profileVariantsTable() { return NULL; /* none in base class */ };
 
-  private:
-
     /// get handler associated with a behaviour
     EnoceanChannelHandlerPtr channelForBehaviour(const DsBehaviour *aBehaviourP);
+
+  private:
 
     bool isAlive();
 

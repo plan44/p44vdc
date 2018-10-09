@@ -122,16 +122,16 @@ namespace p44 {
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
 
     /// collect data for outgoing message from this channel
     /// @param aEsp3PacketPtr must be set to a suitable packet if it is empty, or packet data must be augmented with
     ///   channel's data when packet already exists
-    virtual void collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr);
+    virtual void collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr) P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
   };
   typedef boost::intrusive_ptr<EnoceanA52001Handler> EnoceanA52001HandlerPtr;
 
@@ -183,16 +183,16 @@ namespace p44 {
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
 
     /// collect data for outgoing message from this channel
     /// @param aEsp3PacketPtr must be set to a suitable packet if it is empty, or packet data must be augmented with
     ///   channel's data when packet already exists
-    virtual void collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr);
+    virtual void collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr) P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
   };
   typedef boost::intrusive_ptr<EnoceanA52004Handler> EnoceanA52004HandlerPtr;
 
@@ -239,11 +239,11 @@ namespace p44 {
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
   };
   typedef boost::intrusive_ptr<EnoceanA5130XHandler> EnoceanA5130XHandlerPtr;
 
