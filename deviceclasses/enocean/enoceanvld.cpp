@@ -303,13 +303,14 @@ void EnoceanD201XXHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       // - channel must match
       if ((dataP[1] & 0x1F)!=device.getSubDevice()) return; // not this channel handler
       // - sync current output state
+      uint8_t outVal = dataP[2] & 0x7F;
       LightBehaviourPtr l = device.getOutput<LightBehaviour>();
       if (l) {
-        l->syncBrightnessFromHardware(dataP[2]);
+        l->syncBrightnessFromHardware(outVal);
       }
       else {
         ChannelBehaviourPtr ch = device.getOutput()->getChannelByType(channeltype_default);
-        ch->syncChannelValue(dataP[2]);
+        ch->syncChannelValue(outVal);
       }
       // - update error info
       powerFailure = (dataP[0] & 0x40)!=0;
