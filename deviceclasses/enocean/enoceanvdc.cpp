@@ -252,23 +252,27 @@ void EnoceanVdc::removeDevice(DevicePtr aDevice, bool aForget)
 }
 
 
-void EnoceanVdc::unpairDevicesByAddress(EnoceanAddress aEnoceanAddress, bool aForgetParams, EnoceanSubDevice aFromIndex, EnoceanSubDevice aNumIndices)
+bool EnoceanVdc::unpairDevicesByAddressAndEEP(EnoceanAddress aEnoceanAddress, EnoceanProfile aEEP, bool aForgetParams, EnoceanSubDevice aFromIndex, EnoceanSubDevice aNumIndices)
 {
   // remove all logical devices with same physical EnOcean address
   typedef list<EnoceanDevicePtr> TbdList;
   TbdList toBeDeleted;
   // collect those we need to remove
   for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aEnoceanAddress); pos!=enoceanDevices.upper_bound(aEnoceanAddress); ++pos) {
-    // check subdevice index
-    EnoceanSubDevice i = pos->second->getSubDevice();
-    if (i>=aFromIndex && ((aNumIndices==0) || (i<aFromIndex+aNumIndices))) {
-      toBeDeleted.push_back(pos->second);
+    // check EEP if specified
+    if (EEP_PURE(aEEP)==EEP_PURE(pos->second->getEEProfile())) {
+      // check subdevice index
+      EnoceanSubDevice i = pos->second->getSubDevice();
+      if (i>=aFromIndex && ((aNumIndices==0) || (i<aFromIndex+aNumIndices))) {
+        toBeDeleted.push_back(pos->second);
+      }
     }
   }
   // now call vanish (which will in turn remove devices from the container's list
   for (TbdList::iterator pos = toBeDeleted.begin(); pos!=toBeDeleted.end(); ++pos) {
     (*pos)->hasVanished(aForgetParams);
   }
+  return toBeDeleted.size()>0; // true only if anything deleted at all
 }
 
 
@@ -541,8 +545,14 @@ EnOceanSecurityPtr EnoceanVdc::securityInfoForSender(EnoceanAddress aSender, boo
 Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, EnoceanLearnType aLearnType, Esp3PacketPtr aLearnPacket, EnOceanSecurityPtr aSecurityInfo)
 {
   // no learn/unlearn actions detected so far
-  // - check if we know that device address already. If so, it is a learn-out
-  bool learnIn = enoceanDevices.find(aDeviceAddress)==enoceanDevices.end();
+  // - check if we know that device address AND EEP already. If so, it is a learn-out
+  bool learnIn = true;
+  for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aDeviceAddress); pos!=enoceanDevices.upper_bound(aDeviceAddress); ++pos) {
+    if (EEP_PURE(aEEProfile)==EEP_PURE(pos->second->getEEProfile())) {
+      // device with same address and same EEP already known
+      learnIn = false;
+    }
+  }
   if (learnIn) {
     // this is a not-yet known device, so we might be able to learn it in
     if  (onlyEstablish!=no && aTeachInfoType!=no) {
@@ -580,14 +590,15 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
       // neither our side nor the info in the telegram insists on learn-in, so we can learn-out
       // - un-pair all logical dS devices it has represented
       //   but keep dS level config in case it is reconnected
-      unpairDevicesByAddress(aDeviceAddress, false);
+      bool anyRemoved = unpairDevicesByAddressAndEEP(aDeviceAddress, aEEProfile, false);
       // - confirm smart ack FIRST (before reporting end-of-learn!)
       if (aLearnType==learn_UTE) {
-        enoceanComm.confirmUTE(UTE_LEARNED_OUT, aLearnPacket);
+        enoceanComm.confirmUTE(anyRemoved ? UTE_LEARNED_OUT : UTE_FAIL, aLearnPacket);
       }
       else if (aLearnType==learn_smartack) {
-        enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_REMOVED);
+        enoceanComm.smartAckRespondToLearn(anyRemoved ? SA_RESPONSECODE_REMOVED : SA_RESPONSECODE_UNKNOWNEEP);
       }
+      if (!anyRemoved) return undefined; // nothing learned out (or in)
       // - now report learned-out, which will in turn disable smart-ack learn
       getVdcHost().reportLearnEvent(false, ErrorPtr());
       return no; // always successful learn out
