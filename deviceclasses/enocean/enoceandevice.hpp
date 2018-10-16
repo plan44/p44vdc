@@ -396,6 +396,7 @@ namespace p44 {
   private:
 
     bool isAlive();
+    EnoceanProfile expandEEPWildcard(EnoceanProfile aEEPWildcard);
 
   };
   

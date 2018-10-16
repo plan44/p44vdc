@@ -432,6 +432,21 @@ string EnoceanDevice::description()
 // MARK: ===== profile variants
 
 
+EnoceanProfile EnoceanDevice::expandEEPWildcard(EnoceanProfile aEEPWildcard)
+{
+  EnoceanProfile myEEP = getEEProfile();
+  EnoceanProfile r = 0;
+  for (int i=0; i<4; i++) {
+    if (((aEEPWildcard>>i*8)&0xFF)==0xFF) {
+      r |= myEEP&(0xFF<<i*8); // input has wildcard, use byte from my own EEP
+    }
+    else {
+      r |= aEEPWildcard&(0xFF<<i*8); // use original input byte
+    }
+  }
+  return r;
+}
+
 
 void EnoceanDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB)
 {
@@ -439,18 +454,18 @@ void EnoceanDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigu
   const ProfileVariantEntry *currentVariant = profileVariantsTable();
   bool anyVariants = false;
   while (currentVariant && currentVariant->profileGroup!=0) {
-    // look for current EEP in the list of variants
-    if (getEEProfile()==currentVariant->eep) {
+    // look for current EEP in the list of variants (which might contain wildcards, i.e. 0xFF bytes meaning "SAME AS MYSELF")
+    if (getEEProfile()==expandEEPWildcard(currentVariant->eep)) {
       // create string from all other variants (same profileGroup), if any
       const ProfileVariantEntry *variant = profileVariantsTable();
       while (variant->profileGroup!=0) {
         if (variant->profileGroup==currentVariant->profileGroup) {
-          if (variant->eep!=getEEProfile()) anyVariants = true; // another variant than just myself
+          if (expandEEPWildcard(variant->eep)!=getEEProfile()) anyVariants = true; // another variant than just myself
           string id;
           if (variant->configId)
             id = variant->configId; // has well-known configuration id
           else
-            id = string_format("eep_%08X", variant->eep); // id generated from EEP
+            id = string_format("eep_%08X", expandEEPWildcard(variant->eep)); // id generated from EEP
           aConfigurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, variant->description)));
         }
         variant++;
@@ -468,7 +483,7 @@ string EnoceanDevice::getDeviceConfigurationId()
 {
   const ProfileVariantEntry *currentVariant = profileVariantsTable();
   while (currentVariant && currentVariant->profileGroup!=0) {
-    if (currentVariant->configId && getEEProfile()==currentVariant->eep) {
+    if (currentVariant->configId && getEEProfile()==expandEEPWildcard(currentVariant->eep)) {
       return currentVariant->configId; // has a well-known name, return that
     }
     currentVariant++;
@@ -489,16 +504,16 @@ ErrorPtr EnoceanDevice::switchConfiguration(const string aConfigurationId)
   // - find my profileGroup
   const ProfileVariantEntry *currentVariant = profileVariantsTable();
   while (currentVariant && currentVariant->profileGroup!=0) {
-    if (getEEProfile()==currentVariant->eep) {
+    if (getEEProfile()==expandEEPWildcard(currentVariant->eep)) {
       // this is my profile group, now check if requested profile is in my profile group as well
       const ProfileVariantEntry *variant = profileVariantsTable();
       while (variant && variant->profileGroup!=0) {
         if (
           (variant->profileGroup==currentVariant->profileGroup) &&
-          ((newProfile!=0 && newProfile==variant->eep) || (newProfile==0 && variant->configId && aConfigurationId==variant->configId))
+          ((newProfile!=0 && newProfile==expandEEPWildcard(variant->eep)) || (newProfile==0 && variant->configId && aConfigurationId==variant->configId))
         ) {
           // prevent switching if new profile is same as current one
-          if (variant->eep==currentVariant->eep) return ErrorPtr(); // we already have that profile -> NOP
+          if (expandEEPWildcard(variant->eep)==expandEEPWildcard(currentVariant->eep)) return ErrorPtr(); // we already have that profile -> NOP
           // requested profile is in my group, change now
           switchProfiles(*currentVariant, *variant); // will delete this device, so return immediately afterwards
           return ErrorPtr(); // changed profile
@@ -527,8 +542,8 @@ void EnoceanDevice::switchProfiles(const ProfileVariantEntry &aFromVariant, cons
     rangestart = getSubDevice()/rangesize*rangesize;
   }
   // have devices related to current profile deleted, including settings
-  // Note: this removes myself from container, and deletes the config (which is valid for the previous profile, i.e. a different type of device)
-  getEnoceanVdc().unpairDevicesByAddress(getAddress(), true, rangestart, rangesize);
+  // Note: this removes myself from container, and deletes the config (which is valid only for the previous profile, i.e. a different type of device)
+  getEnoceanVdc().unpairDevicesByAddressAndEEP(getAddress(), getEEProfile(), true, rangestart, rangesize);
   // - create new ones, with same address and manufacturer, but new profile
   EnoceanSubDevice subDeviceIndex = rangestart;
   while (rangesize==0 || subDeviceIndex<rangestart+rangesize) {
@@ -537,7 +552,7 @@ void EnoceanDevice::switchProfiles(const ProfileVariantEntry &aFromVariant, cons
       &getEnoceanVdc(),
       getAddress(), // same address as current device
       subDeviceIndex, // index to create a device for
-      aToVariant.eep, // the new EEP variant
+      expandEEPWildcard(aToVariant.eep), // the new EEP variant
       getEEManufacturer(),
       subDeviceIndex==0 // allow sending teach-in response for first subdevice only
     );

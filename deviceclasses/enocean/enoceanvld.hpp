@@ -77,6 +77,8 @@ namespace p44 {
   {
     typedef EnoceanVLDDevice inherited;
 
+    MLTicket cfgTicket;
+
   public:
 
     /// constructor
@@ -86,11 +88,19 @@ namespace p44 {
     /// @return constant identifier for this type of device (one container might contain more than one type)
     virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_switch_dim"; };
 
+    /// initializes the physical device for being used
+    /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
+    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+
     /// apply channel values
     virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
 
     /// synchronize channel values by reading them back from the device's hardware (if possible)
     virtual void syncChannelValues(SimpleCB aDoneCB) P44_OVERRIDE;
+
+  private:
+
+    void configureD201XX();
 
   };
 

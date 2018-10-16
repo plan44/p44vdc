@@ -93,6 +93,8 @@ static const ProfileVariantEntry profileVariantsVLD[] = {
   {  1, 0x01D23201, 0, "single device with two current sensors", NULL },
   {  2, 0x00D23202, 0, "three separate current sensor devices", NULL },
   {  2, 0x01D23202, 0, "single device with three current sensors", NULL },
+  {  3, 0x00D201FF, 1, "input does not locally control output", "nolocalcontrol" },
+  {  3, 0x01D201FF, 1, "input locally controls output", "localcontrol" },
   { 0, 0, 0, NULL, NULL } // terminator
 };
 
@@ -128,7 +130,7 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 ) {
   EnoceanDevicePtr newDev; // none so far
   // check for specialized handlers for certain profiles first
-  if (EEP_UNTYPED(aEEProfile)==0xD20100) {
+  if (EEP_PURE(EEP_UNTYPED(aEEProfile))==0xD20100) {
     // D2-01 family of switches and dimmers
     newDev = EnoceanD201XXHandler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
@@ -179,6 +181,8 @@ enum {
 };
 typedef uint32_t D201Features;
 
+
+// D2-01-xx number of channels and feature matrix
 
 typedef struct {
   int numChannels;
@@ -350,6 +354,40 @@ EnoceanD201XXDevice::EnoceanD201XXDevice(EnoceanVdc *aVdcP) :
 }
 
 
+void EnoceanD201XXDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
+{
+  // send a little later to not interfere with teach-ins
+  cfgTicket.executeOnce(boost::bind(&EnoceanD201XXDevice::configureD201XX, this), 1*Second);
+  // let inherited complete initialisation
+  inherited::initializeDevice(aCompletedCB, aFactoryReset);
+}
+
+
+void EnoceanD201XXDevice::configureD201XX()
+{
+  ALOG(LOG_INFO, "D2-01-xx: configuring using Actuator Set Local command");
+  Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
+  packet->initForRorg(rorg_VLD, 4);
+  packet->setRadioDestination(getAddress());
+  packet->radioUserData()[0] = 0x02; // CMD 0x1 - Actuator Set Local
+  packet->radioUserData()[1] =
+  (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
+  (1<<7) | // Bit7: OC: Overcurrent shut down automatically restarts
+  (0<<6) | // Bit6: RO: no explicit overcurrent reset now
+  ((EEP_VARIANT(getEEProfile())==1 ? 1 : 0)<<5); // Bit5: LC: local control
+  packet->radioUserData()[2] =
+  (10<<4) | // Bits 7..4: dim timer 2, medium, use 5sec, 0..15 = 0sec..7.5sec (0.5 sec/digit)
+  (15<<0); // Bits 3..0: dim timer 3, slow, use max = 7.5sec, 0..15 = 0sec..7.5sec (0.5 sec/digit)
+  packet->radioUserData()[3] =
+  (0<<7) | // Bit 7: d/n: day/night, always use "day" for now
+  (0<<6) | // Bit 6: PF: disable power failure detection for now
+  (2<<4) | // Bits 5..4: default state: 0=off, 1=100% on, 2=previous state, 3=not used
+  (1<<0); // Bits 3..0: dim timer 0, fast, use min = 0.5sec, 0..15 = 0sec..7.5sec (0.5 sec/digit)
+  getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
+}
+
+
+
 
 void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
@@ -392,7 +430,7 @@ void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       }
     }
     if (doApply) {
-      FOCUSLOG("- D2-01-xx sending Actuator Set Output command: new value = %d%%", percentOn);
+      ALOG(LOG_INFO, "D2-01-xx: sending Actuator Set Output command: new value = %d%%", percentOn);
       Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
       packet->initForRorg(rorg_VLD, 3);
       packet->setRadioDestination(getAddress());
@@ -415,7 +453,7 @@ void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
   if (c) {
     c->syncChannelCB = aDoneCB;
     // trigger device report
-    FOCUSLOG("- D2-01-xx sending Actuator Status Query");
+    ALOG(LOG_INFO, "D2-01-xx: sending Actuator Status Query");
     Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
     packet->initForRorg(rorg_VLD, 2);
     packet->setRadioDestination(getAddress());
