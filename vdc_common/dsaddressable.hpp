@@ -61,7 +61,7 @@ namespace p44 {
     MLMicroSeconds announced; ///< set when last announced to the vdSM
     MLMicroSeconds announcing; ///< set when announcement has been started (but not yet confirmed)
 
-    bool present; ///< current presence status
+    bool present; ///< current presence ("active" property) status
     MLMicroSeconds lastPresenceUpdate; ///< when presence state was last updated
 
   protected:

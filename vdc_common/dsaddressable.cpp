@@ -358,7 +358,7 @@ void DsAddressable::updatePresenceState(bool aPresent, bool aPush)
       ApiValuePtr query = api->newApiValue();
       query->setType(apivalue_object);
       ApiValuePtr subQuery = query->newValue(apivalue_object);
-      subQuery->add("present", subQuery->newValue(apivalue_null));
+      subQuery->add("active", subQuery->newValue(apivalue_null));
       pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
     }
   }
@@ -401,7 +401,7 @@ enum {
   deviceIcon16_key,
   iconName_key,
   name_key,
-  present_key,
+  active_key,
   numDsAddressableProperties
 };
 
@@ -439,7 +439,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     { "deviceIcon16", apivalue_binary, deviceIcon16_key, OKEY(dsAddressable_key) },
     { "deviceIconName", apivalue_string, iconName_key, OKEY(dsAddressable_key) },
     { "name", apivalue_string, name_key, OKEY(dsAddressable_key) },
-    { "present", apivalue_bool+propflag_needsreadprep, present_key, OKEY(dsAddressable_key) }
+    { "active", apivalue_bool+propflag_needsreadprep, active_key, OKEY(dsAddressable_key) }
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -453,7 +453,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
 
 void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
 {
-  if (aPropertyDescriptor->hasObjectKey(dsAddressable_key) && aPropertyDescriptor->fieldKey()==present_key) {
+  if (aPropertyDescriptor->hasObjectKey(dsAddressable_key) && aPropertyDescriptor->fieldKey()==active_key) {
     // update status in case
     if (lastPresenceUpdate+MIN_PRESENCE_SAMPLE_INTERVAL<MainLoop::now()) {
       // request update from device
@@ -506,7 +506,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case deviceIcon16_key: { string icon; if (getDeviceIcon(icon, true, "icon16")) { aPropValue->setBinaryValue(icon); return true; } else return false; }
         case iconName_key: { string iconName; if (getDeviceIcon(iconName, false, "icon16")) { aPropValue->setStringValue(iconName); return true; } else return false; }
         case name_key: aPropValue->setStringValue(getName()); return true;
-        case present_key: aPropValue->setBoolValue(present); return true;
+        case active_key: aPropValue->setBoolValue(present); return true;
       }
       return true;
     }
