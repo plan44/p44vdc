@@ -101,6 +101,7 @@ namespace p44 {
   private:
 
     void configureD201XX();
+    void updateOutput(uint8_t aPercentOn, uint8_t aDimTimeSelector);
 
   };
 
@@ -122,6 +123,8 @@ namespace p44 {
     ErrorLevel errorLevel;
 
     SimpleCB syncChannelCB; ///< callback to call when channel value is synchronized back from HW
+
+    MLTicket resendTicket;
 
     /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
     EnoceanD201XXHandler(EnoceanDevice &aDevice);

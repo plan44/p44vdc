@@ -247,9 +247,6 @@ EnoceanDevicePtr EnoceanD201XXHandler::newDevice(
       newDev = EnoceanDevicePtr(new EnoceanD201XXDevice(aVdcP));
       // assign channel and address
       newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
-      // add the channel handler
-      EnoceanChannelHandlerPtr d201handler = EnoceanChannelHandlerPtr(new EnoceanD201XXHandler(*newDev.get()));
-      newDev->addChannelHandler(d201handler);
       // is always updateable (no need to wait for incoming data)
       newDev->setAlwaysUpdateable();
       // assign EPP information
@@ -273,8 +270,10 @@ EnoceanDevicePtr EnoceanD201XXHandler::newDevice(
         // - configure switch behaviour
         l->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
       }
-      // does not need a channel handler at all, just add behaviour
-      newDev->addBehaviour(l);
+      // add a channel handler with output behaviour
+      EnoceanChannelHandlerPtr d201handler = EnoceanChannelHandlerPtr(new EnoceanD201XXHandler(*newDev.get()));
+      d201handler->behaviour = l;
+      newDev->addChannelHandler(d201handler);
       // count it
       aSubDeviceIndex++;
     }
@@ -306,6 +305,7 @@ void EnoceanD201XXHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       // Actuator Status Response
       // - channel must match
       if ((dataP[1] & 0x1F)!=device.getSubDevice()) return; // not this channel handler
+      resendTicket.cancel();
       // - sync current output state
       uint8_t outVal = dataP[2] & 0x7F;
       LightBehaviourPtr l = device.getOutput<LightBehaviour>();
@@ -430,19 +430,30 @@ void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       }
     }
     if (doApply) {
-      ALOG(LOG_INFO, "D2-01-xx: sending Actuator Set Output command: new value = %d%%", percentOn);
-      Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
-      packet->initForRorg(rorg_VLD, 3);
-      packet->setRadioDestination(getAddress());
-      packet->radioUserData()[0] = 0x01; // CMD 0x1 - Actuator Set Output
-      packet->radioUserData()[1] =
-        (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
-        ((dimValue & 0x07)<<5);
-      packet->radioUserData()[2] = percentOn; // 0=off, 1..100 = 1..100% on
-      sendCommand(packet, NULL);
+      updateOutput(percentOn, dimValue);
+      // re-send later again when we get no response (ticket gets cancelled when receiving confirmation)
+      EnoceanD201XXHandlerPtr c = dynamic_pointer_cast<EnoceanD201XXHandler>(channelForBehaviour(getOutput().get()));
+      if (c) {
+        c->resendTicket.executeOnce(boost::bind(&EnoceanD201XXDevice::updateOutput, this, percentOn, dimValue), 1*Second);
+      }
     }
   }
   inherited::applyChannelValues(aDoneCB, aForDimming);
+}
+
+
+void EnoceanD201XXDevice::updateOutput(uint8_t aPercentOn, uint8_t aDimTimeSelector)
+{
+  ALOG(LOG_INFO, "D2-01-xx: sending Actuator Set Output command: new value = %d%%", aPercentOn);
+  Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
+  packet->initForRorg(rorg_VLD, 3);
+  packet->setRadioDestination(getAddress());
+  packet->radioUserData()[0] = 0x01; // CMD 0x1 - Actuator Set Output
+  packet->radioUserData()[1] =
+  (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
+  ((aDimTimeSelector & 0x07)<<5);
+  packet->radioUserData()[2] = aPercentOn; // 0=off, 1..100 = 1..100% on
+  sendCommand(packet, NULL);
 }
 
 
