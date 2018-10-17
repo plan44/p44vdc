@@ -383,7 +383,7 @@ void EnoceanD201XXDevice::configureD201XX()
   (0<<6) | // Bit 6: PF: disable power failure detection for now
   (2<<4) | // Bits 5..4: default state: 0=off, 1=100% on, 2=previous state, 3=not used
   (1<<0); // Bits 3..0: dim timer 0, fast, use min = 0.5sec, 0..15 = 0sec..7.5sec (0.5 sec/digit)
-  getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
+  sendCommand(packet, NULL);
 }
 
 
@@ -439,7 +439,7 @@ void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
         ((dimValue & 0x07)<<5);
       packet->radioUserData()[2] = percentOn; // 0=off, 1..100 = 1..100% on
-      getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
+      sendCommand(packet, NULL);
     }
   }
   inherited::applyChannelValues(aDoneCB, aForDimming);
@@ -459,7 +459,7 @@ void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
     packet->setRadioDestination(getAddress());
     packet->radioUserData()[0] = 0x03; // CMD 0x3 - Actuator Status Query
     packet->radioUserData()[1] = (getSubDevice() & 0x1F); // Bits 0..4: output channel number (1E & 1F reserved)
-    getEnoceanVdc().enoceanComm.sendCommand(packet, NULL);
+    sendCommand(packet, NULL);
     return;
   }
   inherited::syncChannelValues(aDoneCB);

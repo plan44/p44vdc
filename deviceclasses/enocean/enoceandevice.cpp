@@ -242,6 +242,14 @@ EnoceanChannelHandlerPtr EnoceanDevice::channelForBehaviour(const DsBehaviour *a
 }
 
 
+void EnoceanDevice::sendCommand(Esp3PacketPtr aCommandPacket, ESPPacketCB aResponsePacketCB)
+{
+  aCommandPacket->finalize();
+  ALOG(LOG_INFO, "Sending EnOcean Packet:\n%s", aCommandPacket->description().c_str());
+  getEnoceanVdc().enoceanComm.sendCommand(aCommandPacket, aResponsePacketCB);
+}
+
+
 
 void EnoceanDevice::needOutgoingUpdate()
 {
@@ -270,10 +278,8 @@ void EnoceanDevice::sendOutgoingUpdate()
     if (outgoingEsp3Packet) {
       // set destination
       outgoingEsp3Packet->setRadioDestination(enoceanAddress); // the target is the device I manage
-      outgoingEsp3Packet->finalize();
-      ALOG(LOG_INFO, "sending outgoing EnOcean packet:\n%s", outgoingEsp3Packet->description().c_str());
       // send it
-      getEnoceanVdc().enoceanComm.sendCommand(outgoingEsp3Packet, NULL);
+      sendCommand(outgoingEsp3Packet, NULL);
     }
   }
 }

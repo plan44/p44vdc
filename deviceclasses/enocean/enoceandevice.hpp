@@ -393,6 +393,11 @@ namespace p44 {
     /// get handler associated with a behaviour
     EnoceanChannelHandlerPtr channelForBehaviour(const DsBehaviour *aBehaviourP);
 
+    /// send a command from this device and await response
+    /// @param aResponsePacketCB callback to deliver command response to
+    /// @note this is just a convenience method which includes logging the packet sent in context of the device
+    void sendCommand(Esp3PacketPtr aCommandPacket, ESPPacketCB aResponsePacketCB);
+
   private:
 
     bool isAlive();
