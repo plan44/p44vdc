@@ -345,7 +345,7 @@ void DsAddressable::pingResultHandler(bool aIsPresent)
 
 
 
-void DsAddressable::updatePresenceState(bool aPresent, bool aPush)
+void DsAddressable::updatePresenceState(bool aPresent)
 {
   lastPresenceUpdate = MainLoop::now();
   if (aPresent!=present || lastPresenceUpdate==Never) {
@@ -354,7 +354,7 @@ void DsAddressable::updatePresenceState(bool aPresent, bool aPush)
     ALOG(LOG_NOTICE, "changes to %s", aPresent ? "PRESENT" : "OFFLINE");
     // push change in presence
     VdcApiConnectionPtr api = getVdcHost().getSessionConnection();
-    if (aPush && api) {
+    if (api) {
       ApiValuePtr query = api->newApiValue();
       query->setType(apivalue_object);
       ApiValuePtr subQuery = query->newValue(apivalue_object);
@@ -468,7 +468,7 @@ void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPt
 
 void DsAddressable::presenceSampleHandler(StatusCB aPreparedCB, bool aIsPresent)
 {
-  updatePresenceState(aIsPresent, false);
+  updatePresenceState(aIsPresent);
   aPreparedCB(ErrorPtr());
 }
 

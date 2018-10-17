@@ -205,10 +205,9 @@ namespace p44 {
 
     /// explictly update presence state from device level.
     /// @param aPresent the new presence state
-    /// @param aPush if set, change in presence state will be pushed
     /// @note This can be called from device level implementation at any time to update the
     ///   presence state when it is detected as part of another operation
-    void updatePresenceState(bool aPresent, bool aPush = true);
+    void updatePresenceState(bool aPresent);
 
     /// @}
 
