@@ -432,7 +432,7 @@ void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     if (doApply) {
       updateOutput(percentOn, dimValue);
       // re-send later again when we get no response (ticket gets cancelled when receiving confirmation)
-      EnoceanD201XXHandlerPtr c = dynamic_pointer_cast<EnoceanD201XXHandler>(channelForBehaviour(getOutput().get()));
+      EnoceanD201XXHandlerPtr c = boost::dynamic_pointer_cast<EnoceanD201XXHandler>(channelForBehaviour(getOutput().get()));
       if (c) {
         c->resendTicket.executeOnce(boost::bind(&EnoceanD201XXDevice::updateOutput, this, percentOn, dimValue), 1*Second);
       }
@@ -460,7 +460,7 @@ void EnoceanD201XXDevice::updateOutput(uint8_t aPercentOn, uint8_t aDimTimeSelec
 /// synchronize channel values by reading them back from the device's hardware (if possible)
 void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
 {
-  EnoceanD201XXHandlerPtr c = dynamic_pointer_cast<EnoceanD201XXHandler>(channelForBehaviour(getOutput().get()));
+  EnoceanD201XXHandlerPtr c = boost::dynamic_pointer_cast<EnoceanD201XXHandler>(channelForBehaviour(getOutput().get()));
   if (c) {
     c->syncChannelCB = aDoneCB;
     // trigger device report
