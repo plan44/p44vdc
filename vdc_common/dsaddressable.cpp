@@ -358,7 +358,7 @@ void DsAddressable::updatePresenceState(bool aPresent)
       ApiValuePtr query = api->newApiValue();
       query->setType(apivalue_object);
       ApiValuePtr subQuery = query->newValue(apivalue_object);
-      subQuery->add("active", subQuery->newValue(apivalue_null));
+      query->add("active", subQuery->newValue(apivalue_null));
       pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
     }
   }
