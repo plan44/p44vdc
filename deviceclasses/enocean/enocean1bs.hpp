@@ -45,11 +45,11 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const { return "enocean_1bs"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_1bs"; };
 
     /// get table of profile variants
     /// @return NULL or pointer to a list of profile variants
-    virtual const ProfileVariantEntry *profileVariantsTable();
+    virtual const ProfileVariantEntry *profileVariantsTable() P44_OVERRIDE;
 
     /// factory: (re-)create logical device from address|channel|profile|manufacturer tuple
     /// @param aVdcP the class container
@@ -87,14 +87,14 @@ namespace p44 {
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
 
     /// check if channel is alive (for regularily sending sensors: has received life sign within timeout window)
-    virtual bool isAlive();
+    virtual bool isAlive() P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<SingleContactHandler> SingleContactHandlerPtr;

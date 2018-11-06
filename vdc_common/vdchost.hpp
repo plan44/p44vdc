@@ -94,8 +94,13 @@ namespace p44 {
 
   class VdcHost;
   typedef boost::intrusive_ptr<VdcHost> VdcHostPtr;
+  #if ENABLE_LOCALCONTROLLER
+  typedef boost::intrusive_ptr<LocalController> LocalControllerPtr;
+  #endif
   typedef map<DsUid, VdcPtr> VdcMap;
   typedef map<DsUid, DevicePtr> DsDeviceMap;
+  typedef vector<DevicePtr> DeviceVector;
+  typedef list<DevicePtr> DeviceList;
   typedef list<DsAddressablePtr> DsAddressablesList;
 
   class NotificationGroup
@@ -177,7 +182,7 @@ namespace p44 {
     VdcApiConnectionPtr activeSessionConnection;
 
     #if ENABLE_LOCALCONTROLLER
-    LocalController *localController;
+    LocalControllerPtr localController;
     #endif
 
   public:
@@ -188,6 +193,11 @@ namespace p44 {
     /// VdcHost is a singleton, get access to it
     /// @return vdc host
     static VdcHostPtr sharedVdcHost();
+
+    #if ENABLE_LOCALCONTROLLER
+    /// @return local controller, might be NULL if local controller is not enabled (but compiled in)
+    LocalControllerPtr getLocalController();
+    #endif
 
     /// the list of containers by API-exposed ID (dSUID or derived dsid)
     VdcMap vdcs;
@@ -423,7 +433,10 @@ namespace p44 {
     /// @}
 
     /// have button clicks checked for local handling
-    void checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
+    /// @param aButtonBehaviour the button behaviour that generated the click
+    /// @param aClickType the type of click
+    /// @return true if locally handled
+    bool checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
@@ -458,6 +471,9 @@ namespace p44 {
     /// @param aDevice a device object which has a valid dSUID
     /// @param aForget if set, parameters stored for the device will be deleted
     void removeDevice(DevicePtr aDevice, bool aForget);
+
+    /// @param aDeviceList will receive pointers to all devices
+    void createDeviceList(DeviceVector &aDeviceList);
 
     /// @}
 

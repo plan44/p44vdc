@@ -69,8 +69,6 @@ namespace p44 {
 
   class Vdc;
   typedef boost::intrusive_ptr<Vdc> VdcPtr;
-  typedef std::vector<DevicePtr> DeviceVector;
-  typedef std::list<DevicePtr> DeviceList;
 
 
   /// notification types
@@ -357,12 +355,14 @@ namespace p44 {
     /// @param aVdcError if NotOK, vdc cannot collect devices any more (or at all)
     void setVdcError(ErrorPtr aVdcError) { vdcErr = aVdcError; };
 
+    #if SELFTESTING_ENABLED
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error
     /// @note self will be called *instead* of collectDevices() but might need to do some form of
     ///   collecting devices to perform the test. It might do that by calling collectDevices(), but
     ///   must make sure NOT to modify or generate any persistent data for the class.
     virtual void selfTest(StatusCB aCompletedCB);
+    #endif
 
     /// Forget all previously collected devices
     /// @param aForget if set, all parameters stored for the device (if any) will be deleted.

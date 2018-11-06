@@ -85,9 +85,11 @@ namespace p44 {
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
+    #if SELFTESTING_ENABLED
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error
     virtual void selfTest(StatusCB aCompletedCB) P44_OVERRIDE;
+    #endif
 
     /// scan for (collect) devices and add them to the vdc
     virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
@@ -130,11 +132,13 @@ namespace p44 {
 
     /// un-pair devices by physical device address
     /// @param aEnoceanAddress address for which to disconnect and forget all physical devices
+    /// @param aEEP EEP to learn out (or 0 for any EEP with this address). Note: Variant will NOT be checked!
     /// @param aForgetParams if set, associated dS level configuration will be cleared such that
     ///   after reconnect the device will appear with default config
     /// @param aFromIndex starting subdevice index, defaults to 0
     /// @param aNumIndices how many subdevice index positions (0 = all)
-    void unpairDevicesByAddress(EnoceanAddress aEnoceanAddress, bool aForgetParams, EnoceanSubDevice aFromIndex=0, EnoceanSubDevice aNumIndices=0);
+    /// @return true if any device was actually matched and removed
+    bool unpairDevicesByAddressAndEEP(EnoceanAddress aEnoceanAddress, EnoceanProfile aEEP, bool aForgetParams, EnoceanSubDevice aFromIndex=0, EnoceanSubDevice aNumIndices=0);
 
     /// set container learn mode
     /// @param aEnableLearning true to enable learning mode
@@ -186,7 +190,7 @@ namespace p44 {
     void handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);
     void handleTestRadioPacket(StatusCB aCompletedCB, Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);
 
-    Tristate processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, bool aSmartAck, Esp3PacketPtr aLearnPacket, EnOceanSecurityPtr aSecurityInfo);
+    Tristate processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer, Tristate aTeachInfoType, EnoceanLearnType aLearnType, Esp3PacketPtr aLearnPacket, EnOceanSecurityPtr aSecurityInfo);
 
     ErrorPtr addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aParams);

@@ -147,6 +147,7 @@ namespace p44 {
     friend class Device;
 
     MLTicket invalidatorTicket;
+    MLTicket updateTicket;
 
   protected:
 
@@ -356,6 +357,7 @@ namespace p44 {
   private:
 
     void armInvalidator();
+    void reportFinalValue();
     #if ENABLE_RRDB
     void prepareLogging();
     void logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue);

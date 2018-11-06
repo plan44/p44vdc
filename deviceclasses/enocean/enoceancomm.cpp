@@ -478,6 +478,9 @@ void Esp3Packet::initForRorg(RadioOrg aRadioOrg, size_t aVLDsize)
       else if (aVLDsize<1) aVLDsize=1; // limit to min
       setRadioUserDataLength(aVLDsize);
       break;
+    case rorg_UTE:
+      setRadioUserDataLength(7);
+      break;
     default:
       break;
   }
@@ -592,7 +595,7 @@ RadioOrg Esp3Packet::eepRorg()
 //  Req  Manufacturer|   EEP No.    |dBm |    Repeater ID    |       Sender ID       |     |
 
 
-// UTE Teach-In Query (note: byte numbering is in radioUserData() buffer order, actual 4BS byte numbering is reversed!)
+// UTE Teach-In Query (note: byte numbering is in radioUserData() buffer order, actual VLD byte numbering is reversed!)
 //
 //           D[0]              |    D[1]   |    D[2]   |   D[3]    |    D[4]   |    D[5]   |    D[6]
 //  7    6     5  4    3 2 1 0 | 765432310 | 765432310 | 76543 210 | 765432310 | 765432310 | 765432310
@@ -802,7 +805,6 @@ void Esp3Packet::set4BSTeachInEEP(EnoceanProfile aEEProfile)
 
 Esp3PacketPtr Esp3Packet::newEsp3Message(PacketType aPacketType, uint8_t aCode, uint8_t aNumParamBytes, uint8_t *aParamBytesInitializerP)
 {
-  // send a EPS3 command to the modem to check if it is alive
   Esp3PacketPtr cmdPacket = Esp3PacketPtr(new Esp3Packet);
   cmdPacket->setPacketType(aPacketType);
   // command data is command byte plus params (if any)
@@ -1706,9 +1708,36 @@ void EnoceanComm::smartAckRespondToLearn(uint8_t aConfirmCode, MLMicroSeconds aR
   respPacket->data()[1] = (respMs>>8) & 0xFF;
   respPacket->data()[2] = respMs & 0xFF;
   respPacket->data()[3] = aConfirmCode;
-  // issue response
-  sendPacket(respPacket); // immediate response, not in queue
+  // Smartack response is immediate and does not respond back (not a regular "command")
+  sendPacket(respPacket);
 }
+
+
+void EnoceanComm::confirmUTE(uint8_t aConfirmCode, Esp3PacketPtr aUTEPacket)
+{
+  uint8_t db6 = aUTEPacket->radioUserData()[0]; // DB6 (in EEP specs order)
+  if ((db6 & 0x40)==0) {
+    // UTE teach-in response expected
+    Esp3PacketPtr uteRespPacket = Esp3PacketPtr(new Esp3Packet());
+    uteRespPacket->initForRorg(rorg_UTE);
+    // - is a echo of the request, except for first byte
+    uteRespPacket->radioUserData()[0] =
+      (db6 & 0x80) | // keep uni-/bidirectional bit
+      (aConfirmCode<<4) | // response code
+      0x01; // CMD EEP teach-in-response
+    // - copy remaining bytes
+    for (int i=1; i<7; i++) {
+      uteRespPacket->radioUserData()[i] = aUTEPacket->radioUserData()[i];
+    }
+    // mirror back to sender
+    uteRespPacket->setRadioDestination(aUTEPacket->radioSender());
+    // now send
+    LOG(LOG_INFO, "Sending UTE teach-in response for EEP %06X", EEP_PURE(uteRespPacket->eepProfile()));
+    sendCommand(uteRespPacket, NULL);
+  }
+}
+
+
 
 
 void EnoceanComm::aliveCheckResponse(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)
@@ -1813,7 +1842,6 @@ void EnoceanComm::dispatchPacket(Esp3PacketPtr aPacket)
     // This is a command response
     // - stop timeout
     cmdTimeoutTicket.cancel();
-    // - this is a command response
     if (cmdQueue.empty() || cmdQueue.front().commandPacket) {
       // received unexpected answer
       LOG(LOG_WARNING, "ESP3: Received unexpected response packet of length %zu", aPacket->dataLength());
@@ -1899,6 +1927,8 @@ void EnoceanComm::sendCommand(Esp3PacketPtr aCommandPacket, ESPPacketCB aRespons
 {
   // queue command
   EnoceanCmd cmd;
+  aCommandPacket->finalize();
+  FOCUSLOG("Queueing command packet to send: \n%s", aCommandPacket->description().c_str());
   cmd.commandPacket = aCommandPacket;
   cmd.responseCB = aResponsePacketCB;
   cmdQueue.push_back(cmd);

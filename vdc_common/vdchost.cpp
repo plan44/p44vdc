@@ -97,9 +97,6 @@ VdcHost::VdcHost(bool aWithLocalController) :
   localDimDirection(0), // undefined
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
   mainLoopStatsCounter(0),
-  #if ENABLE_LOCALCONTROLLER
-  localController(NULL),
-  #endif
   productName(DEFAULT_PRODUCT_NAME)
 {
   // remember singleton's address
@@ -108,8 +105,8 @@ VdcHost::VdcHost(bool aWithLocalController) :
   mac = macAddress();
   #if ENABLE_LOCALCONTROLLER
   if (aWithLocalController) {
-    localController = new LocalController(*this);
-    localController->isMemberVariable();
+    // create it
+    localController = LocalControllerPtr(new LocalController(*this));
   }
   #endif
 }
@@ -118,7 +115,7 @@ VdcHost::VdcHost(bool aWithLocalController) :
 VdcHost::~VdcHost()
 {
   #if ENABLE_LOCALCONTROLLER
-  if (localController) delete localController;
+  if (localController) localController.reset();
   #endif
 }
 
@@ -127,6 +124,14 @@ VdcHostPtr VdcHost::sharedVdcHost()
 {
   return VdcHostPtr(sharedVdcHostP);
 }
+
+
+#if ENABLE_LOCALCONTROLLER
+LocalControllerPtr VdcHost::getLocalController()
+{
+  return localController;
+}
+#endif
 
 
 void VdcHost::setEventMonitor(VdchostEventCB aEventCB)
@@ -719,18 +724,23 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
 // MARK: ===== local operation mode
 
 
-void VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
+bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
   #if ENABLE_LOCALCONTROLLER
-  if (!localController || !localController->processButtonClick(aButtonBehaviour, aClickType))
-  #endif
-  {
-    // not handled by local controller
-    if (!activeSessionConnection) {
-      // not connected to a vdSM, handle clicks locally
-      handleClickLocally(aButtonBehaviour, aClickType);
+  if (localController) {
+    if (localController->processButtonClick(aButtonBehaviour, aClickType)) {
+      LOG(LOG_NOTICE, "localcontroller has handled clicktype %d from Button[%zu] '%s' in %s", aClickType, aButtonBehaviour.index, aButtonBehaviour.getHardwareName().c_str(), aButtonBehaviour.device.shortDesc().c_str());
+      return true; // handled
     }
   }
+  #endif
+  // not handled by local controller
+  if (!activeSessionConnection) {
+    // not connected to a vdSM, handle clicks locally
+    handleClickLocally(aButtonBehaviour, aClickType);
+    return true; // handled
+  }
+  return false; // not handled
 }
 
 
@@ -855,13 +865,16 @@ void VdcHost::addTargetToAudience(NotificationAudience &aAudience, DsAddressable
 
 ErrorPtr VdcHost::addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &aDsuid)
 {
+  if (aDsuid.empty()) {
+    return Error::err<VdcApiError>(415, "missing/invalid dSUID");
+  }
   DsAddressablePtr a = addressableForDsUid(aDsuid);
   if (a) {
     addTargetToAudience(aAudience, a);
     return ErrorPtr();
   }
   else {
-    return Error::err<VdcApiError>(404, "missing/invalid dSUID");
+    return Error::err<VdcApiError>(404, "unknown dSUID");
   }
 }
 
@@ -940,7 +953,9 @@ void VdcHost::vdcApiConnectionStatusHandler(VdcApiConnectionPtr aApiConnection, 
   }
   else {
     // error or connection closed
-    LOG(LOG_ERR, "vDC API connection closing, reason: %s", aError->description().c_str());
+    if (!aError->isError(SocketCommError::domain(), SocketCommError::HungUp)) {
+      LOG(LOG_ERR, "vDC API connection closing due to error: %s", aError->description().c_str());
+    }
     // - close if not already closed
     aApiConnection->closeConnection();
     if (aApiConnection==activeSessionConnection) {
@@ -948,10 +963,10 @@ void VdcHost::vdcApiConnectionStatusHandler(VdcApiConnectionPtr aApiConnection, 
       resetAnnouncing(); // stop possibly ongoing announcing
       activeSessionConnection.reset();
       postEvent(vdchost_vdcapi_disconnected);
-      LOG(LOG_NOTICE, "vDC API session ends because connection closed ");
+      LOG(LOG_NOTICE, "=== vDC API session ends because connection closed");
     }
     else {
-      LOG(LOG_NOTICE, "vDC API connection (not yet in session) closed ");
+      LOG(LOG_NOTICE, "=== vDC API connection (not yet in session) closed");
     }
   }
 }
@@ -1023,6 +1038,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
     if (version<VDC_API_VERSION_MIN || version>maxversion) {
       // incompatible version
       respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d..%d", version, VDC_API_VERSION_MIN, maxversion);
+      LOG(LOG_WARNING, "=== hello rejected: %s", respErr->description().c_str());
     }
     else {
       // API version ok, save it
@@ -1060,6 +1076,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         else {
           // not ok to start new session, reject
           respErr = Error::err<VdcApiError>(503, "this vDC already has an active session with vdSM %s",connectedVdsm.getString().c_str());
+          LOG(LOG_WARNING, "=== hello rejected: %s", respErr->description().c_str());
           aRequest->sendError(respErr);
           // close after send
           aRequest->connection()->closeAfterSend();
@@ -1075,6 +1092,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 
 ErrorPtr VdcHost::byeHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 {
+  LOG(LOG_NOTICE, "=== vDC API connection will close due to 'bye' command");
   // always confirm Bye, even out-of-session, so using aJsonRpcComm directly to answer (jsonSessionComm might not be ready)
   aRequest->sendResult(ApiValuePtr());
   // close after send
@@ -1164,7 +1182,7 @@ ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection
         for (int i=0; i<o->arrayLength(); i++) {
           audienceOk = true; // non-empty array is a valid audience specification
           ApiValuePtr e = o->arrayGet(i);
-          dsuid.setAsBinary(e->binaryValue());
+          if (!dsuid.setAsBinary(e->binaryValue())) dsuid.clear();
           respErr = addToAudienceByDsuid(audience, dsuid);
           if (!Error::isOK(respErr)) {
             respErr->prefixMessage("Ignored target for notification '%s': ", aMethod.c_str());
@@ -1174,7 +1192,8 @@ ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection
         respErr.reset();
       }
       else {
-        dsuid.setAsBinary(o->binaryValue());
+        // single dSUIDs
+        if (!dsuid.setAsBinary(o->binaryValue())) dsuid.clear();
         respErr = addToAudienceByDsuid(audience, dsuid);
         audienceOk = true; // non-empty dSUID valid audience specification
       }
@@ -1224,7 +1243,7 @@ ErrorPtr VdcHost::handleMethodForParams(VdcApiRequestPtr aRequest, const string 
         addressable = addressableForItemSpec(itemSpec);
       }
       else {
-        // default to vdchost
+        // default to vdchost (allows start accessing a vdchost by getProperty without knowing a dSUID in the first place)
         addressable = DsAddressablePtr(this);
       }
     }
@@ -1391,6 +1410,15 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
 
 ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
 {
+  #if ENABLE_LOCALCONTROLLER
+  if (localController) {
+    ErrorPtr lcErr;
+    if (localController->handleLocalControllerMethod(lcErr, aRequest, aMethod, aParams)) {
+      // local controller did or will handle the method
+      return lcErr;
+    }
+  }
+  #endif
   return inherited::handleMethod(aRequest, aMethod, aParams);
 }
 
@@ -1456,7 +1484,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByName(string aPropMatch, int &aStar
       OKEY(vdc_obj)
     );
   }
-  // None of the containers within Device - let base class handle Device-Level properties
+  // None of the containers within vdc host - let base class handle root-Level properties
   return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
 }
 
@@ -1503,6 +1531,16 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
   // not my field, let base class handle it
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
+
+
+void VdcHost::createDeviceList(DeviceVector &aDeviceList)
+{
+  aDeviceList.clear();
+  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+    aDeviceList.push_back(pos->second);
+  }
+}
+
 
 
 // MARK: ===== value sources

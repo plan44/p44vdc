@@ -28,6 +28,7 @@
 #include "buttonbehaviour.hpp"
 #include "sensorbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
+#include "lightbehaviour.hpp"
 
 
 using namespace p44;
@@ -92,6 +93,8 @@ static const ProfileVariantEntry profileVariantsVLD[] = {
   {  1, 0x01D23201, 0, "single device with two current sensors", NULL },
   {  2, 0x00D23202, 0, "three separate current sensor devices", NULL },
   {  2, 0x01D23202, 0, "single device with three current sensors", NULL },
+  {  3, 0x00D201FF, 1, "input does not locally control output", "nolocalcontrol" },
+  {  3, 0x01D201FF, 1, "input locally controls output", "localcontrol" },
   { 0, 0, 0, NULL, NULL } // terminator
 };
 
@@ -127,7 +130,11 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 ) {
   EnoceanDevicePtr newDev; // none so far
   // check for specialized handlers for certain profiles first
-  if (EEP_PURE(aEEProfile)==0xD20601) {
+  if (EEP_PURE(EEP_UNTYPED(aEEProfile))==0xD20100) {
+    // D2-01 family of switches and dimmers
+    newDev = EnoceanD201XXHandler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
+  }
+  else if (EEP_PURE(aEEProfile)==0xD20601) {
     // Note: Profile has variants (with and without temperature sensor)
     // use specialized handler for output functions of heating valve (valve value, summer/winter, prophylaxis)
     newDev = EnoceanD20601Handler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
@@ -141,7 +148,339 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 }
 
 
-// MARK: ===== EnoceanD20601Handler
+// MARK: ===== EnoceanD201XXHandler - Electronic Switches and Dimmers with local control
+
+enum {
+  switching = (1<<0),
+  dimming = (1<<1),
+  dimmingConfigurable = (1<<2),
+  pilotWire = (1<<3),
+  localControl = (1<<4),
+  localControlDisable = (1<<5),
+  externalControl = (1<<6),
+  externalControlType = (1<<7),
+  autoOffTimer = (1<<8),
+  delayOffTimer = (1<<9),
+  taughtInDisable = (1<<10),
+  dayNightUI = (1<<11),
+  overCurrentReporting = (1<<12),
+  overCurrentConfigurable = (1<<13),
+  energyMeasurement = (1<<14),
+  powerMeasurement = (1<<15),
+  measurementRollover = (1<<16),
+  measurementAutoscaling = (1<<17),
+  measurementConfigurable = (1<<18),
+  measurementReportOnQuery = (1<<19),
+  measurementAutoReport = (1<<20),
+  defaultStateConfigurable = (1<<21),
+  errorLevelReporting = (1<<22),
+  powerFailureDetection = (1<<23),
+  powerFailureDetectionDisable = (1<<24),
+  maxDimValue = (1<<25),
+  minDimValue = (1<<26),
+};
+typedef uint32_t D201Features;
+
+
+// D2-01-xx number of channels and feature matrix
+
+typedef struct {
+  int numChannels;
+  D201Features features;
+} D201Descriptor;
+
+static const int numD201Descriptors = 0x17;
+static const D201Descriptor D201descriptors[numD201Descriptors] = {
+  { 1, 0x00094011 }, // D2-01-00
+  { 1, 0x00000011 }, // D2-01-01
+  { 1, 0x00094913 }, // D2-01-02
+  { 1, 0x00000013 }, // D2-01-03
+  { 1, 0x001AF437 }, // D2-01-04
+  { 1, 0x007EFC37 }, // D2-01-05
+  { 1, 0x00094001 }, // D2-01-06
+  { 1, 0x00000001 }, // D2-01-07
+  { 1, 0x007EFC31 }, // D2-01-08
+  { 1, 0x007ED417 }, // D2-01-09
+  { 1, 0x01A00C31 }, // D2-01-0A
+  { 1, 0x01BDCC31 }, // D2-01-0B
+  { 1, 0x007EFC39 }, // D2-01-0C
+  { 1, 0x00200C31 }, // D2-01-0D
+  { 1, 0x003DCC31 }, // D2-01-0E
+  { 1, 0x00200FF1 }, // D2-01-0F
+  { 2, 0x00094011 }, // D2-01-10
+  { 2, 0x00000011 }, // D2-01-11
+  { 2, 0x00200FF1 }, // D2-01-12
+  { 4, 0x00000011 }, // D2-01-13
+  { 8, 0x00000011 }, // D2-01-14
+  { 4, 0x00680BF1 }, // D2-01-15
+  { 2, 0x06000BF7 }, // D2-01-16
+};
+
+
+
+EnoceanD201XXHandler::EnoceanD201XXHandler(EnoceanDevice &aDevice) :
+  inherited(aDevice),
+  overCurrent(false),
+  powerFailure(false),
+  errorLevel(ok)
+{
+}
+
+
+// static factory method
+EnoceanDevicePtr EnoceanD201XXHandler::newDevice(
+  EnoceanVdc *aVdcP,
+  EnoceanAddress aAddress,
+  EnoceanSubDevice &aSubDeviceIndex, // current subdeviceindex, factory returns NULL when no device can be created for this subdevice index
+  EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer,
+  bool aSendTeachInResponse
+) {
+  // D2-01-xx - Electronic Switches and Dimmers with local control
+  EnoceanDevicePtr newDev; // none so far
+  EepType d201type = EEP_TYPE(aEEProfile);
+  if (d201type<numD201Descriptors) {
+    // a type we know of, get the descriptor
+    const D201Descriptor &d201desc = D201descriptors[d201type];
+    // each channel corresponds to a subdevice
+    if (aSubDeviceIndex<d201desc.numChannels) {
+      // create EnoceanVLDDevice
+      newDev = EnoceanDevicePtr(new EnoceanD201XXDevice(aVdcP));
+      // assign channel and address
+      newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
+      // is always updateable (no need to wait for incoming data)
+      newDev->setAlwaysUpdateable();
+      // assign EPP information
+      newDev->setEEPInfo(aEEProfile, aEEManufacturer);
+      // treat all as generic (black) devices...
+      newDev->setColorClass(class_black_joker);
+      // ...but always use light behaviour
+      newDev->installSettings(DeviceSettingsPtr(new LightDeviceSettings(*newDev)));
+      LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*newDev.get()));
+      l->setGroupMembership(group_yellow_light, true); // put into light group by default
+      // determine features
+      if (d201desc.features & dimming) {
+        // dimmer
+        newDev->setFunctionDesc("dimmer");
+        // - configure dimmer behaviour
+        l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, -1);
+      }
+      else {
+        // switch only
+        newDev->setFunctionDesc("on/off switch");
+        // - configure switch behaviour
+        l->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
+      }
+      // add a channel handler with output behaviour
+      EnoceanChannelHandlerPtr d201handler = EnoceanChannelHandlerPtr(new EnoceanD201XXHandler(*newDev.get()));
+      d201handler->behaviour = l;
+      newDev->addChannelHandler(d201handler);
+      // count it
+      aSubDeviceIndex++;
+    }
+  }
+  // return device (or empty if none created)
+  return newDev;
+}
+
+
+
+string EnoceanD201XXHandler::shortDesc()
+{
+  const D201Descriptor &d201desc = D201descriptors[EEP_TYPE(device.getEEProfile())];
+  return string_format("%d channel %s", d201desc.numChannels, d201desc.features & dimming ? "Dimmer" : "Switch");
+}
+
+
+// handle incoming data from device and extract data for this channel
+void EnoceanD201XXHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
+{
+  if (!aEsp3PacketPtr->radioHasTeachInfo()) {
+    // only look at non-teach-in packets
+    uint8_t *dataP = aEsp3PacketPtr->radioUserData();
+    int datasize = (int)aEsp3PacketPtr->radioUserDataLength();
+    if (datasize<3) return; // wrong data size
+    uint8_t cmd = dataP[0] & 0x0F;
+    // check message type
+    if (cmd==0x4 && datasize==3) {
+      // Actuator Status Response
+      // - channel must match
+      if ((dataP[1] & 0x1F)!=device.getSubDevice()) return; // not this channel handler
+      resendTicket.cancel();
+      // - sync current output state
+      uint8_t outVal = dataP[2] & 0x7F;
+      LightBehaviourPtr l = device.getOutput<LightBehaviour>();
+      if (l) {
+        l->syncBrightnessFromHardware(outVal);
+      }
+      else {
+        ChannelBehaviourPtr ch = device.getOutput()->getChannelByType(channeltype_default);
+        ch->syncChannelValue(outVal);
+      }
+      // - update error info
+      powerFailure = (dataP[0] & 0x40)!=0;
+      overCurrent = (dataP[1] & 0x80)!=0;
+      errorLevel = (ErrorLevel)((dataP[1]>>5) & 0x03);
+    }
+    if (syncChannelCB) {
+      SimpleCB cb = syncChannelCB;
+      syncChannelCB = NULL;
+      cb();
+    }
+  }
+}
+
+
+int EnoceanD201XXHandler::opStateLevel()
+{
+  if (errorLevel==failure || powerFailure) return 0; // complete failure
+  if (errorLevel==warning || overCurrent) return 20; // warning
+  return inherited::opStateLevel();
+}
+
+string EnoceanD201XXHandler::getOpStateText()
+{
+  if (powerFailure) return "power failure";
+  if (overCurrent) return "overcurrent";
+  if (errorLevel==failure) return "failure";
+  if (errorLevel==warning) return "warning";
+  return inherited::getOpStateText();
+}
+
+
+
+EnoceanD201XXDevice::EnoceanD201XXDevice(EnoceanVdc *aVdcP) :
+  inherited(aVdcP)
+{
+}
+
+
+void EnoceanD201XXDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
+{
+  // send a little later to not interfere with teach-ins
+  cfgTicket.executeOnce(boost::bind(&EnoceanD201XXDevice::configureD201XX, this), 1*Second);
+  // let inherited complete initialisation
+  inherited::initializeDevice(aCompletedCB, aFactoryReset);
+}
+
+
+void EnoceanD201XXDevice::configureD201XX()
+{
+  ALOG(LOG_INFO, "D2-01-xx: configuring using Actuator Set Local command");
+  Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
+  packet->initForRorg(rorg_VLD, 4);
+  packet->setRadioDestination(getAddress());
+  packet->radioUserData()[0] = 0x02; // CMD 0x1 - Actuator Set Local
+  packet->radioUserData()[1] =
+  (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
+  (1<<7) | // Bit7: OC: Overcurrent shut down automatically restarts
+  (0<<6) | // Bit6: RO: no explicit overcurrent reset now
+  ((EEP_VARIANT(getEEProfile())==1 ? 1 : 0)<<5); // Bit5: LC: local control
+  packet->radioUserData()[2] =
+  (10<<4) | // Bits 7..4: dim timer 2, medium, use 5sec, 0..15 = 0sec..7.5sec (0.5 sec/digit)
+  (15<<0); // Bits 3..0: dim timer 3, slow, use max = 7.5sec, 0..15 = 0sec..7.5sec (0.5 sec/digit)
+  packet->radioUserData()[3] =
+  (0<<7) | // Bit 7: d/n: day/night, always use "day" for now
+  (0<<6) | // Bit 6: PF: disable power failure detection for now
+  (2<<4) | // Bits 5..4: default state: 0=off, 1=100% on, 2=previous state, 3=not used
+  (1<<0); // Bits 3..0: dim timer 0, fast, use min = 0.5sec, 0..15 = 0sec..7.5sec (0.5 sec/digit)
+  sendCommand(packet, NULL);
+}
+
+
+
+
+void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
+{
+  // standard output behaviour
+  if (getOutput()) {
+    const D201Descriptor &d201desc = D201descriptors[EEP_TYPE(getEEProfile())];
+    bool doApply = false;
+    uint8_t percentOn;
+    uint8_t dimValue = 0; // 0=immediate change, 1,2,3 = use timer 1,2,3
+    LightBehaviourPtr l = getOutput<LightBehaviour>();
+    if (l) {
+      // light output
+      if (l->brightnessNeedsApplying()) {
+        percentOn = l->brightnessForHardware();
+        if (d201desc.features & dimming) {
+          MLMicroSeconds tt = l->transitionTimeToNewBrightness();
+  //        if (d201desc.features & dimmingConfigurable) {
+  //          // we could set the dimming times
+  //          // TODO: implement
+  //        }
+  //        else
+          {
+            // just assume fixed dimming times
+            if (tt>=1*Minute) dimValue = 3; // use the "slow" timer (dS: 1 Minute)
+            else if (tt>=5*Second) dimValue = 2; // use the "medium" timer (dS: 5 Seconds)
+            else if (tt>0) dimValue = 1; // use the "fast" timer (dS: 100mS)
+          }
+        }
+        doApply = true;
+        l->brightnessApplied();
+      }
+    }
+    else {
+      // generic output
+      ChannelBehaviourPtr ch = getOutput()->getChannelByType(channeltype_default);
+      if (ch->needsApplying()) {
+        percentOn = ch->getChannelValueBool() ? 100 : 0;
+        doApply = true;
+        ch->channelValueApplied();
+      }
+    }
+    if (doApply) {
+      updateOutput(percentOn, dimValue);
+      // re-send later again when we get no response (ticket gets cancelled when receiving confirmation)
+      EnoceanD201XXHandlerPtr c = boost::dynamic_pointer_cast<EnoceanD201XXHandler>(channelForBehaviour(getOutput().get()));
+      if (c) {
+        c->resendTicket.executeOnce(boost::bind(&EnoceanD201XXDevice::updateOutput, this, percentOn, dimValue), 1*Second);
+      }
+    }
+  }
+  inherited::applyChannelValues(aDoneCB, aForDimming);
+}
+
+
+void EnoceanD201XXDevice::updateOutput(uint8_t aPercentOn, uint8_t aDimTimeSelector)
+{
+  ALOG(LOG_INFO, "D2-01-xx: sending Actuator Set Output command: new value = %d%%", aPercentOn);
+  Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
+  packet->initForRorg(rorg_VLD, 3);
+  packet->setRadioDestination(getAddress());
+  packet->radioUserData()[0] = 0x01; // CMD 0x1 - Actuator Set Output
+  packet->radioUserData()[1] =
+  (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
+  ((aDimTimeSelector & 0x07)<<5);
+  packet->radioUserData()[2] = aPercentOn; // 0=off, 1..100 = 1..100% on
+  sendCommand(packet, NULL);
+}
+
+
+/// synchronize channel values by reading them back from the device's hardware (if possible)
+void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
+{
+  EnoceanD201XXHandlerPtr c = boost::dynamic_pointer_cast<EnoceanD201XXHandler>(channelForBehaviour(getOutput().get()));
+  if (c) {
+    c->syncChannelCB = aDoneCB;
+    // trigger device report
+    ALOG(LOG_INFO, "D2-01-xx: sending Actuator Status Query");
+    Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
+    packet->initForRorg(rorg_VLD, 2);
+    packet->setRadioDestination(getAddress());
+    packet->radioUserData()[0] = 0x03; // CMD 0x3 - Actuator Status Query
+    packet->radioUserData()[1] = (getSubDevice() & 0x1F); // Bits 0..4: output channel number (1E & 1F reserved)
+    sendCommand(packet, NULL);
+    return;
+  }
+  inherited::syncChannelValues(aDoneCB);
+}
+
+
+
+
+
+// MARK: ===== EnoceanD20601Handler - SODA Window Handle
 
 /// sensor bitfield extractor function and check for validity for D2-06-01 profile
 static void D20601SensorHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
@@ -247,7 +586,7 @@ EnoceanDevicePtr EnoceanD20601Handler::newDevice(
   EnoceanDevicePtr newDev; // none so far
   int numdevices = 3; // subindex 0,1 = buttons, 2 = sensors
   if (aSubDeviceIndex<numdevices) {
-    // create EnoceanRPSDevice device
+    // create EnoceanVLDDevice
     newDev = EnoceanDevicePtr(new EnoceanVLDDevice(aVdcP));
     // standard device settings without scene table
     newDev->installSettings();

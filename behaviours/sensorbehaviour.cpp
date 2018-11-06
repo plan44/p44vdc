@@ -260,6 +260,9 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
 static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
   // type                      usage           evalWin    collWin          evalType                   pushIntvl  chgOnlyIntvl  trigDelta  trigMode                    trigMin trigIntvl
   // ------------------------  -------------   ---------  --------------   -------------------------  ---------  ------------  ---------  --------------------------  ------- --------------------------
+  // user dials
+  { sensorType_set_point,      usage_user,     0,         0,               eval_none,                 3*Second,  60*Minute,    0,         tr_absolute,                0,      0 },
+  { sensorType_temperature,    usage_user,     0,         0,               eval_none,                 3*Second,  60*Minute,    0,         tr_absolute,                0,      0 },
   // indoor context
   { sensorType_temperature,    usage_room,     0,         0,               eval_none,                 5*Minute,  60*Minute,    0.5,       tr_absolute,                -100,   1*Second /* = "immediate" */ },
   { sensorType_humidity,       usage_room,     0,         0,               eval_none,                 30*Minute, 60*Minute,    2,         tr_absolute,                -1,     1*Second /* = "immediate" */ },
@@ -491,12 +494,20 @@ bool SensorBehaviour::pushSensor(bool aAlways)
         }
       }
     }
+    if (!doPush && changed) {
+      // we have a pending change, but rules don't allow to push now. Make sure final state gets pushed later
+      BLOG(LOG_INFO, "- sensor changes too quickly, cannot push update now, but final state will be pushed after minPushInterval");
+      if (!updateTicket) {
+        updateTicket.executeOnceAt(boost::bind(&SensorBehaviour::reportFinalValue, this), lastPush+minPushInterval);
+      }
+    }
   }
   if (doPush) {
     // push the new value
     if (pushBehaviourState()) {
       lastPush = now;
       lastPushedValue = currentValue;
+      updateTicket.cancel(); // pushed now, no need to push later
       return true;
     }
     else if (device.isPublicDS()) {
@@ -506,6 +517,16 @@ bool SensorBehaviour::pushSensor(bool aAlways)
   return false;
 }
 
+
+void SensorBehaviour::reportFinalValue()
+{
+  // push the current value (after awaiting minPushInterval)
+  updateTicket.cancel();
+  if (pushBehaviourState()) {
+    BLOG(LOG_INFO, "Sensor[%zu] %s '%s' now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentValue, getSensorUnitText().c_str());
+    lastPush = MainLoop::currentMainLoop().now();
+  }
+}
 
 
 void SensorBehaviour::invalidateSensorValue(bool aPush)

@@ -318,6 +318,11 @@ namespace p44 {
     /// @return a zoneID, can be 0 if device is not assigned to a zone (yet)
     DsZoneID getZoneID();
 
+    /// set the zoneID (room) for this device
+    /// @param aZoneId the new zoneId to set
+    /// @note when localcontroller is enabled, this will inform zones of the change
+    void setZoneID(DsZoneID aZoneId);
+
     /// set user assignable name
     /// @param aName name of the addressable entity
     virtual void setName(const string &aName) P44_OVERRIDE;
@@ -612,6 +617,15 @@ namespace p44 {
     ///   Device::requestApplyingChannels() provides an implementation that serializes calls to applyChannelValues and syncChannelValues
     virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) { if (aDoneCB) aDoneCB(); /* just call completed in base class */ };
 
+    /// is called when scene values are applied, either via applyChannelValues or via optimized calls
+    /// @param aDoneCB called when all tasks following applying the scene are done
+    /// @param aScene the scene that was called
+    /// @param aIndirectly if true, applyChannelValues was NOT used to apply the scene, but STILL some other mechanism
+    ///   such as optimized group call has changed outputs. device implementation might need to sync back hardware state in this case.
+    /// @note aIndirectly is NOT set when there was no output change at all and applyChannelValues() was therefore not called.
+    /// @note if derived in subclass, base class' implementation should normally be called as this triggers scene actions
+    virtual void sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndirectly);
+
     /// synchronize channel values by reading them back from the device's hardware (if possible)
     /// @param aDoneCB will be called when values are updated with actual hardware values
     /// @note this method is only called at startup and before saving scenes to make sure changes done to the outputs directly (e.g. using
@@ -643,11 +657,11 @@ namespace p44 {
 
     /// start and/or finalize a operation prepared with callScenePrepare/dimChannelForAreaPrepare
     /// @param aDoneCB called when operation is complete
-    /// @param aDoApply only if set to true, operation must be applied to the hardware. Otherwise
+    /// @param aWhatToApply only if not set to ntfy_none, operation must be applied to the hardware. Otherwise
     ///   the actual applying has been done already by another means (such as native group/scene call on the harware level)
     ///   and must NOT be re-applied.
     ///   However, in all cases internal state must be updated to reflect the finalized operation
-    void executePreparedOperation(SimpleCB aDoneCB, bool aDoApply);
+    void executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatToApply);
 
     /// let this device add itself to the list of devices that can received grouped/optimized scene/dim calls, if applicable
     /// @param aDeliveryState if the device supports optimized calls, it must update the delivery state hashes
@@ -715,10 +729,10 @@ namespace p44 {
     void callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce);
     void callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
     void callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
-    void callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply);
+    void callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);
     void dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
     void dimRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState);
-    void dimChannelExecutePrepared(SimpleCB aDoneCB, bool aDoApply);
+    void dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);
     void outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene);
 
     void sceneActionsComplete(SimpleCB aDoneCB, DsScenePtr aScene);
@@ -726,7 +740,6 @@ namespace p44 {
     void dimHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNow);
     void dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNextDimAt);
     void outputSceneValueSaved(DsScenePtr aScene);
-    void sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene);
 
     void applyingChannelsComplete();
     void updatingChannelsComplete();

@@ -30,7 +30,6 @@
 #include "digitalio.hpp"
 
 #if ENABLE_ENOCEAN_SECURE
-  #warning "WORK IN PROGRESS"
   #include <openssl/evp.h>
   #include <openssl/err.h>
   #include <openssl/ssl.h>
@@ -179,6 +178,13 @@ namespace p44 {
   #define SA_RESPONSECODE_BADRSSI 0x14 // RSSI not good enough, learn-in rejected
   #define SA_RESPONSECODE_REMOVED 0x20 // learned out
   #define SA_RESPONSECODE_NOTSUPP 0xFF // function not supported
+
+  // UTE: confirm codes
+  #define UTE_FAIL 0x0 // UTE teach-in not accepted, general failure
+  #define UTE_LEARNED_IN 0x1 // UTE teach-in successful
+  #define UTE_LEARNED_OUT 0x2 // UTE learn-out successful
+  #define UTE_UNKNOWN_EEP 0x3 // UTE not accepted because of unknown EEP
+
 
   /// Enocean Manufacturer number (11 bits)
   typedef uint16_t EnoceanManufacturer;
@@ -676,6 +682,11 @@ namespace p44 {
     /// @param aConfirmCode confirm code, see SA_RESPONSECODE_xxx
     /// @param aResponseTime for learn-in (SA_RESPONSECODE_LEARNED), how fast the mailbox will be ready for device to claim it
     void smartAckRespondToLearn(uint8_t aConfirmCode, MLMicroSeconds aResponseTime = 0);
+
+    /// send response to UTE learn request
+    /// @param aConfirmCode confirm code, see UTE_xxx
+    /// @param aUTEPacket the original UTE learn-in packet (will be mirrored back when confirmation is requested)
+    void confirmUTE(uint8_t aConfirmCode, Esp3PacketPtr aUTEPacket);
 
   protected:
 

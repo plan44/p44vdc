@@ -288,6 +288,10 @@ void ConsoleDevice::sensorValueHandler(double aValue, MLMicroSeconds aTimeStamp)
 
 void ConsoleDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
+  ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
+  if (cl) {
+    cl->deriveColorMode();
+  }
   // generic device, show changed channels
   for (int i = 0; i<numChannels(); i++) {
     ChannelBehaviourPtr ch = getChannelByIndex(i);

@@ -28,6 +28,9 @@
 
 #include "localcontroller.hpp"
 
+#include "jsonvdcapi.hpp"
+
+#include "outputbehaviour.hpp"
 #include "buttonbehaviour.hpp"
 
 
@@ -35,25 +38,198 @@
 
 using namespace p44;
 
+
+// MARK: ===== ZoneState
+
+ZoneState::ZoneState() :
+  lastGlobalScene(INVALID_SCENE_NO),
+  lastDim(dimmode_stop),
+  lastLightScene(INVALID_SCENE_NO)
+{
+  for (SceneArea i=0; i<=num_areas; ++i) lightOn[i] = false;
+}
+
+
 // MARK: ===== ZoneDescriptor
 
 ZoneDescriptor::ZoneDescriptor() :
-  inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
-  deviceCount(0)
+  inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore())
 {
 }
 
 
 ZoneDescriptor::~ZoneDescriptor()
 {
-
 }
 
 
 void ZoneDescriptor::usedByDevice(DevicePtr aDevice, bool aInUse)
 {
-  deviceCount += (aInUse ? 1 : -1);
+  if (zoneID==zoneId_global) return; // global zone always contains all devices, no need to maintain a list
+  for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+    if (*pos==aDevice) {
+      if (aInUse) return; // already here -> NOP
+      // not in use any more, remove it
+      devices.erase(pos);
+      return;
+    }
+  }
+  // not yet in my list
+  if (aInUse) {
+    devices.push_back(aDevice);
+  }
 }
+
+
+static const SceneKindDescriptor roomScenes[] = {
+  { ROOM_OFF, scene_room|scene_preset|scene_off , "off"},
+  { ROOM_ON, scene_room|scene_preset, "preset 1" },
+  { PRESET_2, scene_room|scene_preset, "preset 2" },
+  { PRESET_3, scene_room|scene_preset, "preset 3" },
+  { PRESET_4, scene_room|scene_preset, "preset 4" },
+  { AREA_1_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 1 off" },
+  { AREA_1_ON, scene_room|scene_preset|scene_area|scene_extended, "area 1 on" },
+  { AREA_2_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 2 off" },
+  { AREA_2_ON, scene_room|scene_preset|scene_area|scene_extended, "area 2 on" },
+  { AREA_3_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 3 off" },
+  { AREA_3_ON, scene_room|scene_preset|scene_area|scene_extended, "area 3 on" },
+  { AREA_4_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 4 off" },
+  { AREA_4_ON, scene_room|scene_preset|scene_area|scene_extended, "area 4 on" },
+  { PRESET_OFF_10, scene_room|scene_preset|scene_off|scene_extended, "off 10" },
+  { PRESET_11, scene_room|scene_preset|scene_extended, "preset 11" },
+  { PRESET_12, scene_room|scene_preset|scene_extended, "preset 12" },
+  { PRESET_13, scene_room|scene_preset|scene_extended, "preset 13" },
+  { PRESET_14, scene_room|scene_preset|scene_extended, "preset 14" },
+  { PRESET_OFF_20, scene_room|scene_preset|scene_off|scene_extended, "off 20" },
+  { PRESET_21, scene_room|scene_preset|scene_extended, "preset 21" },
+  { PRESET_22, scene_room|scene_preset|scene_extended, "preset 22" },
+  { PRESET_23, scene_room|scene_preset|scene_extended, "preset 23" },
+  { PRESET_24, scene_room|scene_preset|scene_extended, "preset 24" },
+  { PRESET_OFF_30, scene_room|scene_preset|scene_off|scene_extended, "off 30" },
+  { PRESET_31, scene_room|scene_preset|scene_extended, "preset 31" },
+  { PRESET_32, scene_room|scene_preset|scene_extended, "preset 32" },
+  { PRESET_33, scene_room|scene_preset|scene_extended, "preset 33" },
+  { PRESET_34, scene_room|scene_preset|scene_extended, "preset 34" },
+  { PRESET_OFF_40, scene_room|scene_preset|scene_off|scene_extended, "off 40" },
+  { PRESET_41, scene_room|scene_preset|scene_extended, "preset 41" },
+  { PRESET_42, scene_room|scene_preset|scene_extended, "preset 42" },
+  { PRESET_43, scene_room|scene_preset|scene_extended, "preset 43" },
+  { PRESET_44, scene_room|scene_preset|scene_extended, "preset 44" },
+  { INVALID_SCENE_NO, 0, NULL } // terminator
+};
+
+
+static const SceneKindDescriptor globalScenes[] = {
+  { AUTO_STANDBY, scene_global, "auto-standby" },
+  { STANDBY, scene_global|scene_preset, "standby" },
+  { DEEP_OFF, scene_global|scene_preset, "deep off" },
+  { SLEEPING, scene_global|scene_preset, "sleeping" },
+  { WAKE_UP, scene_global|scene_preset, "wakeup" },
+  { PRESENT, scene_global|scene_preset, "present" },
+  { ABSENT, scene_global|scene_preset, "absent" },
+  { ZONE_ACTIVE, scene_global, "zone active" },
+  { BELL1, scene_global|scene_preset, "bell 1" },
+  { BELL2, scene_global|scene_preset|scene_extended, "bell 2" },
+  { BELL3, scene_global|scene_preset|scene_extended, "bell 3" },
+  { BELL4, scene_global|scene_preset|scene_extended, "bell 4" },
+  { PANIC, scene_global|scene_preset, "panic" },
+  { ALARM1, scene_global, "alarm 1" },
+  { ALARM2, scene_global|scene_extended, "alarm 2" },
+  { ALARM3, scene_global|scene_extended, "alarm 3" },
+  { ALARM4, scene_global|scene_extended, "alarm 4" },
+  { FIRE, scene_global, "fire" },
+  { SMOKE, scene_global, "smoke" },
+  { WATER, scene_global, "water" },
+  { GAS, scene_global, "gas" },
+  { WIND, scene_global, "wind" },
+  { NO_WIND, scene_global, "no wind" },
+  { RAIN, scene_global, "rain" },
+  { NO_RAIN, scene_global, "no rain" },
+  { HAIL, scene_global, "hail" },
+  { NO_HAIL, scene_global, "no hail" },
+  { POLLUTION, scene_global, "pollution" },
+  { INVALID_SCENE_NO, 0 } // terminator
+};
+
+
+
+DsGroupMask ZoneDescriptor::getZoneGroups(bool aStandardOnly)
+{
+  DsGroupMask zoneGroups = 0;
+  if (zoneID==zoneId_global) {
+    return 0; // groups are not relevant in zone0
+  }
+  else {
+    for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+      OutputBehaviourPtr o = (*pos)->getOutput();
+      if (o) {
+        zoneGroups |= o->groupMemberships();
+      }
+    }
+    if (aStandardOnly) {
+      // only use groups with standard room scenes
+      zoneGroups &= (
+        (1ll<<group_yellow_light) |
+        (1ll<<group_grey_shadow) |
+        (1ll<<group_blue_heating) |
+        (1ll<<group_cyan_audio) |
+        (1ll<<group_blue_cooling) |
+        (1ll<<group_blue_ventilation)
+      );
+    }
+    return zoneGroups;
+  }
+}
+
+
+SceneIdsVector ZoneDescriptor::getZoneScenes(DsGroup aForGroup, SceneKind aRequiredKinds, SceneKind aForbiddenKinds)
+{
+  SceneIdsVector zoneScenes;
+  // create list of scenes
+  const SceneKindDescriptor *sceneKindP = NULL;
+  if (zoneID==zoneId_global) {
+    // global scenes
+    aRequiredKinds |= scene_global;
+    sceneKindP = globalScenes;
+  }
+  else {
+    // room scenes
+    aRequiredKinds |= scene_room;
+    sceneKindP = roomScenes;
+  }
+  aForbiddenKinds &= ~aRequiredKinds; // required ones must be allowed
+  while (sceneKindP && sceneKindP->no!=INVALID_SCENE_NO) {
+    if (
+      (sceneKindP->kind & aRequiredKinds)==aRequiredKinds &&
+      (sceneKindP->kind & aForbiddenKinds)==0
+    ) {
+      // create identifier for it
+      SceneIdentifier si(*sceneKindP, zoneID, aForGroup);
+      // look up in user-defined scenes
+      SceneDescriptorPtr userscene = LocalController::sharedLocalController()->localScenes.getScene(si);
+      if (userscene) {
+        si.name = userscene->getSceneName();
+      }
+      zoneScenes.push_back(si);
+    }
+    sceneKindP++;
+  }
+  return zoneScenes;
+}
+
+
+size_t ZoneDescriptor::devicesInZone() const
+{
+  if (zoneID==zoneId_global) {
+    return LocalController::sharedLocalController()->totalDevices();
+  }
+  else {
+    return devices.size();
+  }
+}
+
+
+
 
 
 // MARK: ===== ZoneDescriptor persistence
@@ -131,27 +307,65 @@ void ZoneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 
 // MARK: ===== ZoneDescriptor property access implementation
 
+static char zonedevices_container_key;
+static char zonedevice_key;
+
 enum {
   zoneName_key,
   deviceCount_key,
+  zoneDevices_key,
   numZoneProperties
 };
 
 static char zonedescriptor_key;
 
-
-
 int ZoneDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
+  if (aParentDescriptor->hasObjectKey(zonedevices_container_key)) {
+    return (int)devicesInZone();
+  }
   return numZoneProperties;
 }
+
+
+
+PropertyDescriptorPtr ZoneDescriptor::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
+{
+  if (aParentDescriptor->hasObjectKey(zonedevices_container_key)) {
+    // accessing one of the zone's devices by numeric index
+    return getDescriptorByNumericName(
+      aPropMatch, aStartIndex, aDomain, aParentDescriptor,
+      OKEY(zonedevice_key)
+    );
+  }
+  // None of the containers within Device - let base class handle vdc-Level properties
+  return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
+}
+
+
+PropertyContainerPtr ZoneDescriptor::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->isArrayContainer()) {
+    // local container (e.g. all devices of this zone)
+    return PropertyContainerPtr(this); // handle myself
+  }
+  else if (aPropertyDescriptor->hasObjectKey(zonedevice_key)) {
+    // - get device
+    PropertyContainerPtr container = devices[aPropertyDescriptor->fieldKey()];
+    return container;
+  }
+  // unknown here
+  return NULL;
+}
+
 
 
 PropertyDescriptorPtr ZoneDescriptor::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numZoneProperties] = {
     { "name", apivalue_string, zoneName_key, OKEY(zonedescriptor_key) },
-    { "devices", apivalue_uint64, deviceCount_key, OKEY(zonedescriptor_key) },
+    { "deviceCount", apivalue_uint64, deviceCount_key, OKEY(zonedescriptor_key) },
+    { "devices", apivalue_object+propflag_needsreadprep+propflag_needswriteprep+propflag_container+propflag_nowildcard, zoneDevices_key, OKEY(zonedevices_container_key) },
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
@@ -161,13 +375,35 @@ PropertyDescriptorPtr ZoneDescriptor::getDescriptorByIndex(int aPropIndex, int a
 }
 
 
+
+void ZoneDescriptor::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+{
+  if (aPropertyDescriptor->hasObjectKey(zonedevices_container_key) && zoneID==zoneId_global) {
+    // for global zone: create temporary list of all devices
+    LocalController::sharedLocalController()->vdcHost.createDeviceList(devices);
+  }
+  // in any case: let inherited handle the callback
+  inherited::prepareAccess(aMode, aPropertyDescriptor, aPreparedCB);
+}
+
+
+void ZoneDescriptor::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(zonedevices_container_key) && zoneID==zoneId_global) {
+    // list is only temporary
+    devices.clear();
+  }
+}
+
+
+
 bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
   if (aPropertyDescriptor->hasObjectKey(zonedescriptor_key)) {
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case zoneName_key: aPropValue->setStringValue(zoneName); return true;
-        case deviceCount_key: aPropValue->setUint32Value(deviceCount); return true;
+        case deviceCount_key: aPropValue->setUint64Value(devicesInZone()); return true;
       }
     }
     else {
@@ -266,7 +502,7 @@ PropertyDescriptorPtr ZoneList::getDescriptorByIndex(int aPropIndex, int aDomain
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyName = string_format("%hu", zones[aPropIndex]->zoneID);
     descP->propertyType = apivalue_object;
-    descP->deletable = zones[aPropIndex]->deviceCount<=0; // zone is deletable when no device uses it
+    descP->deletable = zones[aPropIndex]->devices.size()==0; // zone is deletable when no device uses it
     descP->propertyFieldKey = aPropIndex;
     descP->propertyObjectKey = OKEY(zonelist_key);
     return descP;
@@ -325,6 +561,85 @@ PropertyContainerPtr ZoneList::getContainer(const PropertyDescriptorPtr &aProper
 
 
 
+// MARK: ===== SceneIdentifier
+
+SceneIdentifier::SceneIdentifier()
+{
+  sceneKindP = NULL;
+  sceneNo = INVALID_SCENE_NO;
+  zoneID = scene_global;
+  group = group_undefined;
+}
+
+
+SceneIdentifier::SceneIdentifier(const SceneKindDescriptor &aSceneKind, DsZoneID aZone, DsGroup aGroup)
+{
+  sceneKindP = &aSceneKind;
+  sceneNo = sceneKindP->no;
+  zoneID = aZone;
+  group = aGroup;
+}
+
+
+SceneIdentifier::SceneIdentifier(SceneNo aNo, DsZoneID aZone, DsGroup aGroup)
+{
+  sceneNo = aNo;
+  zoneID = aZone;
+  group = aGroup;
+  deriveSceneKind();
+}
+
+
+SceneIdentifier::SceneIdentifier(const string aStringId)
+{
+  uint16_t tmpSceneNo = INVALID_SCENE_NO;
+  uint16_t tmpZoneID = scene_global;
+  uint16_t tmpGroup = group_undefined;
+  sscanf(aStringId.c_str(), "%hu_%hu_%hu", &tmpSceneNo, &tmpZoneID, &tmpGroup);
+  sceneNo = tmpSceneNo;
+  zoneID = tmpZoneID;
+  group = (DsGroup)tmpGroup;
+  deriveSceneKind();
+}
+
+
+string SceneIdentifier::stringId() const
+{
+  return string_format("%hu_%hu_%hu", (uint16_t)sceneNo, (uint16_t)zoneID, (uint16_t)group);
+}
+
+
+
+string SceneIdentifier::getActionName() const
+{
+  return sceneKindP ? sceneKindP->actionName : string_format("scene %d", sceneNo);
+}
+
+
+string SceneIdentifier::getName() const
+{
+  return name;
+}
+
+
+
+
+bool SceneIdentifier::deriveSceneKind()
+{
+  const SceneKindDescriptor *sk = sceneNo>=START_APARTMENT_SCENES ? globalScenes : roomScenes;
+  while (sk->no<MAX_SCENE_NO) {
+    if (sk->no==sceneNo) {
+      sceneKindP = sk;
+      return true;
+    }
+    sk++;
+  }
+  sceneKindP = NULL; // unknown
+  return false;
+}
+
+
+
 // MARK: ===== SceneDescriptor
 
 SceneDescriptor::SceneDescriptor() :
@@ -348,7 +663,7 @@ const char *SceneDescriptor::tableName()
 
 // primary key field definitions
 
-static const size_t numSceneKeys = 1;
+static const size_t numSceneKeys = 3;
 
 size_t SceneDescriptor::numKeyDefs()
 {
@@ -359,7 +674,9 @@ size_t SceneDescriptor::numKeyDefs()
 const FieldDefinition *SceneDescriptor::getKeyDef(size_t aIndex)
 {
   static const FieldDefinition keyDefs[numSceneKeys] = {
-    { "sceneNo", SQLITE_INTEGER }, // uniquely identifies this zone
+    { "sceneNo", SQLITE_INTEGER },
+    { "sceneZone", SQLITE_INTEGER },
+    { "sceneGroup", SQLITE_INTEGER },
   };
   if (aIndex<numSceneKeys)
     return &keyDefs[aIndex];
@@ -394,10 +711,13 @@ const FieldDefinition *SceneDescriptor::getFieldDef(size_t aIndex)
 void SceneDescriptor::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
 {
   inheritedParams::loadFromRowWithoutParentId(aRow, aIndex, aCommonFlagsP);
-  // get zoneID
-  sceneNo = (DsSceneNumber)aRow->getWithDefault(aIndex++, 0);
+  // get key fields
+  sceneId.sceneNo = aRow->getCastedWithDefault<SceneNo, int>(aIndex++, 0);
+  sceneId.zoneID = aRow->getCastedWithDefault<DsZoneID, int>(aIndex++, 0);
+  sceneId.group = aRow->getCastedWithDefault<DsGroup, int>(aIndex++, group_undefined);
+  sceneId.deriveSceneKind();
   // the name
-  sceneName = nonNullCStr(aRow->get<const char *>(aIndex++));
+  sceneId.name = nonNullCStr(aRow->get<const char *>(aIndex++));
 }
 
 
@@ -405,16 +725,22 @@ void SceneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // - my own id
-  aStatement.bind(aIndex++, sceneNo);
+  aStatement.bind(aIndex++, sceneId.sceneNo);
+  aStatement.bind(aIndex++, sceneId.zoneID);
+  aStatement.bind(aIndex++, sceneId.group);
   // - title
-  aStatement.bind(aIndex++, sceneName.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, sceneId.name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
 // MARK: ===== SceneDescriptor property access implementation
 
 enum {
+  sceneNo_key,
   sceneName_key,
+  sceneAction_key,
+  sceneZoneID_key,
+  sceneGroup_key,
   numSceneProperties
 };
 
@@ -431,7 +757,11 @@ int SceneDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescript
 PropertyDescriptorPtr SceneDescriptor::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numSceneProperties] = {
-    { "name", apivalue_string, zoneName_key, OKEY(scenedescriptor_key) }
+    { "sceneNo", apivalue_uint64, sceneNo_key, OKEY(scenedescriptor_key) },
+    { "name", apivalue_string, sceneName_key, OKEY(scenedescriptor_key) },
+    { "action", apivalue_string, sceneAction_key, OKEY(scenedescriptor_key) },
+    { "zoneID", apivalue_uint64, sceneZoneID_key, OKEY(scenedescriptor_key) },
+    { "group", apivalue_uint64, sceneGroup_key, OKEY(scenedescriptor_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
@@ -446,12 +776,16 @@ bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
   if (aPropertyDescriptor->hasObjectKey(scenedescriptor_key)) {
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
-        case sceneName_key: aPropValue->setStringValue(sceneName); return true;
+        case sceneNo_key: aPropValue->setUint16Value(getSceneNo()); return true;
+        case sceneName_key: aPropValue->setStringValue(getSceneName()); return true;
+        case sceneAction_key: aPropValue->setStringValue(getActionName()); return true;
+        case sceneZoneID_key: aPropValue->setUint16Value(sceneId.zoneID); return true;
+        case sceneGroup_key: aPropValue->setUint8Value(sceneId.group); return true;
       }
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
-        case zoneName_key: setPVar(sceneName, aPropValue->stringValue()); return true;
+        case sceneName_key: setPVar(sceneId.name, aPropValue->stringValue()); return true;
       }
     }
   }
@@ -462,22 +796,26 @@ bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 // MARK: ===== SceneList
 
 
-SceneDescriptorPtr SceneList::getSceneByNo(DsSceneNumber aSceneNo, bool aCreateNewIfNotExisting)
+SceneDescriptorPtr SceneList::getScene(const SceneIdentifier &aSceneId, bool aCreateNewIfNotExisting, size_t *aSceneIndexP)
 {
   SceneDescriptorPtr scene;
-  for (ScenesVector::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
-    if ((*pos)->sceneNo==aSceneNo) {
-      scene = *pos;
+  for (int i = 0; i<scenes.size(); ++i) {
+    SceneDescriptorPtr sc = scenes[i];
+    if (sc->sceneId.sceneNo==aSceneId.sceneNo && sc->sceneId.zoneID==aSceneId.zoneID && sc->sceneId.group==aSceneId.group) {
+      scene = sc;
+      if (aSceneIndexP) *aSceneIndexP = i;
       break;
     }
   }
-  if (!scene && aCreateNewIfNotExisting) {
-    // create new scene descriptor on the fly
+  if (!scene && aCreateNewIfNotExisting && aSceneId.sceneNo<MAX_SCENE_NO) {
+    // create new scene descriptor
     scene = SceneDescriptorPtr(new SceneDescriptor);
-    scene->sceneNo = aSceneNo;
-    scene->sceneName = string_format("Scene #%d", aSceneNo);
-    scene->markClean(); // not modified yet, no need to save
-    scenes.push_back(scene);
+    scene->sceneId = aSceneId;
+    if (scene->sceneId.deriveSceneKind()) {
+      scene->markClean(); // not modified yet, no need to save
+      if (aSceneIndexP) *aSceneIndexP = scenes.size();
+      scenes.push_back(scene);
+    }
   }
   return scene;
 }
@@ -521,7 +859,7 @@ ErrorPtr SceneList::save()
   // save all elements (only dirty ones will be actually stored to DB)
   for (ScenesVector::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->sceneNo, err->description().c_str());
+    if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->sceneId.sceneNo, err->description().c_str());
   }
   return err;
 }
@@ -541,7 +879,7 @@ PropertyDescriptorPtr SceneList::getDescriptorByIndex(int aPropIndex, int aDomai
 {
   if (aPropIndex<scenes.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("%u", scenes[aPropIndex]->sceneNo);
+    descP->propertyName = scenes[aPropIndex]->getStringID();
     descP->propertyType = apivalue_object;
     descP->deletable = true; // scene is deletable
     descP->propertyFieldKey = aPropIndex;
@@ -556,19 +894,16 @@ PropertyDescriptorPtr SceneList::getDescriptorByName(string aPropMatch, int &aSt
 {
   PropertyDescriptorPtr p = inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
   if (!p && aMode==access_write && isNamedPropSpec(aPropMatch)) {
-    // writing to non-existing scene -> insert new scene
+    // writing to non-existing scene -> try to insert new scene
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyName = aPropMatch;
     descP->propertyType = apivalue_object;
     descP->deletable = true; // new scenes are deletable
-    descP->propertyFieldKey = scenes.size(); // new zone will be appended, so index is current size
     descP->propertyObjectKey = OKEY(scenelist_key);
-    uint16_t newSceneNo = MAX_SCENE_NO;
-    if (sscanf(aPropMatch.c_str(), "%hd", &newSceneNo)==1) {
-      if (newSceneNo<MAX_SCENE_NO) {
-        getSceneByNo((DsSceneNumber)newSceneNo, true);
-      }
+    size_t si;
+    if (getScene(SceneIdentifier(aPropMatch), true, &si)) {
       // valid new scene
+      descP->propertyFieldKey = si; // the scene's index
       p = descP;
     }
   }
@@ -611,9 +946,15 @@ LocalController::LocalController(VdcHost &aVdcHost) :
 
 LocalController::~LocalController()
 {
-
 }
 
+
+LocalControllerPtr LocalController::sharedLocalController()
+{
+  LocalControllerPtr lc = VdcHost::sharedVdcHost()->getLocalController();
+  assert(lc); // must exist at this point
+  return lc;
+}
 
 
 void LocalController::processGlobalEvent(VdchostEvent aActivity)
@@ -625,6 +966,269 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
 bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
   FOCUSLOG("processButtonClick: clicktype=%d, device = %s", (int)aClickType, aButtonBehaviour.shortDesc().c_str());
+  // defaults
+  DsGroup group = aButtonBehaviour.buttonGroup;
+  DsChannelType channel = channeltype_default;
+  DsZoneID zoneID = zoneId_global;
+  // possible actions
+  bool doDim = false;
+  SceneNo sceneToCall = INVALID_SCENE_NO;
+  // determine what to do
+  VdcDimMode direction = dimmode_stop; // none known
+  switch (aButtonBehaviour.buttonMode) {
+    case buttonMode_standard:
+    case buttonMode_turbo:
+      direction = dimmode_stop;
+      break;
+    case buttonMode_rockerDown_pairWith0:
+    case buttonMode_rockerDown_pairWith1:
+    case buttonMode_rockerDown_pairWith2:
+    case buttonMode_rockerDown_pairWith3:
+      direction = dimmode_down;
+      break;
+    case buttonMode_rockerUp_pairWith0:
+    case buttonMode_rockerUp_pairWith1:
+    case buttonMode_rockerUp_pairWith2:
+    case buttonMode_rockerUp_pairWith3:
+      direction = dimmode_up;
+      break;
+    case buttonMode_inactive:
+    default:
+      return true; // button inactive or unknown -> NOP, but handled
+  }
+  // evaluate function
+  int area = 0;
+  bool global = false;
+  SceneNo sceneOffclick = INVALID_SCENE_NO;
+  SceneNo scene1click = INVALID_SCENE_NO;
+  SceneNo scene2click = INVALID_SCENE_NO;
+  SceneNo scene3click = INVALID_SCENE_NO;
+  SceneNo scene4click = INVALID_SCENE_NO;
+  if (group==group_black_variable) {
+    switch (aButtonBehaviour.buttonFunc) {
+      case buttonFunc_alarm:
+        scene1click = ALARM1;
+        global = true;
+        break;
+      case buttonFunc_panic:
+        scene1click = PANIC;
+        global = true;
+        break;
+      case buttonFunc_leave:
+        scene1click = ABSENT;
+        global = true;
+        break;
+      case buttonFunc_doorbell:
+        scene1click = BELL1;
+        global = true;
+        break;
+      default:
+        break;
+    }
+  }
+  else {
+    switch (aButtonBehaviour.buttonFunc) {
+      case buttonFunc_area1_preset0x:
+        area = 1;
+        scene1click = AREA_1_ON;
+        sceneOffclick = AREA_1_OFF;
+        goto preset0x;
+      case buttonFunc_area2_preset0x:
+        area = 2;
+        scene1click = AREA_2_ON;
+        sceneOffclick = AREA_2_OFF;
+        goto preset0x;
+      case buttonFunc_area3_preset0x:
+        area = 3;
+        scene1click = AREA_3_ON;
+        sceneOffclick = AREA_3_OFF;
+        goto preset0x;
+      case buttonFunc_area4_preset0x:
+        area = 4;
+        scene1click = AREA_4_ON;
+        sceneOffclick = AREA_4_OFF;
+        goto preset0x;
+      case buttonFunc_area1_preset1x:
+        area = 1;
+        scene1click = AREA_1_ON;
+        sceneOffclick = AREA_1_OFF;
+        goto preset1x;
+      case buttonFunc_area2_preset2x:
+        area = 2;
+        scene1click = AREA_2_ON;
+        sceneOffclick = AREA_2_OFF;
+        goto preset2x;
+      case buttonFunc_area3_preset3x:
+        area = 3;
+        scene1click = AREA_3_ON;
+        sceneOffclick = AREA_3_OFF;
+        goto preset3x;
+      case buttonFunc_area4_preset4x:
+        area = 4;
+        scene1click = AREA_4_ON;
+        sceneOffclick = AREA_4_OFF;
+        goto preset4x;
+      case buttonFunc_room_preset0x:
+        scene1click = ROOM_ON;
+        sceneOffclick = ROOM_OFF;
+      preset0x:
+        scene2click = PRESET_2;
+        scene3click = PRESET_3;
+        scene4click = PRESET_4;
+        break;
+      case buttonFunc_room_preset1x:
+        scene1click = PRESET_11;
+        sceneOffclick = ROOM_OFF;
+      preset1x:
+        scene2click = PRESET_12;
+        scene3click = PRESET_13;
+        scene4click = PRESET_14;
+        break;
+      case buttonFunc_room_preset2x:
+        scene1click = PRESET_21;
+        sceneOffclick = ROOM_OFF;
+      preset2x:
+        scene2click = PRESET_22;
+        scene3click = PRESET_23;
+        scene4click = PRESET_24;
+        break;
+      case buttonFunc_room_preset3x:
+        scene1click = PRESET_31;
+        sceneOffclick = ROOM_OFF;
+      preset3x:
+        scene2click = PRESET_32;
+        scene3click = PRESET_33;
+        scene4click = PRESET_34;
+        break;
+      case buttonFunc_room_preset4x:
+        scene1click = PRESET_41;
+        sceneOffclick = ROOM_OFF;
+      preset4x:
+        scene2click = PRESET_42;
+        scene3click = PRESET_43;
+        scene4click = PRESET_44;
+        break;
+      default:
+        break;
+    }
+  }
+  if (global) {
+    // global scene
+    zoneID = zoneId_global;
+    group = group_undefined;
+    direction = dimmode_up; // always "on"
+    switch (aClickType) {
+      case ct_tip_1x:
+      case ct_click_1x:
+        sceneToCall = scene1click;
+        break;
+      default:
+        return true; // unknown click -> ignore, but handled
+    }
+  }
+  else {
+    // room scene
+    zoneID = aButtonBehaviour.device.getZoneID();
+    channel = aButtonBehaviour.buttonChannel;
+    ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
+    if (!zone) return false; // button in a non-local zone, cannot handle
+    if (group!=group_yellow_light) return true; // NOP because we don't support anything except light for now, but handled
+    // evaluate click
+    if (aClickType==ct_hold_start) {
+      // start dimming if not off (or rocker)
+      if (direction==dimmode_stop) {
+        // single button, no explicit direction
+        if (!zone->zoneState.lightOn[area]) {
+          // TODO: start deep off detection sequence
+          return true; // NOP, handled
+        }
+        // use inverse of last dim
+        direction = zone->zoneState.lastDim==dimmode_up ? dimmode_down : dimmode_up;
+      }
+      zone->zoneState.lastDim = direction;
+      doDim = true;
+    }
+    else if (aClickType==ct_hold_end) {
+      // stop dimming
+      direction = dimmode_stop;
+      doDim = true;
+    }
+    else {
+      // - not hold or release
+      SceneNo sceneOnClick = INVALID_SCENE_NO;
+      switch (aClickType) {
+        case ct_tip_1x:
+        case ct_click_1x:
+          sceneOnClick = scene1click;
+          break;
+        case ct_tip_2x:
+        case ct_click_2x:
+          sceneOnClick = scene2click;
+          direction = dimmode_up;
+          break;
+        case ct_tip_3x:
+        case ct_click_3x:
+          sceneOnClick = scene3click;
+          direction = dimmode_up;
+          break;
+        case ct_tip_4x:
+          sceneOnClick = scene4click;
+          direction = dimmode_up;
+          break;
+        default:
+          return true; // unknown click -> ignore, but handled
+      }
+      if (direction==dimmode_stop) {
+        // single button, no explicit direction
+        direction = zone->zoneState.lightOn[area] ? dimmode_down : dimmode_up;
+      }
+      // local
+      if (direction==dimmode_up) {
+        // calling a preset
+        sceneToCall = sceneOnClick;
+        zone->zoneState.lightOn[area] = true;
+      }
+      else {
+        // calling an off scene
+        sceneToCall = sceneOffclick;
+        zone->zoneState.lightOn[area] = false;
+      }
+      if (sceneToCall!=INVALID_SCENE_NO) {
+        zone->zoneState.lastLightScene = sceneToCall;
+      }
+    }
+    // now perform actions
+    if (doDim || sceneToCall!=INVALID_SCENE_NO) {
+      // deliver
+      NotificationAudience audience;
+      vdcHost.addToAudienceByZoneAndGroup(audience, zoneID, group);
+      JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
+      params->setType(apivalue_object);
+      // - define audience
+      params->add("zone_id", params->newUint64(zoneID));
+      params->add("group", params->newUint64(group));
+      string method;
+      if (doDim) {
+        // { "notification":"dimChannel", "zone_id":0, "group":1, "mode":1, "channelId":0, "area":0 }
+        method = "dimChannel";
+        params->add("mode", params->newInt64(direction));
+        params->add("channelId", params->newUint64(channel));
+        params->add("area", params->newUint64(area));
+      }
+      else if (sceneToCall!=INVALID_SCENE_NO) {
+        // { "notification":"callScene", "zone_id":0, "group":1, "scene":5, "force":false }
+        method = "callScene";
+        params->add("scene", params->newUint64(sceneToCall));
+        params->add("force", params->newBool(false));
+      }
+      else {
+        return true; // NOP, but handled
+      }
+      // - deliver
+      vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
+      return true;
+    }
+  }
   return false; // not handled so far
 }
 
@@ -641,8 +1245,28 @@ void LocalController::deviceAdded(DevicePtr aDevice)
 void LocalController::deviceRemoved(DevicePtr aDevice)
 {
   FOCUSLOG("deviceRemoved: device = %s", aDevice->shortDesc().c_str());
-  // TODO: remove zone usage - however this can be done only if we also track changing zones in devices
-  //   so we leave it for now, meaning that zones can be deleted only after restart
+  ZoneDescriptorPtr deviceZone = localZones.getZoneById(aDevice->getZoneID(), false);
+  if (deviceZone) deviceZone->usedByDevice(aDevice, false);
+}
+
+
+void LocalController::deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, DsZoneID aToZone)
+{
+  FOCUSLOG("deviceChangesZone: device = %s, zone %d -> %d", aDevice->shortDesc().c_str(), aFromZone, aToZone);
+  if (aFromZone!=aToZone) {
+    // - remove from old
+    ZoneDescriptorPtr deviceZone = localZones.getZoneById(aFromZone, false);
+    if (deviceZone) deviceZone->usedByDevice(aDevice, false);
+    // - add to new (and create it in case it is new)
+    deviceZone = localZones.getZoneById(aToZone, true);
+    deviceZone->usedByDevice(aDevice, true);
+  }
+}
+
+
+size_t LocalController::totalDevices() const
+{
+  return vdcHost.dSDevices.size();
 }
 
 
@@ -674,6 +1298,126 @@ ErrorPtr LocalController::save()
 }
 
 
+// MARK: ===== LocalController specific root (vdchost) level method handling
+
+
+static const GroupDescriptor groupInfos[] = {
+  { group_undefined,               group_global,      "undefined" },
+  { group_yellow_light,            group_standard,    "light" },
+  { group_grey_shadow,             group_standard,    "shadow" },
+  { group_blue_heating,            group_standard,    "heating" },
+  { group_cyan_audio,              group_standard,    "audio" },
+  { group_magenta_video,           group_standard,    "video" },
+  { group_red_security,            group_global,      "security" },
+  { group_green_access,            group_global,      "access" },
+  { group_black_variable,          group_application, "joker" },
+  { group_blue_cooling,            group_standard,    "cooling" },
+  { group_blue_ventilation,        group_standard,    "ventilation" },
+  { group_blue_windows,            group_standard,    "windows" },
+  { group_blue_air_recirculation,  group_controller,  "air recirculation" },
+  { group_roomtemperature_control, group_controller,  "room temperature control" },
+  { group_ventilation_control,     group_controller,  "ventilation control" },
+  { group_undefined,               0 /* terminator */,"" }
+};
+
+
+const GroupDescriptor* LocalController::groupInfo(DsGroup aGroup)
+{
+  const GroupDescriptor *giP = groupInfos;
+  while (giP && giP->kind!=0) {
+    if (aGroup==giP->no) {
+      return giP;
+    }
+    giP++;
+  }
+  return NULL;
+}
+
+
+
+
+
+bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
+{
+  if (aMethod=="x-p44-queryScenes") {
+    // query scenes usable for a zone/group combination
+    ApiValuePtr o;
+    aError = DsAddressable::checkParam(aParams, "zoneID", o);
+    if (Error::isOK(aError)) {
+      DsZoneID zoneID = (DsZoneID)o->uint16Value();
+      // get zone
+      ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
+      if (!zone) {
+        aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
+      }
+      else {
+        aError = DsAddressable::checkParam(aParams, "group", o);
+        if (Error::isOK(aError) || zoneID==zoneId_global) {
+          DsGroup group = zoneID==zoneId_global ? group_undefined : (DsGroup)o->uint16Value();
+          // optional scene kind flags
+          SceneKind required = scene_preset;
+          SceneKind forbidden = scene_extended|scene_area;
+          o = aParams->get("required"); if (o) { forbidden = 0; required = o->uint32Value(); } // no auto-exclude when explicitly including
+          o = aParams->get("forbidden"); if (o) forbidden = o->uint32Value();
+          // query possible scenes for this zone/group
+          SceneIdsVector scenes = zone->getZoneScenes(group, required, forbidden);
+          // create answer object
+          ApiValuePtr result = aRequest->newApiValue();
+          result->setType(apivalue_object);
+          for (size_t i = 0; i<scenes.size(); ++i) {
+            ApiValuePtr s = result->newObject();
+            s->add("id", s->newString(scenes[i].stringId()));
+            s->add("no", s->newUint64(scenes[i].sceneNo));
+            s->add("name", s->newString(scenes[i].getName()));
+            s->add("action", s->newString(scenes[i].getActionName()));
+            s->add("kind", s->newUint64(scenes[i].getKindFlags()));
+            result->add(string_format("%zu", i), s);
+          }
+          aRequest->sendResult(result);
+          aError.reset(); // make sure we don't send an extra ErrorOK
+        }
+      }
+    }
+    return true;
+  }
+  else if (aMethod=="x-p44-queryGroups") {
+    // query groups that can be used in a zone
+    ApiValuePtr o;
+    aError = DsAddressable::checkParam(aParams, "zoneID", o);
+    if (Error::isOK(aError)) {
+      DsZoneID zoneID = (DsZoneID)o->uint16Value();
+      ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
+      if (!zone) {
+        aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
+      }
+      else {
+        bool allGroups = false;
+        o = aParams->get("all"); if (o) allGroups = o->boolValue();
+        DsGroupMask groups = zone->getZoneGroups(!allGroups);
+        // create answer object
+        ApiValuePtr result = aRequest->newApiValue();
+        result->setType(apivalue_object);
+        for (int i = 0; i<64; ++i) {
+          if (groups & (1ll<<i)) {
+            const GroupDescriptor* gi = groupInfo((DsGroup)i);
+            ApiValuePtr g = result->newObject();
+            g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
+            g->add("kind", g->newUint64(gi ? gi->kind : 0));
+            result->add(string_format("%d", i), g);
+          }
+        }
+        aRequest->sendResult(result);
+        aError.reset(); // make sure we don't send an extra ErrorOK
+      }
+    }
+    return true;
+  }
+  else {
+    return false; // unknown at the localController level
+  }
+}
+
+
 
 // MARK: ===== LocalController property access
 
@@ -686,8 +1430,6 @@ enum {
   triggers_key,
   numLocalControllerProperties
 };
-
-static char localcontroller_key;
 
 
 int LocalController::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)

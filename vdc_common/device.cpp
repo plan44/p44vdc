@@ -31,6 +31,10 @@
 
 #include "device.hpp"
 
+#if ENABLE_LOCALCONTROLLER
+  #include "localcontroller.hpp"
+#endif
+
 #include "buttonbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
 #include "outputbehaviour.hpp"
@@ -178,6 +182,27 @@ DsZoneID Device::getZoneID()
   }
   return 0; // not assigned to a zone
 }
+
+
+void Device::setZoneID(DsZoneID aZoneId)
+{
+  if (deviceSettings) {
+    #if ENABLE_LOCALCONTROLLER
+    // must report changes of zone usage to local controller
+    DsZoneID previousZone = getZoneID();
+    if (deviceSettings->setPVar(deviceSettings->zoneID, aZoneId)) {
+      LocalControllerPtr lc = getVdcHost().getLocalController();
+      if (lc) {
+        lc->deviceChangesZone(DevicePtr(this), previousZone, aZoneId);
+      }
+    }
+    #else
+    deviceSettings->setPVar(deviceSettings->zoneID, aZoneId);
+    #endif
+  }
+}
+
+
 
 
 string Device::vendorName()
@@ -930,16 +955,15 @@ void Device::optimizerRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState)
 }
 
 
-void Device::executePreparedOperation(SimpleCB aDoneCB, bool aDoApply)
+void Device::executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
   if (preparedScene) {
-    callSceneExecutePrepared(aDoneCB, aDoApply);
+    callSceneExecutePrepared(aDoneCB, aWhatToApply);
     preparedDim = false; // calling scene always cancels prepared dimming
     return;
   }
   else if (preparedDim) {
-    // also call if not prepared any more, can be repetition to stop dimming
-    dimChannelExecutePrepared(aDoneCB, aDoApply);
+    dimChannelExecutePrepared(aDoneCB, aWhatToApply);
     return;
   }
   if (aDoneCB) aDoneCB();
@@ -1340,12 +1364,12 @@ void Device::dimRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState)
 }
 
 
-void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
+void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
   if (preparedDim) {
     // call actual dimming method, which will update state in all cases, but start/stop dimming only when not already done (aDoApply)
-    dimChannel(currentDimChannel, currentDimMode, aDoApply);
-    if (aDoApply) {
+    dimChannel(currentDimChannel, currentDimMode, aWhatToApply!=ntfy_none);
+    if (aWhatToApply!=ntfy_none) {
       if (currentDimMode!=dimmode_stop) {
         // starting
         dimTimeoutTicket.executeOnce(boost::bind(&Device::dimAutostopHandler, this, currentDimChannel), currentAutoStopTime);
@@ -1509,7 +1533,7 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
 
 void Device::callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce)
 {
-  dimChannelExecutePrepared(NULL, true);
+  dimChannelExecutePrepared(NULL, ntfy_dimchannel);
   callScenePrepare2(aPreparedCB, aScene, aForce);
 }
 
@@ -1601,7 +1625,7 @@ void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
 
 
 
-void Device::callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
+void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
   if (preparedScene) {
     DsScenePtr scene = preparedScene;
@@ -1611,24 +1635,24 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
       // prepare for apply (but do NOT yet apply!) on device hardware level)
       if (prepareSceneApply(scene)) {
         // now we can apply values to hardware
-        if (aDoApply) {
+        if (aWhatToApply!=ntfy_none) {
           // normally apply channel values to hardware
-          requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aDoneCB, scene), false);
+          requestApplyingChannels(boost::bind(&Device::sceneValuesApplied, this, aDoneCB, scene, false), false);
           return;
         }
         else {
           // just consider all channels already applied (e.g. by vdc-level native action)
           // - confirm having applied channels (normally, actual device-level apply would do that)
           allChannelsApplied();
-          // - consider scene applied
-          sceneValuesApplied(aDoneCB, scene);
+          // - consider scene applied but indirectly
+          sceneValuesApplied(aDoneCB, scene, true);
           return;
         }
       }
     }
     else {
       // no apply to channels or hardware needed, directly proceed to actions
-      sceneValuesApplied(aDoneCB, scene);
+      sceneValuesApplied(aDoneCB, scene, false);
       return;
     }
   }
@@ -1637,7 +1661,7 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, bool aDoApply)
 }
 
 
-void Device::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene)
+void Device::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndirectly)
 {
   // now perform scene special actions such as blinking
   performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aDoneCB, aScene));
@@ -2006,7 +2030,7 @@ int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
   else if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
     SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
     if (scenes)
-      return MAX_SCENE_NO;
+      return INVALID_SCENE_NO;
     else
       return 0; // device with no scenes
   }
@@ -2260,9 +2284,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         case zoneID_key:
-          if (deviceSettings) {
-            deviceSettings->setPVar(deviceSettings->zoneID, (DsZoneID)aPropValue->int32Value());
-          }
+          setZoneID(aPropValue->int32Value());
           return true;
         case progMode_key:
           progMode = aPropValue->boolValue();

@@ -136,6 +136,7 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
       // push the new value right now
       if (pushBehaviourState()) {
         lastPush = now;
+        debounceTicket.cancel(); // pushed now, no need to push later
       }
       else if (device.isPublicDS()) {
         BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
@@ -143,7 +144,7 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
     }
     else if (changedState) {
       // cannot be pushed now, but final state of the input must be reported later
-      BLOG(LOG_NOTICE, "- input changes too quickly, push of final state will be pushed after minPushInterval");
+      BLOG(LOG_INFO, "- input changes too quickly, push of final state will be pushed after minPushInterval");
       if (!debounceTicket) {
         debounceTicket.executeOnceAt(boost::bind(&BinaryInputBehaviour::reportFinalState, this), lastPush+minPushInterval);
       }
@@ -159,7 +160,7 @@ void BinaryInputBehaviour::reportFinalState()
   // push the current value (after awaiting minPushInterval)
   debounceTicket.cancel();
   if (pushBehaviourState()) {
-    BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' now pushes current state (%d) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentState);
+    BLOG(LOG_INFO, "BinaryInput[%zu] %s '%s' now pushes current state (%d) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentState);
     lastPush = MainLoop::currentMainLoop().now();
   }
 }

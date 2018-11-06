@@ -42,6 +42,9 @@ namespace p44 {
   /// EnOcean subdevice
   typedef uint8_t EnoceanSubDevice;
 
+  /// Learn-In/out procedure type
+  typedef enum { learn_none, learn_simple, learn_smartack, learn_UTE } EnoceanLearnType;
+
 
   // per-addressable logging macros
   #define HLOG(lvl, ...) { if (LOGENABLED(lvl)) { device.logAddressable(lvl, ##__VA_ARGS__); } }
@@ -221,7 +224,7 @@ namespace p44 {
     /// @param aAddress the EnOcean address
     /// @param aProfile the EPP
     /// @param aManufacturer the manufacturer code
-    /// @param aSmartAck set if creating devices as part of a smart-ack learn-in
+    /// @param aLearnType type of learn-in procedure
     /// @param aLearnPacket if this is a learn-in process, the learn packet (NULL if devices are recreated from DB)
     /// @param aSecurityInfo the associated security info. If set, the created devices will become secure devices
     //    (and will not receive unencrypted radio packets)
@@ -231,7 +234,7 @@ namespace p44 {
       EnoceanAddress aAddress,
       EnoceanProfile aProfile,
       EnoceanManufacturer aManufacturer,
-      bool aSmartAck,
+      EnoceanLearnType aLearnType,
       Esp3PacketPtr aLearnPacket,
       EnOceanSecurityPtr aSecurityInfo
     );
@@ -387,12 +390,18 @@ namespace p44 {
     /// @return NULL or pointer to a list of profile variants
     virtual const ProfileVariantEntry *profileVariantsTable() { return NULL; /* none in base class */ };
 
-  private:
-
     /// get handler associated with a behaviour
     EnoceanChannelHandlerPtr channelForBehaviour(const DsBehaviour *aBehaviourP);
 
+    /// send a command from this device and await response
+    /// @param aResponsePacketCB callback to deliver command response to
+    /// @note this is just a convenience method which includes logging the packet sent in context of the device
+    void sendCommand(Esp3PacketPtr aCommandPacket, ESPPacketCB aResponsePacketCB);
+
+  private:
+
     bool isAlive();
+    EnoceanProfile expandEEPWildcard(EnoceanProfile aEEPWildcard);
 
   };
   

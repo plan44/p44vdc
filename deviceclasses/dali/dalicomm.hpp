@@ -101,7 +101,7 @@ namespace p44 {
       BridgeUnknown,
       DALIFrame,
       MissingData,
-      BadChecksum,
+      BadData,
       InvalidAnswer,
       AddressesMissing,
       AddressCollisions,
@@ -123,6 +123,7 @@ namespace p44 {
 
   /// abstracted DALI bus address
   typedef uint8_t DaliAddress;
+  const DaliAddress DaliSingle = 0x00; // dali single address
   const DaliAddress DaliGroup = 0x80; // marks group address
   const DaliAddress DaliBroadcast = 0xFF; // all devices on the bus
   const DaliAddress DaliAddressMask = 0x3F; // address mask
@@ -161,13 +162,16 @@ namespace p44 {
     /// short address
     DaliAddress shortAddress;
     // DALI device information
-    long long gtin; /// < 48 bit global trade identification number (GTIN / EAN)
+    uint8_t vers_101; ///< version of the IEC 62386-101 standard used, byte encoded, see DALI_STD_VERS_* macros
+    uint8_t vers_102; ///< version of the IEC 62386-102 standard used for all control gear in this bus unit, byte encoded, see DALI_STD_VERS_* macros
+    uint8_t vers_103; ///< version of the IEC 62386-103 standard used for all control devices in this bus unit, byte encoded, see DALI_STD_VERS_* macros
+    uint64_t gtin; /// < 48 bit global trade identification number (GTIN / EAN)
     uint8_t fw_version_major; /// < major firmware version
     uint8_t fw_version_minor; /// < minor firmware version
-    long long serialNo; /// < unique serial number
+    uint64_t serialNo; /// < unique serial number
     // OEM product information
-    long long oem_gtin; /// < 48 bit global trade identification number of OEM product (GTIN / EAN)
-    long long oem_serialNo; /// < unique serial number
+    uint64_t oem_gtin; /// < 48 bit global trade identification number of OEM product (GTIN / EAN)
+    uint64_t oem_serialNo; /// < unique serial number
     /// text description
     string description();
     /// status of device info
@@ -213,6 +217,8 @@ namespace p44 {
     // statistics
     long retriedReads;
     long retriedWrites;
+
+    bool dali2ScanLock; ///< if set, scanner will interpret memory bank 0 as DALI 1.0 (because there is no real backwards compatibility between 1.0 and 2.0)
 
     DaliComm(MainLoop &aMainLoop);
     virtual ~DaliComm();
@@ -408,20 +414,29 @@ namespace p44 {
     void daliBusTestData(StatusCB aResultCB, DaliAddress aAddress, uint8_t aNumCycles);
 
 
-    typedef boost::shared_ptr<std::vector<uint8_t> > MemoryVectorPtr;
+    /// a single DALI bank memory cell
+    typedef struct MemoryCell {
+      uint8_t b; ///< the byte value of the cell
+      bool no; ///< if set, the value of the cell is NO (timeout when accessing)
+      MemoryCell(uint8_t aB, bool aNo = false) : b(aB), no(aNo) {};
+    } MemoryCell;
+    /// a series of DALI memory cells
+    typedef std::vector<MemoryCell> MemoryVector;
+    typedef boost::shared_ptr<std::vector<MemoryCell> > MemoryVectorPtr;
 
     /// callback function for daliReadMemory
-
     typedef boost::function<void (MemoryVectorPtr aMemoryVectorPtr, ErrorPtr aError)> DaliReadMemoryCB;
+
     /// Read DALI memory
     /// @param aResultCB callback receiving the data read as a vector<uint8_t>
     /// @param aAddress short address of device to read
     /// @param aBank memory bank to read
     /// @param aOffset offset to start reading
     /// @param aNumBytes number of bytes to read
+    /// @param aMemory optional existing memory vector to append to
     /// @note reading none or less data than requested is not considered an error - aMemoryVectorPtr param in callback will
     ///   just return the number of bytes that could be read; check its size to make sure expected result was returned
-    void daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint8_t aNumBytes);
+    void daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint16_t aNumBytes, DaliComm::MemoryVectorPtr aMemory = DaliComm::MemoryVectorPtr());
 
     /// callback function for daliReadDeviceInfo
     typedef boost::function<void (DaliDeviceInfoPtr aDaliDeviceInfoPtr, ErrorPtr aError)> DaliDeviceInfoCB;

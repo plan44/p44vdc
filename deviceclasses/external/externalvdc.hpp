@@ -29,6 +29,13 @@
 #ifndef ENABLE_EXTERNAL_SINGLEDEVICE
   #define ENABLE_EXTERNAL_SINGLEDEVICE 1
 #endif
+#ifndef ENABLE_FCU_SUPPORT
+  #define ENABLE_FCU_SUPPORT 1
+#endif
+#ifndef ENABLE_EXTERNAL_EXOTIC
+  #define ENABLE_EXTERNAL_EXOTIC 1
+#endif
+
 
 #include "vdc.hpp"
 #include "device.hpp"
@@ -121,8 +128,10 @@ namespace p44 {
     bool querySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
     bool sceneCommands; ///< if set, scene commands are forwarded to the external device
 
+    #if ENABLE_EXTERNAL_EXOTIC
     string configurationId; ///< current configuration's id
     DeviceConfigurationsVector configurations; ///< the device's possible configurations
+    #endif
 
     #if ENABLE_EXTERNAL_SINGLEDEVICE
     bool noConfirmAction; ///< if set, device implementation is not expected to use
@@ -245,13 +254,14 @@ namespace p44 {
     ///   aDevice argument to the DisconnectCB handler.
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
+    #if ENABLE_EXTERNAL_EXOTIC
     /// device configurations implementation
     virtual string getDeviceConfigurationId() P44_OVERRIDE;
     virtual ErrorPtr switchConfiguration(const string aConfigurationId) P44_OVERRIDE;
     virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB) P44_OVERRIDE;
+    #endif
 
     #if ENABLE_EXTERNAL_SINGLEDEVICE
-
     /// @name factory methods for elements configured via dynamic JSON config
     /// @{
 
@@ -259,7 +269,6 @@ namespace p44 {
     virtual ErrorPtr dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle, const string aCategory) P44_OVERRIDE;
 
     /// @}
-
     #endif
 
 

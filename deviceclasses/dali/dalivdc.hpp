@@ -63,6 +63,7 @@ namespace p44 {
   {
     typedef Vdc inherited;
     friend class DaliInputDevice;
+    friend class DaliBusDevice;
 
 		DaliPersistence db;
     DaliDeviceInfoMap deviceInfoCache;
@@ -89,9 +90,11 @@ namespace p44 {
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
+    #if SELFTESTING_ENABLED
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error
     virtual void selfTest(StatusCB aCompletedCB) P44_OVERRIDE;
+    #endif
 
     /// get supported rescan modes for this vDC
     /// @return a combination of rescanmode_xxx bits
@@ -111,7 +114,7 @@ namespace p44 {
     /// @param aDevice the device to ungroup
     /// @param aRequest the API request that causes the ungroup, will be sent an OK when ungrouping is complete
     /// @return error if not successful
-    ErrorPtr ungroupDevice(DalioutputDevicePtr aDevice, VdcApiRequestPtr aRequest);
+    ErrorPtr ungroupDevice(DaliOutputDevicePtr aDevice, VdcApiRequestPtr aRequest);
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -181,22 +184,31 @@ namespace p44 {
     ErrorPtr daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     void bridgeCmdSent(VdcApiRequestPtr aRequest, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
 
+    ErrorPtr daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
+    void daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
+    bool daliAddressSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo);
+    bool daliBusDeviceSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo);
+    bool daliInfoSummary(DaliDeviceInfoPtr aDeviceInfo, ApiValuePtr aInfo);
+
     typedef boost::shared_ptr<std::string> StringPtr;
     void daliScanNext(VdcApiRequestPtr aRequest, DaliAddress aShortAddress, StringPtr aResult);
     void handleDaliScanResult(VdcApiRequestPtr aRequest, DaliAddress aShortAddress, StringPtr aResult, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
-
-    void testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
-    void testRW(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte);
-    void testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
 
     void groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void groupDimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLTimer &aTimer);
     void nativeActionDone(StatusCB aStatusCB, ErrorPtr aError);
 
+    #if SELFTESTING_ENABLED
+    void testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError);
+    void testRW(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte);
+    void testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    #endif
+
     #if ENABLE_DALI_INPUTS
     void daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2);
     DaliInputDevicePtr addInputDevice(const string aConfig, DaliAddress aDaliBaseAddress);
     ErrorPtr addDaliInput(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
+    ErrorPtr getDaliInputAddrs(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     #endif
 
   };
