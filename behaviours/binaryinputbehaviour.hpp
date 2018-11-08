@@ -39,7 +39,7 @@ namespace p44 {
     friend class Device;
 
     MLTicket invalidatorTicket;
-    MLTicket debounceTicket;
+    MLTicket updateTicket;
 
   protected:
 
@@ -51,6 +51,7 @@ namespace p44 {
     bool reportsChanges; ///< set if the input detects changes without polling
     MLMicroSeconds updateInterval;
     MLMicroSeconds aliveSignInterval; ///< how often the input reports its state minimally (if it does not report for longer than that, it can be considered out of order). Can be 0 for inputs from which no regular update can be expected at all
+    MLMicroSeconds maxPushInterval; ///< max push interval (after that, value gets re-pushed even if no input update has occurred)
     /// @}
 
     /// @name persistent settings
@@ -193,6 +194,7 @@ namespace p44 {
   private:
 
     void armInvalidator();
+    bool pushInput(bool aChanged);
     void reportFinalState();
 
   };
