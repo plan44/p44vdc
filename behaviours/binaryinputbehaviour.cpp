@@ -332,6 +332,7 @@ enum {
   reportsChanges_key,
   updateInterval_key,
   aliveSignInterval_key,
+  maxPushInterval_key,
   numDescProperties
 };
 
@@ -345,6 +346,7 @@ const PropertyDescriptorPtr BinaryInputBehaviour::getDescDescriptorByIndex(int a
     { "inputType", apivalue_bool, reportsChanges_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "updateInterval", apivalue_double, updateInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "aliveSignInterval", apivalue_double, aliveSignInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
+    { "maxPushInterval", apivalue_double, maxPushInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -417,6 +419,9 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
           return true;
         case aliveSignInterval_key+descriptions_key_offset:
           aPropValue->setDoubleValue((double)aliveSignInterval/Second);
+          return true;
+        case maxPushInterval_key+descriptions_key_offset:
+          aPropValue->setDoubleValue((double)maxPushInterval/Second);
           return true;
         // Settings properties
         case group_key+settings_key_offset:

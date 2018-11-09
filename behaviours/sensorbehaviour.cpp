@@ -938,6 +938,7 @@ enum {
   resolution_key,
   updateInterval_key,
   aliveSignInterval_key,
+  maxPushInterval_key,
   #if ENABLE_RRDB
   rrdbFile_key,
   #endif
@@ -958,6 +959,7 @@ const PropertyDescriptorPtr SensorBehaviour::getDescDescriptorByIndex(int aPropI
     { "resolution", apivalue_double, resolution_key+descriptions_key_offset, OKEY(sensor_key) },
     { "updateInterval", apivalue_double, updateInterval_key+descriptions_key_offset, OKEY(sensor_key) },
     { "aliveSignInterval", apivalue_double, aliveSignInterval_key+descriptions_key_offset, OKEY(sensor_key) },
+    { "maxPushInterval", apivalue_double, maxPushInterval_key+descriptions_key_offset, OKEY(sensor_key) },
     #if ENABLE_RRDB
     { "x-p44-rrdFile", apivalue_string, rrdbFile_key+descriptions_key_offset, OKEY(sensor_key) },
     #endif
@@ -1057,6 +1059,9 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case aliveSignInterval_key+descriptions_key_offset:
           aPropValue->setDoubleValue((double)aliveSignInterval/Second);
+          return true;
+        case maxPushInterval_key+descriptions_key_offset:
+          aPropValue->setDoubleValue((double)maxPushInterval/Second);
           return true;
         #if ENABLE_RRDB
         case rrdbFile_key+descriptions_key_offset:
