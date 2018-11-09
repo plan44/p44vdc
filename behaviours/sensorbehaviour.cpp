@@ -318,8 +318,7 @@ void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint 
         minPushInterval = profileP->pushIntvl;
       }
       if (profileP->chgOnlyIntvl>0) {
-        changesOnlyInterval = profileP->chgOnlyIntvl; // also report non-changes after this time
-        if (aliveSignInterval!=Never) maxPushInterval = profileP->chgOnlyIntvl; // force push even of outdated value after this time
+        changesOnlyInterval = profileP->chgOnlyIntvl; // also report updates with no change after this time
       }
     }
     ++sbpP; // next
@@ -471,8 +470,8 @@ bool SensorBehaviour::pushSensor(bool aAlways)
       doPush =
         changed || // when changed
         (maxPushInterval!=Never && now>lastPush+maxPushInterval) || // when interval for max push interval has passed (similar, but not quite the same as changesOnlyInterval)
-        now>lastPush+changesOnlyInterval || // when interval for reporting anyway has passed
-        (aliveSignInterval!=Never && now>lastUpdate+aliveSignInterval); // and in case sensor declares a heartbeat interval
+        now>lastPush+changesOnlyInterval || // or when interval for not reporting unchanged values has passed
+        (aliveSignInterval!=Never && now>lastUpdate+aliveSignInterval); // or in case sensor declares a heartbeat interval
     }
     else if (profileP) {
       // Minimal push interval is NOT over, check extra trigger conditions
