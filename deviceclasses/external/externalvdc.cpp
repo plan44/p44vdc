@@ -476,6 +476,7 @@ ErrorPtr ExternalDevice::processSimpleMessage(string aMessageType, string aValue
     if (sscanf(aValue.c_str(), "%d", &active)==1) {
       updatePresenceState(active);
     }
+    return ErrorPtr(); // no answer
   }
   else if (aMessageType.size()>0) {
     // none of the other commands, try inputs
