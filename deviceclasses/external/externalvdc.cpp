@@ -339,6 +339,13 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
         syncedCB = NULL;
         return ErrorPtr(); // no answer
       }
+      else if (aMessageType=="active") {
+        JsonObjectPtr o;
+        if (aMessage->get("value", o)) {
+          updatePresenceState(o->boolValue());
+        }
+        return ErrorPtr(); // no answer
+      }
       else if (aMessageType=="button") {
         err = processInputJson('B', aMessage);
       }
@@ -463,6 +470,12 @@ ErrorPtr ExternalDevice::processSimpleMessage(string aMessageType, string aValue
     if (syncedCB) syncedCB();
     syncedCB = NULL;
     return ErrorPtr(); // no answer
+  }
+  else if (aMessageType=="ACTIVE") {
+    int active = 0;
+    if (sscanf(aValue.c_str(), "%d", &active)==1) {
+      updatePresenceState(active);
+    }
   }
   else if (aMessageType.size()>0) {
     // none of the other commands, try inputs
