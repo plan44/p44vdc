@@ -429,6 +429,46 @@ void EldatVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, T
 }
 
 
+#if SELFTESTING_ENABLED
+
+// MARK: ===== Self test
+
+void EldatVdc::selfTest(StatusCB aCompletedCB)
+{
+  // install test message handler
+  eldatComm.setReceivedMessageHandler(boost::bind(&EldatVdc::handleTestMessage, this, aCompletedCB, _1, _2));
+  // init RX10
+  eldatComm.initialize(NULL);
+}
+
+
+void EldatVdc::handleTestMessage(StatusCB aCompletedCB, string aEldatMessage, ErrorPtr aError)
+{
+  // ignore messages with error
+  if (Error::isOK(aError)) {
+    EldatAddress senderAddress;
+    char data[100];
+    // try to scan Mode 0
+    int rssi;
+    int mode;
+    if (sscanf(aEldatMessage.c_str(),"REC%2d,-%X,%X,%99s", &mode, &rssi, &senderAddress, data)==4) {
+      rssi = -rssi;
+      LOG(LOG_NOTICE, "Received REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
+      if (rssi>=MIN_LEARN_DBM) {
+        // uninstall handler
+        eldatComm.setReceivedMessageHandler(NULL);
+        // seen both init response and independent REC message with sufficient RSSI (RF is ok)
+        aCompletedCB(ErrorPtr());
+        // done
+        return;
+      }
+    }
+  }
+  // - still waiting
+  LOG(LOG_NOTICE, "- ELDAT test: still waiting for REC message with sufficient (>%d) RSSI", MIN_LEARN_DBM);
+}
+
+#endif // SELFTESTING_ENABLED
 
 #endif // ENABLE_ELDAT
 
