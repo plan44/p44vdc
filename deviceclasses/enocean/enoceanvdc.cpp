@@ -843,8 +843,6 @@ void EnoceanVdc::selfTest(StatusCB aCompletedCB)
 {
   // install test packet handler
   enoceanComm.setRadioPacketHandler(boost::bind(&EnoceanVdc::handleTestRadioPacket, this, aCompletedCB, _1, _2));
-  // start watchdog
-  enoceanComm.initialize(NULL);
 }
 
 

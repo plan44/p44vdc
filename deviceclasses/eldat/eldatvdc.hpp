@@ -165,7 +165,10 @@ namespace p44 {
     void dispatchMessage(EldatAddress aSenderAddress, EldatMode aMode, int aRSSI, string aData);
     ErrorPtr addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
 
+    #if SELFTESTING_ENABLED
+    void initializedForTest(StatusCB aCompletedCB, ErrorPtr aError);
     void handleTestMessage(StatusCB aCompletedCB, string aEldatMessage, ErrorPtr aError);
+    #endif
 
 
   };

@@ -84,8 +84,8 @@ void Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 #if SELFTESTING_ENABLED
 void Vdc::selfTest(StatusCB aCompletedCB)
 {
-  // by default, assume everything ok
-  aCompletedCB(ErrorPtr());
+  // by default, signal "no hardware tested"
+  aCompletedCB(Error::err<VdcError>(VdcError::NoHWTested, "No hardware tested"));
 }
 #endif
 

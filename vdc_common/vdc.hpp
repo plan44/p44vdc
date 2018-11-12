@@ -44,6 +44,7 @@ namespace p44 {
       AddAction, ///< optimizer suggests to add a native action
       StaleAction, ///< optimizer has detected stale action
       NoMoreActions, ///< cannot add another native action because there would be too many
+      NoHWTested, ///< no hardware tested
     } ErrorCodes;
     
     static const char *domain() { return "Vdc"; }
@@ -358,7 +359,8 @@ namespace p44 {
     #if SELFTESTING_ENABLED
     /// perform self test
     /// @param aCompletedCB will be called when self test is done, returning ok or error
-    /// @note self will be called *instead* of collectDevices() but might need to do some form of
+    /// @note selfTest will be called with vDC already initialized successfully (or not at all)
+    /// @note selfTest will be called *instead* of collectDevices() but might need to do some form of
     ///   collecting devices to perform the test. It might do that by calling collectDevices(), but
     ///   must make sure NOT to modify or generate any persistent data for the class.
     virtual void selfTest(StatusCB aCompletedCB);

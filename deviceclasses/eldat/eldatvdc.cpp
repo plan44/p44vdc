@@ -435,10 +435,8 @@ void EldatVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, T
 
 void EldatVdc::selfTest(StatusCB aCompletedCB)
 {
-  // install test message handler
+  // install test message handler, then wait for message
   eldatComm.setReceivedMessageHandler(boost::bind(&EldatVdc::handleTestMessage, this, aCompletedCB, _1, _2));
-  // init RX10
-  eldatComm.initialize(NULL);
 }
 
 
