@@ -680,6 +680,10 @@ void DaliBusDevice::queryStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout
     lampFailure = aResponse & 0x02;
   }
   else {
+    if (!Error::isOK(aError)) {
+      // errors are always bus level: set global error status
+      daliVdc.setVdcError(aError);
+    }
     isPresent = false; // no correct status -> not present
   }
   // done updating status

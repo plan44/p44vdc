@@ -711,13 +711,6 @@ ErrorPtr DaliVdc::daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
     aRequest->sendResult(singleAddrSummary);
   }
   else {
-//    #if DEBUG
-//    DaliComm::ShortAddressListPtr l = DaliComm::ShortAddressListPtr(new DaliComm::ShortAddressList);
-//    for (int i=51; i<64; i++) l->push_back(i);
-//    daliSummaryScanDone(aRequest, l, NULL, ErrorPtr());
-//    return ErrorPtr();
-//    #warning "ugly hack!!!"
-//    #endif
     // want info about entire bus - do a raw bus scan to learn what devices are there
     daliComm->daliBusScan(boost::bind(&DaliVdc::daliSummaryScanDone, this, aRequest, _1, _2, _3));
   }

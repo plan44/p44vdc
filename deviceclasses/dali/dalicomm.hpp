@@ -450,7 +450,7 @@ namespace p44 {
 
   private:
 
-    void resetIssued(DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
+    void resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
 
     void daliPrepareForCommand(DaliCommand &aCommand, int &aWithDelay);
     void msbOf16BitQueryReceived(DaliAddress aAddress, Dali16BitValueQueryResultCB aResult16CB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);

@@ -77,6 +77,7 @@ namespace p44 {
     rescanmode_exhaustive = 0x04, ///< exhaustive rescan, should only be used as last resort recovery, as it might cause change of addressing schemes etc.
     rescanmode_clearsettings = 0x08, ///< clear settings (not for incremental)
     rescanmode_reenumerate = 0x10, ///< allow or actively trigger complete re-enumeration of bus device addresses
+    rescanmode_force = 0x20, ///< try a rescan even if the vDC has detected a global error already
   };
   typedef uint8_t RescanMode;
 
