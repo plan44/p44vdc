@@ -685,7 +685,7 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       JsonObjectPtr newScene = JsonObject::newObj();
       // POST /api/<username>/scenes
       // {"name":"thename", "lights":["1","2"], "recycle":false }
-      string sceneName = string_format("digitalSTROM-Scene_%d", aOptimizerEntry->contentId);
+      string sceneName = string_format("dS-Scene_%d", aOptimizerEntry->contentId);
       JsonObjectPtr lights = JsonObject::newArray();
       // transition time is per scene for hue. Use longest transition time among devices
       MLMicroSeconds longestTransition = 0;
@@ -693,13 +693,17 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
         lights->arrayAppend(JsonObject::newString(dev->lightID));
         sceneName += ":" + dev->lightID;
+        if (sceneName.size()>32) {
+          sceneName.erase(29);
+          sceneName += "..."; // exactly 32
+        }
         // find longest transition
         LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
         MLMicroSeconds tt = l->transitionTimeToNewBrightness();
         if (tt>longestTransition) longestTransition = tt;
       }
       newScene->add("transitiontime", JsonObject::newInt64(longestTransition*10/Second));
-      newScene->add("name", JsonObject::newString(sceneName));
+      newScene->add("name", JsonObject::newString(sceneName)); // must be max 32 chars
       newScene->add("lights", lights);
       newScene->add("recycle", JsonObject::newBool(false));
       hueComm.apiAction(httpMethodPOST, "/scenes", newScene, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
@@ -717,12 +721,16 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       JsonObjectPtr newGroup = JsonObject::newObj();
       // POST /api/<username>/scenes
       // {"name":"thename", "lights":["1","2"], "recycle":false }
-      string groupName = "digitalSTROM-DimGroup";
+      string groupName = "dS-Dim";
       JsonObjectPtr lights = JsonObject::newArray();
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
         lights->arrayAppend(JsonObject::newString(dev->lightID));
         groupName += ":" + dev->lightID;
+        if (groupName.size()>32) {
+          groupName.erase(29);
+          groupName += "..."; // exactly 32
+        }
       }
       newGroup->add("name", JsonObject::newString(groupName));
       newGroup->add("lights", lights);
