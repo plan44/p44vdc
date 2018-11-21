@@ -197,12 +197,15 @@ namespace p44 {
     typedef SerialOperationQueue inherited;
 
     int runningProcedures;
+    bool multiMaster;
 
     bool isBusy();
     static ErrorPtr busyError() { return ErrorPtr(new DaliCommError(DaliCommError::Busy)); };
 
     MLMicroSeconds closeAfterIdleTime;
     MLTicket connectionTimeoutTicket;
+
+    MLTicket pingTicket; ///< timer for DALI single master PING
 
     int expectedBridgeResponses; ///< not yet received bridge responses
     bool responsesInSequence; ///< set when repsonses need to be in sequence with requests
@@ -451,6 +454,8 @@ namespace p44 {
   private:
 
     void resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError);
+
+    void singleMasterPing(MLTimer &aMLTimer);
 
     void daliPrepareForCommand(DaliCommand &aCommand, int &aWithDelay);
     void msbOf16BitQueryReceived(DaliAddress aAddress, Dali16BitValueQueryResultCB aResult16CB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);

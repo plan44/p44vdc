@@ -42,6 +42,7 @@ using namespace p44;
 
 
 DaliComm::DaliComm(MainLoop &aMainLoop) :
+  multiMaster(false),
 	inherited(aMainLoop),
   runningProcedures(0),
   dali2ScanLock(false),
@@ -343,6 +344,8 @@ ssize_t DaliComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
 
 // reset the bridge
 
+#define DALI_SINGLE_MASTER_PING_INTERVAL (10*Minute) // Single master controllers must issue a PING command in this interval
+
 void DaliComm::reset(DaliCommandStatusCB aStatusCB)
 {
   // this first reset command should also consume extra bytes left over from previous use
@@ -383,7 +386,20 @@ void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aR
   sendBridgeCommand(CMD_CODE_EDGEADJ, sendEdgeAdj, samplePointAdj, NULL);
   // terminate any special commands on the DALI bus
   daliSend(DALICMD_TERMINATE, 0, aStatusCB);
+  // re-start PING if single master
+  pingTicket.cancel();
+  if (!multiMaster) {
+    pingTicket.executeOnce(boost::bind(&DaliComm::singleMasterPing, this, _1), DALI_SINGLE_MASTER_PING_INTERVAL);
+  }
 }
+
+
+void DaliComm::singleMasterPing(MLTimer &aMLTimer)
+{
+  daliSend(DALICMD_PING, 0, NULL);
+  MainLoop::currentMainLoop().retriggerTimer(aMLTimer, DALI_SINGLE_MASTER_PING_INTERVAL);
+}
+
 
 
 

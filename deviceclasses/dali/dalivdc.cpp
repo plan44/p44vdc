@@ -1442,6 +1442,9 @@ ErrorPtr DaliVdc::getDaliInputAddrs(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 
 void DaliVdc::daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2)
 {
+  if (aEvent==EVENT_CODE_FOREIGN_FRAME && aData1==DALICMD_PING && aData2==0) {
+    LOG(LOG_WARNING, "DALI: another bus master is using this bus -> NOT SUPPORTED!");
+  }
   for(DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
     DaliInputDevicePtr inputDev = boost::dynamic_pointer_cast<DaliInputDevice>(*pos);
     if (inputDev) {
