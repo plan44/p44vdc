@@ -406,7 +406,7 @@ void SparkIoDevice::deriveDsUid()
 string SparkIoDevice::description()
 {
   string s = inherited::description();
-  string_format_append(s, "\n- MessageTorch RGB light controlled via spark cloud API");
+  string_format_append(s, "\n- particle.io cloud device #%s", sparkCoreID.c_str());
   return s;
 }
 

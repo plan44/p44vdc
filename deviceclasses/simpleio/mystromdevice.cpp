@@ -279,7 +279,7 @@ void MyStromDevice::deriveDsUid()
 string MyStromDevice::description()
 {
   string s = inherited::description();
-  string_format_append(s, "\n- myStrom Switch");
+  string_format_append(s, "\n- myStrom Switch @ %s", deviceHostName.c_str());
   return s;
 }
 
