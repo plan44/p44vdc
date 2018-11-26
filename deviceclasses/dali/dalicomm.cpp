@@ -396,7 +396,7 @@ void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aR
 
 void DaliComm::singleMasterPing(MLTimer &aMLTimer)
 {
-  daliSend(DALICMD_PING, 0, NULL);
+  if (!isBusy()) daliSend(DALICMD_PING, 0, NULL);
   MainLoop::currentMainLoop().retriggerTimer(aMLTimer, DALI_SINGLE_MASTER_PING_INTERVAL);
 }
 
