@@ -351,13 +351,15 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
 
   // A5-08-01: Light, Temperature and Occupancy sensor
-  // - e.g. Eltako FBH
+  // - generic EEP
   { 0, 0x08, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0,  510, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, illumText },
   { 0, 0x08, 0x01, 0, class_black_joker,  group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   51, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText },
   { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          1,    0, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  motionText },
   { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText },
   { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
-
+  // - Eltako FABH65S+FBH65B+FBH65S+FBH65TFB (no temperature and presence, extended illumination range)
+  { 1, 0x08, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0, 2048, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, illumText },
+  { 1, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          1,    0, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  motionText },
 
   // A5-09-02: CO concentration, Temperature
   // - e.g. enoluz.com
@@ -671,6 +673,10 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   // A5-14-0A reverse mount alternative
   {  32, 0x00A5140A, 0, "window state - regular mounting position", NULL },
   {  32, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
+  // A5-08-01 generic and Eltako versions
+  {  33, 0x00A50801, 0, "standard EEP", NULL },
+  {  33, 0x01A50801, 0, "Eltako modified version (no temp/presence, extended lux range)", NULL },
+
   { 0, 0, 0, NULL, NULL } // terminator
 };
 
