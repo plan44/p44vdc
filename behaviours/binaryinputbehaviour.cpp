@@ -206,6 +206,15 @@ bool BinaryInputBehaviour::hasDefinedState()
 }
 
 
+void BinaryInputBehaviour::revalidateState()
+{
+  if (hasDefinedState()) {
+    // re-arm invalidator
+    armInvalidator();
+  }
+}
+
+
 string BinaryInputBehaviour::getStatusText()
 {
   if (hasDefinedState()) {

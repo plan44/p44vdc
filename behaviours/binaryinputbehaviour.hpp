@@ -121,6 +121,9 @@ namespace p44 {
     /// @return true if behaviour has a defined (non-NULL) state
     virtual bool hasDefinedState() P44_OVERRIDE;
 
+    /// re-validate current sensor value (i.e. prevent it from expiring and getting invalid)
+    virtual void revalidateState() P44_OVERRIDE;
+
     /// get currently known state
     /// @return current state.
     /// @note The return value only has a meaning if hasDefinedState() returns true

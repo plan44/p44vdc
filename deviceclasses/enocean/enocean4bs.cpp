@@ -1418,6 +1418,16 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         // A5-13-03..06 are not supported
         break;
     }
+    // re-validate all sensors whenever we get any radio packet
+    if (behaviour) behaviour->revalidateState();
+    if (outdoorTemp) outdoorTemp->revalidateState();
+    if (windSpeed) windSpeed->revalidateState();
+    if (gustSpeed) gustSpeed->revalidateState();
+    if (dayIndicator) dayIndicator->revalidateState();
+    if (rainIndicator) rainIndicator->revalidateState();
+    if (sunWest) sunWest->revalidateState();
+    if (sunSouth) sunSouth->revalidateState();
+    if (sunEast) sunEast->revalidateState();
   }
 }
 

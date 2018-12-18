@@ -571,7 +571,13 @@ bool SensorBehaviour::hasDefinedState()
 }
 
 
-
+void SensorBehaviour::revalidateState()
+{
+  if (hasDefinedState()) {
+    // re-arm invalidator
+    armInvalidator();
+  }
+}
 
 
 // MARK: ===== value source implementation
