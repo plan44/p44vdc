@@ -64,6 +64,7 @@ namespace p44 {
     DaliVdc &daliVdc;
 
     MLTicket dimRepeaterTicket; ///< DALI dimming and repeater ticket
+    VdcDimMode currentDimMode; ///< current dim mode
 
     /// feature set
     bool supportsLED; // supports device type 6/LED features

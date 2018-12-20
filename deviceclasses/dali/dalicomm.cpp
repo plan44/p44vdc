@@ -1737,7 +1737,7 @@ private:
         if (bankChecksum!=0x00) {
           // - check retries
           if (retries++<DALI_MAX_BANKREAD_RETRIES) {
-            // retry reading bank 0 info
+            // retry reading bank 1 info
             LOG(LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank1 info from shortAddress %d -> retrying", bankChecksum, retries, busAddress);
             readBank1();
             return;
