@@ -51,7 +51,8 @@ ButtonBehaviour::ButtonBehaviour(Device &aDevice, const string aId) :
   callsPresent(false),
   buttonActionMode(buttonActionMode_none),
   buttonActionId(0),
-  stateMachineMode(statemachine_standard)
+  stateMachineMode(statemachine_standard),
+  longFunctionDelay(t_long_function_delay) // standard dS value, might need tuning for some special (slow) hardware
 {
   // set default hardware configuration
   setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, 1); // not combinable, but button mode writable
@@ -284,7 +285,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
         timerRef = aNow;
         state = S4_nextTipWait;
       }
-      else if (timeSinceRef>=t_long_function_delay) {
+      else if (timeSinceRef>=longFunctionDelay) {
         // long function
         if (!isLocalButtonEnabled() || !isOutputOn()) {
           // hold
@@ -365,7 +366,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
         timerRef = aNow;
         state = S4_nextTipWait;
       }
-      else if (timeSinceRef>t_long_function_delay) {
+      else if (timeSinceRef>longFunctionDelay) {
         sendClick(ct_short_long);
         state = S8_awaitrelease;
       }
@@ -399,7 +400,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
         timerRef = aNow;
         sendClick(ct_tip_3x);
       }
-      else if (timeSinceRef>=t_long_function_delay) {
+      else if (timeSinceRef>=longFunctionDelay) {
         sendClick(ct_short_short_long);
         state = S8_awaitrelease;
       }
@@ -701,6 +702,7 @@ enum {
   buttonActionMode_key,
   buttonActionId_key,
   stateMachineMode_key,
+  longFunctionDelay_key,
   numSettingsProperties
 };
 
@@ -718,6 +720,7 @@ const PropertyDescriptorPtr ButtonBehaviour::getSettingsDescriptorByIndex(int aP
     { "x-p44-buttonActionMode", apivalue_uint64, buttonActionMode_key+settings_key_offset, OKEY(button_key) },
     { "x-p44-buttonActionId", apivalue_uint64, buttonActionId_key+settings_key_offset, OKEY(button_key) },
     { "x-p44-stateMachineMode", apivalue_uint64, stateMachineMode_key+settings_key_offset, OKEY(button_key) },
+    { "x-p44-longFunctionDelay", apivalue_uint64, longFunctionDelay_key+settings_key_offset, OKEY(button_key) },
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -799,6 +802,9 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case stateMachineMode_key+settings_key_offset:
           aPropValue->setUint8Value(stateMachineMode);
+          return true;
+        case longFunctionDelay_key+settings_key_offset:
+          aPropValue->setDoubleValue((double)longFunctionDelay/Second);
           return true;
         // States properties
         case value_key+states_key_offset:
@@ -889,6 +895,9 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case stateMachineMode_key+settings_key_offset:
           setPVar(stateMachineMode, (ButtonStateMachineMode)aPropValue->uint8Value());
+          return true;
+        case longFunctionDelay_key+settings_key_offset:
+          setPVar(longFunctionDelay, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
       }
     }
