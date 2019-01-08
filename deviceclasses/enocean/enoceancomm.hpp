@@ -559,7 +559,7 @@ namespace p44 {
     /// @param aRLC the rolling counter (RLC)
     /// @param aRLCBytes RLC size in bytes
     /// @param aMACBytes MAC size in bytes
-    /// @param aFirstByte if not 0, this is used as the first byte included into the CMAC (intended to include not transmitted RORGs)
+    /// @param aFirstByte if not 0, this is used as the first byte included into the CMAC (intended to include the RORG-S)
     /// @param aData data buffer
     /// @param aDataSize size in bytes of data at aData
     static uint32_t calcCMAC(const AES128Block &aKey, const AES128Block &aSubKey1, const AES128Block &aSubKey2, uint32_t aRLC, int aRLCBytes, int aMACBytes, uint8_t aFirstByte, const uint8_t *aData, size_t aDataSize);
