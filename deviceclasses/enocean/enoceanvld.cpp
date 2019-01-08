@@ -606,7 +606,8 @@ EnoceanDevicePtr EnoceanD20601Handler::newDevice(
       EnoceanChannelHandlerPtr buttonHandler = EnoceanChannelHandlerPtr(new EnoceanD20601ButtonHandler(*newDev.get(), bidx));
       ButtonBehaviourPtr buttonBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
       buttonBhvr->setHardwareButtonConfig(0, buttonType_2way, bidx==0 ? buttonElement_down : buttonElement_up, false, 1-bidx, 2); // combined by default, combinable in pairs
-      buttonBhvr->setStateMachineMode(ButtonBehaviour::statemachine_simple); // SODA buttons are too slow in reporting button release -> always detected as hold by standard state machine, so we use the simple one instead
+      //buttonBhvr->setStateMachineMode(ButtonBehaviour::statemachine_simple); // SODA buttons are too slow in reporting button release -> always detected as hold by standard state machine, so we use the simple one instead
+      buttonBhvr->setLongFunctionDelay(800*MilliSecond); // SODA buttons report release not sooner than 500mS -> extend long function delay to 800mS to allow proper click detection
       buttonBhvr->setGroup(group_grey_shadow); // pre-configure for shadow
       buttonBhvr->setHardwareName(bidx==0 ? "down key" : "up key");
       buttonHandler->behaviour = buttonBhvr;
