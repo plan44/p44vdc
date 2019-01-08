@@ -236,7 +236,7 @@ void EldatVdc::handleMessage(string aEldatMessage, ErrorPtr aError)
     int mode;
     if (sscanf(aEldatMessage.c_str(),"REC%2d,-%X,%X,%99s", &mode, &rssi, &senderAddress, data)==4) {
       rssi = -rssi;
-      LOG(LOG_NOTICE, "processing REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
+      LOG(LOG_INFO, "processing REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
       if (learningMode) {
         processLearn(senderAddress, (EldatMode)mode, rssi, data);
       }
@@ -245,7 +245,7 @@ void EldatVdc::handleMessage(string aEldatMessage, ErrorPtr aError)
       }
     }
     else {
-      LOG(LOG_NOTICE, "received unknown ELDAT message: %s", aEldatMessage.c_str());
+      LOG(LOG_INFO, "received unknown ELDAT message: %s", aEldatMessage.c_str());
     }
   }
 }
