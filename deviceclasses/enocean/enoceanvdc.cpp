@@ -702,8 +702,10 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     aEsp3PacketPtr = unpackedMsg;
     rorg = unpackedMsg->eepRorg();
     LOG(LOG_DEBUG, "Unpacked secure radio packet resulting:\n%s", aEsp3PacketPtr->description().c_str());
-    // check if we need to save the security context
-    saveSecurityInfo(sec, sender, true, true);
+    // possibly save the security context (but do not *yet* save security info if this is a teach in/out packet!)
+    if (!aEsp3PacketPtr->radioHasTeachInfo()) {
+      saveSecurityInfo(sec, sender, true, true);
+    }
   }
   else
   #endif
@@ -724,6 +726,12 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
       EnoceanLearnType lt = aEsp3PacketPtr->eepRorg()==rorg_UTE ? learn_UTE : learn_simple;
       Tristate lrn = processLearn(sender, aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer(), aEsp3PacketPtr->teachInfoType(), lt, aEsp3PacketPtr, sec);
       if (lrn!=undefined) {
+        #if ENABLE_ENOCEAN_SECURE
+        if (sec && lrn==yes) {
+          // secured device learned in, must save security info NOW
+          saveSecurityInfo(sec, sender, false, false);
+        }
+        #endif
         // - only allow one learn action (to prevent learning out device when
         //   button is released or other repetition of radio packet)
         learningMode = false;
