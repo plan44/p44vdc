@@ -221,7 +221,8 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
 void DsAddressable::propertyAccessed(VdcApiRequestPtr aRequest, ApiValuePtr aResultObject, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
-    // read - send back property result
+    // ok - return result object, which is property result tree for getProperty,
+    // and usually null for writes except when a object was created
     aRequest->sendResult(aResultObject);
   }
   else {

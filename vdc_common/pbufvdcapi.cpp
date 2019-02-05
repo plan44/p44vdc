@@ -988,7 +988,13 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
   if (!aResult || aResult->isNull()) {
     // empty result is like sending no error
     err = sendError(0);
-    LOG(LOG_INFO, "vdSM <- vDC (pbuf) result sent: requestid='%d', result=NULL", reqId);
+    LOG(LOG_INFO, "vdSM <- vDC (pbuf) generic OK sent: requestid='%d'", reqId);
+  }
+  else if (responseType==VDCAPI__TYPE__GENERIC_RESPONSE) {
+    // non-empty result, but pbuf API does not have a response message to deliver it -> just acknowledge OK
+    // Note: this can be the case for setProperty creating new object, where result is the created object's id
+    err = sendError(0);
+    LOG(LOG_INFO, "vdSM <- vDC (pbuf) generic OK sent: requestid='%d', UNSENT result=%s", reqId, aResult->description().c_str());
   }
   else {
     // we might have a specific result
@@ -1028,7 +1034,7 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
     // dispose allocated submessage
     protobuf_c_message_free_unpacked(subMessageP, NULL);
     // log
-    LOG(LOG_INFO, "vdSM <- vDC (pbuf) result sent: requestid='%d', result=%s", reqId, aResult ? aResult->description().c_str() : "<none>");
+    LOG(LOG_INFO, "vdSM <- vDC (pbuf) result sent: requestid='%d', result=%s", reqId, aResult->description().c_str());
   }
   return err;
 }

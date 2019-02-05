@@ -517,7 +517,6 @@ PropertyDescriptorPtr ZoneList::getDescriptorByName(string aPropMatch, int &aSta
   if (!p && aMode==access_write && isNamedPropSpec(aPropMatch)) {
     // writing to non-existing zone -> insert new zone
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = aPropMatch;
     descP->propertyType = apivalue_object;
     descP->deletable = true; // new zones are deletable
     descP->propertyFieldKey = zones.size(); // new zone will be appended, so index is current size
@@ -532,6 +531,8 @@ PropertyDescriptorPtr ZoneList::getDescriptorByName(string aPropMatch, int &aSta
       }
     }
     getZoneById(newId, true); // creates the zone on the fly
+    descP->propertyName = string_format("%hu", newId);
+    descP->createdNew = true;
     p = descP;
   }
   return p;
@@ -897,6 +898,7 @@ PropertyDescriptorPtr SceneList::getDescriptorByName(string aPropMatch, int &aSt
     // writing to non-existing scene -> try to insert new scene
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyName = aPropMatch;
+    descP->createdNew = true;
     descP->propertyType = apivalue_object;
     descP->deletable = true; // new scenes are deletable
     descP->propertyObjectKey = OKEY(scenelist_key);
@@ -1175,14 +1177,16 @@ PropertyDescriptorPtr TriggerList::getDescriptorByName(string aPropMatch, int &a
   if (!p && aMode==access_write && aPropMatch=="0") {
     // writing to triggerId==0 -> insert new trigger
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = aPropMatch;
     descP->propertyType = apivalue_object;
     descP->deletable = true; // new scenes are deletable
     descP->propertyObjectKey = OKEY(triggerlist_key);
     size_t ti;
-    if (newTrigger(&ti)) {
+    TriggerPtr trg = newTrigger(&ti);
+    if (trg) {
       // valid new trigger
       descP->propertyFieldKey = ti; // the scene's index
+      descP->propertyName = string_format("%d", trg->triggerId);
+      descP->createdNew = true;
       p = descP;
     }
   }

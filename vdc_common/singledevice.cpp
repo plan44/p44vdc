@@ -1358,6 +1358,7 @@ PropertyDescriptorPtr CustomActions::getDescriptorByName(string aPropMatch, int 
     // writing to non-existing custom action -> insert new action
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyName = aPropMatch;
+    descP->createdNew = true;
     descP->propertyType = apivalue_object;
     descP->deletable = true; // custom actions are deletable
     descP->propertyFieldKey = customActions.size();
