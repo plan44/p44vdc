@@ -457,7 +457,7 @@ ErrorPtr ZoneList::load()
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
       // got record
-      // - load record fields into zone descriptor object
+      // - load record fields into object
       int index = 0;
       newZone->loadFromRow(row, index, NULL);
       // - put custom action into container
@@ -838,7 +838,7 @@ ErrorPtr SceneList::load()
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
       // got record
-      // - load record fields into zone descriptor object
+      // - load record fields into object
       int index = 0;
       newScene->loadFromRow(row, index, NULL);
       // - put custom action into container
@@ -934,6 +934,287 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 
 
 
+// MARK: ===== Trigger
+
+Trigger::Trigger() :
+  inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore())
+{
+}
+
+
+Trigger::~Trigger()
+{
+}
+
+
+// MARK: ===== Trigger persistence
+
+const char *Trigger::tableName()
+{
+  return "triggers";
+}
+
+
+// primary key field definitions
+
+static const size_t numTriggerKeys = 1;
+
+size_t Trigger::numKeyDefs()
+{
+  // no parent id, triggers are global
+  return numTriggerKeys;
+}
+
+const FieldDefinition *Trigger::getKeyDef(size_t aIndex)
+{
+  static const FieldDefinition keyDefs[numTriggerKeys] = {
+    { "triggerId", SQLITE_INTEGER }
+  };
+  if (aIndex<numTriggerKeys)
+    return &keyDefs[aIndex];
+  return NULL;
+}
+
+
+// data field definitions
+
+static const size_t numTriggerFields = 3;
+
+size_t Trigger::numFieldDefs()
+{
+  return inheritedParams::numFieldDefs()+numTriggerFields;
+}
+
+
+const FieldDefinition *Trigger::getFieldDef(size_t aIndex)
+{
+  static const FieldDefinition dataDefs[numTriggerFields] = {
+    { "triggerName", SQLITE_TEXT },
+    { "triggerCondition", SQLITE_TEXT },
+    { "triggerActions", SQLITE_TEXT }
+  };
+  if (aIndex<inheritedParams::numFieldDefs())
+    return inheritedParams::getFieldDef(aIndex);
+  aIndex -= inheritedParams::numFieldDefs();
+  if (aIndex<numTriggerFields)
+    return &dataDefs[aIndex];
+  return NULL;
+}
+
+
+void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
+{
+  inheritedParams::loadFromRowWithoutParentId(aRow, aIndex, aCommonFlagsP);
+  // get key fields
+  triggerId = aRow->getWithDefault<int>(aIndex++, 0);
+  // the fields
+  name = nonNullCStr(aRow->get<const char *>(aIndex++));
+  triggerCondition = nonNullCStr(aRow->get<const char *>(aIndex++));
+  triggerActions = nonNullCStr(aRow->get<const char *>(aIndex++));
+}
+
+
+void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
+{
+  inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  // - my own id
+  aStatement.bind(aIndex++, triggerId);
+  // the fields
+  aStatement.bind(aIndex++, name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, triggerCondition.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, triggerActions.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+}
+
+
+// MARK: ===== Trigger property access implementation
+
+enum {
+  triggerName_key,
+  triggerCondition_key,
+  triggerActions_key,
+  numTriggerProperties
+};
+
+static char trigger_key;
+
+
+
+int Trigger::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return numTriggerProperties;
+}
+
+
+PropertyDescriptorPtr Trigger::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  static const PropertyDescription properties[numTriggerProperties] = {
+    { "name", apivalue_string, triggerName_key, OKEY(trigger_key) },
+    { "condition", apivalue_string, triggerCondition_key, OKEY(trigger_key) },
+    { "actions", apivalue_string, triggerActions_key, OKEY(trigger_key) }
+  };
+  if (aParentDescriptor->isRootOfObject()) {
+    // root level property of this object hierarchy
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(trigger_key)) {
+    if (aMode==access_read) {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case triggerName_key: aPropValue->setStringValue(name); return true;
+        case triggerCondition_key: aPropValue->setStringValue(triggerCondition); return true;
+        case triggerActions_key: aPropValue->setStringValue(triggerActions); return true;
+      }
+    }
+    else {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case triggerName_key: setPVar(name, aPropValue->stringValue()); return true;
+        case triggerCondition_key: setPVar(triggerCondition, aPropValue->stringValue()); return true;
+        case triggerActions_key: setPVar(triggerActions, aPropValue->stringValue()); return true;
+      }
+    }
+  }
+  return false;
+}
+
+
+
+// MARK: ===== TriggerList
+
+TriggerPtr TriggerList::newTrigger(size_t *aTriggerIndexP)
+{
+  int highestId = 0;
+  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
+    if ((*pos)->triggerId>=highestId) highestId = (*pos)->triggerId;
+  }
+  TriggerPtr newTrigger = TriggerPtr(new Trigger);
+  newTrigger->triggerId = highestId+1;
+  if (aTriggerIndexP) *aTriggerIndexP = triggers.size();
+  triggers.push_back(newTrigger);
+  return newTrigger;
+}
+
+
+
+// MARK: ===== TriggerList persistence
+
+ErrorPtr TriggerList::load()
+{
+  ErrorPtr err;
+
+  // create a template
+  TriggerPtr newTrigger = TriggerPtr(new Trigger());
+  // get the query
+  sqlite3pp::query *queryP = newTrigger->newLoadAllQuery(NULL);
+  if (queryP==NULL) {
+    // real error preparing query
+    err = newTrigger->paramStore.error();
+  }
+  else {
+    for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
+      // got record
+      // - load record fields into object
+      int index = 0;
+      newTrigger->loadFromRow(row, index, NULL);
+      // - put custom action into container
+      triggers.push_back(newTrigger);
+      // - fresh object for next row
+      newTrigger = TriggerPtr(new Trigger);
+    }
+    delete queryP; queryP = NULL;
+  }
+  return err;
+}
+
+
+ErrorPtr TriggerList::save()
+{
+  ErrorPtr err;
+
+  // save all elements (only dirty ones will be actually stored to DB)
+  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
+    err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
+    if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving trigger %d: %s", (*pos)->triggerId, err->description().c_str());
+  }
+  return err;
+}
+
+
+// MARK: ===== TriggerList property access implementation
+
+int TriggerList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return (int)triggers.size();
+}
+
+
+static char triggerlist_key;
+
+PropertyDescriptorPtr TriggerList::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  if (aPropIndex<triggers.size()) {
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = string_format("%d",triggers[aPropIndex]->triggerId);
+    descP->propertyType = apivalue_object;
+    descP->deletable = true; // trigger is deletable
+    descP->propertyFieldKey = aPropIndex;
+    descP->propertyObjectKey = OKEY(triggerlist_key);
+    return descP;
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+PropertyDescriptorPtr TriggerList::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
+{
+  PropertyDescriptorPtr p = inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
+  if (!p && aMode==access_write && aPropMatch=="0") {
+    // writing to triggerId==0 -> insert new trigger
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = aPropMatch;
+    descP->propertyType = apivalue_object;
+    descP->deletable = true; // new scenes are deletable
+    descP->propertyObjectKey = OKEY(triggerlist_key);
+    size_t ti;
+    if (newTrigger(&ti)) {
+      // valid new trigger
+      descP->propertyFieldKey = ti; // the scene's index
+      p = descP;
+    }
+  }
+  return p;
+}
+
+
+bool TriggerList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(triggerlist_key) && aMode==access_delete) {
+    // only field-level access is deleting a zone
+    TriggerPtr ds = triggers[aPropertyDescriptor->fieldKey()];
+    ds->deleteFromStore(); // remove from store
+    triggers.erase(triggers.begin()+aPropertyDescriptor->fieldKey()); // remove from container
+    return true;
+  }
+  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
+}
+
+
+PropertyContainerPtr TriggerList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->hasObjectKey(triggerlist_key)) {
+    return triggers[aPropertyDescriptor->fieldKey()];
+  }
+  return NULL;
+}
+
+
+
+
+
 // MARK: ===== LocalController
 
 LocalController::LocalController(VdcHost &aVdcHost) :
@@ -941,6 +1222,7 @@ LocalController::LocalController(VdcHost &aVdcHost) :
 {
   localZones.isMemberVariable();
   localScenes.isMemberVariable();
+  localTriggers.isMemberVariable();
 }
 
 
@@ -1283,6 +1565,8 @@ ErrorPtr LocalController::load()
   if (!Error::isOK(err)) LOG(LOG_ERR, "could not load localZones: %s", err->description().c_str());
   err = localScenes.load();
   if (!Error::isOK(err)) LOG(LOG_ERR, "could not load localScenes: %s", err->description().c_str());
+  err = localTriggers.load();
+  if (!Error::isOK(err)) LOG(LOG_ERR, "could not load localTriggers: %s", err->description().c_str());
   return err;
 }
 
@@ -1294,6 +1578,8 @@ ErrorPtr LocalController::save()
   if (!Error::isOK(err)) LOG(LOG_ERR, "could not save localZones: %s", err->description().c_str());
   err = localScenes.save();
   if (!Error::isOK(err)) LOG(LOG_ERR, "could not save localScenes: %s", err->description().c_str());
+  err = localTriggers.save();
+  if (!Error::isOK(err)) LOG(LOG_ERR, "could not save localTriggers: %s", err->description().c_str());
   return err;
 }
 
@@ -1421,8 +1707,6 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
 
 // MARK: ===== LocalController property access
 
-static char triggerlist_key;
-
 enum {
   // singledevice level properties
   zones_key,
@@ -1473,8 +1757,8 @@ PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr &
         return ZoneListPtr(&localZones);
       case scenes_key:
         return SceneListPtr(&localScenes);
-//      case triggers_key:
-//        return TriggerListPtr(&localTriggers);
+      case triggers_key:
+        return TriggerListPtr(&localTriggers);
     }
   }
   // unknown here

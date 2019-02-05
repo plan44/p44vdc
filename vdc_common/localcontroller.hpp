@@ -337,6 +337,78 @@ namespace p44 {
   typedef boost::intrusive_ptr<SceneList> SceneListPtr;
 
 
+  /// trigger
+  class Trigger : public PropertyContainer, public PersistentParams
+  {
+    typedef PropertyContainer inherited;
+    typedef PersistentParams inheritedParams;
+    friend class TriggerList;
+
+    int triggerId; ///< the immutable ID of this trigger
+    string name;
+    string triggerCondition; ///< expression that must evaluate to true to trigger the action
+    string triggerActions; ///< actions to trigger (scene calls, etc.)
+
+  public:
+
+    Trigger();
+    virtual ~Trigger();
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+
+    // persistence implementation
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numKeyDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getKeyDef(size_t aIndex) P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<Trigger> TriggerPtr;
+
+
+  /// trigger list
+  /// list of user defined triggers
+  class TriggerList : public PropertyContainer
+  {
+    typedef PropertyContainer inherited;
+
+  public:
+
+    typedef vector<TriggerPtr> TriggersVector;
+
+    TriggersVector triggers;
+
+    /// load zones
+    ErrorPtr load();
+
+    /// save zones
+    ErrorPtr save();
+
+    /// get trigger by id
+    TriggerPtr newTrigger(size_t *aTriggerIndexP = NULL);
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<TriggerList> TriggerListPtr;
+
+
+
   /// local controller
   /// manages local zones, scenes, triggers
   class LocalController : public PropertyContainer
@@ -348,6 +420,7 @@ namespace p44 {
 
     ZoneList localZones; ///< the locally used/defined zones
     SceneList localScenes; ///< the locally defined scenes
+    TriggerList localTriggers; ///< the locally defined triggers
 
   public:
 
