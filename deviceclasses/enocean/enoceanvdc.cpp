@@ -712,7 +712,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
   {
     // no security context for this device
     if (rorg==rorg_SEC || rorg==rorg_SEC_ENCAPS) {
-      LOG(LOG_NOTICE, "Secure packet received from sender w/o security info available -> ignored:\n%s", aEsp3PacketPtr->description().c_str());
+      LOG(LOG_INFO, "Secure packet received from sender w/o security info available -> ignored:\n%s", aEsp3PacketPtr->description().c_str());
       return;
     }
   }
