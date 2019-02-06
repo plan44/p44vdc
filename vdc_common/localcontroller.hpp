@@ -25,6 +25,8 @@
 #include "device.hpp"
 #include "vdchost.hpp"
 
+#include "expressions.hpp"
+
 
 #if ENABLE_LOCALCONTROLLER
 
@@ -282,6 +284,9 @@ namespace p44 {
     /// @return group number
     DsGroup getGroup() const { return sceneId.group; };
 
+    /// get the sceneId
+    SceneIdentifier getIdentifier() { return sceneId; };
+
     /// get the scene's ID
     /// @return a string ID uniquely defining this scene in this localcontroller (zone, group, sceneNo)
     string getStringID() const { return sceneId.stringId(); }
@@ -324,6 +329,9 @@ namespace p44 {
     /// get scene by identifier
     SceneDescriptorPtr getScene(const SceneIdentifier &aSceneId, bool aCreateNewIfNotExisting = false, size_t *aSceneIndexP = NULL);
 
+    /// get scene by name
+    SceneDescriptorPtr getSceneByName(const string aSceneName);
+
   protected:
 
     // property access implementation
@@ -349,10 +357,23 @@ namespace p44 {
     string triggerCondition; ///< expression that must evaluate to true to trigger the action
     string triggerActions; ///< actions to trigger (scene calls, etc.)
 
+    Tristate conditionMet;
+
   public:
 
     Trigger();
     virtual ~Trigger();
+
+    /// check trigger and fire actions when condition transitions from non-met to met
+    /// @return true when trigger has fired
+    bool checkAndFire();
+
+    /// execute the trigger actions
+    ErrorPtr executeActions();
+
+    // API method handlers
+    ErrorPtr handleCheckCondition(VdcApiRequestPtr aRequest);
+    ErrorPtr handleTestActions(VdcApiRequestPtr aRequest);
 
   protected:
 
@@ -370,6 +391,12 @@ namespace p44 {
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
+  private:
+
+    ExpressionValue calcCondition();
+    ExpressionValue valueLookup(const string aName);
+    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
+
   };
   typedef boost::intrusive_ptr<Trigger> TriggerPtr;
 
@@ -380,11 +407,16 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
+    MLTicket checkTicket;
+
   public:
 
     typedef vector<TriggerPtr> TriggersVector;
 
     TriggersVector triggers;
+
+    /// start checking for triggers
+    void startChecking();
 
     /// load zones
     ErrorPtr load();
@@ -393,7 +425,11 @@ namespace p44 {
     ErrorPtr save();
 
     /// get trigger by id
-    TriggerPtr newTrigger(size_t *aTriggerIndexP = NULL);
+    /// @param aTriggerId ID of trigger
+    /// @param aCreateNewIfNotExisting if set and ID is not an existing id (0 is NEVER existing), create new
+    /// @param aTriggerIndexP if not NULL, this is assigned the index within the triggers vector
+    /// @return trigger or NULL if not found (and none created)
+    TriggerPtr getTrigger(int aTriggerId, bool aCreateNewIfNotExisting = false, size_t *aTriggerIndexP = NULL);
 
   protected:
 
@@ -403,6 +439,10 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+
+  private:
+
+    void triggerChecker(MLTimer &aTimer);
 
   };
   typedef boost::intrusive_ptr<TriggerList> TriggerListPtr;
@@ -415,6 +455,7 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
     friend class ZoneDescriptor;
+    friend class Trigger;
 
     VdcHost &vdcHost; ///< local reference to vdc host
 
@@ -474,8 +515,14 @@ namespace p44 {
     /// get info (name, kind) about a group
     static const GroupDescriptor* groupInfo(DsGroup aGroup);
 
-    // localcontroller specific method handling
+    /// localcontroller specific method handling
     bool handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams);
+
+    /// call a scene
+    /// @param aTransitionTimeOverride if >=0, this will override the called scene's transition time
+    void callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride = Infinite);
+    void callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride = Infinite);
+
 
   protected:
 

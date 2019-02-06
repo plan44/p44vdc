@@ -192,7 +192,6 @@ namespace p44 {
     void parseValueDefs();
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
-    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
     void evaluateConditions(Tristate aRefState, EvalMode aEvalMode);
     void evaluateConditionsLater();
     void changedConditions();
@@ -204,6 +203,7 @@ namespace p44 {
     Tristate evaluateBoolean(string aExpression);
     ExpressionValue calcEvaluatorExpression(string &aExpression);
     ExpressionValue valueLookup(const string aName);
+    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
     ExpressionValue actionValueLookup(Tristate aCurrentState, const string aName);
 
   };

@@ -33,6 +33,7 @@
 #include "outputbehaviour.hpp"
 #include "buttonbehaviour.hpp"
 
+#include <time.h>
 
 #if ENABLE_LOCALCONTROLLER
 
@@ -797,6 +798,21 @@ bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 // MARK: ===== SceneList
 
 
+SceneDescriptorPtr SceneList::getSceneByName(const string aSceneName)
+{
+  SceneDescriptorPtr scene;
+  for (int i = 0; i<scenes.size(); ++i) {
+    SceneDescriptorPtr sc = scenes[i];
+    if (sc->sceneId.name==aSceneName) {
+      scene = sc;
+      break;
+    }
+  }
+  return scene;
+}
+
+
+
 SceneDescriptorPtr SceneList::getScene(const SceneIdentifier &aSceneId, bool aCreateNewIfNotExisting, size_t *aSceneIndexP)
 {
   SceneDescriptorPtr scene;
@@ -939,13 +955,193 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 // MARK: ===== Trigger
 
 Trigger::Trigger() :
-  inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore())
+  inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
+  triggerId(0),
+  conditionMet(undefined)
 {
 }
 
 
 Trigger::~Trigger()
 {
+}
+
+
+
+// MARK: ===== Trigger condition evaluation
+
+
+bool Trigger::checkAndFire()
+{
+  ExpressionValue res = calcCondition();
+  Tristate newState = undefined;
+  if (res.isOk()) {
+    newState = res.v>0 ? yes : no;
+  }
+  if (newState!=conditionMet) {
+    LOG(LOG_NOTICE, "Trigger '%s': condition changes to %s", name.c_str(), newState==yes ? "TRUE" : (newState==no ? "FALSE" : "undefined"));
+    conditionMet = newState;
+    if (conditionMet==yes) {
+      // trigger when state goes from not met to met.
+      ErrorPtr err = executeActions();
+      if (Error::isOK(err)) {
+        LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully: %s", name.c_str(), triggerActions.c_str());
+      }
+      else {
+        LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), err->description().c_str());
+      }
+    }
+  }
+  return false;
+}
+
+
+ExpressionValue Trigger::calcCondition()
+{
+  return evaluateExpression(
+    triggerCondition,
+    boost::bind(&Trigger::valueLookup, this, _1),
+    boost::bind(&Trigger::evaluateFunction, this, _1, _2)
+  );
+}
+
+
+ExpressionValue Trigger::valueLookup(const string aName)
+{
+  // %%% no values yet
+  return ExpressionError::errValue(ExpressionError::NotFound, "'%s' not found", aName.c_str());
+}
+
+
+ExpressionValue Trigger::evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs)
+{
+  struct timeval t;
+  gettimeofday(&t, NULL);
+  struct tm now;
+  localtime_r(&t.tv_sec, &now);
+  if (aName=="is_weekday" && aArgs.size()>0) {
+    int weekday = now.tm_wday; // 0..6, 0=sunday
+    for (int i = 0; i<aArgs.size(); i++) {
+      int w = (int)aArgs[i].v;
+      if (w==7) w=0; // treat both 0 and 7 as sunday
+      if (w==weekday) {
+        // today is one of the days listed
+        return ExpressionValue(1);
+      }
+    }
+    // none of the specified days
+    return ExpressionValue(0);
+  }
+  else if (aName=="is_time" && aArgs.size()==2) {
+    int h = (int)aArgs[0].v;
+    int m = (int)aArgs[1].v;
+    return ExpressionValue(now.tm_hour==h && now.tm_min==m);
+  }
+  else if (aName=="after_time" && aArgs.size()==2) {
+    int h = (int)aArgs[0].v;
+    int m = (int)aArgs[1].v;
+    return ExpressionValue(now.tm_hour>h || (now.tm_hour==h && now.tm_min>=m));
+  }
+  // no such function
+  return ExpressionError::errValue(ExpressionError::NotFound, "not found"); // just signals caller to try builtin functions
+}
+
+
+
+// MARK: ===== Trigger actions execution
+
+
+ErrorPtr Trigger::executeActions()
+{
+  ErrorPtr err;
+  // Syntax
+  //  actions = <action> [ ; <action> [ ; ...]]
+  //  action = <cmd>:<params>
+  const char *p = triggerActions.c_str();
+  string action;
+  while (nextPart(p, action, ';')) {
+    string cmd;
+    string params;
+    LOG(LOG_INFO, "- starting executing action '%s'", action.c_str());
+    if (!keyAndValue(action, cmd, params, ':')) cmd = action; // could be action only
+    if (cmd=="scene") {
+      // scene:<name>[,<speed>]
+      const char *p2 = params.c_str();
+      string sn;
+      if (nextPart(p2, sn, ',')) {
+        // scene name
+        SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(sn);
+        if (!scene) {
+          err = TextError::err("scene '%s' not found", sn.c_str());
+        }
+        else {
+          string ttm;
+          MLMicroSeconds transitionTime = Infinite; // use scene's standard time
+          if (nextPart(p2, ttm, ',')) {
+            double v;
+            if (sscanf(ttm.c_str(), "%lf", &v)==1) {
+              transitionTime = v*Second;
+            }
+          }
+          // execute the scene
+          LocalController::sharedLocalController()->callScene(scene->getIdentifier(), transitionTime);
+        }
+      }
+      else {
+        err = TextError::err("scene name missing");
+        break;
+      }
+    }
+    else {
+      err = TextError::err("Action '%s' is unknown", cmd.c_str());
+      break;
+    }
+    LOG(LOG_INFO, "- done executing action '%s'", action.c_str());
+  } // while actions
+  return err;
+}
+
+
+
+
+// MARK: ===== Trigger API method handlers
+
+
+ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
+{
+  ApiValuePtr checkResult = aRequest->newApiValue();
+  checkResult->setType(apivalue_object);
+  // Condition
+  ExpressionValue res;
+  res = calcCondition();
+  if (res.isOk()) {
+    checkResult->add("result", checkResult->newDouble(res.v));
+    LOG(LOG_INFO, "- condition '%s' -> %f", triggerCondition.c_str(), res.v);
+  }
+  else {
+    checkResult->add("error", checkResult->newString(res.err->getErrorMessage()));
+  }
+  // return the result
+  aRequest->sendResult(checkResult);
+  return ErrorPtr();
+}
+
+
+ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
+{
+  ApiValuePtr testResult = aRequest->newApiValue();
+  testResult->setType(apivalue_object);
+  ErrorPtr err = executeActions();
+  if (Error::isOK(err)) {
+    testResult->add("result", testResult->newString("OK"));
+    LOG(LOG_INFO, "- successfully executed '%s'", triggerActions.c_str());
+  }
+  else {
+    testResult->add("error", testResult->newString(err->getErrorMessage()));
+  }
+  // return the result
+  aRequest->sendResult(testResult);
+  return ErrorPtr();
 }
 
 
@@ -1087,17 +1283,49 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
 
 // MARK: ===== TriggerList
 
-TriggerPtr TriggerList::newTrigger(size_t *aTriggerIndexP)
+
+TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting, size_t *aTriggerIndexP)
 {
+  TriggerPtr trig;
   int highestId = 0;
-  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
-    if ((*pos)->triggerId>=highestId) highestId = (*pos)->triggerId;
+  size_t tidx = 0;
+  for (tidx=0; tidx<triggers.size(); ++tidx) {
+    int tid = triggers[tidx]->triggerId;
+    if (aTriggerId!=0 && tid==aTriggerId) {
+      // found
+      break;
+    }
+    if (tid>=highestId) highestId = tid;
   }
-  TriggerPtr newTrigger = TriggerPtr(new Trigger);
-  newTrigger->triggerId = highestId+1;
-  if (aTriggerIndexP) *aTriggerIndexP = triggers.size();
-  triggers.push_back(newTrigger);
-  return newTrigger;
+  if (tidx>=triggers.size() && aCreateNewIfNotExisting) {
+    TriggerPtr newTrigger = TriggerPtr(new Trigger);
+    newTrigger->triggerId = highestId+1;
+    triggers.push_back(newTrigger);
+  }
+  if (tidx<triggers.size()) {
+    trig = triggers[tidx];
+    if (aTriggerIndexP) *aTriggerIndexP = tidx;
+  }
+  return trig;
+}
+
+
+#define TRIGGER_CHECK_START_DELAY (10*Second)
+#define TRIGGER_CHECK_INTERVAL (10*Second)
+
+
+void TriggerList::startChecking()
+{
+  checkTicket.executeOnce(boost::bind(&TriggerList::triggerChecker, this, _1), TRIGGER_CHECK_START_DELAY);
+}
+
+
+void TriggerList::triggerChecker(MLTimer &aTimer)
+{
+  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
+    (*pos)->checkAndFire();
+  }
+  MainLoop::currentMainLoop().retriggerTimer(aTimer, TRIGGER_CHECK_INTERVAL);
 }
 
 
@@ -1174,14 +1402,16 @@ PropertyDescriptorPtr TriggerList::getDescriptorByIndex(int aPropIndex, int aDom
 PropertyDescriptorPtr TriggerList::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
 {
   PropertyDescriptorPtr p = inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
-  if (!p && aMode==access_write && aPropMatch=="0") {
-    // writing to triggerId==0 -> insert new trigger
+  if (!p && aMode==access_write) {
+    // writing to non-existing trigger id (usually 0) -> insert new trigger
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyType = apivalue_object;
     descP->deletable = true; // new scenes are deletable
     descP->propertyObjectKey = OKEY(triggerlist_key);
     size_t ti;
-    TriggerPtr trg = newTrigger(&ti);
+    int newId = 0;
+    sscanf(aPropMatch.c_str(), "%d", &newId); // use specified new id, otherwise use 0
+    TriggerPtr trg = getTrigger(newId, true, &ti);
     if (trg) {
       // valid new trigger
       descP->propertyFieldKey = ti; // the scene's index
@@ -1484,7 +1714,10 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       }
     }
     // now perform actions
-    if (doDim || sceneToCall!=INVALID_SCENE_NO) {
+    if (sceneToCall!=INVALID_SCENE_NO) {
+      callScene(sceneToCall, zoneID, group);
+    }
+    else if (doDim) {
       // deliver
       NotificationAudience audience;
       vdcHost.addToAudienceByZoneAndGroup(audience, zoneID, group);
@@ -1493,30 +1726,48 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       // - define audience
       params->add("zone_id", params->newUint64(zoneID));
       params->add("group", params->newUint64(group));
-      string method;
-      if (doDim) {
-        // { "notification":"dimChannel", "zone_id":0, "group":1, "mode":1, "channelId":0, "area":0 }
-        method = "dimChannel";
-        params->add("mode", params->newInt64(direction));
-        params->add("channelId", params->newUint64(channel));
-        params->add("area", params->newUint64(area));
-      }
-      else if (sceneToCall!=INVALID_SCENE_NO) {
-        // { "notification":"callScene", "zone_id":0, "group":1, "scene":5, "force":false }
-        method = "callScene";
-        params->add("scene", params->newUint64(sceneToCall));
-        params->add("force", params->newBool(false));
-      }
-      else {
-        return true; // NOP, but handled
-      }
+      string method = "dimChannel";
+      params->add("mode", params->newInt64(direction));
+      params->add("channelId", params->newUint64(channel));
+      params->add("area", params->newUint64(area));
       // - deliver
       vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
       return true;
     }
+    else {
+      return true; // NOP, but handled
+    }
   }
   return false; // not handled so far
 }
+
+
+void LocalController::callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride)
+{
+  callScene(aScene.sceneNo, aScene.zoneID, aScene.group, aTransitionTimeOverride);
+}
+
+
+void LocalController::callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride)
+{
+  NotificationAudience audience;
+  vdcHost.addToAudienceByZoneAndGroup(audience, aZone, aGroup);
+  JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
+  params->setType(apivalue_object);
+  // - define audience
+  params->add("zone_id", params->newUint64(aZone));
+  params->add("group", params->newUint64(aGroup));
+  // { "notification":"callScene", "zone_id":0, "group":1, "scene":5, "force":false }
+  string method = "callScene";
+  params->add("scene", params->newUint64(aSceneNo));
+  params->add("force", params->newBool(false));
+  if (aTransitionTimeOverride!=Infinite) {
+    params->add("transition", params->newDouble((double)aTransitionTimeOverride/Second));
+  }
+  // - deliver
+  vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
+}
+
 
 
 void LocalController::deviceAdded(DevicePtr aDevice)
@@ -1559,7 +1810,9 @@ size_t LocalController::totalDevices() const
 void LocalController::startRunning()
 {
   FOCUSLOG("startRunning");
+  localTriggers.startChecking();
 }
+
 
 
 ErrorPtr LocalController::load()
@@ -1698,6 +1951,27 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
         }
         aRequest->sendResult(result);
         aError.reset(); // make sure we don't send an extra ErrorOK
+      }
+    }
+    return true;
+  }
+  else if (aMethod=="x-p44-checkTriggerCondition" || aMethod=="x-p44-testTriggerActions") {
+    // check the trigger condition of a trigger
+    ApiValuePtr o;
+    aError = DsAddressable::checkParam(aParams, "triggerID", o);
+    if (Error::isOK(aError)) {
+      int triggerId = o->int32Value();
+      TriggerPtr trig = localTriggers.getTrigger(triggerId);
+      if (!trig) {
+        aError = WebError::webErr(400, "Trigger %d not found", triggerId);
+      }
+      else {
+        if (aMethod=="x-p44-testTriggerActions") {
+          aError = trig->handleTestActions(aRequest);
+        }
+        else {
+          aError = trig->handleCheckCondition(aRequest);
+        }
       }
     }
     return true;
