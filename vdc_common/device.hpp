@@ -136,6 +136,7 @@ namespace p44 {
     // prepared operations
     DsScenePtr preparedScene; ///< set if this scene must be applied at executePreparedOperation()
     bool preparedDim; ///< set if currentDimMode/currentDimChannel must be applied at executePreparedOperation()
+    MLMicroSeconds preparedTransitionOverride; ///< prepared override for transition time
 
     // hardware access serializer/pacer
     SimpleCB appliedOrSupersededCB; ///< will be called when values are either applied or ignored because a subsequent change is already pending
@@ -427,9 +428,10 @@ namespace p44 {
     /// convenience method to call scene on this device
     /// @param aSceneNo the scene to call.
     /// @param aForce if set, the scene overrides possibly active localPriority
+    /// @param aTransitionTimeOverride if not Infinite, this overrides the transition time for the scene call
     /// @note this method internally uses callScenePrepare/callSceneExecute.
     ///    It is exposed as directly calling scenes might be useful for special purposes/debugging
-    void callScene(SceneNo aSceneNo, bool aForce);
+    void callScene(SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransitionTimeOverride = Infinite);
 
     /// convenience method to start or stop dimming a channel of this device.
     /// @param aChannel the channel to start or stop dimming for
@@ -726,7 +728,7 @@ namespace p44 {
     DsGroupMask behaviourGroups();
 
     ErrorPtr checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel);
-    void callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce);
+    void callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransitionTimeOverride);
     void callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
     void callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
     void callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);

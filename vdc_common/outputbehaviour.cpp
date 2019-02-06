@@ -271,10 +271,17 @@ void OutputBehaviour::saveChannelsToScene(DsScenePtr aScene)
 
 
 
-bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene)
+bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTransitionTimeOverride)
 {
   if (aScene) {
-    return performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
+    bool ok = performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
+    if (aTransitionTimeOverride!=Infinite) {
+      // override the transition time in all channels that now need to be applied
+      for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+        if ((*pos)->needsApplying()) (*pos)->setTransitionTime(aTransitionTimeOverride);
+      }
+    }
+    return ok;
   }
   return false; // no scene to apply
 }

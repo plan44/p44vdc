@@ -186,6 +186,10 @@ namespace p44 {
     /// @return time to be used to transition to new value
     MLMicroSeconds transitionTimeToNewValue() { return nextTransitionTime; };
 
+    /// set time for next transition (for overrides - normally, setChannelValue() sets the transition time)
+    /// @param aTransitionTime transition time
+    void setTransitionTime(MLMicroSeconds aTransitionTime) { nextTransitionTime = aTransitionTime; }
+
     /// check if channel value needs to be sent to device hardware
     /// @return true if the cached channel value was changed and should be applied to hardware via device's applyChannelValues()
     bool needsApplying() { return channelUpdatePending; }
