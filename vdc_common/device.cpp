@@ -941,9 +941,6 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         dimChannelForAreaPrepare(aPreparedCB, channel, mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
         return;
       }
-      else {
-        err = Error::err<VdcApiError>(400, "Need to specify channel(type) or channelId");
-      }
     }
     if (!Error::isOK(err)) {
       ALOG(LOG_WARNING, "dimChannel error: %s", err->description().c_str());

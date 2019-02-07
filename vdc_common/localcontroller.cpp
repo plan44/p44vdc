@@ -1484,7 +1484,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
   FOCUSLOG("processButtonClick: clicktype=%d, device = %s", (int)aClickType, aButtonBehaviour.shortDesc().c_str());
   // defaults
   DsGroup group = aButtonBehaviour.buttonGroup;
-  DsChannelType channel = channeltype_default;
+  DsChannelType channelType = channeltype_default;
   DsZoneID zoneID = zoneId_global;
   // possible actions
   bool doDim = false;
@@ -1645,7 +1645,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
   else {
     // room scene
     zoneID = aButtonBehaviour.device.getZoneID();
-    channel = aButtonBehaviour.buttonChannel;
+    channelType = aButtonBehaviour.buttonChannel;
     ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
     if (!zone) return false; // button in a non-local zone, cannot handle
     if (group!=group_yellow_light) return true; // NOP because we don't support anything except light for now, but handled
@@ -1729,7 +1729,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       params->add("group", params->newUint64(group));
       string method = "dimChannel";
       params->add("mode", params->newInt64(direction));
-      params->add("channelId", params->newUint64(channel));
+      params->add("channel", params->newUint64(channelType));
       params->add("area", params->newUint64(area));
       // - deliver
       vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
