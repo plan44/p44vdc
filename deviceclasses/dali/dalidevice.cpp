@@ -2169,6 +2169,14 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
 }
 
 
+void DaliInputDevice::freeAddresses()
+{
+  for (int i=0; i<numAddresses; i++) {
+    daliVdc().removeMemberships(baseAddress+i);
+  }
+}
+
+
 
 bool DaliInputDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {

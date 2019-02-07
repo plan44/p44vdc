@@ -178,6 +178,7 @@ namespace p44 {
 
     void loadLocallyUsedGroupsAndScenes();
     void markUsed(DaliAddress aSceneOrGroup, bool aUsed);
+    void removeMemberships(DaliAddress aSceneOrGroup);
 
     ErrorPtr groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr daliScan(VdcApiRequestPtr aRequest, ApiValuePtr aParams);

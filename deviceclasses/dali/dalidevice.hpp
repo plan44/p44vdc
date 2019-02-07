@@ -743,6 +743,8 @@ namespace p44 {
     ///   false in case it is certain that the device is still connected to this and only this vDC
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
+    /// free all control gear from responding to any of the bus addresses used by this input device
+    void freeAddresses();
 
     /// @name identification of the addressable entity
     /// @{

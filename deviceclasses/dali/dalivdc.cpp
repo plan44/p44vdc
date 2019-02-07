@@ -1031,6 +1031,22 @@ void DaliVdc::markUsed(DaliAddress aSceneOrGroup, bool aUsed)
 }
 
 
+void DaliVdc::removeMemberships(DaliAddress aSceneOrGroup)
+{
+  if ((aSceneOrGroup&DaliAddressTypeMask)==DaliScene) {
+    // make sure no old scene settings remain in any device -> broadcast DALICMD_REMOVE_FROM_SCENE
+    daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(aSceneOrGroup&DaliSceneMask));
+  }
+  else if ((aSceneOrGroup&DaliAddressTypeMask)==DaliGroup) {
+    // Make sure no old group settings remain -> broadcast DALICMD_REMOVE_FROM_GROUP
+    daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_GROUP+(aSceneOrGroup&DaliGroupMask));
+  }
+}
+
+
+
+
+
 void DaliVdc::loadLocallyUsedGroupsAndScenes()
 {
   usedDaliGroupsMask = 0;
@@ -1386,6 +1402,8 @@ ErrorPtr DaliVdc::addDaliInput(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         respErr = WebError::webErr(500, "invalid configuration for DALI input device -> none created");
       }
       else {
+        // remove all control gear from the addresses used for this input device
+        dev->freeAddresses();
         // set name
         if (name.size()>0) dev->setName(name);
         // insert into database
