@@ -1716,6 +1716,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     // now perform actions
     if (sceneToCall!=INVALID_SCENE_NO) {
       callScene(sceneToCall, zoneID, group);
+      return true; // handled
     }
     else if (doDim) {
       // deliver
@@ -1732,7 +1733,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       params->add("area", params->newUint64(area));
       // - deliver
       vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
-      return true;
+      return true; // handled
     }
     else {
       return true; // NOP, but handled
