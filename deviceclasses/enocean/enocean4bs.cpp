@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -1296,7 +1296,8 @@ static const p44::EnoceanSensorDescriptor A513sunEast =
   { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(1,7), DB(1,0), 30, 40*60, &stdSensorHandler, "Sun east" };
 
 EnoceanA5130XHandler::EnoceanA5130XHandler(EnoceanDevice &aDevice) :
-  inherited(aDevice)
+  inherited(aDevice),
+  broken(false)
 {
 }
 
@@ -1387,6 +1388,18 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
 }
 
 
+int EnoceanA5130XHandler::opStateLevel()
+{
+  if (broken) return 0; // complete failure
+  return inherited::opStateLevel();
+}
+
+string EnoceanA5130XHandler::getOpStateText()
+{
+  if (broken) return "Sensor disconnected";
+  return inherited::getOpStateText();
+}
+
 
 // handle incoming data from device and extract data for this channel
 void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
@@ -1398,36 +1411,62 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     if (datasize!=4) return; // wrong data size
     // - check identifier in DB0.7..DB0.4 to see what info we got
     uint8_t identifier = (dataP[3]>>4) & 0x0F;
+    bool nowBroken = false;
     switch (identifier) {
       case 1:
-        // A5-13-01
-        if (behaviour) handleBitField(A513dawnSensor, behaviour, dataP, datasize);
-        if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize);
-        if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize);
-        if (gustSpeed) handleBitField(A513gustSpeed, gustSpeed, dataP, datasize);
-        if (dayIndicator) handleBitField(A513dayIndicator, dayIndicator, dataP, datasize);
-        if (rainIndicator) handleBitField(A513rainIndicator, rainIndicator, dataP, datasize);
+        // 00 00 FF 1A
+        if (dataP[0]==0 && dataP[1]==0 && dataP[2]==0xFF && (dataP[3]&0x02)!=0) {
+          // 00 00 FF 1A = 0lux, -40 degree C, 70km/h wind, rain -> connection to sensor broken
+          nowBroken = true;
+        }
+        else {
+          // A5-13-01
+          nowBroken = false;
+          if (behaviour) handleBitField(A513dawnSensor, behaviour, dataP, datasize);
+          if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize);
+          if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize);
+          if (gustSpeed) handleBitField(A513gustSpeed, gustSpeed, dataP, datasize);
+          if (dayIndicator) handleBitField(A513dayIndicator, dayIndicator, dataP, datasize);
+          if (rainIndicator) handleBitField(A513rainIndicator, rainIndicator, dataP, datasize);
+        }
         break;
       case 2:
         // A5-13-02
-        if (sunWest) handleBitField(A513sunWest, sunWest, dataP, datasize);
-        if (sunSouth) handleBitField(A513sunSouth, sunSouth, dataP, datasize);
-        if (sunEast) handleBitField(A513sunEast, sunEast, dataP, datasize);
+        if (!broken) {
+          if (sunWest) handleBitField(A513sunWest, sunWest, dataP, datasize);
+          if (sunSouth) handleBitField(A513sunSouth, sunSouth, dataP, datasize);
+          if (sunEast) handleBitField(A513sunEast, sunEast, dataP, datasize);
+        }
         break;
       default:
         // A5-13-03..06 are not supported
         break;
     }
-    // re-validate all sensors whenever we get any radio packet
-    if (behaviour) behaviour->revalidateState();
-    if (outdoorTemp) outdoorTemp->revalidateState();
-    if (windSpeed) windSpeed->revalidateState();
-    if (gustSpeed) gustSpeed->revalidateState();
-    if (dayIndicator) dayIndicator->revalidateState();
-    if (rainIndicator) rainIndicator->revalidateState();
-    if (sunWest) sunWest->revalidateState();
-    if (sunSouth) sunSouth->revalidateState();
-    if (sunEast) sunEast->revalidateState();
+    if (nowBroken!=broken) {
+      broken = nowBroken;
+      VdcHardwareError e = broken ? hardwareError_openCircuit : hardwareError_none;
+      if (behaviour) behaviour->setHardwareError(e);
+      if (outdoorTemp) outdoorTemp->setHardwareError(e);
+      if (windSpeed) windSpeed->setHardwareError(e);
+      if (gustSpeed) gustSpeed->setHardwareError(e);
+      if (dayIndicator) dayIndicator->setHardwareError(e);
+      if (rainIndicator) rainIndicator->setHardwareError(e);
+      if (sunWest) sunWest->setHardwareError(e);
+      if (sunSouth) sunSouth->setHardwareError(e);
+      if (sunEast) sunEast->setHardwareError(e);
+    }
+    // re-validate all sensors whenever we get any radio packet and not broken
+    if (!broken) {
+      if (behaviour) behaviour->revalidateState();
+      if (outdoorTemp) outdoorTemp->revalidateState();
+      if (windSpeed) windSpeed->revalidateState();
+      if (gustSpeed) gustSpeed->revalidateState();
+      if (dayIndicator) dayIndicator->revalidateState();
+      if (rainIndicator) rainIndicator->revalidateState();
+      if (sunWest) sunWest->revalidateState();
+      if (sunSouth) sunSouth->revalidateState();
+      if (sunEast) sunEast->revalidateState();
+    }
   }
 }
 
