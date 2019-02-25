@@ -711,13 +711,6 @@ ErrorPtr DaliVdc::daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
     aRequest->sendResult(singleAddrSummary);
   }
   else {
-//    #if DEBUG
-//    DaliComm::ShortAddressListPtr l = DaliComm::ShortAddressListPtr(new DaliComm::ShortAddressList);
-//    for (int i=51; i<64; i++) l->push_back(i);
-//    daliSummaryScanDone(aRequest, l, NULL, ErrorPtr());
-//    return ErrorPtr();
-//    #warning "ugly hack!!!"
-//    #endif
     // want info about entire bus - do a raw bus scan to learn what devices are there
     daliComm->daliBusScan(boost::bind(&DaliVdc::daliSummaryScanDone, this, aRequest, _1, _2, _3));
   }
@@ -1449,6 +1442,9 @@ ErrorPtr DaliVdc::getDaliInputAddrs(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 
 void DaliVdc::daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2)
 {
+  if (aEvent==EVENT_CODE_FOREIGN_FRAME && aData1==DALICMD_PING && aData2==0) {
+    LOG(LOG_WARNING, "DALI: another bus master is using this bus -> NOT SUPPORTED!");
+  }
   for(DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
     DaliInputDevicePtr inputDev = boost::dynamic_pointer_cast<DaliInputDevice>(*pos);
     if (inputDev) {

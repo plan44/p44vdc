@@ -155,12 +155,15 @@ double WindowEvaluator::evaluate()
 
 // MARK: ===== SensorBehaviour
 
+#define DSS_SENSOR_MAX_PUSH_INTERVAL (55*Minute) // all sensors that have a aliveSignInterval!=Never must get pushed at least this often (otherwise dSS flags sensor red)
+
 SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
   profileP(NULL), // the profile
   // persistent settings
   sensorGroup(group_black_variable), // default to joker
   minPushInterval(30*Second), // default unless sensor type profile sets another value
+  maxPushInterval(0),
   changesOnlyInterval(0), // report every sensor update (even if value unchanged)
   // state
   #if ENABLE_RRDB
@@ -298,6 +301,7 @@ void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint 
   resolution = aResolution;
   updateInterval = aUpdateInterval;
   aliveSignInterval = aAliveSignInterval;
+  maxPushInterval = aliveSignInterval==Never ? Never : DSS_SENSOR_MAX_PUSH_INTERVAL; // sensors without any update guarantee do not need to fake regular pushes
   armInvalidator();
   profileP = NULL;
   // default only, devices once created will have this as a persistent setting
@@ -310,8 +314,12 @@ void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint 
       LOG(LOG_INFO, "Activated sensor processing/filtering profile for '%s' (usage %d)", sensorTypeIds[sensorType], sensorUsage);
       profileP = sbpP;
       // get settings defaults
-      if (profileP->pushIntvl>0) minPushInterval = profileP->pushIntvl;
-      if (profileP->chgOnlyIntvl>0) changesOnlyInterval = profileP->chgOnlyIntvl;
+      if (profileP->pushIntvl>0) {
+        minPushInterval = profileP->pushIntvl;
+      }
+      if (profileP->chgOnlyIntvl>0) {
+        changesOnlyInterval = profileP->chgOnlyIntvl; // also report updates with no change after this time
+      }
     }
     ++sbpP; // next
   }
@@ -461,8 +469,9 @@ bool SensorBehaviour::pushSensor(bool aAlways)
       // - changesOnlyInterval has been exceeded
       doPush =
         changed || // when changed
-        now>lastPush+changesOnlyInterval || // when interval for reporting anyway has passed
-        (aliveSignInterval>0 && now>lastUpdate+aliveSignInterval); // and in case sensor declares a heartbeat interval
+        (maxPushInterval!=Never && now>lastPush+maxPushInterval) || // when interval for max push interval has passed (similar, but not quite the same as changesOnlyInterval)
+        now>lastPush+changesOnlyInterval || // or when interval for not reporting unchanged values has passed
+        (aliveSignInterval!=Never && now>lastUpdate+aliveSignInterval); // or in case sensor declares a heartbeat interval
     }
     else if (profileP) {
       // Minimal push interval is NOT over, check extra trigger conditions
@@ -497,9 +506,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
     if (!doPush && changed) {
       // we have a pending change, but rules don't allow to push now. Make sure final state gets pushed later
       BLOG(LOG_INFO, "- sensor changes too quickly, cannot push update now, but final state will be pushed after minPushInterval");
-      if (!updateTicket) {
-        updateTicket.executeOnceAt(boost::bind(&SensorBehaviour::reportFinalValue, this), lastPush+minPushInterval);
-      }
+      updateTicket.executeOnceAt(boost::bind(&SensorBehaviour::reportFinalValue, this), lastPush+minPushInterval);
     }
   }
   if (doPush) {
@@ -507,7 +514,10 @@ bool SensorBehaviour::pushSensor(bool aAlways)
     if (pushBehaviourState()) {
       lastPush = now;
       lastPushedValue = currentValue;
-      updateTicket.cancel(); // pushed now, no need to push later
+      if (hasDefinedState() && maxPushInterval>0) {
+        // schedule re-push of defined value
+        updateTicket.executeOnce(boost::bind(&SensorBehaviour::pushSensor, this, true), maxPushInterval);
+      }
       return true;
     }
     else if (device.isPublicDS()) {
@@ -521,10 +531,10 @@ bool SensorBehaviour::pushSensor(bool aAlways)
 void SensorBehaviour::reportFinalValue()
 {
   // push the current value (after awaiting minPushInterval)
-  updateTicket.cancel();
   if (pushBehaviourState()) {
     BLOG(LOG_INFO, "Sensor[%zu] %s '%s' now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentValue, getSensorUnitText().c_str());
     lastPush = MainLoop::currentMainLoop().now();
+    lastPushedValue = currentValue;
   }
 }
 
@@ -535,6 +545,7 @@ void SensorBehaviour::invalidateSensorValue(bool aPush)
     // currently valid -> invalidate
     lastUpdate = Never;
     currentValue = 0;
+    updateTicket.cancel();
     BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' reports value no longer available", index, behaviourId.c_str(), getHardwareName().c_str());
     if (aPush) {
       // push invalidation (primitive clients not capable of NULL will at least see value==0)
@@ -560,7 +571,13 @@ bool SensorBehaviour::hasDefinedState()
 }
 
 
-
+void SensorBehaviour::revalidateState()
+{
+  if (hasDefinedState()) {
+    // re-arm invalidator
+    armInvalidator();
+  }
+}
 
 
 // MARK: ===== value source implementation
@@ -927,6 +944,7 @@ enum {
   resolution_key,
   updateInterval_key,
   aliveSignInterval_key,
+  maxPushInterval_key,
   #if ENABLE_RRDB
   rrdbFile_key,
   #endif
@@ -947,6 +965,7 @@ const PropertyDescriptorPtr SensorBehaviour::getDescDescriptorByIndex(int aPropI
     { "resolution", apivalue_double, resolution_key+descriptions_key_offset, OKEY(sensor_key) },
     { "updateInterval", apivalue_double, updateInterval_key+descriptions_key_offset, OKEY(sensor_key) },
     { "aliveSignInterval", apivalue_double, aliveSignInterval_key+descriptions_key_offset, OKEY(sensor_key) },
+    { "maxPushInterval", apivalue_double, maxPushInterval_key+descriptions_key_offset, OKEY(sensor_key) },
     #if ENABLE_RRDB
     { "x-p44-rrdFile", apivalue_string, rrdbFile_key+descriptions_key_offset, OKEY(sensor_key) },
     #endif
@@ -1046,6 +1065,9 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case aliveSignInterval_key+descriptions_key_offset:
           aPropValue->setDoubleValue((double)aliveSignInterval/Second);
+          return true;
+        case maxPushInterval_key+descriptions_key_offset:
+          aPropValue->setDoubleValue((double)maxPushInterval/Second);
           return true;
         #if ENABLE_RRDB
         case rrdbFile_key+descriptions_key_offset:

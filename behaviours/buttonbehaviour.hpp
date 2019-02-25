@@ -77,6 +77,7 @@ namespace p44 {
     VdcButtonActionMode buttonActionMode; ///< if set, button clicks directly issue action
     uint8_t buttonActionId; ///< action Id (aka scene number) to trigger when button is clicked
     ButtonStateMachineMode stateMachineMode; ///< state machine to use
+    MLMicroSeconds longFunctionDelay; ///< delay to be used to differentiate "long" press
 
     /// @}
 
@@ -129,6 +130,9 @@ namespace p44 {
 
     /// set state machine mode
     void setStateMachineMode(ButtonStateMachineMode aStateMachineMode) { stateMachineMode = aStateMachineMode; }
+
+    /// set long function delay (how long button must be held to trigger "dimming" (press-and-hold) type operation
+    void setLongFunctionDelay(MLMicroSeconds aLongFunctionDelay) { longFunctionDelay = aLongFunctionDelay; }
 
 
     /// @name interface towards actual device hardware (or simulation)

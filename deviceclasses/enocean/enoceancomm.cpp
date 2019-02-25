@@ -1325,7 +1325,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
         return Esp3PacketPtr(); // invalid CMAC
       }
       // calc CMAC
-      uint32_t cmac_calc = calcCMAC(privateKey, subKey1, subKey2, rollingCounter, rlcsz, macsz, org==rorg_SEC ? rorg_SEC : 0, d, n);
+      uint32_t cmac_calc = calcCMAC(privateKey, subKey1, subKey2, rollingCounter, rlcsz, macsz, org, d, n);
       if (cmac_calc==cmac_sent) {
         // CMAC matches
         break;

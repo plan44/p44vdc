@@ -84,8 +84,8 @@ void Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 #if SELFTESTING_ENABLED
 void Vdc::selfTest(StatusCB aCompletedCB)
 {
-  // by default, assume everything ok
-  aCompletedCB(ErrorPtr());
+  // by default, signal "no hardware tested"
+  aCompletedCB(Error::err<VdcError>(VdcError::NoHWTested, "No hardware tested"));
 }
 #endif
 
@@ -714,6 +714,7 @@ ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, Api
       mode |= rescanmode_normal;
     if (clear) mode |= rescanmode_clearsettings;
     if (reenumerate) mode |= rescanmode_reenumerate;
+    mode |= rescanmode_force; // when explicitly triggered via method, even try scanning when there is a global vdc error present
     collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), mode);
   }
   else if (aMethod=="pair") {
@@ -796,8 +797,8 @@ void Vdc::pairingTimeout(VdcApiRequestPtr aRequest)
 
 void Vdc::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
-  // prevent collecting from vdc which has global error
-  if (!Error::isOK(vdcErr)) {
+  // prevent collecting from vdc which has global error (except if rescanmode_force is set)
+  if ((aRescanFlags&rescanmode_force)==0 && !Error::isOK(vdcErr)) {
     if (aCompletedCB) aCompletedCB(vdcErr);
     return;
   }
@@ -821,6 +822,9 @@ void Vdc::collectedDevices(StatusCB aCompletedCB, ErrorPtr aError)
 {
   // call back
   if (aCompletedCB) aCompletedCB(aError);
+  // store as global error
+  setVdcError(aError);
+  // done
   collecting = false;
   // now schedule periodic recollect
   schedulePeriodicRecollecting();
@@ -1429,13 +1433,23 @@ string Vdc::description()
 }
 
 
-string Vdc::getStatusText()
+int Vdc::opStateLevel()
+{
+  return Error::isOK(vdcErr) ? (collecting ? 50 : 100) : 0;
+}
+
+
+string Vdc::getOpStateText()
 {
   if (!Error::isOK(vdcErr)) {
-    return "Error";
+    return string_format("Error: %s", vdcErr->description().c_str());
   }
-  return inherited::getStatusText();
+  else if (collecting) {
+    return "Scanning...";
+  }
+  return inherited::getOpStateText();
 }
+
 
 
 // MARK: ===== OptimizerEntry

@@ -111,6 +111,7 @@ class SelfTestRunner
   IndicatorOutputPtr greenLED;
   MLTicket errorReportTicket;
   ErrorPtr globalError;
+  int realTests;
 public:
   static void initialize(VdcHost &aVdcHost, StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED)
   {
@@ -123,53 +124,72 @@ private:
     vdcHost(aVdcHost),
     button(aButton),
     redLED(aRedLED),
-    greenLED(aGreenLED)
+    greenLED(aGreenLED),
+    realTests(0)
   {
     // start testing
     nextVdc = vdcHost.vdcs.begin();
-    testNextContainer();
+    testNextVdc();
   }
 
 
-  void testNextContainer()
+  void testNextVdc()
   {
     if (nextVdc!=vdcHost.vdcs.end()) {
       // ok, test next
       // - start green/yellow blinking = test in progress
       greenLED->steadyOn();
       redLED->blinkFor(Infinite, 600*MilliSecond, 50);
-      // - run the test
-      LOG(LOG_WARNING, "Starting Test of %s (Tag=%d, %s)", nextVdc->second->vdcClassIdentifier(), nextVdc->second->getTag(), nextVdc->second->shortDesc().c_str());
-      nextVdc->second->selfTest(boost::bind(&SelfTestRunner::containerTested, this, _1));
+      // - check for init errors
+      ErrorPtr vdcErr = nextVdc->second->getVdcStatus();
+      if (Error::isOK(vdcErr)) {
+        // - run the test
+        LOG(LOG_WARNING, "Starting Test of %s (Tag=%d, %s)", nextVdc->second->vdcClassIdentifier(), nextVdc->second->getTag(), nextVdc->second->shortDesc().c_str());
+        nextVdc->second->selfTest(boost::bind(&SelfTestRunner::vdcTested, this, _1));
+      }
+      else {
+        // - vdc is already in error -> can't run the test, report the initialisation error (vdc status)
+        vdcTested(vdcErr);
+      }
     }
-    else
+    else {
+      if (realTests==0) {
+        // no real tests performed
+        globalError = Error::err<VdcError>(VdcError::NoHWTested, "self test had nothing to actually test (no HW tests performed)");
+      }
       testCompleted(); // done
+    }
   }
 
 
-  void containerTested(ErrorPtr aError)
+  void vdcTested(ErrorPtr aError)
   {
     if (!Error::isOK(aError)) {
-      // test failed
-      LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", nextVdc->second->vdcClassIdentifier(), aError->description().c_str());
-      // remember
-      globalError = aError;
-      // morse out tag number of vDC failing self test until button is pressed
-      greenLED->steadyOff();
-      int numBlinks = nextVdc->second->getTag();
-      redLED->blinkFor(300*MilliSecond*numBlinks, 300*MilliSecond, 50);
-      // call myself again later
-      errorReportTicket.executeOnce(boost::bind(&SelfTestRunner::containerTested, this, aError), 300*MilliSecond*numBlinks+2*Second);
-      // also install button responder
-      button->setButtonHandler(boost::bind(&SelfTestRunner::errorAcknowledged, this), false); // report only release
+      if (!aError->isError("Vdc", VdcError::NoHWTested)) {
+        // test failed
+        LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", nextVdc->second->vdcClassIdentifier(), aError->description().c_str());
+        // remember
+        globalError = aError;
+        // morse out tag number of vDC failing self test until button is pressed
+        greenLED->steadyOff();
+        int numBlinks = nextVdc->second->getTag();
+        redLED->blinkFor(300*MilliSecond*numBlinks, 300*MilliSecond, 50);
+        // call myself again later
+        errorReportTicket.executeOnce(boost::bind(&SelfTestRunner::vdcTested, this, aError), 300*MilliSecond*numBlinks+2*Second);
+        // also install button responder
+        button->setButtonHandler(boost::bind(&SelfTestRunner::errorAcknowledged, this), false); // report only release
+        return; // done for now
+      }
     }
     else {
-      // test was ok
-      LOG(LOG_ERR, "------ Test of '%s' OK", nextVdc->second->vdcClassIdentifier());
-      // check next
-      ++nextVdc;
-      testNextContainer();
+      // real test ok
+      realTests++;
     }
+    // test was ok
+    LOG(LOG_ERR, "------ Test of '%s' OK", nextVdc->second->vdcClassIdentifier());
+    // check next
+    ++nextVdc;
+    testNextVdc();
   }
 
 
@@ -181,7 +201,7 @@ private:
     errorReportTicket.cancel();
     // test next (if any)
     ++nextVdc;
-    testNextContainer();
+    testNextVdc();
   }
 
 
@@ -193,7 +213,7 @@ private:
       greenLED->blinkFor(Infinite, 500, 85); // slow green blinking = good
     }
     else  {
-      LOG(LOG_ERR, "Self test has FAILED");
+      LOG(LOG_ERR, "Self test has FAILED: %s", globalError->description().c_str());
       greenLED->steadyOff();
       redLED->blinkFor(Infinite, 250, 60); // faster red blinking = not good
     }

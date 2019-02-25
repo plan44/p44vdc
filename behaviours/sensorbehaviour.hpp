@@ -162,6 +162,7 @@ namespace p44 {
     MLMicroSeconds updateInterval; ///< approximate time resolution of the sensor (how fast the sensor can track values)
     MLMicroSeconds aliveSignInterval; ///< how often the sensor reports a value minimally (if it does not report for longer than that, it can be considered out of order). Can be 0 for sensors from which no regular update can be expected at all
     const SensorBehaviourProfile *profileP; ///< the sensor behaviour profile, can be NULL for simple forwarding without special processing
+    MLMicroSeconds maxPushInterval; ///< max push interval (after that, value gets re-pushed even if no sensor update has occurred)
     /// @}
 
     /// @name persistent settings
@@ -295,6 +296,9 @@ namespace p44 {
     /// check for defined state
     /// @return true if behaviour has a defined (non-NULL) state
     virtual bool hasDefinedState() P44_OVERRIDE;
+
+    /// re-validate current sensor value (i.e. prevent it from expiring and getting invalid)
+    virtual void revalidateState() P44_OVERRIDE;
 
     /// Get short text for a "first glance" status of the behaviour
     /// @return string, really short, intended to be shown as a narrow column in a list

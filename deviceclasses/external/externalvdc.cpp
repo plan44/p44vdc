@@ -339,6 +339,13 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
         syncedCB = NULL;
         return ErrorPtr(); // no answer
       }
+      else if (aMessageType=="active") {
+        JsonObjectPtr o;
+        if (aMessage->get("value", o)) {
+          updatePresenceState(o->boolValue());
+        }
+        return ErrorPtr(); // no answer
+      }
       else if (aMessageType=="button") {
         err = processInputJson('B', aMessage);
       }
@@ -462,6 +469,13 @@ ErrorPtr ExternalDevice::processSimpleMessage(string aMessageType, string aValue
     // device confirms having reported all channel states (in response to "SYNC" command)
     if (syncedCB) syncedCB();
     syncedCB = NULL;
+    return ErrorPtr(); // no answer
+  }
+  else if (aMessageType=="ACTIVE") {
+    int active = 0;
+    if (sscanf(aValue.c_str(), "%d", &active)==1) {
+      updatePresenceState(active);
+    }
     return ErrorPtr(); // no answer
   }
   else if (aMessageType.size()>0) {

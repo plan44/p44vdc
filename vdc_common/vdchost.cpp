@@ -374,7 +374,7 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc)
 {
-  // initialize all vDCs, even when some
+  // initialize all vDCs, even when some have errors
   if (aNextVdc!=vdcs.end()) {
     aNextVdc->second->initialize(boost::bind(&VdcHost::vdcInitialized, this, aCompletedCB, aFactoryReset, aNextVdc, _1), aFactoryReset);
     return;

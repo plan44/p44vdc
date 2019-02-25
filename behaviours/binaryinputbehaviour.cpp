@@ -23,17 +23,20 @@
 
 using namespace p44;
 
+#define DSS_INPUT_MAX_PUSH_INTERVAL (55*Minute) // all inputs that have a aliveSignInterval!=Never must get pushed at least this often (otherwise dSS flags sensor red)
+
 BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
   // persistent settings
   binInputGroup(group_black_variable),
   configuredInputType(binInpType_none),
   minPushInterval(2*Second), // don't push more often than every 2 seconds
+  maxPushInterval(0),
   changesOnlyInterval(15*Minute), // report unchanged state updates max once every 15 minutes
   // state
   lastUpdate(Never),
   lastPush(Never),
-  currentState(false)
+  currentState(0)
 {
   // set dummy default hardware default configuration (no known alive sign interval!)
   setHardwareInputConfig(binInpType_none, usage_undefined, true, 15*Second, 0);
@@ -83,6 +86,7 @@ void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, 
   reportsChanges = aReportsChanges;
   updateInterval = aUpdateInterval;
   aliveSignInterval = aAliveSignInterval;
+  maxPushInterval = aliveSignInterval==Never ? Never : DSS_INPUT_MAX_PUSH_INTERVAL; // sensors without any update guarantee do not need to fake regular pushes
   armInvalidator();
   // set default input mode to hardware type
   configuredInputType = hardwareInputType;
@@ -132,33 +136,44 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
   if (changedState || now>lastPush+changesOnlyInterval) {
     // changed state or no update sent for more than changesOnlyInterval
     currentState = aNewState;
-    if (lastPush==Never || now>lastPush+minPushInterval) {
-      // push the new value right now
-      if (pushBehaviourState()) {
-        lastPush = now;
-        debounceTicket.cancel(); // pushed now, no need to push later
-      }
-      else if (device.isPublicDS()) {
-        BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
-      }
-    }
-    else if (changedState) {
-      // cannot be pushed now, but final state of the input must be reported later
-      BLOG(LOG_INFO, "- input changes too quickly, push of final state will be pushed after minPushInterval");
-      if (!debounceTicket) {
-        debounceTicket.executeOnceAt(boost::bind(&BinaryInputBehaviour::reportFinalState, this), lastPush+minPushInterval);
-      }
-    }
+    pushInput(changedState);
   }
   // notify listeners
   notifyListeners(changedState ? valueevent_changed : valueevent_confirmed);
 }
 
 
+bool BinaryInputBehaviour::pushInput(bool aChanged)
+{
+  MLMicroSeconds now = MainLoop::now();
+  if (lastPush==Never || now>lastPush+minPushInterval) {
+    // push the new value right now
+    if (pushBehaviourState()) {
+      lastPush = now;
+      if (hasDefinedState() && maxPushInterval!=Never) {
+        // schedule re-push of defined state
+        updateTicket.executeOnce(boost::bind(&BinaryInputBehaviour::pushInput, this, false), maxPushInterval);
+      }
+      return true;
+    }
+    else if (device.isPublicDS()) {
+      BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
+    }
+  }
+  else if (aChanged) {
+    // cannot be pushed now, but final state of the input must be reported later
+    BLOG(LOG_INFO, "- input changes too quickly, push of final state will be pushed after minPushInterval");
+    updateTicket.executeOnceAt(boost::bind(&BinaryInputBehaviour::reportFinalState, this), lastPush+minPushInterval);
+  }
+  return false;
+}
+
+
+
 void BinaryInputBehaviour::reportFinalState()
 {
-  // push the current value (after awaiting minPushInterval)
-  debounceTicket.cancel();
+  // push the current value (after awaiting minPushInterval or after maxPushInterval has passed)
+  updateTicket.cancel();
   if (pushBehaviourState()) {
     BLOG(LOG_INFO, "BinaryInput[%zu] %s '%s' now pushes current state (%d) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentState);
     lastPush = MainLoop::currentMainLoop().now();
@@ -171,7 +186,8 @@ void BinaryInputBehaviour::invalidateInputState()
   if (hasDefinedState()) {
     // currently valid -> invalidate
     lastUpdate = Never;
-    currentState = false;
+    currentState = 0;
+    updateTicket.cancel();
     // push invalidation (primitive clients not capable of NULL will at least see state==false)
     MLMicroSeconds now = MainLoop::now();
     // push the invalid state
@@ -187,6 +203,15 @@ void BinaryInputBehaviour::invalidateInputState()
 bool BinaryInputBehaviour::hasDefinedState()
 {
   return lastUpdate!=Never;
+}
+
+
+void BinaryInputBehaviour::revalidateState()
+{
+  if (hasDefinedState()) {
+    // re-arm invalidator
+    armInvalidator();
+  }
 }
 
 
@@ -316,6 +341,7 @@ enum {
   reportsChanges_key,
   updateInterval_key,
   aliveSignInterval_key,
+  maxPushInterval_key,
   numDescProperties
 };
 
@@ -329,6 +355,7 @@ const PropertyDescriptorPtr BinaryInputBehaviour::getDescDescriptorByIndex(int a
     { "inputType", apivalue_bool, reportsChanges_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "updateInterval", apivalue_double, updateInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "aliveSignInterval", apivalue_double, aliveSignInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
+    { "maxPushInterval", apivalue_double, maxPushInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -401,6 +428,9 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
           return true;
         case aliveSignInterval_key+descriptions_key_offset:
           aPropValue->setDoubleValue((double)aliveSignInterval/Second);
+          return true;
+        case maxPushInterval_key+descriptions_key_offset:
+          aPropValue->setDoubleValue((double)maxPushInterval/Second);
           return true;
         // Settings properties
         case group_key+settings_key_offset:

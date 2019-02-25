@@ -42,6 +42,7 @@ using namespace p44;
 
 
 DaliComm::DaliComm(MainLoop &aMainLoop) :
+  multiMaster(false),
 	inherited(aMainLoop),
   runningProcedures(0),
   dali2ScanLock(false),
@@ -264,7 +265,7 @@ static ErrorPtr checkBridgeResponse(uint8_t aResp1, uint8_t aResp2, ErrorPtr aEr
         case ACK_INVALIDCMD:
           return ErrorPtr(new DaliCommError(DaliCommError::BridgeCmd));
         case ACK_OVERLOAD:
-          return ErrorPtr(new DaliCommError(DaliCommError::BusOverload));
+          return Error::err<DaliCommError>(DaliCommError::BusOverload, "DALI bus overload or short-circuit -> power down and check installation!");
       }
       break;
     case RESP_CODE_DATA_RETRIED:
@@ -343,6 +344,8 @@ ssize_t DaliComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
 
 // reset the bridge
 
+#define DALI_SINGLE_MASTER_PING_INTERVAL (10*Minute) // Single master controllers must issue a PING command in this interval
+
 void DaliComm::reset(DaliCommandStatusCB aStatusCB)
 {
   // this first reset command should also consume extra bytes left over from previous use
@@ -351,18 +354,25 @@ void DaliComm::reset(DaliCommandStatusCB aStatusCB)
   retriedWrites = 0;
   retriedReads = 0;
   expectedBridgeResponses = 0;
-  sendBridgeCommand(CMD_CODE_RESET, 0, 0, boost::bind(&DaliComm::resetIssued, this, aStatusCB, _1, _2, _3), 100*MilliSecond);
+  sendBridgeCommand(CMD_CODE_RESET, 0, 0, boost::bind(&DaliComm::resetIssued, this, 0, aStatusCB, _1, _2, _3), 100*MilliSecond);
 }
 
 
+#define MAX_RESET_RETRIES 20
 
-void DaliComm::resetIssued(DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)
+void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)
 {
   // repeat resets until we get a correct answer
   if (!Error::isOK(aError) || aResp1!=RESP_CODE_ACK || aResp2!=ACK_OK) {
     LOG(LOG_WARNING, "DALI bridge: Incorrect answer (%02X %02X) or error (%s) from reset command -> repeating", aResp1, aResp2, aError ? aError->description().c_str() : "none");
+    if (aCount>=MAX_RESET_RETRIES) {
+      if (Error::isOK(aError)) aError = Error::err<DaliCommError>(DaliCommError::BadData, "Bridge reset failed");
+      if (aStatusCB) aStatusCB(aError, false);
+      return;
+    }
     // issue another reset
-    reset(aStatusCB);
+    expectedBridgeResponses = 0;
+    sendBridgeCommand(CMD_CODE_RESET, 0, 0, boost::bind(&DaliComm::resetIssued, this, aCount+1, aStatusCB, _1, _2, _3), 500*MilliSecond);
     return;
   }
   // send next reset command with a longer delay, to give bridge time to process possibly buffered commands
@@ -376,7 +386,20 @@ void DaliComm::resetIssued(DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_
   sendBridgeCommand(CMD_CODE_EDGEADJ, sendEdgeAdj, samplePointAdj, NULL);
   // terminate any special commands on the DALI bus
   daliSend(DALICMD_TERMINATE, 0, aStatusCB);
+  // re-start PING if single master
+  pingTicket.cancel();
+  if (!multiMaster) {
+    pingTicket.executeOnce(boost::bind(&DaliComm::singleMasterPing, this, _1), DALI_SINGLE_MASTER_PING_INTERVAL);
+  }
 }
+
+
+void DaliComm::singleMasterPing(MLTimer &aMLTimer)
+{
+  if (!isBusy()) daliSend(DALICMD_PING, 0, NULL);
+  MainLoop::currentMainLoop().retriggerTimer(aMLTimer, DALI_SINGLE_MASTER_PING_INTERVAL);
+}
+
 
 
 
@@ -1714,7 +1737,7 @@ private:
         if (bankChecksum!=0x00) {
           // - check retries
           if (retries++<DALI_MAX_BANKREAD_RETRIES) {
-            // retry reading bank 0 info
+            // retry reading bank 1 info
             LOG(LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank1 info from shortAddress %d -> retrying", bankChecksum, retries, busAddress);
             readBank1();
             return;

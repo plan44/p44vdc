@@ -57,6 +57,7 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   currentTransitionTime(Infinite), // invalid
   currentDimPerMS(0), // none
   currentFadeRate(0xFF), currentFadeTime(0xFF), // unlikely values
+  currentDimMode(dimmode_stop),
   supportsLED(false),
   dt6LinearDim(false),
   supportsDT8(false),
@@ -464,6 +465,7 @@ void DaliBusDevice::updateParams(StatusCB aCompletedCB)
     if (aCompletedCB) aCompletedCB(ErrorPtr());
     return;
   }
+  dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   // query actual arc power level
   daliVdc.daliComm->daliSendQuery(
     addressForQuery(),
@@ -662,6 +664,7 @@ void DaliBusDevice::updateStatus(StatusCB aCompletedCB)
     if (aCompletedCB) aCompletedCB(ErrorPtr());
     return;
   }
+  dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   // query the device for status
   daliVdc.daliComm->daliSendQuery(
     addressForQuery(),
@@ -680,6 +683,10 @@ void DaliBusDevice::queryStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout
     lampFailure = aResponse & 0x02;
   }
   else {
+    if (!Error::isOK(aError)) {
+      // errors are always bus level: set global error status
+      daliVdc.setVdcError(aError);
+    }
     isPresent = false; // no correct status -> not present
   }
   // done updating status
@@ -714,6 +721,7 @@ void DaliBusDevice::setTransitionTime(MLMicroSeconds aTransitionTime)
 void DaliBusDevice::setBrightness(Brightness aBrightness)
 {
   if (isDummy) return;
+  dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (currentBrightness!=aBrightness) {
     currentBrightness = aBrightness;
     uint8_t power = brightnessToArcpower(aBrightness);
@@ -726,6 +734,7 @@ void DaliBusDevice::setBrightness(Brightness aBrightness)
 void DaliBusDevice::setDefaultBrightness(Brightness aBrightness)
 {
   if (isDummy) return;
+  dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (aBrightness<0) aBrightness = currentBrightness; // use current brightness
   uint8_t power = brightnessToArcpower(aBrightness);
   LOG(LOG_INFO, "Dali dimmer at shortaddr=%d: setting default/failure brightness = %0.2f, arc power = %d", (int)deviceInfo->shortAddress, aBrightness, (int)power);
@@ -738,6 +747,7 @@ void DaliBusDevice::setDefaultBrightness(Brightness aBrightness)
 bool DaliBusDevice::setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY)
 {
   bool changed = false;
+  dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (supportsDT8) {
     if (currentColorMode!=aMode) {
       changed = true; // change in mode always means change in parameter
@@ -774,6 +784,7 @@ bool DaliBusDevice::setColorParams(ColorLightMode aMode, double aCieXorCT, doubl
 bool DaliBusDevice::setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t aW, uint8_t aA)
 {
   bool changed = false;
+  dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (supportsDT8) {
     if (currentColorMode!=colorLightModeRGBWA) {
       changed = true; // change in mode always means change in parameter
@@ -805,6 +816,7 @@ bool DaliBusDevice::setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t a
 
 void DaliBusDevice::activateColorParams()
 {
+  dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (supportsDT8) {
     daliVdc.daliComm->daliSendCommand(deviceInfo->shortAddress, DALICMD_DT8_ACTIVATE);
   }
@@ -878,6 +890,7 @@ void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
 {
   if (isDummy) return;
   dimRepeaterTicket.cancel(); // stop any previous dimming activity
+  currentDimMode = aDimMode;
   // Use DALI UP/DOWN dimming commands
   if (aDimMode==dimmode_stop) {
     // stop dimming - send MASK
@@ -892,12 +905,14 @@ void DaliBusDevice::dim(VdcDimMode aDimMode, double aDimPerMS)
 
 void DaliBusDevice::dimStart(DaliAddress aDaliAddress, DaliCommand aCommand)
 {
+  if (currentDimMode==dimmode_stop) return; // do not execute delayed starts in case stop came before start preparation was complete
   dimRepeaterTicket.executeOnce(boost::bind(&DaliBusDevice::dimRepeater, this, aDaliAddress, aCommand, _1));
 }
 
 
 void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, DaliCommand aCommand, MLTimer &aTimer)
 {
+  if (currentDimMode==dimmode_stop) return; // safety: do not continue dimming if stopped
   daliVdc.daliComm->daliSendCommand(aDaliAddress, aCommand);
   // schedule next command
   // - DALI UP and DOWN run 200mS, but can be repeated earlier
