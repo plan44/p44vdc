@@ -348,8 +348,9 @@ void DsAddressable::pingResultHandler(bool aIsPresent)
 
 void DsAddressable::updatePresenceState(bool aPresent)
 {
+  bool first = lastPresenceUpdate==Never;
   lastPresenceUpdate = MainLoop::now();
-  if (aPresent!=present || lastPresenceUpdate==Never) {
+  if (aPresent!=present || first) {
     // change in presence
     present = aPresent;
     ALOG(LOG_NOTICE, "changes to %s", aPresent ? "PRESENT" : "OFFLINE");
