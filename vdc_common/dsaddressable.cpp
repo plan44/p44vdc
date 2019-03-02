@@ -449,7 +449,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
 }
 
 
-#define MIN_PRESENCE_SAMPLE_INTERVAL (15*Second)
+#define MIN_PRESENCE_SAMPLE_INTERVAL (120*Second)
 
 void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
 {
