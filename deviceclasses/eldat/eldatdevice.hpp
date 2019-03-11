@@ -47,6 +47,14 @@ namespace p44 {
     eldat_motiondetector, // A=motion detected, B=motion no longer detected
     eldat_ABlight, // relay that goes on on A message, off on B message
     eldat_ABrelay, // relay that goes on on A message, off on B message
+    eldat_windowcontact_onoff, // window contact that sends A/ON message when opened, B/OFF message when closed
+    eldat_windowcontact_offon, // window contact that sends B/OFF message when opened, A/ON message when closed
+    eldat_windowcontact_onoff_s, // window contact that sends A/ON message when opened, B/OFF message when closed, with status every 24h
+    eldat_windowcontact_offon_s, // window contact that sends B/OFF message when opened, A/ON message when closed, with status every 24h
+    eldat_windowhandle_onoff, // window handle that sends A/ON message when opened, B/OFF message when closed
+    eldat_windowhandle_offon, // window handle that sends B/OFF message when opened, A/ON message when closed
+    eldat_windowhandle_onoff_s, // window handle that sends A/ON message when opened, B/OFF message when closed, with status every 24h
+    eldat_windowhandle_offon_s, // window handle that sends B/OFF message when opened, A/ON message when closed, with status every 24h
     eldat_unknown
   } EldatDeviceType;
 
@@ -304,6 +312,50 @@ namespace p44 {
     virtual void handleFunction(EldatFunction aFunction) P44_OVERRIDE;
     
   };
+
+
+  class EldatWindowContact : public EldatDevice
+  {
+    typedef EldatDevice inherited;
+
+  public:
+
+    /// constructor, create device in container
+    /// @param aVdcP the Eldat vDC
+    /// @param aOffOnType if set, this is a OFF/ON type
+    /// @param aWithStatus if set, this device is expected to send status at least once every 24h
+    EldatWindowContact(EldatVdc *aVdcP, bool aOffOnType, bool aWithStatus);
+
+    /// @return human readable model name/short description
+    virtual string modelName() P44_OVERRIDE;
+
+    /// device specific function handling
+    virtual void handleFunction(EldatFunction aFunction) P44_OVERRIDE;
+
+  };
+
+
+
+  class EldatWindowHandle : public EldatDevice
+  {
+    typedef EldatDevice inherited;
+
+  public:
+
+    /// constructor, create device in container
+    /// @param aVdcP the Eldat vDC
+    /// @param aOffOnType if set, this is a OFF/ON type
+    /// @param aWithStatus if set, this device is expected to send status at least once every 24h
+    EldatWindowHandle(EldatVdc *aVdcP, bool aOffOnType, bool aWithStatus);
+
+    /// @return human readable model name/short description
+    virtual string modelName() P44_OVERRIDE;
+
+    /// device specific function handling
+    virtual void handleFunction(EldatFunction aFunction) P44_OVERRIDE;
+
+  };
+
 
 
   class EldatRemoteControlDevice : public EldatDevice
