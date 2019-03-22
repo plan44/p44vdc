@@ -121,6 +121,11 @@ static const SceneKindDescriptor roomScenes[] = {
 
 
 static const SceneKindDescriptor globalScenes[] = {
+  { ROOM_OFF, scene_global|scene_preset|scene_off|scene_extended , "all off"},
+  { ROOM_ON, scene_global|scene_preset|scene_extended, "global preset 1" },
+  { PRESET_2, scene_global|scene_preset|scene_extended, "global preset 2" },
+  { PRESET_3, scene_global|scene_preset|scene_extended, "global preset 3" },
+  { PRESET_4, scene_global|scene_preset|scene_extended, "global preset 4" },
   { AUTO_STANDBY, scene_global, "auto-standby" },
   { STANDBY, scene_global|scene_preset, "standby" },
   { DEEP_OFF, scene_global|scene_preset, "deep off" },
@@ -200,17 +205,23 @@ SceneIdsVector ZoneDescriptor::getZoneScenes(DsGroup aForGroup, SceneKind aRequi
   }
   aForbiddenKinds &= ~aRequiredKinds; // required ones must be allowed
   while (sceneKindP && sceneKindP->no!=INVALID_SCENE_NO) {
-    if (
-      (sceneKindP->kind & aRequiredKinds)==aRequiredKinds &&
-      (sceneKindP->kind & aForbiddenKinds)==0
-    ) {
-      // create identifier for it
-      SceneIdentifier si(*sceneKindP, zoneID, aForGroup);
-      // look up in user-defined scenes
-      SceneDescriptorPtr userscene = LocalController::sharedLocalController()->localScenes.getScene(si);
-      if (userscene) {
-        si.name = userscene->getSceneName();
+    // get identifier
+    SceneIdentifier si(*sceneKindP, zoneID, aForGroup);
+    SceneKind k = sceneKindP->kind;
+    // look up in user-defined scenes
+    SceneDescriptorPtr userscene = LocalController::sharedLocalController()->localScenes.getScene(si);
+    SceneKind forbiddenKinds = aForbiddenKinds;
+    if (userscene) {
+      si.name = userscene->getSceneName();
+      if (!si.name.empty()) {
+        k |= scene_usernamed;
+        forbiddenKinds &= ~(scene_extended|scene_area); // usernamed overrides extended/area exclusion
       }
+    }
+    if (
+      ((k & aRequiredKinds)==aRequiredKinds) &&
+      ((k & forbiddenKinds)==0)
+    ) {
       zoneScenes.push_back(si);
     }
     sceneKindP++;

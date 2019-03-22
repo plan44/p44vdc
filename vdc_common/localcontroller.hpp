@@ -58,6 +58,8 @@ namespace p44 {
     scene_preset = 0x10, ///< preset
     scene_off = 0x20, ///< off (together with scene_preset)
     scene_extended = 0x40, ///< extended
+    // extra flag for excluding user-named scenes from non-extended list
+    scene_usernamed = 0x80, ///< user-named scene, can be used with getZoneScenes()
   };
   typedef uint8_t SceneKind;
 
