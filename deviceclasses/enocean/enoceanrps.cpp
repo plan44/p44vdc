@@ -49,12 +49,12 @@ static const ProfileVariantEntry RPSprofileVariants[] = {
   { 1, 0x00F602FF, 2, "dual rocker switch (as 2-way rockers)", DeviceConfigurations::buttonTwoWay }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
   { 1, 0x02F602FF, 2, "dual rocker switch (2-way, reversed)", DeviceConfigurations::buttonTwoWayReversed }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
   { 1, 0x01F602FF, 2, "dual rocker switch (up and down as separate buttons)", DeviceConfigurations::buttonSingle },
-  { 1, 0x00F60401, 0, "key card activated switch" },
-  { 1, 0x00F604C0, 0, "key card activated switch FKC/FKF" },
-  { 1, 0x00F605C0, 0, "Smoke detector FRW/GUARD" },
-  { 1, 0x00F60502, 0, "Smoke detector" },
-  { 1, 0x00F60500, 0, "Wind speed detector" },
-  { 1, 0x00F60501, 0, "Liquid Leakage detector" },
+  { 1, 0x00F60401, 0, "key card activated switch", NULL },
+  { 1, 0x00F604C0, 0, "key card activated switch FKC/FKF", NULL },
+  { 1, 0x00F605C0, 0, "Smoke detector FRW/GUARD", NULL },
+  { 1, 0x00F60502, 0, "Smoke detector", NULL },
+  { 1, 0x00F60500, 0, "Wind speed detector", NULL },
+  { 1, 0x00F60501, 0, "Liquid Leakage detector", NULL },
   // quad rocker RPS button alternatives
   { 2, 0x00F603FF, 2, "quad rocker switch (as 2-way rockers)", DeviceConfigurations::buttonTwoWay }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
   { 2, 0x02F603FF, 2, "quad rocker switch (2-way, reversed)", DeviceConfigurations::buttonTwoWayReversed }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)

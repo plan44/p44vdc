@@ -287,7 +287,7 @@ EnoceanDevicePtr EnoceanD201XXHandler::newDevice(
 string EnoceanD201XXHandler::shortDesc()
 {
   const D201Descriptor &d201desc = D201descriptors[EEP_TYPE(device.getEEProfile())];
-  return string_format("%d channel %s", d201desc.numChannels, d201desc.features & dimming ? "Dimmer" : "Switch");
+  return string_format("%d channel %s", d201desc.numChannels, d201desc.features & dimming ? "dimmer" : "switch");
 }
 
 
