@@ -1,4 +1,4 @@
-//
+  //
 //  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
@@ -28,6 +28,7 @@ using namespace p44;
 // MARK: ===== channel behaviour
 
 ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChannelId) :
+  inheritedParams(aOutput.device.getVdcHost().getDsParamStore()),
   output(aOutput),
   channelId(aChannelId),
   channelUpdatePending(false), // no output update pending
@@ -44,6 +45,13 @@ ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChann
 void ChannelBehaviour::setResolution(double aResolution)
 {
   resolution = aResolution;
+}
+
+
+
+string ChannelBehaviour::getId()
+{
+  return getApiId(3); // Note: use API ID 3 string
 }
 
 
@@ -189,7 +197,7 @@ double ChannelBehaviour::getTransitionalValue()
 
 // used at startup and before saving scenes to get the current value FROM the hardware
 // NOT to be used to change the hardware channel value!
-void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlwaysSync)
+void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlwaysSync, bool aVolatile)
 {
   if (!channelUpdatePending || aAlwaysSync) {
     if (cachedChannelValue!=aActualChannelValue || LOGENABLED(LOG_DEBUG)) {
@@ -201,11 +209,16 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     }
     // make sure new value is within bounds
     if (aActualChannelValue>getMax())
-      cachedChannelValue = getMax();
+      aActualChannelValue = getMax();
     else if (aActualChannelValue<getMin())
-      cachedChannelValue = getMin();
-    else
+      aActualChannelValue = getMin();
+    // apply
+    if (aVolatile) {
       cachedChannelValue = aActualChannelValue;
+    }
+    else {
+      setPVar(cachedChannelValue, aActualChannelValue);
+    }
     // reset transitions and pending updates
     previousChannelValue = cachedChannelValue;
     transitionProgress = 1; // not in transition
@@ -278,7 +291,7 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     previousChannelValue = channelLastSync!=Never ? getTransitionalValue() : aNewValue; // If there is no valid previous value, set current as previous.
     transitionProgress = 1; // consider done
     // save target parameters for next transition
-    cachedChannelValue = aNewValue;
+    setPVar(cachedChannelValue, aNewValue); // might need to be persisted
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
   }
@@ -312,7 +325,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     previousChannelValue = channelLastSync!=Never ? getTransitionalValue() : newValue; // If there is no valid previous value, set current as previous.
     transitionProgress = 1; // consider done
     // save target parameters for next transition
-    cachedChannelValue = newValue;
+    setPVar(cachedChannelValue, newValue); // might need to be persisted
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
   }
@@ -338,9 +351,95 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
 
 
 
+// MARK: ===== channel persistence
+
+
+const char *ChannelBehaviour::tableName()
+{
+  return "ChannelStates";
+}
+
+// data field definitions
+
+static const size_t numFields = 1;
+
+size_t ChannelBehaviour::numFieldDefs()
+{
+  return inheritedParams::numFieldDefs()+numFields;
+}
+
+
+const FieldDefinition *ChannelBehaviour::getFieldDef(size_t aIndex)
+{
+  static const FieldDefinition dataDefs[numFields] = {
+    { "channelValue", SQLITE_FLOAT }
+  };
+  if (aIndex<inheritedParams::numFieldDefs())
+    return inheritedParams::getFieldDef(aIndex);
+  aIndex -= inheritedParams::numFieldDefs();
+  if (aIndex<numFields)
+    return &dataDefs[aIndex];
+  return NULL;
+}
+
+
+/// load values from passed row
+void ChannelBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
+{
+  inheritedParams::loadFromRow(aRow, aIndex, NULL); // no common flags
+  // get the fields
+  cachedChannelValue = aRow->get<double>(aIndex++);
+  channelUpdatePending = true; // loading a persistent channel value always means it must be propagated to the hardware
+}
+
+
+// bind values to passed statement
+void ChannelBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
+{
+  inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  // bind the fields
+  aStatement.bind(aIndex++, cachedChannelValue);
+}
+
+
+
+string ChannelBehaviour::getDbKey()
+{
+  // Note - we do not key the channel persistence with output behaviour settings' ROWID,
+  //   as this often does not exist at all, but use the deviceID+channelID as key, so
+  //   channels can be persisted independently of
+  return string_format("%s_%s",output.device.getDsUid().getString().c_str(),getId().c_str());
+}
+
+
+ErrorPtr ChannelBehaviour::load()
+{
+  ErrorPtr err = loadFromStore(getDbKey().c_str());
+  if (!Error::isOK(err)) SALOG(output.device, LOG_ERR,"Error loading channel '%s'", getId().c_str());
+  return err;
+}
+
+
+ErrorPtr ChannelBehaviour::save()
+{
+  ErrorPtr err = saveToStore(getDbKey().c_str(), false); // only one record per dbkey (=per device+channelid)
+  if (!Error::isOK(err)) SALOG(output.device, LOG_ERR,"Error saving channel '%s'", getId().c_str());
+  return err;
+}
+
+
+ErrorPtr ChannelBehaviour::forget()
+{
+  return deleteFromStore();
+}
+
+
+
+
 // MARK: ===== channel property access
 
-// Note: this is a simplified single class property access mechanims. ChannelBehaviour is not meant to be derived.
+// Note: this is a simplified single class property access mechanims.
+//   ChannelBehaviour is not meant to have more properties in derived classes
 
 enum {
   name_key,

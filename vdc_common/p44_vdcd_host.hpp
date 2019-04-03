@@ -132,7 +132,7 @@ namespace p44 {
     int webUiPort; ///< port number of the web-UI (on the same host). 0 if no Web-UI present
     string webUiPath; ///< path to be used in the webuiURLString
 
-    P44VdcHost(bool aWithLocalController = false);
+    P44VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false);
 
     /// enable config API
     /// @param aServiceOrPort port number or service string

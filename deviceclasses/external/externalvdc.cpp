@@ -1074,8 +1074,8 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
       endContacts = o->boolValue();
     }
     sb->setDeviceParams(sk, endContacts, 0, 0, 0); // no restrictions for move times
-    sb->position->syncChannelValue(100); // assume fully up at beginning
-    sb->angle->syncChannelValue(100); // assume fully open at beginning
+    sb->position->syncChannelValue(100, false, true); // assume fully up at beginning
+    sb->angle->syncChannelValue(100, false, true); // assume fully open at beginning
     addBehaviour(sb);
   }
   else if (outputType=="basic") {

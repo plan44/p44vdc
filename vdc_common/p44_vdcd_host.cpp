@@ -231,8 +231,8 @@ private:
 // MARK: ===== P44VdcHost
 
 
-P44VdcHost::P44VdcHost(bool aWithLocalController) :
-  inherited(aWithLocalController),
+P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
+  inherited(aWithLocalController, aWithPersistentChannels),
   webUiPort(0)
 {
 }
@@ -305,6 +305,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   // - a JSON request must be either specified in the URL or in the POST data, not both
   // - if POST data ("data" member in the incoming request) is present, "uri_params" is ignored
   // - "uri" selects one of possibly multiple APIs
+  signalActivity(); // P44 JSON API calls are activity as well
   if (Error::isOK(aError)) {
     // not JSON level error, try to process
     LOG(LOG_DEBUG, "cfg -> vdcd (JSON) request received: %s", aJsonObject->c_strValue());
@@ -401,7 +402,6 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
     ApiValuePtr params = JsonApiValue::newValueFromJson(aRequest);
     P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm));
     if (Error::isOK(err)) {
-      // operation method
       if (isMethod) {
         // create request
         // check for old-style name/index and generate basic query (1 or 2 levels)
