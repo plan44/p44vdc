@@ -31,6 +31,8 @@
 
 using namespace p44;
 
+
+
 // MARK: ===== config API - P44JsonApiConnection
 
 
@@ -264,6 +266,11 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   if (configApiServer) {
     configApiServer->startServer(boost::bind(&P44VdcHost::configApiConnectionHandler, this, _1), 3);
   }
+  #if ENABLE_UBUS
+  if (ubusApiServer) {
+    ubusApiServer->startServer();
+  }
+  #endif
   // now init rest of vdc host
   inherited::initialize(aCompletedCB, aFactoryReset);
 }
@@ -278,6 +285,181 @@ void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllow
     configApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
   }
 }
+
+
+#if ENABLE_UBUS
+
+// MARK: ===== ubus API
+
+static const struct blobmsg_policy vdcapi_policy[] = {
+  { .name = "method", .type = BLOBMSG_TYPE_STRING },
+  { .name = "notification", .type = BLOBMSG_TYPE_STRING },
+  { .name = "dSUID", .type = BLOBMSG_TYPE_STRING },
+  { .name = NULL, .type = BLOBMSG_TYPE_UNSPEC },
+};
+
+
+static const struct blobmsg_policy cfgapi_policy[] = {
+  { .name = "method", .type = BLOBMSG_TYPE_STRING },
+  { .name = NULL, .type = BLOBMSG_TYPE_UNSPEC },
+};
+
+
+
+void P44VdcHost::enableUbusApi()
+{
+  if (!ubusApiServer) {
+    // can be enabled only once
+    ubusApiServer = UbusServerPtr(new UbusServer(MainLoop::currentMainLoop()));
+    UbusObjectPtr u = new UbusObject("vdcd", boost::bind(&P44VdcHost::ubusApiRequestHandler, this, _1, _2, _3));
+    u->addMethod("api", vdcapi_policy);
+    u->addMethod("cfg", cfgapi_policy);
+    ubusApiServer->registerObject(u);
+  }
+}
+
+
+void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string aMethod, JsonObjectPtr aJsonRequest)
+{
+  signalActivity(); // ubus API calls are activity as well
+  if (!aJsonRequest) {
+    // we always need a ubus message containing actual call method/notification and params
+    aUbusRequest->sendResponse(JsonObjectPtr(), UBUS_STATUS_INVALID_ARGUMENT);
+    return;
+  }
+  LOG(LOG_DEBUG, "ubus -> vdcd (JSON) request received: %s", aJsonRequest->c_strValue());
+  ErrorPtr err;
+  UbusApiRequestPtr request = UbusApiRequestPtr(new UbusApiRequest(aUbusRequest));
+  if (aMethod=="api") {
+    string cmd;
+    bool isMethod = false;
+    // get method/notification and params
+    JsonObjectPtr m = aJsonRequest->get("method");
+    if (m) {
+      // is a method call, expects answer
+      isMethod = true;
+    }
+    else {
+      // not method, may be notification
+      m = aJsonRequest->get("notification");
+    }
+    if (!m) {
+      err = Error::err<P44VdcError>(400, "invalid request, must specify 'method' or 'notification'");
+    }
+    else {
+      // get method/notification name
+      cmd = m->stringValue();
+      // get params
+      // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
+      ApiValuePtr params = JsonApiValue::newValueFromJson(aJsonRequest);
+      if (Error::isOK(err)) {
+        if (isMethod) {
+          // have method handled
+          err = handleMethodForParams(request, cmd, params);
+          // Note: if method returns NULL, it has sent or will send results itself.
+          //   Otherwise, even if Error is ErrorOK we must send a generic response
+        }
+        else {
+          // handle notification
+          err = handleNotificationForParams(request->connection(), cmd, params);
+          // Notifications are always immediately confirmed, so make sure there's an explicit ErrorOK
+          if (!err) {
+            err = ErrorPtr(new Error(Error::OK));
+          }
+        }
+      }
+    }
+  }
+  // err==NULL here means we don't have to do anything more
+  // err containing an Error object here (even ErrorOK) means we must return status
+  if (err) {
+    request->sendResponse(JsonObjectPtr(), err);
+  }
+}
+
+
+
+// MARK: ===== ubus API - UbusApiConnection
+
+UbusApiConnection::UbusApiConnection()
+{
+  setApiVersion(VDC_API_VERSION_MAX);
+}
+
+
+ApiValuePtr UbusApiConnection::newApiValue()
+{
+  return ApiValuePtr(new JsonApiValue);
+}
+
+
+// MARK: ===== ubus API - UbusApiRequest
+
+UbusApiRequest::UbusApiRequest(UbusRequestPtr aUbusRequest)
+{
+  ubusRequest = aUbusRequest;
+}
+
+
+VdcApiConnectionPtr UbusApiRequest::connection()
+{
+  return VdcApiConnectionPtr(new UbusApiConnection());
+}
+
+
+ErrorPtr UbusApiRequest::sendResult(ApiValuePtr aResult)
+{
+  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) result sent: result=%s", aResult ? aResult->description().c_str() : "<none>");
+  JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
+  JsonObjectPtr r;
+  if (result) r = result->jsonObject();
+  sendResponse(r, ErrorPtr());
+  return ErrorPtr();
+}
+
+
+
+ErrorPtr UbusApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
+{
+  ErrorPtr err;
+  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) error sent: error=%d (%s)", aErrorCode, aErrorMessage.c_str());
+  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
+    err = VdcApiErrorPtr(new VdcApiError(aErrorCode, aErrorMessage, aErrorType, aUserFacingMessage));
+  }
+  else {
+    err = ErrorPtr(new Error(aErrorCode, aErrorMessage)); // re-pack into error object
+  }
+  sendResponse(JsonObjectPtr(), err);
+  return ErrorPtr();
+}
+
+
+
+void UbusApiRequest::sendResponse(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  // create response
+  JsonObjectPtr response = JsonObject::newObj();
+  if (!Error::isOK(aError)) {
+    // error, return error response
+    response->add("error", JsonObject::newInt32((int32_t)aError->getErrorCode()));
+    response->add("errormessage", JsonObject::newString(aError->getErrorMessage()));
+    response->add("errordomain", JsonObject::newString(aError->getErrorDomain()));
+    VdcApiErrorPtr ve = boost::dynamic_pointer_cast<VdcApiError>(aError);
+    if (ve) {
+      response->add("errortype", JsonObject::newInt32(ve->getErrorType()));
+      response->add("userfacingmessage", JsonObject::newString(ve->getUserFacingMessage()));
+    }
+  }
+  else {
+    // no error, return result (if any)
+    response->add("result", aResult);
+  }
+  LOG(LOG_DEBUG, "ubus response: %s", response->c_strValue());
+  ubusRequest->sendResponse(response);
+}
+
+
+#endif
 
 
 
