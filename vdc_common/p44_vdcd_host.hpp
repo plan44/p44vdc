@@ -25,8 +25,18 @@
 #include "vdchost.hpp"
 
 #include "jsoncomm.hpp"
+
+#ifndef ENABLE_JSONCFGAPI
+  // by default, we have _either_ ubus _or_ json config API, depending on ENABLE_UBUS
+  #if ENABLE_UBUS
+    #define ENABLE_JSONCFGAPI 0
+  #else
+    #define ENABLE_JSONCFGAPI 1
+  #endif
+#endif
+
 #if ENABLE_UBUS
-#include "ubus.hpp"
+  #include "ubus.hpp"
 #endif
 
 
@@ -45,6 +55,7 @@ namespace p44 {
   };
 
 
+  #if ENABLE_JSONCFGAPI
 
   /// Dummy config API "connection" object
   class P44JsonApiConnection : public VdcApiConnection
@@ -117,6 +128,7 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;
 
+  #endif
 
   #if ENABLE_UBUS
 
@@ -204,16 +216,16 @@ namespace p44 {
   class P44VdcHost : public VdcHost
   {
     typedef VdcHost inherited;
-    friend class P44JsonApiRequest;
 
     MLTicket learnIdentifyTicket;
-    JsonCommPtr learnIdentifyRequest;
+    VdcApiRequestPtr learnIdentifyRequest;
 
+    #if ENABLE_JSONCFGAPI
     SocketCommPtr configApiServer; ///< JSON API for legacy web interface
+    #endif
 
     #if ENABLE_UBUS
     UbusServerPtr ubusApiServer; ///< ubus API for openwrt web interface
-    MLTicket testTicket; // TODO: %%% test only, remove it!
     #endif
 
 
@@ -224,11 +236,13 @@ namespace p44 {
 
     P44VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false);
 
+    #if ENABLE_JSONCFGAPI
     /// enable config API
     /// @param aServiceOrPort port number or service string
     /// @param aNonLocalAllowed if set, non-local clients are allowed to connect to the config API
     /// @note API server will be started only at initialize()
     void enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed);
+    #endif
 
     #if ENABLE_UBUS
     /// enable ubus API
@@ -244,29 +258,39 @@ namespace p44 {
     void selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED);
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString();
+    virtual string webuiURLString() P44_OVERRIDE;
 
     /// initialize
     /// @param aCompletedCB will be called when the entire container is initialized or has been aborted with a fatal error
     /// @param aFactoryReset if set, database will be reset
-    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+
+    #if ENABLE_JSONCFGAPI
+    static void sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError);
+    #endif
+
+  protected:
+
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
   private:
 
+    #if ENABLE_JSONCFGAPI
     SocketCommPtr configApiConnectionHandler(SocketCommPtr aServerSocketComm);
     void configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonObject);
-    void learnHandler(JsonCommPtr aJsonComm, bool aLearnIn, ErrorPtr aError);
-    void identifyHandler(JsonCommPtr aJsonComm, DevicePtr aDevice);
-    void endIdentify();
+    ErrorPtr processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
+    #if ENABLE_LEGACY_P44CFGAPI
+    ErrorPtr processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
+    #endif
+    #endif
 
     #if ENABLE_UBUS
     void ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string aMethod, JsonObjectPtr aJsonRequest);
     #endif
 
-    ErrorPtr processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
-    ErrorPtr processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
 
-    static void sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError);
+    void learnHandler(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError);
+    void identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice);
 
   };
   typedef boost::intrusive_ptr<P44VdcHost> P44VdcHostPtr;
