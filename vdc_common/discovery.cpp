@@ -651,10 +651,10 @@ void DiscoveryManager::debug_browse_callback(AvahiServiceBrowser *b, AvahiIfInde
 // MARK: ==== generic service browser
 
 
-ServiceBrowserPtr DiscoveryManager::newServiceBrowser(const char *aServiceType, ServiceDiscoveryCB aServiceDiscoveryCB)
+ServiceBrowserPtr DiscoveryManager::newServiceBrowser()
 {
   if (serviceRunning()) {
-    return ServiceBrowserPtr(new ServiceBrowser(aServiceType, aServiceDiscoveryCB));
+    return ServiceBrowserPtr(new ServiceBrowser());
   }
   else {
     LOG(LOG_ERR, "ServiceBrowser: Discovery Service is not running, cannot create service browser");
@@ -671,15 +671,9 @@ void ServiceBrowser::avahi_browse_callback(AvahiServiceBrowser *b, AvahiIfIndex 
 }
 
 
-ServiceBrowser::ServiceBrowser(const char *aServiceType, ServiceDiscoveryCB aServiceDiscoveryCB) :
-  serviceDiscoveryCB(aServiceDiscoveryCB),
+ServiceBrowser::ServiceBrowser() :
   avahiServiceBrowser(NULL)
 {
-  AvahiService *s = DiscoveryManager::sharedDiscoveryManager().service;
-  avahiServiceBrowser = avahi_service_browser_new(s, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, aServiceType, NULL, (AvahiLookupFlags)0, avahi_browse_callback, this);
-  if (!avahiServiceBrowser) {
-    LOG(LOG_ERR, "ServiceBrowser: Failed to create browser for type '%s': %s", aServiceType, avahi_strerror(avahi_service_errno(s)));
-  }
 }
 
 
@@ -688,6 +682,18 @@ ServiceBrowser::~ServiceBrowser()
   if (avahiServiceBrowser) {
     avahi_service_browser_free(avahiServiceBrowser);
     avahiServiceBrowser = NULL;
+  }
+}
+
+
+void ServiceBrowser::browse(const char *aServiceType, ServiceDiscoveryCB aServiceDiscoveryCB)
+{
+  serviceDiscoveryCB = aServiceDiscoveryCB;
+
+  AvahiService *s = DiscoveryManager::sharedDiscoveryManager().service;
+  avahiServiceBrowser = avahi_service_browser_new(s, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, aServiceType, NULL, (AvahiLookupFlags)0, avahi_browse_callback, this);
+  if (!avahiServiceBrowser) {
+    LOG(LOG_ERR, "ServiceBrowser: Failed to create browser for type '%s': %s", aServiceType, avahi_strerror(avahi_service_errno(s)));
   }
 }
 
