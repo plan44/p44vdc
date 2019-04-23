@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -96,6 +96,8 @@ namespace p44 {
     virtual bool needsPreparation(PropertyAccessMode aMode) const { return false; /* usually not */ };
     /// will be shown in wildcard queries
     virtual bool isWildcardAddressable() const { return true; };
+    /// was created by the current write action
+    virtual bool wasCreatedNew() const { return false; };
     /// acts as root of a C++ class hierarchy
     bool isRootOfObject() const { return rootOfObject; };
     /// checks
@@ -156,7 +158,8 @@ namespace p44 {
       arrayContainer(false),
       deletable(false),
       needsReadPrep(false),
-      needsWritePrep(false)
+      needsWritePrep(false),
+      createdNew(false)
     {};
     string propertyName; ///< name of the property
     ApiValueType propertyType; ///< type of the property value
@@ -166,6 +169,7 @@ namespace p44 {
     bool deletable;
     bool needsReadPrep;
     bool needsWritePrep;
+    bool createdNew; ///< set for properties that were created new
 
     virtual const char *name() const P44_OVERRIDE { return propertyName.c_str(); }
     virtual ApiValueType type() const P44_OVERRIDE { return propertyType; }
@@ -174,7 +178,8 @@ namespace p44 {
     virtual bool isArrayContainer() const P44_OVERRIDE { return arrayContainer; };
     virtual bool isDeletable() const P44_OVERRIDE { return deletable; };
     virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return aMode==access_read ? needsReadPrep : needsWritePrep; };
-  };
+    virtual bool wasCreatedNew() const P44_OVERRIDE { return createdNew; };
+};
 
 
 
@@ -324,7 +329,6 @@ namespace p44 {
     ///   Otherwise, properties are assumed to be prepared already and will be accessed directly
     /// @return Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
     ErrorPtr accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList);
-
 
     /// parse aPropmatch for numeric index (both plain number and #n are allowed, plus empty and "*" wildcards)
     /// @param aPropMatch property name to match

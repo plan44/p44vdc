@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -43,8 +43,8 @@ void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQu
   PropertyDescriptorPtr parentDescriptor = PropertyDescriptorPtr(new RootPropertyDescriptor(aApiVersion));
   // first attempt to access
   // - create result object of same API type as query
-  ApiValuePtr result;
-  if (aMode==access_read) result = aQueryObject->newObject();
+  ApiValuePtr result = aQueryObject->newNull(); // write might return a object containing ids of inserted container elements
+  if (aMode==access_read) result->setType(apivalue_object); // read always needs a structured object
   ErrorPtr err = accessPropertyInternal(aMode, aQueryObject, result, aDomain, parentDescriptor, prepList);
   if (prepList->empty()) {
     // no need for preparation, immediately call back
@@ -118,10 +118,9 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
   // aApiObject must be of type apivalue_object
   if (!aQueryObject->isType(apivalue_object))
     return Error::err<VdcApiError>(415, "Query or Value written must be object");
-  if (aMode==access_read) {
-    if (!aResultObject)
-      return Error::err<VdcApiError>(415, "accessing property for read must provide result object");
-    aResultObject->setType(apivalue_object); // must be object
+  // result object
+  if (!aResultObject) {
+    return Error::err<VdcApiError>(415, "accessing property must provide result object");
   }
   // Iterate trough elements of query object
   aQueryObject->resetKeyIteration();
@@ -208,8 +207,8 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
                     }
                   }
                   else {
-                    // for write, just pass the query value
-                    err = container->accessPropertyInternal(aMode, subQuery, ApiValuePtr(), containerDomain, containerPropDesc, aPreparationList);
+                    // for write, just pass the query value and the (non-hierarchic) result object
+                    err = container->accessPropertyInternal(aMode, subQuery, aResultObject, containerDomain, containerPropDesc, aPreparationList);
                     FOCUSLOG("    <<<< RETURNED from accessProperty() recursion", propDesc->name(), container.get());
                   }
                   if ((aMode!=access_read) && Error::isOK(err)) {
@@ -255,9 +254,19 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
               FOCUSLOG("- property '%s' access with preparation complete -> unpreparing", propDesc->name());
               finishAccess(aMode, propDesc);
             }
-            if (aMode==access_write && !wildcard) {
+            if (aMode==access_write) {
+              // return id of created objects
+              if (propDesc->wasCreatedNew()) {
+                aResultObject->setType(apivalue_array);
+                ApiValuePtr inserted = aResultObject->newObject();
+                if (propDesc->parentDescriptor) inserted->add("insertedin", inserted->newString(propDesc->parentDescriptor->name()));
+                inserted->add("element", inserted->newString(propDesc->name()));
+                aResultObject->arrayAppend(inserted);
+              }
               // stop iterating after writing to non-wildcard item (because insertable containers would create multiple items otherwise)
-              propIndex = PROPINDEX_NONE;
+              if (!wildcard) {
+                propIndex = PROPINDEX_NONE;
+              }
             }
           } // actual access, not preparation
         }
@@ -283,11 +292,7 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
     if (!errorMsg.empty()) {
       err = Error::err_str<VdcApiError>(404, errorMsg);
     }
-    #if DEBUGLOGGING
-    if (aMode==access_read) {
-      FOCUSLOG("- query element named '%s' now has result object: %s", queryName.c_str(), aResultObject->description().c_str());
-    }
-    #endif
+    FOCUSLOG("- query element named '%s' now has result object: %s", queryName.c_str(), aResultObject->description().c_str());
   }
   return err;
 }

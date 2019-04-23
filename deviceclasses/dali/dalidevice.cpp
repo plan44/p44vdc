@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -2165,6 +2165,14 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   // mark used groups/scenes
   for (int i=0; i<numAddresses; i++) {
     daliVdc().markUsed(baseAddress+i, true);
+  }
+}
+
+
+void DaliInputDevice::freeAddresses()
+{
+  for (int i=0; i<numAddresses; i++) {
+    daliVdc().removeMemberships(baseAddress+i);
   }
 }
 

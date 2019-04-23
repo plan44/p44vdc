@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -221,7 +221,8 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
 void DsAddressable::propertyAccessed(VdcApiRequestPtr aRequest, ApiValuePtr aResultObject, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
-    // read - send back property result
+    // ok - return result object, which is property result tree for getProperty,
+    // and usually null for writes except when a object was created
     aRequest->sendResult(aResultObject);
   }
   else {
@@ -347,8 +348,9 @@ void DsAddressable::pingResultHandler(bool aIsPresent)
 
 void DsAddressable::updatePresenceState(bool aPresent)
 {
+  bool first = lastPresenceUpdate==Never;
   lastPresenceUpdate = MainLoop::now();
-  if (aPresent!=present || lastPresenceUpdate==Never) {
+  if (aPresent!=present || first) {
     // change in presence
     present = aPresent;
     ALOG(LOG_NOTICE, "changes to %s", aPresent ? "PRESENT" : "OFFLINE");
@@ -448,7 +450,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
 }
 
 
-#define MIN_PRESENCE_SAMPLE_INTERVAL (15*Second)
+#define MIN_PRESENCE_SAMPLE_INTERVAL (120*Second)
 
 void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
 {

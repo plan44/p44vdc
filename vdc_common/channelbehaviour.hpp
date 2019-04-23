@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -185,6 +185,10 @@ namespace p44 {
     /// the transition time to use to change value in the hardware
     /// @return time to be used to transition to new value
     MLMicroSeconds transitionTimeToNewValue() { return nextTransitionTime; };
+
+    /// set time for next transition (for overrides - normally, setChannelValue() sets the transition time)
+    /// @param aTransitionTime transition time
+    void setTransitionTime(MLMicroSeconds aTransitionTime) { nextTransitionTime = aTransitionTime; }
 
     /// check if channel value needs to be sent to device hardware
     /// @return true if the cached channel value was changed and should be applied to hardware via device's applyChannelValues()

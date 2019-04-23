@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -318,13 +318,19 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   //   - Alternate profile is indoor
   { 1, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
   { 1, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,          0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText },
+  // - -20..60 degree with 10 bit resolution
+  //   - Default profile is outdoor
+  { 0, 0x04, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20,   60, DB(2,1), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
+  { 0, 0x04, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_outdoors,      0,  100, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler,  humText },
+  //   - Alternate profile is indoor
+  { 1, 0x04, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -20,   60, DB(2,1), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
+  { 1, 0x04, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,          0,  100, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler,  humText },
   // A5-06-xx: Light Sensors
   // - A5-06-01 outdoor
   { 0, 0x06, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_outdoors,    300,60000, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,      illumText },
   { 0, 0x06, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
-  // - A5-06-01 Eltako FAH60 with low light sensor in DB3
+  // - A5-06-01 Eltako FAH60 with low light sensor in DB3, but no supply voltage
   { 1, 0x06, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_outdoors,    300,60000, DB(2,7), DB(1,0), 100, 40*60, &illumHandlerFAH60, illumText },
-  { 1, 0x06, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
   // - A5-06-02 indoor
   { 0, 0x06, 0x02, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0, 1020, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,      illumText },
   { 0, 0x06, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
@@ -588,8 +594,8 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
 
 // MARK: ===== 4BS profile variants
 
-static const char *indoorText = "indoor temperature";
-static const char *outdoorText = "outdoor temperature";
+static const char *indoorText = "indoor sensor";
+static const char *outdoorText = "outdoor sensor";
 
 
 static const ProfileVariantEntry profileVariants4BS[] = {
@@ -664,18 +670,20 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   { 29, 0x01A50401, 0, outdoorText, NULL },
   { 29, 0x00A50402, 0, outdoorText, NULL }, // outdoor is default!
   { 29, 0x01A50402, 0, indoorText, NULL },
+  { 30, 0x00A50403, 0, outdoorText, NULL }, // outdoor is default!
+  { 30, 0x01A50403, 0, indoorText, NULL },
   // heating valve alternatives
-  {  30, 0x00A52004, 0, "heating valve", NULL },
-  {  30, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
+  {  31, 0x00A52004, 0, "heating valve", NULL },
+  {  31, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
   // A5-14-09 reverse mount alternative
-  {  31, 0x00A51409, 0, "window state - regular mounting position", NULL },
-  {  31, 0x01A51409, 0, "window state - upside down mounting position", NULL },
+  {  32, 0x00A51409, 0, "window state - regular mounting position", NULL },
+  {  32, 0x01A51409, 0, "window state - upside down mounting position", NULL },
   // A5-14-0A reverse mount alternative
-  {  32, 0x00A5140A, 0, "window state - regular mounting position", NULL },
-  {  32, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
+  {  33, 0x00A5140A, 0, "window state - regular mounting position", NULL },
+  {  33, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
   // A5-08-01 generic and Eltako versions
-  {  33, 0x00A50801, 0, "standard EEP", NULL },
-  {  33, 0x01A50801, 0, "Eltako modified version (no temp/presence, extended lux range)", NULL },
+  {  34, 0x00A50801, 0, "standard EEP", NULL },
+  {  34, 0x01A50801, 0, "Eltako modified version (no temp/presence, extended lux range)", NULL },
 
   { 0, 0, 0, NULL, NULL } // terminator
 };
@@ -1296,7 +1304,8 @@ static const p44::EnoceanSensorDescriptor A513sunEast =
   { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(1,7), DB(1,0), 30, 40*60, &stdSensorHandler, "Sun east" };
 
 EnoceanA5130XHandler::EnoceanA5130XHandler(EnoceanDevice &aDevice) :
-  inherited(aDevice)
+  inherited(aDevice),
+  broken(false)
 {
 }
 
@@ -1387,6 +1396,18 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
 }
 
 
+int EnoceanA5130XHandler::opStateLevel()
+{
+  if (broken) return 0; // complete failure
+  return inherited::opStateLevel();
+}
+
+string EnoceanA5130XHandler::getOpStateText()
+{
+  if (broken) return "Sensor disconnected";
+  return inherited::getOpStateText();
+}
+
 
 // handle incoming data from device and extract data for this channel
 void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
@@ -1398,36 +1419,62 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     if (datasize!=4) return; // wrong data size
     // - check identifier in DB0.7..DB0.4 to see what info we got
     uint8_t identifier = (dataP[3]>>4) & 0x0F;
+    bool nowBroken = false;
     switch (identifier) {
       case 1:
-        // A5-13-01
-        if (behaviour) handleBitField(A513dawnSensor, behaviour, dataP, datasize);
-        if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize);
-        if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize);
-        if (gustSpeed) handleBitField(A513gustSpeed, gustSpeed, dataP, datasize);
-        if (dayIndicator) handleBitField(A513dayIndicator, dayIndicator, dataP, datasize);
-        if (rainIndicator) handleBitField(A513rainIndicator, rainIndicator, dataP, datasize);
+        // 00 00 FF 1A
+        if (dataP[0]==0 && dataP[1]==0 && dataP[2]==0xFF && (dataP[3]&0x02)!=0) {
+          // 00 00 FF 1A = 0lux, -40 degree C, 70km/h wind, rain -> connection to sensor broken
+          nowBroken = true;
+        }
+        else {
+          // A5-13-01
+          nowBroken = false;
+          if (behaviour) handleBitField(A513dawnSensor, behaviour, dataP, datasize);
+          if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize);
+          if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize);
+          if (gustSpeed) handleBitField(A513gustSpeed, gustSpeed, dataP, datasize);
+          if (dayIndicator) handleBitField(A513dayIndicator, dayIndicator, dataP, datasize);
+          if (rainIndicator) handleBitField(A513rainIndicator, rainIndicator, dataP, datasize);
+        }
         break;
       case 2:
         // A5-13-02
-        if (sunWest) handleBitField(A513sunWest, sunWest, dataP, datasize);
-        if (sunSouth) handleBitField(A513sunSouth, sunSouth, dataP, datasize);
-        if (sunEast) handleBitField(A513sunEast, sunEast, dataP, datasize);
+        if (!broken) {
+          if (sunWest) handleBitField(A513sunWest, sunWest, dataP, datasize);
+          if (sunSouth) handleBitField(A513sunSouth, sunSouth, dataP, datasize);
+          if (sunEast) handleBitField(A513sunEast, sunEast, dataP, datasize);
+        }
         break;
       default:
         // A5-13-03..06 are not supported
         break;
     }
-    // re-validate all sensors whenever we get any radio packet
-    if (behaviour) behaviour->revalidateState();
-    if (outdoorTemp) outdoorTemp->revalidateState();
-    if (windSpeed) windSpeed->revalidateState();
-    if (gustSpeed) gustSpeed->revalidateState();
-    if (dayIndicator) dayIndicator->revalidateState();
-    if (rainIndicator) rainIndicator->revalidateState();
-    if (sunWest) sunWest->revalidateState();
-    if (sunSouth) sunSouth->revalidateState();
-    if (sunEast) sunEast->revalidateState();
+    if (nowBroken!=broken) {
+      broken = nowBroken;
+      VdcHardwareError e = broken ? hardwareError_openCircuit : hardwareError_none;
+      if (behaviour) behaviour->setHardwareError(e);
+      if (outdoorTemp) outdoorTemp->setHardwareError(e);
+      if (windSpeed) windSpeed->setHardwareError(e);
+      if (gustSpeed) gustSpeed->setHardwareError(e);
+      if (dayIndicator) dayIndicator->setHardwareError(e);
+      if (rainIndicator) rainIndicator->setHardwareError(e);
+      if (sunWest) sunWest->setHardwareError(e);
+      if (sunSouth) sunSouth->setHardwareError(e);
+      if (sunEast) sunEast->setHardwareError(e);
+    }
+    // re-validate all sensors whenever we get any radio packet and not broken
+    if (!broken) {
+      if (behaviour) behaviour->revalidateState();
+      if (outdoorTemp) outdoorTemp->revalidateState();
+      if (windSpeed) windSpeed->revalidateState();
+      if (gustSpeed) gustSpeed->revalidateState();
+      if (dayIndicator) dayIndicator->revalidateState();
+      if (rainIndicator) rainIndicator->revalidateState();
+      if (sunWest) sunWest->revalidateState();
+      if (sunSouth) sunSouth->revalidateState();
+      if (sunEast) sunEast->revalidateState();
+    }
   }
 }
 

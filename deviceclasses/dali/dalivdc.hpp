@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -178,6 +178,7 @@ namespace p44 {
 
     void loadLocallyUsedGroupsAndScenes();
     void markUsed(DaliAddress aSceneOrGroup, bool aUsed);
+    void removeMemberships(DaliAddress aSceneOrGroup);
 
     ErrorPtr groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr daliScan(VdcApiRequestPtr aRequest, ApiValuePtr aParams);

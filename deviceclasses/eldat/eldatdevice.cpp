@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2016-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2016-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -300,10 +300,18 @@ bool EldatDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 
 static const EldatTypeVariantEntry EldatTypeVariants[] = {
   // dual rocker RPS button alternatives
-  { 1, eldat_rocker,            2, "2-way 1/0 or up/down buttons", DeviceConfigurations::buttonTwoWay }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
-  { 1, eldat_rocker_reversed,   2, "2-way 0/1 or down/up buttons (reversed)", DeviceConfigurations::buttonTwoWayReversed }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
-  { 1, eldat_button,            2, "single button", DeviceConfigurations::buttonSingle  },
-  { 1, eldat_motiondetector,    0, "motion detector", NULL },
+  { 1, eldat_rocker,                2, "2-way 1/0 or up/down buttons", DeviceConfigurations::buttonTwoWay }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
+  { 1, eldat_rocker_reversed,       2, "2-way 0/1 or down/up buttons (reversed)", DeviceConfigurations::buttonTwoWayReversed }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
+  { 1, eldat_button,                2, "single button", DeviceConfigurations::buttonSingle  },
+  { 1, eldat_motiondetector,        0, "motion detector", NULL },
+  { 1, eldat_windowcontact_onoff,   0, "window contact (ON/OFF)", NULL },
+  { 1, eldat_windowcontact_onoff_s, 0, "window contact (ON/OFF) with status every 24h", NULL },
+  { 1, eldat_windowcontact_offon,   0, "window contact (OFF/ON)", NULL },
+  { 1, eldat_windowcontact_offon_s, 0, "window contact (OFF/ON) with status every 24h", NULL },
+  { 1, eldat_windowhandle_onoff,    0, "window handle (ON/OFF)", NULL },
+  { 1, eldat_windowhandle_onoff_s,  0, "window handle (ON/OFF) with status every 24h", NULL },
+  { 1, eldat_windowhandle_offon,    0, "window handle (OFF/ON)", NULL },
+  { 1, eldat_windowhandle_offon_s,  0, "window handle (OFF/ON) with status every 24h", NULL },
   { 0, eldat_unknown, 0, NULL, NULL } // terminator
 };
 
@@ -540,6 +548,64 @@ void EldatMotionDetector::handleFunction(EldatFunction aFunction)
 }
 
 
+// MARK: ===== Eldat window contact
+
+
+EldatWindowContact::EldatWindowContact(EldatVdc *aVdcP, bool aOffOnType, bool aWithStatus) :
+  inherited(aVdcP, aOffOnType ? (aWithStatus ? eldat_windowcontact_offon_s : eldat_windowcontact_offon) : (aWithStatus ? eldat_windowcontact_onoff_s : eldat_windowcontact_onoff))
+{
+}
+
+
+string EldatWindowContact::modelName()
+{
+  return "ELDAT window contact";
+}
+
+
+
+void EldatWindowContact::handleFunction(EldatFunction aFunction)
+{
+  // eldat_windowcontact_onoff: A = contact/window opened, B = contact/window closed
+  // eldat_windowcontact_offon: B = contact/window opened, A = contact/window closed
+  BinaryInputBehaviourPtr ib = getInput(0);
+  if (ib) {
+    ib->updateInputState(aFunction==(eldatDeviceType==eldat_windowcontact_onoff || eldatDeviceType==eldat_windowcontact_onoff_s ? 'A' : 'B') ? 1 : 0);
+  }
+}
+
+
+
+
+// MARK: ===== Eldat window handle
+
+
+EldatWindowHandle::EldatWindowHandle(EldatVdc *aVdcP, bool aOffOnType, bool aWithStatus) :
+  inherited(aVdcP, aOffOnType ? (aWithStatus ? eldat_windowhandle_offon_s : eldat_windowhandle_offon) : (aWithStatus ? eldat_windowhandle_onoff_s : eldat_windowhandle_onoff))
+{
+}
+
+
+string EldatWindowHandle::modelName()
+{
+  return "ELDAT window handle";
+}
+
+
+
+void EldatWindowHandle::handleFunction(EldatFunction aFunction)
+{
+  // eldat_windowhandle_onoff: A = handle in opened position, B = handle in closed position
+  // eldat_windowhandle_offon: B = handle in opened position, A = handle in closed position
+  BinaryInputBehaviourPtr ib = getInput(0);
+  if (ib) {
+    ib->updateInputState(aFunction==(eldatDeviceType==eldat_windowhandle_onoff || eldatDeviceType==eldat_windowhandle_onoff_s  ? 'A' : 'B') ? 1 : 0);
+  }
+}
+
+
+
+
 // MARK: ===== Eldat remote control device
 
 
@@ -685,9 +751,9 @@ EldatDevicePtr EldatDevice::newDevice(
     }
   }
   else if (aEldatDeviceType==eldat_motiondetector) {
-    // single button
+    // motion detector
     if (aSubDeviceIndex==aFirstSubDevice) {
-      // Create a ELDAT single button device
+      // Create a ELDAT single motion detector device
       newDev = EldatDevicePtr(new EldatMotionDetector(aVdcP));
       // standard device settings without scene table
       newDev->installSettings();
@@ -704,6 +770,62 @@ EldatDevicePtr EldatDevice::newDevice(
       ib->setHardwareName("detector");
       newDev->addBehaviour(ib);
       // - motion detector uses two indices (it uses A+B functions)
+      aSubDeviceIndex+=2;
+    }
+  }
+  else if (
+    aEldatDeviceType==eldat_windowcontact_onoff || aEldatDeviceType==eldat_windowcontact_onoff_s ||
+    aEldatDeviceType==eldat_windowcontact_offon || aEldatDeviceType==eldat_windowcontact_offon_s
+  ) {
+    // window contact
+    if (aSubDeviceIndex==aFirstSubDevice) {
+      // Create a ELDAT window contact device
+      bool hasStatus = aEldatDeviceType==eldat_windowcontact_onoff_s || aEldatDeviceType==eldat_windowcontact_offon_s;
+      bool isOffOn = aEldatDeviceType==eldat_windowcontact_offon || aEldatDeviceType==eldat_windowcontact_offon_s;
+      newDev = EldatDevicePtr(new EldatWindowContact(aVdcP, isOffOn, hasStatus));
+      // standard device settings without scene table
+      newDev->installSettings();
+      // assign channel and address
+      newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
+      newDev->setFunctionDesc("window contact");
+      // set icon name
+      newDev->setIconInfo("eldat", true);
+      // window contacts can be used for anything
+      newDev->setColorClass(class_black_joker);
+      // Create one input behaviour
+      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
+      ib->setHardwareInputConfig(binInpType_windowOpen, usage_room, true, Never, hasStatus ? 24*Hour : Never);
+      ib->setHardwareName("window open");
+      newDev->addBehaviour(ib);
+      // - window contact uses two indices (it uses A+B functions)
+      aSubDeviceIndex+=2;
+    }
+  }
+  else if (
+    aEldatDeviceType==eldat_windowhandle_onoff || aEldatDeviceType==eldat_windowhandle_onoff_s ||
+    aEldatDeviceType==eldat_windowhandle_offon || aEldatDeviceType==eldat_windowhandle_offon_s
+  ) {
+    // window handle
+    if (aSubDeviceIndex==aFirstSubDevice) {
+      // Create a ELDAT window handle device
+      bool hasStatus = aEldatDeviceType==eldat_windowhandle_onoff_s || aEldatDeviceType==eldat_windowhandle_offon_s;
+      bool isOffOn = aEldatDeviceType==eldat_windowhandle_offon || aEldatDeviceType==eldat_windowhandle_offon_s;
+      newDev = EldatDevicePtr(new EldatWindowHandle(aVdcP, isOffOn, hasStatus));
+      // standard device settings without scene table
+      newDev->installSettings();
+      // assign channel and address
+      newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
+      newDev->setFunctionDesc("window handle");
+      // set icon name
+      newDev->setIconInfo("eldat", true);
+      // window handles can be used for anything
+      newDev->setColorClass(class_black_joker);
+      // Create one input behaviour
+      BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
+      ib->setHardwareInputConfig(binInpType_windowHandle, usage_room, true, Never, hasStatus ? 24*Hour : Never);
+      ib->setHardwareName("handle state");
+      newDev->addBehaviour(ib);
+      // - window contact uses two indices (it uses A+B functions)
       aSubDeviceIndex+=2;
     }
   }

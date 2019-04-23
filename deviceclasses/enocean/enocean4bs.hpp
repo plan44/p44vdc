@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -214,6 +214,7 @@ namespace p44 {
     DsBehaviourPtr sunWest;
     DsBehaviourPtr sunSouth;
     DsBehaviourPtr sunEast;
+    bool broken; ///< set when broken connector to sensor is detected
 
     /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
     EnoceanA5130XHandler(EnoceanDevice &aDevice);
@@ -236,6 +237,14 @@ namespace p44 {
       EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer,
       bool aSendTeachInResponse
     );
+
+    /// Get an indication how good/critical the operation state of this channel is (usually: battery level indicator)
+    /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
+    virtual int opStateLevel() P44_OVERRIDE;
+
+    /// Get short text to describe the operation state (such as radio RSSI, critical battery level, etc.)
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getOpStateText() P44_OVERRIDE;
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information

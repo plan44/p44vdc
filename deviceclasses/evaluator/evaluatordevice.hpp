@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2016-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -192,7 +192,6 @@ namespace p44 {
     void parseValueDefs();
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
-    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
     void evaluateConditions(Tristate aRefState, EvalMode aEvalMode);
     void evaluateConditionsLater();
     void changedConditions();
@@ -204,6 +203,7 @@ namespace p44 {
     Tristate evaluateBoolean(string aExpression);
     ExpressionValue calcEvaluatorExpression(string &aExpression);
     ExpressionValue valueLookup(const string aName);
+    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
     ExpressionValue actionValueLookup(Tristate aCurrentState, const string aName);
 
   };

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -28,7 +28,7 @@
 #define DALI_MAXSCENES 16
 
 
-// DALI commands with standard address format
+// DALI commands with standard address in first byte
 // - normal commands, send once
 #define DALICMD_OFF 0x00 // 0000 0000
 #define DALICMD_UP 0x01 // 0000 0001
@@ -106,7 +106,7 @@
 #define DALICMD_DT8_QUERY_COLORSTATE_WORD 0x08FA // 1111 1010 (selector DTR, result into DTR2/DTR1)
 
 
-// - DALI 2-byte special commands, command in first byte
+// DALI 2-byte special commands, command in first byte
 #define DALICMD_TERMINATE 0xA1 // 1010 0001 0000 0000
 #define DALICMD_SET_DTR 0xA3 // 1010 0011 XXXX XXXX
 #define DALICMD_INITIALISE 0xA5 // 1010 0101 XXXX XXXX

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2016-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -1358,6 +1358,7 @@ PropertyDescriptorPtr CustomActions::getDescriptorByName(string aPropMatch, int 
     // writing to non-existing custom action -> insert new action
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyName = aPropMatch;
+    descP->createdNew = true;
     descP->propertyType = apivalue_object;
     descP->deletable = true; // custom actions are deletable
     descP->propertyFieldKey = customActions.size();

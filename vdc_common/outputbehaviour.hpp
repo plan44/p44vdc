@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -185,12 +185,13 @@ namespace p44 {
 
     /// perform applying Scene to channels
     /// @param aScene the scene to apply
+    /// @param aTransitionTimeOverride if not Infinite, this overrides the transition time for all channels
     /// @return true if apply is complete, i.e. everything ready to apply to hardware outputs.
     ///   false if scene cannot be applied to hardware (not yet, or maybe not at all); applying to hardware, if
     ///   needed at all, will be triggered otherwise.
     /// @note applying to channels is first and separate step from applying channels to hardware
     /// @note this is a OutputBehaviour level wrapper and preparator for behaviour-specific performApplySceneToChannels().
-    bool applySceneToChannels(DsScenePtr aScene);
+    bool applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTransitionTimeOverride);
 
     /// capture current state into passed scene object
     /// @param aScene the scene object to update

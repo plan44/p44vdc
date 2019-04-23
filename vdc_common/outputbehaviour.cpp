@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -271,10 +271,17 @@ void OutputBehaviour::saveChannelsToScene(DsScenePtr aScene)
 
 
 
-bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene)
+bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTransitionTimeOverride)
 {
   if (aScene) {
-    return performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
+    bool ok = performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
+    if (aTransitionTimeOverride!=Infinite) {
+      // override the transition time in all channels that now need to be applied
+      for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+        if ((*pos)->needsApplying()) (*pos)->setTransitionTime(aTransitionTimeOverride);
+      }
+    }
+    return ok;
   }
   return false; // no scene to apply
 }

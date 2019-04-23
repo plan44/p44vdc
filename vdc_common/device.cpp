@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2017 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -902,13 +902,19 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
     if (Error::isOK(err = checkParam(aDeliveryState->callParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
       bool force = false;
+      MLMicroSeconds transitionTimeOverride = Infinite; // none
+      // check for custom transition time
+      o = aDeliveryState->callParams->get("transition");
+      if (o) {
+        transitionTimeOverride = o->doubleValue()*Second;
+      }
       // check for force flag
       if (Error::isOK(err = checkParam(aDeliveryState->callParams, "force", o))) {
         force = o->boolValue();
         // set the channel type as actionParam
         aDeliveryState->actionParam = channeltype_brightness; // legacy dimming is ALWAYS brightness
         // prepare scene call
-        callScenePrepare(aPreparedCB, sceneNo, force);
+        callScenePrepare(aPreparedCB, sceneNo, force, transitionTimeOverride);
         return;
       }
     }
@@ -934,9 +940,6 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         // prepare starting or stopping dimming
         dimChannelForAreaPrepare(aPreparedCB, channel, mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
         return;
-      }
-      else {
-        err = Error::err<VdcApiError>(400, "Need to specify channel(type) or channelId");
       }
     }
     if (!Error::isOK(err)) {
@@ -1468,18 +1471,19 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
 // MARK: ===== scene operations
 
 
-void Device::callScene(SceneNo aSceneNo, bool aForce)
+void Device::callScene(SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransitionTimeOverride)
 {
   // convenience method for calling scenes on single devices
-  callScenePrepare(boost::bind(&Device::executePreparedOperation, this, SimpleCB(), _1), aSceneNo, aForce);
+  callScenePrepare(boost::bind(&Device::executePreparedOperation, this, SimpleCB(), _1), aSceneNo, aForce, aTransitionTimeOverride);
 }
 
 
 
-void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce)
+void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransitionTimeOverride)
 {
   // see if we have a scene table at all
   preparedScene.reset(); // clear possibly previously prepared scene
+  preparedTransitionOverride = aTransitionTimeOverride; // save for later
   preparedDim = false; // no dimming prepared
   SceneDeviceSettingsPtr scenes = getScenes();
   if (output && scenes) {
@@ -1631,7 +1635,7 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatTo
     DsScenePtr scene = preparedScene;
     preparedScene.reset();
     // apply scene logically
-    if (output->applySceneToChannels(scene)) {
+    if (output->applySceneToChannels(scene, preparedTransitionOverride)) {
       // prepare for apply (but do NOT yet apply!) on device hardware level)
       if (prepareSceneApply(scene)) {
         // now we can apply values to hardware
@@ -1720,7 +1724,7 @@ void Device::undoScene(SceneNo aSceneNo)
     // scene found, now apply it to the output (if any)
     if (output) {
       // now apply the pseudo state
-      output->applySceneToChannels(previousState);
+      output->applySceneToChannels(previousState, Infinite); // no transition time override
       // apply the values now, not dimming
       if (prepareSceneApply(previousState)) {
         requestApplyingChannels(NULL, false);
