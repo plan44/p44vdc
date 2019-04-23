@@ -198,8 +198,8 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         sb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_undefined, false, -1);
         sb->setHardwareName("blind");
         sb->setDeviceParams(shadowdevice_jalousie, false, MIN_MOVE_TIME, MAX_SHORT_MOVE_TIME, MIN_LONG_MOVE_TIME);
-        sb->position->syncChannelValue(100); // assume fully up at beginning
-        sb->angle->syncChannelValue(100); // assume fully open at beginning
+        sb->position->syncChannelValue(100, false, true); // assume fully up at beginning
+        sb->angle->syncChannelValue(100, false, true); // assume fully open at beginning
         // does not need a channel handler at all, just add behaviour
         newDev->addBehaviour(sb);
         // count it

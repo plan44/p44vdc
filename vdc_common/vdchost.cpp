@@ -80,7 +80,7 @@ using namespace p44;
 
 static VdcHost *sharedVdcHostP = NULL;
 
-VdcHost::VdcHost(bool aWithLocalController) :
+VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   inheritedParams(dsParamStore),
   mac(0),
   networkConnected(true), // start with the assumption of a connected network
@@ -97,6 +97,7 @@ VdcHost::VdcHost(bool aWithLocalController) :
   localDimDirection(0), // undefined
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
   mainLoopStatsCounter(0),
+  persistentChannels(aWithPersistentChannels),
   productName(DEFAULT_PRODUCT_NAME)
 {
   // remember singleton's address
@@ -476,7 +477,7 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
 {
   if (aNextDevice!=dSDevices.end()) {
     // TODO: now never doing factory reset init, maybe parametrize later
-    aNextDevice->second->initializeDevice(boost::bind(&VdcHost::deviceInitialized, this, aCompletedCB, aNextDevice, _1), false);
+    aNextDevice->second->initializeDevice(boost::bind(&VdcHost::nextDeviceInitialized, this, aCompletedCB, aNextDevice, _1), false);
     return;
   }
   // all devices initialized
@@ -496,17 +497,9 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
 }
 
 
-void VdcHost::deviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice, ErrorPtr aError)
+void VdcHost::nextDeviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "*** error initializing device %s: %s", aNextDevice->second->shortDesc().c_str(), aError->description().c_str());
-  }
-  else {
-    LOG(LOG_NOTICE, "--- initialized device: %s",aNextDevice->second->description().c_str());
-    #if ENABLE_LOCALCONTROLLER
-    if (localController) localController->deviceAdded(aNextDevice->second);
-    #endif
-  }
+  deviceInitialized(aNextDevice->second, aError);
   // check next
   ++aNextDevice;
   initializeNextDevice(aCompletedCB, aNextDevice);
@@ -537,7 +530,7 @@ bool VdcHost::addDevice(DevicePtr aDevice)
   // if not collecting, initialize device right away.
   // Otherwise, initialisation will be done when collecting is complete
   if (!collecting) {
-    aDevice->initializeDevice(boost::bind(&VdcHost::deviceInitialized, this, aDevice), false);
+    aDevice->initializeDevice(boost::bind(&VdcHost::separateDeviceInitialized, this, aDevice, _1), false);
   }
   return true;
 }
@@ -550,15 +543,27 @@ void VdcHost::duplicateIgnored(DevicePtr aDevice)
 }
 
 
-
-void VdcHost::deviceInitialized(DevicePtr aDevice)
+void VdcHost::separateDeviceInitialized(DevicePtr aDevice, ErrorPtr aError)
 {
-  LOG(LOG_NOTICE, "--- initialized device: %s",aDevice->description().c_str());
-  #if ENABLE_LOCALCONTROLLER
-  if (localController) localController->deviceAdded(aDevice);
-  #endif
+  deviceInitialized(aDevice, aError);
   // trigger announcing when initialized (no problem when called while already announcing)
   startAnnouncing();
+}
+
+
+
+void VdcHost::deviceInitialized(DevicePtr aDevice, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    LOG(LOG_ERR, "*** error initializing device %s: %s", aDevice->shortDesc().c_str(), aError->description().c_str());
+  }
+  else {
+    LOG(LOG_NOTICE, "--- initialized device: %s",aDevice->description().c_str());
+    #if ENABLE_LOCALCONTROLLER
+    if (localController) localController->deviceAdded(aDevice);
+    #endif
+    aDevice->addedAndInitialized();
+  }
 }
 
 
@@ -1440,6 +1445,8 @@ static char localController_obj;
 enum {
   vdcs_key,
   valueSources_key,
+  persistentChannels_key,
+  writeOperations_key,
   #if ENABLE_LOCALCONTROLLER
   localController_key,
   #endif
@@ -1463,6 +1470,8 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
   static const PropertyDescription properties[numVdcHostProperties] = {
     { "x-p44-vdcs", apivalue_object+propflag_container, vdcs_key, OKEY(vdcs_obj) },
     { "x-p44-valueSources", apivalue_null, valueSources_key, OKEY(vdchost_obj) },
+    { "x-p44-persistentChannels", apivalue_bool, persistentChannels_key, OKEY(vdchost_obj) },
+    { "x-p44-writeOperations", apivalue_uint64, writeOperations_key, OKEY(vdchost_obj) },
     #if ENABLE_LOCALCONTROLLER
     { "x-p44-localController", apivalue_object, localController_key, OKEY(localController_obj) },
     #endif
@@ -1520,10 +1529,25 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
 {
   if (aPropertyDescriptor->hasObjectKey(vdchost_obj)) {
     if (aMode==access_read) {
+      // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case valueSources_key:
           aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
           createValueSourcesList(aPropValue);
+          return true;
+        case persistentChannels_key:
+          aPropValue->setBoolValue(persistentChannels);
+          return true;
+        case writeOperations_key:
+          aPropValue->setUint32Value(dsParamStore.writeOpsCount);
+          return true;
+      }
+    }
+    else {
+      // write properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        case persistentChannels_key:
+          setPVar(persistentChannels, aPropValue->boolValue());
           return true;
       }
     }
@@ -1689,7 +1713,7 @@ const char *VdcHost::tableName()
 
 // data field definitions
 
-static const size_t numFields = 2;
+static const size_t numFields = 3;
 
 size_t VdcHost::numFieldDefs()
 {
@@ -1702,6 +1726,7 @@ const FieldDefinition *VdcHost::getFieldDef(size_t aIndex)
   static const FieldDefinition dataDefs[numFields] = {
     { "vdcHostName", SQLITE_TEXT },
     { "vdcHostDSUID", SQLITE_TEXT },
+    { "persistentChannels", SQLITE_INTEGER },
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1729,6 +1754,8 @@ void VdcHost::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
     }
   }
   aIndex++;
+  // the persistentchannels flag
+  aRow->getIfNotNull(aIndex++, persistentChannels);
 }
 
 
@@ -1738,10 +1765,13 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, getAssignedName().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  if (externalDsuid)
+  if (externalDsuid) {
     aStatement.bind(aIndex++); // do not save externally defined dSUIDs
-  else
+  }
+  else {
     aStatement.bind(aIndex++, dSUID.getString().c_str(), false); // not static, string is local obj
+  }
+  aStatement.bind(aIndex++, persistentChannels);
 }
 
 

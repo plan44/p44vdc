@@ -181,7 +181,7 @@ namespace p44 {
     ///   and to construct a suitable Device object, including all contained settings, scene and behaviour objects.
     ///   This object is then *possibly* used to operate the device later (in this case it will receive load() and initializeDevice() calls),
     //    but also might get discarded without further calls when it turns out there is already a Device with the same dSUID.
-    /// @note When idenify finishes, the device must be ready to load persistent settings (which means all behaviours and settings objects
+    /// @note When identify finishes, the device must be ready to load persistent settings (which means all behaviours and settings objects
     ///   need to be in place, as these define the device structure to load settings for), and then for being initialized for operation.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) = 0;
 
@@ -210,6 +210,9 @@ namespace p44 {
     /// @note this is called before interaction with dS system starts
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
     virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) { aCompletedCB(ErrorPtr()); /* NOP in base class */ };
+
+    /// this is called after a device was successfully added, loaded with settings and initialized for operation
+    virtual void addedAndInitialized();
 
     /// save unsaved parameters to persistent DB
     /// @note this is usually called from the device container in regular intervals
@@ -569,7 +572,6 @@ namespace p44 {
 
   protected:
 
-
     /// @name low level hardware access
     /// @note actual hardware specific implementation is in derived methods in subclasses.
     ///   Base class uses these methods to access the hardware in a generic way.
@@ -728,6 +730,7 @@ namespace p44 {
     DsGroupMask behaviourGroups();
 
     ErrorPtr checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel);
+    void channelValuesRestored();
     void callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransitionTimeOverride);
     void callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
     void callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);

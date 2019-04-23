@@ -346,8 +346,7 @@ namespace p44 {
 
     // persistence implementation
     enum {
-      outputflag_climateControlIdle = inherited::outputflag_nextflag<<0,
-      outputflag_nextflag = inherited::outputflag_nextflag<<1
+      outputflag_climateControlIdle = 0x0002
     };
     virtual const char *tableName() P44_OVERRIDE;
     virtual size_t numFieldDefs() P44_OVERRIDE;

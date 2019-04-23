@@ -39,13 +39,15 @@ namespace p44 {
   #define FULL_SCALE_DIM_TIME_MS 7000
 
   /// represents a single channel of the output
-  /// @note this class is not meant to be derived. Device specific channel functionality should
+  /// @note this class is not meant to be derived in a device implementation specific way.
+  ///   Device specific channel functionality should
   ///   be implemented in derived Device classes' methods which are passed channels to process.
   ///   The ChannelBehaviour objects only represent the dS interface to channels, not the
   ///   device specific interface from dS channels to actual device hardware.
-  class ChannelBehaviour : public PropertyContainer
+  class ChannelBehaviour : public PropertyContainer, public PersistentParams
   {
-    typedef PropertyContainer inherited;
+    typedef PropertyContainer inheritedProps;
+    typedef PersistentParams inheritedParams;
     friend class OutputBehaviour;
 
   protected:
@@ -106,9 +108,10 @@ namespace p44 {
     /// to sync local cache value
     /// @param aActualChannelValue the value as read from the device
     /// @param aAlwaysSync if set, value is synchronized even if current value is still pending to be applied
+    /// @param aVolatile if set, the resulting value will not be persisted
     /// @note only used to get the actual value FROM the hardware.
     ///   NOT to be used to change the hardware output value!
-    void syncChannelValue(double aActualChannelValue, bool aAlwaysSync=false);
+    void syncChannelValue(double aActualChannelValue, bool aAlwaysSync=false, bool aVolatile=false);
 
     /// sync from boolean value
     /// @param aValue value to sync back to channel value
@@ -204,6 +207,10 @@ namespace p44 {
     /// @name interaction with digitalSTROM system
     /// @{
 
+    /// get the identifier (unique within this device instance)
+    /// @return channel id string as internally identifying the channel
+    string getId();
+
     /// get the channel ID as used in the API
     /// @param aApiVersion the API version to get the ID for. APIs before v3 always return the channel type as a numeric string
     /// @return the channel ID. The channel id must be unique within the device.
@@ -240,12 +247,33 @@ namespace p44 {
     virtual string getStatusText();
 
 
+    /// load behaviour parameters from persistent DB
+    ErrorPtr load();
+
+    /// save unsaved behaviour parameters to persistent DB
+    ErrorPtr save();
+
+    /// forget any parameters stored in persistent DB
+    ErrorPtr forget();
+
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE P44_FINAL;
+
+    // persistence implementation
+    virtual const char *tableName() P44_OVERRIDE P44_FINAL;
+    virtual size_t numFieldDefs() P44_OVERRIDE P44_FINAL;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE P44_FINAL;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE P44_FINAL;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE P44_FINAL;
+
+  private:
+
+    // key for saving this channel in the DB
+    string getDbKey();
 
   };
 

@@ -512,6 +512,9 @@ namespace p44 {
     /// save settings
     ErrorPtr save();
 
+    /// signal activity
+    void signalActivity();
+
     /// @}
 
     /// get info (name, kind) about a group

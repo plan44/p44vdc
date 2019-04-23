@@ -288,17 +288,21 @@ namespace p44 {
     // persistence implementation
     enum {
       outputflag_pushChanges = 0x0001,
-      outputflag_nextflag = 1<<1
+      // Note: 0x0002 is reserved (in climate control)
     };
     virtual const char *tableName() P44_OVERRIDE;
     virtual size_t numFieldDefs() P44_OVERRIDE;
     virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+    virtual ErrorPtr loadChildren() P44_OVERRIDE P44_FINAL;
+    virtual ErrorPtr saveChildren() P44_OVERRIDE P44_FINAL;
+    virtual ErrorPtr deleteChildren() P44_OVERRIDE P44_FINAL;
 
   private:
 
     void channelValuesCaptured(DsScenePtr aScene, bool aFromDevice, SimpleCB aDoneCB);
+    string parentIdForChannels();
 
   };
   

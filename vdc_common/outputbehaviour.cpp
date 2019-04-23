@@ -408,6 +408,35 @@ void OutputBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 }
 
 
+ErrorPtr OutputBehaviour::loadChildren()
+{
+  if (device.getVdcHost().doPersistChannels()) {
+    for (ChannelBehaviourVector::iterator pos=channels.begin(); pos!=channels.end(); ++pos) {
+      (*pos)->load();
+    }
+  }
+  return inherited::loadChildren();
+}
+
+
+ErrorPtr OutputBehaviour::saveChildren()
+{
+  if (device.getVdcHost().doPersistChannels()) {
+    for (ChannelBehaviourVector::iterator pos=channels.begin(); pos!=channels.end(); ++pos) {
+      (*pos)->save();
+    }
+  }
+  return inherited::saveChildren();
+}
+
+ErrorPtr OutputBehaviour::deleteChildren()
+{
+  for (ChannelBehaviourVector::iterator pos=channels.begin(); pos!=channels.end(); ++pos) {
+    (*pos)->forget();
+  }
+  return inherited::deleteChildren();
+}
+
 
 // MARK: ===== output property access
 
