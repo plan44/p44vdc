@@ -111,11 +111,14 @@ namespace p44 {
 
     ServiceDiscoveryCB serviceDiscoveryCB;
 
-    ServiceBrowser(const char *aServiceType, ServiceDiscoveryCB aServiceDiscoveryCB);
+    ServiceBrowser();
 
   public:
 
     virtual ~ServiceBrowser();
+
+    /// browse third-party services
+    void browse(const char *aServiceType, ServiceDiscoveryCB aServiceDiscoveryCB);
 
   private:
 
@@ -216,9 +219,8 @@ namespace p44 {
     /// Refresh DS service advertising
     void refreshAdvertisingDS();
 
-
-    /// get browser for third-party service
-    ServiceBrowserPtr newServiceBrowser(const char *aServiceType, ServiceDiscoveryCB aServiceDiscoveryCB);
+    /// create browser
+    ServiceBrowserPtr newServiceBrowser();
 
 
   private:
