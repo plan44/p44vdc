@@ -479,7 +479,7 @@ ErrorPtr ZoneList::load()
     }
     delete queryP; queryP = NULL;
     // make sure we have a global (appartment) zone
-    getZoneById(0);
+    getZoneById(0, true);
   }
   return err;
 }
