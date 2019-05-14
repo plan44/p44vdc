@@ -690,6 +690,11 @@ void ServiceBrowser::browse(const char *aServiceType, ServiceDiscoveryCB aServic
 {
   serviceDiscoveryCB = aServiceDiscoveryCB;
 
+  if (avahiServiceBrowser) {
+    avahi_service_browser_free(avahiServiceBrowser);
+    avahiServiceBrowser = NULL;
+  }
+
   AvahiService *s = DiscoveryManager::sharedDiscoveryManager().service;
   avahiServiceBrowser = avahi_service_browser_new(s, AVAHI_IF_UNSPEC, AVAHI_PROTO_UNSPEC, aServiceType, NULL, (AvahiLookupFlags)0, avahi_browse_callback, this);
   if (!avahiServiceBrowser) {
