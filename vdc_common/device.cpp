@@ -146,6 +146,21 @@ void Device::identificationOK(IdentifyDeviceCB aIdentifyCB, Device *aActualDevic
 }
 
 
+void Device::addedAndInitialized()
+{
+  // trigger re-applying channel values if this feature is enabled in the vdchost
+  if (output && getVdcHost().doPersistChannels()) {
+    requestApplyingChannels(boost::bind(&Device::channelValuesRestored, this), false);
+  }
+}
+
+
+void Device::channelValuesRestored()
+{
+  ALOG(LOG_INFO, "restored last known channel values");
+}
+
+
 
 string Device::modelUID()
 {
@@ -816,7 +831,7 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         o->add("value", o->newDouble(value));
         // - channel id
         ApiValuePtr ch = o->newObject();
-        ch->add(channel->getApiId(3), o);
+        ch->add(channel->getId(), o);
         // - channelStates
         ApiValuePtr propValue = ch->newObject();
         propValue->add("channelStates", ch);

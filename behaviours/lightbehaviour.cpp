@@ -132,13 +132,13 @@ Brightness LightBehaviour::brightnessForHardware(bool aFinal)
 
 
 
-void LightBehaviour::syncBrightnessFromHardware(Brightness aBrightness, bool aAlwaysSync)
+void LightBehaviour::syncBrightnessFromHardware(Brightness aBrightness, bool aAlwaysSync, bool aVolatile)
 {
   if (
     isDimmable() || // for dimmable lights: always update value
     ((aBrightness>=onThreshold) != (brightness->getChannelValue()>=onThreshold)) // for switched outputs: keep value if onThreshold condition is already met
   ) {
-    brightness->syncChannelValue(aBrightness, aAlwaysSync);
+    brightness->syncChannelValue(aBrightness, aAlwaysSync, aVolatile);
   }
 }
 
@@ -310,8 +310,8 @@ void LightBehaviour::stopSceneActions()
 
 void LightBehaviour::identifyToUser()
 {
-  // simple, non-parametrized blink, 4 seconds, 2 second period, 1 second on
-  blink(4*Second, LightScenePtr(), NULL, 2*Second, 50);
+  // simple, non-parametrized blink, 6 seconds, 1.5 second period, 0.75 second on
+  blink(6*Second, LightScenePtr(), NULL, 1.5*Second, 50);
 }
 
 
@@ -422,10 +422,12 @@ void LightBehaviour::blinkHandler(MLMicroSeconds aEndTime, bool aState, MLMicroS
   else if (!aState) {
     // turn on
     brightness->setChannelValue(brightness->getMax(), 0);
+    brightness->markClean(); // do not save blink states
   }
   else {
     // turn off
     brightness->setChannelValue(brightness->getMinDim(), 0);
+    brightness->markClean(); // do not save blink states
   }
   // apply to hardware
   device.requestApplyingChannels(NULL, false); // not dimming

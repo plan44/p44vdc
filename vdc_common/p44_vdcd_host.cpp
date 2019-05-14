@@ -31,71 +31,6 @@
 
 using namespace p44;
 
-// MARK: ===== config API - P44JsonApiConnection
-
-
-P44JsonApiConnection::P44JsonApiConnection()
-{
-  setApiVersion(VDC_API_VERSION_MAX);
-}
-
-
-ApiValuePtr P44JsonApiConnection::newApiValue()
-{
-  return ApiValuePtr(new JsonApiValue);
-}
-
-
-
-
-
-// MARK: ===== config API - P44JsonApiRequest
-
-
-P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aJsonComm)
-{
-  jsonComm = aJsonComm;
-}
-
-
-VdcApiConnectionPtr P44JsonApiRequest::connection()
-{
-  return VdcApiConnectionPtr(new P44JsonApiConnection());
-}
-
-
-
-
-ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
-{
-  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) result sent: result=%s", aResult ? aResult->description().c_str() : "<none>");
-  JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
-  if (result) {
-    P44VdcHost::sendCfgApiResponse(jsonComm, result->jsonObject(), ErrorPtr());
-  }
-  else {
-    // always return SOMETHING
-    P44VdcHost::sendCfgApiResponse(jsonComm, JsonObject::newNull(), ErrorPtr());
-  }
-  return ErrorPtr();
-}
-
-
-
-ErrorPtr P44JsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
-{
-  ErrorPtr err;
-  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error sent: error=%d (%s)", aErrorCode, aErrorMessage.c_str());
-  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
-    err = VdcApiErrorPtr(new VdcApiError(aErrorCode, aErrorMessage, aErrorType, aUserFacingMessage));
-  }
-  else {
-    err = ErrorPtr(new Error(aErrorCode, aErrorMessage)); // re-pack into error object
-  }
-  P44VdcHost::sendCfgApiResponse(jsonComm, JsonObjectPtr(), err);
-  return ErrorPtr();
-}
-
 
 // MARK: ===== self test runner
 
@@ -231,8 +166,8 @@ private:
 // MARK: ===== P44VdcHost
 
 
-P44VdcHost::P44VdcHost(bool aWithLocalController) :
-  inherited(aWithLocalController),
+P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
+  inherited(aWithLocalController, aWithPersistentChannels),
   webUiPort(0)
 {
 }
@@ -260,14 +195,202 @@ string P44VdcHost::webuiURLString()
 
 void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  #if ENABLE_JSONCFGAPI
   // start config API, if we have one
   if (configApiServer) {
     configApiServer->startServer(boost::bind(&P44VdcHost::configApiConnectionHandler, this, _1), 3);
   }
+  #endif
+  #if ENABLE_UBUS
+  // start ubus API, if we have it
+  if (ubusApiServer) {
+    ubusApiServer->startServer();
+  }
+  #endif
   // now init rest of vdc host
   inherited::initialize(aCompletedCB, aFactoryReset);
 }
 
+
+#if ENABLE_UBUS
+
+// MARK: ===== ubus API
+
+static const struct blobmsg_policy vdcapi_policy[] = {
+  { .name = "method", .type = BLOBMSG_TYPE_STRING },
+  { .name = "notification", .type = BLOBMSG_TYPE_STRING },
+  { .name = "dSUID", .type = BLOBMSG_TYPE_STRING },
+  { .name = NULL, .type = BLOBMSG_TYPE_UNSPEC },
+};
+
+
+//static const struct blobmsg_policy cfgapi_policy[] = {
+//  { .name = "method", .type = BLOBMSG_TYPE_STRING },
+//  { .name = NULL, .type = BLOBMSG_TYPE_UNSPEC },
+//};
+
+
+
+void P44VdcHost::enableUbusApi()
+{
+  if (!ubusApiServer) {
+    // can be enabled only once
+    ubusApiServer = UbusServerPtr(new UbusServer(MainLoop::currentMainLoop()));
+    UbusObjectPtr u = new UbusObject("vdcd", boost::bind(&P44VdcHost::ubusApiRequestHandler, this, _1, _2, _3));
+    u->addMethod("api", vdcapi_policy);
+//    u->addMethod("cfg", cfgapi_policy);
+    ubusApiServer->registerObject(u);
+  }
+}
+
+
+void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string aMethod, JsonObjectPtr aJsonRequest)
+{
+  signalActivity(); // ubus API calls are activity as well
+  if (!aJsonRequest) {
+    // we always need a ubus message containing actual call method/notification and params
+    aUbusRequest->sendResponse(JsonObjectPtr(), UBUS_STATUS_INVALID_ARGUMENT);
+    return;
+  }
+  LOG(LOG_DEBUG, "ubus -> vdcd (JSON) request received: %s", aJsonRequest->c_strValue());
+  ErrorPtr err;
+  UbusApiRequestPtr request = UbusApiRequestPtr(new UbusApiRequest(aUbusRequest));
+  if (aMethod=="api") {
+    string cmd;
+    bool isMethod = false;
+    // get method/notification and params
+    JsonObjectPtr m = aJsonRequest->get("method");
+    if (m) {
+      // is a method call, expects answer
+      isMethod = true;
+    }
+    else {
+      // not method, may be notification
+      m = aJsonRequest->get("notification");
+    }
+    if (!m) {
+      err = Error::err<P44VdcError>(400, "invalid request, must specify 'method' or 'notification'");
+    }
+    else {
+      // get method/notification name
+      cmd = m->stringValue();
+      // get params
+      // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
+      ApiValuePtr params = JsonApiValue::newValueFromJson(aJsonRequest);
+      if (Error::isOK(err)) {
+        if (isMethod) {
+          // have method handled
+          err = handleMethodForParams(request, cmd, params);
+          // Note: if method returns NULL, it has sent or will send results itself.
+          //   Otherwise, even if Error is ErrorOK we must send a generic response
+        }
+        else {
+          // handle notification
+          err = handleNotificationForParams(request->connection(), cmd, params);
+          // Notifications are always immediately confirmed, so make sure there's an explicit ErrorOK
+          if (!err) {
+            err = ErrorPtr(new Error(Error::OK));
+          }
+        }
+      }
+    }
+  }
+  // err==NULL here means we don't have to do anything more
+  // err containing an Error object here (even ErrorOK) means we must return status
+  if (err) {
+    request->sendResponse(JsonObjectPtr(), err);
+  }
+}
+
+
+
+// MARK: ===== ubus API - UbusApiConnection
+
+UbusApiConnection::UbusApiConnection()
+{
+  setApiVersion(VDC_API_VERSION_MAX);
+}
+
+
+ApiValuePtr UbusApiConnection::newApiValue()
+{
+  return ApiValuePtr(new JsonApiValue);
+}
+
+
+// MARK: ===== ubus API - UbusApiRequest
+
+UbusApiRequest::UbusApiRequest(UbusRequestPtr aUbusRequest)
+{
+  ubusRequest = aUbusRequest;
+}
+
+
+VdcApiConnectionPtr UbusApiRequest::connection()
+{
+  return VdcApiConnectionPtr(new UbusApiConnection());
+}
+
+
+ErrorPtr UbusApiRequest::sendResult(ApiValuePtr aResult)
+{
+  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) result sent: result=%s", aResult ? aResult->description().c_str() : "<none>");
+  JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
+  JsonObjectPtr r;
+  if (result) r = result->jsonObject();
+  sendResponse(r, ErrorPtr());
+  return ErrorPtr();
+}
+
+
+
+ErrorPtr UbusApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
+{
+  ErrorPtr err;
+  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) error sent: error=%d (%s)", aErrorCode, aErrorMessage.c_str());
+  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
+    err = VdcApiErrorPtr(new VdcApiError(aErrorCode, aErrorMessage, aErrorType, aUserFacingMessage));
+  }
+  else {
+    err = ErrorPtr(new Error(aErrorCode, aErrorMessage)); // re-pack into error object
+  }
+  sendResponse(JsonObjectPtr(), err);
+  return ErrorPtr();
+}
+
+
+
+void UbusApiRequest::sendResponse(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  // create response
+  JsonObjectPtr response = JsonObject::newObj();
+  if (!Error::isOK(aError)) {
+    // error, return error response
+    response->add("error", JsonObject::newInt32((int32_t)aError->getErrorCode()));
+    response->add("errormessage", JsonObject::newString(aError->getErrorMessage()));
+    response->add("errordomain", JsonObject::newString(aError->getErrorDomain()));
+    VdcApiErrorPtr ve = boost::dynamic_pointer_cast<VdcApiError>(aError);
+    if (ve) {
+      response->add("errortype", JsonObject::newInt32(ve->getErrorType()));
+      response->add("userfacingmessage", JsonObject::newString(ve->getUserFacingMessage()));
+    }
+  }
+  else {
+    // no error, return result (if any)
+    response->add("result", aResult);
+  }
+  LOG(LOG_DEBUG, "ubus response: %s", response->c_strValue());
+  ubusRequest->sendResponse(response);
+}
+
+
+#endif
+
+
+#if ENABLE_JSONCFGAPI
+
+
+// MARK: ===== JSON config API
 
 void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed)
 {
@@ -278,7 +401,6 @@ void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllow
     configApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
   }
 }
-
 
 
 SocketCommPtr P44VdcHost::configApiConnectionHandler(SocketCommPtr aServerSocketCommP)
@@ -305,6 +427,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   // - a JSON request must be either specified in the URL or in the POST data, not both
   // - if POST data ("data" member in the incoming request) is present, "uri_params" is ignored
   // - "uri" selects one of possibly multiple APIs
+  signalActivity(); // P44 JSON API calls are activity as well
   if (Error::isOK(aError)) {
     // not JSON level error, try to process
     LOG(LOG_DEBUG, "cfg -> vdcd (JSON) request received: %s", aJsonObject->c_strValue());
@@ -333,10 +456,12 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         // - use x-p44-vdcs and x-p44-devices properties to find dsuids
         aError = processVdcRequest(aJsonComm, request);
       }
+      #if ENABLE_LEGACY_P44CFGAPI
       else if (apiselector=="p44") {
         // process p44 specific requests
         aError = processP44Request(aJsonComm, request);
       }
+      #endif
       else {
         // unknown API selector
         aError = Error::err<P44VdcError>(400, "invalid URI, unknown API");
@@ -400,37 +525,34 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
     // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
     ApiValuePtr params = JsonApiValue::newValueFromJson(aRequest);
     P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm));
-    if (Error::isOK(err)) {
-      // operation method
-      if (isMethod) {
-        // create request
-        // check for old-style name/index and generate basic query (1 or 2 levels)
-        ApiValuePtr query = params->newObject();
-        ApiValuePtr name = params->get("name");
-        if (name) {
-          ApiValuePtr index = params->get("index");
-          ApiValuePtr subquery = params->newNull();
-          if (index) {
-            // subquery
-            subquery->setType(apivalue_object);
-            subquery->add(index->stringValue(), subquery->newNull());
-          }
-          string nm = trimWhiteSpace(name->stringValue()); // to allow a single space for deep recursing wildcard
-          query->add(nm, subquery);
-          params->add("query", query);
+    if (isMethod) {
+      // create request
+      // check for old-style name/index and generate basic query (1 or 2 levels)
+      ApiValuePtr query = params->newObject();
+      ApiValuePtr name = params->get("name");
+      if (name) {
+        ApiValuePtr index = params->get("index");
+        ApiValuePtr subquery = params->newNull();
+        if (index) {
+          // subquery
+          subquery->setType(apivalue_object);
+          subquery->add(index->stringValue(), subquery->newNull());
         }
-        // have method handled
-        err = handleMethodForParams(request, cmd, params);
-        // Note: if method returns NULL, it has sent or will send results itself.
-        //   Otherwise, even if Error is ErrorOK we must send a generic response
+        string nm = trimWhiteSpace(name->stringValue()); // to allow a single space for deep recursing wildcard
+        query->add(nm, subquery);
+        params->add("query", query);
       }
-      else {
-        // handle notification
-        err = handleNotificationForParams(request->connection(), cmd, params);
-        // Notifications are always immediately confirmed, so make sure there's an explicit ErrorOK
-        if (!err) {
-          err = ErrorPtr(new Error(Error::OK));
-        }
+      // have method handled
+      err = handleMethodForParams(request, cmd, params);
+      // Note: if method returns NULL, it has sent or will send results itself.
+      //   Otherwise, even if Error is ErrorOK we must send a generic response
+    }
+    else {
+      // handle notification
+      err = handleNotificationForParams(request->connection(), cmd, params);
+      // Notifications are always immediately confirmed, so make sure there's an explicit ErrorOK
+      if (!err) {
+        err = ErrorPtr(new Error(Error::OK));
       }
     }
   }
@@ -440,7 +562,9 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
 }
 
 
-// access to plan44 extras that are not part of the vdc API
+#if ENABLE_LEGACY_P44CFGAPI
+
+// lecacy access to plan44 extras that historically were not part of the vdc API
 ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aRequest)
 {
   ErrorPtr err;
@@ -449,95 +573,179 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
     err = Error::err<P44VdcError>(400, "missing 'method'");
   }
   else {
-    string method = m->stringValue();
-    if (method=="learn") {
-      // check proximity check disabling
-      bool disableProximity = false;
-      JsonObjectPtr o = aRequest->get("disableProximityCheck");
-      if (o) {
-        disableProximity = o->boolValue();
-      }
-      // get timeout
-      o = aRequest->get("seconds");
-      int seconds = 30; // default to 30
-      if (o) seconds = o->int32Value();
-      if (seconds==0) {
-        // end learning prematurely
-        stopLearning();
-        learnIdentifyTicket.cancel();
-        // - close still running learn request
-        if (learnIdentifyRequest) {
-          learnIdentifyRequest->closeConnection();
-          learnIdentifyRequest.reset();
-        }
-        // - confirm abort with no result
-        sendCfgApiResponse(aJsonComm, JsonObjectPtr(), ErrorPtr());
-      }
-      else {
-        // start learning
-        learnIdentifyRequest = aJsonComm; // remember so we can cancel it when we receive a separate cancel request
-        startLearning(boost::bind(&P44VdcHost::learnHandler, this, aJsonComm, _1, _2), disableProximity);
-        learnIdentifyTicket.executeOnce(boost::bind(&P44VdcHost::learnHandler, this, aJsonComm, false, Error::err<P44VdcError>(408, "learn timeout")), seconds*Second);
-      }
-    }
-    else if (method=="identify") {
-      // get timeout
-      JsonObjectPtr o = aRequest->get("seconds");
-      int seconds = 30; // default to 30
-      if (o) seconds = o->int32Value();
-      if (seconds==0) {
-        // end reporting user activity
-        setUserActionMonitor(NULL);
-        learnIdentifyTicket.cancel();
-        // - close still running identify request
-        if (learnIdentifyRequest) {
-          learnIdentifyRequest->closeConnection();
-          learnIdentifyRequest.reset();
-        }
-        // - confirm abort with no result
-        sendCfgApiResponse(aJsonComm, JsonObjectPtr(), ErrorPtr());
-      }
-      else {
-        // wait for next user activity
-        learnIdentifyRequest = aJsonComm; // remember so we can cancel it when we receive a separate cancel request
-        setUserActionMonitor(boost::bind(&P44VdcHost::identifyHandler, this, aJsonComm, _1));
-        learnIdentifyTicket.executeOnce(boost::bind(&P44VdcHost::identifyHandler, this, aJsonComm, DevicePtr()), seconds*Second);
-      }
-    }
-    else {
-      err = Error::err<P44VdcError>(400, "unknown method");
-    }
+    string method = "x-p44-" + m->stringValue();
+    ApiValuePtr params = JsonApiValue::newValueFromJson(aRequest);
+    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm));
+    // directly handle as vdchost method
+    err = handleMethod(request, method, params);
   }
+  // returning NULL means caller should not do anything more
+  // returning an Error object (even ErrorOK) means caller should return status
   return err;
 }
 
+#endif // ENABLE_LEGACY_P44CFGAPI
 
-void P44VdcHost::learnHandler(JsonCommPtr aJsonComm, bool aLearnIn, ErrorPtr aError)
+
+// MARK: ===== config API - P44JsonApiConnection
+
+P44JsonApiConnection::P44JsonApiConnection()
+{
+  setApiVersion(VDC_API_VERSION_MAX);
+}
+
+
+ApiValuePtr P44JsonApiConnection::newApiValue()
+{
+  return ApiValuePtr(new JsonApiValue);
+}
+
+
+// MARK: ===== config API - P44JsonApiRequest
+
+P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aJsonComm)
+{
+  jsonComm = aJsonComm;
+}
+
+
+VdcApiConnectionPtr P44JsonApiRequest::connection()
+{
+  return VdcApiConnectionPtr(new P44JsonApiConnection());
+}
+
+
+ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
+{
+  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) result sent: result=%s", aResult ? aResult->description().c_str() : "<none>");
+  JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
+  if (result) {
+    P44VdcHost::sendCfgApiResponse(jsonComm, result->jsonObject(), ErrorPtr());
+  }
+  else {
+    // always return SOMETHING
+    P44VdcHost::sendCfgApiResponse(jsonComm, JsonObject::newNull(), ErrorPtr());
+  }
+  return ErrorPtr();
+}
+
+
+ErrorPtr P44JsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
+{
+  ErrorPtr err;
+  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error sent: error=%d (%s)", aErrorCode, aErrorMessage.c_str());
+  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
+    err = VdcApiErrorPtr(new VdcApiError(aErrorCode, aErrorMessage, aErrorType, aUserFacingMessage));
+  }
+  else {
+    err = ErrorPtr(new Error(aErrorCode, aErrorMessage)); // re-pack into error object
+  }
+  P44VdcHost::sendCfgApiResponse(jsonComm, JsonObjectPtr(), err);
+  return ErrorPtr();
+}
+
+#endif // ENABLE_JSONCFGAPI
+
+
+// MARK: ===== P44 specific vdchost level methods
+
+ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
+{
+  ErrorPtr respErr;
+  if (aMethod=="x-p44-learn") {
+    // check proximity check disabling
+    bool disableProximity = false;
+    ApiValuePtr o = aParams->get("disableProximityCheck");
+    if (o) {
+      disableProximity = o->boolValue();
+    }
+    // get timeout
+    o = aParams->get("seconds");
+    int seconds = 30; // default to 30
+    if (o) seconds = o->int32Value();
+    if (seconds==0) {
+      // end learning prematurely
+      stopLearning();
+      learnIdentifyTicket.cancel();
+      // - close still running learn request
+      if (learnIdentifyRequest) {
+        learnIdentifyRequest->sendStatus(Error::err<P44VdcError>(410, "Learn cancelled"));
+        learnIdentifyRequest.reset();
+      }
+      // - confirm abort with no result
+      aRequest->sendStatus(NULL); // ok
+    }
+    else {
+      // start learning
+      learnIdentifyRequest = aRequest; // remember so we can cancel it when we receive a separate cancel request
+      startLearning(boost::bind(&P44VdcHost::learnHandler, this, aRequest, _1, _2), disableProximity);
+      learnIdentifyTicket.executeOnce(boost::bind(&P44VdcHost::learnHandler, this, aRequest, false, Error::err<P44VdcError>(408, "learn timeout")), seconds*Second);
+    }
+  }
+  else if (aMethod=="x-p44-identify") {
+    // get timeout
+    ApiValuePtr o = aParams->get("seconds");
+    int seconds = 30; // default to 30
+    if (o) seconds = o->int32Value();
+    if (seconds==0) {
+      // end reporting user activity
+      setUserActionMonitor(NULL);
+      learnIdentifyTicket.cancel();
+      // - close still running identify request
+      if (learnIdentifyRequest) {
+        learnIdentifyRequest->sendStatus(Error::err<P44VdcError>(410, "Identify cancelled"));
+        learnIdentifyRequest.reset();
+      }
+      // - confirm abort with no result
+      aRequest->sendStatus(NULL); // ok
+    }
+    else {
+      // wait for next user activity
+      learnIdentifyRequest = aRequest; // remember so we can cancel it when we receive a separate cancel request
+      setUserActionMonitor(boost::bind(&P44VdcHost::identifyHandler, this, aRequest, _1));
+      learnIdentifyTicket.executeOnce(boost::bind(&P44VdcHost::identifyHandler, this, aRequest, DevicePtr()), seconds*Second);
+    }
+  }
+  else {
+    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
+  }
+  return respErr;
+}
+
+
+void P44VdcHost::learnHandler(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError)
 {
   learnIdentifyTicket.cancel();
   stopLearning();
-  sendCfgApiResponse(aJsonComm, JsonObject::newBool(aLearnIn), aError);
+  if (Error::isOK(aError)) {
+    ApiValuePtr v = aRequest->newApiValue();
+    v->setType(apivalue_bool);
+    v->setBoolValue(aLearnIn);
+    aRequest->sendResult(v);
+  }
+  else {
+    aRequest->sendError(aError);
+  }
   learnIdentifyRequest.reset();
 }
 
 
-void P44VdcHost::identifyHandler(JsonCommPtr aJsonComm, DevicePtr aDevice)
+void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
 {
   learnIdentifyTicket.cancel();
   if (aDevice) {
-    sendCfgApiResponse(aJsonComm, JsonObject::newString(aDevice->getDsUid().getString()), ErrorPtr());
-    // end monitor mode
-    setUserActionMonitor(NULL);
+    ApiValuePtr v = aRequest->newApiValue();
+    v->setType(apivalue_string);
+    v->setStringValue(aDevice->getDsUid().getString());
+    aRequest->sendResult(v);
   }
   else {
-    sendCfgApiResponse(aJsonComm, JsonObjectPtr(), Error::err<P44VdcError>(408, "identify timeout"));
-    setUserActionMonitor(NULL);
+    aRequest->sendError(Error::err<P44VdcError>(408, "identify timeout"));
   }
+  // end monitor mode
+  setUserActionMonitor(NULL);
   learnIdentifyRequest.reset();
 }
-
-
-// MARK: ===== self test procedure
 
 
 

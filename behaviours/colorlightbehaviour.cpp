@@ -484,10 +484,10 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         HSV[1] = saturation->getChannelValue()/100; // 0..1
         HSV[2] = 1;
         HSVtoxyV(HSV, xyV);
-        cieX->syncChannelValue(xyV[0]);
-        cieY->syncChannelValue(xyV[1]);
+        cieX->syncChannelValue(xyV[0], false, true);
+        cieY->syncChannelValue(xyV[1], false, true);
         xyVtoCT(xyV, mired);
-        ct->syncChannelValue(mired);
+        ct->syncChannelValue(mired, false, true);
         break;
       case colorLightModeXY:
         // missing HSV and ct
@@ -495,18 +495,18 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         xyV[1] = cieY->getChannelValue();
         xyV[2] = 1;
         xyVtoCT(xyV, mired);
-        ct->syncChannelValue(mired);
+        ct->syncChannelValue(mired, false, true);
       xyVtoHSV:
         xyVtoHSV(xyV, HSV);
-        hue->syncChannelValue(HSV[0]);
-        saturation->syncChannelValue(HSV[1]*100); // 0..100%
+        hue->syncChannelValue(HSV[0], false, true);
+        saturation->syncChannelValue(HSV[1]*100, false, true); // 0..100%
         break;
       case colorLightModeCt:
         // missing HSV and xy
         // - xy
         CTtoxyV(ct->getChannelValue(), xyV);
-        cieX->syncChannelValue(xyV[0]);
-        cieY->syncChannelValue(xyV[1]);
+        cieX->syncChannelValue(xyV[0], false, true);
+        cieY->syncChannelValue(xyV[1], false, true);
         // - also create HSV
         goto xyVtoHSV;
       default:

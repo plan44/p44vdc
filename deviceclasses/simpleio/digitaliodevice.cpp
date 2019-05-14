@@ -139,7 +139,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     s->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, -1);
     s->setDeviceParams(shadowdevice_rollerblind, false, 500*MilliSecond);
     s->position->setFullRangeTime(40*Second);
-    s->position->syncChannelValue(100); // assume fully up at beginning
+    s->position->syncChannelValue(100, false, true); // assume fully up at beginning
     addBehaviour(s);
   }
 	deriveDsUid();

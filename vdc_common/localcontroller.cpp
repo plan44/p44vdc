@@ -479,7 +479,7 @@ ErrorPtr ZoneList::load()
     }
     delete queryP; queryP = NULL;
     // make sure we have a global (appartment) zone
-    getZoneById(0);
+    getZoneById(0, true);
   }
   return err;
 }
@@ -993,6 +993,8 @@ bool Trigger::checkAndFire()
     LOG(LOG_NOTICE, "Trigger '%s': condition changes to %s", name.c_str(), newState==yes ? "TRUE" : (newState==no ? "FALSE" : "undefined"));
     conditionMet = newState;
     if (conditionMet==yes) {
+      // a trigger fire is an activity
+      LocalController::sharedLocalController()->signalActivity();
       // trigger when state goes from not met to met.
       ErrorPtr err = executeActions();
       if (Error::isOK(err)) {
@@ -1484,6 +1486,12 @@ LocalControllerPtr LocalController::sharedLocalController()
 }
 
 
+void LocalController::signalActivity()
+{
+  vdcHost.signalActivity();
+}
+
+
 void LocalController::processGlobalEvent(VdchostEvent aActivity)
 {
   FOCUSLOG("processGlobalEvent: event = %d", (int)aActivity);
@@ -1492,6 +1500,7 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
 
 bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
+  LocalController::sharedLocalController()->signalActivity(); // button clicks are activity
   FOCUSLOG("processButtonClick: clicktype=%d, device = %s", (int)aClickType, aButtonBehaviour.shortDesc().c_str());
   // defaults
   DsGroup group = aButtonBehaviour.buttonGroup;

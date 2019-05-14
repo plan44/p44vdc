@@ -85,7 +85,7 @@ namespace p44 {
   /// persistence for digitalSTROM paramters
   class DsParamStore : public ParamStore
   {
-    typedef SQLite3Persistence inherited;
+    typedef ParamStore inherited;
   protected:
     /// Get DB Schema creation/upgrade SQL statements
     virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
@@ -182,13 +182,16 @@ namespace p44 {
     MLTicket sessionActivityTicket;
     VdcApiConnectionPtr activeSessionConnection;
 
+    // settings
+    bool persistentChannels;
+
     #if ENABLE_LOCALCONTROLLER
     LocalControllerPtr localController;
     #endif
 
   public:
 
-    VdcHost(bool aWithLocalController = false);
+    VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false);
     virtual ~VdcHost();
 
     /// VdcHost is a singleton, get access to it
@@ -370,6 +373,10 @@ namespace p44 {
     /// get IPv4 address relevant for connection status
     /// @return IPv4 as a 32-bit int, or 0 if none found
     uint32_t getIpV4Address();
+
+    /// global setting for persisting (and restoring after reboot) last output channel states
+    /// @return true if output channel states should be saved/restored
+    bool doPersistChannels() { return persistentChannels; };
 
     /// @}
 
@@ -584,6 +591,9 @@ namespace p44 {
     DsAddressablePtr addressableForDsUid(const DsUid &aDsUid);
     DsAddressablePtr addressableForItemSpec(const string &aItemSpec);
 
+    // activity monitor
+    void signalActivity();
+
   private:
 
     // derive dSUID
@@ -595,7 +605,7 @@ namespace p44 {
     void collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc);
     void vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc, ErrorPtr aError);
     void initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice);
-    void deviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice, ErrorPtr aError);
+    void nextDeviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice, ErrorPtr aError);
 
     // local operation mode
     void handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
@@ -613,7 +623,10 @@ namespace p44 {
     ErrorPtr removeHandler(VdcApiRequestPtr aForRequest, DevicePtr aDevice);
     void removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aForRequest, bool aDisconnected);
     void duplicateIgnored(DevicePtr aDevice);
-    void deviceInitialized(DevicePtr aDevice);
+    void separateDeviceInitialized(DevicePtr aDevice, ErrorPtr aError);
+
+    // handles freshly initialized device
+    void deviceInitialized(DevicePtr aDevice, ErrorPtr aError);
 
     // announcing dSUID addressable entities within the device container (vdc host)
     void resetAnnouncing();
@@ -623,9 +636,6 @@ namespace p44 {
 
     // post a vdchost (global) event to all vdcs and via event monitor callback
     void postEvent(VdchostEvent aEvent);
-
-    // activity monitor
-    void signalActivity();
 
     // periodic task
     void periodicTask(MLMicroSeconds aNow);

@@ -26,6 +26,19 @@
 
 #include "jsoncomm.hpp"
 
+#ifndef ENABLE_JSONCFGAPI
+  // by default, we have _either_ ubus _or_ json config API, depending on ENABLE_UBUS
+  #if ENABLE_UBUS
+    #define ENABLE_JSONCFGAPI 0
+  #else
+    #define ENABLE_JSONCFGAPI 1
+  #endif
+#endif
+
+#if ENABLE_UBUS
+  #include "ubus.hpp"
+#endif
+
 
 using namespace std;
 
@@ -42,6 +55,7 @@ namespace p44 {
   };
 
 
+  #if ENABLE_JSONCFGAPI
 
   /// Dummy config API "connection" object
   class P44JsonApiConnection : public VdcApiConnection
@@ -114,31 +128,127 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;
 
+  #endif
+
+  #if ENABLE_UBUS
+
+  /// Dummy ubus API "connection" object
+  class UbusApiConnection : public VdcApiConnection
+  {
+    typedef VdcApiConnection inherited;
+
+  public:
+
+    UbusApiConnection();
+
+    /// install callback for received API requests
+    /// @param aApiRequestHandler will be called when a API request has been received
+    void setRequestHandler(VdcApiRequestCB aApiRequestHandler);
+
+    /// The underlying socket connection (dummy for ubus)
+    /// @return socket connection
+    virtual SocketCommPtr socketConnection() P44_OVERRIDE { return SocketCommPtr(); };
+
+    /// Cannot send a API request
+    /// @return empty or Error object in case of error
+    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE
+      { return TextError::err("cant send request to ubus API"); };
+
+    /// request closing connection after last message has been sent
+    virtual void closeAfterSend() P44_OVERRIDE {};
+
+    /// get a new API value suitable for this connection
+    /// @return new API value of suitable internal implementation to be used on this API connection
+    virtual ApiValuePtr newApiValue() P44_OVERRIDE;
+
+  };
+
+
+
+
+  /// ubus api request
+  class UbusApiRequest : public VdcApiRequest
+  {
+    typedef VdcApiRequest inherited;
+    UbusRequestPtr ubusRequest;
+
+  public:
+
+    /// constructor
+    UbusApiRequest(UbusRequestPtr aUbusRequest);
+
+    /// return the request ID as a string
+    /// @return request ID as string
+    virtual string requestId() P44_OVERRIDE { return ""; }
+
+    /// get the API connection this request originates from
+    /// @return API connection
+    virtual VdcApiConnectionPtr connection() P44_OVERRIDE;
+
+    /// send a vDC API result (answer for successful method call)
+    /// @param aResult the result as a ApiValue. Can be NULL for procedure calls without return value
+    /// @result empty or Error object in case of error sending result response
+    virtual ErrorPtr sendResult(ApiValuePtr aResult) P44_OVERRIDE;
+
+    /// send a vDC API error (answer for unsuccesful method call)
+    /// @param aErrorCode the error code
+    /// @param aErrorMessage the error message or NULL to generate a standard text
+    /// @param aErrorData the optional "data" member for the vDC API error object (in JSON only)
+    /// @param aErrorType the optional "errorType"
+    /// @param aUserFacingMessage the optional user facing message
+    /// @result empty or Error object in case of error sending error response
+    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr(), uint8_t aErrorType = 0, string aUserFacingMessage = "") P44_OVERRIDE;
+
+    /// helper to send response or error
+    /// @param aResult the result object to send
+    /// @param aError the error object to send (if set, it overrides aResult)
+    void sendResponse(JsonObjectPtr aResult, ErrorPtr aError);
+
+  };
+  typedef boost::intrusive_ptr<UbusApiRequest> UbusApiRequestPtr;
+
+
+  #endif // ENABLE_UBUS
+
 
 
   /// plan44 specific implementation of a vdc host, with a separate API used by WebUI components.
   class P44VdcHost : public VdcHost
   {
     typedef VdcHost inherited;
-    friend class P44JsonApiRequest;
 
     MLTicket learnIdentifyTicket;
-    JsonCommPtr learnIdentifyRequest;
+    VdcApiRequestPtr learnIdentifyRequest;
 
-    SocketCommPtr configApiServer; ///< JSON API for web interface
+    #if ENABLE_JSONCFGAPI
+    SocketCommPtr configApiServer; ///< JSON API for legacy web interface
+    #endif
+
+    #if ENABLE_UBUS
+    UbusServerPtr ubusApiServer; ///< ubus API for openwrt web interface
+    #endif
+
 
   public:
 
     int webUiPort; ///< port number of the web-UI (on the same host). 0 if no Web-UI present
     string webUiPath; ///< path to be used in the webuiURLString
 
-    P44VdcHost(bool aWithLocalController = false);
+    P44VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false);
 
+    #if ENABLE_JSONCFGAPI
     /// enable config API
     /// @param aServiceOrPort port number or service string
     /// @param aNonLocalAllowed if set, non-local clients are allowed to connect to the config API
     /// @note API server will be started only at initialize()
     void enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed);
+    #endif
+
+    #if ENABLE_UBUS
+    /// enable ubus API
+    /// @note ubus server will be started only at initialize()
+    void enableUbusApi();
+    #endif
 
 		/// perform self testing
     /// @param aCompletedCB will be called when the entire self test is done
@@ -148,25 +258,39 @@ namespace p44 {
     void selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED);
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString();
+    virtual string webuiURLString() P44_OVERRIDE;
 
     /// initialize
     /// @param aCompletedCB will be called when the entire container is initialized or has been aborted with a fatal error
     /// @param aFactoryReset if set, database will be reset
-    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset);
+    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+
+    #if ENABLE_JSONCFGAPI
+    static void sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError);
+    #endif
+
+  protected:
+
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
   private:
 
+    #if ENABLE_JSONCFGAPI
     SocketCommPtr configApiConnectionHandler(SocketCommPtr aServerSocketComm);
     void configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonObject);
-    void learnHandler(JsonCommPtr aJsonComm, bool aLearnIn, ErrorPtr aError);
-    void identifyHandler(JsonCommPtr aJsonComm, DevicePtr aDevice);
-    void endIdentify();
-
     ErrorPtr processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
+    #if ENABLE_LEGACY_P44CFGAPI
     ErrorPtr processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
+    #endif
+    #endif
 
-    static void sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError);
+    #if ENABLE_UBUS
+    void ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string aMethod, JsonObjectPtr aJsonRequest);
+    #endif
+
+
+    void learnHandler(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError);
+    void identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice);
 
   };
   typedef boost::intrusive_ptr<P44VdcHost> P44VdcHostPtr;
