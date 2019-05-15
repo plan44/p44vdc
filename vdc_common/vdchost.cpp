@@ -77,6 +77,11 @@ using namespace p44;
   #define DEFAULT_DESCRIPTION_TEMPLATE "%V %M%N #%S"
 #endif
 
+// default geolocation
+#if !defined(DEFAULT_LATITUDE) || !defined(DEFAULT_LONGITUDE)
+  #define DEFAULT_LONGITUDE 8.474552
+  #define DEFAULT_LATITUDE 47.394691
+#endif
 
 static VdcHost *sharedVdcHostP = NULL;
 
@@ -98,7 +103,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
   mainLoopStatsCounter(0),
   persistentChannels(aWithPersistentChannels),
-  productName(DEFAULT_PRODUCT_NAME)
+  productName(DEFAULT_PRODUCT_NAME),
+  longitude(DEFAULT_LONGITUDE),
+  latitude(DEFAULT_LATITUDE)
 {
   // remember singleton's address
   sharedVdcHostP = this;
@@ -1447,6 +1454,8 @@ enum {
   valueSources_key,
   persistentChannels_key,
   writeOperations_key,
+  latitude_key,
+  longitude_key,
   #if ENABLE_LOCALCONTROLLER
   localController_key,
   #endif
@@ -1472,6 +1481,8 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "x-p44-valueSources", apivalue_null, valueSources_key, OKEY(vdchost_obj) },
     { "x-p44-persistentChannels", apivalue_bool, persistentChannels_key, OKEY(vdchost_obj) },
     { "x-p44-writeOperations", apivalue_uint64, writeOperations_key, OKEY(vdchost_obj) },
+    { "x-p44-latitude", apivalue_double, latitude_key, OKEY(vdchost_obj) },
+    { "x-p44-longitude", apivalue_double, longitude_key, OKEY(vdchost_obj) },
     #if ENABLE_LOCALCONTROLLER
     { "x-p44-localController", apivalue_object, localController_key, OKEY(localController_obj) },
     #endif
@@ -1541,6 +1552,12 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case writeOperations_key:
           aPropValue->setUint32Value(dsParamStore.writeOpsCount);
           return true;
+        case latitude_key:
+          aPropValue->setDoubleValue(latitude);
+          return true;
+        case longitude_key:
+          aPropValue->setDoubleValue(longitude);
+          return true;
       }
     }
     else {
@@ -1548,6 +1565,12 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
       switch (aPropertyDescriptor->fieldKey()) {
         case persistentChannels_key:
           setPVar(persistentChannels, aPropValue->boolValue());
+          return true;
+        case latitude_key:
+          setPVar(latitude, aPropValue->doubleValue());
+          return true;
+        case longitude_key:
+          setPVar(longitude, aPropValue->doubleValue());
           return true;
       }
     }
@@ -1713,7 +1736,7 @@ const char *VdcHost::tableName()
 
 // data field definitions
 
-static const size_t numFields = 3;
+static const size_t numFields = 5;
 
 size_t VdcHost::numFieldDefs()
 {
@@ -1727,6 +1750,8 @@ const FieldDefinition *VdcHost::getFieldDef(size_t aIndex)
     { "vdcHostName", SQLITE_TEXT },
     { "vdcHostDSUID", SQLITE_TEXT },
     { "persistentChannels", SQLITE_INTEGER },
+    { "latitude", SQLITE_FLOAT },
+    { "longitude", SQLITE_FLOAT },
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1756,6 +1781,8 @@ void VdcHost::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   aIndex++;
   // the persistentchannels flag
   aRow->getIfNotNull(aIndex++, persistentChannels);
+  aRow->getIfNotNull(aIndex++, latitude);
+  aRow->getIfNotNull(aIndex++, longitude);
 }
 
 
@@ -1772,6 +1799,8 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
     aStatement.bind(aIndex++, dSUID.getString().c_str(), false); // not static, string is local obj
   }
   aStatement.bind(aIndex++, persistentChannels);
+  aStatement.bind(aIndex++, latitude);
+  aStatement.bind(aIndex++, longitude);
 }
 
 

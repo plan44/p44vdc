@@ -33,7 +33,7 @@
 #include "outputbehaviour.hpp"
 #include "buttonbehaviour.hpp"
 
-#include <time.h>
+#include "timeutils.hpp"
 
 #if ENABLE_LOCALCONTROLLER
 
@@ -1032,6 +1032,7 @@ ExpressionValue Trigger::evaluateFunction(const string &aName, const FunctionArg
   gettimeofday(&t, NULL);
   struct tm now;
   localtime_r(&t.tv_sec, &now);
+  VdcHost &vdchost = LocalController::sharedLocalController()->vdcHost;
   if (aName=="is_weekday" && aArgs.size()>0) {
     int weekday = now.tm_wday; // 0..6, 0=sunday
     for (int i = 0; i<aArgs.size(); i++) {
@@ -1045,20 +1046,56 @@ ExpressionValue Trigger::evaluateFunction(const string &aName, const FunctionArg
     // none of the specified days
     return ExpressionValue(0);
   }
-  else if (aName=="is_time" && aArgs.size()==2) {
-    int h = (int)aArgs[0].v;
-    int m = (int)aArgs[1].v;
-    return ExpressionValue(now.tm_hour==h && now.tm_min==m);
+  else if (aName=="is_time" && aArgs.size()>=1) {
+    // precision only to the minute!
+    int mins;
+    if (aArgs.size()==2) {
+      // legacy spec
+      mins = (int)aArgs[0].v * 60 + (int)aArgs[1].v;
+    }
+    else {
+      // specification in seconds, usually using time literal
+      mins = (int)(aArgs[0].v / 60);
+    }
+    return ExpressionValue(now.tm_hour*60+now.tm_min == mins);
   }
-  else if (aName=="after_time" && aArgs.size()==2) {
-    int h = (int)aArgs[0].v;
-    int m = (int)aArgs[1].v;
-    return ExpressionValue(now.tm_hour>h || (now.tm_hour==h && now.tm_min>=m));
+  else if (aName=="after_time" && aArgs.size()>=1) {
+    // precision to the second
+    long secs;
+    if (aArgs.size()==2) {
+      // legacy spec
+      secs = ((long)aArgs[0].v * 60 + (long)aArgs[1].v) * 60;
+    }
+    else {
+      // specification in seconds, usually using time literal
+      secs = (long)(aArgs[0].v);
+    }
+    return ExpressionValue(((now.tm_hour*60)+now.tm_min)*60+now.tm_sec>=secs);
+  }
+  else if (aName=="between_yeardays" && aArgs.size()==2) {
+    int first = (int)(aArgs[0].v);
+    int last = (int)(aArgs[1].v);
+    return ExpressionValue(
+      first<=last ?
+      now.tm_yday>=first && now.tm_yday<=last : // within year between first and last
+      now.tm_yday<=last || now.tm_yday>=first // before first day in next year, after last day in previous
+    );
+  }
+  else if (aName=="sunrise") {
+    return ExpressionValue(sunrise(time(NULL), vdchost.latitude, vdchost.longitude, false)*3600);
+  }
+  else if (aName=="dawn") {
+    return ExpressionValue(sunrise(time(NULL), vdchost.latitude, vdchost.longitude, true)*3600);
+  }
+  else if (aName=="sunset") {
+    return ExpressionValue(sunset(time(NULL), vdchost.latitude, vdchost.longitude, false)*3600);
+  }
+  else if (aName=="dusk") {
+    return ExpressionValue(sunset(time(NULL), vdchost.latitude, vdchost.longitude, true)*3600);
   }
   // no such function
   return ExpressionError::errValue(ExpressionError::NotFound, "not found"); // just signals caller to try builtin functions
 }
-
 
 
 // MARK: ===== Trigger actions execution

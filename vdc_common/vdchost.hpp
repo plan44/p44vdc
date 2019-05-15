@@ -203,6 +203,10 @@ namespace p44 {
     LocalControllerPtr getLocalController();
     #endif
 
+    /// geolocation of the installation
+    double longitude;
+    double latitude;
+
     /// the list of containers by API-exposed ID (dSUID or derived dsid)
     VdcMap vdcs;
 
