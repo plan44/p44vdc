@@ -293,6 +293,14 @@ static const DefaultSceneParams defaultScenes[NUMDEFAULTSCENES+1] = {
 };
 
 
+int SimpleScene::areaForScene(SceneNo aSceneNo)
+{
+  if (aSceneNo>NUMDEFAULTSCENES)
+    aSceneNo = NUMDEFAULTSCENES; // last entry in the table is the default for all higher scene numbers
+  return defaultScenes[aSceneNo].sceneArea;
+}
+
+
 void SimpleScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
   // basic initialisation

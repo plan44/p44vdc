@@ -98,7 +98,8 @@ namespace p44 {
     SceneNo lastGlobalScene; ///< last global scene called
 
     // Light state
-    VdcDimMode lastDim; ///< last dimming direction in this room
+    VdcDimMode lastDim; ///< last dimming direction in this zone
+    DsChannelType lastDimChannel; ///< last dimming channel in this zone
     SceneNo lastLightScene; ///< last light scene called
     bool lightOn[5]; ///< set if light is on in this zone and area
 
@@ -133,7 +134,7 @@ namespace p44 {
 
     /// get the zoneID
     /// @return ID of this zone
-    int getZoneId() const { return zoneID; };
+    DsZoneID getZoneId() const { return zoneID; };
 
     /// register as in-use or non-in-use-any-more by a device
     void usedByDevice(DevicePtr aDevice, bool aInUse);
@@ -528,6 +529,12 @@ namespace p44 {
     void callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride = Infinite);
     void callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride = Infinite);
 
+    /// called when delivery of a scene call or dimming notification to a device has been executed
+    /// @param aDevice the device
+    /// @param aDeliveryState the delivery state
+    /// @note this is not called for all types of notifications, only callScene and dimchannel
+    /// @note aDeliveryState lifetime may immediately end when this method returns
+    void deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState);
 
   protected:
 

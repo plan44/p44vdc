@@ -42,6 +42,7 @@ namespace p44 {
   class ButtonBehaviour;
   class DsUid;
   class LocalController;
+  class NotificationDeliveryState;
 
   typedef boost::intrusive_ptr<Vdc> VdcPtr;
   typedef boost::intrusive_ptr<Device> DevicePtr;
@@ -358,6 +359,13 @@ namespace p44 {
     /// @param aNotification the name of the notification
     /// @param aParams the parameters of the notification
     void deliverToAudience(NotificationAudience &aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
+
+    /// called when delivery of a scene call or dimming notification to a device has been executed
+    /// @param aDevice the device
+    /// @param aDeliveryState the delivery state
+    /// @note this is not called for all types of notifications, only callScene and dimchannel
+    /// @note aDeliveryState lifetime may immediately end when this method returns
+    void deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState);
 
     /// @}
 

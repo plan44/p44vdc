@@ -923,8 +923,6 @@ void VdcHost::addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZon
 
 void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  // TODO: allow vdcs to handle groups in an optimized way
-  // For now, notification is just passed to all targets
   for (NotificationAudience::iterator gpos = aAudience.begin(); gpos!=aAudience.end(); ++gpos) {
     if (gpos->vdc) {
       ALOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s", aNotification.c_str(), gpos->members.size(), gpos->vdc->shortDesc().c_str());
@@ -940,6 +938,15 @@ void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectio
     }
   }
 }
+
+
+void VdcHost::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState)
+{
+  #if ENABLE_LOCALCONTROLLER
+  if (localController) localController->deviceWillApplyNotification(aDevice, aDeliveryState);
+  #endif
+}
+
 
 
 

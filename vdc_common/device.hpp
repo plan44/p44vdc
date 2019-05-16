@@ -93,6 +93,7 @@ namespace p44 {
 
     friend class Vdc;
     friend class VdcHost;
+    friend class LocalController;
     friend class VdcCollector;
     friend class DsBehaviour;
     friend class DsScene;
@@ -667,12 +668,19 @@ namespace p44 {
     ///   However, in all cases internal state must be updated to reflect the finalized operation
     void executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatToApply);
 
+    /// update the delivery state
+    /// @param aDeliveryState update params to reflect the
+    /// @param aForOptimisation if set, delivery state is updated for optimized delivery to this device, if possible
+    /// @return true if device could be prepared for optimized delivery and may be added to list of affected devices
+    bool updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bool aForOptimisation);
+
     /// let this device add itself to the list of devices that can received grouped/optimized scene/dim calls, if applicable
     /// @param aDeliveryState if the device supports optimized calls, it must update the delivery state hashes
     ///   and add itself to the list of affected devices
     /// @return false if device does not support optimization (on a call-by-call basis, might support
     ///   it for some scenes but not for others).
     bool addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState);
+
 
     /// let device implementation prepare for (and possibly reject) optimized set
     /// @param aDeliveryState can be inspected to see the scene or dim parameters

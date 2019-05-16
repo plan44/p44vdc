@@ -32,6 +32,7 @@
 
 #include "outputbehaviour.hpp"
 #include "buttonbehaviour.hpp"
+#include "simplescene.hpp"
 
 #include "timeutils.hpp"
 
@@ -84,10 +85,15 @@ void ZoneDescriptor::usedByDevice(DevicePtr aDevice, bool aInUse)
 
 static const SceneKindDescriptor roomScenes[] = {
   { ROOM_OFF, scene_room|scene_preset|scene_off , "off"},
+  { AUTO_OFF, scene_room|scene_preset|scene_off|scene_extended , "slow off"},
   { ROOM_ON, scene_room|scene_preset, "preset 1" },
   { PRESET_2, scene_room|scene_preset, "preset 2" },
   { PRESET_3, scene_room|scene_preset, "preset 3" },
   { PRESET_4, scene_room|scene_preset, "preset 4" },
+  { STANDBY, scene_room|scene_preset|scene_off|scene_extended, "standby" },
+  { DEEP_OFF, scene_room|scene_preset|scene_off|scene_extended, "deep off" },
+  { SLEEPING, scene_room|scene_preset|scene_off|scene_extended, "sleeping" },
+  { WAKE_UP, scene_room|scene_preset|scene_extended, "wakeup" },
   { AREA_1_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 1 off" },
   { AREA_1_ON, scene_room|scene_preset|scene_area|scene_extended, "area 1 on" },
   { AREA_2_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 2 off" },
@@ -127,9 +133,9 @@ static const SceneKindDescriptor globalScenes[] = {
   { PRESET_3, scene_global|scene_preset|scene_extended, "global preset 3" },
   { PRESET_4, scene_global|scene_preset|scene_extended, "global preset 4" },
   { AUTO_STANDBY, scene_global, "auto-standby" },
-  { STANDBY, scene_global|scene_preset, "standby" },
-  { DEEP_OFF, scene_global|scene_preset, "deep off" },
-  { SLEEPING, scene_global|scene_preset, "sleeping" },
+  { STANDBY, scene_global|scene_preset|scene_off, "standby" },
+  { DEEP_OFF, scene_global|scene_preset|scene_off, "deep off" },
+  { SLEEPING, scene_global|scene_preset|scene_off, "sleeping" },
   { WAKE_UP, scene_global|scene_preset, "wakeup" },
   { PRESENT, scene_global|scene_preset, "present" },
   { ABSENT, scene_global|scene_preset, "absent" },
@@ -1708,18 +1714,26 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     if (group!=group_yellow_light) return true; // NOP because we don't support anything except light for now, but handled
     // evaluate click
     if (aClickType==ct_hold_start) {
-      // start dimming if not off (or rocker)
-      if (direction==dimmode_stop) {
-        // single button, no explicit direction
-        if (!zone->zoneState.lightOn[area]) {
-          // TODO: start deep off detection sequence
-          return true; // NOP, handled
+      // start dimming if not off (or if it is specifically the up-key of a rocker)
+      if (!zone->zoneState.lightOn[area]) {
+        // light is currently off
+        if (direction==dimmode_up) {
+          // holding specific up-key can start dimming even if light was off
+          doDim = true;
         }
-        // use inverse of last dim
+        else {
+          // long press while off, and not specifically up: deep off
+          sceneToCall = DEEP_OFF;
+        }
+      }
+      else {
+        // light is on, can dim
+        doDim = true;
+      }
+      if (doDim && direction==dimmode_stop) {
+        // single button, no explicit direction -> use inverse of last dim
         direction = zone->zoneState.lastDim==dimmode_up ? dimmode_down : dimmode_up;
       }
-      zone->zoneState.lastDim = direction;
-      doDim = true;
     }
     else if (aClickType==ct_hold_end) {
       // stop dimming
@@ -1759,15 +1773,10 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       if (direction==dimmode_up) {
         // calling a preset
         sceneToCall = sceneOnClick;
-        zone->zoneState.lightOn[area] = true;
       }
       else {
         // calling an off scene
         sceneToCall = sceneOffclick;
-        zone->zoneState.lightOn[area] = false;
-      }
-      if (sceneToCall!=INVALID_SCENE_NO) {
-        zone->zoneState.lastLightScene = sceneToCall;
       }
     }
     // now perform actions
@@ -1857,6 +1866,64 @@ void LocalController::deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, D
     deviceZone->usedByDevice(aDevice, true);
   }
 }
+
+
+void LocalController::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState)
+{
+  ZoneDescriptorPtr zone = localZones.getZoneById(aDevice->getZoneID(), false);
+  if (zone && aDevice->getOutput()) {
+    DsGroupMask affectedGroups = aDevice->getOutput()->groupMemberships();
+    if (aDeliveryState.optimizedType==ntfy_callscene) {
+      // scene call
+      for (int g = group_undefined; affectedGroups; affectedGroups>>=1, ++g) {
+        if (affectedGroups & 1) {
+          SceneIdentifier calledScene(aDeliveryState.contentId, zone->getZoneId(), (DsGroup)g);
+          // general
+          int area = SimpleScene::areaForScene(calledScene.sceneNo);
+          if (calledScene.getKindFlags()&scene_off) {
+            // is a off scene (area or not), cancels the local priority
+            aDevice->getOutput()->setLocalPriority(false);
+          }
+          else if (area!=0) {
+            // is area on scene, set local priority in the device
+            aDevice->setLocalPriority(calledScene.sceneNo);
+          }
+          if (calledScene.getKindFlags()&scene_global) {
+            zone->zoneState.lastGlobalScene = calledScene.sceneNo;
+          }
+          // group specific
+          if (g==group_yellow_light) {
+            zone->zoneState.lastLightScene = calledScene.sceneNo;
+            zone->zoneState.lightOn[area] = !(calledScene.getKindFlags()&scene_off);
+            if (calledScene.sceneNo==DEEP_OFF) {
+              // force areas off as well
+              zone->zoneState.lightOn[1] = false;
+              zone->zoneState.lightOn[2] = false;
+              zone->zoneState.lightOn[3] = false;
+              zone->zoneState.lightOn[4] = false;
+            }
+          }
+        }
+      }
+    }
+    else if (aDeliveryState.optimizedType==ntfy_dimchannel) {
+      // dimming
+      if (aDeliveryState.actionVariant!=dimmode_stop) {
+        zone->zoneState.lastDimChannel = (DsChannelType)aDeliveryState.actionParam;
+        zone->zoneState.lastDim = (VdcDimMode)aDeliveryState.actionVariant;
+      }
+    }
+    LOG(LOG_INFO,
+      "Zone '%s' (%d) state updated: lastLightScene:%d, lastGlobalScene:%d, on=%d/areas1234=%d%d%d%d",
+      zone->getName().c_str(), zone->getZoneId(),
+      zone->zoneState.lastLightScene, zone->zoneState.lastGlobalScene,
+      zone->zoneState.lightOn[0],
+      zone->zoneState.lightOn[1], zone->zoneState.lightOn[2], zone->zoneState.lightOn[3], zone->zoneState.lightOn[4]
+    );
+  }
+}
+
+
 
 
 size_t LocalController::totalDevices() const

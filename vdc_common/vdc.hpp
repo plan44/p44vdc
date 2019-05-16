@@ -90,6 +90,7 @@ namespace p44 {
   {
     friend class Device;
     friend class Vdc;
+    friend class LocalController;
 
     NotificationDeliveryState(Vdc &aVdc) :
       vdc(aVdc),

@@ -988,34 +988,40 @@ void Device::executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatTo
 }
 
 
-
-bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
+bool Device::updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bool aForOptimisation)
 {
-  bool include = false;
   if (aDeliveryState->optimizedType==ntfy_callscene) {
     if (!preparedScene) return false; // no prepared scene -> not part of optimized set
-    if (prepareForOptimizedSet(aDeliveryState)) {
+    aDeliveryState->contentId = preparedScene->sceneNo; // to re-identify the scene (the contents might have changed...)
+    if (aForOptimisation && prepareForOptimizedSet(aDeliveryState)) {
       // content hash must represent the contents of the called scenes in all affected devices
       Fnv64 sh(preparedScene->sceneHash());
       if (sh.getHash()==0) return false; // scene not hashable -> not part of optimized set
       sh.addString(dSUID.getBinary()); // add device dSUID to make it "mixable" (i.e. combine into one hash via XOR in any order)
       aDeliveryState->contentsHash ^= sh.getHash(); // mix
-      aDeliveryState->contentId = preparedScene->sceneNo; // to re-identify the scene (the contents might have changed...)
-      include = true;
+      return true;
     }
   }
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
     if (!preparedDim) return false; // no prepared scene -> not part of optimized set
-    if (prepareForOptimizedSet(aDeliveryState)) {
-      include = true;
-      aDeliveryState->contentId = 0; // no different content ids
-      aDeliveryState->actionVariant = currentDimMode; // to actually apply the dim mode to the optimized group later
+    aDeliveryState->contentId = 0; // no different content ids
+    aDeliveryState->actionVariant = currentDimMode; // to actually apply the dim mode to the optimized group later
+    aDeliveryState->actionParam = currentDimChannel ? currentDimChannel->getChannelType() : channeltype_default;
+    if (aForOptimisation && prepareForOptimizedSet(aDeliveryState)) {
       if (currentDimMode!=dimmode_stop) {
         aDeliveryState->repeatVariant = dimmode_stop; // auto-stop
         aDeliveryState->repeatAfter = currentAutoStopTime; // after this time
       }
+      return true;
     }
   }
+  return false;
+}
+
+
+bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
+{
+  bool include = updateDeliveryState(aDeliveryState, true);
   if (include) {
     // the device must be added to the device hash
     dSUID.xorDsUidIntoMix(aDeliveryState->affectedDevicesHash, true); // subdevice-safe mixing

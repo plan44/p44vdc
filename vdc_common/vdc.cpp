@@ -288,7 +288,7 @@ void Vdc::queueDelivery(NotificationDeliveryStatePtr aDeliveryState)
 
 void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryStateBeingDeleted)
 {
-  // this is called from aDeliveryStateBeingDeleted destructor, and signals delivery really complete
+  // - done
   delivering = false;
   ALOG(LOG_INFO, "===== '%s' delivery complete", NotificationNames[aDeliveryStateBeingDeleted.callType]);
   // check for pending deliveries
@@ -344,6 +344,8 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
     }
     if (optimizerMode<=opt_disabled || aDeliveryState->optimizedType!=aNotificationToApply || !dev->addToOptimizedSet(aDeliveryState)) {
       // optimisation off, different notification type than others in set, or otherwise not optimizable -> just execute and apply right now
+      dev->updateDeliveryState(aDeliveryState, false); // still: do basic updating of state such that processing has all the info
+      getVdcHost().deviceWillApplyNotification(dev, *aDeliveryState); // let vdchost process for possibly updating global zone state
       dev->executePreparedOperation(NULL, aNotificationToApply);
     }
   }
@@ -499,6 +501,7 @@ void Vdc::finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDel
   AFOCUSLOG("Finalizing repeated notification call");
   // let all devices know operation has repeated
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+    // Note: vdchost does not need to be informed about repeated notifications (so deviceProcessedNotification is not called here)
     (*pos)->executePreparedOperation(NULL, ntfy_none);
   }
 }
@@ -517,6 +520,7 @@ void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDel
   // note: we let all devices do this in parallel, continue when last device reports done
   aDeliveryState->pendingCount = aDeliveryState->affectedDevices.size(); // must be set before calling executePreparedOperation() the first time
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+    getVdcHost().deviceWillApplyNotification(*pos, *aDeliveryState); // let vdchost process for possibly updating global zone state
     (*pos)->executePreparedOperation(boost::bind(&Vdc::preparedDeviceExecuted, this, aEntry, aDeliveryState, aError), notAppliedYet ? aDeliveryState->optimizedType : ntfy_none);
   }
 }
