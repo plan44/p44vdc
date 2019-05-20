@@ -587,6 +587,13 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x30, 0x03, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_user,       1,    0, DB(1,4), DB(1,4), 100, 40*60, &stdInputHandler,  "Water detected" },
   { 0, 0x30, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature,    usage_room,       0,   40, DB(2,7), DB(2,0), 100, 40*60, &invSensorHandler,  tempText },
 
+  // A5-3F-7F: manufacturer specific
+  { 0, 0x3F, 0x7F, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,           usage_undefined,  0,    1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler,  "undefined" }, // just shows the first byte
+  // - Thermokon SR65 3AI - 3 analog inputs 0..10V
+  { 1, 0x3F, 0x7F, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,   10, DB(3,7), DB(3,0), 100,  1000, &stdSensorHandler,  "V3" },
+  { 1, 0x3F, 0x7F, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,   10, DB(2,7), DB(2,0), 100,  1000, &stdSensorHandler,  "V2" },
+  { 1, 0x3F, 0x7F, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,   10, DB(1,7), DB(1,0), 100,  1000, &stdSensorHandler,  "V1" },
+
   // terminator
   { 0, 0,    0,    0, class_black_joker,  group_black_variable,          behaviour_undefined, 0, usage_undefined, 0, 0, 0, 0, 0, 0, NULL /* NULL for extractor function terminates list */, NULL },
 };
@@ -673,18 +680,20 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   { 30, 0x00A50403, 0, outdoorText, NULL }, // outdoor is default!
   { 30, 0x01A50403, 0, indoorText, NULL },
   // heating valve alternatives
-  {  31, 0x00A52004, 0, "heating valve", NULL },
-  {  31, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
+  { 31, 0x00A52004, 0, "heating valve", NULL },
+  { 31, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
   // A5-14-09 reverse mount alternative
-  {  32, 0x00A51409, 0, "window state - regular mounting position", NULL },
-  {  32, 0x01A51409, 0, "window state - upside down mounting position", NULL },
+  { 32, 0x00A51409, 0, "window state - regular mounting position", NULL },
+  { 32, 0x01A51409, 0, "window state - upside down mounting position", NULL },
   // A5-14-0A reverse mount alternative
-  {  33, 0x00A5140A, 0, "window state - regular mounting position", NULL },
-  {  33, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
+  { 33, 0x00A5140A, 0, "window state - regular mounting position", NULL },
+  { 33, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
   // A5-08-01 generic and Eltako versions
-  {  34, 0x00A50801, 0, "standard EEP", NULL },
-  {  34, 0x01A50801, 0, "Eltako modified version (no temp/presence, extended lux range)", NULL },
-
+  { 34, 0x00A50801, 0, "standard EEP", NULL },
+  { 34, 0x01A50801, 0, "Eltako modified version (no temp/presence, extended lux range)", NULL },
+  // A5-3F-7F manufacturer specific
+  { 35, 0x00A53F7F, 0, "undefined", NULL },
+  { 35, 0x01A53F7F, 0, "Thermokon SR65 3AI - 3*0..10V analog inputs", NULL },
   { 0, 0, 0, NULL, NULL } // terminator
 };
 
