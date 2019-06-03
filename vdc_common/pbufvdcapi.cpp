@@ -1040,9 +1040,13 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
 }
 
 
-ErrorPtr VdcPbufApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
+ErrorPtr VdcPbufApiRequest::sendError(ErrorPtr aError)
 {
   ErrorPtr err;
+  if (!aError) {
+    aError = Error::ok();
+  }
+  VdcApiErrorPtr vdcApiErr = dynamic_pointer_cast<VdcApiError>(aError);
   // create a message
   Vdcapi__Message msg = VDCAPI__MESSAGE__INIT;
   Vdcapi__GenericResponse resp = VDCAPI__GENERIC_RESPONSE__INIT;
@@ -1050,15 +1054,20 @@ ErrorPtr VdcPbufApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage,
   msg.generic_response = &resp;
   msg.has_message_id = true; // is response to a previous method call message
   msg.message_id = reqId; // use same message id as in method call
-  resp.code = VdcPbufApiConnection::internalToPbufError(aErrorCode);
-  resp.description = (char *)(aErrorMessage.size()>0 ? aErrorMessage.c_str() : NULL);
+  resp.code = VdcPbufApiConnection::internalToPbufError(aError->getErrorCode());
+  resp.description = (char *)(*aError->getErrorMessage() ? aError->getErrorMessage() : NULL);
   resp.has_errortype = true;
-  resp.errortype = (Vdcapi__ErrorType)aErrorType;
-  resp.usermessagetobetranslated = (char *)(aUserFacingMessage.size()>0 ? aUserFacingMessage.c_str() : NULL);
+  resp.errortype = vdcApiErr ? (Vdcapi__ErrorType)vdcApiErr->getErrorType() : VDCAPI__ERROR_TYPE__FAILED;
+  resp.usermessagetobetranslated = (char *)(vdcApiErr && vdcApiErr->getUserFacingMessage().size()>0 ? vdcApiErr->getUserFacingMessage().c_str() : NULL);
   err = pbufConnection->sendMessage(&msg);
   // log (if not just OK)
-  if (aErrorCode!=Error::OK) {
-    LOG(LOG_INFO, "vdSM <- vDC (pbuf) error sent: requestid='%d', error=%d (%s) - type=%d (%s)", reqId, aErrorCode, aErrorMessage.c_str(), aErrorType, aUserFacingMessage.c_str());
+  if (!Error::isOK(aError)) {
+    if (vdcApiErr) {
+      LOG(LOG_INFO, "vdSM <- vDC (pbuf) error sent: requestid='%d', error=%ld (%s) - type=%d (%s)", reqId, vdcApiErr->getErrorCode(), vdcApiErr->getErrorMessage(), vdcApiErr->getErrorType(), vdcApiErr->getUserFacingMessage().c_str());
+    }
+    else {
+      LOG(LOG_INFO, "vdSM <- vDC (pbuf) error sent: requestid='%d', error=%ld (%s)", reqId, aError->getErrorCode(), aError->getErrorMessage());
+    }
   }
   // done
   return err;
@@ -1485,7 +1494,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         // error decoding message
         if (request) {
           // report immediately if this is a method
-          request->inherited::sendError(err);
+          request->sendError(err);
         }
         else {
           // just log

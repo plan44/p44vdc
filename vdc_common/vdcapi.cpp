@@ -154,22 +154,6 @@ ApiValuePtr VdcApiConnection::newApiValue()
 
 // MARK: ===== VdcApiRequest
 
-ErrorPtr VdcApiRequest::sendError(ErrorPtr aErrorToSend)
-{
-  if (!Error::isOK(aErrorToSend)) {
-    VdcApiErrorPtr ve = boost::dynamic_pointer_cast<VdcApiError>(aErrorToSend);
-    if (ve) {
-      // special VdcApiError, has extra user facing information
-      return sendError((uint32_t)aErrorToSend->getErrorCode(), aErrorToSend->getErrorMessage(), ApiValuePtr(), ve->getErrorType(), ve->getUserFacingMessage());
-    }
-    else {
-      return sendError((uint32_t)aErrorToSend->getErrorCode(), aErrorToSend->getErrorMessage());
-    }
-  }
-  return ErrorPtr();
-}
-
-
 ErrorPtr VdcApiRequest::sendStatus(ErrorPtr aStatusToSend)
 {
   if (Error::isOK(aStatusToSend)) {
