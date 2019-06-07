@@ -344,16 +344,13 @@ ErrorPtr UbusApiRequest::sendResult(ApiValuePtr aResult)
 
 
 
-ErrorPtr UbusApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
+ErrorPtr UbusApiRequest::sendError(ErrorPtr aError)
 {
   ErrorPtr err;
-  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) error sent: error=%d (%s)", aErrorCode, aErrorMessage.c_str());
-  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
-    err = VdcApiErrorPtr(new VdcApiError(aErrorCode, aErrorMessage, aErrorType, aUserFacingMessage));
+  if (!aError) {
+    aError = Error::ok();
   }
-  else {
-    err = ErrorPtr(new Error(aErrorCode, aErrorMessage)); // re-pack into error object
-  }
+  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) error sent: error=%d (%s)", aError->getErrorCode(), aError->getErrorMessage());
   sendResponse(JsonObjectPtr(), err);
   return ErrorPtr();
 }
