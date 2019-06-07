@@ -61,6 +61,7 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool 
   inherited(aVdcP),
   lightID(aLightID),
   uniqueID(aUniqueID),
+  hueCertified(undefined),
   reapplyMode(reapply_once)
 {
   // hue devices are lights
@@ -161,6 +162,15 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
     if (o) {
       swVersion = o->stringValue();
     }
+    // check capabilities
+    o = aDeviceInfo->get("capabilities");
+    if (o) {
+      // certified state
+      JsonObjectPtr o2 = o->get("certified");
+      if (o2) {
+        hueCertified = o2->boolValue() ? yes : no;
+      }
+    }
     // now look at state
     parseLightState(aDeviceInfo);
   }
@@ -244,6 +254,24 @@ string HueDevice::modelVersion() const
 {
   return swVersion;
 }
+
+
+int HueDevice::opStateLevel()
+{
+  return hueCertified==no ? 80 : 100; // explicitly non-certified lights are given some negative points
+}
+
+
+string HueDevice::getOpStateText()
+{
+  string t;
+  if (hueCertified==no) {
+    t += "not certified";
+  }
+  return t;
+}
+
+
 
 
 void HueDevice::checkPresence(PresenceCB aPresenceResultHandler)
