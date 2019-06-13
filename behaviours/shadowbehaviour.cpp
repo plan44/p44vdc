@@ -337,6 +337,9 @@ Tristate ShadowBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_shadeposition:
       // Assumption: Shade outputs should be 16bit resolution and be labelled "Position", not "Value"
       return yes;
+    case modelFeature_identification:
+      // shades can identify (move a little)
+      return yes;
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
