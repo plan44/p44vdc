@@ -760,7 +760,7 @@ string EvaluatorDevice::getEvaluatorType()
 }
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 enum {
   evaluatorType_key,
@@ -864,7 +864,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 }
 
 
-// MARK: ===== settings
+// MARK: - settings
 
 
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(Device &aDevice) :

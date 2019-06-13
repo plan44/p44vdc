@@ -225,7 +225,7 @@ string BinaryInputBehaviour::getStatusText()
 
 
 
-// MARK: ===== value source implementation
+// MARK: - value source implementation
 
 
 string BinaryInputBehaviour::getSourceId()
@@ -267,7 +267,7 @@ int BinaryInputBehaviour::getSourceOpLevel()
 }
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 
 // SQLIte3 table name to store these parameters to
@@ -329,7 +329,7 @@ void BinaryInputBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 static char binaryInput_key;
 
@@ -501,7 +501,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
 
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string BinaryInputBehaviour::description()

@@ -63,7 +63,7 @@ bool DaliVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResoluti
 }
 
 
-// MARK: ===== DB and initialisation
+// MARK: - DB and initialisation
 
 // Version history
 //  1 : first version
@@ -154,7 +154,7 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-// MARK: ===== collect devices
+// MARK: - collect devices
 
 
 int DaliVdc::getRescanModes() const
@@ -533,7 +533,7 @@ void DaliVdc::deviceFeaturesQueried(DaliBusDeviceListPtr aBusDevices, DaliBusDev
 }
 
 
-// MARK: ===== DALI specific methods
+// MARK: - DALI specific methods
 
 ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
@@ -571,7 +571,7 @@ ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod,
 }
 
 
-// MARK: ===== DALI bus diagnostics and summary
+// MARK: - DALI bus diagnostics and summary
 
 
 // scan bus, return status string
@@ -854,7 +854,7 @@ bool DaliVdc::daliInfoSummary(DaliDeviceInfoPtr aDeviceInfo, ApiValuePtr aInfo)
 
 
 
-// MARK: ===== composite device creation
+// MARK: - composite device creation
 
 
 ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
@@ -1016,7 +1016,7 @@ void DaliVdc::groupCollected(VdcApiRequestPtr aRequest)
 }
 
 
-// MARK: ===== management of used groups and scenes
+// MARK: - management of used groups and scenes
 
 void DaliVdc::markUsed(DaliAddress aSceneOrGroup, bool aUsed)
 {
@@ -1070,7 +1070,7 @@ void DaliVdc::loadLocallyUsedGroupsAndScenes()
 
 
 
-// MARK: ===== Native actions (groups and scenes on vDC level)
+// MARK: - Native actions (groups and scenes on vDC level)
 
 static DaliAddress daliAddressFromActionId(const string aNativeActionId)
 {
@@ -1293,7 +1293,7 @@ ErrorPtr DaliVdc::freeNativeAction(const string aNativeActionId)
 
 #if SELFTESTING_ENABLED
 
-// MARK: ===== Self test
+// MARK: - Self test
 
 void DaliVdc::selfTest(StatusCB aCompletedCB)
 {
@@ -1366,7 +1366,7 @@ void DaliVdc::testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint
 
 #if ENABLE_DALI_INPUTS
 
-// MARK: ===== DALI input devices
+// MARK: - DALI input devices
 
 DaliInputDevicePtr DaliVdc::addInputDevice(const string aConfig, DaliAddress aDaliBaseAddress)
 {

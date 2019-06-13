@@ -34,7 +34,7 @@
 using namespace p44;
 
 
-// MARK: ===== special extraction functions
+// MARK: - special extraction functions
 
 
 // strange irregular fan speed scale as used in A5-10-01,02,04,07,08 and 09
@@ -52,7 +52,7 @@ static void currentClampHandler(const struct EnoceanSensorDescriptor &aSensorDes
 }
 
 
-// MARK: ===== sensor mapping table for generic EnoceanSensorHandler
+// MARK: - sensor mapping table for generic EnoceanSensorHandler
 
 using namespace EnoceanSensors;
 
@@ -84,7 +84,7 @@ const p44::EnoceanSensorDescriptor enoceanVLDdescriptors[] = {
 };
 
 
-// MARK: ===== VLD profile variants
+// MARK: - VLD profile variants
 
 
 static const ProfileVariantEntry profileVariantsVLD[] = {
@@ -99,7 +99,7 @@ static const ProfileVariantEntry profileVariantsVLD[] = {
 };
 
 
-// MARK: ===== EnoceanVLDDevice
+// MARK: - EnoceanVLDDevice
 
 EnoceanVLDDevice::EnoceanVLDDevice(EnoceanVdc *aVdcP) :
   inherited(aVdcP)
@@ -148,7 +148,7 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 }
 
 
-// MARK: ===== EnoceanD201XXHandler - Electronic Switches and Dimmers with local control
+// MARK: - EnoceanD201XXHandler - Electronic Switches and Dimmers with local control
 
 enum {
   switching = (1<<0),
@@ -480,7 +480,7 @@ void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
 
 
 
-// MARK: ===== EnoceanD20601Handler - SODA Window Handle
+// MARK: - EnoceanD20601Handler - SODA Window Handle
 
 /// sensor bitfield extractor function and check for validity for D2-06-01 profile
 static void D20601SensorHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
@@ -694,7 +694,7 @@ string EnoceanD20601Handler::shortDesc()
 
 
 
-// MARK: ===== EnoceanD20601ButtonHandler
+// MARK: - EnoceanD20601ButtonHandler
 
 EnoceanD20601ButtonHandler::EnoceanD20601ButtonHandler(EnoceanDevice &aDevice, int aSwitchIndex) :
   inherited(aDevice)

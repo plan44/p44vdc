@@ -282,7 +282,7 @@ string VdcHost::publishedDescription()
 }
 
 
-// MARK: ===== global status
+// MARK: - global status
 
 bool VdcHost::isApiConnected()
 {
@@ -314,7 +314,7 @@ bool VdcHost::isNetworkConnected()
 
 
 
-// MARK: ===== initializisation of DB and containers
+// MARK: - initializisation of DB and containers
 
 
 // Version history
@@ -422,7 +422,7 @@ void VdcHost::startRunning()
 
 
 
-// MARK: ===== collect devices
+// MARK: - collect devices
 
 
 void VdcHost::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
@@ -514,7 +514,7 @@ void VdcHost::nextDeviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator
 
 
 
-// MARK: ===== adding/removing devices
+// MARK: - adding/removing devices
 
 
 bool VdcHost::addDevice(DevicePtr aDevice)
@@ -639,7 +639,7 @@ void VdcHost::reportLearnEvent(bool aLearnIn, ErrorPtr aError)
 
 
 
-// MARK: ===== activity monitoring
+// MARK: - activity monitoring
 
 
 void VdcHost::signalActivity()
@@ -678,7 +678,7 @@ bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
 
 
 
-// MARK: ===== periodic activity
+// MARK: - periodic activity
 
 
 #define PERIODIC_TASK_INTERVAL (5*Second)
@@ -733,7 +733,7 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
 }
 
 
-// MARK: ===== local operation mode
+// MARK: - local operation mode
 
 
 bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
@@ -839,7 +839,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
 }
 
 
-// MARK: ===== notification delivery
+// MARK: - notification delivery
 
 
 NotificationGroup::NotificationGroup(VdcPtr aVdc, DsAddressablePtr aFirstMember) :
@@ -950,7 +950,7 @@ void VdcHost::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliver
 
 
 
-// MARK: ===== vDC API
+// MARK: - vDC API
 
 
 bool VdcHost::sendApiRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
@@ -1288,7 +1288,7 @@ ErrorPtr VdcHost::handleMethodForParams(VdcApiRequestPtr aRequest, const string 
 }
 
 
-// MARK: ===== vDC level methods and notifications
+// MARK: - vDC level methods and notifications
 
 
 ErrorPtr VdcHost::removeHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
@@ -1311,7 +1311,7 @@ void VdcHost::removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aRequest, 
 
 
 
-// MARK: ===== session management
+// MARK: - session management
 
 
 /// reset announcing devices (next startAnnouncing will restart from beginning)
@@ -1425,7 +1425,7 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
 }
 
 
-// MARK: ===== DsAddressable API implementation
+// MARK: - DsAddressable API implementation
 
 ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
 {
@@ -1449,7 +1449,7 @@ void VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const strin
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 static char vdchost_obj;
 static char vdcs_obj;
@@ -1597,7 +1597,7 @@ void VdcHost::createDeviceList(DeviceVector &aDeviceList)
 
 
 
-// MARK: ===== value sources
+// MARK: - value sources
 
 void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
 {
@@ -1658,7 +1658,7 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
 
 
 
-// MARK: ===== persistent vdc host level parameters
+// MARK: - persistent vdc host level parameters
 
 ErrorPtr VdcHost::loadAndFixDsUID()
 {
@@ -1732,7 +1732,7 @@ void VdcHost::loadSettingsFromFiles()
 }
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 // SQLIte3 table name to store these parameters to
 const char *VdcHost::tableName()
@@ -1812,7 +1812,7 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 
 
 
-// MARK: ===== description
+// MARK: - description
 
 string VdcHost::description()
 {

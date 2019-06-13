@@ -64,7 +64,7 @@ DaliComm::~DaliComm()
 }
 
 
-// MARK: ===== GTIN blacklist for ill-behaving devices
+// MARK: - GTIN blacklist for ill-behaving devices
 
 
 const long long DALI_GTIN_blacklist[] = {
@@ -75,7 +75,7 @@ const long long DALI_GTIN_blacklist[] = {
 
 
 
-// MARK: ===== procedure management
+// MARK: - procedure management
 
 void DaliComm::startProcedure()
 {
@@ -97,7 +97,7 @@ bool DaliComm::isBusy()
 
 
 
-// MARK: ===== DALI bridge low level communication
+// MARK: - DALI bridge low level communication
 
 
 static const char *bridgeCmdName(uint8_t aBridgeCmd)
@@ -238,7 +238,7 @@ void DaliComm::connectionTimeout()
   serialComm->closeConnection();
 }
 
-// MARK: ===== DALI bus communication basics
+// MARK: - DALI bus communication basics
 
 
 static ErrorPtr checkBridgeResponse(uint8_t aResp1, uint8_t aResp2, ErrorPtr aError, bool &aNoOrTimeout, bool &aRetried)
@@ -645,7 +645,7 @@ string DaliComm::formatDaliAddress(DaliAddress aAddress)
 
 
 
-// MARK: ===== DALI bus data R/W test
+// MARK: - DALI bus data R/W test
 
 class DaliBusDataTester : public P44Obj
 {
@@ -741,7 +741,7 @@ void DaliComm::daliBusTestData(StatusCB aResultCB, DaliAddress aAddress, uint8_t
 
 
 
-// MARK: ===== DALI bus scanning
+// MARK: - DALI bus scanning
 
 // Scan bus for active devices (returns list of short addresses)
 
@@ -1278,7 +1278,7 @@ void DaliComm::daliFullBusScan(DaliBusScanCB aResultCB, bool aFullScanOnlyIfNeed
 
 
 
-// MARK: ===== DALI memory access / device info reading
+// MARK: - DALI memory access / device info reading
 
 #define DALI_MAX_MEMREAD_RETRIES 3
 
@@ -1397,7 +1397,7 @@ void DaliComm::daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, 
 }
 
 
-// MARK: ===== DALI device info reading
+// MARK: - DALI device info reading
 
 #define DALI_MAX_BANKREAD_RETRIES 3 // how many times reading bank will be tried in case of checksum error
 #define DALI2_MAX_BANK0_REREADS 3 // re-read 3 times at most
@@ -1815,7 +1815,7 @@ void DaliComm::daliReadDeviceInfo(DaliDeviceInfoCB aResultCB, DaliAddress aAddre
 }
 
 
-// MARK: ===== DALI device info
+// MARK: - DALI device info
 
 
 DaliDeviceInfo::DaliDeviceInfo()

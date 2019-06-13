@@ -53,7 +53,7 @@ bool EldatVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolut
 
 
 
-// MARK: ===== DB and initialisation
+// MARK: - DB and initialisation
 
 // Version history
 //  1 : initial version
@@ -101,7 +101,7 @@ void EldatVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-// MARK: ===== collect devices
+// MARK: - collect devices
 
 void EldatVdc::removeDevices(bool aForget)
 {
@@ -223,7 +223,7 @@ void EldatVdc::unpairDevicesByAddress(EldatAddress aEldatAddress, bool aForgetPa
 }
 
 
-// MARK: ===== Handle received messages
+// MARK: - Handle received messages
 
 
 void EldatVdc::handleMessage(string aEldatMessage, ErrorPtr aError)
@@ -330,7 +330,7 @@ void EldatVdc::dispatchMessage(EldatAddress aSenderAddress, EldatMode aMode, int
 
 
 
-// MARK: ===== ELDAT specific methods
+// MARK: - ELDAT specific methods
 
 
 ErrorPtr EldatVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
@@ -417,7 +417,7 @@ ErrorPtr EldatVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 
 
 
-// MARK: ===== learn and unlearn devices
+// MARK: - learn and unlearn devices
 
 
 void EldatVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
@@ -431,7 +431,7 @@ void EldatVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, T
 
 #if SELFTESTING_ENABLED
 
-// MARK: ===== Self test
+// MARK: - Self test
 
 void EldatVdc::selfTest(StatusCB aCompletedCB)
 {

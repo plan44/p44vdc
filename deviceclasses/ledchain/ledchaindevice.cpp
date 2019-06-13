@@ -31,7 +31,7 @@
 using namespace p44;
 
 
-// MARK: ===== LedChainDevice
+// MARK: - LedChainDevice
 
 
 LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, uint16_t aFirstLED, uint16_t aNumLEDs, const string &aDeviceConfig) :

@@ -559,7 +559,7 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
 
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 
 // SQLIte3 table name to store these parameters to
@@ -660,7 +660,7 @@ void ButtonBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 static char button_key;
 
@@ -907,7 +907,7 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 }
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string ButtonBehaviour::description()

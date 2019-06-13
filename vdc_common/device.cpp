@@ -43,7 +43,7 @@
 using namespace p44;
 
 
-// MARK: ===== DeviceConfigurationDescriptor
+// MARK: - DeviceConfigurationDescriptor
 
 
 enum {
@@ -97,7 +97,7 @@ namespace p44 { namespace DeviceConfigurations {
 
 
 
-// MARK: ===== Device
+// MARK: - Device
 
 
 Device::Device(Vdc *aVdcP) :
@@ -358,7 +358,7 @@ void Device::installSettings(DeviceSettingsPtr aDeviceSettings)
 }
 
 
-// MARK: ===== behaviours
+// MARK: - behaviours
 
 void Device::addBehaviour(DsBehaviourPtr aBehaviour)
 {
@@ -481,7 +481,7 @@ void Device::announcementAcknowledged()
 }
 
 
-// MARK: ===== model features
+// MARK: - model features
 
 static const char *modelFeatureNames[numModelFeatures] = {
   "dontcare",
@@ -603,7 +603,7 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
 }
 
 
-// MARK: ===== Channels
+// MARK: - Channels
 
 
 int Device::numChannels()
@@ -663,7 +663,7 @@ ChannelBehaviourPtr Device::getChannelById(const string aChannelId, bool aPendin
 
 
 
-// MARK: ===== Device level vDC API
+// MARK: - Device level vDC API
 
 
 ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
@@ -905,7 +905,7 @@ static SceneNo offSceneForArea(int aArea)
 }
 
 
-// MARK: ===== optimized notification delivery
+// MARK: - optimized notification delivery
 
 
 void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliveryStatePtr aDeliveryState)
@@ -1034,7 +1034,7 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 
 
 
-// MARK: ===== high level serialized hardware access
+// MARK: - high level serialized hardware access
 
 #define SERIALIZER_WATCHDOG 1
 #define SERIALIZER_WATCHDOG_TIMEOUT (20*Second)
@@ -1280,7 +1280,7 @@ void Device::updatingChannelsComplete()
 }
 
 
-// MARK: ===== dimming
+// MARK: - dimming
 
 // dS Dimming rule for Light:
 //  Rule 4 All devices which are turned on and not in local priority state take part in the dimming process.
@@ -1489,7 +1489,7 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
 }
 
 
-// MARK: ===== scene operations
+// MARK: - scene operations
 
 
 void Device::callScene(SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransitionTimeOverride)
@@ -1874,7 +1874,7 @@ bool Device::processControlValue(const string &aName, double aValue)
 
 
 
-// MARK: ===== persistent device params
+// MARK: - persistent device params
 
 
 // load device settings - beaviours + scenes
@@ -1978,7 +1978,7 @@ void Device::loadSettingsFromFiles()
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 enum {
   // device level simple parameters
@@ -2358,7 +2358,7 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
 }
 
 
-// MARK: ===== Device description/shortDesc/status
+// MARK: - Device description/shortDesc/status
 
 
 string Device::description()

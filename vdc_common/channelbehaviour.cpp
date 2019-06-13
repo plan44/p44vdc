@@ -25,7 +25,7 @@
 
 using namespace p44;
 
-// MARK: ===== channel behaviour
+// MARK: - channel behaviour
 
 ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChannelId) :
   inheritedParams(aOutput.device.getVdcHost().getDsParamStore()),
@@ -94,7 +94,7 @@ string ChannelBehaviour::getStatusText()
 
 
 
-// MARK: ===== channel value handling
+// MARK: - channel value handling
 
 
 bool ChannelBehaviour::transitionStep(double aStepSize)
@@ -351,7 +351,7 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
 
 
 
-// MARK: ===== channel persistence
+// MARK: - channel persistence
 
 
 const char *ChannelBehaviour::tableName()
@@ -436,7 +436,7 @@ ErrorPtr ChannelBehaviour::forget()
 
 
 
-// MARK: ===== channel property access
+// MARK: - channel property access
 
 // Note: this is a simplified single class property access mechanims.
 //   ChannelBehaviour is not meant to have more properties in derived classes

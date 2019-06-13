@@ -238,7 +238,7 @@ double OutputBehaviour::channelValueAccordingToMode(double aOutputValue, int aCh
 
 
 
-// MARK: ===== scene handling
+// MARK: - scene handling
 
 
 
@@ -344,7 +344,7 @@ void OutputBehaviour::channelValuesCaptured(DsScenePtr aScene, bool aFromDevice,
 
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 
 // SQLIte3 table name to store these parameters to
@@ -438,7 +438,7 @@ ErrorPtr OutputBehaviour::deleteChildren()
 }
 
 
-// MARK: ===== output property access
+// MARK: - output property access
 
 static char output_key;
 static char output_groups_key;
@@ -641,7 +641,7 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string OutputBehaviour::description()

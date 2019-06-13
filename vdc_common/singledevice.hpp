@@ -1247,7 +1247,7 @@ namespace p44 {
   };
 
 
-  // MARK: ======= misc utils
+  // MARK: -== misc utils
 
   /// factory method to create value descriptor from JSON descriptor
   /// @param aJSONConfig JSON config object for a value descriptor (used as parameter)

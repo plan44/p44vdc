@@ -94,7 +94,7 @@ void DsAddressable::reportVanished()
 }
 
 
-// MARK: ===== vDC API
+// MARK: - vDC API
 
 
 
@@ -367,7 +367,7 @@ void DsAddressable::updatePresenceState(bool aPresent)
 
 
 
-// MARK: ===== interaction with subclasses
+// MARK: - interaction with subclasses
 
 
 void DsAddressable::checkPresence(PresenceCB aPresenceResultHandler)
@@ -377,7 +377,7 @@ void DsAddressable::checkPresence(PresenceCB aPresenceResultHandler)
 }
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 enum {
   type_key,
@@ -517,7 +517,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
 }
 
 
-// MARK: ===== icon loading
+// MARK: - icon loading
 
 bool DsAddressable::getIcon(const char *aIconName, string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
@@ -638,7 +638,7 @@ string DsAddressable::webuiURLString()
 }
 
 
-// MARK: ===== load addressable settings from files
+// MARK: - load addressable settings from files
 
 
 bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExplicitlyOverridden)
@@ -672,7 +672,7 @@ bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExp
 }
 
 
-// MARK: ===== description/shortDesc/logging
+// MARK: - description/shortDesc/logging
 
 
 void DsAddressable::logAddressable(int aErrLevel, const char *aFmt, ... )

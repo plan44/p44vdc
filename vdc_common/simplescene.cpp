@@ -11,7 +11,7 @@
 #include "simplescene.hpp"
 #include "outputbehaviour.hpp"
 
-// MARK: ===== SimpleScene
+// MARK: - SimpleScene
 
 using namespace p44;
 
@@ -25,7 +25,7 @@ SimpleScene::SimpleScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSce
 }
 
 
-// MARK: ===== scene values/channels
+// MARK: - scene values/channels
 
 
 double SimpleScene::sceneValue(int aOutputIndex)
@@ -53,7 +53,7 @@ uint64_t SimpleScene::sceneHash()
 
 
 
-// MARK: ===== Scene persistence
+// MARK: - Scene persistence
 
 const char *SimpleScene::tableName()
 {
@@ -108,7 +108,7 @@ void SimpleScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex,
 }
 
 
-// MARK: ===== SimpleScene property access
+// MARK: - SimpleScene property access
 
 
 static char simplescene_key;
@@ -170,7 +170,7 @@ bool SimpleScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 }
 
 
-// MARK: ===== default scene values
+// MARK: - default scene values
 
 typedef struct {
   uint8_t value; ///< output value for this scene, uint_8 to save footprint
@@ -324,7 +324,7 @@ void SimpleScene::setDefaultSceneValues(SceneNo aSceneNo)
 
 
 
-// MARK: ===== SimpleCmdScene
+// MARK: - SimpleCmdScene
 
 
 SimpleCmdScene::SimpleCmdScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -379,7 +379,7 @@ void SimpleCmdScene::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 }
 
 
-// MARK: ===== scene command substitutions
+// MARK: - scene command substitutions
 
 
 // TODO: later use more generic replacer from simpledevice
@@ -458,7 +458,7 @@ int SimpleCmdScene::substitutePlaceholders(string &aCommandStr)
 
 
 
-// MARK: ===== SimpleCmdScene property access
+// MARK: - SimpleCmdScene property access
 
 
 static char cmdscene_key;
@@ -513,7 +513,7 @@ bool SimpleCmdScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
 
 
 
-// MARK: ===== CmdSceneDeviceSettings
+// MARK: - CmdSceneDeviceSettings
 
 
 CmdSceneDeviceSettings::CmdSceneDeviceSettings(Device &aDevice) :

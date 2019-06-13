@@ -92,7 +92,7 @@ string HueVdc::vendorName()
 
 
 
-// MARK: ===== DB and initialisation
+// MARK: - DB and initialisation
 
 // Version history
 //  1 : first version
@@ -144,7 +144,7 @@ void HueVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-// MARK: ===== collect devices
+// MARK: - collect devices
 
 
 int HueVdc::getRescanModes() const
@@ -545,7 +545,7 @@ void HueVdc::collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aR
 }
 
 
-// MARK: ===== Native actions (groups and scenes on vDC level)
+// MARK: - Native actions (groups and scenes on vDC level)
 
 
 static string hueSceneIdFromActionId(const string aNativeActionId)

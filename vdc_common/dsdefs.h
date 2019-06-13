@@ -22,7 +22,7 @@
 #ifndef p44vdc_dsdefs_h
 #define p44vdc_dsdefs_h
 
-/// MARK: ====== generic dS constants in dS global scope
+/// MARK: -= generic dS constants in dS global scope
 
 /// Constants which are used in the entire dS system
 /// @{
@@ -437,7 +437,7 @@ typedef enum {
 
 
 
-/// MARK: ====== vDC API constants - scope is vDC API only
+/// MARK: -= vDC API constants - scope is vDC API only
 
 /// Constants which are used in the vDC API and have a direct meaning only for vDC API clients (such as vDSM)
 /// @{

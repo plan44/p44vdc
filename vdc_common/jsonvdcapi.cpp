@@ -25,7 +25,7 @@ using namespace p44;
 
 
 
-// MARK: ===== JsonApiValue
+// MARK: - JsonApiValue
 
 JsonApiValue::JsonApiValue()
 {
@@ -131,7 +131,7 @@ ApiValuePtr JsonApiValue::newValueFromJson(JsonObjectPtr aJsonObject)
 
 
 
-// MARK: ===== VdcJsonApiServer
+// MARK: - VdcJsonApiServer
 
 
 VdcApiConnectionPtr VdcJsonApiServer::newConnection()
@@ -149,7 +149,7 @@ ApiValuePtr VdcJsonApiServer::newApiValue()
 
 
 
-// MARK: ===== VdcJsonApiRequest
+// MARK: - VdcJsonApiRequest
 
 
 VdcJsonApiRequest::VdcJsonApiRequest(VdcJsonApiConnectionPtr aConnection, const char *aJsonRpcId)
@@ -196,7 +196,7 @@ ErrorPtr VdcJsonApiRequest::sendError(ErrorPtr aError)
 
 
 
-// MARK: ===== VdcJsonApiConnection
+// MARK: - VdcJsonApiConnection
 
 
 VdcJsonApiConnection::VdcJsonApiConnection()

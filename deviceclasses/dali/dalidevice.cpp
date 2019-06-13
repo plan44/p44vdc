@@ -47,7 +47,7 @@
 using namespace p44;
 
 
-// MARK: ===== DaliBusDevice
+// MARK: - DaliBusDevice
 
 DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   daliVdc(aDaliVdc),
@@ -852,7 +852,7 @@ Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower)
 
 
 
-// MARK: ===== Optimized DALI dimming implementation
+// MARK: - Optimized DALI dimming implementation
 
 
 
@@ -922,7 +922,7 @@ void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, DaliCommand aCommand, 
 
 
 
-// MARK: ===== DaliBusDeviceGroup (multiple DALI devices, addressed as a group, forming single channel dimmer)
+// MARK: - DaliBusDeviceGroup (multiple DALI devices, addressed as a group, forming single channel dimmer)
 
 
 DaliBusDeviceGroup::DaliBusDeviceGroup(DaliVdc &aDaliVdc, uint8_t aGroupNo) :
@@ -1062,7 +1062,7 @@ void DaliBusDeviceGroup::deriveDsUid()
 }
 
 
-// MARK: ===== DaliOutputDevice (base class)
+// MARK: - DaliOutputDevice (base class)
 
 
 DaliOutputDevice::DaliOutputDevice(DaliVdc *aVdcP) :
@@ -1161,7 +1161,7 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 
 
 
-// MARK: ===== DaliSingleControllerDevice (single channel)
+// MARK: - DaliSingleControllerDevice (single channel)
 
 
 DaliSingleControllerDevice::DaliSingleControllerDevice(DaliVdc *aVdcP) :
@@ -1624,7 +1624,7 @@ string DaliSingleControllerDevice::description()
 }
 
 
-// MARK: ===== DaliCompositeDevice (multi-channel color lamp)
+// MARK: - DaliCompositeDevice (multi-channel color lamp)
 
 
 DaliCompositeDevice::DaliCompositeDevice(DaliVdc *aVdcP) :
@@ -2067,7 +2067,7 @@ string DaliCompositeDevice::description()
 #if ENABLE_DALI_INPUTS
 
 
-// MARK: ===== DaliInputDevice
+// MARK: - DaliInputDevice
 
 DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, DaliAddress aBaseAddress) :
   inherited(aVdcP),

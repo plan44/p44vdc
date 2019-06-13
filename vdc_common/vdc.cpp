@@ -97,7 +97,7 @@ const char *Vdc::getPersistentDataDir()
 
 
 
-/// MARK: ===== Identification
+/// MARK: - Identification
 
 
 string Vdc::modelUID()
@@ -214,7 +214,7 @@ string Vdc::modelName()
 
 
 
-/// MARK: ===== grouped delivery of notification to devices (for scene/group optimizations)
+/// MARK: - grouped delivery of notification to devices (for scene/group optimizations)
 
 
 NotificationDeliveryState::~NotificationDeliveryState()
@@ -690,7 +690,7 @@ void Vdc::clearOptimizerCache()
 
 
 
-/// MARK: ===== handle vdc level methods
+/// MARK: - handle vdc level methods
 
 ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
@@ -746,7 +746,7 @@ ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, Api
 }
 
 
-/// MARK: ===== paring
+/// MARK: - paring
 
 void Vdc::performPair(VdcApiRequestPtr aRequest, Tristate aEstablish, bool aDisableProximityCheck, MLMicroSeconds aTimeout)
 {
@@ -797,7 +797,7 @@ void Vdc::pairingTimeout(VdcApiRequestPtr aRequest)
 }
 
 
-// MARK: ===== Collecting devices
+// MARK: - Collecting devices
 
 void Vdc::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
@@ -885,7 +885,7 @@ void Vdc::setPeriodicRecollection(MLMicroSeconds aRecollectInterval, RescanMode 
 
 
 
-// MARK: ===== Managing devices
+// MARK: - Managing devices
 
 
 void Vdc::removeDevice(DevicePtr aDevice, bool aForget)
@@ -1044,7 +1044,7 @@ void Vdc::identifyAndAddDevicesCB(DeviceList aToBeAddedDevices, StatusCB aComple
 
 
 
-// MARK: ===== persistent vdc level params
+// MARK: - persistent vdc level params
 
 ErrorPtr Vdc::loadOptimizerCache()
 {
@@ -1165,7 +1165,7 @@ void Vdc::loadSettingsFromFiles()
 }
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 static char vdc_key;
 static char devices_container_key;
@@ -1351,7 +1351,7 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
 }
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 // SQLIte3 table name to store these parameters to
 const char *Vdc::tableName()
@@ -1420,7 +1420,7 @@ void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const c
   aStatement.bind(aIndex++, minDevicesForOptimizing);
 }
 
-// MARK: ===== description/shortDesc/status
+// MARK: - description/shortDesc/status
 
 
 string Vdc::description()
@@ -1456,7 +1456,7 @@ string Vdc::getOpStateText()
 
 
 
-// MARK: ===== OptimizerEntry
+// MARK: - OptimizerEntry
 
 
 OptimizerEntry::OptimizerEntry() :

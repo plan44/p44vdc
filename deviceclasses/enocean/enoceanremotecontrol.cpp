@@ -37,7 +37,7 @@
 
 using namespace p44;
 
-// MARK: ===== EnoceanRemoteControlDevice
+// MARK: - EnoceanRemoteControlDevice
 
 #define TEACH_IN_TIME (300*MilliSecond) // how long the teach-in simulated button press should last
 
@@ -100,7 +100,7 @@ void EnoceanRemoteControlDevice::markUsedBaseOffsets(string &aUsedOffsetsMap)
 }
 
 
-// MARK: ===== EnoceanRemoteControlHandler
+// MARK: - EnoceanRemoteControlHandler
 
 // Simple on/off controller
 #define BUTTON_PRESS_TIME (200*MilliSecond) // how long the simulated button press should last
@@ -245,7 +245,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
 }
 
 
-// MARK: ===== relay device
+// MARK: - relay device
 
 
 EnoceanRelayControlDevice::EnoceanRelayControlDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep) :
@@ -284,7 +284,7 @@ void EnoceanRelayControlDevice::sendReleaseTelegram(SimpleCB aDoneCB, bool aUp)
 
 
 
-// MARK: ===== time controlled blind device
+// MARK: - time controlled blind device
 
 
 EnoceanBlindControlDevice::EnoceanBlindControlDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep) :
@@ -388,7 +388,7 @@ void EnoceanBlindControlDevice::sendReleaseTelegram(SimpleCB aDoneCB)
 }
 
 
-// MARK: ===== SystemElectronic Heat Tube device
+// MARK: - SystemElectronic Heat Tube device
 
 
 EnoceanSEHeatTubeDevice::EnoceanSEHeatTubeDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep) :

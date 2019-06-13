@@ -52,7 +52,7 @@ bool ZfVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolution
 
 
 
-// MARK: ===== DB and initialisation
+// MARK: - DB and initialisation
 
 // Version history
 //  1 : initial version
@@ -100,7 +100,7 @@ void ZfVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-// MARK: ===== collect devices
+// MARK: - collect devices
 
 void ZfVdc::removeDevices(bool aForget)
 {
@@ -222,7 +222,7 @@ void ZfVdc::unpairDevicesByAddress(ZfAddress aZfAddress, bool aForgetParams, ZfS
 }
 
 
-// MARK: ===== Handle received packets
+// MARK: - Handle received packets
 
 
 void ZfVdc::handlePacket(ZfPacketPtr aPacket, ErrorPtr aError)
@@ -296,7 +296,7 @@ void ZfVdc::dispatchPacket(ZfPacketPtr aPacket)
 
 
 
-// MARK: ===== EnOcean specific methods
+// MARK: - EnOcean specific methods
 
 
 ErrorPtr ZfVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
@@ -380,7 +380,7 @@ ErrorPtr ZfVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, A
 //  }
 //
 
-// MARK: ===== learn and unlearn devices
+// MARK: - learn and unlearn devices
 
 
 void ZfVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
@@ -395,7 +395,7 @@ void ZfVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tris
 
 
 
-//  // MARK: ===== Self test
+//  // MARK: - Self test
 //
 //  void ZfVdc::selfTest(StatusCB aCompletedCB)
 //  {

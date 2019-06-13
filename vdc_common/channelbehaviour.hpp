@@ -281,7 +281,7 @@ namespace p44 {
   typedef vector<ChannelBehaviourPtr> ChannelBehaviourVector;
 
 
-  // MARK: ===== generic channel implementations
+  // MARK: - generic channel implementations
 
 
   /// index value channel
@@ -364,7 +364,7 @@ namespace p44 {
   typedef boost::intrusive_ptr<DialChannel> DialChannelPtr;
 
 
-  // MARK: ===== specific purpose channel implementations
+  // MARK: - specific purpose channel implementations
 
   /// Power state channel
   class PowerStateChannel : public IndexChannel

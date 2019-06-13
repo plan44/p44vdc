@@ -33,7 +33,7 @@
 using namespace p44;
 
 
-// MARK: ===== ESP3 packet object
+// MARK: - ESP3 packet object
 
 // enoceansender hex up:
 // 55 00 07 07 01 7A F6 30 00 86 B8 1A 30 03 FF FF FF FF FF 00 C0
@@ -274,7 +274,7 @@ void Esp3Packet::finalize()
 
 
 
-// MARK: ===== common commands
+// MARK: - common commands
 
 
 ErrorPtr Esp3Packet::responseStatus()
@@ -298,7 +298,7 @@ ErrorPtr Esp3Packet::responseStatus()
 }
 
 
-// MARK: ===== radio telegram specifics
+// MARK: - radio telegram specifics
 
 
 // Radio telegram optional data
@@ -498,7 +498,7 @@ void Esp3Packet::initForRorg(RadioOrg aRadioOrg, size_t aVLDsize)
 
 
 
-// MARK: ===== Enocean Eqipment Profile (EEP) information extraction
+// MARK: - Enocean Eqipment Profile (EEP) information extraction
 
 
 // Radio telegram data (in ESP3, does not contain data checksum crc, e.g. for VLD)
@@ -752,7 +752,7 @@ Tristate Esp3Packet::teachInfoType()
 }
 
 
-// MARK: ===== 4BS comminication specifics
+// MARK: - 4BS comminication specifics
 
 
 uint32_t Esp3Packet::get4BSdata()
@@ -800,7 +800,7 @@ void Esp3Packet::set4BSTeachInEEP(EnoceanProfile aEEProfile)
 }
 
 
-// MARK: ===== packet Factory methods
+// MARK: - packet Factory methods
 
 
 Esp3PacketPtr Esp3Packet::newEsp3Message(PacketType aPacketType, uint8_t aCode, uint8_t aNumParamBytes, uint8_t *aParamBytesInitializerP)
@@ -819,7 +819,7 @@ Esp3PacketPtr Esp3Packet::newEsp3Message(PacketType aPacketType, uint8_t aCode, 
 
 
 
-// MARK: ===== Description
+// MARK: - Description
 
 static const int numRespCodes = 5;
 static const char *respCodeNames[numRespCodes] = {
@@ -900,7 +900,7 @@ string Esp3Packet::description()
 }
 
 
-// MARK: ===== CRC8 calculation
+// MARK: - CRC8 calculation
 
 static u_int8_t CRC8Table[256] = {
   0x00, 0x07, 0x0e, 0x09, 0x1c, 0x1b, 0x12, 0x15,
@@ -955,7 +955,7 @@ uint8_t Esp3Packet::crc8(uint8_t *aDataP, size_t aNumBytes, uint8_t aCRCValue)
 
 
 
-// MARK: ===== Manufacturer names
+// MARK: - Manufacturer names
 
 typedef struct {
   EnoceanManufacturer manufacturerID;
@@ -1068,7 +1068,7 @@ const char *EnoceanComm::manufacturerName(EnoceanManufacturer aManufacturerCode)
 }
 
 
-// MARK: ===== EnOcean Security
+// MARK: - EnOcean Security
 
 #if ENABLE_ENOCEAN_SECURE
 
@@ -1545,7 +1545,7 @@ uint32_t EnOceanSecurity::calcCMAC(const AES128Block &aKey, const AES128Block &a
 
 
 
-// MARK: ===== EnOcean communication handler
+// MARK: - EnOcean communication handler
 
 // baudrate for ESP3 on TCM310
 #define ENOCEAN_ESP3_COMMAPARMS "57600,8,N,1"

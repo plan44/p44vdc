@@ -54,7 +54,7 @@ using namespace p44;
 
 
 
-// MARK: ===== HueDevice
+// MARK: - HueDevice
 
 
 HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool aCTOnly, const string &aUniqueID) :

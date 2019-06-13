@@ -25,7 +25,7 @@
 using namespace p44;
 
 
-// MARK: ===== MovingLightScene
+// MARK: - MovingLightScene
 
 
 MovingLightScene::MovingLightScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -36,7 +36,7 @@ MovingLightScene::MovingLightScene(SceneDeviceSettings &aSceneDeviceSettings, Sc
 }
 
 
-// MARK: ===== color scene values/channels
+// MARK: - color scene values/channels
 
 
 double MovingLightScene::sceneValue(int aChannelIndex)
@@ -62,7 +62,7 @@ void MovingLightScene::setSceneValue(int aChannelIndex, double aValue)
 }
 
 
-// MARK: ===== Color Light Scene persistence
+// MARK: - Color Light Scene persistence
 
 const char *MovingLightScene::tableName()
 {
@@ -115,7 +115,7 @@ void MovingLightScene::bindToStatement(sqlite3pp::statement &aStatement, int &aI
 
 
 
-// MARK: ===== default moving light scene
+// MARK: - default moving light scene
 
 void MovingLightScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
@@ -134,7 +134,7 @@ void MovingLightScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-// MARK: ===== MovingLightDeviceSettings with default light scenes factory
+// MARK: - MovingLightDeviceSettings with default light scenes factory
 
 
 MovingLightDeviceSettings::MovingLightDeviceSettings(Device &aDevice) :
@@ -153,7 +153,7 @@ DsScenePtr MovingLightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 
 
-// MARK: ===== MovingLightBehaviour
+// MARK: - MovingLightBehaviour
 
 
 MovingLightBehaviour::MovingLightBehaviour(Device &aDevice, bool aCtOnly) :
@@ -234,7 +234,7 @@ void MovingLightBehaviour::appliedPosition()
 
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string MovingLightBehaviour::shortDesc()

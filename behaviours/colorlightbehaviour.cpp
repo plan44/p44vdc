@@ -26,7 +26,7 @@
 using namespace p44;
 
 
-// MARK: ===== ColorChannel
+// MARK: - ColorChannel
 
 double ColorChannel::getChannelValueCalculated()
 {
@@ -43,7 +43,7 @@ double ColorChannel::getChannelValueCalculated()
 }
 
 
-// MARK: ===== ColorLightScene
+// MARK: - ColorLightScene
 
 
 ColorLightScene::ColorLightScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -55,7 +55,7 @@ ColorLightScene::ColorLightScene(SceneDeviceSettings &aSceneDeviceSettings, Scen
 }
 
 
-// MARK: ===== color scene values/channels
+// MARK: - color scene values/channels
 
 
 double ColorLightScene::sceneValue(int aChannelIndex)
@@ -87,7 +87,7 @@ void ColorLightScene::setSceneValue(int aChannelIndex, double aValue)
 }
 
 
-// MARK: ===== Color Light Scene persistence
+// MARK: - Color Light Scene persistence
 
 const char *ColorLightScene::tableName()
 {
@@ -143,7 +143,7 @@ void ColorLightScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 
 
 
-// MARK: ===== default color scene
+// MARK: - default color scene
 
 void ColorLightScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
@@ -172,7 +172,7 @@ void ColorLightScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-// MARK: ===== ColorLightDeviceSettings with default light scenes factory
+// MARK: - ColorLightDeviceSettings with default light scenes factory
 
 
 ColorLightDeviceSettings::ColorLightDeviceSettings(Device &aDevice) :
@@ -191,7 +191,7 @@ DsScenePtr ColorLightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 
 
-// MARK: ===== ColorLightBehaviour
+// MARK: - ColorLightBehaviour
 
 
 ColorLightBehaviour::ColorLightBehaviour(Device &aDevice, bool aCtOnly) :
@@ -354,7 +354,7 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
 
 
 
-// MARK: ===== color services for implementing color lights
+// MARK: - color services for implementing color lights
 
 
 bool ColorLightBehaviour::deriveColorMode()
@@ -570,7 +570,7 @@ bool ColorLightBehaviour::colorTransitionStep(double aStepSize)
 
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string ColorLightBehaviour::shortDesc()
@@ -590,7 +590,7 @@ string ColorLightBehaviour::description()
 
 
 
-// MARK: ===== RGBColorLightBehaviour
+// MARK: - RGBColorLightBehaviour
 
 #define DUMP_CONVERSION_TABLE 0
 
@@ -945,7 +945,7 @@ void RGBColorLightBehaviour::setCWWW(double aCW, double aWW, double aMax)
 
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 
 const char *RGBColorLightBehaviour::tableName()
@@ -1015,7 +1015,7 @@ void RGBColorLightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, i
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 
 static char rgblight_key;
@@ -1084,7 +1084,7 @@ bool RGBColorLightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr a
 }
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string RGBColorLightBehaviour::shortDesc()

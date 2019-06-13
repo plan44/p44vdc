@@ -41,7 +41,7 @@
 using namespace p44;
 
 
-// MARK: ===== ZoneState
+// MARK: - ZoneState
 
 ZoneState::ZoneState() :
   lastGlobalScene(INVALID_SCENE_NO),
@@ -52,7 +52,7 @@ ZoneState::ZoneState() :
 }
 
 
-// MARK: ===== ZoneDescriptor
+// MARK: - ZoneDescriptor
 
 ZoneDescriptor::ZoneDescriptor() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore())
@@ -250,7 +250,7 @@ size_t ZoneDescriptor::devicesInZone() const
 
 
 
-// MARK: ===== ZoneDescriptor persistence
+// MARK: - ZoneDescriptor persistence
 
 const char *ZoneDescriptor::tableName()
 {
@@ -323,7 +323,7 @@ void ZoneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 }
 
 
-// MARK: ===== ZoneDescriptor property access implementation
+// MARK: - ZoneDescriptor property access implementation
 
 static char zonedevices_container_key;
 static char zonedevice_key;
@@ -434,7 +434,7 @@ bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
 }
 
 
-// MARK: ===== ZoneList
+// MARK: - ZoneList
 
 
 ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotExisting)
@@ -458,7 +458,7 @@ ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotEx
 }
 
 
-// MARK: ===== ZoneList persistence
+// MARK: - ZoneList persistence
 
 ErrorPtr ZoneList::load()
 {
@@ -504,7 +504,7 @@ ErrorPtr ZoneList::save()
 }
 
 
-// MARK: ===== ZoneList property access implementation
+// MARK: - ZoneList property access implementation
 
 int ZoneList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -580,7 +580,7 @@ PropertyContainerPtr ZoneList::getContainer(const PropertyDescriptorPtr &aProper
 
 
 
-// MARK: ===== SceneIdentifier
+// MARK: - SceneIdentifier
 
 SceneIdentifier::SceneIdentifier()
 {
@@ -659,7 +659,7 @@ bool SceneIdentifier::deriveSceneKind()
 
 
 
-// MARK: ===== SceneDescriptor
+// MARK: - SceneDescriptor
 
 SceneDescriptor::SceneDescriptor() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore())
@@ -672,7 +672,7 @@ SceneDescriptor::~SceneDescriptor()
 }
 
 
-// MARK: ===== SceneDescriptor persistence
+// MARK: - SceneDescriptor persistence
 
 const char *SceneDescriptor::tableName()
 {
@@ -752,7 +752,7 @@ void SceneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 }
 
 
-// MARK: ===== SceneDescriptor property access implementation
+// MARK: - SceneDescriptor property access implementation
 
 enum {
   sceneNo_key,
@@ -812,7 +812,7 @@ bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 }
 
 
-// MARK: ===== SceneList
+// MARK: - SceneList
 
 
 SceneDescriptorPtr SceneList::getSceneByName(const string aSceneName)
@@ -855,7 +855,7 @@ SceneDescriptorPtr SceneList::getScene(const SceneIdentifier &aSceneId, bool aCr
 }
 
 
-// MARK: ===== SceneList persistence
+// MARK: - SceneList persistence
 
 ErrorPtr SceneList::load()
 {
@@ -899,7 +899,7 @@ ErrorPtr SceneList::save()
 }
 
 
-// MARK: ===== SceneList property access implementation
+// MARK: - SceneList property access implementation
 
 int SceneList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -969,7 +969,7 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 
 
 
-// MARK: ===== Trigger
+// MARK: - Trigger
 
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
@@ -985,7 +985,7 @@ Trigger::~Trigger()
 
 
 
-// MARK: ===== Trigger condition evaluation
+// MARK: - Trigger condition evaluation
 
 
 bool Trigger::checkAndFire()
@@ -1104,7 +1104,7 @@ ExpressionValue Trigger::evaluateFunction(const string &aName, const FunctionArg
 }
 
 
-// MARK: ===== Trigger actions execution
+// MARK: - Trigger actions execution
 
 
 ErrorPtr Trigger::executeActions()
@@ -1160,7 +1160,7 @@ ErrorPtr Trigger::executeActions()
 
 
 
-// MARK: ===== Trigger API method handlers
+// MARK: - Trigger API method handlers
 
 
 ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
@@ -1201,7 +1201,7 @@ ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 }
 
 
-// MARK: ===== Trigger persistence
+// MARK: - Trigger persistence
 
 const char *Trigger::tableName()
 {
@@ -1280,7 +1280,7 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 }
 
 
-// MARK: ===== Trigger property access implementation
+// MARK: - Trigger property access implementation
 
 enum {
   triggerName_key,
@@ -1337,7 +1337,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
 
 
 
-// MARK: ===== TriggerList
+// MARK: - TriggerList
 
 
 TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting, size_t *aTriggerIndexP)
@@ -1386,7 +1386,7 @@ void TriggerList::triggerChecker(MLTimer &aTimer)
 
 
 
-// MARK: ===== TriggerList persistence
+// MARK: - TriggerList persistence
 
 ErrorPtr TriggerList::load()
 {
@@ -1430,7 +1430,7 @@ ErrorPtr TriggerList::save()
 }
 
 
-// MARK: ===== TriggerList property access implementation
+// MARK: - TriggerList property access implementation
 
 int TriggerList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -1505,7 +1505,7 @@ PropertyContainerPtr TriggerList::getContainer(const PropertyDescriptorPtr &aPro
 
 
 
-// MARK: ===== LocalController
+// MARK: - LocalController
 
 LocalController::LocalController(VdcHost &aVdcHost) :
   vdcHost(aVdcHost)
@@ -1966,7 +1966,7 @@ ErrorPtr LocalController::save()
 }
 
 
-// MARK: ===== LocalController specific root (vdchost) level method handling
+// MARK: - LocalController specific root (vdchost) level method handling
 
 
 static const GroupDescriptor groupInfos[] = {
@@ -2108,7 +2108,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
 
 
 
-// MARK: ===== LocalController property access
+// MARK: - LocalController property access
 
 enum {
   // singledevice level properties

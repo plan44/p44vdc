@@ -38,7 +38,7 @@ namespace {
   const string NUPNP_PATH = "https://www.meethue.com/api/nupnp";
 }
 
-// MARK: ===== HueApiOperation
+// MARK: - HueApiOperation
 
 HueApiOperation::HueApiOperation(HueComm &aHueComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, HueApiResultCB aResultHandler) :
   hueComm(aHueComm),
@@ -167,7 +167,7 @@ void HueApiOperation::abortOperation(ErrorPtr aError)
 
 
 
-// MARK: ===== BridgeFinder
+// MARK: - BridgeFinder
 
 class p44::BridgeFinder : public P44Obj
 {
@@ -511,7 +511,7 @@ public:
 
 
 
-// MARK: ===== hueComm
+// MARK: - hueComm
 
 
 HueComm::HueComm() :
