@@ -1046,7 +1046,7 @@ ErrorPtr VdcPbufApiRequest::sendError(ErrorPtr aError)
   if (!aError) {
     aError = Error::ok();
   }
-  VdcApiErrorPtr vdcApiErr = dynamic_pointer_cast<VdcApiError>(aError);
+  VdcApiErrorPtr vdcApiErr = boost::dynamic_pointer_cast<VdcApiError>(aError);
   // create a message
   Vdcapi__Message msg = VDCAPI__MESSAGE__INIT;
   Vdcapi__GenericResponse resp = VDCAPI__GENERIC_RESPONSE__INIT;

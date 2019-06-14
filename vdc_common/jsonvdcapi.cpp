@@ -181,7 +181,7 @@ ErrorPtr VdcJsonApiRequest::sendError(ErrorPtr aError)
     aError = Error::ok();
   }
   JsonApiValuePtr errorData;
-  VdcApiErrorPtr vdcApiErr = dynamic_pointer_cast<VdcApiError>(aError);
+  VdcApiErrorPtr vdcApiErr = boost::dynamic_pointer_cast<VdcApiError>(aError);
   if (vdcApiErr) {
     // extra fields possible
     if (vdcApiErr->getErrorType()!=0 || !vdcApiErr->getUserFacingMessage().empty()) {
