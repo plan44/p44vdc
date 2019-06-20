@@ -265,6 +265,9 @@ void ColorLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
       default:
         colorMode = colorLightModeNone;
     }
+    // Don't cares should be correct at this point, but scenes saved long ago might have values that should NOT be
+    // applied but don't have a dontCare. The following call will repair these incorrect scenes:
+    adjustChannelDontCareToColorMode(colorLightScene, true); // only SET dontCares, but do not remove any
   }
   // need recalculation of values
   derivedValuesComplete = false;
@@ -305,7 +308,7 @@ void ColorLightBehaviour::saveChannelsToScene(DsScenePtr aScene)
 }
 
 
-void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene)
+void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene, bool aSetOnly)
 {
   // save the values and adjust don't cares according to color mode
   switch (aColorLightScene->colorMode) {
@@ -314,9 +317,11 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
       if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
-      // enable the used values
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, false);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, false);
+      if (!aSetOnly) {
+        // enable the used values
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, false);
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, false);
+      }
       break;
     }
     case colorLightModeXY: {
@@ -324,9 +329,11 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
       if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
-      // enable the used values
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, false);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, false);
+      if (!aSetOnly) {
+        // enable the used values
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, false);
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, false);
+      }
       break;
     }
     case colorLightModeCt: {
@@ -335,8 +342,10 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
       if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
-      // enable the used values
-      aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, false);
+      if (!aSetOnly) {
+        // enable the used values
+        aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, false);
+      }
       break;
     }
     default: {
@@ -362,19 +371,32 @@ bool ColorLightBehaviour::deriveColorMode()
   // the need to derive the color modes only arises when
   // colors (may) have changed, so this invalidates the derived channel values
   derivedValuesComplete = false;
+  // Note: actual calculation of derived values might not be carried out at all if none of the
+  //   derived channel values is queried. However, we must mark the derived channel values
+  //   volatile here to make sure these don't get persisted
   // check changed channels
   if (!ctOnly) {
     if (hue->needsApplying() || saturation->needsApplying()) {
       colorMode = colorLightModeHueSaturation;
+      cieX->setVolatile();
+      cieY->setVolatile();
+      ct->setVolatile();
       return true;
     }
     else if (cieX->needsApplying() || cieY->needsApplying()) {
       colorMode = colorLightModeXY;
+      hue->setVolatile();
+      saturation->setVolatile();
+      ct->setVolatile();
       return true;
     }
   }
   if (ct->needsApplying()) {
     colorMode = colorLightModeCt;
+    cieX->setVolatile();
+    cieY->setVolatile();
+    hue->setVolatile();
+    saturation->setVolatile();
     return true;
   }
   // could not determine new color mode (assuming old is still ok)

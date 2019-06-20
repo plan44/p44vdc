@@ -204,8 +204,9 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     if (cachedChannelValue!=aActualChannelValue || LOGENABLED(LOG_DEBUG)) {
       // show only changes except if debugging
       SALOG(output.device,LOG_INFO,
-        "Channel '%s': cached value synchronized from %0.2f -> %0.2f",
-        getName(), cachedChannelValue, aActualChannelValue
+        "Channel '%s': cached value synchronized from %0.2f -> %0.2f%s",
+        getName(), cachedChannelValue, aActualChannelValue,
+        aVolatile ? " (derived/volatile)" : ""
       );
     }
     // make sure new value is within bounds
