@@ -484,7 +484,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         HSV[1] = saturation->getChannelValue()/100; // 0..1
         HSV[2] = 1;
         HSVtoxyV(HSV, xyV);
-        cieX->syncChannelValue(xyV[0], false, true);
+        cieX->syncChannelValue(xyV[0], false, true); // derived values are always volatile
         cieY->syncChannelValue(xyV[1], false, true);
         xyVtoCT(xyV, mired);
         ct->syncChannelValue(mired, false, true);

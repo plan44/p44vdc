@@ -69,6 +69,7 @@ namespace p44 {
     /// @name internal volatile state
     /// @{
     bool channelUpdatePending; ///< set if cachedOutputValue represents a value to be transmitted to the hardware
+    bool volatileValue; ///< set if value is not a defining part of the output state (not to be persisted, not necessarily valid)
     double cachedChannelValue; ///< the cached channel value
     double previousChannelValue; ///< the previous channel value, can be used for performing transitions
     double transitionProgress; ///< how much the transition has progressed so far (0..1)

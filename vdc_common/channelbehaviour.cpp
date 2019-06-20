@@ -35,6 +35,7 @@ ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChann
   nextTransitionTime(0), // none
   channelLastSync(Never), // we don't known nor have we sent the output state
   cachedChannelValue(0), // channel output value cache
+  volatileValue(true), // not worth saving yet
   previousChannelValue(0), // previous output value
   transitionProgress(1), // no transition in progress
   resolution(1) // dummy default resolution (derived classes must provide sensible defaults)
@@ -213,7 +214,8 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     else if (aActualChannelValue<getMin())
       aActualChannelValue = getMin();
     // apply
-    if (aVolatile) {
+    volatileValue = aVolatile;
+    if (volatileValue) {
       cachedChannelValue = aActualChannelValue;
     }
     else {
@@ -295,6 +297,7 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
   }
+  volatileValue = false; // channel actively set, is not volatile
 }
 
 
@@ -329,6 +332,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
   }
+  volatileValue = false; // channel actively dimmed, is not volatile
   return newValue;
 }
 
@@ -388,8 +392,14 @@ void ChannelBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex
 {
   inheritedParams::loadFromRow(aRow, aIndex, NULL); // no common flags
   // get the fields
-  cachedChannelValue = aRow->get<double>(aIndex++);
-  channelUpdatePending = true; // loading a persistent channel value always means it must be propagated to the hardware
+  if (aRow->getIfNotNull<double>(aIndex++, cachedChannelValue)) {
+    // loading a non-NULL persistent channel value always means it must be propagated to the hardware
+    channelUpdatePending = true;
+    volatileValue = false;
+  }
+  else {
+    volatileValue = true;
+  }
 }
 
 
@@ -398,16 +408,20 @@ void ChannelBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aI
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, cachedChannelValue);
+  if (volatileValue) {
+    aStatement.bind(aIndex++); // volatile values are not saved
+  }
+  else {
+    aStatement.bind(aIndex++, cachedChannelValue);
+  }
 }
-
 
 
 string ChannelBehaviour::getDbKey()
 {
   // Note - we do not key the channel persistence with output behaviour settings' ROWID,
   //   as this often does not exist at all, but use the deviceID+channelID as key, so
-  //   channels can be persisted independently of
+  //   channels can be persisted independently of device settings.
   return string_format("%s_%s",output.device.getDsUid().getString().c_str(),getId().c_str());
 }
 
@@ -556,8 +570,8 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
           aPropValue->setDoubleValue(getChannelValueCalculated());
           return true;
         case age_key+states_key_offset:
-          if (channelLastSync==Never)
-            aPropValue->setNull(); // no value known
+          if (channelLastSync==Never || volatileValue)
+            aPropValue->setNull(); // no value known, or volatile
           else
             aPropValue->setDoubleValue((double)(MainLoop::now()-channelLastSync)/Second); // time of last sync (does not necessarily relate to currently visible "value", as this might be a to-be-applied new value already)
           return true;
