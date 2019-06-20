@@ -485,23 +485,23 @@ void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aD
             // match path
             string param = key.substr(key.find_last_of('/')+1);
             if (cl && param=="hue") {
-              cl->hue->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_HUE, false, true); // only sync if no new value pending already
+              cl->hue->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_HUE, false); // only sync if no new value pending already
             }
             else if (cl && param=="sat") {
-              cl->saturation->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_SATURATION, false, true); // only sync if no new value pending already
+              cl->saturation->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_SATURATION, false); // only sync if no new value pending already
             }
             else if (cl && param=="xy") {
               JsonObjectPtr e = val->arrayGet(0);
-              if (e) cl->cieX->syncChannelValue(e->doubleValue(), false, true); // only sync if no new value pending already, volatile
+              if (e) cl->cieX->syncChannelValue(e->doubleValue(), false); // only sync if no new value pending already, volatile
               e = val->arrayGet(1);
-              if (e) cl->cieY->syncChannelValue(e->doubleValue(), false, true); // only sync if no new value pending already, volatile
+              if (e) cl->cieY->syncChannelValue(e->doubleValue(), false); // only sync if no new value pending already, volatile
             }
             else if (cl && param=="ct") {
-              cl->ct->syncChannelValue(val->int32Value(), false, true); // only sync if no new value pending already, volatile
+              cl->ct->syncChannelValue(val->int32Value(), false); // only sync if no new value pending already, volatile
             }
             else if (param=="on") {
               if (!val->boolValue()) {
-                aLightBehaviour->syncBrightnessFromHardware(0, false, true); // only sync if no new value pending already, volatile
+                aLightBehaviour->syncBrightnessFromHardware(0, false); // only sync if no new value pending already, volatile
                 blockBrightness = true; // prevent syncing brightness, lamp is off, logical brightness is 0
               }
             }
