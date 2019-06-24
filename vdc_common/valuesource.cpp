@@ -20,8 +20,11 @@
 //
 
 #include "valuesource.hpp"
+#include "vdchost.hpp"
 
 using namespace p44;
+
+// MARK: - ValueSource
 
 ValueSource::ValueSource()
 {
@@ -68,4 +71,162 @@ void ValueSource::notifyListeners(ValueListenerEvent aEvent)
       cb(*this, aEvent);
     }
   }
+}
+
+
+// MARK: - ValueSourceMapper
+
+
+ValueSourceMapper::ValueSourceMapper()
+{
+}
+
+
+ValueSourceMapper::~ValueSourceMapper()
+{
+  forgetMappings();
+}
+
+
+void ValueSourceMapper::forgetMappings()
+{
+  for (ValueSourcesMap::iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
+    pos->second->removeSourceListener(this);
+  }
+  valueMap.clear();
+}
+
+
+ValueSource* ValueSourceMapper::valueSourceByAlias(const string aAlias)
+{
+  ValueSourcesMap::iterator pos = valueMap.find(aAlias);
+  if (pos==valueMap.end()) {
+    return NULL;
+  }
+  return pos->second;
+}
+
+
+bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, ValueListenerCB aCallback, string *aMigratedValueDefsP)
+{
+  LOG(LOG_INFO, "Parsing alias to value source mappings");
+  forgetMappings(); // forget previous mappings
+  string newValueDefs; // re-created value defs using sensor ids rather than indices, for migration
+  // syntax:
+  //  <valuealias>:<valuesourceid> [, <valuealias>:valuesourceid> ...]
+  bool foundall = true;
+  size_t i = 0;
+  while(i<aValueDefs.size()) {
+    size_t e = aValueDefs.find(":", i);
+    if (e!=string::npos) {
+      string valuealias = aValueDefs.substr(i,e-i);
+      i = e+1;
+      size_t e2 = aValueDefs.find_first_of(", \t\n\r", i);
+      if (e2==string::npos) e2 = aValueDefs.size();
+      string valuesourceid = aValueDefs.substr(i,e2-i);
+      // search source
+      ValueSource *vs = VdcHost::sharedVdcHost()->getValueSourceById(valuesourceid);
+      if (vs) {
+        // value source exists
+        // - add listener
+        vs->addSourceListener(aCallback, this);
+        // - add source to my map
+        valueMap[valuealias] = vs;
+        LOG(LOG_INFO, "- alias '%s' connected to source '%s'", valuealias.c_str(), vs->getSourceName().c_str());
+        string_format_append(newValueDefs, "%s:%s", valuealias.c_str(), vs->getSourceId().c_str());
+      }
+      else {
+        LOG(LOG_WARNING, "Value source id '%s' not found -> alias '%s' currently undefined", valuesourceid.c_str(), valuealias.c_str());
+        string_format_append(newValueDefs, "%s:%s", valuealias.c_str(), valuesourceid.c_str());
+        foundall = false;
+      }
+      // skip delimiters
+      i = aValueDefs.find_first_not_of(", \t\n\r", e2);
+      if (i==string::npos) i = aValueDefs.size();
+      newValueDefs += aValueDefs.substr(e2,i-e2);
+    }
+    else {
+      LOG(LOG_ERR, "missing ':' in mapping definition");
+      break;
+    }
+  }
+  if (aMigratedValueDefsP) {
+    aMigratedValueDefsP->clear();
+    if (newValueDefs!=aValueDefs) {
+      *aMigratedValueDefsP = newValueDefs;
+    }
+  }
+  return foundall;
+}
+
+
+ExpressionValue ValueSourceMapper::valueLookup(const string aName)
+{
+  // value specfications can be simple valuesource alias names, or alias names with sub-field specifications:
+  // alias               returns the value of the valuesource itself
+  // alias.valid         returns 1 if valuesource has a valid value, 0 otherwise
+  // alias.oplevel       returns the operation level of the valuesource (0..100%)
+  // alias.age           returns the age of the valuesource's value in seconds
+  string subfield;
+  string name;
+  size_t i = aName.find('.');
+  if (i!=string::npos) {
+    subfield = aName.substr(i+1);
+    name = aName.substr(0,i);
+  }
+  else {
+    name = aName;
+  }
+  ValueSource* vs = valueSourceByAlias(name);
+  if (vs==NULL) {
+    return ExpressionError::errValue(ExpressionError::NotFound, "Undefined alias '%s'", name.c_str());
+  }
+  // value found
+  if (subfield.empty()) {
+    // value itself is requested
+    if (vs->getSourceLastUpdate()!=Never) {
+      return ExpressionValue(vs->getSourceValue());
+    }
+  }
+  else if (subfield=="valid") {
+    return ExpressionValue(vs->getSourceLastUpdate()!=Never ? 1 : 0);
+  }
+  else if (subfield=="oplevel") {
+    int lvl = vs->getSourceOpLevel();
+    if (lvl>=0) return ExpressionValue(lvl);
+    // otherwise: no known value
+  }
+  else if (subfield=="age") {
+    if (vs->getSourceLastUpdate()!=Never) {
+      return ExpressionValue(((double)(MainLoop::now()-vs->getSourceLastUpdate()))/Second);
+    }
+  }
+  else {
+    return ExpressionError::errValue(ExpressionError::NotFound, "Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
+  }
+  // no value (yet)
+  return ExpressionError::errValue(ExpressionError::Null, "'%s' has no known value yet", aName.c_str());
+}
+
+
+
+bool ValueSourceMapper::getMappedSourcesInfo(ApiValuePtr aInfoObject)
+{
+  if (!aInfoObject || !aInfoObject->isType(apivalue_object)) return false;
+  for (ValueSourcesMap::iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
+    ApiValuePtr val = aInfoObject->newObject();
+    MLMicroSeconds lastupdate = pos->second->getSourceLastUpdate();
+    val->add("description", val->newString(pos->second->getSourceName()));
+    if (lastupdate==Never) {
+      val->add("age", val->newNull());
+      val->add("value", val->newNull());
+    }
+    else {
+      val->add("age", val->newDouble((double)(MainLoop::now()-lastupdate)/Second));
+      val->add("value", val->newDouble(pos->second->getSourceValue()));
+    }
+    aInfoObject->add(pos->first,val); // variable name
+    LOG(LOG_INFO, "- '%s' ('%s') = %f", pos->first.c_str(), pos->second->getSourceName().c_str(), pos->second->getSourceValue());
+  }
+  return true;
 }

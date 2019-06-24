@@ -42,7 +42,7 @@ namespace p44 {
     typedef DeviceSettings inherited;
     friend class EvaluatorDevice;
 
-    string valueDefs; ///< mapping of variable names to ValueSources
+    string varDefs; ///< mapping of variable names to ValueSources
     string onCondition; ///< expression that must evaluate to true for output to get active
     string offCondition; ///< expression that must evaluate to true for output to get inactive
     MLMicroSeconds minOnTime; ///< how long the on condition must be present before triggering the result change
@@ -87,8 +87,7 @@ namespace p44 {
     VdcUsageHint sensorUsage;
 
     /// active value sources
-    typedef map<string, ValueSource *> ValueSourcesMap;
-    ValueSourcesMap valueMap;
+    ValueSourceMapper valueMapper;
     MLTicket valueParseTicket;
 
     Tristate currentState;
@@ -188,8 +187,7 @@ namespace p44 {
 
   private:
 
-    void forgetValueDefs();
-    void parseValueDefs();
+    void parseVarDefs();
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     void evaluateConditions(Tristate aRefState, EvalMode aEvalMode);
