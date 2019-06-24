@@ -202,9 +202,10 @@ namespace p44 {
     /// @param aAnyWay if true, lastSent state will be set even if channel was not in needsApplying() state
     void channelValueApplied(bool aAnyWay = false);
 
-    /// can be called to explicitly mark a channel value volatile, meaning it is not carrying relevant data
+    /// can be called to explicitly set a channel's volatile flag, which means it is not carrying relevant data
     /// for defining the output state (e.g. CIE x,y channels when light is in HSV mode)
-    void setVolatile() { volatileValue = true; }
+    /// @param aVolatile true to set volatile, false otherwise
+    void setVolatile(bool aVolatile) { setPVar(volatileValue, aVolatile); }
 
     /// @}
 

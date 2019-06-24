@@ -215,9 +215,9 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     else if (aActualChannelValue<getMin())
       aActualChannelValue = getMin();
     // apply
-    volatileValue = aVolatile;
+    setPVar(volatileValue, aVolatile); // valatile status is persisted as NULL value, so must mark dirty on change
     if (volatileValue) {
-      cachedChannelValue = aActualChannelValue;
+      cachedChannelValue = aActualChannelValue; // when volatile, the actual channel value is not persisted, just updated
     }
     else {
       setPVar(cachedChannelValue, aActualChannelValue);

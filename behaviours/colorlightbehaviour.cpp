@@ -378,25 +378,30 @@ bool ColorLightBehaviour::deriveColorMode()
   if (!ctOnly) {
     if (hue->needsApplying() || saturation->needsApplying()) {
       colorMode = colorLightModeHueSaturation;
-      cieX->setVolatile();
-      cieY->setVolatile();
-      ct->setVolatile();
+      hue->setVolatile(false);
+      saturation->setVolatile(false);
+      cieX->setVolatile(true);
+      cieY->setVolatile(true);
+      ct->setVolatile(true);
       return true;
     }
     else if (cieX->needsApplying() || cieY->needsApplying()) {
       colorMode = colorLightModeXY;
-      hue->setVolatile();
-      saturation->setVolatile();
-      ct->setVolatile();
+      cieX->setVolatile(false);
+      cieY->setVolatile(false);
+      hue->setVolatile(true);
+      saturation->setVolatile(true);
+      ct->setVolatile(true);
       return true;
     }
   }
   if (ct->needsApplying()) {
     colorMode = colorLightModeCt;
-    cieX->setVolatile();
-    cieY->setVolatile();
-    hue->setVolatile();
-    saturation->setVolatile();
+    ct->setVolatile(false);
+    cieX->setVolatile(true);
+    cieY->setVolatile(true);
+    hue->setVolatile(true);
+    saturation->setVolatile(true);
     return true;
   }
   // could not determine new color mode (assuming old is still ok)
