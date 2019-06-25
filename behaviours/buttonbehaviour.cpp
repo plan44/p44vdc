@@ -531,7 +531,9 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     );
     // issue a state property push
     pushBehaviourState();
-    // also let device container know for local click handling
+    // notify listeners
+    notifyListeners(clickType!=ct_hold_repeat ? valueevent_changed : valueevent_confirmed);
+    // also let vdchost know for local click handling
     // TODO: more elegant solution for this
     device.getVdcHost().checkForLocalClickHandling(*this, aClickType);
   }
@@ -558,6 +560,79 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
 }
 
 
+#if ENABLE_LOCALCONTROLLER
+
+// MARK: - value source implementation
+
+
+bool ButtonBehaviour::isEnabled()
+{
+  // only app buttons are available for use in local processing
+  return buttonFunc==buttonFunc_app;
+}
+
+
+string ButtonBehaviour::getSourceId()
+{
+  return string_format("%s_B%s", device.getDsUid().getString().c_str(), getId().c_str());
+}
+
+
+string ButtonBehaviour::getSourceName()
+{
+  // get device name or dSUID for context
+  string n = device.getAssignedName();
+  if (n.empty()) {
+    // use abbreviated dSUID instead
+    string d = device.getDsUid().getString();
+    n = d.substr(0,8) + "..." + d.substr(d.size()-2,2);
+  }
+  // append behaviour description
+  string_format_append(n, ": %s", getHardwareName().c_str());
+  return n;
+}
+
+
+double ButtonBehaviour::getSourceValue()
+{
+  // 0: not pressed
+  // 1..4: number of clicks
+  // >4 : held down
+  if (state==S0_idle) return 0;
+  switch (clickType) {
+    case ct_tip_1x:
+    case ct_click_1x:
+      return 1;
+    case ct_tip_2x:
+    case ct_click_2x:
+      return 2;
+    case ct_tip_3x:
+    case ct_click_3x:
+      return 3;
+    case ct_tip_4x:
+      return 4;
+    case ct_hold_start:
+    case ct_hold_repeat:
+      return 5;
+    case ct_hold_end:
+    default:
+      return 0; // not pressed any more
+  }
+}
+
+
+MLMicroSeconds ButtonBehaviour::getSourceLastUpdate()
+{
+  return lastAction;
+}
+
+
+int ButtonBehaviour::getSourceOpLevel()
+{
+  return device.opStateLevel();
+}
+
+#endif // ENABLE_LOCALCONTROLLER
 
 // MARK: - persistence implementation
 

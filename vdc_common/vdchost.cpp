@@ -1608,7 +1608,7 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
     for (BehaviourVector::iterator pos2 = dev->sensors.begin(); pos2!=dev->sensors.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
-      if (vs) {
+      if (vs && vs->isEnabled()) {
         aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
       }
     }
@@ -1616,7 +1616,15 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
     for (BehaviourVector::iterator pos2 = dev->inputs.begin(); pos2!=dev->inputs.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
-      if (vs) {
+      if (vs && vs->isEnabled()) {
+        aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
+      }
+    }
+    // Buttons
+    for (BehaviourVector::iterator pos2 = dev->buttons.begin(); pos2!=dev->buttons.end(); ++pos2) {
+      DsBehaviourPtr b = *pos2;
+      ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
+      if (vs && vs->isEnabled()) {
         aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
       }
     }
@@ -1640,12 +1648,13 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
       DevicePtr dev = pos->second;
       const char *p = aValueSourceID.c_str()+i+1;
       if (*p) {
-        // first character is type: I=Input, S=Sensor
+        // first character is type: I=Input, S=Sensor, B=Button
         char ty = *p++;
         DsBehaviourPtr bhv;
         switch (ty) {
           case 'S' : bhv = dev->getSensor(Device::by_id_or_index, string(p)); break;
           case 'I' : bhv = dev->getInput(Device::by_id_or_index, string(p)); break;
+          case 'B' : bhv = dev->getButton(Device::by_id_or_index, string(p)); break;
         }
         if (bhv) {
           valueSource = dynamic_cast<ValueSource *>(bhv.get());
