@@ -633,7 +633,7 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
   if (!aError) {
     aError = Error::ok();
   }
-  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error sent: error=%d (%s)", aError->getErrorCode(), aError->getErrorMessage());
+  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error sent: error=%ld (%s)", aError->getErrorCode(), aError->getErrorMessage());
   P44VdcHost::sendCfgApiResponse(jsonComm, JsonObjectPtr(), aError);
   return ErrorPtr();
 }

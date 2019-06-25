@@ -741,7 +741,7 @@ ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel
 
 
 
-void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   ErrorPtr err;
   if (aNotification=="saveScene") {
@@ -844,14 +844,10 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       ALOG(LOG_WARNING, "setOutputChannelValue error: %s", err->description().c_str());
     }
   }
-  else if (aNotification=="identify") {
-    // identify to user
-    ALOG(LOG_NOTICE, "Identify");
-    identifyToUser();
-  }
   else {
-    inherited::handleNotification(aApiConnection, aNotification, aParams);
+    return inherited::handleNotification(aApiConnection, aNotification, aParams);
   }
+  return true; // known notification name
 }
 
 
@@ -1791,18 +1787,15 @@ void Device::callSceneMin(SceneNo aSceneNo)
 }
 
 
-
-
 void Device::identifyToUser()
 {
   if (output) {
     output->identifyToUser(); // pass on to behaviour by default
   }
   else {
-    LOG(LOG_INFO, "***** device 'identify' called (for device with no real identify implementation) *****");
+    inherited::identifyToUser();
   }
 }
-
 
 
 void Device::saveScene(SceneNo aSceneNo)

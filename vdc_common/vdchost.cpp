@@ -1442,9 +1442,9 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
 }
 
 
-void VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+bool VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  inherited::handleNotification(aApiConnection, aNotification, aParams);
+  return inherited::handleNotification(aApiConnection, aNotification, aParams);
 }
 
 

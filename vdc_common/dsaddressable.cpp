@@ -185,14 +185,27 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
     // method name must be present
     string methodName;
     if (Error::isOK(respErr = checkStringParam(aParams, "methodname", methodName))) {
-      ApiValuePtr params = aParams->get("params");
-      if (!params || !params->isType(apivalue_object)) {
-        // no params or not object -> default to empty parameter list
-        params = aRequest->newApiValue();
-        params->setType(apivalue_object);
+      if (methodName=="genericRequest") {
+        respErr = Error::err<VdcApiError>(415, "recursive call of genericRequest");
       }
-      // recursively call method handler with unpacked params
-      return handleMethod(aRequest, methodName, params);
+      else {
+        ApiValuePtr params = aParams->get("params");
+        if (!params || !params->isType(apivalue_object)) {
+          // no params or not object -> default to empty parameter list
+          params = aRequest->newApiValue();
+          params->setType(apivalue_object);
+        }
+        // recursively call method handler with unpacked params
+        respErr = handleMethod(aRequest, methodName, params);
+        if (Error::isError(respErr, VdcApiError::domain(), 405)) {
+          // unknown method (or syntax error in params), but not actual failure of method operation: try as notification
+          if (handleNotification(aRequest->connection(), methodName, params)) {
+            // successful initiation of notification via genericRequest *method* call, confirm with simple OK
+            respErr = Error::ok();
+          }
+        }
+        return respErr;
+      }
     }
   }
   else if (aMethod=="loglevel") {
@@ -298,17 +311,30 @@ void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultOb
 
 
 
-void DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+bool DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   if (aNotification=="ping") {
     // issue device ping (which will issue a pong when device is reachable)
     ALOG(LOG_INFO, "ping -> checking presence...");
     checkPresence(boost::bind(&DsAddressable::pingResultHandler, this, _1));
   }
+  else if (aNotification=="identify") {
+    // identify to user
+    ALOG(LOG_NOTICE, "Identify");
+    identifyToUser();
+  }
   else {
     // unknown notification
     ALOG(LOG_WARNING, "unknown notification '%s'", aNotification.c_str());
+    return false;
   }
+  return true;
+}
+
+
+void DsAddressable::identifyToUser()
+{
+  ALOG(LOG_WARNING, "***** 'identify' called (but addressable does not have a hardware implementation for it)");
 }
 
 
