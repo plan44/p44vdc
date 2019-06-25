@@ -165,32 +165,15 @@ static const SceneKindDescriptor globalScenes[] = {
 
 
 
-DsGroupMask ZoneDescriptor::getZoneGroups(bool aStandardOnly)
+DsGroupMask ZoneDescriptor::getZoneGroups()
 {
   DsGroupMask zoneGroups = 0;
-  if (zoneID==zoneId_global) {
-    return 0; // groups are not relevant in zone0
+  if (zoneID==zoneId_global) return 0; // groups are not relevant in zone0
+  for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+    OutputBehaviourPtr ob = (*pos)->getOutput();
+    if (ob) zoneGroups |= ob->groupMemberships();
   }
-  else {
-    for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
-      OutputBehaviourPtr o = (*pos)->getOutput();
-      if (o) {
-        zoneGroups |= o->groupMemberships();
-      }
-    }
-    if (aStandardOnly) {
-      // only use groups with standard room scenes
-      zoneGroups &= (
-        (1ll<<group_yellow_light) |
-        (1ll<<group_grey_shadow) |
-        (1ll<<group_blue_heating) |
-        (1ll<<group_cyan_audio) |
-        (1ll<<group_blue_cooling) |
-        (1ll<<group_blue_ventilation)
-      );
-    }
-    return zoneGroups;
-  }
+  return zoneGroups;
 }
 
 
@@ -2021,21 +2004,21 @@ ErrorPtr LocalController::save()
 
 
 static const GroupDescriptor groupInfos[] = {
-  { group_undefined,               group_global,      "undefined" },
-  { group_yellow_light,            group_standard,    "light" },
-  { group_grey_shadow,             group_standard,    "shadow" },
-  { group_blue_heating,            group_standard,    "heating" },
-  { group_cyan_audio,              group_standard,    "audio" },
-  { group_magenta_video,           group_standard,    "video" },
-  { group_red_security,            group_global,      "security" },
-  { group_green_access,            group_global,      "access" },
-  { group_black_variable,          group_application, "joker" },
-  { group_blue_cooling,            group_standard,    "cooling" },
-  { group_blue_ventilation,        group_standard,    "ventilation" },
-  { group_blue_windows,            group_standard,    "windows" },
-  { group_blue_air_recirculation,  group_controller,  "air recirculation" },
-  { group_roomtemperature_control, group_controller,  "room temperature control" },
-  { group_ventilation_control,     group_controller,  "ventilation control" },
+  { group_undefined,               group_global,      "undefined",      0x000000 },
+  { group_yellow_light,            group_standard,    "light",          0xFFFF00 },
+  { group_grey_shadow,             group_standard,    "shadow",         0x999999 },
+  { group_blue_heating,            group_standard,    "heating",        0x0000FF },
+  { group_cyan_audio,              group_standard,    "audio",          0x00FFFF },
+  { group_magenta_video,           group_standard,    "video",          0xFF00FF },
+  { group_red_security,            group_global,      "security",       0xFF0000 },
+  { group_green_access,            group_global,      "access",         0x00FF00 },
+  { group_black_variable,          group_application, "joker",          0x000000 },
+  { group_blue_cooling,            group_standard,    "cooling",        0x0000FF },
+  { group_blue_ventilation,        group_standard,    "ventilation",    0x0000FF },
+  { group_blue_windows,            group_standard,    "windows",        0x0000FF },
+  { group_blue_air_recirculation,  group_controller,  "air recirculation", 0x0000FF },
+  { group_roomtemperature_control, group_controller,  "room temperature control", 0x0000FF },
+  { group_ventilation_control,     group_controller,  "ventilation control", 0x0000FF },
   { group_undefined,               0 /* terminator */,"" }
 };
 
@@ -2053,7 +2036,17 @@ const GroupDescriptor* LocalController::groupInfo(DsGroup aGroup)
 }
 
 
-
+DsGroupMask LocalController::standardRoomGroups(DsGroupMask aGroups)
+{
+  return aGroups & (
+    (1ll<<group_yellow_light) |
+    (1ll<<group_grey_shadow) |
+    (1ll<<group_blue_heating) |
+    (1ll<<group_cyan_audio) |
+    (1ll<<group_blue_cooling) |
+    (1ll<<group_blue_ventilation)
+  );
+}
 
 
 bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
@@ -2100,35 +2093,44 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
     return true;
   }
   else if (aMethod=="x-p44-queryGroups") {
-    // query groups that can be used in a zone
-    ApiValuePtr o;
-    aError = DsAddressable::checkParam(aParams, "zoneID", o);
-    if (Error::isOK(aError)) {
+    // query groups that are in use (in a zone or globally)
+    DsGroupMask groups = 0;
+    ApiValuePtr o = aParams->get("zoneID");
+    if (o) {
+      // specific zone
       DsZoneID zoneID = (DsZoneID)o->uint16Value();
       ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
       if (!zone) {
         aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
+        return true;
       }
-      else {
-        bool allGroups = false;
-        o = aParams->get("all"); if (o) allGroups = o->boolValue();
-        DsGroupMask groups = zone->getZoneGroups(!allGroups);
-        // create answer object
-        ApiValuePtr result = aRequest->newApiValue();
-        result->setType(apivalue_object);
-        for (int i = 0; i<64; ++i) {
-          if (groups & (1ll<<i)) {
-            const GroupDescriptor* gi = groupInfo((DsGroup)i);
-            ApiValuePtr g = result->newObject();
-            g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
-            g->add("kind", g->newUint64(gi ? gi->kind : 0));
-            result->add(string_format("%d", i), g);
-          }
-        }
-        aRequest->sendResult(result);
-        aError.reset(); // make sure we don't send an extra ErrorOK
+      groups = zone->getZoneGroups();
+    }
+    else {
+      // globally
+      for (DsDeviceMap::iterator pos = vdcHost.dSDevices.begin(); pos!=vdcHost.dSDevices.end(); ++pos) {
+        OutputBehaviourPtr ob = pos->second->getOutput();
+        if (ob) groups |= ob->groupMemberships();
       }
     }
+    bool allGroups = false;
+    o = aParams->get("all"); if (o) allGroups = o->boolValue();
+    if (!allGroups) groups = standardRoomGroups(groups);
+    // create answer object
+    ApiValuePtr result = aRequest->newApiValue();
+    result->setType(apivalue_object);
+    for (int i = 0; i<64; ++i) {
+      if (groups & (1ll<<i)) {
+        const GroupDescriptor* gi = groupInfo((DsGroup)i);
+        ApiValuePtr g = result->newObject();
+        g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
+        g->add("kind", g->newUint64(gi ? gi->kind : 0));
+        g->add("color", g->newString(string_format("#%06X", gi->hexcolor)));
+        result->add(string_format("%d", i), g);
+      }
+    }
+    aRequest->sendResult(result);
+    aError.reset(); // make sure we don't send an extra ErrorOK
     return true;
   }
   else if (aMethod=="x-p44-checkTriggerCondition" || aMethod=="x-p44-testTriggerActions") {

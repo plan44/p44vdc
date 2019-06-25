@@ -86,6 +86,7 @@ namespace p44 {
     DsGroup no;
     GroupKind kind;
     const char *name;
+    uint32_t hexcolor;
   } GroupDescriptor;
 
 
@@ -146,9 +147,8 @@ namespace p44 {
     /// @return a vector of SceneIdentifier objects
     SceneIdsVector getZoneScenes(DsGroup aForGroup, SceneKind aRequiredKinds, SceneKind aForbiddenKinds);
 
-    /// get the groups relevant for this zone
-    /// @param aStandardOnly if set, only groups with standard room scenes will be reported for non-global zones
-    DsGroupMask getZoneGroups(bool aStandardOnly);
+    /// get the groups relevant for this zone (i.e those used by outputs in this zone)
+    DsGroupMask getZoneGroups();
 
     /// @return number of devices in this zone
     size_t devicesInZone() const;
@@ -418,6 +418,7 @@ namespace p44 {
 
     MLTicket checkTicket;
 
+
   public:
 
     typedef vector<TriggerPtr> TriggersVector;
@@ -526,6 +527,11 @@ namespace p44 {
 
     /// get info (name, kind) about a group
     static const GroupDescriptor* groupInfo(DsGroup aGroup);
+
+    /// filter group mask to only contain standard groups
+    /// @param aGroups bitmask of groups
+    /// @return filtered to contain only standard room scene groups
+    static DsGroupMask standardRoomGroups(DsGroupMask aGroups);
 
     /// localcontroller specific method handling
     bool handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams);
