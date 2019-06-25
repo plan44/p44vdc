@@ -721,6 +721,7 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
 
 #define MOC_DIM_STEP_TIMEOUT (5*Second)
 #define LEGACY_DIM_STEP_TIMEOUT (500*MilliSecond) // should be 400, but give it extra 100 because of delays in getting next dim call, especially for area scenes
+#define EMERGENCY_DIM_STEP_TIMEOUT (300*Second) // just to prevent dimming forever if something goes wrong
 
 
 ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel)
@@ -944,15 +945,24 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       if (Error::isOK(err = checkParam(aDeliveryState->callParams, "mode", o))) {
         // mode
         int mode = o->int32Value();
+        // area
         int area = 0;
         o = aDeliveryState->callParams->get("area");
-        if (o) {
-          area = o->int32Value();
-        }
+        if (o) area = o->int32Value();
+        // autostop of dimming (localcontroller may want to prevent that)
+        bool autostop = true;
+        o = aDeliveryState->callParams->get("autostop");
+        if (o) autostop = o->boolValue();
         // set the channel type as actionParam
         aDeliveryState->actionParam = channel->getChannelType();
         // prepare starting or stopping dimming
-        dimChannelForAreaPrepare(aPreparedCB, channel, mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
+        dimChannelForAreaPrepare(
+          aPreparedCB,
+          channel,
+          mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up),
+          area,
+          autostop ? MOC_DIM_STEP_TIMEOUT : EMERGENCY_DIM_STEP_TIMEOUT
+        );
         return;
       }
     }

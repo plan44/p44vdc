@@ -1852,6 +1852,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       params->add("group", params->newUint64(group));
       string method = "dimChannel";
       params->add("mode", params->newInt64(direction));
+      params->add("autostop", params->newBool(false)); // prevent stop dimming event w/o repeating command
       params->add("channel", params->newUint64(channelType));
       params->add("area", params->newUint64(area));
       // - deliver
