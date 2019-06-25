@@ -1025,10 +1025,41 @@ ExpressionValue Trigger::calcCondition()
 }
 
 
+#define REPARSE_DELAY (30*Second)
+
+void Trigger::parseVarDefs()
+{
+  bool foundall = valueMapper.parseMappingDefs(
+    triggerVarDefs,
+    boost::bind(&Trigger::dependentValueNotification, this, _1, _2)
+  );
+  if (!foundall) {
+    // schedule a re-parse later
+    varParseTicket.executeOnce(boost::bind(&Trigger::parseVarDefs, this), REPARSE_DELAY);
+  }
+  else {
+    // run an initial check now that all values are defined
+    checkAndFire();
+  }
+}
+
+
+void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
+{
+  if (aEvent==valueevent_removed) {
+    // a value has been removed, update my map
+    parseVarDefs();
+  }
+  else {
+    LOG(LOG_INFO, "Trigger '%s': value source '%s' reports value %f -> re-evaluating trigger condition", name.c_str(), aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
+    checkAndFire();
+  }
+}
+
+
 ExpressionValue Trigger::valueLookup(const string aName)
 {
-  // %%% no values yet
-  return ExpressionError::errValue(ExpressionError::NotFound, "'%s' not found", aName.c_str());
+  return valueMapper.valueLookup(aName);
 }
 
 
@@ -1167,16 +1198,23 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 {
   ApiValuePtr checkResult = aRequest->newApiValue();
   checkResult->setType(apivalue_object);
+  ApiValuePtr mappingInfo = checkResult->newObject();
+  parseVarDefs(); // reparse
+  if (valueMapper.getMappedSourcesInfo(mappingInfo)) {
+    checkResult->add("varDefs", mappingInfo);
+  }
   // Condition
+  ApiValuePtr cond = checkResult->newObject();
   ExpressionValue res;
   res = calcCondition();
   if (res.isOk()) {
-    checkResult->add("result", checkResult->newDouble(res.v));
+    cond->add("result", checkResult->newDouble(res.v));
     LOG(LOG_INFO, "- condition '%s' -> %f", triggerCondition.c_str(), res.v);
   }
   else {
-    checkResult->add("error", checkResult->newString(res.err->getErrorMessage()));
+    cond->add("error", checkResult->newString(res.err->getErrorMessage()));
   }
+  checkResult->add("condition", cond);
   // return the result
   aRequest->sendResult(checkResult);
   return ErrorPtr();
@@ -1232,7 +1270,7 @@ const FieldDefinition *Trigger::getKeyDef(size_t aIndex)
 
 // data field definitions
 
-static const size_t numTriggerFields = 3;
+static const size_t numTriggerFields = 4;
 
 size_t Trigger::numFieldDefs()
 {
@@ -1245,7 +1283,8 @@ const FieldDefinition *Trigger::getFieldDef(size_t aIndex)
   static const FieldDefinition dataDefs[numTriggerFields] = {
     { "triggerName", SQLITE_TEXT },
     { "triggerCondition", SQLITE_TEXT },
-    { "triggerActions", SQLITE_TEXT }
+    { "triggerActions", SQLITE_TEXT },
+    { "triggerVarDefs", SQLITE_TEXT }
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1265,6 +1304,7 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   name = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerCondition = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerActions = nonNullCStr(aRow->get<const char *>(aIndex++));
+  triggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
 }
 
 
@@ -1277,6 +1317,7 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerCondition.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerActions.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, triggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
@@ -1285,6 +1326,7 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 enum {
   triggerName_key,
   triggerCondition_key,
+  triggerVarDefs_key,
   triggerActions_key,
   numTriggerProperties
 };
@@ -1304,6 +1346,7 @@ PropertyDescriptorPtr Trigger::getDescriptorByIndex(int aPropIndex, int aDomain,
   static const PropertyDescription properties[numTriggerProperties] = {
     { "name", apivalue_string, triggerName_key, OKEY(trigger_key) },
     { "condition", apivalue_string, triggerCondition_key, OKEY(trigger_key) },
+    { "varDefs", apivalue_string, triggerVarDefs_key, OKEY(trigger_key) },
     { "actions", apivalue_string, triggerActions_key, OKEY(trigger_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
@@ -1321,13 +1364,21 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: aPropValue->setStringValue(name); return true;
         case triggerCondition_key: aPropValue->setStringValue(triggerCondition); return true;
+        case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
         case triggerActions_key: aPropValue->setStringValue(triggerActions); return true;
       }
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: setPVar(name, aPropValue->stringValue()); return true;
-        case triggerCondition_key: setPVar(triggerCondition, aPropValue->stringValue()); return true;
+        case triggerCondition_key:
+          if (setPVar(triggerCondition, aPropValue->stringValue()))
+            checkAndFire();
+            return true;
+        case triggerVarDefs_key:
+          if (setPVar(triggerVarDefs, aPropValue->stringValue()))
+            parseVarDefs(); // changed variable mappings, re-parse them
+          return true;
         case triggerActions_key: setPVar(triggerActions, aPropValue->stringValue()); return true;
       }
     }

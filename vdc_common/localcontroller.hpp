@@ -359,7 +359,10 @@ namespace p44 {
     string name;
     string triggerCondition; ///< expression that must evaluate to true to trigger the action
     string triggerActions; ///< actions to trigger (scene calls, etc.)
+    string triggerVarDefs; ///< variable to valueSource mappings
 
+    ValueSourceMapper valueMapper;
+    MLTicket varParseTicket;
     Tristate conditionMet;
 
   public:
@@ -395,6 +398,9 @@ namespace p44 {
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   private:
+
+    void parseVarDefs();
+    void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
 
     ExpressionValue calcCondition();
     ExpressionValue valueLookup(const string aName);
