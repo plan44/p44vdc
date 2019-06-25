@@ -536,6 +536,8 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
   }
   // now check for device level features
   switch (aFeatureIndex) {
+    case modelFeature_identification:
+      return canIdentifyToUser() ? yes : no;
     case modelFeature_dontcare:
       // Generic: all devices with scene table have the ability to set scene's don't care flag
       return boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings)!=NULL ? yes : no;
@@ -1789,12 +1791,18 @@ void Device::callSceneMin(SceneNo aSceneNo)
 
 void Device::identifyToUser()
 {
-  if (output) {
+  if (canIdentifyToUser()) {
     output->identifyToUser(); // pass on to behaviour by default
   }
   else {
     inherited::identifyToUser();
   }
+}
+
+
+bool Device::canIdentifyToUser()
+{
+  return output && output->canIdentifyToUser();
 }
 
 

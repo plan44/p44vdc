@@ -324,32 +324,34 @@ namespace p44 {
     /// check for presence of model feature (flag in dSS visibility matrix)
     /// @param aFeatureIndex the feature to check for
     /// @return yes if this output behaviour has the feature, no if (explicitly) not, undefined if asked entity does not know
-    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex);
+    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex) P44_OVERRIDE;
 
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
     /// @param aScene the scene that was called (if not dontCare, performApplySceneToChannels() has already been called)
     /// @param aDoneCB will be called when scene actions have completed (but not necessarily when stopped by stopSceneActions())
-    virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB);
+    virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB) P44_OVERRIDE;
 
     /// will be called to stop all ongoing actions before next callScene etc. is issued.
     /// @note this must stop all ongoing actions such that applying another scene or action right afterwards
     ///   cannot mess up things.
-    virtual void stopSceneActions();
+    virtual void stopSceneActions() P44_OVERRIDE;
 
-    /// identify the device to the user in a behaviour-specific way
-    /// @note implemented as blinking for LightBehaviour
-    virtual void identifyToUser();
+    /// identify the device to the user by moving shade a little
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE { return true; }
 
     /// @}
 
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
   protected:
 
@@ -357,28 +359,28 @@ namespace p44 {
     /// @param aScene the scene to load channel values from
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
-    virtual void loadChannelsFromScene(DsScenePtr aScene);
+    virtual void loadChannelsFromScene(DsScenePtr aScene) P44_OVERRIDE;
 
     /// called by captureScene to save channel values to a scene.
     /// @param aScene the scene to save channel values to
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
     /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
-    virtual void saveChannelsToScene(DsScenePtr aScene);
+    virtual void saveChannelsToScene(DsScenePtr aScene) P44_OVERRIDE;
 
 
     // property access implementation for descriptor/settings/states
-    virtual int numSettingsProps();
-    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor);
+    virtual int numSettingsProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     // combined field access for all types of properties
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   private:
 

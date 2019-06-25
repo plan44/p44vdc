@@ -148,6 +148,21 @@ void VdcHost::setEventMonitor(VdchostEventCB aEventCB)
 }
 
 
+void VdcHost::identifyToUser()
+{
+  postEvent(vdchost_identify); // send out signal anyway
+  if (!canIdentifyToUser()) inherited::identifyToUser(); // make sure it is at least logged
+}
+
+
+bool VdcHost::canIdentifyToUser()
+{
+  // assume vdchost can identify itself when it has a event monitor installed which will actually see vdchost_identify
+  return eventMonitorHandler!=NULL;
+}
+
+
+
 void VdcHost::postEvent(VdchostEvent aEvent)
 {
   // let all vdcs know

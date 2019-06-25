@@ -213,6 +213,19 @@ string Vdc::modelName()
 }
 
 
+void Vdc::identifyToUser()
+{
+  // by default, delegate to vdchost (as likely physical "location" of all vdcs)
+  return getVdcHost().identifyToUser();
+}
+
+
+bool Vdc::canIdentifyToUser()
+{
+  // by default, delegate to vdchost (as likely physical "location" of all vdcs)
+  return getVdcHost().canIdentifyToUser();
+}
+
 
 /// MARK: - grouped delivery of notification to devices (for scene/group optimizations)
 
@@ -1189,6 +1202,7 @@ enum {
 enum {
   capability_metering_key,
   capability_dynamicdefinitions_key,
+  capability_identification_key,
   numVdcCapabilities
 };
 
@@ -1245,6 +1259,7 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
     static const PropertyDescription capability_props[numVdcCapabilities] = {
       { "metering", apivalue_bool, capability_metering_key, OKEY(capabilities_container_key) },
       { "dynamicDefinitions", apivalue_bool, capability_dynamicdefinitions_key, OKEY(capabilities_container_key) },
+      { "identification", apivalue_bool, capability_identification_key, OKEY(capabilities_container_key) },
     };
     // simple, all on this level
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&capability_props[aPropIndex], aParentDescriptor));
@@ -1343,6 +1358,7 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
       switch (aPropertyDescriptor->fieldKey()) {
         case capability_metering_key: aPropValue->setBoolValue(false); return true; // TODO: implement actual metering flag
         case capability_dynamicdefinitions_key: aPropValue->setBoolValue(dynamicDefinitions()); return true;
+        case capability_identification_key: aPropValue->setBoolValue(canIdentifyToUser()); return true;
       }
     }
   }

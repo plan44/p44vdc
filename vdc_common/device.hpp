@@ -734,6 +734,10 @@ namespace p44 {
     /// @note device delegates this to the output behaviour (if any)
     virtual void identifyToUser() P44_OVERRIDE;
 
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
+
+
   private:
 
     DsGroupMask behaviourGroups();

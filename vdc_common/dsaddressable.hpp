@@ -370,6 +370,10 @@ namespace p44 {
     /// @note this base class just prints a log message
     virtual void identifyToUser();
 
+    /// check if identifyToUser() has an actual implementation
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() { return false; } // not by default
+
     /// load settings from CSV file
     /// @param aCSVFilepath full file path to a CSV file to read. If file does not exist, the function does nothing. If
     ///   an error occurs loading the file, the error is logged

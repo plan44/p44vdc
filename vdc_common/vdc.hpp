@@ -303,6 +303,15 @@ namespace p44 {
     /// @param aName name of the addressable entity
     virtual void setName(const string &aName) P44_OVERRIDE;
 
+    /// identify the device to the user
+    /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
+    ///   this can be anything.
+    /// @note device delegates this to the output behaviour (if any)
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
+
     /// @}
 
 

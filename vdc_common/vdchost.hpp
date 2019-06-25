@@ -59,6 +59,7 @@ namespace p44 {
   /// Callback for other global device activity
   typedef enum {
     vdchost_activitysignal, ///< user-relevant activity, can be used to trigger flashing an activity LED.
+    vdchost_identify, ///< vdchost is requested to identify itself (e.g. by light or sound)
     vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
     vdchost_network_reconnected, ///< network connection established again
     vdchost_network_lost, ///< network connection was lost
@@ -605,6 +606,12 @@ namespace p44 {
 
     // activity monitor
     void signalActivity();
+
+    /// identify the vdchost to the user
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// @return true if the vdchost has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
 
   private:
 

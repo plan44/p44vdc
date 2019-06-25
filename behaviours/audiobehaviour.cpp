@@ -419,10 +419,6 @@ Tristate AudioBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_outmodegeneric:
       // wants generic output mode
       return yes;
-    case modelFeature_identification:
-      // TODO: implement identifyToUser() some way...
-      return no; // ...until then: no identify
-      //return yes; // once identifyToUser() is implemented
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
@@ -549,7 +545,7 @@ void AudioBehaviour::stopSceneActions()
 void AudioBehaviour::identifyToUser()
 {
   // blink effect?
-  // TODO: %%% implement it
+  // TODO: %%% implement it, and change canIdentifyToUser() result when done
 }
 
 

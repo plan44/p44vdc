@@ -228,8 +228,11 @@ namespace p44 {
     virtual bool canDim(ChannelBehaviourPtr aChannel) P44_OVERRIDE;
 
     /// identify the device to the user in a behaviour-specific way
-    /// @note implemented as blinking for LightBehaviour
     virtual void identifyToUser() P44_OVERRIDE;
+
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE { return false; } // TODO: implement identifyToUser() some way...
+
 
     /// @}
 

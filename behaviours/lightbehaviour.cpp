@@ -109,9 +109,6 @@ Tristate LightBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_transt:
       // Assumption: all light output devices have transition times
       return yes;
-    case modelFeature_identification:
-      // all lights can identify (blink)
-      return yes;
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
