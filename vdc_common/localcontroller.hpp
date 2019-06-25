@@ -103,8 +103,12 @@ namespace p44 {
     DsChannelType lastDimChannel; ///< last dimming channel in this zone
     SceneNo lastLightScene; ///< last light scene called
     bool lightOn[5]; ///< set if light is on in this zone and area
+    bool shadesOpen[5]; ///< set if shades are open in this zone and area
 
     ZoneState();
+    bool stateFor(int aGroup, int aArea);
+    void setStateFor(int aGroup, int aArea, bool aState);
+
   };
 
 

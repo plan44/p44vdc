@@ -48,8 +48,31 @@ ZoneState::ZoneState() :
   lastDim(dimmode_stop),
   lastLightScene(INVALID_SCENE_NO)
 {
-  for (SceneArea i=0; i<=num_areas; ++i) lightOn[i] = false;
+  for (SceneArea i=0; i<=num_areas; ++i) {
+    lightOn[i] = false;
+    shadesOpen[i] = false;
+  }
 }
+
+
+bool ZoneState::stateFor(int aGroup, int aArea)
+{
+  switch(aGroup) {
+    case group_yellow_light : return lightOn[aArea];
+    case group_grey_shadow : return shadesOpen[aArea];
+    default: return false;
+  }
+}
+
+
+void ZoneState::setStateFor(int aGroup, int aArea, bool aState)
+{
+  switch(aGroup) {
+    case group_yellow_light : lightOn[aArea] = aState;
+    case group_grey_shadow : shadesOpen[aArea] = aState;
+  }
+}
+
 
 
 // MARK: - ZoneDescriptor
@@ -1745,11 +1768,11 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     channelType = aButtonBehaviour.buttonChannel;
     ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
     if (!zone) return false; // button in a non-local zone, cannot handle
-    if (group!=group_yellow_light) return true; // NOP because we don't support anything except light for now, but handled
+    if (group!=group_yellow_light && group!=group_grey_shadow) return true; // NOP because we don't support anything except light and shadow for now, but handled
     // evaluate click
     if (aClickType==ct_hold_start) {
       // start dimming if not off (or if it is specifically the up-key of a rocker)
-      if (!zone->zoneState.lightOn[area]) {
+      if (!zone->zoneState.stateFor(group, area)) {
         // light is currently off
         if (direction==dimmode_up) {
           // holding specific up-key can start dimming even if light was off
@@ -1801,7 +1824,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       }
       if (direction==dimmode_stop) {
         // single button, no explicit direction
-        direction = zone->zoneState.lightOn[area] ? dimmode_down : dimmode_up;
+        direction = zone->zoneState.stateFor(group,area) ? dimmode_down : dimmode_up;
       }
       // local
       if (direction==dimmode_up) {
@@ -1928,14 +1951,14 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
           // group specific
           if (g==group_yellow_light) {
             zone->zoneState.lastLightScene = calledScene.sceneNo;
-            zone->zoneState.lightOn[area] = !(calledScene.getKindFlags()&scene_off);
-            if (calledScene.sceneNo==DEEP_OFF) {
-              // force areas off as well
-              zone->zoneState.lightOn[1] = false;
-              zone->zoneState.lightOn[2] = false;
-              zone->zoneState.lightOn[3] = false;
-              zone->zoneState.lightOn[4] = false;
-            }
+          }
+          zone->zoneState.setStateFor(g, area, !(calledScene.getKindFlags()&scene_off));
+          if (calledScene.sceneNo==DEEP_OFF) {
+            // force areas off as well
+            zone->zoneState.setStateFor(g, 1, false);
+            zone->zoneState.setStateFor(g, 2, false);
+            zone->zoneState.setStateFor(g, 3, false);
+            zone->zoneState.setStateFor(g, 4, false);
           }
         }
       }
@@ -1948,11 +1971,13 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
       }
     }
     LOG(LOG_INFO,
-      "Zone '%s' (%d) state updated: lastLightScene:%d, lastGlobalScene:%d, on=%d/areas1234=%d%d%d%d",
+      "Zone '%s' (%d) state updated: lastLightScene:%d, lastGlobalScene:%d, lightOn=%d/areas1234=%d%d%d%d, shadesOpen=%d/%d%d%d%d",
       zone->getName().c_str(), zone->getZoneId(),
       zone->zoneState.lastLightScene, zone->zoneState.lastGlobalScene,
       zone->zoneState.lightOn[0],
-      zone->zoneState.lightOn[1], zone->zoneState.lightOn[2], zone->zoneState.lightOn[3], zone->zoneState.lightOn[4]
+      zone->zoneState.lightOn[1], zone->zoneState.lightOn[2], zone->zoneState.lightOn[3], zone->zoneState.lightOn[4],
+      zone->zoneState.shadesOpen[0],
+      zone->zoneState.shadesOpen[1], zone->zoneState.shadesOpen[2], zone->zoneState.shadesOpen[3], zone->zoneState.shadesOpen[4]
     );
   }
 }
