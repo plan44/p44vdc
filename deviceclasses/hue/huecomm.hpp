@@ -42,6 +42,17 @@ namespace p44 {
     enum {
       OK,
       ReservedForBridge = 1, ///< 1..999 are native bridge error codes
+      UnauthorizedUser = 1, // invalid username, or no rights to modify the resource
+      InvalidJSON = 2, // invalid JSON
+      NotFound = 3, // resource does not exits (scene, group, light...)
+      InvalidMethod = 4, // method is invalid for the resource addressed
+      MissingParam = 5, // missing parameters
+      InvalidParam = 6, // invalid/unknown parameter (in PUT)
+      InvalidValue = 7, // value wrong / out of range
+      ReadOnly = 8, // trying to change read-only parameter
+      TooManyItems = 11, // too many items in list
+      CloudRequired = 12, // connection to cloud/portal is required of the operation
+      InternalError = 901, // internal problem in the bridge (not with the command sent)
       UuidNotFound = 1000, ///< bridge specified by uuid was not found
       ApiNotReady, ///< API not ready (bridge not yet found, no bridge paired)
       Description, ///< SSDP by uuid did find a device, but XML description was inaccessible or invalid

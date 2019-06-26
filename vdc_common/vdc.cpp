@@ -38,6 +38,9 @@ using namespace p44;
 
 #define DEFAULT_MIN_CALLS_BEFORE_OPTIMIZING 3 // do not optimize calls before they have repeated this number of times
 #define DEFAULT_MIN_DEVICES_FOR_OPTIMIZING 5 // do not optimize sets with less than this number of devices
+#define DEFAULT_MAX_OPTIMIZER_SCENES 50 // general upper limit suggestion, individual vdcs might set other defaults
+#define DEFAULT_MAX_OPTIMIZER_GROUPS 20 // general upper limit suggestion, individual vdcs might set other defaults
+
 
 
 Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
@@ -54,7 +57,9 @@ Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   delivering(false),
   totalOptimizableCalls(0),
   minCallsBeforeOptimizing(DEFAULT_MIN_CALLS_BEFORE_OPTIMIZING),
-  minDevicesForOptimizing(DEFAULT_MIN_DEVICES_FOR_OPTIMIZING)
+  minDevicesForOptimizing(DEFAULT_MIN_DEVICES_FOR_OPTIMIZING),
+  maxOptimizerScenes(DEFAULT_MAX_OPTIMIZER_SCENES),
+  maxOptimizerGroups(DEFAULT_MAX_OPTIMIZER_GROUPS)
 {
 }
 
@@ -95,6 +100,15 @@ const char *Vdc::getPersistentDataDir()
   return getVdcHost().getPersistentDataDir();
 }
 
+
+void Vdc::handleGlobalEvent(VdchostEvent aEvent)
+{
+  if (aEvent==vdchost_logstats) {
+    if (optimizerMode>opt_disabled) {
+      optimizerCacheStats();
+    }
+  }
+}
 
 
 /// MARK: - Identification
@@ -471,7 +485,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
       else {
         // affected device set/contentId has no native scene/group installed yet
         AFOCUSLOG("- no native action assigned yet -> checking statistics to see if we should add one");
-        if (optimizerMode==opt_auto && entry->timeWeightedCallCount()>minCallsBeforeOptimizing) {
+        if (optimizerMode==opt_auto && entry->timeWeightedCallCount()>=minCallsBeforeOptimizing) {
           ALOG(LOG_NOTICE, "Optimizer: %s for these devices has occurred repeatedly (weighted: %ld times) -> optimzing it using native action", NotificationNames[aDeliveryState->optimizedType], entry->timeWeightedCallCount());
           finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::AddAction, "Request adding native action"));
           return;
@@ -579,11 +593,11 @@ void Vdc::createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStat
     // - timeWeightedCallCount()
     // - lastUse
     // - numberOfDevices
-    AFOCUSLOG("========= Scoring optimizer entries to find an entry to replace");
     MLMicroSeconds now = MainLoop::now();
     OptimizerEntryPtr loosingEntry;
     long loosingScore;
     long refScore = (aEntry->timeWeightedCallCount()*CALL_COUNT_WEIGHT + aEntry->numberOfDevices*NUM_DEVICES_WEIGHT)*10000;
+    AFOCUSLOG("========= Scoring optimizer entries to find an entry to replace, refScore=%ld", refScore);
     for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
       OptimizerEntryPtr entry = *pos;
       if (entry!=aEntry && !entry->nativeActionId.empty() && entry->type==aEntry->type && (now-entry->lastNativeChange>MIN_ENTRY_AGE)) {
@@ -616,14 +630,11 @@ void Vdc::createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStat
     if (loosingEntry) {
       // found an entry to remove
       ALOG(LOG_NOTICE, "Entry for action '%s' (score=%ld) will be removed to make room for new entry (score=%ld)", loosingEntry->nativeActionId.c_str(), loosingScore, refScore);
-      freeNativeAction(loosingEntry->nativeActionId);
-      loosingEntry->nativeActionId.clear();
-      // retry adding now - if it fails again with VdcError::NoMoreActions, we will not repeat (should not happen anyway after having removed an entry before)
-      createNativeAction(boost::bind(&Vdc::preparedNotificationComplete, this, aEntry, aDeliveryState, true, _1), aEntry, aDeliveryState); // is a change when successful
+      freeNativeAction(boost::bind(&Vdc::removedNativeAction, this, loosingEntry, aEntry, aDeliveryState, _1), loosingEntry->nativeActionId);
       return;
     }
     else {
-      ALOG(LOG_INFO, "Could not create native action now, because there is no room for a new action");
+      ALOG(LOG_INFO, "Could not create native action now: no room for new action, and none old/unimportant enough to delete");
       preparedNotificationComplete(aEntry, aDeliveryState, false, ErrorPtr());
       return;
     }
@@ -635,6 +646,18 @@ void Vdc::createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStat
   }
   // other error
   preparedNotificationComplete(aEntry, aDeliveryState, false, aError);
+}
+
+void Vdc::removedNativeAction(OptimizerEntryPtr aFromEntry, OptimizerEntryPtr aForEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
+{
+  if (!Error::isOK(aError)) {
+    ALOG(LOG_INFO, "Could not delete action to make room for a new one");
+    preparedNotificationComplete(aForEntry, aDeliveryState, false, aError);
+    return;
+  }
+  aFromEntry->nativeActionId.clear();
+  // retry adding now - if it fails again with VdcError::NoMoreActions, we will not repeat (should not happen anyway after having removed an entry before)
+  createNativeAction(boost::bind(&Vdc::preparedNotificationComplete, this, aForEntry, aDeliveryState, true, _1), aForEntry, aDeliveryState); // is a change when successful
 }
 
 
@@ -649,21 +672,27 @@ void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDel
   }
   if (LOGENABLED(LOG_INFO) && optimizerMode>opt_disabled) {
     // show current statistics
-    ALOG(LOG_INFO, "========= Optimizer statistics after %ld optimizable calls", totalOptimizableCalls);
-    for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
-      OptimizerEntryPtr oe = *pos;
-      ALOG(LOG_INFO,
-        "%c '%s' called %ld times (weighted, raw=%ld), last %lld seconds ago, contentId=%d, numdevices=%d, nativeAction='%s'",
-        oe==aEntry ? '*' : '-', // mark entry used in current call
-        NotificationNames[oe->type],
-        oe->timeWeightedCallCount(),
-        oe->numCalls,
-        (MainLoop::now()-oe->lastUse)/Second,
-        oe->contentId,
-        oe->numberOfDevices,
-        oe->nativeActionId.c_str()
-      );
-    }
+    optimizerCacheStats(aEntry);
+  }
+}
+
+
+void Vdc::optimizerCacheStats(OptimizerEntryPtr aCurrentEntry)
+{
+  ALOG(LOG_NOTICE, "========= Optimizer statistics after %ld optimizable calls", totalOptimizableCalls);
+  for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
+    OptimizerEntryPtr oe = *pos;
+    ALOG(LOG_NOTICE,
+      "%c '%s' called %ld times (weighted, raw=%ld), last %lld seconds ago, contentId=%d, numdevices=%d, nativeAction='%s'",
+      oe==aCurrentEntry ? '*' : '-', // mark entry used in current call
+      NotificationNames[oe->type],
+      oe->timeWeightedCallCount(),
+      oe->numCalls,
+      (MainLoop::now()-oe->lastUse)/Second,
+      oe->contentId,
+      oe->numberOfDevices,
+      oe->nativeActionId.c_str()
+    );
   }
 }
 
@@ -688,15 +717,17 @@ void Vdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEnt
 
 
 
+// note: clearing operation might continue in background
 void Vdc::clearOptimizerCache()
 {
-  for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
-    if (!((*pos)->nativeActionId.empty())) {
-      freeNativeAction((*pos)->nativeActionId);
-      (*pos)->deleteFromStore(); // also delete from store
-    }
+  while (optimizerCache.size()>0) {
+    OptimizerEntryPtr e = optimizerCache.front();
+    optimizerCache.pop_front();
+    e->deleteFromStore();
+    // free this one and continue clearing later
+    freeNativeAction(boost::bind(&Vdc::clearOptimizerCache, this), e->nativeActionId);
+    return;
   }
-  optimizerCache.clear();
   ALOG(LOG_WARNING, "Optimizer cache cleared");
 }
 
@@ -1195,6 +1226,8 @@ enum {
   optimizerMode_key,
   minDevicesForOptimizing_key,
   minCallsBeforeOptimizing_key,
+  maxOptimizerScenes_key,
+  maxOptimizerGroups_key,
   numVdcProperties
 };
 
@@ -1275,7 +1308,9 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
       { "x-p44-rescanModes", apivalue_uint64, rescanModes_key, OKEY(vdc_key) },
       { "x-p44-optimizerMode", apivalue_uint64, optimizerMode_key, OKEY(vdc_key) },
       { "x-p44-minDevicesForOptimizing", apivalue_uint64, minDevicesForOptimizing_key, OKEY(vdc_key) },
-      { "x-p44-minCallsBeforeOptimizing", apivalue_uint64, minCallsBeforeOptimizing_key, OKEY(vdc_key) }
+      { "x-p44-minCallsBeforeOptimizing", apivalue_uint64, minCallsBeforeOptimizing_key, OKEY(vdc_key) },
+      { "x-p44-maxOptimizerScenes", apivalue_uint64, maxOptimizerScenes_key, OKEY(vdc_key) },
+      { "x-p44-maxOptimizerGroups", apivalue_uint64, maxOptimizerGroups_key, OKEY(vdc_key) }
     };
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)
@@ -1318,6 +1353,14 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
           if (optimizerMode==opt_unavailable) return false; // do not show the property at all
           aPropValue->setUint32Value(minDevicesForOptimizing);
           return true;
+        case maxOptimizerScenes_key:
+          if (optimizerMode==opt_unavailable) return false; // do not show the property at all
+          aPropValue->setUint32Value(maxOptimizerScenes);
+          return true;
+        case maxOptimizerGroups_key:
+          if (optimizerMode==opt_unavailable) return false; // do not show the property at all
+          aPropValue->setUint32Value(maxOptimizerGroups);
+          return true;
       }
     }
     else {
@@ -1349,6 +1392,14 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
           if (optimizerMode==opt_unavailable) return false; // property not writable
           setPVar(minDevicesForOptimizing, aPropValue->int32Value());
           return true;
+        case maxOptimizerScenes_key:
+          if (optimizerMode==opt_unavailable) return false; // property not writable
+          setPVar(maxOptimizerScenes, aPropValue->int32Value());
+          return true;
+        case maxOptimizerGroups_key:
+          if (optimizerMode==opt_unavailable) return false; // property not writable
+          setPVar(maxOptimizerGroups, aPropValue->int32Value());
+          return true;
       }
     }
   }
@@ -1378,7 +1429,7 @@ const char *Vdc::tableName()
 
 // data field definitions
 
-static const size_t numFields = 6;
+static const size_t numFields = 8;
 
 size_t Vdc::numFieldDefs()
 {
@@ -1394,7 +1445,9 @@ const FieldDefinition *Vdc::getFieldDef(size_t aIndex)
     { "defaultZoneID", SQLITE_INTEGER },
     { "optimizerMode", SQLITE_INTEGER },
     { "minCallsBeforeOptimizing", SQLITE_INTEGER },
-    { "minDevicesForOptimizing", SQLITE_INTEGER }
+    { "minDevicesForOptimizing", SQLITE_INTEGER },
+    { "maxOptimizerScenes", SQLITE_INTEGER },
+    { "maxOptimizerGroups", SQLITE_INTEGER }
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1409,17 +1462,19 @@ const FieldDefinition *Vdc::getFieldDef(size_t aIndex)
 void Vdc::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
 {
   inheritedParams::loadFromRow(aRow, aIndex, aCommonFlagsP);
-  // get the field value
+  // get the field values
   vdcFlags = aRow->get<int>(aIndex++);
   setName(nonNullCStr(aRow->get<const char *>(aIndex++)));
   defaultZoneID = aRow->getCasted<DsZoneID, int>(aIndex++);
   // read optimizer mode only for vdcs that support it
   if (optimizerMode!=opt_unavailable) {
-    optimizerMode = aRow->getCastedWithDefault<OptimizerMode, int>(aIndex++, optimizerMode);
+    optimizerMode = aRow->getCastedWithDefault<OptimizerMode, int>(aIndex, optimizerMode);
   }
   aIndex++;
   aRow->getIfNotNull(aIndex++, minCallsBeforeOptimizing);
   aRow->getIfNotNull(aIndex++, minDevicesForOptimizing);
+  aRow->getIfNotNull(aIndex++, maxOptimizerScenes);
+  aRow->getIfNotNull(aIndex++, maxOptimizerGroups);
 }
 
 
@@ -1434,6 +1489,8 @@ void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const c
   aStatement.bind(aIndex++, optimizerMode);
   aStatement.bind(aIndex++, minCallsBeforeOptimizing);
   aStatement.bind(aIndex++, minDevicesForOptimizing);
+  aStatement.bind(aIndex++, maxOptimizerScenes);
+  aStatement.bind(aIndex++, maxOptimizerGroups);
 }
 
 // MARK: - description/shortDesc/status

@@ -39,6 +39,8 @@ DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   #endif
   // set default optimisation mode
   optimizerMode = opt_disabled; // FIXME: once we are confident, make opt_auto the default
+  maxOptimizerScenes = 16; // dummy, not really checked as HW limits this
+  maxOptimizerGroups = 16; // dummy, not really checked as HW limits this
 }
 
 
@@ -1281,12 +1283,12 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
 }
 
 
-ErrorPtr DaliVdc::freeNativeAction(const string aNativeActionId)
+void DaliVdc::freeNativeAction(StatusCB aStatusCB, const string aNativeActionId)
 {
   DaliAddress a = daliAddressFromActionId(aNativeActionId);
   markUsed(a, false);
   // Nothing more to do here, keep group or scene as-is, will not be called until re-used
-  return ErrorPtr();
+  if (aStatusCB) aStatusCB(ErrorPtr());
 }
 
 

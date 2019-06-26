@@ -60,6 +60,7 @@ namespace p44 {
   typedef enum {
     vdchost_activitysignal, ///< user-relevant activity, can be used to trigger flashing an activity LED.
     vdchost_identify, ///< vdchost is requested to identify itself (e.g. by light or sound)
+    vdchost_logstats, ///< demands logging statistics to the log (should be >=LOG_NOTICE)
     vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
     vdchost_network_reconnected, ///< network connection established again
     vdchost_network_lost, ///< network connection was lost
@@ -559,6 +560,8 @@ namespace p44 {
 
     /// @}
 
+    // post a vdchost (global) event to all vdcs and via event monitor callback
+    void postEvent(VdchostEvent aEvent);
 
   protected:
 
@@ -652,9 +655,6 @@ namespace p44 {
     void startAnnouncing();
     void announceNext();
     void announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequestPtr aRequest, ErrorPtr &aError, ApiValuePtr aResultOrErrorData);
-
-    // post a vdchost (global) event to all vdcs and via event monitor callback
-    void postEvent(VdchostEvent aEvent);
 
     // periodic task
     void periodicTask(MLMicroSeconds aNow);
