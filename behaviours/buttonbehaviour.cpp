@@ -531,8 +531,10 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     );
     // issue a state property push
     pushBehaviourState();
+    #if ENABLE_LOCALCONTROLLER
     // notify listeners
     notifyListeners(clickType!=ct_hold_repeat ? valueevent_changed : valueevent_confirmed);
+    #endif
     // also let vdchost know for local click handling
     // TODO: more elegant solution for this
     device.getVdcHost().checkForLocalClickHandling(*this, aClickType);
