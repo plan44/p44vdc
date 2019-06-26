@@ -213,7 +213,16 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
     ApiValuePtr o;
     if (Error::isOK(respErr = checkParam(aParams, "value", o))) {
       int newLevel = o->int32Value();
-      if (newLevel>=0 && newLevel<=7) {
+      if (newLevel==8) {
+        // trigger statistics
+        LOG(LOG_NOTICE, "\n========== requested showing statistics");
+        getVdcHost().postEvent(vdchost_logstats);
+        LOG(LOG_NOTICE, "\n%s", MainLoop::currentMainLoop().description().c_str());
+        MainLoop::currentMainLoop().statistics_reset();
+        LOG(LOG_NOTICE, "========== statistics shown\n");
+        respErr = Error::ok(); // return OK as generic response
+      }
+      else if (newLevel>=0 && newLevel<=7) {
         int oldLevel = LOGLEVEL;
         SETLOGLEVEL(newLevel);
         LOG(newLevel, "\n\n========== changed log level from %d to %d ===============", oldLevel, newLevel);
