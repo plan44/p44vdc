@@ -144,6 +144,10 @@ bool ValueDescriptor::setValue(ApiValuePtr aValue)
     // numeric integer type or text enumeration (internally integer), set as integer
     return setInt32Value(aValue->int32Value());
   }
+  else if (valueType == valueType_boolean) {
+    // boolean type, implicitly converted to int
+    return setInt32Value(aValue->boolValue());
+  }
   else {
     return setStringValue(aValue->stringValue());
   }
