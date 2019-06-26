@@ -298,7 +298,7 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
   }
-  volatileValue = false; // channel actively set, is not volatile
+  setPVar(volatileValue, false); // channel actively set, is not volatile
 }
 
 
@@ -333,7 +333,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
   }
-  volatileValue = false; // channel actively dimmed, is not volatile
+  setPVar(volatileValue, false); // channel actively dimmed, is not volatile
   return newValue;
 }
 
