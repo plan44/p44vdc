@@ -126,6 +126,9 @@ int32_t ValueDescriptor::getInt32Value(bool aAsInternal, bool aPrevious)
 {
   ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
   getValue(v, aAsInternal, aPrevious);
+  if (valueType == valueType_boolean) {
+    return v->boolValue();
+  }
   return v->int32Value();
 }
 
