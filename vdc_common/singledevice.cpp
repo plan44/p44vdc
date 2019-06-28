@@ -127,10 +127,19 @@ int32_t ValueDescriptor::getInt32Value(bool aAsInternal, bool aPrevious)
   ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
   getValue(v, aAsInternal, aPrevious);
   if (valueType == valueType_boolean) {
-    return v->boolValue();
+    return v->boolValue() ? 1 : 0;
   }
   return v->int32Value();
 }
+
+
+bool ValueDescriptor::getBoolValue(bool aAsInternal, bool aPrevious)
+{
+  ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
+  getValue(v, aAsInternal, aPrevious);
+  return v->boolValue();
+}
+
 
 
 bool ValueDescriptor::setValue(ApiValuePtr aValue)
@@ -149,7 +158,7 @@ bool ValueDescriptor::setValue(ApiValuePtr aValue)
   }
   else if (valueType == valueType_boolean) {
     // boolean type, implicitly converted to int
-    return setInt32Value(aValue->boolValue());
+    return setInt32Value(aValue->boolValue() ? 1 : 0);
   }
   else {
     return setStringValue(aValue->stringValue());
@@ -291,6 +300,13 @@ bool NumericValueDescriptor::setInt32Value(int32_t aValue)
 }
 
 
+bool NumericValueDescriptor::setBoolValue(bool aValue)
+{
+  return setDoubleValue(aValue ? 1 : 0);
+}
+
+
+
 ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
 {
   ErrorPtr err;
@@ -418,6 +434,13 @@ bool EnumValueDescriptor::setDoubleValue(double aValue)
 {
   // double can also be used to set enum by integer
   return setInt32Value((int32_t)aValue);
+}
+
+
+bool EnumValueDescriptor::setBoolValue(bool aValue)
+{
+  // bool can also be used to set enums with only two choices, would allow things like "yes"/"no" or "enabled"/"disabled".
+  return setInt32Value(aValue ? 1 : 0);
 }
 
 
