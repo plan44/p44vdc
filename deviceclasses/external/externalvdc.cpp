@@ -137,6 +137,8 @@ ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceCon
   tag(aTag),
   useMovement(false), // no movement by default
   querySync(false), // no sync query by default
+  sceneCommands(false), // no scene commands by default
+  forwardIdentify(false), // no identification forward by default
   controlValues(false), // no control values by default
   configured(false),
   iconBaseName("ext"), // default icon name
@@ -217,6 +219,23 @@ bool ExternalDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aR
 }
 
 
+bool ExternalDevice::canIdentifyToUser()
+{
+  return forwardIdentify || inherited::canIdentifyToUser();
+}
+
+
+void ExternalDevice::identifyToUser()
+{
+  if (forwardIdentify) {
+    sendDeviceApiFlagMessage("IDENTIFY");
+  }
+  else {
+    inherited::identifyToUser();
+  }
+}
+
+
 
 ExternalVdc &ExternalDevice::getExternalVdc()
 {
@@ -291,35 +310,13 @@ void ExternalDevice::sendDeviceApiSimpleMessage(string aMessage)
 
 void ExternalDevice::sendDeviceApiStatusMessage(ErrorPtr aError)
 {
-  if (deviceConnector->simpletext) {
-    // simple text message
-    string msg;
-    if (Error::isOK(aError))
-      msg = "OK";
-    else
-      msg = string_format("ERROR=%s",aError->getErrorMessage());
-    // send it
-    sendDeviceApiSimpleMessage(msg);
-  }
-  else {
-    // create JSON response
-    JsonObjectPtr message = JsonObject::newObj();
-    message->add("message", JsonObject::newString("status"));
-    if (!Error::isOK(aError)) {
-      LOG(LOG_INFO, "device API error: %s", aError->description().c_str());
-      // error, return error response
-      message->add("status", JsonObject::newString("error"));
-      message->add("errorcode", JsonObject::newInt32((int32_t)aError->getErrorCode()));
-      message->add("errormessage", JsonObject::newString(aError->getErrorMessage()));
-      message->add("errordomain", JsonObject::newString(aError->getErrorDomain()));
-    }
-    else {
-      // no error, return result (if any)
-      message->add("status", JsonObject::newString("ok"));
-    }
-    // send it
-    sendDeviceApiJsonMessage(message);
-  }
+  deviceConnector->sendDeviceApiStatusMessage(aError, tag.c_str());
+}
+
+
+void ExternalDevice::sendDeviceApiFlagMessage(string aFlagWord)
+{
+  deviceConnector->sendDeviceApiFlagMessage(aFlagWord, tag.c_str());
 }
 
 
@@ -799,14 +796,7 @@ void ExternalDevice::syncChannelValues(SimpleCB aDoneCB)
     // save callback, to be called when "synced" message confirms sync done
     syncedCB = aDoneCB;
     // send sync command
-    if (deviceConnector->simpletext) {
-      sendDeviceApiSimpleMessage("SYNC");
-    }
-    else {
-      JsonObjectPtr message = JsonObject::newObj();
-      message->add("message", JsonObject::newString("sync"));
-      sendDeviceApiJsonMessage(message);
-    }
+    sendDeviceApiFlagMessage("SYNC");
   }
   else {
     inherited::syncChannelValues(aDoneCB);
@@ -869,6 +859,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("sync", o)) querySync = o->boolValue();
   if (aInitParams->get("move", o)) useMovement = o->boolValue();
   if (aInitParams->get("scenecommands", o)) sceneCommands = o->boolValue();
+  if (aInitParams->get("identification", o)) forwardIdentify = o->boolValue();
   // get unique ID
   if (!aInitParams->get("uniqueid", o)) {
     return TextError::err("missing 'uniqueid'");
@@ -1339,7 +1330,7 @@ void ExternalDeviceConnector::closeConnection()
 void ExternalDeviceConnector::sendDeviceApiJsonMessage(JsonObjectPtr aMessage, const char *aTag)
 {
   // add in tag if device has one
-  if (aTag) {
+  if (aTag && *aTag) {
     aMessage->add("tag", JsonObject::newString(aTag));
   }
   // now show and send
@@ -1395,6 +1386,18 @@ void ExternalDeviceConnector::sendDeviceApiStatusMessage(ErrorPtr aError, const 
   }
 }
 
+
+void ExternalDeviceConnector::sendDeviceApiFlagMessage(string aFlagWord, const char *aTag)
+{
+  if (simpletext) {
+    sendDeviceApiSimpleMessage(aFlagWord, aTag);
+  }
+  else {
+    JsonObjectPtr message = JsonObject::newObj();
+    message->add("message", JsonObject::newString(lowerCase(aFlagWord)));
+    sendDeviceApiJsonMessage(message, aTag);
+  }
+}
 
 
 ExternalDevicePtr ExternalDeviceConnector::findDeviceByTag(string aTag, bool aNoError)
@@ -1538,6 +1541,10 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       if (aMessage->get("alwaysVisible", o)) {
         externalVdc.alwaysVisible = o->boolValue();
       }
+      // - forward vdc-level identification
+      if (aMessage->get("identification", o)) {
+        externalVdc.forwardIdentify = o->boolValue();
+      }
     }
     else if (msg=="log") {
       // log something
@@ -1629,6 +1636,7 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
   alwaysVisible(false),
+  forwardIdentify(false),
   iconBaseName("vdc_ext") // default icon name
 {
   // create device API server and set connection specifications
@@ -1695,6 +1703,24 @@ string ExternalVdc::webuiURLString()
     return inherited::webuiURLString();
 }
 
+
+bool ExternalVdc::canIdentifyToUser()
+{
+  return forwardIdentify || inherited::canIdentifyToUser();
+}
+
+
+void ExternalVdc::identifyToUser()
+{
+  if (forwardIdentify) {
+    // TODO: %%% send "VDCIDENTIFY" or maybe "vdc:IDENTIFY"
+    //   to all connectors - we need to implement a connector list for that
+    LOG(LOG_WARNING, "vdc level identify forwarding not yet implemented")
+  }
+  else {
+    inherited::identifyToUser();
+  }
+}
 
 
 void ExternalVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
