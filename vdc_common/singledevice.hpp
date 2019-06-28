@@ -100,10 +100,18 @@ namespace p44 {
     /// @param aPrevious if set, the previous value is returned
     double getDoubleValue(bool aAsInternal = false, bool aPrevious = false);
 
-    /// get a double value
+    /// get a 32 bit integer value
     /// @param aAsInternal if set, the value is returned in internal format (relevant for enums, to get them as numeric value)
     /// @param aPrevious if set, the previous value is returned
+    /// @note boolean values return 0 for false, 1 for true
     int32_t getInt32Value(bool aAsInternal = false, bool aPrevious = false);
+
+    /// get a boolean value
+    /// @param aAsInternal if set, the value is returned in internal format (relevant for enums, to get them as numeric value)
+    /// @param aPrevious if set, the previous value is returned
+    /// @note also works for non-boolean numbers or internal enum values (0=false, everything else=true)
+    bool getBoolValue(bool aAsInternal = false, bool aPrevious = false);
+
 
     /// @}
 
@@ -131,6 +139,11 @@ namespace p44 {
     /// @param aValue the string value to set
     /// @return true if set value differs from previous value
     virtual bool setStringValue(const string aValue) { return false; /* NOP in base class */ };
+
+    /// set boolean value
+    /// @param aValue the int value to set
+    /// @return true if set value differs from previous value
+    virtual bool setBoolValue(bool aValue) { return false; /* NOP in base class */ };
 
     /// set API value
     /// @param aValue the value to set, already converted to internal format (for text enums)
@@ -250,6 +263,8 @@ namespace p44 {
 
     virtual bool setInt32Value(int32_t aValue) P44_FINAL P44_OVERRIDE;
 
+    virtual bool setBoolValue(bool aValue) P44_FINAL P44_OVERRIDE;
+
     void setMinValue(double aValue) { min = aValue; }
     void setMaxValue(double aValue) { max = aValue; }
 
@@ -311,6 +326,7 @@ namespace p44 {
     virtual ErrorPtr conforms(ApiValuePtr aApiValue, bool aMakeInternal = false) P44_FINAL P44_OVERRIDE;
     virtual bool getValue(ApiValuePtr aApiValue, bool aAsInternal = false, bool aPrevious = false) P44_FINAL P44_OVERRIDE;
 
+    virtual bool setBoolValue(bool aValue) P44_FINAL P44_OVERRIDE;
     virtual bool setInt32Value(int32_t aValue) P44_FINAL P44_OVERRIDE;
     virtual bool setDoubleValue(double aValue) P44_FINAL P44_OVERRIDE;
     virtual bool setStringValue(const string aValue) P44_FINAL P44_OVERRIDE;
