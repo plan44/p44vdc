@@ -127,6 +127,7 @@ namespace p44 {
     bool controlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
     bool querySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
     bool sceneCommands; ///< if set, scene commands are forwarded to the external device
+    bool forwardIdentify; ///< if set, "IDENTIFY" messages will be sent, and device will show the "identification" modelfeature in the vDC API
 
     #if ENABLE_EXTERNAL_EXOTIC
     string configurationId; ///< current configuration's id
@@ -188,6 +189,13 @@ namespace p44 {
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+    /// identify the external device to the user in some way
+    /// @note for lights, this would be blinking, for sound devices a beep, for moving devices (blinds) a short movement
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// check if identifyToUser() has an actual implementation
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
 
   protected:
 
@@ -279,6 +287,7 @@ namespace p44 {
     void sendDeviceApiJsonMessage(JsonObjectPtr aMessage);
     void sendDeviceApiSimpleMessage(string aMessage);
     void sendDeviceApiStatusMessage(ErrorPtr aError);
+    void sendDeviceApiFlagMessage(string aFlagWord);
 
     ErrorPtr configureDevice(JsonObjectPtr aInitParams);
     ErrorPtr processJsonMessage(string aMessageType, JsonObjectPtr aMessage);
@@ -328,6 +337,7 @@ namespace p44 {
     void sendDeviceApiJsonMessage(JsonObjectPtr aMessage, const char *aTag = NULL);
     void sendDeviceApiSimpleMessage(string aMessage, const char *aTag = NULL);
     void sendDeviceApiStatusMessage(ErrorPtr aError, const char *aTag = NULL);
+    void sendDeviceApiFlagMessage(string aFlagWord, const char *aTag = NULL);
 
   };
 
@@ -348,6 +358,7 @@ namespace p44 {
     string modelVersionString; ///< the string to be returned by vdcModelVersion()
     string configUrl; ///< custom value for configURL if not empty
     bool alwaysVisible; ///< visible even if no devices contained
+    bool forwardIdentify; ///< if set, "VDCIDENTIFY" messages will be sent, and vdc will show the "identification" capability in the vDC API
 
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
@@ -395,6 +406,13 @@ namespace p44 {
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+    /// identify the vdc to the user in some way
+    /// @note usually, this would be a LED or buzzer in the vdc device (bridge, gateway etc.)
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// check if identifyToUser() has an actual implementation
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
 
     /// @}
 
