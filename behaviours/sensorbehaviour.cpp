@@ -28,7 +28,7 @@
 using namespace p44;
 
 
-// MARK: ===== WindowEvaluator
+// MARK: - WindowEvaluator
 
 
 WindowEvaluator::WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime, EvaluationType aEvalType) :
@@ -153,7 +153,7 @@ double WindowEvaluator::evaluate()
 
 
 
-// MARK: ===== SensorBehaviour
+// MARK: - SensorBehaviour
 
 #define DSS_SENSOR_MAX_PUSH_INTERVAL (55*Minute) // all sensors that have a aliveSignInterval!=Never must get pushed at least this often (otherwise dSS flags sensor red)
 
@@ -580,7 +580,7 @@ void SensorBehaviour::revalidateState()
 }
 
 
-// MARK: ===== value source implementation
+// MARK: - value source implementation
 
 
 string SensorBehaviour::getSourceId()
@@ -623,7 +623,7 @@ int SensorBehaviour::getSourceOpLevel()
 
 #if ENABLE_RRDB
 
-// MARK: ===== RRD sensor value logging
+// MARK: - RRD sensor value logging
 
 
 
@@ -850,7 +850,7 @@ void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue
 
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 
 // SQLIte3 table name to store these parameters to
@@ -928,7 +928,7 @@ void SensorBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 static char sensor_key;
 
@@ -1156,7 +1156,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string SensorBehaviour::description()

@@ -168,9 +168,11 @@ namespace p44 {
     /// @param aApiConnection this is the API connection from which the notification originates
     /// @param aNotification the notification
     /// @param aParams the parameters object
+    /// @return true if aNotification is known. Does not say anything about success or failure of the actions
+    ///    it might trigger in the recipient
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this DsAddressable.
-    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
+    virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
 
     /// send a DsAddressable method or notification to vdSM
     /// @param aMethod the method or notification
@@ -363,6 +365,14 @@ namespace p44 {
 
     /// @}
 
+    /// identify the addressable to the user in some way
+    /// @note for lights, this would be blinking, for sound devices a beep, for moving devices (blinds) a short movement
+    /// @note this base class just prints a log message
+    virtual void identifyToUser();
+
+    /// check if identifyToUser() has an actual implementation
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() { return false; } // not by default
 
     /// load settings from CSV file
     /// @param aCSVFilepath full file path to a CSV file to read. If file does not exist, the function does nothing. If

@@ -25,7 +25,7 @@ using namespace p44;
 
 
 
-// MARK: ===== JsonApiValue
+// MARK: - JsonApiValue
 
 JsonApiValue::JsonApiValue()
 {
@@ -131,7 +131,7 @@ ApiValuePtr JsonApiValue::newValueFromJson(JsonObjectPtr aJsonObject)
 
 
 
-// MARK: ===== VdcJsonApiServer
+// MARK: - VdcJsonApiServer
 
 
 VdcApiConnectionPtr VdcJsonApiServer::newConnection()
@@ -149,7 +149,7 @@ ApiValuePtr VdcJsonApiServer::newApiValue()
 
 
 
-// MARK: ===== VdcJsonApiRequest
+// MARK: - VdcJsonApiRequest
 
 
 VdcJsonApiRequest::VdcJsonApiRequest(VdcJsonApiConnectionPtr aConnection, const char *aJsonRpcId)
@@ -174,26 +174,29 @@ ErrorPtr VdcJsonApiRequest::sendResult(ApiValuePtr aResult)
 }
 
 
-ErrorPtr VdcJsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
+ErrorPtr VdcJsonApiRequest::sendError(ErrorPtr aError)
 {
-  LOG(LOG_INFO, "vdSM <- vDC (JSON) error sent: requestid='%s', error=%d (%s)", requestId().c_str(), aErrorCode, aErrorMessage.c_str());
+  LOG(LOG_INFO, "vdSM <- vDC (JSON) error sent: requestid='%s', error='%s'", requestId().c_str(), Error::text(aError).c_str());
+  if (!aError) {
+    aError = Error::ok();
+  }
   JsonApiValuePtr errorData;
-  // add the user facing stuff to errorData
-  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
-    errorData = JsonApiValuePtr(new JsonApiValue);
-    errorData->setType(apivalue_object);
-    errorData->add("errorType", errorData->newUint64(aErrorType));
-    errorData->add("userFacingMessage", errorData->newString(aUserFacingMessage));
+  VdcApiErrorPtr vdcApiErr = boost::dynamic_pointer_cast<VdcApiError>(aError);
+  if (vdcApiErr) {
+    // extra fields possible
+    if (vdcApiErr->getErrorType()!=0 || !vdcApiErr->getUserFacingMessage().empty()) {
+      errorData = JsonApiValuePtr(new JsonApiValue);
+      errorData->setType(apivalue_object);
+      errorData->add("errorType", errorData->newUint64(vdcApiErr->getErrorType()));
+      errorData->add("userFacingMessage", errorData->newString(vdcApiErr->getUserFacingMessage()));
+    }
   }
-  else if (aErrorData) {
-    errorData = boost::dynamic_pointer_cast<JsonApiValue>(aErrorData);
-  }
-  return jsonConnection->jsonRpcComm->sendError(requestId().c_str(), aErrorCode, aErrorMessage.size()>0 ? aErrorMessage.c_str() : NULL, errorData ? errorData->jsonObject() : JsonObjectPtr());
+  return jsonConnection->jsonRpcComm->sendError(requestId().c_str(), (uint32_t)aError->getErrorCode(), *aError->getErrorMessage() ? aError->getErrorMessage() : NULL, errorData ? errorData->jsonObject() : JsonObjectPtr());
 }
 
 
 
-// MARK: ===== VdcJsonApiConnection
+// MARK: - VdcJsonApiConnection
 
 
 VdcJsonApiConnection::VdcJsonApiConnection()

@@ -36,7 +36,7 @@
 
 using namespace p44;
 
-// MARK: ===== EnoceanRPSDevice
+// MARK: - EnoceanRPSDevice
 
 EnoceanRPSDevice::EnoceanRPSDevice(EnoceanVdc *aVdcP) :
   inherited(aVdcP)
@@ -334,7 +334,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
 }
 
 
-// MARK: ===== single button
+// MARK: - single button
 
 EnoceanRpsButtonHandler::EnoceanRpsButtonHandler(EnoceanDevice &aDevice) :
   inherited(aDevice)
@@ -366,7 +366,7 @@ string EnoceanRpsButtonHandler::shortDesc()
 }
 
 
-// MARK: ===== rocker buttons
+// MARK: - rocker buttons
 
 EnoceanRpsRockerHandler::EnoceanRpsRockerHandler(EnoceanDevice &aDevice) :
   inherited(aDevice),
@@ -450,7 +450,7 @@ string EnoceanRpsRockerHandler::shortDesc()
 }
 
 
-// MARK: ===== window handle
+// MARK: - window handle
 
 
 EnoceanRpsWindowHandleHandler::EnoceanRpsWindowHandleHandler(EnoceanDevice &aDevice) :
@@ -492,7 +492,7 @@ string EnoceanRpsWindowHandleHandler::shortDesc()
 }
 
 
-// MARK: ===== key card switch
+// MARK: - key card switch
 
 
 EnoceanRpsCardKeyHandler::EnoceanRpsCardKeyHandler(EnoceanDevice &aDevice) :
@@ -556,7 +556,7 @@ string EnoceanRpsCardKeyHandler::shortDesc()
 }
 
 
-// MARK: ===== Wind and Smoke Detector
+// MARK: - Wind and Smoke Detector
 
 EnoceanRpsWindSmokeDetectorHandler::EnoceanRpsWindSmokeDetectorHandler(EnoceanDevice &aDevice) :
   inherited(aDevice)
@@ -591,7 +591,7 @@ string EnoceanRpsWindSmokeDetectorHandler::shortDesc()
 }
 
 
-// MARK: ===== Liquid Leakage Detector
+// MARK: - Liquid Leakage Detector
 
 EnoceanRpsLeakageDetectorHandler::EnoceanRpsLeakageDetectorHandler(EnoceanDevice &aDevice) :
   inherited(aDevice)

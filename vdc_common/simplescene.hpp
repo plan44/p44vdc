@@ -58,6 +58,12 @@ namespace p44 {
     /// @note is allowed to return different values for same scene contents on different platforms
     virtual uint64_t sceneHash() P44_OVERRIDE;
 
+    /// get default area number for a scene number
+    /// @param aSceneNo scene number
+    /// @return 0 if not an area scene, 1..4 if it is a area scene
+    /// @note only the hard coded default scene table is consulted!
+    static int areaForScene(SceneNo aSceneNo);
+
   protected:
 
     // persistence implementation

@@ -90,6 +90,7 @@ namespace p44 {
   {
     friend class Device;
     friend class Vdc;
+    friend class LocalController;
 
     NotificationDeliveryState(Vdc &aVdc) :
       vdc(aVdc),
@@ -224,6 +225,8 @@ namespace p44 {
     OptimizerMode optimizerMode; ///< the optimizer mode
     int minDevicesForOptimizing; ///< how many devices are needed for optimized scenes/dimming
     int minCallsBeforeOptimizing; ///< how many calls before optimizer tries creating scene/group
+    int maxOptimizerScenes; ///< how many native scenes might be used for the optimizer (actual HW limit might be different)
+    int maxOptimizerGroups; ///< how many native groups might be used for the optimizer (actual HW limit might be different)
 
   public:
 
@@ -302,6 +305,15 @@ namespace p44 {
     /// @param aName name of the addressable entity
     virtual void setName(const string &aName) P44_OVERRIDE;
 
+    /// identify the device to the user
+    /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
+    ///   this can be anything.
+    /// @note device delegates this to the output behaviour (if any)
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
+
     /// @}
 
 
@@ -350,7 +362,7 @@ namespace p44 {
 
     /// handle global events
     /// @param aEvent the event to handle
-    virtual void handleGlobalEvent(VdchostEvent aEvent) { /* NOP in base class */ };
+    virtual void handleGlobalEvent(VdchostEvent aEvent);
 
     /// set vdc-global error
     /// @param aVdcError if NotOK, vdc cannot collect devices any more (or at all)
@@ -535,8 +547,9 @@ namespace p44 {
     virtual void cancelNativeActionUpdate() {};
 
     /// free native action
+    /// @param aStatusCB must be called to return status.
     /// @param aNativeActionId a ID of a native action that should be removed
-    virtual ErrorPtr freeNativeAction(const string aNativeActionId) { return ErrorPtr(); /* NOP in base class */ };
+    virtual void freeNativeAction(StatusCB aStatusCB, const string aNativeActionId) { if (aStatusCB) aStatusCB(ErrorPtr()); /* just ok in base class */ };
 
 
     /// @}
@@ -629,9 +642,12 @@ namespace p44 {
     void finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, bool aChanged, ErrorPtr aError);
+    void removedNativeAction(OptimizerEntryPtr aFromEntry, OptimizerEntryPtr aForEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void notificationDeliveryComplete(NotificationDeliveryState &aDeliveryStateBeingDeleted);
     void queueDelivery(NotificationDeliveryStatePtr aDeliveryState);
+    void optimizerCacheStats(OptimizerEntryPtr aCurrentEntry = OptimizerEntryPtr());
     void clearOptimizerCache();
+    void clearedNativeAction(StatusCB aStatus);
     ErrorPtr loadOptimizerCache();
     ErrorPtr saveOptimizerCache();
 

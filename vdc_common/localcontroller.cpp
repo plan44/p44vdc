@@ -32,26 +32,50 @@
 
 #include "outputbehaviour.hpp"
 #include "buttonbehaviour.hpp"
+#include "simplescene.hpp"
 
-#include <time.h>
+#include "timeutils.hpp"
 
 #if ENABLE_LOCALCONTROLLER
 
 using namespace p44;
 
 
-// MARK: ===== ZoneState
+// MARK: - ZoneState
 
 ZoneState::ZoneState() :
   lastGlobalScene(INVALID_SCENE_NO),
   lastDim(dimmode_stop),
   lastLightScene(INVALID_SCENE_NO)
 {
-  for (SceneArea i=0; i<=num_areas; ++i) lightOn[i] = false;
+  for (SceneArea i=0; i<=num_areas; ++i) {
+    lightOn[i] = false;
+    shadesOpen[i] = false;
+  }
 }
 
 
-// MARK: ===== ZoneDescriptor
+bool ZoneState::stateFor(int aGroup, int aArea)
+{
+  switch(aGroup) {
+    case group_yellow_light : return lightOn[aArea];
+    case group_grey_shadow : return shadesOpen[aArea];
+    default: return false;
+  }
+}
+
+
+void ZoneState::setStateFor(int aGroup, int aArea, bool aState)
+{
+  switch(aGroup) {
+    case group_yellow_light : lightOn[aArea] = aState;
+    case group_grey_shadow : shadesOpen[aArea] = aState;
+  }
+}
+
+
+
+// MARK: - ZoneDescriptor
 
 ZoneDescriptor::ZoneDescriptor() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore())
@@ -84,10 +108,15 @@ void ZoneDescriptor::usedByDevice(DevicePtr aDevice, bool aInUse)
 
 static const SceneKindDescriptor roomScenes[] = {
   { ROOM_OFF, scene_room|scene_preset|scene_off , "off"},
+  { AUTO_OFF, scene_room|scene_preset|scene_off|scene_extended , "slow off"},
   { ROOM_ON, scene_room|scene_preset, "preset 1" },
   { PRESET_2, scene_room|scene_preset, "preset 2" },
   { PRESET_3, scene_room|scene_preset, "preset 3" },
   { PRESET_4, scene_room|scene_preset, "preset 4" },
+  { STANDBY, scene_room|scene_preset|scene_off|scene_extended, "standby" },
+  { DEEP_OFF, scene_room|scene_preset|scene_off|scene_extended, "deep off" },
+  { SLEEPING, scene_room|scene_preset|scene_off|scene_extended, "sleeping" },
+  { WAKE_UP, scene_room|scene_preset|scene_extended, "wakeup" },
   { AREA_1_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 1 off" },
   { AREA_1_ON, scene_room|scene_preset|scene_area|scene_extended, "area 1 on" },
   { AREA_2_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 2 off" },
@@ -127,9 +156,9 @@ static const SceneKindDescriptor globalScenes[] = {
   { PRESET_3, scene_global|scene_preset|scene_extended, "global preset 3" },
   { PRESET_4, scene_global|scene_preset|scene_extended, "global preset 4" },
   { AUTO_STANDBY, scene_global, "auto-standby" },
-  { STANDBY, scene_global|scene_preset, "standby" },
-  { DEEP_OFF, scene_global|scene_preset, "deep off" },
-  { SLEEPING, scene_global|scene_preset, "sleeping" },
+  { STANDBY, scene_global|scene_preset|scene_off, "standby" },
+  { DEEP_OFF, scene_global|scene_preset|scene_off, "deep off" },
+  { SLEEPING, scene_global|scene_preset|scene_off, "sleeping" },
   { WAKE_UP, scene_global|scene_preset, "wakeup" },
   { PRESENT, scene_global|scene_preset, "present" },
   { ABSENT, scene_global|scene_preset, "absent" },
@@ -159,32 +188,15 @@ static const SceneKindDescriptor globalScenes[] = {
 
 
 
-DsGroupMask ZoneDescriptor::getZoneGroups(bool aStandardOnly)
+DsGroupMask ZoneDescriptor::getZoneGroups()
 {
   DsGroupMask zoneGroups = 0;
-  if (zoneID==zoneId_global) {
-    return 0; // groups are not relevant in zone0
+  if (zoneID==zoneId_global) return 0; // groups are not relevant in zone0
+  for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+    OutputBehaviourPtr ob = (*pos)->getOutput();
+    if (ob) zoneGroups |= ob->groupMemberships();
   }
-  else {
-    for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
-      OutputBehaviourPtr o = (*pos)->getOutput();
-      if (o) {
-        zoneGroups |= o->groupMemberships();
-      }
-    }
-    if (aStandardOnly) {
-      // only use groups with standard room scenes
-      zoneGroups &= (
-        (1ll<<group_yellow_light) |
-        (1ll<<group_grey_shadow) |
-        (1ll<<group_blue_heating) |
-        (1ll<<group_cyan_audio) |
-        (1ll<<group_blue_cooling) |
-        (1ll<<group_blue_ventilation)
-      );
-    }
-    return zoneGroups;
-  }
+  return zoneGroups;
 }
 
 
@@ -244,7 +256,7 @@ size_t ZoneDescriptor::devicesInZone() const
 
 
 
-// MARK: ===== ZoneDescriptor persistence
+// MARK: - ZoneDescriptor persistence
 
 const char *ZoneDescriptor::tableName()
 {
@@ -317,7 +329,7 @@ void ZoneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 }
 
 
-// MARK: ===== ZoneDescriptor property access implementation
+// MARK: - ZoneDescriptor property access implementation
 
 static char zonedevices_container_key;
 static char zonedevice_key;
@@ -428,7 +440,7 @@ bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
 }
 
 
-// MARK: ===== ZoneList
+// MARK: - ZoneList
 
 
 ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotExisting)
@@ -452,7 +464,7 @@ ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotEx
 }
 
 
-// MARK: ===== ZoneList persistence
+// MARK: - ZoneList persistence
 
 ErrorPtr ZoneList::load()
 {
@@ -498,7 +510,7 @@ ErrorPtr ZoneList::save()
 }
 
 
-// MARK: ===== ZoneList property access implementation
+// MARK: - ZoneList property access implementation
 
 int ZoneList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -574,7 +586,7 @@ PropertyContainerPtr ZoneList::getContainer(const PropertyDescriptorPtr &aProper
 
 
 
-// MARK: ===== SceneIdentifier
+// MARK: - SceneIdentifier
 
 SceneIdentifier::SceneIdentifier()
 {
@@ -653,7 +665,7 @@ bool SceneIdentifier::deriveSceneKind()
 
 
 
-// MARK: ===== SceneDescriptor
+// MARK: - SceneDescriptor
 
 SceneDescriptor::SceneDescriptor() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore())
@@ -666,7 +678,7 @@ SceneDescriptor::~SceneDescriptor()
 }
 
 
-// MARK: ===== SceneDescriptor persistence
+// MARK: - SceneDescriptor persistence
 
 const char *SceneDescriptor::tableName()
 {
@@ -746,7 +758,7 @@ void SceneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 }
 
 
-// MARK: ===== SceneDescriptor property access implementation
+// MARK: - SceneDescriptor property access implementation
 
 enum {
   sceneNo_key,
@@ -806,7 +818,7 @@ bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 }
 
 
-// MARK: ===== SceneList
+// MARK: - SceneList
 
 
 SceneDescriptorPtr SceneList::getSceneByName(const string aSceneName)
@@ -849,7 +861,7 @@ SceneDescriptorPtr SceneList::getScene(const SceneIdentifier &aSceneId, bool aCr
 }
 
 
-// MARK: ===== SceneList persistence
+// MARK: - SceneList persistence
 
 ErrorPtr SceneList::load()
 {
@@ -893,7 +905,7 @@ ErrorPtr SceneList::save()
 }
 
 
-// MARK: ===== SceneList property access implementation
+// MARK: - SceneList property access implementation
 
 int SceneList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -963,7 +975,7 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 
 
 
-// MARK: ===== Trigger
+// MARK: - Trigger
 
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
@@ -979,7 +991,7 @@ Trigger::~Trigger()
 
 
 
-// MARK: ===== Trigger condition evaluation
+// MARK: - Trigger condition evaluation
 
 
 bool Trigger::checkAndFire()
@@ -1019,10 +1031,41 @@ ExpressionValue Trigger::calcCondition()
 }
 
 
+#define REPARSE_DELAY (30*Second)
+
+void Trigger::parseVarDefs()
+{
+  bool foundall = valueMapper.parseMappingDefs(
+    triggerVarDefs,
+    boost::bind(&Trigger::dependentValueNotification, this, _1, _2)
+  );
+  if (!foundall) {
+    // schedule a re-parse later
+    varParseTicket.executeOnce(boost::bind(&Trigger::parseVarDefs, this), REPARSE_DELAY);
+  }
+  else {
+    // run an initial check now that all values are defined
+    checkAndFire();
+  }
+}
+
+
+void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
+{
+  if (aEvent==valueevent_removed) {
+    // a value has been removed, update my map
+    parseVarDefs();
+  }
+  else {
+    LOG(LOG_INFO, "Trigger '%s': value source '%s' reports value %f -> re-evaluating trigger condition", name.c_str(), aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
+    checkAndFire();
+  }
+}
+
+
 ExpressionValue Trigger::valueLookup(const string aName)
 {
-  // %%% no values yet
-  return ExpressionError::errValue(ExpressionError::NotFound, "'%s' not found", aName.c_str());
+  return valueMapper.valueLookup(aName);
 }
 
 
@@ -1032,6 +1075,7 @@ ExpressionValue Trigger::evaluateFunction(const string &aName, const FunctionArg
   gettimeofday(&t, NULL);
   struct tm now;
   localtime_r(&t.tv_sec, &now);
+  VdcHost &vdchost = LocalController::sharedLocalController()->vdcHost;
   if (aName=="is_weekday" && aArgs.size()>0) {
     int weekday = now.tm_wday; // 0..6, 0=sunday
     for (int i = 0; i<aArgs.size(); i++) {
@@ -1045,23 +1089,59 @@ ExpressionValue Trigger::evaluateFunction(const string &aName, const FunctionArg
     // none of the specified days
     return ExpressionValue(0);
   }
-  else if (aName=="is_time" && aArgs.size()==2) {
-    int h = (int)aArgs[0].v;
-    int m = (int)aArgs[1].v;
-    return ExpressionValue(now.tm_hour==h && now.tm_min==m);
+  else if (aName=="is_time" && aArgs.size()>=1) {
+    // precision only to the minute!
+    int mins;
+    if (aArgs.size()==2) {
+      // legacy spec
+      mins = (int)aArgs[0].v * 60 + (int)aArgs[1].v;
+    }
+    else {
+      // specification in seconds, usually using time literal
+      mins = (int)(aArgs[0].v / 60);
+    }
+    return ExpressionValue(now.tm_hour*60+now.tm_min == mins);
   }
-  else if (aName=="after_time" && aArgs.size()==2) {
-    int h = (int)aArgs[0].v;
-    int m = (int)aArgs[1].v;
-    return ExpressionValue(now.tm_hour>h || (now.tm_hour==h && now.tm_min>=m));
+  else if (aName=="after_time" && aArgs.size()>=1) {
+    // precision to the second
+    long secs;
+    if (aArgs.size()==2) {
+      // legacy spec
+      secs = ((long)aArgs[0].v * 60 + (long)aArgs[1].v) * 60;
+    }
+    else {
+      // specification in seconds, usually using time literal
+      secs = (long)(aArgs[0].v);
+    }
+    return ExpressionValue(((now.tm_hour*60)+now.tm_min)*60+now.tm_sec>=secs);
+  }
+  else if (aName=="between_yeardays" && aArgs.size()==2) {
+    int first = (int)(aArgs[0].v);
+    int last = (int)(aArgs[1].v);
+    return ExpressionValue(
+      first<=last ?
+      now.tm_yday>=first && now.tm_yday<=last : // within year between first and last
+      now.tm_yday<=last || now.tm_yday>=first // before first day in next year, after last day in previous
+    );
+  }
+  else if (aName=="sunrise") {
+    return ExpressionValue(sunrise(time(NULL), vdchost.latitude, vdchost.longitude, false)*3600);
+  }
+  else if (aName=="dawn") {
+    return ExpressionValue(sunrise(time(NULL), vdchost.latitude, vdchost.longitude, true)*3600);
+  }
+  else if (aName=="sunset") {
+    return ExpressionValue(sunset(time(NULL), vdchost.latitude, vdchost.longitude, false)*3600);
+  }
+  else if (aName=="dusk") {
+    return ExpressionValue(sunset(time(NULL), vdchost.latitude, vdchost.longitude, true)*3600);
   }
   // no such function
   return ExpressionError::errValue(ExpressionError::NotFound, "not found"); // just signals caller to try builtin functions
 }
 
 
-
-// MARK: ===== Trigger actions execution
+// MARK: - Trigger actions execution
 
 
 ErrorPtr Trigger::executeActions()
@@ -1117,23 +1197,30 @@ ErrorPtr Trigger::executeActions()
 
 
 
-// MARK: ===== Trigger API method handlers
+// MARK: - Trigger API method handlers
 
 
 ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 {
   ApiValuePtr checkResult = aRequest->newApiValue();
   checkResult->setType(apivalue_object);
+  ApiValuePtr mappingInfo = checkResult->newObject();
+  parseVarDefs(); // reparse
+  if (valueMapper.getMappedSourcesInfo(mappingInfo)) {
+    checkResult->add("varDefs", mappingInfo);
+  }
   // Condition
+  ApiValuePtr cond = checkResult->newObject();
   ExpressionValue res;
   res = calcCondition();
   if (res.isOk()) {
-    checkResult->add("result", checkResult->newDouble(res.v));
+    cond->add("result", checkResult->newDouble(res.v));
     LOG(LOG_INFO, "- condition '%s' -> %f", triggerCondition.c_str(), res.v);
   }
   else {
-    checkResult->add("error", checkResult->newString(res.err->getErrorMessage()));
+    cond->add("error", checkResult->newString(res.err->getErrorMessage()));
   }
+  checkResult->add("condition", cond);
   // return the result
   aRequest->sendResult(checkResult);
   return ErrorPtr();
@@ -1158,7 +1245,7 @@ ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 }
 
 
-// MARK: ===== Trigger persistence
+// MARK: - Trigger persistence
 
 const char *Trigger::tableName()
 {
@@ -1189,7 +1276,7 @@ const FieldDefinition *Trigger::getKeyDef(size_t aIndex)
 
 // data field definitions
 
-static const size_t numTriggerFields = 3;
+static const size_t numTriggerFields = 4;
 
 size_t Trigger::numFieldDefs()
 {
@@ -1202,7 +1289,8 @@ const FieldDefinition *Trigger::getFieldDef(size_t aIndex)
   static const FieldDefinition dataDefs[numTriggerFields] = {
     { "triggerName", SQLITE_TEXT },
     { "triggerCondition", SQLITE_TEXT },
-    { "triggerActions", SQLITE_TEXT }
+    { "triggerActions", SQLITE_TEXT },
+    { "triggerVarDefs", SQLITE_TEXT }
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1222,6 +1310,7 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   name = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerCondition = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerActions = nonNullCStr(aRow->get<const char *>(aIndex++));
+  triggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
 }
 
 
@@ -1234,14 +1323,16 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerCondition.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerActions.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, triggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
-// MARK: ===== Trigger property access implementation
+// MARK: - Trigger property access implementation
 
 enum {
   triggerName_key,
   triggerCondition_key,
+  triggerVarDefs_key,
   triggerActions_key,
   numTriggerProperties
 };
@@ -1261,6 +1352,7 @@ PropertyDescriptorPtr Trigger::getDescriptorByIndex(int aPropIndex, int aDomain,
   static const PropertyDescription properties[numTriggerProperties] = {
     { "name", apivalue_string, triggerName_key, OKEY(trigger_key) },
     { "condition", apivalue_string, triggerCondition_key, OKEY(trigger_key) },
+    { "varDefs", apivalue_string, triggerVarDefs_key, OKEY(trigger_key) },
     { "actions", apivalue_string, triggerActions_key, OKEY(trigger_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
@@ -1278,13 +1370,21 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: aPropValue->setStringValue(name); return true;
         case triggerCondition_key: aPropValue->setStringValue(triggerCondition); return true;
+        case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
         case triggerActions_key: aPropValue->setStringValue(triggerActions); return true;
       }
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: setPVar(name, aPropValue->stringValue()); return true;
-        case triggerCondition_key: setPVar(triggerCondition, aPropValue->stringValue()); return true;
+        case triggerCondition_key:
+          if (setPVar(triggerCondition, aPropValue->stringValue()))
+            checkAndFire();
+            return true;
+        case triggerVarDefs_key:
+          if (setPVar(triggerVarDefs, aPropValue->stringValue()))
+            parseVarDefs(); // changed variable mappings, re-parse them
+          return true;
         case triggerActions_key: setPVar(triggerActions, aPropValue->stringValue()); return true;
       }
     }
@@ -1294,7 +1394,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
 
 
 
-// MARK: ===== TriggerList
+// MARK: - TriggerList
 
 
 TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting, size_t *aTriggerIndexP)
@@ -1343,7 +1443,7 @@ void TriggerList::triggerChecker(MLTimer &aTimer)
 
 
 
-// MARK: ===== TriggerList persistence
+// MARK: - TriggerList persistence
 
 ErrorPtr TriggerList::load()
 {
@@ -1387,7 +1487,7 @@ ErrorPtr TriggerList::save()
 }
 
 
-// MARK: ===== TriggerList property access implementation
+// MARK: - TriggerList property access implementation
 
 int TriggerList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -1462,7 +1562,7 @@ PropertyContainerPtr TriggerList::getContainer(const PropertyDescriptorPtr &aPro
 
 
 
-// MARK: ===== LocalController
+// MARK: - LocalController
 
 LocalController::LocalController(VdcHost &aVdcHost) :
   vdcHost(aVdcHost)
@@ -1668,21 +1768,29 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     channelType = aButtonBehaviour.buttonChannel;
     ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
     if (!zone) return false; // button in a non-local zone, cannot handle
-    if (group!=group_yellow_light) return true; // NOP because we don't support anything except light for now, but handled
+    if (group!=group_yellow_light && group!=group_grey_shadow) return true; // NOP because we don't support anything except light and shadow for now, but handled
     // evaluate click
     if (aClickType==ct_hold_start) {
-      // start dimming if not off (or rocker)
-      if (direction==dimmode_stop) {
-        // single button, no explicit direction
-        if (!zone->zoneState.lightOn[area]) {
-          // TODO: start deep off detection sequence
-          return true; // NOP, handled
+      // start dimming if not off (or if it is specifically the up-key of a rocker)
+      if (!zone->zoneState.stateFor(group, area)) {
+        // light is currently off
+        if (direction==dimmode_up) {
+          // holding specific up-key can start dimming even if light was off
+          doDim = true;
         }
-        // use inverse of last dim
+        else {
+          // long press while off, and not specifically up: deep off
+          sceneToCall = DEEP_OFF;
+        }
+      }
+      else {
+        // light is on, can dim
+        doDim = true;
+      }
+      if (doDim && direction==dimmode_stop) {
+        // single button, no explicit direction -> use inverse of last dim
         direction = zone->zoneState.lastDim==dimmode_up ? dimmode_down : dimmode_up;
       }
-      zone->zoneState.lastDim = direction;
-      doDim = true;
     }
     else if (aClickType==ct_hold_end) {
       // stop dimming
@@ -1716,21 +1824,16 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       }
       if (direction==dimmode_stop) {
         // single button, no explicit direction
-        direction = zone->zoneState.lightOn[area] ? dimmode_down : dimmode_up;
+        direction = zone->zoneState.stateFor(group,area) ? dimmode_down : dimmode_up;
       }
       // local
       if (direction==dimmode_up) {
         // calling a preset
         sceneToCall = sceneOnClick;
-        zone->zoneState.lightOn[area] = true;
       }
       else {
         // calling an off scene
         sceneToCall = sceneOffclick;
-        zone->zoneState.lightOn[area] = false;
-      }
-      if (sceneToCall!=INVALID_SCENE_NO) {
-        zone->zoneState.lastLightScene = sceneToCall;
       }
     }
     // now perform actions
@@ -1749,6 +1852,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       params->add("group", params->newUint64(group));
       string method = "dimChannel";
       params->add("mode", params->newInt64(direction));
+      params->add("autostop", params->newBool(false)); // prevent stop dimming event w/o repeating command
       params->add("channel", params->newUint64(channelType));
       params->add("area", params->newUint64(area));
       // - deliver
@@ -1822,6 +1926,66 @@ void LocalController::deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, D
 }
 
 
+void LocalController::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState)
+{
+  ZoneDescriptorPtr zone = localZones.getZoneById(aDevice->getZoneID(), false);
+  if (zone && aDevice->getOutput()) {
+    DsGroupMask affectedGroups = aDevice->getOutput()->groupMemberships();
+    if (aDeliveryState.optimizedType==ntfy_callscene) {
+      // scene call
+      for (int g = group_undefined; affectedGroups; affectedGroups>>=1, ++g) {
+        if (affectedGroups & 1) {
+          SceneIdentifier calledScene(aDeliveryState.contentId, zone->getZoneId(), (DsGroup)g);
+          // general
+          int area = SimpleScene::areaForScene(calledScene.sceneNo);
+          if (calledScene.getKindFlags()&scene_off) {
+            // is a off scene (area or not), cancels the local priority
+            aDevice->getOutput()->setLocalPriority(false);
+          }
+          else if (area!=0) {
+            // is area on scene, set local priority in the device
+            aDevice->setLocalPriority(calledScene.sceneNo);
+          }
+          if (calledScene.getKindFlags()&scene_global) {
+            zone->zoneState.lastGlobalScene = calledScene.sceneNo;
+          }
+          // group specific
+          if (g==group_yellow_light) {
+            zone->zoneState.lastLightScene = calledScene.sceneNo;
+          }
+          zone->zoneState.setStateFor(g, area, !(calledScene.getKindFlags()&scene_off));
+          if (calledScene.sceneNo==DEEP_OFF) {
+            // force areas off as well
+            zone->zoneState.setStateFor(g, 1, false);
+            zone->zoneState.setStateFor(g, 2, false);
+            zone->zoneState.setStateFor(g, 3, false);
+            zone->zoneState.setStateFor(g, 4, false);
+          }
+        }
+      }
+    }
+    else if (aDeliveryState.optimizedType==ntfy_dimchannel) {
+      // dimming
+      if (aDeliveryState.actionVariant!=dimmode_stop) {
+        zone->zoneState.lastDimChannel = (DsChannelType)aDeliveryState.actionParam;
+        zone->zoneState.lastDim = (VdcDimMode)aDeliveryState.actionVariant;
+      }
+    }
+    LOG(LOG_INFO,
+      "Zone '%s' (%d) state updated: lastLightScene:%d, lastGlobalScene:%d, lightOn=%d/areas1234=%d%d%d%d, shadesOpen=%d/%d%d%d%d",
+      zone->getName().c_str(), zone->getZoneId(),
+      zone->zoneState.lastLightScene, zone->zoneState.lastGlobalScene,
+      zone->zoneState.lightOn[0],
+      zone->zoneState.lightOn[1], zone->zoneState.lightOn[2], zone->zoneState.lightOn[3], zone->zoneState.lightOn[4],
+      zone->zoneState.shadesOpen[0],
+      zone->zoneState.shadesOpen[1], zone->zoneState.shadesOpen[2], zone->zoneState.shadesOpen[3], zone->zoneState.shadesOpen[4]
+    );
+  }
+}
+
+
+
+
 size_t LocalController::totalDevices() const
 {
   return vdcHost.dSDevices.size();
@@ -1862,25 +2026,25 @@ ErrorPtr LocalController::save()
 }
 
 
-// MARK: ===== LocalController specific root (vdchost) level method handling
+// MARK: - LocalController specific root (vdchost) level method handling
 
 
 static const GroupDescriptor groupInfos[] = {
-  { group_undefined,               group_global,      "undefined" },
-  { group_yellow_light,            group_standard,    "light" },
-  { group_grey_shadow,             group_standard,    "shadow" },
-  { group_blue_heating,            group_standard,    "heating" },
-  { group_cyan_audio,              group_standard,    "audio" },
-  { group_magenta_video,           group_standard,    "video" },
-  { group_red_security,            group_global,      "security" },
-  { group_green_access,            group_global,      "access" },
-  { group_black_variable,          group_application, "joker" },
-  { group_blue_cooling,            group_standard,    "cooling" },
-  { group_blue_ventilation,        group_standard,    "ventilation" },
-  { group_blue_windows,            group_standard,    "windows" },
-  { group_blue_air_recirculation,  group_controller,  "air recirculation" },
-  { group_roomtemperature_control, group_controller,  "room temperature control" },
-  { group_ventilation_control,     group_controller,  "ventilation control" },
+  { group_undefined,               group_global,      "undefined",      0x000000 },
+  { group_yellow_light,            group_standard,    "light",          0xFFFF00 },
+  { group_grey_shadow,             group_standard,    "shadow",         0x999999 },
+  { group_blue_heating,            group_standard,    "heating",        0x0000FF },
+  { group_cyan_audio,              group_standard,    "audio",          0x00FFFF },
+  { group_magenta_video,           group_standard,    "video",          0xFF00FF },
+  { group_red_security,            group_global,      "security",       0xFF0000 },
+  { group_green_access,            group_global,      "access",         0x00FF00 },
+  { group_black_variable,          group_application, "joker",          0x000000 },
+  { group_blue_cooling,            group_standard,    "cooling",        0x0000FF },
+  { group_blue_ventilation,        group_standard,    "ventilation",    0x0000FF },
+  { group_blue_windows,            group_standard,    "windows",        0x0000FF },
+  { group_blue_air_recirculation,  group_controller,  "air recirculation", 0x0000FF },
+  { group_roomtemperature_control, group_controller,  "room temperature control", 0x0000FF },
+  { group_ventilation_control,     group_controller,  "ventilation control", 0x0000FF },
   { group_undefined,               0 /* terminator */,"" }
 };
 
@@ -1898,7 +2062,17 @@ const GroupDescriptor* LocalController::groupInfo(DsGroup aGroup)
 }
 
 
-
+DsGroupMask LocalController::standardRoomGroups(DsGroupMask aGroups)
+{
+  return aGroups & (
+    (1ll<<group_yellow_light) |
+    (1ll<<group_grey_shadow) |
+    (1ll<<group_blue_heating) |
+    (1ll<<group_cyan_audio) |
+    (1ll<<group_blue_cooling) |
+    (1ll<<group_blue_ventilation)
+  );
+}
 
 
 bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
@@ -1945,35 +2119,44 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
     return true;
   }
   else if (aMethod=="x-p44-queryGroups") {
-    // query groups that can be used in a zone
-    ApiValuePtr o;
-    aError = DsAddressable::checkParam(aParams, "zoneID", o);
-    if (Error::isOK(aError)) {
+    // query groups that are in use (in a zone or globally)
+    DsGroupMask groups = 0;
+    ApiValuePtr o = aParams->get("zoneID");
+    if (o) {
+      // specific zone
       DsZoneID zoneID = (DsZoneID)o->uint16Value();
       ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
       if (!zone) {
         aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
+        return true;
       }
-      else {
-        bool allGroups = false;
-        o = aParams->get("all"); if (o) allGroups = o->boolValue();
-        DsGroupMask groups = zone->getZoneGroups(!allGroups);
-        // create answer object
-        ApiValuePtr result = aRequest->newApiValue();
-        result->setType(apivalue_object);
-        for (int i = 0; i<64; ++i) {
-          if (groups & (1ll<<i)) {
-            const GroupDescriptor* gi = groupInfo((DsGroup)i);
-            ApiValuePtr g = result->newObject();
-            g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
-            g->add("kind", g->newUint64(gi ? gi->kind : 0));
-            result->add(string_format("%d", i), g);
-          }
-        }
-        aRequest->sendResult(result);
-        aError.reset(); // make sure we don't send an extra ErrorOK
+      groups = zone->getZoneGroups();
+    }
+    else {
+      // globally
+      for (DsDeviceMap::iterator pos = vdcHost.dSDevices.begin(); pos!=vdcHost.dSDevices.end(); ++pos) {
+        OutputBehaviourPtr ob = pos->second->getOutput();
+        if (ob) groups |= ob->groupMemberships();
       }
     }
+    bool allGroups = false;
+    o = aParams->get("all"); if (o) allGroups = o->boolValue();
+    if (!allGroups) groups = standardRoomGroups(groups);
+    // create answer object
+    ApiValuePtr result = aRequest->newApiValue();
+    result->setType(apivalue_object);
+    for (int i = 0; i<64; ++i) {
+      if (groups & (1ll<<i)) {
+        const GroupDescriptor* gi = groupInfo((DsGroup)i);
+        ApiValuePtr g = result->newObject();
+        g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
+        g->add("kind", g->newUint64(gi ? gi->kind : 0));
+        g->add("color", g->newString(string_format("#%06X", gi->hexcolor)));
+        result->add(string_format("%d", i), g);
+      }
+    }
+    aRequest->sendResult(result);
+    aError.reset(); // make sure we don't send an extra ErrorOK
     return true;
   }
   else if (aMethod=="x-p44-checkTriggerCondition" || aMethod=="x-p44-testTriggerActions") {
@@ -2004,7 +2187,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
 
 
 
-// MARK: ===== LocalController property access
+// MARK: - LocalController property access
 
 enum {
   // singledevice level properties

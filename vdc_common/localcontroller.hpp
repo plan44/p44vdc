@@ -86,6 +86,7 @@ namespace p44 {
     DsGroup no;
     GroupKind kind;
     const char *name;
+    uint32_t hexcolor;
   } GroupDescriptor;
 
 
@@ -98,11 +99,16 @@ namespace p44 {
     SceneNo lastGlobalScene; ///< last global scene called
 
     // Light state
-    VdcDimMode lastDim; ///< last dimming direction in this room
+    VdcDimMode lastDim; ///< last dimming direction in this zone
+    DsChannelType lastDimChannel; ///< last dimming channel in this zone
     SceneNo lastLightScene; ///< last light scene called
     bool lightOn[5]; ///< set if light is on in this zone and area
+    bool shadesOpen[5]; ///< set if shades are open in this zone and area
 
     ZoneState();
+    bool stateFor(int aGroup, int aArea);
+    void setStateFor(int aGroup, int aArea, bool aState);
+
   };
 
 
@@ -133,7 +139,7 @@ namespace p44 {
 
     /// get the zoneID
     /// @return ID of this zone
-    int getZoneId() const { return zoneID; };
+    DsZoneID getZoneId() const { return zoneID; };
 
     /// register as in-use or non-in-use-any-more by a device
     void usedByDevice(DevicePtr aDevice, bool aInUse);
@@ -145,9 +151,8 @@ namespace p44 {
     /// @return a vector of SceneIdentifier objects
     SceneIdsVector getZoneScenes(DsGroup aForGroup, SceneKind aRequiredKinds, SceneKind aForbiddenKinds);
 
-    /// get the groups relevant for this zone
-    /// @param aStandardOnly if set, only groups with standard room scenes will be reported for non-global zones
-    DsGroupMask getZoneGroups(bool aStandardOnly);
+    /// get the groups relevant for this zone (i.e those used by outputs in this zone)
+    DsGroupMask getZoneGroups();
 
     /// @return number of devices in this zone
     size_t devicesInZone() const;
@@ -358,7 +363,10 @@ namespace p44 {
     string name;
     string triggerCondition; ///< expression that must evaluate to true to trigger the action
     string triggerActions; ///< actions to trigger (scene calls, etc.)
+    string triggerVarDefs; ///< variable to valueSource mappings
 
+    ValueSourceMapper valueMapper;
+    MLTicket varParseTicket;
     Tristate conditionMet;
 
   public:
@@ -395,6 +403,9 @@ namespace p44 {
 
   private:
 
+    void parseVarDefs();
+    void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
+
     ExpressionValue calcCondition();
     ExpressionValue valueLookup(const string aName);
     ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
@@ -410,6 +421,7 @@ namespace p44 {
     typedef PropertyContainer inherited;
 
     MLTicket checkTicket;
+
 
   public:
 
@@ -520,6 +532,11 @@ namespace p44 {
     /// get info (name, kind) about a group
     static const GroupDescriptor* groupInfo(DsGroup aGroup);
 
+    /// filter group mask to only contain standard groups
+    /// @param aGroups bitmask of groups
+    /// @return filtered to contain only standard room scene groups
+    static DsGroupMask standardRoomGroups(DsGroupMask aGroups);
+
     /// localcontroller specific method handling
     bool handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams);
 
@@ -528,6 +545,12 @@ namespace p44 {
     void callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride = Infinite);
     void callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride = Infinite);
 
+    /// called when delivery of a scene call or dimming notification to a device has been executed
+    /// @param aDevice the device
+    /// @param aDeliveryState the delivery state
+    /// @note this is not called for all types of notifications, only callScene and dimchannel
+    /// @note aDeliveryState lifetime may immediately end when this method returns
+    void deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState);
 
   protected:
 

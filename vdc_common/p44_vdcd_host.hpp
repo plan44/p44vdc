@@ -116,14 +116,14 @@ namespace p44 {
     /// @result empty or Error object in case of error sending result response
     virtual ErrorPtr sendResult(ApiValuePtr aResult) P44_OVERRIDE;
 
-    /// send a vDC API error (answer for unsuccesful method call)
-    /// @param aErrorCode the error code
-    /// @param aErrorMessage the error message or NULL to generate a standard text
-    /// @param aErrorData the optional "data" member for the vDC API error object (in JSON only)
-    /// @param aErrorType the optional "errorType"
-    /// @param aUserFacingMessage the optional user facing message
+    /// send a error to the vDC API (answer for unsuccesful method call)
+    /// @param aError the error object
+    /// @note depending on the Error object's subclass and the vDC API kind (protobuf, json...),
+    ///   different information is transmitted. ErrorCode and ErrorMessage are always sent,
+    ///   Errors based on class VdcApiError will also include errorType, errorData and userFacingMessage
+    /// @note if aError is NULL, a generic "OK" error condition is sent
     /// @result empty or Error object in case of error sending error response
-    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr(), uint8_t aErrorType = 0, string aUserFacingMessage = "") P44_OVERRIDE;
+    virtual ErrorPtr sendError(ErrorPtr aError) P44_OVERRIDE;
 
   };
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;
@@ -190,14 +190,14 @@ namespace p44 {
     /// @result empty or Error object in case of error sending result response
     virtual ErrorPtr sendResult(ApiValuePtr aResult) P44_OVERRIDE;
 
-    /// send a vDC API error (answer for unsuccesful method call)
-    /// @param aErrorCode the error code
-    /// @param aErrorMessage the error message or NULL to generate a standard text
-    /// @param aErrorData the optional "data" member for the vDC API error object (in JSON only)
-    /// @param aErrorType the optional "errorType"
-    /// @param aUserFacingMessage the optional user facing message
+    /// send a error to the vDC API (answer for unsuccesful method call)
+    /// @param aError the error object
+    /// @note depending on the Error object's subclass and the vDC API kind (protobuf, json...),
+    ///   different information is transmitted. ErrorCode and ErrorMessage are always sent,
+    ///   Errors based on class VdcApiError will also include errorType, errorData and userFacingMessage
+    /// @note if aError is NULL, a generic "OK" error condition is sent
     /// @result empty or Error object in case of error sending error response
-    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr(), uint8_t aErrorType = 0, string aUserFacingMessage = "") P44_OVERRIDE;
+    virtual ErrorPtr sendError(ErrorPtr aError) P44_OVERRIDE;
 
     /// helper to send response or error
     /// @param aResult the result object to send

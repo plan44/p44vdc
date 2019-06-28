@@ -691,7 +691,7 @@ namespace p44 {
 
   #if ENABLE_DALI_INPUTS
 
-  // MARK: ===== DALI input device
+  // MARK: - DALI input device
 
   /// base class for all DALI input devices
   class DaliInputDevice : public Device

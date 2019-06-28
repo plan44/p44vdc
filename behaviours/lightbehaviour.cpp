@@ -27,7 +27,7 @@ using namespace p44;
 
 
 
-// MARK: ===== LightDeviceSettings with default light scenes factory
+// MARK: - LightDeviceSettings with default light scenes factory
 
 
 LightDeviceSettings::LightDeviceSettings(Device &aDevice) :
@@ -46,7 +46,7 @@ DsScenePtr LightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 
 
-// MARK: ===== LightBehaviour
+// MARK: - LightBehaviour
 
 #define STANDARD_DIM_CURVE_EXPONENT 4 // standard exponent, usually ok for PWM for LEDs
 
@@ -154,7 +154,7 @@ double LightBehaviour::outputValueAccordingToMode(double aChannelValue, int aCha
 }
 
 
-// MARK: ===== behaviour interaction with digitalSTROM system
+// MARK: - behaviour interaction with digitalSTROM system
 
 
 #define AUTO_OFF_FADE_TIME (60*Second)
@@ -315,7 +315,7 @@ void LightBehaviour::identifyToUser()
 }
 
 
-// MARK: ===== PWM dim curve
+// MARK: - PWM dim curve
 
 // TODO: implement multi point adjustable curves, logarithmic curve with adjustable exponent for now
 
@@ -351,7 +351,7 @@ Brightness LightBehaviour::PWMToBrightness(double aPWM, double aMaxPWM)
 
 
 
-// MARK: ===== blinking
+// MARK: - blinking
 
 
 void LightBehaviour::blink(MLMicroSeconds aDuration, LightScenePtr aParamScene, SimpleCB aDoneCB, MLMicroSeconds aBlinkPeriod, int aOnRatioPercent)
@@ -440,7 +440,7 @@ void LightBehaviour::blinkHandler(MLMicroSeconds aEndTime, bool aState, MLMicroS
 }
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 
 const char *LightBehaviour::tableName()
@@ -530,7 +530,7 @@ void LightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 
 static char light_key;
@@ -635,7 +635,7 @@ bool LightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
 }
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string LightBehaviour::shortDesc()

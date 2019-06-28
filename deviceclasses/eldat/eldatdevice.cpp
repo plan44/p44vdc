@@ -34,7 +34,7 @@
 using namespace p44;
 
 
-// MARK: ===== EldatDevice
+// MARK: - EldatDevice
 
 #define INVALID_RSSI (-999)
 
@@ -222,7 +222,7 @@ string EldatDevice::description()
 }
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 
 enum {
@@ -295,7 +295,7 @@ bool EldatDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 }
 
 
-// MARK: ===== profile variants
+// MARK: - profile variants
 
 
 static const EldatTypeVariantEntry EldatTypeVariants[] = {
@@ -455,7 +455,7 @@ void EldatDevice::switchTypes(const EldatTypeVariantEntry &aFromVariant, const E
 }
 
 
-// MARK: ===== Eldat buttons
+// MARK: - Eldat buttons
 
 
 EldatButtonDevice::EldatButtonDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType) :
@@ -522,7 +522,7 @@ void EldatButtonDevice::buttonReleased(int aButtonNo)
 
 
 
-// MARK: ===== Eldat motion detector
+// MARK: - Eldat motion detector
 
 
 EldatMotionDetector::EldatMotionDetector(EldatVdc *aVdcP) :
@@ -548,7 +548,7 @@ void EldatMotionDetector::handleFunction(EldatFunction aFunction)
 }
 
 
-// MARK: ===== Eldat window contact
+// MARK: - Eldat window contact
 
 
 EldatWindowContact::EldatWindowContact(EldatVdc *aVdcP, bool aOffOnType, bool aWithStatus) :
@@ -577,7 +577,7 @@ void EldatWindowContact::handleFunction(EldatFunction aFunction)
 
 
 
-// MARK: ===== Eldat window handle
+// MARK: - Eldat window handle
 
 
 EldatWindowHandle::EldatWindowHandle(EldatVdc *aVdcP, bool aOffOnType, bool aWithStatus) :
@@ -606,7 +606,7 @@ void EldatWindowHandle::handleFunction(EldatFunction aFunction)
 
 
 
-// MARK: ===== Eldat remote control device
+// MARK: - Eldat remote control device
 
 
 EldatRemoteControlDevice::EldatRemoteControlDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType) :
@@ -682,7 +682,7 @@ void EldatRemoteControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDim
 
 
 
-// MARK: ===== device factory
+// MARK: - device factory
 
 
 EldatDevicePtr EldatDevice::newDevice(

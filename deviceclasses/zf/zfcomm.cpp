@@ -33,7 +33,7 @@
 using namespace p44;
 
 
-// MARK: ===== ZfPacket
+// MARK: - ZfPacket
 
 
 ZfPacket::ZfPacket() :
@@ -99,7 +99,7 @@ string ZfPacket::description()
 
 
 /*
-// MARK: ===== ZF SerialOperations
+// MARK: - ZF SerialOperations
 
 
 class ZfResponse : public SerialOperation
@@ -146,7 +146,7 @@ public:
 */
 
 
-// MARK: ===== ZF communication handler
+// MARK: - ZF communication handler
 
 // baudrate for communication with ZF modem
 #define ZF_COMMAPARMS "57600,8,N,1"

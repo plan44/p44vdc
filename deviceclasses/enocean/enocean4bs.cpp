@@ -33,7 +33,7 @@
 using namespace p44;
 
 
-// MARK: ===== special extraction functions
+// MARK: - special extraction functions
 
 // two-range illumination handler, as used in A5-06-01 and A5-06-02
 static void illumHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
@@ -213,7 +213,7 @@ static void condDB0Bit2Handler(const struct EnoceanSensorDescriptor &aSensorDesc
 
 
 
-// MARK: ===== sensor mapping table for generic EnoceanSensorHandler
+// MARK: - sensor mapping table for generic EnoceanSensorHandler
 
 using namespace EnoceanSensors;
 
@@ -587,12 +587,19 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x30, 0x03, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_user,       1,    0, DB(1,4), DB(1,4), 100, 40*60, &stdInputHandler,  "Water detected" },
   { 0, 0x30, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature,    usage_room,       0,   40, DB(2,7), DB(2,0), 100, 40*60, &invSensorHandler,  tempText },
 
+  // A5-3F-7F: manufacturer specific
+  { 0, 0x3F, 0x7F, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,           usage_undefined,  0,    1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler,  "undefined" }, // just shows the first byte
+  // - Thermokon SR65 3AI - 3 analog inputs 0..10V
+  { 1, 0x3F, 0x7F, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,   10, DB(3,7), DB(3,0), 100,  1000, &stdSensorHandler,  "V3" },
+  { 1, 0x3F, 0x7F, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,   10, DB(2,7), DB(2,0), 100,  1000, &stdSensorHandler,  "V2" },
+  { 1, 0x3F, 0x7F, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,   10, DB(1,7), DB(1,0), 100,  1000, &stdSensorHandler,  "V1" },
+
   // terminator
   { 0, 0,    0,    0, class_black_joker,  group_black_variable,          behaviour_undefined, 0, usage_undefined, 0, 0, 0, 0, 0, 0, NULL /* NULL for extractor function terminates list */, NULL },
 };
 
 
-// MARK: ===== 4BS profile variants
+// MARK: - 4BS profile variants
 
 static const char *indoorText = "indoor sensor";
 static const char *outdoorText = "outdoor sensor";
@@ -673,24 +680,26 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   { 30, 0x00A50403, 0, outdoorText, NULL }, // outdoor is default!
   { 30, 0x01A50403, 0, indoorText, NULL },
   // heating valve alternatives
-  {  31, 0x00A52004, 0, "heating valve", NULL },
-  {  31, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
+  { 31, 0x00A52004, 0, "heating valve", NULL },
+  { 31, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
   // A5-14-09 reverse mount alternative
-  {  32, 0x00A51409, 0, "window state - regular mounting position", NULL },
-  {  32, 0x01A51409, 0, "window state - upside down mounting position", NULL },
+  { 32, 0x00A51409, 0, "window state - regular mounting position", NULL },
+  { 32, 0x01A51409, 0, "window state - upside down mounting position", NULL },
   // A5-14-0A reverse mount alternative
-  {  33, 0x00A5140A, 0, "window state - regular mounting position", NULL },
-  {  33, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
+  { 33, 0x00A5140A, 0, "window state - regular mounting position", NULL },
+  { 33, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
   // A5-08-01 generic and Eltako versions
-  {  34, 0x00A50801, 0, "standard EEP", NULL },
-  {  34, 0x01A50801, 0, "Eltako modified version (no temp/presence, extended lux range)", NULL },
-
+  { 34, 0x00A50801, 0, "standard EEP", NULL },
+  { 34, 0x01A50801, 0, "Eltako modified version (no temp/presence, extended lux range)", NULL },
+  // A5-3F-7F manufacturer specific
+  { 35, 0x00A53F7F, 0, "undefined", NULL },
+  { 35, 0x01A53F7F, 0, "Thermokon SR65 3AI - 3*0..10V analog inputs", NULL },
   { 0, 0, 0, NULL, NULL } // terminator
 };
 
 
 
-// MARK: ===== Enocean4BSDevice
+// MARK: - Enocean4BSDevice
 
 
 Enocean4BSDevice::Enocean4BSDevice(EnoceanVdc *aVdcP) :
@@ -793,7 +802,7 @@ void Enocean4BSDevice::prepare4BSpacket(Esp3PacketPtr &aOutgoingPacket, uint32_t
 
 
 
-// MARK: ===== EnoceanA52001Handler
+// MARK: - EnoceanA52001Handler
 
 
 EnoceanA52001Handler::EnoceanA52001Handler(EnoceanDevice &aDevice) :
@@ -1032,7 +1041,7 @@ string EnoceanA52001Handler::shortDesc()
 }
 
 
-// MARK: ===== EnoceanA52004Handler
+// MARK: - EnoceanA52004Handler
 
 
 EnoceanA52004Handler::EnoceanA52004Handler(EnoceanDevice &aDevice) :
@@ -1279,7 +1288,7 @@ string EnoceanA52004Handler::shortDesc()
 
 
 
-// MARK: ===== EnoceanA5130XHandler
+// MARK: - EnoceanA5130XHandler
 
 // configuration for A5-13-0X sensor channels
 // - A5-13-01 telegram

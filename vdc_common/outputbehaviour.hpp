@@ -224,6 +224,10 @@ namespace p44 {
     ///   specific implementation
     virtual void identifyToUser() { /* NOP in base class */ };
 
+    /// check if identifyToUser() has an actual implementation
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() { return false; } // not by default
+
     /// @}
 
     /// description of object, mainly for debug and logging

@@ -26,7 +26,7 @@
 using namespace p44;
 
 
-// MARK: ===== ColorChannel
+// MARK: - ColorChannel
 
 double ColorChannel::getChannelValueCalculated()
 {
@@ -43,7 +43,7 @@ double ColorChannel::getChannelValueCalculated()
 }
 
 
-// MARK: ===== ColorLightScene
+// MARK: - ColorLightScene
 
 
 ColorLightScene::ColorLightScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -55,7 +55,7 @@ ColorLightScene::ColorLightScene(SceneDeviceSettings &aSceneDeviceSettings, Scen
 }
 
 
-// MARK: ===== color scene values/channels
+// MARK: - color scene values/channels
 
 
 double ColorLightScene::sceneValue(int aChannelIndex)
@@ -87,7 +87,7 @@ void ColorLightScene::setSceneValue(int aChannelIndex, double aValue)
 }
 
 
-// MARK: ===== Color Light Scene persistence
+// MARK: - Color Light Scene persistence
 
 const char *ColorLightScene::tableName()
 {
@@ -143,7 +143,7 @@ void ColorLightScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 
 
 
-// MARK: ===== default color scene
+// MARK: - default color scene
 
 void ColorLightScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
@@ -172,7 +172,7 @@ void ColorLightScene::setDefaultSceneValues(SceneNo aSceneNo)
 }
 
 
-// MARK: ===== ColorLightDeviceSettings with default light scenes factory
+// MARK: - ColorLightDeviceSettings with default light scenes factory
 
 
 ColorLightDeviceSettings::ColorLightDeviceSettings(Device &aDevice) :
@@ -191,7 +191,7 @@ DsScenePtr ColorLightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 
 
-// MARK: ===== ColorLightBehaviour
+// MARK: - ColorLightBehaviour
 
 
 ColorLightBehaviour::ColorLightBehaviour(Device &aDevice, bool aCtOnly) :
@@ -265,6 +265,9 @@ void ColorLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
       default:
         colorMode = colorLightModeNone;
     }
+    // Don't cares should be correct at this point, but scenes saved long ago might have values that should NOT be
+    // applied but don't have a dontCare. The following call will repair these incorrect scenes:
+    adjustChannelDontCareToColorMode(colorLightScene, true); // only SET dontCares, but do not remove any
   }
   // need recalculation of values
   derivedValuesComplete = false;
@@ -305,7 +308,7 @@ void ColorLightBehaviour::saveChannelsToScene(DsScenePtr aScene)
 }
 
 
-void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene)
+void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene, bool aSetOnly)
 {
   // save the values and adjust don't cares according to color mode
   switch (aColorLightScene->colorMode) {
@@ -314,9 +317,11 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
       if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
-      // enable the used values
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, false);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, false);
+      if (!aSetOnly) {
+        // enable the used values
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, false);
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, false);
+      }
       break;
     }
     case colorLightModeXY: {
@@ -324,9 +329,11 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
       if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
-      // enable the used values
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, false);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, false);
+      if (!aSetOnly) {
+        // enable the used values
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, false);
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, false);
+      }
       break;
     }
     case colorLightModeCt: {
@@ -335,8 +342,10 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
       if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
-      // enable the used values
-      aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, false);
+      if (!aSetOnly) {
+        // enable the used values
+        aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, false);
+      }
       break;
     }
     default: {
@@ -354,7 +363,7 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
 
 
 
-// MARK: ===== color services for implementing color lights
+// MARK: - color services for implementing color lights
 
 
 bool ColorLightBehaviour::deriveColorMode()
@@ -362,19 +371,37 @@ bool ColorLightBehaviour::deriveColorMode()
   // the need to derive the color modes only arises when
   // colors (may) have changed, so this invalidates the derived channel values
   derivedValuesComplete = false;
+  // Note: actual calculation of derived values might not be carried out at all if none of the
+  //   derived channel values is queried. However, we must mark the derived channel values
+  //   volatile here to make sure these don't get persisted
   // check changed channels
   if (!ctOnly) {
     if (hue->needsApplying() || saturation->needsApplying()) {
       colorMode = colorLightModeHueSaturation;
+      hue->setVolatile(false);
+      saturation->setVolatile(false);
+      cieX->setVolatile(true);
+      cieY->setVolatile(true);
+      ct->setVolatile(true);
       return true;
     }
     else if (cieX->needsApplying() || cieY->needsApplying()) {
       colorMode = colorLightModeXY;
+      cieX->setVolatile(false);
+      cieY->setVolatile(false);
+      hue->setVolatile(true);
+      saturation->setVolatile(true);
+      ct->setVolatile(true);
       return true;
     }
   }
   if (ct->needsApplying()) {
     colorMode = colorLightModeCt;
+    ct->setVolatile(false);
+    cieX->setVolatile(true);
+    cieY->setVolatile(true);
+    hue->setVolatile(true);
+    saturation->setVolatile(true);
     return true;
   }
   // could not determine new color mode (assuming old is still ok)
@@ -484,7 +511,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         HSV[1] = saturation->getChannelValue()/100; // 0..1
         HSV[2] = 1;
         HSVtoxyV(HSV, xyV);
-        cieX->syncChannelValue(xyV[0], false, true);
+        cieX->syncChannelValue(xyV[0], false, true); // derived values are always volatile
         cieY->syncChannelValue(xyV[1], false, true);
         xyVtoCT(xyV, mired);
         ct->syncChannelValue(mired, false, true);
@@ -570,7 +597,7 @@ bool ColorLightBehaviour::colorTransitionStep(double aStepSize)
 
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string ColorLightBehaviour::shortDesc()
@@ -590,7 +617,7 @@ string ColorLightBehaviour::description()
 
 
 
-// MARK: ===== RGBColorLightBehaviour
+// MARK: - RGBColorLightBehaviour
 
 #define DUMP_CONVERSION_TABLE 0
 
@@ -945,7 +972,7 @@ void RGBColorLightBehaviour::setCWWW(double aCW, double aWW, double aMax)
 
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 
 const char *RGBColorLightBehaviour::tableName()
@@ -1015,7 +1042,7 @@ void RGBColorLightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, i
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 
 static char rgblight_key;
@@ -1084,7 +1111,7 @@ bool RGBColorLightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr a
 }
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string RGBColorLightBehaviour::shortDesc()

@@ -300,7 +300,10 @@ namespace p44 {
     virtual void saveChannelsToScene(DsScenePtr aScene);
 
     /// utility function, adjusts channel-level dontCare flags to current color mode
-    void adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene);
+    /// @param aColorLightScene the scene to adjust
+    /// @param aSetOnly only SET don't care for channels that are not native to the current colormode,
+    ///    but do not touch dontCare for channels that are native.
+    void adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene, bool aSetOnly = false);
 
   };
 

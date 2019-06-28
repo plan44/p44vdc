@@ -111,7 +111,6 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
 
 EvaluatorDevice::~EvaluatorDevice()
 {
-  forgetValueDefs();
 }
 
 
@@ -181,7 +180,7 @@ bool EvaluatorDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *a
 void EvaluatorDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // try connecting to values now. In case not all values are found, this will be re-executed later
-  parseValueDefs();
+  parseVarDefs();
   // done
   inherited::initializeDevice(aCompletedCB, aFactoryReset);
 }
@@ -194,26 +193,13 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     // Check the evaluator
     ApiValuePtr checkResult = aRequest->newApiValue();
     checkResult->setType(apivalue_object);
-    // - value defs
-    parseValueDefs(); // reparse
+    // - variable definitions
+    parseVarDefs(); // reparse
     ALOG(LOG_INFO, "CheckEvaluator:");
-    ApiValuePtr valueDefs = checkResult->newObject();
-    for (ValueSourcesMap::iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
-      ApiValuePtr val = valueDefs->newObject();
-      MLMicroSeconds lastupdate = pos->second->getSourceLastUpdate();
-      val->add("description", val->newString(pos->second->getSourceName()));
-      if (lastupdate==Never) {
-        val->add("age", val->newNull());
-        val->add("value", val->newNull());
-      }
-      else {
-        val->add("age", val->newDouble((double)(MainLoop::now()-lastupdate)/Second));
-        val->add("value", val->newDouble(pos->second->getSourceValue()));
-      }
-      valueDefs->add(pos->first,val); // variable name
-      LOG(LOG_INFO, "- '%s' ('%s') = %f", pos->first.c_str(), pos->second->getSourceName().c_str(), pos->second->getSourceValue());
+    ApiValuePtr varDefs = checkResult->newObject();
+    if (valueMapper.getMappedSourcesInfo(varDefs)) {
+      checkResult->add("varDefs", varDefs);
     }
-    checkResult->add("valueDefs", valueDefs);
     // Conditions
     ApiValuePtr cond;
     ExpressionValue res;
@@ -261,72 +247,26 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
 
 
 
-void EvaluatorDevice::forgetValueDefs()
-{
-  for (ValueSourcesMap::iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
-    pos->second->removeSourceListener(this);
-  }
-  valueMap.clear();
-}
-
-
-
 #define REPARSE_DELAY (30*Second)
 
-void EvaluatorDevice::parseValueDefs()
+void EvaluatorDevice::parseVarDefs()
 {
   valueParseTicket.cancel();
-  forgetValueDefs(); // forget previous mappings
-  string &valueDefs = evaluatorSettings()->valueDefs;
   string newValueDefs; // re-created value defs using sensor ids rather than indices, for migration
-  // syntax:
-  //  <valuealias>:<valuesourceid> [, <valuealias>:valuesourceid> ...]
-  ALOG(LOG_INFO, "Parsing variable definitions");
-  bool foundall = true;
-  size_t i = 0;
-  while(i<valueDefs.size()) {
-    size_t e = valueDefs.find(":", i);
-    if (e!=string::npos) {
-      string valuealias = valueDefs.substr(i,e-i);
-      i = e+1;
-      size_t e2 = valueDefs.find_first_of(", \t\n\r", i);
-      if (e2==string::npos) e2 = valueDefs.size();
-      string valuesourceid = valueDefs.substr(i,e2-i);
-      // search source
-      ValueSource *vs = getVdcHost().getValueSourceById(valuesourceid);
-      if (vs) {
-        // value source exists
-        // - add myself as listener
-        vs->addSourceListener(boost::bind(&EvaluatorDevice::dependentValueNotification, this, _1, _2), this);
-        // - add source to my map
-        valueMap[valuealias] = vs;
-        LOG(LOG_INFO, "- Variable '%s' connected to source '%s'", valuealias.c_str(), vs->getSourceName().c_str());
-        string_format_append(newValueDefs, "%s:%s", valuealias.c_str(), vs->getSourceId().c_str());
-      }
-      else {
-        ALOG(LOG_WARNING, "Value source id '%s' not found -> variable '%s' currently undefined", valuesourceid.c_str(), valuealias.c_str());
-        string_format_append(newValueDefs, "%s:%s", valuealias.c_str(), valuesourceid.c_str());
-        foundall = false;
-      }
-      // skip delimiters
-      i = valueDefs.find_first_not_of(", \t\n\r", e2);
-      if (i==string::npos) i = valueDefs.size();
-      newValueDefs += valueDefs.substr(e2,i-e2);
-    }
-    else {
-      ALOG(LOG_ERR, "missing ':' in value definition");
-      break;
-    }
-  }
-  // migrate old definitions (when re-created definitions are not equal to stored ones)
-  // Note: even migrate partially, when not all defs could be resolved yet
-  if (evaluatorSettings()->valueDefs!=newValueDefs) {
+  bool foundall = valueMapper.parseMappingDefs(
+    evaluatorSettings()->varDefs,
+    boost::bind(&EvaluatorDevice::dependentValueNotification, this, _1, _2),
+    &newValueDefs
+  );
+  if (!newValueDefs.empty()) {
+    // migrate old definitions (when re-created definitions are not equal to stored ones)
+    // Note: even migrate partially, when not all defs could be resolved yet
     ALOG(LOG_NOTICE, "Migrating definitions to new id (rather than index) based form");
-    evaluatorSettings()->setPVar(evaluatorSettings()->valueDefs, newValueDefs);
+    evaluatorSettings()->setPVar(evaluatorSettings()->varDefs, newValueDefs);
   }
   if (!foundall) {
     // schedule a re-parse later
-    valueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::parseValueDefs, this), REPARSE_DELAY);
+    valueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::parseVarDefs, this), REPARSE_DELAY);
   }
   else {
     // run an initial evaluation to calculate default values and possibly start timers
@@ -339,7 +279,7 @@ void EvaluatorDevice::dependentValueNotification(ValueSource &aValueSource, Valu
 {
   if (aEvent==valueevent_removed) {
     // a value has been removed, update my map
-    parseValueDefs();
+    parseVarDefs();
   }
   else {
     ALOG(LOG_INFO, "value source '%s' reports value %f", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
@@ -566,50 +506,7 @@ ExpressionValue EvaluatorDevice::calcEvaluatorExpression(string &aExpression)
 
 ExpressionValue EvaluatorDevice::valueLookup(const string aName)
 {
-  // values can be simple sensor names, or sensor names with sub-field specifications:
-  // sensor               returns the value of the sensor
-  // sensor.valid         returns 1 if sensor has a valid value, 0 otherwise
-  // sensor.oplevel       returns the operation level of the sensor (0..100%)
-  // sensor.age           returns the age of the sensor value in seconds
-  string subfield;
-  string name;
-  size_t i = aName.find('.');
-  if (i!=string::npos) {
-    subfield = aName.substr(i+1);
-    name = aName.substr(0,i);
-  }
-  else {
-    name = aName;
-  }
-  ValueSourcesMap::iterator pos = valueMap.find(name);
-  if (pos==valueMap.end()) {
-    return ExpressionError::errValue(ExpressionError::NotFound, "Undefined sensor '%s'", name.c_str());
-  }
-  // value found
-  if (subfield.empty()) {
-    // value itself is requested
-    if (pos->second->getSourceLastUpdate()!=Never) {
-      return ExpressionValue(pos->second->getSourceValue());
-    }
-  }
-  else if (subfield=="valid") {
-    return ExpressionValue(pos->second->getSourceLastUpdate()!=Never ? 1 : 0);
-  }
-  else if (subfield=="oplevel") {
-    int lvl = pos->second->getSourceOpLevel();
-    if (lvl>=0) return ExpressionValue(lvl);
-    // otherwise: no known value
-  }
-  else if (subfield=="age") {
-    if (pos->second->getSourceLastUpdate()!=Never) {
-      return ExpressionValue(((double)(MainLoop::now()-pos->second->getSourceLastUpdate()))/Second);
-    }
-  }
-  else {
-    return ExpressionError::errValue(ExpressionError::NotFound, "Unknown subfield '%s' for value '%s'", subfield.c_str(), name.c_str());
-  }
-  // no value (yet)
-  return ExpressionError::errValue(ExpressionError::Null, "'%s' has no known value yet", aName.c_str());
+  return valueMapper.valueLookup(aName);
 }
 
 
@@ -760,11 +657,11 @@ string EvaluatorDevice::getEvaluatorType()
 }
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 enum {
   evaluatorType_key,
-  valueDefs_key,
+  varDefs_key,
   onCondition_key,
   offCondition_key,
   minOnTime_key,
@@ -792,7 +689,7 @@ PropertyDescriptorPtr EvaluatorDevice::getDescriptorByIndex(int aPropIndex, int 
 {
   static const PropertyDescription properties[numProperties] = {
     { "x-p44-evaluatorType", apivalue_string, evaluatorType_key, OKEY(evaluatorDevice_key) },
-    { "x-p44-valueDefs", apivalue_string, valueDefs_key, OKEY(evaluatorDevice_key) },
+    { "x-p44-varDefs", apivalue_string, varDefs_key, OKEY(evaluatorDevice_key) },
     { "x-p44-onCondition", apivalue_string, onCondition_key, OKEY(evaluatorDevice_key) },
     { "x-p44-offCondition", apivalue_string, offCondition_key, OKEY(evaluatorDevice_key) },
     { "x-p44-minOnTime", apivalue_double, minOnTime_key, OKEY(evaluatorDevice_key) },
@@ -822,7 +719,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case evaluatorType_key: aPropValue->setStringValue(getEvaluatorType()); return true;
-        case valueDefs_key: aPropValue->setStringValue(evaluatorSettings()->valueDefs); return true;
+        case varDefs_key: aPropValue->setStringValue(evaluatorSettings()->varDefs); return true;
         case onCondition_key: aPropValue->setStringValue(evaluatorSettings()->onCondition); return true;
         case offCondition_key: aPropValue->setStringValue(evaluatorSettings()->offCondition); return true;
         case minOnTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->minOnTime)/Second); return true;
@@ -833,9 +730,9 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
     else {
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
-        case valueDefs_key:
-          if (evaluatorSettings()->setPVar(evaluatorSettings()->valueDefs, aPropValue->stringValue()))
-            parseValueDefs(); // changed valueDefs, re-parse them
+        case varDefs_key:
+          if (evaluatorSettings()->setPVar(evaluatorSettings()->varDefs, aPropValue->stringValue()))
+            parseVarDefs(); // changed varDefs, re-parse them
           return true;
         case onCondition_key:
           if (evaluatorSettings()->setPVar(evaluatorSettings()->onCondition, aPropValue->stringValue()))
@@ -864,7 +761,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 }
 
 
-// MARK: ===== settings
+// MARK: - settings
 
 
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(Device &aDevice) :
@@ -895,7 +792,7 @@ size_t EvaluatorDeviceSettings::numFieldDefs()
 const FieldDefinition *EvaluatorDeviceSettings::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numFields] = {
-    { "valueDefs", SQLITE_TEXT },
+    { "valueDefs", SQLITE_TEXT }, // historically called "valueDefs", kept for DB backwards compatibility
     { "onCondition", SQLITE_TEXT },
     { "offCondition", SQLITE_TEXT },
     { "minOnTime", SQLITE_INTEGER },
@@ -916,7 +813,7 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field values
-  valueDefs.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  varDefs.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
   onCondition.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
   offCondition.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOnTime);
@@ -930,7 +827,7 @@ void EvaluatorDeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, 
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, valueDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, varDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, onCondition.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, offCondition.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (long long int)minOnTime);

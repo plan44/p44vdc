@@ -93,6 +93,7 @@ namespace p44 {
 
     friend class Vdc;
     friend class VdcHost;
+    friend class LocalController;
     friend class VdcCollector;
     friend class DsBehaviour;
     friend class DsScene;
@@ -422,11 +423,13 @@ namespace p44 {
     /// @param aApiConnection this is the API connection from which the notification originates
     /// @param aNotification the notification
     /// @param aParams the parameters object
+    /// @return true if aNotification is known. Does not say anything about success or failure of the actions
+    ///    it might trigger in the recipient
     /// @note callScene and dimChannel notifications are handled separately at the vDC level and dispatched
     ///    using special xxPrepare() and xxExecute() methods.
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this device.
-    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// convenience method to call scene on this device
     /// @param aSceneNo the scene to call.
@@ -518,12 +521,6 @@ namespace p44 {
     ///   start a dimming process, and once again to stop it. There are no repeated start commands or missing stops - Device
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
     virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply);
-
-    /// identify the device to the user
-    /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
-    ///   this can be anything.
-    /// @note base class delegates this to the output behaviour (if any)
-    virtual void identifyToUser();
 
     /// @}
 
@@ -667,12 +664,19 @@ namespace p44 {
     ///   However, in all cases internal state must be updated to reflect the finalized operation
     void executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatToApply);
 
+    /// update the delivery state
+    /// @param aDeliveryState update params to reflect the
+    /// @param aForOptimisation if set, delivery state is updated for optimized delivery to this device, if possible
+    /// @return true if device could be prepared for optimized delivery and may be added to list of affected devices
+    bool updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bool aForOptimisation);
+
     /// let this device add itself to the list of devices that can received grouped/optimized scene/dim calls, if applicable
     /// @param aDeliveryState if the device supports optimized calls, it must update the delivery state hashes
     ///   and add itself to the list of affected devices
     /// @return false if device does not support optimization (on a call-by-call basis, might support
     ///   it for some scenes but not for others).
     bool addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState);
+
 
     /// let device implementation prepare for (and possibly reject) optimized set
     /// @param aDeliveryState can be inspected to see the scene or dim parameters
@@ -723,6 +727,15 @@ namespace p44 {
     /// switch outputs on that are off, and set minmum (logical) output value
     /// @param aSceneNo the scene to check don't care for
     void callSceneMin(SceneNo aSceneNo);
+
+    /// identify the device to the user
+    /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
+    ///   this can be anything.
+    /// @note device delegates this to the output behaviour (if any)
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
 
 
   private:

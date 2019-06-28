@@ -43,7 +43,7 @@
 using namespace p44;
 
 
-// MARK: ===== DeviceConfigurationDescriptor
+// MARK: - DeviceConfigurationDescriptor
 
 
 enum {
@@ -97,7 +97,7 @@ namespace p44 { namespace DeviceConfigurations {
 
 
 
-// MARK: ===== Device
+// MARK: - Device
 
 
 Device::Device(Vdc *aVdcP) :
@@ -358,7 +358,7 @@ void Device::installSettings(DeviceSettingsPtr aDeviceSettings)
 }
 
 
-// MARK: ===== behaviours
+// MARK: - behaviours
 
 void Device::addBehaviour(DsBehaviourPtr aBehaviour)
 {
@@ -481,7 +481,7 @@ void Device::announcementAcknowledged()
 }
 
 
-// MARK: ===== model features
+// MARK: - model features
 
 static const char *modelFeatureNames[numModelFeatures] = {
   "dontcare",
@@ -522,7 +522,8 @@ static const char *modelFeatureNames[numModelFeatures] = {
   "blinkconfig",
   "umroutmode",
   "fcu",
-  "extendedvalvetypes"
+  "extendedvalvetypes",
+  "identification"
 };
 
 
@@ -535,6 +536,8 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
   }
   // now check for device level features
   switch (aFeatureIndex) {
+    case modelFeature_identification:
+      return canIdentifyToUser() ? yes : no;
     case modelFeature_dontcare:
       // Generic: all devices with scene table have the ability to set scene's don't care flag
       return boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings)!=NULL ? yes : no;
@@ -603,7 +606,7 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
 }
 
 
-// MARK: ===== Channels
+// MARK: - Channels
 
 
 int Device::numChannels()
@@ -663,7 +666,7 @@ ChannelBehaviourPtr Device::getChannelById(const string aChannelId, bool aPendin
 
 
 
-// MARK: ===== Device level vDC API
+// MARK: - Device level vDC API
 
 
 ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
@@ -718,6 +721,7 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
 
 #define MOC_DIM_STEP_TIMEOUT (5*Second)
 #define LEGACY_DIM_STEP_TIMEOUT (500*MilliSecond) // should be 400, but give it extra 100 because of delays in getting next dim call, especially for area scenes
+#define EMERGENCY_DIM_STEP_TIMEOUT (300*Second) // just to prevent dimming forever if something goes wrong
 
 
 ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel)
@@ -740,7 +744,7 @@ ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel
 
 
 
-void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   ErrorPtr err;
   if (aNotification=="saveScene") {
@@ -843,14 +847,10 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       ALOG(LOG_WARNING, "setOutputChannelValue error: %s", err->description().c_str());
     }
   }
-  else if (aNotification=="identify") {
-    // identify to user
-    ALOG(LOG_NOTICE, "Identify");
-    identifyToUser();
-  }
   else {
-    inherited::handleNotification(aApiConnection, aNotification, aParams);
+    return inherited::handleNotification(aApiConnection, aNotification, aParams);
   }
+  return true; // known notification name
 }
 
 
@@ -905,7 +905,7 @@ static SceneNo offSceneForArea(int aArea)
 }
 
 
-// MARK: ===== optimized notification delivery
+// MARK: - optimized notification delivery
 
 
 void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliveryStatePtr aDeliveryState)
@@ -945,15 +945,24 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       if (Error::isOK(err = checkParam(aDeliveryState->callParams, "mode", o))) {
         // mode
         int mode = o->int32Value();
+        // area
         int area = 0;
         o = aDeliveryState->callParams->get("area");
-        if (o) {
-          area = o->int32Value();
-        }
+        if (o) area = o->int32Value();
+        // autostop of dimming (localcontroller may want to prevent that)
+        bool autostop = true;
+        o = aDeliveryState->callParams->get("autostop");
+        if (o) autostop = o->boolValue();
         // set the channel type as actionParam
         aDeliveryState->actionParam = channel->getChannelType();
         // prepare starting or stopping dimming
-        dimChannelForAreaPrepare(aPreparedCB, channel, mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
+        dimChannelForAreaPrepare(
+          aPreparedCB,
+          channel,
+          mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up),
+          area,
+          autostop ? MOC_DIM_STEP_TIMEOUT : EMERGENCY_DIM_STEP_TIMEOUT
+        );
         return;
       }
     }
@@ -988,34 +997,40 @@ void Device::executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatTo
 }
 
 
-
-bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
+bool Device::updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bool aForOptimisation)
 {
-  bool include = false;
   if (aDeliveryState->optimizedType==ntfy_callscene) {
     if (!preparedScene) return false; // no prepared scene -> not part of optimized set
-    if (prepareForOptimizedSet(aDeliveryState)) {
+    aDeliveryState->contentId = preparedScene->sceneNo; // to re-identify the scene (the contents might have changed...)
+    if (aForOptimisation && prepareForOptimizedSet(aDeliveryState)) {
       // content hash must represent the contents of the called scenes in all affected devices
       Fnv64 sh(preparedScene->sceneHash());
       if (sh.getHash()==0) return false; // scene not hashable -> not part of optimized set
       sh.addString(dSUID.getBinary()); // add device dSUID to make it "mixable" (i.e. combine into one hash via XOR in any order)
       aDeliveryState->contentsHash ^= sh.getHash(); // mix
-      aDeliveryState->contentId = preparedScene->sceneNo; // to re-identify the scene (the contents might have changed...)
-      include = true;
+      return true;
     }
   }
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
     if (!preparedDim) return false; // no prepared scene -> not part of optimized set
-    if (prepareForOptimizedSet(aDeliveryState)) {
-      include = true;
-      aDeliveryState->contentId = 0; // no different content ids
-      aDeliveryState->actionVariant = currentDimMode; // to actually apply the dim mode to the optimized group later
+    aDeliveryState->contentId = 0; // no different content ids
+    aDeliveryState->actionVariant = currentDimMode; // to actually apply the dim mode to the optimized group later
+    aDeliveryState->actionParam = currentDimChannel ? currentDimChannel->getChannelType() : channeltype_default;
+    if (aForOptimisation && prepareForOptimizedSet(aDeliveryState)) {
       if (currentDimMode!=dimmode_stop) {
         aDeliveryState->repeatVariant = dimmode_stop; // auto-stop
         aDeliveryState->repeatAfter = currentAutoStopTime; // after this time
       }
+      return true;
     }
   }
+  return false;
+}
+
+
+bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
+{
+  bool include = updateDeliveryState(aDeliveryState, true);
   if (include) {
     // the device must be added to the device hash
     dSUID.xorDsUidIntoMix(aDeliveryState->affectedDevicesHash, true); // subdevice-safe mixing
@@ -1028,7 +1043,7 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 
 
 
-// MARK: ===== high level serialized hardware access
+// MARK: - high level serialized hardware access
 
 #define SERIALIZER_WATCHDOG 1
 #define SERIALIZER_WATCHDOG_TIMEOUT (20*Second)
@@ -1274,7 +1289,7 @@ void Device::updatingChannelsComplete()
 }
 
 
-// MARK: ===== dimming
+// MARK: - dimming
 
 // dS Dimming rule for Light:
 //  Rule 4 All devices which are turned on and not in local priority state take part in the dimming process.
@@ -1483,7 +1498,7 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
 }
 
 
-// MARK: ===== scene operations
+// MARK: - scene operations
 
 
 void Device::callScene(SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransitionTimeOverride)
@@ -1784,18 +1799,21 @@ void Device::callSceneMin(SceneNo aSceneNo)
 }
 
 
-
-
 void Device::identifyToUser()
 {
-  if (output) {
+  if (canIdentifyToUser()) {
     output->identifyToUser(); // pass on to behaviour by default
   }
   else {
-    LOG(LOG_INFO, "***** device 'identify' called (for device with no real identify implementation) *****");
+    inherited::identifyToUser();
   }
 }
 
+
+bool Device::canIdentifyToUser()
+{
+  return output && output->canIdentifyToUser();
+}
 
 
 void Device::saveScene(SceneNo aSceneNo)
@@ -1868,7 +1886,7 @@ bool Device::processControlValue(const string &aName, double aValue)
 
 
 
-// MARK: ===== persistent device params
+// MARK: - persistent device params
 
 
 // load device settings - beaviours + scenes
@@ -1972,7 +1990,7 @@ void Device::loadSettingsFromFiles()
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 enum {
   // device level simple parameters
@@ -2352,7 +2370,7 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
 }
 
 
-// MARK: ===== Device description/shortDesc/status
+// MARK: - Device description/shortDesc/status
 
 
 string Device::description()

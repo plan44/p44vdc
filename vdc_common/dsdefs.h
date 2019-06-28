@@ -22,7 +22,7 @@
 #ifndef p44vdc_dsdefs_h
 #define p44vdc_dsdefs_h
 
-/// MARK: ====== generic dS constants in dS global scope
+/// MARK: -= generic dS constants in dS global scope
 
 /// Constants which are used in the entire dS system
 /// @{
@@ -430,6 +430,7 @@ typedef enum {
   modelFeature_umroutmode, ///< Enables the "Output mode" radio group in "Device Properties" dialog and influences its contents. The presented options will be: "single switched" (35) for all dSUIDs and "combined switched" (43), "combined two stage switched" (34), "combined three stage switched" (38) and "disabled" (0).
   modelFeature_fcu, ///< enables FCU specific UI bits such as "automatic" flags
   modelFeature_extendedvalvetypes, ///< Rehau specific modelFeature, extends list of available valve types in "Device Properties" dialog.
+  modelFeature_identification, ///< device has a non-dummy identifyToUser() implementation (so light bulb button will be active)
   numModelFeatures
 } DsModelFeatures;
 
@@ -437,7 +438,7 @@ typedef enum {
 
 
 
-/// MARK: ====== vDC API constants - scope is vDC API only
+/// MARK: -= vDC API constants - scope is vDC API only
 
 /// Constants which are used in the vDC API and have a direct meaning only for vDC API clients (such as vDSM)
 /// @{

@@ -69,6 +69,7 @@ namespace p44 {
     /// @name internal volatile state
     /// @{
     bool channelUpdatePending; ///< set if cachedOutputValue represents a value to be transmitted to the hardware
+    bool volatileValue; ///< set if value is not a defining part of the output state (not to be persisted, not necessarily valid)
     double cachedChannelValue; ///< the cached channel value
     double previousChannelValue; ///< the previous channel value, can be used for performing transitions
     double transitionProgress; ///< how much the transition has progressed so far (0..1)
@@ -201,6 +202,11 @@ namespace p44 {
     /// @param aAnyWay if true, lastSent state will be set even if channel was not in needsApplying() state
     void channelValueApplied(bool aAnyWay = false);
 
+    /// can be called to explicitly set a channel's volatile flag, which means it is not carrying relevant data
+    /// for defining the output state (e.g. CIE x,y channels when light is in HSV mode)
+    /// @param aVolatile true to set volatile, false otherwise
+    void setVolatile(bool aVolatile) { setPVar(volatileValue, aVolatile); }
+
     /// @}
 
 
@@ -281,7 +287,7 @@ namespace p44 {
   typedef vector<ChannelBehaviourPtr> ChannelBehaviourVector;
 
 
-  // MARK: ===== generic channel implementations
+  // MARK: - generic channel implementations
 
 
   /// index value channel
@@ -364,7 +370,7 @@ namespace p44 {
   typedef boost::intrusive_ptr<DialChannel> DialChannelPtr;
 
 
-  // MARK: ===== specific purpose channel implementations
+  // MARK: - specific purpose channel implementations
 
   /// Power state channel
   class PowerStateChannel : public IndexChannel

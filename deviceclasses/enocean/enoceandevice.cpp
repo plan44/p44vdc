@@ -37,7 +37,7 @@
 using namespace p44;
 
 
-// MARK: ===== EnoceanChannelHandler
+// MARK: - EnoceanChannelHandler
 
 EnoceanChannelHandler::EnoceanChannelHandler(EnoceanDevice &aDevice) :
   device(aDevice),
@@ -62,7 +62,7 @@ string EnoceanChannelHandler::getOpStateText()
 
 
 
-// MARK: ===== EnoceanDevice
+// MARK: - EnoceanDevice
 
 #define INVALID_RSSI (-999)
 
@@ -435,7 +435,7 @@ string EnoceanDevice::description()
 }
 
 
-// MARK: ===== profile variants
+// MARK: - profile variants
 
 
 EnoceanProfile EnoceanDevice::expandEEPWildcard(EnoceanProfile aEEPWildcard)
@@ -588,7 +588,7 @@ void EnoceanDevice::switchProfiles(const ProfileVariantEntry &aFromVariant, cons
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 
 enum {
@@ -669,7 +669,7 @@ bool EnoceanDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
 }
 
 
-// MARK: ===== device factory
+// MARK: - device factory
 
 
 EnoceanDevicePtr EnoceanDevice::newDevice(

@@ -32,7 +32,7 @@
 using namespace p44;
 
 
-// MARK: ===== self test runner
+// MARK: - self test runner
 
 #if SELFTESTING_ENABLED
 
@@ -163,7 +163,7 @@ private:
 #endif // SELFTESTING_ENABLED
 
 
-// MARK: ===== P44VdcHost
+// MARK: - P44VdcHost
 
 
 P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
@@ -214,7 +214,7 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 #if ENABLE_UBUS
 
-// MARK: ===== ubus API
+// MARK: - ubus API
 
 static const struct blobmsg_policy vdcapi_policy[] = {
   { .name = "method", .type = BLOBMSG_TYPE_STRING },
@@ -304,7 +304,7 @@ void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string
 
 
 
-// MARK: ===== ubus API - UbusApiConnection
+// MARK: - ubus API - UbusApiConnection
 
 UbusApiConnection::UbusApiConnection()
 {
@@ -318,7 +318,7 @@ ApiValuePtr UbusApiConnection::newApiValue()
 }
 
 
-// MARK: ===== ubus API - UbusApiRequest
+// MARK: - ubus API - UbusApiRequest
 
 UbusApiRequest::UbusApiRequest(UbusRequestPtr aUbusRequest)
 {
@@ -344,16 +344,13 @@ ErrorPtr UbusApiRequest::sendResult(ApiValuePtr aResult)
 
 
 
-ErrorPtr UbusApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
+ErrorPtr UbusApiRequest::sendError(ErrorPtr aError)
 {
   ErrorPtr err;
-  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) error sent: error=%d (%s)", aErrorCode, aErrorMessage.c_str());
-  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
-    err = VdcApiErrorPtr(new VdcApiError(aErrorCode, aErrorMessage, aErrorType, aUserFacingMessage));
+  if (!aError) {
+    aError = Error::ok();
   }
-  else {
-    err = ErrorPtr(new Error(aErrorCode, aErrorMessage)); // re-pack into error object
-  }
+  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) error sent: error=%d (%s)", aError->getErrorCode(), aError->getErrorMessage());
   sendResponse(JsonObjectPtr(), err);
   return ErrorPtr();
 }
@@ -390,7 +387,7 @@ void UbusApiRequest::sendResponse(JsonObjectPtr aResult, ErrorPtr aError)
 #if ENABLE_JSONCFGAPI
 
 
-// MARK: ===== JSON config API
+// MARK: - JSON config API
 
 void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed)
 {
@@ -587,7 +584,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
 #endif // ENABLE_LEGACY_P44CFGAPI
 
 
-// MARK: ===== config API - P44JsonApiConnection
+// MARK: - config API - P44JsonApiConnection
 
 P44JsonApiConnection::P44JsonApiConnection()
 {
@@ -601,7 +598,7 @@ ApiValuePtr P44JsonApiConnection::newApiValue()
 }
 
 
-// MARK: ===== config API - P44JsonApiRequest
+// MARK: - config API - P44JsonApiRequest
 
 P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aJsonComm)
 {
@@ -630,24 +627,21 @@ ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
 }
 
 
-ErrorPtr P44JsonApiRequest::sendError(uint32_t aErrorCode, string aErrorMessage, ApiValuePtr aErrorData, VdcErrorType aErrorType, string aUserFacingMessage)
+ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
 {
   ErrorPtr err;
-  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error sent: error=%d (%s)", aErrorCode, aErrorMessage.c_str());
-  if (aErrorType!=0 || !aUserFacingMessage.empty()) {
-    err = VdcApiErrorPtr(new VdcApiError(aErrorCode, aErrorMessage, aErrorType, aUserFacingMessage));
+  if (!aError) {
+    aError = Error::ok();
   }
-  else {
-    err = ErrorPtr(new Error(aErrorCode, aErrorMessage)); // re-pack into error object
-  }
-  P44VdcHost::sendCfgApiResponse(jsonComm, JsonObjectPtr(), err);
+  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error sent: error=%ld (%s)", aError->getErrorCode(), aError->getErrorMessage());
+  P44VdcHost::sendCfgApiResponse(jsonComm, JsonObjectPtr(), aError);
   return ErrorPtr();
 }
 
 #endif // ENABLE_JSONCFGAPI
 
 
-// MARK: ===== P44 specific vdchost level methods
+// MARK: - P44 specific vdchost level methods
 
 ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
 {

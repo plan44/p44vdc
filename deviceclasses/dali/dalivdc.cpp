@@ -39,6 +39,8 @@ DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   #endif
   // set default optimisation mode
   optimizerMode = opt_disabled; // FIXME: once we are confident, make opt_auto the default
+  maxOptimizerScenes = 16; // dummy, not really checked as HW limits this
+  maxOptimizerGroups = 16; // dummy, not really checked as HW limits this
 }
 
 
@@ -63,7 +65,7 @@ bool DaliVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResoluti
 }
 
 
-// MARK: ===== DB and initialisation
+// MARK: - DB and initialisation
 
 // Version history
 //  1 : first version
@@ -154,7 +156,7 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-// MARK: ===== collect devices
+// MARK: - collect devices
 
 
 int DaliVdc::getRescanModes() const
@@ -533,7 +535,7 @@ void DaliVdc::deviceFeaturesQueried(DaliBusDeviceListPtr aBusDevices, DaliBusDev
 }
 
 
-// MARK: ===== DALI specific methods
+// MARK: - DALI specific methods
 
 ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
@@ -571,7 +573,7 @@ ErrorPtr DaliVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod,
 }
 
 
-// MARK: ===== DALI bus diagnostics and summary
+// MARK: - DALI bus diagnostics and summary
 
 
 // scan bus, return status string
@@ -854,7 +856,7 @@ bool DaliVdc::daliInfoSummary(DaliDeviceInfoPtr aDeviceInfo, ApiValuePtr aInfo)
 
 
 
-// MARK: ===== composite device creation
+// MARK: - composite device creation
 
 
 ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
@@ -1016,7 +1018,7 @@ void DaliVdc::groupCollected(VdcApiRequestPtr aRequest)
 }
 
 
-// MARK: ===== management of used groups and scenes
+// MARK: - management of used groups and scenes
 
 void DaliVdc::markUsed(DaliAddress aSceneOrGroup, bool aUsed)
 {
@@ -1070,7 +1072,7 @@ void DaliVdc::loadLocallyUsedGroupsAndScenes()
 
 
 
-// MARK: ===== Native actions (groups and scenes on vDC level)
+// MARK: - Native actions (groups and scenes on vDC level)
 
 static DaliAddress daliAddressFromActionId(const string aNativeActionId)
 {
@@ -1281,19 +1283,19 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
 }
 
 
-ErrorPtr DaliVdc::freeNativeAction(const string aNativeActionId)
+void DaliVdc::freeNativeAction(StatusCB aStatusCB, const string aNativeActionId)
 {
   DaliAddress a = daliAddressFromActionId(aNativeActionId);
   markUsed(a, false);
   // Nothing more to do here, keep group or scene as-is, will not be called until re-used
-  return ErrorPtr();
+  if (aStatusCB) aStatusCB(ErrorPtr());
 }
 
 
 
 #if SELFTESTING_ENABLED
 
-// MARK: ===== Self test
+// MARK: - Self test
 
 void DaliVdc::selfTest(StatusCB aCompletedCB)
 {
@@ -1366,7 +1368,7 @@ void DaliVdc::testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint
 
 #if ENABLE_DALI_INPUTS
 
-// MARK: ===== DALI input devices
+// MARK: - DALI input devices
 
 DaliInputDevicePtr DaliVdc::addInputDevice(const string aConfig, DaliAddress aDaliBaseAddress)
 {

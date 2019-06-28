@@ -37,7 +37,7 @@
 using namespace p44;
 
 
-// MARK: ===== ValueDescriptor
+// MARK: - ValueDescriptor
 
 
 ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, ValueUnit aValueUnit, bool aHasDefault) :
@@ -243,7 +243,7 @@ VdcValueType ValueDescriptor::stringToValueType(const string aValueTypeName)
 
 
 
-// MARK: ===== NumericValueDescriptor
+// MARK: - NumericValueDescriptor
 
 
 bool NumericValueDescriptor::setDoubleValue(double aValue)
@@ -359,7 +359,7 @@ bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr a
 }
 
 
-// MARK: ===== TextValueDescriptor
+// MARK: - TextValueDescriptor
 
 bool TextValueDescriptor::setStringValue(const string aValue)
 {
@@ -403,7 +403,7 @@ bool TextValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool
 }
 
 
-// MARK: ===== EnumValueDescriptor
+// MARK: - EnumValueDescriptor
 
 
 
@@ -579,7 +579,7 @@ PropertyDescriptorPtr EnumValueDescriptor::getDescriptorByIndex(int aPropIndex, 
 }
 
 
-// MARK: ===== ValueList
+// MARK: - ValueList
 
 void ValueList::addValue(ValueDescriptorPtr aValueDesc)
 {
@@ -634,7 +634,7 @@ PropertyContainerPtr ValueList::getContainer(const PropertyDescriptorPtr &aPrope
 }
 
 
-// MARK: ===== DeviceAction
+// MARK: - DeviceAction
 
 DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const string aDescription, const string aTitle, const string aCategory) :
   singleDeviceP(&aSingleDevice),
@@ -720,7 +720,7 @@ void DeviceAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 }
 
 
-// MARK: ===== DeviceAction property access
+// MARK: - DeviceAction property access
 
 enum {
   actiondescription_key,
@@ -794,7 +794,7 @@ bool DeviceAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
 }
 
 
-// MARK: ===== DeviceActions container
+// MARK: - DeviceActions container
 
 
 void DeviceActions::addToModelUIDHash(string &aHashedString)
@@ -869,7 +869,7 @@ void DeviceActions::addAction(DeviceActionPtr aAction)
 
 
 
-// MARK: ===== DynamicDeviceActions container
+// MARK: - DynamicDeviceActions container
 
 
 void DynamicDeviceActions::addToModelUIDHash(string &aHashedString)
@@ -978,7 +978,7 @@ void DynamicDeviceActions::updateDynamicActions(ActionsVector &aActions)
 
 
 
-// MARK: ===== CustomAction
+// MARK: - CustomAction
 
 ActionMacro::ActionMacro(SingleDevice &aSingleDevice) :
   singleDevice(aSingleDevice),
@@ -1021,7 +1021,7 @@ void ActionMacro::call(ApiValuePtr aParams, StatusCB aCompletedCB)
 
 
 
-// MARK: ===== ActionMacro property access
+// MARK: - ActionMacro property access
 
 enum {
   customactionaction_key,
@@ -1159,7 +1159,7 @@ ErrorPtr ActionMacro::configureMacro(const string aDeviceActionId, JsonObjectPtr
 }
 
 
-// MARK: ===== CustomAction
+// MARK: - CustomAction
 
 CustomAction::CustomAction(SingleDevice &aSingleDevice) :
   inherited(aSingleDevice),
@@ -1174,7 +1174,7 @@ const char *CustomAction::tableName()
 }
 
 
-// MARK: ===== CustomAction persistence
+// MARK: - CustomAction persistence
 
 // primary key field definitions
 
@@ -1271,7 +1271,7 @@ void CustomAction::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex
 }
 
 
-// MARK: ===== CustomAction property access
+// MARK: - CustomAction property access
 
 bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
@@ -1326,7 +1326,7 @@ bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
 
 
 
-// MARK: ===== CustomActions container
+// MARK: - CustomActions container
 
 int CustomActions::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -1484,7 +1484,7 @@ void CustomActions::markClean()
 }
 
 
-// MARK: ===== StandardAction
+// MARK: - StandardAction
 
 StandardAction::StandardAction(SingleDevice &aSingleDevice, const string aId, const string aTitle) :
   inherited(aSingleDevice)
@@ -1501,7 +1501,7 @@ void StandardAction::updateParameterValue(const string& aName, JsonObjectPtr aVa
 }
 
 
-// MARK: ===== StandardActions container
+// MARK: - StandardActions container
 
 
 void StandardActions::addStandardAction(StandardActionPtr aAction)
@@ -1564,7 +1564,7 @@ bool StandardActions::call(const string aActionId, ApiValuePtr aParams, StatusCB
 }
 
 
-// MARK: ===== DeviceStateParams
+// MARK: - DeviceStateParams
 
 static char devicestatedesc_key;
 static char devicestate_key;
@@ -1596,7 +1596,7 @@ bool DeviceStateParams::accessField(PropertyAccessMode aMode, ApiValuePtr aPropV
 
 
 
-// MARK: ===== DeviceState
+// MARK: - DeviceState
 
 DeviceState::DeviceState(SingleDevice &aSingleDevice, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor, DeviceStateWillPushCB aWillPushHandler) :
   singleDeviceP(&aSingleDevice),
@@ -1670,7 +1670,7 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
 
 
 
-// MARK: ===== DeviceState property access
+// MARK: - DeviceState property access
 
 enum {
   statedescription_key,
@@ -1777,7 +1777,7 @@ bool DeviceState::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 
 
 
-// MARK: ===== DeviceStates container
+// MARK: - DeviceStates container
 
 
 
@@ -1842,7 +1842,7 @@ DeviceStatePtr DeviceStates::getState(const string aStateId)
 
 
 
-// MARK: ===== DeviceEvent
+// MARK: - DeviceEvent
 
 
 DeviceEvent::DeviceEvent(SingleDevice &aSingleDevice, const string aEventId, const string aDescription) :
@@ -1853,7 +1853,7 @@ DeviceEvent::DeviceEvent(SingleDevice &aSingleDevice, const string aEventId, con
 }
 
 
-// MARK: ===== DeviceEvent property access
+// MARK: - DeviceEvent property access
 
 enum {
   eventdescription_key,
@@ -1912,7 +1912,7 @@ bool DeviceEvent::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 
 
 
-// MARK: ===== DeviceEvents container
+// MARK: - DeviceEvents container
 
 
 void DeviceEvents::addToModelUIDHash(string &aHashedString)
@@ -2028,7 +2028,7 @@ bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
 
 
 
-// MARK: ===== DeviceProperties container
+// MARK: - DeviceProperties container
 
 
 void DeviceProperties::addProperty(ValueDescriptorPtr aPropertyDesc, bool aReadOnly, bool aNeedsFetch, bool aNullAllowed)
@@ -2073,7 +2073,7 @@ bool DeviceProperties::pushProperty(ValueDescriptorPtr aPropertyDesc)
 }
 
 
-// MARK: ===== DeviceProperties property access
+// MARK: - DeviceProperties property access
 
 
 static char devicepropertydesc_key;
@@ -2142,7 +2142,7 @@ bool DeviceProperties::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
 
 
 
-// MARK: ===== ActionOutputBehaviour
+// MARK: - ActionOutputBehaviour
 
 ActionOutputBehaviour::ActionOutputBehaviour(Device &aDevice) :
   inherited(aDevice)
@@ -2171,7 +2171,7 @@ Tristate ActionOutputBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 
 
 
-// MARK: ===== SingleDevice
+// MARK: - SingleDevice
 
 
 SingleDevice::SingleDevice(Vdc *aVdcP, bool aEnableAsSingleDevice) :
@@ -2230,7 +2230,7 @@ void SingleDevice::addToModelUIDHash(string &aHashedString)
 
 
 
-// MARK: ===== SingleDevice persistence
+// MARK: - SingleDevice persistence
 
 ErrorPtr SingleDevice::load()
 {
@@ -2274,7 +2274,7 @@ void SingleDevice::markClean()
 }
 
 
-// MARK: ===== SingleDevice API calls
+// MARK: - SingleDevice API calls
 
 void SingleDevice::call(const string aActionId, ApiValuePtr aParams, StatusCB aCompletedCB)
 {
@@ -2324,7 +2324,7 @@ void SingleDevice::invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPt
 }
 
 
-// MARK: ===== Singledevice scene command handling
+// MARK: - Singledevice scene command handling
 
 bool SingleDevice::prepareSceneCall(DsScenePtr aScene)
 {
@@ -2400,7 +2400,7 @@ void SingleDevice::sceneInvokedActionComplete(ErrorPtr aError)
 
 
 
-// MARK: ===== SingleDevice property access
+// MARK: - SingleDevice property access
 
 
 enum {
@@ -2486,7 +2486,7 @@ PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPr
 }
 
 
-// MARK: ===== dynamic configuration of single devices via JSON
+// MARK: - dynamic configuration of single devices via JSON
 
 
 ErrorPtr SingleDevice::actionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aCategory)
@@ -2750,7 +2750,7 @@ ErrorPtr SingleDevice::updateDynamicActionFromJSON(const string aActionId, JsonO
 
 
 
-// MARK: ===== misc utils
+// MARK: - misc utils
 
 ErrorPtr p44::parseValueDesc(ValueDescriptorPtr &aValueDesc, JsonObjectPtr aJSONConfig, const string aParamName)
 {

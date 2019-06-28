@@ -33,7 +33,7 @@
 using namespace p44;
 
 
-// MARK: ===== ELDAT SerialOperations
+// MARK: - ELDAT SerialOperations
 
 
 static size_t getMessage(size_t aNumBytes, uint8_t *aBytes, string &aMessage)
@@ -101,7 +101,7 @@ public:
 
 
 
-// MARK: ===== ELDAT communication handler
+// MARK: - ELDAT communication handler
 
 // baudrate for communication with ELDAT TX10 interface
 #define ELDAT_COMMAPARMS "57600,8,N,1"

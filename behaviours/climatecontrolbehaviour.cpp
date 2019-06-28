@@ -25,7 +25,7 @@
 using namespace p44;
 
 
-// MARK: ===== ClimateControlScene (single value, for heating (and simple cooling) valves or other heating/cooling devices)
+// MARK: - ClimateControlScene (single value, for heating (and simple cooling) valves or other heating/cooling devices)
 
 
 ClimateControlScene::ClimateControlScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -95,7 +95,7 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
   markClean(); // default values are always clean
 }
 
-// MARK: ===== ClimateDeviceSettings with default climate scenes factory
+// MARK: - ClimateDeviceSettings with default climate scenes factory
 
 
 ClimateDeviceSettings::ClimateDeviceSettings(Device &aDevice) :
@@ -113,7 +113,7 @@ DsScenePtr ClimateDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 }
 
 
-// MARK: ===== FanCoilUnitScene (specific for FCU behaviour)
+// MARK: - FanCoilUnitScene (specific for FCU behaviour)
 
 #if ENABLE_FCU_SUPPORT
 
@@ -226,7 +226,7 @@ void FanCoilUnitScene::setSceneValue(int aChannelIndex, double aValue)
 }
 
 
-// MARK: ===== FanCoilUnitScene persistence
+// MARK: - FanCoilUnitScene persistence
 
 const char *FanCoilUnitScene::tableName()
 {
@@ -278,7 +278,7 @@ void FanCoilUnitScene::bindToStatement(sqlite3pp::statement &aStatement, int &aI
 }
 
 
-// MARK: ===== FanCoilUnitDeviceSettings with default FCU scenes factory
+// MARK: - FanCoilUnitDeviceSettings with default FCU scenes factory
 
 
 FanCoilUnitDeviceSettings::FanCoilUnitDeviceSettings(Device &aDevice) :
@@ -299,7 +299,7 @@ DsScenePtr FanCoilUnitDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 
 
-// MARK: ===== ClimateControlBehaviour
+// MARK: - ClimateControlBehaviour
 
 
 ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceKind aKind, VdcHeatingSystemCapability aDefaultHeatingSystemCapability) :
@@ -607,7 +607,7 @@ bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene, Sce
 }
 
 
-// MARK: ===== persistence
+// MARK: - persistence
 
 
 const char *ClimateControlBehaviour::tableName()
@@ -667,7 +667,7 @@ void ClimateControlBehaviour::bindToStatement(sqlite3pp::statement &aStatement, 
 }
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 
 static char climatecontrol_key;
@@ -757,7 +757,7 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
 
 
 
-// MARK: ===== description
+// MARK: - description
 
 
 string ClimateControlBehaviour::shortDesc()

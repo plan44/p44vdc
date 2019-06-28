@@ -47,7 +47,7 @@ using namespace p44;
 #define STARTUP_RETRY_DELAY (30*Second) // how long to wait before retrying to start avahi server when failed because of missing network
 #define SERVICES_RESTART_DELAY (2*Minute) // how long to wait before restarting the server (after a problem that caused calling restartServer())
 
-// MARK: ===== DiscoveryManager
+// MARK: - DiscoveryManager
 
 static DiscoveryManager *sharedDiscoveryManagerP = NULL;
 
@@ -146,7 +146,7 @@ void DiscoveryManager::avahi_poll(MLTimer &aTimer)
 
 
 
-// MARK: ===== Basic service
+// MARK: - Basic service
 
 void DiscoveryManager::startService()
 {
@@ -413,7 +413,7 @@ void DiscoveryManager::startAdvertising(AvahiService *aService)
 
 
 
-// MARK: ===== dS advertising
+// MARK: - dS advertising
 
 
 void DiscoveryManager::advertiseDS(

@@ -35,7 +35,11 @@ namespace p44 {
   /// from button press + button release events.
   /// This class should be used as-is for any virtual device which represents
   /// a user button or rocker switch.
-  class ButtonBehaviour : public DsBehaviour
+  class ButtonBehaviour :
+    public DsBehaviour
+    #if ENABLE_LOCALCONTROLLER
+    ,public ValueSource
+    #endif
   {
     typedef DsBehaviour inherited;
 
@@ -160,9 +164,36 @@ namespace p44 {
     /// @return true if behaviour has a defined (non-NULL) state
     virtual bool hasDefinedState() P44_OVERRIDE;
 
-    
     /// @return button element that defines the function of this button in local operation modes
     VdcButtonElement localFunctionElement();
+
+
+    #if ENABLE_LOCALCONTROLLER
+
+    /// @name ValueSource interface
+    /// @{
+
+    /// check if enabled for use
+    virtual bool isEnabled() P44_OVERRIDE;
+
+    /// get id - unique at least in the vdhost's scope
+    virtual string getSourceId() P44_OVERRIDE;
+
+    /// get descriptive name identifying the source within the entire vdc host (for using in selection lists)
+    virtual string getSourceName() P44_OVERRIDE;
+
+    /// get value
+    virtual double getSourceValue() P44_OVERRIDE;
+
+    /// get time of last update
+    virtual MLMicroSeconds getSourceLastUpdate() P44_OVERRIDE;
+
+    /// get operation level (how good/critical the operation state of the underlying device is)
+    virtual int getSourceOpLevel() P44_OVERRIDE;
+
+    /// @}
+
+    #endif // ENABLE_LOCALCONTROLLER
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs

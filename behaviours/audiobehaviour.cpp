@@ -26,7 +26,7 @@
 using namespace p44;
 
 
-// MARK: ===== audio scene values/channels
+// MARK: - audio scene values/channels
 
 AudioScene::AudioScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo),
@@ -59,7 +59,7 @@ void AudioScene::setSceneValue(int aChannelIndex, double aValue)
 }
 
 
-// MARK: ===== Audio Scene persistence
+// MARK: - Audio Scene persistence
 
 const char *AudioScene::tableName()
 {
@@ -124,7 +124,7 @@ void AudioScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, 
 }
 
 
-// MARK: ===== Audio Scene properties
+// MARK: - Audio Scene properties
 
 enum {
   fixvol_key,
@@ -192,7 +192,7 @@ bool AudioScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
 }
 
 
-// MARK: ===== default audio scene
+// MARK: - default audio scene
 
 void AudioScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
@@ -290,7 +290,7 @@ void AudioScene::setDefaultSceneValues(SceneNo aSceneNo)
   markClean(); // default values are always clean
 }
 
-// MARK: ===== FixVol
+// MARK: - FixVol
 
 
 bool AudioScene::hasFixVol()
@@ -349,7 +349,7 @@ void AudioScene::setPausedRestore(bool aNewValue)
 
 
 
-// MARK: ===== AudioDeviceSettings with default audio scenes factory
+// MARK: - AudioDeviceSettings with default audio scenes factory
 
 
 AudioDeviceSettings::AudioDeviceSettings(Device &aDevice) :
@@ -382,7 +382,7 @@ DsScenePtr AudioDeviceSettings::newUndoStateScene()
 
 
 
-// MARK: ===== AudioBehaviour
+// MARK: - AudioBehaviour
 
 #define STANDARD_DIM_CURVE_EXPONENT 4 // standard exponent, usually ok for PWM for LEDs
 
@@ -427,7 +427,7 @@ Tristate AudioBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 
 
 
-// MARK: ===== behaviour interaction with digitalSTROM system
+// MARK: - behaviour interaction with digitalSTROM system
 
 
 #define AUTO_OFF_FADE_TIME (60*Second)
@@ -545,11 +545,11 @@ void AudioBehaviour::stopSceneActions()
 void AudioBehaviour::identifyToUser()
 {
   // blink effect?
-  // TODO: %%% implement it
+  // TODO: %%% implement it, and change canIdentifyToUser() result when done
 }
 
 
-// MARK: ===== description/shortDesc
+// MARK: - description/shortDesc
 
 
 string AudioBehaviour::shortDesc()

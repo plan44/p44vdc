@@ -24,7 +24,7 @@
 using namespace p44;
 
 
-// MARK: ===== VdcApiError
+// MARK: - VdcApiError
 
 
 void VdcApiError::setFormattedUserFacingMessage(const char *aFmt, va_list aArgs)
@@ -68,7 +68,7 @@ string VdcApiError::description() const
 
 
 
-// MARK: ===== VdcApiServer
+// MARK: - VdcApiServer
 
 VdcApiServer::VdcApiServer() :
   inherited(MainLoop::currentMainLoop())
@@ -124,7 +124,7 @@ void VdcApiServer::connectionStatusHandler(SocketCommPtr aSocketComm, ErrorPtr a
 }
 
 
-// MARK: ===== VdcApiConnection
+// MARK: - VdcApiConnection
 
 
 void VdcApiConnection::setRequestHandler(VdcApiRequestCB aApiRequestHandler)
@@ -152,23 +152,7 @@ ApiValuePtr VdcApiConnection::newApiValue()
 }
 
 
-// MARK: ===== VdcApiRequest
-
-ErrorPtr VdcApiRequest::sendError(ErrorPtr aErrorToSend)
-{
-  if (!Error::isOK(aErrorToSend)) {
-    VdcApiErrorPtr ve = boost::dynamic_pointer_cast<VdcApiError>(aErrorToSend);
-    if (ve) {
-      // special VdcApiError, has extra user facing information
-      return sendError((uint32_t)aErrorToSend->getErrorCode(), aErrorToSend->getErrorMessage(), ApiValuePtr(), ve->getErrorType(), ve->getUserFacingMessage());
-    }
-    else {
-      return sendError((uint32_t)aErrorToSend->getErrorCode(), aErrorToSend->getErrorMessage());
-    }
-  }
-  return ErrorPtr();
-}
-
+// MARK: - VdcApiRequest
 
 ErrorPtr VdcApiRequest::sendStatus(ErrorPtr aStatusToSend)
 {

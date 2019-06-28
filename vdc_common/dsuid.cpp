@@ -106,7 +106,7 @@ void DsUid::setSubdeviceIndex(uint8_t aSubDeviceIndex)
 
 
 
-// MARK: ===== set SGTIN based dSUID from parameters
+// MARK: - set SGTIN based dSUID from parameters
 
 // 1. vDC can determine GTIN and SerialNumber of Device → combine GTIN and SerialNumber to a SGTIN
 
@@ -155,7 +155,7 @@ void DsUid::setSerial(uint64_t aSerial)
 
 
 
-// MARK: ===== set UUID based DsUid from parameters
+// MARK: - set UUID based DsUid from parameters
 
 
 // 2. vDC can determine an existing UUID of Device → use existing UUID
@@ -228,7 +228,7 @@ void DsUid::setNameInSpace(const string &aName, const DsUid &aNameSpace)
 
 
 
-// MARK: ===== binary string (bytes) representation
+// MARK: - binary string (bytes) representation
 
 bool DsUid::setAsBinary(const string &aBinary)
 {
@@ -249,7 +249,7 @@ string DsUid::getBinary() const
 
 
 
-// MARK: ===== set/create DsUid from string representation
+// MARK: - set/create DsUid from string representation
 
 
 DsUid::DsUid(const string &aString)
@@ -329,7 +329,7 @@ bool DsUid::setAsString(const string &aString)
 
 
 
-// MARK: ===== getting dSUID string representation
+// MARK: - getting dSUID string representation
 
 
 
@@ -343,7 +343,7 @@ string DsUid::getString() const
 }
 
 
-// MARK: ===== comparison
+// MARK: - comparison
 
 
 bool DsUid::operator== (const DsUid &aDsUid) const
@@ -362,7 +362,7 @@ bool DsUid::operator< (const DsUid &aDsUid) const
 }
 
 
-// MARK: ===== utilities
+// MARK: - utilities
 
 
 void DsUid::xorDsUidIntoMix(string &aMix, bool aHashSubDeviceIndex)

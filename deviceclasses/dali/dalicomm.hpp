@@ -45,7 +45,7 @@ using namespace std;
 #endif
 
 
-// MARK: ===== DALI Bridge commands and responses
+// MARK: - DALI Bridge commands and responses
 
 // bridge commands
 // - one byte commands 0..7
@@ -86,7 +86,7 @@ using namespace std;
 
 namespace p44 {
 
-  // MARK: ===== DaliComm
+  // MARK: - DaliComm
 
 
   class DaliCommError : public Error

@@ -26,7 +26,7 @@
 using namespace p44;
 
 
-// MARK: ===== VentilationScene
+// MARK: - VentilationScene
 
 
 VentilationScene::VentilationScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
@@ -208,7 +208,7 @@ void VentilationScene::setSceneValue(int aChannelIndex, double aValue)
 }
 
 
-// MARK: ===== Ventilation Scene persistence
+// MARK: - Ventilation Scene persistence
 
 const char *VentilationScene::tableName()
 {
@@ -265,7 +265,7 @@ void VentilationScene::bindToStatement(sqlite3pp::statement &aStatement, int &aI
 
 
 
-// MARK: ===== VentilationDeviceSettings with default shadow scenes factory
+// MARK: - VentilationDeviceSettings with default shadow scenes factory
 
 
 VentilationDeviceSettings::VentilationDeviceSettings(Device &aDevice) :
@@ -284,7 +284,7 @@ DsScenePtr VentilationDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 
 
-// MARK: ===== VentilationBehaviour
+// MARK: - VentilationBehaviour
 
 
 VentilationBehaviour::VentilationBehaviour(Device &aDevice, VentilationDeviceKind aKind) :
@@ -408,7 +408,7 @@ bool VentilationBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneC
 
 
 
-// MARK: ===== description
+// MARK: - description
 
 
 string VentilationBehaviour::shortDesc()

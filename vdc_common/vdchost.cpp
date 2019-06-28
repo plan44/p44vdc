@@ -77,6 +77,11 @@ using namespace p44;
   #define DEFAULT_DESCRIPTION_TEMPLATE "%V %M%N #%S"
 #endif
 
+// default geolocation
+#if !defined(DEFAULT_LATITUDE) || !defined(DEFAULT_LONGITUDE)
+  #define DEFAULT_LONGITUDE 8.474552
+  #define DEFAULT_LATITUDE 47.394691
+#endif
 
 static VdcHost *sharedVdcHostP = NULL;
 
@@ -98,7 +103,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
   mainLoopStatsCounter(0),
   persistentChannels(aWithPersistentChannels),
-  productName(DEFAULT_PRODUCT_NAME)
+  productName(DEFAULT_PRODUCT_NAME),
+  longitude(DEFAULT_LONGITUDE),
+  latitude(DEFAULT_LATITUDE)
 {
   // remember singleton's address
   sharedVdcHostP = this;
@@ -139,6 +146,21 @@ void VdcHost::setEventMonitor(VdchostEventCB aEventCB)
 {
   eventMonitorHandler = aEventCB;
 }
+
+
+void VdcHost::identifyToUser()
+{
+  postEvent(vdchost_identify); // send out signal anyway
+  if (!canIdentifyToUser()) inherited::identifyToUser(); // make sure it is at least logged
+}
+
+
+bool VdcHost::canIdentifyToUser()
+{
+  // assume vdchost can identify itself when it has a event monitor installed which will actually see vdchost_identify
+  return eventMonitorHandler!=NULL;
+}
+
 
 
 void VdcHost::postEvent(VdchostEvent aEvent)
@@ -275,7 +297,7 @@ string VdcHost::publishedDescription()
 }
 
 
-// MARK: ===== global status
+// MARK: - global status
 
 bool VdcHost::isApiConnected()
 {
@@ -307,7 +329,7 @@ bool VdcHost::isNetworkConnected()
 
 
 
-// MARK: ===== initializisation of DB and containers
+// MARK: - initializisation of DB and containers
 
 
 // Version history
@@ -415,7 +437,7 @@ void VdcHost::startRunning()
 
 
 
-// MARK: ===== collect devices
+// MARK: - collect devices
 
 
 void VdcHost::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
@@ -507,7 +529,7 @@ void VdcHost::nextDeviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator
 
 
 
-// MARK: ===== adding/removing devices
+// MARK: - adding/removing devices
 
 
 bool VdcHost::addDevice(DevicePtr aDevice)
@@ -632,7 +654,7 @@ void VdcHost::reportLearnEvent(bool aLearnIn, ErrorPtr aError)
 
 
 
-// MARK: ===== activity monitoring
+// MARK: - activity monitoring
 
 
 void VdcHost::signalActivity()
@@ -671,7 +693,7 @@ bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
 
 
 
-// MARK: ===== periodic activity
+// MARK: - periodic activity
 
 
 #define PERIODIC_TASK_INTERVAL (5*Second)
@@ -726,7 +748,7 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
 }
 
 
-// MARK: ===== local operation mode
+// MARK: - local operation mode
 
 
 bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
@@ -832,7 +854,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
 }
 
 
-// MARK: ===== notification delivery
+// MARK: - notification delivery
 
 
 NotificationGroup::NotificationGroup(VdcPtr aVdc, DsAddressablePtr aFirstMember) :
@@ -916,8 +938,6 @@ void VdcHost::addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZon
 
 void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  // TODO: allow vdcs to handle groups in an optimized way
-  // For now, notification is just passed to all targets
   for (NotificationAudience::iterator gpos = aAudience.begin(); gpos!=aAudience.end(); ++gpos) {
     if (gpos->vdc) {
       ALOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s", aNotification.c_str(), gpos->members.size(), gpos->vdc->shortDesc().c_str());
@@ -935,8 +955,17 @@ void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectio
 }
 
 
+void VdcHost::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState)
+{
+  #if ENABLE_LOCALCONTROLLER
+  if (localController) localController->deviceWillApplyNotification(aDevice, aDeliveryState);
+  #endif
+}
 
-// MARK: ===== vDC API
+
+
+
+// MARK: - vDC API
 
 
 bool VdcHost::sendApiRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
@@ -1274,7 +1303,7 @@ ErrorPtr VdcHost::handleMethodForParams(VdcApiRequestPtr aRequest, const string 
 }
 
 
-// MARK: ===== vDC level methods and notifications
+// MARK: - vDC level methods and notifications
 
 
 ErrorPtr VdcHost::removeHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
@@ -1297,7 +1326,7 @@ void VdcHost::removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aRequest, 
 
 
 
-// MARK: ===== session management
+// MARK: - session management
 
 
 /// reset announcing devices (next startAnnouncing will restart from beginning)
@@ -1411,7 +1440,7 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
 }
 
 
-// MARK: ===== DsAddressable API implementation
+// MARK: - DsAddressable API implementation
 
 ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
 {
@@ -1428,14 +1457,14 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
 }
 
 
-void VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+bool VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  inherited::handleNotification(aApiConnection, aNotification, aParams);
+  return inherited::handleNotification(aApiConnection, aNotification, aParams);
 }
 
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 static char vdchost_obj;
 static char vdcs_obj;
@@ -1447,6 +1476,8 @@ enum {
   valueSources_key,
   persistentChannels_key,
   writeOperations_key,
+  latitude_key,
+  longitude_key,
   #if ENABLE_LOCALCONTROLLER
   localController_key,
   #endif
@@ -1472,6 +1503,8 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "x-p44-valueSources", apivalue_null, valueSources_key, OKEY(vdchost_obj) },
     { "x-p44-persistentChannels", apivalue_bool, persistentChannels_key, OKEY(vdchost_obj) },
     { "x-p44-writeOperations", apivalue_uint64, writeOperations_key, OKEY(vdchost_obj) },
+    { "x-p44-latitude", apivalue_double, latitude_key, OKEY(vdchost_obj) },
+    { "x-p44-longitude", apivalue_double, longitude_key, OKEY(vdchost_obj) },
     #if ENABLE_LOCALCONTROLLER
     { "x-p44-localController", apivalue_object, localController_key, OKEY(localController_obj) },
     #endif
@@ -1541,6 +1574,12 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case writeOperations_key:
           aPropValue->setUint32Value(dsParamStore.writeOpsCount);
           return true;
+        case latitude_key:
+          aPropValue->setDoubleValue(latitude);
+          return true;
+        case longitude_key:
+          aPropValue->setDoubleValue(longitude);
+          return true;
       }
     }
     else {
@@ -1548,6 +1587,12 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
       switch (aPropertyDescriptor->fieldKey()) {
         case persistentChannels_key:
           setPVar(persistentChannels, aPropValue->boolValue());
+          return true;
+        case latitude_key:
+          setPVar(latitude, aPropValue->doubleValue());
+          return true;
+        case longitude_key:
+          setPVar(longitude, aPropValue->doubleValue());
           return true;
       }
     }
@@ -1567,7 +1612,7 @@ void VdcHost::createDeviceList(DeviceVector &aDeviceList)
 
 
 
-// MARK: ===== value sources
+// MARK: - value sources
 
 void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
 {
@@ -1578,7 +1623,7 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
     for (BehaviourVector::iterator pos2 = dev->sensors.begin(); pos2!=dev->sensors.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
-      if (vs) {
+      if (vs && vs->isEnabled()) {
         aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
       }
     }
@@ -1586,7 +1631,15 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
     for (BehaviourVector::iterator pos2 = dev->inputs.begin(); pos2!=dev->inputs.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
-      if (vs) {
+      if (vs && vs->isEnabled()) {
+        aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
+      }
+    }
+    // Buttons
+    for (BehaviourVector::iterator pos2 = dev->buttons.begin(); pos2!=dev->buttons.end(); ++pos2) {
+      DsBehaviourPtr b = *pos2;
+      ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
+      if (vs && vs->isEnabled()) {
         aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
       }
     }
@@ -1610,12 +1663,13 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
       DevicePtr dev = pos->second;
       const char *p = aValueSourceID.c_str()+i+1;
       if (*p) {
-        // first character is type: I=Input, S=Sensor
+        // first character is type: I=Input, S=Sensor, B=Button
         char ty = *p++;
         DsBehaviourPtr bhv;
         switch (ty) {
           case 'S' : bhv = dev->getSensor(Device::by_id_or_index, string(p)); break;
           case 'I' : bhv = dev->getInput(Device::by_id_or_index, string(p)); break;
+          case 'B' : bhv = dev->getButton(Device::by_id_or_index, string(p)); break;
         }
         if (bhv) {
           valueSource = dynamic_cast<ValueSource *>(bhv.get());
@@ -1628,7 +1682,7 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
 
 
 
-// MARK: ===== persistent vdc host level parameters
+// MARK: - persistent vdc host level parameters
 
 ErrorPtr VdcHost::loadAndFixDsUID()
 {
@@ -1702,7 +1756,7 @@ void VdcHost::loadSettingsFromFiles()
 }
 
 
-// MARK: ===== persistence implementation
+// MARK: - persistence implementation
 
 // SQLIte3 table name to store these parameters to
 const char *VdcHost::tableName()
@@ -1713,7 +1767,7 @@ const char *VdcHost::tableName()
 
 // data field definitions
 
-static const size_t numFields = 3;
+static const size_t numFields = 5;
 
 size_t VdcHost::numFieldDefs()
 {
@@ -1727,6 +1781,8 @@ const FieldDefinition *VdcHost::getFieldDef(size_t aIndex)
     { "vdcHostName", SQLITE_TEXT },
     { "vdcHostDSUID", SQLITE_TEXT },
     { "persistentChannels", SQLITE_INTEGER },
+    { "latitude", SQLITE_FLOAT },
+    { "longitude", SQLITE_FLOAT },
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1756,6 +1812,8 @@ void VdcHost::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   aIndex++;
   // the persistentchannels flag
   aRow->getIfNotNull(aIndex++, persistentChannels);
+  aRow->getIfNotNull(aIndex++, latitude);
+  aRow->getIfNotNull(aIndex++, longitude);
 }
 
 
@@ -1772,11 +1830,13 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
     aStatement.bind(aIndex++, dSUID.getString().c_str(), false); // not static, string is local obj
   }
   aStatement.bind(aIndex++, persistentChannels);
+  aStatement.bind(aIndex++, latitude);
+  aStatement.bind(aIndex++, longitude);
 }
 
 
 
-// MARK: ===== description
+// MARK: - description
 
 string VdcHost::description()
 {

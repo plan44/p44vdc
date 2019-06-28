@@ -47,7 +47,7 @@ using namespace p44;
 
 #if ENABLE_EXTERNAL_SINGLEDEVICE
 
-// MARK: ===== ExternalDeviceAction
+// MARK: - ExternalDeviceAction
 
 ExternalDeviceAction::ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle, const string aCategory) :
   inherited(aSingleDevice, aName, aDescription, aTitle, aCategory),
@@ -122,7 +122,7 @@ void ExternalDeviceAction::callPerformed(JsonObjectPtr aStatusInfo)
 #endif // ENABLE_EXTERNAL_SINGLEDEVICE
 
 
-// MARK: ===== ExternalDevice
+// MARK: - ExternalDevice
 
 
 ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag) :
@@ -540,7 +540,7 @@ ErrorPtr ExternalDevice::processInputJson(char aInputType, JsonObjectPtr aParams
 }
 
 
-// MARK: ===== process input (or log)
+// MARK: - process input (or log)
 
 ErrorPtr ExternalDevice::processInput(char aInputType, uint32_t aIndex, double aValue)
 {
@@ -624,7 +624,7 @@ void ExternalDevice::releaseButton(ButtonBehaviourPtr aButtonBehaviour)
 
 #if ENABLE_EXTERNAL_EXOTIC
 
-// MARK: ===== device configurations
+// MARK: - device configurations
 
 
 void ExternalDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB)
@@ -666,7 +666,7 @@ ErrorPtr ExternalDevice::switchConfiguration(const string aConfigurationId)
 #endif // ENABLE_EXTERNAL_EXOTIC
 
 
-// MARK: ===== output control
+// MARK: - output control
 
 
 bool ExternalDevice::prepareSceneCall(DsScenePtr aScene)
@@ -839,7 +839,7 @@ bool ExternalDevice::processControlValue(const string &aName, double aValue)
 }
 
 
-// MARK: ===== external device configuration
+// MARK: - external device configuration
 
 #if ENABLE_EXTERNAL_SINGLEDEVICE
 
@@ -1277,7 +1277,7 @@ void ExternalDevice::propertyChanged(ValueDescriptorPtr aChangedProperty)
 #endif // ENABLE_EXTERNAL_SINGLEDEVICE
 
 
-// MARK: ===== external device connector
+// MARK: - external device connector
 
 ExternalDeviceConnector::ExternalDeviceConnector(ExternalVdc &aExternalVdc, JsonCommPtr aDeviceConnection) :
   externalVdc(aExternalVdc),
@@ -1622,7 +1622,7 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 
 
-// MARK: ===== external device container
+// MARK: - external device container
 
 
 

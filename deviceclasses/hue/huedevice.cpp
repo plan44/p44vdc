@@ -54,13 +54,14 @@ using namespace p44;
 
 
 
-// MARK: ===== HueDevice
+// MARK: - HueDevice
 
 
 HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool aCTOnly, const string &aUniqueID) :
   inherited(aVdcP),
   lightID(aLightID),
   uniqueID(aUniqueID),
+  hueCertified(undefined),
   reapplyMode(reapply_once)
 {
   // hue devices are lights
@@ -161,6 +162,15 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
     if (o) {
       swVersion = o->stringValue();
     }
+    // check capabilities
+    o = aDeviceInfo->get("capabilities");
+    if (o) {
+      // certified state
+      JsonObjectPtr o2 = o->get("certified");
+      if (o2) {
+        hueCertified = o2->boolValue() ? yes : no;
+      }
+    }
     // now look at state
     parseLightState(aDeviceInfo);
   }
@@ -244,6 +254,24 @@ string HueDevice::modelVersion() const
 {
   return swVersion;
 }
+
+
+int HueDevice::opStateLevel()
+{
+  return hueCertified==no ? 80 : 100; // explicitly non-certified lights are given some negative points
+}
+
+
+string HueDevice::getOpStateText()
+{
+  string t;
+  if (hueCertified==no) {
+    t += "not certified";
+  }
+  return t;
+}
+
+
 
 
 void HueDevice::checkPresence(PresenceCB aPresenceResultHandler)
@@ -457,23 +485,23 @@ void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aD
             // match path
             string param = key.substr(key.find_last_of('/')+1);
             if (cl && param=="hue") {
-              cl->hue->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_HUE, false, true); // only sync if no new value pending already
+              cl->hue->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_HUE, false); // only sync if no new value pending already
             }
             else if (cl && param=="sat") {
-              cl->saturation->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_SATURATION, false, true); // only sync if no new value pending already
+              cl->saturation->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_SATURATION, false); // only sync if no new value pending already
             }
             else if (cl && param=="xy") {
               JsonObjectPtr e = val->arrayGet(0);
-              if (e) cl->cieX->syncChannelValue(e->doubleValue(), false, true); // only sync if no new value pending already, volatile
+              if (e) cl->cieX->syncChannelValue(e->doubleValue(), false); // only sync if no new value pending already, volatile
               e = val->arrayGet(1);
-              if (e) cl->cieY->syncChannelValue(e->doubleValue(), false, true); // only sync if no new value pending already, volatile
+              if (e) cl->cieY->syncChannelValue(e->doubleValue(), false); // only sync if no new value pending already, volatile
             }
             else if (cl && param=="ct") {
-              cl->ct->syncChannelValue(val->int32Value(), false, true); // only sync if no new value pending already, volatile
+              cl->ct->syncChannelValue(val->int32Value(), false); // only sync if no new value pending already, volatile
             }
             else if (param=="on") {
               if (!val->boolValue()) {
-                aLightBehaviour->syncBrightnessFromHardware(0, false, true); // only sync if no new value pending already, volatile
+                aLightBehaviour->syncBrightnessFromHardware(0, false); // only sync if no new value pending already, volatile
                 blockBrightness = true; // prevent syncing brightness, lamp is off, logical brightness is 0
               }
             }

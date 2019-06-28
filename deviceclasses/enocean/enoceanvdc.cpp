@@ -68,7 +68,7 @@ string EnoceanVdc::vdcModelVersion() const
 
 
 
-// MARK: ===== DB and initialisation
+// MARK: - DB and initialisation
 
 // Version history
 //  1..3 : development versions
@@ -146,7 +146,7 @@ void EnoceanVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-// MARK: ===== collect devices
+// MARK: - collect devices
 
 void EnoceanVdc::removeDevices(bool aForget)
 {
@@ -276,7 +276,7 @@ bool EnoceanVdc::unpairDevicesByAddressAndEEP(EnoceanAddress aEnoceanAddress, En
 }
 
 
-// MARK: ===== EnOcean specific methods
+// MARK: - EnOcean specific methods
 
 
 ErrorPtr EnoceanVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
@@ -395,7 +395,7 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 }
 
 
-// MARK: ===== Security info handling
+// MARK: - Security info handling
 
 #if ENABLE_ENOCEAN_SECURE
 
@@ -533,7 +533,7 @@ EnOceanSecurityPtr EnoceanVdc::securityInfoForSender(EnoceanAddress aSender, boo
 #endif
 
 
-// MARK: ===== learn and unlearn devices
+// MARK: - learn and unlearn devices
 
 #define SMART_ACK_RESPONSE_TIME (100*MilliSecond)
 
@@ -845,7 +845,7 @@ void EnoceanVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck,
 
 #if SELFTESTING_ENABLED
 
-// MARK: ===== Self test
+// MARK: - Self test
 
 void EnoceanVdc::selfTest(StatusCB aCompletedCB)
 {

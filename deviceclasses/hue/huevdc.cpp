@@ -28,6 +28,9 @@
 
 using namespace p44;
 
+#define DEFAULT_HUE_MAX_OPTIMIZER_SCENES 20
+#define DEFAULT_HUE_MAX_OPTIMIZER_GROUPS 5
+
 
 HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag),
@@ -40,6 +43,9 @@ HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   hueComm.isMemberVariable();
   hueComm.useNUPnP = getVdcHost().cloudAllowed();
   optimizerMode = opt_disabled; // optimizer disabled by default, but available
+  // defaults
+  maxOptimizerScenes = DEFAULT_HUE_MAX_OPTIMIZER_SCENES;
+  maxOptimizerGroups = DEFAULT_HUE_MAX_OPTIMIZER_GROUPS;
 }
 
 
@@ -92,7 +98,7 @@ string HueVdc::vendorName()
 
 
 
-// MARK: ===== DB and initialisation
+// MARK: - DB and initialisation
 
 // Version history
 //  1 : first version
@@ -144,7 +150,7 @@ void HueVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-// MARK: ===== collect devices
+// MARK: - collect devices
 
 
 int HueVdc::getRescanModes() const
@@ -192,6 +198,7 @@ void HueVdc::handleGlobalEvent(VdchostEvent aEvent)
     // re-connecting to network should re-scan for hue bridge
     collectDevices(NULL, rescanmode_incremental);
   }
+  inherited::handleGlobalEvent(aEvent);
 }
 
 
@@ -545,7 +552,7 @@ void HueVdc::collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aR
 }
 
 
-// MARK: ===== Native actions (groups and scenes on vDC level)
+// MARK: - Native actions (groups and scenes on vDC level)
 
 
 static string hueSceneIdFromActionId(const string aNativeActionId)
@@ -668,17 +675,14 @@ void HueVdc::nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPt
 
 
 
-#define MAX_OPTIMIZER_SCENES 20
-#define MAX_OPTIMIZER_GROUPS 5
-
 void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
 {
   ErrorPtr err;
   if (aOptimizerEntry->type==ntfy_callscene) {
     // need a free scene
-    if (numOptimizerScenes>=MAX_OPTIMIZER_SCENES) {
+    if (numOptimizerScenes>=maxOptimizerScenes) {
       // too many already
-      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer scenes (%d) already exist", MAX_OPTIMIZER_SCENES);
+      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer scenes (%d) already exist", maxOptimizerScenes);
     }
     else {
       // create a new scene
@@ -712,9 +716,9 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
   }
   else if (aOptimizerEntry->type==ntfy_dimchannel) {
     // need a free group
-    if (numOptimizerGroups>=MAX_OPTIMIZER_SCENES) {
+    if (numOptimizerGroups>=maxOptimizerGroups) {
       // too many already
-      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer groups (%d) already exist", MAX_OPTIMIZER_GROUPS);
+      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer groups (%d) already exist", maxOptimizerGroups);
     }
     else {
       // create a new group
@@ -846,37 +850,51 @@ void HueVdc::nativeActionUpdated(uint64_t aNewHash, OptimizerEntryPtr aOptimizer
 }
 
 
-ErrorPtr HueVdc::freeNativeAction(const string aNativeActionId)
+void HueVdc::freeNativeAction(StatusCB aStatusCB, const string aNativeActionId)
 {
   string id;
   if (!(id = hueSceneIdFromActionId(aNativeActionId)).empty()) {
     // is a scene, delete it
     string url = "/scenes/" + id;
-    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionDeleted, this, _1, _2));
+    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
   }
   else if (!(id = hueGroupIdFromActionId(aNativeActionId)).empty()) {
     string url = "/groups/" + id;
-    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionDeleted, this, _1, _2));
+    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
   }
-  return ErrorPtr();
 }
 
 
-void HueVdc::nativeActionDeleted(JsonObjectPtr aResult, ErrorPtr aError)
+void HueVdc::nativeActionFreed(StatusCB aStatusCB, const string aUrl, JsonObjectPtr aResult, ErrorPtr aError)
 {
+  bool isScene = aUrl.find("/scenes/")!=string::npos;
+  bool deleted = true; // assume deleted
   if (Error::isOK(aError)) {
     // [{"success":"/scenes/3T2SvsxvwteNNys deleted"}]
     JsonObjectPtr s = HueComm::getSuccessItem(aResult,0);
-    if (s && s->stringValue().find("/scenes/")!=string::npos)
-      numOptimizerScenes--;
-    else if (s && s->stringValue().find("/groups/")!=string::npos)
-      numOptimizerGroups--;
-    else
-      aError = TextError::err("delete of hue action did not return group/scene delete confirmation -> failed");
+    if (!s || s->stringValue().find(aUrl)==string::npos) {
+      ALOG(LOG_WARNING, "delete suceeded but did not confirm resource '%s'", aUrl.c_str());
+    }
   }
   if (!Error::isOK(aError)) {
-    ALOG(LOG_WARNING, "could not delete native action: %s", Error::text(aError).c_str());
+    if (aError->isError(HueCommError::domain(), HueCommError::NotFound)) {
+      // to be deleted item does not exist
+      ALOG(LOG_WARNING, "to be deleted '%s' did not exist -> consider deleted", aUrl.c_str());
+      aError.reset(); // consider deleted ok
+    }
+    else {
+      deleted = false;
+      ALOG(LOG_WARNING, "could not delete '%s': %s", aUrl.c_str(), Error::text(aError).c_str());
+    }
   }
+  if (deleted) {
+    // action is considered gone (actually deleted or no longer existing), so count it
+    if (isScene)
+      numOptimizerScenes--;
+    else
+      numOptimizerGroups--;
+  }
+  if (aStatusCB) aStatusCB(aError);
 }
 
 

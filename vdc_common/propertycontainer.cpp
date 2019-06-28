@@ -430,7 +430,7 @@ PropertyDescriptorPtr PropertyContainer::getDescriptorByNumericName(
 }
 
 
-// MARK: ===== reading from CSV
+// MARK: - reading from CSV
 
 
 bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverridden, const char *&aCSVCursor, const char *aTextSourceName, int aLineNo)

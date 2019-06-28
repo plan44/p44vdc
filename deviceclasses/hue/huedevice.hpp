@@ -50,6 +50,7 @@ namespace p44 {
 
     // information from the device itself
     string hueModel;
+    Tristate hueCertified; // yes/no/unknown for certified hue lights
 
     // model software version
     string swVersion;
@@ -164,6 +165,14 @@ namespace p44 {
     /// Get extra info (plan44 specific) to describe the addressable in more detail
     /// @return string, single line extra info describing aspects of the device not visible elsewhere
     virtual string getExtraInfo() P44_OVERRIDE;
+
+    /// Get an indication how good/critical the operation state of the device is (such as lamp failure or reachability on the bus)
+    /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
+    virtual int opStateLevel() P44_OVERRIDE;
+
+    /// Get short text to describe the operation state (such as lamp failure or reachability on the bus)
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getOpStateText() P44_OVERRIDE;
 
     /// @}
 

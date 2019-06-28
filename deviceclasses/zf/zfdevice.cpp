@@ -33,7 +33,7 @@
 using namespace p44;
 
 
-// MARK: ===== ZfDevice
+// MARK: - ZfDevice
 
 #define INVALID_RSSI (-999)
 
@@ -223,7 +223,7 @@ string ZfDevice::description()
 }
 
 
-// MARK: ===== property access
+// MARK: - property access
 
 
 enum {
@@ -296,7 +296,7 @@ bool ZfDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pro
 }
 
 
-// MARK: ===== profile variants
+// MARK: - profile variants
 
 
 static const ZfTypeVariantEntry ZfTypeVariants[] = {
@@ -447,7 +447,7 @@ void ZfDevice::switchTypes(const ZfTypeVariantEntry &aFromVariant, const ZfTypeV
 
 
 
-// MARK: ===== ZF buttons
+// MARK: - ZF buttons
 
 
 ZfButtonDevice::ZfButtonDevice(ZfVdc *aVdcP, ZfDeviceType aDeviceType) :
@@ -476,7 +476,7 @@ void ZfButtonDevice::processPacket(ZfPacketPtr aPacket)
 }
 
 
-// MARK: ===== ZF single contact
+// MARK: - ZF single contact
 
 
 ZfSimpleContact::ZfSimpleContact(ZfVdc *aVdcP) :
@@ -504,7 +504,7 @@ void ZfSimpleContact::processPacket(ZfPacketPtr aPacket)
 }
 
 
-// MARK: ===== device factory
+// MARK: - device factory
 
 
 ZfDevicePtr ZfDevice::newDevice(

@@ -205,14 +205,14 @@ namespace p44 {
     /// @result empty or Error object in case of error sending result response
     virtual ErrorPtr sendResult(ApiValuePtr aResult) P44_OVERRIDE;
 
-    /// send a vDC API error (answer for unsuccesful method call)
-    /// @param aErrorCode the error code
-    /// @param aErrorMessage the error message or NULL to generate a standard text
-    /// @param aErrorData the optional "data" member for the vDC API error object (in JSON only)
-    /// @param aErrorType the optional "errorType"
-    /// @param aUserFacingMessage the optional user facing message
+    /// send a error to the vDC API (answer for unsuccesful method call)
+    /// @param aError the error object
+    /// @note depending on the Error object's subclass and the vDC API kind (protobuf, json...),
+    ///   different information is transmitted. ErrorCode and ErrorMessage are always sent,
+    ///   Errors based on class VdcApiError will also include errorType, errorData and userFacingMessage
+    /// @note if aError is NULL, a generic "OK" error condition is sent
     /// @result empty or Error object in case of error sending error response
-    virtual ErrorPtr sendError(uint32_t aErrorCode, string aErrorMessage = "", ApiValuePtr aErrorData = ApiValuePtr(), VdcErrorType aErrorType = 0, string aUserFacingMessage = "") P44_OVERRIDE;
+    virtual ErrorPtr sendError(ErrorPtr aError) P44_OVERRIDE;
 
   };
 
@@ -246,10 +246,10 @@ namespace p44 {
 
     /// The underlying socket connection
     /// @return socket connection
-    virtual SocketCommPtr socketConnection() { return socketComm; };
+    virtual SocketCommPtr socketConnection() P44_OVERRIDE { return socketComm; };
 
     /// request closing connection after last message has been sent
-    virtual void closeAfterSend();
+    virtual void closeAfterSend() P44_OVERRIDE;
 
     /// send a API request
     /// @param aMethod the vDC API method or notification name to be sent
@@ -258,7 +258,7 @@ namespace p44 {
     ///   Note that the aResponseHandler might not be called at all in case of lost messages etc. So do not rely on
     ///   this callback for chaining a execution thread.
     /// @return empty or Error object in case of error
-    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB());
+    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE;
 
   private:
 

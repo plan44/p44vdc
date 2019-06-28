@@ -42,6 +42,7 @@ namespace p44 {
   class ButtonBehaviour;
   class DsUid;
   class LocalController;
+  class NotificationDeliveryState;
 
   typedef boost::intrusive_ptr<Vdc> VdcPtr;
   typedef boost::intrusive_ptr<Device> DevicePtr;
@@ -58,6 +59,8 @@ namespace p44 {
   /// Callback for other global device activity
   typedef enum {
     vdchost_activitysignal, ///< user-relevant activity, can be used to trigger flashing an activity LED.
+    vdchost_identify, ///< vdchost is requested to identify itself (e.g. by light or sound)
+    vdchost_logstats, ///< demands logging statistics to the log (should be >=LOG_NOTICE)
     vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
     vdchost_network_reconnected, ///< network connection established again
     vdchost_network_lost, ///< network connection was lost
@@ -202,6 +205,10 @@ namespace p44 {
     /// @return local controller, might be NULL if local controller is not enabled (but compiled in)
     LocalControllerPtr getLocalController();
     #endif
+
+    /// geolocation of the installation
+    double longitude;
+    double latitude;
 
     /// the list of containers by API-exposed ID (dSUID or derived dsid)
     VdcMap vdcs;
@@ -355,6 +362,13 @@ namespace p44 {
     /// @param aParams the parameters of the notification
     void deliverToAudience(NotificationAudience &aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
 
+    /// called when delivery of a scene call or dimming notification to a device has been executed
+    /// @param aDevice the device
+    /// @param aDeliveryState the delivery state
+    /// @note this is not called for all types of notifications, only callScene and dimchannel
+    /// @note aDeliveryState lifetime may immediately end when this method returns
+    void deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState);
+
     /// @}
 
 
@@ -436,7 +450,7 @@ namespace p44 {
     /// @{
 
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @}
 
@@ -546,6 +560,8 @@ namespace p44 {
 
     /// @}
 
+    // post a vdchost (global) event to all vdcs and via event monitor callback
+    void postEvent(VdchostEvent aEvent);
 
   protected:
 
@@ -594,6 +610,12 @@ namespace p44 {
     // activity monitor
     void signalActivity();
 
+    /// identify the vdchost to the user
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// @return true if the vdchost has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
+
   private:
 
     // derive dSUID
@@ -633,9 +655,6 @@ namespace p44 {
     void startAnnouncing();
     void announceNext();
     void announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequestPtr aRequest, ErrorPtr &aError, ApiValuePtr aResultOrErrorData);
-
-    // post a vdchost (global) event to all vdcs and via event monitor callback
-    void postEvent(VdchostEvent aEvent);
 
     // periodic task
     void periodicTask(MLMicroSeconds aNow);
