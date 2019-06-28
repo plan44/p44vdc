@@ -126,6 +126,9 @@ int32_t ValueDescriptor::getInt32Value(bool aAsInternal, bool aPrevious)
 {
   ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
   getValue(v, aAsInternal, aPrevious);
+  if (valueType == valueType_boolean) {
+    return v->boolValue();
+  }
   return v->int32Value();
 }
 
@@ -143,6 +146,10 @@ bool ValueDescriptor::setValue(ApiValuePtr aValue)
   else if (valueType<valueType_integer || valueType==valueType_enumeration) {
     // numeric integer type or text enumeration (internally integer), set as integer
     return setInt32Value(aValue->int32Value());
+  }
+  else if (valueType == valueType_boolean) {
+    // boolean type, implicitly converted to int
+    return setInt32Value(aValue->boolValue());
   }
   else {
     return setStringValue(aValue->stringValue());
