@@ -1064,7 +1064,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     if (aInitParams->get("endcontacts", o)) {
       endContacts = o->boolValue();
     }
-    sb->setDeviceParams(sk, endContacts, 0, 0, 0); // no restrictions for move times
+    sb->setDeviceParams(sk, endContacts, 0, 0, 0, !useMovement); // no restrictions for move times, when "move" is not specified, device can do absolute positioning
     sb->position->syncChannelValue(100, false, true); // assume fully up at beginning
     sb->angle->syncChannelValue(100, false, true); // assume fully open at beginning
     addBehaviour(sb);
