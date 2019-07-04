@@ -150,14 +150,16 @@ void Device::addedAndInitialized()
 {
   // trigger re-applying channel values if this feature is enabled in the vdchost
   if (output && getVdcHost().doPersistChannels()) {
-    requestApplyingChannels(boost::bind(&Device::channelValuesRestored, this), false);
+    if (output->reapplyRestoredChannels()) {
+      requestApplyingChannels(boost::bind(&Device::channelValuesRestored, this), false);
+    }
   }
 }
 
 
 void Device::channelValuesRestored()
 {
-  ALOG(LOG_INFO, "restored last known channel values");
+  ALOG(LOG_INFO, "re-applied last known channel values to hardware");
 }
 
 

@@ -271,6 +271,12 @@ namespace p44 {
     /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
     virtual void saveChannelsToScene(DsScenePtr aScene);
 
+    /// check if channel values that were restored from persistent storage should be re-applied to hardware
+    /// @return true if device should perform a requestApplyingChannels() sequence.
+    /// @note instead of returning true, subclass implementation may inititate a specialized re-apply
+    ///   operation here instead.
+    virtual bool reapplyRestoredChannels() { return true; }
+
     // the behaviour type
     virtual BehaviourType getType() P44_OVERRIDE { return behaviour_output; };
 
