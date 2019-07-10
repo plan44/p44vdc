@@ -411,7 +411,7 @@ void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMa
 void VdcHost::vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc, ErrorPtr aError)
 {
   if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "vDC %s: failed to initialize: %s", aNextVdc->second->shortDesc().c_str(), aError->description().c_str());
+    LOG(LOG_ERR, "vDC %s: failed to initialize: %s", aNextVdc->second->shortDesc().c_str(), aError->text());
     aNextVdc->second->setVdcError(aError);
   }
   // anyway, initialize next
@@ -484,7 +484,7 @@ void VdcHost::collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags,
 void VdcHost::vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc, ErrorPtr aError)
 {
   if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "vDC %s: error collecting devices: %s", aNextVdc->second->shortDesc().c_str(), aError->description().c_str());
+    LOG(LOG_ERR, "vDC %s: error collecting devices: %s", aNextVdc->second->shortDesc().c_str(), aError->text());
   }
   // load persistent params for vdc
   aNextVdc->second->load();
@@ -509,7 +509,7 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
   for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); pos++) {
     if (!Error::isOK(pos->second->getVdcStatus())) {
       vdcInitErr = pos->second->getVdcStatus();
-      LOG(LOG_ERR, "*** initial device collecting incomplete because of error: %s", vdcInitErr->description().c_str());
+      LOG(LOG_ERR, "*** initial device collecting incomplete because of error: %s", vdcInitErr->text());
       break;
     }
   }
@@ -577,7 +577,7 @@ void VdcHost::separateDeviceInitialized(DevicePtr aDevice, ErrorPtr aError)
 void VdcHost::deviceInitialized(DevicePtr aDevice, ErrorPtr aError)
 {
   if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "*** error initializing device %s: %s", aDevice->shortDesc().c_str(), aError->description().c_str());
+    LOG(LOG_ERR, "*** error initializing device %s: %s", aDevice->shortDesc().c_str(), aError->text());
   }
   else {
     LOG(LOG_NOTICE, "--- initialized device: %s",aDevice->description().c_str());
@@ -988,7 +988,7 @@ void VdcHost::vdcApiConnectionStatusHandler(VdcApiConnectionPtr aApiConnection, 
   else {
     // error or connection closed
     if (!aError->isError(SocketCommError::domain(), SocketCommError::HungUp)) {
-      LOG(LOG_ERR, "vDC API connection closing due to error: %s", aError->description().c_str());
+      LOG(LOG_ERR, "vDC API connection closing due to error: %s", aError->text());
     }
     // - close if not already closed
     aApiConnection->closeConnection();
@@ -1053,7 +1053,7 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
     else {
       // just log in case of error of a notification
       if (!Error::isOK(respErr)) {
-        LOG(LOG_WARNING, "Notification '%s' processing error: %s", aMethod.c_str(), respErr->description().c_str());
+        LOG(LOG_WARNING, "Notification '%s' processing error: %s", aMethod.c_str(), respErr->text());
       }
     }
   }
@@ -1072,7 +1072,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
     if (version<VDC_API_VERSION_MIN || version>maxversion) {
       // incompatible version
       respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d..%d", version, VDC_API_VERSION_MIN, maxversion);
-      LOG(LOG_WARNING, "=== hello rejected: %s", respErr->description().c_str());
+      LOG(LOG_WARNING, "=== hello rejected: %s", respErr->text());
     }
     else {
       // API version ok, save it
@@ -1110,7 +1110,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         else {
           // not ok to start new session, reject
           respErr = Error::err<VdcApiError>(503, "this vDC already has an active session with vdSM %s",connectedVdsm.getString().c_str());
-          LOG(LOG_WARNING, "=== hello rejected: %s", respErr->description().c_str());
+          LOG(LOG_WARNING, "=== hello rejected: %s", respErr->text());
           aRequest->sendError(respErr);
           // close after send
           aRequest->connection()->closeAfterSend();
@@ -1220,7 +1220,7 @@ ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection
           respErr = addToAudienceByDsuid(audience, dsuid);
           if (!Error::isOK(respErr)) {
             respErr->prefixMessage("Ignored target for notification '%s': ", aMethod.c_str());
-            LOG(LOG_INFO, "%s", respErr->description().c_str());
+            LOG(LOG_INFO, "%s", respErr->text());
           }
         }
         respErr.reset();
@@ -1700,7 +1700,7 @@ ErrorPtr VdcHost::loadAndFixDsUID()
   DsUid originalDsUid = dSUID;
   // load the vdc host settings, which might override the default dSUID
   err = loadFromStore(entityType()); // is a singleton, identify by type
-  if (!Error::isOK(err)) LOG(LOG_ERR,"Error loading settings for vdc host: %s", err->description().c_str());
+  if (!Error::isOK(err)) LOG(LOG_ERR,"Error loading settings for vdc host: %s", err->text());
   // check for settings from files
   loadSettingsFromFiles();
   // now check

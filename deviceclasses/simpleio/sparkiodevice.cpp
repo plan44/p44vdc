@@ -347,7 +347,7 @@ void SparkIoDevice::channelValuesSent(SparkLightBehaviourPtr aSparkLightBehaviou
     aSparkLightBehaviour->appliedColorValues();
   }
   else {
-    LOG(LOG_DEBUG, "Spark API error: %s", aError->description().c_str());
+    LOG(LOG_DEBUG, "Spark API error: %s", aError->text());
   }
   // confirm done
   if (aDoneCB) aDoneCB();

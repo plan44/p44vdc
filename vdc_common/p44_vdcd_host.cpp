@@ -102,7 +102,7 @@ private:
     if (!Error::isOK(aError)) {
       if (!aError->isError("Vdc", VdcError::NoHWTested)) {
         // test failed
-        LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", nextVdc->second->vdcClassIdentifier(), aError->description().c_str());
+        LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", nextVdc->second->vdcClassIdentifier(), aError->text());
         // remember
         globalError = aError;
         // morse out tag number of vDC failing self test until button is pressed
@@ -148,7 +148,7 @@ private:
       greenLED->blinkFor(Infinite, 500, 85); // slow green blinking = good
     }
     else  {
-      LOG(LOG_ERR, "Self test has FAILED: %s", globalError->description().c_str());
+      LOG(LOG_ERR, "Self test has FAILED: %s", globalError->text());
       greenLED->steadyOff();
       redLED->blinkFor(Infinite, 250, 60); // faster red blinking = not good
     }

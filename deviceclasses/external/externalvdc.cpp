@@ -1294,7 +1294,7 @@ void ExternalDeviceConnector::handleDeviceConnectionStatus(ErrorPtr aError)
 {
   if (!Error::isOK(aError)) {
     closeConnection();
-    LOG(LOG_NOTICE, "external device connection closed (%s) -> disconnecting all devices", aError->description().c_str());
+    LOG(LOG_NOTICE, "external device connection closed (%s) -> disconnecting all devices", aError->text());
     // devices have vanished for now, but will keep parameters in case it reconnects later
     while (externalDevices.size()>0) {
       externalDevices.begin()->second->hasVanished(false); // keep config
@@ -1370,7 +1370,7 @@ void ExternalDeviceConnector::sendDeviceApiStatusMessage(ErrorPtr aError, const 
     JsonObjectPtr message = JsonObject::newObj();
     message->add("message", JsonObject::newString("status"));
     if (!Error::isOK(aError)) {
-      LOG(LOG_INFO, "device API error: %s", aError->description().c_str());
+      LOG(LOG_INFO, "device API error: %s", aError->text());
       // error, return error response
       message->add("status", JsonObject::newString("error"));
       message->add("errorcode", JsonObject::newInt32((int32_t)aError->getErrorCode()));

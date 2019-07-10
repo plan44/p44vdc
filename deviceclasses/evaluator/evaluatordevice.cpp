@@ -364,7 +364,7 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState, EvalMode aEvalMode)
         s->updateSensorValue(res.v);
       }
       else {
-        ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.c_str(), res.err->description().c_str());
+        ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.c_str(), res.err->text());
         s->invalidateSensorValue();
       }
     }
@@ -488,7 +488,7 @@ Tristate EvaluatorDevice::evaluateBoolean(string aExpression)
     return res.v>0 ? yes : no;
   }
   else {
-    ALOG(LOG_INFO,"Expression '%s' evaluation error: %s", aExpression.c_str(), res.err->description().c_str());
+    ALOG(LOG_INFO,"Expression '%s' evaluation error: %s", aExpression.c_str(), res.err->text());
     return undefined;
   }
 }
@@ -615,7 +615,7 @@ ErrorPtr EvaluatorDevice::executeAction(Tristate aState)
 
 void EvaluatorDevice::httpActionDone(const string &aResponse, ErrorPtr aError)
 {
-  ALOG(LOG_INFO, "http action returns '%s', error = %s", aResponse.c_str(), Error::text(aError).c_str());
+  ALOG(LOG_INFO, "http action returns '%s', error = %s", aResponse.c_str(), Error::text(aError));
 }
 
 

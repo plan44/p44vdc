@@ -1610,7 +1610,7 @@ void EnoceanComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aE
   // error querying version
   aRetriesLeft--;
   if (aRetriesLeft>=0) {
-    LOG(LOG_WARNING, "EnoceanComm: Initialisation: command failed: %s -> retrying again", aError->description().c_str());
+    LOG(LOG_WARNING, "EnoceanComm: Initialisation: command failed: %s -> retrying again", aError->text());
     // flush the line on the first half of attempts
     if (aRetriesLeft>ENOCEAN_INIT_RETRIES/2) {
       flushLine();
@@ -1903,7 +1903,7 @@ void EnoceanComm::sendPacket(Esp3PacketPtr aPacket)
     serialComm->transmitBytes(aPacket->payloadSize, aPacket->payloadP, err);
   }
   if (!Error::isOK(err)) {
-    LOG(LOG_ERR, "EnoceanComm: sendPacket: error sending packet over serial: %s", err->description().c_str());
+    LOG(LOG_ERR, "EnoceanComm: sendPacket: error sending packet over serial: %s", err->text());
   }
   else {
     FOCUSLOG("Sent EnOcean packet:\n%s", aPacket->description().c_str());

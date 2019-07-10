@@ -261,7 +261,7 @@ public:
       hueComm.apiReady = true; // can use API now
     }
     else {
-      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.baseURL.c_str(), aError->description().c_str());
+      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.baseURL.c_str(), aError->text());
     }
     callback(aError); // success
     keepAlive.reset(); // will delete object if nobody else keeps it
@@ -305,7 +305,7 @@ public:
       }
     }
     else {
-      FOCUSLOG("discovery ended, error = %s (usually: timeout)", aError->description().c_str());
+      FOCUSLOG("discovery ended, error = %s (usually: timeout)", aError->text());
       aSsdpSearch->stopSearch();
       if (hueComm.useNUPnP) {
         // also try N-UPnP
@@ -433,7 +433,7 @@ public:
       }
     }
     else {
-      FOCUSLOG("Error accessing bridge description: %s", aError->description().c_str());
+      FOCUSLOG("Error accessing bridge description: %s", aError->text());
     }
     // try next
     ++currentBridgeCandidate;
@@ -500,7 +500,7 @@ public:
       }
     }
     else {
-      LOG(LOG_INFO, "hue Bridge: Cannot create user: %s", aError->description().c_str());
+      LOG(LOG_INFO, "hue Bridge: Cannot create user: %s", aError->text());
     }
     // try next
     ++currentAuthCandidate;

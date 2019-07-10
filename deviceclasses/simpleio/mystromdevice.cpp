@@ -234,7 +234,7 @@ void MyStromDevice::channelValuesSent(SimpleCB aDoneCB, string aResponse, ErrorP
     sampleState();
   }
   else {
-    FOCUSLOG("myStrom API error: %s", aError->description().c_str());
+    FOCUSLOG("myStrom API error: %s", aError->text());
   }
   // confirm done
   if (aDoneCB) aDoneCB();

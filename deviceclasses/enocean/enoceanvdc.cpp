@@ -619,7 +619,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
 {
   EnoceanAddress sender = aEsp3PacketPtr->radioSender();
   if (aError) {
-    LOG(LOG_INFO, "Radio packet error: %s", aError->description().c_str());
+    LOG(LOG_INFO, "Radio packet error: %s", aError->text());
     return;
   }
   // suppress radio packets send by one of my secondary IDs
@@ -768,7 +768,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
 void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)
 {
   if (aError) {
-    LOG(LOG_INFO, "Event packet error: %s", aError->description().c_str());
+    LOG(LOG_INFO, "Event packet error: %s", aError->text());
     return;
   }
   uint8_t *dataP = aEsp3PacketPtr->data();

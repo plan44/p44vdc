@@ -635,7 +635,7 @@ void DaliBusDevice::queryRGBWAFResponse(StatusCB aCompletedCB, uint16_t aResInde
     }
   }
   else {
-    LOG(LOG_DEBUG, "DaliBusDevice: querying DT8 color value %d returned error: %s", aResIndex, aError->description().c_str());
+    LOG(LOG_DEBUG, "DaliBusDevice: querying DT8 color value %d returned error: %s", aResIndex, aError->text());
   }
   aResIndex++;
   if (aResIndex>=dt8RGBWAFchannels) {
@@ -1324,7 +1324,7 @@ void DaliSingleControllerDevice::processUpdatedParams(ErrorPtr aError)
     }
   }
   else {
-    LOG(LOG_ERR, "DaliDevice: error getting state/params from dimmer: %s", aError->description().c_str());
+    LOG(LOG_ERR, "DaliDevice: error getting state/params from dimmer: %s", aError->text());
   }
 }
 
@@ -1775,7 +1775,7 @@ void DaliCompositeDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryR
 void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryReset, DimmerIndex aDimmerIndex, ErrorPtr aError)
 {
   if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "DaliCompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->description().c_str());
+    LOG(LOG_ERR, "DaliCompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->text());
   }
   while (aDimmerIndex<numDimmers) {
     DaliBusDevicePtr di = dimmers[aDimmerIndex];

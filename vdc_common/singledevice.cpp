@@ -731,7 +731,7 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
   if (!Error::isOK(err)) {
     // rewrite error to include param name
     if (pos!=actionParams->values.end() && err->isDomain(VdcApiError::domain())) {
-      err = Error::err<VdcApiError>(err->getErrorCode(), "parameter '%s': %s", (*pos)->getName().c_str(), err->description().c_str());
+      err = Error::err<VdcApiError>(err->getErrorCode(), "parameter '%s': %s", (*pos)->getName().c_str(), err->text());
     }
     // parameter error, not executing action, call back with error
     if (aCompletedCB) aCompletedCB(err);
@@ -1126,7 +1126,7 @@ ErrorPtr ActionMacro::validateParams(ApiValuePtr aParams, ApiValuePtr aValidated
     }
     else {
       if (aSkipInvalid) continue; // just ignore, but continue checking others
-      return TextError::err("invalid parameter '%s' for custom action '%s': %s", key.c_str(), actionId.c_str(), err->description().c_str());
+      return TextError::err("invalid parameter '%s' for custom action '%s': %s", key.c_str(), actionId.c_str(), err->text());
     }
   }
   SALOG(singleDevice, LOG_DEBUG, "validated params: %s", aValidatedParams ? aValidatedParams->description().c_str() : "<none>");
@@ -1273,7 +1273,7 @@ void CustomAction::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, ui
   JsonObjectPtr j = JsonObject::objFromText(jsonparams.c_str());
   ErrorPtr err = configureMacro(baseAction, j);
   if (!Error::isOK(err)) {
-    SALOG(singleDevice, LOG_ERR, "error loading custom action: %s", err->description().c_str());
+    SALOG(singleDevice, LOG_ERR, "error loading custom action: %s", err->text());
   }
 }
 
@@ -1343,7 +1343,7 @@ bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
             return true;
           }
           // error
-          SALOG(singleDevice, LOG_ERR, "writing 'params' failed: %s", err->description().c_str());
+          SALOG(singleDevice, LOG_ERR, "writing 'params' failed: %s", err->text());
           return false;
         }
       }
@@ -1481,7 +1481,7 @@ ErrorPtr CustomActions::save()
   // save all elements of the map (only dirty ones will be actually stored to DB
   for (CustomActionsVector::iterator pos = customActions.begin(); pos!=customActions.end(); ++pos) {
     err = (*pos)->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed
-    if (!Error::isOK(err)) SALOG(singleDevice, LOG_ERR,"Error saving custom action '%s': %s", (*pos)->actionId.c_str(), err->description().c_str());
+    if (!Error::isOK(err)) SALOG(singleDevice, LOG_ERR,"Error saving custom action '%s': %s", (*pos)->actionId.c_str(), err->text());
   }
   return err;
 }
@@ -2153,7 +2153,7 @@ bool DeviceProperties::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
       // write
       ErrorPtr err = val->conforms(aPropValue, true);
       if (!Error::isOK(err)) {
-        SALOG((*singleDeviceP), LOG_ERR, "Cannot set property '%s': %s", val->getName().c_str(), err->description().c_str());
+        SALOG((*singleDeviceP), LOG_ERR, "Cannot set property '%s': %s", val->getName().c_str(), err->text());
         return false;
       }
       else {
@@ -2349,7 +2349,7 @@ ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
 
 void SingleDevice::invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
 {
-  ALOG(LOG_NOTICE, "- call completed with status: %s", Error::isOK(aError) ? "OK" : aError->description().c_str());
+  ALOG(LOG_NOTICE, "- call completed with status: %s", Error::isOK(aError) ? "OK" : aError->text());
   methodCompleted(aRequest, aError);
 }
 
@@ -2424,7 +2424,7 @@ void SingleDevice::sceneInvokedActionComplete(ErrorPtr aError)
     ALOG(LOG_INFO, "scene invoked command complete");
   }
   else {
-    ALOG(LOG_ERR, "scene invoked command returned error: %s", aError->description().c_str());
+    ALOG(LOG_ERR, "scene invoked command returned error: %s", aError->text());
   }
 }
 

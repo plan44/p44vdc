@@ -165,7 +165,7 @@ void EldatComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aErr
   // error querying version
   aRetriesLeft--;
   if (aRetriesLeft>=0) {
-    LOG(LOG_WARNING, "EldatComm: Initialisation: command failed: %s -> retrying again", aError->description().c_str());
+    LOG(LOG_WARNING, "EldatComm: Initialisation: command failed: %s -> retrying again", aError->text());
     serialComm->setDTR(false); // should cause reset
     serialComm->closeConnection(); // also close and re-open later
     // retry initializing later

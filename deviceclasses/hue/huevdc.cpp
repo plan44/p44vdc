@@ -263,7 +263,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
       return;
     }
     else {
-      ALOG(LOG_NOTICE, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->description().c_str());
+      ALOG(LOG_NOTICE, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->text());
     }
     if (aCompletedCB) aCompletedCB(ErrorPtr()); // no hue bridge to collect lights from (but this is not a collect error)
   }
@@ -440,7 +440,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
   }
   else {
     // not found (usually timeout)
-    ALOG(LOG_NOTICE, "No hue bridge found to register, error = %s", aError->description().c_str());
+    ALOG(LOG_NOTICE, "No hue bridge found to register, error = %s", aError->text());
   }
 }
 
@@ -884,7 +884,7 @@ void HueVdc::nativeActionFreed(StatusCB aStatusCB, const string aUrl, JsonObject
     }
     else {
       deleted = false;
-      ALOG(LOG_WARNING, "could not delete '%s': %s", aUrl.c_str(), Error::text(aError).c_str());
+      ALOG(LOG_WARNING, "could not delete '%s': %s", aUrl.c_str(), Error::text(aError));
     }
   }
   if (deleted) {

@@ -364,7 +364,7 @@ void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aR
 {
   // repeat resets until we get a correct answer
   if (!Error::isOK(aError) || aResp1!=RESP_CODE_ACK || aResp2!=ACK_OK) {
-    LOG(LOG_WARNING, "DALI bridge: Incorrect answer (%02X %02X) or error (%s) from reset command -> repeating", aResp1, aResp2, aError ? aError->description().c_str() : "none");
+    LOG(LOG_WARNING, "DALI bridge: Incorrect answer (%02X %02X) or error (%s) from reset command -> repeating", aResp1, aResp2, aError ? aError->text() : "none");
     if (aCount>=MAX_RESET_RETRIES) {
       if (Error::isOK(aError)) aError = Error::err<DaliCommError>(DaliCommError::BadData, "Bridge reset failed");
       if (aStatusCB) aStatusCB(aError, false);
@@ -684,7 +684,7 @@ private:
   {
     if (!Error::isOK(aError)) {
       numErrors++;
-      LOG(LOG_DEBUG, "- written 0x%02X, got error %s", dtrValue, aError->description().c_str());
+      LOG(LOG_DEBUG, "- written 0x%02X, got error %s", dtrValue, aError->text());
     }
     else {
       if(!aNoOrTimeout) {
@@ -875,7 +875,7 @@ private:
       }
       else {
         unreliableDevicesPtr->push_back(shortAddress);
-        LOG(LOG_ERR, "Detected DALI device at short address %d, but it FAILED R/W TEST: %s -> ignoring", shortAddress, aError->description().c_str());
+        LOG(LOG_ERR, "Detected DALI device at short address %d, but it FAILED R/W TEST: %s -> ignoring", shortAddress, aError->text());
       }
     }
     // check if more short addresses to test
@@ -910,7 +910,7 @@ private:
     // scan done or error, return list to callback
     if (probablyCollision || unconfiguredDevices) {
       if (!Error::isOK(aError)) {
-        LOG(LOG_WARNING, "Error (%s) in quick scan ignored because we need to do a full scan anyway", aError->description().c_str());
+        LOG(LOG_WARNING, "Error (%s) in quick scan ignored because we need to do a full scan anyway", aError->text());
       }
       if (probablyCollision) {
         aError = Error::err<DaliCommError>(DaliCommError::AddressCollisions, "Address collision -> need full bus scan");
@@ -1104,7 +1104,7 @@ private:
     // Anything received but timeout is considered a yes
     bool isYes = DaliComm::isYes(aNoOrTimeout, aResponse, aError, true);
     if (aError) {
-      LOG(LOG_ERR, "compare result error: %s -> aborted scan", aError->description().c_str());
+      LOG(LOG_ERR, "compare result error: %s -> aborted scan", aError->text());
       completed(aError); // other error, abort
       return;
     }
