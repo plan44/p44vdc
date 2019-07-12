@@ -99,7 +99,7 @@ private:
 
   void vdcTested(ErrorPtr aError)
   {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       if (!aError->isError("Vdc", VdcError::NoHWTested)) {
         // test failed
         LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", nextVdc->second->vdcClassIdentifier(), aError->text());
@@ -361,7 +361,7 @@ void UbusApiRequest::sendResponse(JsonObjectPtr aResult, ErrorPtr aError)
 {
   // create response
   JsonObjectPtr response = JsonObject::newObj();
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // error, return error response
     response->add("error", JsonObject::newInt32((int32_t)aError->getErrorCode()));
     response->add("errormessage", JsonObject::newString(aError->getErrorMessage()));
@@ -476,7 +476,7 @@ void P44VdcHost::sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult
 {
   // create response
   JsonObjectPtr response = JsonObject::newObj();
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // error, return error response
     response->add("error", JsonObject::newInt32((int32_t)aError->getErrorCode()));
     response->add("errormessage", JsonObject::newString(aError->getErrorMessage()));

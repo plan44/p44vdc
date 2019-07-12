@@ -320,9 +320,9 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
     else {
       // register by uuid/username (for migration)
       respErr = checkStringParam(aParams, "bridgeUuid", bridgeUuid);
-      if (!Error::isOK(respErr)) return respErr;
+      if (Error::notOK(respErr)) return respErr;
       respErr = checkStringParam(aParams, "bridgeUsername", bridgeUserName);
-      if (!Error::isOK(respErr)) return respErr;
+      if (Error::notOK(respErr)) return respErr;
       // save the bridge parameters
       if(db.executef(
         "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='', fixedURL=0",
@@ -876,7 +876,7 @@ void HueVdc::nativeActionFreed(StatusCB aStatusCB, const string aUrl, JsonObject
       ALOG(LOG_WARNING, "delete suceeded but did not confirm resource '%s'", aUrl.c_str());
     }
   }
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     if (aError->isError(HueCommError::domain(), HueCommError::NotFound)) {
       // to be deleted item does not exist
       ALOG(LOG_WARNING, "to be deleted '%s' did not exist -> consider deleted", aUrl.c_str());

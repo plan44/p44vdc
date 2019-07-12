@@ -410,7 +410,7 @@ void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMa
 
 void VdcHost::vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     LOG(LOG_ERR, "vDC %s: failed to initialize: %s", aNextVdc->second->shortDesc().c_str(), aError->text());
     aNextVdc->second->setVdcError(aError);
   }
@@ -483,7 +483,7 @@ void VdcHost::collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags,
 
 void VdcHost::vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     LOG(LOG_ERR, "vDC %s: error collecting devices: %s", aNextVdc->second->shortDesc().c_str(), aError->text());
   }
   // load persistent params for vdc
@@ -507,7 +507,7 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
   // check for global vdc errors now
   ErrorPtr vdcInitErr;
   for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); pos++) {
-    if (!Error::isOK(pos->second->getVdcStatus())) {
+    if (Error::notOK(pos->second->getVdcStatus())) {
       vdcInitErr = pos->second->getVdcStatus();
       LOG(LOG_ERR, "*** initial device collecting incomplete because of error: %s", vdcInitErr->text());
       break;
@@ -576,7 +576,7 @@ void VdcHost::separateDeviceInitialized(DevicePtr aDevice, ErrorPtr aError)
 
 void VdcHost::deviceInitialized(DevicePtr aDevice, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     LOG(LOG_ERR, "*** error initializing device %s: %s", aDevice->shortDesc().c_str(), aError->text());
   }
   else {
@@ -1052,7 +1052,7 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
     }
     else {
       // just log in case of error of a notification
-      if (!Error::isOK(respErr)) {
+      if (Error::notOK(respErr)) {
         LOG(LOG_WARNING, "Notification '%s' processing error: %s", aMethod.c_str(), respErr->text());
       }
     }
@@ -1218,7 +1218,7 @@ ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection
           ApiValuePtr e = o->arrayGet(i);
           if (!dsuid.setAsBinary(e->binaryValue())) dsuid.clear();
           respErr = addToAudienceByDsuid(audience, dsuid);
-          if (!Error::isOK(respErr)) {
+          if (Error::notOK(respErr)) {
             respErr->prefixMessage("Ignored target for notification '%s': ", aMethod.c_str());
             LOG(LOG_INFO, "%s", respErr->text());
           }
@@ -1700,7 +1700,7 @@ ErrorPtr VdcHost::loadAndFixDsUID()
   DsUid originalDsUid = dSUID;
   // load the vdc host settings, which might override the default dSUID
   err = loadFromStore(entityType()); // is a singleton, identify by type
-  if (!Error::isOK(err)) LOG(LOG_ERR,"Error loading settings for vdc host: %s", err->text());
+  if (Error::notOK(err)) LOG(LOG_ERR,"Error loading settings for vdc host: %s", err->text());
   // check for settings from files
   loadSettingsFromFiles();
   // now check

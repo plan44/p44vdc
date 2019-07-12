@@ -701,11 +701,11 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
     if (o) {
       // caller did supply this parameter
       err = (*pos)->conforms(o, true); // check and convert to internal (for text enums)
-      if (!Error::isOK(err)) {
+      if (Error::notOK(err)) {
         if (nonConformingAsNull() && !o->isNull()) {
           o = aParams->newNull(); // convert it to NULL
           err = (*pos)->conforms(o, true); // check again to see if NULL is conformant
-          if (!Error::isOK(err)) break; // NULL is not conformant -> error out
+          if (Error::notOK(err)) break; // NULL is not conformant -> error out
         }
         else {
           break; // param is not conformant -> error out
@@ -728,7 +728,7 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
     }
     ++pos;
   }
-  if (!Error::isOK(err)) {
+  if (Error::notOK(err)) {
     // rewrite error to include param name
     if (pos!=actionParams->values.end() && err->isDomain(VdcApiError::domain())) {
       err = Error::err<VdcApiError>(err->getErrorCode(), "parameter '%s': %s", (*pos)->getName().c_str(), err->text());
@@ -1114,7 +1114,7 @@ ErrorPtr ActionMacro::validateParams(ApiValuePtr aParams, ApiValuePtr aValidated
     if (vd) {
       // param with that name exists
       err = vd->conforms(val, false);
-      if (!Error::isOK(err) && action->nonConformingAsNull() && !val->isNull()) {
+      if (Error::notOK(err) && action->nonConformingAsNull() && !val->isNull()) {
         val = aParams->newNull(); // convert it to NULL
         err = vd->conforms(val, true); // check again to see if NULL is conformant
       }
@@ -1272,7 +1272,7 @@ void CustomAction::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, ui
   // - configure it
   JsonObjectPtr j = JsonObject::objFromText(jsonparams.c_str());
   ErrorPtr err = configureMacro(baseAction, j);
-  if (!Error::isOK(err)) {
+  if (Error::notOK(err)) {
     SALOG(singleDevice, LOG_ERR, "error loading custom action: %s", err->text());
   }
 }
@@ -1481,7 +1481,7 @@ ErrorPtr CustomActions::save()
   // save all elements of the map (only dirty ones will be actually stored to DB
   for (CustomActionsVector::iterator pos = customActions.begin(); pos!=customActions.end(); ++pos) {
     err = (*pos)->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed
-    if (!Error::isOK(err)) SALOG(singleDevice, LOG_ERR,"Error saving custom action '%s': %s", (*pos)->actionId.c_str(), err->text());
+    if (Error::notOK(err)) SALOG(singleDevice, LOG_ERR,"Error saving custom action '%s': %s", (*pos)->actionId.c_str(), err->text());
   }
   return err;
 }
@@ -2152,7 +2152,7 @@ bool DeviceProperties::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     else if (!val->isReadOnly()) {
       // write
       ErrorPtr err = val->conforms(aPropValue, true);
-      if (!Error::isOK(err)) {
+      if (Error::notOK(err)) {
         SALOG((*singleDeviceP), LOG_ERR, "Cannot set property '%s': %s", val->getName().c_str(), err->text());
         return false;
       }
@@ -2330,7 +2330,7 @@ ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
     // recognizes method only if there are any actions
     string actionid;
     respErr = checkStringParam(aParams, "id", actionid);
-    if (!Error::isOK(respErr))
+    if (Error::notOK(respErr))
       return respErr;
     ApiValuePtr actionParams = aParams->get("params");
     if (!actionParams) {
@@ -2583,7 +2583,7 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
     // standard action
     err = actionFromJSON(a, aJSONConfig, aActionId, desc, category);
   }
-  if (!Error::isOK(err) || !a) return err;
+  if (Error::notOK(err) || !a) return err;
   // check for params
   if (aJSONConfig && aJSONConfig->get("params", o)) {
     string pname;
@@ -2592,7 +2592,7 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
     while (o->nextKeyValue(pname, param)) {
       ValueDescriptorPtr p;
       ErrorPtr err = parameterFromJSON(p, param, pname);
-      if (!Error::isOK(err)) return err;
+      if (Error::notOK(err)) return err;
       if (!p) continue; // if the parsing was ok, but no parameter was created do not add it to the action
       bool optional = !(p->isDefault()); // by default, no default value means the value is optional
       JsonObjectPtr o3;
@@ -2648,7 +2648,7 @@ ErrorPtr SingleDevice::standardActionsFromJSON(JsonObjectPtr aJSONConfig)
           standardActions->addStandardAction(a);
         }
       }
-      if (!Error::isOK(err)) return err->withPrefix("Error creating standard action '%s': ", actionId.c_str());
+      if (Error::notOK(err)) return err->withPrefix("Error creating standard action '%s': ", actionId.c_str());
     }
   }
   return ErrorPtr();
@@ -2700,7 +2700,7 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
       o->resetKeyIteration();
       while (o->nextKeyValue(actionId, actionConfig)) {
         err = addActionFromJSON(dynamic, actionConfig, actionId, false);
-        if (!Error::isOK(err)) return err->withPrefix("Error creating action '%s': ", actionId.c_str());
+        if (Error::notOK(err)) return err->withPrefix("Error creating action '%s': ", actionId.c_str());
       }
     }
   }
@@ -2716,11 +2716,11 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
       if (stateConfig && stateConfig->get("description", o2)) desc = o2->stringValue();
       ValueDescriptorPtr v;
       err = parseValueDesc(v, stateConfig, "state");
-      if (!Error::isOK(err)) return err->withPrefix("Error in 'state' of '%s': ", stateId.c_str());
+      if (Error::notOK(err)) return err->withPrefix("Error in 'state' of '%s': ", stateId.c_str());
       // create the state
       DeviceStatePtr s;
       err = stateFromJSON(s, stateConfig, stateId, desc, v);
-      if (!Error::isOK(err)) return err->withPrefix("Error creating state '%s': ", stateId.c_str());
+      if (Error::notOK(err)) return err->withPrefix("Error creating state '%s': ", stateId.c_str());
       deviceStates->addState(s);
     }
   }
@@ -2737,7 +2737,7 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
       if (eventConfig && eventConfig->get("description", o2)) desc = o2->stringValue();
       DeviceEventPtr e;
       err = eventFromJSON(e, eventConfig, eventId, desc);
-      if (!Error::isOK(err)) return err->withPrefix("Error creating event '%s': ", eventId.c_str());
+      if (Error::notOK(err)) return err->withPrefix("Error creating event '%s': ", eventId.c_str());
       deviceEvents->addEvent(e);
     }
   }
@@ -2755,7 +2755,7 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
         readonly = o2->boolValue();
       ValueDescriptorPtr p;
       err = propertyFromJSON(p, propConfig, propId);
-      if (!Error::isOK(err)) {
+      if (Error::notOK(err)) {
         return err;
       }
       deviceProperties->addProperty(p, readonly);

@@ -576,7 +576,7 @@ ErrorPtr SceneDeviceSettings::saveChildren()
     // save all elements of the map (only dirty ones will be actually stored to DB
     for (DsSceneMap::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
       err = pos->second->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed
-      if (!Error::isOK(err)) SALOG(device, LOG_ERR,"Error saving scene %d: %s", pos->second->sceneNo, err->text());
+      if (Error::notOK(err)) SALOG(device, LOG_ERR,"Error saving scene %d: %s", pos->second->sceneNo, err->text());
     }
   }
   return err;

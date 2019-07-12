@@ -1061,7 +1061,7 @@ ErrorPtr VdcPbufApiRequest::sendError(ErrorPtr aError)
   resp.usermessagetobetranslated = (char *)(vdcApiErr && vdcApiErr->getUserFacingMessage().size()>0 ? vdcApiErr->getUserFacingMessage().c_str() : NULL);
   err = pbufConnection->sendMessage(&msg);
   // log (if not just OK)
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     if (vdcApiErr) {
       LOG(LOG_INFO, "vdSM <- vDC (pbuf) error sent: requestid='%d', error=%ld (%s) - type=%d (%s)", reqId, vdcApiErr->getErrorCode(), vdcApiErr->getErrorMessage(), vdcApiErr->getErrorType(), vdcApiErr->getUserFacingMessage().c_str());
     }
@@ -1150,7 +1150,7 @@ void VdcPbufApiConnection::gotData(ErrorPtr aError)
       delete[] buf; buf = NULL;
     } // some data seems to be ready
   } // no connection error
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // error occurred
     // pbuf API cannot resynchronize, close connection
     LOG(LOG_WARNING, "Error occurred on protobuf connection - cannot be re-synced, closing: %s", aError->text());
@@ -1490,7 +1490,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
       else {
         LOG(LOG_INFO, "vdSM -> vDC (pbuf) notification received: method='%s', params=%s", method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
       }
-      if (!Error::isOK(err)) {
+      if (Error::notOK(err)) {
         // error decoding message
         if (request) {
           // report immediately if this is a method

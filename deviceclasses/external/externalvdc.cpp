@@ -375,7 +375,7 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
             if (aMessage->get("value", o)) {
               ApiValuePtr v = ApiValuePtr(JsonApiValue::newValueFromJson(o));
               ErrorPtr err = prop->conforms(v, true); // check and make internal
-              if (!Error::isOK(err)) return err;
+              if (Error::notOK(err)) return err;
               prop->setValue(v);
             }
             if (aMessage->get("push", o)) {
@@ -413,7 +413,7 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
               // set new value for state
               ApiValuePtr v = ApiValuePtr(JsonApiValue::newValueFromJson(val));
               ErrorPtr err = s->value()->conforms(v, true); // check and make internal
-              if (!Error::isOK(err)) return err;
+              if (Error::notOK(err)) return err;
               s->value()->setValue(v);
               // push state along with events
               s->pushWithEvents(evs);
@@ -1225,9 +1225,9 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   // create actions/states/events and properties from JSON
   if (aInitParams->get("noconfirmaction", o)) noConfirmAction = o->boolValue();
   err = configureFromJSON(aInitParams);
-  if (!Error::isOK(err)) return err;
+  if (Error::notOK(err)) return err;
   err = standardActionsFromJSON(aInitParams);
-  if (!Error::isOK(err)) return err;
+  if (Error::notOK(err)) return err;
   if (deviceProperties) deviceProperties->setPropertyChangedHandler(boost::bind(&ExternalDevice::propertyChanged, this, _1));
   // if any of the singledevice features are selected, protocol must be JSON
   if (deviceActions && deviceConnector->simpletext) {
@@ -1292,7 +1292,7 @@ ExternalDeviceConnector::~ExternalDeviceConnector()
 
 void ExternalDeviceConnector::handleDeviceConnectionStatus(ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     closeConnection();
     LOG(LOG_NOTICE, "external device connection closed (%s) -> disconnecting all devices", aError->text());
     // devices have vanished for now, but will keep parameters in case it reconnects later
@@ -1369,7 +1369,7 @@ void ExternalDeviceConnector::sendDeviceApiStatusMessage(ErrorPtr aError, const 
     // create JSON response
     JsonObjectPtr message = JsonObject::newObj();
     message->add("message", JsonObject::newString("status"));
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       LOG(LOG_INFO, "device API error: %s", aError->text());
       // error, return error response
       message->add("status", JsonObject::newString("error"));
@@ -1438,7 +1438,7 @@ void ExternalDeviceConnector::handleDeviceApiJsonMessage(ErrorPtr aError, JsonOb
     if (aMessage->arrayLength()>0) {
       for (int i=0; i<aMessage->arrayLength(); ++i) {
         aError = handleDeviceApiJsonSubMessage(aMessage->arrayGet(i));
-        if (!Error::isOK(aError)) break;
+        if (Error::notOK(aError)) break;
       }
     }
     else {

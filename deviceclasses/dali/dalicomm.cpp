@@ -363,7 +363,7 @@ void DaliComm::reset(DaliCommandStatusCB aStatusCB)
 void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)
 {
   // repeat resets until we get a correct answer
-  if (!Error::isOK(aError) || aResp1!=RESP_CODE_ACK || aResp2!=ACK_OK) {
+  if (Error::notOK(aError) || aResp1!=RESP_CODE_ACK || aResp2!=ACK_OK) {
     LOG(LOG_WARNING, "DALI bridge: Incorrect answer (%02X %02X) or error (%s) from reset command -> repeating", aResp1, aResp2, aError ? aError->text() : "none");
     if (aCount>=MAX_RESET_RETRIES) {
       if (Error::isOK(aError)) aError = Error::err<DaliCommError>(DaliCommError::BadData, "Bridge reset failed");
@@ -682,7 +682,7 @@ private:
   // handle scan result
   void handleResponse(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
   {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       numErrors++;
       LOG(LOG_DEBUG, "- written 0x%02X, got error %s", dtrValue, aError->text());
     }
@@ -909,7 +909,7 @@ private:
   {
     // scan done or error, return list to callback
     if (probablyCollision || unconfiguredDevices) {
-      if (!Error::isOK(aError)) {
+      if (Error::notOK(aError)) {
         LOG(LOG_WARNING, "Error (%s) in quick scan ignored because we need to do a full scan anyway", aError->text());
       }
       if (probablyCollision) {
@@ -1329,7 +1329,7 @@ private:
   // handle scan result
   void handleResponse(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError, bool aRetried)
   {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       // error
       if (retries++<DALI_MAX_MEMREAD_RETRIES) {
         // restart reading explicitly at current offset

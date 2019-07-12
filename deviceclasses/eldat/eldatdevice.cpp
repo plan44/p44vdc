@@ -656,7 +656,7 @@ void EldatRemoteControlDevice::sendFunction(EldatFunction aFunction)
 
 void EldatRemoteControlDevice::sentFunction(string aAnswer, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     ALOG(LOG_ERR, "Error sending message: %s", aError->text());
   }
   else {

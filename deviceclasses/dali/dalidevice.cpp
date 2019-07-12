@@ -683,7 +683,7 @@ void DaliBusDevice::queryStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout
     lampFailure = aResponse & 0x02;
   }
   else {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       // errors are always bus level: set global error status
       daliVdc.setVdcError(aError);
     }
@@ -1774,7 +1774,7 @@ void DaliCompositeDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryR
 
 void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryReset, DimmerIndex aDimmerIndex, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     LOG(LOG_ERR, "DaliCompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->text());
   }
   while (aDimmerIndex<numDimmers) {

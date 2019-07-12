@@ -569,7 +569,7 @@ ErrorPtr EvaluatorDevice::executeAction(Tristate aState)
           boost::bind(&EvaluatorDevice::evaluateFunction, this, _1, _2),
           "null"
         );
-        if (!Error::isOK(serr)) {
+        if (Error::notOK(serr)) {
           serr->prefixMessage("placeholder substitution error in POST/PUT data: ");
           if (serr->isError(ExpressionError::domain(), ExpressionError::Syntax)) {
             return serr; // do not continue with syntax error
@@ -588,7 +588,7 @@ ErrorPtr EvaluatorDevice::executeAction(Tristate aState)
         boost::bind(&EvaluatorDevice::evaluateFunction, this, _1, _2),
         "null"
       );
-      if (!Error::isOK(serr)) {
+      if (Error::notOK(serr)) {
         serr->prefixMessage("placeholder substitution error in URL: ");
         if (serr->isError(ExpressionError::domain(), ExpressionError::Syntax)) {
           return serr; // do not continue with syntax error

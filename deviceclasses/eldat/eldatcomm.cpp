@@ -220,7 +220,7 @@ void EldatComm::aliveCheck()
 
 void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // alive check failed, try to recover ELDAT interface
     LOG(LOG_ERR, "EldatComm: alive check of ELDAT module failed -> restarting module");
     serialComm->setDTR(false); // release DTR, this should reset the ELDAT interface

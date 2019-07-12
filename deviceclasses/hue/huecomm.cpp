@@ -271,7 +271,7 @@ public:
 
   void bridgeRefindHandler(SsdpSearchPtr aSsdpSearch, ErrorPtr aError, const string& aExpectedUuid)
   {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       if (hueComm.useNUPnP) {
         // could not find bridge, try N-UPnP
         hueComm.findBridgesNupnp(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, aExpectedUuid));
@@ -618,7 +618,7 @@ void HueComm::findBridgesNupnp(HueBridgeNupnpFindCB aFindHandler)
 void HueComm::gotBridgeNupnpResponse(JsonObjectPtr aResult, ErrorPtr aError, HueBridgeNupnpFindCB aFindHandler)
 {
   NupnpResult ret;
-  if (!Error::isOK(aError) || !aResult) {
+  if (Error::notOK(aError) || !aResult) {
     aFindHandler(ret);
     return;
   }

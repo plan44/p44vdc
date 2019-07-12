@@ -117,7 +117,7 @@ void VdcApiServer::connectionStatusHandler(SocketCommPtr aSocketComm, ErrorPtr a
       apiConnectionStatusHandler(apiConnection, aError);
     }
   }
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // connection failed/closed and we don't support reconnect yet
     aSocketComm->relatedObject.reset(); // detach connection object
   }

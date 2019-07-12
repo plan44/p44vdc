@@ -59,7 +59,7 @@ void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQu
 
 void PropertyContainer::prepareNext(PropertyPrepListPtr aPrepList, PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     LOG(LOG_WARNING, "- prepraration of property failed with error: %s", aError->text());
   }
   if (aPrepList->empty()) {
@@ -509,7 +509,7 @@ bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverri
     }
     // now access that property (note: preparation is not checked so properties must be writable without preparation)
     ErrorPtr err = accessPropertyInternal(access_write, property, ApiValuePtr(), aDomain, PropertyDescriptorPtr(), PropertyPrepListPtr());
-    if (!Error::isOK(err)) {
+    if (Error::notOK(err)) {
       LOG(LOG_ERR, "%s:%d - error writing property '%s': %s", aTextSourceName, aLineNo, f.c_str(), err->text());
     }
     else {

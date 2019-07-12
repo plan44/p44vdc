@@ -757,7 +757,7 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       // now save
       saveScene(sceneNo);
     }
-    if (!Error::isOK(err)) {
+    if (Error::notOK(err)) {
       ALOG(LOG_WARNING, "saveScene error: %s", err->text());
     }
   }
@@ -769,7 +769,7 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       // now save
       undoScene(sceneNo);
     }
-    if (!Error::isOK(err)) {
+    if (Error::notOK(err)) {
       ALOG(LOG_WARNING, "undoScene error: %s", err->text());
     }
   }
@@ -781,7 +781,7 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       // now save
       setLocalPriority(sceneNo);
     }
-    if (!Error::isOK(err)) {
+    if (Error::notOK(err)) {
       ALOG(LOG_WARNING, "setLocalPriority error: %s", err->text());
     }
   }
@@ -802,7 +802,7 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         }
       }
     }
-    if (!Error::isOK(err)) {
+    if (Error::notOK(err)) {
       ALOG(LOG_WARNING, "setControlValue error: %s", err->text());
     }
   }
@@ -814,7 +814,7 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       // now call
       callSceneMin(sceneNo);
     }
-    if (!Error::isOK(err)) {
+    if (Error::notOK(err)) {
       ALOG(LOG_WARNING, "callSceneMin error: %s", err->text());
     }
   }
@@ -845,7 +845,7 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, 3, NULL); // no callback
       }
     }
-    if (!Error::isOK(err)) {
+    if (Error::notOK(err)) {
       ALOG(LOG_WARNING, "setOutputChannelValue error: %s", err->text());
     }
   }
@@ -935,7 +935,7 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         return;
       }
     }
-    if (!Error::isOK(err)) {
+    if (Error::notOK(err)) {
       ALOG(LOG_WARNING, "callScene error: %s", err->text());
     }
   }
@@ -968,7 +968,7 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         return;
       }
     }
-    if (!Error::isOK(err)) {
+    if (Error::notOK(err)) {
       ALOG(LOG_WARNING, "dimChannel error: %s", err->text());
     }
   }
@@ -1903,7 +1903,7 @@ ErrorPtr Device::load()
   // load the device settings
   if (deviceSettings) {
     err = deviceSettings->loadFromStore(dSUID.getString().c_str());
-    if (!Error::isOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
+    if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
   }
   // load the behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->load();
@@ -1921,7 +1921,7 @@ ErrorPtr Device::save()
   ErrorPtr err;
   // save the device settings
   if (deviceSettings) err = deviceSettings->saveToStore(dSUID.getString().c_str(), false); // only one record per device
-  if (!Error::isOK(err)) ALOG(LOG_ERR,"Error saving settings: %s", err->text());
+  if (Error::notOK(err)) ALOG(LOG_ERR,"Error saving settings: %s", err->text());
   // save the behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->save();
   for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->save();

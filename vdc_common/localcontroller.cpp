@@ -504,7 +504,7 @@ ErrorPtr ZoneList::save()
   // save all elements (only dirty ones will be actually stored to DB)
   for (ZonesVector::iterator pos = zones.begin(); pos!=zones.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving zone %d: %s", (*pos)->zoneID, err->text());
+    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving zone %d: %s", (*pos)->zoneID, err->text());
   }
   return err;
 }
@@ -899,7 +899,7 @@ ErrorPtr SceneList::save()
   // save all elements (only dirty ones will be actually stored to DB)
   for (ScenesVector::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->sceneId.sceneNo, err->text());
+    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->sceneId.sceneNo, err->text());
   }
   return err;
 }
@@ -1481,7 +1481,7 @@ ErrorPtr TriggerList::save()
   // save all elements (only dirty ones will be actually stored to DB)
   for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving trigger %d: %s", (*pos)->triggerId, err->text());
+    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving trigger %d: %s", (*pos)->triggerId, err->text());
   }
   return err;
 }
@@ -2004,11 +2004,11 @@ ErrorPtr LocalController::load()
 {
   ErrorPtr err;
   err = localZones.load();
-  if (!Error::isOK(err)) LOG(LOG_ERR, "could not load localZones: %s", err->text());
+  if (Error::notOK(err)) LOG(LOG_ERR, "could not load localZones: %s", err->text());
   err = localScenes.load();
-  if (!Error::isOK(err)) LOG(LOG_ERR, "could not load localScenes: %s", err->text());
+  if (Error::notOK(err)) LOG(LOG_ERR, "could not load localScenes: %s", err->text());
   err = localTriggers.load();
-  if (!Error::isOK(err)) LOG(LOG_ERR, "could not load localTriggers: %s", err->text());
+  if (Error::notOK(err)) LOG(LOG_ERR, "could not load localTriggers: %s", err->text());
   return err;
 }
 
@@ -2017,11 +2017,11 @@ ErrorPtr LocalController::save()
 {
   ErrorPtr err;
   err = localZones.save();
-  if (!Error::isOK(err)) LOG(LOG_ERR, "could not save localZones: %s", err->text());
+  if (Error::notOK(err)) LOG(LOG_ERR, "could not save localZones: %s", err->text());
   err = localScenes.save();
-  if (!Error::isOK(err)) LOG(LOG_ERR, "could not save localScenes: %s", err->text());
+  if (Error::notOK(err)) LOG(LOG_ERR, "could not save localScenes: %s", err->text());
   err = localTriggers.save();
-  if (!Error::isOK(err)) LOG(LOG_ERR, "could not save localTriggers: %s", err->text());
+  if (Error::notOK(err)) LOG(LOG_ERR, "could not save localTriggers: %s", err->text());
   return err;
 }
 

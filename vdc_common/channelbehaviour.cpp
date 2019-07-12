@@ -430,7 +430,7 @@ string ChannelBehaviour::getDbKey()
 ErrorPtr ChannelBehaviour::load()
 {
   ErrorPtr err = loadFromStore(getDbKey().c_str());
-  if (!Error::isOK(err)) SALOG(output.device, LOG_ERR,"Error loading channel '%s'", getId().c_str());
+  if (Error::notOK(err)) SALOG(output.device, LOG_ERR,"Error loading channel '%s'", getId().c_str());
   return err;
 }
 
@@ -438,7 +438,7 @@ ErrorPtr ChannelBehaviour::load()
 ErrorPtr ChannelBehaviour::save()
 {
   ErrorPtr err = saveToStore(getDbKey().c_str(), false); // only one record per dbkey (=per device+channelid)
-  if (!Error::isOK(err)) SALOG(output.device, LOG_ERR,"Error saving channel '%s'", getId().c_str());
+  if (Error::notOK(err)) SALOG(output.device, LOG_ERR,"Error saving channel '%s'", getId().c_str());
   return err;
 }
 

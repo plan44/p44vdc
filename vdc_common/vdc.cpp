@@ -536,7 +536,7 @@ void Vdc::finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDel
 
 void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
-  if (!Error::isOK(aError) && !aError->isDomain(VdcError::domain())) {
+  if (Error::notOK(aError) && !aError->isDomain(VdcError::domain())) {
     // actual error, not only signalling add/update
     ALOG(LOG_ERR, "Failed calling native action: %s", Error::text(aError));
   }
@@ -650,7 +650,7 @@ void Vdc::createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStat
 
 void Vdc::removedNativeAction(OptimizerEntryPtr aFromEntry, OptimizerEntryPtr aForEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     ALOG(LOG_INFO, "Could not delete action to make room for a new one");
     preparedNotificationComplete(aForEntry, aDeliveryState, false, aError);
     return;
@@ -846,7 +846,7 @@ void Vdc::pairingTimeout(VdcApiRequestPtr aRequest)
 void Vdc::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // prevent collecting from vdc which has global error (except if rescanmode_force is set)
-  if ((aRescanFlags&rescanmode_force)==0 && !Error::isOK(vdcErr)) {
+  if ((aRescanFlags&rescanmode_force)==0 && Error::notOK(vdcErr)) {
     if (aCompletedCB) aCompletedCB(vdcErr);
     return;
   }
@@ -1135,7 +1135,7 @@ ErrorPtr Vdc::saveOptimizerCache()
       if (!(*pos)->nativeActionId.empty()) {
         (*pos)->markDirty();
         err = (*pos)->saveToStore(dSUID.getString().c_str(), true); // multiple instances allowed, it's a *list*!
-        if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving optimizer entry: %s", err->text());
+        if (Error::notOK(err)) LOG(LOG_ERR,"Error saving optimizer entry: %s", err->text());
       }
     }
   }
@@ -1150,16 +1150,16 @@ ErrorPtr Vdc::load()
   ErrorPtr err;
   // load the vdc settings (collecting phase is already over by now)
   err = loadFromStore(dSUID.getString().c_str());
-  if (!Error::isOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
+  if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
   loadSettingsFromFiles();
   // load the optimizer cache
   err = loadOptimizerCache();
-  if (!Error::isOK(err)) ALOG(LOG_ERR,"Error loading optimizer cache: %s", err->text());
+  if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading optimizer cache: %s", err->text());
   // announce groups and scenes used by optimizer
   for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
     if (!(*pos)->nativeActionId.empty()) {
       ErrorPtr announceErr = announceNativeAction((*pos)->nativeActionId);
-      if (!Error::isOK(announceErr)) {
+      if (Error::notOK(announceErr)) {
         ALOG(LOG_WARNING,"Native action '%s' is no longer valid - removed (%s)", (*pos)->nativeActionId.c_str(), err->text());
         (*pos)->nativeActionId = ""; // erase it, repeated use of that entry will re-create a native action later
       }
@@ -1518,7 +1518,7 @@ int Vdc::opStateLevel()
 
 string Vdc::getOpStateText()
 {
-  if (!Error::isOK(vdcErr)) {
+  if (Error::notOK(vdcErr)) {
     return string_format("Error: %s", vdcErr->text());
   }
   else if (collecting) {
