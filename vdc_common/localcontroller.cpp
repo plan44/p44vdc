@@ -1887,7 +1887,7 @@ void LocalController::callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup
   params->add("scene", params->newUint64(aSceneNo));
   params->add("force", params->newBool(false));
   if (aTransitionTimeOverride!=Infinite) {
-    params->add("transition", params->newDouble((double)aTransitionTimeOverride/Second));
+    params->add("transitionTime", params->newDouble((double)aTransitionTimeOverride/Second));
   }
   // - deliver
   vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);

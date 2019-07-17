@@ -831,6 +831,11 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         if (o) {
           apply_now = o->boolValue();
         }
+        o = aParams->get("transitionTime");
+        MLMicroSeconds oldTT = getOutput()->transitionTime;
+        if (o) {
+          getOutput()->transitionTime = o->doubleValue()*Second;
+        }
         // reverse build the correctly structured property value: { channelStates: { <channel>: { value:<value> } } }
         // - value
         o = aParams->newObject();
@@ -843,6 +848,8 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         propValue->add("channelStates", ch);
         // now access the property for write
         accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, 3, NULL); // no callback
+        // restore the transition time
+        getOutput()->transitionTime = oldTT;
       }
     }
     if (Error::notOK(err)) {
@@ -921,7 +928,7 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       bool force = false;
       MLMicroSeconds transitionTimeOverride = Infinite; // none
       // check for custom transition time
-      o = aDeliveryState->callParams->get("transition");
+      o = aDeliveryState->callParams->get("transitionTime");
       if (o) {
         transitionTimeOverride = o->doubleValue()*Second;
       }
