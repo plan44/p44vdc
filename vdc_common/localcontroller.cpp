@@ -1136,6 +1136,33 @@ ExpressionValue Trigger::evaluateFunction(const string &aName, const FunctionArg
   else if (aName=="dusk") {
     return ExpressionValue(sunset(time(NULL), vdchost.latitude, vdchost.longitude, true)*3600);
   }
+  else if (aName=="timeofday") {
+    return ExpressionValue(((now.tm_hour*60)+now.tm_min)*60+now.tm_sec+(t.tv_usec/1e6));
+  }
+  else if (aName=="hour") {
+    return ExpressionValue(now.tm_hour);
+  }
+  else if (aName=="minute") {
+    return ExpressionValue(now.tm_min);
+  }
+  else if (aName=="second") {
+    return ExpressionValue(now.tm_sec);
+  }
+  else if (aName=="year") {
+    return ExpressionValue(now.tm_year+1900);
+  }
+  else if (aName=="month") {
+    return ExpressionValue(now.tm_mon+1);
+  }
+  else if (aName=="day") {
+    return ExpressionValue(now.tm_mday);
+  }
+  else if (aName=="weekday") {
+    return ExpressionValue(now.tm_wday);
+  }
+  else if (aName=="yearday") {
+    return ExpressionValue(now.tm_yday);
+  }
   // no such function
   return ExpressionError::errValue(ExpressionError::NotFound, "not found"); // just signals caller to try builtin functions
 }
