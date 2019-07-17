@@ -201,8 +201,13 @@ namespace p44 {
     /// get zone by ID
     /// @param aZoneId zone to look up
     /// @param aCreateNewIfNotExisting if true, a zone is created on the fly when none exists for the given ID
-    /// @return zone or NULL if zoneID is not known (and none created)
+    /// @return zone or NULL if aZoneId is not known (and none created)
     ZoneDescriptorPtr getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotExisting = false);
+
+    /// get zone by name
+    /// @param aZoneName a user-assigned zone name to look for
+    /// @return zone or NULL if none with this name is found
+    ZoneDescriptorPtr getZoneByName(const string aZoneName);
 
   protected:
 
@@ -334,9 +339,15 @@ namespace p44 {
     ErrorPtr save();
 
     /// get scene by identifier
+    /// @param aSceneId scene identifier to look up
+    /// @param aCreateNewIfNotExisting if true, a scene descriptor is created on the fly when none exists for the given ID
+    /// @param aSceneIndexP if not NULL, the scene index within the scene list is returned here
+    /// @return scene or NULL if aSceneId is not known (and none created)
     SceneDescriptorPtr getScene(const SceneIdentifier &aSceneId, bool aCreateNewIfNotExisting = false, size_t *aSceneIndexP = NULL);
 
     /// get scene by name
+    /// @param aSceneName a user-assigned scene name to look for
+    /// @return scene or NULL if none with this name is found
     SceneDescriptorPtr getSceneByName(const string aSceneName);
 
   protected:
@@ -532,6 +543,10 @@ namespace p44 {
     /// get info (name, kind) about a group
     static const GroupDescriptor* groupInfo(DsGroup aGroup);
 
+    /// get info about a group by name
+    static const GroupDescriptor* groupInfoByName(const string aGroupName);
+
+
     /// filter group mask to only contain standard groups
     /// @param aGroups bitmask of groups
     /// @return filtered to contain only standard room scene groups
@@ -543,7 +558,13 @@ namespace p44 {
     /// call a scene
     /// @param aTransitionTimeOverride if >=0, this will override the called scene's transition time
     void callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride = Infinite);
+    void callScene(SceneNo aSceneNo, NotificationAudience &aAudience, MLMicroSeconds aTransitionTimeOverride = Infinite);
     void callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride = Infinite);
+
+    /// set output channel values
+    /// @param aTransitionTimeOverride if >=0, this will override the outputs standard transition time
+    void setOutputChannelValues(DsZoneID aZone, DsGroup aGroup, string aChannelId, double aValue, MLMicroSeconds aTransitionTimeOverride = Infinite);
+    void setOutputChannelValues(NotificationAudience &aAudience, string aChannelId, double aValue, MLMicroSeconds aTransitionTimeOverride = Infinite);
 
     /// called when delivery of a scene call or dimming notification to a device has been executed
     /// @param aDevice the device

@@ -464,6 +464,18 @@ ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotEx
 }
 
 
+ZoneDescriptorPtr ZoneList::getZoneByName(const string aZoneName)
+{
+  for (ZonesVector::iterator pos = zones.begin(); pos!=zones.end(); ++pos) {
+    if ((*pos)->getName()==aZoneName) {
+      return *pos;
+    }
+  }
+  return ZoneDescriptorPtr();
+}
+
+
+
 // MARK: - ZoneList persistence
 
 ErrorPtr ZoneList::load()
@@ -1184,8 +1196,14 @@ ErrorPtr Trigger::executeActions()
     string params;
     LOG(LOG_INFO, "- starting executing action '%s'", action.c_str());
     if (!keyAndValue(action, cmd, params, ':')) cmd = action; // could be action only
+    // substitute params in action
+    substituteExpressionPlaceholders(
+      params,
+      boost::bind(&Trigger::valueLookup, this, _1),
+      boost::bind(&Trigger::evaluateFunction, this, _1, _2)
+    );
     if (cmd=="scene") {
-      // scene:<name>[,<speed>]
+      // scene:<name>[,<transitionTime>]
       const char *p2 = params.c_str();
       string sn;
       if (nextPart(p2, sn, ',')) {
@@ -1208,7 +1226,62 @@ ErrorPtr Trigger::executeActions()
         }
       }
       else {
-        err = TextError::err("scene name missing");
+        err = TextError::err("scene name missing. Syntax is: scene:<name>[,<transitionTime>]");
+        break;
+      }
+    }
+    else if (cmd=="set") {
+      // set:<zone>,<value>[,<transitionTime>[,<channelid>[,<group>]]]
+      const char *p2 = params.c_str();
+      string zn;
+      if (nextPart(p2, zn, ',')) {
+        // mandatory zone name
+        ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(zn);
+        if (!zone) {
+          err = TextError::err("zone '%s' not found", zn.c_str());
+        }
+        else {
+          string val;
+          if (nextPart(p2, val, ',')) {
+            // mandatory output value
+            double value;
+            if (sscanf(val.c_str(), "%lf", &value)!=1) {
+              err = TextError::err("invalid output value");
+            }
+            else {
+              string ttm;
+              MLMicroSeconds transitionTime = Infinite; // no override by default, use output's standard transition time
+              DsGroup group = group_yellow_light; // default to light
+              string channelId = "0"; // default channel
+              if (nextPart(p2, ttm, ',')) {
+                // optional transition time
+                double v;
+                if (sscanf(ttm.c_str(), "%lf", &v)==1) {
+                  transitionTime = v*Second;
+                }
+                // optional channel id
+                if (nextPart(p2, channelId, ',')) {
+                  // optional group
+                  string g;
+                  if (nextPart(p2, g, ',')) {
+                    const GroupDescriptor* gdP = LocalController::groupInfoByName(g);
+                    if (gdP) {
+                      group = gdP->no;
+                    }
+                  }
+                }
+              }
+              // set the ouputs
+              LocalController::sharedLocalController()->setOutputChannelValues(zone->getZoneId(), group, channelId, value, transitionTime);
+            }
+          }
+          else {
+            err = TextError::err("missing output value");
+          }
+        }
+      }
+      else {
+        err = TextError::err("zone name missing. Syntax is: set:<zone>,<value>[,<transitionTime>[,<channelid>[,<group>]]]");
         break;
       }
     }
@@ -1904,12 +1977,16 @@ void LocalController::callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup
 {
   NotificationAudience audience;
   vdcHost.addToAudienceByZoneAndGroup(audience, aZone, aGroup);
+  callScene(aSceneNo, audience, aTransitionTimeOverride);
+}
+
+
+void LocalController::callScene(SceneNo aSceneNo, NotificationAudience &aAudience, MLMicroSeconds aTransitionTimeOverride)
+{
   JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
   params->setType(apivalue_object);
-  // - define audience
-  params->add("zone_id", params->newUint64(aZone));
-  params->add("group", params->newUint64(aGroup));
   // { "notification":"callScene", "zone_id":0, "group":1, "scene":5, "force":false }
+  // Note: we don't need the zone/group params, these are defined by the audience already
   string method = "callScene";
   params->add("scene", params->newUint64(aSceneNo));
   params->add("force", params->newBool(false));
@@ -1917,7 +1994,31 @@ void LocalController::callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup
     params->add("transitionTime", params->newDouble((double)aTransitionTimeOverride/Second));
   }
   // - deliver
-  vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
+  vdcHost.deliverToAudience(aAudience, VdcApiConnectionPtr(), method, params);
+}
+
+
+void LocalController::setOutputChannelValues(DsZoneID aZone, DsGroup aGroup, string aChannelId, double aValue, MLMicroSeconds aTransitionTimeOverride)
+{
+  NotificationAudience audience;
+  vdcHost.addToAudienceByZoneAndGroup(audience, aZone, aGroup);
+  setOutputChannelValues(audience, aChannelId, aValue, aTransitionTimeOverride);
+}
+
+
+void LocalController::setOutputChannelValues(NotificationAudience &aAudience, string aChannelId, double aValue, MLMicroSeconds aTransitionTimeOverride)
+{
+  JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
+  params->setType(apivalue_object);
+  // { "notification":"setOutputChannelValue", "zone_id":0, "group":1, "value":50, "channelId":"brightness", "transitionTime":20 }
+  string method = "setOutputChannelValue";
+  params->add("value", params->newDouble(aValue));
+  params->add("channelId", params->newString(aChannelId));
+  if (aTransitionTimeOverride!=Infinite) {
+    params->add("transitionTime", params->newDouble((double)aTransitionTimeOverride/Second));
+  }
+  // - deliver
+  vdcHost.deliverToAudience(aAudience, VdcApiConnectionPtr(), method, params);
 }
 
 
@@ -2087,6 +2188,20 @@ const GroupDescriptor* LocalController::groupInfo(DsGroup aGroup)
   }
   return NULL;
 }
+
+
+const GroupDescriptor* LocalController::groupInfoByName(const string aGroupName)
+{
+  const GroupDescriptor *giP = groupInfos;
+  while (giP && giP->kind!=0) {
+    if (aGroupName==giP->name) {
+      return giP;
+    }
+    giP++;
+  }
+  return NULL;
+}
+
 
 
 DsGroupMask LocalController::standardRoomGroups(DsGroupMask aGroups)
