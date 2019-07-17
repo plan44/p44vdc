@@ -679,11 +679,11 @@ void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDel
 
 void Vdc::optimizerCacheStats(OptimizerEntryPtr aCurrentEntry)
 {
-  ALOG(LOG_NOTICE, "========= Optimizer statistics after %ld optimizable calls", totalOptimizableCalls);
+  string stats;
   for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
     OptimizerEntryPtr oe = *pos;
-    ALOG(LOG_NOTICE,
-      "%c '%s' called %ld times (weighted, raw=%ld), last %lld seconds ago, contentId=%d, numdevices=%d, nativeAction='%s'",
+    string_format_append(stats,
+      "%c '%s' called %ld times (weighted, raw=%ld), last %lld seconds ago, contentId=%d, numdevices=%d, nativeAction='%s'\n",
       oe==aCurrentEntry ? '*' : '-', // mark entry used in current call
       NotificationNames[oe->type],
       oe->timeWeightedCallCount(),
@@ -694,6 +694,11 @@ void Vdc::optimizerCacheStats(OptimizerEntryPtr aCurrentEntry)
       oe->nativeActionId.c_str()
     );
   }
+  LOG(LOG_NOTICE,
+    "\nOptimizer statistics after %ld optimizable calls for vDC %s:\n%s\n",
+    totalOptimizableCalls, shortDesc().c_str(),
+    stats.c_str()
+  );
 }
 
 
