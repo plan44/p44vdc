@@ -209,7 +209,7 @@ namespace p44 {
     DsBehaviourPtr outdoorTemp;
     DsBehaviourPtr windSpeed;
     DsBehaviourPtr gustSpeed;
-    DsBehaviourPtr dayIndicator;
+    DsBehaviourPtr twilightIndicator;
     DsBehaviourPtr rainIndicator;
     DsBehaviourPtr sunWest;
     DsBehaviourPtr sunSouth;

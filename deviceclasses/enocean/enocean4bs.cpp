@@ -1292,25 +1292,25 @@ string EnoceanA52004Handler::shortDesc()
 
 // configuration for A5-13-0X sensor channels
 // - A5-13-01 telegram
-static const p44::EnoceanSensorDescriptor A513dawnSensor =
+static const p44::EnoceanSensorDescriptor A513lowLightSensor =
   { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 999, DB(3,7), DB(3,0), 10, 40*60, &stdSensorHandler, illumText };
 static const p44::EnoceanSensorDescriptor A513outdoorTemp =
   { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_temperature, usage_outdoors, -40, 80, DB(2,7), DB(2,0), 10*60, 40*60, &stdSensorHandler, tempText };
 static const p44::EnoceanSensorDescriptor A513windSpeed =
-  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_wind_speed, usage_outdoors, 0, 70, DB(1,7), DB(1,0), 20, 40*60, &stdSensorHandler, "wind speed" };
+  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_wind_speed, usage_outdoors, 0, 70, DB(1,7), DB(1,0), 20, 40*60, &stdSensorHandler, "Wind Speed" };
 static const p44::EnoceanSensorDescriptor A513gustSpeed =
-  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_gust_speed, usage_outdoors, 0, 70, DB(1,7), DB(1,0), 3, 40*60, &stdSensorHandler, "gust speed" };
-static const p44::EnoceanSensorDescriptor A513dayIndicator =
-  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_none,  usage_outdoors, 1,  0, DB(0,2), DB(0,2), 30, 40*60, &stdInputHandler,  "Day indicator" };
+  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_gust_speed, usage_outdoors, 0, 70, DB(1,7), DB(1,0), 3, 40*60, &stdSensorHandler, "Gust Speed" };
+static const p44::EnoceanSensorDescriptor A513twilightIndicator =
+  { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_twilight,  usage_outdoors, 0,  1, DB(0,2), DB(0,2), 30, 40*60, &stdInputHandler,  "Twilight Indicator" };
 static const p44::EnoceanSensorDescriptor A513rainIndicator =
   { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_rain,  usage_outdoors, 0,  1, DB(0,1), DB(0,1), 30, 40*60, &stdInputHandler,  "Rain indicator" };
 // - A5-13-02 telegram
 static const p44::EnoceanSensorDescriptor A513sunWest =
-  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(3,7), DB(3,0), 30, 40*60, &stdSensorHandler, "Sun west" };
+  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(3,7), DB(3,0), 30, 40*60, &stdSensorHandler, "Sun West" };
 static const p44::EnoceanSensorDescriptor A513sunSouth =
-  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(2,7), DB(2,0), 30, 40*60, &stdSensorHandler, "Sun south" };
+  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(2,7), DB(2,0), 30, 40*60, &stdSensorHandler, "Sun South" };
 static const p44::EnoceanSensorDescriptor A513sunEast =
-  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(1,7), DB(1,0), 30, 40*60, &stdSensorHandler, "Sun east" };
+  { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(1,7), DB(1,0), 30, 40*60, &stdSensorHandler, "Sun East" };
 
 EnoceanA5130XHandler::EnoceanA5130XHandler(EnoceanDevice &aDevice) :
   inherited(aDevice),
@@ -1350,8 +1350,8 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
     if (aSubDeviceIndex==0) {
       // this is the main device
       newDev->setFunctionDesc("environmental multisensor");
-      // - Add channel-built-in behaviour
-      newHandler->behaviour = EnoceanSensorHandler::newSensorBehaviour(A513dawnSensor, newDev, "dawn");
+      // - Add channel-built-in behaviour: low light measurement at dawn and dusk (below 1000lx)
+      newHandler->behaviour = EnoceanSensorHandler::newSensorBehaviour(A513lowLightSensor, newDev, NULL); // automatic id
       // - register the handler and the default behaviour
       newDev->addChannelHandler(newHandler);
       // - Add extra behaviours for A5-13-01
@@ -1361,8 +1361,8 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
       newDev->addBehaviour(newHandler->windSpeed);
       newHandler->gustSpeed = EnoceanSensorHandler::newSensorBehaviour(A513gustSpeed, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->gustSpeed);
-      newHandler->dayIndicator = EnoceanSensorHandler::newSensorBehaviour(A513dayIndicator, newDev, "daylight");
-      newDev->addBehaviour(newHandler->dayIndicator);
+      newHandler->twilightIndicator = EnoceanSensorHandler::newSensorBehaviour(A513twilightIndicator, newDev, "twilight"); // is low light (dawn, dusk) below 1000lx
+      newDev->addBehaviour(newHandler->twilightIndicator);
       newHandler->rainIndicator = EnoceanSensorHandler::newSensorBehaviour(A513rainIndicator, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->rainIndicator);
       // sub sensors in same device?
@@ -1439,11 +1439,11 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         else {
           // A5-13-01
           nowBroken = false;
-          if (behaviour) handleBitField(A513dawnSensor, behaviour, dataP, datasize);
+          if (behaviour) handleBitField(A513lowLightSensor, behaviour, dataP, datasize);
           if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize);
           if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize);
           if (gustSpeed) handleBitField(A513gustSpeed, gustSpeed, dataP, datasize);
-          if (dayIndicator) handleBitField(A513dayIndicator, dayIndicator, dataP, datasize);
+          if (twilightIndicator) handleBitField(A513twilightIndicator, twilightIndicator, dataP, datasize);
           if (rainIndicator) handleBitField(A513rainIndicator, rainIndicator, dataP, datasize);
         }
         break;
@@ -1466,7 +1466,7 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       if (outdoorTemp) outdoorTemp->setHardwareError(e);
       if (windSpeed) windSpeed->setHardwareError(e);
       if (gustSpeed) gustSpeed->setHardwareError(e);
-      if (dayIndicator) dayIndicator->setHardwareError(e);
+      if (twilightIndicator) twilightIndicator->setHardwareError(e);
       if (rainIndicator) rainIndicator->setHardwareError(e);
       if (sunWest) sunWest->setHardwareError(e);
       if (sunSouth) sunSouth->setHardwareError(e);
@@ -1478,7 +1478,7 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       if (outdoorTemp) outdoorTemp->revalidateState();
       if (windSpeed) windSpeed->revalidateState();
       if (gustSpeed) gustSpeed->revalidateState();
-      if (dayIndicator) dayIndicator->revalidateState();
+      if (twilightIndicator) twilightIndicator->revalidateState();
       if (rainIndicator) rainIndicator->revalidateState();
       if (sunWest) sunWest->revalidateState();
       if (sunSouth) sunSouth->revalidateState();
