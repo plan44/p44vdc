@@ -37,21 +37,40 @@ namespace p44 {
   class EvaluatorDevice;
 
 
+  class EvaluatorExpressionContext : public TimedEvaluationContext
+  {
+    typedef TimedEvaluationContext inherited;
+    EvaluatorDevice &evaluator;
+
+  public:
+
+    EvaluatorExpressionContext(EvaluatorDevice &aEvaluator, const GeoLocation& aGeoLocation);
+
+  protected:
+
+    /// lookup variables by name
+    /// @param aName the name of the value/variable to look up
+    /// @return Expression value (with error when value is not available)
+    virtual ExpressionValue valueLookup(const string &aName);
+
+  };
+
+
   class EvaluatorDeviceSettings : public DeviceSettings
   {
     typedef DeviceSettings inherited;
     friend class EvaluatorDevice;
 
     string varDefs; ///< mapping of variable names to ValueSources
-    string onCondition; ///< expression that must evaluate to true for output to get active
-    string offCondition; ///< expression that must evaluate to true for output to get inactive
+    EvaluatorExpressionContext onCondition; ///< expression that must evaluate to true for output to get active
+    EvaluatorExpressionContext offCondition; ///< expression that must evaluate to true for output to get inactive
     MLMicroSeconds minOnTime; ///< how long the on condition must be present before triggering the result change
     MLMicroSeconds minOffTime; ///< how long the on condition must be present before triggering the result change
     string action; ///< (additional) action to fire when evaluator changes state
 
   protected:
 
-    EvaluatorDeviceSettings(Device &aDevice);
+    EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator);
 
     // persistence implementation
     virtual const char *tableName();
@@ -68,6 +87,7 @@ namespace p44 {
   {
     typedef Device inherited;
     friend class EvaluatorVdc;
+    friend class EvaluatorExpressionContext;
 
     long long evaluatorDeviceRowID; ///< the ROWID this device was created from (0=none)
     
@@ -90,19 +110,14 @@ namespace p44 {
     ValueSourceMapper valueMapper;
     MLTicket valueParseTicket;
 
-    Tristate currentState;
+    Tristate currentState; ///< latest evaluator state
+    Tristate currentOn; ///< latest evaluation result of the On expression
+    Tristate currentOff; ///< latest evaluation result of the Off expression
 
     MLMicroSeconds conditionMetSince; ///< since when do we see condition permanently met
     bool onConditionMet; ///< true: conditionMetSince relates to ON-condition, false: conditionMetSince relates to OFF-condition
+    bool reporting; ///< set while reporting evaluation result to sensor or binary input, to prevent infinitite loop though cyclic references
     MLTicket evaluateTicket;
-    bool evaluating; ///< protection against cyclic references
-    MLTicket testlaterTicket;
-    typedef enum {
-      evalmode_normal, ///< normal evaluation
-      evalmode_initial, ///< initial evaluator run
-      evalmode_timed, ///< timed evaluation (testlater()...)
-    } EvalMode;
-    EvalMode evalMode; ///< evaluation mode
 
     HttpCommPtr httpAction; ///< in case evaluator uses http actions
 
@@ -185,23 +200,25 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
+  public:
+
+    ErrorPtr handleReEvaluationResult(bool aIsOffCondition, ExpressionValue aEvaluationResult, EvaluationContext &aContext);
+
   private:
 
     void parseVarDefs();
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     void evaluateConditions(Tristate aRefState, EvalMode aEvalMode);
+    void calculateEvaluatorState(Tristate aRefState, EvalMode aEvalMode);
+    Tristate evaluateBooleanNow(EvaluationContext &aEvalCtx, EvalMode aEvalMode, bool aScheduleReEval);
+
     void evaluateConditionsLater();
     void changedConditions();
     ErrorPtr executeAction(Tristate aState);
     void httpActionDone(const string &aResponse, ErrorPtr aError);
 
     /// expression evaluation
-
-    Tristate evaluateBoolean(string aExpression);
-    ExpressionValue calcEvaluatorExpression(string &aExpression);
-    ExpressionValue valueLookup(const string aName);
-    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
     ExpressionValue actionValueLookup(Tristate aCurrentState, const string aName);
 
   };
