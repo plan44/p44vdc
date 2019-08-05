@@ -992,8 +992,10 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   triggerId(0),
+  triggerCondition(*this, VdcHost::sharedVdcHost()->geolocation),
   conditionMet(undefined)
 {
+  triggerCondition.setEvaluationResultHandler(boost::bind(&Trigger::triggerEvaluationResultHandler, this, _1));
 }
 
 
@@ -1002,16 +1004,35 @@ Trigger::~Trigger()
 }
 
 
-
 // MARK: - Trigger condition evaluation
 
 
-bool Trigger::checkAndFire()
+TriggerExpressionContext::TriggerExpressionContext(Trigger &aTrigger, const GeoLocation& aGeoLocation) :
+  inherited(aGeoLocation),
+  trigger(aTrigger)
 {
-  ExpressionValue res = calcCondition();
+}
+
+
+ExpressionValue TriggerExpressionContext::valueLookup(const string &aName)
+{
+  return trigger.valueMapper.valueLookup(aName);
+}
+
+
+
+ErrorPtr Trigger::checkAndFire()
+{
+  return triggerCondition.triggerEvaluation();
+}
+
+
+ErrorPtr Trigger::triggerEvaluationResultHandler(ExpressionValue aEvaluationResult)
+{
+  ErrorPtr err = aEvaluationResult.err;
   Tristate newState = undefined;
-  if (res.isOk()) {
-    newState = res.v>0 ? yes : no;
+  if (aEvaluationResult.isOk()) {
+    newState = aEvaluationResult.v>0 ? yes : no;
   }
   if (newState!=conditionMet) {
     LOG(LOG_NOTICE, "Trigger '%s': condition changes to %s", name.c_str(), newState==yes ? "TRUE" : (newState==no ? "FALSE" : "undefined"));
@@ -1020,7 +1041,7 @@ bool Trigger::checkAndFire()
       // a trigger fire is an activity
       LocalController::sharedLocalController()->signalActivity();
       // trigger when state goes from not met to met.
-      ErrorPtr err = executeActions();
+      err = executeActions();
       if (Error::isOK(err)) {
         LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully: %s", name.c_str(), triggerActions.c_str());
       }
@@ -1029,17 +1050,7 @@ bool Trigger::checkAndFire()
       }
     }
   }
-  return false;
-}
-
-
-ExpressionValue Trigger::calcCondition()
-{
-  return evaluateExpression(
-    triggerCondition,
-    boost::bind(&Trigger::valueLookup, this, _1),
-    boost::bind(&Trigger::evaluateFunction, this, _1, _2)
-  );
+  return err;
 }
 
 
@@ -1075,112 +1086,13 @@ void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListene
 }
 
 
-ExpressionValue Trigger::valueLookup(const string aName)
+// MARK: - Trigger actions execution
+
+
+ExpressionValue Trigger::actionExpressionValueLookup(const string aName)
 {
   return valueMapper.valueLookup(aName);
 }
-
-
-ExpressionValue Trigger::evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs)
-{
-  struct timeval t;
-  gettimeofday(&t, NULL);
-  struct tm now;
-  localtime_r(&t.tv_sec, &now);
-  VdcHost &vdchost = LocalController::sharedLocalController()->vdcHost;
-  if (aName=="is_weekday" && aArgs.size()>0) {
-    int weekday = now.tm_wday; // 0..6, 0=sunday
-    for (int i = 0; i<aArgs.size(); i++) {
-      int w = (int)aArgs[i].v;
-      if (w==7) w=0; // treat both 0 and 7 as sunday
-      if (w==weekday) {
-        // today is one of the days listed
-        return ExpressionValue(1);
-      }
-    }
-    // none of the specified days
-    return ExpressionValue(0);
-  }
-  else if (aName=="is_time" && aArgs.size()>=1) {
-    // precision only to the minute!
-    int mins;
-    if (aArgs.size()==2) {
-      // legacy spec
-      mins = (int)aArgs[0].v * 60 + (int)aArgs[1].v;
-    }
-    else {
-      // specification in seconds, usually using time literal
-      mins = (int)(aArgs[0].v / 60);
-    }
-    return ExpressionValue(now.tm_hour*60+now.tm_min == mins);
-  }
-  else if (aName=="after_time" && aArgs.size()>=1) {
-    // precision to the second
-    long secs;
-    if (aArgs.size()==2) {
-      // legacy spec
-      secs = ((long)aArgs[0].v * 60 + (long)aArgs[1].v) * 60;
-    }
-    else {
-      // specification in seconds, usually using time literal
-      secs = (long)(aArgs[0].v);
-    }
-    return ExpressionValue(((now.tm_hour*60)+now.tm_min)*60+now.tm_sec>=secs);
-  }
-  else if (aName=="between_yeardays" && aArgs.size()==2) {
-    int first = (int)(aArgs[0].v);
-    int last = (int)(aArgs[1].v);
-    return ExpressionValue(
-      first<=last ?
-      now.tm_yday>=first && now.tm_yday<=last : // within year between first and last
-      now.tm_yday<=last || now.tm_yday>=first // before first day in next year, after last day in previous
-    );
-  }
-  else if (aName=="sunrise") {
-    return ExpressionValue(sunrise(time(NULL), vdchost.latitude, vdchost.longitude, false)*3600);
-  }
-  else if (aName=="dawn") {
-    return ExpressionValue(sunrise(time(NULL), vdchost.latitude, vdchost.longitude, true)*3600);
-  }
-  else if (aName=="sunset") {
-    return ExpressionValue(sunset(time(NULL), vdchost.latitude, vdchost.longitude, false)*3600);
-  }
-  else if (aName=="dusk") {
-    return ExpressionValue(sunset(time(NULL), vdchost.latitude, vdchost.longitude, true)*3600);
-  }
-  else if (aName=="timeofday") {
-    return ExpressionValue(((now.tm_hour*60)+now.tm_min)*60+now.tm_sec+(t.tv_usec/1e6));
-  }
-  else if (aName=="hour") {
-    return ExpressionValue(now.tm_hour);
-  }
-  else if (aName=="minute") {
-    return ExpressionValue(now.tm_min);
-  }
-  else if (aName=="second") {
-    return ExpressionValue(now.tm_sec);
-  }
-  else if (aName=="year") {
-    return ExpressionValue(now.tm_year+1900);
-  }
-  else if (aName=="month") {
-    return ExpressionValue(now.tm_mon+1);
-  }
-  else if (aName=="day") {
-    return ExpressionValue(now.tm_mday);
-  }
-  else if (aName=="weekday") {
-    return ExpressionValue(now.tm_wday);
-  }
-  else if (aName=="yearday") {
-    return ExpressionValue(now.tm_yday);
-  }
-  // no such function
-  return ExpressionError::errValue(ExpressionError::NotFound, "not found"); // just signals caller to try builtin functions
-}
-
-
-// MARK: - Trigger actions execution
 
 
 ErrorPtr Trigger::executeActions()
@@ -1199,8 +1111,8 @@ ErrorPtr Trigger::executeActions()
     // substitute params in action
     substituteExpressionPlaceholders(
       params,
-      boost::bind(&Trigger::valueLookup, this, _1),
-      boost::bind(&Trigger::evaluateFunction, this, _1, _2)
+      boost::bind(&Trigger::actionExpressionValueLookup, this, _1),
+      NULL
     );
     if (cmd=="scene") {
       // scene:<name>[,<transitionTime>]
@@ -1312,13 +1224,15 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   // Condition
   ApiValuePtr cond = checkResult->newObject();
   ExpressionValue res;
-  res = calcCondition();
+  res = triggerCondition.evaluateNow();
+  cond->add("expression", checkResult->newString(triggerCondition.getExpression()));
   if (res.isOk()) {
     cond->add("result", checkResult->newDouble(res.v));
-    LOG(LOG_INFO, "- condition '%s' -> %f", triggerCondition.c_str(), res.v);
+    LOG(LOG_INFO, "- condition '%s' -> %f", triggerCondition.getExpression().c_str(), res.v);
   }
   else {
     cond->add("error", checkResult->newString(res.err->getErrorMessage()));
+    if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(res.pos));
   }
   checkResult->add("condition", cond);
   // return the result
@@ -1408,9 +1322,11 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   triggerId = aRow->getWithDefault<int>(aIndex++, 0);
   // the fields
   name = nonNullCStr(aRow->get<const char *>(aIndex++));
-  triggerCondition = nonNullCStr(aRow->get<const char *>(aIndex++));
+  triggerCondition.setExpression(nonNullCStr(aRow->get<const char *>(aIndex++)));
   triggerActions = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
+  // initiate evaluation, first vardefs and eventually trigger expression to get timers started
+  parseVarDefs();
 }
 
 
@@ -1421,7 +1337,7 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, triggerId);
   // the fields
   aStatement.bind(aIndex++, name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, triggerCondition.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, triggerCondition.getExpression().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerActions.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
@@ -1469,7 +1385,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: aPropValue->setStringValue(name); return true;
-        case triggerCondition_key: aPropValue->setStringValue(triggerCondition); return true;
+        case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getExpression()); return true;
         case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
         case triggerActions_key: aPropValue->setStringValue(triggerActions); return true;
       }
@@ -1478,12 +1394,15 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: setPVar(name, aPropValue->stringValue()); return true;
         case triggerCondition_key:
-          if (setPVar(triggerCondition, aPropValue->stringValue()))
+          if (triggerCondition.setExpression(aPropValue->stringValue())) {
+            markDirty();
             checkAndFire();
-            return true;
+          }
+          return true;
         case triggerVarDefs_key:
-          if (setPVar(triggerVarDefs, aPropValue->stringValue()))
+          if (setPVar(triggerVarDefs, aPropValue->stringValue())) {
             parseVarDefs(); // changed variable mappings, re-parse them
+          }
           return true;
         case triggerActions_key: setPVar(triggerActions, aPropValue->stringValue()); return true;
       }
@@ -1521,26 +1440,6 @@ TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting,
   }
   return trig;
 }
-
-
-#define TRIGGER_CHECK_START_DELAY (10*Second)
-#define TRIGGER_CHECK_INTERVAL (10*Second)
-
-
-void TriggerList::startChecking()
-{
-  checkTicket.executeOnce(boost::bind(&TriggerList::triggerChecker, this, _1), TRIGGER_CHECK_START_DELAY);
-}
-
-
-void TriggerList::triggerChecker(MLTimer &aTimer)
-{
-  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
-    (*pos)->checkAndFire();
-  }
-  MainLoop::currentMainLoop().retriggerTimer(aTimer, TRIGGER_CHECK_INTERVAL);
-}
-
 
 
 // MARK: - TriggerList persistence
@@ -2123,7 +2022,6 @@ size_t LocalController::totalDevices() const
 void LocalController::startRunning()
 {
   FOCUSLOG("startRunning");
-  localTriggers.startChecking();
 }
 
 

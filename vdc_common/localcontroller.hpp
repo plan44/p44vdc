@@ -48,6 +48,8 @@ namespace p44 {
   class SceneIdentifier;
   typedef vector<SceneIdentifier> SceneIdsVector;
 
+  class Trigger;
+
   /// Scene kind flags
   enum {
     // scope
@@ -363,16 +365,36 @@ namespace p44 {
   typedef boost::intrusive_ptr<SceneList> SceneListPtr;
 
 
+
+  class TriggerExpressionContext : public TimedEvaluationContext
+  {
+    typedef TimedEvaluationContext inherited;
+    Trigger &trigger;
+
+  public:
+
+    TriggerExpressionContext(Trigger &aTrigger, const GeoLocation& aGeoLocation);
+
+  protected:
+
+    /// lookup variables by name
+    /// @param aName the name of the value/variable to look up
+    /// @return Expression value (with error when value is not available)
+    virtual ExpressionValue valueLookup(const string &aName);
+  };
+
+
   /// trigger
   class Trigger : public PropertyContainer, public PersistentParams
   {
     typedef PropertyContainer inherited;
     typedef PersistentParams inheritedParams;
     friend class TriggerList;
+    friend class TriggerExpressionContext;
 
     int triggerId; ///< the immutable ID of this trigger
     string name;
-    string triggerCondition; ///< expression that must evaluate to true to trigger the action
+    TriggerExpressionContext triggerCondition; ///< expression that must evaluate to true to trigger the action
     string triggerActions; ///< actions to trigger (scene calls, etc.)
     string triggerVarDefs; ///< variable to valueSource mappings
 
@@ -386,8 +408,8 @@ namespace p44 {
     virtual ~Trigger();
 
     /// check trigger and fire actions when condition transitions from non-met to met
-    /// @return true when trigger has fired
-    bool checkAndFire();
+    /// @return ok or error in case expression evaluation failed
+    ErrorPtr checkAndFire();
 
     /// execute the trigger actions
     ErrorPtr executeActions();
@@ -416,10 +438,8 @@ namespace p44 {
 
     void parseVarDefs();
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
-
-    ExpressionValue calcCondition();
-    ExpressionValue valueLookup(const string aName);
-    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
+    ErrorPtr triggerEvaluationResultHandler(ExpressionValue aEvaluationResult);
+    ExpressionValue actionExpressionValueLookup(const string aName);
 
   };
   typedef boost::intrusive_ptr<Trigger> TriggerPtr;
@@ -439,9 +459,6 @@ namespace p44 {
     typedef vector<TriggerPtr> TriggersVector;
 
     TriggersVector triggers;
-
-    /// start checking for triggers
-    void startChecking();
 
     /// load zones
     ErrorPtr load();
@@ -464,11 +481,7 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
-
-  private:
-
-    void triggerChecker(MLTimer &aTimer);
-
+    
   };
   typedef boost::intrusive_ptr<TriggerList> TriggerListPtr;
 
