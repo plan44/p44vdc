@@ -30,6 +30,7 @@
 #include "dsaddressable.hpp"
 #include "valuesource.hpp"
 #include "digitalio.hpp"
+#include "timeutils.hpp"
 
 #include "vdcapi.hpp"
 
@@ -207,8 +208,7 @@ namespace p44 {
     #endif
 
     /// geolocation of the installation
-    double longitude;
-    double latitude;
+    GeoLocation geolocation;
 
     /// the list of containers by API-exposed ID (dSUID or derived dsid)
     VdcMap vdcs;
