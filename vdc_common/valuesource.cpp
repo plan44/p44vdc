@@ -179,7 +179,7 @@ ExpressionValue ValueSourceMapper::valueLookup(const string aName)
   }
   ValueSource* vs = valueSourceByAlias(name);
   if (vs==NULL) {
-    return ExpressionError::errValue(ExpressionError::NotFound, "Undefined alias '%s'", name.c_str());
+    return ExpressionValue::errValue(ExpressionError::NotFound, "Undefined variable '%s'", name.c_str());
   }
   // value found
   if (subfield.empty()) {
@@ -202,10 +202,10 @@ ExpressionValue ValueSourceMapper::valueLookup(const string aName)
     }
   }
   else {
-    return ExpressionError::errValue(ExpressionError::NotFound, "Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
+    return ExpressionValue::errValue(ExpressionError::NotFound, "Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
   }
   // no value (yet)
-  return ExpressionError::errValue(ExpressionError::Null, "'%s' has no known value yet", aName.c_str());
+  return ExpressionValue::errValue(ExpressionError::Null, "'%s' has no known value yet", aName.c_str());
 }
 
 
