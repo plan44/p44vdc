@@ -1032,7 +1032,7 @@ ErrorPtr Trigger::triggerEvaluationResultHandler(ExpressionValue aEvaluationResu
   ErrorPtr err = aEvaluationResult.err;
   Tristate newState = undefined;
   if (aEvaluationResult.isOk()) {
-    newState = aEvaluationResult.v>0 ? yes : no;
+    newState = aEvaluationResult.boolValue() ? yes : no;
   }
   if (newState!=conditionMet) {
     LOG(LOG_NOTICE, "Trigger '%s': condition changes to %s", name.c_str(), newState==yes ? "TRUE" : (newState==no ? "FALSE" : "undefined"));
@@ -1227,8 +1227,8 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   res = triggerCondition.evaluateNow();
   cond->add("expression", checkResult->newString(triggerCondition.getExpression()));
   if (res.isOk()) {
-    cond->add("result", checkResult->newDouble(res.v));
-    LOG(LOG_INFO, "- condition '%s' -> %f", triggerCondition.getExpression().c_str(), res.v);
+    cond->add("result", res.isString() ? cond->newString(res.stringValue()) : cond->newDouble(res.numValue()));
+    LOG(LOG_INFO, "- condition '%s' -> %s", triggerCondition.getExpression().c_str(), res.stringValue().c_str());
   }
   else {
     cond->add("error", checkResult->newString(res.err->getErrorMessage()));

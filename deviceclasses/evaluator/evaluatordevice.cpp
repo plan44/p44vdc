@@ -209,8 +209,8 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     res = evaluatorSettings()->onCondition.evaluateNow();
     cond->add("expression", checkResult->newString(evaluatorSettings()->onCondition.getExpression()));
     if (res.isOk()) {
-      cond->add("result", cond->newDouble(res.v));
-      LOG(LOG_INFO, "- onCondition '%s' -> %f", evaluatorSettings()->onCondition.getExpression().c_str(), res.v);
+      cond->add("result", res.isString() ? cond->newString(res.stringValue()) : cond->newDouble(res.numValue()));
+      LOG(LOG_INFO, "- onCondition '%s' -> %s", evaluatorSettings()->onCondition.getExpression().c_str(), res.stringValue().c_str());
     }
     else {
       cond->add("error", cond->newString(res.err->getErrorMessage()));
@@ -223,8 +223,8 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       res = evaluatorSettings()->offCondition.evaluateNow();
       cond->add("expression", checkResult->newString(evaluatorSettings()->offCondition.getExpression()));
       if (res.isOk()) {
-        cond->add("result", cond->newDouble(res.v));
-        LOG(LOG_INFO, "- offCondition '%s' -> %f", evaluatorSettings()->offCondition.getExpression().c_str(), res.v);
+        cond->add("result", res.isString() ? cond->newString(res.stringValue()) : cond->newDouble(res.numValue()));
+        LOG(LOG_INFO, "- offCondition '%s' -> %s", evaluatorSettings()->offCondition.getExpression().c_str(), res.stringValue().c_str());
       }
       else {
         cond->add("error", cond->newString(res.err->getErrorMessage()));
@@ -312,8 +312,8 @@ Tristate EvaluatorDevice::evaluateBooleanNow(EvaluationContext &aEvalCtx, EvalMo
   ExpressionValue res = aEvalCtx.evaluateNow(aEvalMode, aScheduleReEval);
   if (res.isOk()) {
     // evaluation successful
-    AFOCUSLOG("===== expression result: '%s' = %f = %s", aEvalCtx.getExpression().c_str(), res.v, res.v>0 ? "true" : "false");
-    return res.v>0 ? yes : no;
+    AFOCUSLOG("===== expression result: '%s' = %s = %s", aEvalCtx.getExpression().c_str(), res.stringValue().c_str(), res.boolValue() ? "true" : "false");
+    return res.boolValue() ? yes : no;
   }
   else {
     ALOG(LOG_INFO,"Expression '%s' evaluation error: %s", aEvalCtx.getExpression().c_str(), res.err->text());
@@ -332,8 +332,8 @@ ErrorPtr EvaluatorDevice::handleReEvaluationResult(bool aIsOffCondition, Express
     if (s) {
       reporting = true;
       if (aEvaluationResult.isOk()) {
-        AFOCUSLOG("===== sensor expression result: '%s' = %f", evaluatorSettings()->onCondition.getExpression().c_str(), aEvaluationResult.v);
-        s->updateSensorValue(aEvaluationResult.v);
+        AFOCUSLOG("===== sensor expression result: '%s' = '%s' = %f", evaluatorSettings()->onCondition.getExpression().c_str(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.numValue());
+        s->updateSensorValue(aEvaluationResult.numValue());
       }
       else {
         ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.getExpression().c_str(), aEvaluationResult.err->text());
@@ -348,8 +348,8 @@ ErrorPtr EvaluatorDevice::handleReEvaluationResult(bool aIsOffCondition, Express
     Tristate b;
     if (aEvaluationResult.isOk()) {
       // evaluation successful
-      AFOCUSLOG("===== timed re-evaluation: '%s' = %f = %s", aContext.getExpression().c_str(), aEvaluationResult.v, aEvaluationResult.v>0 ? "true" : "false");
-      b = aEvaluationResult.v>0 ? yes : no;
+      AFOCUSLOG("===== timed re-evaluation: '%s' = %s = %s", aContext.getExpression().c_str(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.boolValue() ? "true" : "false");
+      b = aEvaluationResult.boolValue() ? yes : no;
     }
     else {
       ALOG(LOG_INFO,"Expression '%s' re-evaluation error: %s", aContext.getExpression().c_str(), aEvaluationResult.err->text());
