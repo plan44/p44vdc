@@ -206,11 +206,11 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     ExpressionValue res;
     // - on condition (or calculation for sensors)
     cond = checkResult->newObject();
-    res = evaluatorSettings()->onCondition.evaluateNow();
-    cond->add("expression", checkResult->newString(evaluatorSettings()->onCondition.getExpression()));
+    res = evaluatorSettings()->onCondition.evaluateSynchronously(evalmode_initial);
+    cond->add("expression", checkResult->newString(evaluatorSettings()->onCondition.getCode()));
     if (res.isOk()) {
       cond->add("result", res.isString() ? cond->newString(res.stringValue()) : cond->newDouble(res.numValue()));
-      LOG(LOG_INFO, "- onCondition '%s' -> %s", evaluatorSettings()->onCondition.getExpression().c_str(), res.stringValue().c_str());
+      LOG(LOG_INFO, "- onCondition '%s' -> %s", evaluatorSettings()->onCondition.getCode(), res.stringValue().c_str());
     }
     else {
       cond->add("error", cond->newString(res.err->getErrorMessage()));
@@ -220,11 +220,11 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     if (evaluatorType!=evaluator_sensor || evaluatorType!=evaluator_internalsensor) {
       // - off condition
       cond = checkResult->newObject();
-      res = evaluatorSettings()->offCondition.evaluateNow();
-      cond->add("expression", checkResult->newString(evaluatorSettings()->offCondition.getExpression()));
+      res = evaluatorSettings()->offCondition.evaluateSynchronously(evalmode_initial);
+      cond->add("expression", checkResult->newString(evaluatorSettings()->offCondition.getCode()));
       if (res.isOk()) {
         cond->add("result", res.isString() ? cond->newString(res.stringValue()) : cond->newDouble(res.numValue()));
-        LOG(LOG_INFO, "- offCondition '%s' -> %s", evaluatorSettings()->offCondition.getExpression().c_str(), res.stringValue().c_str());
+        LOG(LOG_INFO, "- offCondition '%s' -> %s", evaluatorSettings()->offCondition.getCode(), res.stringValue().c_str());
       }
       else {
         cond->add("error", cond->newString(res.err->getErrorMessage()));
@@ -308,15 +308,15 @@ void EvaluatorDevice::changedConditions()
 
 Tristate EvaluatorDevice::evaluateBooleanNow(EvaluationContext &aEvalCtx, EvalMode aEvalMode, bool aScheduleReEval)
 {
-  AFOCUSLOG("----- Starting expression evaluation: '%s'", aEvalCtx.getExpression().c_str());
-  ExpressionValue res = aEvalCtx.evaluateNow(aEvalMode, aScheduleReEval);
+  AFOCUSLOG("----- Starting expression evaluation: '%s'", aEvalCtx.getCode());
+  ExpressionValue res = aEvalCtx.evaluateSynchronously(aEvalMode, aScheduleReEval);
   if (res.isOk()) {
     // evaluation successful
-    AFOCUSLOG("===== expression result: '%s' = %s = %s", aEvalCtx.getExpression().c_str(), res.stringValue().c_str(), res.boolValue() ? "true" : "false");
+    AFOCUSLOG("===== expression result: '%s' = %s = %s", aEvalCtx.getCode(), res.stringValue().c_str(), res.boolValue() ? "true" : "false");
     return res.boolValue() ? yes : no;
   }
   else {
-    ALOG(LOG_INFO,"Expression '%s' evaluation error: %s", aEvalCtx.getExpression().c_str(), res.err->text());
+    ALOG(LOG_INFO,"Expression '%s' evaluation error: %s", aEvalCtx.getCode(), res.err->text());
     return undefined;
   }
 }
@@ -332,11 +332,11 @@ ErrorPtr EvaluatorDevice::handleReEvaluationResult(bool aIsOffCondition, Express
     if (s) {
       reporting = true;
       if (aEvaluationResult.isOk()) {
-        AFOCUSLOG("===== sensor expression result: '%s' = '%s' = %f", evaluatorSettings()->onCondition.getExpression().c_str(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.numValue());
+        AFOCUSLOG("===== sensor expression result: '%s' = '%s' = %f", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.numValue());
         s->updateSensorValue(aEvaluationResult.numValue());
       }
       else {
-        ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.getExpression().c_str(), aEvaluationResult.err->text());
+        ALOG(LOG_INFO,"Sensor expression '%s' evaluation error: %s", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.err->text());
         s->invalidateSensorValue();
       }
     }
@@ -348,16 +348,16 @@ ErrorPtr EvaluatorDevice::handleReEvaluationResult(bool aIsOffCondition, Express
     Tristate b;
     if (aEvaluationResult.isOk()) {
       // evaluation successful
-      AFOCUSLOG("===== timed re-evaluation: '%s' = %s = %s", aContext.getExpression().c_str(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.boolValue() ? "true" : "false");
+      AFOCUSLOG("===== timed re-evaluation: '%s' = %s = %s", aContext.getCode(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.boolValue() ? "true" : "false");
       b = aEvaluationResult.boolValue() ? yes : no;
     }
     else {
-      ALOG(LOG_INFO,"Expression '%s' re-evaluation error: %s", aContext.getExpression().c_str(), aEvaluationResult.err->text());
+      ALOG(LOG_INFO,"Expression '%s' re-evaluation error: %s", aContext.getCode(), aEvaluationResult.err->text());
       b = undefined;
     }
     if (aIsOffCondition) currentOff = b;
     else currentOn = b;
-    calculateEvaluatorState(currentState, aContext.getEvalMode());
+    calculateEvaluatorState(currentState, evalmode_timed);
   }
   return ErrorPtr();
 }
@@ -393,7 +393,7 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
   evaluateTicket.cancel();
   if (!decisionMade && aRefState!=yes) {
     // off or unknown: check for switching on
-    ALOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.getExpression().c_str(), currentOn==undefined ? "<undefined>" : (currentOn==yes ? "true -> switching ON" : "false"));
+    ALOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.getCode(), currentOn==undefined ? "<undefined>" : (currentOn==yes ? "true -> switching ON" : "false"));
     if (currentOn!=yes) {
       // not met now -> reset if we are currently timing this condition
       if (onConditionMet) conditionMetSince = Never;
@@ -421,7 +421,7 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
   }
   if (!decisionMade && aRefState!=no) {
     // on or unknown: check for switching off
-    ALOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.getExpression().c_str(), currentOff==undefined ? "<undefined>" : (currentOff==yes ? "true -> switching OFF" : "false"));
+    ALOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.getCode(), currentOff==undefined ? "<undefined>" : (currentOff==yes ? "true -> switching OFF" : "false"));
     if (currentOff!=yes) {
       // not met now -> reset if we are currently timing this condition
       if (!onConditionMet) conditionMetSince = Never;
@@ -488,28 +488,31 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
 // MARK: - EvaluatorExpressionContext
 
 
-EvaluatorExpressionContext::EvaluatorExpressionContext(EvaluatorDevice &aEvaluator, const GeoLocation& aGeoLocation) :
-  inherited(aGeoLocation),
+EvaluatorExpressionContext::EvaluatorExpressionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP) :
+  inherited(aGeoLocationP),
   evaluator(aEvaluator)
 {
 }
 
 
 
-ExpressionValue EvaluatorExpressionContext::valueLookup(const string &aName)
+bool EvaluatorExpressionContext::valueLookup(const string &aName, ExpressionValue &aResult)
 {
-  return evaluator.valueMapper.valueLookup(aName);
+  if (evaluator.valueMapper.valueLookup(aResult, aName)) return true;
+  return inherited::valueLookup(aName, aResult);
 }
 
 
-ExpressionValue EvaluatorDevice::actionValueLookup(Tristate aCurrentState, const string aName)
+bool EvaluatorDevice::actionValueLookup(Tristate aCurrentState, const string aName, ExpressionValue aResult)
 {
   if (aName=="result") {
-    return ExpressionValue(aCurrentState==yes ? 1 : 0);
+    aResult.setBool(aCurrentState==yes);
+    return true;
   }
   else {
-    return valueMapper.valueLookup(aName);
+    if (valueMapper.valueLookup(aResult, aName)) return true;
   }
+  return false;
 }
 
 
@@ -560,7 +563,7 @@ ErrorPtr EvaluatorDevice::executeAction(Tristate aState)
         method = cmd=="putURL" ? "PUT" : "POST";
         ErrorPtr serr = substituteExpressionPlaceholders(
           data,
-          boost::bind(&EvaluatorDevice::actionValueLookup, this, aState, _1),
+          boost::bind(&EvaluatorDevice::actionValueLookup, this, aState, _1, _2),
           NULL, // TODO: use proper context with timer functions
           "null"
         );
@@ -579,7 +582,7 @@ ErrorPtr EvaluatorDevice::executeAction(Tristate aState)
     if (!method.empty()) {
       ErrorPtr serr = substituteExpressionPlaceholders(
         url,
-        boost::bind(&EvaluatorDevice::actionValueLookup, this, aState, _1),
+        boost::bind(&EvaluatorDevice::actionValueLookup, this, aState, _1, _2),
         NULL,
         "null"
       );
@@ -715,8 +718,8 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       switch (aPropertyDescriptor->fieldKey()) {
         case evaluatorType_key: aPropValue->setStringValue(getEvaluatorType()); return true;
         case varDefs_key: aPropValue->setStringValue(evaluatorSettings()->varDefs); return true;
-        case onCondition_key: aPropValue->setStringValue(evaluatorSettings()->onCondition.getExpression()); return true;
-        case offCondition_key: aPropValue->setStringValue(evaluatorSettings()->offCondition.getExpression()); return true;
+        case onCondition_key: aPropValue->setStringValue(evaluatorSettings()->onCondition.getCode()); return true;
+        case offCondition_key: aPropValue->setStringValue(evaluatorSettings()->offCondition.getCode()); return true;
         case minOnTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->minOnTime)/Second); return true;
         case minOffTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->minOffTime)/Second); return true;
         case action_key: aPropValue->setStringValue(evaluatorSettings()->action); return true;
@@ -730,13 +733,13 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
             parseVarDefs(); // changed varDefs, re-parse them
           return true;
         case onCondition_key:
-          if (evaluatorSettings()->onCondition.setExpression(aPropValue->stringValue())) {
+          if (evaluatorSettings()->onCondition.setCode(aPropValue->stringValue())) {
             evaluatorSettings()->markDirty();
             changedConditions();  // changed conditions, re-evaluate output
           }
           return true;
         case offCondition_key:
-          if (evaluatorSettings()->offCondition.setExpression(aPropValue->stringValue())) {
+          if (evaluatorSettings()->offCondition.setCode(aPropValue->stringValue())) {
             evaluatorSettings()->markDirty();
             changedConditions();  // changed conditions, re-evaluate output
           }
@@ -766,8 +769,8 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator) :
   inherited(aEvaluator),
-  onCondition(aEvaluator, aEvaluator.getVdcHost().geolocation),
-  offCondition(aEvaluator, aEvaluator.getVdcHost().geolocation),
+  onCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation),
+  offCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation),
   minOnTime(0), // trigger immediately
   minOffTime(0) // trigger immediately
 {
@@ -820,8 +823,8 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field values
   varDefs.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  onCondition.setExpression(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  offCondition.setExpression(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  onCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  offCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOnTime);
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOffTime);
   action.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
@@ -834,8 +837,8 @@ void EvaluatorDeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, 
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, varDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, onCondition.getExpression().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, offCondition.getExpression().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, onCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, offCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (long long int)minOnTime);
   aStatement.bind(aIndex++, (long long int)minOffTime);
   aStatement.bind(aIndex++, action.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)

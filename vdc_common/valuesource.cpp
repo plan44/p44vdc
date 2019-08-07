@@ -160,7 +160,7 @@ bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, ValueListener
 }
 
 
-ExpressionValue ValueSourceMapper::valueLookup(const string aName)
+bool ValueSourceMapper::valueLookup(ExpressionValue &aValue, const string aVarSpec)
 {
   // value specfications can be simple valuesource alias names, or alias names with sub-field specifications:
   // alias               returns the value of the valuesource itself
@@ -169,43 +169,52 @@ ExpressionValue ValueSourceMapper::valueLookup(const string aName)
   // alias.age           returns the age of the valuesource's value in seconds
   string subfield;
   string name;
-  size_t i = aName.find('.');
+  size_t i = aVarSpec.find('.');
   if (i!=string::npos) {
-    subfield = aName.substr(i+1);
-    name = aName.substr(0,i);
+    subfield = aVarSpec.substr(i+1);
+    name = aVarSpec.substr(0,i);
   }
   else {
-    name = aName;
+    name = aVarSpec;
   }
   ValueSource* vs = valueSourceByAlias(name);
   if (vs==NULL) {
-    return ExpressionValue::errValue(ExpressionError::NotFound, "Undefined variable '%s'", name.c_str());
+    // not found
+    return false;
   }
   // value found
   if (subfield.empty()) {
     // value itself is requested
     if (vs->getSourceLastUpdate()!=Never) {
-      return ExpressionValue(vs->getSourceValue());
+      aValue = ExpressionValue(vs->getSourceValue());
+      return true;
     }
   }
   else if (subfield=="valid") {
-    return ExpressionValue(vs->getSourceLastUpdate()!=Never ? 1 : 0);
+    aValue = ExpressionValue(vs->getSourceLastUpdate()!=Never ? 1 : 0);
+    return true;
   }
   else if (subfield=="oplevel") {
     int lvl = vs->getSourceOpLevel();
-    if (lvl>=0) return ExpressionValue(lvl);
+    if (lvl>=0) {
+      aValue = ExpressionValue(lvl);
+      return true;
+    }
     // otherwise: no known value
   }
   else if (subfield=="age") {
     if (vs->getSourceLastUpdate()!=Never) {
-      return ExpressionValue(((double)(MainLoop::now()-vs->getSourceLastUpdate()))/Second);
+      aValue = ExpressionValue(((double)(MainLoop::now()-vs->getSourceLastUpdate()))/Second);
+      return true;
     }
   }
   else {
-    return ExpressionValue::errValue(ExpressionError::NotFound, "Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
+    aValue = ExpressionValue::errValue(ExpressionError::NotFound, "Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
+    return true;
   }
   // no value (yet)
-  return ExpressionValue::errValue(ExpressionError::Null, "'%s' has no known value yet", aName.c_str());
+  aValue = ExpressionValue::errValue(ExpressionError::Null, "'%s' has no known value yet", aVarSpec.c_str());
+  return true;
 }
 
 

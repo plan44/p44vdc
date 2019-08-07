@@ -992,9 +992,12 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   triggerId(0),
-  triggerCondition(*this, VdcHost::sharedVdcHost()->geolocation),
+  triggerCondition(*this, &VdcHost::sharedVdcHost()->geolocation),
+  triggerActions(*this, &VdcHost::sharedVdcHost()->geolocation),
   conditionMet(undefined)
 {
+  triggerCondition.isMemberVariable();
+  triggerActions.isMemberVariable();
   triggerCondition.setEvaluationResultHandler(boost::bind(&Trigger::triggerEvaluationResultHandler, this, _1));
 }
 
@@ -1007,23 +1010,25 @@ Trigger::~Trigger()
 // MARK: - Trigger condition evaluation
 
 
-TriggerExpressionContext::TriggerExpressionContext(Trigger &aTrigger, const GeoLocation& aGeoLocation) :
-  inherited(aGeoLocation),
+TriggerExpressionContext::TriggerExpressionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP) :
+  inherited(aGeoLocationP),
   trigger(aTrigger)
 {
 }
 
 
-ExpressionValue TriggerExpressionContext::valueLookup(const string &aName)
+bool TriggerExpressionContext::valueLookup(const string &aName, ExpressionValue &aResult)
 {
-  return trigger.valueMapper.valueLookup(aName);
+  ExpressionValue res;
+  if (trigger.valueMapper.valueLookup(aResult, aName)) return true;
+  return inherited::valueLookup(aName, aResult);
 }
 
 
 
-ErrorPtr Trigger::checkAndFire()
+ErrorPtr Trigger::checkAndFire(EvalMode aEvalMode)
 {
-  return triggerCondition.triggerEvaluation();
+  return triggerCondition.triggerEvaluation(aEvalMode);
 }
 
 
@@ -1043,7 +1048,7 @@ ErrorPtr Trigger::triggerEvaluationResultHandler(ExpressionValue aEvaluationResu
       // trigger when state goes from not met to met.
       err = executeActions();
       if (Error::isOK(err)) {
-        LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully: %s", name.c_str(), triggerActions.c_str());
+        LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully: %s", name.c_str(), triggerActions.getCode());
       }
       else {
         LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), err->text());
@@ -1068,7 +1073,7 @@ void Trigger::parseVarDefs()
   }
   else {
     // run an initial check now that all values are defined
-    checkAndFire();
+    checkAndFire(evalmode_initial);
   }
 }
 
@@ -1081,7 +1086,7 @@ void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListene
   }
   else {
     LOG(LOG_INFO, "Trigger '%s': value source '%s' reports value %f -> re-evaluating trigger condition", name.c_str(), aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
-    checkAndFire();
+    checkAndFire(evalmode_externaltrigger);
   }
 }
 
@@ -1089,121 +1094,218 @@ void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListene
 // MARK: - Trigger actions execution
 
 
-ExpressionValue Trigger::actionExpressionValueLookup(const string aName)
+TriggerActionContext::TriggerActionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP) :
+  inherited(aGeoLocationP),
+  trigger(aTrigger)
 {
-  return valueMapper.valueLookup(aName);
 }
+
+
+bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aResult)
+{
+  ExpressionValue res;
+  if (trigger.valueMapper.valueLookup(aResult, aName)) return true;
+  return inherited::valueLookup(aName, aResult);
+}
+
+
+bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionArgumentVector &aArgs, ExpressionValue &aResult)
+{
+  if (aFunc=="scene" && (aArgs.size()>=1 || aArgs.size()<=2)) {
+    // scene(name)
+    // scene(name, transition time)
+    if (aArgs[0].notOk()) return errorInArg(aArgs[0]); // return error from argument
+    MLMicroSeconds transitionTime = Infinite; // use scene's standard time
+    if (aArgs.size()>=2) {
+      if (aArgs[1].notOk()) return errorInArg(aArgs[1]); // return error from argument
+      transitionTime = aArgs[1].numValue()*Second;
+    }
+    // execute the scene
+    SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(aArgs[0].stringValue());
+    if (!scene)
+      abortWithError(ExpressionError::NotFound, "scene '%s' not found", aArgs[0].stringValue().c_str());
+    else
+      LocalController::sharedLocalController()->callScene(scene->getIdentifier(), transitionTime);
+  }
+  else if (aFunc=="set" && (aArgs.size()>=2 || aArgs.size()<=5)) {
+    // set(zone_or_device, value)
+    // set(zone_or_device, value, transitiontime)
+    // set(zone_or_device, value, transitiontime, channelid)
+    // set(zone, value, transitiontime, channelid, group)
+    if (aArgs[0].notOk()) return errorInArg(aArgs[0]); // return error from argument
+    if (aArgs[1].notOk()) return errorInArg(aArgs[1]); // return error from argument
+    double value = aArgs[1].numValue();
+    // - optional transitiontime
+    MLMicroSeconds transitionTime = Infinite; // use scene's standard time
+    if (aArgs.size()>2) {
+      if (!aArgs[2].isNull()) {
+        if (aArgs[2].notOk()) return errorInArg(aArgs[2]); // return error from argument
+        transitionTime = aArgs[2].numValue()*Second;
+      }
+    }
+    // - optional channelid
+    string channelId = "0"; // default channel
+    if (aArgs.size()>3) {
+      if (!aArgs[3].isNull()) {
+        if (aArgs[3].notOk()) return errorInArg(aArgs[3]); // return error from argument
+        channelId = aArgs[2].stringValue();
+      }
+    }
+    // get zone or device
+    if (ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(aArgs[0].stringValue())) {
+      // - might have an optional group argument
+      DsGroup group = group_yellow_light; // default to light
+      if (aArgs.size()>4) {
+        if (!aArgs[4].valueOk()) return errorInArg(aArgs[4]); // return error from argument
+        const GroupDescriptor* gdP = LocalController::groupInfoByName(aArgs[4].stringValue());
+        if (!gdP) { abortWithError(ExpressionError::NotFound, "unknown group '%s'", aArgs[4].stringValue().c_str()); return true; }
+        group = gdP->no;
+      }
+      LocalController::sharedLocalController()->setOutputChannelValues(zone->getZoneId(), group, channelId, value, transitionTime);
+    }
+    else if (DevicePtr device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(aArgs[0].stringValue())) {
+      if (aArgs.size()>4) { abortWithSyntaxError("group cannot be specified for setting single device's output"); return true; }
+      NotificationAudience audience;
+      VdcHost::sharedVdcHost()->addTargetToAudience(audience, device);
+      LocalController::sharedLocalController()->setOutputChannelValues(audience, channelId, value, transitionTime);
+    }
+    else {
+      abortWithError(ExpressionError::NotFound, "no zone or device named '%s' found", aArgs[0].stringValue().c_str());
+    }
+  }
+  else {
+    return inherited::evaluateFunction(aFunc, aArgs, aResult);
+  }
+  return true; // found
+}
+
+
+#if LEGACY_ACTIONS_SUPPORT
+bool Trigger::actionExpressionValueLookup(const string aName, ExpressionValue aResult)
+{
+  if (valueMapper.valueLookup(aResult, aName)) return true;
+  return false;
+}
+#endif // LEGACY_ACTIONS_SUPPORT
 
 
 ErrorPtr Trigger::executeActions()
 {
   ErrorPtr err;
-  // Syntax
-  //  actions = <action> [ ; <action> [ ; ...]]
-  //  action = <cmd>:<params>
-  const char *p = triggerActions.c_str();
-  string action;
-  while (nextPart(p, action, ';')) {
-    string cmd;
-    string params;
-    LOG(LOG_INFO, "- starting executing action '%s'", action.c_str());
-    if (!keyAndValue(action, cmd, params, ':')) cmd = action; // could be action only
-    // substitute params in action
-    substituteExpressionPlaceholders(
-      params,
-      boost::bind(&Trigger::actionExpressionValueLookup, this, _1),
-      NULL
-    );
-    if (cmd=="scene") {
-      // scene:<name>[,<transitionTime>]
-      const char *p2 = params.c_str();
-      string sn;
-      if (nextPart(p2, sn, ',')) {
-        // scene name
-        SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(sn);
-        if (!scene) {
-          err = TextError::err("scene '%s' not found", sn.c_str());
-        }
-        else {
-          string ttm;
-          MLMicroSeconds transitionTime = Infinite; // use scene's standard time
-          if (nextPart(p2, ttm, ',')) {
-            double v;
-            if (sscanf(ttm.c_str(), "%lf", &v)==1) {
-              transitionTime = v*Second;
-            }
+  #if LEGACY_ACTIONS_SUPPORT
+  const char *p = triggerActions.getCode();
+  while (*p && (*p==' ' || *p=='\t')) p++;
+  if (strncasecmp(p, "scene:", 6)==0 || strncasecmp(p, "set:", 4)==0) {
+    LOG(LOG_WARNING, "Using legacy action syntax -> please convert to script");
+    // Legacy Syntax
+    //  actions = <action> [ ; <action> [ ; ...]]
+    //  action = <cmd>:<params>
+    string action;
+    while (nextPart(p, action, ';')) {
+      string cmd;
+      string params;
+      LOG(LOG_INFO, "- starting executing action '%s'", action.c_str());
+      if (!keyAndValue(action, cmd, params, ':')) cmd = action; // could be action only
+      // substitute params in action
+      substituteExpressionPlaceholders(
+        params,
+        boost::bind(&Trigger::actionExpressionValueLookup, this, _1, _2),
+        NULL
+      );
+      if (cmd=="scene") {
+        // scene:<name>[,<transitionTime>]
+        const char *p2 = params.c_str();
+        string sn;
+        if (nextPart(p2, sn, ',')) {
+          // scene name
+          SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(sn);
+          if (!scene) {
+            err = TextError::err("scene '%s' not found", sn.c_str());
           }
-          // execute the scene
-          LocalController::sharedLocalController()->callScene(scene->getIdentifier(), transitionTime);
-        }
-      }
-      else {
-        err = TextError::err("scene name missing. Syntax is: scene:<name>[,<transitionTime>]");
-        break;
-      }
-    }
-    else if (cmd=="set") {
-      // set:<zone>,<value>[,<transitionTime>[,<channelid>[,<group>]]]
-      const char *p2 = params.c_str();
-      string zn;
-      if (nextPart(p2, zn, ',')) {
-        // mandatory zone name
-        ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(zn);
-        if (!zone) {
-          err = TextError::err("zone '%s' not found", zn.c_str());
+          else {
+            string ttm;
+            MLMicroSeconds transitionTime = Infinite; // use scene's standard time
+            if (nextPart(p2, ttm, ',')) {
+              double v;
+              if (sscanf(ttm.c_str(), "%lf", &v)==1) {
+                transitionTime = v*Second;
+              }
+            }
+            // execute the scene
+            LocalController::sharedLocalController()->callScene(scene->getIdentifier(), transitionTime);
+          }
         }
         else {
-          string val;
-          if (nextPart(p2, val, ',')) {
-            // mandatory output value
-            double value;
-            if (sscanf(val.c_str(), "%lf", &value)!=1) {
-              err = TextError::err("invalid output value");
-            }
-            else {
-              string ttm;
-              MLMicroSeconds transitionTime = Infinite; // no override by default, use output's standard transition time
-              DsGroup group = group_yellow_light; // default to light
-              string channelId = "0"; // default channel
-              if (nextPart(p2, ttm, ',')) {
-                // optional transition time
-                double v;
-                if (sscanf(ttm.c_str(), "%lf", &v)==1) {
-                  transitionTime = v*Second;
-                }
-                // optional channel id
-                if (nextPart(p2, channelId, ',')) {
-                  // optional group
-                  string g;
-                  if (nextPart(p2, g, ',')) {
-                    const GroupDescriptor* gdP = LocalController::groupInfoByName(g);
-                    if (gdP) {
-                      group = gdP->no;
+          err = TextError::err("scene name missing. Syntax is: scene:<name>[,<transitionTime>]");
+          break;
+        }
+      }
+      else if (cmd=="set") {
+        // set:<zone>,<value>[,<transitionTime>[,<channelid>[,<group>]]]
+        const char *p2 = params.c_str();
+        string zn;
+        if (nextPart(p2, zn, ',')) {
+          // mandatory zone name
+          ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(zn);
+          if (!zone) {
+            err = TextError::err("zone '%s' not found", zn.c_str());
+          }
+          else {
+            string val;
+            if (nextPart(p2, val, ',')) {
+              // mandatory output value
+              double value;
+              if (sscanf(val.c_str(), "%lf", &value)!=1) {
+                err = TextError::err("invalid output value");
+              }
+              else {
+                string ttm;
+                MLMicroSeconds transitionTime = Infinite; // no override by default, use output's standard transition time
+                DsGroup group = group_yellow_light; // default to light
+                string channelId = "0"; // default channel
+                if (nextPart(p2, ttm, ',')) {
+                  // optional transition time
+                  double v;
+                  if (sscanf(ttm.c_str(), "%lf", &v)==1) {
+                    transitionTime = v*Second;
+                  }
+                  // optional channel id
+                  if (nextPart(p2, channelId, ',')) {
+                    // optional group
+                    string g;
+                    if (nextPart(p2, g, ',')) {
+                      const GroupDescriptor* gdP = LocalController::groupInfoByName(g);
+                      if (gdP) {
+                        group = gdP->no;
+                      }
                     }
                   }
                 }
+                // set the ouputs
+                LocalController::sharedLocalController()->setOutputChannelValues(zone->getZoneId(), group, channelId, value, transitionTime);
               }
-              // set the ouputs
-              LocalController::sharedLocalController()->setOutputChannelValues(zone->getZoneId(), group, channelId, value, transitionTime);
+            }
+            else {
+              err = TextError::err("missing output value");
             }
           }
-          else {
-            err = TextError::err("missing output value");
-          }
+        }
+        else {
+          err = TextError::err("zone name missing. Syntax is: set:<zone>,<value>[,<transitionTime>[,<channelid>[,<group>]]]");
+          break;
         }
       }
       else {
-        err = TextError::err("zone name missing. Syntax is: set:<zone>,<value>[,<transitionTime>[,<channelid>[,<group>]]]");
+        err = TextError::err("Action '%s' is unknown", cmd.c_str());
         break;
       }
-    }
-    else {
-      err = TextError::err("Action '%s' is unknown", cmd.c_str());
-      break;
-    }
-    LOG(LOG_INFO, "- done executing action '%s'", action.c_str());
-  } // while actions
-  return err;
+      LOG(LOG_INFO, "- done executing action '%s'", action.c_str());
+    } // while legacy actions
+    return err;
+  }
+  #endif // LEGACY_ACTIONS_SUPPORT
+  // run script
+  return triggerActions.evaluateSynchronously(evalmode_script).err;
 }
 
 
@@ -1224,11 +1326,11 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   // Condition
   ApiValuePtr cond = checkResult->newObject();
   ExpressionValue res;
-  res = triggerCondition.evaluateNow();
-  cond->add("expression", checkResult->newString(triggerCondition.getExpression()));
+  res = triggerCondition.evaluateSynchronously(evalmode_initial);
+  cond->add("expression", checkResult->newString(triggerCondition.getCode()));
   if (res.isOk()) {
     cond->add("result", res.isString() ? cond->newString(res.stringValue()) : cond->newDouble(res.numValue()));
-    LOG(LOG_INFO, "- condition '%s' -> %s", triggerCondition.getExpression().c_str(), res.stringValue().c_str());
+    LOG(LOG_INFO, "- condition '%s' -> %s", triggerCondition.getCode(), res.stringValue().c_str());
   }
   else {
     cond->add("error", checkResult->newString(res.err->getErrorMessage()));
@@ -1248,7 +1350,7 @@ ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
   ErrorPtr err = executeActions();
   if (Error::isOK(err)) {
     testResult->add("result", testResult->newString("OK"));
-    LOG(LOG_INFO, "- successfully executed '%s'", triggerActions.c_str());
+    LOG(LOG_INFO, "- successfully executed '%s'", triggerActions.getCode());
   }
   else {
     testResult->add("error", testResult->newString(err->getErrorMessage()));
@@ -1322,8 +1424,8 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   triggerId = aRow->getWithDefault<int>(aIndex++, 0);
   // the fields
   name = nonNullCStr(aRow->get<const char *>(aIndex++));
-  triggerCondition.setExpression(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  triggerActions = nonNullCStr(aRow->get<const char *>(aIndex++));
+  triggerCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  triggerActions.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   triggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
   // initiate evaluation, first vardefs and eventually trigger expression to get timers started
   parseVarDefs();
@@ -1337,8 +1439,8 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, triggerId);
   // the fields
   aStatement.bind(aIndex++, name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, triggerCondition.getExpression().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, triggerActions.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, triggerCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, triggerActions.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
@@ -1385,18 +1487,18 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: aPropValue->setStringValue(name); return true;
-        case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getExpression()); return true;
+        case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getCode()); return true;
         case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
-        case triggerActions_key: aPropValue->setStringValue(triggerActions); return true;
+        case triggerActions_key: aPropValue->setStringValue(triggerActions.getCode()); return true;
       }
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: setPVar(name, aPropValue->stringValue()); return true;
         case triggerCondition_key:
-          if (triggerCondition.setExpression(aPropValue->stringValue())) {
+          if (triggerCondition.setCode(aPropValue->stringValue())) {
             markDirty();
-            checkAndFire();
+            checkAndFire(evalmode_initial);
           }
           return true;
         case triggerVarDefs_key:
@@ -1404,7 +1506,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
             parseVarDefs(); // changed variable mappings, re-parse them
           }
           return true;
-        case triggerActions_key: setPVar(triggerActions, aPropValue->stringValue()); return true;
+        case triggerActions_key: if (triggerActions.setCode(aPropValue->stringValue())) markDirty(); return true;
       }
     }
   }

@@ -44,14 +44,15 @@ namespace p44 {
 
   public:
 
-    EvaluatorExpressionContext(EvaluatorDevice &aEvaluator, const GeoLocation& aGeoLocation);
+    EvaluatorExpressionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP);
 
   protected:
 
     /// lookup variables by name
     /// @param aName the name of the value/variable to look up
-    /// @return Expression value (with error when value is not available)
-    virtual ExpressionValue valueLookup(const string &aName);
+    /// @param aResult set the value here
+    /// @return true if function executed, false if value is unknown
+    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
 
   };
 
@@ -219,7 +220,7 @@ namespace p44 {
     void httpActionDone(const string &aResponse, ErrorPtr aError);
 
     /// expression evaluation
-    ExpressionValue actionValueLookup(Tristate aCurrentState, const string aName);
+    bool actionValueLookup(Tristate aCurrentState, const string aName, ExpressionValue aResult);
 
   };
   typedef boost::intrusive_ptr<EvaluatorDevice> EvaluatorDevicePtr;

@@ -341,13 +341,13 @@ namespace p44 {
     /// @param aAudience the audience
     /// @param aDsuid the dSUID to be added
     /// @return error in case dSUID is not address valid notification target
-    ErrorPtr addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &aDsuid);
+    ErrorPtr addToAudienceByDsuid(NotificationAudience &aAudience, const DsUid &aDsuid);
 
     /// Add a notification target by x-p44-itemSpec to a notification audience
     /// @param aAudience the audience
     /// @param aItemSpec alternative item specification, in case there is no dSUID
     /// @return error in case aItemSpec does not address valid notification target
-    ErrorPtr addToAudienceByItemSpec(NotificationAudience &aAudience, string &aItemSpec);
+    ErrorPtr addToAudienceByItemSpec(NotificationAudience &aAudience, const string &aItemSpec);
 
     /// Add notification targets selected by matching zone and group
     /// @param aAudience the audience
@@ -467,6 +467,11 @@ namespace p44 {
 
     /// @name methods for DeviceClassContainers
     /// @{
+
+    /// get a device by name or dSUID string
+    /// @param aName the name or dSUID
+    /// @return device or NULL
+    DevicePtr getDeviceByNameOrDsUid(const string &aName);
 
     /// called by vDC containers to report learn event
     /// @param aLearnIn true if new device learned in, false if device learned out

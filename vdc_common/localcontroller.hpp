@@ -373,16 +373,58 @@ namespace p44 {
 
   public:
 
-    TriggerExpressionContext(Trigger &aTrigger, const GeoLocation& aGeoLocation);
+    TriggerExpressionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP);
 
   protected:
 
     /// lookup variables by name
     /// @param aName the name of the value/variable to look up
-    /// @return Expression value (with error when value is not available)
-    virtual ExpressionValue valueLookup(const string &aName);
+    /// @param aResult set the value here
+    /// @return true if function executed, false if value is unknown
+    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
+
   };
 
+
+  class TriggerActionContext : public ScriptExecutionContext
+  {
+    typedef ScriptExecutionContext inherited;
+    Trigger &trigger;
+
+  public:
+
+    TriggerActionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP);
+
+  protected:
+
+    /// lookup variables by name
+    /// @param aName the name of the value/variable to look up
+    /// @param aResult set the value here
+    /// @return true if function executed, false if value is unknown
+    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
+
+    /// evaluation of synchronously implemented functions which immediately return a result
+    /// @param aFunc the name of the function to execute
+    /// @param aResult set the function result here
+    /// @return true if function executed, false if function signature is unknown
+    virtual bool evaluateFunction(const string &aFunc, const FunctionArgumentVector &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
+
+    /// evaluation of asynchronously implemented functions which may yield execution and resume later
+    /// @param aFunc the name of the function to execute
+    /// @param aNotYielded
+    /// - true when execution has not yieled and the function evaluation is complete
+    /// - false when the execution of the function has yielded and resumeEvaluation() will be called to complete
+    /// @return true if function executed, false if function signature is unknown
+    /// @note this method will not be called when context is set to execute synchronously, so these functions will not be available then.
+    // TODO: implement
+    //virtual bool evaluateAsyncFunction(const string &aFunc, const FunctionArgumentVector &aArgs, bool &aNotYielded) P44_OVERRIDE;
+
+  };
+
+
+
+
+  #define LEGACY_ACTIONS_SUPPORT 1
 
   /// trigger
   class Trigger : public PropertyContainer, public PersistentParams
@@ -391,12 +433,13 @@ namespace p44 {
     typedef PersistentParams inheritedParams;
     friend class TriggerList;
     friend class TriggerExpressionContext;
+    friend class TriggerActionContext;
 
     int triggerId; ///< the immutable ID of this trigger
     string name;
-    TriggerExpressionContext triggerCondition; ///< expression that must evaluate to true to trigger the action
-    string triggerActions; ///< actions to trigger (scene calls, etc.)
     string triggerVarDefs; ///< variable to valueSource mappings
+    TriggerExpressionContext triggerCondition; ///< expression that must evaluate to true to trigger the action
+    TriggerActionContext triggerActions; ///< the trigger action script
 
     ValueSourceMapper valueMapper;
     MLTicket varParseTicket;
@@ -408,8 +451,9 @@ namespace p44 {
     virtual ~Trigger();
 
     /// check trigger and fire actions when condition transitions from non-met to met
+    /// @param aEvalMode the evaluation mode to use
     /// @return ok or error in case expression evaluation failed
-    ErrorPtr checkAndFire();
+    ErrorPtr checkAndFire(EvalMode aEvalMode);
 
     /// execute the trigger actions
     ErrorPtr executeActions();
@@ -439,8 +483,10 @@ namespace p44 {
     void parseVarDefs();
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     ErrorPtr triggerEvaluationResultHandler(ExpressionValue aEvaluationResult);
-    ExpressionValue actionExpressionValueLookup(const string aName);
 
+    #if LEGACY_ACTIONS_SUPPORT
+    bool actionExpressionValueLookup(const string aName, ExpressionValue aResult);
+    #endif
   };
   typedef boost::intrusive_ptr<Trigger> TriggerPtr;
 
@@ -481,7 +527,7 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
-    
+
   };
   typedef boost::intrusive_ptr<TriggerList> TriggerListPtr;
 
@@ -494,6 +540,7 @@ namespace p44 {
     typedef PropertyContainer inherited;
     friend class ZoneDescriptor;
     friend class Trigger;
+    friend class TriggerActionContext;
 
     VdcHost &vdcHost; ///< local reference to vdc host
 

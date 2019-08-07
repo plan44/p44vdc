@@ -77,13 +77,6 @@ using namespace p44;
   #define DEFAULT_DESCRIPTION_TEMPLATE "%V %M%N #%S"
 #endif
 
-// default geolocation
-#if !defined(DEFAULT_LATITUDE) || !defined(DEFAULT_LONGITUDE)
-  #define DEFAULT_LONGITUDE 8.474552
-  #define DEFAULT_LATITUDE 47.394691
-  #define DEFAULT_HEIGHTABOVESEA 396
-#endif
-
 static VdcHost *sharedVdcHostP = NULL;
 
 VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
@@ -105,7 +98,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mainLoopStatsCounter(0),
   persistentChannels(aWithPersistentChannels),
   productName(DEFAULT_PRODUCT_NAME),
-  geolocation(DEFAULT_LONGITUDE, DEFAULT_LATITUDE, DEFAULT_HEIGHTABOVESEA)
+  geolocation() // default location will be set from timeutils
 {
   // remember singleton's address
   sharedVdcHostP = this;
@@ -529,7 +522,22 @@ void VdcHost::nextDeviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator
 
 
 
-// MARK: - adding/removing devices
+// MARK: - adding/removing/finding devices
+
+
+DevicePtr VdcHost::getDeviceByNameOrDsUid(const string &aName)
+{
+  DsDeviceMap::iterator pos;
+  DsUid dsuid;
+  if (dsuid.setAsString(aName)) {
+    pos = dSDevices.find(dsuid);
+  }
+  for (pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+    if (pos->second->getName()==aName) break;
+  }
+  if (pos!=dSDevices.end()) return pos->second;
+  return DevicePtr();
+}
 
 
 bool VdcHost::addDevice(DevicePtr aDevice)
@@ -890,7 +898,7 @@ void VdcHost::addTargetToAudience(NotificationAudience &aAudience, DsAddressable
 
 
 
-ErrorPtr VdcHost::addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &aDsuid)
+ErrorPtr VdcHost::addToAudienceByDsuid(NotificationAudience &aAudience, const DsUid &aDsuid)
 {
   if (aDsuid.empty()) {
     return Error::err<VdcApiError>(415, "missing/invalid dSUID");
@@ -906,7 +914,7 @@ ErrorPtr VdcHost::addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &a
 }
 
 
-ErrorPtr VdcHost::addToAudienceByItemSpec(NotificationAudience &aAudience, string &aItemSpec)
+ErrorPtr VdcHost::addToAudienceByItemSpec(NotificationAudience &aAudience, const string &aItemSpec)
 {
   DsAddressablePtr a = addressableForItemSpec(aItemSpec);
   if (a) {
