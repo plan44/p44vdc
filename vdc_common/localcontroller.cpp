@@ -1046,13 +1046,7 @@ ErrorPtr Trigger::triggerEvaluationResultHandler(ExpressionValue aEvaluationResu
       // a trigger fire is an activity
       LocalController::sharedLocalController()->signalActivity();
       // trigger when state goes from not met to met.
-      err = executeActions();
-      if (Error::isOK(err)) {
-        LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully: %s", name.c_str(), triggerActions.getCode());
-      }
-      else {
-        LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), err->text());
-      }
+      executeActions(true, boost::bind(&Trigger::triggerActionResultHandler, this, _1));
     }
   }
   return err;
@@ -1109,11 +1103,13 @@ bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aRe
 }
 
 
-bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionArgumentVector &aArgs, ExpressionValue &aResult)
+bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult)
 {
   if (aFunc=="scene" && (aArgs.size()>=1 || aArgs.size()<=2)) {
     // scene(name)
-    // scene(name, transition time)
+    // scene(name, transition_time)
+    // scene(id, room)
+    // scene(id, room, transition_time)
     if (aArgs[0].notOk()) return errorInArg(aArgs[0]); // return error from argument
     MLMicroSeconds transitionTime = Infinite; // use scene's standard time
     if (aArgs.size()>=2) {
@@ -1180,132 +1176,81 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
 }
 
 
-#if LEGACY_ACTIONS_SUPPORT
-bool Trigger::actionExpressionValueLookup(const string aName, ExpressionValue aResult)
-{
-  if (valueMapper.valueLookup(aResult, aName)) return true;
-  return false;
-}
-#endif // LEGACY_ACTIONS_SUPPORT
+#define LEGACY_ACTIONS_REWRITING 1
 
-
-ErrorPtr Trigger::executeActions()
+bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
 {
   ErrorPtr err;
-  #if LEGACY_ACTIONS_SUPPORT
+  #if LEGACY_ACTIONS_REWRITING
   const char *p = triggerActions.getCode();
   while (*p && (*p==' ' || *p=='\t')) p++;
-  if (strncasecmp(p, "scene:", 6)==0 || strncasecmp(p, "set:", 4)==0) {
-    LOG(LOG_WARNING, "Using legacy action syntax -> please convert to script");
+  if (strucmp(p, "scene:", 6)==0 || strucmp(p, "set:", 4)==0) {
     // Legacy Syntax
     //  actions = <action> [ ; <action> [ ; ...]]
     //  action = <cmd>:<params>
+    string actionScript;
     string action;
     while (nextPart(p, action, ';')) {
       string cmd;
       string params;
-      LOG(LOG_INFO, "- starting executing action '%s'", action.c_str());
+      LOG(LOG_WARNING, "- start rewriting action '%s'", action.c_str());
       if (!keyAndValue(action, cmd, params, ':')) cmd = action; // could be action only
-      // substitute params in action
-      substituteExpressionPlaceholders(
-        params,
-        boost::bind(&Trigger::actionExpressionValueLookup, this, _1, _2),
-        NULL
-      );
+      // replace @{expr} by expr, which will work unless the expression does not contain ","
+      size_t i = 0;
+      while ((i = action.find("@{",i))!=string::npos) {
+        size_t e = action.find("}",i+2);
+        string expr = action.substr(i+2,e==string::npos ? e : e-2-i);
+        action.replace(i, e-i+1, expr);
+        p+=expr.size();
+      }
       if (cmd=="scene") {
-        // scene:<name>[,<transitionTime>]
+        // scene:<name>[,<transitionTime>] -> scene("<name>"[,transitionTime>]);
+        actionScript += "scene(";
         const char *p2 = params.c_str();
-        string sn;
-        if (nextPart(p2, sn, ',')) {
-          // scene name
-          SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(sn);
-          if (!scene) {
-            err = TextError::err("scene '%s' not found", sn.c_str());
-          }
-          else {
-            string ttm;
-            MLMicroSeconds transitionTime = Infinite; // use scene's standard time
-            if (nextPart(p2, ttm, ',')) {
-              double v;
-              if (sscanf(ttm.c_str(), "%lf", &v)==1) {
-                transitionTime = v*Second;
-              }
-            }
-            // execute the scene
-            LocalController::sharedLocalController()->callScene(scene->getIdentifier(), transitionTime);
+        string s;
+        if (nextPart(p2, s, ',')) {
+          actionScript += "\"" + s + "\""; // name
+          if (nextPart(p2, s, ',')) {
+            actionScript += ", " + s; // transition time
           }
         }
-        else {
-          err = TextError::err("scene name missing. Syntax is: scene:<name>[,<transitionTime>]");
-          break;
-        }
+        actionScript += "); ";
       }
       else if (cmd=="set") {
         // set:<zone>,<value>[,<transitionTime>[,<channelid>[,<group>]]]
+        actionScript += "set(";
         const char *p2 = params.c_str();
-        string zn;
-        if (nextPart(p2, zn, ',')) {
-          // mandatory zone name
-          ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(zn);
-          if (!zone) {
-            err = TextError::err("zone '%s' not found", zn.c_str());
+        string s;
+        if (nextPart(p2, s, ',')) {
+          actionScript += "\"" + s + "\""; // mandatory zone name
+          if (nextPart(p2, s, ',')) {
+            actionScript += ", " + s; // mandatory output value
+            if (nextPart(p2, s, ',')) actionScript += ", " + s; // optional transition time
+            if (nextPart(p2, s, ',')) actionScript += ", " + s; // optional channel id
+            if (nextPart(p2, s, ',')) actionScript += ", " + s; // optional group
           }
-          else {
-            string val;
-            if (nextPart(p2, val, ',')) {
-              // mandatory output value
-              double value;
-              if (sscanf(val.c_str(), "%lf", &value)!=1) {
-                err = TextError::err("invalid output value");
-              }
-              else {
-                string ttm;
-                MLMicroSeconds transitionTime = Infinite; // no override by default, use output's standard transition time
-                DsGroup group = group_yellow_light; // default to light
-                string channelId = "0"; // default channel
-                if (nextPart(p2, ttm, ',')) {
-                  // optional transition time
-                  double v;
-                  if (sscanf(ttm.c_str(), "%lf", &v)==1) {
-                    transitionTime = v*Second;
-                  }
-                  // optional channel id
-                  if (nextPart(p2, channelId, ',')) {
-                    // optional group
-                    string g;
-                    if (nextPart(p2, g, ',')) {
-                      const GroupDescriptor* gdP = LocalController::groupInfoByName(g);
-                      if (gdP) {
-                        group = gdP->no;
-                      }
-                    }
-                  }
-                }
-                // set the ouputs
-                LocalController::sharedLocalController()->setOutputChannelValues(zone->getZoneId(), group, channelId, value, transitionTime);
-              }
-            }
-            else {
-              err = TextError::err("missing output value");
-            }
-          }
-        }
-        else {
-          err = TextError::err("zone name missing. Syntax is: set:<zone>,<value>[,<transitionTime>[,<channelid>[,<group>]]]");
-          break;
+          actionScript += "); ";
         }
       }
-      else {
-        err = TextError::err("Action '%s' is unknown", cmd.c_str());
-        break;
-      }
-      LOG(LOG_INFO, "- done executing action '%s'", action.c_str());
     } // while legacy actions
-    return err;
+    LOG(LOG_WARNING, "rewritten legacy actions: '%s' -> '%s'", action.c_str(), actionScript.c_str());
+    triggerActions.setCode(actionScript);
+    markDirty();
   }
-  #endif // LEGACY_ACTIONS_SUPPORT
+  #endif // LEGACY_ACTIONS_REWRITING
   // run script
-  return triggerActions.evaluateSynchronously(evalmode_script).err;
+  return triggerActions.execute(aAsynchronously, aCallback);
+}
+
+
+ErrorPtr Trigger::triggerActionResultHandler(ExpressionValue aEvaluationResult)
+{
+  if (aEvaluationResult.isOk()) {
+    LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully: %s", name.c_str(), triggerActions.getCode());
+  }
+  else {
+    LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), aEvaluationResult.err->text());
+  }
 }
 
 
@@ -1334,7 +1279,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   }
   else {
     cond->add("error", checkResult->newString(res.err->getErrorMessage()));
-    if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(res.pos));
+    if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(triggerCondition.getPos()));
   }
   checkResult->add("condition", cond);
   // return the result
@@ -1345,15 +1290,22 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 
 ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 {
+  triggerActions.abort(); // abort previous ones
+  executeActions(true, boost::bind(&Trigger::triggerActionTestResultHandler, this, aRequest, _1));
+  return ErrorPtr();
+}
+
+
+ErrorPtr Trigger::triggerActionTestResultHandler(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult)
+{
   ApiValuePtr testResult = aRequest->newApiValue();
   testResult->setType(apivalue_object);
-  ErrorPtr err = executeActions();
-  if (Error::isOK(err)) {
+  if (triggerActions.getResult().valueOk()) {
     testResult->add("result", testResult->newString("OK"));
     LOG(LOG_INFO, "- successfully executed '%s'", triggerActions.getCode());
   }
   else {
-    testResult->add("error", testResult->newString(err->getErrorMessage()));
+    testResult->add("error", testResult->newString(triggerActions.getResult().err->getErrorMessage()));
   }
   // return the result
   aRequest->sendResult(testResult);
@@ -2313,7 +2265,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
       }
       else {
         if (aMethod=="x-p44-testTriggerActions") {
-          aError = trig->handleTestActions(aRequest);
+          trig->handleTestActions(aRequest); // asynchronous!
         }
         else {
           aError = trig->handleCheckCondition(aRequest);

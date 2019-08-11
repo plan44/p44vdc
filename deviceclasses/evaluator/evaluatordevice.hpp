@@ -49,10 +49,30 @@ namespace p44 {
   protected:
 
     /// lookup variables by name
-    /// @param aName the name of the value/variable to look up
-    /// @param aResult set the value here
-    /// @return true if function executed, false if value is unknown
     virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
+  };
+
+
+  class EvaluatorActionContext : public ScriptExecutionContext
+  {
+    typedef ScriptExecutionContext inherited;
+    EvaluatorDevice &evaluator;
+
+    HttpCommPtr httpAction; ///< in case evaluator uses http actions
+
+  public:
+
+    EvaluatorActionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP);
+
+  protected:
+
+    /// lookup variables by name
+    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
+
+    /// evaluation of asynchronously implemented functions which may yield execution and resume later
+    virtual bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
+
+    void httpActionDone(const string &aResponse, ErrorPtr aError);
 
   };
 
@@ -67,7 +87,7 @@ namespace p44 {
     EvaluatorExpressionContext offCondition; ///< expression that must evaluate to true for output to get inactive
     MLMicroSeconds minOnTime; ///< how long the on condition must be present before triggering the result change
     MLMicroSeconds minOffTime; ///< how long the on condition must be present before triggering the result change
-    string action; ///< (additional) action to fire when evaluator changes state
+    EvaluatorActionContext action; ///< (additional) action to fire when evaluator changes state
 
   protected:
 
@@ -89,6 +109,7 @@ namespace p44 {
     typedef Device inherited;
     friend class EvaluatorVdc;
     friend class EvaluatorExpressionContext;
+    friend class EvaluatorActionContext;
 
     long long evaluatorDeviceRowID; ///< the ROWID this device was created from (0=none)
     
@@ -119,8 +140,6 @@ namespace p44 {
     bool onConditionMet; ///< true: conditionMetSince relates to ON-condition, false: conditionMetSince relates to OFF-condition
     bool reporting; ///< set while reporting evaluation result to sensor or binary input, to prevent infinitite loop though cyclic references
     MLTicket evaluateTicket;
-
-    HttpCommPtr httpAction; ///< in case evaluator uses http actions
 
     EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(deviceSettings); };
 
@@ -216,11 +235,9 @@ namespace p44 {
 
     void evaluateConditionsLater();
     void changedConditions();
-    ErrorPtr executeAction(Tristate aState);
-    void httpActionDone(const string &aResponse, ErrorPtr aError);
 
-    /// expression evaluation
-    bool actionValueLookup(Tristate aCurrentState, const string aName, ExpressionValue aResult);
+    ErrorPtr executeAction(Tristate aState);
+    ErrorPtr actionExecuted(ExpressionValue aEvaluationResult);
 
   };
   typedef boost::intrusive_ptr<EvaluatorDevice> EvaluatorDevicePtr;

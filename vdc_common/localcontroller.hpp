@@ -407,7 +407,7 @@ namespace p44 {
     /// @param aFunc the name of the function to execute
     /// @param aResult set the function result here
     /// @return true if function executed, false if function signature is unknown
-    virtual bool evaluateFunction(const string &aFunc, const FunctionArgumentVector &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
+    virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
 
     /// evaluation of asynchronously implemented functions which may yield execution and resume later
     /// @param aFunc the name of the function to execute
@@ -422,9 +422,6 @@ namespace p44 {
   };
 
 
-
-
-  #define LEGACY_ACTIONS_SUPPORT 1
 
   /// trigger
   class Trigger : public PropertyContainer, public PersistentParams
@@ -456,7 +453,7 @@ namespace p44 {
     ErrorPtr checkAndFire(EvalMode aEvalMode);
 
     /// execute the trigger actions
-    ErrorPtr executeActions();
+    bool executeActions(bool aAsynchronously, EvaluationResultCB aCallback = NULL);
 
     // API method handlers
     ErrorPtr handleCheckCondition(VdcApiRequestPtr aRequest);
@@ -483,10 +480,9 @@ namespace p44 {
     void parseVarDefs();
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     ErrorPtr triggerEvaluationResultHandler(ExpressionValue aEvaluationResult);
+    ErrorPtr triggerActionResultHandler(ExpressionValue aEvaluationResult);
+    ErrorPtr triggerActionTestResultHandler(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
 
-    #if LEGACY_ACTIONS_SUPPORT
-    bool actionExpressionValueLookup(const string aName, ExpressionValue aResult);
-    #endif
   };
   typedef boost::intrusive_ptr<Trigger> TriggerPtr;
 

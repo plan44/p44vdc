@@ -214,7 +214,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     }
     else {
       cond->add("error", cond->newString(res.err->getErrorMessage()));
-      if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(res.pos));
+      if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(evaluatorSettings()->onCondition.getPos()));
     }
     checkResult->add("onCondition", cond);
     if (evaluatorType!=evaluator_sensor || evaluatorType!=evaluator_internalsensor) {
@@ -228,7 +228,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       }
       else {
         cond->add("error", cond->newString(res.err->getErrorMessage()));
-        if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(res.pos));
+        if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(evaluatorSettings()->offCondition.getPos()));
       }
       checkResult->add("offCondition", cond);
     }
@@ -495,7 +495,6 @@ EvaluatorExpressionContext::EvaluatorExpressionContext(EvaluatorDevice &aEvaluat
 }
 
 
-
 bool EvaluatorExpressionContext::valueLookup(const string &aName, ExpressionValue &aResult)
 {
   if (evaluator.valueMapper.valueLookup(aResult, aName)) return true;
@@ -503,118 +502,177 @@ bool EvaluatorExpressionContext::valueLookup(const string &aName, ExpressionValu
 }
 
 
-bool EvaluatorDevice::actionValueLookup(Tristate aCurrentState, const string aName, ExpressionValue aResult)
+
+// MARK: - EvaluatorActionContext
+
+
+EvaluatorActionContext::EvaluatorActionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP) :
+  inherited(aGeoLocationP),
+  evaluator(aEvaluator)
 {
-  if (aName=="result") {
-    aResult.setBool(aCurrentState==yes);
-    return true;
-  }
-  else {
-    if (valueMapper.valueLookup(aResult, aName)) return true;
-  }
-  return false;
 }
 
+bool EvaluatorActionContext::valueLookup(const string &aName, ExpressionValue &aResult)
+{
+  if (strucmp(aName.c_str(),"result")==0) {
+    aResult.setBool(evaluator.currentState==yes);
+    return true;
+  }
+  if (evaluator.valueMapper.valueLookup(aResult, aName)) return true;
+  return inherited::valueLookup(aName, aResult);
+}
+
+
+bool EvaluatorActionContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
+{
+  aNotYielded = true; // by default, so we can use "return errorInArg()" style exits
+  bool isGet = false;
+  bool isPost = false;
+  bool isPut = false;
+  if (strucmp(aFunc.c_str(), "geturl")) isGet = true;
+  else if (strucmp(aFunc.c_str(), "posturl")) isPost = true;
+  else if (strucmp(aFunc.c_str(), "puturl")) isPut = true;
+  else return false; // unknown function
+  if (aArgs.size()<1) return false; // not enough params
+  // one of:
+  //   geturl("<url>")
+  //   posturl("<url>"[,"<data>"])
+  //   puturl("<url>"[,"<data>"])
+  if (aArgs[0].notOk()) return errorInArg(aArgs[0]);
+  string url = aArgs[0].stringValue();
+  string data;
+  string method = isGet ? "GET" : (isPut ? "PUT" : "POST");
+  string user;
+  string password;
+  if (!httpAction) httpAction = HttpCommPtr(new HttpComm(MainLoop::currentMainLoop()));
+  splitURL(url.c_str(), NULL, NULL, NULL, &user, &password);
+  httpAction->setHttpAuthCredentials(user, password);
+  ELOG("issuing %s to %s %s", method.c_str(), url.c_str(), data.c_str());
+  if (!httpAction->httpRequest(
+    url.c_str(),
+    boost::bind(&EvaluatorActionContext::httpActionDone, this, _1, _2),
+    method.c_str(),
+    data.c_str()
+  )) {
+    sp().res.withError(TextError::err("could not issue http request"));
+    return true;
+  }
+  aNotYielded = false; // callback will get result
+  return true; // function found, aNotYielded must be set correctly!
+}
+
+
+void EvaluatorActionContext::httpActionDone(const string &aResponse, ErrorPtr aError)
+{
+  ELOG("http action returns '%s', error = %s", aResponse.c_str(), Error::text(aError));
+  ExpressionValue res;
+  if (Error::isOK(aError)) {
+    res.setString(aResponse);
+  }
+  else {
+    res.withError(aError);
+  }
+  continueWithFunctionResult(res);
+}
 
 
 // MARK: - actions
 
+#define LEGACY_ACTIONS_REWRITING 1
 
 ErrorPtr EvaluatorDevice::executeAction(Tristate aState)
 {
   ErrorPtr err;
   if (aState==undefined) return err; // NOP
-  // basic action syntax:
-  //   <action>
-  // or:
-  //   <onaction>|<offaction>
-  string action = evaluatorSettings()->action;
-  size_t p = action.find('|');
-  if (p!=string::npos) {
-    // separate on and off actions
-    if (aState==yes) {
-      action = evaluatorSettings()->action.substr(0,p); // first part is onAction
-    }
-    else {
-      action = evaluatorSettings()->action.substr(p+1); // second part is offAction
-    }
-  }
-  if (action.empty()) return TextError::err("No action defined for evaluator %s condition", aState==yes ? "ON" : "OFF");
-  // single action syntax:
-  //   <command>:<commandparams>
-  // available commands:
-  // - getURL:<url>
-  // - postURL:<url>;<raw postdata>
-  // - putURL:<url>;<raw putdata>
-  string cmd;
-  string cmdparams;
-  string method;
-  string url;
-  string data;
-  string user;
-  string password;
-  if (keyAndValue(action, cmd, cmdparams, ':')) {
-    if (cmd=="getURL") {
-      method = "GET";
-      url = cmdparams;
-    }
-    else if (cmd=="postURL" || cmd=="putURL") {
-      if (keyAndValue(cmdparams, url, data, ';')) {
-        method = cmd=="putURL" ? "PUT" : "POST";
-        ErrorPtr serr = substituteExpressionPlaceholders(
-          data,
-          boost::bind(&EvaluatorDevice::actionValueLookup, this, aState, _1, _2),
-          NULL, // TODO: use proper context with timer functions
-          "null"
-        );
-        if (Error::notOK(serr)) {
-          serr->prefixMessage("placeholder substitution error in POST/PUT data: ");
-          if (serr->isError(ExpressionError::domain(), ExpressionError::Syntax)) {
-            return serr; // do not continue with syntax error
+  #if LEGACY_ACTIONS_REWRITING
+  const char *p = evaluatorSettings()->action.getCode();
+  while (*p && (*p==' ' || *p=='\t')) p++;
+  if (strucmp(p, "getURL:", 7)==0 || strucmp(p, "postURL:", 8)==0 || strucmp(p, "putURL:", 7)==0) {
+    // old syntax, convert
+    string actionScript;
+    // basic action syntax:
+    //   <action>
+    // or:
+    //   <onaction>|<offaction>
+    string singleaction;
+    bool isOn = true; // on comes first
+    while (nextPart(p, singleaction, '|')) {
+      if (*p=='|') {
+        if (singleaction.empty()) {
+          // off action only
+          actionScript = "if (result==false) ";
+          isOn = false;
+          p++;
+        }
+        else {
+          // no condition for action
+          isOn = false;
+        }
+      }
+      else if (isOn) {
+        // on action is first action
+        actionScript = "if (result==true) ";
+      }
+      else {
+        actionScript += " else ";
+      }
+      // single action syntax:
+      //   <command>:<commandparams>
+      // available commands:
+      // - getURL:<url>
+      // - postURL:<url>;<raw postdata>
+      // - putURL:<url>;<raw putdata>
+      string cmd;
+      string cmdparams;
+      string url;
+      string data;
+      if (keyAndValue(singleaction, cmd, cmdparams, ':')) {
+        actionScript += cmd + '(';
+        if (cmd=="getURL") {
+          url = singleaction;
+        }
+        else {
+          keyAndValue(cmdparams, url, data, ';');
+        }
+        url = shellQuote(url);
+        // replace @{expr} by '"+ string(expr) + "'
+        size_t i = 0;
+        while ((i = url.find("@{",i))!=string::npos) {
+          size_t e = url.find("}",i+2);
+          string expr = "\"+string(" + url.substr(i+2,e==string::npos ? e : e-2-i) +")+\"";
+          url.replace(i, e-i+1, expr);
+        }
+        actionScript += url;
+        if (!data.empty()) {
+          data = shellQuote(data);
+          // replace @{expr} by '"+ string(expr) + "'
+          size_t i = 0;
+          while ((i = data.find("@{",i))!=string::npos) {
+            size_t e = data.find("}",i+2);
+            string expr = "\"+string(" + data.substr(i+2,e==string::npos ? e : e-2-i) +")+\"";
+            data.replace(i, e-i+1, expr);
           }
-          if (Error::isOK(err)) err = serr; // only report first error
+          actionScript += ", " + data;
         }
+        actionScript += ");";
       }
-    }
-    else {
-      err = TextError::err("Unknown action '%s'", cmd.c_str());
-    }
-    if (!method.empty()) {
-      ErrorPtr serr = substituteExpressionPlaceholders(
-        url,
-        boost::bind(&EvaluatorDevice::actionValueLookup, this, aState, _1, _2),
-        NULL,
-        "null"
-      );
-      if (Error::notOK(serr)) {
-        serr->prefixMessage("placeholder substitution error in URL: ");
-        if (serr->isError(ExpressionError::domain(), ExpressionError::Syntax)) {
-          return serr; // do not continue with syntax error
-        }
-        if (Error::isOK(err)) err = serr; // only report first error
-      }
-      if (!httpAction) httpAction = HttpCommPtr(new HttpComm(MainLoop::currentMainLoop()));
-      splitURL(url.c_str(), NULL, NULL, NULL, &user, &password);
-      httpAction->setHttpAuthCredentials(user, password);
-      ALOG(LOG_NOTICE, "issuing %s to %s %s", method.c_str(), url.c_str(), data.c_str());
-      if (!httpAction->httpRequest(
-        url.c_str(),
-        boost::bind(&EvaluatorDevice::httpActionDone, this, _1, _2),
-        method.c_str(),
-        data.c_str()
-      )) {
-        err = TextError::err("could not issue http request");
-      }
-    }
+      isOn = false;
+    } // while legacy actions
+    LOG(LOG_WARNING, "rewritten legacy action: '%s' -> '%s'", singleaction.c_str(), actionScript.c_str());
+    evaluatorSettings()->action.setCode(actionScript);
+    evaluatorSettings()->markDirty();
   }
+  #endif // LEGACY_ACTIONS_REWRITING
+  evaluatorSettings()->action.execute(true, boost::bind(&EvaluatorDevice::actionExecuted, this, _1));
   return err;
 }
 
 
-void EvaluatorDevice::httpActionDone(const string &aResponse, ErrorPtr aError)
+ErrorPtr EvaluatorDevice::actionExecuted(ExpressionValue aEvaluationResult)
 {
-  ALOG(LOG_INFO, "http action returns '%s', error = %s", aResponse.c_str(), Error::text(aError));
+  ALOG(LOG_INFO, "evaluator action script completed with result: '%s', error: %s", aEvaluationResult.stringValue().c_str(), Error::text(aEvaluationResult.err));
 }
+
 
 
 void EvaluatorDevice::deriveDsUid()
@@ -722,7 +780,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case offCondition_key: aPropValue->setStringValue(evaluatorSettings()->offCondition.getCode()); return true;
         case minOnTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->minOnTime)/Second); return true;
         case minOffTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->minOffTime)/Second); return true;
-        case action_key: aPropValue->setStringValue(evaluatorSettings()->action); return true;
+        case action_key: aPropValue->setStringValue(evaluatorSettings()->action.getCode()); return true;
       }
     }
     else {
@@ -753,7 +811,9 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
             changedConditions();  // changed conditions, re-evaluate output
           return true;
         case action_key:
-          evaluatorSettings()->setPVar(evaluatorSettings()->action, aPropValue->stringValue());
+          if (evaluatorSettings()->action.setCode(aPropValue->stringValue())) {
+            evaluatorSettings()->markDirty();
+          }
           return true;
       }
     }
@@ -771,11 +831,13 @@ EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator) :
   inherited(aEvaluator),
   onCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation),
   offCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation),
+  action(aEvaluator, &aEvaluator.getVdcHost().geolocation),
   minOnTime(0), // trigger immediately
   minOffTime(0) // trigger immediately
 {
   onCondition.isMemberVariable();
   offCondition.isMemberVariable();
+  action.isMemberVariable();
   onCondition.setEvaluationResultHandler(boost::bind(&EvaluatorDevice::handleReEvaluationResult, &aEvaluator, false, _1, _2));
   offCondition.setEvaluationResultHandler(boost::bind(&EvaluatorDevice::handleReEvaluationResult, &aEvaluator, true, _1, _2));
 }
@@ -827,7 +889,7 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   offCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOnTime);
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOffTime);
-  action.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  action.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
 }
 
 
@@ -841,7 +903,7 @@ void EvaluatorDeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, 
   aStatement.bind(aIndex++, offCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (long long int)minOnTime);
   aStatement.bind(aIndex++, (long long int)minOffTime);
-  aStatement.bind(aIndex++, action.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, action.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
