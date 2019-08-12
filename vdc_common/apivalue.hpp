@@ -24,6 +24,10 @@
 
 #include "p44utils_common.hpp"
 
+#if ENABLE_EXPRESSIONS
+#include "expressions.hpp"
+#endif
+
 using namespace std;
 
 namespace p44 {
@@ -162,6 +166,9 @@ namespace p44 {
     ApiValuePtr newObject();
     ApiValuePtr newArray();
     ApiValuePtr newNull();
+    #if ENABLE_EXPRESSIONS
+    ApiValuePtr newExpressionValue(ExpressionValue& aValue);
+    #endif
 
     /// @}
 
