@@ -27,6 +27,10 @@
 
 #include "expressions.hpp"
 
+#if EXPRESSION_SCRIPT_SUPPORT
+#include "httpcomm.hpp"
+#endif
+
 
 #if ENABLE_LOCALCONTROLLER
 
@@ -211,6 +215,12 @@ namespace p44 {
     /// @return zone or NULL if none with this name is found
     ZoneDescriptorPtr getZoneByName(const string aZoneName);
 
+    /// get DS zone ID by zone name or literal zone id (number)
+    /// @param aZoneName a user-assigned zone name to look for, or a decimal number directly specifying the DS zoneId
+    /// @return zoneID or -1 if no specific zone could be found
+    int getZoneIdByName(const string aZoneNameOrId);
+
+
   protected:
 
     // property access implementation
@@ -352,6 +362,13 @@ namespace p44 {
     /// @return scene or NULL if none with this name is found
     SceneDescriptorPtr getSceneByName(const string aSceneName);
 
+
+    /// get scene id (dS global scene number, not related to a specific zone) by kind
+    /// @param aSceneSpec name of scene kind like "preset 1", "standby" etc. or dS scene number)
+    /// @return dS scene number or INVALID_SCENE_NO if none is found
+    SceneNo getSceneIdByKind(const string aSceneKindName);
+
+
   protected:
 
     // property access implementation
@@ -391,6 +408,10 @@ namespace p44 {
     typedef ScriptExecutionContext inherited;
     Trigger &trigger;
 
+    #if EXPRESSION_SCRIPT_SUPPORT
+    HttpCommPtr httpAction; ///< in case trigger actions uses http functions
+    #endif
+
   public:
 
     TriggerActionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP);
@@ -398,26 +419,13 @@ namespace p44 {
   protected:
 
     /// lookup variables by name
-    /// @param aName the name of the value/variable to look up
-    /// @param aResult set the value here
-    /// @return true if function executed, false if value is unknown
     virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
 
     /// evaluation of synchronously implemented functions which immediately return a result
-    /// @param aFunc the name of the function to execute
-    /// @param aResult set the function result here
-    /// @return true if function executed, false if function signature is unknown
     virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
 
     /// evaluation of asynchronously implemented functions which may yield execution and resume later
-    /// @param aFunc the name of the function to execute
-    /// @param aNotYielded
-    /// - true when execution has not yieled and the function evaluation is complete
-    /// - false when the execution of the function has yielded and resumeEvaluation() will be called to complete
-    /// @return true if function executed, false if function signature is unknown
-    /// @note this method will not be called when context is set to execute synchronously, so these functions will not be available then.
-    // TODO: implement
-    //virtual bool evaluateAsyncFunction(const string &aFunc, const FunctionArgumentVector &aArgs, bool &aNotYielded) P44_OVERRIDE;
+    bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
 
   };
 
@@ -479,9 +487,9 @@ namespace p44 {
 
     void parseVarDefs();
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
-    ErrorPtr triggerEvaluationResultHandler(ExpressionValue aEvaluationResult);
-    ErrorPtr triggerActionResultHandler(ExpressionValue aEvaluationResult);
-    ErrorPtr triggerActionTestResultHandler(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
+    void triggerEvaluationExecuted(ExpressionValue aEvaluationResult);
+    void triggerActionExecuted(ExpressionValue aEvaluationResult);
+    void testTriggerActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
 
   };
   typedef boost::intrusive_ptr<Trigger> TriggerPtr;

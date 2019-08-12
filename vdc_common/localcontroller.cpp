@@ -466,12 +466,27 @@ ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotEx
 
 ZoneDescriptorPtr ZoneList::getZoneByName(const string aZoneName)
 {
+  int numName = -1;
+  sscanf(aZoneName.c_str(), "%d", &numName);
   for (ZonesVector::iterator pos = zones.begin(); pos!=zones.end(); ++pos) {
-    if ((*pos)->getName()==aZoneName) {
+    if (strucmp((*pos)->getName().c_str(),aZoneName.c_str())==0) {
+      return *pos;
+    }
+    else if (numName>=0 && numName==(*pos)->getZoneId()) {
       return *pos;
     }
   }
   return ZoneDescriptorPtr();
+}
+
+
+int ZoneList::getZoneIdByName(const string aZoneNameOrId)
+{
+  ZoneDescriptorPtr zone = getZoneByName(aZoneNameOrId);
+  if (zone) return zone->getZoneId();
+  int zi;
+  if (sscanf(aZoneNameOrId.c_str(), "%d", &zi)==1) return zi;
+  return -1;
 }
 
 
@@ -838,12 +853,34 @@ SceneDescriptorPtr SceneList::getSceneByName(const string aSceneName)
   SceneDescriptorPtr scene;
   for (int i = 0; i<scenes.size(); ++i) {
     SceneDescriptorPtr sc = scenes[i];
-    if (sc->sceneId.name==aSceneName) {
+    if (strucmp(sc->sceneId.name.c_str(), aSceneName.c_str())==0) {
       scene = sc;
       break;
     }
   }
   return scene;
+}
+
+
+SceneNo SceneList::getSceneIdByKind(const string aSceneKindName)
+{
+  const SceneKindDescriptor* skP = roomScenes;
+  for (int i=0; i<2; i++) {
+    while (skP->no!=INVALID_SCENE_NO) {
+      if (strucmp(aSceneKindName.c_str(), skP->actionName)==0) {
+        return skP->no;
+      }
+      skP++;
+    }
+    // try globals
+    skP = globalScenes;
+  }
+  // try just using integer
+  int sceneNo;
+  if (sscanf(aSceneKindName.c_str(), "%d", &sceneNo)==1) {
+    if (sceneNo>=0 && sceneNo<MAX_SCENE_NO) return sceneNo;
+  }
+  return INVALID_SCENE_NO;
 }
 
 
@@ -998,7 +1035,7 @@ Trigger::Trigger() :
 {
   triggerCondition.isMemberVariable();
   triggerActions.isMemberVariable();
-  triggerCondition.setEvaluationResultHandler(boost::bind(&Trigger::triggerEvaluationResultHandler, this, _1));
+  triggerCondition.setEvaluationResultHandler(boost::bind(&Trigger::triggerEvaluationExecuted, this, _1));
 }
 
 
@@ -1032,9 +1069,8 @@ ErrorPtr Trigger::checkAndFire(EvalMode aEvalMode)
 }
 
 
-ErrorPtr Trigger::triggerEvaluationResultHandler(ExpressionValue aEvaluationResult)
+void Trigger::triggerEvaluationExecuted(ExpressionValue aEvaluationResult)
 {
-  ErrorPtr err = aEvaluationResult.err;
   Tristate newState = undefined;
   if (aEvaluationResult.isOk()) {
     newState = aEvaluationResult.boolValue() ? yes : no;
@@ -1046,10 +1082,9 @@ ErrorPtr Trigger::triggerEvaluationResultHandler(ExpressionValue aEvaluationResu
       // a trigger fire is an activity
       LocalController::sharedLocalController()->signalActivity();
       // trigger when state goes from not met to met.
-      executeActions(true, boost::bind(&Trigger::triggerActionResultHandler, this, _1));
+      executeActions(true, boost::bind(&Trigger::triggerActionExecuted, this, _1));
     }
   }
-  return err;
 }
 
 
@@ -1103,27 +1138,65 @@ bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aRe
 }
 
 
+
+bool TriggerActionContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
+{
+  #if EXPRESSION_SCRIPT_SUPPORT
+  return HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction);
+  #else
+  return false; // no async functions yet
+  #endif
+}
+
+
 bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult)
 {
   if (aFunc=="scene" && (aArgs.size()>=1 || aArgs.size()<=2)) {
     // scene(name)
     // scene(name, transition_time)
-    // scene(id, room)
-    // scene(id, room, transition_time)
+    // scene(id, zone)
+    // scene(id, zone, transition_time)
+    // scene(id, zone, transition_time, group)
     if (aArgs[0].notOk()) return errorInArg(aArgs[0]); // return error from argument
+    int ai = 1;
+    int zoneid = -1; // none specified
+    SceneNo sceneNo = INVALID_SCENE_NO;
     MLMicroSeconds transitionTime = Infinite; // use scene's standard time
-    if (aArgs.size()>=2) {
-      if (aArgs[1].notOk()) return errorInArg(aArgs[1]); // return error from argument
-      transitionTime = aArgs[1].numValue()*Second;
+    DsGroup group = group_yellow_light; // default to light
+    if (aArgs.size()>1 && aArgs[1].isString()) {
+      // second param is a zone
+      // - ..so first one must be a scene number or name
+      sceneNo = LocalController::sharedLocalController()->localScenes.getSceneIdByKind(aArgs[0].stringValue());
+      if (sceneNo==INVALID_SCENE_NO) return abortWithError(ExpressionError::NotFound, "Scene '%s' not found", aArgs[0].stringValue().c_str());
+      // - check zone
+      ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(aArgs[1].stringValue());
+      if (!zone) return abortWithError(ExpressionError::NotFound, "Zone '%s' not found", aArgs[1].stringValue().c_str());
+      zoneid = zone->getZoneId();
+      ai++;
+    }
+    else {
+      // first param is a named zone that includes the room
+      SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(aArgs[0].stringValue());
+      if (!scene) return abortWithError(ExpressionError::NotFound, "scene '%s' not found", aArgs[0].stringValue().c_str());
+      zoneid = scene->getZoneID();
+      sceneNo = scene->getSceneNo();
+    }
+    if (aArgs.size()>ai) {
+      if (aArgs[ai].notOk()) return errorInArg(aArgs[ai]); // return error from argument
+      transitionTime = aArgs[ai].numValue()*Second;
+      ai++;
+      if (aArgs.size()>ai) {
+        if (aArgs[ai].notOk()) return errorInArg(aArgs[ai]); // return error from argument
+        const GroupDescriptor* gdP = LocalController::groupInfoByName(aArgs[ai].stringValue());
+        if (!gdP) return abortWithError(ExpressionError::NotFound, "unknown group '%s'", aArgs[ai].stringValue().c_str());
+        group = gdP->no;
+      }
     }
     // execute the scene
-    SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(aArgs[0].stringValue());
-    if (!scene)
-      abortWithError(ExpressionError::NotFound, "scene '%s' not found", aArgs[0].stringValue().c_str());
-    else
-      LocalController::sharedLocalController()->callScene(scene->getIdentifier(), transitionTime);
+    LocalController::sharedLocalController()->callScene(sceneNo, zoneid, group, transitionTime);
   }
   else if (aFunc=="set" && (aArgs.size()>=2 || aArgs.size()<=5)) {
+    // set(zone_or_device, value)
     // set(zone_or_device, value)
     // set(zone_or_device, value, transitiontime)
     // set(zone_or_device, value, transitiontime, channelid)
@@ -1144,7 +1217,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
     if (aArgs.size()>3) {
       if (!aArgs[3].isNull()) {
         if (aArgs[3].notOk()) return errorInArg(aArgs[3]); // return error from argument
-        channelId = aArgs[2].stringValue();
+        channelId = aArgs[3].stringValue();
       }
     }
     // get zone or device
@@ -1154,7 +1227,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       if (aArgs.size()>4) {
         if (!aArgs[4].valueOk()) return errorInArg(aArgs[4]); // return error from argument
         const GroupDescriptor* gdP = LocalController::groupInfoByName(aArgs[4].stringValue());
-        if (!gdP) { abortWithError(ExpressionError::NotFound, "unknown group '%s'", aArgs[4].stringValue().c_str()); return true; }
+        if (!gdP) return abortWithError(ExpressionError::NotFound, "unknown group '%s'", aArgs[4].stringValue().c_str());
         group = gdP->no;
       }
       LocalController::sharedLocalController()->setOutputChannelValues(zone->getZoneId(), group, channelId, value, transitionTime);
@@ -1166,7 +1239,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       LocalController::sharedLocalController()->setOutputChannelValues(audience, channelId, value, transitionTime);
     }
     else {
-      abortWithError(ExpressionError::NotFound, "no zone or device named '%s' found", aArgs[0].stringValue().c_str());
+      return abortWithError(ExpressionError::NotFound, "no zone or device named '%s' found", aArgs[0].stringValue().c_str());
     }
   }
   else {
@@ -1233,7 +1306,7 @@ bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
         }
       }
     } // while legacy actions
-    LOG(LOG_WARNING, "rewritten legacy actions: '%s' -> '%s'", action.c_str(), actionScript.c_str());
+    LOG(LOG_WARNING, "rewritten legacy actions: '%s' -> '%s'", triggerActions.getCode(), actionScript.c_str());
     triggerActions.setCode(actionScript);
     markDirty();
   }
@@ -1243,9 +1316,9 @@ bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
 }
 
 
-ErrorPtr Trigger::triggerActionResultHandler(ExpressionValue aEvaluationResult)
+void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
 {
-  if (aEvaluationResult.isOk()) {
+  if (aEvaluationResult.valueOk()) {
     LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully: %s", name.c_str(), triggerActions.getCode());
   }
   else {
@@ -1273,13 +1346,13 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   ExpressionValue res;
   res = triggerCondition.evaluateSynchronously(evalmode_initial);
   cond->add("expression", checkResult->newString(triggerCondition.getCode()));
-  if (res.isOk()) {
-    cond->add("result", res.isString() ? cond->newString(res.stringValue()) : cond->newDouble(res.numValue()));
+  if (res.valueOk()) {
+    cond->add("result", cond->newExpressionValue(res));
     LOG(LOG_INFO, "- condition '%s' -> %s", triggerCondition.getCode(), res.stringValue().c_str());
   }
   else {
     cond->add("error", checkResult->newString(res.err->getErrorMessage()));
-    if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(triggerCondition.getPos()));
+    cond->add("at", cond->newUint64(triggerCondition.getPos()));
   }
   checkResult->add("condition", cond);
   // return the result
@@ -1291,25 +1364,23 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 {
   triggerActions.abort(); // abort previous ones
-  executeActions(true, boost::bind(&Trigger::triggerActionTestResultHandler, this, aRequest, _1));
+  executeActions(true, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1));
   return ErrorPtr();
 }
 
 
-ErrorPtr Trigger::triggerActionTestResultHandler(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult)
+void Trigger::testTriggerActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult)
 {
   ApiValuePtr testResult = aRequest->newApiValue();
   testResult->setType(apivalue_object);
-  if (triggerActions.getResult().valueOk()) {
-    testResult->add("result", testResult->newString("OK"));
-    LOG(LOG_INFO, "- successfully executed '%s'", triggerActions.getCode());
+  if (aEvaluationResult.valueOk()) {
+    testResult->add("result", testResult->newExpressionValue(aEvaluationResult));
   }
   else {
-    testResult->add("error", testResult->newString(triggerActions.getResult().err->getErrorMessage()));
+    testResult->add("error", testResult->newString(aEvaluationResult.err->getErrorMessage()));
+    testResult->add("at", testResult->newUint64(triggerActions.getPos()));
   }
-  // return the result
   aRequest->sendResult(testResult);
-  return ErrorPtr();
 }
 
 
@@ -2146,7 +2217,7 @@ const GroupDescriptor* LocalController::groupInfoByName(const string aGroupName)
 {
   const GroupDescriptor *giP = groupInfos;
   while (giP && giP->kind!=0) {
-    if (aGroupName==giP->name) {
+    if (strucmp(aGroupName.c_str(), giP->name)==0) {
       return giP;
     }
     giP++;
