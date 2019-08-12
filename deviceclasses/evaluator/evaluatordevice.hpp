@@ -62,6 +62,8 @@ namespace p44 {
 
   public:
 
+    Tristate execState; ///< the state to show in the excution as "result" (not necessarily the current state, when testing actions)
+
     EvaluatorActionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP);
 
   protected:
@@ -236,8 +238,9 @@ namespace p44 {
     void evaluateConditionsLater();
     void changedConditions();
 
-    ErrorPtr executeAction(Tristate aState);
-    ErrorPtr actionExecuted(ExpressionValue aEvaluationResult);
+    ErrorPtr executeAction(Tristate aState, EvaluationResultCB aResultCB);
+    void actionExecuted(ExpressionValue aEvaluationResult);
+    void testActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
 
   };
   typedef boost::intrusive_ptr<EvaluatorDevice> EvaluatorDevicePtr;

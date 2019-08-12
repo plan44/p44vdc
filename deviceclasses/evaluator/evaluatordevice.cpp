@@ -208,13 +208,13 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     cond = checkResult->newObject();
     res = evaluatorSettings()->onCondition.evaluateSynchronously(evalmode_initial);
     cond->add("expression", checkResult->newString(evaluatorSettings()->onCondition.getCode()));
-    if (res.isOk()) {
-      cond->add("result", res.isString() ? cond->newString(res.stringValue()) : cond->newDouble(res.numValue()));
+    if (res.valueOk()) {
+      cond->add("result", cond->newExpressionValue(res));
       LOG(LOG_INFO, "- onCondition '%s' -> %s", evaluatorSettings()->onCondition.getCode(), res.stringValue().c_str());
     }
     else {
       cond->add("error", cond->newString(res.err->getErrorMessage()));
-      if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(evaluatorSettings()->onCondition.getPos()));
+      cond->add("at", cond->newUint64(evaluatorSettings()->onCondition.getPos()));
     }
     checkResult->add("onCondition", cond);
     if (evaluatorType!=evaluator_sensor || evaluatorType!=evaluator_internalsensor) {
@@ -222,13 +222,13 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       cond = checkResult->newObject();
       res = evaluatorSettings()->offCondition.evaluateSynchronously(evalmode_initial);
       cond->add("expression", checkResult->newString(evaluatorSettings()->offCondition.getCode()));
-      if (res.isOk()) {
-        cond->add("result", res.isString() ? cond->newString(res.stringValue()) : cond->newDouble(res.numValue()));
+      if (res.valueOk()) {
+        cond->add("result", cond->newExpressionValue(res));
         LOG(LOG_INFO, "- offCondition '%s' -> %s", evaluatorSettings()->offCondition.getCode(), res.stringValue().c_str());
       }
       else {
         cond->add("error", cond->newString(res.err->getErrorMessage()));
-        if (!res.err->isError(ExpressionError::domain(), ExpressionError::Null)) cond->add("at", cond->newUint64(evaluatorSettings()->offCondition.getPos()));
+        cond->add("at", cond->newUint64(evaluatorSettings()->offCondition.getPos()));
       }
       checkResult->add("offCondition", cond);
     }
@@ -243,13 +243,28 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       state = vp->boolValue() ? yes : no;
     }
     // now test
-    return Error::ok(executeAction(state));
+    executeAction(state, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1));
+    return ErrorPtr();
   }
   else {
     return inherited::handleMethod(aRequest, aMethod, aParams);
   }
 }
 
+
+void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult)
+{
+  ApiValuePtr testResult = aRequest->newApiValue();
+  testResult->setType(apivalue_object);
+  if (aEvaluationResult.valueOk()) {
+    testResult->add("result", testResult->newExpressionValue(aEvaluationResult));
+  }
+  else {
+    testResult->add("error", testResult->newString(aEvaluationResult.err->getErrorMessage()));
+    testResult->add("at", testResult->newUint64(evaluatorSettings()->action.getPos()));
+  }
+  aRequest->sendResult(testResult);
+}
 
 
 #define REPARSE_DELAY (30*Second)
@@ -473,7 +488,7 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
       }
       case evaluator_internalaction: {
         // execute action
-        executeAction(currentState);
+        executeAction(currentState, boost::bind(&EvaluatorDevice::actionExecuted, this, _1));
         break;
       }
       default: break;
@@ -481,6 +496,12 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
     // done reporting, critical phase is over
     reporting = false;
   }
+}
+
+
+void EvaluatorDevice::actionExecuted(ExpressionValue aEvaluationResult)
+{
+  ALOG(LOG_INFO, "evaluator action script completed with result: '%s', error: %s", aEvaluationResult.stringValue().c_str(), Error::text(aEvaluationResult.err));
 }
 
 
@@ -508,14 +529,15 @@ bool EvaluatorExpressionContext::valueLookup(const string &aName, ExpressionValu
 
 EvaluatorActionContext::EvaluatorActionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP) :
   inherited(aGeoLocationP),
-  evaluator(aEvaluator)
+  evaluator(aEvaluator),
+  execState(undefined)
 {
 }
 
 bool EvaluatorActionContext::valueLookup(const string &aName, ExpressionValue &aResult)
 {
   if (strucmp(aName.c_str(),"result")==0) {
-    aResult.setBool(evaluator.currentState==yes);
+    aResult.setBool(execState==yes);
     return true;
   }
   if (evaluator.valueMapper.valueLookup(aResult, aName)) return true;
@@ -525,54 +547,7 @@ bool EvaluatorActionContext::valueLookup(const string &aName, ExpressionValue &a
 
 bool EvaluatorActionContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
 {
-  aNotYielded = true; // by default, so we can use "return errorInArg()" style exits
-  bool isGet = false;
-  bool isPost = false;
-  bool isPut = false;
-  if (strucmp(aFunc.c_str(), "geturl")) isGet = true;
-  else if (strucmp(aFunc.c_str(), "posturl")) isPost = true;
-  else if (strucmp(aFunc.c_str(), "puturl")) isPut = true;
-  else return false; // unknown function
-  if (aArgs.size()<1) return false; // not enough params
-  // one of:
-  //   geturl("<url>")
-  //   posturl("<url>"[,"<data>"])
-  //   puturl("<url>"[,"<data>"])
-  if (aArgs[0].notOk()) return errorInArg(aArgs[0]);
-  string url = aArgs[0].stringValue();
-  string data;
-  string method = isGet ? "GET" : (isPut ? "PUT" : "POST");
-  string user;
-  string password;
-  if (!httpAction) httpAction = HttpCommPtr(new HttpComm(MainLoop::currentMainLoop()));
-  splitURL(url.c_str(), NULL, NULL, NULL, &user, &password);
-  httpAction->setHttpAuthCredentials(user, password);
-  ELOG("issuing %s to %s %s", method.c_str(), url.c_str(), data.c_str());
-  if (!httpAction->httpRequest(
-    url.c_str(),
-    boost::bind(&EvaluatorActionContext::httpActionDone, this, _1, _2),
-    method.c_str(),
-    data.c_str()
-  )) {
-    sp().res.withError(TextError::err("could not issue http request"));
-    return true;
-  }
-  aNotYielded = false; // callback will get result
-  return true; // function found, aNotYielded must be set correctly!
-}
-
-
-void EvaluatorActionContext::httpActionDone(const string &aResponse, ErrorPtr aError)
-{
-  ELOG("http action returns '%s', error = %s", aResponse.c_str(), Error::text(aError));
-  ExpressionValue res;
-  if (Error::isOK(aError)) {
-    res.setString(aResponse);
-  }
-  else {
-    res.withError(aError);
-  }
-  continueWithFunctionResult(res);
+  return HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction);
 }
 
 
@@ -580,7 +555,7 @@ void EvaluatorActionContext::httpActionDone(const string &aResponse, ErrorPtr aE
 
 #define LEGACY_ACTIONS_REWRITING 1
 
-ErrorPtr EvaluatorDevice::executeAction(Tristate aState)
+ErrorPtr EvaluatorDevice::executeAction(Tristate aState, EvaluationResultCB aResultCB)
 {
   ErrorPtr err;
   if (aState==undefined) return err; // NOP
@@ -629,7 +604,7 @@ ErrorPtr EvaluatorDevice::executeAction(Tristate aState)
       if (keyAndValue(singleaction, cmd, cmdparams, ':')) {
         actionScript += cmd + '(';
         if (cmd=="getURL") {
-          url = singleaction;
+          url = cmdparams;
         }
         else {
           keyAndValue(cmdparams, url, data, ';');
@@ -658,19 +633,14 @@ ErrorPtr EvaluatorDevice::executeAction(Tristate aState)
       }
       isOn = false;
     } // while legacy actions
-    LOG(LOG_WARNING, "rewritten legacy action: '%s' -> '%s'", singleaction.c_str(), actionScript.c_str());
+    LOG(LOG_WARNING, "rewritten legacy action: '%s' -> '%s'", evaluatorSettings()->action.getCode(), actionScript.c_str());
     evaluatorSettings()->action.setCode(actionScript);
     evaluatorSettings()->markDirty();
   }
   #endif // LEGACY_ACTIONS_REWRITING
-  evaluatorSettings()->action.execute(true, boost::bind(&EvaluatorDevice::actionExecuted, this, _1));
+  evaluatorSettings()->action.execState = aState;
+  evaluatorSettings()->action.execute(true, aResultCB);
   return err;
-}
-
-
-ErrorPtr EvaluatorDevice::actionExecuted(ExpressionValue aEvaluationResult)
-{
-  ALOG(LOG_INFO, "evaluator action script completed with result: '%s', error: %s", aEvaluationResult.stringValue().c_str(), Error::text(aEvaluationResult.err));
 }
 
 
