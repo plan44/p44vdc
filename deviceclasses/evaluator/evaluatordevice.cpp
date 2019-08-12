@@ -547,7 +547,8 @@ bool EvaluatorActionContext::valueLookup(const string &aName, ExpressionValue &a
 
 bool EvaluatorActionContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
 {
-  return HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction);
+  if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction)) return true;
+  return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
 }
 
 

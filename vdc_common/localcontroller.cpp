@@ -1142,10 +1142,9 @@ bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aRe
 bool TriggerActionContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
 {
   #if EXPRESSION_SCRIPT_SUPPORT
-  return HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction);
-  #else
-  return false; // no async functions yet
+  if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction)) return true;
   #endif
+  return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
 }
 
 
