@@ -102,7 +102,8 @@ namespace p44 {
 
   class ValueSourceMapper
   {
-    typedef map<string, ValueSource *> ValueSourcesMap;
+
+    typedef map<string, ValueSource *, lessStrucmp> ValueSourcesMap;
     ValueSourcesMap valueMap;
 
   public:

@@ -209,11 +209,11 @@ bool ValueSourceMapper::valueLookup(ExpressionValue &aValue, const string aVarSp
     }
   }
   else {
-    aValue = ExpressionValue::errValue(ExpressionError::NotFound, "Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
+    aValue.setError(ExpressionError::NotFound, "Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
     return true;
   }
   // no value (yet)
-  aValue = ExpressionValue::errValue(ExpressionError::Null, "'%s' has no known value yet", aVarSpec.c_str());
+  aValue.setNull(string_format("'%s' has no known value yet", aVarSpec.c_str()).c_str());
   return true;
 }
 
