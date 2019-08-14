@@ -208,7 +208,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     cond = checkResult->newObject();
     res = evaluatorSettings()->onCondition.evaluateSynchronously(evalmode_initial);
     cond->add("expression", checkResult->newString(evaluatorSettings()->onCondition.getCode()));
-    if (res.isValue()) {
+    if (res.isOK()) {
       cond->add("result", cond->newExpressionValue(res));
       cond->add("text", cond->newString(res.stringValue()));
       LOG(LOG_INFO, "- onCondition '%s' -> %s", evaluatorSettings()->onCondition.getCode(), res.stringValue().c_str());

@@ -1156,7 +1156,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
     // scene(id, zone)
     // scene(id, zone, transition_time)
     // scene(id, zone, transition_time, group)
-    if (aArgs[0].notValue()) return errorInArg(aArgs[0]); // return error from argument
+    if (aArgs[0].notValue()) return errorInArg(aArgs[0], aResult); // return error/null from argument
     int ai = 1;
     int zoneid = -1; // none specified
     SceneNo sceneNo = INVALID_SCENE_NO;
@@ -1181,11 +1181,11 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       sceneNo = scene->getSceneNo();
     }
     if (aArgs.size()>ai) {
-      if (aArgs[ai].notValue()) return errorInArg(aArgs[ai]); // return error from argument
+      if (aArgs[ai].notValue()) return errorInArg(aArgs[ai], aResult); // return error/null from argument
       transitionTime = aArgs[ai].numValue()*Second;
       ai++;
       if (aArgs.size()>ai) {
-        if (aArgs[ai].notValue()) return errorInArg(aArgs[ai]); // return error from argument
+        if (aArgs[ai].notValue()) return errorInArg(aArgs[ai], aResult); // return error/null from argument
         const GroupDescriptor* gdP = LocalController::groupInfoByName(aArgs[ai].stringValue());
         if (!gdP) return throwError(ExpressionError::NotFound, "unknown group '%s'", aArgs[ai].stringValue().c_str());
         group = gdP->no;
@@ -1200,14 +1200,14 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
     // set(zone_or_device, value, transitiontime)
     // set(zone_or_device, value, transitiontime, channelid)
     // set(zone, value, transitiontime, channelid, group)
-    if (aArgs[0].notValue()) return errorInArg(aArgs[0]); // return error from argument
-    if (aArgs[1].notValue()) return errorInArg(aArgs[1]); // return error from argument
+    if (aArgs[0].notValue()) return errorInArg(aArgs[0], aResult); // return error/null from argument
+    if (aArgs[1].notValue()) return errorInArg(aArgs[1], aResult); // return error/null from argument
     double value = aArgs[1].numValue();
     // - optional transitiontime
     MLMicroSeconds transitionTime = Infinite; // use scene's standard time
     if (aArgs.size()>2) {
       if (!aArgs[2].isNull()) {
-        if (aArgs[2].notValue()) return errorInArg(aArgs[2]); // return error from argument
+        if (aArgs[2].notValue()) return errorInArg(aArgs[2], aResult); // return error/null from argument
         transitionTime = aArgs[2].numValue()*Second;
       }
     }
@@ -1215,7 +1215,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
     string channelId = "0"; // default channel
     if (aArgs.size()>3) {
       if (!aArgs[3].isNull()) {
-        if (aArgs[3].notValue()) return errorInArg(aArgs[3]); // return error from argument
+        if (aArgs[3].notValue()) return errorInArg(aArgs[3], aResult); // return error/null from argument
         channelId = aArgs[3].stringValue();
       }
     }
@@ -1224,7 +1224,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       // - might have an optional group argument
       DsGroup group = group_yellow_light; // default to light
       if (aArgs.size()>4) {
-        if (!aArgs[4].isOK()) return errorInArg(aArgs[4]); // return error from argument
+        if (!aArgs[4].isOK()) return errorInArg(aArgs[4], aResult); // return error/null from argument
         const GroupDescriptor* gdP = LocalController::groupInfoByName(aArgs[4].stringValue());
         if (!gdP) return throwError(ExpressionError::NotFound, "unknown group '%s'", aArgs[4].stringValue().c_str());
         group = gdP->no;
