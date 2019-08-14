@@ -1072,7 +1072,7 @@ ErrorPtr Trigger::checkAndFire(EvalMode aEvalMode)
 void Trigger::triggerEvaluationExecuted(ExpressionValue aEvaluationResult)
 {
   Tristate newState = undefined;
-  if (aEvaluationResult.isOk()) {
+  if (aEvaluationResult.isValue()) {
     newState = aEvaluationResult.boolValue() ? yes : no;
   }
   if (newState!=conditionMet) {
@@ -1156,7 +1156,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
     // scene(id, zone)
     // scene(id, zone, transition_time)
     // scene(id, zone, transition_time, group)
-    if (aArgs[0].notOk()) return errorInArg(aArgs[0]); // return error from argument
+    if (aArgs[0].notValue()) return errorInArg(aArgs[0]); // return error from argument
     int ai = 1;
     int zoneid = -1; // none specified
     SceneNo sceneNo = INVALID_SCENE_NO;
@@ -1166,28 +1166,28 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       // second param is a zone
       // - ..so first one must be a scene number or name
       sceneNo = LocalController::sharedLocalController()->localScenes.getSceneIdByKind(aArgs[0].stringValue());
-      if (sceneNo==INVALID_SCENE_NO) return abortWithError(ExpressionError::NotFound, "Scene '%s' not found", aArgs[0].stringValue().c_str());
+      if (sceneNo==INVALID_SCENE_NO) return throwError(ExpressionError::NotFound, "Scene '%s' not found", aArgs[0].stringValue().c_str());
       // - check zone
       ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(aArgs[1].stringValue());
-      if (!zone) return abortWithError(ExpressionError::NotFound, "Zone '%s' not found", aArgs[1].stringValue().c_str());
+      if (!zone) return throwError(ExpressionError::NotFound, "Zone '%s' not found", aArgs[1].stringValue().c_str());
       zoneid = zone->getZoneId();
       ai++;
     }
     else {
       // first param is a named zone that includes the room
       SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(aArgs[0].stringValue());
-      if (!scene) return abortWithError(ExpressionError::NotFound, "scene '%s' not found", aArgs[0].stringValue().c_str());
+      if (!scene) return throwError(ExpressionError::NotFound, "scene '%s' not found", aArgs[0].stringValue().c_str());
       zoneid = scene->getZoneID();
       sceneNo = scene->getSceneNo();
     }
     if (aArgs.size()>ai) {
-      if (aArgs[ai].notOk()) return errorInArg(aArgs[ai]); // return error from argument
+      if (aArgs[ai].notValue()) return errorInArg(aArgs[ai]); // return error from argument
       transitionTime = aArgs[ai].numValue()*Second;
       ai++;
       if (aArgs.size()>ai) {
-        if (aArgs[ai].notOk()) return errorInArg(aArgs[ai]); // return error from argument
+        if (aArgs[ai].notValue()) return errorInArg(aArgs[ai]); // return error from argument
         const GroupDescriptor* gdP = LocalController::groupInfoByName(aArgs[ai].stringValue());
-        if (!gdP) return abortWithError(ExpressionError::NotFound, "unknown group '%s'", aArgs[ai].stringValue().c_str());
+        if (!gdP) return throwError(ExpressionError::NotFound, "unknown group '%s'", aArgs[ai].stringValue().c_str());
         group = gdP->no;
       }
     }
@@ -1200,14 +1200,14 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
     // set(zone_or_device, value, transitiontime)
     // set(zone_or_device, value, transitiontime, channelid)
     // set(zone, value, transitiontime, channelid, group)
-    if (aArgs[0].notOk()) return errorInArg(aArgs[0]); // return error from argument
-    if (aArgs[1].notOk()) return errorInArg(aArgs[1]); // return error from argument
+    if (aArgs[0].notValue()) return errorInArg(aArgs[0]); // return error from argument
+    if (aArgs[1].notValue()) return errorInArg(aArgs[1]); // return error from argument
     double value = aArgs[1].numValue();
     // - optional transitiontime
     MLMicroSeconds transitionTime = Infinite; // use scene's standard time
     if (aArgs.size()>2) {
       if (!aArgs[2].isNull()) {
-        if (aArgs[2].notOk()) return errorInArg(aArgs[2]); // return error from argument
+        if (aArgs[2].notValue()) return errorInArg(aArgs[2]); // return error from argument
         transitionTime = aArgs[2].numValue()*Second;
       }
     }
@@ -1215,7 +1215,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
     string channelId = "0"; // default channel
     if (aArgs.size()>3) {
       if (!aArgs[3].isNull()) {
-        if (aArgs[3].notOk()) return errorInArg(aArgs[3]); // return error from argument
+        if (aArgs[3].notValue()) return errorInArg(aArgs[3]); // return error from argument
         channelId = aArgs[3].stringValue();
       }
     }
@@ -1224,9 +1224,9 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       // - might have an optional group argument
       DsGroup group = group_yellow_light; // default to light
       if (aArgs.size()>4) {
-        if (!aArgs[4].valueOk()) return errorInArg(aArgs[4]); // return error from argument
+        if (!aArgs[4].isOK()) return errorInArg(aArgs[4]); // return error from argument
         const GroupDescriptor* gdP = LocalController::groupInfoByName(aArgs[4].stringValue());
-        if (!gdP) return abortWithError(ExpressionError::NotFound, "unknown group '%s'", aArgs[4].stringValue().c_str());
+        if (!gdP) return throwError(ExpressionError::NotFound, "unknown group '%s'", aArgs[4].stringValue().c_str());
         group = gdP->no;
       }
       LocalController::sharedLocalController()->setOutputChannelValues(zone->getZoneId(), group, channelId, value, transitionTime);
@@ -1238,7 +1238,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       LocalController::sharedLocalController()->setOutputChannelValues(audience, channelId, value, transitionTime);
     }
     else {
-      return abortWithError(ExpressionError::NotFound, "no zone or device named '%s' found", aArgs[0].stringValue().c_str());
+      return throwError(ExpressionError::NotFound, "no zone or device named '%s' found", aArgs[0].stringValue().c_str());
     }
   }
   else {
@@ -1317,11 +1317,11 @@ bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
 
 void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
 {
-  if (aEvaluationResult.valueOk()) {
-    LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully: %s", name.c_str(), triggerActions.getCode());
+  if (aEvaluationResult.isOK()) {
+    LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully, result: %s", name.c_str(), aEvaluationResult.stringValue().c_str());
   }
   else {
-    LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), aEvaluationResult.err->text());
+    LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), aEvaluationResult.error()->text());
   }
 }
 
@@ -1345,12 +1345,13 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   ExpressionValue res;
   res = triggerCondition.evaluateSynchronously(evalmode_initial);
   cond->add("expression", checkResult->newString(triggerCondition.getCode()));
-  if (res.valueOk()) {
+  if (res.isOK()) {
     cond->add("result", cond->newExpressionValue(res));
+    cond->add("text", cond->newString(res.stringValue()));
     LOG(LOG_INFO, "- condition '%s' -> %s", triggerCondition.getCode(), res.stringValue().c_str());
   }
   else {
-    cond->add("error", checkResult->newString(res.err->getErrorMessage()));
+    cond->add("error", checkResult->newString(res.error()->getErrorMessage()));
     cond->add("at", cond->newUint64(triggerCondition.getPos()));
   }
   checkResult->add("condition", cond);
@@ -1372,11 +1373,11 @@ void Trigger::testTriggerActionExecuted(VdcApiRequestPtr aRequest, ExpressionVal
 {
   ApiValuePtr testResult = aRequest->newApiValue();
   testResult->setType(apivalue_object);
-  if (aEvaluationResult.valueOk()) {
+  if (aEvaluationResult.isOK()) {
     testResult->add("result", testResult->newExpressionValue(aEvaluationResult));
   }
   else {
-    testResult->add("error", testResult->newString(aEvaluationResult.err->getErrorMessage()));
+    testResult->add("error", testResult->newString(aEvaluationResult.error()->getErrorMessage()));
     testResult->add("at", testResult->newUint64(triggerActions.getPos()));
   }
   aRequest->sendResult(testResult);
