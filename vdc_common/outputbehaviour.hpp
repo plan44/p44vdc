@@ -29,15 +29,51 @@ using namespace std;
 
 namespace p44 {
 
+  class OutputBehaviour;
+
+  #if ENABLE_SCENE_SCRIPT
+
+  class SceneScriptContext : public ScriptExecutionContext
+  {
+    typedef ScriptExecutionContext inherited;
+    OutputBehaviour &output;
+
+  public:
+
+    SceneScriptContext(OutputBehaviour &aOutput, const GeoLocation* aGeoLocationP);
+
+  protected:
+
+    /// evaluation of synchronously implemented functions which immediately return a result
+    virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
+
+    /// evaluation of asynchronously implemented functions which may yield execution and resume later
+    bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
+
+  private:
+
+    void channelsApplied();
+
+  };
+
+  #endif // ENABLE_SCENE_SCRIPT
+
+
+
   /// Implements the basic behaviour of an output with one or multiple output channels
   class OutputBehaviour : public DsBehaviour
   {
     typedef DsBehaviour inherited;
     friend class ChannelBehaviour;
     friend class Device;
+    friend class SceneScriptContext;
 
     /// channels
     ChannelBehaviourVector channels;
+
+    #if ENABLE_SCENE_SCRIPT
+    SceneScriptContext sceneScriptContext; ///< script context to run scene scripts
+    #endif
 
   protected:
 
@@ -176,12 +212,12 @@ namespace p44 {
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
     /// @param aScene the scene that was called (if not dontCare, performApplySceneToChannels() has already been called)
     /// @param aDoneCB will be called when scene actions have completed (but not necessarily when stopped by stopSceneActions())
-    virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB) { if (aDoneCB) aDoneCB(); /* NOP in base class */ };
+    virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB);
 
     /// will be called to stop all ongoing actions before next callScene etc. is issued.
     /// @note this must stop all ongoing actions such that applying another scene or action right afterwards
     ///   cannot mess up things.
-    virtual void stopSceneActions() { /* NOP in base class */ };
+    virtual void stopSceneActions();
 
     /// perform applying Scene to channels
     /// @param aScene the scene to apply
@@ -313,6 +349,10 @@ namespace p44 {
 
     void channelValuesCaptured(DsScenePtr aScene, bool aFromDevice, SimpleCB aDoneCB);
     string parentIdForChannels();
+
+    #if ENABLE_SCENE_SCRIPT
+    void sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluationResult);
+    #endif
 
   };
   

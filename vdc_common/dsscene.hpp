@@ -28,6 +28,15 @@
 
 #include "devicesettings.hpp"
 
+#if ENABLE_EXPRESSIONS && !defined(ENABLE_SCENE_SCRIPT)
+  #define ENABLE_SCENE_SCRIPT 1
+#endif
+
+#if ENABLE_SCENE_SCRIPT
+#include "expressions.hpp"
+#endif
+
+
 using namespace std;
 
 namespace p44 {
@@ -123,6 +132,9 @@ namespace p44 {
     SceneNo sceneNo; ///< scene number
     SceneCmd sceneCmd; ///< scene command
     SceneArea sceneArea; ///< scene area, 0 if none
+    #if ENABLE_SCENE_SCRIPT
+    string sceneScript; ///< scene script
+    #endif
 
     /// @}
 
