@@ -53,6 +53,8 @@ namespace p44 {
   };
 
 
+  #if EXPRESSION_SCRIPT_SUPPORT
+
   class EvaluatorActionContext : public ScriptExecutionContext
   {
     typedef ScriptExecutionContext inherited;
@@ -78,6 +80,8 @@ namespace p44 {
 
   };
 
+  #endif // EXPRESSION_SCRIPT_SUPPORT
+
 
   class EvaluatorDeviceSettings : public DeviceSettings
   {
@@ -89,7 +93,11 @@ namespace p44 {
     EvaluatorExpressionContext offCondition; ///< expression that must evaluate to true for output to get inactive
     MLMicroSeconds minOnTime; ///< how long the on condition must be present before triggering the result change
     MLMicroSeconds minOffTime; ///< how long the on condition must be present before triggering the result change
+    #if EXPRESSION_SCRIPT_SUPPORT
     EvaluatorActionContext action; ///< (additional) action to fire when evaluator changes state
+    #else
+    string oldAction; ///< dummy, keep it for now
+    #endif
 
   protected:
 
@@ -238,9 +246,11 @@ namespace p44 {
     void evaluateConditionsLater();
     void changedConditions();
 
+    #if EXPRESSION_SCRIPT_SUPPORT
     ErrorPtr executeAction(Tristate aState, EvaluationResultCB aResultCB);
     void actionExecuted(ExpressionValue aEvaluationResult);
     void testActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
+    #endif // EXPRESSION_SCRIPT_SUPPORT
 
   };
   typedef boost::intrusive_ptr<EvaluatorDevice> EvaluatorDevicePtr;

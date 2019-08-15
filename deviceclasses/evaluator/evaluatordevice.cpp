@@ -59,8 +59,10 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     evaluatorType = evaluator_input;
   else if (aEvaluatorConfig=="internal" || aEvaluatorConfig=="internalinput") // "internal" must be still recognized for backwards compatibility with existing settings!
     evaluatorType = evaluator_internalinput;
+  #if EXPRESSION_SCRIPT_SUPPORT
   else if (aEvaluatorConfig=="internalaction")
     evaluatorType = evaluator_internalaction;
+  #endif
   else if (sscanf(aEvaluatorConfig.c_str(), "sensor:%d:%d", &sensorType, &sensorUsage)==2)
     evaluatorType = evaluator_sensor;
   else if (sscanf(aEvaluatorConfig.c_str(), "internalsensor:%d:%d", &sensorType, &sensorUsage)==2)
@@ -238,6 +240,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     aRequest->sendResult(checkResult);
     return ErrorPtr();
   }
+  #if EXPRESSION_SCRIPT_SUPPORT
   else if (aMethod=="x-p44-testEvaluatorAction") {
     ApiValuePtr vp = aParams->get("result");
     Tristate state = currentState;
@@ -248,6 +251,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     executeAction(state, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1));
     return ErrorPtr();
   }
+  #endif
   else {
     return inherited::handleMethod(aRequest, aMethod, aParams);
   }
@@ -488,11 +492,13 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
         }
         break;
       }
+      #if EXPRESSION_SCRIPT_SUPPORT
       case evaluator_internalaction: {
         // execute action
         executeAction(currentState, boost::bind(&EvaluatorDevice::actionExecuted, this, _1));
         break;
       }
+      #endif
       default: break;
     }
     // done reporting, critical phase is over
@@ -525,6 +531,7 @@ bool EvaluatorExpressionContext::valueLookup(const string &aName, ExpressionValu
 }
 
 
+#if EXPRESSION_SCRIPT_SUPPORT
 
 // MARK: - EvaluatorActionContext
 
@@ -646,6 +653,8 @@ ErrorPtr EvaluatorDevice::executeAction(Tristate aState, EvaluationResultCB aRes
   return err;
 }
 
+#endif // EXPRESSION_SCRIPT_SUPPORT
+
 
 
 void EvaluatorDevice::deriveDsUid()
@@ -695,7 +704,9 @@ enum {
   offCondition_key,
   minOnTime_key,
   minOffTime_key,
+  #if EXPRESSION_SCRIPT_SUPPORT
   action_key,
+  #endif
   numProperties
 };
 
@@ -723,7 +734,9 @@ PropertyDescriptorPtr EvaluatorDevice::getDescriptorByIndex(int aPropIndex, int 
     { "x-p44-offCondition", apivalue_string, offCondition_key, OKEY(evaluatorDevice_key) },
     { "x-p44-minOnTime", apivalue_double, minOnTime_key, OKEY(evaluatorDevice_key) },
     { "x-p44-minOffTime", apivalue_double, minOffTime_key, OKEY(evaluatorDevice_key) },
+    #if EXPRESSION_SCRIPT_SUPPORT
     { "x-p44-action", apivalue_string, action_key, OKEY(evaluatorDevice_key) },
+    #endif
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level - accessing properties on the Device level
@@ -753,7 +766,9 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case offCondition_key: aPropValue->setStringValue(evaluatorSettings()->offCondition.getCode()); return true;
         case minOnTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->minOnTime)/Second); return true;
         case minOffTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->minOffTime)/Second); return true;
+        #if EXPRESSION_SCRIPT_SUPPORT
         case action_key: aPropValue->setStringValue(evaluatorSettings()->action.getCode()); return true;
+        #endif
       }
     }
     else {
@@ -783,11 +798,13 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (evaluatorSettings()->setPVar(evaluatorSettings()->minOffTime, (MLMicroSeconds)(aPropValue->doubleValue()*Second)))
             changedConditions();  // changed conditions, re-evaluate output
           return true;
+        #if EXPRESSION_SCRIPT_SUPPORT
         case action_key:
           if (evaluatorSettings()->action.setCode(aPropValue->stringValue())) {
             evaluatorSettings()->markDirty();
           }
           return true;
+        #endif
       }
     }
   }
@@ -804,13 +821,17 @@ EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator) :
   inherited(aEvaluator),
   onCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation),
   offCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation),
+  #if EXPRESSION_SCRIPT_SUPPORT
   action(aEvaluator, &aEvaluator.getVdcHost().geolocation),
+  #endif
   minOnTime(0), // trigger immediately
   minOffTime(0) // trigger immediately
 {
   onCondition.isMemberVariable();
   offCondition.isMemberVariable();
+  #if EXPRESSION_SCRIPT_SUPPORT
   action.isMemberVariable();
+  #endif
   onCondition.setEvaluationResultHandler(boost::bind(&EvaluatorDevice::handleReEvaluationResult, &aEvaluator, false, _1, _2));
   offCondition.setEvaluationResultHandler(boost::bind(&EvaluatorDevice::handleReEvaluationResult, &aEvaluator, true, _1, _2));
 }
@@ -841,7 +862,7 @@ const FieldDefinition *EvaluatorDeviceSettings::getFieldDef(size_t aIndex)
     { "offCondition", SQLITE_TEXT },
     { "minOnTime", SQLITE_INTEGER },
     { "minOffTime", SQLITE_INTEGER },
-    { "action", SQLITE_TEXT },
+    { "action", SQLITE_TEXT }, // note: this is a dummy if we don't have EXPRESSION_SCRIPT_SUPPORT
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
@@ -862,7 +883,11 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   offCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOnTime);
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOffTime);
+  #if EXPRESSION_SCRIPT_SUPPORT
   action.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  #else
+  oldAction(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  #endif
 }
 
 
@@ -876,7 +901,11 @@ void EvaluatorDeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, 
   aStatement.bind(aIndex++, offCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (long long int)minOnTime);
   aStatement.bind(aIndex++, (long long int)minOffTime);
+  #if EXPRESSION_SCRIPT_SUPPORT
   aStatement.bind(aIndex++, action.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  #else
+  aStatement.bind(aIndex++, oldAction.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  #endif
 }
 
 
