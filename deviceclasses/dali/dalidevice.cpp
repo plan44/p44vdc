@@ -1123,11 +1123,11 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   LightBehaviourPtr l = getOutput<LightBehaviour>();
   bool withColor = false;
-  if (l && needsToApplyChannels()) {
+  MLMicroSeconds transitionTime = 0;
+  if (l && needsToApplyChannels(&transitionTime)) {
     // abort previous transition
     transitionTicket.cancel();
     // brightness transition time is relevant for the whole transition
-    MLMicroSeconds transitionTime = l->transitionTimeToNewBrightness();
     if (l->brightnessNeedsApplying()) {
       l->brightnessTransitionStep(); // init brightness transition
     }

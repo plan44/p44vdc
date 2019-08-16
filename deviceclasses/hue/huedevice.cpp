@@ -359,13 +359,13 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
   // Update of light state needed
   LightBehaviourPtr l = getOutput<LightBehaviour>();
   if (l) {
-    if (!aAnyway && !needsToApplyChannels()) {
+    MLMicroSeconds transitionTime = 0; // undefined so far
+    if (!aAnyway && !needsToApplyChannels(&transitionTime)) {
       // NOP for this call
       channelValuesSent(l, aDoneCB, JsonObjectPtr(), ErrorPtr());
       return false; // no changes
     }
     ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
-    MLMicroSeconds transitionTime = 0; // undefined so far
     // build hue API light state
     string url = string_format("/lights/%s/state", lightID.c_str());
     JsonObjectPtr newState = JsonObject::newObj();
@@ -373,7 +373,6 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
     bool lightIsOn = true; // assume on
     if (aAnyway || !aForDimming || l->brightness->needsApplying()) {
       Brightness b = l->brightnessForHardware();
-      transitionTime = l->transitionTimeToNewBrightness();
       if (b<DS_BRIGHTNESS_STEP) {
         // light off, no other parameters
         newState->add("on", JsonObject::newBool(false));
@@ -396,11 +395,9 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
           case colorLightModeHueSaturation: {
             // for dimming, only actually changed component (hue or saturation)
             if (aAnyway || !aForDimming || cl->hue->needsApplying()) {
-              if (transitionTime==0) transitionTime = cl->hue->transitionTimeToNewValue();
               newState->add("hue", JsonObject::newInt32(cl->hue->getChannelValue()*HUEAPI_FACTOR_HUE+0.5));
             }
             if (aAnyway || !aForDimming || cl->saturation->needsApplying()) {
-              if (transitionTime==0) transitionTime = cl->saturation->transitionTimeToNewValue();
               newState->add("sat", JsonObject::newInt32(cl->saturation->getChannelValue()*HUEAPI_FACTOR_SATURATION+0.5));
             }
             break;
@@ -408,8 +405,6 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
           case colorLightModeXY: {
             // x,y are always applied together
             if (aAnyway || cl->cieX->needsApplying() || cl->cieY->needsApplying()) {
-              if (transitionTime==0) transitionTime = cl->cieX->transitionTimeToNewValue();
-              if (transitionTime==0) transitionTime = cl->cieY->transitionTimeToNewValue();
               JsonObjectPtr xyArr = JsonObject::newArray();
               xyArr->arrayAppend(JsonObject::newDouble(cl->cieX->getChannelValue()));
               xyArr->arrayAppend(JsonObject::newDouble(cl->cieY->getChannelValue()));
@@ -419,7 +414,6 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
           }
           case colorLightModeCt: {
             if (aAnyway || cl->ct->needsApplying()) {
-              if (transitionTime==0) transitionTime = cl->ct->transitionTimeToNewValue();
               newState->add("ct", JsonObject::newInt32(cl->ct->getChannelValue()));
             }
             break;

@@ -621,18 +621,24 @@ int Device::numChannels()
 }
 
 
-bool Device::needsToApplyChannels()
+bool Device::needsToApplyChannels(MLMicroSeconds* aTransitionTimeP)
 {
+  MLMicroSeconds tt = 0;
+  bool needsApply = false;
   for (int i=0; i<numChannels(); i++) {
     ChannelBehaviourPtr ch = getChannelByIndex(i, true);
     if (ch) {
       // at least this channel needs update
       LOG(LOG_DEBUG, "needsToApplyChannels() returns true because of %s", ch->description().c_str());
-      return true;
+      if (!aTransitionTimeP) return true; // no need to check more channels
+      needsApply = true;
+      if (ch->transitionTimeToNewValue()>tt) {
+        tt = ch->transitionTimeToNewValue();
+      }
     }
   }
-  // no channel needs apply
-  return false;
+  if (aTransitionTimeP) *aTransitionTimeP = tt;
+  return needsApply;
 }
 
 

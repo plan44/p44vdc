@@ -531,8 +531,9 @@ namespace p44 {
     /// @return number of output channels in this device
     int numChannels();
 
+    /// @param aTransitionTimeP if set, will return the highest transition time among the changed channels
     /// @return true if any channel needs to be applied to hardware
-    bool needsToApplyChannels();
+    bool needsToApplyChannels(MLMicroSeconds* aTransitionTimeP = NULL);
 
     /// confirms all channels applied to hardware
     /// @param aAnyWay if true, lastSent state will be set even for channels that were not in needsApplying() state
