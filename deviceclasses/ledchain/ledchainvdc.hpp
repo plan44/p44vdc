@@ -32,6 +32,7 @@
 
 #include "ledchaincomm.hpp"
 
+#include "viewstack.hpp"
 
 using namespace std;
 
@@ -50,9 +51,8 @@ namespace p44 {
     virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
+  typedef vector<string> StringVector;
 
-	typedef std::multimap<string, string> DeviceConfigMap;
-	
   typedef boost::intrusive_ptr<LedChainVdc> LedChainVdcPtr;
   class LedChainVdc : public Vdc
   {
@@ -60,23 +60,15 @@ namespace p44 {
     friend class LedChainDevice;
 
     LedChainDevicePersistence db;
-
-    LEDChainComm::LedType ledType;
-    string ledChainDevice;
-    int numLedsInChain;
+    LEDChainArrangement ledArrangement;
     uint8_t maxOutValue;
-    LEDChainCommPtr ws281xcomm;
+    ViewStackPtr rootView;
 
     typedef std::list<LedChainDevicePtr> LedChainDeviceList;
 
-    LedChainDeviceList sortedSegments; ///< list of devices, ordered by firstLED
-    uint16_t renderStart; ///< first LED needing rendering (valid if renderTicket!=0)
-    uint16_t renderEnd; ///< end of rendering range = first LED not needing rendering (valid if renderTicket!=0)
-    MLTicket renderTicket;
-
   public:
   
-    LedChainVdc(int aInstanceNumber, const string aChainSpec, VdcHost *aVdcHostP, int aTag);
+    LedChainVdc(int aInstanceNumber, StringVector aLedChainConfigs, VdcHost *aVdcHostP, int aTag);
 
     void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
@@ -122,10 +114,8 @@ namespace p44 {
 
   private:
 
-    static bool segmentCompare(LedChainDevicePtr aFirst, LedChainDevicePtr aSecond);
-    LedChainDevicePtr addLedChainDevice(uint16_t aFirstLED, uint16_t aNumLEDs, string aDeviceConfig);
+    LedChainDevicePtr addLedChainDevice(int aX, int aDx, int aY, int aDy, string aDeviceConfig);
 
-    void triggerRenderingRange(uint16_t aFirst, uint16_t aNum);
     void render();
 
   };

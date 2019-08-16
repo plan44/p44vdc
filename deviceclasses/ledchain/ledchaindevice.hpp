@@ -39,30 +39,22 @@ namespace p44 {
     typedef Device inherited;
     friend class LedChainVdc;
 
-    uint16_t firstLED;
-    uint16_t numLEDs;
+    P44ViewPtr lightView; ///< the view representing the light
 
     typedef enum {
-      ledchain_unknown,
-      ledchain_softsegment
-    } LedChainType;
+      lighttype_unknown,
+      lighttype_simplearea
+    } LightType;
 
-    LedChainType ledchainType;
-    bool hasWhite;
-
-    uint16_t startSoftEdge;
-    uint16_t endSoftEdge;
+    LightType lightType;
 
     long long ledChainDeviceRowID; ///< the ROWID this device was created from (0=none)
 
     MLTicket transitionTicket;
 
-    /// current color values
-    double r, g, b, w;
-
   public:
 
-    LedChainDevice(LedChainVdc *aVdcP, uint16_t aFirstLED, uint16_t aNumLEDs, const string &aDeviceConfig);
+    LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int aDy, const string &aDeviceConfig);
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
@@ -90,7 +82,7 @@ namespace p44 {
     /// @param aBlue will receive blue intensity
     /// @param aWhite will receive white intensity for LED chains that have a separate white component
     /// @return opacity of light (0=no light, 1=only this light source, between: weight in mix with other sources)
-    double getLEDColor(uint16_t aLedNumber, uint8_t &aRed, uint8_t &aGreen, uint8_t &aBlue, uint8_t &aWhite);
+    double getLEDColor(int aLedNumber, uint8_t &aRed, uint8_t &aGreen, uint8_t &aBlue, uint8_t &aWhite);
 
     /// @}
 
@@ -135,10 +127,6 @@ namespace p44 {
     virtual string modelName() P44_OVERRIDE;
 
     /// @}
-
-  protected:
-
-    void deriveDsUid();
 
   private:
 

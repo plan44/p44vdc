@@ -34,8 +34,9 @@ using namespace p44;
 
 // Version history
 //  1 : First version
+//  2 : Add y/dy
 #define LEDCHAINDEVICES_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
-#define LEDCHAINDEVICES_SCHEMA_VERSION 1 // current version
+#define LEDCHAINDEVICES_SCHEMA_VERSION 2 // current version
 
 string LedChainDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
@@ -47,44 +48,36 @@ string LedChainDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToV
     // - create my tables
     sql.append(
       "CREATE TABLE devConfigs ("
-      " firstLED INTEGER,"
-      " numLEDs INTEGER,"
+      " firstLED INTEGER," // now x
+      " numLEDs INTEGER," // now dx
+      " y INTEGER,"
+      " dy INTEGER,"
       " deviceconfig TEXT"
       ");"
     );
     // reached final version in one step
     aToVersion = LEDCHAINDEVICES_SCHEMA_VERSION;
   }
+  else if (aFromVersion==1) {
+    // V1->V2: groupNo added
+    sql =
+      "ALTER TABLE devConfigs ADD y INTEGER;"
+      "ALTER TABLE devConfigs ADD dy INTEGER;";
+    // reached version 2
+    aToVersion = 2;
+  }
   return sql;
 }
 
 
 
-LedChainVdc::LedChainVdc(int aInstanceNumber, const string aChainSpec, VdcHost *aVdcHostP, int aTag) :
+LedChainVdc::LedChainVdc(int aInstanceNumber, StringVector aLedChainConfigs, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  renderStart(0),
-  renderEnd(0),
-  maxOutValue(128) // by default, allow only half of max intensity (for full intensity a ~200 LED chain needs 70W power supply!)
+  maxOutValue(255)
 {
-  // parse chain specification
-  // Syntax: [chaintype:[leddevicename:]]numberOfLeds
-  ledType = LEDChainComm::ledtype_ws281x; // assume WS2812/13
-  string chaintype;
-  string rest = aChainSpec;
-  if (keyAndValue(rest, chaintype, rest, ':')) {
-    // chain type specified
-    if (chaintype=="SK6812") {
-      ledType = LEDChainComm::ledtype_sk6812;
-    }
-    else if (chaintype=="P9823") {
-      ledType = LEDChainComm::ledtype_p9823;
-    }
-    // there might be a LED device name
-    keyAndValue(rest, ledChainDevice, rest, ':');
-  }
-  // now there should be a number of LEDs
-  if (sscanf(rest.c_str(), "%d", &numLedsInChain)!=1) {
-    numLedsInChain = 200; // default
+  ledArrangement.isMemberVariable();
+  for (StringVector::iterator pos = aLedChainConfigs.begin(); pos!=aLedChainConfigs.end(); ++pos) {
+    ledArrangement.addLEDChain(*pos);
   }
 }
 
@@ -92,87 +85,36 @@ LedChainVdc::LedChainVdc(int aInstanceNumber, const string aChainSpec, VdcHost *
 void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   ErrorPtr err;
+  // initialize root view
+  PixelRect r = ledArrangement.totalCover();
+  rootView = ViewStackPtr(new ViewStack);
+  rootView->setFrame(r);
+  rootView->setBackgroundColor(transparent);
+  ledArrangement.setRootView(rootView);
   // initialize database
   string databaseName = getPersistentDataDir();
   string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   err = db.connectAndInitialize(databaseName.c_str(), LEDCHAINDEVICES_SCHEMA_VERSION, LEDCHAINDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
   // Initialize chain driver
-  ws281xcomm = LEDChainCommPtr(new LEDChainComm(ledType, ledChainDevice, numLedsInChain));
-  ws281xcomm->begin();
-  // trigger a full chain rendering
-  triggerRenderingRange(0, numLedsInChain);
+  ledArrangement.begin(true);
   // done
   aCompletedCB(ErrorPtr());
-}
-
-
-#define MIN_RENDER_INTERVAL (5*MilliSecond)
-
-void LedChainVdc::triggerRenderingRange(uint16_t aFirst, uint16_t aNum)
-{
-  if (!renderTicket) {
-    // no rendering pending, initialize range
-    renderStart = aFirst;
-    renderEnd = aFirst+aNum;
-  }
-  else {
-    // enlarge range
-    if (aFirst<renderStart) renderStart = aFirst;
-    if (aFirst+aNum>renderEnd) renderEnd = aFirst+aNum;
-  }
-  if (!renderTicket) {
-    renderTicket.executeOnce(boost::bind(&LedChainVdc::render, this), MIN_RENDER_INTERVAL);
-  }
 }
 
 
 Brightness LedChainVdc::getMinBrightness()
 {
   // scale up according to scaled down maximum, and make it 0..100
-  return ws281xcomm->getMinVisibleColorIntensity()*100.0/(double)maxOutValue;
+  return ledArrangement.getMinVisibleColorIntensity()*100.0/(double)maxOutValue;
 }
 
 
 bool LedChainVdc::hasWhite()
 {
   // so far, only SK6812 have white
-  return ledType==LEDChainComm::ledtype_sk6812;
+  return ledArrangement.hasWhite();
 }
 
-
-
-static inline void increase(uint8_t &aByte, uint8_t aAmount, uint8_t aMax = 255)
-{
-  uint16_t r = aByte+aAmount;
-  if (r>aMax)
-    aByte = aMax;
-  else
-    aByte = (uint8_t)r;
-}
-
-
-void LedChainVdc::render()
-{
-  renderTicket = 0; // done
-  for (uint16_t i=renderStart; i<renderEnd; i++) {
-    // TODO: optimize asking only devices active in this range
-    // for now, just ask all
-    uint8_t r, g, b, w;
-    uint8_t rv=0, gv=0, bv=0, wv=0; // composed
-    for (LedChainDeviceList::iterator pos = sortedSegments.begin(); pos!=sortedSegments.end(); ++pos) {
-      double opacity = (*pos)->getLEDColor(i, r, g, b, w);
-      if (opacity>0) {
-        increase(rv, opacity*r);
-        increase(gv, opacity*g);
-        increase(bv, opacity*b);
-        increase(wv, opacity*w);
-      }
-    }
-    ws281xcomm->setColorDimmed(i, rv, gv, bv, wv, maxOutValue); // not more than maximum brightness allowed
-  }
-  // transfer to hardware
-  ws281xcomm->show();
-}
 
 
 bool LedChainVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
@@ -191,26 +133,19 @@ const char *LedChainVdc::vdcClassIdentifier() const
 }
 
 
-// Binary predicate that, taking two values of the same type of those contained in the list,
-// returns true if the first argument goes before the second argument in the strict weak ordering
-// it defines, and false otherwise.
-bool LedChainVdc::segmentCompare(LedChainDevicePtr aFirst, LedChainDevicePtr aSecond)
-{
-  return aFirst->firstLED < aSecond->firstLED;
-}
-
-
-LedChainDevicePtr LedChainVdc::addLedChainDevice(uint16_t aFirstLED, uint16_t aNumLEDs, string aDeviceConfig)
+LedChainDevicePtr LedChainVdc::addLedChainDevice(int aX, int aDx, int aY, int aDy, string aDeviceConfig)
 {
   LedChainDevicePtr newDev;
-  newDev = LedChainDevicePtr(new LedChainDevice(this, aFirstLED, aNumLEDs, aDeviceConfig));
+  newDev = LedChainDevicePtr(new LedChainDevice(this, aX, aDx, aY, aDy, aDeviceConfig));
   // add to container if device was created
   if (newDev) {
     // add to container
     simpleIdentifyAndAddDevice(newDev);
-    // add to my list and sort
-    sortedSegments.push_back(newDev);
-    sortedSegments.sort(segmentCompare);
+    // add to view
+    rootView->setPositioningMode(P44View::noAdjust);
+    rootView->pushView(newDev->lightView);
+    // - re-render
+    ledArrangement.step();
     return boost::dynamic_pointer_cast<LedChainDevice>(newDev);
   }
   // none added
@@ -224,14 +159,10 @@ void LedChainVdc::removeDevice(DevicePtr aDevice, bool aForget)
   if (dev) {
     // - remove single device from superclass
     inherited::removeDevice(aDevice, aForget);
-    // - remove device from sorted segments list
-    for (LedChainDeviceList::iterator pos = sortedSegments.begin(); pos!=sortedSegments.end(); ++pos) {
-      if (*pos==aDevice) {
-        sortedSegments.erase(pos);
-        triggerRenderingRange(0,numLedsInChain); // fully re-render to remove deleted light immediately
-        break;
-      }
-    }
+    // - remove device's view
+    rootView->removeView(dev->lightView);
+    // - re-render
+    ledArrangement.step();
   }
 }
 
@@ -244,9 +175,9 @@ void LedChainVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // then add those from the DB
     sqlite3pp::query qry(db);
-    if (qry.prepare("SELECT firstLED, numLEDs, deviceconfig, rowid FROM devConfigs ORDER BY firstLED")==SQLITE_OK) {
+    if (qry.prepare("SELECT firstLED, numLEDs, y, dy, deviceconfig, rowid FROM devConfigs ORDER BY firstLED,y")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
-        LedChainDevicePtr dev =addLedChainDevice(i->get<int>(0), i->get<int>(1), i->get<string>(2));
+        LedChainDevicePtr dev = addLedChainDevice(i->get<int>(0), i->get<int>(1), i->get<int>(2), i->get<int>(3), i->get<string>(4));
         dev->ledChainDeviceRowID = i->get<int>(3);
       }
     }
@@ -263,20 +194,27 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
     // add a new LED chain segment device
     string deviceConfig;
     ApiValuePtr o;
-    uint16_t firstLED, numLEDs;
-    respErr = checkParam(aParams, "firstLED", o);
+    int x, dx;
+    int y = 0;
+    int dy = 1;
+    respErr = checkParam(aParams, "x", o);
     if (Error::isOK(respErr)) {
-      firstLED = o->int16Value();
-      respErr = checkParam(aParams, "numLEDs", o);
+      x = o->int32Value();
+      respErr = checkParam(aParams, "dx", o);
       if (Error::isOK(respErr)) {
-        numLEDs = o->int16Value();
+        dx = o->int32Value();
         respErr = checkStringParam(aParams, "deviceConfig", deviceConfig);
         if (Error::isOK(respErr)) {
+          // optional y position and size
+          o = aParams->get("y");
+          if (o) y = o->int32Value();
+          o = aParams->get("dy");
+          if (o) dy = o->int32Value();
           // optional name
           string name;
           checkStringParam(aParams, "name", name);
           // try to create device
-          LedChainDevicePtr dev = addLedChainDevice(firstLED, numLEDs, deviceConfig);
+          LedChainDevicePtr dev = addLedChainDevice(x, dx, y, dy, deviceConfig);
           if (!dev) {
             respErr = WebError::webErr(500, "invalid configuration for LedChain device -> none created");
           }
@@ -285,8 +223,8 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
             if (name.size()>0) dev->setName(name);
             // insert into database
             if(db.executef(
-              "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, deviceconfig) VALUES (%d, %d,'%q')",
-              firstLED, numLEDs, deviceConfig.c_str()
+              "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, y, dy, deviceconfig) VALUES (%d, %d, %d, %d, '%q')",
+              x, dx, y, dy, deviceConfig.c_str()
             )!=SQLITE_OK) {
               respErr = db.error("saving LED chain segment params");
             }
