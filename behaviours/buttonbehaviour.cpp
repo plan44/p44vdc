@@ -146,7 +146,7 @@ static const char *stateNames[] = {
   "S11_localdim",
   "S12_3clickWait",
   "S13_3pauseWait",
-  "S14_awaitrelease"
+  "S14_awaitrelease_timedout"
 };
 #endif
 
@@ -173,16 +173,22 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
       // - always count button press as a tip
       isTip = true;
       // - state is now Awaitrelease
-      state = S14_awaitrelease;
+      state = S8_awaitrelease;
     }
     else {
       // the button was released right now
       // - if we haven't seen a press before, assume the press got lost and act on the release
       if (state==S0_idle) {
         isTip = true;
+        // as we'll send the click event NOW, but will get no physical release from the button, we must simulate keyOpComplete()
+        buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::keyOpComplete, this), t_tip_timeout);
+        state = S0_idle;
       }
-      // - state is now idle again
-      state = S0_idle;
+      else {
+        // - state is now idle AGAIN after a previous click event
+        state = S0_idle;
+        keyOpComplete();
+      }
     }
     if (isTip) {
       if (isLocalButtonEnabled() && clickCounter==0) {
@@ -232,7 +238,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
 
 void ButtonBehaviour::dimRepeat()
 {
-  buttonStateMachineTicket = 0;
+  buttonStateMachineTicket.cancel();
   // button still pressed
   BFOCUSLOG("dimming in progress - sending ct_hold_repeat (repeatcount = %d)", holdRepeats);
   sendClick(ct_hold_repeat);
@@ -315,8 +321,9 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
           holdRepeats++;
         }
         else {
+          // early hold end reporting, still waiting for actual release of the button
           sendClick(ct_hold_end);
-          state = S14_awaitrelease;
+          state = S14_awaitrelease_timedout;
         }
       }
       break;
@@ -332,6 +339,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       }
       else if (timeSinceRef>=t_tip_timeout) {
         state = S0_idle;
+        keyOpComplete();
       }
       break;
 
@@ -414,7 +422,14 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S8_awaitrelease:
-    case S14_awaitrelease:
+      // normal wait for
+      if (aStateChanged && !buttonPressed) {
+        state = S0_idle;
+        keyOpComplete();
+      }
+      break;
+    case S14_awaitrelease_timedout:
+      // silently reset the state machine, hold_end was already sent before
       if (aStateChanged && !buttonPressed) {
         state = S0_idle;
       }
@@ -539,6 +554,15 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     // TODO: more elegant solution for this
     device.getVdcHost().checkForLocalClickHandling(*this, aClickType);
   }
+}
+
+
+void ButtonBehaviour::keyOpComplete()
+{
+  #if ENABLE_LOCALCONTROLLER
+  // notify listeners
+  notifyListeners(valueevent_changed);
+  #endif
 }
 
 
