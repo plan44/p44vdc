@@ -227,7 +227,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   pix.b = b;
   pix.a = cl->brightnessForHardware()*255/100; // alpha is brightness
   lightView->setBackgroundColor(pix);
-  getLedChainVdc().ledArrangement.step(); // update
+  getLedChainVdc().ledArrangement.render(); // update
   // next step
   if (moreSteps) {
     ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);

@@ -145,7 +145,7 @@ LedChainDevicePtr LedChainVdc::addLedChainDevice(int aX, int aDx, int aY, int aD
     rootView->setPositioningMode(P44View::noAdjust);
     rootView->pushView(newDev->lightView);
     // - re-render
-    ledArrangement.step();
+    ledArrangement.render();
     return boost::dynamic_pointer_cast<LedChainDevice>(newDev);
   }
   // none added
@@ -162,7 +162,7 @@ void LedChainVdc::removeDevice(DevicePtr aDevice, bool aForget)
     // - remove device's view
     rootView->removeView(dev->lightView);
     // - re-render
-    ledArrangement.step();
+    ledArrangement.render();
   }
 }
 

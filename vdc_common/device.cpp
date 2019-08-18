@@ -943,7 +943,7 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       if (Error::isOK(err = checkParam(aDeliveryState->callParams, "force", o))) {
         force = o->boolValue();
         // set the channel type as actionParam
-        aDeliveryState->actionParam = channeltype_brightness; // legacy dimming is ALWAYS brightness
+        aDeliveryState->actionParam = channeltype_brightness; // legacy dimming (i.e. dimming via scene calls) is ALWAYS brightness
         // prepare scene call
         callScenePrepare(aPreparedCB, sceneNo, force, transitionTimeOverride);
         return;

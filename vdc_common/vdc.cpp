@@ -323,7 +323,6 @@ void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryState
   // - done
   delivering = false;
   ALOG(LOG_INFO, "===== '%s' delivery complete", NotificationNames[aDeliveryStateBeingDeleted.callType]);
-  notificationDelivered(); // inform subclasses which e.g. might want to trigger vdc-wide updates to hardware
   // check for pending deliveries
   if (pendingDeliveries.size()>0) {
     // get next from queue

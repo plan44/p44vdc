@@ -319,6 +319,7 @@ bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTr
   if (aScene) {
     bool ok = performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
     if (aTransitionTimeOverride!=Infinite) {
+      BLOG(LOG_INFO, "Transition times of all changing channels overridden: actual transition time is now %d mS", (int)(aTransitionTimeOverride/MilliSecond));
       // override the transition time in all channels that now need to be applied
       for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
         if ((*pos)->needsApplying()) (*pos)->setTransitionTime(aTransitionTimeOverride);
