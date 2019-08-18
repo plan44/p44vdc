@@ -1107,6 +1107,15 @@ void Trigger::parseVarDefs()
 }
 
 
+void Trigger::processGlobalEvent(VdchostEvent aActivity)
+{
+  if (aActivity==vdchost_devices_initialized) {
+    parseVarDefs();
+  }
+}
+
+
+
 void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
 {
   if (aEvent==valueevent_removed) {
@@ -1174,7 +1183,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       ai++;
     }
     else {
-      // first param is a named zone that includes the room
+      // first param is a named scene that includes the zone
       SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(aArgs[0].stringValue());
       if (!scene) return throwError(ExpressionError::NotFound, "scene '%s' not found", aArgs[0].stringValue().c_str());
       zoneid = scene->getZoneID();
@@ -1683,6 +1692,12 @@ PropertyContainerPtr TriggerList::getContainer(const PropertyDescriptorPtr &aPro
 }
 
 
+void TriggerList::processGlobalEvent(VdchostEvent aActivity)
+{
+  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
+    (*pos)->processGlobalEvent(aActivity);
+  }
+}
 
 
 
@@ -1719,6 +1734,7 @@ void LocalController::signalActivity()
 void LocalController::processGlobalEvent(VdchostEvent aActivity)
 {
   FOCUSLOG("processGlobalEvent: event = %d", (int)aActivity);
+  localTriggers.processGlobalEvent(aActivity);
 }
 
 

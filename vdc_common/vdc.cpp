@@ -103,11 +103,16 @@ const char *Vdc::getPersistentDataDir()
 
 void Vdc::handleGlobalEvent(VdchostEvent aEvent)
 {
+  // note: global events that reach the vdcs are not too frequent and must be distributed to all devices
   if (aEvent==vdchost_logstats) {
     if (optimizerMode>opt_disabled) {
       optimizerCacheStats();
     }
   }
+  for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+    (*pos)->handleGlobalEvent(aEvent);
+  }
+  inherited::handleGlobalEvent(aEvent);
 }
 
 
@@ -318,6 +323,7 @@ void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryState
   // - done
   delivering = false;
   ALOG(LOG_INFO, "===== '%s' delivery complete", NotificationNames[aDeliveryStateBeingDeleted.callType]);
+  notificationDelivered(); // inform subclasses which e.g. might want to trigger vdc-wide updates to hardware
   // check for pending deliveries
   if (pendingDeliveries.size()>0) {
     // get next from queue

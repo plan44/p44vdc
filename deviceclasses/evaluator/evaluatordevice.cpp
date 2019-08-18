@@ -189,6 +189,12 @@ void EvaluatorDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset
 }
 
 
+void EvaluatorDevice::handleGlobalEvent(VdchostEvent aEvent)
+{
+  if (aEvent==vdchost_devices_initialized) parseVarDefs();
+  inherited::handleGlobalEvent(aEvent);
+}
+
 
 ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {

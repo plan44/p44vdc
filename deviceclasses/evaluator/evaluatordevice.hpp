@@ -221,6 +221,11 @@ namespace p44 {
     /// device level API methods (p44 specific, JSON only, for debugging evaluators)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
+
+
   protected:
 
     void deriveDsUid();

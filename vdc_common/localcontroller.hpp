@@ -460,6 +460,10 @@ namespace p44 {
     /// @return ok or error in case expression evaluation failed
     ErrorPtr checkAndFire(EvalMode aEvalMode);
 
+    /// called when vdc host event occurs
+    /// @param aActivity the activity that occurred at the vdc host level
+    void processGlobalEvent(VdchostEvent aActivity);
+
     /// execute the trigger actions
     bool executeActions(bool aAsynchronously, EvaluationResultCB aCallback = NULL);
 
@@ -510,11 +514,15 @@ namespace p44 {
 
     TriggersVector triggers;
 
-    /// load zones
+    /// load triggers
     ErrorPtr load();
 
-    /// save zones
+    /// save triggers
     ErrorPtr save();
+
+    /// called when vdc host event occurs
+    /// @param aActivity the activity that occurred at the vdc host level
+    void processGlobalEvent(VdchostEvent aActivity);
 
     /// get trigger by id
     /// @param aTriggerId ID of trigger

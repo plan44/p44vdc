@@ -58,19 +58,6 @@ namespace p44 {
   typedef boost::function<void (DevicePtr aDevice, bool aRegular)> DeviceUserActionCB;
 
   /// Callback for other global device activity
-  typedef enum {
-    vdchost_activitysignal, ///< user-relevant activity, can be used to trigger flashing an activity LED.
-    vdchost_identify, ///< vdchost is requested to identify itself (e.g. by light or sound)
-    vdchost_logstats, ///< demands logging statistics to the log (should be >=LOG_NOTICE)
-    vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
-    vdchost_network_reconnected, ///< network connection established again
-    vdchost_network_lost, ///< network connection was lost
-    vdchost_vdcapi_connected, ///< the VDC API is connected (to a vdsm using it)
-    vdchost_vdcapi_disconnected, ///< the VDC API was disconnected
-    vdchost_vdcs_initialized, ///< all vdcs are initialized now
-    vdchost_devices_collected, ///< initial device collection run is complete
-    vdchost_devices_initialized, ///< initial device initialisation run is complete
-  } VdchostEvent;
   typedef boost::function<void (VdchostEvent aActivity)> VdchostEventCB;
 
   /// Rescan modes

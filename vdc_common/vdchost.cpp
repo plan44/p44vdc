@@ -158,9 +158,11 @@ bool VdcHost::canIdentifyToUser()
 
 void VdcHost::postEvent(VdchostEvent aEvent)
 {
-  // let all vdcs know
-  for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
-    pos->second->handleGlobalEvent(aEvent);
+  if (aEvent>=vdchost_redistributed_events) {
+    // let all vdcs (and their devices) know
+    for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
+      pos->second->handleGlobalEvent(aEvent);
+    }
   }
   #if ENABLE_LOCALCONTROLLER
   if (localController) localController->processGlobalEvent(aEvent);

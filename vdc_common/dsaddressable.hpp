@@ -46,6 +46,25 @@ namespace p44 {
 
   class VdcHost;
 
+  /// global events that DsAddressables might receive
+  typedef enum {
+    // events not passed to vdcs and devices, remains on vdchost level
+    vdchost_activitysignal, ///< user-relevant activity, can be used to trigger flashing an activity LED.
+    // events passed to all vdcs and devices
+    vdchost_redistributed_events, ///< events >= this will be distributed to all vdcs and devices (and should not be too frequent for this reason)
+    vdchost_identify = vdchost_redistributed_events, ///< vdchost is requested to identify itself (e.g. by light or sound)
+    vdchost_logstats, ///< demands logging statistics to the log (should be >=LOG_NOTICE)
+    vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
+    vdchost_network_reconnected, ///< network connection established again
+    vdchost_network_lost, ///< network connection was lost
+    vdchost_vdcapi_connected, ///< the VDC API is connected (to a vdsm using it)
+    vdchost_vdcapi_disconnected, ///< the VDC API was disconnected
+    vdchost_vdcs_initialized, ///< all vdcs are initialized now
+    vdchost_devices_collected, ///< initial device collection run is complete
+    vdchost_devices_initialized, ///< initial device initialisation run is complete
+  } VdchostEvent;
+
+
   /// base class representing a entity which is addressable with a dSUID
   /// dS devices are most obvious addressables, but vDCs and the vDC host itself is also addressable and uses this base class
   class DsAddressable : public PropertyContainer
@@ -115,6 +134,10 @@ namespace p44 {
     /// report that this addressable has vanished (temporarily or permanently disconnected)
     /// @note only addressables that have been announced on the vDC API will send a vanish message
     void reportVanished();
+
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) { /* NOP in base class */ };
 
     /// @name vDC API
     /// @{
