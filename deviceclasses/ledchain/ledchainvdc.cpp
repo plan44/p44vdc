@@ -174,10 +174,10 @@ void LedChainVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // then add those from the DB
     sqlite3pp::query qry(db);
-    if (qry.prepare("SELECT firstLED, numLEDs, y, dy, deviceconfig, rowid FROM devConfigs ORDER BY firstLED,y")==SQLITE_OK) {
+    if (qry.prepare("SELECT rowid, firstLED, numLEDs, y, dy, deviceconfig FROM devConfigs ORDER BY firstLED,y")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
-        LedChainDevicePtr dev = addLedChainDevice(i->get<int>(0), i->get<int>(1), i->get<int>(2), i->get<int>(3), i->get<string>(4));
-        dev->ledChainDeviceRowID = i->get<int>(3);
+        LedChainDevicePtr dev = addLedChainDevice(i->get<int>(1), i->get<int>(2), i->get<int>(3), i->get<int>(4), i->get<string>(5));
+        dev->ledChainDeviceRowID = i->get<int>(0);
       }
     }
   }
