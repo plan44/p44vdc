@@ -225,12 +225,12 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   pix.r = r;
   pix.g = g;
   pix.b = b;
-  pix.a = cl->brightnessForHardware()*255/100; // alpha is brightness
+  pix.a = cl->brightnessForHardware()*getLedChainVdc().ledArrangement.getMaxOutValue()/100; // alpha is brightness, scaled down to maxOutValue
   lightView->setBackgroundColor(pix);
   getLedChainVdc().ledArrangement.render(); // update
   // next step
   if (moreSteps) {
-    ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
+    ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, pix.a);
     // not yet complete, schedule next step
     transitionTicket.executeOnce(
       boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
@@ -239,7 +239,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     return; // will be called later again
   }
   if (!aForDimming) {
-    ALOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
+    ALOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, pix.a);
   }
 }
 

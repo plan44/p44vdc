@@ -72,8 +72,7 @@ string LedChainDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToV
 
 
 LedChainVdc::LedChainVdc(int aInstanceNumber, StringVector aLedChainConfigs, VdcHost *aVdcHostP, int aTag) :
-  Vdc(aInstanceNumber, aVdcHostP, aTag),
-  maxOutValue(255)
+  Vdc(aInstanceNumber, aVdcHostP, aTag)
 {
   ledArrangement.isMemberVariable();
   for (StringVector::iterator pos = aLedChainConfigs.begin(); pos!=aLedChainConfigs.end(); ++pos) {
@@ -105,7 +104,7 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 Brightness LedChainVdc::getMinBrightness()
 {
   // scale up according to scaled down maximum, and make it 0..100
-  return ledArrangement.getMinVisibleColorIntensity()*100.0/(double)maxOutValue;
+  return ledArrangement.getMinVisibleColorIntensity()*100.0/(double)ledArrangement.getMaxOutValue();
 }
 
 

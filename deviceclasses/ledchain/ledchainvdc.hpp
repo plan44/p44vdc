@@ -61,7 +61,6 @@ namespace p44 {
 
     LedChainDevicePersistence db;
     LEDChainArrangement ledArrangement;
-    uint8_t maxOutValue;
     ViewStackPtr rootView;
 
     typedef std::list<LedChainDevicePtr> LedChainDeviceList;
@@ -79,10 +78,10 @@ namespace p44 {
 
     void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;
 
-    /// set max output value to send to WS2812 LEDs. This is like a global brightness limit, to prevent LED chain
+    /// set max output value to send to WS281x LEDs. This is like a global brightness limit, to prevent LED chain
     /// power supply overload
     /// @param aMaxOutValue max output value, 0..255.
-    void setMaxOutValue(uint8_t aMaxOutValue) { maxOutValue = aMaxOutValue; };
+    void setMaxOutValue(uint8_t aMaxOutValue) { ledArrangement.setMaxOutValue(aMaxOutValue); };
 
     /// get minimum brigthness for dimming
     /// @return minimum brightness that will just barely keep the LEDs on
