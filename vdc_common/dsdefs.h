@@ -329,6 +329,13 @@ typedef enum {
 
   channeltype_p44_position_v = channeltype_custom_first+0, ///< vertical position (e.g for moving lights)
   channeltype_p44_position_h = channeltype_custom_first+1, ///< horizontal position (e.g for moving lights)
+  channeltype_p44_zoom_v = channeltype_custom_first+2, ///< vertical zoom (for extended functionality moving lights)
+  channeltype_p44_zoom_h = channeltype_custom_first+3, ///< horizontal zoom (for extended functionality moving lights)
+  channeltype_p44_rotation = channeltype_custom_first+4, ///< rotation (for extended functionality moving lights)
+  channeltype_p44_brightness_gradient = channeltype_custom_first+5, ///< gradient for brightness
+  channeltype_p44_hue_gradient = channeltype_custom_first+6, ///< gradient for hue
+  channeltype_p44_saturation_gradient = channeltype_custom_first+7, ///< gradient for saturation
+  channeltype_p44_feature_mode = channeltype_custom_first+8, ///< feature mode
 
   channeltype_p44_audio_content_source = channeltype_custom_first+22, ///< audio content source // FIXME: p44-specific channel type for audio content source until dS specifies one
 
