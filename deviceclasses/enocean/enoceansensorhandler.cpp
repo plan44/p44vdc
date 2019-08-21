@@ -136,6 +136,9 @@ namespace p44 { namespace EnoceanSensors {
 
   const char *supplyText = "Power supply";
 
+  const char *lowBatText = "Low battery";
+
+
 } }
 
 
@@ -293,6 +296,7 @@ DsBehaviourPtr EnoceanSensorHandler::newSensorBehaviour(const EnoceanSensorDescr
 }
 
 
+#define LOW_BAT_VOLTAGE_LEVEL 2.6 // assume CR2032 type battery, which goes down to 2V but 2.6 is already indicating "low"
 
 // handle incoming data from device and extract data for this channel
 void EnoceanSensorHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
@@ -309,7 +313,7 @@ void EnoceanSensorHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       }
       else if (sensorChannelDescriptorP->behaviourType==behaviour_sensor && sensorChannelDescriptorP->behaviourParam==sensorType_supplyVoltage) {
         SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(behaviour);
-        if (sb && sb->hasDefinedState()) lowBat = sb->getCurrentValue()<2.6; // assume CR2032 type battery, which goes down to 2V but 2.6 is already indicating "low"
+        if (sb && sb->hasDefinedState()) lowBat = sb->getCurrentValue()<LOW_BAT_VOLTAGE_LEVEL;
       }
     }
   }

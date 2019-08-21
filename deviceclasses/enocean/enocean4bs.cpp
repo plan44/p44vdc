@@ -530,7 +530,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_wind_direction, usage_outdoors,22.5,  360, DB(3,3), DB(3,0), 100, 40*60, &angleHandler, "wind direction" },
   { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_wind_speed,     usage_outdoors,0.45,89.36, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, "wind speed" }, // 1..199.9 mph = 0.45..89.36 m/S
   { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_gust_speed,     usage_outdoors,0.45,89.36, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, "max wind (gust) speed" }, // 1..199.9 mph = 0.45..89.36 m/S
-  { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_lowBattery,     usage_outdoors,   0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  "Low Battery" },
+  { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_lowBattery,     usage_outdoors,   0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  lowBatText },
 
   // A5-14: Multi-Function Sensors
   // A5-14-01: Single door/window contact, 0=contact (and window/door) closed, 1=contact (and window/door) open
@@ -828,7 +828,7 @@ EnoceanDevicePtr EnoceanA52001Handler::newDevice(
   static const p44::EnoceanSensorDescriptor tempSensor =
     { 0, 0x20, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room, 0, 40, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText };
   static const p44::EnoceanSensorDescriptor lowBatInput =
-    { 0, 0x20, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 1,  0, DB(2,4), DB(2,4), 100, 40*60, &stdInputHandler,  "Low Battery" };
+    { 0, 0x20, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 1,  0, DB(2,4), DB(2,4), 100, 40*60, &stdInputHandler,  lowBatText };
   // create device
   EnoceanDevicePtr newDev; // none so far
   if (aSubDeviceIndex<1) {
@@ -1060,7 +1060,7 @@ static const p44::EnoceanSensorDescriptor A52004feedTemp =
 static const p44::EnoceanSensorDescriptor A52004setpointTemp =
   { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_user, 10, 30, DB(2,7), DB(2,0), 5, Never, &stdSensorHandler, setPointText }; // user action quickly forwarded, but not regularily transmitted
 static const p44::EnoceanSensorDescriptor A52004lowBatInput =
-  { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 0,  1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  "Low Battery" };
+  { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 0,  1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  lowBatText };
 
 
 // static factory method
