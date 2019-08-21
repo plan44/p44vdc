@@ -191,7 +191,6 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
   ErrorPtr respErr;
   if (aMethod=="x-p44-addDevice") {
     // add a new LED chain segment device
-    string deviceConfig;
     ApiValuePtr o;
     int x, dx;
     int y = 0;
@@ -202,41 +201,47 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
       respErr = checkParam(aParams, "dx", o);
       if (Error::isOK(respErr)) {
         dx = o->int32Value();
-        respErr = checkStringParam(aParams, "deviceConfig", deviceConfig);
+        string uid;
+        respErr = checkStringParam(aParams, "uniqueId", uid);
         if (Error::isOK(respErr)) {
-          // optional y position and size
-          o = aParams->get("y");
-          if (o) y = o->int32Value();
-          o = aParams->get("dy");
-          if (o) dy = o->int32Value();
-          // optional name
-          string name;
-          checkStringParam(aParams, "name", name);
-          // try to create device
-          LedChainDevicePtr dev = addLedChainDevice(x, dx, y, dy, deviceConfig);
-          if (!dev) {
-            respErr = WebError::webErr(500, "invalid configuration for LedChain device -> none created");
-          }
-          else {
-            // set name
-            if (name.size()>0) dev->setName(name);
-            // insert into database
-            if(db.executef(
-              "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, y, dy, deviceconfig) VALUES (%d, %d, %d, %d, '%q')",
-              x, dx, y, dy, deviceConfig.c_str()
-            )!=SQLITE_OK) {
-              respErr = db.error("saving LED chain segment params");
+          string cfg;
+          respErr = checkStringParam(aParams, "deviceConfig", cfg);
+          if (Error::isOK(respErr)) {
+            string deviceConfig = "#"+uid+':'+cfg;
+            // optional y position and size
+            o = aParams->get("y");
+            if (o) y = o->int32Value();
+            o = aParams->get("dy");
+            if (o) dy = o->int32Value();
+            // optional name
+            string name;
+            checkStringParam(aParams, "name", name);
+            // try to create device
+            LedChainDevicePtr dev = addLedChainDevice(x, dx, y, dy, deviceConfig);
+            if (!dev) {
+              respErr = WebError::webErr(500, "invalid configuration for LedChain device -> none created");
             }
             else {
-              dev->ledChainDeviceRowID = db.last_insert_rowid();
-              // confirm
-              ApiValuePtr r = aRequest->newApiValue();
-              r->setType(apivalue_object);
-              r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
-              r->add("rowid", r->newUint64(dev->ledChainDeviceRowID));
-              r->add("name", r->newString(dev->getName()));
-              aRequest->sendResult(r);
-              respErr.reset(); // make sure we don't send an extra ErrorOK
+              // set name
+              if (name.size()>0) dev->setName(name);
+              // insert into database
+              if(db.executef(
+                "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, y, dy, deviceconfig) VALUES (%d, %d, %d, %d, '%q')",
+                x, dx, y, dy, deviceConfig.c_str()
+              )!=SQLITE_OK) {
+                respErr = db.error("saving LED chain segment params");
+              }
+              else {
+                dev->ledChainDeviceRowID = db.last_insert_rowid();
+                // confirm
+                ApiValuePtr r = aRequest->newApiValue();
+                r->setType(apivalue_object);
+                r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
+                r->add("rowid", r->newUint64(dev->ledChainDeviceRowID));
+                r->add("name", r->newString(dev->getName()));
+                aRequest->sendResult(r);
+                respErr.reset(); // make sure we don't send an extra ErrorOK
+              }
             }
           }
         }

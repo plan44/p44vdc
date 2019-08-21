@@ -80,9 +80,19 @@ class FeatureLightSpot : public LightSpotView
 
 public:
 
+  FeatureLightSpot(int aX, int aDx, int aY, int aDy)
+  {
+    PixelRect f = { aX, aY, aDx, aDy };
+    setFrame(f);
+    setFullFrameContent();
+    setPosition(50, 50); // middle
+    setZoom(50, 50); // filling larger dimension of frame
+  }
+
+
   void setPosition(double aRelX, double aRelY)
   {
-    // movement area is twice the size of the LED arrangement covered area, so light can be moved out of visible field
+    // movement area is 2 times the frame, so light can be moved out completely out of the frame in both directions
     // This means light center appears at left/bottom edge at 0.25 and disappears at right/top edge at 0.75
     setCenter({
       (int)(-frame.dx/2+frame.dx*aRelX*0.02),
@@ -92,7 +102,8 @@ public:
 
   void setZoom(double aRelDx, double aRelDy)
   {
-    // zoom area is (like position) twice the size of the LED arrangement covered area
+    // zoom area is (like position) twice the size of the larger dimension of the frame
+    // This means the light fully fits the frame in the larger direction at zoom==50
     int maxD = max(frame.dx, frame.dy);
     setExtent({
       (int)(maxD*aRelDx*0.01),
@@ -114,75 +125,67 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   inherited(aVdcP)
 {
   RGBColorLightBehaviourPtr behaviour;
-  // type:config_for_type
-  // Where:
-  // - with type=segment
+  // aDeviceConfig syntax:
+  //   [#uniqueid:]lighttype:config_for_lighttype
+  //   Note: uniqueid can be any unique string to derive a dSUID from, or a valid dSUID to be used as-is
+  // where:
+  // - with lighttype=segment
   //   - aX,aDx,aY,aDY determine the size of the segment (view)
-  //   - config=b:e
+  //   - config=[id:]b:e
+  //     - id: optional unique id identifying the light, must start with non-numeric, if set, determines the dSUID
   //     - b:0..n size of softedge at beginning
   //     - e:0..n size of softedge at end
-  // - with type=field
+  // - with lighttype=lightspot
   //   - aX,aY determine the (initial) center of the light field
   //   - aDx,aDy determine the (initial) diameter of the light field
-  //   - config=??? %%%tbd
+  //   - config=id
+  //     id: unique id identifying the light, must start with non-numeric, determines the dSUID
   // evaluate config
   string config = aDeviceConfig;
-  string mode, s;
-  int startSoftEdge = 0;
-  int endSoftEdge = 0;
-  size_t i = config.find(":");
+  string lt, s;
+  const char* p = config.c_str();
   bool configOK = false;
-  if (i!=string::npos) {
-    mode = config.substr(0,i);
-    config.erase(0,i+1);
-  }
-  lightType = lighttype_unknown;
-  if (mode=="segment" || mode=="area") {
-    // simple segment (area) of the matrix/chain
-    lightType = lighttype_simplearea;
-    i = config.find(":");
-    if (i!=string::npos) {
-      s = config.substr(0,i);
-      config.erase(0,i+1);
-      if (sscanf(s.c_str(), "%d", &startSoftEdge)==1) {
-        if (sscanf(config.c_str(), "%d", &endSoftEdge)==1) {
-          // install the view
-          lightView = P44ViewPtr(new LightSegment(aX, aDx, aY, aDy, startSoftEdge, endSoftEdge));
-          // complete config
-          configOK = true;
-        }
-      }
+  // check for optional unique id
+  const char* p2 = p;
+  if (nextPart(p2, s, ':')) {
+    if (s[0]=='#') {
+      // this is the unique ID
+      uniqueId = s.substr(1); // save it
+      p = p2; // skip it
     }
   }
-  else if (mode=="lightspot") {
-    // light spot
-    lightType = lighttype_lightspot;
-    // TODO: implement options
-//    i = config.find(":");
-//    if (i!=string::npos) {
-//      s = config.substr(0,i);
-//      config.erase(0,i+1);
-//      if (sscanf(s.c_str(), "%d", &startSoftEdge)==1) {
-//        if (sscanf(config.c_str(), "%d", &endSoftEdge)==1) {
-//          // install the view
-//          lightView = P44ViewPtr(new LightSegment(aX, aDx, aY, aDy, startSoftEdge, endSoftEdge));
-//          // complete config
-//          configOK = true;
-//        }
-//      }
-//    }
-    configOK = true;
-    installSettings(DeviceSettingsPtr(new FeatureLightDeviceSettings(*this)));
-    behaviour = FeatureLightBehaviourPtr(new FeatureLightBehaviour(*this, false));
-    FeatureLightSpotPtr lsv = FeatureLightSpotPtr(new FeatureLightSpot());
-    PixelRect cover = getLedChainVdc().ledArrangement.totalCover();
-    lsv->setFrame(cover); // covers the entire area
-    lsv->setCenter({ aX, aY });
-    lsv->setExtent({ aDx, aDy });
-    lightView = lsv;
+  if (nextPart(p, lt, ':')) {
+    // found light type
+    lightType = lighttype_unknown;
+    if (lt=="segment" || lt=="area") {
+      if (lt=="segment" && aDy==0) aDy = 1; // backwards compatibility, old DB entries have null Y/dY and return 0 for it
+      // simple segment (area) of the matrix/chain
+      lightType = lighttype_simplearea;
+      int startSoftEdge = 0;
+      int endSoftEdge = 0;
+      if (nextPart(p, s, ':')) {
+        if (sscanf(s.c_str(), "%d", &startSoftEdge)==1) {
+          if (nextPart(p, s, ':')) {
+            sscanf(config.c_str(), "%d", &endSoftEdge);
+          }
+        }
+      }
+      // install the view
+      lightView = P44ViewPtr(new LightSegment(aX, aDx, aY, aDy, startSoftEdge, endSoftEdge));
+      // complete config
+      configOK = true;
+    }
+    else if (lt=="lightspot") {
+      // light spot
+      lightType = lighttype_lightspot;
+      installSettings(DeviceSettingsPtr(new FeatureLightDeviceSettings(*this)));
+      behaviour = FeatureLightBehaviourPtr(new FeatureLightBehaviour(*this, false));
+      lightView = FeatureLightSpotPtr(new FeatureLightSpot(aX, aDx, aY, aDy));
+      configOK = true;
+    }
   }
   if (!configOK) {
-    LOG(LOG_ERR, "invalid LedChain device config: %s", aDeviceConfig.c_str());
+    ALOG(LOG_ERR, "invalid LedChain device config: %s", aDeviceConfig.c_str());
   }
   if (!behaviour) {
     // default to simple color light (we can't have nothing even with invalid config)
@@ -196,19 +199,21 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   behaviour->initMinBrightness(getLedChainVdc().getMinBrightness());
   addBehaviour(behaviour);
   // - create dSUID
-  // vDC implementation specific UUID:
-  //   UUIDv5 with name = classcontainerinstanceid::ledchainType:firstLED:lastLED
-  DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string ii = vdcP->vdcInstanceIdentifier();
-  if (lightType==lighttype_simplearea && aY==0 && aDy==1) {
-    // make dSUID compatible with older simple ledchain implementation if it is just a single chain
-    string_format_append(ii, "%d:%d:%d", lightType, aX, aDx);
+  if (uniqueId.empty()) {
+    // no unique id, use type and position to form dSUID (backwards compatibility)
+    ALOG(LOG_WARNING, "Legacy LED chain device, should specify unique ID to get stable dSUID");
+    uniqueId = string_format("%d:%d:%d", lightType, aX, aDx);
   }
-  else {
-    // (initial) position and size determine the dSUID
-    string_format_append(ii, "%d:%d:%d:%d:%d", lightType, aX, aDx, aY, aDy);
+  // if uniqueId is a valid dSUID/UUID, use it as-is
+  if (!dSUID.setAsString(uniqueId)) {
+    // generate vDC implementation specific UUID:
+    //   UUIDv5 with name = <classcontainerinstanceid><uniqueid> (separator missing for backwards compatibility)
+    //   Note: for backwards compatibility, when no uniqueid ist set, <ledchainType>:<firstLED>:<lastLED> is used
+    DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
+    string ii = vdcP->vdcInstanceIdentifier();
+    ii += uniqueId;
+    dSUID.setNameInSpace(ii, vdcNamespace);
   }
-  dSUID.setNameInSpace(ii, vdcNamespace);
 }
 
 
@@ -369,7 +374,7 @@ string LedChainDevice::getExtraInfo()
 {
   string s;
   PixelRect r = lightView->getFrame();
-  s = string_format("LED matrix light in rectangle (%d,%d,%d,%d)", r.x, r.y, r.dx, r.dy);
+  s = string_format("LED matrix light in rectangle (%d,%d,%d,%d), id='%s'", r.x, r.y, r.dx, r.dy, uniqueId.c_str());
   return s;
 }
 
@@ -379,7 +384,7 @@ string LedChainDevice::description()
 {
   string s = inherited::description();
   PixelRect r = lightView->getFrame();
-  string_format_append(s, "\n- LED matrix light in rectangle (%d,%d,%d,%d)", r.x, r.y, r.dx, r.dy);
+  string_format_append(s, "\n- LED matrix light in rectangle (%d,%d,%d,%d)\n  unique ID='%s'", r.x, r.y, r.dx, r.dy, uniqueId.c_str());
   return s;
 }
 

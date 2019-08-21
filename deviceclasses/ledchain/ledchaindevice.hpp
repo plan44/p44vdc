@@ -47,7 +47,8 @@ namespace p44 {
       lighttype_lightspot,
     } LightType;
 
-    LightType lightType;
+    LightType lightType; ///< type of light
+    string uniqueId; ///< unique ID, if set it is used to determine the dsUID
 
     long long ledChainDeviceRowID; ///< the ROWID this device was created from (0=none)
 
