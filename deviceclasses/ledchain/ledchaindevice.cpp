@@ -326,6 +326,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
         fl->saturationGradient->getTransitionalValue()/100, (mode>>16) & 0xFF,
         (mode & 0x01000000)==0 // not radial
       );
+      fls->setWrapMode((mode & 0x02000000)==0 ? P44View::clipXY : 0);
     }
   }
   else {
