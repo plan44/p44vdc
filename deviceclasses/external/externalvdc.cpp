@@ -31,6 +31,8 @@
 
 #if ENABLE_EXTERNAL_EXOTIC
   #include "movinglightbehaviour.hpp"
+  #include "audiobehaviour.hpp"
+  #include "videobehaviour.hpp"
 #endif
 
 #if ENABLE_FCU_SUPPORT
@@ -996,6 +998,33 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     ml->setHardwareName(hardwareName);
     addBehaviour(ml);
   }
+  else if (outputType=="featurelight") {
+    if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
+    // - use feature light settings, which include a color+position+zoom+rotation+gradients scene table
+    installSettings(DeviceSettingsPtr(new FeatureLightDeviceSettings(*this)));
+    // - add feature light behaviour
+    FeatureLightBehaviourPtr fl = FeatureLightBehaviourPtr(new FeatureLightBehaviour(*this, false));
+    fl->setHardwareName(hardwareName);
+    addBehaviour(fl);
+  }
+  else if (outputType=="audio") {
+    if (defaultGroup==group_undefined) defaultGroup = group_cyan_audio;
+    // - use audio settings, which include a volume+powerstate+contensource+sceneCmd scene table
+    installSettings(DeviceSettingsPtr(new AudioDeviceSettings(*this)));
+    // - add audio behaviour
+    AudioBehaviourPtr ab = AudioBehaviourPtr(new AudioBehaviour(*this));
+    ab->setHardwareName(hardwareName);
+    addBehaviour(ab);
+  }
+  else if (outputType=="video") {
+    if (defaultGroup==group_undefined) defaultGroup = group_magenta_video;
+    // - use video settings, which include a volume+powerstate+contensource+sceneCmd scene table
+    installSettings(DeviceSettingsPtr(new VideoDeviceSettings(*this)));
+    // - add video behaviour
+    VideoBehaviourPtr vb = VideoBehaviourPtr(new VideoBehaviour(*this));
+    vb->setHardwareName(hardwareName);
+    addBehaviour(vb);
+  }
   #endif // ENABLE_EXTERNAL_EXOTIC
   else if (outputType=="heatingvalve") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
@@ -1240,6 +1269,12 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   }
   // configured
   configured = true;
+  //#if DEBUG
+  //boost::intrusive_ptr<VideoDeviceSettings> vs = boost::dynamic_pointer_cast<VideoDeviceSettings>(deviceSettings);
+  //if (vs) {
+  //  vs->dumpDefaultScenes();
+  //}
+  //#endif
   // explicit ok
   return Error::ok();
 }
