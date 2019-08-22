@@ -235,10 +235,8 @@ MLMicroSeconds LightBehaviour::transitionTimeFromSceneEffect(VdcSceneEffect aEff
       dimTimeIndex = 1; break;
     case scene_effect_custom :
       dimTimeIndex = 2; break;
-    case scene_effect_transition:
-      return aEffectParam*MilliSecond; // transition time is just the effect param (in milliseconds)
     default:
-      return 0; // no known effect -> just return 0 for transition time
+      return inherited::transitionTimeFromSceneEffect(aEffect, aEffectParam, aDimUp);
   }
   // dimTimeIndex found, look up actual time
   return transitionTimeFromDimTime(aDimUp ? dimTimeUp[dimTimeIndex] : dimTimeDown[dimTimeIndex]);

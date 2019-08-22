@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -19,8 +19,8 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __p44vdc__audiobehaviour__
-#define __p44vdc__audiobehaviour__
+#ifndef __p44vdc__videobehaviour__
+#define __p44vdc__videobehaviour__
 
 #include "device.hpp"
 #include "simplescene.hpp"
@@ -30,36 +30,38 @@ using namespace std;
 
 namespace p44 {
 
-  /// Audio content source channel
-  class AudioContentSourceChannel : public IndexChannel
+  /// Video content source channel
+  /// TODO: generalize, make one content source channel for audio and video
+  class VideoContentSourceChannel : public IndexChannel
   {
     typedef IndexChannel inherited;
 
   public:
-    AudioContentSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "contentSource") {};
+    VideoContentSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "contentSource") {};
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_audio_content_source; }; ///< the dS channel type
     virtual const char *getName() P44_OVERRIDE { return "contentsource"; };
 
   };
-  typedef boost::intrusive_ptr<AudioContentSourceChannel> AudioContentSourceChannelPtr;
+  typedef boost::intrusive_ptr<VideoContentSourceChannel> VideoContentSourceChannelPtr;
 
 
 
-  /// A concrete class implementing the Scene object for a audio device, having a volume channel plus a index value (for specific song/sound effects)
-  /// @note subclasses can implement more parameters
-  class AudioScene : public SimpleCmdScene
+  /// A concrete class implementing the Scene object for a video device, having a volume channel
+  /// plus a source channel
+  /// @note subclasses can implement more channels
+  class VideoScene : public SimpleCmdScene
   {
     typedef SimpleCmdScene inherited;
 
   public:
-    AudioScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo);
+    VideoScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo);
 
-    /// @name audio scene specific values
+    /// @name video scene specific values
     /// @{
 
     uint32_t contentSource; ///< the index of a content source, e.g. a song/sound effect from a list
-    DsPowerState powerState; ///< the power state of the audio device
+    DsPowerState powerState; ///< the power state of the video device
 
     /// @}
 
@@ -74,17 +76,10 @@ namespace p44 {
     // query flags
     bool hasFixVol();
     bool isMessage();
-    bool hasPriority();
-    bool isInterruptible();
-    bool hasPausedRestore();
 
     // set flags
     void setFixVol(bool aNewValue);
     void setMessage(bool aNewValue);
-    void setPriority(bool aNewValue);
-    void setInterruptible(bool aNewValue);
-    void setPausedRestore(bool aNewValue);
-
 
   protected:
 
@@ -101,18 +96,18 @@ namespace p44 {
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   };
-  typedef boost::intrusive_ptr<AudioScene> AudioScenePtr;
+  typedef boost::intrusive_ptr<VideoScene> VideoScenePtr;
 
 
 
-  /// the persistent parameters of a audio scene device (including scene table)
+  /// the persistent parameters of a video scene device (including scene table)
   /// @note subclasses can implement more parameters
-  class AudioDeviceSettings : public CmdSceneDeviceSettings
+  class VideoDeviceSettings : public CmdSceneDeviceSettings
   {
     typedef CmdSceneDeviceSettings inherited;
 
   public:
-    AudioDeviceSettings(Device &aDevice);
+    VideoDeviceSettings(Device &aDevice);
 
     /// factory method to create the correct subclass type of DsScene
     /// @param aSceneNo the scene number to create a scene object for.
@@ -123,11 +118,15 @@ namespace p44 {
     /// suitable for storing current state for later undo.
     virtual DsScenePtr newUndoStateScene() P44_OVERRIDE;
 
+    #if DEBUG
+    void dumpDefaultScenes();
+    #endif
+
   };
 
 
-  /// Implements the behaviour of a digitalSTROM Audio device
-  class AudioBehaviour : public OutputBehaviour
+  /// Implements the behaviour of a digitalSTROM video device
+  class VideoBehaviour : public OutputBehaviour
   {
     typedef OutputBehaviour inherited;
 
@@ -150,18 +149,18 @@ namespace p44 {
 
   public:
 
-    AudioBehaviour(Device &aDevice);
+    VideoBehaviour(Device &aDevice);
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour
-    virtual const char *behaviourTypeIdentifier() P44_OVERRIDE P44_FINAL { return "audio"; };
+    virtual const char *behaviourTypeIdentifier() P44_OVERRIDE P44_FINAL { return "video"; };
 
     /// the volume channel
     AudioVolumeChannelPtr volume;
     /// the power state channel
     PowerStateChannelPtr powerState;
     /// the content source channel
-    AudioContentSourceChannelPtr contentSource;
+    VideoContentSourceChannelPtr contentSource;
 
     /// the current state command
     bool stateRestoreCmdValid; ///< set if state restore command is valid
@@ -236,8 +235,8 @@ namespace p44 {
 
   };
 
-  typedef boost::intrusive_ptr<AudioBehaviour> AudioBehaviourPtr;
+  typedef boost::intrusive_ptr<VideoBehaviour> VideoBehaviourPtr;
 
 } // namespace p44
 
-#endif /* defined(__p44vdc__audiobehaviour__) */
+#endif /* defined(__p44vdc__videobehaviour__) */

@@ -243,13 +243,6 @@ namespace p44 {
     /// stop blinking immediately
     virtual void stopBlink();
 
-    /// get transition time in microseconds from given scene effect
-    /// @param aEffect the scene effect
-    /// @param aEffectParam parameter for the effect (standard dS scenes do not have it)
-    /// @param aDimUp true when dimming up, false when dimming down
-    MLMicroSeconds transitionTimeFromSceneEffect(VdcSceneEffect aEffect, uint32_t aEffectParam, bool aDimUp);
-
-
     /// get PWM value for brightness (from brightness channel) according to dim curve
     /// @param aBrightness brightness to convert to PWM value
     /// @param aMaxPWM max PWM duty cycle value
@@ -262,6 +255,12 @@ namespace p44 {
     /// @return the brightness value corresponding to aPWM (which must be 0..aMaxPWM)
     Brightness PWMToBrightness(double aPWM, double aMaxPWM);
 
+    /// get transition time in microseconds from given scene effect
+    /// @param aEffect the scene effect
+    /// @param aEffectParam parameter for the effect (standard dS scenes do not have it)
+    /// @param aDimUp true when dimming up, false when dimming down
+    /// @return 0 if no transition time known for the given effect parameters
+    virtual MLMicroSeconds transitionTimeFromSceneEffect(VdcSceneEffect aEffect, uint32_t aEffectParam, bool aDimUp) P44_OVERRIDE;
 
     /// @}
 

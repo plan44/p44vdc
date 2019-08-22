@@ -387,6 +387,32 @@ namespace p44 {
   typedef boost::intrusive_ptr<PowerStateChannel> PowerStateChannelPtr;
 
 
+  /// Audio volume channel, 0..100%
+  class AudioVolumeChannel : public ChannelBehaviour
+  {
+    typedef ChannelBehaviour inherited;
+    double dimPerMS;
+
+  public:
+    AudioVolumeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "audioVolume")
+    {
+      resolution = 0.1; // arbitrary, 1:1000 seems ok
+      dimPerMS = (getMax()-getMin())/7000; // standard 7 seconds for full scale by default
+    };
+
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_audio_volume; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "volume"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // dS volume goes from 0 to 100%
+    virtual double getMax() P44_OVERRIDE { return 100; };
+    virtual double getDimPerMS() P44_OVERRIDE { return dimPerMS; }; ///< value to step up or down per Millisecond
+
+    virtual void setDimPerMS(double aDimPerMS) { dimPerMS = aDimPerMS; }; ///< set dimming per MS to make actual audio steps and dimming steps align better than with standard step
+
+  };
+  typedef boost::intrusive_ptr<AudioVolumeChannel> AudioVolumeChannelPtr;
+
+
 } // namespace p44
 
 #endif /* defined(__p44vdc__channelbehaviour__) */
