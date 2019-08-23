@@ -189,13 +189,6 @@ void EvaluatorDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset
 }
 
 
-void EvaluatorDevice::handleGlobalEvent(VdchostEvent aEvent)
-{
-  if (aEvent==vdchost_devices_initialized) parseVarDefs();
-  inherited::handleGlobalEvent(aEvent);
-}
-
-
 ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   if (aMethod=="x-p44-checkEvaluator") {
@@ -280,6 +273,23 @@ void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ExpressionVa
 
 
 #define REPARSE_DELAY (30*Second)
+
+void EvaluatorDevice::handleGlobalEvent(VdchostEvent aEvent)
+{
+  if (aEvent==vdchost_devices_initialized) {
+    parseVarDefs();
+  }
+  else if (aEvent==vdchost_network_reconnected) {
+    // network coming up might change local time
+    if (!valueParseTicket) {
+      // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
+      //   Otherwise: have condition re-evaluated (because it possibly contain references to local time)
+      valueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::evaluateConditions, this, currentState, evalmode_timed), REPARSE_DELAY);
+    }
+  }
+  inherited::handleGlobalEvent(aEvent);
+}
+
 
 void EvaluatorDevice::parseVarDefs()
 {

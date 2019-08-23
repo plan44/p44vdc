@@ -1092,6 +1092,7 @@ void Trigger::triggerEvaluationExecuted(ExpressionValue aEvaluationResult)
 
 void Trigger::parseVarDefs()
 {
+  varParseTicket.cancel();
   bool foundall = valueMapper.parseMappingDefs(
     triggerVarDefs,
     boost::bind(&Trigger::dependentValueNotification, this, _1, _2)
@@ -1110,7 +1111,16 @@ void Trigger::parseVarDefs()
 void Trigger::processGlobalEvent(VdchostEvent aActivity)
 {
   if (aActivity==vdchost_devices_initialized) {
+    // good chance we'll get everything resolved now
     parseVarDefs();
+  }
+  else if (aActivity==vdchost_network_reconnected) {
+    // network coming up might change local time
+    if (!varParseTicket) {
+      // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
+      //   Otherwise: have condition re-evaluated (because it possibly contain references to local time)
+      varParseTicket.executeOnce(boost::bind(&Trigger::checkAndFire, this, evalmode_timed), REPARSE_DELAY);
+    }
   }
 }
 
@@ -1733,8 +1743,11 @@ void LocalController::signalActivity()
 
 void LocalController::processGlobalEvent(VdchostEvent aActivity)
 {
-  FOCUSLOG("processGlobalEvent: event = %d", (int)aActivity);
-  localTriggers.processGlobalEvent(aActivity);
+  if (aActivity>=vdchost_redistributed_events) {
+    // only process events that should be redistributed to all objects
+    FOCUSLOG("processGlobalEvent: event = %d", (int)aActivity);
+    localTriggers.processGlobalEvent(aActivity);
+  }
 }
 
 
