@@ -416,6 +416,9 @@ namespace p44 {
 
     TriggerActionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP);
 
+    /// abort action
+    virtual bool abort(bool aDoCallBack = true) P44_OVERRIDE;
+
   protected:
 
     /// lookup variables by name
@@ -444,7 +447,7 @@ namespace p44 {
     string name;
     string triggerVarDefs; ///< variable to valueSource mappings
     TriggerExpressionContext triggerCondition; ///< expression that must evaluate to true to trigger the action
-    TriggerActionContext triggerActions; ///< the trigger action script
+    TriggerActionContext triggerAction; ///< the trigger action script
 
     ValueSourceMapper valueMapper;
     MLTicket varParseTicket;
@@ -466,6 +469,9 @@ namespace p44 {
 
     /// execute the trigger actions
     bool executeActions(bool aAsynchronously, EvaluationResultCB aCallback = NULL);
+
+    /// stop running trigger actions
+    void stopActions();
 
     // API method handlers
     ErrorPtr handleCheckCondition(VdcApiRequestPtr aRequest);

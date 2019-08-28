@@ -68,6 +68,9 @@ namespace p44 {
 
     EvaluatorActionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP);
 
+    /// abort action
+    virtual bool abort(bool aDoCallBack = true) P44_OVERRIDE;
+
   protected:
 
     /// lookup variables by name

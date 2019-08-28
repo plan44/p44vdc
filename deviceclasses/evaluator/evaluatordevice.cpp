@@ -250,6 +250,10 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     executeAction(state, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1));
     return ErrorPtr();
   }
+  else if (aMethod=="x-p44-stopEvaluatorAction") {
+    evaluatorSettings()->action.abort();
+    return Error::ok();
+  }
   #endif
   else {
     return inherited::handleMethod(aRequest, aMethod, aParams);
@@ -575,6 +579,16 @@ bool EvaluatorActionContext::evaluateAsyncFunction(const string &aFunc, const Fu
   if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction)) return true;
   return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
 }
+
+
+bool EvaluatorActionContext::abort(bool aDoCallBack)
+{
+  if (httpAction) {
+    httpAction->cancelRequest();
+  }
+  return inherited::abort(aDoCallBack);
+}
+
 
 
 // MARK: - actions

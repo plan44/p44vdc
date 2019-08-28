@@ -720,6 +720,10 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       respErr = WebError::webErr(400, "device cannot send teach in signal of requested variant");
     }
   }
+  else if (aMethod=="x-p44-stopSceneActions") {
+    stopSceneActions();
+    respErr = Error::ok();
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }

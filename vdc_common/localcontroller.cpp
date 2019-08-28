@@ -1030,11 +1030,11 @@ Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   triggerId(0),
   triggerCondition(*this, &VdcHost::sharedVdcHost()->geolocation),
-  triggerActions(*this, &VdcHost::sharedVdcHost()->geolocation),
+  triggerAction(*this, &VdcHost::sharedVdcHost()->geolocation),
   conditionMet(undefined)
 {
   triggerCondition.isMemberVariable();
-  triggerActions.isMemberVariable();
+  triggerAction.isMemberVariable();
   triggerCondition.setEvaluationResultHandler(boost::bind(&Trigger::triggerEvaluationExecuted, this, _1));
 }
 
@@ -1147,6 +1147,16 @@ TriggerActionContext::TriggerActionContext(Trigger &aTrigger, const GeoLocation*
   trigger(aTrigger)
 {
 }
+
+
+bool TriggerActionContext::abort(bool aDoCallBack)
+{
+  if (httpAction) {
+    httpAction->cancelRequest();
+  }
+  return inherited::abort(aDoCallBack);
+}
+
 
 
 bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aResult)
@@ -1273,7 +1283,7 @@ bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
 {
   ErrorPtr err;
   #if LEGACY_ACTIONS_REWRITING
-  const char *p = triggerActions.getCode();
+  const char *p = triggerAction.getCode();
   while (*p && (*p==' ' || *p=='\t')) p++;
   if (strucmp(p, "scene:", 6)==0 || strucmp(p, "set:", 4)==0) {
     // Legacy Syntax
@@ -1324,13 +1334,13 @@ bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
         }
       }
     } // while legacy actions
-    LOG(LOG_WARNING, "rewritten legacy actions: '%s' -> '%s'", triggerActions.getCode(), actionScript.c_str());
-    triggerActions.setCode(actionScript);
+    LOG(LOG_WARNING, "rewritten legacy actions: '%s' -> '%s'", triggerAction.getCode(), actionScript.c_str());
+    triggerAction.setCode(actionScript);
     markDirty();
   }
   #endif // LEGACY_ACTIONS_REWRITING
   // run script
-  return triggerActions.execute(aAsynchronously, aCallback);
+  return triggerAction.execute(aAsynchronously, aCallback);
 }
 
 
@@ -1342,6 +1352,12 @@ void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
   else {
     LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), aEvaluationResult.error()->text());
   }
+}
+
+
+void Trigger::stopActions()
+{
+  triggerAction.abort();
 }
 
 
@@ -1382,7 +1398,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 
 ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 {
-  triggerActions.abort(); // abort previous ones
+  triggerAction.abort(); // abort previous ones
   executeActions(true, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1));
   return ErrorPtr();
 }
@@ -1397,7 +1413,7 @@ void Trigger::testTriggerActionExecuted(VdcApiRequestPtr aRequest, ExpressionVal
   }
   else {
     testResult->add("error", testResult->newString(aEvaluationResult.error()->getErrorMessage()));
-    testResult->add("at", testResult->newUint64(triggerActions.getPos()));
+    testResult->add("at", testResult->newUint64(triggerAction.getPos()));
   }
   aRequest->sendResult(testResult);
 }
@@ -1447,7 +1463,7 @@ const FieldDefinition *Trigger::getFieldDef(size_t aIndex)
   static const FieldDefinition dataDefs[numTriggerFields] = {
     { "triggerName", SQLITE_TEXT },
     { "triggerCondition", SQLITE_TEXT },
-    { "triggerActions", SQLITE_TEXT },
+    { "triggerActions", SQLITE_TEXT }, // note: only historically: triggerActionsS (plural)
     { "triggerVarDefs", SQLITE_TEXT }
   };
   if (aIndex<inheritedParams::numFieldDefs())
@@ -1467,7 +1483,7 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   // the fields
   name = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  triggerActions.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  triggerAction.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   triggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
   // initiate evaluation, first vardefs and eventually trigger expression to get timers started
   parseVarDefs();
@@ -1482,7 +1498,7 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   // the fields
   aStatement.bind(aIndex++, name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, triggerActions.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, triggerAction.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
@@ -1493,7 +1509,7 @@ enum {
   triggerName_key,
   triggerCondition_key,
   triggerVarDefs_key,
-  triggerActions_key,
+  triggerAction_key,
   numTriggerProperties
 };
 
@@ -1513,7 +1529,7 @@ PropertyDescriptorPtr Trigger::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "name", apivalue_string, triggerName_key, OKEY(trigger_key) },
     { "condition", apivalue_string, triggerCondition_key, OKEY(trigger_key) },
     { "varDefs", apivalue_string, triggerVarDefs_key, OKEY(trigger_key) },
-    { "actions", apivalue_string, triggerActions_key, OKEY(trigger_key) }
+    { "action", apivalue_string, triggerAction_key, OKEY(trigger_key) }
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
@@ -1531,7 +1547,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case triggerName_key: aPropValue->setStringValue(name); return true;
         case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getCode()); return true;
         case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
-        case triggerActions_key: aPropValue->setStringValue(triggerActions.getCode()); return true;
+        case triggerAction_key: aPropValue->setStringValue(triggerAction.getCode()); return true;
       }
     }
     else {
@@ -1548,7 +1564,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
             parseVarDefs(); // changed variable mappings, re-parse them
           }
           return true;
-        case triggerActions_key: if (triggerActions.setCode(aPropValue->stringValue())) markDirty(); return true;
+        case triggerAction_key: if (triggerAction.setCode(aPropValue->stringValue())) markDirty(); return true;
       }
     }
   }
@@ -2353,7 +2369,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
     aError.reset(); // make sure we don't send an extra ErrorOK
     return true;
   }
-  else if (aMethod=="x-p44-checkTriggerCondition" || aMethod=="x-p44-testTriggerActions") {
+  else if (aMethod=="x-p44-checkTriggerCondition" || aMethod=="x-p44-testTriggerAction" || aMethod=="x-p44-stopTriggerAction") {
     // check the trigger condition of a trigger
     ApiValuePtr o;
     aError = DsAddressable::checkParam(aParams, "triggerID", o);
@@ -2364,8 +2380,11 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
         aError = WebError::webErr(400, "Trigger %d not found", triggerId);
       }
       else {
-        if (aMethod=="x-p44-testTriggerActions") {
+        if (aMethod=="x-p44-testTriggerAction") {
           trig->handleTestActions(aRequest); // asynchronous!
+        }
+        else if (aMethod=="x-p44-stopTriggerAction") {
+          trig->stopActions();
         }
         else {
           aError = trig->handleCheckCondition(aRequest);
