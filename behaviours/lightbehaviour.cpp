@@ -160,20 +160,6 @@ double LightBehaviour::outputValueAccordingToMode(double aChannelValue, int aCha
 #define AUTO_OFF_FADE_TIME (60*Second)
 #define AUTO_OFF_FADE_STEPSIZE 5
 
-// apply scene
-bool LightBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd)
-{
-  // check special cases for light scenes
-  LightScenePtr lightScene = boost::dynamic_pointer_cast<LightScene>(aScene);
-  if (lightScene) {
-    // any scene call cancels actions (and fade down)
-    stopSceneActions();
-  } // if lightScene
-  // other type of scene, let base class handle it
-  return inherited::performApplySceneToChannels(aScene, aSceneCmd);
-}
-
-
 void LightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
 {
   LightScenePtr lightScene = boost::dynamic_pointer_cast<LightScene>(aScene);

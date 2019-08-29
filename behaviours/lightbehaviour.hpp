@@ -193,15 +193,6 @@ namespace p44 {
     /// @return yes if this output behaviour has the feature, no if (explicitly) not, undefined if asked entity does not know
     virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex) P44_OVERRIDE;
 
-    /// apply scene to output channels
-    /// @param aScene the scene to apply to output channels
-    /// @param aSceneCmd This will be used instead of the scenecommand stored in the scene.
-    /// @return true if apply is complete, i.e. everything ready to apply to hardware outputs.
-    ///   false if scene cannot yet be applied to hardware, and will be performed later
-    /// @note this derived class' performApplySceneToChannels only implements special hard-wired behaviour specific scenes
-    ///   basic scene apply functionality is provided by base class' implementation already.
-    virtual bool performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd) P44_OVERRIDE;
-
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
     /// @param aScene the scene that was called (if not dontCare, performApplySceneToChannels() has already been called)
     /// @param aDoneCB will be called when scene actions have completed (but not necessarily when stopped by stopSceneActions())

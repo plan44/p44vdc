@@ -402,7 +402,7 @@ bool VentilationBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneC
       // all other scene calls are processed normally
       break;
   }
-  // other type of scene, let base class handle it
+  // let base class handle it now
   return inherited::performApplySceneToChannels(aScene, aSceneCmd);
 }
 

@@ -334,6 +334,8 @@ bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTr
 
 bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd)
 {
+  // stop any actions still ongoing from a previous call
+  stopSceneActions();
   // scenes with invoke functionality will apply channel values by default
   if (aSceneCmd==scene_cmd_none) {
     aSceneCmd = aScene->sceneCmd;

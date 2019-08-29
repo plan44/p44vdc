@@ -297,7 +297,7 @@ namespace p44 {
     ///   It MAY cause subsequent applyChannelValues() calls AFTER returning to perform special effects
     /// @note this method does not handle dimming, and must not be called with dimming specific scenes. For dimming,
     ///   only dimChannel method must be used.
-    /// @note base class' implementation provides applying the scene values to channels.
+    /// @note base class' implementation provides stopping scene actions and applying the scene values to channels.
     ///   Derived classes may implement handling of hard-wired behaviour specific scenes.
     virtual bool performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd);
 

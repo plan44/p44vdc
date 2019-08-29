@@ -765,7 +765,6 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
-      // now save
       saveScene(sceneNo);
     }
     if (Error::notOK(err)) {
@@ -777,7 +776,6 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
-      // now save
       undoScene(sceneNo);
     }
     if (Error::notOK(err)) {
@@ -789,7 +787,6 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
-      // now save
       setLocalPriority(sceneNo);
     }
     if (Error::notOK(err)) {
