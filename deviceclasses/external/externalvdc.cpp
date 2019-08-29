@@ -709,6 +709,26 @@ bool ExternalDevice::prepareSceneCall(DsScenePtr aScene)
 }
 
 
+bool ExternalDevice::prepareSceneApply(DsScenePtr aScene)
+{
+  // only implemented to catch "UNDO"
+  if (sceneCommands && aScene->sceneCmd==scene_cmd_undo) {
+    if (deviceConnector->simpletext) {
+      string m = string_format("SCMD=UNDO");
+      sendDeviceApiSimpleMessage(m);
+    }
+    else {
+      JsonObjectPtr message = JsonObject::newObj();
+      message->add("message", JsonObject::newString("scenecommand"));
+      message->add("cmd", JsonObject::newString("UNDO"));
+      sendDeviceApiJsonMessage(message);
+    }
+  }
+  return inherited::prepareSceneApply(aScene);
+}
+
+
+
 
 void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
