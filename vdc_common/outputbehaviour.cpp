@@ -342,6 +342,7 @@ bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aS
   }
   if (
     aSceneCmd==scene_cmd_invoke ||
+    aSceneCmd==scene_cmd_undo ||
     aSceneCmd==scene_cmd_off ||
     aSceneCmd==scene_cmd_slow_off ||
     aSceneCmd==scene_cmd_min ||

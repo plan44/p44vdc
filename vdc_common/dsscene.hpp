@@ -42,8 +42,10 @@ using namespace std;
 namespace p44 {
 
   /// scene commands
+  /// @note these enum values are private to the build, and MUST NOT be persisted (order can change)
   typedef enum {
     scene_cmd_none, ///< no command, reserved scene
+    scene_cmd_undo, ///< the pseudo scene that is applied at undoScene will have this scene_cmd
     scene_cmd_invoke, ///< standard scene invoke behaviour, i.e. load channel values, apply effects if any
     scene_cmd_off, ///< standard off behaviour (usually equivalent to invoke, but might have slightly different semantics in certain behaviours)
     scene_cmd_min, ///< standard min behaviour (usually equivalent to invoke, but might have slightly different semantics in certain behaviours)

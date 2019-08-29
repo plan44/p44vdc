@@ -584,13 +584,15 @@ namespace p44 {
     /// @param aScene the scene that is to be called
     /// @return true if scene preparation is ok and call can continue. If false, no further action will be taken
     /// @note this is called BEFORE scene values are recalled
+    /// @note this is NOT called at undoScene.
     virtual bool prepareSceneCall(DsScenePtr aScene);
 
-    /// prepare for applying a scene on the device level
-    /// @param aScene the scene that is to be applied
+    /// prepare for applying a scene or scene undo on the device level
+    /// @param aScene the scene that is to be applied (or restored channel values from an undoScene, see below)
     /// @return true if channel values should be applied, false if not
-    /// @note this is called AFTER scene values are already loaded and prepareSceneCall() has already been called, but before
-    ///   channels are applied (or not, if method returns false)
+    /// @note for a scene call, this is called AFTER scene values are already loaded and prepareSceneCall() has already been called,
+    ///   but before channels are applied (or not, if method returns false). For a undoScene call, prepareSceneCall() is NOT
+    ///   called (it's not a scene call), but prepareSceneApply() is called with a pseudo-scene having sceneCmd==scene_cmd_undo.
     virtual bool prepareSceneApply(DsScenePtr aScene);
 
     /// perform special scene actions (like flashing) which are independent of dontCare flag.

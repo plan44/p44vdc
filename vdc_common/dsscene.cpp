@@ -280,7 +280,7 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   sceneNo = aRow->get<int>(aIndex++);
   // as the scene is loaded into a object which did not yet have the correct scene number
   // default values must be set again now that the sceneNo is known
-  // Note: this is important to make sure those field which are not stored have the correct scene related value (sceneCmd, sceneArea)
+  // Note: this is important to make sure those fields which are not stored have the correct scene related value (sceneCmd, sceneArea)
   setDefaultSceneValues(sceneNo);
   // then proceed with loading other fields
   globalSceneFlags = aRow->get<int>(aIndex++);
@@ -501,7 +501,7 @@ DsScenePtr SceneDeviceSettings::newUndoStateScene()
 {
   DsScenePtr undoStateScene = newDefaultScene(ROOM_ON); // use main on as template
   // to make sure: the "previous" pseudo-screne must always be "invoke" type (restoring output values)
-  undoStateScene->sceneCmd = scene_cmd_invoke;
+  undoStateScene->sceneCmd = scene_cmd_undo;
   undoStateScene->sceneArea = 0; // no area
   return undoStateScene;
 }
