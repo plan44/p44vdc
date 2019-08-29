@@ -251,7 +251,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     return ErrorPtr();
   }
   else if (aMethod=="x-p44-stopEvaluatorAction") {
-    evaluatorSettings()->action.abort();
+    evaluatorSettings()->action.abort(false);
     return Error::ok();
   }
   #endif

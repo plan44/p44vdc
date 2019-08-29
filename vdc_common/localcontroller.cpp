@@ -1357,7 +1357,7 @@ void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
 
 void Trigger::stopActions()
 {
-  triggerAction.abort();
+  triggerAction.abort(false);
 }
 
 
@@ -1400,7 +1400,7 @@ ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 {
   triggerAction.abort(); // abort previous ones
   executeActions(true, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1));
-  return ErrorPtr();
+  return ErrorPtr(); // will send result later
 }
 
 
@@ -2385,6 +2385,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
         }
         else if (aMethod=="x-p44-stopTriggerAction") {
           trig->stopActions();
+          aError = Error::ok();
         }
         else {
           aError = trig->handleCheckCondition(aRequest);

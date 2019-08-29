@@ -131,15 +131,14 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   // where:
   // - with lighttype=segment
   //   - aX,aDx,aY,aDY determine the size of the segment (view)
-  //   - config=[id:]b:e
+  //   - config=b:e
   //     - id: optional unique id identifying the light, must start with non-numeric, if set, determines the dSUID
   //     - b:0..n size of softedge at beginning
   //     - e:0..n size of softedge at end
   // - with lighttype=lightspot
   //   - aX,aY determine the (initial) center of the light field
   //   - aDx,aDy determine the (initial) diameter of the light field
-  //   - config=id
-  //     id: unique id identifying the light, must start with non-numeric, determines the dSUID
+  //   - config=<none yet>
   // evaluate config
   string config = aDeviceConfig;
   string lt, s;
