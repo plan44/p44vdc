@@ -247,11 +247,12 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
 }
 
 
-void ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply)
+bool ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply)
 {
-  if (!(aScene->isSceneValueFlagSet(getChannelIndex(), valueflags_dontCare))) {
-    setChannelValue(aNewValue, aNewValue>getTransitionalValue() ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
-  }
+  if (aScene->isSceneValueFlagSet(getChannelIndex(), valueflags_dontCare))
+    return false; // don't care, don't set
+  setChannelValue(aNewValue, aNewValue>getTransitionalValue() ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
+  return true; // actually set
 }
 
 

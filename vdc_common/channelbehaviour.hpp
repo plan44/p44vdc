@@ -136,8 +136,13 @@ namespace p44 {
 
     /// convenience variant of setChannelValue, which also checks the associated dontCare flag from the scene passed
     /// and only assigns the new value if the dontCare flags is NOT set.
+    /// @param aScene the scene to check for dontCare flags
+    /// @param aNewValue the new output value
+    /// @param aTransitionTimeUp time in microseconds to be spent on transition from current to higher channel value
+    /// @param aTransitionTimeDown time in microseconds to be spent on transition from current to lower channel value
     /// @param aAlwaysApply if set, new value will be applied to hardware even if not different from currently known value
-    void setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply);
+    /// @return true if channel value was actually set (aScene does not have the channel's dontCare flag set)
+    bool setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply);
 
     /// dim channel value up or down, preventing going below getMinDim().
     /// @param aIncrement how much to increment/decrement the value

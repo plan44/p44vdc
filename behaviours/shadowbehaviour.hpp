@@ -373,7 +373,7 @@ namespace p44 {
 
     /// check if channel values that were restored from persistent storage should be re-applied to hardware
     /// @return true if device should perform a requestApplyingChannels() sequence.
-    virtual bool reapplyRestoredChannels();
+    virtual bool reapplyRestoredChannels() P44_OVERRIDE;
 
     // property access implementation for descriptor/settings/states
     virtual int numSettingsProps() P44_OVERRIDE;

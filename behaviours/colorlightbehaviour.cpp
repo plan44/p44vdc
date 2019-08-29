@@ -151,6 +151,21 @@ void ColorLightScene::setDefaultSceneValues(SceneNo aSceneNo)
   inherited::setDefaultSceneValues(aSceneNo);
   // Add special color lamp behaviour
   switch (aSceneNo) {
+    case ROOM_OFF:
+    case AREA_1_OFF:
+    case AREA_2_OFF:
+    case AREA_3_OFF:
+    case AREA_4_OFF:
+    case PRESET_OFF_10:
+    case PRESET_OFF_20:
+    case PRESET_OFF_30:
+    case PRESET_OFF_40:
+    case AUTO_OFF:
+    case LOCAL_OFF:
+    case DEEP_OFF:
+      // no color for off
+      colorMode = colorLightModeNone;
+      break;
     case PANIC:
     case FIRE:
       // Alert - use cold white
@@ -246,28 +261,33 @@ void ColorLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     MLMicroSeconds ttUp = transitionTimeFromSceneEffect(colorLightScene->effect, colorLightScene->effectParam, true);
     MLMicroSeconds ttDown = transitionTimeFromSceneEffect(colorLightScene->effect, colorLightScene->effectParam, false);
     // prepare next color values in channels
-    colorMode = colorLightScene->colorMode;
-    switch (colorMode) {
+    bool colorInfoSet = false;
+    ColorLightMode loadedMode = colorLightScene->colorMode;
+    switch (loadedMode) {
       case colorLightModeHueSaturation: {
-        hue->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true);
-        saturation->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true);
+        if (hue->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
+        if (saturation->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true)) colorInfoSet = true;
         break;
       }
       case colorLightModeXY: {
-        cieX->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true);
-        cieY->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true);
+        if (cieX->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
+        if (cieY->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true)) colorInfoSet = true;
         break;
       }
       case colorLightModeCt: {
-        ct->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true);
+        if (ct->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
         break;
       }
       default:
-        colorMode = colorLightModeNone;
+        loadedMode = colorLightModeNone;
     }
-    // Don't cares should be correct at this point, but scenes saved long ago might have values that should NOT be
-    // applied but don't have a dontCare. The following call will repair these incorrect scenes:
-    adjustChannelDontCareToColorMode(colorLightScene, true); // only SET dontCares, but do not remove any
+    if (brightnessForHardware(true)>0 && colorInfoSet) {
+      // change current color mode only if final brightness is not zero and any color channels have actually changed
+      colorMode = loadedMode;
+      // Don't cares should be correct at this point, but scenes saved long ago might have values that should NOT be
+      // applied but don't have a dontCare. The following call will repair these incorrect scenes:
+      adjustChannelDontCareToColorMode(colorLightScene, true); // only SET dontCares, but do not remove any
+    }
   }
   // need recalculation of values
   derivedValuesComplete = false;
