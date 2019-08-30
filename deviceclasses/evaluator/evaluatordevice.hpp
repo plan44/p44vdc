@@ -37,21 +37,74 @@ namespace p44 {
   class EvaluatorDevice;
 
 
+  class EvaluatorExpressionContext : public TimedEvaluationContext
+  {
+    typedef TimedEvaluationContext inherited;
+    EvaluatorDevice &evaluator;
+
+  public:
+
+    EvaluatorExpressionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP);
+
+  protected:
+
+    /// lookup variables by name
+    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
+  };
+
+
+  #if EXPRESSION_SCRIPT_SUPPORT
+
+  class EvaluatorActionContext : public ScriptExecutionContext
+  {
+    typedef ScriptExecutionContext inherited;
+    EvaluatorDevice &evaluator;
+
+    HttpCommPtr httpAction; ///< in case evaluator uses http actions
+
+  public:
+
+    Tristate execState; ///< the state to show in the excution as "result" (not necessarily the current state, when testing actions)
+
+    EvaluatorActionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP);
+
+    /// abort action
+    virtual bool abort(bool aDoCallBack = true) P44_OVERRIDE;
+
+  protected:
+
+    /// lookup variables by name
+    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
+
+    /// evaluation of asynchronously implemented functions which may yield execution and resume later
+    virtual bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
+
+    void httpActionDone(const string &aResponse, ErrorPtr aError);
+
+  };
+
+  #endif // EXPRESSION_SCRIPT_SUPPORT
+
+
   class EvaluatorDeviceSettings : public DeviceSettings
   {
     typedef DeviceSettings inherited;
     friend class EvaluatorDevice;
 
     string varDefs; ///< mapping of variable names to ValueSources
-    string onCondition; ///< expression that must evaluate to true for output to get active
-    string offCondition; ///< expression that must evaluate to true for output to get inactive
+    EvaluatorExpressionContext onCondition; ///< expression that must evaluate to true for output to get active
+    EvaluatorExpressionContext offCondition; ///< expression that must evaluate to true for output to get inactive
     MLMicroSeconds minOnTime; ///< how long the on condition must be present before triggering the result change
     MLMicroSeconds minOffTime; ///< how long the on condition must be present before triggering the result change
-    string action; ///< (additional) action to fire when evaluator changes state
+    #if EXPRESSION_SCRIPT_SUPPORT
+    EvaluatorActionContext action; ///< (additional) action to fire when evaluator changes state
+    #else
+    string oldAction; ///< dummy, keep it for now
+    #endif
 
   protected:
 
-    EvaluatorDeviceSettings(Device &aDevice);
+    EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator);
 
     // persistence implementation
     virtual const char *tableName();
@@ -68,6 +121,8 @@ namespace p44 {
   {
     typedef Device inherited;
     friend class EvaluatorVdc;
+    friend class EvaluatorExpressionContext;
+    friend class EvaluatorActionContext;
 
     long long evaluatorDeviceRowID; ///< the ROWID this device was created from (0=none)
     
@@ -90,21 +145,14 @@ namespace p44 {
     ValueSourceMapper valueMapper;
     MLTicket valueParseTicket;
 
-    Tristate currentState;
+    Tristate currentState; ///< latest evaluator state
+    Tristate currentOn; ///< latest evaluation result of the On expression
+    Tristate currentOff; ///< latest evaluation result of the Off expression
 
     MLMicroSeconds conditionMetSince; ///< since when do we see condition permanently met
     bool onConditionMet; ///< true: conditionMetSince relates to ON-condition, false: conditionMetSince relates to OFF-condition
+    bool reporting; ///< set while reporting evaluation result to sensor or binary input, to prevent infinitite loop though cyclic references
     MLTicket evaluateTicket;
-    bool evaluating; ///< protection against cyclic references
-    MLTicket testlaterTicket;
-    typedef enum {
-      evalmode_normal, ///< normal evaluation
-      evalmode_initial, ///< initial evaluator run
-      evalmode_timed, ///< timed evaluation (testlater()...)
-    } EvalMode;
-    EvalMode evalMode; ///< evaluation mode
-
-    HttpCommPtr httpAction; ///< in case evaluator uses http actions
 
     EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(deviceSettings); };
 
@@ -176,6 +224,11 @@ namespace p44 {
     /// device level API methods (p44 specific, JSON only, for debugging evaluators)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
+
+
   protected:
 
     void deriveDsUid();
@@ -185,24 +238,27 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
+  public:
+
+    ErrorPtr handleReEvaluationResult(bool aIsOffCondition, ExpressionValue aEvaluationResult, EvaluationContext &aContext);
+
   private:
 
     void parseVarDefs();
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     void evaluateConditions(Tristate aRefState, EvalMode aEvalMode);
+    void calculateEvaluatorState(Tristate aRefState, EvalMode aEvalMode);
+    Tristate evaluateBooleanNow(EvaluationContext &aEvalCtx, EvalMode aEvalMode, bool aScheduleReEval);
+
     void evaluateConditionsLater();
     void changedConditions();
-    ErrorPtr executeAction(Tristate aState);
-    void httpActionDone(const string &aResponse, ErrorPtr aError);
 
-    /// expression evaluation
-
-    Tristate evaluateBoolean(string aExpression);
-    ExpressionValue calcEvaluatorExpression(string &aExpression);
-    ExpressionValue valueLookup(const string aName);
-    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
-    ExpressionValue actionValueLookup(Tristate aCurrentState, const string aName);
+    #if EXPRESSION_SCRIPT_SUPPORT
+    ErrorPtr executeAction(Tristate aState, EvaluationResultCB aResultCB);
+    void actionExecuted(ExpressionValue aEvaluationResult);
+    void testActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
+    #endif // EXPRESSION_SCRIPT_SUPPORT
 
   };
   typedef boost::intrusive_ptr<EvaluatorDevice> EvaluatorDevicePtr;

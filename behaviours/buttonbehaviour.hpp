@@ -82,7 +82,6 @@ namespace p44 {
     uint8_t buttonActionId; ///< action Id (aka scene number) to trigger when button is clicked
     ButtonStateMachineMode stateMachineMode; ///< state machine to use
     MLMicroSeconds longFunctionDelay; ///< delay to be used to differentiate "long" press
-
     /// @}
 
 
@@ -254,7 +253,7 @@ namespace p44 {
       S11_localdim,
       S12_3clickWait,
       S13_3pauseWait,
-      S14_awaitrelease, // duplicate of S8
+      S14_awaitrelease_timedout, // await release of a hold that timed-out (button stuck more than 30 secs)
     } ButtonState;
 
     // state machine vars
@@ -281,6 +280,7 @@ namespace p44 {
     void resetStateMachine();
     void checkStandardStateMachine(bool aStateChanged, MLMicroSeconds aNow);
     void checkCustomStateMachine(bool aStateChanged, MLMicroSeconds aNow);
+    void keyOpComplete();
     void dimRepeat();
     void localSwitchOutput();
     void localDim(bool aStart);

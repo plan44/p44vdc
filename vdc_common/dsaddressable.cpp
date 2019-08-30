@@ -313,7 +313,7 @@ void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultOb
     sendRequest("pushNotification", pushParams);
   }
   else {
-    ALOG(LOG_WARNING, "push failed because to-be-pushed property could not be accessed: %s", aError->description().c_str());
+    ALOG(LOG_WARNING, "push failed because to-be-pushed property could not be accessed: %s", aError->text());
   }
 }
 

@@ -136,8 +136,13 @@ namespace p44 {
 
     /// convenience variant of setChannelValue, which also checks the associated dontCare flag from the scene passed
     /// and only assigns the new value if the dontCare flags is NOT set.
+    /// @param aScene the scene to check for dontCare flags
+    /// @param aNewValue the new output value
+    /// @param aTransitionTimeUp time in microseconds to be spent on transition from current to higher channel value
+    /// @param aTransitionTimeDown time in microseconds to be spent on transition from current to lower channel value
     /// @param aAlwaysApply if set, new value will be applied to hardware even if not different from currently known value
-    void setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply);
+    /// @return true if channel value was actually set (aScene does not have the channel's dontCare flag set)
+    bool setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply);
 
     /// dim channel value up or down, preventing going below getMinDim().
     /// @param aIncrement how much to increment/decrement the value
@@ -385,6 +390,32 @@ namespace p44 {
 
   };
   typedef boost::intrusive_ptr<PowerStateChannel> PowerStateChannelPtr;
+
+
+  /// Audio volume channel, 0..100%
+  class AudioVolumeChannel : public ChannelBehaviour
+  {
+    typedef ChannelBehaviour inherited;
+    double dimPerMS;
+
+  public:
+    AudioVolumeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "audioVolume")
+    {
+      resolution = 0.1; // arbitrary, 1:1000 seems ok
+      dimPerMS = (getMax()-getMin())/7000; // standard 7 seconds for full scale by default
+    };
+
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_audio_volume; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "volume"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // dS volume goes from 0 to 100%
+    virtual double getMax() P44_OVERRIDE { return 100; };
+    virtual double getDimPerMS() P44_OVERRIDE { return dimPerMS; }; ///< value to step up or down per Millisecond
+
+    virtual void setDimPerMS(double aDimPerMS) { dimPerMS = aDimPerMS; }; ///< set dimming per MS to make actual audio steps and dimming steps align better than with standard step
+
+  };
+  typedef boost::intrusive_ptr<AudioVolumeChannel> AudioVolumeChannelPtr;
 
 
 } // namespace p44

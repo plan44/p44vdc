@@ -286,6 +286,7 @@ ShadowBehaviour::ShadowBehaviour(Device &aDevice) :
   minMoveTime(200*MilliSecond),
   maxShortMoveTime(0),
   minLongMoveTime(0),
+  absoluteMovement(false),
   stopDelayTime(0),
   hasEndContacts(false),
   // persistent settings (defaults are MixWerk's)
@@ -314,13 +315,14 @@ ShadowBehaviour::ShadowBehaviour(Device &aDevice) :
 }
 
 
-void ShadowBehaviour::setDeviceParams(ShadowDeviceKind aShadowDeviceKind, bool aHasEndContacts, MLMicroSeconds aMinMoveTime, MLMicroSeconds aMaxShortMoveTime, MLMicroSeconds aMinLongMoveTime)
+void ShadowBehaviour::setDeviceParams(ShadowDeviceKind aShadowDeviceKind, bool aHasEndContacts, MLMicroSeconds aMinMoveTime, MLMicroSeconds aMaxShortMoveTime, MLMicroSeconds aMinLongMoveTime, bool aAbsoluteMovement)
 {
   shadowDeviceKind = aShadowDeviceKind;
   hasEndContacts = aHasEndContacts;
   minMoveTime = aMinMoveTime;
   maxShortMoveTime = aMaxShortMoveTime;
   minLongMoveTime = aMinLongMoveTime;
+  absoluteMovement = aAbsoluteMovement;
 }
 
 
@@ -815,6 +817,13 @@ void ShadowBehaviour::saveChannelsToScene(DsScenePtr aScene)
 }
 
 
+bool ShadowBehaviour::reapplyRestoredChannels()
+{
+  // only absolute movement capable devices should be restored.
+  // For relative movement controlled blinds, we can assume power outage does NOT change
+  // the hardware state, and re-applying would more likely mess it up rather than preserve it.
+  return absoluteMovement;
+}
 
 
 void ShadowBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)

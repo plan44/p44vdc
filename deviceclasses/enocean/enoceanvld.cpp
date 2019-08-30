@@ -59,6 +59,11 @@ using namespace EnoceanSensors;
 const p44::EnoceanSensorDescriptor enoceanVLDdescriptors[] = {
   // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max, MSB,     LSB,   updateIv,aliveSignIv, handler,              typeText
 
+  // D2-14-30 Multi-Function Smoke, Air quality, Temperature, Humidity sensor
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     51, DB(3,0), DB(2,1),    100,      40*60, &stdSensorHandler,  tempText },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(2,0), DB(1,1),    100,      40*60, &stdSensorHandler,  humText },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_red_security,            behaviour_binaryinput, binInpType_smoke,       usage_room,         0,      1, DB(5,7), DB(5,7),    100,      40*60, &stdInputHandler,   "Smoke Alarm" },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,         0,      1, DB(4,2), DB(4,2),    100,      40*60, &stdInputHandler,   lowBatText }, // MSB of 2-bit battery status -> low+Critical report low bat
   // D2-32 AC current clamps
   // D2-32-00: single phase current clamp
   { 0, 0x32, 0x00, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler, "Current" },

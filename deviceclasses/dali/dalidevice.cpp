@@ -635,7 +635,7 @@ void DaliBusDevice::queryRGBWAFResponse(StatusCB aCompletedCB, uint16_t aResInde
     }
   }
   else {
-    LOG(LOG_DEBUG, "DaliBusDevice: querying DT8 color value %d returned error: %s", aResIndex, aError->description().c_str());
+    LOG(LOG_DEBUG, "DaliBusDevice: querying DT8 color value %d returned error: %s", aResIndex, aError->text());
   }
   aResIndex++;
   if (aResIndex>=dt8RGBWAFchannels) {
@@ -683,7 +683,7 @@ void DaliBusDevice::queryStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout
     lampFailure = aResponse & 0x02;
   }
   else {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       // errors are always bus level: set global error status
       daliVdc.setVdcError(aError);
     }
@@ -1123,11 +1123,11 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   LightBehaviourPtr l = getOutput<LightBehaviour>();
   bool withColor = false;
-  if (l && needsToApplyChannels()) {
+  MLMicroSeconds transitionTime = 0;
+  if (l && needsToApplyChannels(&transitionTime)) {
     // abort previous transition
     transitionTicket.cancel();
     // brightness transition time is relevant for the whole transition
-    MLMicroSeconds transitionTime = l->transitionTimeToNewBrightness();
     if (l->brightnessNeedsApplying()) {
       l->brightnessTransitionStep(); // init brightness transition
     }
@@ -1324,7 +1324,7 @@ void DaliSingleControllerDevice::processUpdatedParams(ErrorPtr aError)
     }
   }
   else {
-    LOG(LOG_ERR, "DaliDevice: error getting state/params from dimmer: %s", aError->description().c_str());
+    LOG(LOG_ERR, "DaliDevice: error getting state/params from dimmer: %s", aError->text());
   }
 }
 
@@ -1774,8 +1774,8 @@ void DaliCompositeDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryR
 
 void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryReset, DimmerIndex aDimmerIndex, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "DaliCompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->description().c_str());
+  if (Error::notOK(aError)) {
+    LOG(LOG_ERR, "DaliCompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->text());
   }
   while (aDimmerIndex<numDimmers) {
     DaliBusDevicePtr di = dimmers[aDimmerIndex];

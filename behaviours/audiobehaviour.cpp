@@ -430,7 +430,7 @@ Tristate AudioBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 // MARK: - behaviour interaction with digitalSTROM system
 
 
-#define AUTO_OFF_FADE_TIME (60*Second)
+#define AUTO_OFF_FADE_TIME (1800*Second)
 #define AUTO_OFF_FADE_STEPSIZE 5
 
 // apply scene

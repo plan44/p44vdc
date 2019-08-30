@@ -102,7 +102,8 @@ namespace p44 {
 
   class ValueSourceMapper
   {
-    typedef map<string, ValueSource *> ValueSourcesMap;
+
+    typedef map<string, ValueSource *, lessStrucmp> ValueSourcesMap;
     ValueSourcesMap valueMap;
 
   public:
@@ -131,8 +132,10 @@ namespace p44 {
     ValueSource* valueSourceByAlias(const string aAlias);
 
     /// get value (or meta information such as .age, .oplevel and .valid subfields) of mapped value source
-    /// @param aVarSpec variable 
-    ExpressionValue valueLookup(const string aVarSpec);
+    /// @param aValue will be set to the variable's value or error if aVarSpec identifies a known variable
+    /// @param aVarSpec variable specification
+    /// @return true if aValue was set, false if further sources for the variable should be searched (if any)
+    bool valueLookup(ExpressionValue &aValue, const string aVarSpec);
 
     /// get info about all mapped sources (everything needed for editing mappingdefs)
     /// @param the api object to add info for mappings to

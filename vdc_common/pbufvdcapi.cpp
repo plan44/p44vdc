@@ -1061,7 +1061,7 @@ ErrorPtr VdcPbufApiRequest::sendError(ErrorPtr aError)
   resp.usermessagetobetranslated = (char *)(vdcApiErr && vdcApiErr->getUserFacingMessage().size()>0 ? vdcApiErr->getUserFacingMessage().c_str() : NULL);
   err = pbufConnection->sendMessage(&msg);
   // log (if not just OK)
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     if (vdcApiErr) {
       LOG(LOG_INFO, "vdSM <- vDC (pbuf) error sent: requestid='%d', error=%ld (%s) - type=%d (%s)", reqId, vdcApiErr->getErrorCode(), vdcApiErr->getErrorMessage(), vdcApiErr->getErrorType(), vdcApiErr->getUserFacingMessage().c_str());
     }
@@ -1150,10 +1150,10 @@ void VdcPbufApiConnection::gotData(ErrorPtr aError)
       delete[] buf; buf = NULL;
     } // some data seems to be ready
   } // no connection error
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // error occurred
     // pbuf API cannot resynchronize, close connection
-    LOG(LOG_WARNING, "Error occurred on protobuf connection - cannot be re-synced, closing: %s", aError->description().c_str());
+    LOG(LOG_WARNING, "Error occurred on protobuf connection - cannot be re-synced, closing: %s", aError->text());
     closeConnection();
   }
 }
@@ -1455,7 +1455,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
       PendingAnswerMap::iterator pos = pendingAnswers.find(responseForId);
       if (pos==pendingAnswers.end()) {
         // errors without ID cannot be associated with calls made earlier, so just log the error
-        LOG(LOG_WARNING, "vdSM -> vDC (pbuf) error: Received response with unknown 'id'=%d, error=%s", responseForId, Error::isOK(err) ? "<none>" : err->description().c_str());
+        LOG(LOG_WARNING, "vdSM -> vDC (pbuf) error: Received response with unknown 'id'=%d, error=%s", responseForId, Error::isOK(err) ? "<none>" : err->text());
       }
       else {
         // found callback
@@ -1467,7 +1467,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
           LOG(LOG_INFO, "vdSM -> vDC (pbuf) result received: id='%s', result=%s", request->requestId().c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
         }
         else {
-          LOG(LOG_INFO, "vdSM -> vDC (pbuf) error received: id='%s', error=%s, errordata=%s", request->requestId().c_str(), err->description().c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+          LOG(LOG_INFO, "vdSM -> vDC (pbuf) error received: id='%s', error=%s, errordata=%s", request->requestId().c_str(), err->text(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
         }
         cb(this, request, err, msgFieldsObj); // call handler
       }
@@ -1490,7 +1490,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
       else {
         LOG(LOG_INFO, "vdSM -> vDC (pbuf) notification received: method='%s', params=%s", method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
       }
-      if (!Error::isOK(err)) {
+      if (Error::notOK(err)) {
         // error decoding message
         if (request) {
           // report immediately if this is a method
@@ -1498,7 +1498,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         }
         else {
           // just log
-          LOG(LOG_ERR, "Ill-formed notification: %s -> ignored", err->description().c_str());
+          LOG(LOG_ERR, "Ill-formed notification: %s -> ignored", err->text());
         }
         err.reset(); // reported
       }

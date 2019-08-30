@@ -99,10 +99,10 @@ private:
 
   void vdcTested(ErrorPtr aError)
   {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       if (!aError->isError("Vdc", VdcError::NoHWTested)) {
         // test failed
-        LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", nextVdc->second->vdcClassIdentifier(), aError->description().c_str());
+        LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", nextVdc->second->vdcClassIdentifier(), aError->text());
         // remember
         globalError = aError;
         // morse out tag number of vDC failing self test until button is pressed
@@ -148,7 +148,7 @@ private:
       greenLED->blinkFor(Infinite, 500, 85); // slow green blinking = good
     }
     else  {
-      LOG(LOG_ERR, "Self test has FAILED: %s", globalError->description().c_str());
+      LOG(LOG_ERR, "Self test has FAILED: %s", globalError->text());
       greenLED->steadyOff();
       redLED->blinkFor(Infinite, 250, 60); // faster red blinking = not good
     }
@@ -361,7 +361,7 @@ void UbusApiRequest::sendResponse(JsonObjectPtr aResult, ErrorPtr aError)
 {
   // create response
   JsonObjectPtr response = JsonObject::newObj();
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // error, return error response
     response->add("error", JsonObject::newInt32((int32_t)aError->getErrorCode()));
     response->add("errormessage", JsonObject::newString(aError->getErrorMessage()));
@@ -476,7 +476,7 @@ void P44VdcHost::sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult
 {
   // create response
   JsonObjectPtr response = JsonObject::newObj();
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // error, return error response
     response->add("error", JsonObject::newInt32((int32_t)aError->getErrorCode()));
     response->add("errormessage", JsonObject::newString(aError->getErrorMessage()));

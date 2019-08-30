@@ -380,6 +380,15 @@ void SensorBehaviour::setSensorNameWithRange(const char *aName)
 }
 
 
+void SensorBehaviour::setFilter(EvaluationType aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime)
+{
+  if (aEvalType==eval_none) {
+    filter.reset(); // remove, standard filter (if any) will be re-installed at next datapoint
+  }
+  else {
+    filter = WindowEvaluatorPtr(new WindowEvaluator(aWindowTime, aDataPointCollTime, aEvalType));
+  }
+}
 
 
 void SensorBehaviour::updateEngineeringValue(long aEngineeringValue, bool aPush, int32_t aContextId, const char *aContextMsg)
@@ -423,11 +432,11 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
     LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", contextId, contextMsg.c_str());
   }
   if (changedValue) {
-    // check for averaging
-    if (profileP && profileP->evalType!=eval_none) {
+    // check for filtering
+    if (filter || (profileP && profileP->evalType!=eval_none)) {
       // process values through filter
       if (!filter) {
-        // need a filter, create it
+        // no filter exists yet, but profile needs a filter, create it now
         filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->collWin, profileP->evalType));
       }
       filter->addValue(aValue, now);

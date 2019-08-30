@@ -261,7 +261,7 @@ public:
       hueComm.apiReady = true; // can use API now
     }
     else {
-      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.baseURL.c_str(), aError->description().c_str());
+      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.baseURL.c_str(), aError->text());
     }
     callback(aError); // success
     keepAlive.reset(); // will delete object if nobody else keeps it
@@ -271,7 +271,7 @@ public:
 
   void bridgeRefindHandler(SsdpSearchPtr aSsdpSearch, ErrorPtr aError, const string& aExpectedUuid)
   {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       if (hueComm.useNUPnP) {
         // could not find bridge, try N-UPnP
         hueComm.findBridgesNupnp(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, aExpectedUuid));
@@ -305,7 +305,7 @@ public:
       }
     }
     else {
-      FOCUSLOG("discovery ended, error = %s (usually: timeout)", aError->description().c_str());
+      FOCUSLOG("discovery ended, error = %s (usually: timeout)", aError->text());
       aSsdpSearch->stopSearch();
       if (hueComm.useNUPnP) {
         // also try N-UPnP
@@ -433,7 +433,7 @@ public:
       }
     }
     else {
-      FOCUSLOG("Error accessing bridge description: %s", aError->description().c_str());
+      FOCUSLOG("Error accessing bridge description: %s", aError->text());
     }
     // try next
     ++currentBridgeCandidate;
@@ -500,7 +500,7 @@ public:
       }
     }
     else {
-      LOG(LOG_INFO, "hue Bridge: Cannot create user: %s", aError->description().c_str());
+      LOG(LOG_INFO, "hue Bridge: Cannot create user: %s", aError->text());
     }
     // try next
     ++currentAuthCandidate;
@@ -618,7 +618,7 @@ void HueComm::findBridgesNupnp(HueBridgeNupnpFindCB aFindHandler)
 void HueComm::gotBridgeNupnpResponse(JsonObjectPtr aResult, ErrorPtr aError, HueBridgeNupnpFindCB aFindHandler)
 {
   NupnpResult ret;
-  if (!Error::isOK(aError) || !aResult) {
+  if (Error::notOK(aError) || !aResult) {
     aFindHandler(ret);
     return;
   }

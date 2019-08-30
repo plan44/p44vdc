@@ -256,6 +256,14 @@ namespace p44 {
     /// @return formatted sensor value range as string
     string getSensorRange();
 
+    /// set (custom) filter for sensor
+    /// @param aEvalType the type of evaluation the filter should perform (specify eval_none to remove custom filter)
+    /// @param aWindowTime width (timespan) of evaluation window
+    /// @param aDataPointCollTime within that timespan, new values reported will be collected into a single datapoint
+    /// @note this overrides any filtering that may have been set via sensor profiles at instantiation of the sensor
+    ///   (setting eval_none restores sensor-type specific filtering, if any)
+    void setFilter(EvaluationType aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime);
+
     /// @name interface towards actual device hardware (or simulation)
     /// @{
 

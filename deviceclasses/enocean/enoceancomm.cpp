@@ -1610,7 +1610,7 @@ void EnoceanComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aE
   // error querying version
   aRetriesLeft--;
   if (aRetriesLeft>=0) {
-    LOG(LOG_WARNING, "EnoceanComm: Initialisation: command failed: %s -> retrying again", aError->description().c_str());
+    LOG(LOG_WARNING, "EnoceanComm: Initialisation: command failed: %s -> retrying again", aError->text());
     // flush the line on the first half of attempts
     if (aRetriesLeft>ENOCEAN_INIT_RETRIES/2) {
       flushLine();
@@ -1742,7 +1742,7 @@ void EnoceanComm::confirmUTE(uint8_t aConfirmCode, Esp3PacketPtr aUTEPacket)
 
 void EnoceanComm::aliveCheckResponse(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // alive check failed, try to recover EnOcean interface
     LOG(LOG_ERR, "EnoceanComm: alive check of EnOcean module failed -> restarting module");
     // - close the connection
@@ -1883,7 +1883,7 @@ void EnoceanComm::flushLine()
   uint8_t zeroes[42];
   memset(zeroes, 0, sizeof(zeroes));
   serialComm->transmitBytes(sizeof(zeroes), zeroes, err);
-  if (!Error::isOK(err)) {
+  if (Error::notOK(err)) {
     LOG(LOG_ERR, "EnoceanComm: flushLine: error sending flush bytes");
   }
 }
@@ -1902,8 +1902,8 @@ void EnoceanComm::sendPacket(Esp3PacketPtr aPacket)
     // - payload
     serialComm->transmitBytes(aPacket->payloadSize, aPacket->payloadP, err);
   }
-  if (!Error::isOK(err)) {
-    LOG(LOG_ERR, "EnoceanComm: sendPacket: error sending packet over serial: %s", err->description().c_str());
+  if (Error::notOK(err)) {
+    LOG(LOG_ERR, "EnoceanComm: sendPacket: error sending packet over serial: %s", err->text());
   }
   else {
     FOCUSLOG("Sent EnOcean packet:\n%s", aPacket->description().c_str());

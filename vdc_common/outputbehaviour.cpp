@@ -39,11 +39,17 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   // volatile state
   localPriority(false), // no local priority
   transitionTime(0) // immediate transitions by default
+  #if ENABLE_SCENE_SCRIPT
+  ,sceneScriptContext(*this, &VdcHost::sharedVdcHost()->geolocation)
+  #endif
 {
   // set default group membership (which is group_undefined)
   resetGroupMembership();
   // set default hardware default configuration
   setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
+  #if ENABLE_SCENE_SCRIPT
+  sceneScriptContext.isMemberVariable();
+  #endif
 }
 
 
@@ -270,12 +276,50 @@ void OutputBehaviour::saveChannelsToScene(DsScenePtr aScene)
 }
 
 
+void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
+{
+  #if ENABLE_SCENE_SCRIPT
+  SimpleScenePtr simpleScene = boost::dynamic_pointer_cast<SimpleScene>(aScene);
+  if (simpleScene && simpleScene->effect==scene_effect_script) {
+    // run scene script
+    sceneScriptContext.abort(false); // abort previous, no callback
+    BLOG(LOG_INFO, "Starting Scene Script: '%.40s...'", simpleScene->sceneScript.c_str());
+    sceneScriptContext.releaseState();
+    sceneScriptContext.setCode(simpleScene->sceneScript);
+    sceneScriptContext.execute(true, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1));
+    return;
+  }
+  #endif
+  if (aDoneCB) aDoneCB(); // NOP
+}
+
+
+#if ENABLE_SCENE_SCRIPT
+
+void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluationResult)
+{
+  BLOG(LOG_INFO, "Scene Script completed, returns: '%s'", aEvaluationResult.stringValue().c_str());
+  if (aDoneCB) aDoneCB();
+}
+
+#endif // ENABLE_SCENE_SCRIPT
+
+
+void OutputBehaviour::stopSceneActions()
+{
+  #if ENABLE_SCENE_SCRIPT
+  sceneScriptContext.abort(false); // do not call back
+  #endif
+}
+
+
 
 bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTransitionTimeOverride)
 {
   if (aScene) {
     bool ok = performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
     if (aTransitionTimeOverride!=Infinite) {
+      BLOG(LOG_INFO, "Transition times of all changing channels overridden: actual transition time is now %d mS", (int)(aTransitionTimeOverride/MilliSecond));
       // override the transition time in all channels that now need to be applied
       for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
         if ((*pos)->needsApplying()) (*pos)->setTransitionTime(aTransitionTimeOverride);
@@ -290,12 +334,15 @@ bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTr
 
 bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd)
 {
+  // stop any actions still ongoing from a previous call
+  stopSceneActions();
   // scenes with invoke functionality will apply channel values by default
   if (aSceneCmd==scene_cmd_none) {
     aSceneCmd = aScene->sceneCmd;
   }
   if (
     aSceneCmd==scene_cmd_invoke ||
+    aSceneCmd==scene_cmd_undo ||
     aSceneCmd==scene_cmd_off ||
     aSceneCmd==scene_cmd_slow_off ||
     aSceneCmd==scene_cmd_min ||
@@ -340,6 +387,109 @@ void OutputBehaviour::channelValuesCaptured(DsScenePtr aScene, bool aFromDevice,
   if (aDoneCB) aDoneCB();
 }
 
+
+MLMicroSeconds OutputBehaviour::transitionTimeFromSceneEffect(VdcSceneEffect aEffect, uint32_t aEffectParam, bool aDimUp)
+{
+  switch (aEffect) {
+    // Note: light scenes have their own timing for these, here we just return the defaults
+    // - smooth = 100mS
+    // - slow   = 1min (60800mS)
+    // - custom = 5sec
+    case scene_effect_smooth :
+      return 100*MilliSecond;
+    case scene_effect_slow :
+      return 1*Minute;
+    case scene_effect_custom :
+      return 5*Second;
+    case scene_effect_transition:
+      return aEffectParam*MilliSecond; // transition time is just the effect param (in milliseconds)
+    default:
+      break;
+  }
+  return 0; // no known effect -> just return 0 for transition time
+}
+
+
+
+// MARK: - scene script context
+
+#if ENABLE_SCENE_SCRIPT
+
+
+SceneScriptContext::SceneScriptContext(OutputBehaviour &aOutput, const GeoLocation* aGeoLocationP) :
+  inherited(aGeoLocationP),
+  output(aOutput)
+{
+}
+
+
+bool SceneScriptContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
+{
+  if (aFunc=="applychannels" && aArgs.size()==0) {
+    SALOG(output.device, LOG_INFO, "scene script: applychannels() requests applying channels now");
+    output.device.requestApplyingChannels(boost::bind(&SceneScriptContext::channelsApplied, this), false);
+    aNotYielded = false; // yielded execution
+  }
+  else {
+    return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
+  }
+  return true; // found
+}
+
+
+void SceneScriptContext::channelsApplied()
+{
+  SALOG(output.device, LOG_INFO, "scene script: applychannels() complete");
+  ExpressionValue res;
+  continueWithAsyncFunctionResult(res);
+}
+
+
+
+bool SceneScriptContext::evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult)
+{
+  bool isDimchannel = aFunc=="dimchannel";
+  if ((isDimchannel || aFunc=="channel") && (aArgs.size()>=isDimchannel ? 2 : 1) && aArgs.size()<=3) {
+    // channel(channelid)               - return the value of the specified channel
+    // [dim]channel(channelid, value)   - set the channel value to the specified value or dim it relatively
+    // [dim]channel(channelid, value, transitiontime)
+    if (aArgs[0].notValue()) return errorInArg(aArgs[0], aResult); // return error/null from argument
+    ChannelBehaviourPtr channel = output.getChannelById(aArgs[0].stringValue());
+    if (!channel) {
+      aResult.setNull("unknown channel");
+    }
+    else {
+      // channel found
+      if (aArgs.size()==1) {
+        // return channel value
+        aResult.setNumber(channel->getChannelValueCalculated());
+      }
+      else {
+        // set value
+        if (aArgs[1].notValue()) return errorInArg(aArgs[0], aResult); // return error/null from argument
+        MLMicroSeconds transitionTime = 0; // default to immediate
+        if (aArgs.size()>2) {
+          if (!aArgs[2].isNull()) {
+            if (aArgs[2].notValue()) return errorInArg(aArgs[2], aResult); // return error/null from argument
+            transitionTime = aArgs[2].numValue()*Second;
+          }
+        }
+        if (isDimchannel)
+          channel->dimChannelValue(aArgs[1].numValue(), transitionTime);
+        else
+          channel->setChannelValue(aArgs[1].numValue(), transitionTime, true); // always apply
+        aResult.setBool(true);
+      }
+    }
+  }
+  else {
+    return inherited::evaluateFunction(aFunc, aArgs, aResult);
+  }
+  return true; // found
+}
+
+
+#endif // ENABLE_SCENE_SCRIPT
 
 
 

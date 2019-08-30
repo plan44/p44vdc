@@ -205,6 +205,9 @@ namespace p44 {
     /// @note this is called BEFORE scene values are recalled
     virtual bool prepareSceneCall(DsScenePtr aScene) P44_OVERRIDE;
 
+    /// prepare for applying a scene or scene undo on the device level
+    virtual bool prepareSceneApply(DsScenePtr aScene) P44_OVERRIDE;
+
     /// apply all pending channel value updates to the device's hardware
     /// @param aDoneCB will called when values are actually applied, or hardware reports an error/timeout
     /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement

@@ -150,14 +150,17 @@ void Device::addedAndInitialized()
 {
   // trigger re-applying channel values if this feature is enabled in the vdchost
   if (output && getVdcHost().doPersistChannels()) {
-    requestApplyingChannels(boost::bind(&Device::channelValuesRestored, this), false);
+    if (output->reapplyRestoredChannels()) {
+      ALOG(LOG_INFO, "requesting re-applying last known channel values to hardware");
+      requestApplyingChannels(boost::bind(&Device::channelValuesRestored, this), false);
+    }
   }
 }
 
 
 void Device::channelValuesRestored()
 {
-  ALOG(LOG_INFO, "restored last known channel values");
+  ALOG(LOG_INFO, "re-applied last known channel values to hardware");
 }
 
 
@@ -618,18 +621,24 @@ int Device::numChannels()
 }
 
 
-bool Device::needsToApplyChannels()
+bool Device::needsToApplyChannels(MLMicroSeconds* aTransitionTimeP)
 {
+  MLMicroSeconds tt = 0;
+  bool needsApply = false;
   for (int i=0; i<numChannels(); i++) {
     ChannelBehaviourPtr ch = getChannelByIndex(i, true);
     if (ch) {
       // at least this channel needs update
       LOG(LOG_DEBUG, "needsToApplyChannels() returns true because of %s", ch->description().c_str());
-      return true;
+      if (!aTransitionTimeP) return true; // no need to check more channels
+      needsApply = true;
+      if (ch->transitionTimeToNewValue()>tt) {
+        tt = ch->transitionTimeToNewValue();
+      }
     }
   }
-  // no channel needs apply
-  return false;
+  if (aTransitionTimeP) *aTransitionTimeP = tt;
+  return needsApply;
 }
 
 
@@ -711,6 +720,10 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       respErr = WebError::webErr(400, "device cannot send teach in signal of requested variant");
     }
   }
+  else if (aMethod=="x-p44-stopSceneActions") {
+    stopSceneActions();
+    respErr = Error::ok();
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
@@ -752,11 +765,10 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
-      // now save
       saveScene(sceneNo);
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "saveScene error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "saveScene error: %s", err->text());
     }
   }
   else if (aNotification=="undoScene") {
@@ -764,11 +776,10 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
-      // now save
       undoScene(sceneNo);
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "undoScene error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "undoScene error: %s", err->text());
     }
   }
   else if (aNotification=="setLocalPriority") {
@@ -776,11 +787,10 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
-      // now save
       setLocalPriority(sceneNo);
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "setLocalPriority error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "setLocalPriority error: %s", err->text());
     }
   }
   else if (aNotification=="setControlValue") {
@@ -800,8 +810,8 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         }
       }
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "setControlValue error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "setControlValue error: %s", err->text());
     }
   }
   else if (aNotification=="callSceneMin") {
@@ -812,8 +822,8 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       // now call
       callSceneMin(sceneNo);
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "callSceneMin error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "callSceneMin error: %s", err->text());
     }
   }
   else if (aNotification=="setOutputChannelValue") {
@@ -829,6 +839,11 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         if (o) {
           apply_now = o->boolValue();
         }
+        o = aParams->get("transitionTime");
+        MLMicroSeconds oldTT = getOutput()->transitionTime;
+        if (o) {
+          getOutput()->transitionTime = o->doubleValue()*Second;
+        }
         // reverse build the correctly structured property value: { channelStates: { <channel>: { value:<value> } } }
         // - value
         o = aParams->newObject();
@@ -841,10 +856,12 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         propValue->add("channelStates", ch);
         // now access the property for write
         accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, 3, NULL); // no callback
+        // restore the transition time
+        getOutput()->transitionTime = oldTT;
       }
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "setOutputChannelValue error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "setOutputChannelValue error: %s", err->text());
     }
   }
   else {
@@ -919,7 +936,7 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       bool force = false;
       MLMicroSeconds transitionTimeOverride = Infinite; // none
       // check for custom transition time
-      o = aDeliveryState->callParams->get("transition");
+      o = aDeliveryState->callParams->get("transitionTime");
       if (o) {
         transitionTimeOverride = o->doubleValue()*Second;
       }
@@ -927,14 +944,14 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       if (Error::isOK(err = checkParam(aDeliveryState->callParams, "force", o))) {
         force = o->boolValue();
         // set the channel type as actionParam
-        aDeliveryState->actionParam = channeltype_brightness; // legacy dimming is ALWAYS brightness
+        aDeliveryState->actionParam = channeltype_brightness; // legacy dimming (i.e. dimming via scene calls) is ALWAYS brightness
         // prepare scene call
         callScenePrepare(aPreparedCB, sceneNo, force, transitionTimeOverride);
         return;
       }
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "callScene error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "callScene error: %s", err->text());
     }
   }
   else if (aDeliveryState->callType==ntfy_dimchannel) {
@@ -966,8 +983,8 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         return;
       }
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "dimChannel error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "dimChannel error: %s", err->text());
     }
   }
   aPreparedCB(ntfy_none);
@@ -1625,10 +1642,10 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
       // Note: we only ask updating from device for scenes that are likely to be undone, and thus important
       //   to capture perfectly. For all others, it is sufficient to just capture the cached output channel
       //   values and not waste time with expensive queries to device hardware.
-      // Note: the actual updating might happen later (when the hardware responds) but
+      // Note: the actual updating is allowed to happen later (when the hardware responds) but
       //   if so, implementations must make sure access to the hardware is serialized such that
       //   the values are captured before values from performApplySceneToChannels() below are applied.
-      output->captureScene(previousState, aScene->preciseUndoImportant() , boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
+      output->captureScene(previousState, aScene->preciseUndoImportant(), boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
     } // if output
   } // not dontCare
   else {
@@ -1901,7 +1918,7 @@ ErrorPtr Device::load()
   // load the device settings
   if (deviceSettings) {
     err = deviceSettings->loadFromStore(dSUID.getString().c_str());
-    if (!Error::isOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->description().c_str());
+    if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
   }
   // load the behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->load();
@@ -1919,7 +1936,7 @@ ErrorPtr Device::save()
   ErrorPtr err;
   // save the device settings
   if (deviceSettings) err = deviceSettings->saveToStore(dSUID.getString().c_str(), false); // only one record per device
-  if (!Error::isOK(err)) ALOG(LOG_ERR,"Error saving settings: %s", err->description().c_str());
+  if (Error::notOK(err)) ALOG(LOG_ERR,"Error saving settings: %s", err->text());
   // save the behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->save();
   for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->save();

@@ -103,11 +103,16 @@ const char *Vdc::getPersistentDataDir()
 
 void Vdc::handleGlobalEvent(VdchostEvent aEvent)
 {
+  // note: global events that reach the vdcs are not too frequent and must be distributed to all devices
   if (aEvent==vdchost_logstats) {
     if (optimizerMode>opt_disabled) {
       optimizerCacheStats();
     }
   }
+  for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+    (*pos)->handleGlobalEvent(aEvent);
+  }
+  inherited::handleGlobalEvent(aEvent);
 }
 
 
@@ -536,9 +541,9 @@ void Vdc::finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDel
 
 void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
-  if (!Error::isOK(aError) && !aError->isDomain(VdcError::domain())) {
+  if (Error::notOK(aError) && !aError->isDomain(VdcError::domain())) {
     // actual error, not only signalling add/update
-    ALOG(LOG_ERR, "Failed calling native action: %s", Error::text(aError).c_str());
+    ALOG(LOG_ERR, "Failed calling native action: %s", Error::text(aError));
   }
   bool notAppliedYet = aError!=NULL; // any error, including Error::OK, means that notification was NOT applied yet
   // now let all devices either finish the operation or apply it (in case no cached operation was applied on vdc level)
@@ -650,7 +655,7 @@ void Vdc::createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStat
 
 void Vdc::removedNativeAction(OptimizerEntryPtr aFromEntry, OptimizerEntryPtr aForEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     ALOG(LOG_INFO, "Could not delete action to make room for a new one");
     preparedNotificationComplete(aForEntry, aDeliveryState, false, aError);
     return;
@@ -668,7 +673,7 @@ void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDel
     if (aChanged) aEntry->markDirty(); // is a successful change, must be persisted
   }
   else {
-    ALOG(LOG_WARNING, "Creating or updating native action has failed: %s", Error::text(aError).c_str());
+    ALOG(LOG_WARNING, "Creating or updating native action has failed: %s", Error::text(aError));
   }
   if (LOGENABLED(LOG_INFO) && optimizerMode>opt_disabled) {
     // show current statistics
@@ -679,11 +684,11 @@ void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDel
 
 void Vdc::optimizerCacheStats(OptimizerEntryPtr aCurrentEntry)
 {
-  ALOG(LOG_NOTICE, "========= Optimizer statistics after %ld optimizable calls", totalOptimizableCalls);
+  string stats;
   for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
     OptimizerEntryPtr oe = *pos;
-    ALOG(LOG_NOTICE,
-      "%c '%s' called %ld times (weighted, raw=%ld), last %lld seconds ago, contentId=%d, numdevices=%d, nativeAction='%s'",
+    string_format_append(stats,
+      "%c '%s' called %ld times (weighted, raw=%ld), last %lld seconds ago, contentId=%d, numdevices=%d, nativeAction='%s'\n",
       oe==aCurrentEntry ? '*' : '-', // mark entry used in current call
       NotificationNames[oe->type],
       oe->timeWeightedCallCount(),
@@ -694,6 +699,11 @@ void Vdc::optimizerCacheStats(OptimizerEntryPtr aCurrentEntry)
       oe->nativeActionId.c_str()
     );
   }
+  LOG(LOG_NOTICE,
+    "\nOptimizer statistics after %ld optimizable calls for vDC %s:\n%s\n",
+    totalOptimizableCalls, shortDesc().c_str(),
+    stats.c_str()
+  );
 }
 
 
@@ -846,7 +856,7 @@ void Vdc::pairingTimeout(VdcApiRequestPtr aRequest)
 void Vdc::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // prevent collecting from vdc which has global error (except if rescanmode_force is set)
-  if ((aRescanFlags&rescanmode_force)==0 && !Error::isOK(vdcErr)) {
+  if ((aRescanFlags&rescanmode_force)==0 && Error::notOK(vdcErr)) {
     if (aCompletedCB) aCompletedCB(vdcErr);
     return;
   }
@@ -989,7 +999,7 @@ void Vdc::identifyDeviceCB(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, i
   // failed, check for retries
   if (aMaxRetries>0) {
     // report this error into the log
-    LOG(LOG_WARNING, "device identification failed: %s -> retrying %d times", aError->description().c_str(), aMaxRetries);
+    LOG(LOG_WARNING, "device identification failed: %s -> retrying %d times", aError->text(), aMaxRetries);
     aMaxRetries--;
     identifyTicket.executeOnce(boost::bind(&Vdc::identifyDevice, this, aNewDevice, aIdentifyCB, aMaxRetries, aRetryDelay), aRetryDelay);
     return;
@@ -1050,7 +1060,7 @@ void Vdc::identifyAndAddDeviceCB(StatusCB aCompletedCB, ErrorPtr aError, Device 
     }
   }
   else {
-    LOG(LOG_ERR, "Could not get device identification: %s -> ignored", aError->description().c_str());
+    LOG(LOG_ERR, "Could not get device identification: %s -> ignored", aError->text());
     // we can't add this device, continue to next without adding
   }
   if (aCompletedCB) aCompletedCB(aError);
@@ -1135,7 +1145,7 @@ ErrorPtr Vdc::saveOptimizerCache()
       if (!(*pos)->nativeActionId.empty()) {
         (*pos)->markDirty();
         err = (*pos)->saveToStore(dSUID.getString().c_str(), true); // multiple instances allowed, it's a *list*!
-        if (!Error::isOK(err)) LOG(LOG_ERR,"Error saving optimizer entry: %s", err->description().c_str());
+        if (Error::notOK(err)) LOG(LOG_ERR,"Error saving optimizer entry: %s", err->text());
       }
     }
   }
@@ -1150,17 +1160,17 @@ ErrorPtr Vdc::load()
   ErrorPtr err;
   // load the vdc settings (collecting phase is already over by now)
   err = loadFromStore(dSUID.getString().c_str());
-  if (!Error::isOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->description().c_str());
+  if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
   loadSettingsFromFiles();
   // load the optimizer cache
   err = loadOptimizerCache();
-  if (!Error::isOK(err)) ALOG(LOG_ERR,"Error loading optimizer cache: %s", err->description().c_str());
+  if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading optimizer cache: %s", err->text());
   // announce groups and scenes used by optimizer
   for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
     if (!(*pos)->nativeActionId.empty()) {
       ErrorPtr announceErr = announceNativeAction((*pos)->nativeActionId);
-      if (!Error::isOK(announceErr)) {
-        ALOG(LOG_WARNING,"Native action '%s' is no longer valid - removed (%s)", (*pos)->nativeActionId.c_str(), err->description().c_str());
+      if (Error::notOK(announceErr)) {
+        ALOG(LOG_WARNING,"Native action '%s' is no longer valid - removed (%s)", (*pos)->nativeActionId.c_str(), err->text());
         (*pos)->nativeActionId = ""; // erase it, repeated use of that entry will re-create a native action later
       }
     }
@@ -1504,7 +1514,7 @@ string Vdc::description()
     getInstanceNumber(),
     shortDesc().c_str(),
     (long)devices.size(),
-    Error::isOK(vdcErr) ? "OK" : vdcErr->description().c_str()
+    Error::isOK(vdcErr) ? "OK" : vdcErr->text()
   );
   return d;
 }
@@ -1518,8 +1528,8 @@ int Vdc::opStateLevel()
 
 string Vdc::getOpStateText()
 {
-  if (!Error::isOK(vdcErr)) {
-    return string_format("Error: %s", vdcErr->description().c_str());
+  if (Error::notOK(vdcErr)) {
+    return string_format("Error: %s", vdcErr->text());
   }
   else if (collecting) {
     return "Scanning...";

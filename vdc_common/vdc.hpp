@@ -268,42 +268,8 @@ namespace p44 {
     /// @}
 		
 		
-    /// @name identification
+    /// @name identification to user
     /// @{
-
-    /// deviceclass identifier
-		/// @return constant identifier for this container class (no spaces, filename-safe)
-    virtual const char *vdcClassIdentifier() const = 0;
-		
-    /// Instance number (to differentiate multiple vDC containers of the same class)
-		/// @return instance index number
-		int getInstanceNumber() const;
-
-    /// get a sufficiently unique identifier for this class container
-    /// @return ID that identifies this container running on a specific hardware
-    ///   the ID should not be dependent on the software version
-    ///   the ID must differ for each of multiple vDC containers run on the same hardware
-    ///   the ID MUST change when same software runs on different hardware
-    /// @note Current implementation derives this from the devicecontainer's dSUID,
-    ///   the deviceClassIdentitfier and the instance number in the form "class:instanceIndex@devicecontainerDsUid"
-    string vdcInstanceIdentifier() const;
-
-    /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
-    /// devices.
-    /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() { return false; }
-
-    /// some vdcs can have definitions of parameters, states, and properties changing depending on the device information
-    /// @return if true, this vDC should be queried for all actions parameters, states and properties descriptions
-    virtual bool dynamicDefinitions() { return false; } // by default dynamic definitions are not used
-
-    /// get user assigned name of the vDC container, or if there is none, a synthesized default name
-    /// @return name string
-    virtual string getName() P44_OVERRIDE;
-
-    /// set user assignable name
-    /// @param aName name of the addressable entity
-    virtual void setName(const string &aName) P44_OVERRIDE;
 
     /// identify the device to the user
     /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
@@ -362,7 +328,7 @@ namespace p44 {
 
     /// handle global events
     /// @param aEvent the event to handle
-    virtual void handleGlobalEvent(VdchostEvent aEvent);
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
 
     /// set vdc-global error
     /// @param aVdcError if NotOK, vdc cannot collect devices any more (or at all)
@@ -453,6 +419,40 @@ namespace p44 {
     /// @name identification of the addressable entity
     /// @{
 
+    /// deviceclass identifier
+    /// @return constant identifier for this container class (no spaces, filename-safe)
+    virtual const char *vdcClassIdentifier() const = 0;
+
+    /// Instance number (to differentiate multiple vDC containers of the same class)
+    /// @return instance index number
+    int getInstanceNumber() const;
+
+    /// get a sufficiently unique identifier for this class container
+    /// @return ID that identifies this container running on a specific hardware
+    ///   the ID should not be dependent on the software version
+    ///   the ID must differ for each of multiple vDC containers run on the same hardware
+    ///   the ID MUST change when same software runs on different hardware
+    /// @note Current implementation derives this from the devicecontainer's dSUID,
+    ///   the deviceClassIdentitfier and the instance number in the form "class:instanceIndex@devicecontainerDsUid"
+    string vdcInstanceIdentifier() const;
+
+    /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
+    /// devices.
+    /// @return if true, this vDC should not be announced towards the dS system when it has no devices
+    virtual bool invisibleWhenEmpty() { return false; }
+
+    /// some vdcs can have definitions of parameters, states, and properties changing depending on the device information
+    /// @return if true, this vDC should be queried for all actions parameters, states and properties descriptions
+    virtual bool dynamicDefinitions() { return false; } // by default dynamic definitions are not used
+
+    /// get user assigned name of the vDC container, or if there is none, a synthesized default name
+    /// @return name string
+    virtual string getName() P44_OVERRIDE;
+
+    /// set user assignable name
+    /// @param aName name of the addressable entity
+    virtual void setName(const string &aName) P44_OVERRIDE;
+
     /// @return human readable, language independent model name/short description
     /// @note base class will construct this from global product name and vdcModelSuffix()
     virtual string modelName() P44_OVERRIDE;
@@ -501,7 +501,7 @@ namespace p44 {
 
     /// @}
 
-    /// @name Implementation methods for native scene and grouped dimming support
+    /// @name Implementation methods for vdc wide operations such as native scene and grouped dimming support
     /// @{
 
     /// this is called to check if optimizer should be used for a particular set of devices

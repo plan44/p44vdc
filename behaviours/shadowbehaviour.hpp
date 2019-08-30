@@ -209,7 +209,7 @@ namespace p44 {
   /// callback from ShadowBehaviour to device implementation to perform moving sequence
   /// @param aDoneCB must be called when the movement change has been applied (as precisely as
   ///   possible at the time when the movement change actually happens in the hardware).
-  /// @param aNewDirection 0=stopp, -1=start moving down, +1=start moving up
+  /// @param aNewDirection 0=stop, -1=start moving down, +1=start moving up
   /// @note implementation should NOT call channelValueApplied(), this is done by ShadowBehaviour when appropriate
   typedef boost::function<void (SimpleCB aDoneCB, int aNewDirection)> MovementChangeCB;
 
@@ -227,6 +227,7 @@ namespace p44 {
     MLMicroSeconds minMoveTime;
     MLMicroSeconds maxShortMoveTime;
     MLMicroSeconds minLongMoveTime;
+    bool absoluteMovement;
     bool hasEndContacts;
     /// @}
 
@@ -290,7 +291,9 @@ namespace p44 {
     /// @param aMinMoveTime minimal movement time that can be applied
     /// @param aMaxShortMoveTime maximum short movement time (in case where a certain on impulse length might trigger permanent moves)
     /// @param aMinLongMoveTime minimum time for a long move (e.g. permanent move stoppable by another impulse)
-    void setDeviceParams(ShadowDeviceKind aShadowDeviceKind, bool aHasEndContacts, MLMicroSeconds aMinMoveTime, MLMicroSeconds aMaxShortMoveTime=0, MLMicroSeconds aMinLongMoveTime=0);
+    /// @param aAbsoluteMovement if set, this means the device can perform absolute movements, i.e. will NOT use applyBlindChannels()
+    ///   but can directly apply channel values to device (which is aware of its own position)
+    void setDeviceParams(ShadowDeviceKind aShadowDeviceKind, bool aHasEndContacts, MLMicroSeconds aMinMoveTime, MLMicroSeconds aMaxShortMoveTime=0, MLMicroSeconds aMinLongMoveTime=0, bool aAbsoluteMovement=false);
 
     /// initiates a blind moving sequence to apply current channel values to hardware
     /// @param aMovementCB will be called (usually multiple times) to perform the needed movement sequence.
@@ -368,6 +371,9 @@ namespace p44 {
     /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
     virtual void saveChannelsToScene(DsScenePtr aScene) P44_OVERRIDE;
 
+    /// check if channel values that were restored from persistent storage should be re-applied to hardware
+    /// @return true if device should perform a requestApplyingChannels() sequence.
+    virtual bool reapplyRestoredChannels() P44_OVERRIDE;
 
     // property access implementation for descriptor/settings/states
     virtual int numSettingsProps() P44_OVERRIDE;

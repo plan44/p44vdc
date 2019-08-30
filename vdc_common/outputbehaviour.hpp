@@ -29,15 +29,51 @@ using namespace std;
 
 namespace p44 {
 
+  class OutputBehaviour;
+
+  #if ENABLE_SCENE_SCRIPT
+
+  class SceneScriptContext : public ScriptExecutionContext
+  {
+    typedef ScriptExecutionContext inherited;
+    OutputBehaviour &output;
+
+  public:
+
+    SceneScriptContext(OutputBehaviour &aOutput, const GeoLocation* aGeoLocationP);
+
+  protected:
+
+    /// evaluation of synchronously implemented functions which immediately return a result
+    virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
+
+    /// evaluation of asynchronously implemented functions which may yield execution and resume later
+    bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
+
+  private:
+
+    void channelsApplied();
+
+  };
+
+  #endif // ENABLE_SCENE_SCRIPT
+
+
+
   /// Implements the basic behaviour of an output with one or multiple output channels
   class OutputBehaviour : public DsBehaviour
   {
     typedef DsBehaviour inherited;
     friend class ChannelBehaviour;
     friend class Device;
+    friend class SceneScriptContext;
 
     /// channels
     ChannelBehaviourVector channels;
+
+    #if ENABLE_SCENE_SCRIPT
+    SceneScriptContext sceneScriptContext; ///< script context to run scene scripts
+    #endif
 
   protected:
 
@@ -176,12 +212,12 @@ namespace p44 {
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
     /// @param aScene the scene that was called (if not dontCare, performApplySceneToChannels() has already been called)
     /// @param aDoneCB will be called when scene actions have completed (but not necessarily when stopped by stopSceneActions())
-    virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB) { if (aDoneCB) aDoneCB(); /* NOP in base class */ };
+    virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB);
 
     /// will be called to stop all ongoing actions before next callScene etc. is issued.
     /// @note this must stop all ongoing actions such that applying another scene or action right afterwards
     ///   cannot mess up things.
-    virtual void stopSceneActions() { /* NOP in base class */ };
+    virtual void stopSceneActions();
 
     /// perform applying Scene to channels
     /// @param aScene the scene to apply
@@ -230,6 +266,13 @@ namespace p44 {
 
     /// @}
 
+    /// get transition time in microseconds from given scene effect
+    /// @param aEffect the scene effect
+    /// @param aEffectParam parameter for the effect (standard dS scenes do not have it)
+    /// @param aDimUp true when dimming up, false when dimming down
+    /// @return 0 if no transition time known for the given effect parameters
+    virtual MLMicroSeconds transitionTimeFromSceneEffect(VdcSceneEffect aEffect, uint32_t aEffectParam, bool aDimUp);
+
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
     virtual string description() P44_OVERRIDE;
@@ -254,7 +297,7 @@ namespace p44 {
     ///   It MAY cause subsequent applyChannelValues() calls AFTER returning to perform special effects
     /// @note this method does not handle dimming, and must not be called with dimming specific scenes. For dimming,
     ///   only dimChannel method must be used.
-    /// @note base class' implementation provides applying the scene values to channels.
+    /// @note base class' implementation provides stopping scene actions and applying the scene values to channels.
     ///   Derived classes may implement handling of hard-wired behaviour specific scenes.
     virtual bool performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd);
 
@@ -270,6 +313,12 @@ namespace p44 {
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
     /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
     virtual void saveChannelsToScene(DsScenePtr aScene);
+
+    /// check if channel values that were restored from persistent storage should be re-applied to hardware
+    /// @return true if device should perform a requestApplyingChannels() sequence.
+    /// @note instead of returning true, subclass implementation may inititate a specialized re-apply
+    ///   operation here instead.
+    virtual bool reapplyRestoredChannels() { return true; }
 
     // the behaviour type
     virtual BehaviourType getType() P44_OVERRIDE { return behaviour_output; };
@@ -307,6 +356,10 @@ namespace p44 {
 
     void channelValuesCaptured(DsScenePtr aScene, bool aFromDevice, SimpleCB aDoneCB);
     string parentIdForChannels();
+
+    #if ENABLE_SCENE_SCRIPT
+    void sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluationResult);
+    #endif
 
   };
   

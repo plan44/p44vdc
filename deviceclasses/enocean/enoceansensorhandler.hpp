@@ -100,6 +100,7 @@ namespace p44 {
     extern const char *dayNightText;
     extern const char *contactText;
     extern const char *supplyText;
+    extern const char *lowBatText;
 
   }
 

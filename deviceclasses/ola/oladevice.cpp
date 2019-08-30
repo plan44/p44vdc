@@ -211,13 +211,11 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     if (cl) {
       MovingLightBehaviourPtr ml = getOutput<MovingLightBehaviour>();
-      if (needsToApplyChannels()) {
+      if (needsToApplyChannels(&transitionTime)) {
         // needs update
         // - derive (possibly new) color mode from changed channels
         cl->deriveColorMode();
         // - calculate and start transition
-        //   TODO: depending to what channel has changed, take transition time from that channel. For now always using brightness transition time
-        transitionTime = cl->transitionTimeToNewBrightness();
         cl->brightnessTransitionStep(); // init
         cl->colorTransitionStep(); // init
         if (ml) ml->positionTransitionStep(); // init
