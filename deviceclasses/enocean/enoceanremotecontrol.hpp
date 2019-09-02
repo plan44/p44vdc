@@ -29,6 +29,11 @@
 #include "enoceandevice.hpp"
 #include "channelbehaviour.hpp"
 
+#ifndef ENABLE_ENOCEAN_SHADOW
+  #define ENABLE_ENOCEAN_SHADOW 1
+#endif
+
+
 using namespace std;
 
 namespace p44 {
@@ -131,6 +136,8 @@ namespace p44 {
   };
 
 
+  #if ENABLE_ENOCEAN_SHADOW
+
   class EnoceanBlindControlDevice : public EnoceanRemoteControlDevice
   {
     typedef EnoceanRemoteControlDevice inherited;
@@ -164,6 +171,8 @@ namespace p44 {
     void sendReleaseTelegram(SimpleCB aDoneCB);
 
   };
+
+  #endif // ENABLE_ENOCEAN_SHADOW
 
 
 

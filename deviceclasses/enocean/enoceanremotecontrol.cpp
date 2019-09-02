@@ -31,9 +31,12 @@
 #if ENABLE_ENOCEAN
 
 #include "climatecontrolbehaviour.hpp"
-#include "shadowbehaviour.hpp"
 #include "lightbehaviour.hpp"
 #include "enoceanvdc.hpp"
+
+#if ENABLE_ENOCEAN_SHADOW
+#include "shadowbehaviour.hpp"
+#endif
 
 using namespace p44;
 
@@ -178,6 +181,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         // count it
         aSubDeviceIndex++;
       }
+      #if ENABLE_ENOCEAN_SHADOW
       else if (EEP_TYPE(aEEProfile)==PSEUDO_TYPE_BLIND) {
         // full-featured blind controller
         newDev = EnoceanDevicePtr(new EnoceanBlindControlDevice(aVdcP));
@@ -205,6 +209,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         // count it
         aSubDeviceIndex++;
       }
+      #endif
     }
     else if (EEP_FUNC(aEEProfile)==PSEUDO_FUNC_SYSTEMELECTRONIC && aSubDeviceIndex<1) {
       // SystemElectronic.de proprietary devices
@@ -286,6 +291,7 @@ void EnoceanRelayControlDevice::sendReleaseTelegram(SimpleCB aDoneCB, bool aUp)
 
 // MARK: - time controlled blind device
 
+#if ENABLE_ENOCEAN_SHADOW
 
 EnoceanBlindControlDevice::EnoceanBlindControlDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep) :
   inherited(aVdcP, aDsuidIndexStep),
@@ -386,6 +392,8 @@ void EnoceanBlindControlDevice::sendReleaseTelegram(SimpleCB aDoneCB)
     sequenceTicket.executeOnce(boost::bind(aDoneCB), PAUSE_TIME);
   }
 }
+
+#endif // ENABLE_ENOCEAN_SHADOW
 
 
 // MARK: - SystemElectronic Heat Tube device
