@@ -432,6 +432,7 @@ PropertyDescriptorPtr PropertyContainer::getDescriptorByNumericName(
 
 // MARK: - reading from CSV
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverridden, const char *&aCSVCursor, const char *aTextSourceName, int aLineNo)
 {
@@ -519,4 +520,4 @@ bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverri
   return anySettingsApplied;
 }
 
-
+#endif // ENABLE_SETTINGS_FROM_FILES

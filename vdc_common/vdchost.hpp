@@ -549,8 +549,10 @@ namespace p44 {
     /// forget any parameters stored in persistent DB
     ErrorPtr forget();
 
+    #if ENABLE_SETTINGS_FROM_FILES
     // load additional settings from file
     void loadSettingsFromFiles();
+    #endif
 
     /// @}
 

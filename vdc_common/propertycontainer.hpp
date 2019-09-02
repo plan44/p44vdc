@@ -22,6 +22,7 @@
 #ifndef __p44vdc__propertycontainer__
 #define __p44vdc__propertycontainer__
 
+#include "p44vdc_common.hpp"
 #include "vdcapi.hpp"
 
 using namespace std;
@@ -229,6 +230,7 @@ namespace p44 {
 
     /// @}
 
+    #if ENABLE_SETTINGS_FROM_FILES
     /// read properties from CSV formatted text
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
     /// @param aOnlyExplicitlyOverridden if set, only properties prefixed with an exclamation mark are applied
@@ -237,6 +239,7 @@ namespace p44 {
     /// @param aLineNo line number within the text source, for logging error messages
     /// @return true if some settings were applied
     bool readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverridden, const char *&aCSVCursor, const char *aTextSourceName, int aLineNo);
+    #endif // ENABLE_SETTINGS_FROM_FILES
 
   protected:
 

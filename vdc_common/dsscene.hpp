@@ -22,7 +22,7 @@
 #ifndef __p44vdc__dsscene__
 #define __p44vdc__dsscene__
 
-
+#include "p44vdc_common.hpp"
 #include "persistentparams.hpp"
 #include "propertycontainer.hpp"
 
@@ -331,8 +331,10 @@ namespace p44 {
     /// delete scenes
     virtual ErrorPtr deleteChildren() P44_FINAL;
 
+    #if ENABLE_SETTINGS_FROM_FILES
     /// load additional defaults for scenes from files
     void loadScenesFromFiles();
+    #endif
     
     /// @}
   };

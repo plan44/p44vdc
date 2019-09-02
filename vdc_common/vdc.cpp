@@ -1161,7 +1161,9 @@ ErrorPtr Vdc::load()
   // load the vdc settings (collecting phase is already over by now)
   err = loadFromStore(dSUID.getString().c_str());
   if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
+  #if ENABLE_SETTINGS_FROM_FILES
   loadSettingsFromFiles();
+  #endif
   // load the optimizer cache
   err = loadOptimizerCache();
   if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading optimizer cache: %s", err->text());
@@ -1199,6 +1201,8 @@ ErrorPtr Vdc::forget()
 }
 
 
+#if ENABLE_SETTINGS_FROM_FILES
+
 void Vdc::loadSettingsFromFiles()
 {
   string dir = getVdcHost().getConfigDir();
@@ -1217,6 +1221,8 @@ void Vdc::loadSettingsFromFiles()
     if (loadSettingsFromFile(fn.c_str(), rowid!=0)) markClean();
   }
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - property access

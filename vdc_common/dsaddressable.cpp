@@ -675,6 +675,7 @@ string DsAddressable::webuiURLString()
 
 // MARK: - load addressable settings from files
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExplicitlyOverridden)
 {
@@ -705,6 +706,8 @@ bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExp
   }
   return anySettingsApplied;
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - description/shortDesc/logging

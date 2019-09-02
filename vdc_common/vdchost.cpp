@@ -1742,8 +1742,10 @@ ErrorPtr VdcHost::loadAndFixDsUID()
   // load the vdc host settings, which might override the default dSUID
   err = loadFromStore(entityType()); // is a singleton, identify by type
   if (Error::notOK(err)) LOG(LOG_ERR,"Error loading settings for vdc host: %s", err->text());
+  #if ENABLE_SETTINGS_FROM_FILES
   // check for settings from files
   loadSettingsFromFiles();
+  #endif
   // now check
   if (!externalDsuid) {
     if (storedDsuid) {
@@ -1786,6 +1788,7 @@ ErrorPtr VdcHost::forget()
 }
 
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 void VdcHost::loadSettingsFromFiles()
 {
@@ -1795,6 +1798,8 @@ void VdcHost::loadSettingsFromFiles()
   // if vdc has already stored properties, only explicitly marked properties will be applied
   if (loadSettingsFromFile(fn.c_str(), rowid!=0)) markClean();
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - persistence implementation

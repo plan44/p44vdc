@@ -1926,7 +1926,9 @@ ErrorPtr Device::load()
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->load();
   if (output) output->load();
   // load settings from files
+  #if ENABLE_SETTINGS_FROM_FILES
   loadSettingsFromFiles();
+  #endif
   return ErrorPtr();
 }
 
@@ -1982,6 +1984,8 @@ ErrorPtr Device::forget()
 }
 
 
+#if ENABLE_SETTINGS_FROM_FILES
+
 void Device::loadSettingsFromFiles()
 {
   string dir = getVdcHost().getConfigDir();
@@ -2005,6 +2009,7 @@ void Device::loadSettingsFromFiles()
   }
 }
 
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - property access

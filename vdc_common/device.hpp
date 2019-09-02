@@ -202,8 +202,10 @@ namespace p44 {
     /// @note this is usually called from the device container when device is added (detected), before initializeDevice() and after identifyDevice()
     virtual ErrorPtr load();
 
+    #if ENABLE_SETTINGS_FROM_FILES
     // load additional settings from files
     void loadSettingsFromFiles();
+    #endif
 
     /// initializes the physical device for being used
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)

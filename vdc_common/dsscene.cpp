@@ -585,8 +585,10 @@ ErrorPtr SceneDeviceSettings::loadChildren()
       scene = newDefaultScene(0);
     }
     delete queryP; queryP = NULL;
+    #if ENABLE_SETTINGS_FROM_FILES
     // Now check for default settings from files
     loadScenesFromFiles();
+    #endif
   }
   return err;
 }
@@ -622,6 +624,7 @@ ErrorPtr SceneDeviceSettings::deleteChildren()
 
 // MARK: - additional scene defaults from files
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 void SceneDeviceSettings::loadScenesFromFiles()
 {
@@ -708,3 +711,5 @@ void SceneDeviceSettings::loadScenesFromFiles()
     }
   }
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES

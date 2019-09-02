@@ -398,12 +398,14 @@ namespace p44 {
     /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
     virtual bool canIdentifyToUser() { return false; } // not by default
 
+    #if ENABLE_SETTINGS_FROM_FILES
     /// load settings from CSV file
     /// @param aCSVFilepath full file path to a CSV file to read. If file does not exist, the function does nothing. If
     ///   an error occurs loading the file, the error is logged
     /// @param aOnlyExplicitlyOverridden if set, only properties are applied which are explicitly marked with a exclamation mark prefix
     /// @return true if some settings were applied
     bool loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExplicitlyOverridden);
+    #endif
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
