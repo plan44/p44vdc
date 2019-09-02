@@ -261,7 +261,7 @@ public:
       hueComm.apiReady = true; // can use API now
     }
     else {
-      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.baseURL.c_str(), aError->text());
+      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.fixedBaseURL.c_str(), aError->text());
     }
     callback(aError); // success
     keepAlive.reset(); // will delete object if nobody else keeps it
@@ -410,10 +410,12 @@ public:
         readUuidFromXml(aResponse);
       }
 
-      if (manufacturer == "Royal Philips Electronics" &&
-          (model == MODEL_FREE_RTOS || model == MODEL_HOMEKIT_LINUX) &&
-          !urlbase.empty() &&
-          isUuidValid(aExpectedUuid)) {
+      if (
+        aResponse.find("hue")!=string::npos && // the word "hue" must be contained, but no longer Philips (it's Signify now, who knows when they will change again...)
+        (model == MODEL_FREE_RTOS || model == MODEL_HOMEKIT_LINUX) &&
+        !urlbase.empty() &&
+        isUuidValid(aExpectedUuid)
+      ) {
         // create the base address for the API
         string url = urlbase + "api";
         if (refind) {
