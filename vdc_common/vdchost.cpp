@@ -337,7 +337,9 @@ void VdcHost::checkTimeOfDayChange()
     timeOfDayDiff = td; // first time
   }
   else {
-    if (abs(timeOfDayDiff-td)>5*Second) {
+    MLMicroSeconds d = timeOfDayDiff-td;
+    if (d<0) d = -d;
+    if (d>5*Second) {
       LOG(LOG_NOTICE, "*** Time-Of-Day has changed by %.f seconds", (double)(timeOfDayDiff-td)/Second);
       timeOfDayDiff = td;
       postEvent(vdchost_timeofday_changed);
