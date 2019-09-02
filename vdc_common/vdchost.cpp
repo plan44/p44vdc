@@ -90,8 +90,8 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   allowCloud(false),
   DsAddressable(this),
   collecting(false),
-  lastActivity(0),
-  lastPeriodicRun(0),
+  lastActivity(Never),
+  lastPeriodicRun(Never),
   learningMode(false),
   localDimDirection(0), // undefined
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
@@ -110,6 +110,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
     localController = LocalControllerPtr(new LocalController(*this));
   }
   #endif
+  // initialize real time jump detection as early as possible (to catch changes happening during initialisation)
+  timeOfDayDiff = Infinite;
+  checkTimeOfDayChange(); // will not post a event when timeOfDayDiff is Infinite
 }
 
 
@@ -160,9 +163,11 @@ void VdcHost::postEvent(VdchostEvent aEvent)
 {
   if (aEvent>=vdchost_redistributed_events) {
     // let all vdcs (and their devices) know
+    LOG(LOG_INFO, ">>> start sending global event %d to all vdcs", (int)aEvent);
     for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
       pos->second->handleGlobalEvent(aEvent);
     }
+    LOG(LOG_INFO, ">>> global event %d processed by all vdcs", (int)aEvent);
   }
   #if ENABLE_LOCALCONTROLLER
   if (localController) localController->processGlobalEvent(aEvent);
@@ -320,6 +325,26 @@ bool VdcHost::isNetworkConnected()
   }
   return networkConnected;
 }
+
+
+void VdcHost::checkTimeOfDayChange()
+{
+  struct tm lt;
+  MainLoop::getLocalTime(lt);
+  long long lm = ((((long long)lt.tm_year*366+lt.tm_yday)*24+lt.tm_hour)*60+lt.tm_min)*60+lt.tm_sec; // local time fingerprint (not monotonic, not accurate)
+  MLMicroSeconds td = MainLoop::now()-lm*Second;
+  if (timeOfDayDiff==Infinite) {
+    timeOfDayDiff = td; // first time
+  }
+  else {
+    if (abs(timeOfDayDiff-td)>5*Second) {
+      LOG(LOG_NOTICE, "*** Time-Of-Day has changed by %.f seconds", (double)(timeOfDayDiff-td)/Second);
+      timeOfDayDiff = td;
+      postEvent(vdchost_timeofday_changed);
+    }
+  }
+}
+
 
 
 
@@ -724,6 +749,8 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
     if (!collecting) {
       // re-check network connection, might cause re-collection in some vdcs
       isNetworkConnected();
+      // track time of day changes
+      checkTimeOfDayChange();
       // check again for devices that need to be announced
       startAnnouncing();
       // do a save run as well

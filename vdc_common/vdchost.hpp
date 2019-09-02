@@ -148,6 +148,8 @@ namespace p44 {
     MLMicroSeconds lastActivity;
     MLMicroSeconds lastPeriodicRun;
 
+    MLMicroSeconds timeOfDayDiff; ///< current difference of monotonic ML time and a pseudo local time to detect changes (TZ changes, NTP updates)
+
     int8_t localDimDirection;
 
     // learning
@@ -650,6 +652,7 @@ namespace p44 {
 
     // periodic task
     void periodicTask(MLMicroSeconds aNow);
+    void checkTimeOfDayChange();
 
     // getting MAC
     void getMyMac(StatusCB aCompletedCB, bool aFactoryReset);

@@ -283,7 +283,7 @@ void EvaluatorDevice::handleGlobalEvent(VdchostEvent aEvent)
   if (aEvent==vdchost_devices_initialized) {
     parseVarDefs();
   }
-  else if (aEvent==vdchost_network_reconnected) {
+  else if (aEvent==vdchost_network_reconnected || aEvent==vdchost_timeofday_changed) {
     // network coming up might change local time
     if (!valueParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway

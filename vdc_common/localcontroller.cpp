@@ -1114,7 +1114,7 @@ void Trigger::processGlobalEvent(VdchostEvent aActivity)
     // good chance we'll get everything resolved now
     parseVarDefs();
   }
-  else if (aActivity==vdchost_network_reconnected) {
+  else if (aActivity==vdchost_network_reconnected || aActivity==vdchost_timeofday_changed) {
     // network coming up might change local time
     if (!varParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway

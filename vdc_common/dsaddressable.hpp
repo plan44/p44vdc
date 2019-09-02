@@ -57,6 +57,7 @@ namespace p44 {
     vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
     vdchost_network_reconnected, ///< network connection established again
     vdchost_network_lost, ///< network connection was lost
+    vdchost_timeofday_changed, ///< real time of day has changed (TZ change, NTP update after reboot)
     vdchost_vdcapi_connected, ///< the VDC API is connected (to a vdsm using it)
     vdchost_vdcapi_disconnected, ///< the VDC API was disconnected
     vdchost_vdcs_initialized, ///< all vdcs are initialized now
