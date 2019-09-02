@@ -28,7 +28,7 @@
 
 #include "devicesettings.hpp"
 
-#if ENABLE_EXPRESSIONS && !defined(ENABLE_SCENE_SCRIPT)
+#if ENABLE_EXPRESSIONS && EXPRESSION_SCRIPT_SUPPORT && !defined(ENABLE_SCENE_SCRIPT)
   #define ENABLE_SCENE_SCRIPT 1
 #endif
 
