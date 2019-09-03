@@ -66,7 +66,7 @@ public:
     endSoftEdge(aEndSoftEdge)
   {
     setForegroundColor(black);
-    setBackgroundColor(black);
+    setBackgroundColor(transparent);
     PixelRect f = { aX, aY, aDx, aDy };
     setFrame(f);
     setFullFrameContent();
@@ -85,7 +85,7 @@ public:
   FeatureLightSpot(int aX, int aDx, int aY, int aDy)
   {
     setForegroundColor(black);
-    setBackgroundColor(black);
+    setBackgroundColor(transparent);
     PixelRect f = { aX, aY, aDx, aDy };
     setFrame(f);
     setFullFrameContent();
