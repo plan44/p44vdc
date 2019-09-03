@@ -112,8 +112,8 @@ double WindowEvaluator::evaluate()
   double result = 0;
   double divisor = 0;
   int count = 0;
+  MLMicroSeconds lastTs = Never;
   for (DataPointsList::iterator pos = dataPoints.begin(); pos != dataPoints.end(); ++pos) {
-    MLMicroSeconds lastTs = Never;
     switch (evalType) {
       case eval_max: {
         if (count==0 || pos->value>result) result = pos->value;
