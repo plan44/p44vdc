@@ -496,6 +496,7 @@ namespace p44 {
   private:
 
     void parseVarDefs();
+    void reCheckTimed();
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     void triggerEvaluationExecuted(ExpressionValue aEvaluationResult);
     void triggerActionExecuted(ExpressionValue aEvaluationResult);
@@ -565,6 +566,8 @@ namespace p44 {
     ZoneList localZones; ///< the locally used/defined zones
     SceneList localScenes; ///< the locally defined scenes
     TriggerList localTriggers; ///< the locally defined triggers
+
+    bool devicesReady; ///< set when vdchost reports devices initialized
 
   public:
 

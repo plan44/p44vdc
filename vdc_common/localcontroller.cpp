@@ -1101,8 +1101,8 @@ void Trigger::parseVarDefs()
     // schedule a re-parse later
     varParseTicket.executeOnce(boost::bind(&Trigger::parseVarDefs, this), REPARSE_DELAY);
   }
-  else {
-    // run an initial check now that all values are defined
+  else if (LocalController::sharedLocalController()->devicesReady) {
+    // do not run checks (and fire triggers too early) before devices are reported initialized
     checkAndFire(evalmode_initial);
   }
 }
@@ -1114,16 +1114,22 @@ void Trigger::processGlobalEvent(VdchostEvent aActivity)
     // good chance we'll get everything resolved now
     parseVarDefs();
   }
-  else if (aActivity==vdchost_network_reconnected || aActivity==vdchost_timeofday_changed) {
-    // network coming up might change local time
+  else if (aActivity==vdchost_timeofday_changed) {
+    // change in local time
     if (!varParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
       //   Otherwise: have condition re-evaluated (because it possibly contain references to local time)
-      varParseTicket.executeOnce(boost::bind(&Trigger::checkAndFire, this, evalmode_timed), REPARSE_DELAY);
+      varParseTicket.executeOnce(boost::bind(&Trigger::reCheckTimed, this), REPARSE_DELAY);
     }
   }
 }
 
+
+void Trigger::reCheckTimed()
+{
+  varParseTicket.cancel();
+  checkAndFire(evalmode_timed);
+}
 
 
 void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
@@ -1730,7 +1736,8 @@ void TriggerList::processGlobalEvent(VdchostEvent aActivity)
 // MARK: - LocalController
 
 LocalController::LocalController(VdcHost &aVdcHost) :
-  vdcHost(aVdcHost)
+  vdcHost(aVdcHost),
+  devicesReady(false)
 {
   localZones.isMemberVariable();
   localScenes.isMemberVariable();
@@ -1759,10 +1766,15 @@ void LocalController::signalActivity()
 
 void LocalController::processGlobalEvent(VdchostEvent aActivity)
 {
+  if (aActivity==vdchost_devices_initialized) {
+    // from now on, triggers can/should fire
+    devicesReady = true;
+  }
   if (aActivity>=vdchost_redistributed_events) {
     // only process events that should be redistributed to all objects
-    FOCUSLOG("processGlobalEvent: event = %d", (int)aActivity);
+    LOG(LOG_INFO, ">>> localcontroller starts processing global event %d", (int)aActivity);
     localTriggers.processGlobalEvent(aActivity);
+    LOG(LOG_INFO, ">>> localcontroller done processing event %d", (int)aActivity);
   }
 }
 

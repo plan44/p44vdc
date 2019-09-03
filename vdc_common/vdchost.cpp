@@ -163,11 +163,11 @@ void VdcHost::postEvent(VdchostEvent aEvent)
 {
   if (aEvent>=vdchost_redistributed_events) {
     // let all vdcs (and their devices) know
-    LOG(LOG_INFO, ">>> start sending global event %d to all vdcs", (int)aEvent);
+    LOG(LOG_INFO, ">>> vdcs start processing global event %d", (int)aEvent);
     for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
       pos->second->handleGlobalEvent(aEvent);
     }
-    LOG(LOG_INFO, ">>> global event %d processed by all vdcs", (int)aEvent);
+    LOG(LOG_INFO, ">>> vdcs done processing event %d", (int)aEvent);
   }
   #if ENABLE_LOCALCONTROLLER
   if (localController) localController->processGlobalEvent(aEvent);
