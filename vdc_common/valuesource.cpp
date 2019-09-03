@@ -209,7 +209,7 @@ bool ValueSourceMapper::valueLookup(ExpressionValue &aValue, const string aVarSp
     }
   }
   else {
-    aValue.setError(ExpressionError::NotFound, "Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
+    aValue.setSyntaxError("Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
     return true;
   }
   // no value (yet)
