@@ -180,7 +180,7 @@ namespace p44 {
     virtual bool isDeletable() const P44_OVERRIDE { return deletable; };
     virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return aMode==access_read ? needsReadPrep : needsWritePrep; };
     virtual bool wasCreatedNew() const P44_OVERRIDE { return createdNew; };
-};
+  };
 
 
 

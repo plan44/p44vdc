@@ -996,6 +996,9 @@ PropertyDescriptorPtr SceneList::getDescriptorByName(string aPropMatch, int &aSt
       descP->propertyFieldKey = si; // the scene's index
       p = descP;
     }
+    else {
+      delete descP;
+    }
   }
   return p;
 }
@@ -1696,6 +1699,9 @@ PropertyDescriptorPtr TriggerList::getDescriptorByName(string aPropMatch, int &a
       descP->propertyName = string_format("%d", trg->triggerId);
       descP->createdNew = true;
       p = descP;
+    }
+    else {
+      delete descP;
     }
   }
   return p;

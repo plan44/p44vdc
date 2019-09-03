@@ -1409,7 +1409,6 @@ bool EnOceanSecurity::AES128(const AES128Block &aKey, const AES128Block &aData, 
     if (EVP_EncryptUpdate (&ctx, pointer, &outlen, aData, AES128BlockLen)) {
       pointer += outlen;
       if (EVP_EncryptFinal_ex(&ctx, pointer, &outlen)) {
-        pointer += outlen;
         return true;
       }
       else {
