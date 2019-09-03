@@ -1628,7 +1628,7 @@ private:
       b = (*aBank0Data)[i].b;
       if (b!=0xFF) allFF = false;
       if ((*aBank0Data)[i].no) b = 0; // consider missing bytes as zeroes
-      deviceInfo->serialNo = (deviceInfo->serialNo << 8) + (*aBank0Data)[i].b;
+      deviceInfo->serialNo = (deviceInfo->serialNo << 8) + b;
     }
     if (allFF) deviceInfo->serialNo = 0; // all FF means no serial number
     // now some more plausibility checks at the GTIN/serial level
