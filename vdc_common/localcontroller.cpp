@@ -1221,6 +1221,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
     if (aArgs.size()>ai) {
       if (aArgs[ai].notValue()) return errorInArg(aArgs[ai], aResult); // return error/null from argument
       transitionTime = aArgs[ai].numValue()*Second;
+      if (transitionTime<0) transitionTime = Infinite; // use default
       ai++;
       if (aArgs.size()>ai) {
         if (aArgs[ai].notValue()) return errorInArg(aArgs[ai], aResult); // return error/null from argument
@@ -1247,6 +1248,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       if (!aArgs[2].isNull()) {
         if (aArgs[2].notValue()) return errorInArg(aArgs[2], aResult); // return error/null from argument
         transitionTime = aArgs[2].numValue()*Second;
+        if (transitionTime<0) transitionTime = Infinite; // use default
       }
     }
     // - optional channelid
