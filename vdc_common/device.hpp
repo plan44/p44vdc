@@ -770,6 +770,7 @@ namespace p44 {
     bool checkForReapply();
     void forkDoneCB(SimpleCB aOriginalCB, SimpleCB aNewCallback);
     void configurationPrepared(StatusCB aPreparedCB);
+    void syncedChannels(VdcApiRequestPtr aRequest);
 
   };
 

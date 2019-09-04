@@ -724,10 +724,21 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
     stopSceneActions();
     respErr = Error::ok();
   }
+  else if (aMethod=="x-p44-syncChannels") {
+    requestUpdatingChannels(boost::bind(&Device::syncedChannels, this, aRequest));
+    return ErrorPtr(); // no response now
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
   return respErr;
+}
+
+
+void Device::syncedChannels(VdcApiRequestPtr aRequest)
+{
+  // confirm channels synced
+  aRequest->sendResult(ApiValuePtr());
 }
 
 
@@ -1062,7 +1073,9 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 
 // MARK: - high level serialized hardware access
 
-#define SERIALIZER_WATCHDOG 1
+#ifndef SERIALIZER_WATCHDOG
+  #define SERIALIZER_WATCHDOG 1
+#endif
 #define SERIALIZER_WATCHDOG_TIMEOUT (20*Second)
 
 void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForDimming, bool aModeChange)
@@ -1227,11 +1240,6 @@ void Device::applyingChannelsComplete()
 
 
 
-/// request that channel values are updated by reading them back from the device's hardware
-/// @param aUpdatedOrCachedCB will be called when values are updated with actual hardware values
-///   or pending values are in process to be applied to the hardware and thus these cached values can be considered current.
-/// @note this method is only called at startup and before saving scenes to make sure changes done to the outputs directly (e.g. using
-///   a direct remote control for a lamp) are included. Just reading a channel state does not call this method.
 void Device::requestUpdatingChannels(SimpleCB aUpdatedOrCachedCB)
 {
   AFOCUSLOG("requestUpdatingChannels entered");

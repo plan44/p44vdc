@@ -52,7 +52,7 @@ namespace p44 {
 
   private:
 
-    void channelsApplied();
+    void channelOpComplete();
 
   };
 

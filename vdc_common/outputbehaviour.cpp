@@ -427,7 +427,12 @@ bool SceneScriptContext::evaluateAsyncFunction(const string &aFunc, const Functi
 {
   if (aFunc=="applychannels" && aArgs.size()==0) {
     SALOG(output.device, LOG_INFO, "scene script: applychannels() requests applying channels now");
-    output.device.requestApplyingChannels(boost::bind(&SceneScriptContext::channelsApplied, this), false);
+    output.device.requestApplyingChannels(boost::bind(&SceneScriptContext::channelOpComplete, this), false);
+    aNotYielded = false; // yielded execution
+  }
+  else if (aFunc=="syncchannels" && aArgs.size()==0) {
+    SALOG(output.device, LOG_INFO, "scene script: syncchannels() requests updating channels from device");
+    output.device.requestUpdatingChannels(boost::bind(&SceneScriptContext::channelOpComplete, this));
     aNotYielded = false; // yielded execution
   }
   else {
@@ -437,9 +442,9 @@ bool SceneScriptContext::evaluateAsyncFunction(const string &aFunc, const Functi
 }
 
 
-void SceneScriptContext::channelsApplied()
+void SceneScriptContext::channelOpComplete()
 {
-  SALOG(output.device, LOG_INFO, "scene script: applychannels() complete");
+  SALOG(output.device, LOG_INFO, "scene script: channel operation complete");
   ExpressionValue res;
   continueWithAsyncFunctionResult(res);
 }
