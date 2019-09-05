@@ -194,7 +194,7 @@ namespace p44 {
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
     void channelValuesSent(LightBehaviourPtr aColorLightBehaviour, SimpleCB aDoneCB, JsonObjectPtr aResult, ErrorPtr aError);
     void channelValuesReceived(SimpleCB aDoneCB, JsonObjectPtr aDeviceInfo, ErrorPtr aError);
-    bool applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway);
+    bool applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway, MLMicroSeconds &aTransitionTime);
     void reapplyTimerHandler();
     void parseLightState(JsonObjectPtr aDeviceInfo);
 

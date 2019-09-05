@@ -328,11 +328,12 @@ void HueDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   reapplyTicket.cancel();
   reapplyCount = 0;
-  if (applyLightState(aDoneCB, aForDimming, false)) {
+  MLMicroSeconds tt = 0; // none so far
+  if (applyLightState(aDoneCB, aForDimming, false, tt)) {
     // actually applied something, schedule reapply if enabled and not dimming
     if (!aForDimming && reapplyMode!=reapply_none) {
-      // initially re-apply shortly after
-      reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), INITIAL_REAPPLY_DELAY);
+      // initially re-apply shortly after, but not before transition time is over
+      reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), tt>INITIAL_REAPPLY_DELAY ? tt : INITIAL_REAPPLY_DELAY);
     }
   }
 }
@@ -344,7 +345,8 @@ void HueDevice::reapplyTimerHandler()
   reapplyTicket = 0;
   reapplyCount++;
   ALOG(reapplyCount>1 ? LOG_DEBUG : LOG_INFO, "Re-applying values to hue (%d. time) to make sure light actually is udpated", reapplyCount);
-  applyLightState(NULL, false, true);
+  MLMicroSeconds tt = 0; // none so far
+  applyLightState(NULL, false, true, tt);
   if (reapplyMode==reapply_periodic) {
     // re-apply periodically -> schedule next
     reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), PERIODIC_REAPPLY_INTERVAL);
@@ -354,13 +356,13 @@ void HueDevice::reapplyTimerHandler()
 
 
 
-bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway)
+bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway, MLMicroSeconds &aTransitionTime)
 {
   // Update of light state needed
+  aTransitionTime = 0; // none so far
   LightBehaviourPtr l = getOutput<LightBehaviour>();
   if (l) {
-    MLMicroSeconds transitionTime = 0; // undefined so far
-    if (!aAnyway && !needsToApplyChannels(&transitionTime)) {
+    if (!aAnyway && !needsToApplyChannels(&aTransitionTime)) {
       // NOP for this call
       channelValuesSent(l, aDoneCB, JsonObjectPtr(), ErrorPtr());
       return false; // no changes
@@ -433,7 +435,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
     }
     // show what we are doing
     if (LOGENABLED(LOG_INFO) && (!aForDimming || LOGENABLED(LOG_DEBUG))) {
-      ALOG(LOG_INFO, "sending new light state: light is %s, brightness=%0.0f, transition in %d mS", lightIsOn ? "ON" : "OFF", l->brightness->getChannelValue(), (int)(transitionTime/MilliSecond));
+      ALOG(LOG_INFO, "sending new light state: light is %s, brightness=%0.0f, transition in %d mS", lightIsOn ? "ON" : "OFF", l->brightness->getChannelValue(), (int)(aTransitionTime/MilliSecond));
       if (cl) {
         switch (cl->colorMode) {
           case colorLightModeHueSaturation:
@@ -452,7 +454,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
       }
     }
     // use transition time from (1/10 = 100mS second resolution)
-    newState->add("transitiontime", JsonObject::newInt64(transitionTime/(100*MilliSecond)));
+    newState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
     hueComm().apiAction(httpMethodPUT, url.c_str(), newState, boost::bind(&HueDevice::channelValuesSent, this, l, aDoneCB, _1, _2));
   }
   return true;
