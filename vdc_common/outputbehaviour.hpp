@@ -267,11 +267,10 @@ namespace p44 {
     /// @}
 
     /// get transition time in microseconds from given scene effect
-    /// @param aEffect the scene effect
-    /// @param aEffectParam parameter for the effect (standard dS scenes do not have it)
+    /// @param aScene the scene
     /// @param aDimUp true when dimming up, false when dimming down
-    /// @return 0 if no transition time known for the given effect parameters
-    virtual MLMicroSeconds transitionTimeFromSceneEffect(VdcSceneEffect aEffect, uint32_t aEffectParam, bool aDimUp);
+    /// @return 0 if no transition time is set for the scene
+    virtual MLMicroSeconds transitionTimeFromScene(DsScenePtr aScene, bool aDimUp);
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs

@@ -168,7 +168,7 @@ void LightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     Brightness b = lightScene->value;
     VdcSceneEffect e = lightScene->effect;
     uint32_t ep = lightScene->effectParam;
-    brightness->setChannelValueIfNotDontCare(lightScene, b, transitionTimeFromSceneEffect(e, ep, true), transitionTimeFromSceneEffect(e, ep, false), true);
+    brightness->setChannelValueIfNotDontCare(lightScene, b, transitionTimeFromScene(lightScene, true), transitionTimeFromScene(lightScene, false), true);
   }
   else {
     // only if not light scene, use default loader
@@ -211,18 +211,21 @@ static MLMicroSeconds transitionTimeFromDimTime(uint8_t aDimTime)
 }
 
 
-MLMicroSeconds LightBehaviour::transitionTimeFromSceneEffect(VdcSceneEffect aEffect, uint32_t aEffectParam, bool aDimUp)
+MLMicroSeconds LightBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool aDimUp)
 {
   uint8_t dimTimeIndex;
-  switch (aEffect) {
-    case scene_effect_smooth :
-      dimTimeIndex = 0; break;
-    case scene_effect_slow :
-      dimTimeIndex = 1; break;
-    case scene_effect_custom :
-      dimTimeIndex = 2; break;
-    default:
-      return inherited::transitionTimeFromSceneEffect(aEffect, aEffectParam, aDimUp);
+  SimpleScenePtr ssc = boost::dynamic_pointer_cast<SimpleScene>(aScene);
+  if (ssc) {
+    switch (ssc->effect) {
+      case scene_effect_smooth :
+        dimTimeIndex = 0; break;
+      case scene_effect_slow :
+        dimTimeIndex = 1; break;
+      case scene_effect_custom :
+        dimTimeIndex = 2; break;
+      default:
+        return inherited::transitionTimeFromScene(aScene, aDimUp);
+    }
   }
   // dimTimeIndex found, look up actual time
   return transitionTimeFromDimTime(aDimUp ? dimTimeUp[dimTimeIndex] : dimTimeDown[dimTimeIndex]);
@@ -249,7 +252,7 @@ void LightBehaviour::onAtMinBrightness(DsScenePtr aScene)
       // - load scene values for channels
       loadChannelsFromScene(lightScene); // Note: causes log message because channel is set to new value
       // - override brightness with minDim
-      brightness->setChannelValue(brightness->getMinDim(), transitionTimeFromSceneEffect(lightScene->effect, lightScene->effectParam, true));
+      brightness->setChannelValue(brightness->getMinDim(), transitionTimeFromScene(lightScene, true));
     }
   }
 }

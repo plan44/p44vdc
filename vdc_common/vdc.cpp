@@ -675,6 +675,10 @@ void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDel
   else {
     ALOG(LOG_WARNING, "Creating or updating native action has failed: %s", Error::text(aError));
   }
+  // release anything left from preparation now
+  for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+    (*pos)->releasePreparedOperation();
+  }
   if (LOGENABLED(LOG_INFO) && optimizerMode>opt_disabled) {
     // show current statistics
     optimizerCacheStats(aEntry);

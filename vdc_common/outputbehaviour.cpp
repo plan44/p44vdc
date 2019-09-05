@@ -388,23 +388,26 @@ void OutputBehaviour::channelValuesCaptured(DsScenePtr aScene, bool aFromDevice,
 }
 
 
-MLMicroSeconds OutputBehaviour::transitionTimeFromSceneEffect(VdcSceneEffect aEffect, uint32_t aEffectParam, bool aDimUp)
+MLMicroSeconds OutputBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool aDimUp)
 {
-  switch (aEffect) {
-    // Note: light scenes have their own timing for these, here we just return the defaults
-    // - smooth = 100mS
-    // - slow   = 1min (60800mS)
-    // - custom = 5sec
-    case scene_effect_smooth :
-      return 100*MilliSecond;
-    case scene_effect_slow :
-      return 1*Minute;
-    case scene_effect_custom :
-      return 5*Second;
-    case scene_effect_transition:
-      return aEffectParam*MilliSecond; // transition time is just the effect param (in milliseconds)
-    default:
-      break;
+  SimpleScenePtr ssc = boost::dynamic_pointer_cast<SimpleScene>(aScene);
+  if (ssc) {
+    switch (ssc->effect) {
+      // Note: light scenes have their own timing for these, here we just return the defaults
+      // - smooth = 100mS
+      // - slow   = 1min (60800mS)
+      // - custom = 5sec
+      case scene_effect_smooth :
+        return 100*MilliSecond;
+      case scene_effect_slow :
+        return 1*Minute;
+      case scene_effect_custom :
+        return 5*Second;
+      case scene_effect_transition:
+        return ssc->effectParam*MilliSecond; // transition time is just the effect param (in milliseconds)
+      default:
+        break;
+    }
   }
   return 0; // no known effect -> just return 0 for transition time
 }

@@ -1120,10 +1120,7 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
         if (dev && dev->daliController) {
-          LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
-          if (l) {
-            dev->daliController->setTransitionTime(l->transitionTimeToNewBrightness());
-          }
+          dev->daliController->setTransitionTime(dev->transitionTimeForPreparedScene(true)); // including override value
         }
       }
       // Broadcast scene call: DALICMD_GO_TO_SCENE

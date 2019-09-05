@@ -201,10 +201,10 @@ bool HueDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliverySta
 {
   // in general, we don't optimize for APIs before 1.11
   if (!hueVdc().has_1_11_api) return false;
-  // TODO: we only optimize scenes for now, not dimming
   if (aDeliveryState->optimizedType==ntfy_callscene) {
-    // scenes are generally optimizable
-    return true;
+    // scenes are generally optimizable, unless there is a transition time override
+    // TODO: remove the condition once hue bridge allows overriding scene transition times
+    return transitionTimeOverride()==Infinite;
   }
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
     // only brightness, saturation and hue dimming is optimizable for now
@@ -453,7 +453,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
         }
       }
     }
-    // use transition time from (1/10 = 100mS second resolution)
+    // use transition time from (1/10 = 100mS resolution)
     newState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
     hueComm().apiAction(httpMethodPUT, url.c_str(), newState, boost::bind(&HueDevice::channelValuesSent, this, l, aDoneCB, _1, _2));
   }

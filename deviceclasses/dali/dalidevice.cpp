@@ -1516,8 +1516,7 @@ bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStat
   // check notification-specific conditions
   if (aDeliveryState->optimizedType==ntfy_callscene) {
     // scenes are generally optimizable unless transition time is really slow and must be executed in multiple steps
-    LightBehaviourPtr l = getOutput<LightBehaviour>();
-    if (l) return l->transitionTimeToNewBrightness()<=MAX_SINGLE_STEP_TRANSITION_TIME;
+    return transitionTimeForPreparedScene(true)<=MAX_SINGLE_STEP_TRANSITION_TIME;
   }
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
     // only brightness dimming optimizable for now

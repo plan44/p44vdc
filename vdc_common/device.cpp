@@ -1025,6 +1025,13 @@ void Device::executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatTo
 }
 
 
+void Device::releasePreparedOperation()
+{
+  preparedScene.reset();
+  preparedTransitionOverride = Infinite; // none
+}
+
+
 bool Device::updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bool aForOptimisation)
 {
   if (aDeliveryState->optimizedType==ntfy_callscene) {
@@ -1683,12 +1690,25 @@ void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
 }
 
 
+MLMicroSeconds Device::transitionTimeForPreparedScene(bool aIncludingOverride)
+{
+  MLMicroSeconds tt = 0;
+  if (preparedScene) {
+    if (aIncludingOverride && preparedTransitionOverride!=Infinite) {
+      tt = preparedTransitionOverride;
+    }
+    else if (output) {
+      tt = output->transitionTimeFromScene(preparedScene, true);
+    }
+  }
+  return tt;
+}
+
 
 void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
   if (preparedScene) {
     DsScenePtr scene = preparedScene;
-    preparedScene.reset();
     // apply scene logically
     if (output->applySceneToChannels(scene, preparedTransitionOverride)) {
       // prepare for apply (but do NOT yet apply!) on device hardware level)
