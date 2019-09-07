@@ -45,6 +45,7 @@ namespace p44 {
       lighttype_unknown,
       lighttype_simplearea,
       lighttype_lightspot,
+      lighttype_flexview
     } LightType;
 
     LightType lightType; ///< type of light
@@ -133,6 +134,7 @@ namespace p44 {
   private:
 
     virtual void applyChannelValueSteps(bool aForDimming, double aStepSize);
+    bool viewCfgSubstLookup(const string &aName, ExpressionValue &aResult);
 
   };
   typedef boost::intrusive_ptr<LedChainDevice> LedChainDevicePtr;

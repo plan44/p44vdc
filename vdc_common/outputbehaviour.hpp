@@ -42,8 +42,6 @@ namespace p44 {
 
     SceneScriptContext(OutputBehaviour &aOutput, const GeoLocation* aGeoLocationP);
 
-  protected:
-
     /// evaluation of synchronously implemented functions which immediately return a result
     virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
 
@@ -71,11 +69,14 @@ namespace p44 {
     /// channels
     ChannelBehaviourVector channels;
 
+  public:
+    
     #if ENABLE_SCENE_SCRIPT
     SceneScriptContext sceneScriptContext; ///< script context to run scene scripts
     #endif
 
   protected:
+
 
     /// @name hardware derived parameters (constant during operation)
     /// @{

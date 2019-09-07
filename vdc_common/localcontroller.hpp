@@ -419,13 +419,13 @@ namespace p44 {
     /// abort action
     virtual bool abort(bool aDoCallBack = true) P44_OVERRIDE;
 
-  protected:
-
     /// lookup variables by name
     virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
 
     /// evaluation of synchronously implemented functions which immediately return a result
     virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
+
+  protected:
 
     /// evaluation of asynchronously implemented functions which may yield execution and resume later
     bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;

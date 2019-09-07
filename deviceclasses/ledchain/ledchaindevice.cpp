@@ -36,6 +36,9 @@
 #include "lightbehaviour.hpp"
 #include "movinglightbehaviour.hpp"
 
+#if ENABLE_VIEWCONFIG
+#include "viewfactory.hpp"
+#endif
 
 using namespace p44;
 
@@ -120,6 +123,39 @@ typedef boost::intrusive_ptr<FeatureLightSpot> FeatureLightSpotPtr;
 
 
 
+// MARK: - FlexViewLight
+
+class FlexViewLight : public ViewStack
+{
+
+public:
+
+  FlexViewLight(int aX, int aDx, int aY, int aDy, const char* aViewConfig)
+  {
+    setForegroundColor(black);
+    setBackgroundColor(transparent);
+    PixelRect f = { aX, aY, aDx, aDy };
+    setFrame(f);
+    setFullFrameContent();
+    setPosition(50, 50); // middle
+  }
+
+
+  void setPosition(double aRelX, double aRelY)
+  {
+    // movement area is 2 times the frame, so light can be moved out completely out of the frame in both directions
+    // This means light center appears at left/bottom edge at 0.25 and disappears at right/top edge at 0.75
+    PixelRect f = getContent();
+    f.x = (int)(-frame.dx/2+frame.dx*aRelX*0.02);
+    f.y = (int)(-frame.dy/2+frame.dy*aRelY*0.02);
+    setContent(f);
+  }
+
+};
+typedef boost::intrusive_ptr<FlexViewLight> FlexViewLightPtr;
+
+
+
 
 
 
@@ -134,15 +170,16 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   //   Note: uniqueid can be any unique string to derive a dSUID from, or a valid dSUID to be used as-is
   // where:
   // - with lighttype=segment
-  //   - aX,aDx,aY,aDY determine the size of the segment (view)
+  //   - aX,aDx,aY,aDY determine the position and size (=frame) of the segment (view)
   //   - config=b:e
-  //     - id: optional unique id identifying the light, must start with non-numeric, if set, determines the dSUID
   //     - b:0..n size of softedge at beginning
   //     - e:0..n size of softedge at end
   // - with lighttype=lightspot
-  //   - aX,aY determine the (initial) center of the light field
-  //   - aDx,aDy determine the (initial) diameter of the light field
+  //   - aX,aDx,aY,aDY determine the position and size (=frame) of the light spot
   //   - config=<none yet>
+  // - with lighttype=flexview
+  //   - aX,aDx,aY,aDY determine the position and size (=frame) of the viewstack that represents the flex view
+  //   - config=JSON string or resource file to load
   // evaluate config
   string config = aDeviceConfig;
   string lt, s;
@@ -186,6 +223,30 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
       lightView = FeatureLightSpotPtr(new FeatureLightSpot(aX, aDx, aY, aDy));
       configOK = true;
     }
+    #if ENABLE_VIEWCONFIG
+    else if (lt=="flexview") {
+      // flexible light, based on p44lrgraphics view configurable via JSON file or string
+      lightType = lighttype_flexview;
+      installSettings(DeviceSettingsPtr(new MovingLightDeviceSettings(*this)));
+      behaviour = MovingLightBehaviourPtr(new MovingLightBehaviour(*this, false));
+      lightView = FlexViewLightPtr(new FlexViewLight(aX, aDx, aY, aDy, p));
+      JsonObjectPtr cfg;
+      ErrorPtr err;
+      if (*p=='{') {
+        cfg = JsonObject::objFromText(p, -1, &err);
+      }
+      else if (*p) {
+        cfg = JsonObject::objFromFile(Application::sharedApplication()->resourcePath(p).c_str(), &err);
+      }
+      if (Error::isOK(err)) {
+        err = lightView->configureView(cfg);
+      }
+      if (Error::notOK(err)) {
+        ALOG(LOG_WARNING, "Invalid flexview config: %s", err->text());
+      }
+      configOK = true;
+    }
+    #endif
   }
   if (!configOK) {
     ALOG(LOG_ERR, "invalid LedChain device config: %s", aDeviceConfig.c_str());
@@ -195,6 +256,13 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
     behaviour = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
+  }
+  if (lightView) {
+    // add function to allow view manipulation via scripts
+    ValueLookupCB vl = boost::bind(&LedChainDevice::viewCfgSubstLookup, this, _1, _2);
+    behaviour->sceneScriptContext.registerFunctionHandler(
+      boost::bind(&p44::evaluateViewFunctions, _1, _2, _3, _4, lightView, vl)
+    );
   }
   // - is RGB
   colorClass = class_yellow_light;
@@ -217,6 +285,12 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     ii += uniqueId;
     dSUID.setNameInSpace(ii, vdcNamespace);
   }
+}
+
+
+bool LedChainDevice::viewCfgSubstLookup(const string &aName, ExpressionValue &aResult)
+{
+  return getOutput()->sceneScriptContext.EvaluationContext::valueLookup(aName, aResult);
 }
 
 
@@ -291,12 +365,15 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
 {
   // RGB or RGBW dimmer
   RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
+  MovingLightBehaviourPtr ml = getOutput<MovingLightBehaviour>();
   FeatureLightBehaviourPtr fl = getOutput<FeatureLightBehaviour>();
   bool moreSteps = cl->colorTransitionStep(aStepSize);
   if (cl->brightnessTransitionStep(aStepSize)) moreSteps = true;
-  if (fl) {
-    if (fl->positionTransitionStep(aStepSize)) moreSteps = true;
-    if (fl->featureTransitionStep(aStepSize)) moreSteps = true;
+  if (ml) {
+    if (ml->positionTransitionStep(aStepSize)) moreSteps = true;
+    if (fl) {
+      if (fl->featureTransitionStep(aStepSize)) moreSteps = true;
+    }
   }
   // RGB light, get basic color
   FOCUSLOG("Ledchain: brightness = %f, hue=%f, saturation=%f", cl->brightness->getTransitionalValue(), cl->hue->getTransitionalValue(), cl->saturation->getTransitionalValue());
@@ -313,7 +390,8 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   pix.r = r;
   pix.g = g;
   pix.b = b;
-  pix.a = cl->brightnessForHardware()*getLedChainVdc().ledArrangement.getMaxOutValue()/100; // alpha is brightness, scaled down to maxOutValue
+  pix.a = 255;
+  lightView->setAlpha(cl->brightnessForHardware()*getLedChainVdc().ledArrangement.getMaxOutValue()/100); // alpha is brightness, scaled down to maxOutValue
   // possibly with extended features
   if (fl) {
     FeatureLightSpotPtr fls = boost::dynamic_pointer_cast<FeatureLightSpot>(lightView);
@@ -334,6 +412,12 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   }
   else {
     lightView->setForegroundColor(pix);
+    if (ml) {
+      FlexViewLightPtr fvl = boost::dynamic_pointer_cast<FlexViewLight>(lightView);
+      if (fvl) {
+        fvl->setPosition(ml->horizontalPosition->getTransitionalValue(), ml->verticalPosition->getTransitionalValue());
+      }
+    }
   }
   getLedChainVdc().ledArrangement.render(); // update
   // next step
@@ -359,6 +443,8 @@ string LedChainDevice::modelName()
     return "Static LED Matrix Area";
   else if (lightType==lighttype_lightspot)
     return "Moving Light on LED Matrix";
+  else if (lightType==lighttype_flexview)
+    return "P44View on LED Matrix";
   return "LedChain device";
 }
 
