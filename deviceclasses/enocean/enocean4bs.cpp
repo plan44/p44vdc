@@ -675,25 +675,25 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   // - with humidity
   { 29, 0x00A50401, 0, indoorText, NULL },
   { 29, 0x01A50401, 0, outdoorText, NULL },
-  { 29, 0x00A50402, 0, outdoorText, NULL }, // outdoor is default!
-  { 29, 0x01A50402, 0, indoorText, NULL },
-  { 30, 0x00A50403, 0, outdoorText, NULL }, // outdoor is default!
-  { 30, 0x01A50403, 0, indoorText, NULL },
+  { 30, 0x00A50402, 0, outdoorText, NULL }, // outdoor is default!
+  { 30, 0x01A50402, 0, indoorText, NULL },
+  { 31, 0x00A50403, 0, outdoorText, NULL }, // outdoor is default!
+  { 31, 0x01A50403, 0, indoorText, NULL },
   // heating valve alternatives
-  { 31, 0x00A52004, 0, "heating valve", NULL },
-  { 31, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
+  { 32, 0x00A52004, 0, "heating valve", NULL },
+  { 32, 0x01A52004, 0, "heating valve (with sensors and setpoint)", NULL },
   // A5-14-09 reverse mount alternative
-  { 32, 0x00A51409, 0, "window state - regular mounting position", NULL },
-  { 32, 0x01A51409, 0, "window state - upside down mounting position", NULL },
+  { 33, 0x00A51409, 0, "window state - regular mounting position", NULL },
+  { 33, 0x01A51409, 0, "window state - upside down mounting position", NULL },
   // A5-14-0A reverse mount alternative
-  { 33, 0x00A5140A, 0, "window state - regular mounting position", NULL },
-  { 33, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
+  { 34, 0x00A5140A, 0, "window state - regular mounting position", NULL },
+  { 34, 0x01A5140A, 0, "window state - upside down mounting position", NULL },
   // A5-08-01 generic and Eltako versions
-  { 34, 0x00A50801, 0, "standard EEP", NULL },
-  { 34, 0x01A50801, 0, "Eltako modified version (no temp/presence, extended lux range)", NULL },
+  { 35, 0x00A50801, 0, "standard EEP", NULL },
+  { 35, 0x01A50801, 0, "Eltako modified version (no temp/presence, extended lux range)", NULL },
   // A5-3F-7F manufacturer specific
-  { 35, 0x00A53F7F, 0, "undefined", NULL },
-  { 35, 0x01A53F7F, 0, "Thermokon SR65 3AI - 3*0..10V analog inputs", NULL },
+  { 36, 0x00A53F7F, 0, "undefined", NULL },
+  { 36, 0x01A53F7F, 0, "Thermokon SR65 3AI - 3*0..10V analog inputs", NULL },
   { 0, 0, 0, NULL, NULL } // terminator
 };
 
