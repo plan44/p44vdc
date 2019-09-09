@@ -144,12 +144,12 @@ public:
 
   void setPosition(double aRelX, double aRelY)
   {
-    // movement range is 2 times the CONTENT size, so light can be moved out completely out of sight in both directions
+    // movement range is 2 times of max(content, frame) size, so light can be moved out completely out of sight in both directions
     // This means light edge disappears to the left at 0% and to the right at 100%, latest
     // (however, wrapping content will NOT disappear, just show the next wrap)
     PixelRect f = getContent();
-    f.x = (int)((aRelX-50)/50*f.dx);
-    f.y = (int)((aRelY-50)/50*f.dy);
+    f.x = (int)((aRelX-50)/50*max(f.dx,frame.dx));
+    f.y = (int)((aRelY-50)/50*max(f.dy,frame.dy));
     setContent(f);
   }
 
@@ -412,14 +412,18 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       fls->setWrapMode((mode & 0x02000000)==0 ? P44View::clipXY : 0);
     }
   }
-  else {
-    lightView->setForegroundColor(pix);
-    if (ml) {
-      FlexViewLightPtr fvl = boost::dynamic_pointer_cast<FlexViewLight>(lightView);
-      if (fvl) {
-        fvl->setPosition(ml->horizontalPosition->getTransitionalValue(), ml->verticalPosition->getTransitionalValue());
-      }
+  else if (ml) {
+    FlexViewLightPtr fvl = boost::dynamic_pointer_cast<FlexViewLight>(lightView);
+    if (fvl) {
+      fvl->setPosition(ml->horizontalPosition->getTransitionalValue(), ml->verticalPosition->getTransitionalValue());
+      // set color of the LIGHT view (if any)
+      P44ViewPtr v = fvl->getView("LIGHT");
+      if (v) v->setForegroundColor(pix);
     }
+  }
+  else {
+    // simple area, just set foreground color
+    lightView->setForegroundColor(pix);
   }
   getLedChainVdc().ledArrangement.render(); // update
   // next step
