@@ -99,8 +99,9 @@ public:
 
   void setPosition(double aRelX, double aRelY)
   {
-    // movement area is 2 times the frame, so light can be moved out completely out of the frame in both directions
-    // This means light center appears at left/bottom edge at 0.25 and disappears at right/top edge at 0.75
+    // movement range for the center is 2 times the frame, so light can
+    // be moved out completely out of the frame in both directions (1/2 frame)
+    // This means light CENTER appears at left/bottom edge at 0.25 and disappears at right/top edge at 0.75
     setCenter({
       (int)(-frame.dx/2+frame.dx*aRelX*0.02),
       (int)(-frame.dy/2+frame.dy*aRelY*0.02),
@@ -143,11 +144,12 @@ public:
 
   void setPosition(double aRelX, double aRelY)
   {
-    // movement area is 2 times the frame, so light can be moved out completely out of the frame in both directions
-    // This means light center appears at left/bottom edge at 0.25 and disappears at right/top edge at 0.75
+    // movement range is 2 times the CONTENT size, so light can be moved out completely out of sight in both directions
+    // This means light edge disappears to the left at 0% and to the right at 100%, latest
+    // (however, wrapping content will NOT disappear, just show the next wrap)
     PixelRect f = getContent();
-    f.x = (int)(-frame.dx/2+frame.dx*aRelX*0.02);
-    f.y = (int)(-frame.dy/2+frame.dy*aRelY*0.02);
+    f.x = (int)((aRelX-50)/50*f.dx);
+    f.y = (int)((aRelY-50)/50*f.dy);
     setContent(f);
   }
 
