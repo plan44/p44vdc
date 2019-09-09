@@ -44,8 +44,7 @@ namespace p44 {
     typedef enum {
       lighttype_unknown,
       lighttype_simplearea,
-      lighttype_lightspot,
-      lighttype_flexview
+      lighttype_feature
     } LightType;
 
     LightType lightType; ///< type of light
