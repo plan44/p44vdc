@@ -366,7 +366,7 @@ void FeatureLightScene::setDefaultSceneValues(SceneNo aSceneNo)
   brightnessGradient = DEFAULT_BRIGHTNESS_GRADIENT;
   hueGradient = DEFAULT_HUE_GRADIENT;
   saturationGradient = DEFAULT_SATURATION_GRADIENT;
-  featureMode = DEFAULT_FEATURE_MODE; // linear, oscillating
+  featureMode = DEFAULT_FEATURE_MODE;
   // set dontcare flags
   FeatureLightBehaviourPtr featureLightBehaviour = boost::dynamic_pointer_cast<FeatureLightBehaviour>(getOutputBehaviour());
   if (featureLightBehaviour) {

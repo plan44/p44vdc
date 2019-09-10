@@ -351,7 +351,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
           fl->saturationGradient->getTransitionalValue()/100, (mode>>16) & 0xFF,
           (mode & 0x01000000)==0 // not radial
         );
-        cev->setWrapMode((mode & 0x02000000)==0 ? P44View::clipXY : 0);
+        cev->setWrapMode((cev->getWrapMode()&~P44View::clipMask) | ((mode & 0x02000000)==0 ? P44View::clipXY : 0));
       }
       else {
         // not a ColorEffectView, just set foreground color
