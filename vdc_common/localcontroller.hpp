@@ -429,6 +429,7 @@ namespace p44 {
 
     /// evaluation of asynchronously implemented functions which may yield execution and resume later
     bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
+    void triggerFuncExecuted(ExpressionValue aEvaluationResult);
 
   };
 
@@ -468,7 +469,7 @@ namespace p44 {
     void processGlobalEvent(VdchostEvent aActivity);
 
     /// execute the trigger actions
-    bool executeActions(bool aAsynchronously, EvaluationResultCB aCallback = NULL);
+    bool executeActions(EvaluationResultCB aCallback = NULL);
 
     /// stop running trigger actions
     void stopActions();
@@ -538,6 +539,11 @@ namespace p44 {
     /// @return trigger or NULL if not found (and none created)
     TriggerPtr getTrigger(int aTriggerId, bool aCreateNewIfNotExisting = false, size_t *aTriggerIndexP = NULL);
 
+    /// get trigger by name
+    /// @param aTriggerName a user-assigned scene name to look for
+    /// @return trigger or NULL if none with this name is found
+    TriggerPtr getTriggerByName(const string aTriggerName);
+
   protected:
 
     // property access implementation
@@ -559,6 +565,7 @@ namespace p44 {
     typedef PropertyContainer inherited;
     friend class ZoneDescriptor;
     friend class Trigger;
+    friend class TriggerList;
     friend class TriggerActionContext;
 
     VdcHost &vdcHost; ///< local reference to vdc host

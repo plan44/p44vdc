@@ -1085,8 +1085,19 @@ void Trigger::triggerEvaluationExecuted(ExpressionValue aEvaluationResult)
       // a trigger fire is an activity
       LocalController::sharedLocalController()->signalActivity();
       // trigger when state goes from not met to met.
-      executeActions(true, boost::bind(&Trigger::triggerActionExecuted, this, _1));
+      executeActions(boost::bind(&Trigger::triggerActionExecuted, this, _1));
     }
+  }
+}
+
+
+void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
+{
+  if (aEvaluationResult.isOK()) {
+    LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully, result: %s", name.c_str(), aEvaluationResult.stringValue().c_str());
+  }
+  else {
+    LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), aEvaluationResult.error()->text());
   }
 }
 
@@ -1167,7 +1178,6 @@ bool TriggerActionContext::abort(bool aDoCallBack)
 }
 
 
-
 bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aResult)
 {
   ExpressionValue res;
@@ -1176,13 +1186,32 @@ bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aRe
 }
 
 
-
 bool TriggerActionContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
 {
   #if EXPRESSION_SCRIPT_SUPPORT
-  if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction)) return true;
+  if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction))
+    return true;
+  else
   #endif
+  if (aFunc=="trigger" && aArgs.size()==1) {
+    TriggerPtr targetTrigger = LocalController::sharedLocalController()->localTriggers.getTriggerByName(aArgs[0].stringValue());
+    if (!targetTrigger) {
+      return throwError(ExpressionError::NotFound, "No trigger named '%s' found", aArgs[0].stringValue().c_str());
+    }
+    else if (targetTrigger==&trigger) {
+      return throwError(ExpressionError::CyclicReference, "Cannot recursively call trigger '%s'", aArgs[0].stringValue().c_str());
+    }
+    targetTrigger->executeActions(boost::bind(&TriggerActionContext::triggerFuncExecuted, this, _1));
+    aNotYielded = false; // yielded to other trigger's action
+    return true;
+  }
   return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
+}
+
+
+void TriggerActionContext::triggerFuncExecuted(ExpressionValue aEvaluationResult)
+{
+  continueWithAsyncFunctionResult(aEvaluationResult);
 }
 
 
@@ -1290,7 +1319,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
 
 #define LEGACY_ACTIONS_REWRITING 1
 
-bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
+bool Trigger::executeActions(EvaluationResultCB aCallback)
 {
   ErrorPtr err;
   #if LEGACY_ACTIONS_REWRITING
@@ -1351,18 +1380,7 @@ bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
   }
   #endif // LEGACY_ACTIONS_REWRITING
   // run script
-  return triggerAction.execute(aAsynchronously, aCallback);
-}
-
-
-void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
-{
-  if (aEvaluationResult.isOK()) {
-    LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully, result: %s", name.c_str(), aEvaluationResult.stringValue().c_str());
-  }
-  else {
-    LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), aEvaluationResult.error()->text());
-  }
+  return triggerAction.execute(true, aCallback);
 }
 
 
@@ -1410,7 +1428,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 {
   triggerAction.abort(); // abort previous ones
-  executeActions(true, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1));
+  executeActions(boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1));
   return ErrorPtr(); // will send result later
 }
 
@@ -1611,6 +1629,18 @@ TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting,
   }
   return trig;
 }
+
+
+TriggerPtr TriggerList::getTriggerByName(const string aTriggerName)
+{
+  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
+    if (strucmp((*pos)->name.c_str(),aTriggerName.c_str())==0) {
+      return *pos;
+    }
+  }
+  return TriggerPtr();
+}
+
 
 
 // MARK: - TriggerList persistence
