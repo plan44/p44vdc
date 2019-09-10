@@ -1189,11 +1189,12 @@ bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aRe
 bool TriggerActionContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
 {
   #if EXPRESSION_SCRIPT_SUPPORT
-  if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction))
+  if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction)) {
     return true;
-  else
-  #endif
-  if (aFunc=="trigger" && aArgs.size()==1) {
+  }
+  else if (aFunc=="trigger" && aArgs.size()==1) {
+    // trigger('triggername')
+    if (aArgs[0].notValue()) return errorInArg(aArgs[0], false); // return error from argument
     TriggerPtr targetTrigger = LocalController::sharedLocalController()->localTriggers.getTriggerByName(aArgs[0].stringValue());
     if (!targetTrigger) {
       return throwError(ExpressionError::NotFound, "No trigger named '%s' found", aArgs[0].stringValue().c_str());
@@ -1205,6 +1206,20 @@ bool TriggerActionContext::evaluateAsyncFunction(const string &aFunc, const Func
     aNotYielded = false; // yielded to other trigger's action
     return true;
   }
+  else if (aFunc=="switchcontext" && aArgs.size()==1) {
+    // switchcontext('device_with_output')
+    if (aArgs[0].notValue()) return errorInArg(aArgs[0], false); // return error from argument
+    DevicePtr device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(aArgs[0].stringValue());
+    OutputBehaviourPtr output;
+    if (device) output = device->getOutput();
+    if (!output) {
+      return throwError(ExpressionError::NotFound, "No device with output named '%s' found", aArgs[0].stringValue().c_str());
+    }
+    // continue execution in a different context
+    aNotYielded = chainContext(output->sceneScriptContext, boost::bind(&TriggerActionContext::triggerFuncExecuted, this, _1));
+    return true;
+  }
+  #endif
   return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
 }
 
