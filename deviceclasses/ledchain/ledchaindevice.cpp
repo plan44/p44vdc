@@ -184,6 +184,8 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     behaviour = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
   }
   if (lightView) {
+    // make sure it is invisible at the beginning
+    lightView->hide();
     // add function to allow view manipulation via scripts
     ValueLookupCB vl = boost::bind(&LedChainDevice::viewCfgSubstLookup, this, _1, _2);
     behaviour->sceneScriptContext.registerFunctionHandler(

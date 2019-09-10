@@ -166,8 +166,6 @@ void LightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   if (lightScene) {
     // load brightness channel from scene
     Brightness b = lightScene->value;
-    VdcSceneEffect e = lightScene->effect;
-    uint32_t ep = lightScene->effectParam;
     brightness->setChannelValueIfNotDontCare(lightScene, b, transitionTimeFromScene(lightScene, true), transitionTimeFromScene(lightScene, false), true);
   }
   else {
