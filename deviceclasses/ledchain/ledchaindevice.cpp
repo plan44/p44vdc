@@ -366,7 +366,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   getLedChainVdc().ledArrangement.render(); // update
   // next step
   if (moreSteps) {
-    ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, pix.a);
+    ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
     // not yet complete, schedule next step
     transitionTicket.executeOnce(
       boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
@@ -375,7 +375,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     return; // will be called later again
   }
   if (!aForDimming) {
-    ALOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, pix.a);
+    ALOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
   }
 }
 

@@ -97,7 +97,7 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   PixelRect r = ledArrangement.totalCover();
   rootView = ViewStackPtr(new ViewStack);
   rootView->setFrame(r);
-  rootView->setBackgroundColor(transparent);
+  rootView->setBackgroundColor(black); // stack with black background is more efficient (and there's nothing below, anyway)
   ledArrangement.setRootView(rootView);
   // initialize database
   string databaseName = getPersistentDataDir();
