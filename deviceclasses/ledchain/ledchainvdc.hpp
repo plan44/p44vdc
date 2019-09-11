@@ -113,7 +113,7 @@ namespace p44 {
 
   private:
 
-    LedChainDevicePtr addLedChainDevice(int aX, int aDx, int aY, int aDy, string aDeviceConfig);
+    LedChainDevicePtr addLedChainDevice(int aX, int aDx, int aY, int aDy, int aZOrder, string aDeviceConfig);
 
     void render();
 
