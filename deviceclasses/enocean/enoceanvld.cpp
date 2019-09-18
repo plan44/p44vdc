@@ -37,7 +37,7 @@ using namespace p44;
 // MARK: - special extraction functions
 
 
-// strange irregular fan speed scale as used in A5-10-01,02,04,07,08 and 09
+/// strange irregular fan speed scale as used in A5-10-01,02,04,07,08 and 09
 static void currentClampHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // extract 8-bit value
@@ -52,6 +52,29 @@ static void currentClampHandler(const struct EnoceanInputDescriptor &aInputDescr
 }
 
 
+/// standard button input handler
+static void D2030AButtonHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
+{
+  if (ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(aBehaviour)) {
+    uint8_t action = (uint8_t)EnoceanInputs::bitsExtractor(aInputDescriptor, aDataP, aDataSize);
+    // special coding
+    // - 1 : single click
+    // - 2 : double click
+    // - 3 : pressed longer
+    // - 4 : released
+    switch (action) {
+      case 1 : bb->injectClick(ct_click_1x); break;
+      case 2 : bb->injectClick(ct_click_2x); break;
+      case 3 : bb->injectClick(ct_hold_start); break;
+      case 4 : bb->injectClick(ct_hold_end); break;
+    }
+  }
+}
+
+
+
+
+
 // MARK: - mapping table for generic EnoceanInputHandler
 
 using namespace EnoceanInputs;
@@ -60,7 +83,7 @@ const p44::EnoceanInputDescriptor enoceanVLDdescriptors[] = {
   // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max, MSB,     LSB,   updateIv,aliveSignIv, handler,              typeText
 
   // D2-03-0A Single button with battery indicator
-  { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_button,      buttonElement_center,   usage_room,         0,      1, DB(0,7), DB(0,0),      0,          0, &stdButtonHandler,   "button" },
+  { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_button,      buttonElement_center,   usage_room,         0,      1, DB(0,7), DB(0,0),      0,          0, &D2030AButtonHandler,   "button" },
   { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_none,        usage_room,         0,    255, DB(1,7), DB(1,0),      0,          0, &batPercSensorHandler,  supplyText },
   // D2-14-30 Multi-Function Smoke, Air quality, Temperature, Humidity sensor
   { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     51, DB(3,0), DB(2,1),    100,      40*60, &stdSensorHandler,   tempText },
