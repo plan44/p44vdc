@@ -27,7 +27,7 @@
 #if ENABLE_ENOCEAN
 
 #include "enoceandevice.hpp"
-#include "enoceansensorhandler.hpp"
+#include "enoceaninputhandler.hpp"
 
 using namespace std;
 
@@ -165,8 +165,6 @@ namespace p44 {
     virtual string shortDesc() P44_OVERRIDE;
   };
   typedef boost::intrusive_ptr<EnoceanD201XXHandler> EnoceanD201XXHandlerPtr;
-
-
 
 
   /// SODA window handle handler

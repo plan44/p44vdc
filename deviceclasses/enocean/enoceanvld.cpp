@@ -38,11 +38,11 @@ using namespace p44;
 
 
 // strange irregular fan speed scale as used in A5-10-01,02,04,07,08 and 09
-static void currentClampHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void currentClampHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // extract 8-bit value
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
-    double value = EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+    double value = EnoceanInputs::bitsExtractor(aInputDescriptor, aDataP, aDataSize);
     if (aDataP[0] & 0x40) {
       // divisor by 10 is active
       value = value / 10;
@@ -52,18 +52,21 @@ static void currentClampHandler(const struct EnoceanSensorDescriptor &aSensorDes
 }
 
 
-// MARK: - sensor mapping table for generic EnoceanSensorHandler
+// MARK: - mapping table for generic EnoceanInputHandler
 
-using namespace EnoceanSensors;
+using namespace EnoceanInputs;
 
-const p44::EnoceanSensorDescriptor enoceanVLDdescriptors[] = {
+const p44::EnoceanInputDescriptor enoceanVLDdescriptors[] = {
   // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max, MSB,     LSB,   updateIv,aliveSignIv, handler,              typeText
 
+  // D2-03-0A Single button with battery indicator
+  { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_button,      buttonElement_center,   usage_room,         0,      1, DB(0,7), DB(0,0),      0,          0, &stdButtonHandler,   "button" },
+  { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_none,        usage_room,         0,    255, DB(1,7), DB(1,0),      0,          0, &batPercSensorHandler,  supplyText },
   // D2-14-30 Multi-Function Smoke, Air quality, Temperature, Humidity sensor
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     51, DB(3,0), DB(2,1),    100,      40*60, &stdSensorHandler,  tempText },
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(2,0), DB(1,1),    100,      40*60, &stdSensorHandler,  humText },
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_red_security,            behaviour_binaryinput, binInpType_smoke,       usage_room,         0,      1, DB(5,7), DB(5,7),    100,      40*60, &stdInputHandler,   "Smoke Alarm" },
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,         0,      1, DB(4,2), DB(4,2),    100,      40*60, &stdInputHandler,   lowBatText }, // MSB of 2-bit battery status -> low+Critical report low bat
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     51, DB(3,0), DB(2,1),    100,      40*60, &stdSensorHandler,   tempText },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(2,0), DB(1,1),    100,      40*60, &stdSensorHandler,   humText },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_red_security,            behaviour_binaryinput, binInpType_smoke,       usage_room,         0,      1, DB(5,7), DB(5,7),    100,      40*60, &stdInputHandler,    "Smoke Alarm" },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,         0,      1, DB(4,2), DB(4,2),    100,      40*60, &lowBatInputHandler, lowBatText }, // MSB of 2-bit battery status -> low+Critical report low bat
   // D2-32 AC current clamps
   // D2-32-00: single phase current clamp
   { 0, 0x32, 0x00, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler, "Current" },
@@ -139,6 +142,10 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
     // D2-01 family of switches and dimmers
     newDev = EnoceanD201XXHandler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
+//  else if (EEP_UNTYPED(aEEProfile)==0xD20300) {
+//    // D2-03-xx buttons and window handles
+//    newDev = EnoceanD203xxHandler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
+//  }
   else if (EEP_PURE(aEEProfile)==0xD20601) {
     // Note: Profile has variants (with and without temperature sensor)
     // use specialized handler for output functions of heating valve (valve value, summer/winter, prophylaxis)
@@ -147,7 +154,7 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
   else
   {
     // check table based sensors, might create more than one device
-    newDev = EnoceanSensorHandler::newDevice(aVdcP, createVLDDeviceFunc, enoceanVLDdescriptors, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
+    newDev = EnoceanInputHandler::newDevice(aVdcP, createVLDDeviceFunc, enoceanVLDdescriptors, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
   return newDev;
 }
@@ -483,18 +490,16 @@ void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
 
 
 
-
-
 // MARK: - EnoceanD20601Handler - SODA Window Handle
 
 /// sensor bitfield extractor function and check for validity for D2-06-01 profile
-static void D20601SensorHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void D20601SensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
-  uint64_t value = bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  uint64_t value = bitsExtractor(aInputDescriptor, aDataP, aDataSize);
   // now pass to behaviour
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
     // D20601 values all have the last two values in the bitrange reserved for invalid/notsupported value
-    int fieldsize = aSensorDescriptor.msBit-aSensorDescriptor.lsBit+1;
+    int fieldsize = aInputDescriptor.msBit-aInputDescriptor.lsBit+1;
     uint64_t maxval = (1<<fieldsize)-1;
     if (value==maxval || value==maxval-1)
       sb->invalidateSensorValue(); // not a valid value
@@ -505,9 +510,9 @@ static void D20601SensorHandler(const struct EnoceanSensorDescriptor &aSensorDes
 
 
 /// binary input bitfield extractor function and check for validity for D2-06-01 profile
-static void D20601InputHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void D20601InputHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
-  uint64_t value = bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  uint64_t value = bitsExtractor(aInputDescriptor, aDataP, aDataSize);
   // now pass to behaviour
   if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
     // D20601 binary values use 4-bit fields, with bit 0=signal and 0xE and 0xF indicating invalid/notsupported
@@ -520,9 +525,9 @@ static void D20601InputHandler(const struct EnoceanSensorDescriptor &aSensorDesc
 
 
 /// binary input bitfield extractor function and check for validity for window tilted input in D2-06-01 profile
-static void D20601TiltedHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void D20601TiltedHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
-  uint64_t value = bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  uint64_t value = bitsExtractor(aInputDescriptor, aDataP, aDataSize);
   // now pass to behaviour
   if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
     // D20601 binary values use 4-bit fields, with 0=undefined, 1..0xD=state and 0xE and 0xF indicating invalid/notsupported
@@ -535,9 +540,9 @@ static void D20601TiltedHandler(const struct EnoceanSensorDescriptor &aSensorDes
 
 
 /// binary input bitfield extractor function and check for validity for window handle position input in D2-06-01 profile
-static void D20601HandlePosHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void D20601HandlePosHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
-  uint64_t value = bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  uint64_t value = bitsExtractor(aInputDescriptor, aDataP, aDataSize);
   // now pass to behaviour
   if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
     // D20601 binary values use 4-bit fields, with 0=undefined, 1..0xD=state and 0xE and 0xF indicating invalid/notsupported
@@ -552,23 +557,23 @@ static void D20601HandlePosHandler(const struct EnoceanSensorDescriptor &aSensor
 // configuration for D2-06-01 sensor channels
 
 // - D2-06-01 sensor telegram
-static const p44::EnoceanSensorDescriptor D20601handleposition =
+static const p44::EnoceanInputDescriptor D20601handleposition =
   { 0, 0x06, 0x01, 0, class_black_joker, group_blue_windows, behaviour_binaryinput, binInpType_windowHandle, usage_undefined, 0, 2, DB(7,7), DB(7,4), 100, 40*60, &D20601HandlePosHandler, "Window Handle State" };
-static const p44::EnoceanSensorDescriptor D20601temperature =
+static const p44::EnoceanInputDescriptor D20601temperature =
   { 0, 0x06, 0x01, 0, class_black_joker, group_roomtemperature_control, behaviour_sensor, sensorType_temperature, usage_room, -20, 61.6, DB(4,7), DB(4,0), 100, 0, &D20601SensorHandler, tempText };
-static const p44::EnoceanSensorDescriptor D20601humidity =
+static const p44::EnoceanInputDescriptor D20601humidity =
   { 0, 0x06, 0x01, 0, class_black_joker, group_roomtemperature_control, behaviour_sensor, sensorType_humidity, usage_room, 0, 127.5, DB(3,7), DB(3,0), 100, 0, &D20601SensorHandler, humText };
-static const p44::EnoceanSensorDescriptor D20601illumination =
+static const p44::EnoceanInputDescriptor D20601illumination =
   { 0, 0x06, 0x01, 0, class_black_joker, group_yellow_light, behaviour_sensor, sensorType_illumination, usage_undefined, 0, 65535, DB(2,7), DB(1,0), 100, 0, &D20601SensorHandler, illumText };
-static const p44::EnoceanSensorDescriptor D20601battery =
+static const p44::EnoceanInputDescriptor D20601battery =
   { 0, 0x06, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_none, usage_undefined, 0, 155, DB(0,7), DB(0,3), 100, 40*60, &D20601SensorHandler, supplyText };
-static const p44::EnoceanSensorDescriptor D20601burglaryAlarm =
+static const p44::EnoceanInputDescriptor D20601burglaryAlarm =
   { 0, 0x06, 0x01, 0, class_red_security, group_red_security, behaviour_binaryinput, binInpType_none, usage_undefined, 0, 1, DB(8,7), DB(8,4), 100, 40*60, &D20601InputHandler, "Burglary alarm" };
-static const p44::EnoceanSensorDescriptor D20601protectionAlarm =
+static const p44::EnoceanInputDescriptor D20601protectionAlarm =
   { 0, 0x06, 0x01, 0, class_red_security, group_red_security, behaviour_binaryinput, binInpType_none, usage_undefined, 0, 1, DB(8,3), DB(8,0), 100, 0, &D20601InputHandler, "Protection alarm" };
-static const p44::EnoceanSensorDescriptor D20601motion =
+static const p44::EnoceanInputDescriptor D20601motion =
   { 0, 0x06, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_motion, usage_undefined, 0, 1, DB(5,7), DB(5,4), 100, 0, &D20601InputHandler, motionText };
-static const p44::EnoceanSensorDescriptor D20601tilt =
+static const p44::EnoceanInputDescriptor D20601tilt =
   { 0, 0x06, 0x01, 0, class_black_joker, group_blue_windows, behaviour_binaryinput, binInpType_none, usage_undefined, 0, 1, DB(7,3), DB(7,0), 100, 40*60, &D20601TiltedHandler, "Window tilted" };
 
 
@@ -631,25 +636,25 @@ EnoceanDevicePtr EnoceanD20601Handler::newDevice(
       // - create D2-06-01 specific handler (which handles all sensors and inputs, but not buttons)
       EnoceanD20601HandlerPtr newHandler = EnoceanD20601HandlerPtr(new EnoceanD20601Handler(*newDev.get()));
       // - channel-built-in behaviour is main function = window position
-      newHandler->behaviour = EnoceanSensorHandler::newSensorBehaviour(D20601handleposition, newDev, NULL); // automatic id;
+      newHandler->behaviour = EnoceanInputHandler::newInputChannelBehaviour(D20601handleposition, newDev, NULL); // automatic id;
       newDev->addChannelHandler(newHandler);
       // - add extra sensors
-      newHandler->temperatureSensor = EnoceanSensorHandler::newSensorBehaviour(D20601temperature, newDev, NULL); // automatic id
+      newHandler->temperatureSensor = EnoceanInputHandler::newInputChannelBehaviour(D20601temperature, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->temperatureSensor);
-      newHandler->humiditySensor = EnoceanSensorHandler::newSensorBehaviour(D20601humidity, newDev, NULL); // automatic id
+      newHandler->humiditySensor = EnoceanInputHandler::newInputChannelBehaviour(D20601humidity, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->humiditySensor);
-      newHandler->illuminationSensor = EnoceanSensorHandler::newSensorBehaviour(D20601illumination, newDev, NULL); // automatic id
+      newHandler->illuminationSensor = EnoceanInputHandler::newInputChannelBehaviour(D20601illumination, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->illuminationSensor);
-      newHandler->batterySensor = EnoceanSensorHandler::newSensorBehaviour(D20601battery, newDev, NULL); // automatic id
+      newHandler->batterySensor = EnoceanInputHandler::newInputChannelBehaviour(D20601battery, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->batterySensor);
       // - and input behaviours
-      newHandler->burglaryAlarmInput = EnoceanSensorHandler::newSensorBehaviour(D20601burglaryAlarm, newDev, "burglary"); // specific id
+      newHandler->burglaryAlarmInput = EnoceanInputHandler::newInputChannelBehaviour(D20601burglaryAlarm, newDev, "burglary"); // specific id
       newDev->addBehaviour(newHandler->burglaryAlarmInput);
-      newHandler->protectionAlarmInput = EnoceanSensorHandler::newSensorBehaviour(D20601protectionAlarm, newDev, "protection"); // specific id
+      newHandler->protectionAlarmInput = EnoceanInputHandler::newInputChannelBehaviour(D20601protectionAlarm, newDev, "protection"); // specific id
       newDev->addBehaviour(newHandler->protectionAlarmInput);
-      newHandler->motionInput = EnoceanSensorHandler::newSensorBehaviour(D20601motion, newDev, NULL); // automatic id
+      newHandler->motionInput = EnoceanInputHandler::newInputChannelBehaviour(D20601motion, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->motionInput);
-      newHandler->tiltInput = EnoceanSensorHandler::newSensorBehaviour(D20601tilt, newDev, "tilted"); // specific id
+      newHandler->tiltInput = EnoceanInputHandler::newInputChannelBehaviour(D20601tilt, newDev, "tilted"); // specific id
       newDev->addBehaviour(newHandler->tiltInput);
       // count it
       aSubDeviceIndex++;
@@ -672,21 +677,21 @@ void EnoceanD20601Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     // check message type
     if (dataP[0]==0x00) {
       // Sensor Values message
-      if (behaviour) handleBitField(D20601handleposition, behaviour, dataP, datasize);
-      if (temperatureSensor) handleBitField(D20601temperature, temperatureSensor, dataP, datasize);
-      if (humiditySensor) handleBitField(D20601humidity, humiditySensor, dataP, datasize);
-      if (illuminationSensor) handleBitField(D20601illumination, illuminationSensor, dataP, datasize);
+      if (behaviour) handleBitField(D20601handleposition, behaviour, dataP, datasize, this);
+      if (temperatureSensor) handleBitField(D20601temperature, temperatureSensor, dataP, datasize, this);
+      if (humiditySensor) handleBitField(D20601humidity, humiditySensor, dataP, datasize, this);
+      if (illuminationSensor) handleBitField(D20601illumination, illuminationSensor, dataP, datasize, this);
       if (batterySensor) {
-        handleBitField(D20601battery, batterySensor, dataP, datasize);
+        handleBitField(D20601battery, batterySensor, dataP, datasize, this);
         SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(batterySensor);
         if (sb && sb->hasDefinedState()) {
-          lowBat = sb->getCurrentValue()<20; // consider <=20% == low Battery
+          batPercentage = sb->getCurrentValue();
         }
       }
-      if (burglaryAlarmInput) handleBitField(D20601burglaryAlarm, burglaryAlarmInput, dataP, datasize);
-      if (protectionAlarmInput) handleBitField(D20601protectionAlarm, protectionAlarmInput, dataP, datasize);
-      if (motionInput) handleBitField(D20601motion, motionInput, dataP, datasize);
-      if (tiltInput) handleBitField(D20601tilt, tiltInput, dataP, datasize);
+      if (burglaryAlarmInput) handleBitField(D20601burglaryAlarm, burglaryAlarmInput, dataP, datasize, this);
+      if (protectionAlarmInput) handleBitField(D20601protectionAlarm, protectionAlarmInput, dataP, datasize, this);
+      if (motionInput) handleBitField(D20601motion, motionInput, dataP, datasize, this);
+      if (tiltInput) handleBitField(D20601tilt, tiltInput, dataP, datasize, this);
     }
   }
 }

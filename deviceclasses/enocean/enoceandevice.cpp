@@ -42,21 +42,21 @@ using namespace p44;
 EnoceanChannelHandler::EnoceanChannelHandler(EnoceanDevice &aDevice) :
   device(aDevice),
   dsChannelIndex(0),
-  lowBat(false)
+  batPercentage(100)
 {
 }
 
 
 int EnoceanChannelHandler::opStateLevel()
 {
-  if (!isAlive()) return 0; /* completely offline, operation not possible */
-  if (lowBat) return 20; /* low battery, operation critical */
+  if (!isAlive()) return 0; // completely offline, operation not possible
+  if (batPercentage<=LOW_BAT_PERCENTAGE) return batPercentage; // low battery, operation critical
   return 100;
 }
 
 string EnoceanChannelHandler::getOpStateText()
 {
-  if (lowBat) return "low battery";
+  if (batPercentage<=LOW_BAT_PERCENTAGE) return "low battery";
   return "";
 }
 

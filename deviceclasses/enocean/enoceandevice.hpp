@@ -59,6 +59,12 @@ namespace p44 {
 
   #define TIMEOUT_FACTOR_FOR_INACTIVE 4
 
+  /// Battery levels
+  #define LOW_BAT_PERCENTAGE 20 // anything not above this will be considered critically low batter
+  #define LOW_BAT_VOLTAGE_LEVEL 2.6 // assume CR2032 type battery, which goes down to 2V but 2.6 is already indicating "low"
+  #define FULL_BAT_VOLTAGE_LEVEL 3.0 // assume CR2032 type battery, rated 3V nominal voltage
+
+
   /// single EnOcean device channel, abstract class
   class EnoceanChannelHandler : public P44Obj
   {
@@ -74,10 +80,9 @@ namespace p44 {
     /// @note create new channels using factory static methods of specialized subclasses
     EnoceanChannelHandler(EnoceanDevice &aDevice);
 
-    bool lowBat; ///< this can be set by handlers to indicate low battery status (will be reported via opStateLevel/opStateText
-
   public:
 
+    uint8_t batPercentage; ///< this can be set by handlers to indicate battery status. Set to LOW_BAT_PERCENTAGE or below when device only reports good/bad
     DsBehaviourPtr behaviour; ///< the associated behaviour
     int8_t dsChannelIndex; ///< for outputs, the dS channel index
     EnoceanChannel channel; ///< channel number

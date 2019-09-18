@@ -27,7 +27,7 @@
 #if ENABLE_ENOCEAN
 
 #include "enoceandevice.hpp"
-#include "enoceansensorhandler.hpp"
+#include "enoceaninputhandler.hpp"
 
 using namespace std;
 

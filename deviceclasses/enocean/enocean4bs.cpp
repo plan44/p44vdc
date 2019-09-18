@@ -36,7 +36,7 @@ using namespace p44;
 // MARK: - special extraction functions
 
 // two-range illumination handler, as used in A5-06-01 and A5-06-02
-static void illumHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void illumHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   double value;
   // actual data comes in:
@@ -45,13 +45,13 @@ static void illumHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor
   if (aDataSize<4) return;
   if (aDataP[3-0] & 0x01) {
     // DB(0,0)==1: DB 2 contains low range / higher resolution
-    double res = (aSensorDescriptor.max/2 - aSensorDescriptor.min) / 255.0; // units per LSB, half scale (half max)
-    value = aSensorDescriptor.min + (double)aDataP[3-2]*res;
+    double res = (aInputDescriptor.max/2 - aInputDescriptor.min) / 255.0; // units per LSB, half scale (half max)
+    value = aInputDescriptor.min + (double)aDataP[3-2]*res;
   }
   else {
     // DB(0,0)==0: DB 1 contains high range / lower resolution
-    double res = (aSensorDescriptor.max - aSensorDescriptor.min*2) / 255.0; // units per LSB, full scale
-    value = aSensorDescriptor.min*2 + (double)aDataP[3-1]*res; // starting point is double min!
+    double res = (aInputDescriptor.max - aInputDescriptor.min*2) / 255.0; // units per LSB, full scale
+    value = aInputDescriptor.min*2 + (double)aDataP[3-1]*res; // starting point is double min!
   }
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
     sb->updateSensorValue(value);
@@ -60,7 +60,7 @@ static void illumHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor
 
 
 // three-range illumination handler, as used in A5-06-01 in Eltako FAH60
-static void illumHandlerFAH60(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void illumHandlerFAH60(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // DB2==0 -> in DB(3), 0..100lx = 0..255
   if (aDataP[3-2]==0) {
@@ -71,7 +71,7 @@ static void illumHandlerFAH60(const struct EnoceanSensorDescriptor &aSensorDescr
   }
   else {
     // same as standard A5-06-01
-    illumHandler(aSensorDescriptor, aBehaviour, aDataP, aDataSize);
+    illumHandler(aInputDescriptor, aBehaviour, aDataP, aDataSize, aChannelP);
   }
 }
 
@@ -79,7 +79,7 @@ static void illumHandlerFAH60(const struct EnoceanSensorDescriptor &aSensorDescr
 
 
 // power meter data extraction handler
-static void powerMeterHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void powerMeterHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // raw value is in DB3.7..DB1.0 (upper 24 bits)
   uint32_t value =
@@ -114,11 +114,11 @@ static void powerMeterHandler(const struct EnoceanSensorDescriptor &aSensorDescr
 
 
 // strange irregular fan speed scale as used in A5-10-01,02,04,07,08 and 09
-static void fanSpeedHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void fanSpeedHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // extract 8-bit value
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
-    uint8_t value = (uint8_t)EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+    uint8_t value = (uint8_t)EnoceanInputs::bitsExtractor(aInputDescriptor, aDataP, aDataSize);
     // 255..210 = Auto
     // 209..190 = Speed 0 / OFF
     // 189..165 = Speed 1
@@ -141,20 +141,20 @@ static void fanSpeedHandler(const struct EnoceanSensorDescriptor &aSensorDescrip
 
 
 // window closed (0), open (1), tilted (2) tri-state binary input in A5-14-09/0A
-static void windowStateHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void windowStateHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // A5-14-09/0A have 0=closed, 1=tilted, 2=reserved/invalid, 3=open
-  uint8_t status = (uint8_t)EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  uint8_t status = (uint8_t)EnoceanInputs::bitsExtractor(aInputDescriptor, aDataP, aDataSize);
   if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
     // 00->0 (closed), 01->2 (tilted), 10/11->1 (open)
     bb->updateInputState(status==0 ? 0 : (status==1 ? 2 : 1));
   }
 }
 // window closed (0), open (1), tilted (2) tri-state binary input in A5-14-09/0A
-static void reversedWindowStateHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void reversedWindowStateHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // A5-14-09/0A have 0=closed, 1=tilted, 2=reserved/invalid, 3=open
-  uint8_t status = (uint8_t)EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  uint8_t status = (uint8_t)EnoceanInputs::bitsExtractor(aInputDescriptor, aDataP, aDataSize);
   if (BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour)) {
     // 00->2 (tilted), 01->0 (closed), 10/11->1 (open)
     bb->updateInputState(status==0 ? 2 : (status==1 ? 0 : 1));
@@ -166,7 +166,7 @@ static void reversedWindowStateHandler(const struct EnoceanSensorDescriptor &aSe
 
 
 // two-range illumination sensor in A5-06-05
-static void illumA50605Handler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void illumA50605Handler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   bool lowrange = aDataP[3-0] & 0x01; // DB0.0 selects range: 0=high range data in DB1, 1=low range data in DB2
   uint16_t raw = lowrange ? aDataP[3-2] : (uint16_t)aDataP[3-1]*2; // raw value in low range scaling = 0..510 = 0..10200 lx
@@ -178,9 +178,9 @@ static void illumA50605Handler(const struct EnoceanSensorDescriptor &aSensorDesc
 
 
 // 0..360 angle handler (makes sure results is always 0..<360
-static void angleHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void angleHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
-  uint32_t value = (uint32_t)EnoceanSensors::bitsExtractor(aSensorDescriptor, aDataP, aDataSize);
+  uint32_t value = (uint32_t)EnoceanInputs::bitsExtractor(aInputDescriptor, aDataP, aDataSize);
   // convert range to degrees
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
     double degrees = sb->getMin()+(sb->getResolution()*value);
@@ -193,36 +193,36 @@ static void angleHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor
 
 
 // only update sensor when DB0 Bit1 is set
-static void condDB0Bit1Handler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void condDB0Bit1Handler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // DB0.1 must be set, otherwise this sensor is not available and value must not be updated
   if (aDataP[3-0] & 0x02) {
-    EnoceanSensors::stdSensorHandler(aSensorDescriptor, aBehaviour, aDataP, aDataSize);
+    EnoceanInputs::stdSensorHandler(aInputDescriptor, aBehaviour, aDataP, aDataSize, aChannelP);
   }
 }
 
 
 // only update sensor when DB0 Bit2 is set
-static void condDB0Bit2Handler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize)
+static void condDB0Bit2Handler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // DB0.2 must be set, otherwise this sensor is not available and value must not be updated
   if (aDataP[3-0] & 0x04) {
-    EnoceanSensors::stdSensorHandler(aSensorDescriptor, aBehaviour, aDataP, aDataSize);
+    EnoceanInputs::stdSensorHandler(aInputDescriptor, aBehaviour, aDataP, aDataSize, aChannelP);
   }
 }
 
 
 
-// MARK: - sensor mapping table for generic EnoceanSensorHandler
+// MARK: - mapping table for generic EnoceanInputHandler
 
-using namespace EnoceanSensors;
+using namespace EnoceanInputs;
 
 static const char *vibrationText = "Vibration";
 static const char *lockText = "Lock";
 static const char *doorText = "Door";
 static const char *windowText = "Window open/tilted";
 
-const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
+const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max,MSB,     LSB,  updateIv,aliveSignIv, handler,     typeText
   // A5-02-xx: Temperature sensors
   // - 40 degree range
@@ -328,33 +328,33 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // A5-06-xx: Light Sensors
   // - A5-06-01 outdoor
   { 0, 0x06, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_outdoors,    300,60000, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,      illumText },
-  { 0, 0x06, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x06, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // - A5-06-01 Eltako FAH60 with low light sensor in DB3, but no supply voltage
   { 1, 0x06, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_outdoors,    300,60000, DB(2,7), DB(1,0), 100, 40*60, &illumHandlerFAH60, illumText },
   // - A5-06-02 indoor
   { 0, 0x06, 0x02, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0, 1020, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,      illumText },
-  { 0, 0x06, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x06, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // - A5-06-03 10-bit indoor
   { 0, 0x06, 0x03, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0, 1024, DB(2,7), DB(1,6), 100, 40*60, &stdSensorHandler,  illumText },
-  { 0, 0x06, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x06, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // - A5-06-04 courtain wall sensor + temperature
   { 0, 0x06, 0x04, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_outdoors,      0,65535, DB(2,7), DB(1,0), 100, 40*60, &stdSensorHandler,  illumText },
   { 0, 0x06, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20,   60, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler,  tempText },
   // - A5-06-05 two range light
   { 0, 0x06, 0x05, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0,10200, DB(1,7), DB(1,0), 100, 40*60, &illumA50605Handler,illumText },
-  { 0, 0x06, 0x05, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x06, 0x05, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
 
   // A5-07-xx: Occupancy Sensor
   // - occupancy sensor
   { 0, 0x07, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          0,    1, DB(1,7), DB(1,7), 100, 40*60, &stdInputHandler,  motionText },
-  { 0, 0x07, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x07, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // - slightly different occupancy sensor
   { 0, 0x07, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          0,    1, DB(0,7), DB(0,7), 100, 40*60, &stdInputHandler,  motionText },
-  { 0, 0x07, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x07, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // - occupancy sensor with illumination sensor
   { 0, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          0,    1, DB(0,7), DB(0,7), 100, 40*60, &stdInputHandler,  motionText },
   { 0, 0x07, 0x03, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0, 1024, DB(2,7), DB(1,6), 100, 40*60, &stdSensorHandler, illumText },
-  { 0, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
 
   // A5-08-01: Light, Temperature and Occupancy sensor
   // - generic EEP
@@ -362,7 +362,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x08, 0x01, 0, class_black_joker,  group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   51, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText },
   { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          1,    0, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  motionText },
   { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_presence,    usage_user,          1,    0, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  occupText },
-  { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // - Eltako FABH65S+FBH65B+FBH65S+FBH65TFB (no temperature and presence, extended illumination range)
   { 1, 0x08, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0, 2048, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, illumText },
   { 1, 0x08, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          1,    0, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  motionText },
@@ -371,7 +371,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   // - e.g. enoluz.com
   { 0, 0x09, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_gas_CO,      usage_room,          0, 1020, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,   coText },
   { 0, 0x09, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   51, DB(1,7), DB(1,0), 100, 40*60, &condDB0Bit1Handler, tempText },
-  { 0, 0x09, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x09, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
 
   // A5-09-04: Humidity, CO2 concentration, Temperature
   // - e.g. enoluz.com
@@ -530,57 +530,57 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_wind_direction, usage_outdoors,22.5,  360, DB(3,3), DB(3,0), 100, 40*60, &angleHandler, "wind direction" },
   { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_wind_speed,     usage_outdoors,0.45,89.36, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, "wind speed" }, // 1..199.9 mph = 0.45..89.36 m/S
   { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_gust_speed,     usage_outdoors,0.45,89.36, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, "max wind (gust) speed" }, // 1..199.9 mph = 0.45..89.36 m/S
-  { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_lowBattery,     usage_outdoors,   0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  lowBatText },
+  { 0, 0x13, 0x07, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_lowBattery,     usage_outdoors,   0,    1, DB(0,0), DB(0,0), 100, 40*60, &lowBatInputHandler,  lowBatText },
 
   // A5-14: Multi-Function Sensors
   // A5-14-01: Single door/window contact, 0=contact (and window/door) closed, 1=contact (and window/door) open
   { 0, 0x14, 0x01, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  contactText },
-  { 0, 0x14, 0x01, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x01, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-02: Single door/window contact with illumination, 0=contact (and window/door) closed, 1=contact (and window/door) open
   { 0, 0x14, 0x02, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  contactText },
   { 0, 0x14, 0x02, 0, class_red_security, group_yellow_light,            behaviour_sensor,      sensorType_illumination,   usage_room,       0, 1020, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, illumText },
-  { 0, 0x14, 0x02, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x02, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-03: Single door/window contact with vibration, 0=contact (and window/door) closed, 1=contact (and window/door) open
   { 0, 0x14, 0x03, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  contactText },
   { 0, 0x14, 0x03, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  vibrationText },
-  { 0, 0x14, 0x03, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x03, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-04: Single door/window contact with illumination and vibration, 0=contact (and window/door) closed, 1=contact (and window/door) open
   { 0, 0x14, 0x04, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  contactText },
   { 0, 0x14, 0x04, 0, class_red_security, group_yellow_light,            behaviour_sensor,      sensorType_illumination,   usage_room,       0, 1020, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, illumText },
   { 0, 0x14, 0x04, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  vibrationText },
-  { 0, 0x14, 0x04, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x04, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-05: Vibration detector
   { 0, 0x14, 0x05, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  vibrationText },
-  { 0, 0x14, 0x05, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x05, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-06: Single door/window contact with illumination and vibration, 0=contact (and window/door) closed, 1=contact (and window/door) open
   { 0, 0x14, 0x06, 0, class_red_security, group_yellow_light,            behaviour_sensor,      sensorType_illumination,   usage_room,       0, 1020, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, illumText },
   { 0, 0x14, 0x06, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  vibrationText },
-  { 0, 0x14, 0x06, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x06, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-07: Dual door contact for door and lock, 0=door closed/locked, 1=door open/unlocked
   { 0, 0x14, 0x07, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_doorOpen,       usage_undefined,  0,    1, DB(0,2), DB(0,2), 100, 40*60, &stdInputHandler,  doorText },
   { 0, 0x14, 0x07, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  lockText },
-  { 0, 0x14, 0x07, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x07, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-08: Dual door contact for door and lock plus vibration, 0=door closed/locked, 1=door open/unlocked
   { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_doorOpen,       usage_undefined,  0,    1, DB(0,2), DB(0,2), 100, 40*60, &stdInputHandler,  doorText },
   { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  lockText },
   { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
-  { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-09: Window state, 0=closed, 1=open, 2=tilted
   // - standard mount
   { 0, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &windowStateHandler, windowText },
-  { 0, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // - reverse mount (value 2 and 0 swapped)
   { 1, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &reversedWindowStateHandler, windowText },
-  { 1, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 1, 0x14, 0x09, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-0A: Window state + vibration, 0=closed, 1=open, 2=tilted
   // - standard mount
   { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &windowStateHandler, windowText },
   { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
-  { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 0, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // - reverse mount (value 2 and 0 swapped)
   { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_windowHandle,   usage_undefined,  0,    1, DB(0,2), DB(0,1), 100, 40*60, &reversedWindowStateHandler, windowText },
   { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
-  { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler, supplyText },
+  { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
 
   // A5-30-03: generic temperature + 4 digital inputs
   // - variant for Afriso water sensor with Wake==0 -> water detected
@@ -595,7 +595,7 @@ const p44::EnoceanSensorDescriptor enocean4BSdescriptors[] = {
   { 1, 0x3F, 0x7F, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,   10, DB(1,7), DB(1,0), 100,  1000, &stdSensorHandler,  "V1" },
 
   // terminator
-  { 0, 0,    0,    0, class_black_joker,  group_black_variable,          behaviour_undefined, 0, usage_undefined, 0, 0, 0, 0, 0, 0, NULL /* NULL for extractor function terminates list */, NULL },
+  { 0, 0,    0,    0, class_black_joker,  group_black_variable,          behaviour_undefined, 0, usage_undefined, 0, 0, 0, 0, 0, 0, NULL, NULL /* NULL for type text terminates list */ },
 };
 
 
@@ -777,7 +777,7 @@ EnoceanDevicePtr Enocean4BSDevice::newDevice(
   }
   else {
     // check table based sensors, might create more than one device
-    newDev = EnoceanSensorHandler::newDevice(aVdcP, create4BSDeviceFunc, enocean4BSdescriptors, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
+    newDev = EnoceanInputHandler::newDevice(aVdcP, create4BSDeviceFunc, enocean4BSdescriptors, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
   return newDev;
 }
@@ -825,10 +825,10 @@ EnoceanDevicePtr EnoceanA52001Handler::newDevice(
   // A5-20-01: heating valve actuator
   // - e.g. thermokon SAB 02 or Kieback+Peter MD15-FTL, MD10-FTL
   // configuration for included sensor channels
-  static const p44::EnoceanSensorDescriptor tempSensor =
+  static const p44::EnoceanInputDescriptor tempSensor =
     { 0, 0x20, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room, 0, 40, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText };
-  static const p44::EnoceanSensorDescriptor lowBatInput =
-    { 0, 0x20, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 1,  0, DB(2,4), DB(2,4), 100, 40*60, &stdInputHandler,  lowBatText };
+  static const p44::EnoceanInputDescriptor lowBatInput =
+    { 0, 0x20, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 1,  0, DB(2,4), DB(2,4), 100, 40*60, &lowBatInputHandler,  lowBatText };
   // create device
   EnoceanDevicePtr newDev; // none so far
   if (aSubDeviceIndex<1) {
@@ -855,10 +855,10 @@ EnoceanDevicePtr EnoceanA52001Handler::newDevice(
     newDev->addChannelHandler(newHandler);
     if (EEP_VARIANT(aEEProfile)!=0) {
       // all non-default profiles have the valve sensor enabled -> add built-in temp sensor
-      EnoceanSensorHandler::addSensorChannel(newDev, tempSensor, false, NULL); // automatic id
+      EnoceanInputHandler::addInputChannel(newDev, tempSensor, false, NULL); // automatic id
     }
     // report low bat status as a binary input
-    EnoceanSensorHandler::addSensorChannel(newDev, lowBatInput, false, NULL); // automatic id
+    EnoceanInputHandler::addInputChannel(newDev, lowBatInput, false, NULL); // automatic id
     // A5-20-01 need teach-in response if requested (i.e. if this device creation is caused by learn-in, not reinstantiation from DB)
     if (aSendTeachInResponse) {
       newDev->sendTeachInResponse();
@@ -1053,14 +1053,14 @@ EnoceanA52004Handler::EnoceanA52004Handler(EnoceanDevice &aDevice) :
 }
 
 // configuration for included sensor channels
-static const p44::EnoceanSensorDescriptor A52004roomTemp =
+static const p44::EnoceanInputDescriptor A52004roomTemp =
   { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room, 10, 30, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText };
-static const p44::EnoceanSensorDescriptor A52004feedTemp =
+static const p44::EnoceanInputDescriptor A52004feedTemp =
   { 0, 0x20, 0x04, 0, class_blue_climate, group_blue_heating,            behaviour_sensor,      sensorType_temperature, usage_undefined, 20, 80, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, "feed temperature" };
-static const p44::EnoceanSensorDescriptor A52004setpointTemp =
+static const p44::EnoceanInputDescriptor A52004setpointTemp =
   { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_user, 10, 30, DB(2,7), DB(2,0), 5, Never, &stdSensorHandler, setPointText }; // user action quickly forwarded, but not regularily transmitted
-static const p44::EnoceanSensorDescriptor A52004lowBatInput =
-  { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 0,  1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  lowBatText };
+static const p44::EnoceanInputDescriptor A52004lowBatInput =
+  { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room, 0,  1, DB(0,0), DB(0,0), 100, 40*60, NULL,  lowBatText }; // battery status update coded below
 
 
 // static factory method
@@ -1100,17 +1100,17 @@ EnoceanDevicePtr EnoceanA52004Handler::newDevice(
     if (EEP_VARIANT(aEEProfile)!=0) {
       // all non-default profiles have the sensors enabled
       // - built-in room temperature
-      newHandler->roomTemp = EnoceanSensorHandler::newSensorBehaviour(A52004roomTemp, newDev, NULL); // automatic id
+      newHandler->roomTemp = EnoceanInputHandler::newInputChannelBehaviour(A52004roomTemp, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->roomTemp);
       // - built-in feed temperature
-      newHandler->feedTemp = EnoceanSensorHandler::newSensorBehaviour(A52004feedTemp, newDev, NULL); // automatic id
+      newHandler->feedTemp = EnoceanInputHandler::newInputChannelBehaviour(A52004feedTemp, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->feedTemp);
       // - set point temperature
-      newHandler->setpointTemp = EnoceanSensorHandler::newSensorBehaviour(A52004setpointTemp, newDev, NULL); // automatic id
+      newHandler->setpointTemp = EnoceanInputHandler::newInputChannelBehaviour(A52004setpointTemp, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->setpointTemp);
     }
     // report low bat status as a binary input
-    newHandler->lowBatInput = EnoceanSensorHandler::newSensorBehaviour(A52004lowBatInput, newDev, NULL); // automatic id
+    newHandler->lowBatInput = EnoceanInputHandler::newInputChannelBehaviour(A52004lowBatInput, newDev, NULL); // automatic id
     newDev->addBehaviour(newHandler->lowBatInput);
     // A5-20-04 need teach-in response if requested (i.e. if this device creation is caused by learn-in, not reinstantiation from DB)
     if (aSendTeachInResponse) {
@@ -1162,17 +1162,18 @@ void EnoceanA52004Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       }
       else {
         // DB1 transmits room temperature
-        if (roomTemp && measurementOn) EnoceanSensors::handleBitField(A52004roomTemp, roomTemp, dataP, datasize);
+        if (roomTemp && measurementOn) EnoceanInputs::handleBitField(A52004roomTemp, roomTemp, dataP, datasize, this);
       }
-      // - update low bat state
+      // - update low battery state here (can't use bit field handler, because lowBat is not a bit but a enum decoded above)
       boost::dynamic_pointer_cast<BinaryInputBehaviour>(lowBatInput)->updateInputState(lowBat);
+      batPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100;
       if (ENOBIT(0, 1, dataP, datasize)) {
         // set point transmitted
-        if (setpointTemp) EnoceanSensors::handleBitField(A52004setpointTemp, setpointTemp, dataP, datasize);
+        if (setpointTemp) EnoceanInputs::handleBitField(A52004setpointTemp, setpointTemp, dataP, datasize, this);
       }
       else {
         // feed temperature transmitted
-        if (feedTemp && measurementOn) EnoceanSensors::handleBitField(A52004feedTemp, feedTemp, dataP, datasize);
+        if (feedTemp && measurementOn) EnoceanInputs::handleBitField(A52004feedTemp, feedTemp, dataP, datasize, this);
       }
       // show general status
       HLOG(LOG_NOTICE,
@@ -1292,24 +1293,24 @@ string EnoceanA52004Handler::shortDesc()
 
 // configuration for A5-13-0X sensor channels
 // - A5-13-01 telegram
-static const p44::EnoceanSensorDescriptor A513lowLightSensor =
+static const p44::EnoceanInputDescriptor A513lowLightSensor =
   { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 999, DB(3,7), DB(3,0), 10, 40*60, &stdSensorHandler, illumText };
-static const p44::EnoceanSensorDescriptor A513outdoorTemp =
+static const p44::EnoceanInputDescriptor A513outdoorTemp =
   { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_temperature, usage_outdoors, -40, 80, DB(2,7), DB(2,0), 10*60, 40*60, &stdSensorHandler, tempText };
-static const p44::EnoceanSensorDescriptor A513windSpeed =
+static const p44::EnoceanInputDescriptor A513windSpeed =
   { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_wind_speed, usage_outdoors, 0, 70, DB(1,7), DB(1,0), 20, 40*60, &stdSensorHandler, "Wind Speed" };
-static const p44::EnoceanSensorDescriptor A513gustSpeed =
+static const p44::EnoceanInputDescriptor A513gustSpeed =
   { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_gust_speed, usage_outdoors, 0, 70, DB(1,7), DB(1,0), 3, 40*60, &stdSensorHandler, "Gust Speed" };
-static const p44::EnoceanSensorDescriptor A513twilightIndicator =
+static const p44::EnoceanInputDescriptor A513twilightIndicator =
   { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_twilight,  usage_outdoors, 0,  1, DB(0,2), DB(0,2), 30, 40*60, &stdInputHandler,  "Twilight Indicator" };
-static const p44::EnoceanSensorDescriptor A513rainIndicator =
+static const p44::EnoceanInputDescriptor A513rainIndicator =
   { 0, 0x13, 0x01, 0, class_black_joker, group_black_variable, behaviour_binaryinput, binInpType_rain,  usage_outdoors, 0,  1, DB(0,1), DB(0,1), 30, 40*60, &stdInputHandler,  "Rain indicator" };
 // - A5-13-02 telegram
-static const p44::EnoceanSensorDescriptor A513sunWest =
+static const p44::EnoceanInputDescriptor A513sunWest =
   { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(3,7), DB(3,0), 30, 40*60, &stdSensorHandler, "Sun West" };
-static const p44::EnoceanSensorDescriptor A513sunSouth =
+static const p44::EnoceanInputDescriptor A513sunSouth =
   { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(2,7), DB(2,0), 30, 40*60, &stdSensorHandler, "Sun South" };
-static const p44::EnoceanSensorDescriptor A513sunEast =
+static const p44::EnoceanInputDescriptor A513sunEast =
   { 0, 0x13, 0x02, 0, class_black_joker, group_black_variable, behaviour_sensor, sensorType_illumination, usage_outdoors, 0, 150000, DB(1,7), DB(1,0), 30, 40*60, &stdSensorHandler, "Sun East" };
 
 EnoceanA5130XHandler::EnoceanA5130XHandler(EnoceanDevice &aDevice) :
@@ -1351,49 +1352,49 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
       // this is the main device
       newDev->setFunctionDesc("environmental multisensor");
       // - Add channel-built-in behaviour: low light measurement at dawn and dusk (below 1000lx)
-      newHandler->behaviour = EnoceanSensorHandler::newSensorBehaviour(A513lowLightSensor, newDev, NULL); // automatic id
+      newHandler->behaviour = EnoceanInputHandler::newInputChannelBehaviour(A513lowLightSensor, newDev, NULL); // automatic id
       // - register the handler and the default behaviour
       newDev->addChannelHandler(newHandler);
       // - Add extra behaviours for A5-13-01
-      newHandler->outdoorTemp = EnoceanSensorHandler::newSensorBehaviour(A513outdoorTemp, newDev, NULL); // automatic id
+      newHandler->outdoorTemp = EnoceanInputHandler::newInputChannelBehaviour(A513outdoorTemp, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->outdoorTemp);
-      newHandler->windSpeed = EnoceanSensorHandler::newSensorBehaviour(A513windSpeed, newDev, NULL); // automatic id
+      newHandler->windSpeed = EnoceanInputHandler::newInputChannelBehaviour(A513windSpeed, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->windSpeed);
-      newHandler->gustSpeed = EnoceanSensorHandler::newSensorBehaviour(A513gustSpeed, newDev, NULL); // automatic id
+      newHandler->gustSpeed = EnoceanInputHandler::newInputChannelBehaviour(A513gustSpeed, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->gustSpeed);
-      newHandler->twilightIndicator = EnoceanSensorHandler::newSensorBehaviour(A513twilightIndicator, newDev, "twilight"); // is low light (dawn, dusk) below 1000lx
+      newHandler->twilightIndicator = EnoceanInputHandler::newInputChannelBehaviour(A513twilightIndicator, newDev, "twilight"); // is low light (dawn, dusk) below 1000lx
       newDev->addBehaviour(newHandler->twilightIndicator);
-      newHandler->rainIndicator = EnoceanSensorHandler::newSensorBehaviour(A513rainIndicator, newDev, NULL); // automatic id
+      newHandler->rainIndicator = EnoceanInputHandler::newInputChannelBehaviour(A513rainIndicator, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->rainIndicator);
       // sub sensors in same device?
       if (!separateSunSensors) {
         // - Add extra behaviours for A5-13-02
-        newHandler->sunWest = EnoceanSensorHandler::newSensorBehaviour(A513sunWest, newDev, "sun_west");
+        newHandler->sunWest = EnoceanInputHandler::newInputChannelBehaviour(A513sunWest, newDev, "sun_west");
         newDev->addBehaviour(newHandler->sunWest);
-        newHandler->sunSouth = EnoceanSensorHandler::newSensorBehaviour(A513sunSouth, newDev, "sun_south");
+        newHandler->sunSouth = EnoceanInputHandler::newInputChannelBehaviour(A513sunSouth, newDev, "sun_south");
         newDev->addBehaviour(newHandler->sunSouth);
-        newHandler->sunEast = EnoceanSensorHandler::newSensorBehaviour(A513sunEast, newDev, "sun_east");
+        newHandler->sunEast = EnoceanInputHandler::newInputChannelBehaviour(A513sunEast, newDev, "sun_east");
         newDev->addBehaviour(newHandler->sunEast);
       }
     }
     else if (aSubDeviceIndex==1) {
       // this is a sun direction sensor
       newDev->setFunctionDesc("sun west sensor");
-      newHandler->sunWest = EnoceanSensorHandler::newSensorBehaviour(A513sunWest, newDev, "sun_west");
+      newHandler->sunWest = EnoceanInputHandler::newInputChannelBehaviour(A513sunWest, newDev, "sun_west");
       newDev->addChannelHandler(newHandler);
       newDev->addBehaviour(newHandler->sunWest);
     }
     else if (aSubDeviceIndex==2) {
       // this is a sun direction sensor
       newDev->setFunctionDesc("sun south sensor");
-      newHandler->sunSouth = EnoceanSensorHandler::newSensorBehaviour(A513sunSouth, newDev, "sun_south");
+      newHandler->sunSouth = EnoceanInputHandler::newInputChannelBehaviour(A513sunSouth, newDev, "sun_south");
       newDev->addChannelHandler(newHandler);
       newDev->addBehaviour(newHandler->sunSouth);
     }
     else if (aSubDeviceIndex==3) {
       // this is a sun direction sensor
       newDev->setFunctionDesc("sun east sensor");
-      newHandler->sunEast = EnoceanSensorHandler::newSensorBehaviour(A513sunEast, newDev, "sun_east");
+      newHandler->sunEast = EnoceanInputHandler::newInputChannelBehaviour(A513sunEast, newDev, "sun_east");
       newDev->addChannelHandler(newHandler);
       newDev->addBehaviour(newHandler->sunEast);
     }
@@ -1439,20 +1440,20 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         else {
           // A5-13-01
           nowBroken = false;
-          if (behaviour) handleBitField(A513lowLightSensor, behaviour, dataP, datasize);
-          if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize);
-          if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize);
-          if (gustSpeed) handleBitField(A513gustSpeed, gustSpeed, dataP, datasize);
-          if (twilightIndicator) handleBitField(A513twilightIndicator, twilightIndicator, dataP, datasize);
-          if (rainIndicator) handleBitField(A513rainIndicator, rainIndicator, dataP, datasize);
+          if (behaviour) handleBitField(A513lowLightSensor, behaviour, dataP, datasize, this);
+          if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize, this);
+          if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize, this);
+          if (gustSpeed) handleBitField(A513gustSpeed, gustSpeed, dataP, datasize, this);
+          if (twilightIndicator) handleBitField(A513twilightIndicator, twilightIndicator, dataP, datasize, this);
+          if (rainIndicator) handleBitField(A513rainIndicator, rainIndicator, dataP, datasize, this);
         }
         break;
       case 2:
         // A5-13-02
         if (!broken) {
-          if (sunWest) handleBitField(A513sunWest, sunWest, dataP, datasize);
-          if (sunSouth) handleBitField(A513sunSouth, sunSouth, dataP, datasize);
-          if (sunEast) handleBitField(A513sunEast, sunEast, dataP, datasize);
+          if (sunWest) handleBitField(A513sunWest, sunWest, dataP, datasize, this);
+          if (sunSouth) handleBitField(A513sunSouth, sunSouth, dataP, datasize, this);
+          if (sunEast) handleBitField(A513sunEast, sunEast, dataP, datasize, this);
         }
         break;
       default:
