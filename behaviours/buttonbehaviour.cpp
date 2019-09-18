@@ -117,6 +117,66 @@ void ButtonBehaviour::updateButtonState(bool aPressed)
 }
 
 
+void ButtonBehaviour::injectClick(DsClickType aClickType)
+{
+  switch (aClickType) {
+    // add clicks and tips to counter (which will expire after t_tip_timeout)
+    case ct_tip_4x:
+      clickCounter++;
+    case ct_tip_3x:
+    case ct_click_3x:
+      clickCounter++;
+    case ct_tip_2x:
+    case ct_click_2x:
+      clickCounter++;
+    case ct_tip_1x:
+    case ct_click_1x:
+      clickCounter++;
+      // report current count as tips
+      state = S4_nextTipWait; // must set a state, although regular state machine is not used, to make sure valueSource reports clicks
+      if (isLocalButtonEnabled() && clickCounter==1) {
+        // first tip switches local output if local button is enabled
+        localSwitchOutput();
+      }
+      else if (clickCounter<=4) {
+        sendClick((DsClickType)(ct_tip_1x+clickCounter-1));
+      }
+      if (clickCounter<4) {
+        // time out after we're sure all tips are accumulated
+        buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::injectedOpComplete, this), t_tip_timeout);
+      }
+      else {
+        // counter overflow, reset right now
+        injectedOpComplete();
+      }
+      break;
+    case ct_hold_start:
+      if (clickType==ct_hold_start) {
+        aClickType = ct_hold_repeat; // already started before -> treat as repeat
+      }
+      state = S8_awaitrelease; // must set a state, although regular state machine is not used, to make sure valueSource reports holds
+      sendClick(aClickType);
+      buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
+      break;
+    case ct_hold_end:
+      if (clickType!=ct_hold_start && clickType!=ct_hold_repeat) break; // suppress hold end when not in hold start
+      sendClick(aClickType);
+      injectedOpComplete();
+      break;
+    default:
+      break;
+
+  }
+}
+
+
+void ButtonBehaviour::injectedOpComplete()
+{
+  resetStateMachine();
+  keyOpComplete();
+}
+
+
 void ButtonBehaviour::resetStateMachine()
 {
   buttonPressed = false;
@@ -128,6 +188,19 @@ void ButtonBehaviour::resetStateMachine()
   buttonStateMachineTicket.cancel();
 }
 
+
+void ButtonBehaviour::holdRepeat()
+{
+  buttonStateMachineTicket.cancel();
+  // button still pressed
+  BFOCUSLOG("dimming in progress - sending ct_hold_repeat (repeatcount = %d)", holdRepeats);
+  sendClick(ct_hold_repeat);
+  holdRepeats++;
+  if (holdRepeats<max_hold_repeats) {
+    // schedule next repeat
+    buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
+  }
+}
 
 
 #if FOCUSLOGGING
@@ -219,7 +292,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
           sendClick(ct_hold_start);
           // schedule hold repeats
           holdRepeats = 0;
-          buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::dimRepeat, this), t_dim_repeat_time);
+          buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
         }
         else {
           // button just released
@@ -234,21 +307,6 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
     BLOG(LOG_ERR, "invalid stateMachineMode");
   }
 }
-
-
-void ButtonBehaviour::dimRepeat()
-{
-  buttonStateMachineTicket.cancel();
-  // button still pressed
-  BFOCUSLOG("dimming in progress - sending ct_hold_repeat (repeatcount = %d)", holdRepeats);
-  sendClick(ct_hold_repeat);
-  holdRepeats++;
-  if (holdRepeats<max_hold_repeats) {
-    // schedule next repeat
-    buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::dimRepeat, this), t_dim_repeat_time);
-  }
-}
-
 
 
 // standard button state machine

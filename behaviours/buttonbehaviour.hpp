@@ -145,11 +145,16 @@ namespace p44 {
     /// @param aPressed true if button is currently pressed, false if button is currently released
     void updateButtonState(bool aPressed);
 
+    /// inject already detected clicks or hold/release operations
+    /// @note this is for devices which do click/hold disambiguation themselves.
+    /// Do NOT used this mixed with updateButtonState()!
+    /// @param aClickType the click or hold/release to inject
+    void injectClick(DsClickType aClickType);
+
     /// send direct action
     /// @param aActionMode the mode how to send the action
     /// @param aActionId the scene number to send
     void sendAction(VdcButtonActionMode aActionMode, uint8_t aActionId);
-
 
     /// send click
     /// @param aClickType the click to send
@@ -281,9 +286,10 @@ namespace p44 {
     void checkStandardStateMachine(bool aStateChanged, MLMicroSeconds aNow);
     void checkCustomStateMachine(bool aStateChanged, MLMicroSeconds aNow);
     void keyOpComplete();
-    void dimRepeat();
+    void holdRepeat();
     void localSwitchOutput();
     void localDim(bool aStart);
+    void injectedOpComplete();
 
     /// @}
 
