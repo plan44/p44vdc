@@ -61,8 +61,6 @@ HueApiOperation::~HueApiOperation()
 
 bool HueApiOperation::initiate()
 {
-  if (!canInitiate())
-    return false;
   // initiate the web request
   const char *methodStr;
   switch (method) {
@@ -70,6 +68,9 @@ bool HueApiOperation::initiate()
     case httpMethodPUT : methodStr = "PUT"; break;
     case httpMethodDELETE : methodStr = "DELETE"; break;
     default : methodStr = "GET"; data.reset(); break;
+  }
+  if (method==httpMethodPUT) {
+    LOG(LOG_INFO, "Sending hue API action (PUT) command: %s: %s", url.c_str(), data ? data->c_strValue() : "<no data>");
   }
   hueComm.bridgeAPIComm.jsonRequest(url.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, data);
   // executed
@@ -521,7 +522,6 @@ HueComm::HueComm() :
   bridgeAPIComm(MainLoop::currentMainLoop()),
   findInProgress(false),
   apiReady(false),
-  lastApiAction(Never),
   useNUPnP(false)
 {
   bridgeAPIComm.setServerCertVfyDir("");
@@ -563,8 +563,7 @@ void HueComm::apiAction(HttpMethods aMethod, const char* aUrlSuffix, JsonObjectP
   // Q: How many commands you can send per second?
   // A: You can send commands to the lights too fast. If you stay roughly around 10 commands per
   //    second to the /lights resource as maximum you should be fine.
-  op->setInitiatesAt(lastApiAction+100*MilliSecond); // do not start next command earlier than 100mS after the previous one
-  lastApiAction = MainLoop::currentMainLoop().now(); // remember this operation
+  op->setInitiationDelay(100*MilliSecond, true); // do not start next command earlier than 100mS after the previous one
   queueOperation(op);
   // process operations
   processOperations();
@@ -609,8 +608,7 @@ void HueComm::refindBridge(HueBridgeFindCB aFindHandler)
 void HueComm::findBridgesNupnp(HueBridgeNupnpFindCB aFindHandler)
 {
   HueApiOperationPtr op = HueApiOperationPtr(new HueApiOperation(*this, httpMethodGET, NUPNP_PATH.c_str(), NULL, boost::bind(&HueComm::gotBridgeNupnpResponse, this, _1, _2, aFindHandler)));
-  op->setInitiatesAt(lastApiAction+100*MilliSecond); // do not start next command earlier than 100mS after the previous one
-  lastApiAction = MainLoop::currentMainLoop().now(); // remember this operation
+  op->setInitiationDelay(100*MilliSecond, true); // do not start next command earlier than 100mS after the previous one
   queueOperation(op);
   // process operations
   processOperations();
