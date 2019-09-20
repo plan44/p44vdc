@@ -1098,7 +1098,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     // - use shadow scene settings
     installSettings(DeviceSettingsPtr(new ShadowDeviceSettings(*this)));
     // - add shadow behaviour
-    ShadowBehaviourPtr sb = ShadowBehaviourPtr(new ShadowBehaviour(*this));
+    ShadowBehaviourPtr sb = ShadowBehaviourPtr(new ShadowBehaviour(*this, defaultGroup));
     sb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_undefined, false, -1);
     sb->setHardwareName(hardwareName);
     ShadowDeviceKind sk = shadowdevice_jalousie; // default to jalousie
@@ -1128,7 +1128,10 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     o->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_undefined, false, -1);
     o->setHardwareName(hardwareName);
     o->setGroupMembership(defaultGroup, true); // put into default group
-    o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "basic")));
+    if (outputFunction==outputFunction_switch)
+      o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "basic_switch")));
+    else
+      o->addChannel(ChannelBehaviourPtr(new DialChannel(*o, "basic_dial")));
     addBehaviour(o);
   }
   else {
