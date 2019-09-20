@@ -55,15 +55,14 @@ namespace p44 {
     // model software version
     string swVersion;
 
-    // reapply mechanism for difficult situations
-    typedef enum {
-      reapply_none, ///< do not re-apply
-      reapply_once, ///< re-apply once shortly after initial apply
-      reapply_periodic ///< alse re-apply periodically later (for broken bulbs that go white after a while)
-    } ReapplyMode;
-    ReapplyMode reapplyMode;
-    int reapplyCount;
+    // mechanisms for difficult devices
+    MLMicroSeconds reapplyAfter;
     MLTicket reapplyTicket;
+    bool separateOnAndChannels;
+
+    // internal state
+    Tristate currentlyOn; ///< current "on" status
+    uint8_t lastSentBri; ///< last sent "bri", 0=undefined
 
     MLTicket dimTicket;
 
@@ -194,9 +193,10 @@ namespace p44 {
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
     void channelValuesSent(LightBehaviourPtr aColorLightBehaviour, SimpleCB aDoneCB, JsonObjectPtr aResult, ErrorPtr aError);
     void channelValuesReceived(SimpleCB aDoneCB, JsonObjectPtr aDeviceInfo, ErrorPtr aError);
-    bool applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway, MLMicroSeconds &aTransitionTime);
-    void reapplyTimerHandler();
+    bool applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReapply, MLMicroSeconds &aTransitionTime);
+    void reapplyTimerHandler(MLMicroSeconds aTransitionTime);
     void parseLightState(JsonObjectPtr aDeviceInfo);
+    void checkBrokenDevices(JsonObjectPtr aDeviceInfo);
 
   };
   

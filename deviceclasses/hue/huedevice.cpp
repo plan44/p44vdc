@@ -52,6 +52,8 @@ using namespace p44;
 
 // - CIE x,y: hue and dS use 0..1 for x and y
 
+#define DEFAULT_REAPPLY_DELAY (1*Second)
+
 
 
 // MARK: - HueDevice
@@ -62,7 +64,10 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool 
   lightID(aLightID),
   uniqueID(aUniqueID),
   hueCertified(undefined),
-  reapplyMode(reapply_once)
+  reapplyAfter(DEFAULT_REAPPLY_DELAY),
+  currentlyOn(undefined),
+  lastSentBri(0), // undefined (bri starts at 1)
+  separateOnAndChannels(false)
 {
   // hue devices are lights
   setColorClass(class_yellow_light);
@@ -134,6 +139,21 @@ void HueDevice::setName(const string &aName)
 }
 
 
+void HueDevice::checkBrokenDevices(JsonObjectPtr aDeviceInfo)
+{
+  JsonObjectPtr o;
+  if (
+    // Molto Luce VOLARE ZB3 with TCI electronics v.1.2 is quite broken
+    // (random brightness when "on" and "bri" are changed in same command)
+    aDeviceInfo->get("modelid", o) && o->stringValue()=="VOLARE ZB3" &&
+    aDeviceInfo->get("swversion", o) && o->stringValue()=="v.1.2"
+  ) {
+    ALOG(LOG_WARNING, "Model %s is known broken, enabling tweaks. device info:\n%s", hueModel.c_str(), aDeviceInfo->c_strValue());
+    separateOnAndChannels = true;
+  }
+}
+
+
 
 void HueDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
@@ -171,6 +191,8 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
         hueCertified = o2->boolValue() ? yes : no;
       }
     }
+    // look for known bad devices and possibly enable tweaks
+    checkBrokenDevices(aDeviceInfo);
     // now look at state
     parseLightState(aDeviceInfo);
   }
@@ -321,48 +343,38 @@ void HueDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aDisconne
 
 
 
-#define INITIAL_REAPPLY_DELAY (1*Second)
-#define PERIODIC_REAPPLY_INTERVAL (30*Second)
 
 void HueDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   reapplyTicket.cancel();
-  reapplyCount = 0;
-  MLMicroSeconds tt = 0; // none so far
+  MLMicroSeconds tt = 0; // none so far, applyLigtState will determine highest time
   if (applyLightState(aDoneCB, aForDimming, false, tt)) {
     // actually applied something, schedule reapply if enabled and not dimming
-    if (!aForDimming && reapplyMode!=reapply_none) {
+    if (!aForDimming && reapplyAfter!=Never) {
       // initially re-apply shortly after, but not before transition time is over
-      reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), tt>INITIAL_REAPPLY_DELAY ? tt : INITIAL_REAPPLY_DELAY);
+      reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this, tt), tt>reapplyAfter ? tt : reapplyAfter);
     }
   }
 }
 
 
 
-void HueDevice::reapplyTimerHandler()
+void HueDevice::reapplyTimerHandler(MLMicroSeconds aTransitionTime)
 {
-  reapplyTicket = 0;
-  reapplyCount++;
-  ALOG(reapplyCount>1 ? LOG_DEBUG : LOG_INFO, "Re-applying values to hue (%d. time) to make sure light actually is udpated", reapplyCount);
-  MLMicroSeconds tt = 0; // none so far
-  applyLightState(NULL, false, true, tt);
-  if (reapplyMode==reapply_periodic) {
-    // re-apply periodically -> schedule next
-    reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this), PERIODIC_REAPPLY_INTERVAL);
-  }
+  reapplyTicket.cancel();
+  ALOG(LOG_INFO, "Re-applying values to hue to make sure light actually is udpated");
+  applyLightState(NULL, false, true, aTransitionTime);
 }
 
 
 
 
-bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway, MLMicroSeconds &aTransitionTime)
+bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReapply, MLMicroSeconds &aTransitionTime)
 {
   // Update of light state needed
-  aTransitionTime = 0; // none so far
   LightBehaviourPtr l = getOutput<LightBehaviour>();
   if (l) {
-    if (!aAnyway && !needsToApplyChannels(&aTransitionTime)) {
+    if (!aReapply && !needsToApplyChannels(&aTransitionTime)) {
       // NOP for this call
       channelValuesSent(l, aDoneCB, JsonObjectPtr(), ErrorPtr());
       return false; // no changes
@@ -372,18 +384,49 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
     string url = string_format("/lights/%s/state", lightID.c_str());
     JsonObjectPtr newState = JsonObject::newObj();
     // brightness is always re-applied unless it's dimming
-    bool lightIsOn = true; // assume on
-    if (aAnyway || !aForDimming || l->brightness->needsApplying()) {
+    bool lightIsOn = currentlyOn!=no; // assume on even if unknown
+    if (aReapply || !aForDimming || l->brightness->needsApplying()) {
       Brightness b = l->brightnessForHardware();
-      if (b<DS_BRIGHTNESS_STEP) {
-        // light off, no other parameters
+      lightIsOn = b>=DS_BRIGHTNESS_STEP;
+      if (!lightIsOn) {
+        // light should be off, no other parameters
         newState->add("on", JsonObject::newBool(false));
         lightIsOn = false;
       }
       else {
         // light on
-        newState->add("on", JsonObject::newBool(true));
-        newState->add("bri", JsonObject::newInt32(b*HUEAPI_FACTOR_BRIGHTNESS+HUEAPI_OFFSET_BRIGHTNESS+0.5)); // DS_BRIGHTNESS_STEP..100 -> 1..254
+        uint8_t newBri = b*HUEAPI_FACTOR_BRIGHTNESS+HUEAPI_OFFSET_BRIGHTNESS+0.5; // DS_BRIGHTNESS_STEP..100 -> 1..254
+        if (separateOnAndChannels) {
+          // known broken light, make sure on is never sent together with brightness, but always separately before
+          if (currentlyOn!=yes || aReapply) {
+            if (lastSentBri!=newBri || aReapply) {
+              // both on and bri changes -> need to send "on" ahead
+              ALOG(LOG_INFO, "light with known broken API: send \"on\":true separately, transition %d mS", (int)(aTransitionTime/MilliSecond));
+              JsonObjectPtr onState = JsonObject::newObj();
+              onState->add("on", JsonObject::newBool(true));
+              onState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
+              // just send, don't care about the answer
+              hueComm().apiAction(httpMethodPUT, url.c_str(), onState, NULL);
+              // Note: hueComm will make sure next API command is paced in >=100mS distance,
+              // so we can go on creating the bri/color state change right now
+              newState->add("bri", JsonObject::newInt32(newBri));
+            }
+            else {
+              // no brightness change, safe to send on now (no matter if changed or not)
+              newState->add("on", JsonObject::newBool(true));
+            }
+          }
+          else {
+              // no "on" change, just send brightness (no matter if changed or not)
+              newState->add("bri", JsonObject::newInt32(newBri));
+            }
+          }
+        else {
+          // normal light, can send on and bri together
+          newState->add("on", JsonObject::newBool(true));
+          newState->add("bri", JsonObject::newInt32(newBri));
+        }
+        lastSentBri = newBri;
       }
     }
     // for color lights, also check color (but not if light is off)
@@ -396,17 +439,17 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
         switch (cl->colorMode) {
           case colorLightModeHueSaturation: {
             // for dimming, only actually changed component (hue or saturation)
-            if (aAnyway || !aForDimming || cl->hue->needsApplying()) {
+            if (aReapply || !aForDimming || cl->hue->needsApplying()) {
               newState->add("hue", JsonObject::newInt32(cl->hue->getChannelValue()*HUEAPI_FACTOR_HUE+0.5));
             }
-            if (aAnyway || !aForDimming || cl->saturation->needsApplying()) {
+            if (aReapply || !aForDimming || cl->saturation->needsApplying()) {
               newState->add("sat", JsonObject::newInt32(cl->saturation->getChannelValue()*HUEAPI_FACTOR_SATURATION+0.5));
             }
             break;
           }
           case colorLightModeXY: {
             // x,y are always applied together
-            if (aAnyway || cl->cieX->needsApplying() || cl->cieY->needsApplying()) {
+            if (aReapply || cl->cieX->needsApplying() || cl->cieY->needsApplying()) {
               JsonObjectPtr xyArr = JsonObject::newArray();
               xyArr->arrayAppend(JsonObject::newDouble(cl->cieX->getChannelValue()));
               xyArr->arrayAppend(JsonObject::newDouble(cl->cieY->getChannelValue()));
@@ -415,7 +458,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
             break;
           }
           case colorLightModeCt: {
-            if (aAnyway || cl->ct->needsApplying()) {
+            if (aReapply || cl->ct->needsApplying()) {
               newState->add("ct", JsonObject::newInt32(cl->ct->getChannelValue()));
             }
             break;
@@ -435,7 +478,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
     }
     // show what we are doing
     if (LOGENABLED(LOG_INFO) && (!aForDimming || LOGENABLED(LOG_DEBUG))) {
-      ALOG(LOG_INFO, "sending new light state: light is %s, brightness=%0.0f, transition in %d mS", lightIsOn ? "ON" : "OFF", l->brightness->getChannelValue(), (int)(aTransitionTime/MilliSecond));
+      ALOG(LOG_INFO, "sending new light state: light is %s, brightness=%0.0f, transition %d mS", lightIsOn ? "ON" : "OFF", l->brightness->getChannelValue(), (int)(aTransitionTime/MilliSecond));
       if (cl) {
         switch (cl->colorMode) {
           case colorLightModeHueSaturation:
@@ -464,8 +507,8 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aAnyway
 
 void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aDoneCB, JsonObjectPtr aResult, ErrorPtr aError)
 {
-  if (!reapplyTicket || reapplyCount>1) {
-    // synchronize actual channel values as hue delivers them back, but only if not first re-apply still pending
+  if (!reapplyTicket) {
+    // synchronize actual channel values as hue delivers them back, but only if not re-apply still pending
     if (aResult) {
       ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(aLightBehaviour);
       // [{"success":{"\/lights\/1\/state\/transitiontime":1}},{"success":{"\/lights\/1\/state\/on":true}},{"success":{"\/lights\/1\/state\/hue":0}},{"success":{"\/lights\/1\/state\/sat":255}},{"success":{"\/lights\/1\/state\/bri":255}}]
@@ -496,7 +539,8 @@ void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aD
               cl->ct->syncChannelValue(val->int32Value(), false); // only sync if no new value pending already, volatile
             }
             else if (param=="on") {
-              if (!val->boolValue()) {
+              currentlyOn = val->boolValue() ? yes : no;
+              if (currentlyOn==no) {
                 aLightBehaviour->syncBrightnessFromHardware(0, false); // only sync if no new value pending already, volatile
                 blockBrightness = true; // prevent syncing brightness, lamp is off, logical brightness is 0
               }
@@ -533,6 +577,7 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
       o = state->get("on");
       if (o && o->boolValue()) {
         // lamp is on, get brightness
+        currentlyOn = yes;
         o = state->get("bri");
         if (o) {
           double hb = o->int32Value(); // hue brightness from 1..254
@@ -541,6 +586,7 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
         }
       }
       else {
+        currentlyOn = o ? no : undefined; // if no "on" field was included, consider undefined
         l->syncBrightnessFromHardware(0); // off
       }
       ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(l);
