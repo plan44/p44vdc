@@ -272,7 +272,7 @@ namespace p44 {
 
 
   public:
-    ShadowBehaviour(Device &aDevice);
+    ShadowBehaviour(Device &aDevice, DsGroup aGroup = group_grey_shadow);
 
     /// device type identifier
     /// @return constant identifier for this type of behaviour

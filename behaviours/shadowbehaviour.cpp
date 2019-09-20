@@ -279,7 +279,7 @@ DsScenePtr ShadowAwningDeviceSetting::newDefaultScene(SceneNo aSceneNo)
 #define INTER_SHORT_MOVE_DELAY (1*Second)
 
 
-ShadowBehaviour::ShadowBehaviour(Device &aDevice) :
+ShadowBehaviour::ShadowBehaviour(Device &aDevice, DsGroup aGroup) :
   inherited(aDevice),
   // hardware derived parameters
   shadowDeviceKind(shadowdevice_jalousie),
@@ -303,8 +303,8 @@ ShadowBehaviour::ShadowBehaviour(Device &aDevice) :
   referencePosition(100), // assume fully open, at top
   referenceAngle(100) // at top means that angle is open as well
 {
-  // make it member of the light group
-  setGroupMembership(group_grey_shadow, true);
+  // make it member of the specified group (usually: shadow)
+  setGroupMembership(aGroup, true);
   // primary output controls position
   setHardwareName("position");
   // add the channels (every shadow device has an angle so far, but roller/sun blinds dont use it)
