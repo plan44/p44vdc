@@ -1396,6 +1396,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     currentDimChannel = aChannel;
     currentAutoStopTime = aAutoStopAfter;
     preparedDim = true;
+    preparedScene.reset(); // to make sure there's no leftover
     aPreparedCB(ntfy_dimchannel); // needs to start or stop dimming
     return;
   }

@@ -391,7 +391,6 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       if (!lightIsOn) {
         // light should be off, no other parameters
         newState->add("on", JsonObject::newBool(false));
-        lightIsOn = false;
       }
       else {
         // light on

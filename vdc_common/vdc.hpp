@@ -636,6 +636,7 @@ namespace p44 {
 
     void prepareNextNotification(NotificationDeliveryStatePtr aDeliveryState);
     void notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, NotificationType aNotificationToApply);
+    void preparedOperationExecuted(DevicePtr aDevice);
     void executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState);
     void preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void repeatPreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState);

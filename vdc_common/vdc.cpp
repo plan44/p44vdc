@@ -378,11 +378,18 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
       // optimisation off, different notification type than others in set, or otherwise not optimizable -> just execute and apply right now
       dev->updateDeliveryState(aDeliveryState, false); // still: do basic updating of state such that processing has all the info
       getVdcHost().deviceWillApplyNotification(dev, *aDeliveryState); // let vdchost process for possibly updating global zone state
-      dev->executePreparedOperation(NULL, aNotificationToApply);
+      dev->executePreparedOperation(boost::bind(&Vdc::preparedOperationExecuted, this, dev), aNotificationToApply);
     }
   }
   // break caller chain by going via mainloop
   MainLoop::currentMainLoop().executeNow(boost::bind(&Vdc::prepareNextNotification, this, aDeliveryState));
+}
+
+
+void Vdc::preparedOperationExecuted(DevicePtr aDevice)
+{
+  // non-optimized execution of operation complete
+  aDevice->releasePreparedOperation();
 }
 
 
