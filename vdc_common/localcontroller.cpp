@@ -1085,6 +1085,7 @@ void Trigger::triggerEvaluationExecuted(ExpressionValue aEvaluationResult)
       // a trigger fire is an activity
       LocalController::sharedLocalController()->signalActivity();
       // trigger when state goes from not met to met.
+      stopActions(); // abort previous actions
       executeActions(boost::bind(&Trigger::triggerActionExecuted, this, _1));
     }
   }
@@ -1442,7 +1443,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 
 ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 {
-  triggerAction.abort(); // abort previous ones
+  triggerAction.abort(true); // abort previous ones, calling back (to finish request that possibly has started the script)
   executeActions(boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1));
   return ErrorPtr(); // will send result later
 }
