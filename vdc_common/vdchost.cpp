@@ -1410,7 +1410,7 @@ void VdcHost::announceNext()
       vdc->isPublicDS() && // only public ones
       vdc->announced==Never &&
       (vdc->announcing==Never || MainLoop::now()>vdc->announcing+ANNOUNCE_RETRY_TIMEOUT) &&
-      (!vdc->invisibleWhenEmpty() || vdc->getNumberOfDevices()>0)
+      (!vdc->getVdcFlag(vdcflag_hidewhenempty) || vdc->getNumberOfDevices()>0)
     ) {
       // mark device as being in process of getting announced
       vdc->announcing = MainLoop::now();

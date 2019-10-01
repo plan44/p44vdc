@@ -106,6 +106,7 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // Initialize chain driver
   ledArrangement.begin(true);
   // done
+  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(ErrorPtr());
 }
 

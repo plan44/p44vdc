@@ -91,11 +91,6 @@ namespace p44 {
     /// @return true if LEDs have a separate white channel
     bool hasWhite();
 
-    /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
-    /// devices.
-    /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return true; }
-
     /// vdc level methods (p44 specific, JSON only, for creating LED chain devices)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 

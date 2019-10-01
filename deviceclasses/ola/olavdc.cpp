@@ -83,6 +83,7 @@ void OlaVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   pthread_mutex_init(&olaBufferAccess, NULL);
   olaThread = MainLoop::currentMainLoop().executeInThread(boost::bind(&OlaVdc::olaThreadRoutine, this, _1), NULL);
   // done
+  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(ErrorPtr());
 }
 

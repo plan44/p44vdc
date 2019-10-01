@@ -1597,7 +1597,8 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       }
       // - always visible (even when empty)
       if (aMessage->get("alwaysVisible", o)) {
-        externalVdc.alwaysVisible = o->boolValue();
+        // Note: this is now a (persistent!) vdc level property, which can be set from external API this way
+        externalVdc.setVdcFlag(vdcflag_hidewhenempty, !o->boolValue());
       }
       // - forward vdc-level identification
       if (aMessage->get("identification", o)) {
@@ -1693,7 +1694,6 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  alwaysVisible(false),
   forwardIdentify(false),
   iconBaseName("vdc_ext") // default icon name
 {
@@ -1708,6 +1708,7 @@ void ExternalVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // start device API server
   ErrorPtr err = externalDeviceApiServer->startServer(boost::bind(&ExternalVdc::deviceApiConnectionHandler, this, _1), 10);
+  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(err); // return status of starting server
 }
 

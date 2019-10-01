@@ -360,7 +360,6 @@ namespace p44 {
     string modelNameString; ///< the string to be returned by modelName()
     string modelVersionString; ///< the string to be returned by vdcModelVersion()
     string configUrl; ///< custom value for configURL if not empty
-    bool alwaysVisible; ///< visible even if no devices contained
     bool forwardIdentify; ///< if set, "VDCIDENTIFY" messages will be sent, and vdc will show the "identification" capability in the vDC API
 
   public:
@@ -376,10 +375,6 @@ namespace p44 {
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
     virtual string vdcModelSuffix() const P44_OVERRIDE { return "external"; }
-
-    /// External device container should not be announced when it has no devices
-    /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return !alwaysVisible; };
 
     /// get supported rescan modes for this vDC. This indicates (usually to a web-UI) which
     /// of the flags to collectDevices() make sense for this vDC.

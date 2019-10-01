@@ -1255,6 +1255,7 @@ enum {
   minCallsBeforeOptimizing_key,
   maxOptimizerScenes_key,
   maxOptimizerGroups_key,
+  hideWhenEmpty_key,
   numVdcProperties
 };
 
@@ -1337,7 +1338,8 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
       { "x-p44-minDevicesForOptimizing", apivalue_uint64, minDevicesForOptimizing_key, OKEY(vdc_key) },
       { "x-p44-minCallsBeforeOptimizing", apivalue_uint64, minCallsBeforeOptimizing_key, OKEY(vdc_key) },
       { "x-p44-maxOptimizerScenes", apivalue_uint64, maxOptimizerScenes_key, OKEY(vdc_key) },
-      { "x-p44-maxOptimizerGroups", apivalue_uint64, maxOptimizerGroups_key, OKEY(vdc_key) }
+      { "x-p44-maxOptimizerGroups", apivalue_uint64, maxOptimizerGroups_key, OKEY(vdc_key) },
+      { "x-p44-hideWhenEmpty", apivalue_bool, hideWhenEmpty_key, OKEY(vdc_key) }
     };
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)
@@ -1388,6 +1390,9 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
           if (optimizerMode==opt_unavailable) return false; // do not show the property at all
           aPropValue->setUint32Value(maxOptimizerGroups);
           return true;
+        case hideWhenEmpty_key:
+          aPropValue->setBoolValue(getVdcFlag(vdcflag_hidewhenempty));
+          return true;
       }
     }
     else {
@@ -1426,6 +1431,9 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
         case maxOptimizerGroups_key:
           if (optimizerMode==opt_unavailable) return false; // property not writable
           setPVar(maxOptimizerGroups, aPropValue->int32Value());
+          return true;
+        case hideWhenEmpty_key:
+          setVdcFlag(vdcflag_hidewhenempty, aPropValue->boolValue());
           return true;
       }
     }
@@ -1509,8 +1517,9 @@ void Vdc::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *a
 void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  vdcFlags |= vdcflag_flagsinitialized; // this save now contains real content for vdcFlags, which must not be overriden by defaults at next initialisation
   // bind the fields
-  aStatement.bind(aIndex++, vdcFlags);
+  aStatement.bind(aIndex++, (int)vdcFlags);
   aStatement.bind(aIndex++, getAssignedName().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, defaultZoneID);
   aStatement.bind(aIndex++, optimizerMode);
