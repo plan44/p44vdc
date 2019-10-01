@@ -421,6 +421,9 @@ void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMa
 {
   // initialize all vDCs, even when some have errors
   if (aNextVdc!=vdcs.end()) {
+    // load persistent params for vdc (dSUID is already stable at this point, cannot depend on initialize()!)
+    aNextVdc->second->load();
+    // initialize with parameters already loaded
     aNextVdc->second->initialize(boost::bind(&VdcHost::vdcInitialized, this, aCompletedCB, aFactoryReset, aNextVdc, _1), aFactoryReset);
     return;
   }
@@ -508,8 +511,6 @@ void VdcHost::vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMa
   if (Error::notOK(aError)) {
     LOG(LOG_ERR, "vDC %s: error collecting devices: %s", aNextVdc->second->shortDesc().c_str(), aError->text());
   }
-  // load persistent params for vdc
-  aNextVdc->second->load();
   LOG(LOG_NOTICE, "=== done collecting from %s\n", aNextVdc->second->shortDesc().c_str());
   // next
   aNextVdc++;
@@ -538,6 +539,22 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
   aCompletedCB(vdcInitErr);
   LOG(LOG_NOTICE, "=== initialized all collected devices\n");
   collecting = false;
+  // make sure at least one vdc can be announced to dS, even if all are empty and instructed to hide when empty
+  bool someVisible = false;
+  VdcPtr firstPublic;
+  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+    VdcPtr vdc = pos->second;
+    if (vdc->isPublicDS()) {
+      if (!firstPublic) firstPublic = vdc;
+      if (!vdc->getVdcFlag(vdcflag_hidewhenempty) || vdc->getNumberOfDevices()>0) {
+        someVisible = true;
+        break;
+      }
+    }
+  }
+  if (!someVisible && firstPublic) {
+    firstPublic->vdcFlags &= ~vdcflag_hidewhenempty; // temporarily show this vdc to avoid webui getting unreachable from dS
+  }
 }
 
 
@@ -1393,6 +1410,7 @@ void VdcHost::resetAnnouncing()
 void VdcHost::startAnnouncing()
 {
   if (!collecting && !announcementTicket && activeSessionConnection) {
+    // start announcing
     announceNext();
   }
 }
