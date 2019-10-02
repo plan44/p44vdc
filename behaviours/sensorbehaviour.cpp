@@ -748,7 +748,7 @@ void SensorBehaviour::prepareLogging()
       }
     }
     // use or create rrd file
-    rrdbfile = Application::sharedApplication()->dataPath(rrdbpath);
+    rrdbfile = Application::sharedApplication()->tempPath(rrdbpath);
     if (rrdbpath.empty() || rrdbfile[rrdbfile.size()-1]=='/') {
       // auto-generate filename
       pathstring_format_append(rrdbfile, "Log_%s.rrd", getSourceId().c_str());
