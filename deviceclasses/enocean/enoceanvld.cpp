@@ -170,8 +170,7 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 //    newDev = EnoceanD203xxHandler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
 //  }
   else if (EEP_PURE(aEEProfile)==0xD20601) {
-    // Note: Profile has variants (with and without temperature sensor)
-    // use specialized handler for output functions of heating valve (valve value, summer/winter, prophylaxis)
+    // multi function window handle
     newDev = EnoceanD20601Handler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
   else
