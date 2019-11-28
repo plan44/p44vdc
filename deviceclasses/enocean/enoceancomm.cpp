@@ -1075,12 +1075,12 @@ const char *EnoceanComm::manufacturerName(EnoceanManufacturer aManufacturerCode)
 #define RLC_WINDOW_SIZE 128 // defined in the "Security of Enocean Networks" spec, pg 27
 
 EnOceanSecurity::EnOceanSecurity() :
-securityLevelFormat(0),
-teachInInfo(0),
-rollingCounter(0),
-lastSavedRLC(0),
-lastSave(Never),
-teachInP(NULL)
+  securityLevelFormat(0),
+  teachInInfo(0),
+  rollingCounter(0),
+  lastSavedRLC(0),
+  lastSave(Never),
+  teachInP(NULL)
 {
   memset(&privateKey, 0, AES128BlockLen);
   memset(&subKey1, 0, AES128BlockLen);
