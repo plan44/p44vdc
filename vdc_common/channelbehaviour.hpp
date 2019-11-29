@@ -24,7 +24,11 @@
 
 #include "device.hpp"
 #include "dsbehaviour.hpp"
+#if REDUCED_FOOTPRINT
 #include "valueunits.hpp"
+#else
+#include "valuedescriptor.hpp"
+#endif
 
 using namespace std;
 
@@ -53,6 +57,9 @@ namespace p44 {
   protected:
 
     OutputBehaviour &output;
+    #if !REDUCED_FOOTPRINT
+    EnumListPtr enumList;
+    #endif
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
@@ -212,6 +219,13 @@ namespace p44 {
     /// @param aVolatile true to set volatile, false otherwise
     void setVolatile(bool aVolatile) { setPVar(volatileValue, aVolatile); }
 
+    /// add an enumeration mapping for the channel value
+    /// @note normally, channels do not have an enumeration description ("values" in channel description), but
+    ///    first call to this method creates one.
+    /// @param aEnumText the text value
+    /// @param aEnumValue the integer value corresponding to the text
+    void addEnum(const char *aEnumText, uint32_t aEnumValue);
+
     /// @}
 
 
@@ -271,6 +285,9 @@ namespace p44 {
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    #if !REDUCED_FOOTPRINT
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+    #endif
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE P44_FINAL;
 
@@ -383,7 +400,14 @@ namespace p44 {
     typedef IndexChannel inherited;
 
   public:
-    PowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { setNumIndices(numDsPowerStates); }; ///< see DsPowerState enum
+    PowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState")
+    {
+      setNumIndices(numDsPowerStates); ///< see DsPowerState enum
+      addEnum("off", powerState_off);
+      addEnum("on", powerState_on);
+      addEnum("forcedOff", powerState_forcedOff);
+      addEnum("standby", powerState_standby);
+    };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_power_state; }; ///< the dS channel type
     virtual const char *getName() P44_OVERRIDE { return "power state"; };

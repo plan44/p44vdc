@@ -94,6 +94,18 @@ string ChannelBehaviour::getStatusText()
 }
 
 
+void ChannelBehaviour::addEnum(const char *aEnumText, uint32_t aEnumValue)
+{
+  // in reduced footprint, this is a NOP, we don't have the EnumList
+  #if !REDUCED_FOOTPRINT
+  if (!enumList) enumList = EnumListPtr(new EnumList(true));
+  enumList->addMapping(aEnumText, aEnumValue);
+  #endif
+}
+
+
+
+
 
 // MARK: - channel value handling
 
@@ -467,6 +479,9 @@ enum {
   min_key,
   max_key,
   resolution_key,
+  #if !REDUCED_FOOTPRINT
+  enumvalues_key,
+  #endif
   numChannelDescProperties
 };
 
@@ -481,10 +496,17 @@ enum {
 };
 
 static char channel_Key;
+static char channel_enumvalues_key;
 
 
 int ChannelBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
+  #if !REDUCED_FOOTPRINT
+  if (aParentDescriptor->hasObjectKey(channel_enumvalues_key)) {
+    // number of enum values
+    return enumList ? enumList->numProps() : 0;
+  }
+  #endif
   switch (aParentDescriptor->parentDescriptor->fieldKey()) {
     case descriptions_key_offset: return numChannelDescProperties;
     case settings_key_offset: return numChannelSettingsProperties;
@@ -492,7 +514,6 @@ int ChannelBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
     default: return 0;
   }
 }
-
 
 PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -506,6 +527,9 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
     { "min", apivalue_double, min_key+descriptions_key_offset, OKEY(channel_Key) },
     { "max", apivalue_double, max_key+descriptions_key_offset, OKEY(channel_Key) },
     { "resolution", apivalue_double, resolution_key+descriptions_key_offset, OKEY(channel_Key) },
+    #if !REDUCED_FOOTPRINT
+    { "values", apivalue_object+propflag_container, enumvalues_key, OKEY(channel_enumvalues_key) }
+    #endif
   };
   //static const PropertyDescription channelSettingsProperties[numChannelSettingsProperties] = {
   //};
@@ -513,6 +537,11 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
     { "value", apivalue_double, value_key+states_key_offset, OKEY(channel_Key) }, // note: so far, pbuf API requires uint here
     { "age", apivalue_double, age_key+states_key_offset, OKEY(channel_Key) },
   };
+  #if !REDUCED_FOOTPRINT
+  if (aParentDescriptor->hasObjectKey(channel_enumvalues_key)) {
+    return enumList ? enumList->getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor) : NULL;
+  }
+  #endif
   if (aPropIndex>=numProps(aDomain, aParentDescriptor))
     return NULL;
   switch (aParentDescriptor->parentDescriptor->fieldKey()) {
@@ -528,9 +557,27 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
 }
 
 
+#if !REDUCED_FOOTPRINT
+PropertyContainerPtr ChannelBehaviour::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(channel_enumvalues_key)) {
+    return enumList ? PropertyContainerPtr(this) : PropertyContainerPtr(); // handle enum values array myself
+  }
+  // unknown here
+  return inheritedProps::getContainer(aPropertyDescriptor, aDomain);
+}
+#endif
+
+
 // access to all fields
 bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
+  #if !REDUCED_FOOTPRINT
+  if (aPropertyDescriptor->hasObjectKey(INSTANCE_OKEY(enumList.get()))) {
+    return enumList ? enumList->accessField(aMode, aPropValue, aPropertyDescriptor) : false;
+  }
+  else
+  #endif
   if (aPropertyDescriptor->hasObjectKey(channel_Key)) {
     if (aMode==access_read) {
       // read properties
