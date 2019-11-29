@@ -34,7 +34,8 @@ namespace p44 {
   struct PropertyDescriptor;
 
 
-  #define OKEY(x) ((intptr_t)&x) ///< macro to define unique object keys by using address of a variable
+  #define OKEY(x) ((intptr_t)&x) ///< macro to define class unique object keys by using address of a variable
+  #define INSTANCE_OKEY(o) ((intptr_t)o) ///< macro to define instance unique object keys by using address of an object instance
 
   #define PROPINDEX_NONE -1 ///< special value to signal "no next descriptor" for getDescriptorByName
 
