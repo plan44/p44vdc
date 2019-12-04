@@ -738,11 +738,9 @@ void Enocean4BSDevice::sendTeachInResponse()
 {
   Esp3PacketPtr responsePacket = Esp3PacketPtr(new Esp3Packet);
   responsePacket->initForRorg(rorg_4BS);
-  // TODO: implement other 4BS teach-in variants
   if (EEP_FUNC(getEEProfile())==0x20) {
-    // A5-20-xx, just mirror back the learn request's EEP
-    responsePacket->set4BSTeachInEEP(getEEProfile());
-    // Note: manufacturer not set for now (is 0)
+    // A5-20-xx wants 4BS teach-in variant 3 response
+    responsePacket->set4BSTeachInEEP(getEEProfile(), getEEManufacturer());
     // Set learn response flags
     //               D[3]
     //   7   6   5   4   3   2   1   0

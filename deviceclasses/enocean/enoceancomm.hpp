@@ -422,7 +422,8 @@ namespace p44 {
 
 
     /// @param aEEProfile the EEP to represent in the 4BS telegram
-    void set4BSTeachInEEP(EnoceanProfile aEEProfile);
+    /// @param aManufacturer the manufacturer code
+    void set4BSTeachInEEP(EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer);
 
     /// @}
 
