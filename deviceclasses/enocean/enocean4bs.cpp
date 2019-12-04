@@ -221,6 +221,8 @@ static const char *vibrationText = "Vibration";
 static const char *lockText = "Lock";
 static const char *doorText = "Door";
 static const char *windowText = "Window open/tilted";
+static const char *feedText = "feed temperature";
+
 
 const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max,MSB,     LSB,  updateIv,aliveSignIv, handler,     typeText
@@ -914,7 +916,7 @@ void EnoceanA52001Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       }
       // show general status
       HLOG(LOG_NOTICE,
-        "EnOcean valve actual set point: %d%% open\n"
+        "EnOcean valve actual position: %d%% open\n"
         "- Service %s, Energy input %s, Energy storage %scharged, Battery %s, Cover %s, Sensor %s, Detected window %s, Actuator %s",
         (data>>DB(3,0)) & 0xFF, // get data from DB(3,0..7), range is 0..100% (NOT 0..255!)
         data & DBMASK(2,7) ? "ON" : "off",
@@ -1004,7 +1006,7 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         }
         else {
           // no control values available, use last actual valve position (which is initially 50%)
-          LOG(LOG_NOTICE, "- In self regulating mode, but control values not (yet) available -> use previous valve position=%d%% open", lastActualValvePos);
+          LOG(LOG_NOTICE, "- self regulating mode, but control values not (yet) available -> keep valve at %d%% open", lastActualValvePos);
           data |= (lastActualValvePos<<DB(3,0)); // insert data into DB(3,0..7)
         }
       }
@@ -1062,7 +1064,7 @@ string EnoceanA52001Handler::shortDesc()
 }
 
 
-// MARK: - EnoceanA52004Handler - heating valve with feed temperature
+// MARK: - EnoceanA52004Handler - heating valve with feed temperature and set point display
 
 
 EnoceanA52004Handler::EnoceanA52004Handler(EnoceanDevice &aDevice) :
@@ -1075,7 +1077,7 @@ EnoceanA52004Handler::EnoceanA52004Handler(EnoceanDevice &aDevice) :
 static const p44::EnoceanInputDescriptor A52004roomTemp =
   { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room, 10, 30, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, tempText };
 static const p44::EnoceanInputDescriptor A52004feedTemp =
-  { 0, 0x20, 0x04, 0, class_blue_climate, group_blue_heating,            behaviour_sensor,      sensorType_temperature, usage_undefined, 20, 80, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, "feed temperature" };
+  { 0, 0x20, 0x04, 0, class_blue_climate, group_blue_heating,            behaviour_sensor,      sensorType_temperature, usage_undefined, 20, 80, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler, feedText };
 static const p44::EnoceanInputDescriptor A52004setpointTemp =
   { 0, 0x20, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_user, 10, 30, DB(2,7), DB(2,0), 5, Never, &stdSensorHandler, setPointText }; // user action quickly forwarded, but not regularily transmitted
 static const p44::EnoceanInputDescriptor A52004lowBatInput =
@@ -1230,7 +1232,6 @@ void EnoceanA52004Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
     }
     if (serviceState!=service_idle) {
       // process pending service steps
-      // - DB0..1 = service command 0=no change, 1=open valve, 2=run init, 3=close valve
       if (serviceState==service_openandclosevalve || serviceState==service_openvalve) {
         // trigger force full open
         LOG(LOG_NOTICE, "- valve prophylaxis operation: fully opening valve for 2 min");
@@ -1306,22 +1307,38 @@ string EnoceanA52004Handler::shortDesc()
 }
 
 
-// MARK: - EnoceanA52006Handler - harvesting heating valve with local offset
+// MARK: - EnoceanA52006Handler - harvesting heating valve with local offset / setpoint
 
 
 EnoceanA52006Handler::EnoceanA52006Handler(EnoceanDevice &aDevice) :
   inherited(aDevice),
-  serviceState(service_idle)
+  serviceState(service_idle),
+  currentValvePos(50),
+  askForFeed(false)
 {
 }
+
+
+static void a52006relSetPointHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
+{
+  uint64_t value = bitsExtractor(aInputDescriptor, aDataP, aDataSize);
+  // now pass to behaviour
+  if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
+    double offs = (double)((value+5)&0x07)/10.0; // range is 0x7B..0x05, convert to -1.0..1.0
+    sb->updateSensorValue(offs);
+  }
+}
+
 
 // configuration for included sensor channels
 static const p44::EnoceanInputDescriptor A52006roomTemp =
   { 0, 0x20, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,      0,  63.5, DB(1,6), DB(1,0), 100, 40*60, &stdSensorHandler, tempText };
 static const p44::EnoceanInputDescriptor A52006feedTemp =
-  { 0, 0x20, 0x06, 0, class_blue_climate, group_blue_heating,            behaviour_sensor,      sensorType_temperature, usage_undefined, 0, 127.5, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, "feed temperature" };
+  { 0, 0x20, 0x06, 0, class_blue_climate, group_blue_heating,            behaviour_sensor,      sensorType_temperature, usage_undefined, 0, 127.5, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler, feedText };
 static const p44::EnoceanInputDescriptor A52006setpoint =
-  { 0, 0x20, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_set_point,   usage_user,      0,     1, DB(2,6), DB(2,0),   5, Never, NULL, setPointText }; // setpoint status update coded below
+  { 0, 0x20, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_set_point,   usage_user,      0,     1, DB(2,6), DB(2,0),   5, Never, &a52006relSetPointHandler, setPointText }; // relative setpoint
+static const p44::EnoceanInputDescriptor A52006setpointTemp =
+  { 0, 0x20, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_user,      0,  63.5, DB(2,6), DB(2,0),   5, Never, &stdSensorHandler, setPointText }; // absolute setpoint
 static const p44::EnoceanInputDescriptor A52006lowBatInput =
   { 0, 0x20, 0x06, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,      0,     1, DB(0,0), DB(0,0), 100, 40*60, NULL,  lowBatText }; // battery status update coded below
 
@@ -1360,8 +1377,8 @@ EnoceanDevicePtr EnoceanA52006Handler::newDevice(
     EnoceanA52006HandlerPtr newHandler = EnoceanA52006HandlerPtr(new EnoceanA52006Handler(*newDev.get()));
     newHandler->behaviour = cb;
     newDev->addChannelHandler(newHandler);
+    // Bit 0 in variant code means sensors enabled
     if (EEP_VARIANT(aEEProfile) & 0x01) {
-      // Bit 0 in variant code means sensors enabled
       // - built-in room temperature
       newHandler->roomTemp = EnoceanInputHandler::newInputChannelBehaviour(A52006roomTemp, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->roomTemp);
@@ -1369,9 +1386,14 @@ EnoceanDevicePtr EnoceanA52006Handler::newDevice(
       newHandler->feedTemp = EnoceanInputHandler::newInputChannelBehaviour(A52006feedTemp, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->feedTemp);
     }
-    if ((EEP_VARIANT(aEEProfile) & 0x02)==0) {
-      // Bit 1 in variant code means self regulating mode (with local offset), which does NOT report back local offset
-      // - local offset as set point
+    // Bit 1 in variant code means self regulating mode (with local offset), reporting absolute setpoint
+    if (EEP_VARIANT(aEEProfile) & 0x02) {
+      // - absolute set point temperature (received setpoint adjusted by user)
+      newHandler->setpoint = EnoceanInputHandler::newInputChannelBehaviour(A52006setpointTemp, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->setpoint);
+    }
+    else {
+      // - relative set point (local offset +/-5 degrees)
       newHandler->setpoint = EnoceanInputHandler::newInputChannelBehaviour(A52006setpoint, newDev, NULL); // automatic id
       newDev->addBehaviour(newHandler->setpoint);
     }
@@ -1391,7 +1413,6 @@ EnoceanDevicePtr EnoceanA52006Handler::newDevice(
 }
 
 
-
 void EnoceanA52006Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 {
   if (!aEsp3PacketPtr->radioHasTeachInfo()) {
@@ -1407,8 +1428,10 @@ void EnoceanA52006Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         HLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
         behaviour->setHardwareError(hardwareError_overload);
       }
-      // - check ES - energy storage level
-      bool lowBat = ENOBIT(0, 5, dataP, datasize);
+      // - get current valve position
+      currentValvePos = ENOBYTE(3, dataP, datasize);
+      // - check ES - energy storage level (1=sufficient, 0=discharged)
+      bool lowBat = ENOBIT(0, 5, dataP, datasize)==0;
       batPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100;
       boost::dynamic_pointer_cast<BinaryInputBehaviour>(lowBatInput)->updateInputState(lowBat);
       // - temperatures
@@ -1420,18 +1443,29 @@ void EnoceanA52006Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         // ambient (room) temperature transmitted
         if (roomTemp) EnoceanInputs::handleBitField(A52006roomTemp, roomTemp, dataP, datasize, this);
       }
-      if (setpoint && ENOBIT(2, 7, dataP, datasize)==0) {
-        // LOM=0, DB2.6-0 is signed local offset -5..5
-        double offs = (double)((ENOBYTE(2, dataP, datasize) & 0x7F)+5)/10; // 0..1, 0.5 = default
-        if (setpoint) boost::dynamic_pointer_cast<SensorBehaviour>(setpoint)->updateSensorValue(offs);
+      if (setpoint) {
+        if (EEP_VARIANT(device.getEEProfile()) & 0x02) {
+          // set point is absolute
+          if (ENOBIT(2, 7, dataP, datasize)) {
+            // LOM=1, absolute temperature
+            EnoceanInputs::handleBitField(A52006setpointTemp, setpoint, dataP, datasize, this);
+          }
+        }
+        else {
+          // set point is relative
+          if (ENOBIT(2, 7, dataP, datasize)==0) {
+            // LOM=0, relative temperature
+            EnoceanInputs::handleBitField(A52006setpoint, setpoint, dataP, datasize, this);
+          }
+        }
       }
       // show general status
       HLOG(LOG_NOTICE,
-        "EnOcean valve actual set point: %d%% open\n"
+        "EnOcean valve actual position: %d%% open\n"
         "- %s harvesting\n"
         "- %sopen window detected\n"
         "- radio signal %s, communication %s",
-        ENOBYTE(3, dataP, datasize),
+        currentValvePos,
         ENOBIT(0, 6, dataP, datasize) ? "now" : "not", // ENIE
         ENOBIT(0, 4, dataP, datasize) ? "" : "no ", // DWO
         ENOBIT(0, 1, dataP, datasize) ? "WEAK" : "ok", // RSS
@@ -1465,12 +1499,11 @@ void EnoceanA52006Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
     }
     if (serviceState!=service_idle) {
       // process pending service steps
-      // - DB0..1 = service command 0=no change, 1=open valve, 2=run init, 3=close valve
       if (serviceState==service_openandclosevalve || serviceState==service_openvalve) {
         // trigger force full open
         LOG(LOG_NOTICE, "- valve prophylaxis operation: fully opening valve for 2 min");
-        data |= 100<<DB(3,0); // do not use service, just open to 100%
-        data |= 3<<DB(1,0); // 2 min
+        data |= 100<<DB(3,0); // open to 100%
+        data |= 1<<DB(1,4); // 2 min (0b001 in bits 4..6)
         if (serviceState==service_openandclosevalve) {
           // next is closing
           serviceState = service_closevalve;
@@ -1486,7 +1519,7 @@ void EnoceanA52006Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         // trigger force fully closed
         LOG(LOG_NOTICE, "- valve prophylaxis operation: fully closing valve for 2 min");
         data |= 0<<DB(3,0); // do not use service, just close to 0%
-        data |= 3<<DB(1,0); // 2 min
+        data |= 1<<DB(1,4); // 2 min (0b001 in bits 4..6)
         // next is normal operation again
         serviceState = service_idle;
         device.needOutgoingUpdate();
@@ -1496,36 +1529,53 @@ void EnoceanA52006Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
       // Normal operation
       // - wake up cycle: fast in winter, slow in summer
       if (cb->isClimateControlIdle()) {
-        data |= 54<<DB(1,0); // Summer: 12 hours
-        data |= DBMASK(1,6); // measurement disabled
-        LOG(LOG_NOTICE, "- valve is in IDLE mode (12hr wake cycle)");
+        data |= 1<<DB(1,3); // Summer mode: 8 hours radio duty cycle
+        LOG(LOG_NOTICE, "- valve is in SUMMER mode (8hr wake cycle)");
       }
       else {
-        data |= 39<<DB(1,0); // Winter: 20 min
-        if (!roomTemp && !feedTemp) {
-          // nobody interested in measurements, don't waste battery on performing them
-          data |= DBMASK(1,6); // measurement disabled
-        }
+        data |= 0<<DB(1,4); // Winter: automatic 2,5 or 10min communication interval (0b000 in bits 4..6)
       }
       // - valve position
-      //   Note: value is always positive even for cooling, because climateControlBehaviour checks outputfunction and sees this is a unipolar valve
-      int8_t newValue = cb->outputValueAccordingToMode(ch->getChannelValue(), ch->getChannelIndex());
-      // Still: limit to 0..100 to make sure
-      if (newValue<0) newValue = 0;
-      else if (newValue>100) newValue=100;
-      data |= newValue<<DB(3,0);
-      // - set point (only for displaying it)
-      double currentTemp, setPoint;
-      if (cb->getZoneTemperatures(currentTemp, setPoint)) {
-        if (setPoint<10) setPoint=10;
-        else if (setPoint>30) setPoint=30;
-        uint8_t sp = (uint8_t)((setPoint-10)/20*255);
-        data |= sp<<DB(2,0);
+      if (EEP_VARIANT(device.getEEProfile()) & 0x02) {
+        // self-regulating mode, only send set point and actual room temperature
+        double currentTemp, setPoint;
+        if (cb->getZoneTemperatures(currentTemp, setPoint)) {
+          // send set point
+          LOG(LOG_NOTICE, "- self regulating mode, current temp = %.1f °C, set point = %.1f °C", currentTemp, setPoint);
+          data |= 1<<DB(1,2); // SPS, DB3 contains 0..40 degree set point temp
+          if (setPoint>40) setPoint = 40;
+          else if (setPoint<0) setPoint = 0;
+          data |= ((uint8_t)(setPoint*2)) << DB(3,0); // in half degrees, 0..80
+          // and room temperature
+          if (currentTemp>40) currentTemp = 40;
+          else if (currentTemp<0) currentTemp = 0;
+          data |= ((uint8_t)(currentTemp*4)) << DB(2,0); // in quarter degrees, 0..160
+        }
+        else {
+          // no control values available, use last actual valve position (which is initially 50%)
+          LOG(LOG_NOTICE, "- self regulating mode, but control values not (yet) available -> keep valve at %d%% open", currentValvePos);
+          data |= (currentValvePos<<DB(3,0)); // insert data into DB(3,0..7)
+        }
       }
-      // display orientation == 0 == standard
-      // button lock == 0 == not locked
-      LOG(LOG_NOTICE, "- requesting new valve position: %d%% open", newValue);
+      else {
+        // direct valve position control
+        //   Note: value is always positive even for cooling, because climateControlBehaviour checks outputfunction and sees this is a unipolar valve
+        currentValvePos = cb->outputValueAccordingToMode(ch->getChannelValue(), ch->getChannelIndex());
+        // Still: limit to 0..100 to make sure
+        if (currentValvePos<0) currentValvePos = 0;
+        else if (currentValvePos>100) currentValvePos=100;
+        data |= currentValvePos<<DB(3,0);
+        LOG(LOG_NOTICE, "- requesting new valve position: %d%% open", currentValvePos);
+      }
     }
+    // ask for feed or ambient temperature
+    if (feedTemp || roomTemp) {
+      if (askForFeed) data |= 1<<DB(1,1); // TSL: 0=request ambient, 1=feed temperature
+      askForFeed = !askForFeed; // toggle
+    }
+    // Left zero
+    // - DB(1,7) : REF : execute reference run when set to 1
+    // - DB(1,0) : SBY : go to standby (radio off, wake up only via user interaction)
     // save data
     aEsp3PacketPtr->set4BSdata(data);
     // value from this channel is applied to the outgoing telegram
