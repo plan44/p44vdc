@@ -67,7 +67,7 @@ namespace p44 {
     float max; ///< max value
     uint8_t msBit; ///< most significant bit of sensor value field in data (for 4BS: 31=Bit7 of DB_3, 0=Bit0 of DB_0)
     uint8_t lsBit; ///< least significant bit of sensor value field in data (for 4BS: 31=Bit7 of DB_3, 0=Bit0 of DB_0)
-    double updateInterval; ///< normal update interval (average time resolution) in seconds. For non-periodic sensors, this denotes the average response time to changes (e.g. for a user dial)
+    double updateInterval; ///< normal update interval (average time resolution) in seconds. For non-periodic sensors, this denotes the average response time to changes (e.g. for a user dial). If negative for binary inputs, this enables auto-resetting to "min" value after updateInterval
     double aliveSignInterval; ///< maximum interval between two reports of a sensor (0 if there is no minimal report interval). If sensor does not push a value for longer than that, it should be considered out-of-order
     BitFieldHandlerFunc bitFieldHandler; ///< function used to convert between bit field in telegram and engineering value for the behaviour
     const char *typeText; ///< text describing the channel. NULL to terminate list

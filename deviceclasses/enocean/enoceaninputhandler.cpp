@@ -329,7 +329,14 @@ DsBehaviourPtr EnoceanInputHandler::newInputChannelBehaviour(const EnoceanInputD
     case behaviour_binaryinput: {
       // behaviourParam is DsBinaryInputType
       BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*aDevice.get(),nonNullCStr(aId)));
-      ib->setHardwareInputConfig((DsBinaryInputType)aInputDescriptor.behaviourParam, aInputDescriptor.usage, true, aInputDescriptor.updateInterval*Second, aInputDescriptor.aliveSignInterval*Second);
+      ib->setHardwareInputConfig(
+        (DsBinaryInputType)aInputDescriptor.behaviourParam,
+        aInputDescriptor.usage,
+        true,
+        abs(aInputDescriptor.updateInterval*Second), // can be negative in descriptor to enable auto-reset
+        aInputDescriptor.aliveSignInterval*Second, // can be Never
+        aInputDescriptor.updateInterval<0 ? aInputDescriptor.min : -1 // negative updateInterval means autoreset to "min" after update interval
+      );
       ib->setGroup(aInputDescriptor.channelGroup);
       ib->setHardwareName(aInputDescriptor.typeText);
       return ib;
