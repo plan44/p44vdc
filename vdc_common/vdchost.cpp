@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -90,8 +90,8 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   allowCloud(false),
   DsAddressable(this),
   collecting(false),
-  lastActivity(0),
-  lastPeriodicRun(0),
+  lastActivity(Never),
+  lastPeriodicRun(Never),
   learningMode(false),
   localDimDirection(0), // undefined
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
@@ -110,6 +110,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
     localController = LocalControllerPtr(new LocalController(*this));
   }
   #endif
+  // initialize real time jump detection as early as possible (to catch changes happening during initialisation)
+  timeOfDayDiff = Infinite;
+  checkTimeOfDayChange(); // will not post a event when timeOfDayDiff is Infinite
 }
 
 
@@ -160,9 +163,11 @@ void VdcHost::postEvent(VdchostEvent aEvent)
 {
   if (aEvent>=vdchost_redistributed_events) {
     // let all vdcs (and their devices) know
+    LOG(LOG_INFO, ">>> vdcs start processing global event %d", (int)aEvent);
     for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
       pos->second->handleGlobalEvent(aEvent);
     }
+    LOG(LOG_INFO, ">>> vdcs done processing event %d", (int)aEvent);
   }
   #if ENABLE_LOCALCONTROLLER
   if (localController) localController->processGlobalEvent(aEvent);
@@ -322,6 +327,28 @@ bool VdcHost::isNetworkConnected()
 }
 
 
+void VdcHost::checkTimeOfDayChange()
+{
+  struct tm lt;
+  MainLoop::getLocalTime(lt);
+  long long lm = ((((long long)lt.tm_year*366+lt.tm_yday)*24+lt.tm_hour)*60+lt.tm_min)*60+lt.tm_sec; // local time fingerprint (not monotonic, not accurate)
+  MLMicroSeconds td = MainLoop::now()-lm*Second;
+  if (timeOfDayDiff==Infinite) {
+    timeOfDayDiff = td; // first time
+  }
+  else {
+    MLMicroSeconds d = timeOfDayDiff-td;
+    if (d<0) d = -d;
+    if (d>5*Second) {
+      LOG(LOG_NOTICE, "*** Time-Of-Day has changed by %.f seconds", (double)(timeOfDayDiff-td)/Second);
+      timeOfDayDiff = td;
+      postEvent(vdchost_timeofday_changed);
+    }
+  }
+}
+
+
+
 
 
 // MARK: - initializisation of DB and containers
@@ -394,6 +421,9 @@ void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMa
 {
   // initialize all vDCs, even when some have errors
   if (aNextVdc!=vdcs.end()) {
+    // load persistent params for vdc (dSUID is already stable at this point, cannot depend on initialize()!)
+    aNextVdc->second->load();
+    // initialize with parameters already loaded
     aNextVdc->second->initialize(boost::bind(&VdcHost::vdcInitialized, this, aCompletedCB, aFactoryReset, aNextVdc, _1), aFactoryReset);
     return;
   }
@@ -481,8 +511,6 @@ void VdcHost::vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMa
   if (Error::notOK(aError)) {
     LOG(LOG_ERR, "vDC %s: error collecting devices: %s", aNextVdc->second->shortDesc().c_str(), aError->text());
   }
-  // load persistent params for vdc
-  aNextVdc->second->load();
   LOG(LOG_NOTICE, "=== done collecting from %s\n", aNextVdc->second->shortDesc().c_str());
   // next
   aNextVdc++;
@@ -511,6 +539,22 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
   aCompletedCB(vdcInitErr);
   LOG(LOG_NOTICE, "=== initialized all collected devices\n");
   collecting = false;
+  // make sure at least one vdc can be announced to dS, even if all are empty and instructed to hide when empty
+  bool someVisible = false;
+  VdcPtr firstPublic;
+  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+    VdcPtr vdc = pos->second;
+    if (vdc->isPublicDS()) {
+      if (!firstPublic) firstPublic = vdc;
+      if (!vdc->getVdcFlag(vdcflag_hidewhenempty) || vdc->getNumberOfDevices()>0) {
+        someVisible = true;
+        break;
+      }
+    }
+  }
+  if (!someVisible && firstPublic) {
+    firstPublic->vdcFlags &= ~vdcflag_hidewhenempty; // temporarily show this vdc to avoid webui getting unreachable from dS
+  }
 }
 
 
@@ -724,6 +768,8 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
     if (!collecting) {
       // re-check network connection, might cause re-collection in some vdcs
       isNetworkConnected();
+      // track time of day changes
+      checkTimeOfDayChange();
       // check again for devices that need to be announced
       startAnnouncing();
       // do a save run as well
@@ -1364,6 +1410,7 @@ void VdcHost::resetAnnouncing()
 void VdcHost::startAnnouncing()
 {
   if (!collecting && !announcementTicket && activeSessionConnection) {
+    // start announcing
     announceNext();
   }
 }
@@ -1381,7 +1428,7 @@ void VdcHost::announceNext()
       vdc->isPublicDS() && // only public ones
       vdc->announced==Never &&
       (vdc->announcing==Never || MainLoop::now()>vdc->announcing+ANNOUNCE_RETRY_TIMEOUT) &&
-      (!vdc->invisibleWhenEmpty() || vdc->getNumberOfDevices()>0)
+      (!vdc->getVdcFlag(vdcflag_hidewhenempty) || vdc->getNumberOfDevices()>0)
     ) {
       // mark device as being in process of getting announced
       vdc->announcing = MainLoop::now();
@@ -1713,8 +1760,10 @@ ErrorPtr VdcHost::loadAndFixDsUID()
   // load the vdc host settings, which might override the default dSUID
   err = loadFromStore(entityType()); // is a singleton, identify by type
   if (Error::notOK(err)) LOG(LOG_ERR,"Error loading settings for vdc host: %s", err->text());
+  #if ENABLE_SETTINGS_FROM_FILES
   // check for settings from files
   loadSettingsFromFiles();
+  #endif
   // now check
   if (!externalDsuid) {
     if (storedDsuid) {
@@ -1757,6 +1806,7 @@ ErrorPtr VdcHost::forget()
 }
 
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 void VdcHost::loadSettingsFromFiles()
 {
@@ -1766,6 +1816,8 @@ void VdcHost::loadSettingsFromFiles()
   // if vdc has already stored properties, only explicitly marked properties will be applied
   if (loadSettingsFromFile(fn.c_str(), rowid!=0)) markClean();
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - persistence implementation

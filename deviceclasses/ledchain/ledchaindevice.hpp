@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -44,7 +44,7 @@ namespace p44 {
     typedef enum {
       lighttype_unknown,
       lighttype_simplearea,
-      lighttype_lightspot,
+      lighttype_feature
     } LightType;
 
     LightType lightType; ///< type of light
@@ -133,6 +133,7 @@ namespace p44 {
   private:
 
     virtual void applyChannelValueSteps(bool aForDimming, double aStepSize);
+    bool viewCfgSubstLookup(const string &aName, ExpressionValue &aResult);
 
   };
   typedef boost::intrusive_ptr<LedChainDevice> LedChainDevicePtr;

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -702,8 +702,8 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     aEsp3PacketPtr = unpackedMsg;
     rorg = unpackedMsg->eepRorg();
     LOG(LOG_DEBUG, "Unpacked secure radio packet resulting:\n%s", aEsp3PacketPtr->description().c_str());
-    // possibly save the security context (but do not *yet* save security info if this is a teach in/out packet!)
-    if (!aEsp3PacketPtr->radioHasTeachInfo()) {
+    // possibly save the security context (but do not *yet* save security info if this is a explicit (=not RPS) teach in/out packet!)
+    if (!aEsp3PacketPtr->radioHasTeachInfo() || aEsp3PacketPtr->eepRorg()==rorg_RPS) {
       saveSecurityInfo(sec, sender, true, true);
     }
   }

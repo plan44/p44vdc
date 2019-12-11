@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2016-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -209,7 +209,7 @@ bool ValueSourceMapper::valueLookup(ExpressionValue &aValue, const string aVarSp
     }
   }
   else {
-    aValue.setError(ExpressionError::NotFound, "Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
+    aValue.setSyntaxError("Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
     return true;
   }
   // no value (yet)

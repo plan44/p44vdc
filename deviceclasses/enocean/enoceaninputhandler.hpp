@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -19,8 +19,8 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __p44vdc__enoceansensorhandler__
-#define __p44vdc__enoceansensorhandler__
+#ifndef __p44vdc__enoceaninputhandler__
+#define __p44vdc__enoceaninputhandler__
 
 #include "p44vdc_common.hpp"
 
@@ -43,17 +43,17 @@ using namespace std;
 
 namespace p44 {
 
-  struct EnoceanSensorDescriptor;
+  struct EnoceanInputDescriptor;
 
   /// decoder function
   /// @param aDescriptor descriptor for data to extract
   /// @param aBehaviour the beehaviour that will receive the extracted value
   /// @param aDataP pointer to data, MSB comes first, LSB comes last (for 4BS data: MSB=enocean DB_3, LSB=enocean DB_0)
   /// @param aDataSize number of data bytes
-  typedef void (*BitFieldHandlerFunc)(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize);
+  typedef void (*BitFieldHandlerFunc)(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
 
   /// enocean sensor value descriptor
-  typedef struct EnoceanSensorDescriptor {
+  typedef struct EnoceanInputDescriptor {
     uint8_t variant; ///< the variant from the EEP signature
     uint8_t func; ///< the function code from the EPP signature
     uint8_t type; ///< the type code from the EPP signature
@@ -67,25 +67,32 @@ namespace p44 {
     float max; ///< max value
     uint8_t msBit; ///< most significant bit of sensor value field in data (for 4BS: 31=Bit7 of DB_3, 0=Bit0 of DB_0)
     uint8_t lsBit; ///< least significant bit of sensor value field in data (for 4BS: 31=Bit7 of DB_3, 0=Bit0 of DB_0)
-    double updateInterval; ///< normal update interval (average time resolution) in seconds. For non-periodic sensors, this denotes the average response time to changes (e.g. for a user dial)
+    double updateInterval; ///< normal update interval (average time resolution) in seconds. For non-periodic sensors, this denotes the average response time to changes (e.g. for a user dial). If negative for binary inputs, this enables auto-resetting to "min" value after updateInterval
     double aliveSignInterval; ///< maximum interval between two reports of a sensor (0 if there is no minimal report interval). If sensor does not push a value for longer than that, it should be considered out-of-order
     BitFieldHandlerFunc bitFieldHandler; ///< function used to convert between bit field in telegram and engineering value for the behaviour
-    const char *typeText;
-  } EnoceanSensorDescriptor;
+    const char *typeText; ///< text describing the channel. NULL to terminate list
+  } EnoceanInputDescriptor;
 
 
-  /// @name functions and texts for use in EnoceanSensorDescriptor table entries
+  /// @name functions and texts for use in EnoceanInputDescriptor table entries
   /// @{
 
-  namespace EnoceanSensors {
+  namespace EnoceanInputs {
 
-    void handleBitField(const EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize);
-    uint64_t bitsExtractor(const struct EnoceanSensorDescriptor &aSensorDescriptor, uint8_t *aDataP, int aDataSize);
+    void handleBitField(const EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
+    uint64_t bitsExtractor(const struct EnoceanInputDescriptor &aInputDescriptor, uint8_t *aDataP, int aDataSize);
 
-    void stdSensorHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize);
-    void invSensorHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize);
+    void stdSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
+    void invSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
 
-    void stdInputHandler(const struct EnoceanSensorDescriptor &aSensorDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize);
+    void stdInputHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
+
+    void stdButtonHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
+
+    void lowBatInputHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
+    void batVoltSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
+    void batPercSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
+
 
     // texts
     extern const char *tempText;
@@ -107,15 +114,15 @@ namespace p44 {
   /// @}
 
 
-  /// generic, table driven sensor channel handler
-  class EnoceanSensorHandler : public EnoceanChannelHandler
+  /// generic, table driven input channel handler
+  class EnoceanInputHandler : public EnoceanChannelHandler
   {
     typedef EnoceanChannelHandler inherited;
 
   protected:
 
     /// protected constructor, static factory function newDevice of derived class is the place to call it from
-    EnoceanSensorHandler(EnoceanDevice &aDevice);
+    EnoceanInputHandler(EnoceanDevice &aDevice);
 
   public:
 
@@ -123,7 +130,7 @@ namespace p44 {
     typedef EnoceanDevicePtr (*CreateDeviceFunc)(EnoceanVdc *aVdcP);
 
     /// the sensor channel descriptor
-    const EnoceanSensorDescriptor *sensorChannelDescriptorP;
+    const EnoceanInputDescriptor *sensorChannelDescriptorP;
 
     /// factory: (re-)create logical device from address|channel|profile|manufacturer tuple
     /// @param aVdcP the class container
@@ -137,7 +144,7 @@ namespace p44 {
     static EnoceanDevicePtr newDevice(
       EnoceanVdc *aVdcP,
       CreateDeviceFunc aCreateDeviceFunc,
-      const EnoceanSensorDescriptor *aDescriptorTable,
+      const EnoceanInputDescriptor *aDescriptorTable,
       EnoceanAddress aAddress,
       EnoceanSubDevice &aSubDeviceIndex, // current subdeviceindex, factory returns NULL when no device can be created for this subdevice index
       EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer,
@@ -147,25 +154,25 @@ namespace p44 {
 
     /// factory: add sensor/binary input channel to device by descriptor
     /// @param aDevice the device to add the channel to
-    /// @param aSensorDescriptor a sensor or binary input descriptor
+    /// @param aInputDescriptor a sensor or binary input descriptor
     /// @param aSetDeviceDescription if set, this sensor channel is the "main" channel and will set description on the device itself
     /// @param aId if not NULL, a string to be used for the behaviour ID
-    static void addSensorChannel(
+    static void addInputChannel(
       EnoceanDevicePtr aDevice,
-      const EnoceanSensorDescriptor &aSensorDescriptor,
+      const EnoceanInputDescriptor &aInputDescriptor,
       bool aSetDeviceDescription,
       const char *aId
     );
 
     /// factory: create behaviour (sensor/binary input) by descriptor
     /// @param aDevice the device to add the behaviour to
-    /// @param aSensorDescriptor a sensor or binary input descriptor
+    /// @param aInputDescriptor a sensor or binary input descriptor
     /// @param aId if not NULL, a string to be used for the behaviour ID
     /// @return the behaviour
-    static DsBehaviourPtr newSensorBehaviour(const EnoceanSensorDescriptor &aSensorDescriptor, DevicePtr aDevice, const char *aId);
+    static DsBehaviourPtr newInputChannelBehaviour(const EnoceanInputDescriptor &aInputDescriptor, DevicePtr aDevice, const char *aId);
 
     /// utility: get description string from sensor descriptor info
-    static string sensorDesc(const EnoceanSensorDescriptor &aSensorDescriptor);
+    static string inputDesc(const EnoceanInputDescriptor &aInputDescriptor);
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
@@ -179,10 +186,10 @@ namespace p44 {
     virtual string shortDesc();
 
   };
-  typedef boost::intrusive_ptr<EnoceanSensorHandler> EnoceanSensorHandlerPtr;
+  typedef boost::intrusive_ptr<EnoceanInputHandler> EnoceanInputHandlerPtr;
 
 
 } // namespace p44
 
 #endif // ENABLE_ENOCEAN
-#endif // __p44vdc__enoceansensorhandler__
+#endif // __p44vdc__enoceaninputhandler__

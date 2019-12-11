@@ -188,8 +188,8 @@ void MovingLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   // now load moving light specific scene information
   MovingLightScenePtr movingLightScene = boost::dynamic_pointer_cast<MovingLightScene>(aScene);
   if (movingLightScene) {
-    MLMicroSeconds ttUp = transitionTimeFromSceneEffect(movingLightScene->effect, movingLightScene->effectParam, true);
-    MLMicroSeconds ttDown = transitionTimeFromSceneEffect(movingLightScene->effect, movingLightScene->effectParam, false);
+    MLMicroSeconds ttUp = transitionTimeFromScene(movingLightScene, true);
+    MLMicroSeconds ttDown = transitionTimeFromScene(movingLightScene, false);
     // prepare next position values in channels
     horizontalPosition->setChannelValueIfNotDontCare(movingLightScene, movingLightScene->hPos, ttUp, ttDown, true);
     verticalPosition->setChannelValueIfNotDontCare(movingLightScene, movingLightScene->vPos, ttUp, ttDown, true);
@@ -366,7 +366,7 @@ void FeatureLightScene::setDefaultSceneValues(SceneNo aSceneNo)
   brightnessGradient = DEFAULT_BRIGHTNESS_GRADIENT;
   hueGradient = DEFAULT_HUE_GRADIENT;
   saturationGradient = DEFAULT_SATURATION_GRADIENT;
-  featureMode = DEFAULT_FEATURE_MODE; // linear, oscillating
+  featureMode = DEFAULT_FEATURE_MODE;
   // set dontcare flags
   FeatureLightBehaviourPtr featureLightBehaviour = boost::dynamic_pointer_cast<FeatureLightBehaviour>(getOutputBehaviour());
   if (featureLightBehaviour) {
@@ -454,8 +454,8 @@ void FeatureLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   // now load moving light specific scene information
   FeatureLightScenePtr featureLightScene = boost::dynamic_pointer_cast<FeatureLightScene>(aScene);
   if (featureLightScene) {
-    MLMicroSeconds ttUp = transitionTimeFromSceneEffect(featureLightScene->effect, featureLightScene->effectParam, true);
-    MLMicroSeconds ttDown = transitionTimeFromSceneEffect(featureLightScene->effect, featureLightScene->effectParam, false);
+    MLMicroSeconds ttUp = transitionTimeFromScene(featureLightScene, true);
+    MLMicroSeconds ttDown = transitionTimeFromScene(featureLightScene, false);
     // prepare next position values in channels
     horizontalZoom->setChannelValueIfNotDontCare(featureLightScene, featureLightScene->hZoom, ttUp, ttDown, true);
     verticalZoom->setChannelValueIfNotDontCare(featureLightScene, featureLightScene->vZoom, ttUp, ttDown, true);

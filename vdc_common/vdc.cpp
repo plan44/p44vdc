@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -378,11 +378,18 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
       // optimisation off, different notification type than others in set, or otherwise not optimizable -> just execute and apply right now
       dev->updateDeliveryState(aDeliveryState, false); // still: do basic updating of state such that processing has all the info
       getVdcHost().deviceWillApplyNotification(dev, *aDeliveryState); // let vdchost process for possibly updating global zone state
-      dev->executePreparedOperation(NULL, aNotificationToApply);
+      dev->executePreparedOperation(boost::bind(&Vdc::preparedOperationExecuted, this, dev), aNotificationToApply);
     }
   }
   // break caller chain by going via mainloop
   MainLoop::currentMainLoop().executeNow(boost::bind(&Vdc::prepareNextNotification, this, aDeliveryState));
+}
+
+
+void Vdc::preparedOperationExecuted(DevicePtr aDevice)
+{
+  // non-optimized execution of operation complete
+  aDevice->releasePreparedOperation();
 }
 
 
@@ -674,6 +681,10 @@ void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDel
   }
   else {
     ALOG(LOG_WARNING, "Creating or updating native action has failed: %s", Error::text(aError));
+  }
+  // release anything left from preparation now
+  for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+    (*pos)->releasePreparedOperation();
   }
   if (LOGENABLED(LOG_INFO) && optimizerMode>opt_disabled) {
     // show current statistics
@@ -1161,7 +1172,9 @@ ErrorPtr Vdc::load()
   // load the vdc settings (collecting phase is already over by now)
   err = loadFromStore(dSUID.getString().c_str());
   if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
+  #if ENABLE_SETTINGS_FROM_FILES
   loadSettingsFromFiles();
+  #endif
   // load the optimizer cache
   err = loadOptimizerCache();
   if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading optimizer cache: %s", err->text());
@@ -1199,6 +1212,8 @@ ErrorPtr Vdc::forget()
 }
 
 
+#if ENABLE_SETTINGS_FROM_FILES
+
 void Vdc::loadSettingsFromFiles()
 {
   string dir = getVdcHost().getConfigDir();
@@ -1217,6 +1232,8 @@ void Vdc::loadSettingsFromFiles()
     if (loadSettingsFromFile(fn.c_str(), rowid!=0)) markClean();
   }
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - property access
@@ -1238,6 +1255,7 @@ enum {
   minCallsBeforeOptimizing_key,
   maxOptimizerScenes_key,
   maxOptimizerGroups_key,
+  hideWhenEmpty_key,
   numVdcProperties
 };
 
@@ -1320,7 +1338,8 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
       { "x-p44-minDevicesForOptimizing", apivalue_uint64, minDevicesForOptimizing_key, OKEY(vdc_key) },
       { "x-p44-minCallsBeforeOptimizing", apivalue_uint64, minCallsBeforeOptimizing_key, OKEY(vdc_key) },
       { "x-p44-maxOptimizerScenes", apivalue_uint64, maxOptimizerScenes_key, OKEY(vdc_key) },
-      { "x-p44-maxOptimizerGroups", apivalue_uint64, maxOptimizerGroups_key, OKEY(vdc_key) }
+      { "x-p44-maxOptimizerGroups", apivalue_uint64, maxOptimizerGroups_key, OKEY(vdc_key) },
+      { "x-p44-hideWhenEmpty", apivalue_bool, hideWhenEmpty_key, OKEY(vdc_key) }
     };
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)
@@ -1371,6 +1390,9 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
           if (optimizerMode==opt_unavailable) return false; // do not show the property at all
           aPropValue->setUint32Value(maxOptimizerGroups);
           return true;
+        case hideWhenEmpty_key:
+          aPropValue->setBoolValue(getVdcFlag(vdcflag_hidewhenempty));
+          return true;
       }
     }
     else {
@@ -1409,6 +1431,9 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
         case maxOptimizerGroups_key:
           if (optimizerMode==opt_unavailable) return false; // property not writable
           setPVar(maxOptimizerGroups, aPropValue->int32Value());
+          return true;
+        case hideWhenEmpty_key:
+          setVdcFlag(vdcflag_hidewhenempty, aPropValue->boolValue());
           return true;
       }
     }
@@ -1492,8 +1517,9 @@ void Vdc::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *a
 void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  vdcFlags |= vdcflag_flagsinitialized; // this save now contains real content for vdcFlags, which must not be overriden by defaults at next initialisation
   // bind the fields
-  aStatement.bind(aIndex++, vdcFlags);
+  aStatement.bind(aIndex++, (int)vdcFlags);
   aStatement.bind(aIndex++, getAssignedName().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, defaultZoneID);
   aStatement.bind(aIndex++, optimizerMode);

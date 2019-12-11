@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -585,8 +585,10 @@ ErrorPtr SceneDeviceSettings::loadChildren()
       scene = newDefaultScene(0);
     }
     delete queryP; queryP = NULL;
+    #if ENABLE_SETTINGS_FROM_FILES
     // Now check for default settings from files
     loadScenesFromFiles();
+    #endif
   }
   return err;
 }
@@ -622,6 +624,7 @@ ErrorPtr SceneDeviceSettings::deleteChildren()
 
 // MARK: - additional scene defaults from files
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 void SceneDeviceSettings::loadScenesFromFiles()
 {
@@ -708,3 +711,5 @@ void SceneDeviceSettings::loadScenesFromFiles()
     }
   }
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES

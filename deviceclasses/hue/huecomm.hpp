@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -129,7 +129,6 @@ namespace p44 {
 
     bool findInProgress;
     bool apiReady;
-    MLMicroSeconds lastApiAction;
 
   public:
 

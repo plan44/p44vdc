@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2017-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -419,16 +419,17 @@ namespace p44 {
     /// abort action
     virtual bool abort(bool aDoCallBack = true) P44_OVERRIDE;
 
-  protected:
-
     /// lookup variables by name
     virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
 
     /// evaluation of synchronously implemented functions which immediately return a result
     virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
 
+  protected:
+
     /// evaluation of asynchronously implemented functions which may yield execution and resume later
     bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
+    void triggerFuncExecuted(ExpressionValue aEvaluationResult);
 
   };
 
@@ -468,7 +469,7 @@ namespace p44 {
     void processGlobalEvent(VdchostEvent aActivity);
 
     /// execute the trigger actions
-    bool executeActions(bool aAsynchronously, EvaluationResultCB aCallback = NULL);
+    bool executeActions(EvaluationResultCB aCallback = NULL);
 
     /// stop running trigger actions
     void stopActions();
@@ -496,6 +497,7 @@ namespace p44 {
   private:
 
     void parseVarDefs();
+    void reCheckTimed();
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     void triggerEvaluationExecuted(ExpressionValue aEvaluationResult);
     void triggerActionExecuted(ExpressionValue aEvaluationResult);
@@ -537,6 +539,11 @@ namespace p44 {
     /// @return trigger or NULL if not found (and none created)
     TriggerPtr getTrigger(int aTriggerId, bool aCreateNewIfNotExisting = false, size_t *aTriggerIndexP = NULL);
 
+    /// get trigger by name
+    /// @param aTriggerName a user-assigned scene name to look for
+    /// @return trigger or NULL if none with this name is found
+    TriggerPtr getTriggerByName(const string aTriggerName);
+
   protected:
 
     // property access implementation
@@ -558,6 +565,7 @@ namespace p44 {
     typedef PropertyContainer inherited;
     friend class ZoneDescriptor;
     friend class Trigger;
+    friend class TriggerList;
     friend class TriggerActionContext;
 
     VdcHost &vdcHost; ///< local reference to vdc host
@@ -565,6 +573,8 @@ namespace p44 {
     ZoneList localZones; ///< the locally used/defined zones
     SceneList localScenes; ///< the locally defined scenes
     TriggerList localTriggers; ///< the locally defined triggers
+
+    bool devicesReady; ///< set when vdchost reports devices initialized
 
   public:
 

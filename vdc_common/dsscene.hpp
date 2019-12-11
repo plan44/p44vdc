@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -22,13 +22,13 @@
 #ifndef __p44vdc__dsscene__
 #define __p44vdc__dsscene__
 
-
+#include "p44vdc_common.hpp"
 #include "persistentparams.hpp"
 #include "propertycontainer.hpp"
 
 #include "devicesettings.hpp"
 
-#if ENABLE_EXPRESSIONS && !defined(ENABLE_SCENE_SCRIPT)
+#if ENABLE_EXPRESSIONS && EXPRESSION_SCRIPT_SUPPORT && !defined(ENABLE_SCENE_SCRIPT)
   #define ENABLE_SCENE_SCRIPT 1
 #endif
 
@@ -331,8 +331,10 @@ namespace p44 {
     /// delete scenes
     virtual ErrorPtr deleteChildren() P44_FINAL;
 
+    #if ENABLE_SETTINGS_FROM_FILES
     /// load additional defaults for scenes from files
     void loadScenesFromFiles();
+    #endif
     
     /// @}
   };

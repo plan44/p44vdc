@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -91,11 +91,6 @@ namespace p44 {
     /// @return true if LEDs have a separate white channel
     bool hasWhite();
 
-    /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
-    /// devices.
-    /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return true; }
-
     /// vdc level methods (p44 specific, JSON only, for creating LED chain devices)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
@@ -113,7 +108,7 @@ namespace p44 {
 
   private:
 
-    LedChainDevicePtr addLedChainDevice(int aX, int aDx, int aY, int aDy, string aDeviceConfig);
+    LedChainDevicePtr addLedChainDevice(int aX, int aDx, int aY, int aDy, int aZOrder, string aDeviceConfig);
 
     void render();
 

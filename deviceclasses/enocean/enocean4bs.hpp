@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -27,7 +27,7 @@
 #if ENABLE_ENOCEAN
 
 #include "enoceandevice.hpp"
-#include "enoceansensorhandler.hpp"
+#include "enoceaninputhandler.hpp"
 
 using namespace std;
 
@@ -82,7 +82,7 @@ namespace p44 {
 
 
 
-  /// heating valve handler
+  /// basic heating valve handler
   class EnoceanA52001Handler : public EnoceanChannelHandler
   {
     typedef EnoceanChannelHandler inherited;
@@ -137,7 +137,7 @@ namespace p44 {
 
 
 
-  /// heating valve handler
+  /// heating valve with feed temperature handler
   class EnoceanA52004Handler : public EnoceanChannelHandler
   {
     typedef EnoceanChannelHandler inherited;
@@ -149,9 +149,6 @@ namespace p44 {
       service_closevalve,
       service_finish
     } serviceState;
-
-    int8_t lastRequestedValvePos; ///< last valve position requested (used to calculate output for binary valves like MD10-FTL)
-    int8_t lastActualValvePos; ///< last actually applied valve position (first derivative of lastRequestedValvePos)
 
     /// behaviours of extra sensors
     DsBehaviourPtr roomTemp;
@@ -196,6 +193,66 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<EnoceanA52004Handler> EnoceanA52004HandlerPtr;
 
+
+
+  /// harvesting heating valve with set point handler
+  class EnoceanA52006Handler : public EnoceanChannelHandler
+  {
+    typedef EnoceanChannelHandler inherited;
+
+    enum {
+      service_idle,
+      service_openvalve,
+      service_openandclosevalve,
+      service_closevalve,
+      service_finish
+    } serviceState;
+
+    /// behaviours of extra sensors
+    DsBehaviourPtr roomTemp;
+    DsBehaviourPtr feedTemp;
+    DsBehaviourPtr setpoint;
+    DsBehaviourPtr lowBatInput;
+
+    int8_t currentValvePos; ///< current valve position (as received from device)
+    bool askForFeed; ///< toggle to alternate between room and feed temperature queries
+
+    /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
+    EnoceanA52006Handler(EnoceanDevice &aDevice);
+
+  public:
+
+    /// factory: (re-)create logical device from address|channel|profile|manufacturer tuple
+    /// @param aVdcP the class container
+    /// @param aSubDeviceIndex subdevice number (multiple logical EnoceanDevices might exists for the same EnoceanAddress)
+    ///   upon exit, this will be incremented by the number of subdevice indices the device occupies in the index space
+    ///   (usually 1, but some profiles might reserve extra space, such as up/down buttons)
+    /// @param aEEProfile VARIANT/RORG/FUNC/TYPE EEP profile number
+    /// @param aEEManufacturer manufacturer number (or manufacturer_unknown)
+    /// @param aSendTeachInResponse enable sending teach-in response for this device
+    /// @return returns NULL if no device can be created for the given aSubDeviceIndex, new device otherwise
+    static EnoceanDevicePtr newDevice(
+      EnoceanVdc *aVdcP,
+      EnoceanAddress aAddress,
+      EnoceanSubDevice &aSubDeviceIndex,
+      EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer,
+      bool aSendTeachInResponse
+    );
+
+    /// handle radio packet related to this channel
+    /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
+
+    /// collect data for outgoing message from this channel
+    /// @param aEsp3PacketPtr must be set to a suitable packet if it is empty, or packet data must be augmented with
+    ///   channel's data when packet already exists
+    virtual void collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr) P44_OVERRIDE;
+
+    /// short (text without LFs!) description of object, mainly for referencing it in log messages
+    /// @return textual description of object
+    virtual string shortDesc() P44_OVERRIDE;
+  };
+  typedef boost::intrusive_ptr<EnoceanA52006Handler> EnoceanA52006HandlerPtr;
 
 
 

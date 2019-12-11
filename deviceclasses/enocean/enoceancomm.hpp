@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -422,7 +422,8 @@ namespace p44 {
 
 
     /// @param aEEProfile the EEP to represent in the 4BS telegram
-    void set4BSTeachInEEP(EnoceanProfile aEEProfile);
+    /// @param aManufacturer the manufacturer code
+    void set4BSTeachInEEP(EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer);
 
     /// @}
 

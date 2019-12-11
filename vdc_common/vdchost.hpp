@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -147,6 +147,8 @@ namespace p44 {
     MLTicket periodicTaskTicket;
     MLMicroSeconds lastActivity;
     MLMicroSeconds lastPeriodicRun;
+
+    MLMicroSeconds timeOfDayDiff; ///< current difference of monotonic ML time and a pseudo local time to detect changes (TZ changes, NTP updates)
 
     int8_t localDimDirection;
 
@@ -547,8 +549,10 @@ namespace p44 {
     /// forget any parameters stored in persistent DB
     ErrorPtr forget();
 
+    #if ENABLE_SETTINGS_FROM_FILES
     // load additional settings from file
     void loadSettingsFromFiles();
+    #endif
 
     /// @}
 
@@ -650,6 +654,7 @@ namespace p44 {
 
     // periodic task
     void periodicTask(MLMicroSeconds aNow);
+    void checkTimeOfDayChange();
 
     // getting MAC
     void getMyMac(StatusCB aCompletedCB, bool aFactoryReset);

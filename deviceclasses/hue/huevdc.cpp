@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -598,6 +598,15 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
       // PUT /api/<username>/groups/<groupid>/action
       // { "scene": "AB34EF5", "transitiontime":60 }
       setGroupState->add("scene", JsonObject::newString(hueActionId));
+      // TODO: maybe uncomment later, but per hue API 1.33, "transitiontime" at this point does not have any effect; only the scene stored transition time is used
+      //   once enabled, make sure we don't reject calls with transition time override any more in huedevice's prepareForOptimizedSet()
+      // determine slowest transition time over all affected devices
+      // MLMicroSeconds maxtt = 0;
+      // for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+      //   MLMicroSeconds devtt = (*pos)->transitionTimeForPreparedScene(true); // including override value
+      //   if (devtt>maxtt) maxtt = devtt;
+      // }
+      // setGroupState->add("transitiontime", JsonObject::newInt64(maxtt*10/Second)); // 100mS resolution
       hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
       return;
     }
@@ -692,7 +701,7 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       string sceneName = string_format("dS-Scene_%d", aOptimizerEntry->contentId);
       JsonObjectPtr lights = JsonObject::newArray();
       // transition time is per scene for hue. Use longest transition time among devices
-      MLMicroSeconds longestTransition = 0;
+      MLMicroSeconds maxtt = 0;
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
         lights->arrayAppend(JsonObject::newString(dev->lightID));
@@ -702,11 +711,10 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
           sceneName += "..."; // exactly 32
         }
         // find longest transition
-        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
-        MLMicroSeconds tt = l->transitionTimeToNewBrightness();
-        if (tt>longestTransition) longestTransition = tt;
+        MLMicroSeconds devtt = dev->transitionTimeForPreparedScene(false); // without override value
+        if (devtt>maxtt) maxtt = devtt;
       }
-      newScene->add("transitiontime", JsonObject::newInt64(longestTransition*10/Second));
+      newScene->add("transitiontime", JsonObject::newInt64(maxtt*10/Second));
       newScene->add("name", JsonObject::newString(sceneName)); // must be max 32 chars
       newScene->add("lights", lights);
       newScene->add("recycle", JsonObject::newBool(false));
@@ -794,22 +802,21 @@ void HueVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       // PUT /api/<username>/scenes/<sceneid>
       // {"lights":["1","2"], "storelightstate":true }
       JsonObjectPtr lights = JsonObject::newArray();
-      MLMicroSeconds longestTransition = 0;
+      MLMicroSeconds maxtt = 0;
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
         // collect id to update
         lights->arrayAppend(JsonObject::newString(dev->lightID));
         // find longest transition
-        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
-        MLMicroSeconds tt = l->transitionTimeToNewBrightness();
-        if (tt>longestTransition) longestTransition = tt;
+        MLMicroSeconds devtt = dev->transitionTimeForPreparedScene(false); // without transition time override
+        if (devtt>maxtt) maxtt = devtt;
       }
-      updatedScene->add("transitiontime", JsonObject::newInt64(longestTransition*10/Second));
+      updatedScene->add("transitiontime", JsonObject::newInt64(maxtt*10/Second));
       updatedScene->add("storelightstate", JsonObject::newBool(true));
       // actually perform scene update only after transitions are all complete (50% safety margin)
       uint64_t newHash = aOptimizerEntry->contentsHash; // remember the correct hash for the case we can execute the delayed update
       aOptimizerEntry->contentsHash = 0; // reset for now, scene is not up-to-date yet
-      delayedSceneUpdateTicket.executeOnce(boost::bind(&HueVdc::performNativeSceneUpdate, this, newHash, sceneId, updatedScene, aDeliveryState->affectedDevices, aOptimizerEntry), longestTransition*3/2);
+      delayedSceneUpdateTicket.executeOnce(boost::bind(&HueVdc::performNativeSceneUpdate, this, newHash, sceneId, updatedScene, aDeliveryState->affectedDevices, aOptimizerEntry), maxtt*3/2);
       aStatusCB(ErrorPtr());
       return;
     }

@@ -38,7 +38,7 @@ namespace p44 {
     typedef DsBehaviour inherited;
     friend class Device;
 
-    MLTicket invalidatorTicket;
+    MLTicket timeoutTicket;
     MLTicket updateTicket;
 
   protected:
@@ -49,9 +49,10 @@ namespace p44 {
     DsBinaryInputType hardwareInputType; ///< the input type when device has hardwired functions
     VdcUsageHint inputUsage; ///< the input type when device has hardwired functions
     bool reportsChanges; ///< set if the input detects changes without polling
-    MLMicroSeconds updateInterval;
+    MLMicroSeconds updateInterval; ///< how fast the input is expected to update its value maximally (can be much less often, up to never, depending on actual signals)
     MLMicroSeconds aliveSignInterval; ///< how often the input reports its state minimally (if it does not report for longer than that, it can be considered out of order). Can be 0 for inputs from which no regular update can be expected at all
     MLMicroSeconds maxPushInterval; ///< max push interval (after that, value gets re-pushed even if no input update has occurred)
+    int autoResetTo; ///< input value to reset to after updateInterval has passed, <0 means no auto reset
     /// @}
 
     /// @name persistent settings
@@ -90,9 +91,10 @@ namespace p44 {
     ///   update interval can be expected.
     /// @param aAliveSignInterval how often the input will send an update in all cases. If 0, this means that no regular
     ///   update interval can be expected.
+    /// @param aAutoResetTo input value to reset to after updateInterval has passed, <0 means no auto reset
     /// @note this must be called once before the device gets added to the device container. Implementation might
     ///   also derive default values for settings from this information.
-    void setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval);
+    void setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, int aAutoResetTo = -1);
 
     /// get the hardware input type
     /// @return the type of the input
@@ -196,7 +198,8 @@ namespace p44 {
 
   private:
 
-    void armInvalidator();
+    void startInputTimeout(MLMicroSeconds aTimeout, int aAfterTimeOutState = -1);
+    void inputTimeout(int aAfterTimeOutState);
     bool pushInput(bool aChanged);
     void reportFinalState();
 

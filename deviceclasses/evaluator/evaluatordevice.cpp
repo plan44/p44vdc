@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2016-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -261,6 +261,8 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
 }
 
 
+#if EXPRESSION_SCRIPT_SUPPORT
+
 void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult)
 {
   ApiValuePtr testResult = aRequest->newApiValue();
@@ -275,6 +277,8 @@ void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ExpressionVa
   aRequest->sendResult(testResult);
 }
 
+#endif // EXPRESSION_SCRIPT_SUPPORT
+
 
 #define REPARSE_DELAY (30*Second)
 
@@ -283,7 +287,7 @@ void EvaluatorDevice::handleGlobalEvent(VdchostEvent aEvent)
   if (aEvent==vdchost_devices_initialized) {
     parseVarDefs();
   }
-  else if (aEvent==vdchost_network_reconnected) {
+  else if (aEvent==vdchost_network_reconnected || aEvent==vdchost_timeofday_changed) {
     // network coming up might change local time
     if (!valueParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
@@ -526,12 +530,14 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
   }
 }
 
+#if EXPRESSION_SCRIPT_SUPPORT
 
 void EvaluatorDevice::actionExecuted(ExpressionValue aEvaluationResult)
 {
   ALOG(LOG_INFO, "evaluator action script completed with result: '%s', error: %s", aEvaluationResult.stringValue().c_str(), Error::text(aEvaluationResult.error()));
 }
 
+#endif // EXPRESSION_SCRIPT_SUPPORT
 
 
 // MARK: - EvaluatorExpressionContext
@@ -916,7 +922,7 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   #if EXPRESSION_SCRIPT_SUPPORT
   action.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #else
-  oldAction(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  oldAction = nonNullCStr(aRow->get<const char *>(aIndex++));
   #endif
 }
 

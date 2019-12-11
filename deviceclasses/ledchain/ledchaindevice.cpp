@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -32,10 +32,14 @@
 #if ENABLE_LEDCHAIN
 
 #include "p44view.hpp"
-#include "lightspotview.hpp"
 #include "lightbehaviour.hpp"
 #include "movinglightbehaviour.hpp"
+#include "coloreffectview.hpp"
+#include "lightspotview.hpp"
 
+#if ENABLE_VIEWCONFIG
+#include "viewfactory.hpp"
+#endif
 
 using namespace p44;
 
@@ -66,61 +70,13 @@ public:
     endSoftEdge(aEndSoftEdge)
   {
     setForegroundColor(black);
-    setBackgroundColor(black);
+    setBackgroundColor(transparent);
     PixelRect f = { aX, aY, aDx, aDy };
     setFrame(f);
     setFullFrameContent();
   }
 
 };
-
-
-// MARK: - FeatureLightSpot
-
-class FeatureLightSpot : public LightSpotView
-{
-
-public:
-
-  FeatureLightSpot(int aX, int aDx, int aY, int aDy)
-  {
-    setForegroundColor(black);
-    setBackgroundColor(black);
-    PixelRect f = { aX, aY, aDx, aDy };
-    setFrame(f);
-    setFullFrameContent();
-    setPosition(50, 50); // middle
-    setZoom(50, 50); // filling larger dimension of frame
-  }
-
-
-  void setPosition(double aRelX, double aRelY)
-  {
-    // movement area is 2 times the frame, so light can be moved out completely out of the frame in both directions
-    // This means light center appears at left/bottom edge at 0.25 and disappears at right/top edge at 0.75
-    setCenter({
-      (int)(-frame.dx/2+frame.dx*aRelX*0.02),
-      (int)(-frame.dy/2+frame.dy*aRelY*0.02),
-    });
-  }
-
-  void setZoom(double aRelDx, double aRelDy)
-  {
-    // zoom area is (like position) twice the size of the larger dimension of the frame
-    // This means the light fully fits the frame in the larger direction at zoom==50
-    int maxD = max(frame.dx, frame.dy);
-    setExtent({
-      (int)(maxD*aRelDx*0.01),
-      (int)(maxD*aRelDy*0.01)
-    });
-  }
-
-};
-typedef boost::intrusive_ptr<FeatureLightSpot> FeatureLightSpotPtr;
-
-
-
-
 
 
 // MARK: - LedChainDevice
@@ -134,20 +90,21 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   //   Note: uniqueid can be any unique string to derive a dSUID from, or a valid dSUID to be used as-is
   // where:
   // - with lighttype=segment
-  //   - aX,aDx,aY,aDY determine the size of the segment (view)
+  //   - aX,aDx,aY,aDY determine the position and size (=frame) of the segment (view)
   //   - config=b:e
-  //     - id: optional unique id identifying the light, must start with non-numeric, if set, determines the dSUID
   //     - b:0..n size of softedge at beginning
   //     - e:0..n size of softedge at end
-  // - with lighttype=lightspot
-  //   - aX,aY determine the (initial) center of the light field
-  //   - aDx,aDy determine the (initial) diameter of the light field
-  //   - config=<none yet>
+  // - with lighttype=featurelight
+  //   - aX,aDx,aY,aDY determine the position and size (=frame) of the light spot
+  //   - config:string|filepath|JSON
+  //     - empty: lightspot view
+  //     - string: name of a view type, which will be instantiated with full frame
+  //     - JSON object beginning with '{': config for root view
+  //     - filename (string containing a period) or path: name of a JSON file to load
   // evaluate config
   string config = aDeviceConfig;
   string lt, s;
   const char* p = config.c_str();
-  bool configOK = false;
   // check for optional unique id
   const char* p2 = p;
   if (nextPart(p2, s, ':')) {
@@ -175,26 +132,65 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
       }
       // install the view
       lightView = P44ViewPtr(new LightSegment(aX, aDx, aY, aDy, startSoftEdge, endSoftEdge));
-      // complete config
-      configOK = true;
     }
-    else if (lt=="lightspot") {
+    #if ENABLE_VIEWCONFIG
+    else if (lt=="feature") {
       // light spot
-      lightType = lighttype_lightspot;
+      lightType = lighttype_feature;
       installSettings(DeviceSettingsPtr(new FeatureLightDeviceSettings(*this)));
       behaviour = FeatureLightBehaviourPtr(new FeatureLightBehaviour(*this, false));
-      lightView = FeatureLightSpotPtr(new FeatureLightSpot(aX, aDx, aY, aDy));
-      configOK = true;
+      // create the root view (not necessarily a ColorEffectView, but likely so
+      JsonObjectPtr cfg;
+      ErrorPtr err;
+      if (*p=='{') {
+        // JSON config
+        cfg = JsonObject::objFromText(p, -1, &err);
+      }
+      else if (strchr(p, '.')) {
+        // filename
+        cfg = JsonObject::objFromFile(Application::sharedApplication()->resourcePath(p).c_str(), &err);
+      }
+      else {
+        string vty = "lightspot"; // default to lightspot
+        if (*p) vty = p;
+        cfg = JsonObject::newObj();
+        cfg->add("type", cfg->newString(vty));
+      }
+      if (Error::isOK(err)) {
+        // - override frame
+        cfg->add("x", cfg->newInt32(aX));
+        cfg->add("y", cfg->newInt32(aY));
+        cfg->add("dx", cfg->newInt32(aDx));
+        cfg->add("dy", cfg->newInt32(aDy));
+        if (!cfg->get("fullframe")) cfg->add("fullframe", cfg->newBool(true));
+        if (!cfg->get("type")) cfg->add("type", cfg->newString("stack"));
+        // - create
+        err = createViewFromConfig(cfg, lightView, P44ViewPtr());
+      }
+      if (Error::notOK(err)) {
+        ALOG(LOG_WARNING, "Invalid feature light config: %s", err->text());
+      }
     }
+    #endif
   }
-  if (!configOK) {
-    ALOG(LOG_ERR, "invalid LedChain device config: %s", aDeviceConfig.c_str());
+  if (!lightView) {
+    lightView = P44ViewPtr(new P44View()); // dummy to avoid crashes
+    ALOG(LOG_WARNING, "No light view found");
   }
   if (!behaviour) {
     // default to simple color light (we can't have nothing even with invalid config)
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
     behaviour = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
+  }
+  if (lightView) {
+    // make sure it is invisible at the beginning
+    lightView->hide();
+    // add function to allow view manipulation via scripts
+    ValueLookupCB vl = boost::bind(&LedChainDevice::viewCfgSubstLookup, this, _1, _2);
+    behaviour->sceneScriptContext.registerFunctionHandler(
+      boost::bind(&p44::evaluateViewFunctions, _1, _2, _3, _4, lightView, vl)
+    );
   }
   // - is RGB
   colorClass = class_yellow_light;
@@ -217,6 +213,12 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     ii += uniqueId;
     dSUID.setNameInSpace(ii, vdcNamespace);
   }
+}
+
+
+bool LedChainDevice::viewCfgSubstLookup(const string &aName, ExpressionValue &aResult)
+{
+  return getOutput()->sceneScriptContext.EvaluationContext::valueLookup(aName, aResult);
 }
 
 
@@ -291,12 +293,15 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
 {
   // RGB or RGBW dimmer
   RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
+  MovingLightBehaviourPtr ml = getOutput<MovingLightBehaviour>();
   FeatureLightBehaviourPtr fl = getOutput<FeatureLightBehaviour>();
   bool moreSteps = cl->colorTransitionStep(aStepSize);
   if (cl->brightnessTransitionStep(aStepSize)) moreSteps = true;
-  if (fl) {
-    if (fl->positionTransitionStep(aStepSize)) moreSteps = true;
-    if (fl->featureTransitionStep(aStepSize)) moreSteps = true;
+  if (ml) {
+    if (ml->positionTransitionStep(aStepSize)) moreSteps = true;
+    if (fl) {
+      if (fl->featureTransitionStep(aStepSize)) moreSteps = true;
+    }
   }
   // RGB light, get basic color
   FOCUSLOG("Ledchain: brightness = %f, hue=%f, saturation=%f", cl->brightness->getTransitionalValue(), cl->hue->getTransitionalValue(), cl->saturation->getTransitionalValue());
@@ -313,32 +318,55 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   pix.r = r;
   pix.g = g;
   pix.b = b;
-  pix.a = cl->brightnessForHardware()*getLedChainVdc().ledArrangement.getMaxOutValue()/100; // alpha is brightness, scaled down to maxOutValue
-  // possibly with extended features
-  if (fl) {
-    FeatureLightSpotPtr fls = boost::dynamic_pointer_cast<FeatureLightSpot>(lightView);
-    if (fls) {
-      fls->setPosition(fl->horizontalPosition->getTransitionalValue(), fl->verticalPosition->getTransitionalValue());
-      fls->setZoom(fl->horizontalZoom->getTransitionalValue(), fl->verticalZoom->getTransitionalValue());
-      fls->setRotation(fl->rotation->getTransitionalValue());
-      uint32_t mode = fl->featureMode->getChannelValue();
-      fls->setColoringParameters(
-        pix,
-        fl->brightnessGradient->getTransitionalValue()/100, mode & 0xFF,
-        fl->hueGradient->getTransitionalValue()/100, (mode>>8) & 0xFF,
-        fl->saturationGradient->getTransitionalValue()/100, (mode>>16) & 0xFF,
-        (mode & 0x01000000)==0 // not radial
-      );
-      fls->setWrapMode((mode & 0x02000000)==0 ? P44View::clipXY : 0);
+  pix.a = 255;
+  lightView->setAlpha(cl->brightnessForHardware()*getLedChainVdc().ledArrangement.getMaxOutValue()/100); // alpha is brightness, scaled down to maxOutValue
+  P44ViewPtr targetView = lightView->getView("LIGHT"); // where to direct extras to
+  if (!targetView) targetView = lightView;
+  if (ml) {
+    // moving light, has position, common to all views
+    targetView->setRelativeContentOrigin(
+      (fl->horizontalPosition->getTransitionalValue()-50)/50,
+      (fl->verticalPosition->getTransitionalValue()-50)/50
+    );
+    if (fl) {
+      // feature light with extra channels
+      // - rotation is common to all views
+      targetView->setContentRotation(fl->rotation->getTransitionalValue());
+      ColorEffectViewPtr cev = boost::dynamic_pointer_cast<ColorEffectView>(targetView);
+      if (cev) {
+        // features available only in ColorEffectView
+        // - zoom area is (like position) twice the size of the larger dimension of the frame
+        //   This means the light fully fits the frame in the larger direction at zoom==50
+        PixelCoord sz = cev->getFrameSize();
+        int maxD = max(sz.x, sz.y);
+        cev->setExtent({
+          (int)(maxD*fl->horizontalZoom->getTransitionalValue()*0.01),
+          (int)(maxD*fl->verticalZoom->getTransitionalValue()*0.01)
+        });
+        uint32_t mode = fl->featureMode->getChannelValue();
+        cev->setColoringParameters(
+          pix,
+          fl->brightnessGradient->getTransitionalValue()/100, mode & 0xFF,
+          fl->hueGradient->getTransitionalValue()/100, (mode>>8) & 0xFF,
+          fl->saturationGradient->getTransitionalValue()/100, (mode>>16) & 0xFF,
+          (mode & 0x01000000)==0 // not radial
+        );
+        cev->setWrapMode((cev->getWrapMode()&~P44View::clipMask) | ((mode & 0x02000000)==0 ? P44View::clipXY : 0));
+      }
+      else {
+        // not a ColorEffectView, just set foreground color
+        targetView->setForegroundColor(pix);
+      }
     }
   }
   else {
+    // simple area, just set foreground color
     lightView->setForegroundColor(pix);
   }
   getLedChainVdc().ledArrangement.render(); // update
   // next step
   if (moreSteps) {
-    ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, pix.a);
+    ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
     // not yet complete, schedule next step
     transitionTicket.executeOnce(
       boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
@@ -347,7 +375,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     return; // will be called later again
   }
   if (!aForDimming) {
-    ALOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, pix.a);
+    ALOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
   }
 }
 
@@ -357,8 +385,8 @@ string LedChainDevice::modelName()
 {
   if (lightType==lighttype_simplearea)
     return "Static LED Matrix Area";
-  else if (lightType==lighttype_lightspot)
-    return "Moving Light on LED Matrix";
+  else if (lightType==lighttype_feature)
+    return "Moving Feature Light on LED Matrix";
   return "LedChain device";
 }
 

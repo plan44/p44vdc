@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -42,21 +42,21 @@ using namespace p44;
 EnoceanChannelHandler::EnoceanChannelHandler(EnoceanDevice &aDevice) :
   device(aDevice),
   dsChannelIndex(0),
-  lowBat(false)
+  batPercentage(100)
 {
 }
 
 
 int EnoceanChannelHandler::opStateLevel()
 {
-  if (!isAlive()) return 0; /* completely offline, operation not possible */
-  if (lowBat) return 20; /* low battery, operation critical */
+  if (!isAlive()) return 0; // completely offline, operation not possible
+  if (batPercentage<=LOW_BAT_PERCENTAGE) return batPercentage; // low battery, operation critical
   return 100;
 }
 
 string EnoceanChannelHandler::getOpStateText()
 {
-  if (lowBat) return "low battery";
+  if (batPercentage<=LOW_BAT_PERCENTAGE) return "low battery";
   return "";
 }
 

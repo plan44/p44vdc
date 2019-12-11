@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -202,8 +202,10 @@ namespace p44 {
     /// @note this is usually called from the device container when device is added (detected), before initializeDevice() and after identifyDevice()
     virtual ErrorPtr load();
 
+    #if ENABLE_SETTINGS_FROM_FILES
     // load additional settings from files
     void loadSettingsFromFiles();
+    #endif
 
     /// initializes the physical device for being used
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
@@ -448,6 +450,16 @@ namespace p44 {
     ///    It is exposed as directly controlling dimming might be useful for special purposes (e.g. identify)
     void dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
 
+    /// this can be called by optimizing scene call implementations in vdcs
+    /// to get the scene transition time before the transition times are applied to the channels
+    /// @param aIncludingOverride if set, a potential per-call override of the transition time will be returned,
+    ///   otherwise, only the transition time actually stored in the scene is returned.
+    /// @return transition time
+    MLMicroSeconds transitionTimeForPreparedScene(bool aIncludingOverride);
+
+    /// @return transition time override value, if there is any, Infinite otherwise
+    MLMicroSeconds transitionTimeOverride() { return preparedScene ? preparedTransitionOverride : 0; };
+
     /// undo scene call on this device (i.e. revert outputs to values present immediately before calling that scene)
     /// @param aSceneNo the scene call to undo (needs to be specified to prevent undoing the wrong scene)
     void undoScene(SceneNo aSceneNo);
@@ -667,6 +679,11 @@ namespace p44 {
     ///   However, in all cases internal state must be updated to reflect the finalized operation
     void executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatToApply);
 
+    /// release anything that might be prepared in the device for an operation
+    /// @note a prepared operation might need to hold on objects even after executePreparedOperation(),
+    ///   for example the prepared scene which might be needed to get transition time
+    void releasePreparedOperation();
+
     /// update the delivery state
     /// @param aDeliveryState update params to reflect the
     /// @param aForOptimisation if set, delivery state is updated for optimized delivery to this device, if possible
@@ -680,12 +697,13 @@ namespace p44 {
     ///   it for some scenes but not for others).
     bool addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState);
 
-
     /// let device implementation prepare for (and possibly reject) optimized set
     /// @param aDeliveryState can be inspected to see the scene or dim parameters
     ///   (optimizedType, actionParam, actionVariant are already set)
     /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
     ///    executed without optimisation
+    /// @note this can be used by devices to reject optimisation on a call-by-call basis, e.g. when a custom transition time
+    ///   prevents using a native scene as-is. At the time of call, the operation has already been prepared
     virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) { return false; /* not optimizable by default */ };
 
     /// @}
@@ -768,6 +786,7 @@ namespace p44 {
     bool checkForReapply();
     void forkDoneCB(SimpleCB aOriginalCB, SimpleCB aNewCallback);
     void configurationPrepared(StatusCB aPreparedCB);
+    void syncedChannels(VdcApiRequestPtr aRequest);
 
   };
 

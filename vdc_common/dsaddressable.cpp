@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -675,6 +675,7 @@ string DsAddressable::webuiURLString()
 
 // MARK: - load addressable settings from files
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExplicitlyOverridden)
 {
@@ -705,6 +706,8 @@ bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExp
   }
   return anySettingsApplied;
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - description/shortDesc/logging

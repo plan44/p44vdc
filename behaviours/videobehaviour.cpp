@@ -318,7 +318,7 @@ void VideoDeviceSettings::dumpDefaultScenes()
     string_format_append(s, "%s\t", voli ? "1" : "-"); // VolI = volume ignore flag
     string_format_append(s, "%s\t", videoScene->hasFixVol() ? "1" : "-"); // VolF = fixvol
     string_format_append(s, "%s\t", videoScene->isMessage() ? "1" : "-"); // MM = message
-    string_format_append(s, "%.3f\t", (double)device.getOutput()->transitionTimeFromSceneEffect(videoScene->effect, videoScene->effectParam, true)/Second);
+    string_format_append(s, "%.3f\t", (double)device.getOutput()->transitionTimeFromScene(videoScene, true)/Second);
     if (csi) s+="-\t"; else string_format_append(s, "%d\t", (int)videoScene->sceneValue(2)); // CS = content source
     string_format_append(s, "%s\t", csi ? "1" : "-"); // CSI = content source ignore flag
     printf("%s\n", s.c_str());

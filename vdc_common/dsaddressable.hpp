@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -57,6 +57,7 @@ namespace p44 {
     vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
     vdchost_network_reconnected, ///< network connection established again
     vdchost_network_lost, ///< network connection was lost
+    vdchost_timeofday_changed, ///< real time of day has changed (TZ change, NTP update after reboot)
     vdchost_vdcapi_connected, ///< the VDC API is connected (to a vdsm using it)
     vdchost_vdcapi_disconnected, ///< the VDC API was disconnected
     vdchost_vdcs_initialized, ///< all vdcs are initialized now
@@ -397,12 +398,14 @@ namespace p44 {
     /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
     virtual bool canIdentifyToUser() { return false; } // not by default
 
+    #if ENABLE_SETTINGS_FROM_FILES
     /// load settings from CSV file
     /// @param aCSVFilepath full file path to a CSV file to read. If file does not exist, the function does nothing. If
     ///   an error occurs loading the file, the error is logged
     /// @param aOnlyExplicitlyOverridden if set, only properties are applied which are explicitly marked with a exclamation mark prefix
     /// @return true if some settings were applied
     bool loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExplicitlyOverridden);
+    #endif
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);

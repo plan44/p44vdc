@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -724,10 +724,21 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
     stopSceneActions();
     respErr = Error::ok();
   }
+  else if (aMethod=="x-p44-syncChannels") {
+    requestUpdatingChannels(boost::bind(&Device::syncedChannels, this, aRequest));
+    return ErrorPtr(); // no response now
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
   return respErr;
+}
+
+
+void Device::syncedChannels(VdcApiRequestPtr aRequest)
+{
+  // confirm channels synced
+  aRequest->sendResult(ApiValuePtr());
 }
 
 
@@ -1014,6 +1025,13 @@ void Device::executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatTo
 }
 
 
+void Device::releasePreparedOperation()
+{
+  preparedScene.reset();
+  preparedTransitionOverride = Infinite; // none
+}
+
+
 bool Device::updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bool aForOptimisation)
 {
   if (aDeliveryState->optimizedType==ntfy_callscene) {
@@ -1062,7 +1080,9 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 
 // MARK: - high level serialized hardware access
 
-#define SERIALIZER_WATCHDOG 1
+#ifndef SERIALIZER_WATCHDOG
+  #define SERIALIZER_WATCHDOG 1
+#endif
 #define SERIALIZER_WATCHDOG_TIMEOUT (20*Second)
 
 void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForDimming, bool aModeChange)
@@ -1227,11 +1247,6 @@ void Device::applyingChannelsComplete()
 
 
 
-/// request that channel values are updated by reading them back from the device's hardware
-/// @param aUpdatedOrCachedCB will be called when values are updated with actual hardware values
-///   or pending values are in process to be applied to the hardware and thus these cached values can be considered current.
-/// @note this method is only called at startup and before saving scenes to make sure changes done to the outputs directly (e.g. using
-///   a direct remote control for a lamp) are included. Just reading a channel state does not call this method.
 void Device::requestUpdatingChannels(SimpleCB aUpdatedOrCachedCB)
 {
   AFOCUSLOG("requestUpdatingChannels entered");
@@ -1381,6 +1396,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     currentDimChannel = aChannel;
     currentAutoStopTime = aAutoStopAfter;
     preparedDim = true;
+    preparedScene.reset(); // to make sure there's no leftover
     aPreparedCB(ntfy_dimchannel); // needs to start or stop dimming
     return;
   }
@@ -1675,12 +1691,25 @@ void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
 }
 
 
+MLMicroSeconds Device::transitionTimeForPreparedScene(bool aIncludingOverride)
+{
+  MLMicroSeconds tt = 0;
+  if (preparedScene) {
+    if (aIncludingOverride && preparedTransitionOverride!=Infinite) {
+      tt = preparedTransitionOverride;
+    }
+    else if (output) {
+      tt = output->transitionTimeFromScene(preparedScene, true);
+    }
+  }
+  return tt;
+}
+
 
 void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
   if (preparedScene) {
     DsScenePtr scene = preparedScene;
-    preparedScene.reset();
     // apply scene logically
     if (output->applySceneToChannels(scene, preparedTransitionOverride)) {
       // prepare for apply (but do NOT yet apply!) on device hardware level)
@@ -1926,7 +1955,9 @@ ErrorPtr Device::load()
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->load();
   if (output) output->load();
   // load settings from files
+  #if ENABLE_SETTINGS_FROM_FILES
   loadSettingsFromFiles();
+  #endif
   return ErrorPtr();
 }
 
@@ -1982,6 +2013,8 @@ ErrorPtr Device::forget()
 }
 
 
+#if ENABLE_SETTINGS_FROM_FILES
+
 void Device::loadSettingsFromFiles()
 {
   string dir = getVdcHost().getConfigDir();
@@ -2005,6 +2038,7 @@ void Device::loadSettingsFromFiles()
   }
 }
 
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - property access

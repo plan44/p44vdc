@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2017-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -996,6 +996,9 @@ PropertyDescriptorPtr SceneList::getDescriptorByName(string aPropMatch, int &aSt
       descP->propertyFieldKey = si; // the scene's index
       p = descP;
     }
+    else {
+      delete descP;
+    }
   }
   return p;
 }
@@ -1082,8 +1085,20 @@ void Trigger::triggerEvaluationExecuted(ExpressionValue aEvaluationResult)
       // a trigger fire is an activity
       LocalController::sharedLocalController()->signalActivity();
       // trigger when state goes from not met to met.
-      executeActions(true, boost::bind(&Trigger::triggerActionExecuted, this, _1));
+      stopActions(); // abort previous actions
+      executeActions(boost::bind(&Trigger::triggerActionExecuted, this, _1));
     }
+  }
+}
+
+
+void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
+{
+  if (aEvaluationResult.isOK()) {
+    LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully, result: %s", name.c_str(), aEvaluationResult.stringValue().c_str());
+  }
+  else {
+    LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), aEvaluationResult.error()->text());
   }
 }
 
@@ -1101,8 +1116,8 @@ void Trigger::parseVarDefs()
     // schedule a re-parse later
     varParseTicket.executeOnce(boost::bind(&Trigger::parseVarDefs, this), REPARSE_DELAY);
   }
-  else {
-    // run an initial check now that all values are defined
+  else if (LocalController::sharedLocalController()->devicesReady) {
+    // do not run checks (and fire triggers too early) before devices are reported initialized
     checkAndFire(evalmode_initial);
   }
 }
@@ -1114,16 +1129,22 @@ void Trigger::processGlobalEvent(VdchostEvent aActivity)
     // good chance we'll get everything resolved now
     parseVarDefs();
   }
-  else if (aActivity==vdchost_network_reconnected) {
-    // network coming up might change local time
+  else if (aActivity==vdchost_timeofday_changed) {
+    // change in local time
     if (!varParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
       //   Otherwise: have condition re-evaluated (because it possibly contain references to local time)
-      varParseTicket.executeOnce(boost::bind(&Trigger::checkAndFire, this, evalmode_timed), REPARSE_DELAY);
+      varParseTicket.executeOnce(boost::bind(&Trigger::reCheckTimed, this), REPARSE_DELAY);
     }
   }
 }
 
+
+void Trigger::reCheckTimed()
+{
+  varParseTicket.cancel();
+  checkAndFire(evalmode_timed);
+}
 
 
 void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
@@ -1158,7 +1179,6 @@ bool TriggerActionContext::abort(bool aDoCallBack)
 }
 
 
-
 bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aResult)
 {
   ExpressionValue res;
@@ -1167,13 +1187,47 @@ bool TriggerActionContext::valueLookup(const string &aName, ExpressionValue &aRe
 }
 
 
-
 bool TriggerActionContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
 {
   #if EXPRESSION_SCRIPT_SUPPORT
-  if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction)) return true;
+  if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction)) {
+    return true;
+  }
+  else if (aFunc=="trigger" && aArgs.size()==1) {
+    // trigger('triggername')
+    if (aArgs[0].notValue()) return errorInArg(aArgs[0], false); // return error from argument
+    TriggerPtr targetTrigger = LocalController::sharedLocalController()->localTriggers.getTriggerByName(aArgs[0].stringValue());
+    if (!targetTrigger) {
+      return throwError(ExpressionError::NotFound, "No trigger named '%s' found", aArgs[0].stringValue().c_str());
+    }
+    else if (targetTrigger==&trigger) {
+      return throwError(ExpressionError::CyclicReference, "Cannot recursively call trigger '%s'", aArgs[0].stringValue().c_str());
+    }
+    targetTrigger->executeActions(boost::bind(&TriggerActionContext::triggerFuncExecuted, this, _1));
+    aNotYielded = false; // yielded to other trigger's action
+    return true;
+  }
+  else if (aFunc=="switchcontext" && aArgs.size()==1) {
+    // switchcontext('device_with_output')
+    if (aArgs[0].notValue()) return errorInArg(aArgs[0], false); // return error from argument
+    DevicePtr device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(aArgs[0].stringValue());
+    OutputBehaviourPtr output;
+    if (device) output = device->getOutput();
+    if (!output) {
+      return throwError(ExpressionError::NotFound, "No device with output named '%s' found", aArgs[0].stringValue().c_str());
+    }
+    // continue execution in a different context
+    aNotYielded = chainContext(output->sceneScriptContext, boost::bind(&TriggerActionContext::triggerFuncExecuted, this, _1));
+    return true;
+  }
   #endif
   return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
+}
+
+
+void TriggerActionContext::triggerFuncExecuted(ExpressionValue aEvaluationResult)
+{
+  continueWithAsyncFunctionResult(aEvaluationResult);
 }
 
 
@@ -1212,6 +1266,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
     if (aArgs.size()>ai) {
       if (aArgs[ai].notValue()) return errorInArg(aArgs[ai], aResult); // return error/null from argument
       transitionTime = aArgs[ai].numValue()*Second;
+      if (transitionTime<0) transitionTime = Infinite; // use default
       ai++;
       if (aArgs.size()>ai) {
         if (aArgs[ai].notValue()) return errorInArg(aArgs[ai], aResult); // return error/null from argument
@@ -1238,6 +1293,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
       if (!aArgs[2].isNull()) {
         if (aArgs[2].notValue()) return errorInArg(aArgs[2], aResult); // return error/null from argument
         transitionTime = aArgs[2].numValue()*Second;
+        if (transitionTime<0) transitionTime = Infinite; // use default
       }
     }
     // - optional channelid
@@ -1279,7 +1335,7 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
 
 #define LEGACY_ACTIONS_REWRITING 1
 
-bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
+bool Trigger::executeActions(EvaluationResultCB aCallback)
 {
   ErrorPtr err;
   #if LEGACY_ACTIONS_REWRITING
@@ -1340,18 +1396,7 @@ bool Trigger::executeActions(bool aAsynchronously, EvaluationResultCB aCallback)
   }
   #endif // LEGACY_ACTIONS_REWRITING
   // run script
-  return triggerAction.execute(aAsynchronously, aCallback);
-}
-
-
-void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
-{
-  if (aEvaluationResult.isOK()) {
-    LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully, result: %s", name.c_str(), aEvaluationResult.stringValue().c_str());
-  }
-  else {
-    LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), aEvaluationResult.error()->text());
-  }
+  return triggerAction.execute(true, aCallback);
 }
 
 
@@ -1398,8 +1443,8 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 
 ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 {
-  triggerAction.abort(); // abort previous ones
-  executeActions(true, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1));
+  triggerAction.abort(true); // abort previous ones, calling back (to finish request that possibly has started the script)
+  executeActions(boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1));
   return ErrorPtr(); // will send result later
 }
 
@@ -1602,6 +1647,18 @@ TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting,
 }
 
 
+TriggerPtr TriggerList::getTriggerByName(const string aTriggerName)
+{
+  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
+    if (strucmp((*pos)->name.c_str(),aTriggerName.c_str())==0) {
+      return *pos;
+    }
+  }
+  return TriggerPtr();
+}
+
+
+
 // MARK: - TriggerList persistence
 
 ErrorPtr TriggerList::load()
@@ -1691,6 +1748,9 @@ PropertyDescriptorPtr TriggerList::getDescriptorByName(string aPropMatch, int &a
       descP->createdNew = true;
       p = descP;
     }
+    else {
+      delete descP;
+    }
   }
   return p;
 }
@@ -1730,7 +1790,8 @@ void TriggerList::processGlobalEvent(VdchostEvent aActivity)
 // MARK: - LocalController
 
 LocalController::LocalController(VdcHost &aVdcHost) :
-  vdcHost(aVdcHost)
+  vdcHost(aVdcHost),
+  devicesReady(false)
 {
   localZones.isMemberVariable();
   localScenes.isMemberVariable();
@@ -1759,10 +1820,15 @@ void LocalController::signalActivity()
 
 void LocalController::processGlobalEvent(VdchostEvent aActivity)
 {
+  if (aActivity==vdchost_devices_initialized) {
+    // from now on, triggers can/should fire
+    devicesReady = true;
+  }
   if (aActivity>=vdchost_redistributed_events) {
     // only process events that should be redistributed to all objects
-    FOCUSLOG("processGlobalEvent: event = %d", (int)aActivity);
+    LOG(LOG_INFO, ">>> localcontroller starts processing global event %d", (int)aActivity);
     localTriggers.processGlobalEvent(aActivity);
+    LOG(LOG_INFO, ">>> localcontroller done processing event %d", (int)aActivity);
   }
 }
 

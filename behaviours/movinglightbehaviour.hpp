@@ -173,7 +173,8 @@ namespace p44 {
   #define DEFAULT_BRIGHTNESS_GRADIENT -30  // dimming down a bit towards the edges
   #define DEFAULT_HUE_GRADIENT 0
   #define DEFAULT_SATURATION_GRADIENT 0
-  #define DEFAULT_FEATURE_MODE 0x222222  // linear, oscillating, radial, clipped
+  #define MAX_FEATURE_MODE 0x3FFFFFF
+  #define DEFAULT_FEATURE_MODE 0x0222222  // linear, oscillating, radial, clipped
 
 
   class VZoomChannel : public ChannelBehaviour
@@ -270,7 +271,7 @@ namespace p44 {
     typedef DialChannel inherited;
 
   public:
-    FeatureModeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "featureMode") { setMax(0x3FFFFFF); cachedChannelValue = DEFAULT_FEATURE_MODE; };
+    FeatureModeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "featureMode") { setMax(MAX_FEATURE_MODE); cachedChannelValue = DEFAULT_FEATURE_MODE; };
     virtual const char *getName() P44_OVERRIDE { return "feature mode"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_feature_mode; }; ///< the dS channel type
   };

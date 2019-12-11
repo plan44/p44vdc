@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -1098,7 +1098,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     // - use shadow scene settings
     installSettings(DeviceSettingsPtr(new ShadowDeviceSettings(*this)));
     // - add shadow behaviour
-    ShadowBehaviourPtr sb = ShadowBehaviourPtr(new ShadowBehaviour(*this));
+    ShadowBehaviourPtr sb = ShadowBehaviourPtr(new ShadowBehaviour(*this, defaultGroup));
     sb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_undefined, false, -1);
     sb->setHardwareName(hardwareName);
     ShadowDeviceKind sk = shadowdevice_jalousie; // default to jalousie
@@ -1128,7 +1128,10 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     o->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_undefined, false, -1);
     o->setHardwareName(hardwareName);
     o->setGroupMembership(defaultGroup, true); // put into default group
-    o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "basic")));
+    if (outputFunction==outputFunction_switch)
+      o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "basic_switch")));
+    else
+      o->addChannel(ChannelBehaviourPtr(new DialChannel(*o, "basic_dial")));
     addBehaviour(o);
   }
   else {
@@ -1594,7 +1597,8 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       }
       // - always visible (even when empty)
       if (aMessage->get("alwaysVisible", o)) {
-        externalVdc.alwaysVisible = o->boolValue();
+        // Note: this is now a (persistent!) vdc level property, which can be set from external API this way
+        externalVdc.setVdcFlag(vdcflag_hidewhenempty, !o->boolValue());
       }
       // - forward vdc-level identification
       if (aMessage->get("identification", o)) {
@@ -1690,7 +1694,6 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  alwaysVisible(false),
   forwardIdentify(false),
   iconBaseName("vdc_ext") // default icon name
 {
@@ -1705,6 +1708,7 @@ void ExternalVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // start device API server
   ErrorPtr err = externalDeviceApiServer->startServer(boost::bind(&ExternalVdc::deviceApiConnectionHandler, this, _1), 10);
+  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(err); // return status of starting server
 }
 
