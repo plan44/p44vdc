@@ -28,7 +28,7 @@ using namespace p44;
 
 VideoScene::VideoScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo),
-  contentSource(0),
+  station(0),
   powerState(powerState_off)
 {
 }
@@ -77,7 +77,7 @@ size_t VideoScene::numFieldDefs()
 const FieldDefinition *VideoScene::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numVideoSceneFields] = {
-    { "contentSource", SQLITE_INTEGER },
+    { "station", SQLITE_INTEGER },
     { "powerState", SQLITE_INTEGER },
   };
   if (aIndex<inherited::numFieldDefs())
@@ -104,7 +104,7 @@ void VideoScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
-  contentSource = aRow->get<int>(aIndex++);
+  station = aRow->get<int>(aIndex++);
   powerState = (DsPowerState)aRow->get<int>(aIndex++);
 }
 
@@ -114,7 +114,7 @@ void VideoScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, 
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, (int)contentSource);
+  aStatement.bind(aIndex++, (int)station);
   aStatement.bind(aIndex++, (int)powerState);
 }
 
@@ -292,7 +292,7 @@ void VideoScene::setDefaultSceneValues(SceneNo aSceneNo)
   if (vb) {
     if (voli) setSceneValueFlags(vb->volume->getChannelIndex(), valueflags_dontCare, true);
     if (psi) setSceneValueFlags(vb->powerState->getChannelIndex(), valueflags_dontCare, true);
-    if (sci) setSceneValueFlags(vb->contentSource->getChannelIndex(), valueflags_dontCare, true);
+    if (sci) setSceneValueFlags(vb->station->getChannelIndex(), valueflags_dontCare, true);
   }
   markClean(); // default values are always clean
 }
@@ -411,9 +411,9 @@ VideoBehaviour::VideoBehaviour(Device &aDevice) :
   // - power state
   powerState = PowerStateChannelPtr(new PowerStateChannel(*this));
   addChannel(powerState);
-  // - content source
-  contentSource = VideoContentSourceChannelPtr(new VideoContentSourceChannel(*this));
-  addChannel(contentSource);
+  // - tv station
+  station = VideoStationChannelPtr(new VideoStationChannel(*this));
+  addChannel(station);
 }
 
 
@@ -483,8 +483,8 @@ void VideoBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     }
     // - powerstate
     powerState->setChannelValueIfNotDontCare(aScene, videoScene->powerState, 0, 0, false);
-    // - content source
-    contentSource->setChannelValueIfNotDontCare(aScene, videoScene->contentSource, 0, 0, !videoScene->command.empty()); // always apply if there is a command
+    // - tv station
+    station->setChannelValueIfNotDontCare(aScene, videoScene->station, 0, 0, !videoScene->command.empty()); // always apply if there is a command
     // - state restore command
     stateRestoreCmd = videoScene->command;
     stateRestoreCmdValid = !videoScene->command.empty(); // only non-empty command is considered valid
@@ -501,8 +501,8 @@ void VideoBehaviour::saveChannelsToScene(DsScenePtr aScene)
     videoScene->setSceneValueFlags(volume->getChannelIndex(), valueflags_dontCare, false);
     videoScene->setPVar(videoScene->powerState, (DsPowerState)powerState->getChannelValue());
     videoScene->setSceneValueFlags(powerState->getChannelIndex(), valueflags_dontCare, false);
-    videoScene->setPVar(videoScene->contentSource, (uint32_t)contentSource->getChannelValue());
-    videoScene->setSceneValueFlags(contentSource->getChannelIndex(), valueflags_dontCare, false);
+    videoScene->setPVar(videoScene->station, (uint32_t)station->getChannelValue());
+    videoScene->setSceneValueFlags(station->getChannelIndex(), valueflags_dontCare, false);
     // save command from scene if there is one
     if (stateRestoreCmdValid) {
       videoScene->setPVar(videoScene->command, stateRestoreCmd);
@@ -567,10 +567,10 @@ string VideoBehaviour::description()
 {
   string s = string_format("%s behaviour\n", shortDesc().c_str());
   string_format_append(s,
-    "\n- volume = %.1f, powerstate = %d, contentsource = %u",
+    "\n- volume = %.1f, powerstate = %d, station = %u",
     volume->getChannelValue(),
     (int)powerState->getChannelValue(),
-    (unsigned int)contentSource->getChannelValue()
+    (unsigned int)station->getChannelValue()
   );
   s.append(inherited::description());
   return s;

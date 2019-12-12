@@ -30,20 +30,20 @@ using namespace std;
 
 namespace p44 {
 
-  /// Video content source channel
+  /// Video station channel
   /// TODO: generalize, make one content source channel for audio and video
-  class VideoContentSourceChannel : public IndexChannel
+  class VideoStationChannel : public IndexChannel
   {
     typedef IndexChannel inherited;
 
   public:
-    VideoContentSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "contentSource") {};
+    VideoStationChannel(OutputBehaviour &aOutput) : inherited(aOutput, "station") {};
 
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_audio_content_source; }; ///< the dS channel type
-    virtual const char *getName() P44_OVERRIDE { return "contentsource"; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_video_station; }; ///< the dS channel type
+    virtual const char *getName() P44_OVERRIDE { return "station"; };
 
   };
-  typedef boost::intrusive_ptr<VideoContentSourceChannel> VideoContentSourceChannelPtr;
+  typedef boost::intrusive_ptr<VideoStationChannel> VideoStationChannelPtr;
 
 
 
@@ -60,7 +60,7 @@ namespace p44 {
     /// @name video scene specific values
     /// @{
 
-    uint32_t contentSource; ///< the index of a content source, e.g. a song/sound effect from a list
+    uint32_t station; ///< the index of a tv station, e.g. 23 - BBC Channel
     DsPowerState powerState; ///< the power state of the video device
 
     /// @}
@@ -159,8 +159,8 @@ namespace p44 {
     AudioVolumeChannelPtr volume;
     /// the power state channel
     PowerStateChannelPtr powerState;
-    /// the content source channel
-    VideoContentSourceChannelPtr contentSource;
+    /// the tv station channel
+    VideoStationChannelPtr station;
 
     /// the current state command
     bool stateRestoreCmdValid; ///< set if state restore command is valid

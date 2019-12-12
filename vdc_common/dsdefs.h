@@ -338,6 +338,8 @@ typedef enum {
   channeltype_p44_feature_mode = channeltype_custom_first+8, ///< feature mode
 
   channeltype_p44_audio_content_source = channeltype_custom_first+22, ///< audio content source // FIXME: p44-specific channel type for audio content source until dS specifies one
+  channeltype_p44_video_station,
+  channeltype_p44_video_input,
 
   numChannelTypes = 240 // 0..239 are channel types
 } DsChannelTypeEnum;
