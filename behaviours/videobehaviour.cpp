@@ -29,6 +29,7 @@ using namespace p44;
 VideoScene::VideoScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo),
   station(0),
+  inputSource(0),
   powerState(powerState_off)
 {
 }
@@ -39,6 +40,8 @@ double VideoScene::sceneValue(int aChannelIndex)
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
 //    case channeltype_p44_audio_content_source: return contentSource;
+    case channeltype_video_station: return station;
+    case channeltype_video_input_source: return inputSource;
     case channeltype_power_state: return powerState;
     default: return inherited::sceneValue(aChannelIndex);
   }
@@ -51,6 +54,8 @@ void VideoScene::setSceneValue(int aChannelIndex, double aValue)
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
 //    case channeltype_p44_audio_content_source: setPVar(contentSource, (uint32_t)aValue); break;
+    case channeltype_video_station: setPVar(station, (uint)aValue); break;
+    case channeltype_video_input_source: setPVar(inputSource, (uint)aValue); break;
     case channeltype_power_state: setPVar(powerState, (DsPowerState)aValue); break;
     default: inherited::setSceneValue(aChannelIndex, aValue); break;
   }
@@ -66,7 +71,7 @@ const char *VideoScene::tableName()
 
 // data field definitions
 
-static const size_t numVideoSceneFields = 2;
+static const size_t numVideoSceneFields = 3;
 
 size_t VideoScene::numFieldDefs()
 {
@@ -78,6 +83,7 @@ const FieldDefinition *VideoScene::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numVideoSceneFields] = {
     { "station", SQLITE_INTEGER },
+    { "inputSource", SQLITE_INTEGER },
     { "powerState", SQLITE_INTEGER },
   };
   if (aIndex<inherited::numFieldDefs())
@@ -105,6 +111,7 @@ void VideoScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
   station = aRow->get<int>(aIndex++);
+  inputSource = aRow->get<int>(aIndex++);
   powerState = (DsPowerState)aRow->get<int>(aIndex++);
 }
 
@@ -115,6 +122,7 @@ void VideoScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, 
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, (int)station);
+  aStatement.bind(aIndex++, (int)inputSource);
   aStatement.bind(aIndex++, (int)powerState);
 }
 
@@ -292,7 +300,10 @@ void VideoScene::setDefaultSceneValues(SceneNo aSceneNo)
   if (vb) {
     if (voli) setSceneValueFlags(vb->volume->getChannelIndex(), valueflags_dontCare, true);
     if (psi) setSceneValueFlags(vb->powerState->getChannelIndex(), valueflags_dontCare, true);
-    if (sci) setSceneValueFlags(vb->station->getChannelIndex(), valueflags_dontCare, true);
+    if (sci) {
+      setSceneValueFlags(vb->station->getChannelIndex(), valueflags_dontCare, true);
+      setSceneValueFlags(vb->inputSource->getChannelIndex(), valueflags_dontCare, true);
+    }
   }
   markClean(); // default values are always clean
 }
@@ -414,6 +425,9 @@ VideoBehaviour::VideoBehaviour(Device &aDevice) :
   // - tv station
   station = VideoStationChannelPtr(new VideoStationChannel(*this));
   addChannel(station);
+  // - tv input source
+  inputSource = VideoInputSourceChannelPtr(new VideoInputSourceChannel(*this));
+  addChannel(inputSource);
 }
 
 
@@ -485,6 +499,8 @@ void VideoBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     powerState->setChannelValueIfNotDontCare(aScene, videoScene->powerState, 0, 0, false);
     // - tv station
     station->setChannelValueIfNotDontCare(aScene, videoScene->station, 0, 0, !videoScene->command.empty()); // always apply if there is a command
+    // - tv input source
+    inputSource->setChannelValueIfNotDontCare(aScene, videoScene->inputSource, 0, 0, !videoScene->command.empty()); // always apply if there is a command
     // - state restore command
     stateRestoreCmd = videoScene->command;
     stateRestoreCmdValid = !videoScene->command.empty(); // only non-empty command is considered valid
@@ -503,6 +519,8 @@ void VideoBehaviour::saveChannelsToScene(DsScenePtr aScene)
     videoScene->setSceneValueFlags(powerState->getChannelIndex(), valueflags_dontCare, false);
     videoScene->setPVar(videoScene->station, (uint32_t)station->getChannelValue());
     videoScene->setSceneValueFlags(station->getChannelIndex(), valueflags_dontCare, false);
+    videoScene->setPVar(videoScene->inputSource, (uint32_t)inputSource->getChannelValue());
+    videoScene->setSceneValueFlags(inputSource->getChannelIndex(), valueflags_dontCare, false);
     // save command from scene if there is one
     if (stateRestoreCmdValid) {
       videoScene->setPVar(videoScene->command, stateRestoreCmd);
@@ -567,10 +585,11 @@ string VideoBehaviour::description()
 {
   string s = string_format("%s behaviour\n", shortDesc().c_str());
   string_format_append(s,
-    "\n- volume = %.1f, powerstate = %d, station = %u",
+    "\n- volume = %.1f, powerstate = %d, station = %u, inputSource = %u",
     volume->getChannelValue(),
     (int)powerState->getChannelValue(),
-    (unsigned int)station->getChannelValue()
+    (unsigned int)station->getChannelValue(),
+    (unsigned int)inputSource->getChannelValue()
   );
   s.append(inherited::description());
   return s;

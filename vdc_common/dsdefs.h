@@ -321,6 +321,8 @@ typedef enum {
   channeltype_airflow_intensity_auto = 21, ///< airflow intensity automatic mode (0=off, >0=on)
   channeltype_water_temperature = 22, ///< water temperature
   channeltype_water_flow = 23, ///< water flow rate
+  channeltype_video_station = 24, ///< video tv station (channel number)
+  channeltype_video_input_source = 25, ///< video input source (TV, HDMI etc.)
 
   channeltype_custom_first = 192, ///< first device-specific channel
   channeltype_custom_last = 239, ///< last device-specific channel
@@ -338,8 +340,6 @@ typedef enum {
   channeltype_p44_feature_mode = channeltype_custom_first+8, ///< feature mode
 
   channeltype_p44_audio_content_source = channeltype_custom_first+22, ///< audio content source // FIXME: p44-specific channel type for audio content source until dS specifies one
-  channeltype_p44_video_station,
-  channeltype_p44_video_input,
 
   numChannelTypes = 240 // 0..239 are channel types
 } DsChannelTypeEnum;
