@@ -35,7 +35,11 @@ namespace p44 {
   /// from button press + button release events.
   /// This class should be used as-is for any virtual device which represents
   /// a user button or rocker switch.
-  class ButtonBehaviour : public DsBehaviour
+  class ButtonBehaviour :
+    public DsBehaviour
+    #if ENABLE_LOCALCONTROLLER
+    ,public ValueSource
+    #endif
   {
     typedef DsBehaviour inherited;
 
@@ -78,7 +82,6 @@ namespace p44 {
     uint8_t buttonActionId; ///< action Id (aka scene number) to trigger when button is clicked
     ButtonStateMachineMode stateMachineMode; ///< state machine to use
     MLMicroSeconds longFunctionDelay; ///< delay to be used to differentiate "long" press
-
     /// @}
 
 
@@ -142,11 +145,16 @@ namespace p44 {
     /// @param aPressed true if button is currently pressed, false if button is currently released
     void updateButtonState(bool aPressed);
 
+    /// inject already detected clicks or hold/release operations
+    /// @note this is for devices which do click/hold disambiguation themselves.
+    /// Do NOT used this mixed with updateButtonState()!
+    /// @param aClickType the click or hold/release to inject
+    void injectClick(DsClickType aClickType);
+
     /// send direct action
     /// @param aActionMode the mode how to send the action
     /// @param aActionId the scene number to send
     void sendAction(VdcButtonActionMode aActionMode, uint8_t aActionId);
-
 
     /// send click
     /// @param aClickType the click to send
@@ -160,9 +168,36 @@ namespace p44 {
     /// @return true if behaviour has a defined (non-NULL) state
     virtual bool hasDefinedState() P44_OVERRIDE;
 
-    
     /// @return button element that defines the function of this button in local operation modes
     VdcButtonElement localFunctionElement();
+
+
+    #if ENABLE_LOCALCONTROLLER
+
+    /// @name ValueSource interface
+    /// @{
+
+    /// check if enabled for use
+    virtual bool isEnabled() P44_OVERRIDE;
+
+    /// get id - unique at least in the vdhost's scope
+    virtual string getSourceId() P44_OVERRIDE;
+
+    /// get descriptive name identifying the source within the entire vdc host (for using in selection lists)
+    virtual string getSourceName() P44_OVERRIDE;
+
+    /// get value
+    virtual double getSourceValue() P44_OVERRIDE;
+
+    /// get time of last update
+    virtual MLMicroSeconds getSourceLastUpdate() P44_OVERRIDE;
+
+    /// get operation level (how good/critical the operation state of the underlying device is)
+    virtual int getSourceOpLevel() P44_OVERRIDE;
+
+    /// @}
+
+    #endif // ENABLE_LOCALCONTROLLER
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
@@ -223,7 +258,7 @@ namespace p44 {
       S11_localdim,
       S12_3clickWait,
       S13_3pauseWait,
-      S14_awaitrelease, // duplicate of S8
+      S14_awaitrelease_timedout, // await release of a hold that timed-out (button stuck more than 30 secs)
     } ButtonState;
 
     // state machine vars
@@ -250,9 +285,11 @@ namespace p44 {
     void resetStateMachine();
     void checkStandardStateMachine(bool aStateChanged, MLMicroSeconds aNow);
     void checkCustomStateMachine(bool aStateChanged, MLMicroSeconds aNow);
-    void dimRepeat();
+    void keyOpComplete();
+    void holdRepeat();
     void localSwitchOutput();
     void localDim(bool aStart);
+    void injectedOpComplete();
 
     /// @}
 

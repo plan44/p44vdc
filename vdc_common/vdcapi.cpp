@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -117,7 +117,7 @@ void VdcApiServer::connectionStatusHandler(SocketCommPtr aSocketComm, ErrorPtr a
       apiConnectionStatusHandler(apiConnection, aError);
     }
   }
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // connection failed/closed and we don't support reconnect yet
     aSocketComm->relatedObject.reset(); // detach connection object
   }

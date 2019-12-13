@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -193,13 +193,11 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // three channel RGB PWM dimmer
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     if (cl) {
-      if (needsToApplyChannels()) {
+      if (needsToApplyChannels(&transitionTime)) {
         // needs update
         // - derive (possibly new) color mode from changed channels
         cl->deriveColorMode();
         // - calculate and start transition
-        //   TODO: depending to what channel has changed, take transition time from that channel. For now always using brightness transition time
-        transitionTime = cl->transitionTimeToNewBrightness();
         cl->brightnessTransitionStep(); // init
         cl->colorTransitionStep(); // init
         applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)TRANSITION_STEP_TIME/transitionTime);

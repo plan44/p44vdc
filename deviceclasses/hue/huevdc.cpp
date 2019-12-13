@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -28,6 +28,9 @@
 
 using namespace p44;
 
+#define DEFAULT_HUE_MAX_OPTIMIZER_SCENES 20
+#define DEFAULT_HUE_MAX_OPTIMIZER_GROUPS 5
+
 
 HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag),
@@ -40,6 +43,9 @@ HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   hueComm.isMemberVariable();
   hueComm.useNUPnP = getVdcHost().cloudAllowed();
   optimizerMode = opt_disabled; // optimizer disabled by default, but available
+  // defaults
+  maxOptimizerScenes = DEFAULT_HUE_MAX_OPTIMIZER_SCENES;
+  maxOptimizerGroups = DEFAULT_HUE_MAX_OPTIMIZER_GROUPS;
 }
 
 
@@ -192,6 +198,7 @@ void HueVdc::handleGlobalEvent(VdchostEvent aEvent)
     // re-connecting to network should re-scan for hue bridge
     collectDevices(NULL, rescanmode_incremental);
   }
+  inherited::handleGlobalEvent(aEvent);
 }
 
 
@@ -256,7 +263,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
       return;
     }
     else {
-      ALOG(LOG_NOTICE, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->description().c_str());
+      ALOG(LOG_NOTICE, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->text());
     }
     if (aCompletedCB) aCompletedCB(ErrorPtr()); // no hue bridge to collect lights from (but this is not a collect error)
   }
@@ -313,9 +320,9 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
     else {
       // register by uuid/username (for migration)
       respErr = checkStringParam(aParams, "bridgeUuid", bridgeUuid);
-      if (!Error::isOK(respErr)) return respErr;
+      if (Error::notOK(respErr)) return respErr;
       respErr = checkStringParam(aParams, "bridgeUsername", bridgeUserName);
-      if (!Error::isOK(respErr)) return respErr;
+      if (Error::notOK(respErr)) return respErr;
       // save the bridge parameters
       if(db.executef(
         "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='', fixedURL=0",
@@ -433,7 +440,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
   }
   else {
     // not found (usually timeout)
-    ALOG(LOG_NOTICE, "No hue bridge found to register, error = %s", aError->description().c_str());
+    ALOG(LOG_NOTICE, "No hue bridge found to register, error = %s", aError->text());
   }
 }
 
@@ -591,6 +598,15 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
       // PUT /api/<username>/groups/<groupid>/action
       // { "scene": "AB34EF5", "transitiontime":60 }
       setGroupState->add("scene", JsonObject::newString(hueActionId));
+      // TODO: maybe uncomment later, but per hue API 1.33, "transitiontime" at this point does not have any effect; only the scene stored transition time is used
+      //   once enabled, make sure we don't reject calls with transition time override any more in huedevice's prepareForOptimizedSet()
+      // determine slowest transition time over all affected devices
+      // MLMicroSeconds maxtt = 0;
+      // for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+      //   MLMicroSeconds devtt = (*pos)->transitionTimeForPreparedScene(true); // including override value
+      //   if (devtt>maxtt) maxtt = devtt;
+      // }
+      // setGroupState->add("transitiontime", JsonObject::newInt64(maxtt*10/Second)); // 100mS resolution
       hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
       return;
     }
@@ -668,17 +684,14 @@ void HueVdc::nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPt
 
 
 
-#define MAX_OPTIMIZER_SCENES 20
-#define MAX_OPTIMIZER_GROUPS 5
-
 void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
 {
   ErrorPtr err;
   if (aOptimizerEntry->type==ntfy_callscene) {
     // need a free scene
-    if (numOptimizerScenes>=MAX_OPTIMIZER_SCENES) {
+    if (numOptimizerScenes>=maxOptimizerScenes) {
       // too many already
-      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer scenes (%d) already exist", MAX_OPTIMIZER_SCENES);
+      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer scenes (%d) already exist", maxOptimizerScenes);
     }
     else {
       // create a new scene
@@ -688,7 +701,7 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       string sceneName = string_format("dS-Scene_%d", aOptimizerEntry->contentId);
       JsonObjectPtr lights = JsonObject::newArray();
       // transition time is per scene for hue. Use longest transition time among devices
-      MLMicroSeconds longestTransition = 0;
+      MLMicroSeconds maxtt = 0;
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
         lights->arrayAppend(JsonObject::newString(dev->lightID));
@@ -698,11 +711,10 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
           sceneName += "..."; // exactly 32
         }
         // find longest transition
-        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
-        MLMicroSeconds tt = l->transitionTimeToNewBrightness();
-        if (tt>longestTransition) longestTransition = tt;
+        MLMicroSeconds devtt = dev->transitionTimeForPreparedScene(false); // without override value
+        if (devtt>maxtt) maxtt = devtt;
       }
-      newScene->add("transitiontime", JsonObject::newInt64(longestTransition*10/Second));
+      newScene->add("transitiontime", JsonObject::newInt64(maxtt*10/Second));
       newScene->add("name", JsonObject::newString(sceneName)); // must be max 32 chars
       newScene->add("lights", lights);
       newScene->add("recycle", JsonObject::newBool(false));
@@ -712,9 +724,9 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
   }
   else if (aOptimizerEntry->type==ntfy_dimchannel) {
     // need a free group
-    if (numOptimizerGroups>=MAX_OPTIMIZER_SCENES) {
+    if (numOptimizerGroups>=maxOptimizerGroups) {
       // too many already
-      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer groups (%d) already exist", MAX_OPTIMIZER_GROUPS);
+      err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer groups (%d) already exist", maxOptimizerGroups);
     }
     else {
       // create a new group
@@ -790,22 +802,21 @@ void HueVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       // PUT /api/<username>/scenes/<sceneid>
       // {"lights":["1","2"], "storelightstate":true }
       JsonObjectPtr lights = JsonObject::newArray();
-      MLMicroSeconds longestTransition = 0;
+      MLMicroSeconds maxtt = 0;
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
         // collect id to update
         lights->arrayAppend(JsonObject::newString(dev->lightID));
         // find longest transition
-        LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
-        MLMicroSeconds tt = l->transitionTimeToNewBrightness();
-        if (tt>longestTransition) longestTransition = tt;
+        MLMicroSeconds devtt = dev->transitionTimeForPreparedScene(false); // without transition time override
+        if (devtt>maxtt) maxtt = devtt;
       }
-      updatedScene->add("transitiontime", JsonObject::newInt64(longestTransition*10/Second));
+      updatedScene->add("transitiontime", JsonObject::newInt64(maxtt*10/Second));
       updatedScene->add("storelightstate", JsonObject::newBool(true));
       // actually perform scene update only after transitions are all complete (50% safety margin)
       uint64_t newHash = aOptimizerEntry->contentsHash; // remember the correct hash for the case we can execute the delayed update
       aOptimizerEntry->contentsHash = 0; // reset for now, scene is not up-to-date yet
-      delayedSceneUpdateTicket.executeOnce(boost::bind(&HueVdc::performNativeSceneUpdate, this, newHash, sceneId, updatedScene, aDeliveryState->affectedDevices, aOptimizerEntry), longestTransition*3/2);
+      delayedSceneUpdateTicket.executeOnce(boost::bind(&HueVdc::performNativeSceneUpdate, this, newHash, sceneId, updatedScene, aDeliveryState->affectedDevices, aOptimizerEntry), maxtt*3/2);
       aStatusCB(ErrorPtr());
       return;
     }
@@ -846,37 +857,51 @@ void HueVdc::nativeActionUpdated(uint64_t aNewHash, OptimizerEntryPtr aOptimizer
 }
 
 
-ErrorPtr HueVdc::freeNativeAction(const string aNativeActionId)
+void HueVdc::freeNativeAction(StatusCB aStatusCB, const string aNativeActionId)
 {
   string id;
   if (!(id = hueSceneIdFromActionId(aNativeActionId)).empty()) {
     // is a scene, delete it
     string url = "/scenes/" + id;
-    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionDeleted, this, _1, _2));
+    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
   }
   else if (!(id = hueGroupIdFromActionId(aNativeActionId)).empty()) {
     string url = "/groups/" + id;
-    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionDeleted, this, _1, _2));
+    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
   }
-  return ErrorPtr();
 }
 
 
-void HueVdc::nativeActionDeleted(JsonObjectPtr aResult, ErrorPtr aError)
+void HueVdc::nativeActionFreed(StatusCB aStatusCB, const string aUrl, JsonObjectPtr aResult, ErrorPtr aError)
 {
+  bool isScene = aUrl.find("/scenes/")!=string::npos;
+  bool deleted = true; // assume deleted
   if (Error::isOK(aError)) {
     // [{"success":"/scenes/3T2SvsxvwteNNys deleted"}]
     JsonObjectPtr s = HueComm::getSuccessItem(aResult,0);
-    if (s && s->stringValue().find("/scenes/")!=string::npos)
+    if (!s || s->stringValue().find(aUrl)==string::npos) {
+      ALOG(LOG_WARNING, "delete suceeded but did not confirm resource '%s'", aUrl.c_str());
+    }
+  }
+  if (Error::notOK(aError)) {
+    if (aError->isError(HueCommError::domain(), HueCommError::NotFound)) {
+      // to be deleted item does not exist
+      ALOG(LOG_WARNING, "to be deleted '%s' did not exist -> consider deleted", aUrl.c_str());
+      aError.reset(); // consider deleted ok
+    }
+    else {
+      deleted = false;
+      ALOG(LOG_WARNING, "could not delete '%s': %s", aUrl.c_str(), Error::text(aError));
+    }
+  }
+  if (deleted) {
+    // action is considered gone (actually deleted or no longer existing), so count it
+    if (isScene)
       numOptimizerScenes--;
-    else if (s && s->stringValue().find("/groups/")!=string::npos)
-      numOptimizerGroups--;
     else
-      aError = TextError::err("delete of hue action did not return group/scene delete confirmation -> failed");
+      numOptimizerGroups--;
   }
-  if (!Error::isOK(aError)) {
-    ALOG(LOG_WARNING, "could not delete native action: %s", Error::text(aError).c_str());
-  }
+  if (aStatusCB) aStatusCB(aError);
 }
 
 

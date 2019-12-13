@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -83,6 +83,7 @@ void OlaVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   pthread_mutex_init(&olaBufferAccess, NULL);
   olaThread = MainLoop::currentMainLoop().executeInThread(boost::bind(&OlaVdc::olaThreadRoutine, this, _1), NULL);
   // done
+  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(ErrorPtr());
 }
 

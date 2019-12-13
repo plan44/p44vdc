@@ -1,5 +1,5 @@
   //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -35,6 +35,7 @@ ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChann
   nextTransitionTime(0), // none
   channelLastSync(Never), // we don't known nor have we sent the output state
   cachedChannelValue(0), // channel output value cache
+  volatileValue(true), // not worth saving yet
   previousChannelValue(0), // previous output value
   transitionProgress(1), // no transition in progress
   resolution(1) // dummy default resolution (derived classes must provide sensible defaults)
@@ -91,6 +92,18 @@ string ChannelBehaviour::getStatusText()
   if (fracDigits<0) fracDigits=0;
   return string_format("%0.*f %s", fracDigits, cachedChannelValue, valueUnitName(getChannelUnit(), true).c_str());
 }
+
+
+void ChannelBehaviour::addEnum(const char *aEnumText, uint32_t aEnumValue)
+{
+  // in reduced footprint, this is a NOP, we don't have the EnumList
+  #if !REDUCED_FOOTPRINT
+  if (!enumList) enumList = EnumListPtr(new EnumList(true));
+  enumList->addMapping(aEnumText, aEnumValue);
+  #endif
+}
+
+
 
 
 
@@ -203,8 +216,9 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     if (cachedChannelValue!=aActualChannelValue || LOGENABLED(LOG_DEBUG)) {
       // show only changes except if debugging
       SALOG(output.device,LOG_INFO,
-        "Channel '%s': cached value synchronized from %0.2f -> %0.2f",
-        getName(), cachedChannelValue, aActualChannelValue
+        "Channel '%s': cached value synchronized from %0.2f -> %0.2f%s",
+        getName(), cachedChannelValue, aActualChannelValue,
+        aVolatile ? " (derived/volatile)" : ""
       );
     }
     // make sure new value is within bounds
@@ -213,8 +227,9 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     else if (aActualChannelValue<getMin())
       aActualChannelValue = getMin();
     // apply
-    if (aVolatile) {
-      cachedChannelValue = aActualChannelValue;
+    setPVar(volatileValue, aVolatile); // valatile status is persisted as NULL value, so must mark dirty on change
+    if (volatileValue) {
+      cachedChannelValue = aActualChannelValue; // when volatile, the actual channel value is not persisted, just updated
     }
     else {
       setPVar(cachedChannelValue, aActualChannelValue);
@@ -244,11 +259,12 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
 }
 
 
-void ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply)
+bool ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply)
 {
-  if (!(aScene->isSceneValueFlagSet(getChannelIndex(), valueflags_dontCare))) {
-    setChannelValue(aNewValue, aNewValue>getTransitionalValue() ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
-  }
+  if (aScene->isSceneValueFlagSet(getChannelIndex(), valueflags_dontCare))
+    return false; // don't care, don't set
+  setChannelValue(aNewValue, aNewValue>getTransitionalValue() ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
+  return true; // actually set
 }
 
 
@@ -295,6 +311,7 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
   }
+  setPVar(volatileValue, false); // channel actively set, is not volatile
 }
 
 
@@ -329,6 +346,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     nextTransitionTime = aTransitionTime;
     channelUpdatePending = true; // pending to be sent to the device
   }
+  setPVar(volatileValue, false); // channel actively dimmed, is not volatile
   return newValue;
 }
 
@@ -388,8 +406,14 @@ void ChannelBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex
 {
   inheritedParams::loadFromRow(aRow, aIndex, NULL); // no common flags
   // get the fields
-  cachedChannelValue = aRow->get<double>(aIndex++);
-  channelUpdatePending = true; // loading a persistent channel value always means it must be propagated to the hardware
+  if (aRow->getIfNotNull<double>(aIndex++, cachedChannelValue)) {
+    // loading a non-NULL persistent channel value always means it must be propagated to the hardware
+    channelUpdatePending = true;
+    volatileValue = false;
+  }
+  else {
+    volatileValue = true;
+  }
 }
 
 
@@ -398,16 +422,20 @@ void ChannelBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aI
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, cachedChannelValue);
+  if (volatileValue) {
+    aStatement.bind(aIndex++); // volatile values are not saved
+  }
+  else {
+    aStatement.bind(aIndex++, cachedChannelValue);
+  }
 }
-
 
 
 string ChannelBehaviour::getDbKey()
 {
   // Note - we do not key the channel persistence with output behaviour settings' ROWID,
   //   as this often does not exist at all, but use the deviceID+channelID as key, so
-  //   channels can be persisted independently of
+  //   channels can be persisted independently of device settings.
   return string_format("%s_%s",output.device.getDsUid().getString().c_str(),getId().c_str());
 }
 
@@ -415,7 +443,7 @@ string ChannelBehaviour::getDbKey()
 ErrorPtr ChannelBehaviour::load()
 {
   ErrorPtr err = loadFromStore(getDbKey().c_str());
-  if (!Error::isOK(err)) SALOG(output.device, LOG_ERR,"Error loading channel '%s'", getId().c_str());
+  if (Error::notOK(err)) SALOG(output.device, LOG_ERR,"Error loading channel '%s'", getId().c_str());
   return err;
 }
 
@@ -423,7 +451,7 @@ ErrorPtr ChannelBehaviour::load()
 ErrorPtr ChannelBehaviour::save()
 {
   ErrorPtr err = saveToStore(getDbKey().c_str(), false); // only one record per dbkey (=per device+channelid)
-  if (!Error::isOK(err)) SALOG(output.device, LOG_ERR,"Error saving channel '%s'", getId().c_str());
+  if (Error::notOK(err)) SALOG(output.device, LOG_ERR,"Error saving channel '%s'", getId().c_str());
   return err;
 }
 
@@ -451,6 +479,9 @@ enum {
   min_key,
   max_key,
   resolution_key,
+  #if !REDUCED_FOOTPRINT
+  enumvalues_key,
+  #endif
   numChannelDescProperties
 };
 
@@ -465,10 +496,17 @@ enum {
 };
 
 static char channel_Key;
+static char channel_enumvalues_key;
 
 
 int ChannelBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
+  #if !REDUCED_FOOTPRINT
+  if (aParentDescriptor->hasObjectKey(channel_enumvalues_key)) {
+    // number of enum values
+    return enumList ? enumList->numProps() : 0;
+  }
+  #endif
   switch (aParentDescriptor->parentDescriptor->fieldKey()) {
     case descriptions_key_offset: return numChannelDescProperties;
     case settings_key_offset: return numChannelSettingsProperties;
@@ -476,7 +514,6 @@ int ChannelBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
     default: return 0;
   }
 }
-
 
 PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -490,6 +527,9 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
     { "min", apivalue_double, min_key+descriptions_key_offset, OKEY(channel_Key) },
     { "max", apivalue_double, max_key+descriptions_key_offset, OKEY(channel_Key) },
     { "resolution", apivalue_double, resolution_key+descriptions_key_offset, OKEY(channel_Key) },
+    #if !REDUCED_FOOTPRINT
+    { "values", apivalue_object+propflag_container, enumvalues_key, OKEY(channel_enumvalues_key) }
+    #endif
   };
   //static const PropertyDescription channelSettingsProperties[numChannelSettingsProperties] = {
   //};
@@ -497,6 +537,11 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
     { "value", apivalue_double, value_key+states_key_offset, OKEY(channel_Key) }, // note: so far, pbuf API requires uint here
     { "age", apivalue_double, age_key+states_key_offset, OKEY(channel_Key) },
   };
+  #if !REDUCED_FOOTPRINT
+  if (aParentDescriptor->hasObjectKey(channel_enumvalues_key)) {
+    return enumList ? enumList->getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor) : NULL;
+  }
+  #endif
   if (aPropIndex>=numProps(aDomain, aParentDescriptor))
     return NULL;
   switch (aParentDescriptor->parentDescriptor->fieldKey()) {
@@ -512,9 +557,27 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
 }
 
 
+#if !REDUCED_FOOTPRINT
+PropertyContainerPtr ChannelBehaviour::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(channel_enumvalues_key)) {
+    return enumList ? PropertyContainerPtr(this) : PropertyContainerPtr(); // handle enum values array myself
+  }
+  // unknown here
+  return inheritedProps::getContainer(aPropertyDescriptor, aDomain);
+}
+#endif
+
+
 // access to all fields
 bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
+  #if !REDUCED_FOOTPRINT
+  if (aPropertyDescriptor->hasObjectKey(INSTANCE_OKEY(enumList.get()))) {
+    return enumList ? enumList->accessField(aMode, aPropValue, aPropertyDescriptor) : false;
+  }
+  else
+  #endif
   if (aPropertyDescriptor->hasObjectKey(channel_Key)) {
     if (aMode==access_read) {
       // read properties
@@ -556,8 +619,8 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
           aPropValue->setDoubleValue(getChannelValueCalculated());
           return true;
         case age_key+states_key_offset:
-          if (channelLastSync==Never)
-            aPropValue->setNull(); // no value known
+          if (channelLastSync==Never || volatileValue)
+            aPropValue->setNull(); // no value known, or volatile
           else
             aPropValue->setDoubleValue((double)(MainLoop::now()-channelLastSync)/Second); // time of last sync (does not necessarily relate to currently visible "value", as this might be a to-be-applied new value already)
           return true;

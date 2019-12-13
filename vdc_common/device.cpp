@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -150,14 +150,17 @@ void Device::addedAndInitialized()
 {
   // trigger re-applying channel values if this feature is enabled in the vdchost
   if (output && getVdcHost().doPersistChannels()) {
-    requestApplyingChannels(boost::bind(&Device::channelValuesRestored, this), false);
+    if (output->reapplyRestoredChannels()) {
+      ALOG(LOG_INFO, "requesting re-applying last known channel values to hardware");
+      requestApplyingChannels(boost::bind(&Device::channelValuesRestored, this), false);
+    }
   }
 }
 
 
 void Device::channelValuesRestored()
 {
-  ALOG(LOG_INFO, "restored last known channel values");
+  ALOG(LOG_INFO, "re-applied last known channel values to hardware");
 }
 
 
@@ -536,6 +539,8 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
   }
   // now check for device level features
   switch (aFeatureIndex) {
+    case modelFeature_identification:
+      return canIdentifyToUser() ? yes : no;
     case modelFeature_dontcare:
       // Generic: all devices with scene table have the ability to set scene's don't care flag
       return boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings)!=NULL ? yes : no;
@@ -616,18 +621,24 @@ int Device::numChannels()
 }
 
 
-bool Device::needsToApplyChannels()
+bool Device::needsToApplyChannels(MLMicroSeconds* aTransitionTimeP)
 {
+  MLMicroSeconds tt = 0;
+  bool needsApply = false;
   for (int i=0; i<numChannels(); i++) {
     ChannelBehaviourPtr ch = getChannelByIndex(i, true);
     if (ch) {
       // at least this channel needs update
       LOG(LOG_DEBUG, "needsToApplyChannels() returns true because of %s", ch->description().c_str());
-      return true;
+      if (!aTransitionTimeP) return true; // no need to check more channels
+      needsApply = true;
+      if (ch->transitionTimeToNewValue()>tt) {
+        tt = ch->transitionTimeToNewValue();
+      }
     }
   }
-  // no channel needs apply
-  return false;
+  if (aTransitionTimeP) *aTransitionTimeP = tt;
+  return needsApply;
 }
 
 
@@ -709,6 +720,14 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       respErr = WebError::webErr(400, "device cannot send teach in signal of requested variant");
     }
   }
+  else if (aMethod=="x-p44-stopSceneActions") {
+    stopSceneActions();
+    respErr = Error::ok();
+  }
+  else if (aMethod=="x-p44-syncChannels") {
+    requestUpdatingChannels(boost::bind(&Device::syncedChannels, this, aRequest));
+    return ErrorPtr(); // no response now
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
@@ -716,9 +735,17 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
 }
 
 
+void Device::syncedChannels(VdcApiRequestPtr aRequest)
+{
+  // confirm channels synced
+  aRequest->sendResult(ApiValuePtr());
+}
+
+
 
 #define MOC_DIM_STEP_TIMEOUT (5*Second)
 #define LEGACY_DIM_STEP_TIMEOUT (500*MilliSecond) // should be 400, but give it extra 100 because of delays in getting next dim call, especially for area scenes
+#define EMERGENCY_DIM_STEP_TIMEOUT (300*Second) // just to prevent dimming forever if something goes wrong
 
 
 ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel)
@@ -741,7 +768,7 @@ ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel
 
 
 
-void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   ErrorPtr err;
   if (aNotification=="saveScene") {
@@ -749,11 +776,10 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
-      // now save
       saveScene(sceneNo);
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "saveScene error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "saveScene error: %s", err->text());
     }
   }
   else if (aNotification=="undoScene") {
@@ -761,11 +787,10 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
-      // now save
       undoScene(sceneNo);
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "undoScene error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "undoScene error: %s", err->text());
     }
   }
   else if (aNotification=="setLocalPriority") {
@@ -773,11 +798,10 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     ApiValuePtr o;
     if (Error::isOK(err = checkParam(aParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
-      // now save
       setLocalPriority(sceneNo);
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "setLocalPriority error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "setLocalPriority error: %s", err->text());
     }
   }
   else if (aNotification=="setControlValue") {
@@ -797,8 +821,8 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         }
       }
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "setControlValue error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "setControlValue error: %s", err->text());
     }
   }
   else if (aNotification=="callSceneMin") {
@@ -809,8 +833,8 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
       // now call
       callSceneMin(sceneNo);
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "callSceneMin error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "callSceneMin error: %s", err->text());
     }
   }
   else if (aNotification=="setOutputChannelValue") {
@@ -826,6 +850,11 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         if (o) {
           apply_now = o->boolValue();
         }
+        o = aParams->get("transitionTime");
+        MLMicroSeconds oldTT = getOutput()->transitionTime;
+        if (o) {
+          getOutput()->transitionTime = o->doubleValue()*Second;
+        }
         // reverse build the correctly structured property value: { channelStates: { <channel>: { value:<value> } } }
         // - value
         o = aParams->newObject();
@@ -838,20 +867,18 @@ void Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         propValue->add("channelStates", ch);
         // now access the property for write
         accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, 3, NULL); // no callback
+        // restore the transition time
+        getOutput()->transitionTime = oldTT;
       }
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "setOutputChannelValue error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "setOutputChannelValue error: %s", err->text());
     }
   }
-  else if (aNotification=="identify") {
-    // identify to user
-    ALOG(LOG_NOTICE, "Identify");
-    identifyToUser();
-  }
   else {
-    inherited::handleNotification(aApiConnection, aNotification, aParams);
+    return inherited::handleNotification(aApiConnection, aNotification, aParams);
   }
+  return true; // known notification name
 }
 
 
@@ -920,7 +947,7 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       bool force = false;
       MLMicroSeconds transitionTimeOverride = Infinite; // none
       // check for custom transition time
-      o = aDeliveryState->callParams->get("transition");
+      o = aDeliveryState->callParams->get("transitionTime");
       if (o) {
         transitionTimeOverride = o->doubleValue()*Second;
       }
@@ -928,14 +955,14 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       if (Error::isOK(err = checkParam(aDeliveryState->callParams, "force", o))) {
         force = o->boolValue();
         // set the channel type as actionParam
-        aDeliveryState->actionParam = channeltype_brightness; // legacy dimming is ALWAYS brightness
+        aDeliveryState->actionParam = channeltype_brightness; // legacy dimming (i.e. dimming via scene calls) is ALWAYS brightness
         // prepare scene call
         callScenePrepare(aPreparedCB, sceneNo, force, transitionTimeOverride);
         return;
       }
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "callScene error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "callScene error: %s", err->text());
     }
   }
   else if (aDeliveryState->callType==ntfy_dimchannel) {
@@ -946,20 +973,29 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       if (Error::isOK(err = checkParam(aDeliveryState->callParams, "mode", o))) {
         // mode
         int mode = o->int32Value();
+        // area
         int area = 0;
         o = aDeliveryState->callParams->get("area");
-        if (o) {
-          area = o->int32Value();
-        }
+        if (o) area = o->int32Value();
+        // autostop of dimming (localcontroller may want to prevent that)
+        bool autostop = true;
+        o = aDeliveryState->callParams->get("autostop");
+        if (o) autostop = o->boolValue();
         // set the channel type as actionParam
         aDeliveryState->actionParam = channel->getChannelType();
         // prepare starting or stopping dimming
-        dimChannelForAreaPrepare(aPreparedCB, channel, mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up), area, MOC_DIM_STEP_TIMEOUT);
+        dimChannelForAreaPrepare(
+          aPreparedCB,
+          channel,
+          mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up),
+          area,
+          autostop ? MOC_DIM_STEP_TIMEOUT : EMERGENCY_DIM_STEP_TIMEOUT
+        );
         return;
       }
     }
-    if (!Error::isOK(err)) {
-      ALOG(LOG_WARNING, "dimChannel error: %s", err->description().c_str());
+    if (Error::notOK(err)) {
+      ALOG(LOG_WARNING, "dimChannel error: %s", err->text());
     }
   }
   aPreparedCB(ntfy_none);
@@ -986,6 +1022,13 @@ void Device::executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatTo
     return;
   }
   if (aDoneCB) aDoneCB();
+}
+
+
+void Device::releasePreparedOperation()
+{
+  preparedScene.reset();
+  preparedTransitionOverride = Infinite; // none
 }
 
 
@@ -1037,7 +1080,9 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 
 // MARK: - high level serialized hardware access
 
-#define SERIALIZER_WATCHDOG 1
+#ifndef SERIALIZER_WATCHDOG
+  #define SERIALIZER_WATCHDOG 1
+#endif
 #define SERIALIZER_WATCHDOG_TIMEOUT (20*Second)
 
 void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForDimming, bool aModeChange)
@@ -1202,11 +1247,6 @@ void Device::applyingChannelsComplete()
 
 
 
-/// request that channel values are updated by reading them back from the device's hardware
-/// @param aUpdatedOrCachedCB will be called when values are updated with actual hardware values
-///   or pending values are in process to be applied to the hardware and thus these cached values can be considered current.
-/// @note this method is only called at startup and before saving scenes to make sure changes done to the outputs directly (e.g. using
-///   a direct remote control for a lamp) are included. Just reading a channel state does not call this method.
 void Device::requestUpdatingChannels(SimpleCB aUpdatedOrCachedCB)
 {
   AFOCUSLOG("requestUpdatingChannels entered");
@@ -1356,6 +1396,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     currentDimChannel = aChannel;
     currentAutoStopTime = aAutoStopAfter;
     preparedDim = true;
+    preparedScene.reset(); // to make sure there's no leftover
     aPreparedCB(ntfy_dimchannel); // needs to start or stop dimming
     return;
   }
@@ -1617,10 +1658,10 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
       // Note: we only ask updating from device for scenes that are likely to be undone, and thus important
       //   to capture perfectly. For all others, it is sufficient to just capture the cached output channel
       //   values and not waste time with expensive queries to device hardware.
-      // Note: the actual updating might happen later (when the hardware responds) but
+      // Note: the actual updating is allowed to happen later (when the hardware responds) but
       //   if so, implementations must make sure access to the hardware is serialized such that
       //   the values are captured before values from performApplySceneToChannels() below are applied.
-      output->captureScene(previousState, aScene->preciseUndoImportant() , boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
+      output->captureScene(previousState, aScene->preciseUndoImportant(), boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
     } // if output
   } // not dontCare
   else {
@@ -1650,12 +1691,25 @@ void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
 }
 
 
+MLMicroSeconds Device::transitionTimeForPreparedScene(bool aIncludingOverride)
+{
+  MLMicroSeconds tt = 0;
+  if (preparedScene) {
+    if (aIncludingOverride && preparedTransitionOverride!=Infinite) {
+      tt = preparedTransitionOverride;
+    }
+    else if (output) {
+      tt = output->transitionTimeFromScene(preparedScene, true);
+    }
+  }
+  return tt;
+}
+
 
 void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
   if (preparedScene) {
     DsScenePtr scene = preparedScene;
-    preparedScene.reset();
     // apply scene logically
     if (output->applySceneToChannels(scene, preparedTransitionOverride)) {
       // prepare for apply (but do NOT yet apply!) on device hardware level)
@@ -1791,18 +1845,21 @@ void Device::callSceneMin(SceneNo aSceneNo)
 }
 
 
-
-
 void Device::identifyToUser()
 {
-  if (output) {
+  if (canIdentifyToUser()) {
     output->identifyToUser(); // pass on to behaviour by default
   }
   else {
-    LOG(LOG_INFO, "***** device 'identify' called (for device with no real identify implementation) *****");
+    inherited::identifyToUser();
   }
 }
 
+
+bool Device::canIdentifyToUser()
+{
+  return output && output->canIdentifyToUser();
+}
 
 
 void Device::saveScene(SceneNo aSceneNo)
@@ -1890,7 +1947,7 @@ ErrorPtr Device::load()
   // load the device settings
   if (deviceSettings) {
     err = deviceSettings->loadFromStore(dSUID.getString().c_str());
-    if (!Error::isOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->description().c_str());
+    if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
   }
   // load the behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->load();
@@ -1898,7 +1955,9 @@ ErrorPtr Device::load()
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->load();
   if (output) output->load();
   // load settings from files
+  #if ENABLE_SETTINGS_FROM_FILES
   loadSettingsFromFiles();
+  #endif
   return ErrorPtr();
 }
 
@@ -1908,7 +1967,7 @@ ErrorPtr Device::save()
   ErrorPtr err;
   // save the device settings
   if (deviceSettings) err = deviceSettings->saveToStore(dSUID.getString().c_str(), false); // only one record per device
-  if (!Error::isOK(err)) ALOG(LOG_ERR,"Error saving settings: %s", err->description().c_str());
+  if (Error::notOK(err)) ALOG(LOG_ERR,"Error saving settings: %s", err->text());
   // save the behaviours
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->save();
   for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->save();
@@ -1954,6 +2013,8 @@ ErrorPtr Device::forget()
 }
 
 
+#if ENABLE_SETTINGS_FROM_FILES
+
 void Device::loadSettingsFromFiles()
 {
   string dir = getVdcHost().getConfigDir();
@@ -1977,6 +2038,7 @@ void Device::loadSettingsFromFiles()
   }
 }
 
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - property access

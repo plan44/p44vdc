@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -59,8 +59,8 @@ void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQu
 
 void PropertyContainer::prepareNext(PropertyPrepListPtr aPrepList, PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
-    LOG(LOG_WARNING, "- prepraration of property failed with error: %s", aError->description().c_str());
+  if (Error::notOK(aError)) {
+    LOG(LOG_WARNING, "- prepraration of property failed with error: %s", aError->text());
   }
   if (aPrepList->empty()) {
     // all prepared, access again
@@ -218,7 +218,7 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
                   // 404 errors are collected, but dont abort the query
                   if (Error::isError(err, VdcApiError::domain(), 404)) {
                     if (!errorMsg.empty()) errorMsg += "; ";
-                    errorMsg += string_format("Error(s) accessing subproperties of '%s' : { %s }", queryName.c_str(), err->description().c_str());
+                    errorMsg += string_format("Error(s) accessing subproperties of '%s' : { %s }", queryName.c_str(), err->text());
                     err.reset(); // forget the error on this level
                   }
                 }
@@ -432,6 +432,7 @@ PropertyDescriptorPtr PropertyContainer::getDescriptorByNumericName(
 
 // MARK: - reading from CSV
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverridden, const char *&aCSVCursor, const char *aTextSourceName, int aLineNo)
 {
@@ -509,8 +510,8 @@ bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverri
     }
     // now access that property (note: preparation is not checked so properties must be writable without preparation)
     ErrorPtr err = accessPropertyInternal(access_write, property, ApiValuePtr(), aDomain, PropertyDescriptorPtr(), PropertyPrepListPtr());
-    if (!Error::isOK(err)) {
-      LOG(LOG_ERR, "%s:%d - error writing property '%s': %s", aTextSourceName, aLineNo, f.c_str(), err->description().c_str());
+    if (Error::notOK(err)) {
+      LOG(LOG_ERR, "%s:%d - error writing property '%s': %s", aTextSourceName, aLineNo, f.c_str(), err->text());
     }
     else {
       anySettingsApplied = true;
@@ -519,4 +520,4 @@ bool PropertyContainer::readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverri
   return anySettingsApplied;
 }
 
-
+#endif // ENABLE_SETTINGS_FROM_FILES

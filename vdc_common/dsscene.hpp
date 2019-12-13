@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -22,19 +22,30 @@
 #ifndef __p44vdc__dsscene__
 #define __p44vdc__dsscene__
 
-
+#include "p44vdc_common.hpp"
 #include "persistentparams.hpp"
 #include "propertycontainer.hpp"
 
 #include "devicesettings.hpp"
+
+#if ENABLE_EXPRESSIONS && EXPRESSION_SCRIPT_SUPPORT && !defined(ENABLE_SCENE_SCRIPT)
+  #define ENABLE_SCENE_SCRIPT 1
+#endif
+
+#if ENABLE_SCENE_SCRIPT
+#include "expressions.hpp"
+#endif
+
 
 using namespace std;
 
 namespace p44 {
 
   /// scene commands
+  /// @note these enum values are private to the build, and MUST NOT be persisted (order can change)
   typedef enum {
     scene_cmd_none, ///< no command, reserved scene
+    scene_cmd_undo, ///< the pseudo scene that is applied at undoScene will have this scene_cmd
     scene_cmd_invoke, ///< standard scene invoke behaviour, i.e. load channel values, apply effects if any
     scene_cmd_off, ///< standard off behaviour (usually equivalent to invoke, but might have slightly different semantics in certain behaviours)
     scene_cmd_min, ///< standard min behaviour (usually equivalent to invoke, but might have slightly different semantics in certain behaviours)
@@ -123,6 +134,9 @@ namespace p44 {
     SceneNo sceneNo; ///< scene number
     SceneCmd sceneCmd; ///< scene command
     SceneArea sceneArea; ///< scene area, 0 if none
+    #if ENABLE_SCENE_SCRIPT
+    string sceneScript; ///< scene script
+    #endif
 
     /// @}
 
@@ -317,8 +331,10 @@ namespace p44 {
     /// delete scenes
     virtual ErrorPtr deleteChildren() P44_FINAL;
 
+    #if ENABLE_SETTINGS_FROM_FILES
     /// load additional defaults for scenes from files
     void loadScenesFromFiles();
+    #endif
     
     /// @}
   };

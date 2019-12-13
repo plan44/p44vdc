@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -188,8 +188,9 @@ namespace p44 {
     virtual void cancelNativeActionUpdate() P44_OVERRIDE;
 
     /// free native action
+    /// @param aStatusCB must be called to return status.
     /// @param aNativeActionId a ID of a native action that should be removed
-    virtual ErrorPtr freeNativeAction(const string aNativeActionId) P44_OVERRIDE;
+    virtual void freeNativeAction(StatusCB aStatusCB, const string aNativeActionId) P44_OVERRIDE;
 
     /// @}
 
@@ -207,7 +208,7 @@ namespace p44 {
     void nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState, JsonObjectPtr aResult, ErrorPtr aError);
     void performNativeSceneUpdate(uint64_t aNewHash, string aSceneId, JsonObjectPtr aSceneUpdate, DeviceList aAffectedDevices, OptimizerEntryPtr aOptimizerEntry);
     void nativeActionUpdated(uint64_t aNewHash, OptimizerEntryPtr aOptimizerEntry, JsonObjectPtr aResult, ErrorPtr aError);
-    void nativeActionDeleted(JsonObjectPtr aResult, ErrorPtr aError);
+    void nativeActionFreed(StatusCB aStatusCB, const string aUrl, JsonObjectPtr aResult, ErrorPtr aError);
     void groupDimRepeater(JsonObjectPtr aDimState, int aTransitionTime, MLTimer &aTimer);
     void nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPtr aError);
   };

@@ -165,7 +165,7 @@ void EldatComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aErr
   // error querying version
   aRetriesLeft--;
   if (aRetriesLeft>=0) {
-    LOG(LOG_WARNING, "EldatComm: Initialisation: command failed: %s -> retrying again", aError->description().c_str());
+    LOG(LOG_WARNING, "EldatComm: Initialisation: command failed: %s -> retrying again", aError->text());
     serialComm->setDTR(false); // should cause reset
     serialComm->closeConnection(); // also close and re-open later
     // retry initializing later
@@ -220,7 +220,7 @@ void EldatComm::aliveCheck()
 
 void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // alive check failed, try to recover ELDAT interface
     LOG(LOG_ERR, "EldatComm: alive check of ELDAT module failed -> restarting module");
     serialComm->setDTR(false); // release DTR, this should reset the ELDAT interface

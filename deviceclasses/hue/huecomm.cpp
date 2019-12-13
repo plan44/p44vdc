@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -61,8 +61,6 @@ HueApiOperation::~HueApiOperation()
 
 bool HueApiOperation::initiate()
 {
-  if (!canInitiate())
-    return false;
   // initiate the web request
   const char *methodStr;
   switch (method) {
@@ -70,6 +68,9 @@ bool HueApiOperation::initiate()
     case httpMethodPUT : methodStr = "PUT"; break;
     case httpMethodDELETE : methodStr = "DELETE"; break;
     default : methodStr = "GET"; data.reset(); break;
+  }
+  if (method==httpMethodPUT) {
+    LOG(LOG_INFO, "Sending hue API action (PUT) command: %s: %s", url.c_str(), data ? data->c_strValue() : "<no data>");
   }
   hueComm.bridgeAPIComm.jsonRequest(url.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, data);
   // executed
@@ -261,7 +262,7 @@ public:
       hueComm.apiReady = true; // can use API now
     }
     else {
-      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.baseURL.c_str(), aError->description().c_str());
+      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.fixedBaseURL.c_str(), aError->text());
     }
     callback(aError); // success
     keepAlive.reset(); // will delete object if nobody else keeps it
@@ -271,7 +272,7 @@ public:
 
   void bridgeRefindHandler(SsdpSearchPtr aSsdpSearch, ErrorPtr aError, const string& aExpectedUuid)
   {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       if (hueComm.useNUPnP) {
         // could not find bridge, try N-UPnP
         hueComm.findBridgesNupnp(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, aExpectedUuid));
@@ -305,7 +306,7 @@ public:
       }
     }
     else {
-      FOCUSLOG("discovery ended, error = %s (usually: timeout)", aError->description().c_str());
+      FOCUSLOG("discovery ended, error = %s (usually: timeout)", aError->text());
       aSsdpSearch->stopSearch();
       if (hueComm.useNUPnP) {
         // also try N-UPnP
@@ -410,10 +411,12 @@ public:
         readUuidFromXml(aResponse);
       }
 
-      if (manufacturer == "Royal Philips Electronics" &&
-          (model == MODEL_FREE_RTOS || model == MODEL_HOMEKIT_LINUX) &&
-          !urlbase.empty() &&
-          isUuidValid(aExpectedUuid)) {
+      if (
+        aResponse.find("hue")!=string::npos && // the word "hue" must be contained, but no longer Philips (it's Signify now, who knows when they will change again...)
+        (model == MODEL_FREE_RTOS || model == MODEL_HOMEKIT_LINUX) &&
+        !urlbase.empty() &&
+        isUuidValid(aExpectedUuid)
+      ) {
         // create the base address for the API
         string url = urlbase + "api";
         if (refind) {
@@ -433,7 +436,7 @@ public:
       }
     }
     else {
-      FOCUSLOG("Error accessing bridge description: %s", aError->description().c_str());
+      FOCUSLOG("Error accessing bridge description: %s", aError->text());
     }
     // try next
     ++currentBridgeCandidate;
@@ -500,7 +503,7 @@ public:
       }
     }
     else {
-      LOG(LOG_INFO, "hue Bridge: Cannot create user: %s", aError->description().c_str());
+      LOG(LOG_INFO, "hue Bridge: Cannot create user: %s", aError->text());
     }
     // try next
     ++currentAuthCandidate;
@@ -519,7 +522,6 @@ HueComm::HueComm() :
   bridgeAPIComm(MainLoop::currentMainLoop()),
   findInProgress(false),
   apiReady(false),
-  lastApiAction(Never),
   useNUPnP(false)
 {
   bridgeAPIComm.setServerCertVfyDir("");
@@ -561,8 +563,7 @@ void HueComm::apiAction(HttpMethods aMethod, const char* aUrlSuffix, JsonObjectP
   // Q: How many commands you can send per second?
   // A: You can send commands to the lights too fast. If you stay roughly around 10 commands per
   //    second to the /lights resource as maximum you should be fine.
-  op->setInitiatesAt(lastApiAction+100*MilliSecond); // do not start next command earlier than 100mS after the previous one
-  lastApiAction = MainLoop::currentMainLoop().now(); // remember this operation
+  op->setInitiationDelay(100*MilliSecond, true); // do not start next command earlier than 100mS after the previous one
   queueOperation(op);
   // process operations
   processOperations();
@@ -607,8 +608,7 @@ void HueComm::refindBridge(HueBridgeFindCB aFindHandler)
 void HueComm::findBridgesNupnp(HueBridgeNupnpFindCB aFindHandler)
 {
   HueApiOperationPtr op = HueApiOperationPtr(new HueApiOperation(*this, httpMethodGET, NUPNP_PATH.c_str(), NULL, boost::bind(&HueComm::gotBridgeNupnpResponse, this, _1, _2, aFindHandler)));
-  op->setInitiatesAt(lastApiAction+100*MilliSecond); // do not start next command earlier than 100mS after the previous one
-  lastApiAction = MainLoop::currentMainLoop().now(); // remember this operation
+  op->setInitiationDelay(100*MilliSecond, true); // do not start next command earlier than 100mS after the previous one
   queueOperation(op);
   // process operations
   processOperations();
@@ -618,7 +618,7 @@ void HueComm::findBridgesNupnp(HueBridgeNupnpFindCB aFindHandler)
 void HueComm::gotBridgeNupnpResponse(JsonObjectPtr aResult, ErrorPtr aError, HueBridgeNupnpFindCB aFindHandler)
 {
   NupnpResult ret;
-  if (!Error::isOK(aError) || !aResult) {
+  if (Error::notOK(aError) || !aResult) {
     aFindHandler(ret);
     return;
   }

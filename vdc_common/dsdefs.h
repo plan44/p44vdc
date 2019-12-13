@@ -22,7 +22,7 @@
 #ifndef p44vdc_dsdefs_h
 #define p44vdc_dsdefs_h
 
-/// MARK: -= generic dS constants in dS global scope
+// MARK: - generic dS constants in dS global scope
 
 /// Constants which are used in the entire dS system
 /// @{
@@ -329,6 +329,13 @@ typedef enum {
 
   channeltype_p44_position_v = channeltype_custom_first+0, ///< vertical position (e.g for moving lights)
   channeltype_p44_position_h = channeltype_custom_first+1, ///< horizontal position (e.g for moving lights)
+  channeltype_p44_zoom_v = channeltype_custom_first+2, ///< vertical zoom (for extended functionality moving lights)
+  channeltype_p44_zoom_h = channeltype_custom_first+3, ///< horizontal zoom (for extended functionality moving lights)
+  channeltype_p44_rotation = channeltype_custom_first+4, ///< rotation (for extended functionality moving lights)
+  channeltype_p44_brightness_gradient = channeltype_custom_first+5, ///< gradient for brightness
+  channeltype_p44_hue_gradient = channeltype_custom_first+6, ///< gradient for hue
+  channeltype_p44_saturation_gradient = channeltype_custom_first+7, ///< gradient for saturation
+  channeltype_p44_feature_mode = channeltype_custom_first+8, ///< feature mode
 
   channeltype_p44_audio_content_source = channeltype_custom_first+22, ///< audio content source // FIXME: p44-specific channel type for audio content source until dS specifies one
 
@@ -438,9 +445,9 @@ typedef enum {
 
 
 
-/// MARK: -= vDC API constants - scope is vDC API only
+// MARK: - vDC API constants - scope is vDC API only
 
-/// Constants which are used in the vDC API and have a direct meaning only for vDC API clients (such as vDSM)
+/// Constants which are used in the vDC API and have a direct meaning only for vDC API clients (such as vdSM)
 /// @{
 
 
@@ -506,6 +513,7 @@ typedef enum {
   scene_effect_custom = 3, ///< custom (default: 5sec) transition
   scene_effect_alert = 4, ///< blink (for light devices, effectParam!=0 allows detail control) / alerting (in general: an effect that draws the user’s attention)
   scene_effect_transition = 5, ///< transition time according to scene-level effectParam (milliseconds)
+  scene_effect_script = 6, ///< run scene script
 } VdcSceneEffect;
 
 

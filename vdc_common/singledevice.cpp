@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2016-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -35,610 +35,6 @@
 #include "jsonvdcapi.hpp"
 
 using namespace p44;
-
-
-// MARK: - ValueDescriptor
-
-
-ValueDescriptor::ValueDescriptor(const string aName, VdcValueType aValueType, ValueUnit aValueUnit, bool aHasDefault) :
-  valueName(aName),
-  valueType(aValueType),
-  valueUnit(aValueUnit),
-  hasValue(aHasDefault),
-  isOptionalValue(!aHasDefault), // note that this is only the most common case, but setIsOptional make null values acceptable even when there is a default value
-  readOnly(false),
-  needsFetch(false),
-  isDefaultValue(aHasDefault), // note that this is only most common case, but setIsDefault can be used to make even a null value default
-  lastUpdate(Never),
-  lastChange(Never)
-{
-}
-
-
-bool ValueDescriptor::setLastUpdate(MLMicroSeconds aLastUpdate)
-{
-  if (aLastUpdate==Infinite)
-    aLastUpdate = MainLoop::currentMainLoop().now();
-  lastUpdate = aLastUpdate;
-  bool gotValue = !hasValue; // if this is the first value update, consider value changed
-  hasValue = true;
-  isDefaultValue = false;
-  return gotValue;
-}
-
-
-
-bool ValueDescriptor::setChanged(bool aChanged)
-{
-  // update lastChange even if not technically changed, but only updated the first time apart from having a default value
-  if (aChanged || lastChange==Never) {
-    lastChange = MainLoop::currentMainLoop().now();
-  }
-  return aChanged;
-}
-
-
-
-bool ValueDescriptor::needsConformanceCheck(ApiValuePtr aApiValue, ErrorPtr &aError)
-{
-  if (!aApiValue) return false; // no value always conforms
-  if (aApiValue->isNull()) {
-    // check NULL value here, same for all types
-    if (!isOptionalValue) {
-      aError = Error::err<VdcApiError>(415, "Non-optional value, null not allowed");
-      return false; // Error -> no type specific check needed any more
-    }
-    else {
-      return false; // null value is ok -> no type specific check needed any more
-    }
-  }
-  // not null, allow type specific check
-  return true;
-}
-
-
-
-bool ValueDescriptor::invalidate()
-{
-  bool hadValue = hasValue;
-  hasValue = false;
-  return hadValue;
-}
-
-
-string ValueDescriptor::getStringValue(bool aAsInternal, bool aPrevious)
-{
-  ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
-  getValue(v, aAsInternal, aPrevious);
-  return v->stringValue();
-}
-
-
-double ValueDescriptor::getDoubleValue(bool aAsInternal, bool aPrevious)
-{
-  ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
-  getValue(v, aAsInternal, aPrevious);
-  return v->doubleValue();
-}
-
-
-int32_t ValueDescriptor::getInt32Value(bool aAsInternal, bool aPrevious)
-{
-  ApiValuePtr v = VdcHost::sharedVdcHost()->newApiValue();
-  getValue(v, aAsInternal, aPrevious);
-  if (valueType == valueType_boolean) {
-    return v->boolValue();
-  }
-  return v->int32Value();
-}
-
-
-bool ValueDescriptor::setValue(ApiValuePtr aValue)
-{
-  if (!aValue || aValue->isNull()) {
-    // setting NULL means invalidating
-    return invalidate();
-  }
-  else if (valueType==valueType_numeric) {
-    // numeric float type, set as double
-    return setDoubleValue(aValue->doubleValue());
-  }
-  else if (valueType<valueType_integer || valueType==valueType_enumeration) {
-    // numeric integer type or text enumeration (internally integer), set as integer
-    return setInt32Value(aValue->int32Value());
-  }
-  else if (valueType == valueType_boolean) {
-    // boolean type, implicitly converted to int
-    return setInt32Value(aValue->boolValue());
-  }
-  else {
-    return setStringValue(aValue->stringValue());
-  }
-}
-
-
-
-
-enum {
-  type_key,
-  unit_key,
-  symbol_key,
-  min_key,
-  max_key,
-  resolution_key,
-  default_key,
-  readonly_key,
-  optional_key,
-  enumvalues_key,
-  numValueProperties
-};
-
-static char value_key;
-static char value_enumvalues_key;
-
-
-int ValueDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  return numValueProperties;
-}
-
-
-PropertyDescriptorPtr ValueDescriptor::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  static const PropertyDescription properties[numValueProperties] = {
-    { "type", apivalue_string, type_key, OKEY(value_key) },
-    { "siunit", apivalue_string, unit_key, OKEY(value_key) },
-    { "symbol", apivalue_string, symbol_key, OKEY(value_key) },
-    { "min", apivalue_double, min_key, OKEY(value_key) },
-    { "max", apivalue_double, max_key, OKEY(value_key) },
-    { "resolution", apivalue_double, resolution_key, OKEY(value_key) },
-    { "default", apivalue_null, default_key, OKEY(value_key) },
-    { "readonly", apivalue_bool, readonly_key, OKEY(value_key) },
-    { "optional", apivalue_bool, optional_key, OKEY(value_key) },
-    { "values", apivalue_object+propflag_container, enumvalues_key, OKEY(value_enumvalues_key) }
-  };
-  if (aParentDescriptor->isRootOfObject()) {
-    // root level property of this object hierarchy
-    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
-  }
-  return PropertyDescriptorPtr();
-}
-
-
-bool ValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
-{
-  if (aPropertyDescriptor->hasObjectKey(value_key) && aMode==access_read) {
-    switch (aPropertyDescriptor->fieldKey()) {
-      case type_key: aPropValue->setStringValue(valueTypeName(valueType)); return true;
-      case unit_key: if (valueUnit!=valueUnit_none) { aPropValue->setStringValue(valueUnitName(valueUnit, false)); return true; } else return false;
-      case symbol_key: if (valueUnit!=valueUnit_none) { aPropValue->setStringValue(valueUnitName(valueUnit, true)); return true; } else return false;
-      case readonly_key: if (readOnly) { aPropValue->setBoolValue(readOnly); return true; } else return false; // show only when set (only for deviceProperties)
-      case optional_key: if (!readOnly && isOptionalValue) { aPropValue->setBoolValue(isOptionalValue); return true; } else return false; // show only when writable AND optional
-      case default_key: return (isDefaultValue ?  getValue(aPropValue, false) : false);
-    }
-  }
-  return false;
-}
-
-
-const char *valueTypeNames[numValueTypes] = {
-  "unknown",
-  "numeric",
-  "integer",
-  "boolean",
-  "enumeration",
-  "string",
-};
-
-
-string ValueDescriptor::valueTypeName(VdcValueType aValueType)
-{
-  if (aValueType>=numValueTypes) aValueType = valueType_unknown;
-  return valueTypeNames[aValueType];
-}
-
-
-VdcValueType ValueDescriptor::stringToValueType(const string aValueTypeName)
-{
-  for (int i=0; i<numValueTypes; i++) {
-    if (aValueTypeName == valueTypeNames[i]) {
-      return (VdcValueType)i;
-    }
-  }
-  return valueType_unknown;
-}
-
-
-
-// MARK: - NumericValueDescriptor
-
-
-bool NumericValueDescriptor::setDoubleValue(double aValue)
-{
-  bool didChange = false; // assume no change
-  if (setLastUpdate()) {
-    // first time value is set - set both values and consider it a change
-    previousValue = aValue;
-    value = aValue;
-    didChange = true;
-  }
-  if (value!=aValue) {
-    // only changed values are considered a change
-    previousValue = value;
-    value = aValue;
-    didChange = true;
-  }
-  return setChanged(didChange);
-}
-
-
-bool NumericValueDescriptor::updateDoubleValue(double aValue, double aMinChange)
-{
-  if (aMinChange<0) aMinChange = resolution/2;
-  if (!hasValue || fabs(aValue - value) > aMinChange) {
-    // change is large enough to actually update (or currently no value set at all)
-    return setDoubleValue(aValue);
-  }
-  return false; // no change
-}
-
-
-
-
-bool NumericValueDescriptor::setInt32Value(int32_t aValue)
-{
-  return setDoubleValue(aValue);
-}
-
-
-ErrorPtr NumericValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
-{
-  ErrorPtr err;
-  // check if value conforms
-  if (needsConformanceCheck(aApiValue, err)) {
-    ApiValueType vt = aApiValue->getType();
-    if (valueType==valueType_boolean) {
-      // bool parameter, valuetype should be int or bool
-      if (
-        vt!=apivalue_bool &&
-        vt!=apivalue_int64 &&
-        vt!=apivalue_uint64
-      ) {
-        err = Error::err<VdcApiError>(415, "invalid boolean");
-      }
-    }
-    else if (valueType==valueType_numeric || valueType==valueType_integer) {
-      // check bounds
-      double v = aApiValue->doubleValue();
-      if (v<min || v>max) {
-        err = Error::err<VdcApiError>(415, "number out of range");
-      }
-    }
-    else {
-      // everything else is not valid for numeric parameter
-      err = Error::err<VdcApiError>(415, "invalid number");
-    }
-  }
-  return err;
-}
-
-
-bool NumericValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool aPrevious)
-{
-  if (!hasValue || !aApiValue) return false;
-  double v = aPrevious ? previousValue : value;
-  if (valueType==valueType_boolean) {
-    aApiValue->setType(apivalue_bool);
-    aApiValue->setBoolValue(v);
-  }
-  else if (valueType==valueType_integer) {
-    aApiValue->setType(apivalue_int64);
-    aApiValue->setInt64Value(v);
-  }
-  else {
-    aApiValue->setType(apivalue_double);
-    aApiValue->setDoubleValue(v);
-  }
-  return true;
-}
-
-
-
-bool NumericValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
-{
-  if (aMode==access_read) {
-    // everything is read only
-    if (aPropertyDescriptor->hasObjectKey(value_key)) {
-      switch (aPropertyDescriptor->fieldKey()) {
-        case min_key:
-          if (valueType==valueType_boolean) return false;
-          aPropValue->setDoubleValue(min); return true;
-        case max_key:
-          if (valueType==valueType_boolean) return false;
-          aPropValue->setDoubleValue(max); return true;
-        case resolution_key:
-          if (valueType==valueType_boolean) return false;
-          aPropValue->setDoubleValue(resolution); return true;
-      }
-    }
-  }
-  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
-}
-
-
-// MARK: - TextValueDescriptor
-
-bool TextValueDescriptor::setStringValue(const string aValue)
-{
-  bool didChange = false; // assume no change
-  if (setLastUpdate()) {
-    // first time value is set - set both values and consider it a change
-    previousValue = aValue;
-    value = aValue;
-    didChange = true;
-  }
-  if (!(value==aValue)) {
-    // only changed values are considered a change
-    previousValue = value;
-    value = aValue;
-    didChange = true;
-  }
-  return setChanged(didChange);
-}
-
-
-ErrorPtr TextValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
-{
-  ErrorPtr err;
-  if (needsConformanceCheck(aApiValue, err)) {
-    // check if value conforms
-    if (aApiValue->getType()!=apivalue_string) {
-      err = Error::err<VdcApiError>(415, "invalid string");
-    }
-  }
-  return err;
-}
-
-
-
-bool TextValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool aPrevious)
-{
-  if (!hasValue || !aApiValue) return false;
-  aApiValue->setType(apivalue_string);
-  aApiValue->setStringValue(value);
-  return true;
-}
-
-
-// MARK: - EnumValueDescriptor
-
-
-
-bool EnumValueDescriptor::setDoubleValue(double aValue)
-{
-  // double can also be used to set enum by integer
-  return setInt32Value((int32_t)aValue);
-}
-
-
-bool EnumValueDescriptor::setInt32Value(int32_t aValue)
-{
-  bool didChange = false; // assume no change
-  if (setLastUpdate()) {
-    // first time value is set - set both values and consider it a change
-    previousValue = aValue;
-    value = aValue;
-    didChange = true;
-  }
-  if (value!=aValue) {
-    // only changed values are considered a change
-    previousValue = value;
-    value = aValue;
-    didChange = true;
-  }
-  return setChanged(didChange);
-}
-
-
-bool EnumValueDescriptor::setStringValue(const string aEnumText)
-{
-  for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
-    if (pos->first==aEnumText) {
-      // found
-      return setInt32Value(pos->second);
-    }
-  }
-  return false; // no change
-}
-
-bool EnumValueDescriptor::setStringValueCaseInsensitive(const string& aValue)
-{
-  for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
-    if (lowerCase(pos->first) == lowerCase(aValue)) {
-      // found
-      return setInt32Value(pos->second);
-    }
-  }
-  return false; // no change
-}
-
-
-EnumValueDescriptorPtr EnumValueDescriptor::create(const char* aName, std::vector<const char*> aValues)
-{
-  EnumValueDescriptorPtr desc = EnumValueDescriptorPtr(new EnumValueDescriptor(aName, true));
-  int i = 0;
-  for(std::vector<const char*>::iterator it = aValues.begin(); it!=aValues.end(); it++) {
-    desc->addEnum(*it, i++);
-  }
-  return desc;
-}
-
-
-void EnumValueDescriptor::addEnum(const char *aEnumText, int aEnumValue, bool aIsDefault)
-{
-  enumDescs.push_back(EnumDesc(aEnumText, aEnumValue));
-  if (aIsDefault) {
-    value = aEnumValue; // also assign as default
-    hasValue = true;
-    isDefaultValue = true;
-  }
-}
-
-
-ErrorPtr EnumValueDescriptor::conforms(ApiValuePtr aApiValue, bool aMakeInternal)
-{
-  ErrorPtr err;
-  if (needsConformanceCheck(aApiValue, err)) {
-    // check if value conforms
-    if (aApiValue->getType()!=apivalue_string) {
-      err = Error::err<VdcApiError>(415, "enum label must be string");
-    }
-    else {
-      // must be one of the texts in the enum list
-      string s = aApiValue->stringValue();
-      for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
-        if (pos->first==s) {
-          // found
-          if (aMakeInternal && !noInternalValue) {
-            aApiValue->setType(apivalue_uint64);
-            aApiValue->setUint32Value(pos->second);
-          }
-          return err;
-        }
-      }
-      err = Error::err<VdcApiError>(415, "invalid enum label");
-    }
-  }
-  return err;
-}
-
-
-
-bool EnumValueDescriptor::getValue(ApiValuePtr aApiValue, bool aAsInternal, bool aPrevious)
-{
-  if (!hasValue || !aApiValue) return false;
-  uint32_t v = aPrevious ? previousValue : value;
-  if (aAsInternal && !noInternalValue) {
-    aApiValue->setType(apivalue_uint64);
-    aApiValue->setUint32Value(v);
-    return true;
-  }
-  else {
-    aApiValue->setType(apivalue_string);
-    for (EnumVector::iterator pos = enumDescs.begin(); pos!=enumDescs.end(); ++pos) {
-      if (pos->second==v) {
-        aApiValue->setStringValue(pos->first);
-        return true;
-      }
-    }
-    return false;
-  }
-}
-
-
-bool EnumValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
-{
-  if (aMode==access_read) {
-    // everything is read only
-    if (aPropertyDescriptor->hasObjectKey(value_enumvalues_key)) {
-      // all enum list properties are NULL values...
-      return true; // ...but they exist!
-    }
-  }
-  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
-}
-
-
-PropertyContainerPtr EnumValueDescriptor::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
-{
-  if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(value_enumvalues_key)) {
-    return PropertyContainerPtr(this); // handle enum values array myself
-  }
-  // unknown here
-  return inherited::getContainer(aPropertyDescriptor, aDomain);
-}
-
-
-int EnumValueDescriptor::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  if (aParentDescriptor->hasObjectKey(value_enumvalues_key)) {
-    // number of enum values
-    return (int)enumDescs.size();
-  }
-  return inherited::numProps(aDomain, aParentDescriptor);
-}
-
-
-PropertyDescriptorPtr EnumValueDescriptor::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  if (aParentDescriptor->hasObjectKey(value_enumvalues_key)) {
-    // enumvalues - distinct set of NULL values (only names count)
-    if (aPropIndex<enumDescs.size()) {
-      DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-      descP->propertyName = enumDescs[aPropIndex].first;
-      descP->propertyType = apivalue_null;
-      descP->propertyFieldKey = aPropIndex;
-      descP->propertyObjectKey = OKEY(value_enumvalues_key);
-      return descP;
-    }
-  }
-  return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor);
-}
-
-
-// MARK: - ValueList
-
-void ValueList::addValue(ValueDescriptorPtr aValueDesc)
-{
-  values.push_back(aValueDesc);
-}
-
-
-ValueDescriptorPtr ValueList::getValue(const string aName)
-{
-  for (ValuesVector::iterator pos = values.begin(); pos!=values.end(); ++pos) {
-    if ((*pos)->valueName==aName) {
-      // found
-      return *pos;
-    }
-  }
-  // not found
-  return ValueDescriptorPtr();
-}
-
-
-
-
-
-int ValueList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  return (int)values.size();
-}
-
-
-static char valueDescriptor_key;
-
-PropertyDescriptorPtr ValueList::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  if (aPropIndex<values.size()) {
-    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = values[aPropIndex]->valueName;
-    descP->propertyType = apivalue_object;
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(valueDescriptor_key);
-    return descP;
-  }
-  return PropertyDescriptorPtr();
-}
-
-
-PropertyContainerPtr ValueList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
-{
-  if (aPropertyDescriptor->hasObjectKey(valueDescriptor_key)) {
-    return values[aPropertyDescriptor->fieldKey()];
-  }
-  return NULL;
-}
 
 
 // MARK: - DeviceAction
@@ -678,11 +74,11 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
     if (o) {
       // caller did supply this parameter
       err = (*pos)->conforms(o, true); // check and convert to internal (for text enums)
-      if (!Error::isOK(err)) {
+      if (Error::notOK(err)) {
         if (nonConformingAsNull() && !o->isNull()) {
           o = aParams->newNull(); // convert it to NULL
           err = (*pos)->conforms(o, true); // check again to see if NULL is conformant
-          if (!Error::isOK(err)) break; // NULL is not conformant -> error out
+          if (Error::notOK(err)) break; // NULL is not conformant -> error out
         }
         else {
           break; // param is not conformant -> error out
@@ -705,10 +101,10 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
     }
     ++pos;
   }
-  if (!Error::isOK(err)) {
+  if (Error::notOK(err)) {
     // rewrite error to include param name
     if (pos!=actionParams->values.end() && err->isDomain(VdcApiError::domain())) {
-      err = Error::err<VdcApiError>(err->getErrorCode(), "parameter '%s': %s", (*pos)->getName().c_str(), err->description().c_str());
+      err = Error::err<VdcApiError>(err->getErrorCode(), "parameter '%s': %s", (*pos)->getName().c_str(), err->text());
     }
     // parameter error, not executing action, call back with error
     if (aCompletedCB) aCompletedCB(err);
@@ -1091,7 +487,7 @@ ErrorPtr ActionMacro::validateParams(ApiValuePtr aParams, ApiValuePtr aValidated
     if (vd) {
       // param with that name exists
       err = vd->conforms(val, false);
-      if (!Error::isOK(err) && action->nonConformingAsNull() && !val->isNull()) {
+      if (Error::notOK(err) && action->nonConformingAsNull() && !val->isNull()) {
         val = aParams->newNull(); // convert it to NULL
         err = vd->conforms(val, true); // check again to see if NULL is conformant
       }
@@ -1103,7 +499,7 @@ ErrorPtr ActionMacro::validateParams(ApiValuePtr aParams, ApiValuePtr aValidated
     }
     else {
       if (aSkipInvalid) continue; // just ignore, but continue checking others
-      return TextError::err("invalid parameter '%s' for custom action '%s': %s", key.c_str(), actionId.c_str(), err->description().c_str());
+      return TextError::err("invalid parameter '%s' for custom action '%s': %s", key.c_str(), actionId.c_str(), err->text());
     }
   }
   SALOG(singleDevice, LOG_DEBUG, "validated params: %s", aValidatedParams ? aValidatedParams->description().c_str() : "<none>");
@@ -1249,8 +645,8 @@ void CustomAction::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, ui
   // - configure it
   JsonObjectPtr j = JsonObject::objFromText(jsonparams.c_str());
   ErrorPtr err = configureMacro(baseAction, j);
-  if (!Error::isOK(err)) {
-    SALOG(singleDevice, LOG_ERR, "error loading custom action: %s", err->description().c_str());
+  if (Error::notOK(err)) {
+    SALOG(singleDevice, LOG_ERR, "error loading custom action: %s", err->text());
   }
 }
 
@@ -1320,7 +716,7 @@ bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
             return true;
           }
           // error
-          SALOG(singleDevice, LOG_ERR, "writing 'params' failed: %s", err->description().c_str());
+          SALOG(singleDevice, LOG_ERR, "writing 'params' failed: %s", err->text());
           return false;
         }
       }
@@ -1458,7 +854,7 @@ ErrorPtr CustomActions::save()
   // save all elements of the map (only dirty ones will be actually stored to DB
   for (CustomActionsVector::iterator pos = customActions.begin(); pos!=customActions.end(); ++pos) {
     err = (*pos)->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed
-    if (!Error::isOK(err)) SALOG(singleDevice, LOG_ERR,"Error saving custom action '%s': %s", (*pos)->actionId.c_str(), err->description().c_str());
+    if (Error::notOK(err)) SALOG(singleDevice, LOG_ERR,"Error saving custom action '%s': %s", (*pos)->actionId.c_str(), err->text());
   }
   return err;
 }
@@ -2129,8 +1525,8 @@ bool DeviceProperties::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     else if (!val->isReadOnly()) {
       // write
       ErrorPtr err = val->conforms(aPropValue, true);
-      if (!Error::isOK(err)) {
-        SALOG((*singleDeviceP), LOG_ERR, "Cannot set property '%s': %s", val->getName().c_str(), err->description().c_str());
+      if (Error::notOK(err)) {
+        SALOG((*singleDeviceP), LOG_ERR, "Cannot set property '%s': %s", val->getName().c_str(), err->text());
         return false;
       }
       else {
@@ -2307,7 +1703,7 @@ ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
     // recognizes method only if there are any actions
     string actionid;
     respErr = checkStringParam(aParams, "id", actionid);
-    if (!Error::isOK(respErr))
+    if (Error::notOK(respErr))
       return respErr;
     ApiValuePtr actionParams = aParams->get("params");
     if (!actionParams) {
@@ -2326,7 +1722,7 @@ ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
 
 void SingleDevice::invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
 {
-  ALOG(LOG_NOTICE, "- call completed with status: %s", Error::isOK(aError) ? "OK" : aError->description().c_str());
+  ALOG(LOG_NOTICE, "- call completed with status: %s", Error::isOK(aError) ? "OK" : aError->text());
   methodCompleted(aRequest, aError);
 }
 
@@ -2401,7 +1797,7 @@ void SingleDevice::sceneInvokedActionComplete(ErrorPtr aError)
     ALOG(LOG_INFO, "scene invoked command complete");
   }
   else {
-    ALOG(LOG_ERR, "scene invoked command returned error: %s", aError->description().c_str());
+    ALOG(LOG_ERR, "scene invoked command returned error: %s", aError->text());
   }
 }
 
@@ -2560,7 +1956,7 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
     // standard action
     err = actionFromJSON(a, aJSONConfig, aActionId, desc, category);
   }
-  if (!Error::isOK(err) || !a) return err;
+  if (Error::notOK(err) || !a) return err;
   // check for params
   if (aJSONConfig && aJSONConfig->get("params", o)) {
     string pname;
@@ -2569,7 +1965,7 @@ ErrorPtr SingleDevice::addActionFromJSON(bool aDynamic, JsonObjectPtr aJSONConfi
     while (o->nextKeyValue(pname, param)) {
       ValueDescriptorPtr p;
       ErrorPtr err = parameterFromJSON(p, param, pname);
-      if (!Error::isOK(err)) return err;
+      if (Error::notOK(err)) return err;
       if (!p) continue; // if the parsing was ok, but no parameter was created do not add it to the action
       bool optional = !(p->isDefault()); // by default, no default value means the value is optional
       JsonObjectPtr o3;
@@ -2625,7 +2021,7 @@ ErrorPtr SingleDevice::standardActionsFromJSON(JsonObjectPtr aJSONConfig)
           standardActions->addStandardAction(a);
         }
       }
-      if (!Error::isOK(err)) return err->withPrefix("Error creating standard action '%s': ", actionId.c_str());
+      if (Error::notOK(err)) return err->withPrefix("Error creating standard action '%s': ", actionId.c_str());
     }
   }
   return ErrorPtr();
@@ -2677,7 +2073,7 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
       o->resetKeyIteration();
       while (o->nextKeyValue(actionId, actionConfig)) {
         err = addActionFromJSON(dynamic, actionConfig, actionId, false);
-        if (!Error::isOK(err)) return err->withPrefix("Error creating action '%s': ", actionId.c_str());
+        if (Error::notOK(err)) return err->withPrefix("Error creating action '%s': ", actionId.c_str());
       }
     }
   }
@@ -2693,11 +2089,11 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
       if (stateConfig && stateConfig->get("description", o2)) desc = o2->stringValue();
       ValueDescriptorPtr v;
       err = parseValueDesc(v, stateConfig, "state");
-      if (!Error::isOK(err)) return err->withPrefix("Error in 'state' of '%s': ", stateId.c_str());
+      if (Error::notOK(err)) return err->withPrefix("Error in 'state' of '%s': ", stateId.c_str());
       // create the state
       DeviceStatePtr s;
       err = stateFromJSON(s, stateConfig, stateId, desc, v);
-      if (!Error::isOK(err)) return err->withPrefix("Error creating state '%s': ", stateId.c_str());
+      if (Error::notOK(err)) return err->withPrefix("Error creating state '%s': ", stateId.c_str());
       deviceStates->addState(s);
     }
   }
@@ -2714,7 +2110,7 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
       if (eventConfig && eventConfig->get("description", o2)) desc = o2->stringValue();
       DeviceEventPtr e;
       err = eventFromJSON(e, eventConfig, eventId, desc);
-      if (!Error::isOK(err)) return err->withPrefix("Error creating event '%s': ", eventId.c_str());
+      if (Error::notOK(err)) return err->withPrefix("Error creating event '%s': ", eventId.c_str());
       deviceEvents->addEvent(e);
     }
   }
@@ -2732,7 +2128,7 @@ ErrorPtr SingleDevice::configureFromJSON(JsonObjectPtr aJSONConfig)
         readonly = o2->boolValue();
       ValueDescriptorPtr p;
       err = propertyFromJSON(p, propConfig, propId);
-      if (!Error::isOK(err)) {
+      if (Error::notOK(err)) {
         return err;
       }
       deviceProperties->addProperty(p, readonly);

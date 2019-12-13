@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -28,6 +28,11 @@
 
 #include "enoceandevice.hpp"
 #include "channelbehaviour.hpp"
+
+#ifndef ENABLE_ENOCEAN_SHADOW
+  #define ENABLE_ENOCEAN_SHADOW 1
+#endif
+
 
 using namespace std;
 
@@ -131,6 +136,8 @@ namespace p44 {
   };
 
 
+  #if ENABLE_ENOCEAN_SHADOW
+
   class EnoceanBlindControlDevice : public EnoceanRemoteControlDevice
   {
     typedef EnoceanRemoteControlDevice inherited;
@@ -164,6 +171,8 @@ namespace p44 {
     void sendReleaseTelegram(SimpleCB aDoneCB);
 
   };
+
+  #endif // ENABLE_ENOCEAN_SHADOW
 
 
 

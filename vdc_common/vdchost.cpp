@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -77,12 +77,6 @@ using namespace p44;
   #define DEFAULT_DESCRIPTION_TEMPLATE "%V %M%N #%S"
 #endif
 
-// default geolocation
-#if !defined(DEFAULT_LATITUDE) || !defined(DEFAULT_LONGITUDE)
-  #define DEFAULT_LONGITUDE 8.474552
-  #define DEFAULT_LATITUDE 47.394691
-#endif
-
 static VdcHost *sharedVdcHostP = NULL;
 
 VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
@@ -96,16 +90,15 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   allowCloud(false),
   DsAddressable(this),
   collecting(false),
-  lastActivity(0),
-  lastPeriodicRun(0),
+  lastActivity(Never),
+  lastPeriodicRun(Never),
   learningMode(false),
   localDimDirection(0), // undefined
   mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
   mainLoopStatsCounter(0),
   persistentChannels(aWithPersistentChannels),
   productName(DEFAULT_PRODUCT_NAME),
-  longitude(DEFAULT_LONGITUDE),
-  latitude(DEFAULT_LATITUDE)
+  geolocation() // default location will be set from timeutils
 {
   // remember singleton's address
   sharedVdcHostP = this;
@@ -117,6 +110,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
     localController = LocalControllerPtr(new LocalController(*this));
   }
   #endif
+  // initialize real time jump detection as early as possible (to catch changes happening during initialisation)
+  timeOfDayDiff = Infinite;
+  checkTimeOfDayChange(); // will not post a event when timeOfDayDiff is Infinite
 }
 
 
@@ -148,11 +144,30 @@ void VdcHost::setEventMonitor(VdchostEventCB aEventCB)
 }
 
 
+void VdcHost::identifyToUser()
+{
+  postEvent(vdchost_identify); // send out signal anyway
+  if (!canIdentifyToUser()) inherited::identifyToUser(); // make sure it is at least logged
+}
+
+
+bool VdcHost::canIdentifyToUser()
+{
+  // assume vdchost can identify itself when it has a event monitor installed which will actually see vdchost_identify
+  return eventMonitorHandler!=NULL;
+}
+
+
+
 void VdcHost::postEvent(VdchostEvent aEvent)
 {
-  // let all vdcs know
-  for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
-    pos->second->handleGlobalEvent(aEvent);
+  if (aEvent>=vdchost_redistributed_events) {
+    // let all vdcs (and their devices) know
+    LOG(LOG_INFO, ">>> vdcs start processing global event %d", (int)aEvent);
+    for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
+      pos->second->handleGlobalEvent(aEvent);
+    }
+    LOG(LOG_INFO, ">>> vdcs done processing event %d", (int)aEvent);
   }
   #if ENABLE_LOCALCONTROLLER
   if (localController) localController->processGlobalEvent(aEvent);
@@ -312,6 +327,28 @@ bool VdcHost::isNetworkConnected()
 }
 
 
+void VdcHost::checkTimeOfDayChange()
+{
+  struct tm lt;
+  MainLoop::getLocalTime(lt);
+  long long lm = ((((long long)lt.tm_year*366+lt.tm_yday)*24+lt.tm_hour)*60+lt.tm_min)*60+lt.tm_sec; // local time fingerprint (not monotonic, not accurate)
+  MLMicroSeconds td = MainLoop::now()-lm*Second;
+  if (timeOfDayDiff==Infinite) {
+    timeOfDayDiff = td; // first time
+  }
+  else {
+    MLMicroSeconds d = timeOfDayDiff-td;
+    if (d<0) d = -d;
+    if (d>5*Second) {
+      LOG(LOG_NOTICE, "*** Time-Of-Day has changed by %.f seconds", (double)(timeOfDayDiff-td)/Second);
+      timeOfDayDiff = td;
+      postEvent(vdchost_timeofday_changed);
+    }
+  }
+}
+
+
+
 
 
 // MARK: - initializisation of DB and containers
@@ -384,6 +421,9 @@ void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMa
 {
   // initialize all vDCs, even when some have errors
   if (aNextVdc!=vdcs.end()) {
+    // load persistent params for vdc (dSUID is already stable at this point, cannot depend on initialize()!)
+    aNextVdc->second->load();
+    // initialize with parameters already loaded
     aNextVdc->second->initialize(boost::bind(&VdcHost::vdcInitialized, this, aCompletedCB, aFactoryReset, aNextVdc, _1), aFactoryReset);
     return;
   }
@@ -395,8 +435,8 @@ void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMa
 
 void VdcHost::vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "vDC %s: failed to initialize: %s", aNextVdc->second->shortDesc().c_str(), aError->description().c_str());
+  if (Error::notOK(aError)) {
+    LOG(LOG_ERR, "vDC %s: failed to initialize: %s", aNextVdc->second->shortDesc().c_str(), aError->text());
     aNextVdc->second->setVdcError(aError);
   }
   // anyway, initialize next
@@ -468,11 +508,9 @@ void VdcHost::collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags,
 
 void VdcHost::vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "vDC %s: error collecting devices: %s", aNextVdc->second->shortDesc().c_str(), aError->description().c_str());
+  if (Error::notOK(aError)) {
+    LOG(LOG_ERR, "vDC %s: error collecting devices: %s", aNextVdc->second->shortDesc().c_str(), aError->text());
   }
-  // load persistent params for vdc
-  aNextVdc->second->load();
   LOG(LOG_NOTICE, "=== done collecting from %s\n", aNextVdc->second->shortDesc().c_str());
   // next
   aNextVdc++;
@@ -492,15 +530,31 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
   // check for global vdc errors now
   ErrorPtr vdcInitErr;
   for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); pos++) {
-    if (!Error::isOK(pos->second->getVdcStatus())) {
+    if (Error::notOK(pos->second->getVdcStatus())) {
       vdcInitErr = pos->second->getVdcStatus();
-      LOG(LOG_ERR, "*** initial device collecting incomplete because of error: %s", vdcInitErr->description().c_str());
+      LOG(LOG_ERR, "*** initial device collecting incomplete because of error: %s", vdcInitErr->text());
       break;
     }
   }
   aCompletedCB(vdcInitErr);
   LOG(LOG_NOTICE, "=== initialized all collected devices\n");
   collecting = false;
+  // make sure at least one vdc can be announced to dS, even if all are empty and instructed to hide when empty
+  bool someVisible = false;
+  VdcPtr firstPublic;
+  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+    VdcPtr vdc = pos->second;
+    if (vdc->isPublicDS()) {
+      if (!firstPublic) firstPublic = vdc;
+      if (!vdc->getVdcFlag(vdcflag_hidewhenempty) || vdc->getNumberOfDevices()>0) {
+        someVisible = true;
+        break;
+      }
+    }
+  }
+  if (!someVisible && firstPublic) {
+    firstPublic->vdcFlags &= ~vdcflag_hidewhenempty; // temporarily show this vdc to avoid webui getting unreachable from dS
+  }
 }
 
 
@@ -514,7 +568,22 @@ void VdcHost::nextDeviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator
 
 
 
-// MARK: - adding/removing devices
+// MARK: - adding/removing/finding devices
+
+
+DevicePtr VdcHost::getDeviceByNameOrDsUid(const string &aName)
+{
+  DsDeviceMap::iterator pos;
+  DsUid dsuid;
+  if (dsuid.setAsString(aName)) {
+    pos = dSDevices.find(dsuid);
+  }
+  for (pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+    if (pos->second->getName()==aName) break;
+  }
+  if (pos!=dSDevices.end()) return pos->second;
+  return DevicePtr();
+}
 
 
 bool VdcHost::addDevice(DevicePtr aDevice)
@@ -561,8 +630,8 @@ void VdcHost::separateDeviceInitialized(DevicePtr aDevice, ErrorPtr aError)
 
 void VdcHost::deviceInitialized(DevicePtr aDevice, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "*** error initializing device %s: %s", aDevice->shortDesc().c_str(), aError->description().c_str());
+  if (Error::notOK(aError)) {
+    LOG(LOG_ERR, "*** error initializing device %s: %s", aDevice->shortDesc().c_str(), aError->text());
   }
   else {
     LOG(LOG_NOTICE, "--- initialized device: %s",aDevice->description().c_str());
@@ -699,6 +768,8 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
     if (!collecting) {
       // re-check network connection, might cause re-collection in some vdcs
       isNetworkConnected();
+      // track time of day changes
+      checkTimeOfDayChange();
       // check again for devices that need to be announced
       startAnnouncing();
       // do a save run as well
@@ -875,7 +946,7 @@ void VdcHost::addTargetToAudience(NotificationAudience &aAudience, DsAddressable
 
 
 
-ErrorPtr VdcHost::addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &aDsuid)
+ErrorPtr VdcHost::addToAudienceByDsuid(NotificationAudience &aAudience, const DsUid &aDsuid)
 {
   if (aDsuid.empty()) {
     return Error::err<VdcApiError>(415, "missing/invalid dSUID");
@@ -891,7 +962,7 @@ ErrorPtr VdcHost::addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &a
 }
 
 
-ErrorPtr VdcHost::addToAudienceByItemSpec(NotificationAudience &aAudience, string &aItemSpec)
+ErrorPtr VdcHost::addToAudienceByItemSpec(NotificationAudience &aAudience, const string &aItemSpec)
 {
   DsAddressablePtr a = addressableForItemSpec(aItemSpec);
   if (a) {
@@ -973,7 +1044,7 @@ void VdcHost::vdcApiConnectionStatusHandler(VdcApiConnectionPtr aApiConnection, 
   else {
     // error or connection closed
     if (!aError->isError(SocketCommError::domain(), SocketCommError::HungUp)) {
-      LOG(LOG_ERR, "vDC API connection closing due to error: %s", aError->description().c_str());
+      LOG(LOG_ERR, "vDC API connection closing due to error: %s", aError->text());
     }
     // - close if not already closed
     aApiConnection->closeConnection();
@@ -1037,8 +1108,8 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
     }
     else {
       // just log in case of error of a notification
-      if (!Error::isOK(respErr)) {
-        LOG(LOG_WARNING, "Notification '%s' processing error: %s", aMethod.c_str(), respErr->description().c_str());
+      if (Error::notOK(respErr)) {
+        LOG(LOG_WARNING, "Notification '%s' processing error: %s", aMethod.c_str(), respErr->text());
       }
     }
   }
@@ -1057,7 +1128,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
     if (version<VDC_API_VERSION_MIN || version>maxversion) {
       // incompatible version
       respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d..%d", version, VDC_API_VERSION_MIN, maxversion);
-      LOG(LOG_WARNING, "=== hello rejected: %s", respErr->description().c_str());
+      LOG(LOG_WARNING, "=== hello rejected: %s", respErr->text());
     }
     else {
       // API version ok, save it
@@ -1095,7 +1166,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         else {
           // not ok to start new session, reject
           respErr = Error::err<VdcApiError>(503, "this vDC already has an active session with vdSM %s",connectedVdsm.getString().c_str());
-          LOG(LOG_WARNING, "=== hello rejected: %s", respErr->description().c_str());
+          LOG(LOG_WARNING, "=== hello rejected: %s", respErr->text());
           aRequest->sendError(respErr);
           // close after send
           aRequest->connection()->closeAfterSend();
@@ -1203,9 +1274,9 @@ ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection
           ApiValuePtr e = o->arrayGet(i);
           if (!dsuid.setAsBinary(e->binaryValue())) dsuid.clear();
           respErr = addToAudienceByDsuid(audience, dsuid);
-          if (!Error::isOK(respErr)) {
+          if (Error::notOK(respErr)) {
             respErr->prefixMessage("Ignored target for notification '%s': ", aMethod.c_str());
-            LOG(LOG_INFO, "%s", respErr->description().c_str());
+            LOG(LOG_INFO, "%s", respErr->text());
           }
         }
         respErr.reset();
@@ -1339,6 +1410,7 @@ void VdcHost::resetAnnouncing()
 void VdcHost::startAnnouncing()
 {
   if (!collecting && !announcementTicket && activeSessionConnection) {
+    // start announcing
     announceNext();
   }
 }
@@ -1356,7 +1428,7 @@ void VdcHost::announceNext()
       vdc->isPublicDS() && // only public ones
       vdc->announced==Never &&
       (vdc->announcing==Never || MainLoop::now()>vdc->announcing+ANNOUNCE_RETRY_TIMEOUT) &&
-      (!vdc->invisibleWhenEmpty() || vdc->getNumberOfDevices()>0)
+      (!vdc->getVdcFlag(vdcflag_hidewhenempty) || vdc->getNumberOfDevices()>0)
     ) {
       // mark device as being in process of getting announced
       vdc->announcing = MainLoop::now();
@@ -1442,9 +1514,9 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
 }
 
 
-void VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+bool VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  inherited::handleNotification(aApiConnection, aNotification, aParams);
+  return inherited::handleNotification(aApiConnection, aNotification, aParams);
 }
 
 
@@ -1463,6 +1535,7 @@ enum {
   writeOperations_key,
   latitude_key,
   longitude_key,
+  heightabovesea_key,
   #if ENABLE_LOCALCONTROLLER
   localController_key,
   #endif
@@ -1490,6 +1563,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "x-p44-writeOperations", apivalue_uint64, writeOperations_key, OKEY(vdchost_obj) },
     { "x-p44-latitude", apivalue_double, latitude_key, OKEY(vdchost_obj) },
     { "x-p44-longitude", apivalue_double, longitude_key, OKEY(vdchost_obj) },
+    { "x-p44-heightabovesea", apivalue_double, heightabovesea_key, OKEY(vdchost_obj) },
     #if ENABLE_LOCALCONTROLLER
     { "x-p44-localController", apivalue_object, localController_key, OKEY(localController_obj) },
     #endif
@@ -1560,10 +1634,10 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           aPropValue->setUint32Value(dsParamStore.writeOpsCount);
           return true;
         case latitude_key:
-          aPropValue->setDoubleValue(latitude);
+          aPropValue->setDoubleValue(geolocation.latitude);
           return true;
         case longitude_key:
-          aPropValue->setDoubleValue(longitude);
+          aPropValue->setDoubleValue(geolocation.longitude);
           return true;
       }
     }
@@ -1574,10 +1648,10 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           setPVar(persistentChannels, aPropValue->boolValue());
           return true;
         case latitude_key:
-          setPVar(latitude, aPropValue->doubleValue());
+          setPVar(geolocation.latitude, aPropValue->doubleValue());
           return true;
         case longitude_key:
-          setPVar(longitude, aPropValue->doubleValue());
+          setPVar(geolocation.longitude, aPropValue->doubleValue());
           return true;
       }
     }
@@ -1608,7 +1682,7 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
     for (BehaviourVector::iterator pos2 = dev->sensors.begin(); pos2!=dev->sensors.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
-      if (vs) {
+      if (vs && vs->isEnabled()) {
         aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
       }
     }
@@ -1616,7 +1690,15 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
     for (BehaviourVector::iterator pos2 = dev->inputs.begin(); pos2!=dev->inputs.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
-      if (vs) {
+      if (vs && vs->isEnabled()) {
+        aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
+      }
+    }
+    // Buttons
+    for (BehaviourVector::iterator pos2 = dev->buttons.begin(); pos2!=dev->buttons.end(); ++pos2) {
+      DsBehaviourPtr b = *pos2;
+      ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
+      if (vs && vs->isEnabled()) {
         aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
       }
     }
@@ -1640,12 +1722,13 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
       DevicePtr dev = pos->second;
       const char *p = aValueSourceID.c_str()+i+1;
       if (*p) {
-        // first character is type: I=Input, S=Sensor
+        // first character is type: I=Input, S=Sensor, B=Button
         char ty = *p++;
         DsBehaviourPtr bhv;
         switch (ty) {
           case 'S' : bhv = dev->getSensor(Device::by_id_or_index, string(p)); break;
           case 'I' : bhv = dev->getInput(Device::by_id_or_index, string(p)); break;
+          case 'B' : bhv = dev->getButton(Device::by_id_or_index, string(p)); break;
         }
         if (bhv) {
           valueSource = dynamic_cast<ValueSource *>(bhv.get());
@@ -1676,9 +1759,11 @@ ErrorPtr VdcHost::loadAndFixDsUID()
   DsUid originalDsUid = dSUID;
   // load the vdc host settings, which might override the default dSUID
   err = loadFromStore(entityType()); // is a singleton, identify by type
-  if (!Error::isOK(err)) LOG(LOG_ERR,"Error loading settings for vdc host: %s", err->description().c_str());
+  if (Error::notOK(err)) LOG(LOG_ERR,"Error loading settings for vdc host: %s", err->text());
+  #if ENABLE_SETTINGS_FROM_FILES
   // check for settings from files
   loadSettingsFromFiles();
+  #endif
   // now check
   if (!externalDsuid) {
     if (storedDsuid) {
@@ -1721,6 +1806,7 @@ ErrorPtr VdcHost::forget()
 }
 
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 void VdcHost::loadSettingsFromFiles()
 {
@@ -1730,6 +1816,8 @@ void VdcHost::loadSettingsFromFiles()
   // if vdc has already stored properties, only explicitly marked properties will be applied
   if (loadSettingsFromFile(fn.c_str(), rowid!=0)) markClean();
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - persistence implementation
@@ -1743,7 +1831,7 @@ const char *VdcHost::tableName()
 
 // data field definitions
 
-static const size_t numFields = 5;
+static const size_t numFields = 6;
 
 size_t VdcHost::numFieldDefs()
 {
@@ -1759,6 +1847,7 @@ const FieldDefinition *VdcHost::getFieldDef(size_t aIndex)
     { "persistentChannels", SQLITE_INTEGER },
     { "latitude", SQLITE_FLOAT },
     { "longitude", SQLITE_FLOAT },
+    { "heightabovesea", SQLITE_FLOAT },
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1788,8 +1877,9 @@ void VdcHost::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   aIndex++;
   // the persistentchannels flag
   aRow->getIfNotNull(aIndex++, persistentChannels);
-  aRow->getIfNotNull(aIndex++, latitude);
-  aRow->getIfNotNull(aIndex++, longitude);
+  aRow->getIfNotNull(aIndex++, geolocation.latitude);
+  aRow->getIfNotNull(aIndex++, geolocation.longitude);
+  aRow->getIfNotNull(aIndex++, geolocation.heightAboveSea);
 }
 
 
@@ -1806,8 +1896,9 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
     aStatement.bind(aIndex++, dSUID.getString().c_str(), false); // not static, string is local obj
   }
   aStatement.bind(aIndex++, persistentChannels);
-  aStatement.bind(aIndex++, latitude);
-  aStatement.bind(aIndex++, longitude);
+  aStatement.bind(aIndex++, geolocation.latitude);
+  aStatement.bind(aIndex++, geolocation.longitude);
+  aStatement.bind(aIndex++, geolocation.heightAboveSea);
 }
 
 

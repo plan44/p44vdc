@@ -419,10 +419,6 @@ Tristate AudioBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_outmodegeneric:
       // wants generic output mode
       return yes;
-    case modelFeature_identification:
-      // TODO: implement identifyToUser() some way...
-      return no; // ...until then: no identify
-      //return yes; // once identifyToUser() is implemented
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
@@ -434,7 +430,7 @@ Tristate AudioBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 // MARK: - behaviour interaction with digitalSTROM system
 
 
-#define AUTO_OFF_FADE_TIME (60*Second)
+#define AUTO_OFF_FADE_TIME (1800*Second)
 #define AUTO_OFF_FADE_STEPSIZE 5
 
 // apply scene
@@ -549,7 +545,7 @@ void AudioBehaviour::stopSceneActions()
 void AudioBehaviour::identifyToUser()
 {
   // blink effect?
-  // TODO: %%% implement it
+  // TODO: %%% implement it, and change canIdentifyToUser() result when done
 }
 
 

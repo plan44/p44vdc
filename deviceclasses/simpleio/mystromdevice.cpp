@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -234,7 +234,7 @@ void MyStromDevice::channelValuesSent(SimpleCB aDoneCB, string aResponse, ErrorP
     sampleState();
   }
   else {
-    FOCUSLOG("myStrom API error: %s", aError->description().c_str());
+    FOCUSLOG("myStrom API error: %s", aError->text());
   }
   // confirm done
   if (aDoneCB) aDoneCB();

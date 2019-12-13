@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -22,6 +22,7 @@
 #ifndef __p44vdc__propertycontainer__
 #define __p44vdc__propertycontainer__
 
+#include "p44vdc_common.hpp"
 #include "vdcapi.hpp"
 
 using namespace std;
@@ -33,7 +34,8 @@ namespace p44 {
   struct PropertyDescriptor;
 
 
-  #define OKEY(x) ((intptr_t)&x) ///< macro to define unique object keys by using address of a variable
+  #define OKEY(x) ((intptr_t)&x) ///< macro to define class unique object keys by using address of a variable
+  #define INSTANCE_OKEY(o) ((intptr_t)o) ///< macro to define instance unique object keys by using address of an object instance
 
   #define PROPINDEX_NONE -1 ///< special value to signal "no next descriptor" for getDescriptorByName
 
@@ -179,7 +181,7 @@ namespace p44 {
     virtual bool isDeletable() const P44_OVERRIDE { return deletable; };
     virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return aMode==access_read ? needsReadPrep : needsWritePrep; };
     virtual bool wasCreatedNew() const P44_OVERRIDE { return createdNew; };
-};
+  };
 
 
 
@@ -229,6 +231,7 @@ namespace p44 {
 
     /// @}
 
+    #if ENABLE_SETTINGS_FROM_FILES
     /// read properties from CSV formatted text
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
     /// @param aOnlyExplicitlyOverridden if set, only properties prefixed with an exclamation mark are applied
@@ -237,6 +240,7 @@ namespace p44 {
     /// @param aLineNo line number within the text source, for logging error messages
     /// @return true if some settings were applied
     bool readPropsFromCSV(int aDomain, bool aOnlyExplicitlyOverridden, const char *&aCSVCursor, const char *aTextSourceName, int aLineNo);
+    #endif // ENABLE_SETTINGS_FROM_FILES
 
   protected:
 

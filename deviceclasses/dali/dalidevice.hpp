@@ -74,6 +74,7 @@ namespace p44 {
     bool dt8CT; // supports DT 8 color temperature features
     uint8_t dt8PrimaryColors; // if>0, how many primary color channels are supported
     uint8_t dt8RGBWAFchannels; // if>0, how many RGBWAF channels are supported
+    bool dt8autoactivation; // if set, changing DAPC (brightness) auto-activates colors set in TEMPROARY color registers
 
     /// cached status (call updateStatus() to update these)
     bool isDummy; ///< set if dummy (not found on bus, but known to be part of a composite device)
@@ -160,7 +161,8 @@ namespace p44 {
 
     /// set new brightness
     /// @param aBrightness new brightness to set
-    void setBrightness(Brightness aBrightness);
+    /// @return true if brightness has changed
+    bool setBrightness(Brightness aBrightness);
 
     /// set new color parameters as CIE x/y or CT
     /// @param aMode new color mode
@@ -223,6 +225,7 @@ namespace p44 {
     void probeDeviceTypeResponse(StatusCB aCompletedCB, uint8_t aNextDT, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
     void queryDTFeatures(StatusCB aCompletedCB);
     void dt8FeaturesResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    void dt8GearStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
 
     void queryGroup0to7Response(DaliGroupsCB aDaliGroupsCB, DaliAddress aShortAddress, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
     void queryGroup8to15Response(DaliGroupsCB aDaliGroupsCB, DaliAddress aShortAddress, uint16_t aGroupBitMask, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);

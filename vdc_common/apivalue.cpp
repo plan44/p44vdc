@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -331,6 +331,17 @@ ApiValuePtr ApiValue::newNull()
   return newValue(apivalue_null);
 }
 
+
+#if ENABLE_EXPRESSIONS
+
+ApiValuePtr ApiValue::newExpressionValue(ExpressionValue& aValue)
+{
+  if (aValue.isNull()) return newNull();
+  else if (aValue.isString()) return newString(aValue.stringValue());
+  else return newDouble(aValue.numValue());
+}
+
+#endif
 
 
 

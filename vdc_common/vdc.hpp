@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -83,6 +83,13 @@ namespace p44 {
     ntfy_generic, ///< generic notification, not optimized/optimizable
     numNotificationTypes
   } NotificationType;
+
+
+  enum {
+    vdcflag_flagsinitialized = 0x00000001, ///< if set, the flags saved in the DB are initialized (and not the default 0 coming from the ages before 10/2019 where vdcflags were unused)
+    vdcflag_hidewhenempty = 0x00000002 ///< if set, vdc will not be announced towards dS as long as it has no devices
+  };
+  typedef uint32_t VdcFlags;
 
 
   /// container for tracking notification delivery and optimisation
@@ -200,7 +207,7 @@ namespace p44 {
     MLTicket pairTicket; ///< used for pairing
 
     /// Settings
-    int vdcFlags; ///< generic vdc flag word
+    VdcFlags vdcFlags; ///< generic vdc flag word
     DsZoneID defaultZoneID; ///< default dS zone ID
 
     /// periodic rescan, collecting
@@ -225,6 +232,8 @@ namespace p44 {
     OptimizerMode optimizerMode; ///< the optimizer mode
     int minDevicesForOptimizing; ///< how many devices are needed for optimized scenes/dimming
     int minCallsBeforeOptimizing; ///< how many calls before optimizer tries creating scene/group
+    int maxOptimizerScenes; ///< how many native scenes might be used for the optimizer (actual HW limit might be different)
+    int maxOptimizerGroups; ///< how many native groups might be used for the optimizer (actual HW limit might be different)
 
   public:
 
@@ -241,10 +250,12 @@ namespace p44 {
     /// add this vDC to vDC host.
     void addVdcToVdcHost();
 
-		/// initialize
+		/// initialize vdc.
 		/// @param aCompletedCB will be called when initialisation is complete
 		///   callback will return an error if initialisation has failed and the vDC is not functional
 		/// @param aFactoryReset if set, also perform factory reset for data persisted for this vDC
+    /// @note this is called after persistent settings have been loaded
+    /// @note this is called before collection of devices, and before any interaction with dS system starts
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset);
 		
     /// @name persistence
@@ -266,42 +277,17 @@ namespace p44 {
     /// @}
 		
 		
-    /// @name identification
+    /// @name identification to user
     /// @{
 
-    /// deviceclass identifier
-		/// @return constant identifier for this container class (no spaces, filename-safe)
-    virtual const char *vdcClassIdentifier() const = 0;
-		
-    /// Instance number (to differentiate multiple vDC containers of the same class)
-		/// @return instance index number
-		int getInstanceNumber() const;
+    /// identify the device to the user
+    /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
+    ///   this can be anything.
+    /// @note device delegates this to the output behaviour (if any)
+    virtual void identifyToUser() P44_OVERRIDE;
 
-    /// get a sufficiently unique identifier for this class container
-    /// @return ID that identifies this container running on a specific hardware
-    ///   the ID should not be dependent on the software version
-    ///   the ID must differ for each of multiple vDC containers run on the same hardware
-    ///   the ID MUST change when same software runs on different hardware
-    /// @note Current implementation derives this from the devicecontainer's dSUID,
-    ///   the deviceClassIdentitfier and the instance number in the form "class:instanceIndex@devicecontainerDsUid"
-    string vdcInstanceIdentifier() const;
-
-    /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
-    /// devices.
-    /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() { return false; }
-
-    /// some vdcs can have definitions of parameters, states, and properties changing depending on the device information
-    /// @return if true, this vDC should be queried for all actions parameters, states and properties descriptions
-    virtual bool dynamicDefinitions() { return false; } // by default dynamic definitions are not used
-
-    /// get user assigned name of the vDC container, or if there is none, a synthesized default name
-    /// @return name string
-    virtual string getName() P44_OVERRIDE;
-
-    /// set user assignable name
-    /// @param aName name of the addressable entity
-    virtual void setName(const string &aName) P44_OVERRIDE;
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
 
     /// @}
 
@@ -351,7 +337,7 @@ namespace p44 {
 
     /// handle global events
     /// @param aEvent the event to handle
-    virtual void handleGlobalEvent(VdchostEvent aEvent) { /* NOP in base class */ };
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
 
     /// set vdc-global error
     /// @param aVdcError if NotOK, vdc cannot collect devices any more (or at all)
@@ -433,14 +419,45 @@ namespace p44 {
     /// forget any parameters stored in persistent DB
     ErrorPtr forget();
 
+    #if ENABLE_SETTINGS_FROM_FILES
     // load additional settings from files
     void loadSettingsFromFiles();
+    #endif
 
 		/// @}
 
 
     /// @name identification of the addressable entity
     /// @{
+
+    /// deviceclass identifier
+    /// @return constant identifier for this container class (no spaces, filename-safe)
+    virtual const char *vdcClassIdentifier() const = 0;
+
+    /// Instance number (to differentiate multiple vDC containers of the same class)
+    /// @return instance index number
+    int getInstanceNumber() const;
+
+    /// get a sufficiently unique identifier for this class container
+    /// @return ID that identifies this container running on a specific hardware
+    ///   the ID should not be dependent on the software version
+    ///   the ID must differ for each of multiple vDC containers run on the same hardware
+    ///   the ID MUST change when same software runs on different hardware
+    /// @note Current implementation derives this from the devicecontainer's dSUID,
+    ///   the deviceClassIdentitfier and the instance number in the form "class:instanceIndex@devicecontainerDsUid"
+    string vdcInstanceIdentifier() const;
+
+    /// some vdcs can have definitions of parameters, states, and properties changing depending on the device information
+    /// @return if true, this vDC should be queried for all actions parameters, states and properties descriptions
+    virtual bool dynamicDefinitions() { return false; } // by default dynamic definitions are not used
+
+    /// get user assigned name of the vDC container, or if there is none, a synthesized default name
+    /// @return name string
+    virtual string getName() P44_OVERRIDE;
+
+    /// set user assignable name
+    /// @param aName name of the addressable entity
+    virtual void setName(const string &aName) P44_OVERRIDE;
 
     /// @return human readable, language independent model name/short description
     /// @note base class will construct this from global product name and vdcModelSuffix()
@@ -490,7 +507,7 @@ namespace p44 {
 
     /// @}
 
-    /// @name Implementation methods for native scene and grouped dimming support
+    /// @name Implementation methods for vdc wide operations such as native scene and grouped dimming support
     /// @{
 
     /// this is called to check if optimizer should be used for a particular set of devices
@@ -536,8 +553,9 @@ namespace p44 {
     virtual void cancelNativeActionUpdate() {};
 
     /// free native action
+    /// @param aStatusCB must be called to return status.
     /// @param aNativeActionId a ID of a native action that should be removed
-    virtual ErrorPtr freeNativeAction(const string aNativeActionId) { return ErrorPtr(); /* NOP in base class */ };
+    virtual void freeNativeAction(StatusCB aStatusCB, const string aNativeActionId) { if (aStatusCB) aStatusCB(ErrorPtr()); /* just ok in base class */ };
 
 
     /// @}
@@ -572,6 +590,9 @@ namespace p44 {
     virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+    bool getVdcFlag(VdcFlags aFlagMask) { return (vdcFlags & aFlagMask)!=0; }
+    void setVdcFlag(VdcFlags aFlagMask, bool aNewValue) { setPVar(vdcFlags, (vdcFlags & ~aFlagMask) | (aNewValue ? aFlagMask : 0)); }
 
     // derive dSUID
     void deriveDsUid();
@@ -622,6 +643,7 @@ namespace p44 {
 
     void prepareNextNotification(NotificationDeliveryStatePtr aDeliveryState);
     void notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, NotificationType aNotificationToApply);
+    void preparedOperationExecuted(DevicePtr aDevice);
     void executePreparedNotification(NotificationDeliveryStatePtr aDeliveryState);
     void preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void repeatPreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState);
@@ -630,9 +652,12 @@ namespace p44 {
     void finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, bool aChanged, ErrorPtr aError);
+    void removedNativeAction(OptimizerEntryPtr aFromEntry, OptimizerEntryPtr aForEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError);
     void notificationDeliveryComplete(NotificationDeliveryState &aDeliveryStateBeingDeleted);
     void queueDelivery(NotificationDeliveryStatePtr aDeliveryState);
+    void optimizerCacheStats(OptimizerEntryPtr aCurrentEntry = OptimizerEntryPtr());
     void clearOptimizerCache();
+    void clearedNativeAction(StatusCB aStatus);
     ErrorPtr loadOptimizerCache();
     ErrorPtr saveOptimizerCache();
 

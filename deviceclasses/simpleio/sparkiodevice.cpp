@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -347,7 +347,7 @@ void SparkIoDevice::channelValuesSent(SparkLightBehaviourPtr aSparkLightBehaviou
     aSparkLightBehaviour->appliedColorValues();
   }
   else {
-    LOG(LOG_DEBUG, "Spark API error: %s", aError->description().c_str());
+    LOG(LOG_DEBUG, "Spark API error: %s", aError->text());
   }
   // confirm done
   if (aDoneCB) aDoneCB();

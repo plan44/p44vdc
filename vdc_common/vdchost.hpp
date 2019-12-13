@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -30,6 +30,7 @@
 #include "dsaddressable.hpp"
 #include "valuesource.hpp"
 #include "digitalio.hpp"
+#include "timeutils.hpp"
 
 #include "vdcapi.hpp"
 
@@ -57,17 +58,6 @@ namespace p44 {
   typedef boost::function<void (DevicePtr aDevice, bool aRegular)> DeviceUserActionCB;
 
   /// Callback for other global device activity
-  typedef enum {
-    vdchost_activitysignal, ///< user-relevant activity, can be used to trigger flashing an activity LED.
-    vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
-    vdchost_network_reconnected, ///< network connection established again
-    vdchost_network_lost, ///< network connection was lost
-    vdchost_vdcapi_connected, ///< the VDC API is connected (to a vdsm using it)
-    vdchost_vdcapi_disconnected, ///< the VDC API was disconnected
-    vdchost_vdcs_initialized, ///< all vdcs are initialized now
-    vdchost_devices_collected, ///< initial device collection run is complete
-    vdchost_devices_initialized, ///< initial device initialisation run is complete
-  } VdchostEvent;
   typedef boost::function<void (VdchostEvent aActivity)> VdchostEventCB;
 
   /// Rescan modes
@@ -158,6 +148,8 @@ namespace p44 {
     MLMicroSeconds lastActivity;
     MLMicroSeconds lastPeriodicRun;
 
+    MLMicroSeconds timeOfDayDiff; ///< current difference of monotonic ML time and a pseudo local time to detect changes (TZ changes, NTP updates)
+
     int8_t localDimDirection;
 
     // learning
@@ -205,8 +197,7 @@ namespace p44 {
     #endif
 
     /// geolocation of the installation
-    double longitude;
-    double latitude;
+    GeoLocation geolocation;
 
     /// the list of containers by API-exposed ID (dSUID or derived dsid)
     VdcMap vdcs;
@@ -339,13 +330,13 @@ namespace p44 {
     /// @param aAudience the audience
     /// @param aDsuid the dSUID to be added
     /// @return error in case dSUID is not address valid notification target
-    ErrorPtr addToAudienceByDsuid(NotificationAudience &aAudience, DsUid &aDsuid);
+    ErrorPtr addToAudienceByDsuid(NotificationAudience &aAudience, const DsUid &aDsuid);
 
     /// Add a notification target by x-p44-itemSpec to a notification audience
     /// @param aAudience the audience
     /// @param aItemSpec alternative item specification, in case there is no dSUID
     /// @return error in case aItemSpec does not address valid notification target
-    ErrorPtr addToAudienceByItemSpec(NotificationAudience &aAudience, string &aItemSpec);
+    ErrorPtr addToAudienceByItemSpec(NotificationAudience &aAudience, const string &aItemSpec);
 
     /// Add notification targets selected by matching zone and group
     /// @param aAudience the audience
@@ -448,7 +439,7 @@ namespace p44 {
     /// @{
 
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @}
 
@@ -465,6 +456,11 @@ namespace p44 {
 
     /// @name methods for DeviceClassContainers
     /// @{
+
+    /// get a device by name or dSUID string
+    /// @param aName the name or dSUID
+    /// @return device or NULL
+    DevicePtr getDeviceByNameOrDsUid(const string &aName);
 
     /// called by vDC containers to report learn event
     /// @param aLearnIn true if new device learned in, false if device learned out
@@ -553,11 +549,15 @@ namespace p44 {
     /// forget any parameters stored in persistent DB
     ErrorPtr forget();
 
+    #if ENABLE_SETTINGS_FROM_FILES
     // load additional settings from file
     void loadSettingsFromFiles();
+    #endif
 
     /// @}
 
+    // post a vdchost (global) event to all vdcs and via event monitor callback
+    void postEvent(VdchostEvent aEvent);
 
   protected:
 
@@ -606,6 +606,12 @@ namespace p44 {
     // activity monitor
     void signalActivity();
 
+    /// identify the vdchost to the user
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// @return true if the vdchost has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
+
   private:
 
     // derive dSUID
@@ -646,11 +652,9 @@ namespace p44 {
     void announceNext();
     void announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequestPtr aRequest, ErrorPtr &aError, ApiValuePtr aResultOrErrorData);
 
-    // post a vdchost (global) event to all vdcs and via event monitor callback
-    void postEvent(VdchostEvent aEvent);
-
     // periodic task
     void periodicTask(MLMicroSeconds aNow);
+    void checkTimeOfDayChange();
 
     // getting MAC
     void getMyMac(StatusCB aCompletedCB, bool aFactoryReset);

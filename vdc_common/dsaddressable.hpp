@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -45,6 +45,26 @@ namespace p44 {
   #define VDC_CFG_DOMAIN 0x1000
 
   class VdcHost;
+
+  /// global events that DsAddressables might receive
+  typedef enum {
+    // events not passed to vdcs and devices, remains on vdchost level
+    vdchost_activitysignal, ///< user-relevant activity, can be used to trigger flashing an activity LED.
+    // events passed to all vdcs and devices
+    vdchost_redistributed_events, ///< events >= this will be distributed to all vdcs and devices (and should not be too frequent for this reason)
+    vdchost_identify = vdchost_redistributed_events, ///< vdchost is requested to identify itself (e.g. by light or sound)
+    vdchost_logstats, ///< demands logging statistics to the log (should be >=LOG_NOTICE)
+    vdchost_descriptionchanged, ///< user-visible description of the device (such as vdchost name) has changed.
+    vdchost_network_reconnected, ///< network connection established again
+    vdchost_network_lost, ///< network connection was lost
+    vdchost_timeofday_changed, ///< real time of day has changed (TZ change, NTP update after reboot)
+    vdchost_vdcapi_connected, ///< the VDC API is connected (to a vdsm using it)
+    vdchost_vdcapi_disconnected, ///< the VDC API was disconnected
+    vdchost_vdcs_initialized, ///< all vdcs are initialized now
+    vdchost_devices_collected, ///< initial device collection run is complete
+    vdchost_devices_initialized, ///< initial device initialisation run is complete
+  } VdchostEvent;
+
 
   /// base class representing a entity which is addressable with a dSUID
   /// dS devices are most obvious addressables, but vDCs and the vDC host itself is also addressable and uses this base class
@@ -116,6 +136,10 @@ namespace p44 {
     /// @note only addressables that have been announced on the vDC API will send a vanish message
     void reportVanished();
 
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) { /* NOP in base class */ };
+
     /// @name vDC API
     /// @{
 
@@ -168,9 +192,11 @@ namespace p44 {
     /// @param aApiConnection this is the API connection from which the notification originates
     /// @param aNotification the notification
     /// @param aParams the parameters object
+    /// @return true if aNotification is known. Does not say anything about success or failure of the actions
+    ///    it might trigger in the recipient
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this DsAddressable.
-    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
+    virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
 
     /// send a DsAddressable method or notification to vdSM
     /// @param aMethod the method or notification
@@ -363,13 +389,23 @@ namespace p44 {
 
     /// @}
 
+    /// identify the addressable to the user in some way
+    /// @note for lights, this would be blinking, for sound devices a beep, for moving devices (blinds) a short movement
+    /// @note this base class just prints a log message
+    virtual void identifyToUser();
 
+    /// check if identifyToUser() has an actual implementation
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() { return false; } // not by default
+
+    #if ENABLE_SETTINGS_FROM_FILES
     /// load settings from CSV file
     /// @param aCSVFilepath full file path to a CSV file to read. If file does not exist, the function does nothing. If
     ///   an error occurs loading the file, the error is logged
     /// @param aOnlyExplicitlyOverridden if set, only properties are applied which are explicitly marked with a exclamation mark prefix
     /// @return true if some settings were applied
     bool loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExplicitlyOverridden);
+    #endif
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);

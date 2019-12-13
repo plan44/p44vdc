@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -129,7 +129,7 @@ void EnoceanVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 	string databaseName = getPersistentDataDir();
 	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), ENOCEAN_SCHEMA_VERSION, ENOCEAN_SCHEMA_MIN_VERSION, aFactoryReset);
-  if (!Error::isOK(error)) {
+  if (Error::notOK(error)) {
     // failed DB, no point in starting communication
     aCompletedCB(error); // return status of DB init
   }
@@ -619,7 +619,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
 {
   EnoceanAddress sender = aEsp3PacketPtr->radioSender();
   if (aError) {
-    LOG(LOG_INFO, "Radio packet error: %s", aError->description().c_str());
+    LOG(LOG_INFO, "Radio packet error: %s", aError->text());
     return;
   }
   // suppress radio packets send by one of my secondary IDs
@@ -702,8 +702,8 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     aEsp3PacketPtr = unpackedMsg;
     rorg = unpackedMsg->eepRorg();
     LOG(LOG_DEBUG, "Unpacked secure radio packet resulting:\n%s", aEsp3PacketPtr->description().c_str());
-    // possibly save the security context (but do not *yet* save security info if this is a teach in/out packet!)
-    if (!aEsp3PacketPtr->radioHasTeachInfo()) {
+    // possibly save the security context (but do not *yet* save security info if this is a explicit (=not RPS) teach in/out packet!)
+    if (!aEsp3PacketPtr->radioHasTeachInfo() || aEsp3PacketPtr->eepRorg()==rorg_RPS) {
       saveSecurityInfo(sec, sender, true, true);
     }
   }
@@ -768,7 +768,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
 void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)
 {
   if (aError) {
-    LOG(LOG_INFO, "Event packet error: %s", aError->description().c_str());
+    LOG(LOG_INFO, "Event packet error: %s", aError->text());
     return;
   }
   uint8_t *dataP = aEsp3PacketPtr->data();

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2016-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -23,6 +23,8 @@
 #define __p44vdc__valuesource__
 
 #include "p44vdc_common.hpp"
+#include "vdcapi.hpp"
+#include "expressions.hpp"
 
 using namespace std;
 
@@ -54,7 +56,11 @@ namespace p44 {
     ValueSource();
 
     /// destructor
-    ~ValueSource();
+    virtual ~ValueSource();
+
+    /// return true only if enabled for being used
+    /// @return true if enabled for use (e.g. non-app buttons are not enabled)
+    virtual bool isEnabled() { return true; /* enabled by default */ };
 
     /// get id - unique at least in the vdhost's scope
     /// @return id string, not containing = or : characters
@@ -85,8 +91,6 @@ namespace p44 {
     /// @param aListener unique identification of the listener (usually its memory address)
     void removeSourceListener(void *aListener);
 
-
-
   protected:
 
     /// notify all listeners
@@ -94,6 +98,54 @@ namespace p44 {
 
   };
 
+
+
+  class ValueSourceMapper
+  {
+
+    typedef map<string, ValueSource *, lessStrucmp> ValueSourcesMap;
+    ValueSourcesMap valueMap;
+
+  public:
+
+    ValueSourceMapper();
+    virtual ~ValueSourceMapper();
+
+    /// forget current value mappings, unsubscribe from all value observations
+    void forgetMappings();
+
+    /// parse mapping definition string
+    /// @param aMappingDefs string associating simple alias names with valuedefs IDs
+    ///    Syntax is: <valuealias>:<valuesourceid> [, <valuealias>:valuesourceid> ...]
+    /// @param aValueCallback will be called when any of the mapped values changes or is deleted
+    /// @param aMigratedValueDefsP if not NULL, this string will be set empty if no migration is needed,
+    ///    and contain the migrated valuedefs otherwise
+    /// @note will cause current mappings to get overwritten (forgetMapping is called implicitly)
+    /// @result returns true if all definitions could be mapped, false otherwise
+    bool parseMappingDefs(const string &aValueDefs, ValueListenerCB aCallback, string *aMigratedValueDefsP = NULL);
+
+    /// find value source by alias
+    /// @param aAlias alias name
+    /// @return NULL if not found, (temporary!) pointer to value source otherwise
+    /// @note ValueSource pointer returned is not refcounted, valuesource object might
+    ///   get deleted when control is passed to mainloop
+    ValueSource* valueSourceByAlias(const string aAlias);
+
+    /// get value (or meta information such as .age, .oplevel and .valid subfields) of mapped value source
+    /// @param aValue will be set to the variable's value or error if aVarSpec identifies a known variable
+    /// @param aVarSpec variable specification
+    /// @return true if aValue was set, false if further sources for the variable should be searched (if any)
+    bool valueLookup(ExpressionValue &aValue, const string aVarSpec);
+
+    /// get info about all mapped sources (everything needed for editing mappingdefs)
+    /// @param the api object to add info for mappings to
+    /// @return true if information could be added
+    bool getMappedSourcesInfo(ApiValuePtr aInfoObject);
+
+
+
+
+  };
 
 
 

@@ -156,8 +156,9 @@ namespace p44 {
     virtual void updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
 
     /// free native action
+    /// @param aStatusCB must be called to return status.
     /// @param aNativeActionId a ID of a native action that should be removed
-    virtual ErrorPtr freeNativeAction(const string aNativeActionId) P44_OVERRIDE;
+    virtual void freeNativeAction(StatusCB aStatusCB, const string aNativeActionId) P44_OVERRIDE;
 
     /// @}
 

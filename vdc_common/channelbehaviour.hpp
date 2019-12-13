@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -24,7 +24,11 @@
 
 #include "device.hpp"
 #include "dsbehaviour.hpp"
+#if REDUCED_FOOTPRINT
 #include "valueunits.hpp"
+#else
+#include "valuedescriptor.hpp"
+#endif
 
 using namespace std;
 
@@ -53,6 +57,9 @@ namespace p44 {
   protected:
 
     OutputBehaviour &output;
+    #if !REDUCED_FOOTPRINT
+    EnumListPtr enumList;
+    #endif
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
@@ -69,6 +76,7 @@ namespace p44 {
     /// @name internal volatile state
     /// @{
     bool channelUpdatePending; ///< set if cachedOutputValue represents a value to be transmitted to the hardware
+    bool volatileValue; ///< set if value is not a defining part of the output state (not to be persisted, not necessarily valid)
     double cachedChannelValue; ///< the cached channel value
     double previousChannelValue; ///< the previous channel value, can be used for performing transitions
     double transitionProgress; ///< how much the transition has progressed so far (0..1)
@@ -135,8 +143,13 @@ namespace p44 {
 
     /// convenience variant of setChannelValue, which also checks the associated dontCare flag from the scene passed
     /// and only assigns the new value if the dontCare flags is NOT set.
+    /// @param aScene the scene to check for dontCare flags
+    /// @param aNewValue the new output value
+    /// @param aTransitionTimeUp time in microseconds to be spent on transition from current to higher channel value
+    /// @param aTransitionTimeDown time in microseconds to be spent on transition from current to lower channel value
     /// @param aAlwaysApply if set, new value will be applied to hardware even if not different from currently known value
-    void setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply);
+    /// @return true if channel value was actually set (aScene does not have the channel's dontCare flag set)
+    bool setChannelValueIfNotDontCare(DsScenePtr aScene, double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply);
 
     /// dim channel value up or down, preventing going below getMinDim().
     /// @param aIncrement how much to increment/decrement the value
@@ -201,6 +214,18 @@ namespace p44 {
     /// @param aAnyWay if true, lastSent state will be set even if channel was not in needsApplying() state
     void channelValueApplied(bool aAnyWay = false);
 
+    /// can be called to explicitly set a channel's volatile flag, which means it is not carrying relevant data
+    /// for defining the output state (e.g. CIE x,y channels when light is in HSV mode)
+    /// @param aVolatile true to set volatile, false otherwise
+    void setVolatile(bool aVolatile) { setPVar(volatileValue, aVolatile); }
+
+    /// add an enumeration mapping for the channel value
+    /// @note normally, channels do not have an enumeration description ("values" in channel description), but
+    ///    first call to this method creates one.
+    /// @param aEnumText the text value
+    /// @param aEnumValue the integer value corresponding to the text
+    void addEnum(const char *aEnumText, uint32_t aEnumValue);
+
     /// @}
 
 
@@ -260,6 +285,9 @@ namespace p44 {
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    #if !REDUCED_FOOTPRINT
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+    #endif
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE P44_FINAL;
 
@@ -372,13 +400,46 @@ namespace p44 {
     typedef IndexChannel inherited;
 
   public:
-    PowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState") { setNumIndices(numDsPowerStates); }; ///< see DsPowerState enum
+    PowerStateChannel(OutputBehaviour &aOutput) : inherited(aOutput, "powerState")
+    {
+      setNumIndices(numDsPowerStates); ///< see DsPowerState enum
+      addEnum("off", powerState_off);
+      addEnum("on", powerState_on);
+      addEnum("forcedOff", powerState_forcedOff);
+      addEnum("standby", powerState_standby);
+    };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_power_state; }; ///< the dS channel type
     virtual const char *getName() P44_OVERRIDE { return "power state"; };
 
   };
   typedef boost::intrusive_ptr<PowerStateChannel> PowerStateChannelPtr;
+
+
+  /// Audio volume channel, 0..100%
+  class AudioVolumeChannel : public ChannelBehaviour
+  {
+    typedef ChannelBehaviour inherited;
+    double dimPerMS;
+
+  public:
+    AudioVolumeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "audioVolume")
+    {
+      resolution = 0.1; // arbitrary, 1:1000 seems ok
+      dimPerMS = (getMax()-getMin())/7000; // standard 7 seconds for full scale by default
+    };
+
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_audio_volume; }; ///< the dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "volume"; };
+    virtual double getMin() P44_OVERRIDE { return 0; }; // dS volume goes from 0 to 100%
+    virtual double getMax() P44_OVERRIDE { return 100; };
+    virtual double getDimPerMS() P44_OVERRIDE { return dimPerMS; }; ///< value to step up or down per Millisecond
+
+    virtual void setDimPerMS(double aDimPerMS) { dimPerMS = aDimPerMS; }; ///< set dimming per MS to make actual audio steps and dimming steps align better than with standard step
+
+  };
+  typedef boost::intrusive_ptr<AudioVolumeChannel> AudioVolumeChannelPtr;
 
 
 } // namespace p44

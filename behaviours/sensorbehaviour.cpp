@@ -112,8 +112,8 @@ double WindowEvaluator::evaluate()
   double result = 0;
   double divisor = 0;
   int count = 0;
+  MLMicroSeconds lastTs = Never;
   for (DataPointsList::iterator pos = dataPoints.begin(); pos != dataPoints.end(); ++pos) {
-    MLMicroSeconds lastTs = Never;
     switch (evalType) {
       case eval_max: {
         if (count==0 || pos->value>result) result = pos->value;
@@ -380,6 +380,15 @@ void SensorBehaviour::setSensorNameWithRange(const char *aName)
 }
 
 
+void SensorBehaviour::setFilter(EvaluationType aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime)
+{
+  if (aEvalType==eval_none) {
+    filter.reset(); // remove, standard filter (if any) will be re-installed at next datapoint
+  }
+  else {
+    filter = WindowEvaluatorPtr(new WindowEvaluator(aWindowTime, aDataPointCollTime, aEvalType));
+  }
+}
 
 
 void SensorBehaviour::updateEngineeringValue(long aEngineeringValue, bool aPush, int32_t aContextId, const char *aContextMsg)
@@ -423,11 +432,11 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
     LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", contextId, contextMsg.c_str());
   }
   if (changedValue) {
-    // check for averaging
-    if (profileP && profileP->evalType!=eval_none) {
+    // check for filtering
+    if (filter || (profileP && profileP->evalType!=eval_none)) {
       // process values through filter
       if (!filter) {
-        // need a filter, create it
+        // no filter exists yet, but profile needs a filter, create it now
         filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->collWin, profileP->evalType));
       }
       filter->addValue(aValue, now);
@@ -739,7 +748,7 @@ void SensorBehaviour::prepareLogging()
       }
     }
     // use or create rrd file
-    rrdbfile = Application::sharedApplication()->dataPath(rrdbpath);
+    rrdbfile = Application::sharedApplication()->tempPath(rrdbpath);
     if (rrdbpath.empty() || rrdbfile[rrdbfile.size()-1]=='/') {
       // auto-generate filename
       pathstring_format_append(rrdbfile, "Log_%s.rrd", getSourceId().c_str());

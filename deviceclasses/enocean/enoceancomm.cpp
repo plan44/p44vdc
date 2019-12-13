@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -788,14 +788,17 @@ void Esp3Packet::set4BSdata(uint32_t a4BSdata)
 //    FUNC    |     TYPE      |      MANUFACTURER      | typ res res sta bit
 
 
-void Esp3Packet::set4BSTeachInEEP(EnoceanProfile aEEProfile)
+void Esp3Packet::set4BSTeachInEEP(EnoceanProfile aEEProfile, EnoceanManufacturer aManufacturer)
 {
   if (eepRorg()==rorg_4BS && EEP_RORG(aEEProfile)==rorg_4BS) {
     radioUserData()[0] =
       ((aEEProfile>>6) & 0xFC) | // 6 FUNC bits
       ((aEEProfile>>5) & 0x03); // upper 2 TYPE bits
     radioUserData()[1] =
-      ((aEEProfile<<3) & 0x1F); // lower 5 TYPE bits
+      ((aEEProfile<<3) & 0xF8) | // lower 5 TYPE bits
+      ((aManufacturer>>8) & 0x07); // upper 3 manufacturer bits
+    radioUserData()[2] =
+      (aManufacturer & 0xFF); // lower 8 manufacturer bits
   }
 }
 
@@ -1075,12 +1078,12 @@ const char *EnoceanComm::manufacturerName(EnoceanManufacturer aManufacturerCode)
 #define RLC_WINDOW_SIZE 128 // defined in the "Security of Enocean Networks" spec, pg 27
 
 EnOceanSecurity::EnOceanSecurity() :
-securityLevelFormat(0),
-teachInInfo(0),
-rollingCounter(0),
-lastSavedRLC(0),
-lastSave(Never),
-teachInP(NULL)
+  securityLevelFormat(0),
+  teachInInfo(0),
+  rollingCounter(0),
+  lastSavedRLC(0),
+  lastSave(Never),
+  teachInP(NULL)
 {
   memset(&privateKey, 0, AES128BlockLen);
   memset(&subKey1, 0, AES128BlockLen);
@@ -1409,7 +1412,6 @@ bool EnOceanSecurity::AES128(const AES128Block &aKey, const AES128Block &aData, 
     if (EVP_EncryptUpdate (&ctx, pointer, &outlen, aData, AES128BlockLen)) {
       pointer += outlen;
       if (EVP_EncryptFinal_ex(&ctx, pointer, &outlen)) {
-        pointer += outlen;
         return true;
       }
       else {
@@ -1610,7 +1612,7 @@ void EnoceanComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aE
   // error querying version
   aRetriesLeft--;
   if (aRetriesLeft>=0) {
-    LOG(LOG_WARNING, "EnoceanComm: Initialisation: command failed: %s -> retrying again", aError->description().c_str());
+    LOG(LOG_WARNING, "EnoceanComm: Initialisation: command failed: %s -> retrying again", aError->text());
     // flush the line on the first half of attempts
     if (aRetriesLeft>ENOCEAN_INIT_RETRIES/2) {
       flushLine();
@@ -1742,7 +1744,7 @@ void EnoceanComm::confirmUTE(uint8_t aConfirmCode, Esp3PacketPtr aUTEPacket)
 
 void EnoceanComm::aliveCheckResponse(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     // alive check failed, try to recover EnOcean interface
     LOG(LOG_ERR, "EnoceanComm: alive check of EnOcean module failed -> restarting module");
     // - close the connection
@@ -1883,7 +1885,7 @@ void EnoceanComm::flushLine()
   uint8_t zeroes[42];
   memset(zeroes, 0, sizeof(zeroes));
   serialComm->transmitBytes(sizeof(zeroes), zeroes, err);
-  if (!Error::isOK(err)) {
+  if (Error::notOK(err)) {
     LOG(LOG_ERR, "EnoceanComm: flushLine: error sending flush bytes");
   }
 }
@@ -1902,8 +1904,8 @@ void EnoceanComm::sendPacket(Esp3PacketPtr aPacket)
     // - payload
     serialComm->transmitBytes(aPacket->payloadSize, aPacket->payloadP, err);
   }
-  if (!Error::isOK(err)) {
-    LOG(LOG_ERR, "EnoceanComm: sendPacket: error sending packet over serial: %s", err->description().c_str());
+  if (Error::notOK(err)) {
+    LOG(LOG_ERR, "EnoceanComm: sendPacket: error sending packet over serial: %s", err->text());
   }
   else {
     FOCUSLOG("Sent EnOcean packet:\n%s", aPacket->description().c_str());

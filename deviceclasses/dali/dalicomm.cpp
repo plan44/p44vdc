@@ -363,8 +363,8 @@ void DaliComm::reset(DaliCommandStatusCB aStatusCB)
 void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aResp1, uint8_t aResp2, ErrorPtr aError)
 {
   // repeat resets until we get a correct answer
-  if (!Error::isOK(aError) || aResp1!=RESP_CODE_ACK || aResp2!=ACK_OK) {
-    LOG(LOG_WARNING, "DALI bridge: Incorrect answer (%02X %02X) or error (%s) from reset command -> repeating", aResp1, aResp2, aError ? aError->description().c_str() : "none");
+  if (Error::notOK(aError) || aResp1!=RESP_CODE_ACK || aResp2!=ACK_OK) {
+    LOG(LOG_WARNING, "DALI bridge: Incorrect answer (%02X %02X) or error (%s) from reset command -> repeating", aResp1, aResp2, aError ? aError->text() : "none");
     if (aCount>=MAX_RESET_RETRIES) {
       if (Error::isOK(aError)) aError = Error::err<DaliCommError>(DaliCommError::BadData, "Bridge reset failed");
       if (aStatusCB) aStatusCB(aError, false);
@@ -682,9 +682,9 @@ private:
   // handle scan result
   void handleResponse(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
   {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       numErrors++;
-      LOG(LOG_DEBUG, "- written 0x%02X, got error %s", dtrValue, aError->description().c_str());
+      LOG(LOG_DEBUG, "- written 0x%02X, got error %s", dtrValue, aError->text());
     }
     else {
       if(!aNoOrTimeout) {
@@ -875,7 +875,7 @@ private:
       }
       else {
         unreliableDevicesPtr->push_back(shortAddress);
-        LOG(LOG_ERR, "Detected DALI device at short address %d, but it FAILED R/W TEST: %s -> ignoring", shortAddress, aError->description().c_str());
+        LOG(LOG_ERR, "Detected DALI device at short address %d, but it FAILED R/W TEST: %s -> ignoring", shortAddress, aError->text());
       }
     }
     // check if more short addresses to test
@@ -909,8 +909,8 @@ private:
   {
     // scan done or error, return list to callback
     if (probablyCollision || unconfiguredDevices) {
-      if (!Error::isOK(aError)) {
-        LOG(LOG_WARNING, "Error (%s) in quick scan ignored because we need to do a full scan anyway", aError->description().c_str());
+      if (Error::notOK(aError)) {
+        LOG(LOG_WARNING, "Error (%s) in quick scan ignored because we need to do a full scan anyway", aError->text());
       }
       if (probablyCollision) {
         aError = Error::err<DaliCommError>(DaliCommError::AddressCollisions, "Address collision -> need full bus scan");
@@ -1104,7 +1104,7 @@ private:
     // Anything received but timeout is considered a yes
     bool isYes = DaliComm::isYes(aNoOrTimeout, aResponse, aError, true);
     if (aError) {
-      LOG(LOG_ERR, "compare result error: %s -> aborted scan", aError->description().c_str());
+      LOG(LOG_ERR, "compare result error: %s -> aborted scan", aError->text());
       completed(aError); // other error, abort
       return;
     }
@@ -1329,7 +1329,7 @@ private:
   // handle scan result
   void handleResponse(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError, bool aRetried)
   {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       // error
       if (retries++<DALI_MAX_MEMREAD_RETRIES) {
         // restart reading explicitly at current offset
@@ -1628,7 +1628,7 @@ private:
       b = (*aBank0Data)[i].b;
       if (b!=0xFF) allFF = false;
       if ((*aBank0Data)[i].no) b = 0; // consider missing bytes as zeroes
-      deviceInfo->serialNo = (deviceInfo->serialNo << 8) + (*aBank0Data)[i].b;
+      deviceInfo->serialNo = (deviceInfo->serialNo << 8) + b;
     }
     if (allFF) deviceInfo->serialNo = 0; // all FF means no serial number
     // now some more plausibility checks at the GTIN/serial level

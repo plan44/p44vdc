@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2017-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -27,6 +27,10 @@
 
 #include "expressions.hpp"
 
+#if EXPRESSION_SCRIPT_SUPPORT
+#include "httpcomm.hpp"
+#endif
+
 
 #if ENABLE_LOCALCONTROLLER
 
@@ -47,6 +51,8 @@ namespace p44 {
 
   class SceneIdentifier;
   typedef vector<SceneIdentifier> SceneIdsVector;
+
+  class Trigger;
 
   /// Scene kind flags
   enum {
@@ -86,6 +92,7 @@ namespace p44 {
     DsGroup no;
     GroupKind kind;
     const char *name;
+    uint32_t hexcolor;
   } GroupDescriptor;
 
 
@@ -102,8 +109,12 @@ namespace p44 {
     DsChannelType lastDimChannel; ///< last dimming channel in this zone
     SceneNo lastLightScene; ///< last light scene called
     bool lightOn[5]; ///< set if light is on in this zone and area
+    bool shadesOpen[5]; ///< set if shades are open in this zone and area
 
     ZoneState();
+    bool stateFor(int aGroup, int aArea);
+    void setStateFor(int aGroup, int aArea, bool aState);
+
   };
 
 
@@ -146,9 +157,8 @@ namespace p44 {
     /// @return a vector of SceneIdentifier objects
     SceneIdsVector getZoneScenes(DsGroup aForGroup, SceneKind aRequiredKinds, SceneKind aForbiddenKinds);
 
-    /// get the groups relevant for this zone
-    /// @param aStandardOnly if set, only groups with standard room scenes will be reported for non-global zones
-    DsGroupMask getZoneGroups(bool aStandardOnly);
+    /// get the groups relevant for this zone (i.e those used by outputs in this zone)
+    DsGroupMask getZoneGroups();
 
     /// @return number of devices in this zone
     size_t devicesInZone() const;
@@ -197,8 +207,19 @@ namespace p44 {
     /// get zone by ID
     /// @param aZoneId zone to look up
     /// @param aCreateNewIfNotExisting if true, a zone is created on the fly when none exists for the given ID
-    /// @return zone or NULL if zoneID is not known (and none created)
+    /// @return zone or NULL if aZoneId is not known (and none created)
     ZoneDescriptorPtr getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotExisting = false);
+
+    /// get zone by name
+    /// @param aZoneName a user-assigned zone name to look for
+    /// @return zone or NULL if none with this name is found
+    ZoneDescriptorPtr getZoneByName(const string aZoneName);
+
+    /// get DS zone ID by zone name or literal zone id (number)
+    /// @param aZoneName a user-assigned zone name to look for, or a decimal number directly specifying the DS zoneId
+    /// @return zoneID or -1 if no specific zone could be found
+    int getZoneIdByName(const string aZoneNameOrId);
+
 
   protected:
 
@@ -330,10 +351,23 @@ namespace p44 {
     ErrorPtr save();
 
     /// get scene by identifier
+    /// @param aSceneId scene identifier to look up
+    /// @param aCreateNewIfNotExisting if true, a scene descriptor is created on the fly when none exists for the given ID
+    /// @param aSceneIndexP if not NULL, the scene index within the scene list is returned here
+    /// @return scene or NULL if aSceneId is not known (and none created)
     SceneDescriptorPtr getScene(const SceneIdentifier &aSceneId, bool aCreateNewIfNotExisting = false, size_t *aSceneIndexP = NULL);
 
     /// get scene by name
+    /// @param aSceneName a user-assigned scene name to look for
+    /// @return scene or NULL if none with this name is found
     SceneDescriptorPtr getSceneByName(const string aSceneName);
+
+
+    /// get scene id (dS global scene number, not related to a specific zone) by kind
+    /// @param aSceneSpec name of scene kind like "preset 1", "standby" etc. or dS scene number)
+    /// @return dS scene number or INVALID_SCENE_NO if none is found
+    SceneNo getSceneIdByKind(const string aSceneKindName);
+
 
   protected:
 
@@ -348,18 +382,76 @@ namespace p44 {
   typedef boost::intrusive_ptr<SceneList> SceneListPtr;
 
 
+
+  class TriggerExpressionContext : public TimedEvaluationContext
+  {
+    typedef TimedEvaluationContext inherited;
+    Trigger &trigger;
+
+  public:
+
+    TriggerExpressionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP);
+
+  protected:
+
+    /// lookup variables by name
+    /// @param aName the name of the value/variable to look up
+    /// @param aResult set the value here
+    /// @return true if function executed, false if value is unknown
+    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
+
+  };
+
+
+  class TriggerActionContext : public ScriptExecutionContext
+  {
+    typedef ScriptExecutionContext inherited;
+    Trigger &trigger;
+
+    #if EXPRESSION_SCRIPT_SUPPORT
+    HttpCommPtr httpAction; ///< in case trigger actions uses http functions
+    #endif
+
+  public:
+
+    TriggerActionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP);
+
+    /// abort action
+    virtual bool abort(bool aDoCallBack = true) P44_OVERRIDE;
+
+    /// lookup variables by name
+    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
+
+    /// evaluation of synchronously implemented functions which immediately return a result
+    virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
+
+  protected:
+
+    /// evaluation of asynchronously implemented functions which may yield execution and resume later
+    bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
+    void triggerFuncExecuted(ExpressionValue aEvaluationResult);
+
+  };
+
+
+
   /// trigger
   class Trigger : public PropertyContainer, public PersistentParams
   {
     typedef PropertyContainer inherited;
     typedef PersistentParams inheritedParams;
     friend class TriggerList;
+    friend class TriggerExpressionContext;
+    friend class TriggerActionContext;
 
     int triggerId; ///< the immutable ID of this trigger
     string name;
-    string triggerCondition; ///< expression that must evaluate to true to trigger the action
-    string triggerActions; ///< actions to trigger (scene calls, etc.)
+    string triggerVarDefs; ///< variable to valueSource mappings
+    TriggerExpressionContext triggerCondition; ///< expression that must evaluate to true to trigger the action
+    TriggerActionContext triggerAction; ///< the trigger action script
 
+    ValueSourceMapper valueMapper;
+    MLTicket varParseTicket;
     Tristate conditionMet;
 
   public:
@@ -368,11 +460,19 @@ namespace p44 {
     virtual ~Trigger();
 
     /// check trigger and fire actions when condition transitions from non-met to met
-    /// @return true when trigger has fired
-    bool checkAndFire();
+    /// @param aEvalMode the evaluation mode to use
+    /// @return ok or error in case expression evaluation failed
+    ErrorPtr checkAndFire(EvalMode aEvalMode);
+
+    /// called when vdc host event occurs
+    /// @param aActivity the activity that occurred at the vdc host level
+    void processGlobalEvent(VdchostEvent aActivity);
 
     /// execute the trigger actions
-    ErrorPtr executeActions();
+    bool executeActions(EvaluationResultCB aCallback = NULL);
+
+    /// stop running trigger actions
+    void stopActions();
 
     // API method handlers
     ErrorPtr handleCheckCondition(VdcApiRequestPtr aRequest);
@@ -396,9 +496,12 @@ namespace p44 {
 
   private:
 
-    ExpressionValue calcCondition();
-    ExpressionValue valueLookup(const string aName);
-    ExpressionValue evaluateFunction(const string &aName, const FunctionArgumentVector &aArgs);
+    void parseVarDefs();
+    void reCheckTimed();
+    void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
+    void triggerEvaluationExecuted(ExpressionValue aEvaluationResult);
+    void triggerActionExecuted(ExpressionValue aEvaluationResult);
+    void testTriggerActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
 
   };
   typedef boost::intrusive_ptr<Trigger> TriggerPtr;
@@ -412,20 +515,22 @@ namespace p44 {
 
     MLTicket checkTicket;
 
+
   public:
 
     typedef vector<TriggerPtr> TriggersVector;
 
     TriggersVector triggers;
 
-    /// start checking for triggers
-    void startChecking();
-
-    /// load zones
+    /// load triggers
     ErrorPtr load();
 
-    /// save zones
+    /// save triggers
     ErrorPtr save();
+
+    /// called when vdc host event occurs
+    /// @param aActivity the activity that occurred at the vdc host level
+    void processGlobalEvent(VdchostEvent aActivity);
 
     /// get trigger by id
     /// @param aTriggerId ID of trigger
@@ -433,6 +538,11 @@ namespace p44 {
     /// @param aTriggerIndexP if not NULL, this is assigned the index within the triggers vector
     /// @return trigger or NULL if not found (and none created)
     TriggerPtr getTrigger(int aTriggerId, bool aCreateNewIfNotExisting = false, size_t *aTriggerIndexP = NULL);
+
+    /// get trigger by name
+    /// @param aTriggerName a user-assigned scene name to look for
+    /// @return trigger or NULL if none with this name is found
+    TriggerPtr getTriggerByName(const string aTriggerName);
 
   protected:
 
@@ -442,10 +552,6 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
-
-  private:
-
-    void triggerChecker(MLTimer &aTimer);
 
   };
   typedef boost::intrusive_ptr<TriggerList> TriggerListPtr;
@@ -459,12 +565,16 @@ namespace p44 {
     typedef PropertyContainer inherited;
     friend class ZoneDescriptor;
     friend class Trigger;
+    friend class TriggerList;
+    friend class TriggerActionContext;
 
     VdcHost &vdcHost; ///< local reference to vdc host
 
     ZoneList localZones; ///< the locally used/defined zones
     SceneList localScenes; ///< the locally defined scenes
     TriggerList localTriggers; ///< the locally defined triggers
+
+    bool devicesReady; ///< set when vdchost reports devices initialized
 
   public:
 
@@ -521,13 +631,28 @@ namespace p44 {
     /// get info (name, kind) about a group
     static const GroupDescriptor* groupInfo(DsGroup aGroup);
 
+    /// get info about a group by name
+    static const GroupDescriptor* groupInfoByName(const string aGroupName);
+
+
+    /// filter group mask to only contain standard groups
+    /// @param aGroups bitmask of groups
+    /// @return filtered to contain only standard room scene groups
+    static DsGroupMask standardRoomGroups(DsGroupMask aGroups);
+
     /// localcontroller specific method handling
     bool handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams);
 
     /// call a scene
     /// @param aTransitionTimeOverride if >=0, this will override the called scene's transition time
     void callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride = Infinite);
+    void callScene(SceneNo aSceneNo, NotificationAudience &aAudience, MLMicroSeconds aTransitionTimeOverride = Infinite);
     void callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride = Infinite);
+
+    /// set output channel values
+    /// @param aTransitionTimeOverride if >=0, this will override the outputs standard transition time
+    void setOutputChannelValues(DsZoneID aZone, DsGroup aGroup, string aChannelId, double aValue, MLMicroSeconds aTransitionTimeOverride = Infinite);
+    void setOutputChannelValues(NotificationAudience &aAudience, string aChannelId, double aValue, MLMicroSeconds aTransitionTimeOverride = Infinite);
 
     /// called when delivery of a scene call or dimming notification to a device has been executed
     /// @param aDevice the device

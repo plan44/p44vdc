@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -231,7 +231,11 @@ const FieldDefinition *DsScene::getKeyDef(size_t aIndex)
 
 // data field definitions
 
+#if ENABLE_SCENE_SCRIPT
+static const size_t numFields = 2;
+#else
 static const size_t numFields = 1;
+#endif
 
 size_t DsScene::numFieldDefs()
 {
@@ -243,6 +247,9 @@ const FieldDefinition *DsScene::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numFields] = {
     { "commonFlags", SQLITE_INTEGER }
+    #if ENABLE_SCENE_SCRIPT
+    ,{ "sceneScript", SQLITE_TEXT }
+    #endif
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -273,10 +280,13 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   sceneNo = aRow->get<int>(aIndex++);
   // as the scene is loaded into a object which did not yet have the correct scene number
   // default values must be set again now that the sceneNo is known
-  // Note: this is important to make sure those field which are not stored have the correct scene related value (sceneCmd, sceneArea)
+  // Note: this is important to make sure those fields which are not stored have the correct scene related value (sceneCmd, sceneArea)
   setDefaultSceneValues(sceneNo);
   // then proceed with loading other fields
   globalSceneFlags = aRow->get<int>(aIndex++);
+  #if ENABLE_SCENE_SCRIPT
+  sceneScript.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  #endif
 }
 
 
@@ -286,6 +296,9 @@ void DsScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   // bind the fields
   aStatement.bind(aIndex++, (int)sceneNo);
   aStatement.bind(aIndex++, (int)globalSceneFlags);
+  #if ENABLE_SCENE_SCRIPT
+  aStatement.bind(aIndex++, sceneScript.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  #endif
 }
 
 
@@ -381,6 +394,9 @@ enum {
   channels_key,
   ignoreLocalPriority_key,
   dontCare_key,
+  #if ENABLE_SCENE_SCRIPT
+  sceneScript_key,
+  #endif
   numSceneProperties
 };
 
@@ -401,6 +417,9 @@ PropertyDescriptorPtr DsScene::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "channels", apivalue_object+propflag_container, channels_key, OKEY(dsscene_channels_key) },
     { "ignoreLocalPriority", apivalue_bool, ignoreLocalPriority_key, OKEY(dsscene_key) },
     { "dontCare", apivalue_bool, dontCare_key, OKEY(dsscene_key) },
+    #if ENABLE_SCENE_SCRIPT
+    { "x-p44-sceneScript", apivalue_string, sceneScript_key, OKEY(dsscene_key) },
+    #endif
   };
   int n = inheritedProps::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -431,6 +450,11 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case dontCare_key:
           aPropValue->setBoolValue(isDontCare());
           return true;
+        #if ENABLE_SCENE_SCRIPT
+        case sceneScript_key:
+          aPropValue->setStringValue(sceneScript);
+          return true;
+        #endif
       }
     }
     else {
@@ -442,6 +466,11 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case dontCare_key:
           setDontCare(aPropValue->boolValue());
           return true;
+        #if ENABLE_SCENE_SCRIPT
+        case sceneScript_key:
+          setPVar(sceneScript, aPropValue->stringValue());
+          return true;
+        #endif
       }
     }
   }
@@ -472,7 +501,7 @@ DsScenePtr SceneDeviceSettings::newUndoStateScene()
 {
   DsScenePtr undoStateScene = newDefaultScene(ROOM_ON); // use main on as template
   // to make sure: the "previous" pseudo-screne must always be "invoke" type (restoring output values)
-  undoStateScene->sceneCmd = scene_cmd_invoke;
+  undoStateScene->sceneCmd = scene_cmd_undo;
   undoStateScene->sceneArea = 0; // no area
   return undoStateScene;
 }
@@ -507,9 +536,6 @@ void SceneDeviceSettings::updateScene(DsScenePtr aScene)
   // as we need the ROWID of the settings as parentID, make sure we get saved if we don't have one
   if (rowid==0) markDirty();
 }
-
-
-
 
 
 // MARK: - scene table persistence
@@ -559,8 +585,10 @@ ErrorPtr SceneDeviceSettings::loadChildren()
       scene = newDefaultScene(0);
     }
     delete queryP; queryP = NULL;
+    #if ENABLE_SETTINGS_FROM_FILES
     // Now check for default settings from files
     loadScenesFromFiles();
+    #endif
   }
   return err;
 }
@@ -576,7 +604,7 @@ ErrorPtr SceneDeviceSettings::saveChildren()
     // save all elements of the map (only dirty ones will be actually stored to DB
     for (DsSceneMap::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
       err = pos->second->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed
-      if (!Error::isOK(err)) SALOG(device, LOG_ERR,"Error saving scene %d: %s", pos->second->sceneNo, err->description().c_str());
+      if (Error::notOK(err)) SALOG(device, LOG_ERR,"Error saving scene %d: %s", pos->second->sceneNo, err->text());
     }
   }
   return err;
@@ -596,6 +624,7 @@ ErrorPtr SceneDeviceSettings::deleteChildren()
 
 // MARK: - additional scene defaults from files
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 void SceneDeviceSettings::loadScenesFromFiles()
 {
@@ -682,3 +711,5 @@ void SceneDeviceSettings::loadScenesFromFiles()
     }
   }
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -83,7 +83,7 @@ string DsBehaviour::getDbKey()
 ErrorPtr DsBehaviour::load()
 {
   ErrorPtr err = loadFromStore(getDbKey().c_str());
-  if (!Error::isOK(err)) BLOG(LOG_ERR,"Error loading behaviour %s: %s", shortDesc().c_str(), err->description().c_str());
+  if (Error::notOK(err)) BLOG(LOG_ERR,"Error loading behaviour %s: %s", shortDesc().c_str(), err->text());
   return err;
 }
 
@@ -91,7 +91,7 @@ ErrorPtr DsBehaviour::load()
 ErrorPtr DsBehaviour::save()
 {
   ErrorPtr err = saveToStore(getDbKey().c_str(), false); // only one record per dbkey (=per device+behaviourindex)
-  if (!Error::isOK(err)) BLOG(LOG_ERR,"Error saving behaviour %s: %s", shortDesc().c_str(), err->description().c_str());
+  if (Error::notOK(err)) BLOG(LOG_ERR,"Error saving behaviour %s: %s", shortDesc().c_str(), err->text());
   return err;
 }
 

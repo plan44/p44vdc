@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -127,6 +127,7 @@ namespace p44 {
     bool controlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
     bool querySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
     bool sceneCommands; ///< if set, scene commands are forwarded to the external device
+    bool forwardIdentify; ///< if set, "IDENTIFY" messages will be sent, and device will show the "identification" modelfeature in the vDC API
 
     #if ENABLE_EXTERNAL_EXOTIC
     string configurationId; ///< current configuration's id
@@ -189,6 +190,13 @@ namespace p44 {
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
+    /// identify the external device to the user in some way
+    /// @note for lights, this would be blinking, for sound devices a beep, for moving devices (blinds) a short movement
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// check if identifyToUser() has an actual implementation
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
+
   protected:
 
     /// prepare for calling a scene on the device level
@@ -196,6 +204,9 @@ namespace p44 {
     /// @return true if scene preparation is ok and call can continue. If false, no further action will be taken
     /// @note this is called BEFORE scene values are recalled
     virtual bool prepareSceneCall(DsScenePtr aScene) P44_OVERRIDE;
+
+    /// prepare for applying a scene or scene undo on the device level
+    virtual bool prepareSceneApply(DsScenePtr aScene) P44_OVERRIDE;
 
     /// apply all pending channel value updates to the device's hardware
     /// @param aDoneCB will called when values are actually applied, or hardware reports an error/timeout
@@ -279,6 +290,7 @@ namespace p44 {
     void sendDeviceApiJsonMessage(JsonObjectPtr aMessage);
     void sendDeviceApiSimpleMessage(string aMessage);
     void sendDeviceApiStatusMessage(ErrorPtr aError);
+    void sendDeviceApiFlagMessage(string aFlagWord);
 
     ErrorPtr configureDevice(JsonObjectPtr aInitParams);
     ErrorPtr processJsonMessage(string aMessageType, JsonObjectPtr aMessage);
@@ -328,6 +340,7 @@ namespace p44 {
     void sendDeviceApiJsonMessage(JsonObjectPtr aMessage, const char *aTag = NULL);
     void sendDeviceApiSimpleMessage(string aMessage, const char *aTag = NULL);
     void sendDeviceApiStatusMessage(ErrorPtr aError, const char *aTag = NULL);
+    void sendDeviceApiFlagMessage(string aFlagWord, const char *aTag = NULL);
 
   };
 
@@ -347,7 +360,7 @@ namespace p44 {
     string modelNameString; ///< the string to be returned by modelName()
     string modelVersionString; ///< the string to be returned by vdcModelVersion()
     string configUrl; ///< custom value for configURL if not empty
-    bool alwaysVisible; ///< visible even if no devices contained
+    bool forwardIdentify; ///< if set, "VDCIDENTIFY" messages will be sent, and vdc will show the "identification" capability in the vDC API
 
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
@@ -362,10 +375,6 @@ namespace p44 {
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
     virtual string vdcModelSuffix() const P44_OVERRIDE { return "external"; }
-
-    /// External device container should not be announced when it has no devices
-    /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return !alwaysVisible; };
 
     /// get supported rescan modes for this vDC. This indicates (usually to a web-UI) which
     /// of the flags to collectDevices() make sense for this vDC.
@@ -395,6 +404,13 @@ namespace p44 {
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+    /// identify the vdc to the user in some way
+    /// @note usually, this would be a LED or buzzer in the vdc device (bridge, gateway etc.)
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// check if identifyToUser() has an actual implementation
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
 
     /// @}
 

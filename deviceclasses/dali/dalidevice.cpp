@@ -285,7 +285,7 @@ void DaliBusDevice::probeDeviceType(StatusCB aCompletedCB, uint8_t aNextDT)
 {
   if (aNextDT>10) {
     // all device types checked
-    // done with device type, check groups now
+    // done with device type, check DT features now
     queryDTFeatures(aCompletedCB);
     return;
   }
@@ -337,11 +337,27 @@ void DaliBusDevice::dt8FeaturesResponse(StatusCB aCompletedCB, bool aNoOrTimeout
     dt8PrimaryColors = (aResponse>>2) & 0x07; // bits 2..4 is the number of primary color channels available
     dt8RGBWAFchannels = (aResponse>>5) & 0x07; // bits 5..7 is the number of RGBWAF channels available
     LOG(LOG_INFO, "- DALI DT8 bus device with shortaddr %d: features byte = 0x%02X", deviceInfo->shortAddress, aResponse);
+    daliVdc.daliComm->daliSendQuery(
+      deviceInfo->shortAddress,
+      DALICMD_DT8_QUERY_GEAR_STATUS,
+      boost::bind(&DaliBusDevice::dt8GearStatusResponse, this, aCompletedCB, _1, _2, _3)
+    );
+    return;
   }
-  if (aCompletedCB) aCompletedCB(ErrorPtr());
+  if (aCompletedCB) aCompletedCB(aError);
 }
 
 
+void DaliBusDevice::dt8GearStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+{
+  // extended version type query response.
+  if (Error::isOK(aError) && !aNoOrTimeout) {
+    // DT8 gear status response
+    dt8autoactivation = (aResponse & 0x01)!=0;
+    LOG(LOG_INFO, "- DALI DT8 bus device has auto-activation on DAPC %sABLED", dt8autoactivation ? "EN" : "DIS");
+  }
+  if (aCompletedCB) aCompletedCB(aError);
+}
 
 
 void DaliBusDevice::getGroupMemberShip(DaliGroupsCB aDaliGroupsCB, DaliAddress aShortAddress)
@@ -635,7 +651,7 @@ void DaliBusDevice::queryRGBWAFResponse(StatusCB aCompletedCB, uint16_t aResInde
     }
   }
   else {
-    LOG(LOG_DEBUG, "DaliBusDevice: querying DT8 color value %d returned error: %s", aResIndex, aError->description().c_str());
+    LOG(LOG_DEBUG, "DaliBusDevice: querying DT8 color value %d returned error: %s", aResIndex, aError->text());
   }
   aResIndex++;
   if (aResIndex>=dt8RGBWAFchannels) {
@@ -683,7 +699,7 @@ void DaliBusDevice::queryStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout
     lampFailure = aResponse & 0x02;
   }
   else {
-    if (!Error::isOK(aError)) {
+    if (Error::notOK(aError)) {
       // errors are always bus level: set global error status
       daliVdc.setVdcError(aError);
     }
@@ -718,16 +734,18 @@ void DaliBusDevice::setTransitionTime(MLMicroSeconds aTransitionTime)
 }
 
 
-void DaliBusDevice::setBrightness(Brightness aBrightness)
+bool DaliBusDevice::setBrightness(Brightness aBrightness)
 {
-  if (isDummy) return;
+  if (isDummy) return false;
   dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (currentBrightness!=aBrightness) {
     currentBrightness = aBrightness;
     uint8_t power = brightnessToArcpower(aBrightness);
     LOG(LOG_INFO, "Dali dimmer at shortaddr=%d: setting new brightness = %0.2f, arc power = %d", (int)deviceInfo->shortAddress, aBrightness, (int)power);
     daliVdc.daliComm->daliSendDirectPower(deviceInfo->shortAddress, power);
+    return true; // changed
   }
+  return false; // not changed
 }
 
 
@@ -1123,11 +1141,11 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   LightBehaviourPtr l = getOutput<LightBehaviour>();
   bool withColor = false;
-  if (l && needsToApplyChannels()) {
+  MLMicroSeconds transitionTime = 0;
+  if (l && needsToApplyChannels(&transitionTime)) {
     // abort previous transition
     transitionTicket.cancel();
     // brightness transition time is relevant for the whole transition
-    MLMicroSeconds transitionTime = l->transitionTimeToNewBrightness();
     if (l->brightnessNeedsApplying()) {
       l->brightnessTransitionStep(); // init brightness transition
     }
@@ -1324,7 +1342,7 @@ void DaliSingleControllerDevice::processUpdatedParams(ErrorPtr aError)
     }
   }
   else {
-    LOG(LOG_ERR, "DaliDevice: error getting state/params from dimmer: %s", aError->description().c_str());
+    LOG(LOG_ERR, "DaliDevice: error getting state/params from dimmer: %s", aError->text());
   }
 }
 
@@ -1426,7 +1444,8 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
   if (neednewbrightness || needactivation) {
     // update actual dimmer value
     if (l->brightnessTransitionStep(aStepSize)) moreSteps = true;
-    daliController->setBrightness(l->brightnessForHardware());
+    bool sentDAPC = daliController->setBrightness(l->brightnessForHardware());
+    if (sentDAPC && daliController->dt8autoactivation) needactivation = false; // prevent activating twice!
   }
   // activate color params in case brightness has not changed or device is not in auto-activation mode (we don't set this)
   if (needactivation) {
@@ -1516,8 +1535,7 @@ bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStat
   // check notification-specific conditions
   if (aDeliveryState->optimizedType==ntfy_callscene) {
     // scenes are generally optimizable unless transition time is really slow and must be executed in multiple steps
-    LightBehaviourPtr l = getOutput<LightBehaviour>();
-    if (l) return l->transitionTimeToNewBrightness()<=MAX_SINGLE_STEP_TRANSITION_TIME;
+    return transitionTimeForPreparedScene(true)<=MAX_SINGLE_STEP_TRANSITION_TIME;
   }
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
     // only brightness dimming optimizable for now
@@ -1774,8 +1792,8 @@ void DaliCompositeDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryR
 
 void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryReset, DimmerIndex aDimmerIndex, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "DaliCompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->description().c_str());
+  if (Error::notOK(aError)) {
+    LOG(LOG_ERR, "DaliCompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->text());
   }
   while (aDimmerIndex<numDimmers) {
     DaliBusDevicePtr di = dimmers[aDimmerIndex];

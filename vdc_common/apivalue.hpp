@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -23,6 +23,10 @@
 #define __p44vdc__apivalue__
 
 #include "p44utils_common.hpp"
+
+#if ENABLE_EXPRESSIONS
+#include "expressions.hpp"
+#endif
 
 using namespace std;
 
@@ -162,6 +166,9 @@ namespace p44 {
     ApiValuePtr newObject();
     ApiValuePtr newArray();
     ApiValuePtr newNull();
+    #if ENABLE_EXPRESSIONS
+    ApiValuePtr newExpressionValue(ExpressionValue& aValue);
+    #endif
 
     /// @}
 

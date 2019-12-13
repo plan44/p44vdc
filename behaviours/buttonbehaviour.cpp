@@ -117,6 +117,66 @@ void ButtonBehaviour::updateButtonState(bool aPressed)
 }
 
 
+void ButtonBehaviour::injectClick(DsClickType aClickType)
+{
+  switch (aClickType) {
+    // add clicks and tips to counter (which will expire after t_tip_timeout)
+    case ct_tip_4x:
+      clickCounter++;
+    case ct_tip_3x:
+    case ct_click_3x:
+      clickCounter++;
+    case ct_tip_2x:
+    case ct_click_2x:
+      clickCounter++;
+    case ct_tip_1x:
+    case ct_click_1x:
+      clickCounter++;
+      // report current count as tips
+      state = S4_nextTipWait; // must set a state, although regular state machine is not used, to make sure valueSource reports clicks
+      if (isLocalButtonEnabled() && clickCounter==1) {
+        // first tip switches local output if local button is enabled
+        localSwitchOutput();
+      }
+      else if (clickCounter<=4) {
+        sendClick((DsClickType)(ct_tip_1x+clickCounter-1));
+      }
+      if (clickCounter<4) {
+        // time out after we're sure all tips are accumulated
+        buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::injectedOpComplete, this), t_tip_timeout);
+      }
+      else {
+        // counter overflow, reset right now
+        injectedOpComplete();
+      }
+      break;
+    case ct_hold_start:
+      if (clickType==ct_hold_start) {
+        aClickType = ct_hold_repeat; // already started before -> treat as repeat
+      }
+      state = S8_awaitrelease; // must set a state, although regular state machine is not used, to make sure valueSource reports holds
+      sendClick(aClickType);
+      buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
+      break;
+    case ct_hold_end:
+      if (clickType!=ct_hold_start && clickType!=ct_hold_repeat) break; // suppress hold end when not in hold start
+      sendClick(aClickType);
+      injectedOpComplete();
+      break;
+    default:
+      break;
+
+  }
+}
+
+
+void ButtonBehaviour::injectedOpComplete()
+{
+  resetStateMachine();
+  keyOpComplete();
+}
+
+
 void ButtonBehaviour::resetStateMachine()
 {
   buttonPressed = false;
@@ -128,6 +188,19 @@ void ButtonBehaviour::resetStateMachine()
   buttonStateMachineTicket.cancel();
 }
 
+
+void ButtonBehaviour::holdRepeat()
+{
+  buttonStateMachineTicket.cancel();
+  // button still pressed
+  BFOCUSLOG("dimming in progress - sending ct_hold_repeat (repeatcount = %d)", holdRepeats);
+  sendClick(ct_hold_repeat);
+  holdRepeats++;
+  if (holdRepeats<max_hold_repeats) {
+    // schedule next repeat
+    buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
+  }
+}
 
 
 #if FOCUSLOGGING
@@ -146,7 +219,7 @@ static const char *stateNames[] = {
   "S11_localdim",
   "S12_3clickWait",
   "S13_3pauseWait",
-  "S14_awaitrelease"
+  "S14_awaitrelease_timedout"
 };
 #endif
 
@@ -173,16 +246,22 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
       // - always count button press as a tip
       isTip = true;
       // - state is now Awaitrelease
-      state = S14_awaitrelease;
+      state = S8_awaitrelease;
     }
     else {
       // the button was released right now
       // - if we haven't seen a press before, assume the press got lost and act on the release
       if (state==S0_idle) {
         isTip = true;
+        // as we'll send the click event NOW, but will get no physical release from the button, we must simulate keyOpComplete()
+        buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::keyOpComplete, this), t_tip_timeout);
+        state = S0_idle;
       }
-      // - state is now idle again
-      state = S0_idle;
+      else {
+        // - state is now idle AGAIN after a previous click event
+        state = S0_idle;
+        keyOpComplete();
+      }
     }
     if (isTip) {
       if (isLocalButtonEnabled() && clickCounter==0) {
@@ -213,7 +292,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
           sendClick(ct_hold_start);
           // schedule hold repeats
           holdRepeats = 0;
-          buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::dimRepeat, this), t_dim_repeat_time);
+          buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
         }
         else {
           // button just released
@@ -228,21 +307,6 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
     BLOG(LOG_ERR, "invalid stateMachineMode");
   }
 }
-
-
-void ButtonBehaviour::dimRepeat()
-{
-  buttonStateMachineTicket = 0;
-  // button still pressed
-  BFOCUSLOG("dimming in progress - sending ct_hold_repeat (repeatcount = %d)", holdRepeats);
-  sendClick(ct_hold_repeat);
-  holdRepeats++;
-  if (holdRepeats<max_hold_repeats) {
-    // schedule next repeat
-    buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::dimRepeat, this), t_dim_repeat_time);
-  }
-}
-
 
 
 // standard button state machine
@@ -315,8 +379,9 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
           holdRepeats++;
         }
         else {
+          // early hold end reporting, still waiting for actual release of the button
           sendClick(ct_hold_end);
-          state = S14_awaitrelease;
+          state = S14_awaitrelease_timedout;
         }
       }
       break;
@@ -332,6 +397,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       }
       else if (timeSinceRef>=t_tip_timeout) {
         state = S0_idle;
+        keyOpComplete();
       }
       break;
 
@@ -414,7 +480,14 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S8_awaitrelease:
-    case S14_awaitrelease:
+      // normal wait for
+      if (aStateChanged && !buttonPressed) {
+        state = S0_idle;
+        keyOpComplete();
+      }
+      break;
+    case S14_awaitrelease_timedout:
+      // silently reset the state machine, hold_end was already sent before
       if (aStateChanged && !buttonPressed) {
         state = S0_idle;
       }
@@ -531,10 +604,23 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     );
     // issue a state property push
     pushBehaviourState();
-    // also let device container know for local click handling
+    #if ENABLE_LOCALCONTROLLER
+    // notify listeners
+    notifyListeners(clickType!=ct_hold_repeat ? valueevent_changed : valueevent_confirmed);
+    #endif
+    // also let vdchost know for local click handling
     // TODO: more elegant solution for this
     device.getVdcHost().checkForLocalClickHandling(*this, aClickType);
   }
+}
+
+
+void ButtonBehaviour::keyOpComplete()
+{
+  #if ENABLE_LOCALCONTROLLER
+  // notify listeners
+  notifyListeners(valueevent_changed);
+  #endif
 }
 
 
@@ -558,6 +644,79 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
 }
 
 
+#if ENABLE_LOCALCONTROLLER
+
+// MARK: - value source implementation
+
+
+bool ButtonBehaviour::isEnabled()
+{
+  // only app buttons are available for use in local processing
+  return buttonFunc==buttonFunc_app;
+}
+
+
+string ButtonBehaviour::getSourceId()
+{
+  return string_format("%s_B%s", device.getDsUid().getString().c_str(), getId().c_str());
+}
+
+
+string ButtonBehaviour::getSourceName()
+{
+  // get device name or dSUID for context
+  string n = device.getAssignedName();
+  if (n.empty()) {
+    // use abbreviated dSUID instead
+    string d = device.getDsUid().getString();
+    n = d.substr(0,8) + "..." + d.substr(d.size()-2,2);
+  }
+  // append behaviour description
+  string_format_append(n, ": %s", getHardwareName().c_str());
+  return n;
+}
+
+
+double ButtonBehaviour::getSourceValue()
+{
+  // 0: not pressed
+  // 1..4: number of clicks
+  // >4 : held down
+  if (state==S0_idle) return 0;
+  switch (clickType) {
+    case ct_tip_1x:
+    case ct_click_1x:
+      return 1;
+    case ct_tip_2x:
+    case ct_click_2x:
+      return 2;
+    case ct_tip_3x:
+    case ct_click_3x:
+      return 3;
+    case ct_tip_4x:
+      return 4;
+    case ct_hold_start:
+    case ct_hold_repeat:
+      return 5;
+    case ct_hold_end:
+    default:
+      return 0; // not pressed any more
+  }
+}
+
+
+MLMicroSeconds ButtonBehaviour::getSourceLastUpdate()
+{
+  return lastAction;
+}
+
+
+int ButtonBehaviour::getSourceOpLevel()
+{
+  return device.opStateLevel();
+}
+
+#endif // ENABLE_LOCALCONTROLLER
 
 // MARK: - persistence implementation
 

@@ -279,13 +279,14 @@ DsScenePtr ShadowAwningDeviceSetting::newDefaultScene(SceneNo aSceneNo)
 #define INTER_SHORT_MOVE_DELAY (1*Second)
 
 
-ShadowBehaviour::ShadowBehaviour(Device &aDevice) :
+ShadowBehaviour::ShadowBehaviour(Device &aDevice, DsGroup aGroup) :
   inherited(aDevice),
   // hardware derived parameters
   shadowDeviceKind(shadowdevice_jalousie),
   minMoveTime(200*MilliSecond),
   maxShortMoveTime(0),
   minLongMoveTime(0),
+  absoluteMovement(false),
   stopDelayTime(0),
   hasEndContacts(false),
   // persistent settings (defaults are MixWerk's)
@@ -302,8 +303,8 @@ ShadowBehaviour::ShadowBehaviour(Device &aDevice) :
   referencePosition(100), // assume fully open, at top
   referenceAngle(100) // at top means that angle is open as well
 {
-  // make it member of the light group
-  setGroupMembership(group_grey_shadow, true);
+  // make it member of the specified group (usually: shadow)
+  setGroupMembership(aGroup, true);
   // primary output controls position
   setHardwareName("position");
   // add the channels (every shadow device has an angle so far, but roller/sun blinds dont use it)
@@ -314,13 +315,14 @@ ShadowBehaviour::ShadowBehaviour(Device &aDevice) :
 }
 
 
-void ShadowBehaviour::setDeviceParams(ShadowDeviceKind aShadowDeviceKind, bool aHasEndContacts, MLMicroSeconds aMinMoveTime, MLMicroSeconds aMaxShortMoveTime, MLMicroSeconds aMinLongMoveTime)
+void ShadowBehaviour::setDeviceParams(ShadowDeviceKind aShadowDeviceKind, bool aHasEndContacts, MLMicroSeconds aMinMoveTime, MLMicroSeconds aMaxShortMoveTime, MLMicroSeconds aMinLongMoveTime, bool aAbsoluteMovement)
 {
   shadowDeviceKind = aShadowDeviceKind;
   hasEndContacts = aHasEndContacts;
   minMoveTime = aMinMoveTime;
   maxShortMoveTime = aMaxShortMoveTime;
   minLongMoveTime = aMinLongMoveTime;
+  absoluteMovement = aAbsoluteMovement;
 }
 
 
@@ -336,9 +338,6 @@ Tristate ShadowBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
       return no; // suppress general 8-bit outmode assumption
     case modelFeature_shadeposition:
       // Assumption: Shade outputs should be 16bit resolution and be labelled "Position", not "Value"
-      return yes;
-    case modelFeature_identification:
-      // shades can identify (move a little)
       return yes;
     default:
       // not available at this level, ask base class
@@ -818,6 +817,13 @@ void ShadowBehaviour::saveChannelsToScene(DsScenePtr aScene)
 }
 
 
+bool ShadowBehaviour::reapplyRestoredChannels()
+{
+  // only absolute movement capable devices should be restored.
+  // For relative movement controlled blinds, we can assume power outage does NOT change
+  // the hardware state, and re-applying would more likely mess it up rather than preserve it.
+  return absoluteMovement;
+}
 
 
 void ShadowBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)

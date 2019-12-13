@@ -39,6 +39,8 @@ DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   #endif
   // set default optimisation mode
   optimizerMode = opt_disabled; // FIXME: once we are confident, make opt_auto the default
+  maxOptimizerScenes = 16; // dummy, not really checked as HW limits this
+  maxOptimizerGroups = 16; // dummy, not really checked as HW limits this
 }
 
 
@@ -403,8 +405,8 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
 
 void DaliVdc::initializeNextDimmer(DaliBusDeviceListPtr aDimmerDevices, uint16_t aGroupsInUse, DaliBusDeviceList::iterator aNextDimmer, StatusCB aCompletedCB, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
-    LOG(LOG_ERR, "Error initializing dimmer: %s", aError->description().c_str());
+  if (Error::notOK(aError)) {
+    LOG(LOG_ERR, "Error initializing dimmer: %s", aError->text());
   }
   if (aNextDimmer!=aDimmerDevices->end()) {
     // check next
@@ -499,9 +501,9 @@ void DaliVdc::deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDevice
 {
   bool missingData = aError && aError->isError(DaliCommError::domain(), DaliCommError::MissingData);
   bool badData = aError && aError->isError(DaliCommError::domain(), DaliCommError::BadData);
-  if (!Error::isOK(aError) && !missingData && !badData) {
+  if (Error::notOK(aError) && !missingData && !badData) {
     // real fatal error, can't continue
-    LOG(LOG_ERR, "Error reading device info: %s",aError->description().c_str());
+    LOG(LOG_ERR, "Error reading device info: %s",aError->text());
     return aCompletedCB(aError);
   }
   // no error, or error but due to missing or bad data -> device exists and possibly still has ok device info
@@ -720,7 +722,7 @@ ErrorPtr DaliVdc::daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 
 void DaliVdc::daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     aRequest->sendError(aError);
     return;
   }
@@ -1118,10 +1120,7 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
         if (dev && dev->daliController) {
-          LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
-          if (l) {
-            dev->daliController->setTransitionTime(l->transitionTimeToNewBrightness());
-          }
+          dev->daliController->setTransitionTime(dev->transitionTimeForPreparedScene(true)); // including override value
         }
       }
       // Broadcast scene call: DALICMD_GO_TO_SCENE
@@ -1155,8 +1154,8 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
 
 void DaliVdc::groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
-    ALOG(LOG_WARNING, "Error while preparing device for group dimming: %s", aError->description().c_str());
+  if (Error::notOK(aError)) {
+    ALOG(LOG_WARNING, "Error while preparing device for group dimming: %s", aError->text());
   }
   if (--aDeliveryState->pendingCount>0) {
     AFOCUSLOG("waiting for all affected devices to confirm dim preparation: %d/%d remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
@@ -1281,12 +1280,12 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
 }
 
 
-ErrorPtr DaliVdc::freeNativeAction(const string aNativeActionId)
+void DaliVdc::freeNativeAction(StatusCB aStatusCB, const string aNativeActionId)
 {
   DaliAddress a = daliAddressFromActionId(aNativeActionId);
   markUsed(a, false);
   // Nothing more to do here, keep group or scene as-is, will not be called until re-used
-  return ErrorPtr();
+  if (aStatusCB) aStatusCB(ErrorPtr());
 }
 
 
@@ -1355,7 +1354,7 @@ void DaliVdc::testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint
     // not ok
     if (Error::isOK(aError) && aNoOrTimeout) aError = ErrorPtr(new DaliCommError(DaliCommError::MissingData));
     // report
-    LOG(LOG_ERR, "DALI self test error: sent 0x%02X, error: %s",aTestByte, aError->description().c_str());
+    LOG(LOG_ERR, "DALI self test error: sent 0x%02X, error: %s",aTestByte, aError->text());
     aCompletedCB(aError);
   }
 }

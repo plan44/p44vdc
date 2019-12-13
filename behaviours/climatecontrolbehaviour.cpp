@@ -401,7 +401,7 @@ bool ClimateControlBehaviour::checkForcedOffWake()
         BLOG(LOG_NOTICE, "waking FCU from forced off mode by applying scene #%d - because in a protective mode and temperature requires action", forceOffWakeSceneNo);
         DsScenePtr wakeScene = device.getScenes()->getScene(forceOffWakeSceneNo);
         if (wakeScene) {
-          // bypass our local
+          // bypass our local implementation, just invoke
           return inherited::performApplySceneToChannels(wakeScene, scene_cmd_invoke);
         }
       }
@@ -602,7 +602,7 @@ bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene, Sce
     }
   }
   #endif
-  // other type of scene, let base class handle it
+  // let base class handle it now
   return inherited::performApplySceneToChannels(aScene, aSceneCmd);
 }
 

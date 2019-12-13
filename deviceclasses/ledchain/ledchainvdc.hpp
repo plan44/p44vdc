@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -32,6 +32,7 @@
 
 #include "ledchaincomm.hpp"
 
+#include "viewstack.hpp"
 
 using namespace std;
 
@@ -50,9 +51,8 @@ namespace p44 {
     virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
+  typedef vector<string> StringVector;
 
-	typedef std::multimap<string, string> DeviceConfigMap;
-	
   typedef boost::intrusive_ptr<LedChainVdc> LedChainVdcPtr;
   class LedChainVdc : public Vdc
   {
@@ -60,23 +60,14 @@ namespace p44 {
     friend class LedChainDevice;
 
     LedChainDevicePersistence db;
-
-    LEDChainComm::LedType ledType;
-    string ledChainDevice;
-    int numLedsInChain;
-    uint8_t maxOutValue;
-    LEDChainCommPtr ws281xcomm;
+    LEDChainArrangement ledArrangement;
+    ViewStackPtr rootView;
 
     typedef std::list<LedChainDevicePtr> LedChainDeviceList;
 
-    LedChainDeviceList sortedSegments; ///< list of devices, ordered by firstLED
-    uint16_t renderStart; ///< first LED needing rendering (valid if renderTicket!=0)
-    uint16_t renderEnd; ///< end of rendering range = first LED not needing rendering (valid if renderTicket!=0)
-    MLTicket renderTicket;
-
   public:
   
-    LedChainVdc(int aInstanceNumber, const string aChainSpec, VdcHost *aVdcHostP, int aTag);
+    LedChainVdc(int aInstanceNumber, StringVector aLedChainConfigs, VdcHost *aVdcHostP, int aTag);
 
     void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
@@ -87,10 +78,10 @@ namespace p44 {
 
     void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;
 
-    /// set max output value to send to WS2812 LEDs. This is like a global brightness limit, to prevent LED chain
+    /// set max output value to send to WS281x LEDs. This is like a global brightness limit, to prevent LED chain
     /// power supply overload
     /// @param aMaxOutValue max output value, 0..255.
-    void setMaxOutValue(uint8_t aMaxOutValue) { maxOutValue = aMaxOutValue; };
+    void setMaxOutValue(uint8_t aMaxOutValue) { ledArrangement.setMaxOutValue(aMaxOutValue); };
 
     /// get minimum brigthness for dimming
     /// @return minimum brightness that will just barely keep the LEDs on
@@ -99,11 +90,6 @@ namespace p44 {
     /// get minimum brigthness for dimming
     /// @return true if LEDs have a separate white channel
     bool hasWhite();
-
-    /// some containers (statically defined devices for example) should be invisible for the dS system when they have no
-    /// devices.
-    /// @return if true, this vDC should not be announced towards the dS system when it has no devices
-    virtual bool invisibleWhenEmpty() P44_OVERRIDE { return true; }
 
     /// vdc level methods (p44 specific, JSON only, for creating LED chain devices)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
@@ -122,10 +108,8 @@ namespace p44 {
 
   private:
 
-    static bool segmentCompare(LedChainDevicePtr aFirst, LedChainDevicePtr aSecond);
-    LedChainDevicePtr addLedChainDevice(uint16_t aFirstLED, uint16_t aNumLEDs, string aDeviceConfig);
+    LedChainDevicePtr addLedChainDevice(int aX, int aDx, int aY, int aDy, int aZOrder, string aDeviceConfig);
 
-    void triggerRenderingRange(uint16_t aFirst, uint16_t aNum);
     void render();
 
   };

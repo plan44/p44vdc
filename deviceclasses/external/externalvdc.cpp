@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -31,6 +31,8 @@
 
 #if ENABLE_EXTERNAL_EXOTIC
   #include "movinglightbehaviour.hpp"
+  #include "audiobehaviour.hpp"
+  #include "videobehaviour.hpp"
 #endif
 
 #if ENABLE_FCU_SUPPORT
@@ -137,6 +139,8 @@ ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceCon
   tag(aTag),
   useMovement(false), // no movement by default
   querySync(false), // no sync query by default
+  sceneCommands(false), // no scene commands by default
+  forwardIdentify(false), // no identification forward by default
   controlValues(false), // no control values by default
   configured(false),
   iconBaseName("ext"), // default icon name
@@ -217,6 +221,23 @@ bool ExternalDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aR
 }
 
 
+bool ExternalDevice::canIdentifyToUser()
+{
+  return forwardIdentify || inherited::canIdentifyToUser();
+}
+
+
+void ExternalDevice::identifyToUser()
+{
+  if (forwardIdentify) {
+    sendDeviceApiFlagMessage("IDENTIFY");
+  }
+  else {
+    inherited::identifyToUser();
+  }
+}
+
+
 
 ExternalVdc &ExternalDevice::getExternalVdc()
 {
@@ -291,35 +312,13 @@ void ExternalDevice::sendDeviceApiSimpleMessage(string aMessage)
 
 void ExternalDevice::sendDeviceApiStatusMessage(ErrorPtr aError)
 {
-  if (deviceConnector->simpletext) {
-    // simple text message
-    string msg;
-    if (Error::isOK(aError))
-      msg = "OK";
-    else
-      msg = string_format("ERROR=%s",aError->getErrorMessage());
-    // send it
-    sendDeviceApiSimpleMessage(msg);
-  }
-  else {
-    // create JSON response
-    JsonObjectPtr message = JsonObject::newObj();
-    message->add("message", JsonObject::newString("status"));
-    if (!Error::isOK(aError)) {
-      LOG(LOG_INFO, "device API error: %s", aError->description().c_str());
-      // error, return error response
-      message->add("status", JsonObject::newString("error"));
-      message->add("errorcode", JsonObject::newInt32((int32_t)aError->getErrorCode()));
-      message->add("errormessage", JsonObject::newString(aError->getErrorMessage()));
-      message->add("errordomain", JsonObject::newString(aError->getErrorDomain()));
-    }
-    else {
-      // no error, return result (if any)
-      message->add("status", JsonObject::newString("ok"));
-    }
-    // send it
-    sendDeviceApiJsonMessage(message);
-  }
+  deviceConnector->sendDeviceApiStatusMessage(aError, tag.c_str());
+}
+
+
+void ExternalDevice::sendDeviceApiFlagMessage(string aFlagWord)
+{
+  deviceConnector->sendDeviceApiFlagMessage(aFlagWord, tag.c_str());
 }
 
 
@@ -378,7 +377,7 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
             if (aMessage->get("value", o)) {
               ApiValuePtr v = ApiValuePtr(JsonApiValue::newValueFromJson(o));
               ErrorPtr err = prop->conforms(v, true); // check and make internal
-              if (!Error::isOK(err)) return err;
+              if (Error::notOK(err)) return err;
               prop->setValue(v);
             }
             if (aMessage->get("push", o)) {
@@ -416,7 +415,7 @@ ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr a
               // set new value for state
               ApiValuePtr v = ApiValuePtr(JsonApiValue::newValueFromJson(val));
               ErrorPtr err = s->value()->conforms(v, true); // check and make internal
-              if (!Error::isOK(err)) return err;
+              if (Error::notOK(err)) return err;
               s->value()->setValue(v);
               // push state along with events
               s->pushWithEvents(evs);
@@ -710,6 +709,26 @@ bool ExternalDevice::prepareSceneCall(DsScenePtr aScene)
 }
 
 
+bool ExternalDevice::prepareSceneApply(DsScenePtr aScene)
+{
+  // only implemented to catch "UNDO"
+  if (sceneCommands && aScene->sceneCmd==scene_cmd_undo) {
+    if (deviceConnector->simpletext) {
+      string m = string_format("SCMD=UNDO");
+      sendDeviceApiSimpleMessage(m);
+    }
+    else {
+      JsonObjectPtr message = JsonObject::newObj();
+      message->add("message", JsonObject::newString("scenecommand"));
+      message->add("cmd", JsonObject::newString("UNDO"));
+      sendDeviceApiJsonMessage(message);
+    }
+  }
+  return inherited::prepareSceneApply(aScene);
+}
+
+
+
 
 void ExternalDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
@@ -799,14 +818,7 @@ void ExternalDevice::syncChannelValues(SimpleCB aDoneCB)
     // save callback, to be called when "synced" message confirms sync done
     syncedCB = aDoneCB;
     // send sync command
-    if (deviceConnector->simpletext) {
-      sendDeviceApiSimpleMessage("SYNC");
-    }
-    else {
-      JsonObjectPtr message = JsonObject::newObj();
-      message->add("message", JsonObject::newString("sync"));
-      sendDeviceApiJsonMessage(message);
-    }
+    sendDeviceApiFlagMessage("SYNC");
   }
   else {
     inherited::syncChannelValues(aDoneCB);
@@ -869,6 +881,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("sync", o)) querySync = o->boolValue();
   if (aInitParams->get("move", o)) useMovement = o->boolValue();
   if (aInitParams->get("scenecommands", o)) sceneCommands = o->boolValue();
+  if (aInitParams->get("identification", o)) forwardIdentify = o->boolValue();
   // get unique ID
   if (!aInitParams->get("uniqueid", o)) {
     return TextError::err("missing 'uniqueid'");
@@ -1005,6 +1018,33 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     ml->setHardwareName(hardwareName);
     addBehaviour(ml);
   }
+  else if (outputType=="featurelight") {
+    if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
+    // - use feature light settings, which include a color+position+zoom+rotation+gradients scene table
+    installSettings(DeviceSettingsPtr(new FeatureLightDeviceSettings(*this)));
+    // - add feature light behaviour
+    FeatureLightBehaviourPtr fl = FeatureLightBehaviourPtr(new FeatureLightBehaviour(*this, false));
+    fl->setHardwareName(hardwareName);
+    addBehaviour(fl);
+  }
+  else if (outputType=="audio") {
+    if (defaultGroup==group_undefined) defaultGroup = group_cyan_audio;
+    // - use audio settings, which include a volume+powerstate+contensource+sceneCmd scene table
+    installSettings(DeviceSettingsPtr(new AudioDeviceSettings(*this)));
+    // - add audio behaviour
+    AudioBehaviourPtr ab = AudioBehaviourPtr(new AudioBehaviour(*this));
+    ab->setHardwareName(hardwareName);
+    addBehaviour(ab);
+  }
+  else if (outputType=="video") {
+    if (defaultGroup==group_undefined) defaultGroup = group_magenta_video;
+    // - use video settings, which include a volume+powerstate+contensource+sceneCmd scene table
+    installSettings(DeviceSettingsPtr(new VideoDeviceSettings(*this)));
+    // - add video behaviour
+    VideoBehaviourPtr vb = VideoBehaviourPtr(new VideoBehaviour(*this));
+    vb->setHardwareName(hardwareName);
+    addBehaviour(vb);
+  }
   #endif // ENABLE_EXTERNAL_EXOTIC
   else if (outputType=="heatingvalve") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
@@ -1058,7 +1098,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     // - use shadow scene settings
     installSettings(DeviceSettingsPtr(new ShadowDeviceSettings(*this)));
     // - add shadow behaviour
-    ShadowBehaviourPtr sb = ShadowBehaviourPtr(new ShadowBehaviour(*this));
+    ShadowBehaviourPtr sb = ShadowBehaviourPtr(new ShadowBehaviour(*this, defaultGroup));
     sb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_undefined, false, -1);
     sb->setHardwareName(hardwareName);
     ShadowDeviceKind sk = shadowdevice_jalousie; // default to jalousie
@@ -1073,7 +1113,7 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     if (aInitParams->get("endcontacts", o)) {
       endContacts = o->boolValue();
     }
-    sb->setDeviceParams(sk, endContacts, 0, 0, 0); // no restrictions for move times
+    sb->setDeviceParams(sk, endContacts, 0, 0, 0, !useMovement); // no restrictions for move times, when "move" is not specified, device can do absolute positioning
     sb->position->syncChannelValue(100, false, true); // assume fully up at beginning
     sb->angle->syncChannelValue(100, false, true); // assume fully open at beginning
     addBehaviour(sb);
@@ -1088,7 +1128,10 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
     o->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_undefined, false, -1);
     o->setHardwareName(hardwareName);
     o->setGroupMembership(defaultGroup, true); // put into default group
-    o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "basic")));
+    if (outputFunction==outputFunction_switch)
+      o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "basic_switch")));
+    else
+      o->addChannel(ChannelBehaviourPtr(new DialChannel(*o, "basic_dial")));
     addBehaviour(o);
   }
   else {
@@ -1234,9 +1277,9 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   // create actions/states/events and properties from JSON
   if (aInitParams->get("noconfirmaction", o)) noConfirmAction = o->boolValue();
   err = configureFromJSON(aInitParams);
-  if (!Error::isOK(err)) return err;
+  if (Error::notOK(err)) return err;
   err = standardActionsFromJSON(aInitParams);
-  if (!Error::isOK(err)) return err;
+  if (Error::notOK(err)) return err;
   if (deviceProperties) deviceProperties->setPropertyChangedHandler(boost::bind(&ExternalDevice::propertyChanged, this, _1));
   // if any of the singledevice features are selected, protocol must be JSON
   if (deviceActions && deviceConnector->simpletext) {
@@ -1249,6 +1292,12 @@ ErrorPtr ExternalDevice::configureDevice(JsonObjectPtr aInitParams)
   }
   // configured
   configured = true;
+  //#if DEBUG
+  //boost::intrusive_ptr<VideoDeviceSettings> vs = boost::dynamic_pointer_cast<VideoDeviceSettings>(deviceSettings);
+  //if (vs) {
+  //  vs->dumpDefaultScenes();
+  //}
+  //#endif
   // explicit ok
   return Error::ok();
 }
@@ -1301,9 +1350,9 @@ ExternalDeviceConnector::~ExternalDeviceConnector()
 
 void ExternalDeviceConnector::handleDeviceConnectionStatus(ErrorPtr aError)
 {
-  if (!Error::isOK(aError)) {
+  if (Error::notOK(aError)) {
     closeConnection();
-    LOG(LOG_NOTICE, "external device connection closed (%s) -> disconnecting all devices", aError->description().c_str());
+    LOG(LOG_NOTICE, "external device connection closed (%s) -> disconnecting all devices", aError->text());
     // devices have vanished for now, but will keep parameters in case it reconnects later
     while (externalDevices.size()>0) {
       externalDevices.begin()->second->hasVanished(false); // keep config
@@ -1339,7 +1388,7 @@ void ExternalDeviceConnector::closeConnection()
 void ExternalDeviceConnector::sendDeviceApiJsonMessage(JsonObjectPtr aMessage, const char *aTag)
 {
   // add in tag if device has one
-  if (aTag) {
+  if (aTag && *aTag) {
     aMessage->add("tag", JsonObject::newString(aTag));
   }
   // now show and send
@@ -1378,8 +1427,8 @@ void ExternalDeviceConnector::sendDeviceApiStatusMessage(ErrorPtr aError, const 
     // create JSON response
     JsonObjectPtr message = JsonObject::newObj();
     message->add("message", JsonObject::newString("status"));
-    if (!Error::isOK(aError)) {
-      LOG(LOG_INFO, "device API error: %s", aError->description().c_str());
+    if (Error::notOK(aError)) {
+      LOG(LOG_INFO, "device API error: %s", aError->text());
       // error, return error response
       message->add("status", JsonObject::newString("error"));
       message->add("errorcode", JsonObject::newInt32((int32_t)aError->getErrorCode()));
@@ -1395,6 +1444,18 @@ void ExternalDeviceConnector::sendDeviceApiStatusMessage(ErrorPtr aError, const 
   }
 }
 
+
+void ExternalDeviceConnector::sendDeviceApiFlagMessage(string aFlagWord, const char *aTag)
+{
+  if (simpletext) {
+    sendDeviceApiSimpleMessage(aFlagWord, aTag);
+  }
+  else {
+    JsonObjectPtr message = JsonObject::newObj();
+    message->add("message", JsonObject::newString(lowerCase(aFlagWord)));
+    sendDeviceApiJsonMessage(message, aTag);
+  }
+}
 
 
 ExternalDevicePtr ExternalDeviceConnector::findDeviceByTag(string aTag, bool aNoError)
@@ -1435,7 +1496,7 @@ void ExternalDeviceConnector::handleDeviceApiJsonMessage(ErrorPtr aError, JsonOb
     if (aMessage->arrayLength()>0) {
       for (int i=0; i<aMessage->arrayLength(); ++i) {
         aError = handleDeviceApiJsonSubMessage(aMessage->arrayGet(i));
-        if (!Error::isOK(aError)) break;
+        if (Error::notOK(aError)) break;
       }
     }
     else {
@@ -1536,7 +1597,12 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       }
       // - always visible (even when empty)
       if (aMessage->get("alwaysVisible", o)) {
-        externalVdc.alwaysVisible = o->boolValue();
+        // Note: this is now a (persistent!) vdc level property, which can be set from external API this way
+        externalVdc.setVdcFlag(vdcflag_hidewhenempty, !o->boolValue());
+      }
+      // - forward vdc-level identification
+      if (aMessage->get("identification", o)) {
+        externalVdc.forwardIdentify = o->boolValue();
       }
     }
     else if (msg=="log") {
@@ -1628,7 +1694,7 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  alwaysVisible(false),
+  forwardIdentify(false),
   iconBaseName("vdc_ext") // default icon name
 {
   // create device API server and set connection specifications
@@ -1642,6 +1708,7 @@ void ExternalVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // start device API server
   ErrorPtr err = externalDeviceApiServer->startServer(boost::bind(&ExternalVdc::deviceApiConnectionHandler, this, _1), 10);
+  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(err); // return status of starting server
 }
 
@@ -1695,6 +1762,24 @@ string ExternalVdc::webuiURLString()
     return inherited::webuiURLString();
 }
 
+
+bool ExternalVdc::canIdentifyToUser()
+{
+  return forwardIdentify || inherited::canIdentifyToUser();
+}
+
+
+void ExternalVdc::identifyToUser()
+{
+  if (forwardIdentify) {
+    // TODO: %%% send "VDCIDENTIFY" or maybe "vdc:IDENTIFY"
+    //   to all connectors - we need to implement a connector list for that
+    LOG(LOG_WARNING, "vdc level identify forwarding not yet implemented")
+  }
+  else {
+    inherited::identifyToUser();
+  }
+}
 
 
 void ExternalVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)

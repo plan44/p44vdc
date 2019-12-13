@@ -151,6 +151,21 @@ void ColorLightScene::setDefaultSceneValues(SceneNo aSceneNo)
   inherited::setDefaultSceneValues(aSceneNo);
   // Add special color lamp behaviour
   switch (aSceneNo) {
+    case ROOM_OFF:
+    case AREA_1_OFF:
+    case AREA_2_OFF:
+    case AREA_3_OFF:
+    case AREA_4_OFF:
+    case PRESET_OFF_10:
+    case PRESET_OFF_20:
+    case PRESET_OFF_30:
+    case PRESET_OFF_40:
+    case AUTO_OFF:
+    case LOCAL_OFF:
+    case DEEP_OFF:
+      // no color for off
+      colorMode = colorLightModeNone;
+      break;
     case PANIC:
     case FIRE:
       // Alert - use cold white
@@ -243,27 +258,35 @@ void ColorLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   // now load color specific scene information
   ColorLightScenePtr colorLightScene = boost::dynamic_pointer_cast<ColorLightScene>(aScene);
   if (colorLightScene) {
-    MLMicroSeconds ttUp = transitionTimeFromSceneEffect(colorLightScene->effect, colorLightScene->effectParam, true);
-    MLMicroSeconds ttDown = transitionTimeFromSceneEffect(colorLightScene->effect, colorLightScene->effectParam, false);
+    MLMicroSeconds ttUp = transitionTimeFromScene(colorLightScene, true);
+    MLMicroSeconds ttDown = transitionTimeFromScene(colorLightScene, false);
     // prepare next color values in channels
-    colorMode = colorLightScene->colorMode;
-    switch (colorMode) {
+    bool colorInfoSet = false;
+    ColorLightMode loadedMode = colorLightScene->colorMode;
+    switch (loadedMode) {
       case colorLightModeHueSaturation: {
-        hue->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true);
-        saturation->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true);
+        if (hue->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
+        if (saturation->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true)) colorInfoSet = true;
         break;
       }
       case colorLightModeXY: {
-        cieX->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true);
-        cieY->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true);
+        if (cieX->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
+        if (cieY->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true)) colorInfoSet = true;
         break;
       }
       case colorLightModeCt: {
-        ct->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true);
+        if (ct->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
         break;
       }
       default:
-        colorMode = colorLightModeNone;
+        loadedMode = colorLightModeNone;
+    }
+    if (brightnessForHardware(true)>0 && colorInfoSet) {
+      // change current color mode only if final brightness is not zero and any color channels have actually changed
+      colorMode = loadedMode;
+      // Don't cares should be correct at this point, but scenes saved long ago might have values that should NOT be
+      // applied but don't have a dontCare. The following call will repair these incorrect scenes:
+      adjustChannelDontCareToColorMode(colorLightScene, true); // only SET dontCares, but do not remove any
     }
   }
   // need recalculation of values
@@ -305,7 +328,7 @@ void ColorLightBehaviour::saveChannelsToScene(DsScenePtr aScene)
 }
 
 
-void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene)
+void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene, bool aSetOnly)
 {
   // save the values and adjust don't cares according to color mode
   switch (aColorLightScene->colorMode) {
@@ -314,9 +337,11 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
       if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
-      // enable the used values
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, false);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, false);
+      if (!aSetOnly) {
+        // enable the used values
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, false);
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, false);
+      }
       break;
     }
     case colorLightModeXY: {
@@ -324,9 +349,11 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
       if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
       aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
-      // enable the used values
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, false);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, false);
+      if (!aSetOnly) {
+        // enable the used values
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, false);
+        if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, false);
+      }
       break;
     }
     case colorLightModeCt: {
@@ -335,8 +362,10 @@ void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aC
       if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
       if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
-      // enable the used values
-      aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, false);
+      if (!aSetOnly) {
+        // enable the used values
+        aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, false);
+      }
       break;
     }
     default: {
@@ -362,19 +391,37 @@ bool ColorLightBehaviour::deriveColorMode()
   // the need to derive the color modes only arises when
   // colors (may) have changed, so this invalidates the derived channel values
   derivedValuesComplete = false;
+  // Note: actual calculation of derived values might not be carried out at all if none of the
+  //   derived channel values is queried. However, we must mark the derived channel values
+  //   volatile here to make sure these don't get persisted
   // check changed channels
   if (!ctOnly) {
     if (hue->needsApplying() || saturation->needsApplying()) {
       colorMode = colorLightModeHueSaturation;
+      hue->setVolatile(false);
+      saturation->setVolatile(false);
+      cieX->setVolatile(true);
+      cieY->setVolatile(true);
+      ct->setVolatile(true);
       return true;
     }
     else if (cieX->needsApplying() || cieY->needsApplying()) {
       colorMode = colorLightModeXY;
+      cieX->setVolatile(false);
+      cieY->setVolatile(false);
+      hue->setVolatile(true);
+      saturation->setVolatile(true);
+      ct->setVolatile(true);
       return true;
     }
   }
   if (ct->needsApplying()) {
     colorMode = colorLightModeCt;
+    ct->setVolatile(false);
+    cieX->setVolatile(true);
+    cieY->setVolatile(true);
+    hue->setVolatile(true);
+    saturation->setVolatile(true);
     return true;
   }
   // could not determine new color mode (assuming old is still ok)
@@ -484,7 +531,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         HSV[1] = saturation->getChannelValue()/100; // 0..1
         HSV[2] = 1;
         HSVtoxyV(HSV, xyV);
-        cieX->syncChannelValue(xyV[0], false, true);
+        cieX->syncChannelValue(xyV[0], false, true); // derived values are always volatile
         cieY->syncChannelValue(xyV[1], false, true);
         xyVtoCT(xyV, mired);
         ct->syncChannelValue(mired, false, true);

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -202,8 +202,10 @@ namespace p44 {
     /// @note this is usually called from the device container when device is added (detected), before initializeDevice() and after identifyDevice()
     virtual ErrorPtr load();
 
+    #if ENABLE_SETTINGS_FROM_FILES
     // load additional settings from files
     void loadSettingsFromFiles();
+    #endif
 
     /// initializes the physical device for being used
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
@@ -423,11 +425,13 @@ namespace p44 {
     /// @param aApiConnection this is the API connection from which the notification originates
     /// @param aNotification the notification
     /// @param aParams the parameters object
+    /// @return true if aNotification is known. Does not say anything about success or failure of the actions
+    ///    it might trigger in the recipient
     /// @note callScene and dimChannel notifications are handled separately at the vDC level and dispatched
     ///    using special xxPrepare() and xxExecute() methods.
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this device.
-    virtual void handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// convenience method to call scene on this device
     /// @param aSceneNo the scene to call.
@@ -445,6 +449,16 @@ namespace p44 {
     /// @note this method internally uses dimChannelForAreaPrepare/dimChannelForAreaExecute.
     ///    It is exposed as directly controlling dimming might be useful for special purposes (e.g. identify)
     void dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
+
+    /// this can be called by optimizing scene call implementations in vdcs
+    /// to get the scene transition time before the transition times are applied to the channels
+    /// @param aIncludingOverride if set, a potential per-call override of the transition time will be returned,
+    ///   otherwise, only the transition time actually stored in the scene is returned.
+    /// @return transition time
+    MLMicroSeconds transitionTimeForPreparedScene(bool aIncludingOverride);
+
+    /// @return transition time override value, if there is any, Infinite otherwise
+    MLMicroSeconds transitionTimeOverride() { return preparedScene ? preparedTransitionOverride : 0; };
 
     /// undo scene call on this device (i.e. revert outputs to values present immediately before calling that scene)
     /// @param aSceneNo the scene call to undo (needs to be specified to prevent undoing the wrong scene)
@@ -520,12 +534,6 @@ namespace p44 {
     ///   class makes sure these cases (which may occur at the vDC API level) are not passed on to dimChannel()
     virtual void dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool aDoApply);
 
-    /// identify the device to the user
-    /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
-    ///   this can be anything.
-    /// @note base class delegates this to the output behaviour (if any)
-    virtual void identifyToUser();
-
     /// @}
 
 
@@ -535,8 +543,9 @@ namespace p44 {
     /// @return number of output channels in this device
     int numChannels();
 
+    /// @param aTransitionTimeP if set, will return the highest transition time among the changed channels
     /// @return true if any channel needs to be applied to hardware
-    bool needsToApplyChannels();
+    bool needsToApplyChannels(MLMicroSeconds* aTransitionTimeP = NULL);
 
     /// confirms all channels applied to hardware
     /// @param aAnyWay if true, lastSent state will be set even for channels that were not in needsApplying() state
@@ -587,13 +596,15 @@ namespace p44 {
     /// @param aScene the scene that is to be called
     /// @return true if scene preparation is ok and call can continue. If false, no further action will be taken
     /// @note this is called BEFORE scene values are recalled
+    /// @note this is NOT called at undoScene.
     virtual bool prepareSceneCall(DsScenePtr aScene);
 
-    /// prepare for applying a scene on the device level
-    /// @param aScene the scene that is to be applied
+    /// prepare for applying a scene or scene undo on the device level
+    /// @param aScene the scene that is to be applied (or restored channel values from an undoScene, see below)
     /// @return true if channel values should be applied, false if not
-    /// @note this is called AFTER scene values are already loaded and prepareSceneCall() has already been called, but before
-    ///   channels are applied (or not, if method returns false)
+    /// @note for a scene call, this is called AFTER scene values are already loaded and prepareSceneCall() has already been called,
+    ///   but before channels are applied (or not, if method returns false). For a undoScene call, prepareSceneCall() is NOT
+    ///   called (it's not a scene call), but prepareSceneApply() is called with a pseudo-scene having sceneCmd==scene_cmd_undo.
     virtual bool prepareSceneApply(DsScenePtr aScene);
 
     /// perform special scene actions (like flashing) which are independent of dontCare flag.
@@ -668,6 +679,11 @@ namespace p44 {
     ///   However, in all cases internal state must be updated to reflect the finalized operation
     void executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatToApply);
 
+    /// release anything that might be prepared in the device for an operation
+    /// @note a prepared operation might need to hold on objects even after executePreparedOperation(),
+    ///   for example the prepared scene which might be needed to get transition time
+    void releasePreparedOperation();
+
     /// update the delivery state
     /// @param aDeliveryState update params to reflect the
     /// @param aForOptimisation if set, delivery state is updated for optimized delivery to this device, if possible
@@ -681,12 +697,13 @@ namespace p44 {
     ///   it for some scenes but not for others).
     bool addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState);
 
-
     /// let device implementation prepare for (and possibly reject) optimized set
     /// @param aDeliveryState can be inspected to see the scene or dim parameters
     ///   (optimizedType, actionParam, actionVariant are already set)
     /// @return true if device is ok with being part of optimized set. If false is returned, the call will be
     ///    executed without optimisation
+    /// @note this can be used by devices to reject optimisation on a call-by-call basis, e.g. when a custom transition time
+    ///   prevents using a native scene as-is. At the time of call, the operation has already been prepared
     virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) { return false; /* not optimizable by default */ };
 
     /// @}
@@ -732,6 +749,15 @@ namespace p44 {
     /// @param aSceneNo the scene to check don't care for
     void callSceneMin(SceneNo aSceneNo);
 
+    /// identify the device to the user
+    /// @note for lights, this is usually implemented as a blink operation, but depending on the device type,
+    ///   this can be anything.
+    /// @note device delegates this to the output behaviour (if any)
+    virtual void identifyToUser() P44_OVERRIDE;
+
+    /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
+
 
   private:
 
@@ -760,6 +786,7 @@ namespace p44 {
     bool checkForReapply();
     void forkDoneCB(SimpleCB aOriginalCB, SimpleCB aNewCallback);
     void configurationPrepared(StatusCB aPreparedCB);
+    void syncedChannels(VdcApiRequestPtr aRequest);
 
   };
 

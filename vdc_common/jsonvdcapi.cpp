@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -176,7 +176,7 @@ ErrorPtr VdcJsonApiRequest::sendResult(ApiValuePtr aResult)
 
 ErrorPtr VdcJsonApiRequest::sendError(ErrorPtr aError)
 {
-  LOG(LOG_INFO, "vdSM <- vDC (JSON) error sent: requestid='%s', error='%s'", requestId().c_str(), Error::text(aError).c_str());
+  LOG(LOG_INFO, "vdSM <- vDC (JSON) error sent: requestid='%s', error='%s'", requestId().c_str(), Error::text(aError));
   if (!aError) {
     aError = Error::ok();
   }
@@ -266,7 +266,7 @@ void VdcJsonApiConnection::jsonResponseHandler(VdcApiResponseCB aResponseHandler
       LOG(LOG_INFO, "vdSM -> vDC (JSON) result received: id='%s', result=%s", request->requestId().c_str(), resultOrErrorData ? resultOrErrorData->description().c_str() : "<none>");
     }
     else {
-      LOG(LOG_INFO, "vdSM -> vDC (JSON) error received: id='%s', error=%s, errordata=%s", request->requestId().c_str(), aError->description().c_str(), resultOrErrorData ? resultOrErrorData->description().c_str() : "<none>");
+      LOG(LOG_INFO, "vdSM -> vDC (JSON) error received: id='%s', error=%s, errordata=%s", request->requestId().c_str(), aError->text(), resultOrErrorData ? resultOrErrorData->description().c_str() : "<none>");
     }
     aResponseHandler(VdcApiConnectionPtr(this), request, aError, resultOrErrorData);
   }

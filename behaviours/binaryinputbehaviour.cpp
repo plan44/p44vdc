@@ -33,6 +33,7 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
   minPushInterval(2*Second), // don't push more often than every 2 seconds
   maxPushInterval(0),
   changesOnlyInterval(15*Minute), // report unchanged state updates max once every 15 minutes
+  autoResetTo(-1), // no auto reset
   // state
   lastUpdate(Never),
   lastPush(Never),
@@ -79,15 +80,17 @@ const char *inputTypeIds[numVdcSensorTypes] = {
 
 
 
-void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval)
+void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, int aAutoResetTo)
 {
   hardwareInputType = aInputType;
   inputUsage = aUsage;
   reportsChanges = aReportsChanges;
   updateInterval = aUpdateInterval;
+  autoResetTo = aAutoResetTo;
   aliveSignInterval = aAliveSignInterval;
   maxPushInterval = aliveSignInterval==Never ? Never : DSS_INPUT_MAX_PUSH_INTERVAL; // sensors without any update guarantee do not need to fake regular pushes
-  armInvalidator();
+  // setup standard timeout to undefined state
+  startInputTimeout(aliveSignInterval, undefined);
   // set default input mode to hardware type
   configuredInputType = hardwareInputType;
 }
@@ -107,12 +110,26 @@ InputState BinaryInputBehaviour::maxExtendedValue()
 }
 
 
-void BinaryInputBehaviour::armInvalidator()
+void BinaryInputBehaviour::startInputTimeout(MLMicroSeconds aTimeout, int aAfterTimeOutState)
 {
-  invalidatorTicket.cancel();
-  if (aliveSignInterval!=Never) {
-    // this sensor can time out, schedule invalidation
-    invalidatorTicket.executeOnce(boost::bind(&BinaryInputBehaviour::invalidateInputState, this), aliveSignInterval);
+  timeoutTicket.cancel();
+  if (aTimeout!=Never) {
+    // schedule invalidation or auto-reset
+    timeoutTicket.executeOnce(boost::bind(&BinaryInputBehaviour::inputTimeout, this, aAfterTimeOutState), aTimeout);
+  }
+}
+
+
+void BinaryInputBehaviour::inputTimeout(int aAfterTimeOutState)
+{
+  if (aAfterTimeOutState<0) {
+    // consider invalid
+    invalidateInputState();
+  }
+  else {
+    // just set a state (e.g. motion sensors that only report motion, but no non-motion
+    BLOG(LOG_INFO, "Auto-resetting input state after timeout now");
+    updateInputState(aAfterTimeOutState);
   }
 }
 
@@ -123,7 +140,14 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
   // always update age, even if value itself may not have changed
   MLMicroSeconds now = MainLoop::now();
   lastUpdate = now;
-  armInvalidator();
+  if (autoResetTo>=0 && aNewState!=autoResetTo) {
+    // this update sets the output to a non-reset state -> set up auto reset
+    startInputTimeout(updateInterval, autoResetTo);
+  }
+  else {
+    // just start the invalidation timeout
+    startInputTimeout(aliveSignInterval, -1);
+  }
   bool changedState = aNewState!=currentState;
   if (changedState) {
     // input state change is considered a (regular!) user action, have it checked globally first
@@ -208,9 +232,9 @@ bool BinaryInputBehaviour::hasDefinedState()
 
 void BinaryInputBehaviour::revalidateState()
 {
-  if (hasDefinedState()) {
-    // re-arm invalidator
-    armInvalidator();
+  if (hasDefinedState() && (autoResetTo<0 || updateInterval==Never || currentState==autoResetTo)) {
+    // re-arm invalidator (unless autoreset is pending)
+    startInputTimeout(aliveSignInterval, undefined);
   }
 }
 

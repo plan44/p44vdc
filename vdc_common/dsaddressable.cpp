@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 1-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -185,14 +185,27 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
     // method name must be present
     string methodName;
     if (Error::isOK(respErr = checkStringParam(aParams, "methodname", methodName))) {
-      ApiValuePtr params = aParams->get("params");
-      if (!params || !params->isType(apivalue_object)) {
-        // no params or not object -> default to empty parameter list
-        params = aRequest->newApiValue();
-        params->setType(apivalue_object);
+      if (methodName=="genericRequest") {
+        respErr = Error::err<VdcApiError>(415, "recursive call of genericRequest");
       }
-      // recursively call method handler with unpacked params
-      return handleMethod(aRequest, methodName, params);
+      else {
+        ApiValuePtr params = aParams->get("params");
+        if (!params || !params->isType(apivalue_object)) {
+          // no params or not object -> default to empty parameter list
+          params = aRequest->newApiValue();
+          params->setType(apivalue_object);
+        }
+        // recursively call method handler with unpacked params
+        respErr = handleMethod(aRequest, methodName, params);
+        if (Error::isError(respErr, VdcApiError::domain(), 405)) {
+          // unknown method (or syntax error in params), but not actual failure of method operation: try as notification
+          if (handleNotification(aRequest->connection(), methodName, params)) {
+            // successful initiation of notification via genericRequest *method* call, confirm with simple OK
+            respErr = Error::ok();
+          }
+        }
+        return respErr;
+      }
     }
   }
   else if (aMethod=="loglevel") {
@@ -200,7 +213,16 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
     ApiValuePtr o;
     if (Error::isOK(respErr = checkParam(aParams, "value", o))) {
       int newLevel = o->int32Value();
-      if (newLevel>=0 && newLevel<=7) {
+      if (newLevel==8) {
+        // trigger statistics
+        LOG(LOG_NOTICE, "\n========== requested showing statistics");
+        getVdcHost().postEvent(vdchost_logstats);
+        LOG(LOG_NOTICE, "\n%s", MainLoop::currentMainLoop().description().c_str());
+        MainLoop::currentMainLoop().statistics_reset();
+        LOG(LOG_NOTICE, "========== statistics shown\n");
+        respErr = Error::ok(); // return OK as generic response
+      }
+      else if (newLevel>=0 && newLevel<=7) {
         int oldLevel = LOGLEVEL;
         SETLOGLEVEL(newLevel);
         LOG(newLevel, "\n\n========== changed log level from %d to %d ===============", oldLevel, newLevel);
@@ -291,24 +313,37 @@ void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultOb
     sendRequest("pushNotification", pushParams);
   }
   else {
-    ALOG(LOG_WARNING, "push failed because to-be-pushed property could not be accessed: %s", aError->description().c_str());
+    ALOG(LOG_WARNING, "push failed because to-be-pushed property could not be accessed: %s", aError->text());
   }
 }
 
 
 
 
-void DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+bool DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   if (aNotification=="ping") {
     // issue device ping (which will issue a pong when device is reachable)
     ALOG(LOG_INFO, "ping -> checking presence...");
     checkPresence(boost::bind(&DsAddressable::pingResultHandler, this, _1));
   }
+  else if (aNotification=="identify") {
+    // identify to user
+    ALOG(LOG_NOTICE, "Identify");
+    identifyToUser();
+  }
   else {
     // unknown notification
     ALOG(LOG_WARNING, "unknown notification '%s'", aNotification.c_str());
+    return false;
   }
+  return true;
+}
+
+
+void DsAddressable::identifyToUser()
+{
+  ALOG(LOG_WARNING, "***** 'identify' called (but addressable does not have a hardware implementation for it)");
 }
 
 
@@ -640,6 +675,7 @@ string DsAddressable::webuiURLString()
 
 // MARK: - load addressable settings from files
 
+#if ENABLE_SETTINGS_FROM_FILES
 
 bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExplicitlyOverridden)
 {
@@ -670,6 +706,8 @@ bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExp
   }
   return anySettingsApplied;
 }
+
+#endif // ENABLE_SETTINGS_FROM_FILES
 
 
 // MARK: - description/shortDesc/logging
