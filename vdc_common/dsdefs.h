@@ -321,6 +321,8 @@ typedef enum {
   channeltype_airflow_intensity_auto = 21, ///< airflow intensity automatic mode (0=off, >0=on)
   channeltype_water_temperature = 22, ///< water temperature
   channeltype_water_flow = 23, ///< water flow rate
+  channeltype_video_station = 24, ///< video tv station (channel number)
+  channeltype_video_input_source = 25, ///< video input source (TV, HDMI etc.)
 
   channeltype_custom_first = 192, ///< first device-specific channel
   channeltype_custom_last = 239, ///< last device-specific channel

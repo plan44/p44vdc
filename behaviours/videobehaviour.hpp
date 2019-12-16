@@ -30,21 +30,36 @@ using namespace std;
 
 namespace p44 {
 
-  /// Video content source channel
+  /// Video station channel
   /// TODO: generalize, make one content source channel for audio and video
-  class VideoContentSourceChannel : public IndexChannel
+  class VideoStationChannel : public IndexChannel
   {
     typedef IndexChannel inherited;
 
   public:
-    VideoContentSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "contentSource") {};
+    VideoStationChannel(OutputBehaviour &aOutput) : inherited(aOutput, "videoStation") {};
 
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_audio_content_source; }; ///< the dS channel type
-    virtual const char *getName() P44_OVERRIDE { return "contentsource"; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_video_station; }; ///< the dS channel type
+    virtual const char *getName() P44_OVERRIDE { return "video station"; };
 
   };
-  typedef boost::intrusive_ptr<VideoContentSourceChannel> VideoContentSourceChannelPtr;
+  typedef boost::intrusive_ptr<VideoStationChannel> VideoStationChannelPtr;
 
+
+  /// Video input source channel
+  /// TODO: generalize, make one content source channel for audio and video
+  class VideoInputSourceChannel : public IndexChannel
+  {
+    typedef IndexChannel inherited;
+
+  public:
+    VideoInputSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "videoInputSource") {};
+
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_video_input_source; }; ///< the dS channel type
+    virtual const char *getName() P44_OVERRIDE { return "video input source"; };
+
+  };
+  typedef boost::intrusive_ptr<VideoInputSourceChannel> VideoInputSourceChannelPtr;
 
 
   /// A concrete class implementing the Scene object for a video device, having a volume channel
@@ -60,7 +75,8 @@ namespace p44 {
     /// @name video scene specific values
     /// @{
 
-    uint32_t contentSource; ///< the index of a content source, e.g. a song/sound effect from a list
+    uint32_t station; ///< the index of a tv station, e.g. 23 - BBC Channel
+    uint32_t inputSource; ///< the index of a input source, e.g. 7 - HDMI2
     DsPowerState powerState; ///< the power state of the video device
 
     /// @}
@@ -159,8 +175,10 @@ namespace p44 {
     AudioVolumeChannelPtr volume;
     /// the power state channel
     PowerStateChannelPtr powerState;
-    /// the content source channel
-    VideoContentSourceChannelPtr contentSource;
+    /// the tv station channel
+    VideoStationChannelPtr station;
+    /// the tv input source channel
+    VideoInputSourceChannelPtr inputSource;
 
     /// the current state command
     bool stateRestoreCmdValid; ///< set if state restore command is valid
