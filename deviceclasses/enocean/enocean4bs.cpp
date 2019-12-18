@@ -1267,7 +1267,7 @@ void EnoceanA52004Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         LOG(LOG_NOTICE, "- valve is in IDLE mode (12hr wake cycle)");
       }
       else {
-        data |= 39<<DB(1,0); // Winter: 20 min
+        data |= 19<<DB(1,0); // Winter: 10 min
         if (!roomTemp && !feedTemp) {
           // nobody interested in measurements, don't waste battery on performing them
           data |= DBMASK(1,6); // measurement disabled
