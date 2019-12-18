@@ -480,7 +480,7 @@ enum {
   max_key,
   resolution_key,
   #if !REDUCED_FOOTPRINT
-  enumoptions_key,
+  enumvalues_key,
   #endif
   numChannelDescProperties
 };
@@ -496,13 +496,13 @@ enum {
 };
 
 static char channel_Key;
-static char channel_enumoptions_key;
+static char channel_enumvalues_key;
 
 
 int ChannelBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   #if !REDUCED_FOOTPRINT
-  if (aParentDescriptor->hasObjectKey(channel_enumoptions_key)) {
+  if (aParentDescriptor->hasObjectKey(channel_enumvalues_key)) {
     // number of enum values
     return enumList ? enumList->numProps() : 0;
   }
@@ -528,7 +528,7 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
     { "max", apivalue_double, max_key+descriptions_key_offset, OKEY(channel_Key) },
     { "resolution", apivalue_double, resolution_key+descriptions_key_offset, OKEY(channel_Key) },
     #if !REDUCED_FOOTPRINT
-    { "options", apivalue_object+propflag_container, enumoptions_key, OKEY(channel_enumoptions_key) }
+    { "values", apivalue_object+propflag_container, enumvalues_key, OKEY(channel_enumvalues_key) }
     #endif
   };
   //static const PropertyDescription channelSettingsProperties[numChannelSettingsProperties] = {
@@ -538,7 +538,7 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
     { "age", apivalue_double, age_key+states_key_offset, OKEY(channel_Key) },
   };
   #if !REDUCED_FOOTPRINT
-  if (aParentDescriptor->hasObjectKey(channel_enumoptions_key)) {
+  if (aParentDescriptor->hasObjectKey(channel_enumvalues_key)) {
     return enumList ? enumList->getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor) : NULL;
   }
   #endif
@@ -560,7 +560,7 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
 #if !REDUCED_FOOTPRINT
 PropertyContainerPtr ChannelBehaviour::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
-  if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(channel_enumoptions_key)) {
+  if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(channel_enumvalues_key)) {
     return enumList ? PropertyContainerPtr(this) : PropertyContainerPtr(); // handle enum values array myself
   }
   // unknown here
