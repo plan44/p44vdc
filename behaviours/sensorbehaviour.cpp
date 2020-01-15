@@ -523,6 +523,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
     if (pushBehaviourState()) {
       lastPush = now;
       lastPushedValue = currentValue;
+      BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' successfully pushed value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), lastPushedValue, getSensorUnitText().c_str());
       if (hasDefinedState() && maxPushInterval>0) {
         // schedule re-push of defined value
         updateTicket.executeOnce(boost::bind(&SensorBehaviour::pushSensor, this, true), maxPushInterval);
@@ -541,7 +542,7 @@ void SensorBehaviour::reportFinalValue()
 {
   // push the current value (after awaiting minPushInterval)
   if (pushBehaviourState()) {
-    BLOG(LOG_INFO, "Sensor[%zu] %s '%s' now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentValue, getSensorUnitText().c_str());
+    BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentValue, getSensorUnitText().c_str());
     lastPush = MainLoop::currentMainLoop().now();
     lastPushedValue = currentValue;
   }

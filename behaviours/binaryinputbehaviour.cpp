@@ -174,6 +174,7 @@ bool BinaryInputBehaviour::pushInput(bool aChanged)
     // push the new value right now
     if (pushBehaviourState()) {
       lastPush = now;
+      BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' successfully pushed state = %d", index, behaviourId.c_str(), getHardwareName().c_str(), currentState);
       if (hasDefinedState() && maxPushInterval!=Never) {
         // schedule re-push of defined state
         updateTicket.executeOnce(boost::bind(&BinaryInputBehaviour::pushInput, this, false), maxPushInterval);
@@ -199,7 +200,7 @@ void BinaryInputBehaviour::reportFinalState()
   // push the current value (after awaiting minPushInterval or after maxPushInterval has passed)
   updateTicket.cancel();
   if (pushBehaviourState()) {
-    BLOG(LOG_INFO, "BinaryInput[%zu] %s '%s' now pushes current state (%d) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentState);
+    BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' now pushes current state (%d) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentState);
     lastPush = MainLoop::currentMainLoop().now();
   }
 }
