@@ -83,6 +83,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
 {
   error = aError;
   if (Error::isOK(error)) {
+    LOG(LOG_INFO, "Receiving hue API response: %s", aJsonResponse ? aJsonResponse->c_strValue() : "<no data>");
     // pre-process response in case of non-GET
     if (method!=httpMethodGET) {
       // Expected:
@@ -124,6 +125,9 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
       // GET, just return entire data
       data = aJsonResponse;
     }
+  }
+  else {
+    LOG(LOG_WARNING, "hue API error: %s", error->text());
   }
   // done
   completed = true;
