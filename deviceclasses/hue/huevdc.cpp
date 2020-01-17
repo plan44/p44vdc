@@ -90,7 +90,7 @@ string HueVdc::hardwareGUID()
 
 string HueVdc::vendorName()
 {
-  return "Philips";
+  return "Philips/Signify";
 }
 
 

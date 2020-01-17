@@ -170,6 +170,7 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
     JsonObjectPtr o;
     // get model name from device (note: with 1.3 bridge and later this could be read at collection, but pre-1.3 needs this separate call)
     hueModel.clear();
+    hueVendor.clear();
     o = aDeviceInfo->get("type");
     if (o) {
       hueModel = o->stringValue();
@@ -181,6 +182,10 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
     o = aDeviceInfo->get("swversion");
     if (o) {
       swVersion = o->stringValue();
+    }
+    o = aDeviceInfo->get("manufacturername");
+    if (o) {
+      hueVendor = o->stringValue();
     }
     // check capabilities
     o = aDeviceInfo->get("capabilities");
@@ -276,6 +281,12 @@ string HueDevice::modelVersion() const
 {
   return swVersion;
 }
+
+
+string HueDevice::vendorName()
+{
+  return hueVendor;
+};
 
 
 int HueDevice::opStateLevel()

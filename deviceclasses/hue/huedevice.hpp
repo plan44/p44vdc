@@ -50,6 +50,7 @@ namespace p44 {
 
     // information from the device itself
     string hueModel;
+    string hueVendor;
     Tristate hueCertified; // yes/no/unknown for certified hue lights
 
     // model software version
@@ -152,6 +153,9 @@ namespace p44 {
 
     /// @return human readable version string
     virtual string modelVersion() const P44_OVERRIDE;
+
+    /// @return Vendor name for display purposes
+    virtual string vendorName() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
