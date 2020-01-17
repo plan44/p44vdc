@@ -401,7 +401,12 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       lightIsOn = b>=DS_BRIGHTNESS_STEP;
       if (!lightIsOn) {
         // light should be off, no other parameters
+        if (separateOnAndChannels) {
+          newState->add("bri", JsonObject::newInt32(1));
+          lastSentBri = 1;
+        }
         newState->add("on", JsonObject::newBool(false));
+        currentlyOn = no; // assume off from now on (actual response might change it)
       }
       else {
         // light on
@@ -414,6 +419,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
               ALOG(LOG_INFO, "light with known broken API: send \"on\":true separately, transition %d mS", (int)(aTransitionTime/MilliSecond));
               JsonObjectPtr onState = JsonObject::newObj();
               onState->add("on", JsonObject::newBool(true));
+              onState->add("bri", JsonObject::newInt32(newBri)); // send it here already a first time
               onState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
               // just send, don't care about the answer
               hueComm().apiAction(httpMethodPUT, url.c_str(), onState, NULL);
@@ -427,15 +433,16 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
             }
           }
           else {
-              // no "on" change, just send brightness (no matter if changed or not)
-              newState->add("bri", JsonObject::newInt32(newBri));
-            }
+            // no "on" change, just send brightness (no matter if changed or not)
+            newState->add("bri", JsonObject::newInt32(newBri));
           }
+        }
         else {
           // normal light, can send on and bri together
           newState->add("on", JsonObject::newBool(true));
           newState->add("bri", JsonObject::newInt32(newBri));
         }
+        currentlyOn = yes; // assume off from now on (actual response might change it)
         lastSentBri = newBri;
       }
     }
