@@ -366,7 +366,7 @@ const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   { 0, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          0,    1, DB(0,7), DB(0,7), 100, 40*60, &stdInputHandler,  motionText },
   { 0, 0x07, 0x03, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0, 1024, DB(2,7), DB(1,6), 100, 40*60, &stdSensorHandler, illumText },
   { 0, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
-  //   - with PIR on message only, times out after 70 seconds (negative updateInterval in this t40*60
+  //   - with PIR on message only, times out after 70 seconds (negative updateInterval in this table)
   { 1, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_motion,      usage_room,          0,    1, DB(0,7), DB(0,7), -70, 40*60, &stdInputHandler,  motionText },
   { 1, 0x07, 0x03, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,          0, 1024, DB(2,7), DB(1,6), 100, 40*60, &stdSensorHandler, illumText },
   { 1, 0x07, 0x03, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
