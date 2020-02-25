@@ -80,13 +80,10 @@ string LedChainDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToV
 
 
 
-LedChainVdc::LedChainVdc(int aInstanceNumber, StringVector aLedChainConfigs, VdcHost *aVdcHostP, int aTag) :
-  Vdc(aInstanceNumber, aVdcHostP, aTag)
+LedChainVdc::LedChainVdc(int aInstanceNumber, LEDChainArrangementPtr aLedArrangement, VdcHost *aVdcHostP, int aTag) :
+  Vdc(aInstanceNumber, aVdcHostP, aTag),
+  ledArrangement(aLedArrangement)
 {
-  ledArrangement.isMemberVariable();
-  for (StringVector::iterator pos = aLedChainConfigs.begin(); pos!=aLedChainConfigs.end(); ++pos) {
-    ledArrangement.addLEDChain(*pos);
-  }
 }
 
 
@@ -94,17 +91,19 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   ErrorPtr err;
   // initialize root view
-  PixelRect r = ledArrangement.totalCover();
-  rootView = ViewStackPtr(new ViewStack);
-  rootView->setFrame(r);
-  rootView->setBackgroundColor(black); // stack with black background is more efficient (and there's nothing below, anyway)
-  ledArrangement.setRootView(rootView);
-  // initialize database
-  string databaseName = getPersistentDataDir();
-  string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  err = db.connectAndInitialize(databaseName.c_str(), LEDCHAINDEVICES_SCHEMA_VERSION, LEDCHAINDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
-  // Initialize chain driver
-  ledArrangement.begin(true);
+  if (ledArrangement) {
+    PixelRect r = ledArrangement->totalCover();
+    rootView = ViewStackPtr(new ViewStack);
+    rootView->setFrame(r);
+    rootView->setBackgroundColor(black); // stack with black background is more efficient (and there's nothing below, anyway)
+    ledArrangement->setRootView(rootView);
+    // initialize database
+    string databaseName = getPersistentDataDir();
+    string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
+    err = db.connectAndInitialize(databaseName.c_str(), LEDCHAINDEVICES_SCHEMA_VERSION, LEDCHAINDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
+    // Initialize chain driver
+    ledArrangement->begin(true);
+  }
   // done
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(ErrorPtr());
@@ -114,14 +113,14 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 Brightness LedChainVdc::getMinBrightness()
 {
   // scale up according to scaled down maximum, and make it 0..100
-  return ledArrangement.getMinVisibleColorIntensity()*100.0/(double)ledArrangement.getMaxOutValue();
+  return ledArrangement ? ledArrangement->getMinVisibleColorIntensity()*100.0/(double)ledArrangement->getMaxOutValue() : 0;
 }
 
 
 bool LedChainVdc::hasWhite()
 {
   // so far, only SK6812 have white
-  return ledArrangement.hasWhite();
+  return ledArrangement ? ledArrangement->hasWhite() : false;
 }
 
 
@@ -155,7 +154,7 @@ LedChainDevicePtr LedChainVdc::addLedChainDevice(int aX, int aDx, int aY, int aD
     rootView->setPositioningMode(P44View::noAdjust);
     rootView->pushView(newDev->lightView);
     // - re-render
-    ledArrangement.render();
+    if (ledArrangement) ledArrangement->render();
     return boost::dynamic_pointer_cast<LedChainDevice>(newDev);
   }
   // none added
@@ -172,7 +171,7 @@ void LedChainVdc::removeDevice(DevicePtr aDevice, bool aForget)
     // - remove device's view
     rootView->removeView(dev->lightView);
     // - re-render
-    ledArrangement.render();
+    if (ledArrangement) ledArrangement->render();
   }
 }
 

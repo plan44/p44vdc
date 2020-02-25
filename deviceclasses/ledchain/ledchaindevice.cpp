@@ -319,7 +319,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   pix.g = g;
   pix.b = b;
   pix.a = 255;
-  lightView->setAlpha(cl->brightnessForHardware()*getLedChainVdc().ledArrangement.getMaxOutValue()/100); // alpha is brightness, scaled down to maxOutValue
+  lightView->setAlpha(cl->brightnessForHardware()*getLedChainVdc().ledArrangement->getMaxOutValue()/100); // alpha is brightness, scaled down to maxOutValue
   P44ViewPtr targetView = lightView->getView("LIGHT"); // where to direct extras to
   if (!targetView) targetView = lightView;
   if (ml) {
@@ -363,7 +363,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     // simple area, just set foreground color
     lightView->setForegroundColor(pix);
   }
-  getLedChainVdc().ledArrangement.render(); // update
+  getLedChainVdc().ledArrangement->render(); // update
   // next step
   if (moreSteps) {
     ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
