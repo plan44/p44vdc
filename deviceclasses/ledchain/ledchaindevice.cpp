@@ -57,7 +57,7 @@ protected:
   /// @param aPt content coordinate
   /// @note aPt is NOT guaranteed to be within actual content as defined by contentSize
   ///   implementation must check this!
-  virtual PixelColor contentColorAt(PixelCoord aPt)
+  virtual PixelColor contentColorAt(PixelPoint aPt)
   {
     if (isInContentSize(aPt)) return foregroundColor;
     else return transparent;
@@ -327,7 +327,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     targetView->setRelativeContentOrigin(
       (fl->horizontalPosition->getTransitionalValue()-50)/50,
       (fl->verticalPosition->getTransitionalValue()-50)/50,
-      true, // centered
+      true // centered
     );
     if (fl) {
       // feature light with extra channels
@@ -338,7 +338,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
         // features available only in ColorEffectView
         // - zoom area is (like position) twice the size of the larger dimension of the frame
         //   This means the light fully fits the frame in the larger direction at zoom==50
-        PixelCoord sz = cev->getFrameSize();
+        PixelPoint sz = cev->getFrameSize();
         int maxD = max(sz.x, sz.y);
         cev->setExtent({
           (int)(maxD*fl->horizontalZoom->getTransitionalValue()*0.01),
