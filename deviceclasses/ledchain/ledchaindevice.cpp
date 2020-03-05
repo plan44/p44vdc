@@ -326,7 +326,8 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     // moving light, has position, common to all views
     targetView->setRelativeContentOrigin(
       (fl->horizontalPosition->getTransitionalValue()-50)/50,
-      (fl->verticalPosition->getTransitionalValue()-50)/50
+      (fl->verticalPosition->getTransitionalValue()-50)/50,
+      true, // centered
     );
     if (fl) {
       // feature light with extra channels
