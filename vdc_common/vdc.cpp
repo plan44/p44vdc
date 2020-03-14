@@ -1638,6 +1638,10 @@ void OptimizerEntry::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
   // timestamps are stored as unix timestamps
   lastUse = MainLoop::unixTimeToMainLoopTime(aRow->getCasted<uint64_t, long long>(aIndex++));
   lastNativeChange = MainLoop::unixTimeToMainLoopTime(aRow->getCasted<uint64_t, long long>(aIndex++));
+  // sanity checks, cannot be in the future
+  MLMicroSeconds now = MainLoop::now();
+  if (lastUse>now) lastUse = Never; // default to not being used recently at all
+  if (lastNativeChange>now) lastNativeChange = now; // default to being a recently set-up entry to avoid deletion
 }
 
 
@@ -1664,6 +1668,7 @@ long OptimizerEntry::timeWeightedCallCount()
 {
   if (lastUse!=Never) {
     MLMicroSeconds age = MainLoop::now()-lastUse;
+    if (age<0) return numCalls>0 ? numCalls : 0; // in case of jumping time, to avoid negative numCalls
     if (age>CALL_COUNT_FADE_TIMEOUT) return 0; // completely faded away already
     return numCalls-(long)((uint64_t)numCalls*age/CALL_COUNT_FADE_TIMEOUT);
   }
