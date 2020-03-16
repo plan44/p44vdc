@@ -75,7 +75,7 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field value
   aRow->getIfNotNull<int>(aIndex++, deviceFlags);
-  device.setName(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  device.initializeName(nonNullCStr(aRow->get<const char *>(aIndex++))); // do not propagate to HW!
   aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, zoneID);
 }
 
