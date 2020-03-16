@@ -1572,11 +1572,11 @@ OptimizerEntry::OptimizerEntry() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   type(ntfy_undefined),
   numberOfDevices(0),
-  numCalls(0),
-  lastUse(Never),
-  lastNativeChange(Never),
   contentId(0),
-  contentsHash(0)
+  contentsHash(0),
+  lastNativeChange(Never),
+  numCalls(0),
+  lastUse(Never)
 {
 }
 
