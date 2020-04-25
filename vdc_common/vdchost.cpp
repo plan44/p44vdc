@@ -411,7 +411,7 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     vdcApiServer->setConnectionStatusHandler(boost::bind(&VdcHost::vdcApiConnectionStatusHandler, this, _1, _2));
     vdcApiServer->start();
   }
-  // start initialisation of class containers
+  // start initialisation of vDCs
   initializeNextVdc(aCompletedCB, aFactoryReset, vdcs.begin());
 }
 
@@ -770,7 +770,7 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
       isNetworkConnected();
       // track time of day changes
       checkTimeOfDayChange();
-      // check again for devices that need to be announced
+      // check again for devices and vdcs that need to be announced
       startAnnouncing();
       // do a save run as well
       // - myself

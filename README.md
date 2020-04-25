@@ -2,7 +2,7 @@
 p44vdc
 ======
 
-[![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=luz&url=https://github.com/plan44/p44vdc&title=p44vdc&language=&tags=github&category=software) 
+*[[if you want to support p44vdc development, please consider to sponsor plan44]](https://github.com/sponsors/plan44)* 
 
 "p44vdc" is a a free (opensource, GPLv3) framework of C++ source files, which is used to build virtual device connectors (vdcs) for digitalSTROM systems.
 
