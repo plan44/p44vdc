@@ -35,7 +35,7 @@ using namespace p44;
 namespace {
   const string MODEL_FREE_RTOS = "929000226503";
   const string MODEL_HOMEKIT_LINUX = "BSB002";
-  const string NUPNP_PATH = "https://www.meethue.com/api/nupnp";
+  const string NUPNP_PATH = "https://discovery.meethue.com/";
 }
 
 // MARK: - HueApiOperation
