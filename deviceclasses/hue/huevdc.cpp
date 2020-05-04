@@ -348,7 +348,15 @@ void HueVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tri
 {
   if (aEnableLearning) {
     if (!fixedURL || bridgeUserName.empty()) {
-      hueComm.fixedBaseURL.clear(); // do not use the cached URL for learning in/out!
+      // no IP known or not logged in: actually search for bridge to learn/unlearn
+      if (fixedURL) {
+        // use the user-defined URL
+        hueComm.fixedBaseURL = bridgeApiURL;
+      }
+      else {
+        // do not use a chached (but not explicitly user-configured) URL
+        hueComm.fixedBaseURL.clear();
+      }
       hueComm.findNewBridge(
         string_format("%s#%s", getVdcHost().modelName().c_str(), getVdcHost().getDeviceHardwareId().c_str()).c_str(),
         15*Second, // try to login for 15 secs
