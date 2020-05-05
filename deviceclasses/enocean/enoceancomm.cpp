@@ -1403,27 +1403,30 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
 bool EnOceanSecurity::AES128(const AES128Block &aKey, const AES128Block &aData, AES128Block &aAES128)
 {
   // single block AES128 (aes-128-ecb, "electronic code book")
-  EVP_CIPHER_CTX ctx;
-  EVP_CIPHER_CTX_init(&ctx);
-  if (EVP_EncryptInit_ex (&ctx, EVP_aes_128_ecb(), NULL, aKey, NULL)) {
-    EVP_CIPHER_CTX_set_padding(&ctx, false); // no padding
-    uint8_t *pointer = aAES128;
-    int outlen;
-    if (EVP_EncryptUpdate (&ctx, pointer, &outlen, aData, AES128BlockLen)) {
-      pointer += outlen;
-      if (EVP_EncryptFinal_ex(&ctx, pointer, &outlen)) {
-        return true;
+  EVP_CIPHER_CTX* ctxP = EVP_CIPHER_CTX_new();
+  if (ctxP) {
+    if (EVP_EncryptInit_ex (ctxP, EVP_aes_128_ecb(), NULL, aKey, NULL)) {
+      EVP_CIPHER_CTX_set_padding(ctxP, false); // no padding
+      uint8_t *pointer = aAES128;
+      int outlen;
+      if (EVP_EncryptUpdate(ctxP, pointer, &outlen, aData, AES128BlockLen)) {
+        pointer += outlen;
+        if (EVP_EncryptFinal_ex(ctxP, pointer, &outlen)) {
+          EVP_CIPHER_CTX_free(ctxP);
+          return true;
+        }
+        else {
+          DBGLOG(LOG_ERR, "EVP_EncryptFinal_ex failed");
+        }
       }
       else {
-        DBGLOG(LOG_ERR, "EVP_EncryptFinal_ex failed");
+        DBGLOG(LOG_ERR, "EVP_EncryptUpdate failed");
       }
     }
     else {
-      DBGLOG(LOG_ERR, "EVP_EncryptUpdate failed");
+      DBGLOG(LOG_ERR, "EVP_EncryptInit_ex failed");
     }
-  }
-  else {
-    DBGLOG(LOG_ERR, "EVP_EncryptInit_ex failed");
+    EVP_CIPHER_CTX_free(ctxP);
   }
   return false;
 }
