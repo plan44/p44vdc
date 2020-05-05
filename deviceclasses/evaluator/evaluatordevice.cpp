@@ -53,6 +53,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
 {
   // Config is:
   //  <behaviour mode>
+  int st, su;
   if (aEvaluatorConfig=="rocker")
     evaluatorType = evaluator_rocker;
   else if (aEvaluatorConfig=="input")
@@ -63,10 +64,16 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   else if (aEvaluatorConfig=="internalaction")
     evaluatorType = evaluator_internalaction;
   #endif
-  else if (sscanf(aEvaluatorConfig.c_str(), "sensor:%d:%d", &sensorType, &sensorUsage)==2)
+  else if (sscanf(aEvaluatorConfig.c_str(), "sensor:%d:%d", &st, &su)==2) {
     evaluatorType = evaluator_sensor;
-  else if (sscanf(aEvaluatorConfig.c_str(), "internalsensor:%d:%d", &sensorType, &sensorUsage)==2)
+    sensorType = (VdcSensorType)st;
+    sensorUsage = (VdcUsageHint)su;
+  }
+  else if (sscanf(aEvaluatorConfig.c_str(), "internalsensor:%d:%d", &st, &su)==2) {
     evaluatorType = evaluator_internalsensor;
+    sensorType = (VdcSensorType)st;
+    sensorUsage = (VdcUsageHint)su;
+  }
   else {
     LOG(LOG_ERR, "unknown evaluator type: %s", aEvaluatorConfig.c_str());
   }
