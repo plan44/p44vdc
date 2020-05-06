@@ -458,7 +458,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
         AFOCUSLOG("- native action already exists: '%s'", entry->nativeActionId.c_str());
         if (entry->contentsHash==aDeliveryState->contentsHash) {
           // content has not changed since native action was last updated -> we can use it!
-          ALOG(LOG_NOTICE, "Optimized %s: executing %s using native action '%s' (variant %d)", NotificationNames[aDeliveryState->callType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), aDeliveryState->actionVariant);
+          ALOG(LOG_NOTICE, "Optimized %s: executing %s using native action '%s' (contentId %d, variant %d)", NotificationNames[aDeliveryState->callType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), entry->contentId, aDeliveryState->actionVariant);
           if (aDeliveryState->repeatAfter!=Never) {
             AFOCUSLOG("- action scheduled to repeat in %.2f seconds", (double)(aDeliveryState->repeatAfter)/Second);
             // Note: it is essential to create a new delivery state here, otherwise the original notification cannot complete (coupled to object lifetime)
@@ -504,7 +504,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
         }
         else {
           // not adding action, we'll wait and see if this call repeats enough to do so
-          AFOCUSLOG("- not imporant enough -> just execute normally now");
+          AFOCUSLOG("- not important enough -> just execute normally now");
           finalizePreparedNotification(entry, aDeliveryState, Error::ok());
           return;
         }
@@ -652,7 +652,7 @@ void Vdc::createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStat
     }
   }
   else if (Error::isOK(aError)) {
-    ALOG(LOG_NOTICE, "Created native action '%s' for '%s' (variant %d)", aEntry->nativeActionId.c_str(), NotificationNames[aDeliveryState->optimizedType], aDeliveryState->actionVariant);
+    ALOG(LOG_NOTICE, "Created native action '%s' for '%s' (contentId %d, variant %d)", aEntry->nativeActionId.c_str(), NotificationNames[aDeliveryState->optimizedType], aEntry->contentId, aDeliveryState->actionVariant);
     preparedNotificationComplete(aEntry, aDeliveryState, true, aError);
     return;
   }

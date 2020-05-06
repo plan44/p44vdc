@@ -1025,10 +1025,12 @@ void DaliVdc::markUsed(DaliAddress aSceneOrGroup, bool aUsed)
   if ((aSceneOrGroup&DaliAddressTypeMask)==DaliScene) {
     uint16_t m = 1<<(aSceneOrGroup & DaliSceneMask);
     if (aUsed) usedDaliScenesMask |= m; else usedDaliScenesMask &= ~m;
+    LOG(LOG_INFO,"marked DALI scene %d %s, new mask = 0x%04hX", aSceneOrGroup & DaliSceneMask, aUsed ? "IN USE" : "FREE", usedDaliScenesMask);
   }
   else if ((aSceneOrGroup&DaliAddressTypeMask)==DaliGroup) {
     uint16_t m = 1<<(aSceneOrGroup & DaliGroupMask);
     if (aUsed) usedDaliGroupsMask |= m; else usedDaliGroupsMask &= ~m;
+    LOG(LOG_INFO,"marked DALI group %d %s, new mask = 0x%04hX", aSceneOrGroup & DaliGroupMask, aUsed ? "IN USE" : "FREE", usedDaliScenesMask);
   }
 }
 
