@@ -30,9 +30,37 @@ using namespace p44;
 
 AudioScene::AudioScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo),
-  contentSource(0),
   powerState(powerState_off)
 {
+}
+
+
+ApiValueType AudioScene::getChannelValueType(int aChannelIndex)
+{
+  ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
+  switch (cb->getChannelType()) {
+    case channeltype_p44_audio_content_source: return apivalue_string;
+    case channeltype_power_state: return apivalue_double;
+    default: return inherited::getChannelValueType(aChannelIndex);
+  }
+}
+
+string AudioScene::sceneValueString(int aChannelIndex)
+{
+  ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
+  switch (cb->getChannelType()) {
+    case channeltype_p44_audio_content_source: return contentSource;
+    default: return inherited::sceneValueString(aChannelIndex);
+  }
+}
+
+void AudioScene::setSceneValueString(int aChannelIndex, const string& aValue)
+{
+  ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
+  switch (cb->getChannelType()) {
+    case channeltype_p44_audio_content_source: setPVar(contentSource, aValue); break;
+    default: inherited::setSceneValueString(aChannelIndex, aValue); break;
+  }
 }
 
 
@@ -40,7 +68,6 @@ double AudioScene::sceneValue(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
-    case channeltype_p44_audio_content_source: return contentSource;
     case channeltype_power_state: return powerState;
     default: return inherited::sceneValue(aChannelIndex);
   }
@@ -52,11 +79,11 @@ void AudioScene::setSceneValue(int aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
-    case channeltype_p44_audio_content_source: setPVar(contentSource, (uint32_t)aValue); break;
     case channeltype_power_state: setPVar(powerState, (DsPowerState)aValue); break;
     default: inherited::setSceneValue(aChannelIndex, aValue); break;
   }
 }
+
 
 
 // MARK: - Audio Scene persistence
@@ -79,7 +106,7 @@ size_t AudioScene::numFieldDefs()
 const FieldDefinition *AudioScene::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numAudioSceneFields] = {
-    { "contentSource", SQLITE_INTEGER },
+    { "contentSource", SQLITE_TEXT },
     { "powerState", SQLITE_INTEGER },
   };
   if (aIndex<inherited::numFieldDefs())
@@ -109,7 +136,7 @@ void AudioScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
-  contentSource = aRow->get<int>(aIndex++);
+  contentSource = nonNullCStr(aRow->get<const char *>(aIndex++));
   powerState = (DsPowerState)aRow->get<int>(aIndex++);
 }
 
@@ -119,7 +146,7 @@ void AudioScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, 
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, (int)contentSource);
+  aStatement.bind(aIndex++, contentSource.c_str(), false);
   aStatement.bind(aIndex++, (int)powerState);
 }
 
@@ -479,7 +506,7 @@ void AudioBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     // - powerstate
     powerState->setChannelValueIfNotDontCare(aScene, audioScene->powerState, 0, 0, false);
     // - content source
-    contentSource->setChannelValueIfNotDontCare(aScene, audioScene->contentSource, 0, 0, !audioScene->command.empty()); // always apply if there is a command
+    contentSource->setChannelValueIfNotDontCare(aScene, audioScene->contentSource, !audioScene->command.empty()); // always apply if there is a command
     // - state restore command
     stateRestoreCmd = audioScene->command;
     stateRestoreCmdValid = !audioScene->command.empty(); // only non-empty command is considered valid
@@ -496,7 +523,7 @@ void AudioBehaviour::saveChannelsToScene(DsScenePtr aScene)
     audioScene->setSceneValueFlags(volume->getChannelIndex(), valueflags_dontCare, false);
     audioScene->setPVar(audioScene->powerState, (DsPowerState)powerState->getChannelValue());
     audioScene->setSceneValueFlags(powerState->getChannelIndex(), valueflags_dontCare, false);
-    audioScene->setPVar(audioScene->contentSource, (uint32_t)contentSource->getChannelValue());
+    audioScene->setPVar(audioScene->contentSource, contentSource->getChannelValueString());
     audioScene->setSceneValueFlags(contentSource->getChannelIndex(), valueflags_dontCare, false);
     // save command from scene if there is one
     if (stateRestoreCmdValid) {
