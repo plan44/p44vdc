@@ -186,12 +186,19 @@ namespace p44 {
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @return the scene value
     virtual double sceneValue(int aChannelIndex) = 0;
+    virtual string sceneValueString(int aChannelIndex) { return ""; /* nope in base class */}
 
     /// modify scene value
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @param aValue the new scene value
     /// @note marks scene dirty if value is actually changed
     virtual void setSceneValue(int aChannelIndex, double aValue) = 0;
+    virtual void setSceneValueString(int aChannelIndex, const string& aValue) {/* nope in base class */}
+
+    /// get output channel value type
+    /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
+    /// @return output channel value type
+    virtual ApiValueType getChannelValueType(int aChannelIndex) { return apivalue_double; }
 
     /// utility: check a scene value flag
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
