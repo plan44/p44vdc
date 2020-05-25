@@ -70,7 +70,7 @@ protected:
   {
     // scene value level properties
     static const PropertyDescription valueproperties[numValueProperties] = {
-      { "value", apivalue_double, value_key, OKEY(scenevalue_key) },
+      { "value", apivalue_null, value_key, OKEY(scenevalue_key) },
       { "dontCare", apivalue_bool, dontCare_key, OKEY(scenevalue_key) },
     };
     if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
@@ -109,6 +109,7 @@ protected:
               aPropValue->setType(apivalue_string);
               aPropValue->setStringValue(scene.sceneValueString(outputIndex));
             } else {
+              aPropValue->setType(apivalue_double);
               aPropValue->setDoubleValue(scene.sceneValue(outputIndex));
             }
             return true;

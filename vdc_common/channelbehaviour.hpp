@@ -101,7 +101,7 @@ namespace p44 {
     virtual double getMinDim() { return getMin(); }; ///< dimming min value defaults to same value as min
     virtual bool wrapsAround() { return false; }; ///< if true, channel is considered to wrap around, meaning max being the same value as min, and dimming never stopping but wrapping around. Off by default
     virtual bool enforceResolution() { return true; }; ///< if true, actual channel value will always be rounded to resolution of the channel
-
+    virtual ApiValueType getChannelValueType() { return apivalue_double; }
     /// @}
 
 
@@ -451,22 +451,21 @@ namespace p44 {
     string stringValue;
 
   public:
-    StringChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 0; };
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
-    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "stringChannel"; };
-    virtual double getMin() P44_OVERRIDE { return 0; };
-    virtual double getMax() P44_OVERRIDE { return 0; };
-    virtual double getDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
+    StringChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 0; }
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; } ///< no real dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); }
+    virtual const char *getName() P44_OVERRIDE { return "stringChannel"; }
+    virtual double getMin() P44_OVERRIDE { return 0; }
+    virtual double getMax() P44_OVERRIDE { return 0; }
+    virtual double getDimPerMS() P44_OVERRIDE { return 0; } // not dimmable
+    virtual ApiValueType getChannelValueType() P44_OVERRIDE { return apivalue_string; }
 
     virtual bool setChannelValueIfNotDontCare(DsScenePtr aScene, const string& aNewValue, bool aAlwaysApply);
     virtual void setChannelValueString(const string& aValue, bool aAlwaysSync=false);
     virtual void syncChannelValueString(const string& aValue, bool aAlwaysSync=false);
     virtual string getChannelValueString();
 
-    // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    // string value property access implementation
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE P44_FINAL;
 
     // persistence implementation

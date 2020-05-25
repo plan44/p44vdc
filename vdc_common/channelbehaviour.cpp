@@ -534,7 +534,7 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
   //static const PropertyDescription channelSettingsProperties[numChannelSettingsProperties] = {
   //};
   static const PropertyDescription channelStateProperties[numChannelStateProperties] = {
-    { "value", apivalue_double, value_key+states_key_offset, OKEY(channel_Key) }, // note: so far, pbuf API requires uint here
+    { "value", apivalue_null, value_key+states_key_offset, OKEY(channel_Key) }, // note: so far, pbuf API requires uint here
     { "age", apivalue_double, age_key+states_key_offset, OKEY(channel_Key) },
   };
   #if !REDUCED_FOOTPRINT
@@ -616,6 +616,7 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         // States properties
         case value_key+states_key_offset:
           // get value of channel, possibly calculating it if needed (color conversions)
+          aPropValue->setType(apivalue_double);
           aPropValue->setDoubleValue(getChannelValueCalculated());
           return true;
         case age_key+states_key_offset:
@@ -724,63 +725,29 @@ void StringChannel::bindToStatement(sqlite3pp::statement &aStatement, int &aInde
 }
 
 
-static char stringchannel_Key;
-
-
-int StringChannel::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  if (aParentDescriptor->isRootOfObject()) {
-    switch (aParentDescriptor->parentDescriptor->fieldKey()) {
-      case states_key_offset: return numChannelStateProperties;
-      default: return inherited::numProps(aDomain, aParentDescriptor);;
-    }
-  }
-  return inherited::numProps(aDomain, aParentDescriptor);
-}
-
-PropertyDescriptorPtr StringChannel::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  static const PropertyDescription channelStateProperties[numChannelStateProperties] = {
-    { "value", apivalue_string, value_key+states_key_offset, OKEY(stringchannel_Key) },
-    { "age", apivalue_double, age_key+states_key_offset, OKEY(stringchannel_Key) }
-  };
-  if (aParentDescriptor->parentDescriptor->isRootOfObject()) {
-    if (aPropIndex>=numProps(aDomain, aParentDescriptor))
-      return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor);;
-    switch (aParentDescriptor->parentDescriptor->fieldKey()) {
-      case states_key_offset:
-        return PropertyDescriptorPtr(new StaticPropertyDescriptor(&channelStateProperties[aPropIndex], aParentDescriptor));
-      default:
-        return NULL;
-    }
-  }
-  return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor);
-}
-
-// access to all fields
+// access to string value property
 bool StringChannel::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
-  if (aMode==access_read) {
-    // read properties
-    switch (aPropertyDescriptor->fieldKey()) {
-      // Description properties
-      // States properties
-      case value_key+states_key_offset:
-        aPropValue->setType(apivalue_string);
-        aPropValue->setStringValue(stringValue);
-        return true;
-      case age_key+states_key_offset:
-        aPropValue->setDoubleValue((double)(MainLoop::now()-channelLastSync)/Second); // time of last sync (does not necessarily relate to currently visible "value", as this might be a to-be-applied new value already)
-        return true;
+  if (aPropertyDescriptor->hasObjectKey(channel_Key)) {
+    if (aMode==access_read) {
+      // read properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        // Description properties
+        // States properties
+        case value_key+states_key_offset:
+          aPropValue->setType(apivalue_string);
+          aPropValue->setStringValue(stringValue);
+          return true;
+      }
     }
-  }
-  else {
-    // write properties
-    switch (aPropertyDescriptor->fieldKey()) {
-      // States properties
-      case value_key+states_key_offset:
-        stringValue = aPropValue->stringValue();
-        return true;
+    else {
+      // write properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        // States properties
+        case value_key+states_key_offset:
+          setChannelValueString(aPropValue->stringValue());
+          return true;
+      }
     }
   }
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);

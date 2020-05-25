@@ -38,11 +38,10 @@ AudioScene::AudioScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aScene
 ApiValueType AudioScene::getChannelValueType(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
-  switch (cb->getChannelType()) {
-    case channeltype_p44_audio_content_source: return apivalue_string;
-    case channeltype_power_state: return apivalue_double;
-    default: return inherited::getChannelValueType(aChannelIndex);
+  if (cb) {
+    return cb->getChannelValueType();
   }
+  return inherited::getChannelValueType(aChannelIndex);
 }
 
 string AudioScene::sceneValueString(int aChannelIndex)
@@ -71,7 +70,6 @@ double AudioScene::sceneValue(int aChannelIndex)
     case channeltype_power_state: return powerState;
     default: return inherited::sceneValue(aChannelIndex);
   }
-  return 0;
 }
 
 
@@ -106,7 +104,7 @@ size_t AudioScene::numFieldDefs()
 const FieldDefinition *AudioScene::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numAudioSceneFields] = {
-    { "contentSource", SQLITE_TEXT },
+    { "contentSourceStr", SQLITE_TEXT },
     { "powerState", SQLITE_INTEGER },
   };
   if (aIndex<inherited::numFieldDefs())
