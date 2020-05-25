@@ -464,6 +464,9 @@ namespace p44 {
     virtual void setChannelValueString(const string& aValue, bool aAlwaysSync=false);
     virtual void syncChannelValueString(const string& aValue, bool aAlwaysSync=false);
     virtual string getChannelValueString();
+    #if !REDUCED_FOOTPRINT
+    virtual void setValueOptions(const vector<const char*>& aValues);
+    #endif
 
     // string value property access implementation
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE P44_FINAL;

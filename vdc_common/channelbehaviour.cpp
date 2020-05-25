@@ -683,6 +683,14 @@ string StringChannel::getChannelValueString()
   return stringValue;
 }
 
+#if !REDUCED_FOOTPRINT
+void StringChannel::setValueOptions(const vector<const char*>& aValues)
+{
+  enumList = EnumListPtr(new EnumList(false));
+  enumList->addEnumTexts(aValues);
+}
+#endif
+
 static const size_t numStringChannelFields = 1;
 
 size_t StringChannel::numFieldDefs()
