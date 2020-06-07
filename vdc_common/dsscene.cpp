@@ -70,7 +70,7 @@ protected:
   {
     // scene value level properties
     static const PropertyDescription valueproperties[numValueProperties] = {
-      { "value", apivalue_null, value_key, OKEY(scenevalue_key) },
+      { "value", apivalue_null, value_key, OKEY(scenevalue_key) }, // channel value can be of different types
       { "dontCare", apivalue_bool, dontCare_key, OKEY(scenevalue_key) },
     };
     if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
@@ -105,7 +105,6 @@ protected:
         switch (aPropertyDescriptor->fieldKey()) {
           case value_key:
             if (scene.getChannelValueType(outputIndex) == apivalue_string) {
-              // override double type
               aPropValue->setType(apivalue_string);
               aPropValue->setStringValue(scene.sceneValueString(outputIndex));
             } else {
@@ -386,6 +385,16 @@ void DsScene::setSceneValueFlags(int aChannelIndex, uint32_t aFlagMask, bool aSe
       markDirty();
     }
   }
+}
+
+
+ApiValueType DsScene::getChannelValueType(int aChannelIndex)
+{
+  ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
+  if (cb) {
+    return cb->getChannelValueType();
+  }
+  return apivalue_null; // should not happen: no such channel
 }
 
 

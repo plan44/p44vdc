@@ -35,15 +35,6 @@ AudioScene::AudioScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aScene
 }
 
 
-ApiValueType AudioScene::getChannelValueType(int aChannelIndex)
-{
-  ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
-  if (cb) {
-    return cb->getChannelValueType();
-  }
-  return inherited::getChannelValueType(aChannelIndex);
-}
-
 string AudioScene::sceneValueString(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);

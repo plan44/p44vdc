@@ -68,7 +68,6 @@ namespace p44 {
     virtual void setDefaultSceneValues(SceneNo aSceneNo) P44_OVERRIDE;
 
     // scene values implementation
-    virtual ApiValueType getChannelValueType(int aChannelIndex) P44_OVERRIDE;
     virtual string sceneValueString(int aChannelIndex) P44_OVERRIDE;
     virtual void setSceneValueString(int aChannelIndex, const string& aValue) P44_OVERRIDE;
 
