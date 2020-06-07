@@ -298,11 +298,6 @@ namespace p44 {
     /// @note always updates the scene and causes write to DB even if scene was not marked dirty already
     void updateScene(DsScenePtr aScene);
 
-    /// reset scene to default values
-    /// @param aSceneNo the scene to revert to default values
-    /// @note database records will be deleted if the scene had non-default values before.
-    void resetScene(SceneNo aSceneNo);
-
     /// factory method to create the correct subclass type of DsScene with default values
     /// @param aSceneNo the scene number to create a scene object with proper default values for.
     /// @note this method can be derived in concrete subclasses to return the appropriate scene object.
