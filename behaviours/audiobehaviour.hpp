@@ -31,9 +31,9 @@ using namespace std;
 namespace p44 {
 
   /// Audio content source channel
-  class AudioContentSourceChannel : public IndexChannel
+  class AudioContentSourceChannel : public StringChannel
   {
-    typedef IndexChannel inherited;
+    typedef StringChannel inherited;
 
   public:
     AudioContentSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "contentSource") {};
@@ -58,7 +58,7 @@ namespace p44 {
     /// @name audio scene specific values
     /// @{
 
-    uint32_t contentSource; ///< the index of a content source, e.g. a song/sound effect from a list
+    std::string contentSource; ///< content source, e.g. a song/sound effect from a list
     DsPowerState powerState; ///< the power state of the audio device
 
     /// @}
@@ -68,6 +68,10 @@ namespace p44 {
     virtual void setDefaultSceneValues(SceneNo aSceneNo) P44_OVERRIDE;
 
     // scene values implementation
+    virtual ApiValueType getChannelValueType(int aChannelIndex) P44_OVERRIDE;
+    virtual string sceneValueString(int aChannelIndex) P44_OVERRIDE;
+    virtual void setSceneValueString(int aChannelIndex, const string& aValue) P44_OVERRIDE;
+
     virtual double sceneValue(int aChannelIndex) P44_OVERRIDE;
     virtual void setSceneValue(int aChannelIndex, double aValue) P44_OVERRIDE;
 

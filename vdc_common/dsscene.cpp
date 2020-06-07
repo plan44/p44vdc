@@ -70,7 +70,7 @@ protected:
   {
     // scene value level properties
     static const PropertyDescription valueproperties[numValueProperties] = {
-      { "value", apivalue_double, value_key, OKEY(scenevalue_key) },
+      { "value", apivalue_null, value_key, OKEY(scenevalue_key) },
       { "dontCare", apivalue_bool, dontCare_key, OKEY(scenevalue_key) },
     };
     if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
@@ -104,7 +104,14 @@ protected:
         // read properties
         switch (aPropertyDescriptor->fieldKey()) {
           case value_key:
-            aPropValue->setDoubleValue(scene.sceneValue(outputIndex));
+            if (scene.getChannelValueType(outputIndex) == apivalue_string) {
+              // override double type
+              aPropValue->setType(apivalue_string);
+              aPropValue->setStringValue(scene.sceneValueString(outputIndex));
+            } else {
+              aPropValue->setType(apivalue_double);
+              aPropValue->setDoubleValue(scene.sceneValue(outputIndex));
+            }
             return true;
           case dontCare_key:
             aPropValue->setBoolValue(scene.isSceneValueFlagSet(outputIndex, valueflags_dontCare));
@@ -115,7 +122,11 @@ protected:
         // write properties
         switch (aPropertyDescriptor->fieldKey()) {
           case value_key:
-            scene.setSceneValue(outputIndex, aPropValue->doubleValue());
+            if (scene.getChannelValueType(outputIndex) == apivalue_string) {
+              scene.setSceneValueString(outputIndex, aPropValue->stringValue());
+            } else {
+              scene.setSceneValue(outputIndex, aPropValue->doubleValue());
+            }
             return true;
           case dontCare_key:
             scene.setSceneValueFlags(outputIndex, valueflags_dontCare, aPropValue->boolValue());

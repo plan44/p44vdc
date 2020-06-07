@@ -534,7 +534,7 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
   //static const PropertyDescription channelSettingsProperties[numChannelSettingsProperties] = {
   //};
   static const PropertyDescription channelStateProperties[numChannelStateProperties] = {
-    { "value", apivalue_double, value_key+states_key_offset, OKEY(channel_Key) }, // note: so far, pbuf API requires uint here
+    { "value", apivalue_null, value_key+states_key_offset, OKEY(channel_Key) }, // note: so far, pbuf API requires uint here
     { "age", apivalue_double, age_key+states_key_offset, OKEY(channel_Key) },
   };
   #if !REDUCED_FOOTPRINT
@@ -616,6 +616,7 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         // States properties
         case value_key+states_key_offset:
           // get value of channel, possibly calculating it if needed (color conversions)
+          aPropValue->setType(apivalue_double);
           aPropValue->setDoubleValue(getChannelValueCalculated());
           return true;
         case age_key+states_key_offset:
@@ -640,5 +641,123 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
   }
   // single class level properties only, don't call inherited
   return false;
+}
+
+// MARK: - string channel behaviour
+
+bool StringChannel::setChannelValueIfNotDontCare(DsScenePtr aScene, const string& aNewValue, bool aAlwaysApply)
+{
+  if (aScene->isSceneValueFlagSet(getChannelIndex(), valueflags_dontCare))
+    return false; // don't care, don't set
+  setChannelValueString(aNewValue, aAlwaysApply);
+  return true; // actually set
+}
+
+void StringChannel::syncChannelValueString(const string& aActualChannelValue, bool aAlwaysSync)
+{
+  if (!channelUpdatePending || aAlwaysSync) {
+    if (stringValue!=aActualChannelValue || LOGENABLED(LOG_DEBUG)) {
+      // show only changes except if debugging
+      LOG(LOG_INFO, "Channel '%s': cached value synchronized from %s -> %s",
+        getName(), stringValue.c_str(), aActualChannelValue.c_str()
+      );
+    }
+    setPVar(stringValue, aActualChannelValue);
+    // reset pending updates
+    channelUpdatePending = false; // we are in sync
+    channelLastSync = MainLoop::now(); // value is current
+  }
+}
+
+void StringChannel::setChannelValueString(const string& aNewValue, bool aAlwaysApply)
+{
+  if (aAlwaysApply || (aNewValue!=stringValue)) {
+    LOG(LOG_INFO, "Channel '%s' is requested to change from %s ->  %s", getName(), stringValue.c_str(), aNewValue.c_str());
+    setPVar(stringValue, aNewValue); // might need to be persisted
+    channelUpdatePending = true; // pending to be sent to the device
+  }
+}
+
+string StringChannel::getChannelValueString()
+{
+  return stringValue;
+}
+
+#if !REDUCED_FOOTPRINT
+void StringChannel::setValueOptions(const vector<const char*>& aValues)
+{
+  enumList = EnumListPtr(new EnumList(false));
+  enumList->addEnumTexts(aValues);
+}
+#endif
+
+static const size_t numStringChannelFields = 1;
+
+size_t StringChannel::numFieldDefs()
+{
+  return inheritedParams::numFieldDefs()+numStringChannelFields;
+}
+
+
+const FieldDefinition *StringChannel::getFieldDef(size_t aIndex)
+{
+  static const FieldDefinition dataDefs[numStringChannelFields] = {
+    { "stringChannelValue", SQLITE_TEXT }
+  };
+  if (aIndex<inheritedParams::numFieldDefs())
+    return inheritedParams::getFieldDef(aIndex);
+  aIndex -= inheritedParams::numFieldDefs();
+  if (aIndex<numFields)
+    return &dataDefs[aIndex];
+  return NULL;
+}
+
+
+/// load values from passed row
+void StringChannel::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
+{
+  inheritedParams::loadFromRow(aRow, aIndex, NULL); // no common flags
+  string newValue = nonNullCStr(aRow->get<const char *>(aIndex++));
+  if (newValue != stringValue) {
+    channelUpdatePending = true;
+  }
+}
+
+
+// bind values to passed statement
+void StringChannel::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
+{
+  inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  // bind the fields
+  aStatement.bind(aIndex++, stringValue.c_str(), false);
+}
+
+
+// access to string value property
+bool StringChannel::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(channel_Key)) {
+    if (aMode==access_read) {
+      // read properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        // Description properties
+        // States properties
+        case value_key+states_key_offset:
+          aPropValue->setType(apivalue_string);
+          aPropValue->setStringValue(stringValue);
+          return true;
+      }
+    }
+    else {
+      // write properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        // States properties
+        case value_key+states_key_offset:
+          setChannelValueString(aPropValue->stringValue());
+          return true;
+      }
+    }
+  }
+  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
 

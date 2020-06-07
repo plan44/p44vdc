@@ -101,7 +101,7 @@ namespace p44 {
     virtual double getMinDim() { return getMin(); }; ///< dimming min value defaults to same value as min
     virtual bool wrapsAround() { return false; }; ///< if true, channel is considered to wrap around, meaning max being the same value as min, and dimming never stopping but wrapping around. Off by default
     virtual bool enforceResolution() { return true; }; ///< if true, actual channel value will always be rounded to resolution of the channel
-
+    virtual ApiValueType getChannelValueType() { return apivalue_double; }
     /// @}
 
 
@@ -284,19 +284,19 @@ namespace p44 {
   protected:
 
     // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     #if !REDUCED_FOOTPRINT
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
     #endif
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE P44_FINAL;
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE P44_FINAL;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
     virtual const char *tableName() P44_OVERRIDE P44_FINAL;
-    virtual size_t numFieldDefs() P44_OVERRIDE P44_FINAL;
-    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE P44_FINAL;
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE P44_FINAL;
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE P44_FINAL;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   private:
 
@@ -440,6 +440,45 @@ namespace p44 {
 
   };
   typedef boost::intrusive_ptr<AudioVolumeChannel> AudioVolumeChannelPtr;
+
+
+  /// string value channel
+  class StringChannel : public ChannelBehaviour
+  {
+    typedef ChannelBehaviour inherited;
+    typedef PersistentParams inheritedParams;
+
+    string stringValue;
+
+  public:
+    StringChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 0; }
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; } ///< no real dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); }
+    virtual const char *getName() P44_OVERRIDE { return "stringChannel"; }
+    virtual double getMin() P44_OVERRIDE { return 0; }
+    virtual double getMax() P44_OVERRIDE { return 0; }
+    virtual double getDimPerMS() P44_OVERRIDE { return 0; } // not dimmable
+    virtual ApiValueType getChannelValueType() P44_OVERRIDE { return apivalue_string; }
+
+    virtual bool setChannelValueIfNotDontCare(DsScenePtr aScene, const string& aNewValue, bool aAlwaysApply);
+    virtual void setChannelValueString(const string& aValue, bool aAlwaysSync=false);
+    virtual void syncChannelValueString(const string& aValue, bool aAlwaysSync=false);
+    virtual string getChannelValueString();
+    #if !REDUCED_FOOTPRINT
+    virtual void setValueOptions(const vector<const char*>& aValues);
+    #endif
+
+    // string value property access implementation
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE P44_FINAL;
+
+    // persistence implementation
+    virtual size_t numFieldDefs() P44_OVERRIDE P44_FINAL;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE P44_FINAL;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE P44_FINAL;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE P44_FINAL;
+
+  };
+  typedef boost::intrusive_ptr<StringChannel> StringChannelPtr;
 
 
 } // namespace p44
