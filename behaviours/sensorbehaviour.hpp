@@ -40,6 +40,10 @@ namespace p44 {
     eval_min ///< minimum within the window time
   } EvaluationType;
 
+  // Sliding window data evaluator.
+  // Features:
+  // - allows irregular time intervals between data points
+  // - can aggregate multiple samples into one datapoint for the sliding window
   class WindowEvaluator : public P44Obj
   {
     typedef struct {
@@ -67,13 +71,12 @@ namespace p44 {
     /// @param aEvalType the type of evaluation to perform
     WindowEvaluator(MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime, EvaluationType aEvalType);
 
-    /// Add a new value to the evaluator. Depending on
+    /// Add a new value to the evaluator.
     /// @param aValue the value to add
     /// @param aTimeStamp the timestamp, must be increasing for every call, default==Never==now
     void addValue(double aValue, MLMicroSeconds aTimeStamp = Never);
 
     /// Get the current evaluation result
-    /// @param aEvaluationType the type of evaluation to perform
     /// @note will return 0 when no datapoints are accumulated at all
     double evaluate();
 

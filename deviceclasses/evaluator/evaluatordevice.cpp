@@ -379,9 +379,9 @@ ErrorPtr EvaluatorDevice::handleReEvaluationResult(bool aIsOffCondition, Express
 {
   if (evaluatorType==evaluator_sensor || evaluatorType==evaluator_internalsensor) {
     // sensor evaluator was re-evaluated
-    // protect against state updates triggering evaluation again via cyclic references
     SensorBehaviourPtr s = getSensor(0);
     if (s) {
+      // protect against state updates triggering evaluation again via cyclic references
       reporting = true;
       if (aEvaluationResult.isValue()) {
         AFOCUSLOG("===== sensor expression result: '%s' = '%s' = %f", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.numValue());
@@ -391,9 +391,9 @@ ErrorPtr EvaluatorDevice::handleReEvaluationResult(bool aIsOffCondition, Express
         ALOG(LOG_INFO,"Sensor expression '%s' evaluation status: %s", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.stringValue().c_str());
         s->invalidateSensorValue();
       }
+      // done reporting, critical phase is over
+      reporting = false;
     }
-    // done reporting, critical phase is over
-    reporting = false;
   }
   else {
     // binary evaluator expression was re-evaluated
