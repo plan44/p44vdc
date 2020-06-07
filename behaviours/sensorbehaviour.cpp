@@ -701,7 +701,8 @@ void SensorBehaviour::prepareLogging()
         string stp;
         if (!nextPart(p, stp, ' ')) break;
         sscanf(stp.c_str(), "%ld", &step);
-        // also forward --step argument (no autostep)
+        // forward "--step" and the argument (no autostep)
+        cfgArgs.push_back(arg);
         cfgArgs.push_back(stp);
       }
       else if (arg=="auto") {
@@ -774,7 +775,7 @@ void SensorBehaviour::prepareLogging()
         args.push_back("--step"); args.push_back(string_format("%ld", step)); // use sensor's native interval if known, 15sec otherwise
       }
       // possibly automatic datasources
-      long heartbeat = aliveSignInterval ? aliveSignInterval/Second : step*5;
+      long heartbeat = aliveSignInterval ? aliveSignInterval/Second : 60*60*24; // without aliveSignInterval, allow a day of no updates
       if (autoRaw) {
         args.push_back(string_format("DS:%s_R:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
       }
