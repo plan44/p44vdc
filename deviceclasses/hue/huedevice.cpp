@@ -494,7 +494,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       l->brightness->channelValueApplied(true); // confirm early, as subsequent request might set new value again
     }
     // show what we are doing
-    if (LOGENABLED(LOG_INFO) && (!aForDimming || LOGENABLED(LOG_DEBUG))) {
+    if (ALOGENABLED(LOG_INFO) && (!aForDimming || ALOGENABLED(LOG_DEBUG))) {
       ALOG(LOG_INFO, "sending new light state: light is %s, brightness=%0.0f, transition %d mS", lightIsOn ? "ON" : "OFF", l->brightness->getChannelValue(), (int)(aTransitionTime/MilliSecond));
       if (cl) {
         switch (cl->colorMode) {

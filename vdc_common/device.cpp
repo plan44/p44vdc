@@ -471,6 +471,16 @@ OutputBehaviourPtr Device::getOutput()
 }
 
 
+DsBehaviourPtr Device::behaviourById(const string aId)
+{
+  DsBehaviourPtr b;
+  if (output && output->behaviourId==aId) b = output;
+  if (!b) b = getFromBehaviourVector(sensors, by_id, aId);
+  if (!b) b = getFromBehaviourVector(inputs, by_id, aId);
+  if (!b) b = getFromBehaviourVector(buttons, by_id, aId);
+  return b;
+}
+
 
 void Device::announcementAcknowledged()
 {
@@ -2422,6 +2432,20 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
 
 
 // MARK: - Device description/shortDesc/status
+
+
+bool Device::setLogLevelOffset(int aLogLevelOffset, const char *aSubItemSpec)
+{
+  if (aSubItemSpec) {
+    DsBehaviourPtr b = behaviourById(aSubItemSpec);
+    if (!b) return false;
+    b->logLevelOffset = aLogLevelOffset;
+    return true;
+  }
+  else {
+    return inherited::setLogLevelOffset(aLogLevelOffset, NULL);
+  }
+}
 
 
 string Device::description()

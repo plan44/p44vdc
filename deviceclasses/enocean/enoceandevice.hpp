@@ -47,7 +47,7 @@ namespace p44 {
 
 
   // per-addressable logging macros
-  #define HLOG(lvl, ...) { if (LOGENABLED(lvl)) { device.logAddressable(lvl, ##__VA_ARGS__); } }
+  #define HLOG(lvl, ...) { if (LOGENABLEDX(lvl, device.getLogLevelOffset())) { device.logAddressable(lvl, ##__VA_ARGS__); } }
   #if FOCUSLOGGING
   #define HFOCUSLOG(...) { HLOG(FOCUSLOGLEVEL, ##__VA_ARGS__); }
   #else

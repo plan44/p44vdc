@@ -360,6 +360,11 @@ namespace p44 {
     SensorBehaviourPtr getSensor(int aIndex, const string aId = "");
     BinaryInputBehaviourPtr getInput(int aIndex, const string aId = "");
 
+    /// get a behaviour (any type) by id
+    /// @param aId the behaviour id. For the output, the id is always "output"
+    /// @return first output, sensor, input, button (in that order) matching the specified id
+    DsBehaviourPtr behaviourById(const string aId);
+
     /// get specifically subtyped output behaviour
     /// @return the output behaviour or NULL if there is no output of the specified type
     template <typename T> boost::intrusive_ptr<T> getOutput() {
@@ -578,6 +583,12 @@ namespace p44 {
     /// Get short text for a "first glance" status of the device
     /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
     virtual string getStatusText() P44_OVERRIDE;
+
+    /// set the log level offset on this addressable or a (not directly addressable) subitem of it
+    /// @param aLogLevelOffset the new log level offset
+    /// @param aSubItemSpec string specifying the subitem to set the log level offset for
+    /// @return true if offset changed (i.e. subitem found if specified)
+    virtual bool setLogLevelOffset(int aLogLevelOffset, const char *aSubItemSpec = NULL);
 
 
   protected:

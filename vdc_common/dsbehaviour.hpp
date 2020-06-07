@@ -65,7 +65,8 @@ namespace p44 {
 
 
   // behaviour-level logging macro
-  #define BLOG(lvl, ...) { if (LOGENABLED(lvl)) { device.logAddressable(lvl, ##__VA_ARGS__); } }
+  #define BLOGENABLED(lvl) LOGENABLEDX(lvl, getLogLevelOffset())
+  #define BLOG(lvl, ...) { if (BLOGENABLED(lvl)) { device.logAddressable(lvl, ##__VA_ARGS__); } }
   #if FOCUSLOGGING
   #define BFOCUSLOG(...) { BLOG(FOCUSLOGLEVEL, ##__VA_ARGS__); }
   #else
@@ -84,6 +85,8 @@ namespace p44 {
 
     friend class Device;
     friend class DsScene;
+
+    int logLevelOffset; ///< will be added to BLOG log levels for checking (in 7..5 range only)
 
   protected:
 
@@ -190,6 +193,9 @@ namespace p44 {
     /// @return type string, which is the string used to prefix the xxxDescriptions, xxxSettings and xxxStates properties
     /// @note this only identifies the basic behaviour type. Subclassed behaviours can only be identified using behaviourTypeIdentifier()
     const char *getTypeName();
+
+    /// @return the per-instance log level offset
+    int getLogLevelOffset();
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs

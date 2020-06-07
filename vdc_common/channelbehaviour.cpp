@@ -213,7 +213,7 @@ double ChannelBehaviour::getTransitionalValue()
 void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlwaysSync, bool aVolatile)
 {
   if (!channelUpdatePending || aAlwaysSync) {
-    if (cachedChannelValue!=aActualChannelValue || LOGENABLED(LOG_DEBUG)) {
+    if (cachedChannelValue!=aActualChannelValue || LOGENABLEDX(LOG_DEBUG, output.device.getLogLevelOffset())) {
       // show only changes except if debugging
       SALOG(output.device,LOG_INFO,
         "Channel '%s': cached value synchronized from %0.2f -> %0.2f%s",

@@ -799,7 +799,7 @@ void SensorBehaviour::prepareLogging()
       // now add explicit config
       args.insert(args.end(), cfgArgs.begin(), cfgArgs.end());
       // create the rrd file from config
-      if (LOGENABLED(LOG_INFO)) {
+      if (BLOGENABLED(LOG_INFO)) {
         string a;
         for (int i=0; i<args.size(); ++i) a += args[i] + ' ';
         BLOG(LOG_INFO, "rrd: creating new RRD with args: %s", a.c_str());

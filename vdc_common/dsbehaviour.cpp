@@ -36,7 +36,8 @@ DsBehaviour::DsBehaviour(Device &aDevice, const string aBehaviourId) :
   device(aDevice),
   hardwareName(""), // empty, will show behaviour ID by default
   hardwareError(hardwareError_none),
-  hardwareErrorUpdated(p44::Never)
+  hardwareErrorUpdated(p44::Never),
+  logLevelOffset(0) // means: inherit from device
 {
 }
 
@@ -247,6 +248,13 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 
 
 // MARK: - description/shortDesc
+
+
+int DsBehaviour::getLogLevelOffset()
+{
+  if (logLevelOffset!=0) return logLevelOffset; // I have my own offset
+  return device.getLogLevelOffset(); // just go with device
+}
 
 
 string DsBehaviour::shortDesc()

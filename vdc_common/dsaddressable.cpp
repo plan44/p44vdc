@@ -41,7 +41,8 @@ DsAddressable::DsAddressable(VdcHost *aVdcHostP) :
   announced(Never),
   announcing(Never),
   present(true), // by default, consider addressable present
-  lastPresenceUpdate(Never)
+  lastPresenceUpdate(Never),
+  logLevelOffset(0)
 {
 }
 
@@ -230,6 +231,27 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       }
       else {
         respErr = Error::err<VdcApiError>(405, "invalid log level %d", newLevel);
+      }
+    }
+  }
+  else if (aMethod=="logleveloffset") {
+    ApiValuePtr o;
+    if (Error::isOK(respErr = checkParam(aParams, "value", o))) {
+      int logLevelOffset = o->int32Value();
+      o = aParams->get("subitem");
+      string subItemSpec;
+      const char *si = NULL;
+      if (o) {
+        // addressing a sub-item
+        subItemSpec = o->stringValue();
+        si = subItemSpec.c_str();
+      }
+      if (setLogLevelOffset(logLevelOffset, si)) {
+        ALOG(LOG_WARNING, "%s now has logleveloffset = %d", nonNullCStr(si), logLevelOffset);
+        respErr = Error::ok(); // return OK as generic response
+      }
+      else {
+        respErr = Error::err<VdcApiError>(405, "cannot set log offset for %s %s", shortDesc().c_str(), nonNullCStr(si));
       }
     }
   }
@@ -712,6 +734,20 @@ bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExp
 
 // MARK: - description/shortDesc/logging
 
+int DsAddressable::getLogLevelOffset()
+{
+  return logLevelOffset;
+}
+
+
+bool DsAddressable::setLogLevelOffset(int aLogLevelOffset, const char *aSubItemSpec)
+{
+  // base class: just set my own offset
+  logLevelOffset = aLogLevelOffset;
+  return true;
+}
+
+
 
 void DsAddressable::logAddressable(int aErrLevel, const char *aFmt, ... )
 {
@@ -721,7 +757,7 @@ void DsAddressable::logAddressable(int aErrLevel, const char *aFmt, ... )
   string message = string_format("%s %s: ", entityType(), shortDesc().c_str());
   string_format_v(message, true, aFmt, args);
   va_end(args);
-  globalLogger.logStr(aErrLevel, message);
+  globalLogger.logStr_always(aErrLevel, message);
 }
 
 
