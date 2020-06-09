@@ -90,6 +90,8 @@
 
 // - DT6 extended (device type specific) commands and queries
 #define DALICMD_DT6_SELECT_DIMMING_CURVE 0x06E3 // 1110 0011 (from DTR)
+#define DALICMD_DT6_QUERY_DIMMING_CURVE 0x06EE // 1110 1110
+#define DALICMD_DT6_QUERY_POSSIBLE_OPERATING_MODES 0x06EF // 1110 1111
 
 // - DT8 extended (device type specific) commands and queries
 #define DALICMD_DT8_SET_TEMP_XCOORD 0x08E0 // 1110 0000 (from DTR1/DTR)

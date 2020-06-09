@@ -643,11 +643,17 @@ ErrorPtr DaliVdc::daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
     // direct bridge command as 3 byte hex string
     // bb1122 (bb=bridge command, 11=first DALI, 22=second DALI
     cmd = hexToBinaryString(p->stringValue().c_str(), true, 3);
-    if (cmd.size()!=3) {
-      respErr = WebError::webErr(500, "bridgecmd must be 3 hex bytes");
+    if ((cmd.size()%3)!=0) {
+      respErr = WebError::webErr(500, "bridgecmd must be integer multiple of 3 hex bytes (one or multiple DALI bridge commands)");
     }
     else {
-      daliComm->sendBridgeCommand(cmd[0], cmd[1], cmd[2], boost::bind(&DaliVdc::bridgeCmdSent, this, aRequest, _1, _2, _3));
+      // - process all but last cmd w/o returning result
+      int c;
+      for (c=0; c<cmd.size()-3; c+=3) {
+        daliComm->sendBridgeCommand(cmd[c+0], cmd[c+1], cmd[c+2], NULL);
+      }
+      // - last cmd: return result
+      daliComm->sendBridgeCommand(cmd[c+0], cmd[c+1], cmd[c+2], boost::bind(&DaliVdc::bridgeCmdSent, this, aRequest, _1, _2, _3));
     }
   }
   else {
