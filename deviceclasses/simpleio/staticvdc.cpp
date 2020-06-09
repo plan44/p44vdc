@@ -27,7 +27,6 @@
 #include "analogiodevice.hpp"
 #include "consoledevice.hpp"
 #include "evaluatordevice.hpp"
-#include "sparkiodevice.hpp"
 #include "mystromdevice.hpp"
 
 using namespace p44;
@@ -148,10 +147,6 @@ StaticDevicePtr StaticVdc::addStaticDevice(string aDeviceType, string aDeviceCon
   else if (aDeviceType=="mystrom") {
     // mystrom WiFi switch
     newDev = DevicePtr(new MyStromDevice(this, aDeviceConfig));
-  }
-  else if (aDeviceType=="spark") {
-    // spark core based device
-    newDev = DevicePtr(new SparkIoDevice(this, aDeviceConfig));
   }
   // add to container if device was created
   if (newDev) {
