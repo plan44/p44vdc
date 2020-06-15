@@ -614,7 +614,7 @@ VdcApiConnectionPtr P44JsonApiRequest::connection()
 
 ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
 {
-  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) result sent: result=%s", aResult ? aResult->description().c_str() : "<none>");
+  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) result: %s", aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   if (result) {
     P44VdcHost::sendCfgApiResponse(jsonComm, result->jsonObject(), ErrorPtr());
@@ -633,7 +633,7 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
   if (!aError) {
     aError = Error::ok();
   }
-  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error sent: error=%ld (%s)", aError->getErrorCode(), aError->getErrorMessage());
+  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error: %ld (%s)", aError->getErrorCode(), aError->getErrorMessage());
   P44VdcHost::sendCfgApiResponse(jsonComm, JsonObjectPtr(), aError);
   return ErrorPtr();
 }
