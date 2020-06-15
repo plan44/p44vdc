@@ -559,15 +559,12 @@ namespace p44 {
     // post a vdchost (global) event to all vdcs and via event monitor callback
     void postEvent(VdchostEvent aEvent);
 
-  protected:
-
     /// add a vDC container
     /// @param aVdcPtr a intrusive_ptr to a vDC container
     /// @note this is a one-time initialisation. Device class containers are not meant to be removed at runtime
     void addVdc(VdcPtr aVdcPtr);
 
-
-    /// @name method for friend classes to send API messages
+    /// @name method for friend classes to send and process API messages
     /// @note sending results/errors is done via the VcdApiRequest object
     /// @{
 
@@ -578,6 +575,11 @@ namespace p44 {
     /// @return true if message could be sent, false otherwise (e.g. no vdSM connection)
     bool sendApiRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB());
 
+    // method and notification dispatching
+    ErrorPtr handleMethodForParams(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
+    ErrorPtr handleNotificationForParams(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams);
+    DsAddressablePtr addressableForDsUid(const DsUid &aDsUid);
+    DsAddressablePtr addressableForItemSpec(const string &aItemSpec);
 
     /// @}
 
@@ -596,12 +598,6 @@ namespace p44 {
     virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
-
-    // method and notification dispatching
-    ErrorPtr handleMethodForParams(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
-    ErrorPtr handleNotificationForParams(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams);
-    DsAddressablePtr addressableForDsUid(const DsUid &aDsUid);
-    DsAddressablePtr addressableForItemSpec(const string &aItemSpec);
 
     // activity monitor
     void signalActivity();

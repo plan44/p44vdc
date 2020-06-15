@@ -172,6 +172,8 @@ void VdcHost::postEvent(VdchostEvent aEvent)
   #if ENABLE_LOCALCONTROLLER
   if (localController) localController->processGlobalEvent(aEvent);
   #endif
+  // let vdchost itself know
+  handleGlobalEvent(aEvent);
   // also let app-level event monitor know
   if (eventMonitorHandler) {
     eventMonitorHandler(aEvent);

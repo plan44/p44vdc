@@ -62,7 +62,6 @@ namespace p44 {
   {
     typedef VdcApiConnection inherited;
 
-
   public:
 
     P44JsonApiConnection();
@@ -86,10 +85,7 @@ namespace p44 {
     /// get a new API value suitable for this connection
     /// @return new API value of suitable internal implementation to be used on this API connection
     virtual ApiValuePtr newApiValue() P44_OVERRIDE;
-
   };
-
-
 
 
   /// plan44 specific config API JSON request
@@ -128,7 +124,82 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;
 
-  #endif
+  #endif // ENABLE_JSONCFGAPI
+
+
+  #if EXPRESSION_SCRIPT_SUPPORT
+
+  /// Dummy api call from script "connection" object
+  class ScriptCallConnection : public VdcApiConnection
+  {
+    typedef VdcApiConnection inherited;
+
+  public:
+
+    ScriptCallConnection();
+
+    /// install callback for received API requests
+    /// @param aApiRequestHandler will be called when a API request has been received
+    void setRequestHandler(VdcApiRequestCB aApiRequestHandler);
+
+    /// The underlying socket connection
+    /// @return socket connection
+    virtual SocketCommPtr socketConnection() P44_OVERRIDE { return SocketCommPtr(); };
+
+    /// Cannot send a API request
+    /// @return empty or Error object in case of error
+    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE
+      { return TextError::err("can't send request to script API"); };
+
+    /// request closing connection after last message has been sent
+    virtual void closeAfterSend() P44_OVERRIDE {};
+
+    /// get a new API value suitable for this connection
+    /// @return new API value of suitable internal implementation to be used on this API connection
+    virtual ApiValuePtr newApiValue() P44_OVERRIDE;
+  };
+
+
+  /// API JSON request from script
+  class ScriptApiRequest : public VdcApiRequest
+  {
+    typedef VdcApiRequest inherited;
+
+    ScriptExecutionContextPtr scriptContext;
+
+  public:
+
+    /// constructor
+    ScriptApiRequest(ScriptExecutionContextPtr aScriptContext);
+
+    /// return the request ID as a string
+    /// @return request ID as string
+    virtual string requestId()  P44_OVERRIDE { return ""; }
+
+    /// get the API connection this request originates from
+    /// @return API connection
+    virtual VdcApiConnectionPtr connection() P44_OVERRIDE;
+
+    /// send a vDC API result (answer for successful method call)
+    /// @param aResult the result as a ApiValue. Can be NULL for procedure calls without return value
+    /// @result empty or Error object in case of error sending result response
+    virtual ErrorPtr sendResult(ApiValuePtr aResult) P44_OVERRIDE;
+
+    /// send a error to the vDC API (answer for unsuccesful method call)
+    /// @param aError the error object
+    /// @note depending on the Error object's subclass and the vDC API kind (protobuf, json...),
+    ///   different information is transmitted. ErrorCode and ErrorMessage are always sent,
+    ///   Errors based on class VdcApiError will also include errorType, errorData and userFacingMessage
+    /// @note if aError is NULL, a generic "OK" error condition is sent
+    /// @result empty or Error object in case of error sending error response
+    virtual ErrorPtr sendError(ErrorPtr aError) P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<ScriptApiRequest> ScriptApiRequestPtr;
+
+  #endif // EXPRESSION_SCRIPT_SUPPORT
+
+
 
   #if ENABLE_UBUS
 
@@ -162,8 +233,6 @@ namespace p44 {
     virtual ApiValuePtr newApiValue() P44_OVERRIDE;
 
   };
-
-
 
 
   /// ubus api request
@@ -207,7 +276,6 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<UbusApiRequest> UbusApiRequestPtr;
 
-
   #endif // ENABLE_UBUS
 
 
@@ -228,6 +296,9 @@ namespace p44 {
     UbusServerPtr ubusApiServer; ///< ubus API for openwrt web interface
     #endif
 
+    #if EXPRESSION_SCRIPT_SUPPORT
+    ScriptQueue globalScripts;
+    #endif
 
   public:
 
@@ -265,6 +336,10 @@ namespace p44 {
     /// @param aFactoryReset if set, database will be reset
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
+
     #if ENABLE_JSONCFGAPI
     static void sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError);
     #endif
@@ -288,6 +363,9 @@ namespace p44 {
     void ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string aMethod, JsonObjectPtr aJsonRequest);
     #endif
 
+    #if EXPRESSION_SCRIPT_SUPPORT
+    void runInitScripts();
+    #endif
 
     void learnHandler(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError);
     void identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice);

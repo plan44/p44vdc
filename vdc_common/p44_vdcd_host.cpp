@@ -212,6 +212,21 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 }
 
 
+
+void P44VdcHost::handleGlobalEvent(VdchostEvent aEvent)
+{
+  if (aEvent==vdchost_devices_initialized) {
+    #if EXPRESSION_SCRIPT_SUPPORT
+    // this is the moment to (re)run global scripts
+    runInitScripts();
+    #endif // EXPRESSION_SCRIPT_SUPPORT
+  }
+  inherited::handleGlobalEvent(aEvent);
+}
+
+
+
+
 #if ENABLE_UBUS
 
 // MARK: - ubus API
@@ -639,6 +654,157 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
 }
 
 #endif // ENABLE_JSONCFGAPI
+
+
+#if EXPRESSION_SCRIPT_SUPPORT
+
+// MARK: - script API - ScriptCallConnection
+
+ScriptCallConnection::ScriptCallConnection()
+{
+  setApiVersion(VDC_API_VERSION_MAX);
+}
+
+
+ApiValuePtr ScriptCallConnection::newApiValue()
+{
+  return ApiValuePtr(new JsonApiValue);
+}
+
+
+// MARK: - script API - ScriptApiRequest
+
+ScriptApiRequest::ScriptApiRequest(ScriptExecutionContextPtr aScriptContext)
+{
+  scriptContext = aScriptContext;
+}
+
+
+VdcApiConnectionPtr ScriptApiRequest::connection()
+{
+  return VdcApiConnectionPtr(new ScriptCallConnection());
+}
+
+
+ErrorPtr ScriptApiRequest::sendResult(ApiValuePtr aResult)
+{
+  LOG(LOG_DEBUG, "script <- vdcd (JSON) result: %s", aResult ? aResult->description().c_str() : "<none>");
+  JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
+  ExpressionValue res;
+  if (result) {
+    res.setJson(result->jsonObject());
+  }
+  else {
+    res.setNull();
+  }
+  scriptContext->continueWithAsyncFunctionResult(res);
+  return ErrorPtr();
+}
+
+
+ErrorPtr ScriptApiRequest::sendError(ErrorPtr aError)
+{
+  ErrorPtr err;
+  if (!aError) {
+    aError = Error::ok();
+  }
+  LOG(LOG_DEBUG, "script <- vdcd (JSON) error: %ld (%s)", aError->getErrorCode(), aError->getErrorMessage());
+  ExpressionValue res;
+  res.setError(aError);
+  scriptContext->continueWithAsyncFunctionResult(res);
+  return ErrorPtr();
+}
+
+
+// MARK: - global vdc host scripts
+
+class P44VdcHostScriptContext : public ScriptExecutionContext
+{
+  typedef ScriptExecutionContext inherited;
+  VdcHost &p44VdcHost;
+
+public:
+
+  P44VdcHostScriptContext(P44VdcHost &aP44VdcHost) :
+    inherited(&aP44VdcHost.geolocation),
+    p44VdcHost(aP44VdcHost)
+  {
+  }
+
+  bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
+  {
+    if (aFunc=="vdcapi" && aArgs.size()==1) {
+      // vdcapi(jsoncall)
+      if (aArgs[0].notValue()) return errorInArg(aArgs[0], false); // return error from argument
+      // get method/notification and params
+      JsonObjectPtr rq = aArgs[0].jsonValue();
+      JsonObjectPtr m = rq->get("method");
+      bool isMethod = false;
+      ErrorPtr err;
+      if (m) {
+        isMethod = true;
+      }
+      else {
+        m = rq->get("notification");
+      }
+      if (!m) {
+        return throwError(Error::err<P44VdcError>(400, "invalid API request, must specify 'method' or 'notification'"));
+      }
+      else {
+        // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
+        ApiValuePtr params = JsonApiValue::newValueFromJson(rq);
+        VdcApiRequestPtr request = VdcApiRequestPtr(new ScriptApiRequest(this));
+        if (isMethod) {
+          err = p44VdcHost.handleMethodForParams(request, m->stringValue(), params);
+          // Note: if method returns NULL, it has sent or will send results itself.
+          //   Otherwise, even if Error is ErrorOK we must send a generic response
+        }
+        else {
+          // handle notification
+          err = p44VdcHost.handleNotificationForParams(request->connection(), m->stringValue(), params);
+          // Notifications are always immediately confirmed, so make sure there's an explicit ErrorOK
+          if (!err) {
+            err = ErrorPtr(new Error(Error::OK));
+          }
+        }
+        if (!err) {
+          // API result will arrive later and complete function then
+          aNotYielded = false;
+        }
+        else {
+          request->sendError(err);
+        }
+      }
+      return true;
+    }
+    return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
+  }
+
+};
+
+void P44VdcHost::runInitScripts()
+{
+  globalScripts.clear();
+  // command line provided script
+  string scriptFn;
+  string script;
+  if (CmdLineApp::sharedCmdLineApp()->getStringOption("initscript", scriptFn)) {
+    scriptFn = Application::sharedApplication()->resourcePath(scriptFn);
+    ErrorPtr err = string_fromfile(scriptFn, script);
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "cannot open initscript: %s", err->text());
+    }
+    else {
+      ScriptExecutionContextPtr s = ScriptExecutionContextPtr(new P44VdcHostScriptContext(*this));
+      s->setCode(script);
+      s->setContextInfo("initscript", this);
+      globalScripts.queueScript(s);
+    }
+  }
+}
+
+
+#endif // EXPRESSION_SCRIPT_SUPPORT
 
 
 // MARK: - P44 specific vdchost level methods
