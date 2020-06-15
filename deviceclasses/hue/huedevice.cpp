@@ -148,7 +148,7 @@ void HueDevice::checkBrokenDevices(JsonObjectPtr aDeviceInfo)
     aDeviceInfo->get("modelid", o) && o->stringValue()=="VOLARE ZB3" &&
     aDeviceInfo->get("swversion", o) && o->stringValue()=="v.1.2"
   ) {
-    ALOG(LOG_WARNING, "Model %s is known broken, enabling tweaks. device info:\n%s", hueModel.c_str(), aDeviceInfo->c_strValue());
+    OLOG(LOG_WARNING, "Model %s is known broken, enabling tweaks. device info:\n%s", hueModel.c_str(), aDeviceInfo->c_strValue());
     separateOnAndChannels = true;
   }
 }
@@ -373,7 +373,7 @@ void HueDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 void HueDevice::reapplyTimerHandler(MLMicroSeconds aTransitionTime)
 {
   reapplyTicket.cancel();
-  ALOG(LOG_INFO, "Re-applying values to hue to make sure light actually is udpated");
+  OLOG(LOG_INFO, "Re-applying values to hue to make sure light actually is udpated");
   applyLightState(NULL, false, true, aTransitionTime);
 }
 
@@ -416,7 +416,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
           if (currentlyOn!=yes || aReapply) {
             if (lastSentBri!=newBri || aReapply) {
               // both on and bri changes -> need to send "on" ahead
-              ALOG(LOG_INFO, "light with known broken API: send \"on\":true separately, transition %d mS", (int)(aTransitionTime/MilliSecond));
+              OLOG(LOG_INFO, "light with known broken API: send \"on\":true separately, transition %d mS", (int)(aTransitionTime/MilliSecond));
               JsonObjectPtr onState = JsonObject::newObj();
               onState->add("on", JsonObject::newBool(true));
               onState->add("bri", JsonObject::newInt32(newBri)); // send it here already a first time
@@ -494,8 +494,8 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       l->brightness->channelValueApplied(true); // confirm early, as subsequent request might set new value again
     }
     // show what we are doing
-    if (ALOGENABLED(LOG_INFO) && (!aForDimming || ALOGENABLED(LOG_DEBUG))) {
-      ALOG(LOG_INFO, "sending new light state: light is %s, brightness=%0.0f, transition %d mS", lightIsOn ? "ON" : "OFF", l->brightness->getChannelValue(), (int)(aTransitionTime/MilliSecond));
+    if (OLOGENABLED(LOG_INFO) && (!aForDimming || OLOGENABLED(LOG_DEBUG))) {
+      OLOG(LOG_INFO, "sending new light state: light is %s, brightness=%0.0f, transition %d mS", lightIsOn ? "ON" : "OFF", l->brightness->getChannelValue(), (int)(aTransitionTime/MilliSecond));
       if (cl) {
         switch (cl->colorMode) {
           case colorLightModeHueSaturation:

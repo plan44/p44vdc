@@ -102,7 +102,7 @@ string ButtonBehaviour::getAutoId()
 
 void ButtonBehaviour::updateButtonState(bool aPressed)
 {
-  BLOG(LOG_NOTICE, "Button[%zu] %s '%s' reports %s", index, behaviourId.c_str(), getHardwareName().c_str(), aPressed ? "pressed" : "released");
+  OLOG(LOG_NOTICE, "reports %s", aPressed ? "pressed" : "released");
   bool stateChanged = aPressed!=buttonPressed;
   buttonPressed = aPressed; // remember new state
   // check which statemachine to use
@@ -193,7 +193,7 @@ void ButtonBehaviour::holdRepeat()
 {
   buttonStateMachineTicket.cancel();
   // button still pressed
-  BFOCUSLOG("dimming in progress - sending ct_hold_repeat (repeatcount = %d)", holdRepeats);
+  FOCUSOLOG("dimming in progress - sending ct_hold_repeat (repeatcount = %d)", holdRepeats);
   sendClick(ct_hold_repeat);
   holdRepeats++;
   if (holdRepeats<max_hold_repeats) {
@@ -234,7 +234,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
   timerRef = aNow;
 
   if (buttonMode==buttonMode_turbo || stateMachineMode==statemachine_simple) {
-    BFOCUSLOG("simple button state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
+    FOCUSOLOG("simple button state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
     // reset click counter if tip timeout has passed since last event
     if (timeSinceRef>t_tip_timeout) {
       clickCounter = 0;
@@ -277,7 +277,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
     }
   }
   else if (stateMachineMode==statemachine_dimmer) {
-    BFOCUSLOG("dimmer button state machine entered");
+    FOCUSOLOG("dimmer button state machine entered");
     // just issue hold and stop events (e.g. for volume)
     if (aStateChanged) {
       if (isLocalButtonEnabled() && isOutputOn()) {
@@ -287,7 +287,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
       else {
         // not local button mode
         if (buttonPressed) {
-          BFOCUSLOG("started dimming - sending ct_hold_start");
+          FOCUSOLOG("started dimming - sending ct_hold_start");
           // button just pressed
           sendClick(ct_hold_start);
           // schedule hold repeats
@@ -296,7 +296,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
         }
         else {
           // button just released
-          BFOCUSLOG("stopped dimming - sending ct_hold_end");
+          FOCUSOLOG("stopped dimming - sending ct_hold_end");
           sendClick(ct_hold_end);
           buttonStateMachineTicket.cancel();
         }
@@ -304,7 +304,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
     }
   }
   else {
-    BLOG(LOG_ERR, "invalid stateMachineMode");
+    OLOG(LOG_ERR, "invalid stateMachineMode");
   }
 }
 
@@ -315,7 +315,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
   buttonStateMachineTicket.cancel();
   MLMicroSeconds timeSinceRef = aNow-timerRef;
 
-  BFOCUSLOG("button state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
+  FOCUSOLOG("state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
   switch (state) {
 
     case S0_idle :
@@ -493,7 +493,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       }
       break;
   }
-  BFOCUSLOG(" -->                       exit state %s with %sfurther timing needed", stateNames[state], timerRef!=Never ? "" : "NO ");
+  FOCUSOLOG(" -->                       exit state %s with %sfurther timing needed", stateNames[state], timerRef!=Never ? "" : "NO ");
   if (timerRef!=Never) {
     // need timing, schedule calling again
     buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::checkStandardStateMachine, this, false, _2), 10*MilliSecond);
@@ -540,7 +540,7 @@ VdcDimMode ButtonBehaviour::twoWayDirection()
 
 void ButtonBehaviour::localSwitchOutput()
 {
-  BLOG(LOG_NOTICE, "Button[%zu] '%s': Local switch", index, getHardwareName().c_str());
+  OLOG(LOG_NOTICE, "Local switch");
   int dir = twoWayDirection();
   if (dir==0) {
     // single button, toggle
@@ -561,7 +561,7 @@ void ButtonBehaviour::localSwitchOutput()
 
 void ButtonBehaviour::localDim(bool aStart)
 {
-  BLOG(LOG_NOTICE, "Button[%zu] %s '%s': Local dim %s", index, behaviourId.c_str(), getHardwareName().c_str(), aStart ? "START" : "STOP");
+  OLOG(LOG_NOTICE, "Local dim %s", aStart ? "START" : "STOP");
   ChannelBehaviourPtr channel = device.getChannelByIndex(0); // default channel
   if (channel) {
     if (aStart) {
@@ -598,10 +598,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
   // button press is considered a (regular!) user action, have it checked globally first
   if (!device.getVdcHost().signalDeviceUserAction(device, true)) {
     // button press not consumed on global level, forward to upstream dS
-    BLOG(LOG_NOTICE,
-      "Button[%zu] '%s' pushes value = %d, clickType %d",
-      index, getHardwareName().c_str(), buttonPressed, aClickType
-    );
+    OLOG(LOG_NOTICE, "pushes value = %d, clickType %d", buttonPressed, aClickType);
     // issue a state property push
     pushBehaviourState();
     #if ENABLE_LOCALCONTROLLER
@@ -635,10 +632,7 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
   lastAction = MainLoop::now();
   actionMode = aActionMode;
   actionId = aActionId;
-  BLOG(LOG_NOTICE,
-    "Button[%zu] %s '%s' pushes actionMode = %d, actionId %d",
-    index, behaviourId.c_str(), getHardwareName().c_str(), actionMode, actionId
-  );
+  OLOG(LOG_NOTICE, "pushes actionMode = %d, actionId %d", actionMode, actionId);
   // issue a state property push
   pushBehaviourState();
 }
@@ -1005,12 +999,12 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           // for unchangeably paired (rocker) buttons, automatically change group on counterpart
           if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
             // also change group in button1
-            BLOG(LOG_NOTICE,"paired button group changed in button0 -> also changed in button1");
+            OLOG(LOG_NOTICE,"paired button group changed in button0 -> also changed in button1");
             ButtonBehaviourPtr bb = device.getButton(1); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
           }
           else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
             // also change group in button0
-            BLOG(LOG_NOTICE,"paired button group changed in button1 -> also changed in button0");
+            OLOG(LOG_NOTICE,"paired button group changed in button1 -> also changed in button0");
             ButtonBehaviourPtr bb = device.getButton(0); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
           }
           return true;
@@ -1028,12 +1022,12 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           // for unchangeably paired (rocker) buttons, automatically change function on counterpart
           if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
             // also change function in button1
-            BLOG(LOG_NOTICE,"paired button function changed in button0 -> also changed in button1");
+            OLOG(LOG_NOTICE,"paired button function changed in button0 -> also changed in button1");
             ButtonBehaviourPtr bb = device.getButton(1); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
           }
           else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
             // also change function in button0
-            BLOG(LOG_NOTICE,"paired button function changed in button1 -> also changed in button0");
+            OLOG(LOG_NOTICE,"paired button function changed in button1 -> also changed in button0");
             ButtonBehaviourPtr bb = device.getButton(0); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
           }
           return true;

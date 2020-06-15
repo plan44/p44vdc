@@ -62,11 +62,11 @@ StaticVdc &StaticDevice::getStaticVdc()
 
 void StaticDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
-  ALOG(LOG_DEBUG, "disconnecting static device with rowid=%lld", staticDeviceRowID);
+  OLOG(LOG_DEBUG, "disconnecting static device with rowid=%lld", staticDeviceRowID);
   // clear learn-in data from DB
   if (staticDeviceRowID) {
     if(getStaticVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", staticDeviceRowID)!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Edeleting static device: %s", getStaticVdc().db.error()->description().c_str());
+      OLOG(LOG_ERR, "Edeleting static device: %s", getStaticVdc().db.error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now

@@ -624,7 +624,7 @@ ErrorPtr SceneDeviceSettings::saveChildren()
     // save all elements of the map (only dirty ones will be actually stored to DB
     for (DsSceneMap::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
       err = pos->second->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed
-      if (Error::notOK(err)) SALOG(device, LOG_ERR,"Error saving scene %d: %s", pos->second->sceneNo, err->text());
+      if (Error::notOK(err)) SOLOG(device, LOG_ERR,"Error saving scene %d: %s", pos->second->sceneNo, err->text());
     }
   }
   return err;
@@ -673,14 +673,14 @@ void SceneDeviceSettings::loadScenesFromFiles()
       int syserr = errno;
       if (syserr!=ENOENT) {
         // file not existing is ok, all other errors must be reported
-        SALOG(device, LOG_ERR, "failed opening file '%s' - %s", fn.c_str(), strerror(syserr));
+        SOLOG(device, LOG_ERR, "failed opening file '%s' - %s", fn.c_str(), strerror(syserr));
       }
       // don't process, try next
-      SALOG(device, LOG_DEBUG, "loadScenesFromFiles: tried '%s' - not found", fn.c_str());
+      SOLOG(device, LOG_DEBUG, "loadScenesFromFiles: tried '%s' - not found", fn.c_str());
     }
     else {
       // file opened
-      SALOG(device, LOG_DEBUG, "loadScenesFromFiles: found '%s' - processing", fn.c_str());
+      SOLOG(device, LOG_DEBUG, "loadScenesFromFiles: found '%s' - processing", fn.c_str());
       while (string_fgetline(file, line)) {
         lineNo++;
         // skip empty lines and those starting with #, allowing to format and comment CSV
@@ -703,7 +703,7 @@ void SceneDeviceSettings::loadScenesFromFiles()
           // read scene number
           int sceneNo;
           if (sscanf(fp, "%d", &sceneNo)!=1) {
-            SALOG(device, LOG_ERR, "%s:%d - no or invalid scene number", fn.c_str(), lineNo);
+            SOLOG(device, LOG_ERR, "%s:%d - no or invalid scene number", fn.c_str(), lineNo);
             continue; // no valid scene number -> invalid line
           }
           // check if this scene is already in the list (i.e. already has non-hardwired settings)
@@ -724,7 +724,7 @@ void SceneDeviceSettings::loadScenesFromFiles()
           scene->markClean();
           // put scene into table
           scenes[sceneNo] = scene;
-          SALOG(device, LOG_INFO, "Customized scene %d %sfrom config file %s", sceneNo, overridden ? "(with override) " : "", fn.c_str());
+          SOLOG(device, LOG_INFO, "Customized scene %d %sfrom config file %s", sceneNo, overridden ? "(with override) " : "", fn.c_str());
         }
       }
       fclose(file);

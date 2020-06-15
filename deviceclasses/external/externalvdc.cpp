@@ -153,7 +153,7 @@ ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceCon
 
 ExternalDevice::~ExternalDevice()
 {
-  ALOG(LOG_DEBUG, "destructed");
+  OLOG(LOG_DEBUG, "destructed");
 }
 
 

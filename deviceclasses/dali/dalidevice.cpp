@@ -1404,14 +1404,14 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
           // RGBWA
           rgbl->getRGBWA(r, g, b, w, a, 127, true);
           if (!aForDimming) {
-            ALOG(LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
+            OLOG(LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
           }
         }
         else {
           // RGBW
           rgbl->getRGBW(r, g, b, w, 127, true);
           if (!aForDimming) {
-            ALOG(LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
+            OLOG(LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
           }
         }
       }
@@ -1419,7 +1419,7 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
         // RGB
         rgbl->getRGB(r, g, b, 127, true);
         if (!aForDimming) {
-          ALOG(LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
+          OLOG(LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
         }
       }
       needactivation = daliController->setRGBWAParams(r, g, b, w, a);
@@ -1472,7 +1472,7 @@ void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDim
     if (aChannel->getChannelType()==channeltype_brightness) {
       // start dimming
       if (aDoApply) {
-        ALOG(LOG_INFO,
+        OLOG(LOG_INFO,
           "dimChannel (DALI): channel '%s' %s",
           aChannel->getName(),
           aDimMode==dimmode_stop ? "STOPS dimming" : (aDimMode==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
@@ -1905,21 +1905,21 @@ void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithCol
         // CT
         cl->getCWWW(w, a, 100); // dali dimmers use abstracted 0..100% brightness as input
         if (!aForDimming) {
-          ALOG(LOG_INFO, "DALI composite CWWW: CW=%d, WW=%d", (int)w, (int)a);
+          OLOG(LOG_INFO, "DALI composite CWWW: CW=%d, WW=%d", (int)w, (int)a);
         }
       }
       else {
         // RGBWA
         cl->getRGBWA(r, g, b, w, a, 100); // dali dimmers use abstracted 0..100% brightness as input
         if (!aForDimming) {
-          ALOG(LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
+          OLOG(LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
         }
       }
     }
     else {
       cl->getRGBW(r, g, b, w, 100); // dali dimmers use abstracted 0..100% brightness as input
       if (!aForDimming) {
-        ALOG(LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
+        OLOG(LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
       }
     }
   }
@@ -1927,7 +1927,7 @@ void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithCol
     // RGB
     cl->getRGB(r, g, b, 100); // dali dimmers use abstracted 0..100% brightness as input
     if (!aForDimming) {
-      ALOG(LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
+      OLOG(LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
     }
   }
   // apply new values
@@ -2178,7 +2178,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     addBehaviour(ib);
   }
   else {
-    ALOG(LOG_ERR, "unknown device type");
+    OLOG(LOG_ERR, "unknown device type");
   }
   // mark used groups/scenes
   for (int i=0; i<numAddresses; i++) {
@@ -2218,11 +2218,11 @@ bool DaliInputDevice::isSoftwareDisconnectable()
 
 void DaliInputDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
-  ALOG(LOG_DEBUG, "disconnecting DALI input device with rowid=%lld", daliInputDeviceRowID);
+  OLOG(LOG_DEBUG, "disconnecting DALI input device with rowid=%lld", daliInputDeviceRowID);
   // clear learn-in data from DB
   if (daliInputDeviceRowID) {
     if(daliVdc().db.executef("DELETE FROM inputDevices WHERE rowid=%lld", daliInputDeviceRowID)!=SQLITE_OK) {
-      ALOG(LOG_ERR, "deleting DALI input device: %s", daliVdc().db.error()->description().c_str());
+      OLOG(LOG_ERR, "deleting DALI input device: %s", daliVdc().db.error()->description().c_str());
     }
     for (int i=0; i<numAddresses; i++) {
       daliVdc().markUsed(baseAddress+i, false);

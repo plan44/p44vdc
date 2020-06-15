@@ -144,7 +144,7 @@ void EldatDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultH
 {
   // clear learn-in data from DB
   if(getEldatVdc().db.executef("DELETE FROM knownDevices WHERE eldatAddress=%d AND subdevice=%d", getAddress(), getSubDevice())!=SQLITE_OK) {
-    ALOG(LOG_ERR, "Error deleting device: %s", getEldatVdc().db.error()->description().c_str());
+    OLOG(LOG_ERR, "Error deleting device: %s", getEldatVdc().db.error()->description().c_str());
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);
@@ -657,10 +657,10 @@ void EldatRemoteControlDevice::sendFunction(EldatFunction aFunction)
 void EldatRemoteControlDevice::sentFunction(string aAnswer, ErrorPtr aError)
 {
   if (Error::notOK(aError)) {
-    ALOG(LOG_ERR, "Error sending message: %s", aError->text());
+    OLOG(LOG_ERR, "Error sending message: %s", aError->text());
   }
   else {
-    ALOG(LOG_INFO, "Sending function result: %s", aAnswer.c_str());
+    OLOG(LOG_INFO, "Sending function result: %s", aAnswer.c_str());
   }
 }
 

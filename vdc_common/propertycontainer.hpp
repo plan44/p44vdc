@@ -211,7 +211,7 @@ namespace p44 {
   /// a single C++ class can implement multiple levels of the property tree.
   /// PropertyContainer is also designed to allow subclasses adding property fields to the fields
   /// provided by base classes, without modifications of the base class.
-  class PropertyContainer : public P44Obj
+  class PropertyContainer : public P44LoggingObj
   {
 
   public:

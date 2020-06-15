@@ -41,8 +41,7 @@ DsAddressable::DsAddressable(VdcHost *aVdcHostP) :
   announced(Never),
   announcing(Never),
   present(true), // by default, consider addressable present
-  lastPresenceUpdate(Never),
-  logLevelOffset(0)
+  lastPresenceUpdate(Never)
 {
 }
 
@@ -234,27 +233,6 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       }
     }
   }
-  else if (aMethod=="logleveloffset") {
-    ApiValuePtr o;
-    if (Error::isOK(respErr = checkParam(aParams, "value", o))) {
-      int logLevelOffset = o->int32Value();
-      o = aParams->get("subitem");
-      string subItemSpec;
-      const char *si = NULL;
-      if (o) {
-        // addressing a sub-item
-        subItemSpec = o->stringValue();
-        si = subItemSpec.c_str();
-      }
-      if (setLogLevelOffset(logLevelOffset, si)) {
-        ALOG(LOG_WARNING, "%s now has logleveloffset = %d", nonNullCStr(si), logLevelOffset);
-        respErr = Error::ok(); // return OK as generic response
-      }
-      else {
-        respErr = Error::err<VdcApiError>(405, "cannot set log offset for %s %s", shortDesc().c_str(), nonNullCStr(si));
-      }
-    }
-  }
   else {
     respErr = Error::err<VdcApiError>(405, "unknown method '%s'", aMethod.c_str());
   }
@@ -312,7 +290,7 @@ bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEv
   else {
     if (isPublicDS()) {
       // is public, but not yet announced, show warning (non-public devices never push and must not log anything here)
-      ALOG(LOG_WARNING, "pushNotification suppressed - is not yet announced");
+      OLOG(LOG_WARNING, "pushNotification suppressed - is not yet announced");
     }
   }
   return false; // push not possible now
@@ -335,7 +313,7 @@ void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultOb
     sendRequest("pushNotification", pushParams);
   }
   else {
-    ALOG(LOG_WARNING, "push failed because to-be-pushed property could not be accessed: %s", aError->text());
+    OLOG(LOG_WARNING, "push failed because to-be-pushed property could not be accessed: %s", aError->text());
   }
 }
 
@@ -346,17 +324,17 @@ bool DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const
 {
   if (aNotification=="ping") {
     // issue device ping (which will issue a pong when device is reachable)
-    ALOG(LOG_INFO, "ping -> checking presence...");
+    OLOG(LOG_INFO, "ping -> checking presence...");
     checkPresence(boost::bind(&DsAddressable::pingResultHandler, this, _1));
   }
   else if (aNotification=="identify") {
     // identify to user
-    ALOG(LOG_NOTICE, "Identify");
+    OLOG(LOG_NOTICE, "Identify");
     identifyToUser();
   }
   else {
     // unknown notification
-    ALOG(LOG_WARNING, "unknown notification '%s'", aNotification.c_str());
+    OLOG(LOG_WARNING, "unknown notification '%s'", aNotification.c_str());
     return false;
   }
   return true;
@@ -365,7 +343,7 @@ bool DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const
 
 void DsAddressable::identifyToUser()
 {
-  ALOG(LOG_WARNING, "***** 'identify' called (but addressable does not have a hardware implementation for it)");
+  OLOG(LOG_WARNING, "***** 'identify' called (but addressable does not have a hardware implementation for it)");
 }
 
 
@@ -393,11 +371,11 @@ void DsAddressable::pingResultHandler(bool aIsPresent)
   // send pong
   if (aIsPresent) {
     // send back Pong notification
-    ALOG(LOG_INFO, "is present -> sending pong");
+    OLOG(LOG_INFO, "is present -> sending pong");
     sendRequest("pong", ApiValuePtr());
   }
   else {
-    ALOG(LOG_NOTICE, "is NOT present -> no Pong sent");
+    OLOG(LOG_NOTICE, "is NOT present -> no Pong sent");
   }
 }
 
@@ -410,7 +388,7 @@ void DsAddressable::updatePresenceState(bool aPresent)
   if (aPresent!=present || first) {
     // change in presence
     present = aPresent;
-    ALOG(LOG_NOTICE, "changes to %s", aPresent ? "PRESENT" : "OFFLINE");
+    OLOG(LOG_NOTICE, "changes to %s", aPresent ? "PRESENT" : "OFFLINE");
     // push change in presence
     VdcApiConnectionPtr api = getVdcHost().getSessionConnection();
     if (api) {
@@ -456,6 +434,7 @@ enum {
   statusText_key,
   opStateLevel_key,
   opStateText_key,
+  logLevelOffset_key,
   deviceIcon16_key,
   iconName_key,
   name_key,
@@ -494,6 +473,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     { "x-p44-statusText", apivalue_string, statusText_key, OKEY(dsAddressable_key) },
     { "x-p44-opStateLevel", apivalue_uint64, opStateLevel_key, OKEY(dsAddressable_key) },
     { "x-p44-opStateText", apivalue_string, opStateText_key, OKEY(dsAddressable_key) },
+    { "x-p44-logLevelOffset", apivalue_int64, logLevelOffset_key, OKEY(dsAddressable_key) },
     { "deviceIcon16", apivalue_binary, deviceIcon16_key, OKEY(dsAddressable_key) },
     { "deviceIconName", apivalue_string, iconName_key, OKEY(dsAddressable_key) },
     { "name", apivalue_string, name_key, OKEY(dsAddressable_key) },
@@ -538,6 +518,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
     if (aMode!=access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case name_key: setName(aPropValue->stringValue()); return true;
+        case logLevelOffset_key: setLogLevelOffset(aPropValue->int32Value()); return true;
       }
     }
     else {
@@ -560,6 +541,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case statusText_key: aPropValue->setStringValue(getStatusText()); return true;
         case opStateLevel_key: { int l=opStateLevel(); if (l<0) aPropValue->setNull(); else aPropValue->setUint16Value(l); return true; }
         case opStateText_key: aPropValue->setStringValue(getOpStateText()); return true;
+        case logLevelOffset_key: { int o=getLocalLogLevelOffset(); if (o==0) return false; else aPropValue->setInt32Value(o); return true; }
         case objectDescription_key: aPropValue->setStringValue(description()); return true;
         case deviceIcon16_key: { string icon; if (getDeviceIcon(icon, true, "icon16")) { aPropValue->setBinaryValue(icon); return true; } else return false; }
         case iconName_key: { string iconName; if (getDeviceIcon(iconName, false, "icon16")) { aPropValue->setStringValue(iconName); return true; } else return false; }
@@ -723,7 +705,7 @@ bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExp
     }
     fclose(file);
     if (anySettingsApplied) {
-      ALOG(LOG_INFO, "Customized settings from config file %s", aCSVFilepath);
+      OLOG(LOG_INFO, "Customized settings from config file %s", aCSVFilepath);
     }
   }
   return anySettingsApplied;
@@ -734,30 +716,9 @@ bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExp
 
 // MARK: - description/shortDesc/logging
 
-int DsAddressable::getLogLevelOffset()
+string DsAddressable::logContextPrefix()
 {
-  return logLevelOffset;
-}
-
-
-bool DsAddressable::setLogLevelOffset(int aLogLevelOffset, const char *aSubItemSpec)
-{
-  // base class: just set my own offset
-  logLevelOffset = aLogLevelOffset;
-  return true;
-}
-
-
-
-void DsAddressable::logAddressable(int aErrLevel, const char *aFmt, ... )
-{
-  va_list args;
-  va_start(args, aFmt);
-  // format the message
-  string message = string_format("%s %s: ", entityType(), shortDesc().c_str());
-  string_format_v(message, true, aFmt, args);
-  va_end(args);
-  globalLogger.logStr_always(aErrLevel, message);
+  return string_format("%s %s", entityType(), shortDesc().c_str());
 }
 
 

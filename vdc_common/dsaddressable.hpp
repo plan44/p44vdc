@@ -28,16 +28,6 @@
 
 #include "vdcapi.hpp"
 
-// per-addressable logging macros
-#define ALOGENABLED(lvl) LOGENABLEDX(lvl, getLogLevelOffset())
-#define ALOG(lvl, ...) { if (ALOGENABLED(lvl)) { logAddressable(lvl, ##__VA_ARGS__); } }
-#define SALOG(addressable,lvl, ...) { if (LOGENABLEDX(lvl, addressable.getLogLevelOffset())) { addressable.logAddressable(lvl, ##__VA_ARGS__); } }
-#if FOCUSLOGGING
-#define AFOCUSLOG(...) { ALOG(FOCUSLOGLEVEL, ##__VA_ARGS__); }
-#else
-#define AFOCUSLOG(...)
-#endif
-
 using namespace std;
 
 namespace p44 {
@@ -84,8 +74,6 @@ namespace p44 {
 
     bool present; ///< current presence ("active" property) status
     MLMicroSeconds lastPresenceUpdate; ///< when presence state was last updated
-
-    int logLevelOffset; ///< will be added to ALOG and SALOG log level for checking (in 7..5 range only)
 
   protected:
     VdcHost *vdcHostP;
@@ -357,19 +345,8 @@ namespace p44 {
     /// @return textual description of object, may contain LFs
     virtual string description() = 0;
 
-    /// @return the per-instance log level offset
-    int getLogLevelOffset();
-
-    /// set the log level offset on this addressable or a (not directly addressable) subitem of it
-    /// @param aLogLevelOffset the new log level offset
-    /// @param aSubItemSpec string specifying the subitem to set the log level offset for
-    /// @return true if offset changed (i.e. subitem found if specified)
-    virtual bool setLogLevelOffset(int aLogLevelOffset, const char *aSubItemSpec = NULL);
-
-    /// log a message, prefixed with addressable's identification
-    /// @param aErrLevel error level of the message
-    /// @param aFmt ... printf style error message
-    void logAddressable(int aErrLevel, const char *aFmt, ... ) __printflike(3,4);
+    /// @return a prefix for log messages from this addressable
+    virtual string logContextPrefix();
 
   protected:
 

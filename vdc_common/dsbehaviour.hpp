@@ -64,16 +64,6 @@ namespace p44 {
   class SensorBehaviour;
 
 
-  // behaviour-level logging macro
-  #define BLOGENABLED(lvl) LOGENABLEDX(lvl, getLogLevelOffset())
-  #define BLOG(lvl, ...) { if (BLOGENABLED(lvl)) { device.logAddressable(lvl, ##__VA_ARGS__); } }
-  #if FOCUSLOGGING
-  #define BFOCUSLOG(...) { BLOG(FOCUSLOGLEVEL, ##__VA_ARGS__); }
-  #else
-  #define BFOCUSLOG(...)
-  #endif
-
-
   /// a DsBehaviour represents and implements a device behaviour according to dS specs
   /// (for example: the dS Light state machine). The interface of a DsBehaviour is generic
   /// such that it can be used by different physical implementations (e.g. both DALI devices
@@ -85,8 +75,6 @@ namespace p44 {
 
     friend class Device;
     friend class DsScene;
-
-    int logLevelOffset; ///< will be added to BLOG log levels for checking (in 7..5 range only)
 
   protected:
 
@@ -194,9 +182,6 @@ namespace p44 {
     /// @note this only identifies the basic behaviour type. Subclassed behaviours can only be identified using behaviourTypeIdentifier()
     const char *getTypeName();
 
-    /// @return the per-instance log level offset
-    int getLogLevelOffset();
-
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
     virtual string description();
@@ -204,6 +189,12 @@ namespace p44 {
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
     virtual string shortDesc();
+
+    /// @return a prefix for log messages from this addressable
+    virtual string logContextPrefix() P44_OVERRIDE;
+
+    /// @return log level offset (overridden to use something other than the P44LoggingObj's)
+    virtual int getLogLevelOffset() P44_OVERRIDE;
 
   protected:
 
@@ -245,12 +236,12 @@ namespace p44 {
     /// @param aPropValue JsonObject with a single value
     /// @param aPropertyDescriptor decriptor for a single value field/array in this behaviour.
     /// @return false if value could not be accessed
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     /// @}
 
     /// only for deeper levels
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor);
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
 
   private:
 
@@ -258,7 +249,7 @@ namespace p44 {
     string getDbKey();
 
     // property access basic dispatcher implementation
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor);
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     int numLocalProps(PropertyDescriptorPtr aParentDescriptor);
 
   };

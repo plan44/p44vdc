@@ -353,7 +353,7 @@ string SensorBehaviour::getSensorRange()
   }
   int fracDigits = 2; // default if no resolution defined
   if (resolution!=0) {
-    fracDigits = (int)(-log(resolution)/log(10)+0.99);
+    fracDigits = (int)(-::log(resolution)/::log(10)+0.99);
   }
   if (fracDigits<0) fracDigits=0;
   return string_format("%0.*f..%0.*f", fracDigits, min, fracDigits, max);
@@ -365,7 +365,7 @@ string SensorBehaviour::getStatusText()
   if (hasDefinedState()) {
     int fracDigits = 2; // default if no resolution defined
     if (resolution!=0) {
-      fracDigits = (int)(-log(resolution)/log(10)+0.99);
+      fracDigits = (int)(-::log(resolution)/::log(10)+0.99);
     }
     if (fracDigits<0) fracDigits=0;
     return string_format("%0.*f %s", fracDigits, currentValue, getSensorUnitText().c_str());
@@ -427,7 +427,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   // update value
   if (aMinChange<0) aMinChange = resolution/2;
   if (fabs(aValue - currentValue) > aMinChange) changedValue = true;
-  BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' reports %s value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
+  OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "reports %s value = %0.3f %s", changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
   if (contextId>=0 || !contextMsg.empty()) {
     LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", contextId, contextMsg.c_str());
   }
@@ -443,7 +443,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
       double v = filter->evaluate();
       // re-evaluate changed flag after filtering
       if (fabs(v - currentValue) > resolution/2) changedValue = true;
-      BLOG(changedValue ? LOG_NOTICE : LOG_INFO, "Sensor[%zu] %s '%s' calculates %s filtered value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
+      OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "calculates %s filtered value = %0.3f %s", changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
       currentValue = v;
     }
     else {
@@ -508,13 +508,13 @@ bool SensorBehaviour::pushSensor(bool aAlways)
           }
         }
         if (doPush) {
-          BLOG(LOG_INFO, "Sensor[%zu] %s '%s' meets SOD conditions (%0.3f -> %0.3f %s) to push now", index, behaviourId.c_str(), getHardwareName().c_str(), lastPushedValue, currentValue, getSensorUnitText().c_str());
+          OLOG(LOG_INFO, "meets SOD conditions (%0.3f -> %0.3f %s) to push now", lastPushedValue, currentValue, getSensorUnitText().c_str());
         }
       }
     }
     if (!doPush && changed) {
       // we have a pending change, but rules don't allow to push now. Make sure final state gets pushed later
-      BLOG(LOG_INFO, "- sensor changes too quickly, cannot push update now, but final state will be pushed after minPushInterval");
+      OLOG(LOG_INFO, "- changes too quickly, cannot push update now, but final state will be pushed after minPushInterval");
       updateTicket.executeOnceAt(boost::bind(&SensorBehaviour::reportFinalValue, this), lastPush+minPushInterval);
     }
   }
@@ -523,7 +523,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
     if (pushBehaviourState()) {
       lastPush = now;
       lastPushedValue = currentValue;
-      BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' successfully pushed value = %0.3f %s", index, behaviourId.c_str(), getHardwareName().c_str(), lastPushedValue, getSensorUnitText().c_str());
+      OLOG(LOG_NOTICE, "successfully pushed value = %0.3f %s", lastPushedValue, getSensorUnitText().c_str());
       if (hasDefinedState() && maxPushInterval>0) {
         // schedule re-push of defined value
         updateTicket.executeOnce(boost::bind(&SensorBehaviour::pushSensor, this, true), maxPushInterval);
@@ -531,7 +531,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
       return true;
     }
     else if (device.isPublicDS()) {
-      BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
+      OLOG(LOG_NOTICE, "could not be pushed");
     }
   }
   return false;
@@ -542,7 +542,7 @@ void SensorBehaviour::reportFinalValue()
 {
   // push the current value (after awaiting minPushInterval)
   if (pushBehaviourState()) {
-    BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentValue, getSensorUnitText().c_str());
+    OLOG(LOG_NOTICE, "now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", currentValue, getSensorUnitText().c_str());
     lastPush = MainLoop::currentMainLoop().now();
     lastPushedValue = currentValue;
   }
@@ -556,7 +556,7 @@ void SensorBehaviour::invalidateSensorValue(bool aPush)
     lastUpdate = Never;
     currentValue = 0;
     updateTicket.cancel();
-    BLOG(LOG_NOTICE, "Sensor[%zu] %s '%s' reports value no longer available", index, behaviourId.c_str(), getHardwareName().c_str());
+    OLOG(LOG_NOTICE, "reports value no longer available");
     if (aPush) {
       // push invalidation (primitive clients not capable of NULL will at least see value==0)
       pushSensor(true);
@@ -744,7 +744,7 @@ void SensorBehaviour::prepareLogging()
       if (autoFiltered) rrdbupdate += ":%F";
       if (autoPushed) rrdbupdate += ":%P";
       if (rrdbupdate.size()<4) {
-        BLOG(LOG_WARNING, "Cannot create RRD update string, missing 'auto..' or 'update' config");
+        OLOG(LOG_WARNING, "Cannot create RRD update string, missing 'auto..' or 'update' config");
         rrdbupdate = "";
         loggingReady = false; // no point in trying
       }
@@ -800,24 +800,24 @@ void SensorBehaviour::prepareLogging()
       // now add explicit config
       args.insert(args.end(), cfgArgs.begin(), cfgArgs.end());
       // create the rrd file from config
-      if (BLOGENABLED(LOG_INFO)) {
+      if (OLOGENABLED(LOG_INFO)) {
         string a;
         for (int i=0; i<args.size(); ++i) a += args[i] + ' ';
-        BLOG(LOG_INFO, "rrd: creating new RRD with args: %s", a.c_str());
+        OLOG(LOG_INFO, "rrd: creating new RRD with args: %s", a.c_str());
       }
       int ret = rrd_call(rrd_create, args);
       if (ret==0) {
-        BLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", rrdbfile.c_str());
+        OLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", rrdbfile.c_str());
         loggingReady = true;
         lastRrdUpdate = MainLoop::currentMainLoop().now(); // creation counts as update, make sure we don't immediately try to send first update afterwards
       }
       else {
-        BLOG(LOG_ERR, "rrd: cannot create rrd file '%s': %s", rrdbfile.c_str(), rrd_get_error());
+        OLOG(LOG_ERR, "rrd: cannot create rrd file '%s': %s", rrdbfile.c_str(), rrd_get_error());
       }
     }
     else {
       // file apparently already exists
-      BLOG(LOG_INFO, "rrd: using existing file '%s'", rrdbfile.c_str());
+      OLOG(LOG_INFO, "rrd: using existing file '%s'", rrdbfile.c_str());
       loggingReady = true;
     }
   }
@@ -851,7 +851,7 @@ void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue
     args.push_back(ud);
     int ret = rrd_call(rrd_update, args);
     if (ret!=0) {
-      BLOG(LOG_WARNING, "rrd: could not update rrd data for file '%s': %s", rrdbfile.c_str(), rrd_get_error());
+      OLOG(LOG_WARNING, "rrd: could not update rrd data for file '%s': %s", rrdbfile.c_str(), rrd_get_error());
       loggingReady = false; // back to not initialized, might work again after recreating file
     }
   }

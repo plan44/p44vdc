@@ -49,6 +49,7 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
   #if ENABLE_SCENE_SCRIPT
   sceneScriptContext.isMemberVariable();
+  sceneScriptContext.setContextInfo("scenescript", this);
   #endif
 }
 
@@ -283,7 +284,7 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
   if (simpleScene && simpleScene->effect==scene_effect_script) {
     // run scene script
     sceneScriptContext.abort(false); // abort previous, no callback
-    BLOG(LOG_INFO, "Starting Scene Script: '%.40s...'", simpleScene->sceneScript.c_str());
+    OLOG(LOG_INFO, "Starting Scene Script: '%.40s...'", simpleScene->sceneScript.c_str());
     sceneScriptContext.releaseState();
     sceneScriptContext.setCode(simpleScene->sceneScript);
     sceneScriptContext.execute(true, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1));
@@ -298,7 +299,7 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 
 void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluationResult)
 {
-  BLOG(LOG_INFO, "Scene Script completed, returns: '%s'", aEvaluationResult.stringValue().c_str());
+  OLOG(LOG_INFO, "Scene Script completed, returns: '%s'", aEvaluationResult.stringValue().c_str());
   if (aDoneCB) aDoneCB();
 }
 
@@ -319,7 +320,7 @@ bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTr
   if (aScene) {
     bool ok = performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
     if (aTransitionTimeOverride!=Infinite) {
-      BLOG(LOG_INFO, "Transition times of all changing channels overridden: actual transition time is now %d mS", (int)(aTransitionTimeOverride/MilliSecond));
+      OLOG(LOG_INFO, "Transition times of all changing channels overridden: actual transition time is now %d mS", (int)(aTransitionTimeOverride/MilliSecond));
       // override the transition time in all channels that now need to be applied
       for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
         if ((*pos)->needsApplying()) (*pos)->setTransitionTime(aTransitionTimeOverride);
@@ -429,12 +430,12 @@ SceneScriptContext::SceneScriptContext(OutputBehaviour &aOutput, const GeoLocati
 bool SceneScriptContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
 {
   if (aFunc=="applychannels" && aArgs.size()==0) {
-    SALOG(output.device, LOG_INFO, "scene script: applychannels() requests applying channels now");
+    SOLOG(output, LOG_INFO, "scene script: applychannels() requests applying channels now");
     output.device.requestApplyingChannels(boost::bind(&SceneScriptContext::channelOpComplete, this), false);
     aNotYielded = false; // yielded execution
   }
   else if (aFunc=="syncchannels" && aArgs.size()==0) {
-    SALOG(output.device, LOG_INFO, "scene script: syncchannels() requests updating channels from device");
+    SOLOG(output, LOG_INFO, "scene script: syncchannels() requests updating channels from device");
     output.device.requestUpdatingChannels(boost::bind(&SceneScriptContext::channelOpComplete, this));
     aNotYielded = false; // yielded execution
   }
@@ -447,7 +448,7 @@ bool SceneScriptContext::evaluateAsyncFunction(const string &aFunc, const Functi
 
 void SceneScriptContext::channelOpComplete()
 {
-  SALOG(output.device, LOG_INFO, "scene script: channel operation complete");
+  SOLOG(output, LOG_INFO, "scene script: channel operation complete");
   ExpressionValue res;
   continueWithAsyncFunctionResult(res);
 }
@@ -800,6 +801,12 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 
 // MARK: - description/shortDesc
+
+string OutputBehaviour::logContextPrefix()
+{
+  return string_format("%s: %s", device.logContextPrefix().c_str(), getTypeName());
+}
+
 
 
 string OutputBehaviour::description()

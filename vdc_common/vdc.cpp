@@ -306,11 +306,11 @@ void Vdc::queueDelivery(NotificationDeliveryStatePtr aDeliveryState)
   if (delivering) {
     // queue for when current delivery is done
     pendingDeliveries.push_back(aDeliveryState);
-    ALOG(LOG_INFO, "'%s' delivery queued (previous delivery still running) - now %lu queued deliveries", NotificationNames[aDeliveryState->callType], pendingDeliveries.size());
+    OLOG(LOG_INFO, "'%s' delivery queued (previous delivery still running) - now %lu queued deliveries", NotificationNames[aDeliveryState->callType], pendingDeliveries.size());
   }
   else {
     // optimization - start right now
-    ALOG(LOG_INFO, "===== '%s' delivery to %lu devices starts now", NotificationNames[aDeliveryState->callType], aDeliveryState->audience.size());
+    OLOG(LOG_INFO, "===== '%s' delivery to %lu devices starts now", NotificationNames[aDeliveryState->callType], aDeliveryState->audience.size());
     delivering = true;
     aDeliveryState->delivering = true;
     prepareNextNotification(aDeliveryState);
@@ -322,7 +322,7 @@ void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryState
 {
   // - done
   delivering = false;
-  ALOG(LOG_INFO, "===== '%s' delivery complete", NotificationNames[aDeliveryStateBeingDeleted.callType]);
+  OLOG(LOG_INFO, "===== '%s' delivery complete", NotificationNames[aDeliveryStateBeingDeleted.callType]);
   // check for pending deliveries
   if (pendingDeliveries.size()>0) {
     // get next from queue
@@ -331,7 +331,7 @@ void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryState
     //   because we rely on the NotificationDeliveryState's destructor to call us back here when done!
     pendingDeliveries.pop_front();
     // - now start
-    ALOG(LOG_INFO, "===== '%s' queued delivery to %ld devices starts now", NotificationNames[nds->callType], nds->audience.size());
+    OLOG(LOG_INFO, "===== '%s' queued delivery to %ld devices starts now", NotificationNames[nds->callType], nds->audience.size());
     delivering = true;
     nds->delivering = true;
     prepareNextNotification(nds);
@@ -363,7 +363,7 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
   if (aNotificationToApply==ntfy_retrigger) {
     // nothing to apply, retrigger repeat when it is running
     if (optimizedCallRepeaterTicket && dev->currentAutoStopTime!=Never) {
-      AFOCUSLOG("- retriggering repeater for another %.2f seconds", (double)(dev->currentAutoStopTime)/Second);
+      FOCUSOLOG("- retriggering repeater for another %.2f seconds", (double)(dev->currentAutoStopTime)/Second);
       MainLoop::currentMainLoop().rescheduleExecutionTicket(optimizedCallRepeaterTicket, dev->currentAutoStopTime);
     }
   }
@@ -405,7 +405,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
 {
   if (aDeliveryState->affectedDevices.size()>0) {
     totalOptimizableCalls++;
-    AFOCUSLOG(
+    FOCUSOLOG(
       "notification #%ld affects %lu optimizable devices for '%s' with hash=%s, contentId=%d, contentsHash=%016llX",
       totalOptimizableCalls,
       aDeliveryState->affectedDevices.size(),
@@ -425,7 +425,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
             // same set of affected devices
             if (e->contentId==aDeliveryState->contentId) {
               // match
-              AFOCUSLOG("- found cache entry with %ld calls already", e->numCalls);
+              FOCUSOLOG("- found cache entry with %ld calls already", e->numCalls);
               entry = e;
               break;
             }
@@ -433,7 +433,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
         }
       }
       if (!entry && optimizerMode==opt_auto) {
-        AFOCUSLOG("- creating new cache entry");
+        FOCUSOLOG("- creating new cache entry");
         entry = OptimizerEntryPtr(new OptimizerEntry);
         entry->type = aDeliveryState->optimizedType;
         entry->affectedDevicesHash = aDeliveryState->affectedDevicesHash;
@@ -455,12 +455,12 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
       // can we already use the entry?
       if (!entry->nativeActionId.empty()) {
         // cache entry already has a native action identifier attached
-        AFOCUSLOG("- native action already exists: '%s'", entry->nativeActionId.c_str());
+        FOCUSOLOG("- native action already exists: '%s'", entry->nativeActionId.c_str());
         if (entry->contentsHash==aDeliveryState->contentsHash) {
           // content has not changed since native action was last updated -> we can use it!
-          ALOG(LOG_NOTICE, "Optimized %s: executing %s using native action '%s' (contentId %d, variant %d)", NotificationNames[aDeliveryState->callType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), entry->contentId, aDeliveryState->actionVariant);
+          OLOG(LOG_NOTICE, "Optimized %s: executing %s using native action '%s' (contentId %d, variant %d)", NotificationNames[aDeliveryState->callType], NotificationNames[aDeliveryState->optimizedType], entry->nativeActionId.c_str(), entry->contentId, aDeliveryState->actionVariant);
           if (aDeliveryState->repeatAfter!=Never) {
-            AFOCUSLOG("- action scheduled to repeat in %.2f seconds", (double)(aDeliveryState->repeatAfter)/Second);
+            FOCUSOLOG("- action scheduled to repeat in %.2f seconds", (double)(aDeliveryState->repeatAfter)/Second);
             // Note: it is essential to create a new delivery state here, otherwise the original notification cannot complete (coupled to object lifetime)
             NotificationDeliveryStatePtr rep = NotificationDeliveryStatePtr(new NotificationDeliveryState(*this));
             // shallow copy only, this deliveryState is only used for callNativeAction() and is considered already prepared
@@ -475,7 +475,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
           else {
             // cancel possibly running repeater ticket
             if (optimizedCallRepeaterTicket) {
-              AFOCUSLOG("- cancelling repeating previous action");
+              FOCUSOLOG("- cancelling repeating previous action");
               optimizedCallRepeaterTicket.cancel();
             }
           }
@@ -484,11 +484,11 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
         }
         else {
           if (optimizerMode>=opt_update) {
-            AFOCUSLOG("- content hash mismatch -> cannot be called now, must be updated later");
+            FOCUSOLOG("- content hash mismatch -> cannot be called now, must be updated later");
             finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::StaleAction, "Stale native action '%s'", entry->nativeActionId.c_str()));
           }
           else {
-            AFOCUSLOG("- content hash mismatch in frozen mode -> just execute normally now");
+            FOCUSOLOG("- content hash mismatch in frozen mode -> just execute normally now");
             finalizePreparedNotification(entry, aDeliveryState, Error::ok());
           }
           return;
@@ -496,15 +496,15 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
       }
       else {
         // affected device set/contentId has no native scene/group installed yet
-        AFOCUSLOG("- no native action assigned yet -> checking statistics to see if we should add one");
+        FOCUSOLOG("- no native action assigned yet -> checking statistics to see if we should add one");
         if (optimizerMode==opt_auto && entry->timeWeightedCallCount()>=minCallsBeforeOptimizing) {
-          ALOG(LOG_NOTICE, "Optimizer: %s for these devices has occurred repeatedly (weighted: %ld times) -> optimzing it using native action", NotificationNames[aDeliveryState->optimizedType], entry->timeWeightedCallCount());
+          OLOG(LOG_NOTICE, "Optimizer: %s for these devices has occurred repeatedly (weighted: %ld times) -> optimzing it using native action", NotificationNames[aDeliveryState->optimizedType], entry->timeWeightedCallCount());
           finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::AddAction, "Request adding native action"));
           return;
         }
         else {
           // not adding action, we'll wait and see if this call repeats enough to do so
-          AFOCUSLOG("- not important enough -> just execute normally now");
+          FOCUSOLOG("- not important enough -> just execute normally now");
           finalizePreparedNotification(entry, aDeliveryState, Error::ok());
           return;
         }
@@ -512,7 +512,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
     }
     else {
       // no cache entry (because optimizer off or not enough devices in affected set
-      AFOCUSLOG("- no cache entry (optimizer off or set of devices not suitable for optimization) -> just execute normally now");
+      FOCUSOLOG("- no cache entry (optimizer off or set of devices not suitable for optimization) -> just execute normally now");
       finalizePreparedNotification(entry, aDeliveryState, Error::ok()); // non-null but OK error means that we have nothing applied yet
       return;
     }
@@ -530,14 +530,14 @@ void Vdc::repeatPreparedNotification(OptimizerEntryPtr aEntry, NotificationDeliv
     (*pos)->optimizerRepeatPrepare(aDeliveryState);
   }
   // - call the native action again
-  AFOCUSLOG("- scheduled repeat of action %s", aEntry->nativeActionId.c_str());
+  FOCUSOLOG("- scheduled repeat of action %s", aEntry->nativeActionId.c_str());
   callNativeAction(boost::bind(&Vdc::finalizeRepeatedNotification, this, aEntry, aDeliveryState), aEntry->nativeActionId, aDeliveryState);
 }
 
 
 void Vdc::finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState)
 {
-  AFOCUSLOG("Finalizing repeated notification call");
+  FOCUSOLOG("Finalizing repeated notification call");
   // let all devices know operation has repeated
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
     // Note: vdchost does not need to be informed about repeated notifications (so deviceProcessedNotification is not called here)
@@ -550,7 +550,7 @@ void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDel
 {
   if (Error::notOK(aError) && !aError->isDomain(VdcError::domain())) {
     // actual error, not only signalling add/update
-    ALOG(LOG_ERR, "Failed calling native action: %s", Error::text(aError));
+    OLOG(LOG_ERR, "Failed calling native action: %s", Error::text(aError));
   }
   bool notAppliedYet = aError!=NULL; // any error, including Error::OK, means that notification was NOT applied yet
   // now let all devices either finish the operation or apply it (in case no cached operation was applied on vdc level)
@@ -568,7 +568,7 @@ void Vdc::finalizePreparedNotification(OptimizerEntryPtr aEntry, NotificationDel
 void Vdc::preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
   if (--aDeliveryState->pendingCount>0) {
-    AFOCUSLOG("waiting for all affected devices to confirm apply: %zu/%lu remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
+    FOCUSOLOG("waiting for all affected devices to confirm apply: %zu/%lu remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
     return; // not all confirmed yet
   }
   // check if we need to update or create native actions
@@ -579,7 +579,7 @@ void Vdc::preparedDeviceExecuted(OptimizerEntryPtr aEntry, NotificationDeliveryS
   }
   else if (Error::isError(aError, VdcError::domain(), VdcError::StaleAction)) {
     // update native action contents
-    ALOG(LOG_NOTICE, "Updating native action '%s' for '%s' (variant %d)", aEntry->nativeActionId.c_str(), NotificationNames[aDeliveryState->optimizedType], aDeliveryState->actionVariant);
+    OLOG(LOG_NOTICE, "Updating native action '%s' for '%s' (variant %d)", aEntry->nativeActionId.c_str(), NotificationNames[aDeliveryState->optimizedType], aDeliveryState->actionVariant);
     aEntry->contentsHash = aDeliveryState->contentsHash; // prepare new hash BEFORE - delayed updates might want to reset it in updateNativeAction()
     updateNativeAction(boost::bind(&Vdc::preparedNotificationComplete, this, aEntry, aDeliveryState, true, _1), aEntry, aDeliveryState); // is a change of the entry
     return;
@@ -609,7 +609,7 @@ void Vdc::createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStat
     OptimizerEntryPtr loosingEntry;
     long loosingScore;
     long refScore = (aEntry->timeWeightedCallCount()*CALL_COUNT_WEIGHT + aEntry->numberOfDevices*NUM_DEVICES_WEIGHT)*10000;
-    AFOCUSLOG("========= Scoring optimizer entries to find an entry to replace, refScore=%ld", refScore);
+    FOCUSOLOG("========= Scoring optimizer entries to find an entry to replace, refScore=%ld", refScore);
     for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
       OptimizerEntryPtr entry = *pos;
       if (entry!=aEntry && !entry->nativeActionId.empty() && entry->type==aEntry->type && (now-entry->lastNativeChange>MIN_ENTRY_AGE)) {
@@ -641,18 +641,18 @@ void Vdc::createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStat
     }
     if (loosingEntry) {
       // found an entry to remove
-      ALOG(LOG_NOTICE, "Entry for action '%s' (score=%ld) will be removed to make room for new entry (score=%ld)", loosingEntry->nativeActionId.c_str(), loosingScore, refScore);
+      OLOG(LOG_NOTICE, "Entry for action '%s' (score=%ld) will be removed to make room for new entry (score=%ld)", loosingEntry->nativeActionId.c_str(), loosingScore, refScore);
       freeNativeAction(boost::bind(&Vdc::removedNativeAction, this, loosingEntry, aEntry, aDeliveryState, _1), loosingEntry->nativeActionId);
       return;
     }
     else {
-      ALOG(LOG_INFO, "Could not create native action now: no room for new action, and none old/unimportant enough to delete");
+      OLOG(LOG_INFO, "Could not create native action now: no room for new action, and none old/unimportant enough to delete");
       preparedNotificationComplete(aEntry, aDeliveryState, false, ErrorPtr());
       return;
     }
   }
   else if (Error::isOK(aError)) {
-    ALOG(LOG_NOTICE, "Created native action '%s' for '%s' (contentId %d, variant %d)", aEntry->nativeActionId.c_str(), NotificationNames[aDeliveryState->optimizedType], aEntry->contentId, aDeliveryState->actionVariant);
+    OLOG(LOG_NOTICE, "Created native action '%s' for '%s' (contentId %d, variant %d)", aEntry->nativeActionId.c_str(), NotificationNames[aDeliveryState->optimizedType], aEntry->contentId, aDeliveryState->actionVariant);
     preparedNotificationComplete(aEntry, aDeliveryState, true, aError);
     return;
   }
@@ -663,7 +663,7 @@ void Vdc::createdNativeAction(OptimizerEntryPtr aEntry, NotificationDeliveryStat
 void Vdc::removedNativeAction(OptimizerEntryPtr aFromEntry, OptimizerEntryPtr aForEntry, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
   if (Error::notOK(aError)) {
-    ALOG(LOG_INFO, "Could not delete action to make room for a new one");
+    OLOG(LOG_INFO, "Could not delete action to make room for a new one");
     preparedNotificationComplete(aForEntry, aDeliveryState, false, aError);
     return;
   }
@@ -680,7 +680,7 @@ void Vdc::preparedNotificationComplete(OptimizerEntryPtr aEntry, NotificationDel
     if (aChanged) aEntry->markDirty(); // is a successful change, must be persisted
   }
   else {
-    ALOG(LOG_WARNING, "Creating or updating native action has failed: %s", Error::text(aError));
+    OLOG(LOG_WARNING, "Creating or updating native action has failed: %s", Error::text(aError));
   }
   // release anything left from preparation now
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
@@ -749,7 +749,7 @@ void Vdc::clearOptimizerCache()
     freeNativeAction(boost::bind(&Vdc::clearOptimizerCache, this), e->nativeActionId);
     return;
   }
-  ALOG(LOG_WARNING, "Optimizer cache cleared");
+  OLOG(LOG_WARNING, "Optimizer cache cleared");
 }
 
 
@@ -821,12 +821,12 @@ void Vdc::performPair(VdcApiRequestPtr aRequest, Tristate aEstablish, bool aDisa
   if (aTimeout<=0) {
     // calling with timeout==0 means aborting learn (which has already happened by now)
     // - confirm with OK
-    ALOG(LOG_NOTICE, "- pairing aborted");
+    OLOG(LOG_NOTICE, "- pairing aborted");
     aRequest->sendStatus(Error::err<VdcApiError>(404, "pairing/unpairing aborted"));
     return;
   }
   // start new pairing
-  ALOG(LOG_NOTICE, "Starting single vDC pairing");
+  OLOG(LOG_NOTICE, "Starting single vDC pairing");
   pairTicket.executeOnce(boost::bind(&Vdc::pairingTimeout, this, aRequest), aTimeout);
   getVdcHost().learnHandler = boost::bind(&Vdc::pairingEvent, this, aRequest, _1, _2);
   setLearnMode(true, aDisableProximityCheck, aEstablish);
@@ -839,12 +839,12 @@ void Vdc::pairingEvent(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError
   if (Error::isOK(aError)) {
     if (aLearnIn) {
       // learned in something
-      ALOG(LOG_NOTICE, "- pairing established");
+      OLOG(LOG_NOTICE, "- pairing established");
       aRequest->sendStatus(Error::ok());
     }
     else {
       // learned out something
-      ALOG(LOG_NOTICE, "- pairing removed");
+      OLOG(LOG_NOTICE, "- pairing removed");
       aRequest->sendStatus(Error::err<VdcApiError>(410, "device unpaired"));
     }
   }
@@ -857,7 +857,7 @@ void Vdc::pairingEvent(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError
 void Vdc::pairingTimeout(VdcApiRequestPtr aRequest)
 {
   getVdcHost().stopLearning();
-  ALOG(LOG_NOTICE, "- timeout: no pairing or unpairing occurred");
+  OLOG(LOG_NOTICE, "- timeout: no pairing or unpairing occurred");
   aRequest->sendStatus(Error::err<VdcApiError>(404, "timeout, no (un)pairing event occurred"));
 }
 
@@ -874,7 +874,7 @@ void Vdc::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
   // prevent collecting while already collecting
   if (collecting) {
     // already collecting - don't collect again
-    ALOG(LOG_WARNING,"requested collecting while already collecting");
+    OLOG(LOG_WARNING,"requested collecting while already collecting");
     if (aCompletedCB) aCompletedCB(Error::err<VdcError>(VdcError::Collecting, "already collecting"));
     return;
   }
@@ -920,11 +920,11 @@ void Vdc::schedulePeriodicRecollecting()
 void Vdc::initiateRecollect(RescanMode aRescanMode)
 {
   if (delivering) {
-    ALOG(LOG_NOTICE, "busy processing notification: postponed in-operation recollect");
+    OLOG(LOG_NOTICE, "busy processing notification: postponed in-operation recollect");
     schedulePeriodicRecollecting();
   }
   else {
-    ALOG(LOG_NOTICE, "starting in-operation recollect");
+    OLOG(LOG_NOTICE, "starting in-operation recollect");
     collectDevices(boost::bind(&Vdc::recollectDone, this), aRescanMode);
     // end of collect will schedule periodic recollect again
   }
@@ -933,7 +933,7 @@ void Vdc::initiateRecollect(RescanMode aRescanMode)
 
 void Vdc::recollectDone()
 {
-  ALOG(LOG_NOTICE, "in-operation recollect done");
+  OLOG(LOG_NOTICE, "in-operation recollect done");
 }
 
 
@@ -988,7 +988,7 @@ void Vdc::identifyDevice(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int
   // Note: aNewDevice bound to the callback prevents it from being deleted during identification
   if (aNewDevice->identifyDevice(boost::bind(&Vdc::identifyDeviceCB, this, aNewDevice, aIdentifyCB, aMaxRetries, aRetryDelay, _1, _2))) {
     // instant identify, callback is not called by device -> simulate it at this level
-    ALOG(LOG_WARNING, "has instant identification, but vdc seems to expect it to be non-instant!");
+    OLOG(LOG_WARNING, "has instant identification, but vdc seems to expect it to be non-instant!");
     identifyDeviceCB(aNewDevice, aIdentifyCB, 0, 0, ErrorPtr(), aNewDevice.get());
   }
 }
@@ -1171,19 +1171,19 @@ ErrorPtr Vdc::load()
   ErrorPtr err;
   // load the vdc settings (collecting phase is already over by now)
   err = loadFromStore(dSUID.getString().c_str());
-  if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading settings: %s", err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR,"Error loading settings: %s", err->text());
   #if ENABLE_SETTINGS_FROM_FILES
   loadSettingsFromFiles();
   #endif
   // load the optimizer cache
   err = loadOptimizerCache();
-  if (Error::notOK(err)) ALOG(LOG_ERR,"Error loading optimizer cache: %s", err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR,"Error loading optimizer cache: %s", err->text());
   // announce groups and scenes used by optimizer
   for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
     if (!(*pos)->nativeActionId.empty()) {
       ErrorPtr announceErr = announceNativeAction((*pos)->nativeActionId);
       if (Error::notOK(announceErr)) {
-        ALOG(LOG_WARNING,"Native action '%s' is no longer valid - removed (%s)", (*pos)->nativeActionId.c_str(), err->text());
+        OLOG(LOG_WARNING,"Native action '%s' is no longer valid - removed (%s)", (*pos)->nativeActionId.c_str(), err->text());
         (*pos)->nativeActionId = ""; // erase it, repeated use of that entry will re-create a native action later
       }
     }

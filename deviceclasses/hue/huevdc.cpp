@@ -209,7 +209,7 @@ void HueVdc::refindBridge(StatusCB aCompletedCB)
 {
   if (!getVdcHost().isNetworkConnected()) {
     // TODO: checking IPv4 only at this time, need to add IPv6 later
-    ALOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
+    OLOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
     refindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), REFIND_RETRY_DELAY);
     return;
   }
@@ -226,7 +226,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
     // found already registered bridge again
-    ALOG(LOG_NOTICE,
+    OLOG(LOG_NOTICE,
       "Hue bridge uuid '%s' found again:\n"
       "- userName = %s\n"
       "- API base URL = %s",
@@ -243,7 +243,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
         bridgeUuid.c_str(),
         bridgeApiURL.c_str()
       )!=SQLITE_OK) {
-        ALOG(LOG_ERR, "Error saving hue bridge url: %s", db.error()->description().c_str());
+        OLOG(LOG_ERR, "Error saving hue bridge url: %s", db.error()->description().c_str());
       }
     }
     // collect existing lights
@@ -256,14 +256,14 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
     // - if URL does not work, clear cached IP and try again (unless IP is user-provided)
     if (!bridgeApiURL.empty() && !fixedURL) {
       // forget the cached IP
-      ALOG(LOG_NOTICE, "Could not access bridge API at %s - revert to finding bridge by UUID", bridgeApiURL.c_str());
+      OLOG(LOG_NOTICE, "Could not access bridge API at %s - revert to finding bridge by UUID", bridgeApiURL.c_str());
       bridgeApiURL.clear();
       // retry searching by uuid
       refindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), 500*MilliSecond);
       return;
     }
     else {
-      ALOG(LOG_NOTICE, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->text());
+      OLOG(LOG_NOTICE, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->text());
     }
     if (aCompletedCB) aCompletedCB(ErrorPtr()); // no hue bridge to collect lights from (but this is not a collect error)
   }
@@ -375,7 +375,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
     // found and authenticated bridge
-    ALOG(LOG_NOTICE,
+    OLOG(LOG_NOTICE,
       "Hue bridge found and logged in:\n"
       "- uuid = %s\n"
       "- userName = %s\n"
@@ -430,7 +430,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
         bridgeUserName.c_str(),
         bridgeApiURL.c_str()
       )!=SQLITE_OK) {
-        ALOG(LOG_ERR, "Error saving hue bridge learn params: %s", db.error()->description().c_str());
+        OLOG(LOG_ERR, "Error saving hue bridge learn params: %s", db.error()->description().c_str());
       }
       // now process the learn in/out
       if (learnedIn==yes) {
@@ -448,7 +448,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
   }
   else {
     // not found (usually timeout)
-    ALOG(LOG_NOTICE, "No hue bridge found to register, error = %s", aError->text());
+    OLOG(LOG_NOTICE, "No hue bridge found to register, error = %s", aError->text());
   }
 }
 
@@ -464,7 +464,7 @@ void HueVdc::learnedInComplete(ErrorPtr aError)
 void HueVdc::queryBridgeAndLights(StatusCB aCollectedHandler)
 {
   // query bridge config
-  ALOG(LOG_INFO, "Querying hue bridge for config...");
+  OLOG(LOG_INFO, "Querying hue bridge for config...");
   hueComm.apiQuery("/config", boost::bind(&HueVdc::gotBridgeConfig, this, aCollectedHandler, _1, _2));
 }
 
@@ -498,25 +498,25 @@ void HueVdc::gotBridgeConfig(StatusCB aCollectedHandler, JsonObjectPtr aResult, 
   }
   if (has_1_11_api) {
     // query scenes (in parallel to lights!)
-    ALOG(LOG_INFO, "Querying hue bridge for available scenes...");
+    OLOG(LOG_INFO, "Querying hue bridge for available scenes...");
     hueComm.apiQuery("/scenes", boost::bind(&HueVdc::collectedScenesHandler, this, aCollectedHandler, _1, _2));
   }
   // Note: can be used to incrementally search additional lights
   // - issue lights query
-  ALOG(LOG_INFO, "Querying hue bridge for available lights...");
+  OLOG(LOG_INFO, "Querying hue bridge for available lights...");
   hueComm.apiQuery("/lights", boost::bind(&HueVdc::collectedLightsHandler, this, aCollectedHandler, _1, _2));
 }
 
 
 void HueVdc::collectedScenesHandler(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError)
 {
-  ALOG(LOG_INFO, "hue bridge reports scenes = \n%s", aResult ? aResult->c_strValue() : "<none>");
+  OLOG(LOG_INFO, "hue bridge reports scenes = \n%s", aResult ? aResult->c_strValue() : "<none>");
 }
 
 
 void HueVdc::collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aResult, ErrorPtr aError)
 {
-  ALOG(LOG_INFO, "hue bridge reports lights = \n%s", aResult ? aResult->c_strValue() : "<none>");
+  OLOG(LOG_INFO, "hue bridge reports lights = \n%s", aResult ? aResult->c_strValue() : "<none>");
   if (aResult) {
     // pre-v1.3 bridges: { "1": { "name": "Bedroom" }, "2": .... }
     // v1.3 and later bridges: { "1": { "name": "Bedroom", "state": {...}, "modelid":"LCT001", ... }, "2": .... }
@@ -686,7 +686,7 @@ void HueVdc::nativeActionDone(StatusCB aStatusCB, JsonObjectPtr aResult, ErrorPt
       aError = TextError::err("call of scene (group set state) did not return a success item -> failed");
     }
   }
-  AFOCUSLOG("hue Native action done with status: %s", Error::text(aError).c_str());
+  FOCUSOLOG("hue Native action done with status: %s", Error::text(aError).c_str());
   if (aStatusCB) aStatusCB(aError);
 }
 
@@ -778,14 +778,14 @@ void HueVdc::nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
           // successfully created scene
           numOptimizerScenes++;
           aOptimizerEntry->nativeActionId = "hue_scene_" + i->stringValue();
-          ALOG(LOG_INFO,"created new hue scene '%s'", aOptimizerEntry->nativeActionId.c_str());
+          OLOG(LOG_INFO,"created new hue scene '%s'", aOptimizerEntry->nativeActionId.c_str());
           // TODO: if hue scene saves transitional values, we might need to call updateNativeAction() here
         }
         else if (aOptimizerEntry->type==ntfy_dimchannel) {
           // successfully created group
           numOptimizerGroups++;
           aOptimizerEntry->nativeActionId = "hue_group_" + i->stringValue();
-          ALOG(LOG_INFO,"created new hue group '%s'", aOptimizerEntry->nativeActionId.c_str());
+          OLOG(LOG_INFO,"created new hue group '%s'", aOptimizerEntry->nativeActionId.c_str());
         }
         aOptimizerEntry->lastNativeChange = MainLoop::now();
         aStatusCB(ErrorPtr()); // success
@@ -856,7 +856,7 @@ void HueVdc::nativeActionUpdated(uint64_t aNewHash, OptimizerEntryPtr aOptimizer
     // [{ "success": { "id": "Abc123Def456Ghi" } }]
     // TODO: details checks - for now just assume update has worked when request did not produce an error
     aOptimizerEntry->lastNativeChange = MainLoop::now();
-    ALOG(LOG_INFO,"updated hue scene");
+    OLOG(LOG_INFO,"updated hue scene");
     // done, update entry
     aOptimizerEntry->contentsHash = aNewHash;
     aOptimizerEntry->lastNativeChange = MainLoop::now();
@@ -888,18 +888,18 @@ void HueVdc::nativeActionFreed(StatusCB aStatusCB, const string aUrl, JsonObject
     // [{"success":"/scenes/3T2SvsxvwteNNys deleted"}]
     JsonObjectPtr s = HueComm::getSuccessItem(aResult,0);
     if (!s || s->stringValue().find(aUrl)==string::npos) {
-      ALOG(LOG_WARNING, "delete suceeded but did not confirm resource '%s'", aUrl.c_str());
+      OLOG(LOG_WARNING, "delete suceeded but did not confirm resource '%s'", aUrl.c_str());
     }
   }
   if (Error::notOK(aError)) {
     if (aError->isError(HueCommError::domain(), HueCommError::NotFound)) {
       // to be deleted item does not exist
-      ALOG(LOG_WARNING, "to be deleted '%s' did not exist -> consider deleted", aUrl.c_str());
+      OLOG(LOG_WARNING, "to be deleted '%s' did not exist -> consider deleted", aUrl.c_str());
       aError.reset(); // consider deleted ok
     }
     else {
       deleted = false;
-      ALOG(LOG_WARNING, "could not delete '%s': %s", aUrl.c_str(), Error::text(aError));
+      OLOG(LOG_WARNING, "could not delete '%s': %s", aUrl.c_str(), Error::text(aError));
     }
   }
   if (deleted) {

@@ -168,14 +168,14 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
         err = createViewFromConfig(cfg, lightView, P44ViewPtr());
       }
       if (Error::notOK(err)) {
-        ALOG(LOG_WARNING, "Invalid feature light config: %s", err->text());
+        OLOG(LOG_WARNING, "Invalid feature light config: %s", err->text());
       }
     }
     #endif
   }
   if (!lightView) {
     lightView = P44ViewPtr(new P44View()); // dummy to avoid crashes
-    ALOG(LOG_WARNING, "No light view found");
+    OLOG(LOG_WARNING, "No light view found");
   }
   if (!behaviour) {
     // default to simple color light (we can't have nothing even with invalid config)
@@ -200,7 +200,7 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   // - create dSUID
   if (uniqueId.empty()) {
     // no unique id, use type and position to form dSUID (backwards compatibility)
-    ALOG(LOG_WARNING, "Legacy LED chain device, should specify unique ID to get stable dSUID");
+    OLOG(LOG_WARNING, "Legacy LED chain device, should specify unique ID to get stable dSUID");
     uniqueId = string_format("%d:%d:%d", lightType, aX, aDx);
   }
   // if uniqueId is a valid dSUID/UUID, use it as-is
@@ -245,7 +245,7 @@ void LedChainDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
   // clear learn-in data from DB
   if (ledChainDeviceRowID) {
     if(getLedChainVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", ledChainDeviceRowID)!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Error deleting led chain device: %s", getLedChainVdc().db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error deleting led chain device: %s", getLedChainVdc().db.error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -367,7 +367,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   getLedChainVdc().ledArrangement->render(); // update
   // next step
   if (moreSteps) {
-    ALOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
+    OLOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
     // not yet complete, schedule next step
     transitionTicket.executeOnce(
       boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
@@ -376,7 +376,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     return; // will be called later again
   }
   if (!aForDimming) {
-    ALOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
+    OLOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
   }
 }
 

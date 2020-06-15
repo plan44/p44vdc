@@ -175,7 +175,7 @@ bool EldatVdc::addAndRememberDevice(EldatDevicePtr aEldatDevice)
       aEldatDevice->getSubDevice(),
       aEldatDevice->getEldatDeviceType()
     )!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
     }
     return true;
   }

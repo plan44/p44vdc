@@ -398,7 +398,7 @@ bool ClimateControlBehaviour::checkForcedOffWake()
     if (getZoneTemperatures(temp, setpoint)) {
       if (forcedOffWakeMode*temp < forcedOffWakeMode*setpoint) {
         // need to wake the device from powerState_forcedOff
-        BLOG(LOG_NOTICE, "waking FCU from forced off mode by applying scene #%d - because in a protective mode and temperature requires action", forceOffWakeSceneNo);
+        OLOG(LOG_NOTICE, "waking FCU from forced off mode by applying scene #%d - because in a protective mode and temperature requires action", forceOffWakeSceneNo);
         DsScenePtr wakeScene = device.getScenes()->getScene(forceOffWakeSceneNo);
         if (wakeScene) {
           // bypass our local implementation, just invoke
@@ -571,14 +571,14 @@ bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene, Sce
     switch (aSceneCmd) {
       case scene_cmd_climatecontrol_mode_protective_heating:
         // enables waking from powerState_forcedOff when temperature falls below set point
-        BLOG(LOG_INFO, "Entering protective heating mode - wake on temperature drop enabled");
+        OLOG(LOG_INFO, "Entering protective heating mode - wake on temperature drop enabled");
         forcedOffWakeMode = 1;
         forceOffWakeSceneNo = aScene->sceneNo;
         aSceneCmd = scene_cmd_invoke;
         break;
       case scene_cmd_climatecontrol_mode_protective_cooling:
         // enables waking from powerState_forcedOff when temperature rises above set point
-        BLOG(LOG_INFO, "Entering protective cooling mode - wake on temperature rise enabled");
+        OLOG(LOG_INFO, "Entering protective cooling mode - wake on temperature rise enabled");
         forcedOffWakeMode = -1;
         forceOffWakeSceneNo = aScene->sceneNo;
         aSceneCmd = scene_cmd_invoke; // otherwise, treat like invoke
@@ -597,7 +597,7 @@ bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene, Sce
     }
     if (powerState->getIndex()==powerState_forcedOff) {
       // no scene calls in forced off mode
-      BLOG(LOG_INFO, "FCU is in forced off state, scene calls are suppressed");
+      OLOG(LOG_INFO, "FCU is in forced off state, scene calls are suppressed");
       return false;
     }
   }

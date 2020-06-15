@@ -330,7 +330,7 @@ double LightBehaviour::brightnessToPWM(Brightness aBrightness, double aMaxPWM)
 
 Brightness LightBehaviour::PWMToBrightness(double aPWM, double aMaxPWM)
 {
-  return 100/dimCurveExp*log(aPWM*(exp(dimCurveExp)-1)/aMaxPWM + 1);
+  return 100/dimCurveExp*::log(aPWM*(exp(dimCurveExp)-1)/aMaxPWM + 1);
 }
 
 

@@ -584,13 +584,6 @@ namespace p44 {
     /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
     virtual string getStatusText() P44_OVERRIDE;
 
-    /// set the log level offset on this addressable or a (not directly addressable) subitem of it
-    /// @param aLogLevelOffset the new log level offset
-    /// @param aSubItemSpec string specifying the subitem to set the log level offset for
-    /// @return true if offset changed (i.e. subitem found if specified)
-    virtual bool setLogLevelOffset(int aLogLevelOffset, const char *aSubItemSpec = NULL);
-
-
   protected:
 
     /// @name low level hardware access

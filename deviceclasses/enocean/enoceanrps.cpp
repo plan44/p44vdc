@@ -434,7 +434,7 @@ void EnoceanRpsRockerHandler::setButtonState(bool aPressed)
     // real change, propagate to behaviour
     ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(behaviour);
     if (b) {
-      HLOG(LOG_INFO, "Enocean Button %s - %08X, subDevice %d, channel %d: changed state to %s", b->getHardwareName().c_str(), device.getAddress(), device.getSubDevice(), channel, aPressed ? "PRESSED" : "RELEASED");
+      OLOG(LOG_INFO, "Enocean Button %s - %08X, subDevice %d: changed state to %s", b->getHardwareName().c_str(), device.getAddress(), device.getSubDevice(), aPressed ? "PRESSED" : "RELEASED");
       b->updateButtonState(aPressed);
     }
     // update cached status

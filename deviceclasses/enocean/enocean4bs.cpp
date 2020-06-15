@@ -907,15 +907,15 @@ void EnoceanA52001Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       // - check actuator obstructed
       uint32_t data = aEsp3PacketPtr->get4BSdata();
       if ((data & DBMASK(2,0))!=0) {
-        HLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
+        OLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
         behaviour->setHardwareError(hardwareError_overload);
       }
       else if ((data & DBMASK(2,4))==0 && (data & DBMASK(2,5))==0) {
-        HLOG(LOG_ERR, "EnOcean valve error: energy storage AND battery are low");
+        OLOG(LOG_ERR, "EnOcean valve error: energy storage AND battery are low");
         behaviour->setHardwareError(hardwareError_lowBattery);
       }
       // show general status
-      HLOG(LOG_NOTICE,
+      OLOG(LOG_NOTICE,
         "EnOcean valve actual position: %d%% open\n"
         "- Service %s, Energy input %s, Energy storage %scharged, Battery %s, Cover %s, Sensor %s, Detected window %s, Actuator %s",
         (data>>DB(3,0)) & 0xFF, // get data from DB(3,0..7), range is 0..100% (NOT 0..255!)
@@ -1163,19 +1163,19 @@ void EnoceanA52004Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       if (ENOBIT(0, 0, dataP, datasize)) {
         // DB1 transmits failure code
         uint8_t fc = ENOBYTE(1, dataP, datasize) & 0xFF;
-        HLOG(LOG_NOTICE, "EnOcean valve A5-20-04 failure code: %d", fc);
+        OLOG(LOG_NOTICE, "EnOcean valve A5-20-04 failure code: %d", fc);
         switch (fc) {
           case 18:
             // battery empty
-            HLOG(LOG_ERR, "EnOcean valve error: battery is low");
+            OLOG(LOG_ERR, "EnOcean valve error: battery is low");
             behaviour->setHardwareError(hardwareError_lowBattery);
             lowBat = true;
             break;
           case 33:
-            HLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
+            OLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
             goto valveErr;
           case 36:
-            HLOG(LOG_ERR, "EnOcean valve error: end point detection error");
+            OLOG(LOG_ERR, "EnOcean valve error: end point detection error");
           valveErr:
             behaviour->setHardwareError(hardwareError_overload);
             break;
@@ -1197,7 +1197,7 @@ void EnoceanA52004Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         if (feedTemp && measurementOn) EnoceanInputs::handleBitField(A52004feedTemp, feedTemp, dataP, datasize, this);
       }
       // show general status
-      HLOG(LOG_NOTICE,
+      OLOG(LOG_NOTICE,
         "EnOcean valve actual set point: %d%% open\n"
         "- Buttons %s, Status %s",
         ENOBYTE(3, dataP, datasize), // DB3 = valve position, range is 0..100% (NOT 0..255!)
@@ -1425,7 +1425,7 @@ void EnoceanA52006Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       // because sensor value meaning depends on additional status bits in A5-20-06
       // - check ACO - actuator obstructed
       if (ENOBIT(0, 0, dataP, datasize)) {
-        HLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
+        OLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
         behaviour->setHardwareError(hardwareError_overload);
       }
       // - get current valve position
@@ -1460,7 +1460,7 @@ void EnoceanA52006Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         }
       }
       // show general status
-      HLOG(LOG_NOTICE,
+      OLOG(LOG_NOTICE,
         "EnOcean valve actual position: %d%% open\n"
         "- %s harvesting\n"
         "- %sopen window detected\n"

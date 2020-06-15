@@ -151,7 +151,7 @@ void EvaluatorDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
   // clear learn-in data from DB
   if (evaluatorDeviceRowID) {
     if(getEvaluatorVdc().db.executef("DELETE FROM evaluators WHERE rowid=%lld", evaluatorDeviceRowID)!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Error deleting evaluator: %s", getEvaluatorVdc().db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error deleting evaluator: %s", getEvaluatorVdc().db.error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -204,7 +204,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     checkResult->setType(apivalue_object);
     // - variable definitions
     parseVarDefs(); // reparse
-    ALOG(LOG_INFO, "CheckEvaluator:");
+    OLOG(LOG_INFO, "CheckEvaluator:");
     ApiValuePtr varDefs = checkResult->newObject();
     if (valueMapper.getMappedSourcesInfo(varDefs)) {
       checkResult->add("varDefs", varDefs);
@@ -318,7 +318,7 @@ void EvaluatorDevice::parseVarDefs()
   if (!newValueDefs.empty()) {
     // migrate old definitions (when re-created definitions are not equal to stored ones)
     // Note: even migrate partially, when not all defs could be resolved yet
-    ALOG(LOG_NOTICE, "Migrating definitions to new id (rather than index) based form");
+    OLOG(LOG_NOTICE, "Migrating definitions to new id (rather than index) based form");
     evaluatorSettings()->setPVar(evaluatorSettings()->varDefs, newValueDefs);
   }
   if (!foundall) {
@@ -339,9 +339,9 @@ void EvaluatorDevice::dependentValueNotification(ValueSource &aValueSource, Valu
     parseVarDefs();
   }
   else {
-    ALOG(LOG_INFO, "value source '%s' reports value %f", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
+    OLOG(LOG_INFO, "value source '%s' reports value %f", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
     if (reporting) {
-      ALOG(LOG_WARNING, "value source '%s' is part of cyclic reference -> not evaluating any further", aValueSource.getSourceName().c_str());
+      OLOG(LOG_WARNING, "value source '%s' is part of cyclic reference -> not evaluating any further", aValueSource.getSourceName().c_str());
     }
     else {
       evaluateConditions(currentState, evalmode_externaltrigger);
@@ -360,15 +360,15 @@ void EvaluatorDevice::changedConditions()
 
 Tristate EvaluatorDevice::evaluateBooleanNow(EvaluationContext &aEvalCtx, EvalMode aEvalMode, bool aScheduleReEval)
 {
-  AFOCUSLOG("----- Starting expression evaluation: '%s'", aEvalCtx.getCode());
+  FOCUSOLOG("----- Starting expression evaluation: '%s'", aEvalCtx.getCode());
   ExpressionValue res = aEvalCtx.evaluateSynchronously(aEvalMode, aScheduleReEval);
   if (res.isValue()) {
     // evaluation successful
-    AFOCUSLOG("===== expression result: '%s' = %s = %s", aEvalCtx.getCode(), res.stringValue().c_str(), res.boolValue() ? "true" : "false");
+    FOCUSOLOG("===== expression result: '%s' = %s = %s", aEvalCtx.getCode(), res.stringValue().c_str(), res.boolValue() ? "true" : "false");
     return res.boolValue() ? yes : no;
   }
   else {
-    ALOG(LOG_INFO,"Expression '%s' evaluation undefined: %s", aEvalCtx.getCode(), res.stringValue().c_str());
+    OLOG(LOG_INFO,"Expression '%s' evaluation undefined: %s", aEvalCtx.getCode(), res.stringValue().c_str());
     return undefined;
   }
 }
@@ -384,11 +384,11 @@ ErrorPtr EvaluatorDevice::handleReEvaluationResult(bool aIsOffCondition, Express
       // protect against state updates triggering evaluation again via cyclic references
       reporting = true;
       if (aEvaluationResult.isValue()) {
-        AFOCUSLOG("===== sensor expression result: '%s' = '%s' = %f", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.numValue());
+        FOCUSOLOG("===== sensor expression result: '%s' = '%s' = %f", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.numValue());
         s->updateSensorValue(aEvaluationResult.numValue());
       }
       else {
-        ALOG(LOG_INFO,"Sensor expression '%s' evaluation status: %s", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.stringValue().c_str());
+        OLOG(LOG_INFO,"Sensor expression '%s' evaluation status: %s", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.stringValue().c_str());
         s->invalidateSensorValue();
       }
       // done reporting, critical phase is over
@@ -400,11 +400,11 @@ ErrorPtr EvaluatorDevice::handleReEvaluationResult(bool aIsOffCondition, Express
     Tristate b;
     if (aEvaluationResult.isValue()) {
       // evaluation successful
-      AFOCUSLOG("===== timed re-evaluation: '%s' = %s = %s", aContext.getCode(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.boolValue() ? "true" : "false");
+      FOCUSOLOG("===== timed re-evaluation: '%s' = %s = %s", aContext.getCode(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.boolValue() ? "true" : "false");
       b = aEvaluationResult.boolValue() ? yes : no;
     }
     else {
-      ALOG(LOG_INFO,"Expression '%s' re-evaluation status: %s", aContext.getCode(), aEvaluationResult.stringValue().c_str());
+      OLOG(LOG_INFO,"Expression '%s' re-evaluation status: %s", aContext.getCode(), aEvaluationResult.stringValue().c_str());
       b = undefined;
     }
     if (aIsOffCondition) currentOff = b;
@@ -426,7 +426,7 @@ void EvaluatorDevice::evaluateConditions(Tristate aRefState, EvalMode aEvalMode)
   else {
     // evaluate binary state and report it
     if (aEvalMode==evalmode_initial) {
-      ALOG(LOG_INFO, "Initial evaluation (after startup or expression changes) -> delays inactive");
+      OLOG(LOG_INFO, "Initial evaluation (after startup or expression changes) -> delays inactive");
     }
     // always evaluate both conditions because they could contain timed subexpressions that need to be scheduled
     currentOn = evaluateBooleanNow(evaluatorSettings()->onCondition, aEvalMode, true);
@@ -445,7 +445,7 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
   evaluateTicket.cancel();
   if (!decisionMade && aRefState!=yes) {
     // off or unknown: check for switching on
-    ALOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.getCode(), currentOn==undefined ? "<undefined>" : (currentOn==yes ? "true -> switching ON" : "false"));
+    OLOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.getCode(), currentOn==undefined ? "<undefined>" : (currentOn==yes ? "true -> switching ON" : "false"));
     if (currentOn!=yes) {
       // not met now -> reset if we are currently timing this condition
       if (onConditionMet) conditionMetSince = Never;
@@ -465,7 +465,7 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
       }
       else {
         // condition not met long enough yet, need to re-check later
-        ALOG(LOG_INFO, "- ON condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
+        OLOG(LOG_INFO, "- ON condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
         evaluatorSettings()->onCondition.scheduleLatestEvaluation(metAt);
         return;
       }
@@ -473,7 +473,7 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
   }
   if (!decisionMade && aRefState!=no) {
     // on or unknown: check for switching off
-    ALOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.getCode(), currentOff==undefined ? "<undefined>" : (currentOff==yes ? "true -> switching OFF" : "false"));
+    OLOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.getCode(), currentOff==undefined ? "<undefined>" : (currentOff==yes ? "true -> switching OFF" : "false"));
     if (currentOff!=yes) {
       // not met now -> reset if we are currently timing this condition
       if (!onConditionMet) conditionMetSince = Never;
@@ -493,7 +493,7 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
       }
       else {
         // condition not met long enough yet, need to re-check later
-        ALOG(LOG_INFO, "- OFF condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
+        OLOG(LOG_INFO, "- OFF condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
         evaluatorSettings()->offCondition.scheduleLatestEvaluation(metAt);
         return;
       }
@@ -541,7 +541,7 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
 
 void EvaluatorDevice::actionExecuted(ExpressionValue aEvaluationResult)
 {
-  ALOG(LOG_INFO, "evaluator action script completed with result: '%s', error: %s", aEvaluationResult.stringValue().c_str(), Error::text(aEvaluationResult.error()));
+  OLOG(LOG_INFO, "evaluator action script completed with result: '%s', error: %s", aEvaluationResult.stringValue().c_str(), Error::text(aEvaluationResult.error()));
 }
 
 #endif // EXPRESSION_SCRIPT_SUPPORT
@@ -871,9 +871,12 @@ EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator) :
   minOffTime(0) // trigger immediately
 {
   onCondition.isMemberVariable();
+  onCondition.setContextInfo("onCondition", &device);
   offCondition.isMemberVariable();
+  offCondition.setContextInfo("offCondition", &device);
   #if EXPRESSION_SCRIPT_SUPPORT
   action.isMemberVariable();
+  action.setContextInfo("action", &device);
   #endif
   onCondition.setEvaluationResultHandler(boost::bind(&EvaluatorDevice::handleReEvaluationResult, &aEvaluator, false, _1, _2));
   offCondition.setEvaluationResultHandler(boost::bind(&EvaluatorDevice::handleReEvaluationResult, &aEvaluator, true, _1, _2));

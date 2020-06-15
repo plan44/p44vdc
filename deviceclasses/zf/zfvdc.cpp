@@ -174,7 +174,7 @@ bool ZfVdc::addAndRememberDevice(ZfDevicePtr aZfDevice)
       aZfDevice->getSubDevice(),
       aZfDevice->getZfDeviceType()
     )!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
     }
     return true;
   }

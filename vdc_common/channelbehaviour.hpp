@@ -267,6 +267,12 @@ namespace p44 {
     /// @return textual description of object, may contain LFs
     virtual string description();
 
+    /// @return a prefix for log messages from this addressable
+    virtual string logContextPrefix() P44_OVERRIDE;
+
+    /// @return log level offset (overridden to use something other than the P44LoggingObj's)
+    virtual int getLogLevelOffset() P44_OVERRIDE;
+
     /// Get short text for a "first glance" status of the behaviour
     /// @return string, really short, intended to be shown as a narrow column in a list
     virtual string getStatusText();

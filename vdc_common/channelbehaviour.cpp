@@ -85,10 +85,24 @@ string ChannelBehaviour::description()
 }
 
 
+string ChannelBehaviour::logContextPrefix()
+{
+  return string_format("%s: channel[%d] %s", output.device.logContextPrefix().c_str(), channelIndex, getName());
+}
+
+
+int ChannelBehaviour::getLogLevelOffset()
+{
+  return output.getLogLevelOffset();
+}
+
+
+
+
 
 string ChannelBehaviour::getStatusText()
 {
-  int fracDigits = (int)(-log(resolution)/log(10)+0.99);
+  int fracDigits = (int)(-::log(resolution)/::log(10)+0.99);
   if (fracDigits<0) fracDigits=0;
   return string_format("%0.*f %s", fracDigits, cachedChannelValue, valueUnitName(getChannelUnit(), true).c_str());
 }
@@ -213,11 +227,11 @@ double ChannelBehaviour::getTransitionalValue()
 void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlwaysSync, bool aVolatile)
 {
   if (!channelUpdatePending || aAlwaysSync) {
-    if (cachedChannelValue!=aActualChannelValue || LOGENABLEDX(LOG_DEBUG, output.device.getLogLevelOffset())) {
+    if (cachedChannelValue!=aActualChannelValue || OLOGENABLED(LOG_DEBUG)) {
       // show only changes except if debugging
-      SALOG(output.device,LOG_INFO,
-        "Channel '%s': cached value synchronized from %0.2f -> %0.2f%s",
-        getName(), cachedChannelValue, aActualChannelValue,
+      OLOG(LOG_INFO,
+        "cached value synchronized from %0.2f -> %0.2f%s",
+        cachedChannelValue, aActualChannelValue,
         aVolatile ? " (derived/volatile)" : ""
       );
     }
@@ -299,9 +313,9 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
   }
   // prevent propagating changes smaller than device resolution, but always apply when transition is in progress
   if (aAlwaysApply || inTransition() || fabs(aNewValue-cachedChannelValue)>=getResolution()) {
-    SALOG(output.device, LOG_INFO,
-      "Channel '%s' is requested to change from %0.2f ->  %0.2f (transition time=%d mS)",
-      getName(), cachedChannelValue, aNewValue, (int)(aTransitionTime/MilliSecond)
+    OLOG(LOG_INFO,
+      "is requested to change from %0.2f ->  %0.2f (transition time=%d mS)",
+      cachedChannelValue, aNewValue, (int)(aTransitionTime/MilliSecond)
     );
     // setting new value captures current (possibly transitional) value as previous and completes transition
     previousChannelValue = channelLastSync!=Never ? getTransitionalValue() : aNewValue; // If there is no valid previous value, set current as previous.
@@ -359,9 +373,9 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
     channelLastSync = MainLoop::now(); // now we know that we are in sync
     if (!aAnyWay) {
       // only log when actually of importance (to prevent messages for devices that apply mostly immediately)
-      SALOG(output.device, LOG_INFO,
-        "Channel '%s' has applied new value %0.2f to hardware%s",
-        getName(), cachedChannelValue, inTransition() ? " (still in transition)" : " (complete)"
+      OLOG(LOG_INFO,
+        "applied new value %0.2f to hardware%s",
+        cachedChannelValue, inTransition() ? " (still in transition)" : " (complete)"
       );
     }
   }
@@ -443,7 +457,7 @@ string ChannelBehaviour::getDbKey()
 ErrorPtr ChannelBehaviour::load()
 {
   ErrorPtr err = loadFromStore(getDbKey().c_str());
-  if (Error::notOK(err)) SALOG(output.device, LOG_ERR,"Error loading channel '%s'", getId().c_str());
+  if (Error::notOK(err)) OLOG(LOG_ERR,"cannot load: %s", err->text());
   return err;
 }
 
@@ -451,7 +465,7 @@ ErrorPtr ChannelBehaviour::load()
 ErrorPtr ChannelBehaviour::save()
 {
   ErrorPtr err = saveToStore(getDbKey().c_str(), false); // only one record per dbkey (=per device+channelid)
-  if (Error::notOK(err)) SALOG(output.device, LOG_ERR,"Error saving channel '%s'", getId().c_str());
+  if (Error::notOK(err)) OLOG(LOG_ERR,"cannot save: %s", err->text());
   return err;
 }
 
@@ -656,10 +670,10 @@ bool StringChannel::setChannelValueIfNotDontCare(DsScenePtr aScene, const string
 void StringChannel::syncChannelValueString(const string& aActualChannelValue, bool aAlwaysSync)
 {
   if (!channelUpdatePending || aAlwaysSync) {
-    if (stringValue!=aActualChannelValue || LOGENABLED(LOG_DEBUG)) {
+    if (stringValue!=aActualChannelValue || OLOGENABLED(LOG_DEBUG)) {
       // show only changes except if debugging
-      LOG(LOG_INFO, "Channel '%s': cached value synchronized from %s -> %s",
-        getName(), stringValue.c_str(), aActualChannelValue.c_str()
+      OLOG(LOG_INFO, "cached value synchronized from %s -> %s",
+        stringValue.c_str(), aActualChannelValue.c_str()
       );
     }
     setPVar(stringValue, aActualChannelValue);
@@ -672,7 +686,7 @@ void StringChannel::syncChannelValueString(const string& aActualChannelValue, bo
 void StringChannel::setChannelValueString(const string& aNewValue, bool aAlwaysApply)
 {
   if (aAlwaysApply || (aNewValue!=stringValue)) {
-    LOG(LOG_INFO, "Channel '%s' is requested to change from %s ->  %s", getName(), stringValue.c_str(), aNewValue.c_str());
+    OLOG(LOG_INFO, "is requested to change from %s ->  %s", stringValue.c_str(), aNewValue.c_str());
     setPVar(stringValue, aNewValue); // might need to be persisted
     channelUpdatePending = true; // pending to be sent to the device
   }

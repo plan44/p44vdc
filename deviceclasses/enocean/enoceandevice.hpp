@@ -45,16 +45,6 @@ namespace p44 {
   /// Learn-In/out procedure type
   typedef enum { learn_none, learn_simple, learn_smartack, learn_UTE } EnoceanLearnType;
 
-
-  // per-addressable logging macros
-  #define HLOG(lvl, ...) { if (LOGENABLEDX(lvl, device.getLogLevelOffset())) { device.logAddressable(lvl, ##__VA_ARGS__); } }
-  #if FOCUSLOGGING
-  #define HFOCUSLOG(...) { HLOG(FOCUSLOGLEVEL, ##__VA_ARGS__); }
-  #else
-  #define HFOCUSLOG(...)
-  #endif
-
-
   typedef boost::intrusive_ptr<EnoceanChannelHandler> EnoceanChannelHandlerPtr;
 
   #define TIMEOUT_FACTOR_FOR_INACTIVE 4
@@ -66,7 +56,7 @@ namespace p44 {
 
 
   /// single EnOcean device channel, abstract class
-  class EnoceanChannelHandler : public P44Obj
+  class EnoceanChannelHandler : public P44LoggingObj
   {
     typedef P44Obj inherited;
 
@@ -112,6 +102,12 @@ namespace p44 {
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
     virtual string shortDesc() = 0;
+
+    /// @return log level offset (overridden to use something other than the P44LoggingObj's)
+    virtual int getLogLevelOffset() P44_OVERRIDE;
+
+    /// @return a prefix for log messages from this addressable
+    virtual string logContextPrefix() P44_OVERRIDE;
 
   };
 

@@ -48,7 +48,7 @@ DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const 
 {
   // FIXME: remove later: warning indicating not-yet-converted vdc implementations
   if (actionId.substr(0,4)=="std.") {
-    SALOG(aSingleDevice, LOG_WARNING, "old style device implementation: actions should not have 'std.' prefix in the id!");
+    SOLOG(aSingleDevice, LOG_WARNING, "old style device implementation: actions should not have 'std.' prefix in the id!");
   }
   // install value list for parameters
   actionParams = ValueListPtr(new ValueList);
@@ -355,7 +355,7 @@ bool DynamicDeviceActions::pushActionChange(DeviceActionPtr aAction, bool aRemov
   if (!aAction) return false;
   SingleDevice &sd = *aAction->singleDeviceP;
   VdcApiConnectionPtr api = sd.getVdcHost().getSessionConnection();
-  SALOG((sd), LOG_NOTICE, "%spushing: dynamic action '%s' was %s", api ? "" : "Not announced, not ", aAction->getId().c_str(), aRemoved ? "removed" : "added or changed");
+  SOLOG((sd), LOG_NOTICE, "%spushing: dynamic action '%s' was %s", api ? "" : "Not announced, not ", aAction->getId().c_str(), aRemoved ? "removed" : "added or changed");
   // try to push to connected vDC API client
   if (api) {
     // create query for description property to get pushed
@@ -502,7 +502,7 @@ ErrorPtr ActionMacro::validateParams(ApiValuePtr aParams, ApiValuePtr aValidated
       return TextError::err("invalid parameter '%s' for custom action '%s': %s", key.c_str(), actionId.c_str(), err->text());
     }
   }
-  SALOG(singleDevice, LOG_DEBUG, "validated params: %s", aValidatedParams ? aValidatedParams->description().c_str() : "<none>");
+  SOLOG(singleDevice, LOG_DEBUG, "validated params: %s", aValidatedParams ? aValidatedParams->description().c_str() : "<none>");
   return ErrorPtr(); // all parameters conform (or aSkipInvalid)
 }
 
@@ -545,7 +545,7 @@ ErrorPtr ActionMacro::configureMacro(const string aDeviceActionId, JsonObjectPtr
     action = singleDevice.deviceActions->getAction(aDeviceActionId.substr(4));
     // FIXME: remove later: warning indicating macro definition (=last saved when deviceActions still had the 'std.' prefix)
     if (action) {
-      SALOG(singleDevice, LOG_INFO, "old-style macro '%s' still uses 'std.' prefix for deviceAction -> last saved before standardActions", actionId.c_str());
+      SOLOG(singleDevice, LOG_INFO, "old-style macro '%s' still uses 'std.' prefix for deviceAction -> last saved before standardActions", actionId.c_str());
     }
   }
   if (action) {
@@ -646,7 +646,7 @@ void CustomAction::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, ui
   JsonObjectPtr j = JsonObject::objFromText(jsonparams.c_str());
   ErrorPtr err = configureMacro(baseAction, j);
   if (Error::notOK(err)) {
-    SALOG(singleDevice, LOG_ERR, "error loading custom action: %s", err->text());
+    SOLOG(singleDevice, LOG_ERR, "error loading custom action: %s", err->text());
   }
 }
 
@@ -699,7 +699,7 @@ bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
             storedParams = newParams; // use cleaned-up set of params
             return true;
           }
-          SALOG(singleDevice, LOG_ERR, "there is no deviceAction called '%s'", aPropValue->stringValue().c_str());
+          SOLOG(singleDevice, LOG_ERR, "there is no deviceAction called '%s'", aPropValue->stringValue().c_str());
           return false;
         }
         case customactiontitle_key: {
@@ -716,7 +716,7 @@ bool CustomAction::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
             return true;
           }
           // error
-          SALOG(singleDevice, LOG_ERR, "writing 'params' failed: %s", err->text());
+          SOLOG(singleDevice, LOG_ERR, "writing 'params' failed: %s", err->text());
           return false;
         }
       }
@@ -854,7 +854,7 @@ ErrorPtr CustomActions::save()
   // save all elements of the map (only dirty ones will be actually stored to DB
   for (CustomActionsVector::iterator pos = customActions.begin(); pos!=customActions.end(); ++pos) {
     err = (*pos)->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed
-    if (Error::notOK(err)) SALOG(singleDevice, LOG_ERR,"Error saving custom action '%s': %s", (*pos)->actionId.c_str(), err->text());
+    if (Error::notOK(err)) SOLOG(singleDevice, LOG_ERR,"Error saving custom action '%s': %s", (*pos)->actionId.c_str(), err->text());
   }
   return err;
 }
@@ -1032,7 +1032,7 @@ bool DeviceState::pushWithEvent(DeviceEventPtr aEvent)
 bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
 {
   VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
-  SALOG((*singleDeviceP), LOG_NOTICE, "%spushing: state '%s' changed to '%s'", api ? "" : "Not announced, not ", stateId.c_str(), stateDescriptor->getStringValue().c_str());
+  SOLOG((*singleDeviceP), LOG_NOTICE, "%spushing: state '%s' changed to '%s'", api ? "" : "Not announced, not ", stateId.c_str(), stateDescriptor->getStringValue().c_str());
   // update for every push attempt, as this are "events"
   lastPush = MainLoop::currentMainLoop().now();
   // collect additional events to push
@@ -1057,13 +1057,13 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
       ApiValuePtr event = api->newApiValue();
       event->setType(apivalue_null); // for now, events don't have any properties, so it's just named NULL values
       events->add((*pos)->eventId, event);
-      SALOG((*singleDeviceP), LOG_NOTICE, "- pushing event '%s' along with state change", (*pos)->eventId.c_str());
+      SOLOG((*singleDeviceP), LOG_NOTICE, "- pushing event '%s' along with state change", (*pos)->eventId.c_str());
     }
     return singleDeviceP->pushNotification(query, events, VDC_API_DOMAIN, api->getApiVersion());
   }
   else {
     for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
-      SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s' not pushed", (*pos)->eventId.c_str());
+      SOLOG((*singleDeviceP), LOG_NOTICE, "- event '%s' not pushed", (*pos)->eventId.c_str());
     }
   }
   // no API, cannot not push
@@ -1403,7 +1403,7 @@ bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
   VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
   if (!aEventList.empty()) {
     // add events
-    SALOG((*singleDeviceP), LOG_NOTICE, "%spushing: independent event(s):", api ? "" : "Not announced, not ");
+    SOLOG((*singleDeviceP), LOG_NOTICE, "%spushing: independent event(s):", api ? "" : "Not announced, not ");
     if (api) {
       ApiValuePtr events;
       for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
@@ -1414,13 +1414,13 @@ bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
         ApiValuePtr event = api->newApiValue();
         event->setType(apivalue_null); // for now, events don't have any properties, so it's just named NULL values
         events->add((*pos)->eventId, event);
-        SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s'", (*pos)->eventId.c_str());
+        SOLOG((*singleDeviceP), LOG_NOTICE, "- event '%s'", (*pos)->eventId.c_str());
       }
       return singleDeviceP->pushNotification(ApiValuePtr(), events, VDC_API_DOMAIN, api->getApiVersion());
     }
     else {
       for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
-        SALOG((*singleDeviceP), LOG_NOTICE, "- event '%s' not pushed", (*pos)->eventId.c_str());
+        SOLOG((*singleDeviceP), LOG_NOTICE, "- event '%s' not pushed", (*pos)->eventId.c_str());
       }
 
     }
@@ -1526,7 +1526,7 @@ bool DeviceProperties::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
       // write
       ErrorPtr err = val->conforms(aPropValue, true);
       if (Error::notOK(err)) {
-        SALOG((*singleDeviceP), LOG_ERR, "Cannot set property '%s': %s", val->getName().c_str(), err->text());
+        SOLOG((*singleDeviceP), LOG_ERR, "Cannot set property '%s': %s", val->getName().c_str(), err->text());
         return false;
       }
       else {
@@ -1711,7 +1711,7 @@ ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
       actionParams = aParams->newObject();
     }
     // now call the action
-    ALOG(LOG_NOTICE, "invokeDeviceAction: %s:%s", actionid.c_str(), actionParams->description().c_str());
+    OLOG(LOG_NOTICE, "invokeDeviceAction: %s:%s", actionid.c_str(), actionParams->description().c_str());
     call(actionid, actionParams, boost::bind(&SingleDevice::invokeDeviceActionComplete, this, aRequest, _1));
     // callback will create the response when done
     return ErrorPtr(); // do not return anything now
@@ -1722,7 +1722,7 @@ ErrorPtr SingleDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
 
 void SingleDevice::invokeDeviceActionComplete(VdcApiRequestPtr aRequest, ErrorPtr aError)
 {
-  ALOG(LOG_NOTICE, "- call completed with status: %s", Error::isOK(aError) ? "OK" : aError->text());
+  OLOG(LOG_NOTICE, "- call completed with status: %s", Error::isOK(aError) ? "OK" : aError->text());
   methodCompleted(aRequest, aError);
 }
 
@@ -1780,7 +1780,7 @@ bool SingleDevice::prepareSceneCall(DsScenePtr aScene)
           j = JsonObject::newObj();
         }
         actionParams = JsonApiValue::newValueFromJson(j);
-        ALOG(LOG_NOTICE, "invoking action via scene %d command: %s:%s", aScene->sceneNo, actionid.c_str(), actionParams->description().c_str());
+        OLOG(LOG_NOTICE, "invoking action via scene %d command: %s:%s", aScene->sceneNo, actionid.c_str(), actionParams->description().c_str());
         call(actionid, actionParams, boost::bind(&SingleDevice::sceneInvokedActionComplete, this, _1));
         return false; // do not continue applying
       }
@@ -1794,10 +1794,10 @@ bool SingleDevice::prepareSceneCall(DsScenePtr aScene)
 void SingleDevice::sceneInvokedActionComplete(ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
-    ALOG(LOG_INFO, "scene invoked command complete");
+    OLOG(LOG_INFO, "scene invoked command complete");
   }
   else {
-    ALOG(LOG_ERR, "scene invoked command returned error: %s", aError->text());
+    OLOG(LOG_ERR, "scene invoked command returned error: %s", aError->text());
   }
 }
 

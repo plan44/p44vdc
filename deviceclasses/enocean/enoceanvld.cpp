@@ -399,7 +399,7 @@ void EnoceanD201XXDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryR
 
 void EnoceanD201XXDevice::configureD201XX()
 {
-  ALOG(LOG_INFO, "D2-01-xx: configuring using Actuator Set Local command");
+  OLOG(LOG_INFO, "D2-01-xx: configuring using Actuator Set Local command");
   Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
   packet->initForRorg(rorg_VLD, 4);
   packet->setRadioDestination(getAddress());
@@ -478,7 +478,7 @@ void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 
 void EnoceanD201XXDevice::updateOutput(uint8_t aPercentOn, uint8_t aDimTimeSelector)
 {
-  ALOG(LOG_INFO, "D2-01-xx: sending Actuator Set Output command: new value = %d%%", aPercentOn);
+  OLOG(LOG_INFO, "D2-01-xx: sending Actuator Set Output command: new value = %d%%", aPercentOn);
   Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
   packet->initForRorg(rorg_VLD, 3);
   packet->setRadioDestination(getAddress());
@@ -498,7 +498,7 @@ void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
   if (c) {
     c->syncChannelCB = aDoneCB;
     // trigger device report
-    ALOG(LOG_INFO, "D2-01-xx: sending Actuator Status Query");
+    OLOG(LOG_INFO, "D2-01-xx: sending Actuator Status Query");
     Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
     packet->initForRorg(rorg_VLD, 2);
     packet->setRadioDestination(getAddress());

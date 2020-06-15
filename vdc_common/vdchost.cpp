@@ -179,6 +179,7 @@ void VdcHost::postEvent(VdchostEvent aEvent)
 }
 
 
+
 ApiValuePtr VdcHost::newApiValue()
 {
   return vdcApiServer ? vdcApiServer->newApiValue() : ApiValuePtr(new JsonApiValue);
@@ -234,8 +235,6 @@ const char *VdcHost::getIconDir()
 {
 	return iconDir.c_str();
 }
-
-
 
 
 
@@ -346,9 +345,6 @@ void VdcHost::checkTimeOfDayChange()
     }
   }
 }
-
-
-
 
 
 // MARK: - initializisation of DB and containers
@@ -996,12 +992,12 @@ void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectio
 {
   for (NotificationAudience::iterator gpos = aAudience.begin(); gpos!=aAudience.end(); ++gpos) {
     if (gpos->vdc) {
-      ALOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s", aNotification.c_str(), gpos->members.size(), gpos->vdc->shortDesc().c_str());
+      OLOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s", aNotification.c_str(), gpos->members.size(), gpos->vdc->shortDesc().c_str());
       // let vdc process this, might be able to optimize delivery using hardware's native mechanisms such as scenes or groups
       gpos->vdc->deliverToAudience(gpos->members, aApiConnection, aNotification, aParams);
     }
     else {
-      ALOG(LOG_INFO, "==== delivering notification '%s' to %lu non-devices now", aNotification.c_str(), gpos->members.size());
+      OLOG(LOG_INFO, "==== delivering notification '%s' to %lu non-devices now", aNotification.c_str(), gpos->members.size());
       // just deliver to each member, no optimization for non-devices
       for (DsAddressablesList::iterator apos = gpos->members.begin(); apos!=gpos->members.end(); ++apos) {
         (*apos)->handleNotification(aApiConnection, aNotification, aParams);

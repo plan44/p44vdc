@@ -36,8 +36,7 @@ DsBehaviour::DsBehaviour(Device &aDevice, const string aBehaviourId) :
   device(aDevice),
   hardwareName(""), // empty, will show behaviour ID by default
   hardwareError(hardwareError_none),
-  hardwareErrorUpdated(p44::Never),
-  logLevelOffset(0) // means: inherit from device
+  hardwareErrorUpdated(p44::Never)
 {
 }
 
@@ -84,7 +83,7 @@ string DsBehaviour::getDbKey()
 ErrorPtr DsBehaviour::load()
 {
   ErrorPtr err = loadFromStore(getDbKey().c_str());
-  if (Error::notOK(err)) BLOG(LOG_ERR,"Error loading behaviour %s: %s", shortDesc().c_str(), err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR,"Error loading behaviour %s: %s", shortDesc().c_str(), err->text());
   return err;
 }
 
@@ -92,7 +91,7 @@ ErrorPtr DsBehaviour::load()
 ErrorPtr DsBehaviour::save()
 {
   ErrorPtr err = saveToStore(getDbKey().c_str(), false); // only one record per dbkey (=per device+behaviourindex)
-  if (Error::notOK(err)) BLOG(LOG_ERR,"Error saving behaviour %s: %s", shortDesc().c_str(), err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR,"Error saving behaviour %s: %s", shortDesc().c_str(), err->text());
   return err;
 }
 
@@ -143,6 +142,10 @@ enum {
   numDsBehaviourDescProperties
 };
 
+enum {
+  logLevelOffset_key,
+  numDsBehaviourSettingsProperties
+};
 
 enum {
   error_key,
@@ -164,7 +167,7 @@ int DsBehaviour::numLocalProps(PropertyDescriptorPtr aParentDescriptor)
   }
   switch (pdP->fieldKey()) {
     case descriptions_key_offset: return numDescProps()+numDsBehaviourDescProperties;
-    case settings_key_offset: return numSettingsProps(); // no settings on the DsBehaviour level
+    case settings_key_offset: return numSettingsProps()+numDsBehaviourSettingsProperties;
     case states_key_offset: return numStateProps()+numDsBehaviourStateProperties;
     default: break;
   }
@@ -185,6 +188,9 @@ PropertyDescriptorPtr DsBehaviour::getDescriptorByIndex(int aPropIndex, int aDom
     { "type", apivalue_string, type_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
     { "dsIndex", apivalue_uint64, dsIndex_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
     { "x-p44-behaviourType", apivalue_string, behaviourType_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
+  };
+  static const PropertyDescription settingsProperties[numDsBehaviourSettingsProperties] = {
+    { "x-p44-logLevelOffset", apivalue_int64, logLevelOffset_key+settings_key_offset, OKEY(dsBehaviour_Key) },
   };
   static const PropertyDescription stateProperties[numDsBehaviourStateProperties] = {
     { "error", apivalue_uint64, error_key+states_key_offset, OKEY(dsBehaviour_Key) },
@@ -210,7 +216,10 @@ PropertyDescriptorPtr DsBehaviour::getDescriptorByIndex(int aPropIndex, int aDom
       // check type-specific descriptions
       return getDescDescriptorByIndex(aPropIndex, aParentDescriptor);
     case settings_key_offset:
-      // no settings at the DsBehaviour level
+      // check for generic settings properties
+      if (aPropIndex<numDsBehaviourSettingsProperties)
+        return PropertyDescriptorPtr(new StaticPropertyDescriptor(&settingsProperties[aPropIndex], aParentDescriptor));
+      aPropIndex -= numDsBehaviourSettingsProperties;
       // check type-specific settings
       return getSettingsDescriptorByIndex(aPropIndex, aParentDescriptor);
     case states_key_offset:
@@ -237,8 +246,19 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
         case type_key+descriptions_key_offset: aPropValue->setStringValue(getTypeName()); return true;
         case dsIndex_key+descriptions_key_offset: aPropValue->setUint64Value(getIndex()); return true;
         case behaviourType_key+descriptions_key_offset: aPropValue->setStringValue(behaviourTypeIdentifier()); return true;
+        // settings
+        case logLevelOffset_key+settings_key_offset: { int o=getLocalLogLevelOffset(); if (o==0) return false; else aPropValue->setInt32Value(o); return true; }
         // state
         case error_key+states_key_offset: aPropValue->setUint16Value(hardwareError); return true;
+      }
+    }
+    else {
+      // write properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        // Settings properties
+        case logLevelOffset_key+settings_key_offset:
+          setLogLevelOffset(aPropValue->int32Value());
+          return true;
       }
     }
   }
@@ -247,14 +267,7 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 
 
 
-// MARK: - description/shortDesc
-
-
-int DsBehaviour::getLogLevelOffset()
-{
-  if (logLevelOffset!=0) return logLevelOffset; // I have my own offset
-  return device.getLogLevelOffset(); // just go with device
-}
+// MARK: - description/shortDesc/logging
 
 
 string DsBehaviour::shortDesc()
@@ -268,6 +281,22 @@ string DsBehaviour::description()
   string s = string_format("\n- behaviour hardware name: '%s'", getHardwareName().c_str());
   string_format_append(s, "\n- hardwareError: %d\n", hardwareError);
   return s;
+}
+
+
+int DsBehaviour::getLogLevelOffset()
+{
+  if (logLevelOffset==0) {
+    // no own offset - inherit device's
+    return device.getLogLevelOffset();
+  }
+  return inheritedProps::getLogLevelOffset();
+}
+
+
+string DsBehaviour::logContextPrefix()
+{
+  return string_format("%s: %s[%zu] %s '%s'", device.logContextPrefix().c_str(), getTypeName(), getIndex(), getApiId(3).c_str(), getHardwareName().c_str());
 }
 
 

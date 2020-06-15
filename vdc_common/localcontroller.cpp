@@ -1037,7 +1037,9 @@ Trigger::Trigger() :
   conditionMet(undefined)
 {
   triggerCondition.isMemberVariable();
+  triggerCondition.setContextInfo("condition", this);
   triggerAction.isMemberVariable();
+  triggerAction.setContextInfo("action", this);
   triggerCondition.setEvaluationResultHandler(boost::bind(&Trigger::triggerEvaluationExecuted, this, _1));
 }
 
@@ -1045,6 +1047,13 @@ Trigger::Trigger() :
 Trigger::~Trigger()
 {
 }
+
+
+string Trigger::logContextPrefix()
+{
+  return string_format("Trigger '%s'", name.c_str());
+}
+
 
 
 // MARK: - Trigger condition evaluation
@@ -1555,6 +1564,7 @@ enum {
   triggerCondition_key,
   triggerVarDefs_key,
   triggerAction_key,
+  logLevelOffset_key,
   numTriggerProperties
 };
 
@@ -1574,7 +1584,8 @@ PropertyDescriptorPtr Trigger::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "name", apivalue_string, triggerName_key, OKEY(trigger_key) },
     { "condition", apivalue_string, triggerCondition_key, OKEY(trigger_key) },
     { "varDefs", apivalue_string, triggerVarDefs_key, OKEY(trigger_key) },
-    { "action", apivalue_string, triggerAction_key, OKEY(trigger_key) }
+    { "action", apivalue_string, triggerAction_key, OKEY(trigger_key) },
+    { "logLevelOffset", apivalue_int64, logLevelOffset_key, OKEY(trigger_key) },
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
@@ -1593,11 +1604,14 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getCode()); return true;
         case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
         case triggerAction_key: aPropValue->setStringValue(triggerAction.getCode()); return true;
+        case logLevelOffset_key: aPropValue->setInt32Value(getLocalLogLevelOffset()); return true;
       }
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
-        case triggerName_key: setPVar(name, aPropValue->stringValue()); return true;
+        case triggerName_key:
+          setPVar(name, aPropValue->stringValue());
+          return true;
         case triggerCondition_key:
           if (triggerCondition.setCode(aPropValue->stringValue())) {
             markDirty();
@@ -1610,6 +1624,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           }
           return true;
         case triggerAction_key: if (triggerAction.setCode(aPropValue->stringValue())) markDirty(); return true;
+        case logLevelOffset_key: setLogLevelOffset(aPropValue->int32Value()); return true;
       }
     }
   }

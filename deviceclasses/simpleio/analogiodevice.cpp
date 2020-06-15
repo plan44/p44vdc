@@ -234,7 +234,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     analogIO->setValue(pwm);
     // next step
     if (moreSteps) {
-      ALOG(LOG_DEBUG, "AnalogIO transitional brightness value: %.2f", w);
+      OLOG(LOG_DEBUG, "AnalogIO transitional brightness value: %.2f", w);
       // not yet complete, schedule next step
       timerTicket.executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
@@ -242,7 +242,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       );
       return; // will be called later again
     }
-    if (!aForDimming) ALOG(LOG_INFO, "AnalogIO final PWM value: %.2f", w);
+    if (!aForDimming) OLOG(LOG_INFO, "AnalogIO final PWM value: %.2f", w);
   }
   else if (analogIOType==analogio_rgbdimmer) {
     // three channel RGB PWM dimmer
@@ -273,7 +273,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     analogIO3->setValue(pwm);
     // next step
     if (moreSteps) {
-      ALOG(LOG_DEBUG, "AnalogIO transitional RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
+      OLOG(LOG_DEBUG, "AnalogIO transitional RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
       // not yet complete, schedule next step
       timerTicket.executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
@@ -281,7 +281,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       );
       return; // will be called later again
     }
-    if (!aForDimming) ALOG(LOG_INFO, "AnalogIO final RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
+    if (!aForDimming) OLOG(LOG_INFO, "AnalogIO final RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
   }
 }
 

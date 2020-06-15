@@ -410,7 +410,7 @@ void ShadowBehaviour::syncBlindState()
 
 void ShadowBehaviour::applyBlindChannels(MovementChangeCB aMovementCB, SimpleCB aApplyDoneCB, bool aForDimming)
 {
-  BFOCUSLOG("Initiating blind moving sequence");
+  FOCUSOLOG("Initiating blind moving sequence");
   movementCB = aMovementCB;
   if (blindState!=blind_idle) {
     // not idle
@@ -441,7 +441,7 @@ void ShadowBehaviour::applyBlindChannels(MovementChangeCB aMovementCB, SimpleCB 
 
 void ShadowBehaviour::dimBlind(MovementChangeCB aMovementCB, VdcDimMode aDimMode)
 {
-  BFOCUSLOG("dimBlind called for %s", aDimMode==dimmode_up ? "UP" : (aDimMode==dimmode_down ? "DOWN" : "STOP"));
+  FOCUSOLOG("dimBlind called for %s", aDimMode==dimmode_up ? "UP" : (aDimMode==dimmode_down ? "DOWN" : "STOP"));
   if (aDimMode==dimmode_stop) {
     // simply stop
     movementCB = aMovementCB; // install new
@@ -485,7 +485,7 @@ void ShadowBehaviour::stop(SimpleCB aApplyDoneCB)
       // normal stop, unless this is a stop caused by a request to apply new values afterwards
       blindState = blind_stopping;
     }
-    BLOG(LOG_INFO, "Stopping all movement%s", blindState==blind_stopping_before_apply ? " before applying" : "");
+    OLOG(LOG_INFO, "Stopping all movement%s", blindState==blind_stopping_before_apply ? " before applying" : "");
     movingTicket.cancel();
     movementCB(boost::bind(&ShadowBehaviour::stopped, this, aApplyDoneCB, true), 0);
   }
@@ -502,7 +502,7 @@ void ShadowBehaviour::endReached(bool aTop)
 {
   // completely ignore if we don't have end contacts
   if (hasEndContacts) {
-    BLOG(LOG_INFO, "reports %s actually reached", aTop ? "top (fully rolled in)" : "bottom (fully extended)");
+    OLOG(LOG_INFO, "reports %s actually reached", aTop ? "top (fully rolled in)" : "bottom (fully extended)");
     // cancel timeouts that might want to stop movement
     movingTicket.cancel();
     // check for updating full range time
@@ -539,7 +539,7 @@ void ShadowBehaviour::stopped(SimpleCB aApplyDoneCB, bool delay)
 {
   updateMoveTimeAtEndReached = false; // stopping cancels full range timing update (if stop is due to end contact, measurement will be already done now)
   moveTimerStop();
-  FOCUSLOG("- calculated current blind position=%.1f%%, angle=%.1f", referencePosition, referenceAngle);
+  FOCUSOLOG("- calculated current blind position=%.1f%%, angle=%.1f", referencePosition, referenceAngle);
 
   if (delay) {
     sequenceTicket.executeOnce(boost::bind(&ShadowBehaviour::processStopped, this, aApplyDoneCB), stopDelayTime*Second);
@@ -584,7 +584,7 @@ void ShadowBehaviour::allDone(SimpleCB aApplyDoneCB)
   moveTimerStop();
   movementCB = NULL;
   blindState = blind_idle;
-  BLOG(LOG_INFO, "End of movement sequence, reached position=%.1f%%, angle=%.1f", referencePosition, referenceAngle);
+  OLOG(LOG_INFO, "End of movement sequence, reached position=%.1f%%, angle=%.1f", referencePosition, referenceAngle);
   if (aApplyDoneCB) aApplyDoneCB();
 }
 
@@ -639,7 +639,7 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
       if (stopIn<angleCloseTime)
         stopIn = angleCloseTime;
     }
-    BLOG(LOG_INFO,
+    OLOG(LOG_INFO,
       "Blind position=%.1f%% requested, current=%.1f%% -> moving %s for %.3f Seconds",
       targetPosition, referencePosition, dist>0 ? "up" : "down", (double)stopIn/Second
     );
@@ -692,7 +692,7 @@ void ShadowBehaviour::applyAngle(SimpleCB aApplyDoneCB)
     }
     // For full opened or closed, add 20% to make sure we're in sync
     if (targetAngle>=100 || targetAngle<=0) stopIn *= 1.2;
-    BLOG(LOG_INFO,
+    OLOG(LOG_INFO,
       "Blind angle=%.1f%% requested, current=%.1f%% -> moving %s for %.3f Seconds",
       targetAngle, referenceAngle, dist>0 ? "up" : "down", (double)stopIn/Second
     );

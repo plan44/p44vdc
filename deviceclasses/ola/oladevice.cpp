@@ -173,7 +173,7 @@ void OlaDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHan
   // clear learn-in data from DB
   if (olaDeviceRowID) {
     if(getOlaVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", olaDeviceRowID)!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Error deleting device: %s", getOlaVdc().db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error deleting device: %s", getOlaVdc().db.error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -241,7 +241,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     setDMXChannel(whiteChannel,(DmxValue)w);
     // next step
     if (moreSteps) {
-      ALOG(LOG_DEBUG, "transitional DMX512 value %d=%d", whiteChannel, (int)w);
+      OLOG(LOG_DEBUG, "transitional DMX512 value %d=%d", whiteChannel, (int)w);
       // not yet complete, schedule next step
       transitionTicket.executeOnce(
         boost::bind(&OlaDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
@@ -250,7 +250,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       return; // will be called later again
     }
     if (!aForDimming) {
-      ALOG(LOG_INFO, "final DMX512 channel %d=%d", whiteChannel, (int)w);
+      OLOG(LOG_INFO, "final DMX512 channel %d=%d", whiteChannel, (int)w);
     }
     l->brightnessApplied(); // confirm having applied the new brightness
   }
@@ -296,7 +296,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     }
     // next step
     if (moreSteps) {
-      ALOG(LOG_DEBUG,
+      OLOG(LOG_DEBUG,
         "transitional DMX512 values R(%hd)=%d, G(%hd)=%d, B(%hd)=%d, W(%hd)=%d, A(%hd)=%d, H(%hd)=%d, V(%hd)=%d",
         redChannel, (int)r, greenChannel, (int)g, blueChannel, (int)b,
         whiteChannel, (int)w, amberChannel, (int)a,
@@ -310,7 +310,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       return; // will be called later again
     }
     if (!aForDimming) {
-      ALOG(LOG_INFO,
+      OLOG(LOG_INFO,
         "final DMX512 values R(%hd)=%d, G(%hd)=%d, B(%hd)=%d, W(%hd)=%d, A(%hd)=%d, H(%hd)=%d, V(%hd)=%d",
         redChannel, (int)r, greenChannel, (int)g, blueChannel, (int)b,
         whiteChannel, (int)w, amberChannel, (int)a,

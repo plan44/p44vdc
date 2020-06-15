@@ -224,7 +224,7 @@ bool EnoceanVdc::addAndRememberDevice(EnoceanDevicePtr aEnoceanDevice)
       aEnoceanDevice->getEEProfile(),
       aEnoceanDevice->getEEManufacturer()
     )!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
     }
     return true;
   }
@@ -422,10 +422,10 @@ bool EnoceanVdc::dropSecurityInfoForSender(EnoceanAddress aSender)
   if (securityInfos.erase(aSender)>0) {
     // also delete from db
     if (db.executef("DELETE FROM secureDevices WHERE enoceanAddress=%d", aSender)!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Error deleting security info for device %08X: %s", aSender, db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error deleting security info for device %08X: %s", aSender, db.error()->description().c_str());
       return false;
     }
-    ALOG(LOG_INFO, "Deleted security info for device %08X", aSender);
+    OLOG(LOG_INFO, "Deleted security info for device %08X", aSender);
   }
   return true;
 }
@@ -471,7 +471,7 @@ void EnoceanVdc::loadSecurityInfos()
       securityInfos[addr] = sec;
     }
   }
-  ALOG(LOG_INFO, "loaded security info for %lu devices", securityInfos.size());
+  OLOG(LOG_INFO, "loaded security info for %lu devices", securityInfos.size());
 }
 
 
@@ -493,14 +493,14 @@ bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddre
       aSecurityInfo->rollingCounter,
       aEnoceanAddress
     )!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Error updating RLC for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error updating RLC for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
       return false;
     }
   }
   else {
     sqlite3pp::command cmd(db);
     if (cmd.prepare("INSERT OR REPLACE INTO secureDevices (enoceanAddress, slf, rlc, key, teachInInfo) VALUES (?,?,?,?,?)")!=SQLITE_OK) {
-      ALOG(LOG_ERR, "Error preparing SQL for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error preparing SQL for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
       return false;
     }
     else {
@@ -511,14 +511,14 @@ bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddre
       cmd.bind(idx++, aSecurityInfo->privateKey, EnOceanSecurity::AES128BlockLen, true); // is static
       cmd.bind(idx++, aSecurityInfo->teachInInfo);
       if (cmd.execute()!=SQLITE_OK) {
-        ALOG(LOG_ERR, "Error saving security info for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
+        OLOG(LOG_ERR, "Error saving security info for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
       }
     }
   }
   // saved
   aSecurityInfo->lastSavedRLC = aSecurityInfo->rollingCounter;
   aSecurityInfo->lastSave = MainLoop::now();
-  ALOG(LOG_INFO, "Saved/updated security info for device %08X", aEnoceanAddress);
+  OLOG(LOG_INFO, "Saved/updated security info for device %08X", aEnoceanAddress);
   return true;
 }
 

@@ -916,7 +916,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                   memberUID.getString().c_str(),
                   groupNo
                 )!=SQLITE_OK) {
-                  ALOG(LOG_ERR, "Error saving DALI group member: %s", db.error()->description().c_str());
+                  OLOG(LOG_ERR, "Error saving DALI group member: %s", db.error()->description().c_str());
                 }
               }
             }
@@ -929,7 +929,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                 dimmerType.c_str(),
                 collectionID
               )!=SQLITE_OK) {
-                ALOG(LOG_ERR, "Error saving DALI composite device member: %s", db.error()->description().c_str());
+                OLOG(LOG_ERR, "Error saving DALI composite device member: %s", db.error()->description().c_str());
               }
               if (collectionID<0) {
                 // use rowid of just inserted item as collectionID
@@ -940,7 +940,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                   collectionID,
                   collectionID
                 )!=SQLITE_OK) {
-                  ALOG(LOG_ERR, "Error updating DALI composite device: %s", db.error()->description().c_str());
+                  OLOG(LOG_ERR, "Error updating DALI composite device: %s", db.error()->description().c_str());
                 }
               }
             }
@@ -983,7 +983,7 @@ ErrorPtr DaliVdc::ungroupDevice(DaliOutputDevicePtr aDevice, VdcApiRequestPtr aR
         "DELETE FROM compositeDevices WHERE dimmerType!='GRP' AND collectionID=%ld",
         (long)dev->collectionID
       )!=SQLITE_OK) {
-        ALOG(LOG_ERR, "Error deleting DALI composite device: %s", db.error()->description().c_str());
+        OLOG(LOG_ERR, "Error deleting DALI composite device: %s", db.error()->description().c_str());
       }
     }
   }
@@ -997,7 +997,7 @@ ErrorPtr DaliVdc::ungroupDevice(DaliOutputDevicePtr aDevice, VdcApiRequestPtr aR
         "DELETE FROM compositeDevices WHERE dimmerType='GRP' AND groupNo=%d",
         groupNo
       )!=SQLITE_OK) {
-        ALOG(LOG_ERR, "Error deleting DALI group: %s", db.error()->description().c_str());
+        OLOG(LOG_ERR, "Error deleting DALI group: %s", db.error()->description().c_str());
       }
     }
   }
@@ -1139,7 +1139,7 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
       // Dim group
       // - get mode
       VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
-      ALOG(LOG_INFO,
+      OLOG(LOG_INFO,
         "optimized group dimming (DALI): 'brightness' %s",
         dm==dimmode_stop ? "STOPS dimming" : (dm==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
       );
@@ -1163,10 +1163,10 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
 void DaliVdc::groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, NotificationDeliveryStatePtr aDeliveryState, ErrorPtr aError)
 {
   if (Error::notOK(aError)) {
-    ALOG(LOG_WARNING, "Error while preparing device for group dimming: %s", aError->text());
+    OLOG(LOG_WARNING, "Error while preparing device for group dimming: %s", aError->text());
   }
   if (--aDeliveryState->pendingCount>0) {
-    AFOCUSLOG("waiting for all affected devices to confirm dim preparation: %d/%d remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
+    FOCUSOLOG("waiting for all affected devices to confirm dim preparation: %d/%d remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
     return; // not all confirmed yet
   }
   // now issue dimming command to group
@@ -1198,7 +1198,7 @@ void DaliVdc::groupDimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLTim
 
 void DaliVdc::nativeActionDone(StatusCB aStatusCB, ErrorPtr aError)
 {
-  AFOCUSLOG("DALI Native action done with status: %s", Error::text(aError).c_str());
+  FOCUSOLOG("DALI Native action done with status: %s", Error::text(aError).c_str());
   if (aStatusCB) aStatusCB(aError);
 }
 
@@ -1237,7 +1237,7 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
     markUsed(a, true);
     aOptimizerEntry->nativeActionId = actionIdFromDaliAddress(a);
     aOptimizerEntry->lastNativeChange = MainLoop::now();
-    ALOG(LOG_INFO,"creating action '%s' (DaliAddress=0x%02X)", aOptimizerEntry->nativeActionId.c_str(), a);
+    OLOG(LOG_INFO,"creating action '%s' (DaliAddress=0x%02X)", aOptimizerEntry->nativeActionId.c_str(), a);
     if (aDeliveryState->optimizedType==ntfy_callscene) {
       // make sure no old scene settings remain in any device -> broadcast DALICMD_REMOVE_FROM_SCENE
       daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(a&DaliSceneMask));
@@ -1279,7 +1279,7 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
       }
     }
     // done
-    ALOG(LOG_INFO,"updated DALI scene #%d", a&DaliSceneMask);
+    OLOG(LOG_INFO,"updated DALI scene #%d", a&DaliSceneMask);
     aOptimizerEntry->lastNativeChange = MainLoop::now();
     aStatusCB(ErrorPtr());
     return;

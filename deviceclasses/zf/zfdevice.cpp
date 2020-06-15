@@ -136,7 +136,7 @@ void ZfDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHand
 {
   // clear learn-in data from DB
   if(getZfVdc().db.executef("DELETE FROM knownDevices WHERE zfAddress=%d AND subdevice=%d", getAddress(), getSubDevice())!=SQLITE_OK) {
-    ALOG(LOG_ERR, "Error deleting device: %s", getZfVdc().db.error()->description().c_str());
+    OLOG(LOG_ERR, "Error deleting device: %s", getZfVdc().db.error()->description().c_str());
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);

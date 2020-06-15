@@ -478,6 +478,9 @@ namespace p44 {
     ErrorPtr handleCheckCondition(VdcApiRequestPtr aRequest);
     ErrorPtr handleTestActions(VdcApiRequestPtr aRequest);
 
+    /// @return a prefix for log messages from this addressable
+    virtual string logContextPrefix() P44_OVERRIDE;
+
   protected:
 
     // property access implementation

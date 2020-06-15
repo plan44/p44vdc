@@ -61,6 +61,18 @@ string EnoceanChannelHandler::getOpStateText()
 }
 
 
+int EnoceanChannelHandler::getLogLevelOffset()
+{
+  // no own offset - inherit device's
+  return device.getLogLevelOffset();
+}
+
+
+string EnoceanChannelHandler::logContextPrefix()
+{
+  return string_format("%s: channel[%d]", device.logContextPrefix().c_str(), channel);
+}
+
 
 // MARK: - EnoceanDevice
 
@@ -202,7 +214,7 @@ void EnoceanDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResul
 {
   // clear learn-in data from DB
   if(getEnoceanVdc().db.executef("DELETE FROM knownDevices WHERE enoceanAddress=%d AND subdevice=%d", getAddress(), getSubDevice())!=SQLITE_OK) {
-    ALOG(LOG_ERR, "Error deleting device: %s", getEnoceanVdc().db.error()->description().c_str());
+    OLOG(LOG_ERR, "Error deleting device: %s", getEnoceanVdc().db.error()->description().c_str());
   }
   #if ENABLE_ENOCEAN_SECURE
   // clear security info if no subdevices are left
@@ -245,7 +257,7 @@ EnoceanChannelHandlerPtr EnoceanDevice::channelForBehaviour(const DsBehaviour *a
 void EnoceanDevice::sendCommand(Esp3PacketPtr aCommandPacket, ESPPacketCB aResponsePacketCB)
 {
   aCommandPacket->finalize();
-  ALOG(LOG_INFO, "Sending EnOcean Packet:\n%s", aCommandPacket->description().c_str());
+  OLOG(LOG_INFO, "Sending EnOcean Packet:\n%s", aCommandPacket->description().c_str());
   getEnoceanVdc().enoceanComm.sendCommand(aCommandPacket, aResponsePacketCB);
 }
 
@@ -260,7 +272,7 @@ void EnoceanDevice::needOutgoingUpdate()
     sendOutgoingUpdate();
   }
   else {
-    ALOG(LOG_NOTICE, "flagged output update pending -> outgoing EnOcean package will be sent later");
+    OLOG(LOG_NOTICE, "flagged output update pending -> outgoing EnOcean package will be sent later");
   }
 }
 
@@ -316,7 +328,7 @@ void EnoceanDevice::updateRadioMetrics(Esp3PacketPtr aEsp3PacketPtr)
 
 void EnoceanDevice::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 {
-  ALOG(LOG_INFO, "now starts processing EnOcean packet:\n%s", aEsp3PacketPtr->description().c_str());
+  OLOG(LOG_INFO, "now starts processing EnOcean packet:\n%s", aEsp3PacketPtr->description().c_str());
   updateRadioMetrics(aEsp3PacketPtr);
   // pass to every channel
   for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
@@ -326,7 +338,7 @@ void EnoceanDevice::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
   if (pendingDeviceUpdate || updateAtEveryReceive) {
     // send updates, if any
     pendingDeviceUpdate = true; // set it in case of updateAtEveryReceive (so message goes out even if no changes pending)
-    ALOG(LOG_NOTICE, "pending output update is now sent to device");
+    OLOG(LOG_NOTICE, "pending output update is now sent to device");
     sendOutgoingUpdate();
   }
 }

@@ -128,7 +128,7 @@ void BinaryInputBehaviour::inputTimeout(int aAfterTimeOutState)
   }
   else {
     // just set a state (e.g. motion sensors that only report motion, but no non-motion
-    BLOG(LOG_INFO, "Auto-resetting input state after timeout now");
+    OLOG(LOG_INFO, "Auto-resetting input state after timeout now");
     updateInputState(aAfterTimeOutState);
   }
 }
@@ -154,7 +154,7 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
     device.getVdcHost().signalDeviceUserAction(device, true);
     // Note: even if global identify handler processes this, still report state changes (otherwise upstream could get out of sync)
   }
-  BLOG(changedState ? LOG_NOTICE : LOG_INFO, "BinaryInput[%zu] %s '%s' reports %s state = %d", index, behaviourId.c_str(), getHardwareName().c_str(), changedState ? "NEW" : "same", aNewState);
+  OLOG(changedState ? LOG_NOTICE : LOG_INFO, "reports %s state = %d", changedState ? "NEW" : "same", aNewState);
   // in all cases, binary input state changes must be forwarded long term
   // (but minPushInterval must "debounce" rapid intermediate changes)
   if (changedState || now>lastPush+changesOnlyInterval) {
@@ -174,7 +174,7 @@ bool BinaryInputBehaviour::pushInput(bool aChanged)
     // push the new value right now
     if (pushBehaviourState()) {
       lastPush = now;
-      BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' successfully pushed state = %d", index, behaviourId.c_str(), getHardwareName().c_str(), currentState);
+      OLOG(LOG_NOTICE, "successfully pushed state = %d", currentState);
       if (hasDefinedState() && maxPushInterval!=Never) {
         // schedule re-push of defined state
         updateTicket.executeOnce(boost::bind(&BinaryInputBehaviour::pushInput, this, false), maxPushInterval);
@@ -182,12 +182,12 @@ bool BinaryInputBehaviour::pushInput(bool aChanged)
       return true;
     }
     else if (device.isPublicDS()) {
-      BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' could not be pushed", index, behaviourId.c_str(), getHardwareName().c_str());
+      OLOG(LOG_NOTICE, "could not be pushed");
     }
   }
   else if (aChanged) {
     // cannot be pushed now, but final state of the input must be reported later
-    BLOG(LOG_INFO, "- input changes too quickly, push of final state will be pushed after minPushInterval");
+    OLOG(LOG_INFO, "input changes too quickly, push of final state will be pushed after minPushInterval");
     updateTicket.executeOnceAt(boost::bind(&BinaryInputBehaviour::reportFinalState, this), lastPush+minPushInterval);
   }
   return false;
@@ -200,7 +200,7 @@ void BinaryInputBehaviour::reportFinalState()
   // push the current value (after awaiting minPushInterval or after maxPushInterval has passed)
   updateTicket.cancel();
   if (pushBehaviourState()) {
-    BLOG(LOG_NOTICE, "BinaryInput[%zu] %s '%s' now pushes current state (%d) after awaiting minPushInterval", index, behaviourId.c_str(), getHardwareName().c_str(), currentState);
+    OLOG(LOG_NOTICE, "now pushes current state (%d) after awaiting minPushInterval", currentState);
     lastPush = MainLoop::currentMainLoop().now();
   }
 }
