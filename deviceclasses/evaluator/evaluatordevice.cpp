@@ -559,6 +559,10 @@ EvaluatorExpressionContext::EvaluatorExpressionContext(EvaluatorDevice &aEvaluat
 
 bool EvaluatorExpressionContext::valueLookup(const string &aName, ExpressionValue &aResult)
 {
+  if (strucmp(aName.c_str(),"oncondition")==0) {
+    aResult.setBool(evaluator.currentOn);
+    return true;
+  }
   if (evaluator.valueMapper.valueLookup(aResult, aName)) return true;
   return inherited::valueLookup(aName, aResult);
 }
