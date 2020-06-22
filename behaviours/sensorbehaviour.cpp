@@ -691,6 +691,7 @@ void SensorBehaviour::prepareLogging()
     bool autoStep = true;
     bool autoUpdate = true;
     long step = 1;
+    string consolidationFunc = "AVERAGE";
     while (nextPart(p, arg, ' ')) {
       arg = trimWhiteSpace(arg);
       // catch special "macros"
@@ -712,11 +713,8 @@ void SensorBehaviour::prepareLogging()
       }
       else if (arg=="autods") {
         // fully automatic datasource, but no rra
+        // - just record filtered
         autoFiltered = true;
-      }
-      else if (arg=="autorra") {
-        // automatic "reasonable" RRAs
-        autoRRA = true;
       }
       else if (arg.substr(0,7)=="autods:") {
         // automatic datasources
@@ -724,6 +722,16 @@ void SensorBehaviour::prepareLogging()
         autoRaw = arg.find("R",7)!=string::npos;
         autoFiltered = arg.find("F",7)!=string::npos;
         autoPushed = arg.find("P",7)!=string::npos;
+      }
+      else if (arg=="autorra") {
+        // automatic "reasonable" RRAs
+        autoRRA = true;
+      }
+      else if (arg.substr(0,8)=="autorra:") {
+        // automatic "reasonable" RRAs with custom consodlidation function
+        // Syntax: autorra:CF
+        consolidationFunc = arg.substr(8);
+        autoRRA = true;
       }
       else if (arg.substr(0,7)=="update:") {
         // update statement in case no autods is in use (any autods use will create a update string automatically)
@@ -787,10 +795,12 @@ void SensorBehaviour::prepareLogging()
       }
       if (autoRRA) {
         // choose correct consolidation function
-        string consolidationFunc = "AVERAGE";
-        if (profileP) {
-          if (profileP->evalType==eval_max) consolidationFunc = "MAX";
-          else if (profileP->evalType==eval_min) consolidationFunc = "MIN";
+        if (consolidationFunc.empty()) {
+          consolidationFunc = "AVERAGE";
+          if (profileP) {
+            if (profileP->evalType==eval_max) consolidationFunc = "MAX";
+            else if (profileP->evalType==eval_min) consolidationFunc = "MIN";
+          }
         }
         // now RRAs: RRA:consolidationFunc:xff:steps:rows
         args.push_back(string_format("RRA:%s:0.5:%ld:%ld", consolidationFunc.c_str(), 1l, 7*24*3600/step)); // 1:1 samples for a week (with autostep: unless updateInterval is <15 sec, see above)
