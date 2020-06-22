@@ -103,7 +103,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"evalresult"));
     b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
-    b->setHardwareName("evaluation result");
+    b->setHardwareName("evaluation decision");
     addBehaviour(b);
   }
   else if (evaluatorType==evaluator_sensor  || evaluatorType==evaluator_internalsensor) {
@@ -112,7 +112,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     // - create one sensor
     SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this,"evalresult"));
     s->setHardwareSensorConfig(sensorType, sensorUsage, 0, 0, 0, 100*MilliSecond, 0);
-    s->setHardwareName("evaluation result");
+    s->setHardwareName("calculated sensor result");
     addBehaviour(s);
   }
   deriveDsUid();

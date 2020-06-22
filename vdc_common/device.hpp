@@ -308,7 +308,7 @@ namespace p44 {
     /// @param aColorClass color group number
     void setColorClass(DsClass aColorClass);
 
-    /// get basic device color group
+    /// get basic device color class (basically, color of the virtual plastic enclosing the device...)
     /// @return color class number
     DsClass getColorClass() { return colorClass; };
 

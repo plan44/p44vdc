@@ -243,9 +243,9 @@ void Device::setName(const string &aName)
 }
 
 
-void Device::setColorClass(DsClass aColorGroup)
+void Device::setColorClass(DsClass aColorClass)
 {
-  colorClass = aColorGroup;
+  colorClass = aColorClass;
 }
 
 
