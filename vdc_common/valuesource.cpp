@@ -239,3 +239,23 @@ bool ValueSourceMapper::getMappedSourcesInfo(ApiValuePtr aInfoObject)
   }
   return true;
 }
+
+
+string ValueSourceMapper::shortDesc() const
+{
+  string s;
+  const char *sep = "";
+  for (ValueSourcesMap::const_iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
+    s += sep;
+    sep = ", ";
+    string_format_append(s, "%s=", pos->first.c_str());
+    MLMicroSeconds lastupdate = pos->second->getSourceLastUpdate();
+    if (lastupdate==Never) {
+      s += "UNDEFINED";
+    }
+    else {
+      string_format_append(s, "%.3f", pos->second->getSourceValue());
+    }
+  }
+  return s;
+}

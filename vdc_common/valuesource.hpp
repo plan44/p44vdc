@@ -142,8 +142,9 @@ namespace p44 {
     /// @return true if information could be added
     bool getMappedSourcesInfo(ApiValuePtr aInfoObject);
 
-
-
+    /// short (text without LFs!) description of this object, mainly for referencing it in log messages
+    /// @return textual description of valuemapper in name=value list form
+    string shortDesc() const;
 
   };
 

@@ -1088,7 +1088,10 @@ void Trigger::triggerEvaluationExecuted(ExpressionValue aEvaluationResult)
     newState = aEvaluationResult.boolValue() ? yes : no;
   }
   if (newState!=conditionMet) {
-    LOG(LOG_NOTICE, "Trigger '%s': condition changes to %s", name.c_str(), newState==yes ? "TRUE" : (newState==no ? "FALSE" : "undefined"));
+    OLOG(LOG_NOTICE, "condition changes to %s based on values: %s",
+      newState==yes ? "TRUE" : (newState==no ? "FALSE" : "undefined"),
+      valueMapper.shortDesc().c_str()
+    );
     conditionMet = newState;
     if (conditionMet==yes) {
       // a trigger fire is an activity
@@ -1104,10 +1107,10 @@ void Trigger::triggerEvaluationExecuted(ExpressionValue aEvaluationResult)
 void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
 {
   if (aEvaluationResult.isOK()) {
-    LOG(LOG_NOTICE, "Trigger '%s': actions executed successfully, result: %s", name.c_str(), aEvaluationResult.stringValue().c_str());
+    OLOG(LOG_NOTICE, "actions executed successfully, result: %s", aEvaluationResult.stringValue().c_str());
   }
   else {
-    LOG(LOG_ERR, "Trigger '%s': actions did not execute successfully: %s", name.c_str(), aEvaluationResult.error()->text());
+    OLOG(LOG_ERR, "actions did not execute successfully: %s", aEvaluationResult.error()->text());
   }
 }
 
@@ -1163,7 +1166,7 @@ void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListene
     parseVarDefs();
   }
   else {
-    LOG(LOG_INFO, "Trigger '%s': value source '%s' reports value %f -> re-evaluating trigger condition", name.c_str(), aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
+    OLOG(LOG_INFO, "value source '%s' reports value %f -> re-evaluating trigger condition", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
     checkAndFire(evalmode_externaltrigger);
   }
 }
@@ -1359,7 +1362,7 @@ bool Trigger::executeActions(EvaluationResultCB aCallback)
     while (nextPart(p, action, ';')) {
       string cmd;
       string params;
-      LOG(LOG_WARNING, "- start rewriting action '%s'", action.c_str());
+      OLOG(LOG_WARNING, "- start rewriting action '%s'", action.c_str());
       if (!keyAndValue(action, cmd, params, ':')) cmd = action; // could be action only
       // replace @{expr} by expr, which will work unless the expression does not contain ","
       size_t i = 0;
@@ -1399,7 +1402,7 @@ bool Trigger::executeActions(EvaluationResultCB aCallback)
         }
       }
     } // while legacy actions
-    LOG(LOG_WARNING, "rewritten legacy actions: '%s' -> '%s'", triggerAction.getCode(), actionScript.c_str());
+    OLOG(LOG_WARNING, "rewritten legacy actions: '%s' -> '%s'", triggerAction.getCode(), actionScript.c_str());
     triggerAction.setCode(actionScript);
     markDirty();
   }
@@ -1437,7 +1440,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   if (res.isOK()) {
     cond->add("result", cond->newExpressionValue(res));
     cond->add("text", cond->newString(res.stringValue()));
-    LOG(LOG_INFO, "- condition '%s' -> %s", triggerCondition.getCode(), res.stringValue().c_str());
+    OLOG(LOG_INFO, "condition '%s' -> %s", triggerCondition.getCode(), res.stringValue().c_str());
   }
   else {
     cond->add("error", checkResult->newString(res.error()->getErrorMessage()));

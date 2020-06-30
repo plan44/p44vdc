@@ -502,6 +502,12 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
   if (decisionMade && currentState!=undefined) {
     // protect against state updates triggering evaluation again via cyclic references
     reporting = true;
+    // give some context info
+    OLOG(LOG_NOTICE, "new evaluation: %s based on %s values: %s",
+      currentState==yes ? "TRUE" : "FALSE",
+      aEvalMode==evalmode_timed ? "timing and" : "new",
+      valueMapper.shortDesc().c_str()
+    );
     // report it
     switch (evaluatorType) {
       case evaluator_input :
