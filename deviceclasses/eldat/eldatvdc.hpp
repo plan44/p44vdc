@@ -38,22 +38,34 @@ using namespace std;
 namespace p44 {
 
   // Errors
-  typedef enum {
-    EldatErrorOK,
-    EldatDeviceLearned,
-    EldatDeviceUnlearned,
-    EldatNoKnownProfile,
-    EldatLearnTimeout,
-    EldatLearnAborted,
-  } EldatErrors;
-
   class EldatError : public Error
   {
   public:
+    typedef enum {
+      OK,
+      DeviceLearned,
+      DeviceUnlearned,
+      NoKnownProfile,
+      LearnTimeout,
+      LearnAborted,
+      numErrorCodes
+    } ErrorCodes;
     static const char *domain() { return "Eldat"; }
-    virtual const char *getErrorDomain() const { return EldatError::domain(); };
-    EldatError(EldatErrors aError) : Error(ErrorCode(aError)) {};
-    EldatError(EldatErrors aError, std::string aErrorMessage) : Error(ErrorCode(aError), aErrorMessage) {};
+    virtual const char *getErrorDomain() const P44_OVERRIDE { return EldatError::domain(); };
+    EldatError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    #if ENABLE_NAMED_ERRORS
+  protected:
+    virtual const char* errorName() const P44_OVERRIDE { return errNames[getErrorCode()]; };
+  private:
+    static constexpr const char* const errNames[numErrorCodes] = {
+      "OK",
+      "DeviceLearned",
+      "DeviceUnlearned",
+      "NoKnownProfile",
+      "LearnTimeout",
+      "LearnAborted",
+    };
+    #endif // ENABLE_NAMED_ERRORS
   };
 
 

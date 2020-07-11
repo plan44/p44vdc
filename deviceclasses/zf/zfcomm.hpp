@@ -33,20 +33,31 @@ using namespace std;
 namespace p44 {
 
   // Errors
-  typedef enum {
-    ZfCommErrorOK,
-    ZfCommErrorCmdTimeout,
-    ZfCommErrorCmdError,
-    ZfCommErrorCompatibility
-  } ZfCommErrors;
-
   class ZfCommError : public Error
   {
   public:
+    typedef enum {
+      OK,
+      CmdTimeout,
+      CmdError,
+      Compatibility,
+      numErrorCodes
+    } ErrorCodes;
+
     static const char *domain() { return "ZfComm"; }
-    virtual const char *getErrorDomain() const { return ZfCommError::domain(); };
-    ZfCommError(ZfCommErrors aError) : Error(ErrorCode(aError)) {};
-    ZfCommError(ZfCommErrors aError, std::string aErrorMessage) : Error(ErrorCode(aError), aErrorMessage) {};
+    virtual const char *getErrorDomain() const P44_OVERRIDE { return ZfCommError::domain(); };
+    ZfCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    #if ENABLE_NAMED_ERRORS
+  protected:
+    virtual const char* errorName() const P44_OVERRIDE { return errNames[getErrorCode()]; };
+  private:
+    static constexpr const char* const errNames[numErrorCodes] = {
+      "OK",
+      "CmdTimeout",
+      "CmdError",
+      "Compatibility"
+    };
+    #endif // ENABLE_NAMED_ERRORS
   };
 
 

@@ -45,11 +45,27 @@ namespace p44 {
       StaleAction, ///< optimizer has detected stale action
       NoMoreActions, ///< cannot add another native action because there would be too many
       NoHWTested, ///< no hardware tested
+      numErrorCodes
     } ErrorCodes;
     
     static const char *domain() { return "Vdc"; }
-    virtual const char *getErrorDomain() const { return VdcError::domain(); };
+    virtual const char *getErrorDomain() const P44_OVERRIDE { return VdcError::domain(); };
     VdcError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    #if ENABLE_NAMED_ERRORS
+  protected:
+    virtual const char* errorName() const P44_OVERRIDE { return errNames[getErrorCode()]; };
+  private:
+    static constexpr const char* const errNames[numErrorCodes] = {
+      "OK",
+      "NoDevice",
+      "Initialize",
+      "Collecting",
+      "AddAction",
+      "StaleAction",
+      "NoMoreActions",
+      "NoHWTested",
+    };
+    #endif // ENABLE_NAMED_ERRORS
   };
 	
 	

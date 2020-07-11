@@ -37,23 +37,33 @@ using namespace std;
 
 namespace p44 {
 
-  // Errors
-  typedef enum {
-    ZfErrorOK,
-    ZfDeviceLearned,
-    ZfDeviceUnlearned,
-    ZfNoKnownProfile,
-    ZfLearnTimeout,
-    ZfLearnAborted,
-  } ZfErrors;
-
   class ZfError : public Error
   {
-  public:
+    typedef enum {
+      OK,
+      DeviceLearned,
+      DeviceUnlearned,
+      NoKnownProfile,
+      LearnTimeout,
+      LearnAborted,
+      numErrorCodes
+    } ErrorCodes;
     static const char *domain() { return "ZF"; }
-    virtual const char *getErrorDomain() const { return ZfError::domain(); };
-    ZfError(ZfErrors aError) : Error(ErrorCode(aError)) {};
-    ZfError(ZfErrors aError, std::string aErrorMessage) : Error(ErrorCode(aError), aErrorMessage) {};
+    virtual const char *getErrorDomain() const P44_OVERRIDE { return ZfError::domain(); };
+    ZfError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    #if ENABLE_NAMED_ERRORS
+  protected:
+    virtual const char* errorName() const P44_OVERRIDE { return errNames[getErrorCode()]; };
+  private:
+    static constexpr const char* const errNames[numErrorCodes] = {
+      "OK",
+      "DeviceLearned",
+      "DeviceUnlearned",
+      "NoKnownProfile",
+      "LearnTimeout",
+      "LearnAborted",
+    };
+    #endif // ENABLE_NAMED_ERRORS
   };
 
 

@@ -32,21 +32,31 @@ using namespace std;
 
 namespace p44 {
 
-  // Errors
-  typedef enum {
-    EldatCommErrorOK,
-    EldatCommErrorCmdTimeout,
-    EldatCommErrorCmdError,
-    EldatCommErrorCompatibility
-  } EldatCommErrors;
-
   class EldatCommError : public Error
   {
   public:
+    typedef enum {
+      OK,
+      CmdTimeout,
+      CmdError,
+      Compatibility,
+      numErrorCodes
+    } ErrorCodes;
+
     static const char *domain() { return "EldatComm"; }
-    virtual const char *getErrorDomain() const { return EldatCommError::domain(); };
-    EldatCommError(EldatCommErrors aError) : Error(ErrorCode(aError)) {};
-    EldatCommError(EldatCommErrors aError, std::string aErrorMessage) : Error(ErrorCode(aError), aErrorMessage) {};
+    virtual const char *getErrorDomain() const P44_OVERRIDE { return EldatCommError::domain(); };
+    EldatCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    #if ENABLE_NAMED_ERRORS
+  protected:
+    virtual const char* errorName() const P44_OVERRIDE { return errNames[getErrorCode()]; };
+  private:
+    static constexpr const char* const errNames[numErrorCodes] = {
+      "OK",
+      "CmdTimeout",
+      "CmdError",
+      "Compatibility"
+    };
+    #endif // ENABLE_NAMED_ERRORS
   };
 
 

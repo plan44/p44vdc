@@ -188,11 +188,11 @@ void EldatComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, string 
     if (sscanf(aAnswer.c_str(), "ID,%hX,%hX,%hX", &vid, &usbPid, &appVersion)==3) {
       LOG(LOG_INFO, "ELDAT module info (ID): vid=0x%04hX, usbPid=0x%04hX, version=0x%04hX", vid, usbPid, appVersion);
       if (vid!=ELDAT_VID) {
-        initError(aCompletedCB, 0, ErrorPtr(new EldatCommError(EldatCommErrorCompatibility, string_format("Invalid Vendor ID 0x%04hX", vid))));
+        initError(aCompletedCB, 0, Error::err<EldatCommError>(EldatCommError::Compatibility, "Invalid Vendor ID 0x%04hX", vid));
         return;
       }
       if (usbPid!=ELDAT_PID) {
-        initError(aCompletedCB, 0, ErrorPtr(new EldatCommError(EldatCommErrorCompatibility, string_format("Unsupported Product ID 0x%04hX", usbPid))));
+        initError(aCompletedCB, 0, Error::err<EldatCommError>(EldatCommError::Compatibility, "Unsupported Product ID 0x%04hX", usbPid));
         return;
       }
     }

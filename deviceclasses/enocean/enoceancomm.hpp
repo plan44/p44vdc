@@ -51,12 +51,27 @@ namespace p44 {
       CmdError,
       Unsupported,
       BadParam,
-      Denied
+      Denied,
+      numErrorCodes
     } ErrorCodes;
 
     static const char *domain() { return "EnoceanComm"; }
-    virtual const char *getErrorDomain() const { return EnoceanCommError::domain(); };
+    virtual const char *getErrorDomain() const P44_OVERRIDE { return EnoceanCommError::domain(); };
     EnoceanCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    #if ENABLE_NAMED_ERRORS
+  protected:
+    virtual const char* errorName() const P44_OVERRIDE { return errNames[getErrorCode()]; };
+  private:
+    static constexpr const char* const errNames[numErrorCodes] = {
+      "OK",
+      "CmdTimeout",
+      "WrongPacket",
+      "CmdError",
+      "Unsupported",
+      "BadParam",
+      "Denied",
+    };
+    #endif // ENABLE_NAMED_ERRORS
   };
 
 

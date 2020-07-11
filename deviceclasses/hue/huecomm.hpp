@@ -63,8 +63,12 @@ namespace p44 {
     typedef int ErrorCodes;
 
     static const char *domain() { return "HueComm"; }
-    virtual const char *getErrorDomain() const { return HueCommError::domain(); };
+    virtual const char *getErrorDomain() const P44_OVERRIDE{ return HueCommError::domain(); };
     explicit HueCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    #if ENABLE_NAMED_ERRORS
+  protected:
+    virtual const char* errorName() const P44_OVERRIDE;
+    #endif // ENABLE_NAMED_ERRORS
   };
 
 

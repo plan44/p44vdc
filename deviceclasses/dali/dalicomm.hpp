@@ -108,12 +108,35 @@ namespace p44 {
       DeviceSearch,
       SetShortAddress,
       BusOverload,
-      DataUnreliable
+      DataUnreliable,
+      numErrorCodes
     } ErrorCodes;
 
     static const char *domain() { return "DaliComm"; }
-    virtual const char *getErrorDomain() const { return DaliCommError::domain(); };
+    virtual const char *getErrorDomain() const P44_OVERRIDE { return DaliCommError::domain(); };
     DaliCommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    #if ENABLE_NAMED_ERRORS
+  protected:
+    virtual const char* errorName() const P44_OVERRIDE { return errNames[getErrorCode()]; };
+  private:
+    static constexpr const char* const errNames[numErrorCodes] = {
+      "OK",
+      "Busy",
+      "BridgeComm",
+      "BridgeCmd",
+      "BridgeUnknown",
+      "DALIFrame",
+      "MissingData",
+      "BadData",
+      "InvalidAnswer",
+      "AddressesMissing",
+      "AddressCollisions",
+      "DeviceSearch",
+      "SetShortAddress",
+      "BusOverload",
+      "DataUnreliable",
+    };
+    #endif // ENABLE_NAMED_ERRORS
   };
 
 

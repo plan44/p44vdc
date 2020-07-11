@@ -38,6 +38,35 @@ namespace {
   const string NUPNP_PATH = "https://discovery.meethue.com/";
 }
 
+
+#if ENABLE_NAMED_ERRORS
+const char* HueCommError::errorName() const
+{
+  switch(getErrorCode()) {
+    case UnauthorizedUser: return "UnauthorizedUser";
+    case InvalidJSON: return "InvalidJSON";
+    case NotFound: return "NotFound";
+    case InvalidMethod: return "InvalidMethod";
+    case MissingParam: return "MissingParam";
+    case InvalidParam: return "InvalidParam";
+    case InvalidValue: return "InvalidValue";
+    case ReadOnly: return "ReadOnly";
+    case TooManyItems: return "TooManyItems";
+    case CloudRequired: return "CloudRequired";
+    case InternalError: return "InternalError";
+    case UuidNotFound: return "UuidNotFound";
+    case ApiNotReady: return "ApiNotReady";
+    case Description: return "Description";
+    case InvalidUser: return "InvalidUser";
+    case NoRegistration: return "NoRegistration";
+    case InvalidResponse: return "InvalidResponse";
+  }
+  return NULL;
+}
+#endif // ENABLE_NAMED_ERRORS
+
+
+
 // MARK: - HueApiOperation
 
 HueApiOperation::HueApiOperation(HueComm &aHueComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, HueApiResultCB aResultHandler) :
