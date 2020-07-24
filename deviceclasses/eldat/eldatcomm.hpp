@@ -84,7 +84,7 @@ namespace p44 {
 
 	public:
 		
-		EldatComm(MainLoop &aMainLoop);
+		EldatComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
 		virtual ~EldatComm();
 		
     /// set the connection parameters to connect to the ELDAT modem

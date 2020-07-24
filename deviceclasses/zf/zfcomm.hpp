@@ -112,7 +112,7 @@ namespace p44 {
 
 	public:
 		
-		ZfComm(MainLoop &aMainLoop);
+		ZfComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
 		virtual ~ZfComm();
 		
     /// set the connection parameters to connect to the ZF modem
