@@ -2459,3 +2459,43 @@ string Device::getStatusText()
   }
   return s;
 }
+
+
+// MARK: - Device scripting object
+
+#if P44SCRIPT_FULL_SUPPORT
+
+using namespace P44Script;
+
+static ScriptObjPtr output_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite)
+{
+  DeviceObj* d = dynamic_cast<DeviceObj*>(aParentObj.get());
+  assert(d);
+  OutputBehaviourPtr o = d->device()->getOutput();
+  if (o) {
+    return new OutputObj(o);
+  }
+  return new AnnotatedNullValue("device has no output");
+}
+
+
+static const BuiltinMemberDescriptor deviceMembers[] = {
+  { "output", builtinmember, 0, NULL, .accessor = &output_accessor },
+  { NULL } // terminator
+};
+
+
+static BuiltInMemberLookup* sharedDeviceMemberLookupP = NULL;
+
+DeviceObj::DeviceObj(DevicePtr aDevice) :
+  mDevice(aDevice)
+{
+  if (sharedDeviceMemberLookupP==NULL) {
+    sharedDeviceMemberLookupP = new BuiltInMemberLookup(deviceMembers);
+    sharedDeviceMemberLookupP->isMemberVariable(); // disable refcounting
+  }
+  registerMemberLookup(sharedDeviceMemberLookupP);
+}
+
+
+#endif // P44SCRIPT_FULL_SUPPORT

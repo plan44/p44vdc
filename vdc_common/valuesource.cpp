@@ -97,9 +97,9 @@ void ValueSourceMapper::forgetMappings()
 }
 
 
-ValueSource* ValueSourceMapper::valueSourceByAlias(const string aAlias)
+ValueSource* ValueSourceMapper::valueSourceByAlias(const string aAlias) const
 {
-  ValueSourcesMap::iterator pos = valueMap.find(aAlias);
+  ValueSourcesMap::const_iterator pos = valueMap.find(aAlias);
   if (pos==valueMap.end()) {
     return NULL;
   }
@@ -160,6 +160,8 @@ bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, ValueListener
 }
 
 
+#if ENABLE_EXPRESSIONS
+
 bool ValueSourceMapper::valueLookup(ExpressionValue &aValue, const string aVarSpec)
 {
   // value specfications can be simple valuesource alias names, or alias names with sub-field specifications:
@@ -217,7 +219,56 @@ bool ValueSourceMapper::valueLookup(ExpressionValue &aValue, const string aVarSp
   return true;
 }
 
+#endif // ENABLE_EXPRESSIONS
 
+
+#if ENABLE_P44SCRIPT
+
+class ValueSourceObj : public NumericValue
+{
+  typedef NumericValue inherited;
+  MLMicroSeconds mLastUpdate;
+  int mOpLevel;
+public:
+  ValueSourceObj(ValueSource* aValueSourceP) :
+    inherited(aValueSourceP->getSourceValue()),
+    mLastUpdate(aValueSourceP->getSourceLastUpdate()),
+    mOpLevel(aValueSourceP->getSourceOpLevel())
+  {
+  };
+
+  virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) P44_OVERRIDE
+  {
+    ScriptObjPtr val;
+    if (uequals(aName, "age")) {
+      if (mLastUpdate!=Never) val = new NumericValue((double)(MainLoop::now()-mLastUpdate)/Second);
+      else val = new AnnotatedNullValue("unseen");
+    }
+    else if (uequals(aName, "valid")) {
+      val = new NumericValue(mLastUpdate!=Never);
+    }
+    else if (uequals(aName, "oplevel")) {
+      val = new NumericValue(num);
+    }
+    return val;
+  }
+
+};
+
+
+
+ScriptObjPtr ValueSourceMapper::memberByNameFrom(ScriptObjPtr aThisObj, const string aName, TypeInfo aTypeRequirements) const
+{
+  ScriptObjPtr vsMember;
+  ValueSource* vs = valueSourceByAlias(aName);
+  if (vs) {
+    vsMember = new ValueSourceObj(vs);
+  }
+  return vsMember;
+}
+
+
+#endif // ENABLE_P44SCRIPT
 
 bool ValueSourceMapper::getMappedSourcesInfo(ApiValuePtr aInfoObject)
 {

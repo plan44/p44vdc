@@ -170,6 +170,12 @@ P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) 
   inherited(aWithLocalController, aWithPersistentChannels),
   webUiPort(0)
 {
+  #if ENABLE_P44SCRIPT
+  vdcHostScriptContext = StandardScriptingDomain::sharedDomain().newContext();
+  // vdchost is the global context for this app, so register its members in the standard scripting
+  // domain making them accessible in all scripts
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(P44VdcHostLookup::sharedLookup());
+  #endif
 }
 
 
@@ -216,7 +222,7 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 void P44VdcHost::handleGlobalEvent(VdchostEvent aEvent)
 {
   if (aEvent==vdchost_devices_initialized) {
-    #if EXPRESSION_SCRIPT_SUPPORT
+    #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
     // this is the moment to (re)run global scripts
     runInitScripts();
     #endif // EXPRESSION_SCRIPT_SUPPORT
@@ -656,7 +662,7 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
 #endif // ENABLE_JSONCFGAPI
 
 
-#if EXPRESSION_SCRIPT_SUPPORT
+#if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
 
 // MARK: - script API - ScriptCallConnection
 
@@ -674,12 +680,6 @@ ApiValuePtr ScriptCallConnection::newApiValue()
 
 // MARK: - script API - ScriptApiRequest
 
-ScriptApiRequest::ScriptApiRequest(ScriptExecutionContextPtr aScriptContext)
-{
-  scriptContext = aScriptContext;
-}
-
-
 VdcApiConnectionPtr ScriptApiRequest::connection()
 {
   return VdcApiConnectionPtr(new ScriptCallConnection());
@@ -690,6 +690,9 @@ ErrorPtr ScriptApiRequest::sendResult(ApiValuePtr aResult)
 {
   LOG(LOG_DEBUG, "script <- vdcd (JSON) result: %s", aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
+  #if ENABLE_P44SCRIPT
+  mBuiltinFunctionContext->finish(result ? ScriptObjPtr(new JsonValue(result->jsonObject())) : ScriptObjPtr(new AnnotatedNullValue("no vdcapi result")));
+  #else
   ExpressionValue res;
   if (result) {
     res.setJson(result->jsonObject());
@@ -698,6 +701,7 @@ ErrorPtr ScriptApiRequest::sendResult(ApiValuePtr aResult)
     res.setNull();
   }
   scriptContext->continueWithAsyncFunctionResult(res);
+  #endif
   return ErrorPtr();
 }
 
@@ -709,14 +713,43 @@ ErrorPtr ScriptApiRequest::sendError(ErrorPtr aError)
     aError = Error::ok();
   }
   LOG(LOG_DEBUG, "script <- vdcd (JSON) error: %ld (%s)", aError->getErrorCode(), aError->getErrorMessage());
+  #if ENABLE_P44SCRIPT
+  mBuiltinFunctionContext->finish(ScriptObjPtr(new ErrorValue(aError)));
+  #else
   ExpressionValue res;
   res.setError(aError);
   scriptContext->continueWithAsyncFunctionResult(res);
+  #endif
   return ErrorPtr();
 }
 
 
 // MARK: - global vdc host scripts
+
+
+#if ENABLE_P44SCRIPT
+
+void P44VdcHost::runInitScripts()
+{
+  // command line provided script
+  string scriptFn;
+  string script;
+  if (CmdLineApp::sharedCmdLineApp()->getStringOption("initscript", scriptFn)) {
+    scriptFn = Application::sharedApplication()->resourcePath(scriptFn);
+    ErrorPtr err = string_fromfile(scriptFn, script);
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "cannot open initscript: %s", err->text());
+    }
+    else {
+      ScriptSource initScript("initscript", this);
+      initScript.setSource(script, scriptbody|floatingGlobs);
+      initScript.setSharedMainContext(vdcHostScriptContext);
+      initScript.run(queue);
+    }
+  }
+}
+
+#else
 
 class P44VdcHostScriptContext : public ScriptExecutionContext
 {
@@ -803,8 +836,9 @@ void P44VdcHost::runInitScripts()
   }
 }
 
+#endif
 
-#endif // EXPRESSION_SCRIPT_SUPPORT
+#endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
 
 
 // MARK: - P44 specific vdchost level methods
@@ -866,11 +900,52 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
       learnIdentifyTicket.executeOnce(boost::bind(&P44VdcHost::identifyHandler, this, aRequest, DevicePtr()), seconds*Second);
     }
   }
+  #if P44SCRIPT_FULL_SUPPORT
+  else if (aMethod=="x-p44-scriptExec") {
+    // direct execution of a script command line
+    ApiValuePtr o = aParams->get("script");
+    if (o) {
+      ScriptSource src("scriptExec", this);
+      src.setSource(o->stringValue(), sourcecode);
+      src.setSharedMainContext(vdcHostScriptContext);
+      src.run(sourcecode+regular+keepvars+concurrently+floatingGlobs, boost::bind(&P44VdcHost::scriptExecHandler, this, aRequest, _1));
+    }
+    else {
+      aRequest->sendStatus(NULL); // no script -> NOP
+    }
+  }
+  #endif // P44SCRIPT_FULL_SUPPORT
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
   return respErr;
 }
+
+
+#if P44SCRIPT_FULL_SUPPORT
+void P44VdcHost::scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
+{
+  ApiValuePtr ans = aRequest->newApiValue();
+  ans->setType(apivalue_object);
+  if (aResult) {
+    if (aResult->isErr()) {
+      ans->add("error", ans->newString(aResult->errorValue()->text()));
+    }
+    else {
+      ans->add("result", ans->newScriptValue(aResult));
+    }
+    ans->add("annotation", ans->newString(aResult->getAnnotation()));
+    SourceCursor *cursorP = aResult->cursor();
+    if (cursorP) {
+      ans->add("sourceline", ans->newString(cursorP->linetext()));
+      ans->add("at", ans->newUint64(cursorP->textpos()));
+      ans->add("line", ans->newUint64(cursorP->lineno()));
+      ans->add("char", ans->newUint64(cursorP->charpos()));
+    }
+  }
+  aRequest->sendResult(ans);
+}
+#endif
 
 
 void P44VdcHost::learnHandler(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError)
@@ -908,4 +983,95 @@ void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
 }
 
 
+#if P44SCRIPT_FULL_SUPPORT
 
+using namespace P44Script;
+
+// MARK: - VdcHost global members and functions
+
+// vdcapi(jsoncall)
+static const BuiltInArgDesc vdcapi_args[] = { { json+structured } };
+static const size_t vdcapi_numargs = sizeof(vdcapi_args)/sizeof(BuiltInArgDesc);
+static void vdcapi_func(BuiltinFunctionContextPtr f)
+{
+  // get method/notification and params
+  JsonObjectPtr rq = f->arg(0)->jsonValue();
+  JsonObjectPtr m = rq->get("method");
+  bool isMethod = false;
+  ErrorPtr err;
+  if (m) {
+    isMethod = true;
+  }
+  else {
+    m = rq->get("notification");
+  }
+  if (!m) {
+    f->finish(new ErrorValue(Error::err<P44VdcError>(400, "invalid API request, must specify 'method' or 'notification'")));
+    return;
+  }
+  else {
+    // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
+    ApiValuePtr params = JsonApiValue::newValueFromJson(rq);
+    VdcApiRequestPtr request = VdcApiRequestPtr(new ScriptApiRequest(f));
+    if (isMethod) {
+      err = VdcHost::sharedVdcHost()->handleMethodForParams(request, m->stringValue(), params);
+      // Note: if method returns NULL, it has sent or will send results itself.
+      //   Otherwise, even if Error is ErrorOK we must send a generic response
+    }
+    else {
+      // handle notification
+      err = VdcHost::sharedVdcHost()->handleNotificationForParams(request->connection(), m->stringValue(), params);
+      // Notifications are always immediately confirmed, so make sure there's an explicit ErrorOK
+      if (!err) {
+        err = ErrorPtr(new Error(Error::OK));
+      }
+    }
+    if (err) {
+      // no API result will arrive later, so finish here
+      request->sendError(err);
+      f->finish();
+      return;
+    }
+    // otherwise, method will finish function call
+  }
+}
+
+
+// device(device_name_or_dSUID)
+static const BuiltInArgDesc device_args[] = { { text } };
+static const size_t device_numargs = sizeof(device_args)/sizeof(BuiltInArgDesc);
+static void device_func(BuiltinFunctionContextPtr f)
+{
+  DevicePtr device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(f->arg(0)->stringValue());
+  if (!device) {
+    f->finish(new ErrorValue(ScriptError::NotFound, "no device '%s' found", f->arg(0)->stringValue().c_str()));
+    return;
+  }
+  f->finish(new DeviceObj(device));
+}
+
+
+static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
+  { "vdcapi", json, vdcapi_numargs, vdcapi_args, &vdcapi_func },
+  { "device", any, device_numargs, device_args, &device_func },
+  { NULL } // terminator
+};
+
+P44VdcHostLookup::P44VdcHostLookup() :
+  inherited(p44VdcHostMembers)
+{
+}
+
+static MemberLookupPtr sharedVdcHostLookup;
+
+MemberLookupPtr P44VdcHostLookup::sharedLookup()
+{
+  if (!sharedVdcHostLookup) {
+    sharedVdcHostLookup = new P44VdcHostLookup;
+    sharedVdcHostLookup->isMemberVariable(); // disable refcounting
+  }
+  return sharedVdcHostLookup;
+}
+
+
+#endif // P44SCRIPT_FULL_SUPPORT

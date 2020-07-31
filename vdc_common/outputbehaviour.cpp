@@ -39,7 +39,7 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   // volatile state
   localPriority(false), // no local priority
   transitionTime(0) // immediate transitions by default
-  #if ENABLE_SCENE_SCRIPT
+  #if ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
   ,sceneScriptContext(*this, &VdcHost::sharedVdcHost()->geolocation)
   #endif
 {
@@ -48,8 +48,12 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   // set default hardware default configuration
   setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
   #if ENABLE_SCENE_SCRIPT
+  #if ENABLE_P44SCRIPT
+  sceneScriptContext = StandardScriptingDomain::sharedDomain().newContext(new P44Script::OutputObj(this)); // common context for (scene)scripts of this output
+  #else
   sceneScriptContext.isMemberVariable();
   sceneScriptContext.setContextInfo("scenescript", this);
+  #endif
   #endif
 }
 
@@ -283,12 +287,17 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
   SimpleScenePtr simpleScene = boost::dynamic_pointer_cast<SimpleScene>(aScene);
   if (simpleScene && simpleScene->effect==scene_effect_script) {
     // run scene script
+    #if ENABLE_P44SCRIPT
+    OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->sceneScript.getSource().c_str(), true, 80).c_str() );
+    simpleScene->sceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), Infinite);
+    #else
     sceneScriptContext.abort(false); // abort previous, no callback
     OLOG(LOG_INFO, "Starting Scene Script: '%.40s...'", simpleScene->sceneScript.c_str());
     sceneScriptContext.releaseState();
     sceneScriptContext.setCode(simpleScene->sceneScript);
     sceneScriptContext.execute(true, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1));
     return;
+    #endif
   }
   #endif
   if (aDoneCB) aDoneCB(); // NOP
@@ -297,11 +306,19 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 
 #if ENABLE_SCENE_SCRIPT
 
+#if ENABLE_P44SCRIPT
+void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ScriptObjPtr aResult)
+{
+  OLOG(LOG_INFO, "Scene Script completed, returns: '%s'", aResult->stringValue().c_str());
+  if (aDoneCB) aDoneCB();
+}
+#else
 void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluationResult)
 {
   OLOG(LOG_INFO, "Scene Script completed, returns: '%s'", aEvaluationResult.stringValue().c_str());
   if (aDoneCB) aDoneCB();
 }
+#endif
 
 #endif // ENABLE_SCENE_SCRIPT
 
@@ -309,7 +326,11 @@ void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluat
 void OutputBehaviour::stopSceneActions()
 {
   #if ENABLE_SCENE_SCRIPT
+  #if ENABLE_P44SCRIPT
+  sceneScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
+  #else
   sceneScriptContext.abort(false); // do not call back
+  #endif
   #endif
 }
 
@@ -417,7 +438,7 @@ MLMicroSeconds OutputBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool 
 
 // MARK: - scene script context
 
-#if ENABLE_SCENE_SCRIPT
+#if ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
 
 
 SceneScriptContext::SceneScriptContext(OutputBehaviour &aOutput, const GeoLocation* aGeoLocationP) :
@@ -498,7 +519,7 @@ bool SceneScriptContext::evaluateFunction(const string &aFunc, const FunctionArg
 }
 
 
-#endif // ENABLE_SCENE_SCRIPT
+#endif // ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
 
 
 
@@ -829,5 +850,102 @@ string OutputBehaviour::getStatusText()
 }
 
 
+// MARK: - Output scripting object
+
+#if ENABLE_SCENE_SCRIPT && ENABLE_P44SCRIPT
+
+using namespace P44Script;
+
+static void channelOpComplete(BuiltinFunctionContextPtr f, OutputBehaviourPtr aOutput)
+{
+  SPLOG(aOutput, LOG_INFO, "scene script: channel operation complete");
+  f->finish();
+}
+
+// applychannels()
+static void applychannels_func(BuiltinFunctionContextPtr f)
+{
+  OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
+  assert(o);
+  SPLOG(o->output(), LOG_INFO, "scene script: applychannels() requests applying channels now");
+  o->output()->getDevice().requestApplyingChannels(boost::bind(&channelOpComplete, f, o->output()), false);
+}
+
+// syncchannels()
+static void syncchannels_func(BuiltinFunctionContextPtr f)
+{
+  OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
+  assert(o);
+  SPLOG(o->output(), LOG_INFO, "scene script: syncchannels() requests applying channels now");
+  o->output()->getDevice().requestUpdatingChannels(boost::bind(&channelOpComplete, f, o->output()));
+}
 
 
+// channel(channelid)               - return the value of the specified channel
+// [dim]channel(channelid, value)   - set the channel value to the specified value or dim it relatively
+// [dim]channel(channelid, value, transitiontime)
+static const BuiltInArgDesc channel_args[] = { { text }, { numeric+optional }, { numeric+optional } };
+static const size_t channel_numargs = sizeof(channel_args)/sizeof(BuiltInArgDesc);
+static void channel_funcImpl(bool aDim, BuiltinFunctionContextPtr f)
+{
+  OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
+  assert(o);
+  ChannelBehaviourPtr channel = o->output()->getChannelById(f->arg(0)->stringValue());
+  if (!channel) {
+    f->finish(new AnnotatedNullValue("unknown channel"));
+    return;
+  }
+  else {
+    // channel found
+    if (f->numArgs()==1) {
+      // return channel value
+      f->finish(new NumericValue(channel->getChannelValueCalculated()));
+      return;
+    }
+    else {
+      // set value
+      MLMicroSeconds transitionTime = 0; // default to immediate
+      if (f->numArgs()>2) {
+        transitionTime = f->arg(2)->doubleValue()*Second;
+      }
+      if (aDim)
+        channel->dimChannelValue(f->arg(1)->doubleValue(), transitionTime);
+      else
+        channel->setChannelValue(f->arg(1)->doubleValue(), transitionTime, true); // always apply
+    }
+  }
+  f->finish();
+}
+
+static void channel_func(BuiltinFunctionContextPtr f)
+{
+  channel_funcImpl(false, f);
+}
+static void dimchannel_func(BuiltinFunctionContextPtr f)
+{
+  channel_funcImpl(true, f);
+}
+
+static const BuiltinMemberDescriptor outputMembers[] = {
+  { "applychannels", null, 0, NULL, &applychannels_func },
+  { "syncchannels", null, 0, NULL, &syncchannels_func },
+  { "channel", numeric, channel_numargs, channel_args, &channel_func },
+  { "dimchannel", numeric, channel_numargs, channel_args, &dimchannel_func },
+  { NULL } // terminator
+};
+
+
+static BuiltInMemberLookup* sharedOutputMemberLookupP = NULL;
+
+OutputObj::OutputObj(OutputBehaviourPtr aOutput) :
+  mOutput(aOutput)
+{
+  if (sharedOutputMemberLookupP==NULL) {
+    sharedOutputMemberLookupP = new BuiltInMemberLookup(outputMembers);
+    sharedOutputMemberLookupP->isMemberVariable(); // disable refcounting
+  }
+  registerMemberLookup(sharedOutputMemberLookupP);
+}
+
+
+#endif // ENABLE_SCENE_SCRIPT && ENABLE_P44SCRIPT

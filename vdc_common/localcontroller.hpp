@@ -382,6 +382,7 @@ namespace p44 {
   typedef boost::intrusive_ptr<SceneList> SceneListPtr;
 
 
+  #if ENABLE_EXPRESSIONS
 
   class TriggerExpressionContext : public TimedEvaluationContext
   {
@@ -433,6 +434,7 @@ namespace p44 {
 
   };
 
+  #endif
 
 
   /// trigger
@@ -447,8 +449,6 @@ namespace p44 {
     int triggerId; ///< the immutable ID of this trigger
     string name;
     string triggerVarDefs; ///< variable to valueSource mappings
-    TriggerExpressionContext triggerCondition; ///< expression that must evaluate to true to trigger the action
-    TriggerActionContext triggerAction; ///< the trigger action script
 
     ValueSourceMapper valueMapper;
     MLTicket varParseTicket;
@@ -456,20 +456,33 @@ namespace p44 {
 
   public:
 
+    #if ENABLE_P44SCRIPT
+    ScriptMainContextPtr triggerContext; ///< context shared for all scripts in this trigger
+    TriggerSource triggerCondition;
+    ScriptSource triggerAction;
+    #else
+    TriggerExpressionContext triggerCondition; ///< expression that must evaluate to true to trigger the action
+    TriggerActionContext triggerAction; ///< the trigger action script
+    #endif
+
     Trigger();
     virtual ~Trigger();
+
+    /// called when vdc host event occurs
+    /// @param aActivity the activity that occurred at the vdc host level
+    void processGlobalEvent(VdchostEvent aActivity);
+
+    #if ENABLE_EXPRESSIONS
 
     /// check trigger and fire actions when condition transitions from non-met to met
     /// @param aEvalMode the evaluation mode to use
     /// @return ok or error in case expression evaluation failed
     ErrorPtr checkAndFire(EvalMode aEvalMode);
 
-    /// called when vdc host event occurs
-    /// @param aActivity the activity that occurred at the vdc host level
-    void processGlobalEvent(VdchostEvent aActivity);
-
     /// execute the trigger actions
     bool executeActions(EvaluationResultCB aCallback = NULL);
+
+    #endif
 
     /// stop running trigger actions
     void stopActions();
@@ -500,11 +513,18 @@ namespace p44 {
   private:
 
     void parseVarDefs();
-    void reCheckTimed();
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
+
+    #if ENABLE_P44SCRIPT
+    void handleTrigger(ScriptObjPtr aResult);
+    void triggerActionExecuted(ScriptObjPtr aResult);
+    void testTriggerActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
+    #else
+    void reCheckTimed();
     void triggerEvaluationExecuted(ExpressionValue aEvaluationResult);
     void triggerActionExecuted(ExpressionValue aEvaluationResult);
     void testTriggerActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
+    #endif
 
   };
   typedef boost::intrusive_ptr<Trigger> TriggerPtr;
@@ -572,14 +592,13 @@ namespace p44 {
     friend class TriggerActionContext;
 
     VdcHost &vdcHost; ///< local reference to vdc host
+    bool devicesReady; ///< set when vdchost reports devices initialized
+
+  public:
 
     ZoneList localZones; ///< the locally used/defined zones
     SceneList localScenes; ///< the locally defined scenes
     TriggerList localTriggers; ///< the locally defined triggers
-
-    bool devicesReady; ///< set when vdchost reports devices initialized
-
-  public:
 
     LocalController(VdcHost &aVdcHost);
     virtual ~LocalController();
@@ -673,6 +692,21 @@ namespace p44 {
 
   };
 
+
+  #if ENABLE_P44SCRIPT
+  namespace P44Script {
+
+    /// represents the global objects related to localController
+    class LocalControllerLookup : public BuiltInMemberLookup
+    {
+      typedef BuiltInMemberLookup inherited;
+      LocalControllerLookup();
+    public:
+      static MemberLookupPtr sharedLookup();
+    };
+
+  }
+  #endif
 
 } // namespace p44
 

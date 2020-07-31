@@ -21,6 +21,9 @@
 
 #include "apivalue.hpp"
 
+#if SCRIPTING_JSON_SUPPORT
+#include "jsonvdcapi.hpp"
+#endif
 
 using namespace p44;
 
@@ -339,6 +342,24 @@ ApiValuePtr ApiValue::newExpressionValue(ExpressionValue& aValue)
   if (aValue.isNull()) return newNull();
   else if (aValue.isString()) return newString(aValue.stringValue());
   else return newDouble(aValue.numValue());
+}
+
+#endif
+
+#if ENABLE_P44SCRIPT
+
+ApiValuePtr ApiValue::newScriptValue(P44Script::ScriptObjPtr aValue)
+{
+  if (!aValue || aValue->undefined()) return newNull();
+  else if (aValue->hasType(P44Script::text)) return newString(aValue->stringValue());
+  #if SCRIPTING_JSON_SUPPORT
+  else if (aValue->hasType(P44Script::json)) {
+    ApiValuePtr j = newNull();
+    *j = *JsonApiValue::newValueFromJson(aValue->jsonValue());
+    return j;
+  }
+  #endif
+  else return newDouble(aValue->doubleValue());
 }
 
 #endif

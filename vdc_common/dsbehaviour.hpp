@@ -149,6 +149,9 @@ namespace p44 {
     /// @return string, really short, intended to be shown as a narrow column in a list
     virtual string getStatusText() { return ""; };
 
+    virtual Device& getDevice() { return device; };
+
+
 
     /// @name persistent settings management
     /// @{

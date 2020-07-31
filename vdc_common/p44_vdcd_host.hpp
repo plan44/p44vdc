@@ -127,7 +127,7 @@ namespace p44 {
   #endif // ENABLE_JSONCFGAPI
 
 
-  #if EXPRESSION_SCRIPT_SUPPORT
+  #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
 
   /// Dummy api call from script "connection" object
   class ScriptCallConnection : public VdcApiConnection
@@ -165,12 +165,20 @@ namespace p44 {
   {
     typedef VdcApiRequest inherited;
 
+    #if ENABLE_P44SCRIPT
+    BuiltinFunctionContextPtr mBuiltinFunctionContext;
+    #else
     ScriptExecutionContextPtr scriptContext;
+    #endif
 
   public:
 
     /// constructor
-    ScriptApiRequest(ScriptExecutionContextPtr aScriptContext);
+    #if ENABLE_P44SCRIPT
+    ScriptApiRequest(BuiltinFunctionContextPtr aBuiltinFunctionContext) : mBuiltinFunctionContext(aBuiltinFunctionContext) {};
+    #else
+    ScriptApiRequest(ScriptExecutionContextPtr aScriptContext) : scriptContext(aScriptContext) {};
+    #endif
 
     /// return the request ID as a string
     /// @return request ID as string
@@ -296,6 +304,9 @@ namespace p44 {
     UbusServerPtr ubusApiServer; ///< ubus API for openwrt web interface
     #endif
 
+    #if P44SCRIPT_FULL_SUPPORT
+    ScriptMainContextPtr vdcHostScriptContext; ///< context for global vdc scripts
+    #endif
     #if EXPRESSION_SCRIPT_SUPPORT
     ScriptQueue globalScripts;
     #endif
@@ -363,6 +374,10 @@ namespace p44 {
     void ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string aMethod, JsonObjectPtr aJsonRequest);
     #endif
 
+    #if P44SCRIPT_FULL_SUPPORT
+    void runInitScripts();
+    void scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
+    #endif
     #if EXPRESSION_SCRIPT_SUPPORT
     void runInitScripts();
     #endif
@@ -373,6 +388,19 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<P44VdcHost> P44VdcHostPtr;
 
+
+  #if P44SCRIPT_FULL_SUPPORT
+  namespace P44Script {
+
+    class P44VdcHostLookup : public BuiltInMemberLookup {
+      typedef BuiltInMemberLookup inherited;
+      P44VdcHostLookup();
+    public:
+      static MemberLookupPtr sharedLookup();
+    };
+
+  }
+  #endif
 
 
 }

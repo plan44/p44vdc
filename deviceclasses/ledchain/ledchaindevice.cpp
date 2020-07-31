@@ -187,10 +187,15 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     // make sure it is invisible at the beginning
     lightView->hide();
     // add function to allow view manipulation via scripts
+    #if ENABLE_EXPRESSIONS
     ValueLookupCB vl = boost::bind(&LedChainDevice::viewCfgSubstLookup, this, _1, _2);
     behaviour->sceneScriptContext.registerFunctionHandler(
       boost::bind(&p44::evaluateViewFunctions, _1, _2, _3, _4, lightView, vl)
     );
+    #endif
+    #if ENABLE_P44SCRIPT
+    // FIXME: do we need to register a lookup here?
+    #endif
   }
   // - is RGB
   colorClass = class_yellow_light;
@@ -215,12 +220,12 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   }
 }
 
-
+#if ENABLE_EXPRESSIONS
 bool LedChainDevice::viewCfgSubstLookup(const string &aName, ExpressionValue &aResult)
 {
   return getOutput()->sceneScriptContext.EvaluationContext::valueLookup(aName, aResult);
 }
-
+#endif
 
 bool LedChainDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {

@@ -795,6 +795,25 @@ namespace p44 {
   };
 
 
+  #if P44SCRIPT_FULL_SUPPORT
+  namespace P44Script {
+
+    /// represents a p44vdc device
+    class DeviceObj : public StructuredLookupObject
+    {
+      typedef P44Script::StructuredLookupObject inherited;
+      DevicePtr mDevice;
+    public:
+      DeviceObj(DevicePtr aDevice);
+      virtual string getAnnotation() const P44_OVERRIDE { return "device"; };
+      DevicePtr device() { return mDevice; };
+    };
+
+  } // namespace P44Script
+  #endif
+
+
+
 } // namespace p44
 
 

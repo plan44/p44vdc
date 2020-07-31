@@ -28,12 +28,13 @@
 
 #include "devicesettings.hpp"
 
-#if ENABLE_EXPRESSIONS && EXPRESSION_SCRIPT_SUPPORT && !defined(ENABLE_SCENE_SCRIPT)
+#if !defined(ENABLE_SCENE_SCRIPT) && ((ENABLE_P44SCRIPT && P44SCRIPT_FULL_SUPPORT) || (ENABLE_EXPRESSIONS && EXPRESSION_SCRIPT_SUPPORT))
   #define ENABLE_SCENE_SCRIPT 1
 #endif
 
 #if ENABLE_SCENE_SCRIPT
 #include "expressions.hpp"
+#include "p44script.hpp"
 #endif
 
 
@@ -135,7 +136,11 @@ namespace p44 {
     SceneCmd sceneCmd; ///< scene command
     SceneArea sceneArea; ///< scene area, 0 if none
     #if ENABLE_SCENE_SCRIPT
+    #if ENABLE_P44SCRIPT
+    P44Script::ScriptSource sceneScript; ///< scene script
+    #else
     string sceneScript; ///< scene script
+    #endif
     #endif
 
     /// @}

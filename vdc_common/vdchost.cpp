@@ -100,6 +100,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   productName(DEFAULT_PRODUCT_NAME),
   geolocation() // default location will be set from timeutils
 {
+  #if ENABLE_P44SCRIPT
+  P44Script::StandardScriptingDomain::sharedDomain().setGeoLocation(&geolocation);
+  #endif
   // remember singleton's address
   sharedVdcHostP = this;
   // obtain default MAC address (might be changed by setIdMode())
@@ -576,10 +579,14 @@ DevicePtr VdcHost::getDeviceByNameOrDsUid(const string &aName)
   if (dsuid.setAsString(aName)) {
     pos = dSDevices.find(dsuid);
   }
-  for (pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
-    if (pos->second->getName()==aName) break;
+  else {
+    for (pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+      if (pos->second->getName()==aName) break;
+    }
   }
-  if (pos!=dSDevices.end()) return pos->second;
+  if (pos!=dSDevices.end()) {
+    return pos->second;
+  }
   return DevicePtr();
 }
 

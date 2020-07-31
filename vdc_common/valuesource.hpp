@@ -25,8 +25,10 @@
 #include "p44vdc_common.hpp"
 #include "vdcapi.hpp"
 #include "expressions.hpp"
+#include "p44script.hpp"
 
 using namespace std;
+using namespace p44::P44Script;
 
 namespace p44 {
 
@@ -99,8 +101,10 @@ namespace p44 {
   };
 
 
-
   class ValueSourceMapper
+    #if ENABLE_P44SCRIPT
+    : public MemberLookup
+    #endif
   {
 
     typedef map<string, ValueSource *, lessStrucmp> ValueSourcesMap;
@@ -129,13 +133,28 @@ namespace p44 {
     /// @return NULL if not found, (temporary!) pointer to value source otherwise
     /// @note ValueSource pointer returned is not refcounted, valuesource object might
     ///   get deleted when control is passed to mainloop
-    ValueSource* valueSourceByAlias(const string aAlias);
+    ValueSource* valueSourceByAlias(const string aAlias) const;
+
+    #if ENABLE_EXPRESSIONS
 
     /// get value (or meta information such as .age, .oplevel and .valid subfields) of mapped value source
     /// @param aValue will be set to the variable's value or error if aVarSpec identifies a known variable
     /// @param aVarSpec variable specification
     /// @return true if aValue was set, false if further sources for the variable should be searched (if any)
     bool valueLookup(ExpressionValue &aValue, const string aVarSpec);
+
+    #endif // ENABLE_EXPRESSIONS
+
+    #if ENABLE_P44SCRIPT
+
+    /// get object subfield/member by name
+    /// @param aThisObj the object _instance_ of which we want to access a member (can be NULL in case of singletons)
+    /// @param aName name of the member to find
+    /// @param aTypeRequirements what type and type attributes the returned member must have, defaults to no restriction
+    /// @return ScriptObj representing the member, or NULL if none
+    virtual ScriptObjPtr memberByNameFrom(ScriptObjPtr aThisObj, const string aName, TypeInfo aTypeRequirements) const P44_OVERRIDE;
+
+    #endif // ENABLE_P44SCRIPT
 
     /// get info about all mapped sources (everything needed for editing mappingdefs)
     /// @param the api object to add info for mappings to

@@ -1032,15 +1032,29 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   triggerId(0),
+  #if ENABLE_P44SCRIPT
+  triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, expression|synchronously),
+  triggerAction("action", this),
+  #else
   triggerCondition(*this, &VdcHost::sharedVdcHost()->geolocation),
   triggerAction(*this, &VdcHost::sharedVdcHost()->geolocation),
+  #endif
   conditionMet(undefined)
 {
+  #if ENABLE_P44SCRIPT
+  valueMapper.isMemberVariable();
+  triggerContext = triggerCondition.domain()->newContext(); // common context for condition and action
+  triggerContext->registerMemberLookup(&valueMapper); // allow context to access the mapped values
+  triggerContext->registerMemberLookup(LocalControllerLookup::sharedLookup()); // allow context to access the mapped values
+  triggerCondition.setSharedMainContext(triggerContext);
+  triggerAction.setSharedMainContext(triggerContext);
+  #else
   triggerCondition.isMemberVariable();
   triggerCondition.setContextInfo("condition", this);
   triggerAction.isMemberVariable();
   triggerAction.setContextInfo("action", this);
   triggerCondition.setEvaluationResultHandler(boost::bind(&Trigger::triggerEvaluationExecuted, this, _1));
+  #endif
 }
 
 
@@ -1058,6 +1072,7 @@ string Trigger::logContextPrefix()
 
 // MARK: - Trigger condition evaluation
 
+#if ENABLE_EXPRESSIONS
 
 TriggerExpressionContext::TriggerExpressionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP) :
   inherited(aGeoLocationP),
@@ -1114,6 +1129,14 @@ void Trigger::triggerActionExecuted(ExpressionValue aEvaluationResult)
   }
 }
 
+void Trigger::reCheckTimed()
+{
+  varParseTicket.cancel();
+  checkAndFire(evalmode_timed);
+}
+
+#endif // ENABLE_EXPRESSIONS
+
 
 #define REPARSE_DELAY (30*Second)
 
@@ -1130,7 +1153,11 @@ void Trigger::parseVarDefs()
   }
   else if (LocalController::sharedLocalController()->devicesReady) {
     // do not run checks (and fire triggers too early) before devices are reported initialized
+    #if ENABLE_P44SCRIPT
+    triggerCondition.evaluate(initial);
+    #else
     checkAndFire(evalmode_initial);
+    #endif
   }
 }
 
@@ -1146,16 +1173,13 @@ void Trigger::processGlobalEvent(VdchostEvent aActivity)
     if (!varParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
       //   Otherwise: have condition re-evaluated (because it possibly contain references to local time)
+      #if ENABLE_P44SCRIPT
+      triggerCondition.nextEvaluationNotLaterThan(REPARSE_DELAY);
+      #else
       varParseTicket.executeOnce(boost::bind(&Trigger::reCheckTimed, this), REPARSE_DELAY);
+      #endif
     }
   }
-}
-
-
-void Trigger::reCheckTimed()
-{
-  varParseTicket.cancel();
-  checkAndFire(evalmode_timed);
 }
 
 
@@ -1167,13 +1191,115 @@ void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListene
   }
   else {
     OLOG(LOG_INFO, "value source '%s' reports value %f -> re-evaluating trigger condition", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
+    #if ENABLE_P44SCRIPT
+    triggerCondition.evaluate(triggered);
+    #else
     checkAndFire(evalmode_externaltrigger);
+    #endif
   }
 }
 
 
+
+#if ENABLE_P44SCRIPT
+
 // MARK: - Trigger actions execution
 
+void Trigger::handleTrigger(ScriptObjPtr aResult)
+{
+  // note: is a onGettingTrue trigger, no further result evaluation needed
+  OLOG(LOG_NOTICE, "triggers based on values: %s",
+    valueMapper.shortDesc().c_str()
+  );
+  // a trigger fire is an activity
+  LocalController::sharedLocalController()->signalActivity();
+  // launch action
+  triggerAction.run(regular|stopall, boost::bind(&Trigger::triggerActionExecuted, this, _1), Infinite);
+}
+
+
+void Trigger::triggerActionExecuted(ScriptObjPtr aResult)
+{
+  if (!aResult->isErr()) {
+    OLOG(LOG_NOTICE, "actions executed successfully, result: %s", aResult->stringValue().c_str());
+  }
+  else {
+    OLOG(LOG_ERR, "actions did not execute successfully: %s", aResult->errorValue()->text());
+  }
+}
+
+
+// MARK: - Trigger API method handlers
+
+ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
+{
+  ApiValuePtr checkResult = aRequest->newApiValue();
+  checkResult->setType(apivalue_object);
+  ApiValuePtr mappingInfo = checkResult->newObject();
+  parseVarDefs(); // reparse
+  if (valueMapper.getMappedSourcesInfo(mappingInfo)) {
+    checkResult->add("varDefs", mappingInfo);
+  }
+  // Condition
+  ApiValuePtr cond = checkResult->newObject();
+  ScriptObjPtr res = triggerCondition.run(initial|synchronously, NULL, 2*Second);
+  cond->add("expression", checkResult->newString(triggerCondition.getSource().c_str()));
+  if (!res->isErr()) {
+    cond->add("result", cond->newScriptValue(res));
+    cond->add("text", cond->newString(res->stringValue()));
+    OLOG(LOG_INFO, "condition '%s' -> %s", triggerCondition.getSource().c_str(), res->stringValue().c_str());
+  }
+  else {
+    cond->add("error", cond->newString(res->errorValue()->getErrorMessage()));
+    SourceCursor* cursor = res->cursor();
+    if (cursor) {
+      cond->add("at", cond->newUint64(cursor->textpos()));
+      cond->add("line", cond->newUint64(cursor->lineno()));
+      cond->add("char", cond->newUint64(cursor->charpos()));
+    }
+  }
+  checkResult->add("condition", cond);
+  // return the result
+  aRequest->sendResult(checkResult);
+  return ErrorPtr();
+}
+
+
+ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
+{
+  triggerAction.run(regular|stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), Infinite);
+  return ErrorPtr(); // will send result later
+}
+
+
+void Trigger::testTriggerActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
+{
+  ApiValuePtr testResult = aRequest->newApiValue();
+  testResult->setType(apivalue_object);
+  if (!aResult->isErr()) {
+    testResult->add("result", testResult->newScriptValue(aResult));
+  }
+  else {
+    testResult->add("error", testResult->newString(aResult->errorValue()->getErrorMessage()));
+    SourceCursor* cursor = aResult->cursor();
+    if (cursor) {
+      testResult->add("at", testResult->newUint64(cursor->textpos()));
+      testResult->add("line", testResult->newUint64(cursor->lineno()));
+      testResult->add("char", testResult->newUint64(cursor->charpos()));
+    }
+  }
+  aRequest->sendResult(testResult);
+}
+
+
+void Trigger::stopActions()
+{
+  triggerContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "trigger actions stopped"));
+}
+
+#else
+
+// MARK: - Trigger actions execution
 
 TriggerActionContext::TriggerActionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP) :
   inherited(aGeoLocationP),
@@ -1344,7 +1470,6 @@ bool TriggerActionContext::evaluateFunction(const string &aFunc, const FunctionA
   return true; // found
 }
 
-
 #define LEGACY_ACTIONS_REWRITING 1
 
 bool Trigger::executeActions(EvaluationResultCB aCallback)
@@ -1419,7 +1544,6 @@ void Trigger::stopActions()
 
 
 
-
 // MARK: - Trigger API method handlers
 
 
@@ -1474,6 +1598,9 @@ void Trigger::testTriggerActionExecuted(VdcApiRequestPtr aRequest, ExpressionVal
   }
   aRequest->sendResult(testResult);
 }
+
+#endif // ENABLE_EXPRESSIONS
+
 
 
 // MARK: - Trigger persistence
@@ -1539,8 +1666,13 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   triggerId = aRow->getWithDefault<int>(aIndex++, 0);
   // the fields
   name = nonNullCStr(aRow->get<const char *>(aIndex++));
+  #if ENABLE_P44SCRIPT
+  triggerCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  triggerAction.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)), sourcecode);
+  #else
   triggerCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   triggerAction.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  #endif
   triggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
   // initiate evaluation, first vardefs and eventually trigger expression to get timers started
   parseVarDefs();
@@ -1554,8 +1686,13 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, triggerId);
   // the fields
   aStatement.bind(aIndex++, name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  #if ENABLE_P44SCRIPT
+  aStatement.bind(aIndex++, triggerCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, triggerAction.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  #else
   aStatement.bind(aIndex++, triggerCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerAction.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  #endif
   aStatement.bind(aIndex++, triggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
@@ -1604,9 +1741,14 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: aPropValue->setStringValue(name); return true;
-        case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getCode()); return true;
         case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
+        #if ENABLE_P44SCRIPT
+        case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getSource().c_str()); return true;
+        case triggerAction_key: aPropValue->setStringValue(triggerAction.getSource().c_str()); return true;
+        #else
+        case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getCode()); return true;
         case triggerAction_key: aPropValue->setStringValue(triggerAction.getCode()); return true;
+        #endif
         case logLevelOffset_key: aPropValue->setInt32Value(getLocalLogLevelOffset()); return true;
       }
     }
@@ -1615,18 +1757,28 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case triggerName_key:
           setPVar(name, aPropValue->stringValue());
           return true;
+        case triggerVarDefs_key:
+          if (setPVar(triggerVarDefs, aPropValue->stringValue())) {
+            parseVarDefs(); // changed variable mappings, re-parse them
+          }
+          return true;
+        #if ENABLE_P44SCRIPT
+        case triggerCondition_key:
+          if (triggerCondition.setTriggerSource(aPropValue->stringValue())) {
+            markDirty();
+            triggerCondition.evaluate(initial);
+          }
+          return true;
+        case triggerAction_key: if (triggerAction.setSource(aPropValue->stringValue()), sourcecode) markDirty(); return true;
+        #else
         case triggerCondition_key:
           if (triggerCondition.setCode(aPropValue->stringValue())) {
             markDirty();
             checkAndFire(evalmode_initial);
           }
           return true;
-        case triggerVarDefs_key:
-          if (setPVar(triggerVarDefs, aPropValue->stringValue())) {
-            parseVarDefs(); // changed variable mappings, re-parse them
-          }
-          return true;
         case triggerAction_key: if (triggerAction.setCode(aPropValue->stringValue())) markDirty(); return true;
+        #endif
         case logLevelOffset_key: setLogLevelOffset(aPropValue->int32Value()); return true;
       }
     }
@@ -2546,6 +2698,166 @@ PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr &
 }
 
 
+#if ENABLE_P44SCRIPT
 
+using namespace P44Script;
+
+// MARK: - Local controller specific functions
+
+// trigger('triggername')    execute a trigger's action script
+static const BuiltInArgDesc trigger_args[] = { { text } };
+static const size_t trigger_numargs = sizeof(trigger_args)/sizeof(BuiltInArgDesc);
+static void trigger_funcExecuted(BuiltinFunctionContextPtr f, ScriptObjPtr aResult)
+{
+  f->finish(aResult);
+}
+static void trigger_func(BuiltinFunctionContextPtr f)
+{
+  TriggerPtr targetTrigger = LocalController::sharedLocalController()->localTriggers.getTriggerByName(f->arg(0)->stringValue());
+  if (!targetTrigger) {
+    f->finish(new ErrorValue(ScriptError::NotFound, "No trigger named '%s' found", f->arg(0)->stringValue().c_str()));
+    return;
+  }
+  targetTrigger->triggerAction.run(regular|stopall, boost::bind(&trigger_funcExecuted, f, _1), Infinite);
+}
+
+
+// scene(name)
+// scene(name, transition_time)
+// scene(id, zone)
+// scene(id, zone, transition_time)
+// scene(id, zone, transition_time, group)
+static const BuiltInArgDesc scene_args[] = { { text+numeric }, { text+numeric+optional }, { numeric+optional }, { text+numeric+optional } };
+static const size_t scene_numargs = sizeof(scene_args)/sizeof(BuiltInArgDesc);
+static void scene_func(BuiltinFunctionContextPtr f)
+{
+  int ai = 1;
+  int zoneid = -1; // none specified
+  SceneNo sceneNo = INVALID_SCENE_NO;
+  MLMicroSeconds transitionTime = Infinite; // use scene's standard time
+  DsGroup group = group_yellow_light; // default to light
+  if (f->numArgs()>1 && f->arg(1)->hasType(text)) {
+    // second param is a zone
+    // - ..so first one must be a scene number or name
+    sceneNo = LocalController::sharedLocalController()->localScenes.getSceneIdByKind(f->arg(0)->stringValue());
+    if (sceneNo==INVALID_SCENE_NO) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
+      return;
+    }
+    // - check zone
+    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(f->arg(1)->stringValue());
+    if (!zone) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "Zone '%s' not found", f->arg(1)->stringValue().c_str()));
+      return;
+    }
+    zoneid = zone->getZoneId();
+    ai++;
+  }
+  else {
+    // first param is a named scene that includes the zone
+    SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(f->arg(0)->stringValue());
+    if (!scene) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
+      return;
+    }
+    zoneid = scene->getZoneID();
+    sceneNo = scene->getSceneNo();
+  }
+  if (f->numArgs()>ai) {
+    transitionTime = f->arg(ai)->doubleValue()*Second;
+    if (transitionTime<0) transitionTime = Infinite; // use default
+    ai++;
+    if (f->numArgs()>ai) {
+      const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(ai)->stringValue());
+      if (!gdP) {
+        f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(ai)->stringValue().c_str()));
+        return;
+      }
+      group = gdP->no;
+    }
+  }
+  // execute the scene
+  LocalController::sharedLocalController()->callScene(sceneNo, zoneid, group, transitionTime);
+  f->finish();
+}
+
+
+// set(zone_or_device, value)
+// set(zone_or_device, value)
+// set(zone_or_device, value, transitiontime)
+// set(zone_or_device, value, transitiontime, channelid)
+// set(zone, value, transitiontime, channelid, group)
+static const BuiltInArgDesc set_args[] = { { text+numeric }, { numeric }, { numeric+optional }, { text+optional }, { text+numeric+optional } };
+static const size_t set_numargs = sizeof(set_args)/sizeof(BuiltInArgDesc);
+static void set_func(BuiltinFunctionContextPtr f)
+{
+  double value = f->arg(1)->doubleValue();
+  // - optional transitiontime
+  MLMicroSeconds transitionTime = Infinite; // use scene's standard time
+  if (f->numArgs()>2 && f->arg(2)->defined()) {
+    transitionTime = f->arg(2)->doubleValue()*Second;
+    if (transitionTime<0) transitionTime = Infinite; // use default
+  }
+  // - optional channelid
+  string channelId = "0"; // default channel
+  if (f->numArgs()>3 &&  f->arg(3)->defined()) {
+    channelId = f->arg(3)->stringValue();
+  }
+  // get zone or device
+  if (ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(f->arg(0)->stringValue())) {
+    // - might have an optional group argument
+    DsGroup group = group_yellow_light; // default to light
+    if (f->numArgs()>4) {
+      const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(4)->stringValue());
+      if (!gdP) {
+        f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(4)->stringValue().c_str()));
+        return;
+      }
+      group = gdP->no;
+    }
+    LocalController::sharedLocalController()->setOutputChannelValues(zone->getZoneId(), group, channelId, value, transitionTime);
+  }
+  else if (DevicePtr device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(f->arg(0)->stringValue())) {
+    if (f->numArgs()>4) {
+      f->finish(new ErrorValue(ScriptError::Syntax, "group cannot be specified for setting single device's output"));
+      return;
+    }
+    NotificationAudience audience;
+    VdcHost::sharedVdcHost()->addTargetToAudience(audience, device);
+    LocalController::sharedLocalController()->setOutputChannelValues(audience, channelId, value, transitionTime);
+  }
+  else {
+    f->finish(new ErrorValue(ScriptError::NotFound, "no zone or device named '%s' found", f->arg(0)->stringValue().c_str()));
+    return;
+  }
+  // success
+  f->finish();
+}
+
+
+static const BuiltinMemberDescriptor localControllerFuncs[] = {
+  { "trigger", any, trigger_numargs, trigger_args, &trigger_func },
+  { "scene", any, scene_numargs, scene_args, &scene_func },
+  { "set", any, set_numargs, set_args, &set_func },
+  { NULL } // terminator
+};
+
+LocalControllerLookup::LocalControllerLookup() :
+  inherited(localControllerFuncs)
+{
+}
+
+static MemberLookupPtr sharedLocalControllerLookup;
+
+MemberLookupPtr LocalControllerLookup::sharedLookup()
+{
+  if (!sharedLocalControllerLookup) {
+    sharedLocalControllerLookup = new LocalControllerLookup;
+    sharedLocalControllerLookup->isMemberVariable(); // disable refcounting
+  }
+  return sharedLocalControllerLookup;
+}
+
+#endif // ENABLE_P44SCRIPT
 
 #endif // ENABLE_LOCALCONTROLLER

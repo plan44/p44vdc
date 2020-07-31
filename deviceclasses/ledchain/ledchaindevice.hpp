@@ -133,7 +133,10 @@ namespace p44 {
   private:
 
     virtual void applyChannelValueSteps(bool aForDimming, double aStepSize);
+
+    #if ENABLE_EXPRESSIONS
     bool viewCfgSubstLookup(const string &aName, ExpressionValue &aResult);
+    #endif
 
   };
   typedef boost::intrusive_ptr<LedChainDevice> LedChainDevicePtr;

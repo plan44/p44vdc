@@ -37,6 +37,8 @@ namespace p44 {
   class EvaluatorDevice;
 
 
+  #if ENABLE_EXPRESSIONS
+
   class EvaluatorExpressionContext : public TimedEvaluationContext
   {
     typedef TimedEvaluationContext inherited;
@@ -84,6 +86,7 @@ namespace p44 {
   };
 
   #endif // EXPRESSION_SCRIPT_SUPPORT
+  #endif // ENABLE_EXPRESSIONS
 
 
   class EvaluatorDeviceSettings : public DeviceSettings
@@ -92,19 +95,27 @@ namespace p44 {
     friend class EvaluatorDevice;
 
     string varDefs; ///< mapping of variable names to ValueSources
+    #if ENABLE_P44SCRIPT
+    ScriptMainContextPtr evaluatorContext; ///< context shared for all scripts in this evaluator
+    TriggerSource onCondition;
+    TriggerSource offCondition;
+    #elif ENABLE_EXPRESSIONS
     EvaluatorExpressionContext onCondition; ///< expression that must evaluate to true for output to get active
     EvaluatorExpressionContext offCondition; ///< expression that must evaluate to true for output to get inactive
+    #else
+    #error "Evaluators need ENABLE_P44SCRIPT or legacy ENABLE_EXPRESSIONS"
+    #endif
     MLMicroSeconds minOnTime; ///< how long the on condition must be present before triggering the result change
     MLMicroSeconds minOffTime; ///< how long the on condition must be present before triggering the result change
-    #if EXPRESSION_SCRIPT_SUPPORT
+    #if P44SCRIPT_FULL_SUPPORT
+    ScriptSource action;
+    #elif EXPRESSION_SCRIPT_SUPPORT
     EvaluatorActionContext action; ///< (additional) action to fire when evaluator changes state
-    #else
-    string oldAction; ///< dummy, keep it for now
     #endif
 
   protected:
 
-    EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator);
+    EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bool aIsSensor);
 
     // persistence implementation
     virtual const char *tableName();
@@ -121,8 +132,11 @@ namespace p44 {
   {
     typedef Device inherited;
     friend class EvaluatorVdc;
+    friend class EvaluatorDeviceSettings;
+    #if ENABLE_EXPRESSIONS
     friend class EvaluatorExpressionContext;
     friend class EvaluatorActionContext;
+    #endif
 
     long long evaluatorDeviceRowID; ///< the ROWID this device was created from (0=none)
     
@@ -152,7 +166,9 @@ namespace p44 {
     MLMicroSeconds conditionMetSince; ///< since when do we see condition permanently met
     bool onConditionMet; ///< true: conditionMetSince relates to ON-condition, false: conditionMetSince relates to OFF-condition
     bool reporting; ///< set while reporting evaluation result to sensor or binary input, to prevent infinitite loop though cyclic references
+    #if ENABLE_EXPRESSIONS
     MLTicket evaluateTicket;
+    #endif
 
     EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(deviceSettings); };
 
@@ -240,19 +256,30 @@ namespace p44 {
 
   public:
 
+    #if ENABLE_P44SCRIPT
+    void handleTrigger(bool aOnCondition, ScriptObjPtr aResult);
+    #else
     ErrorPtr handleReEvaluationResult(bool aIsOffCondition, ExpressionValue aEvaluationResult, EvaluationContext &aContext);
+    #endif
 
   private:
 
     void parseVarDefs();
 
     void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
+
+    #if ENABLE_P44SCRIPT
+    void evaluateConditions(EvaluationFlags aRunMode);
+    void changedConditions();
+    void calculateEvaluatorState();
+    #else
     void evaluateConditions(Tristate aRefState, EvalMode aEvalMode);
     void calculateEvaluatorState(Tristate aRefState, EvalMode aEvalMode);
     Tristate evaluateBooleanNow(EvaluationContext &aEvalCtx, EvalMode aEvalMode, bool aScheduleReEval);
 
     void evaluateConditionsLater();
     void changedConditions();
+    #endif
 
     #if EXPRESSION_SCRIPT_SUPPORT
     ErrorPtr executeAction(Tristate aState, EvaluationResultCB aResultCB);

@@ -31,7 +31,7 @@ namespace p44 {
 
   class OutputBehaviour;
 
-  #if ENABLE_SCENE_SCRIPT
+  #if ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
 
   class SceneScriptContext : public ScriptExecutionContext
   {
@@ -54,7 +54,7 @@ namespace p44 {
 
   };
 
-  #endif // ENABLE_SCENE_SCRIPT
+  #endif // ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
 
 
 
@@ -72,7 +72,11 @@ namespace p44 {
   public:
     
     #if ENABLE_SCENE_SCRIPT
+    #if ENABLE_P44SCRIPT
+    ScriptMainContextPtr sceneScriptContext; ///< script context to run scene scripts of this output
+    #else
     SceneScriptContext sceneScriptContext; ///< script context to run scene scripts
+    #endif
     #endif
 
   protected:
@@ -361,12 +365,35 @@ namespace p44 {
     string parentIdForChannels();
 
     #if ENABLE_SCENE_SCRIPT
+    #if ENABLE_P44SCRIPT
+    void sceneScriptDone(SimpleCB aDoneCB, ScriptObjPtr aResult);
+    #else
     void sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluationResult);
+    #endif
     #endif
 
   };
   
   typedef boost::intrusive_ptr<OutputBehaviour> OutputBehaviourPtr;
+
+
+  #if ENABLE_P44SCRIPT
+  namespace P44Script {
+
+    /// represents a output behaviour of a p44vdc device
+    class OutputObj : public StructuredLookupObject
+    {
+      typedef P44Script::StructuredLookupObject inherited;
+      OutputBehaviourPtr mOutput;
+    public:
+      OutputObj(OutputBehaviourPtr aOutput);
+      virtual string getAnnotation() const P44_OVERRIDE { return "device output"; };
+      OutputBehaviourPtr output() { return mOutput; }
+    };
+
+  } // namespace P44Script
+  #endif
+
 
 } // namespace p44
 
