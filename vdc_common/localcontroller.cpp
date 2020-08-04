@@ -1154,7 +1154,7 @@ void Trigger::parseVarDefs()
   else if (LocalController::sharedLocalController()->devicesReady) {
     // do not run checks (and fire triggers too early) before devices are reported initialized
     #if ENABLE_P44SCRIPT
-    triggerCondition.evaluate(initial);
+    triggerCondition.reInitialize();
     #else
     checkAndFire(evalmode_initial);
     #endif
@@ -1208,7 +1208,7 @@ void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListene
 void Trigger::handleTrigger(ScriptObjPtr aResult)
 {
   // note: is a onGettingTrue trigger, no further result evaluation needed
-  OLOG(LOG_NOTICE, "triggers based on values: %s",
+  OLOG(LOG_NOTICE, "triggers based on values (and maybe timing): %s",
     valueMapper.shortDesc().c_str()
   );
   // a trigger fire is an activity
@@ -1764,9 +1764,8 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           return true;
         #if ENABLE_P44SCRIPT
         case triggerCondition_key:
-          if (triggerCondition.setTriggerSource(aPropValue->stringValue())) {
+          if (triggerCondition.setTriggerSource(aPropValue->stringValue(), true)) {
             markDirty();
-            triggerCondition.evaluate(initial);
           }
           return true;
         case triggerAction_key: if (triggerAction.setSource(aPropValue->stringValue()), sourcecode) markDirty(); return true;

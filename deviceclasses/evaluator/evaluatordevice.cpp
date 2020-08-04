@@ -1054,14 +1054,12 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         #if ENABLE_P44SCRIPT
         case onCondition_key:
-          if (evaluatorSettings()->onCondition.setTriggerSource(aPropValue->stringValue())) {
-            changedConditions();  // changed conditions, re-evaluate output
+          if (evaluatorSettings()->onCondition.setTriggerSource(aPropValue->stringValue(), true)) {
             evaluatorSettings()->markDirty();
           }
           return true;
         case offCondition_key:
-          if (evaluatorSettings()->offCondition.setTriggerSource(aPropValue->stringValue())) {
-            changedConditions();  // changed conditions, re-evaluate output
+          if (evaluatorSettings()->offCondition.setTriggerSource(aPropValue->stringValue(), true)) {
             evaluatorSettings()->markDirty();
           }
           return true;
