@@ -28,6 +28,10 @@
 
 #include "macaddress.hpp"
 
+#if ENABLE_P44SCRIPT
+  // global script extras
+  #include "httpcomm.hpp"
+#endif
 
 using namespace p44;
 
@@ -175,7 +179,13 @@ P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) 
   // vdchost is the global context for this app, so register its members in the standard scripting
   // domain making them accessible in all scripts
   StandardScriptingDomain::sharedDomain().registerMemberLookup(P44VdcHostLookup::sharedLookup());
-  #endif
+  #if P44SCRIPT_FULL_SUPPORT
+  // Add some extras
+  #if ENABLE_HTTP_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::HttpLookup);
+  #endif // ENABLE_HTTP_SCRIPT_FUNCS
+  #endif // ENABLE_HTTP_SCRIPT_FUNCS
+  #endif // ENABLE_P44SCRIPT
 }
 
 
