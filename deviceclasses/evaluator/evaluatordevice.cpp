@@ -360,11 +360,19 @@ void EvaluatorDevice::parseVarDefs()
 {
   valueParseTicket.cancel();
   string newValueDefs; // re-created value defs using sensor ids rather than indices, for migration
+  #if ENABLE_P44SCRIPT
+  bool foundall = valueMapper.parseMappingDefs(
+    evaluatorSettings()->varDefs,
+    NULL, // use EventSource/EventSink notification
+    &newValueDefs
+  );
+  #else
   bool foundall = valueMapper.parseMappingDefs(
     evaluatorSettings()->varDefs,
     boost::bind(&EvaluatorDevice::dependentValueNotification, this, _1, _2),
     &newValueDefs
   );
+  #endif
   if (!newValueDefs.empty()) {
     // migrate old definitions (when re-created definitions are not equal to stored ones)
     // Note: even migrate partially, when not all defs could be resolved yet
@@ -382,28 +390,6 @@ void EvaluatorDevice::parseVarDefs()
     #else
     evaluateConditions(currentState, evalmode_initial);
     #endif
-  }
-}
-
-
-void EvaluatorDevice::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
-{
-  if (aEvent==valueevent_removed) {
-    // a value has been removed, update my map
-    parseVarDefs();
-  }
-  else {
-    OLOG(LOG_INFO, "value source '%s' reports value %f", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
-    if (reporting) {
-      OLOG(LOG_WARNING, "value source '%s' is part of cyclic reference -> not evaluating any further", aValueSource.getSourceName().c_str());
-    }
-    else {
-      #if ENABLE_P44SCRIPT
-      evaluateConditions(P44Script::triggered);
-      #else
-      evaluateConditions(currentState, evalmode_externaltrigger);
-      #endif
-    }
   }
 }
 
@@ -566,6 +552,24 @@ void EvaluatorDevice::calculateEvaluatorState()
 
 
 #else
+
+void EvaluatorDevice::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
+{
+  if (aEvent==valueevent_removed) {
+    // a value has been removed, update my map
+    parseVarDefs();
+  }
+  else {
+    OLOG(LOG_INFO, "value source '%s' reports value %f", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
+    if (reporting) {
+      OLOG(LOG_WARNING, "value source '%s' is part of cyclic reference -> not evaluating any further", aValueSource.getSourceName().c_str());
+    }
+    else {
+      evaluateConditions(currentState, evalmode_externaltrigger);
+    }
+  }
+}
+
 
 void EvaluatorDevice::changedConditions()
 {

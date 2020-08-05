@@ -1143,10 +1143,14 @@ void Trigger::reCheckTimed()
 void Trigger::parseVarDefs()
 {
   varParseTicket.cancel();
+  #if ENABLE_P44SCRIPT
+  bool foundall = valueMapper.parseMappingDefs(triggerVarDefs, NULL); // use EventSource/EventSink notification
+  #else
   bool foundall = valueMapper.parseMappingDefs(
     triggerVarDefs,
     boost::bind(&Trigger::dependentValueNotification, this, _1, _2)
   );
+  #endif
   if (!foundall) {
     // schedule a re-parse later
     varParseTicket.executeOnce(boost::bind(&Trigger::parseVarDefs, this), REPARSE_DELAY);
@@ -1154,7 +1158,7 @@ void Trigger::parseVarDefs()
   else if (LocalController::sharedLocalController()->devicesReady) {
     // do not run checks (and fire triggers too early) before devices are reported initialized
     #if ENABLE_P44SCRIPT
-    triggerCondition.reInitialize();
+    triggerCondition.compileAndInit();
     #else
     checkAndFire(evalmode_initial);
     #endif
@@ -1181,24 +1185,6 @@ void Trigger::processGlobalEvent(VdchostEvent aActivity)
     }
   }
 }
-
-
-void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
-{
-  if (aEvent==valueevent_removed) {
-    // a value has been removed, update my map
-    parseVarDefs();
-  }
-  else {
-    OLOG(LOG_INFO, "value source '%s' reports value %f -> re-evaluating trigger condition", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
-    #if ENABLE_P44SCRIPT
-    triggerCondition.evaluate(triggered);
-    #else
-    checkAndFire(evalmode_externaltrigger);
-    #endif
-  }
-}
-
 
 
 #if ENABLE_P44SCRIPT
@@ -1545,6 +1531,20 @@ void Trigger::stopActions()
 
 
 // MARK: - Trigger API method handlers
+
+
+void Trigger::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
+{
+  if (aEvent==valueevent_removed) {
+    // a value has been removed, update my map
+    parseVarDefs();
+  }
+  else {
+    OLOG(LOG_INFO, "value source '%s' reports value %f -> re-evaluating trigger condition", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
+    checkAndFire(evalmode_externaltrigger);
+  }
+}
+
 
 
 ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)

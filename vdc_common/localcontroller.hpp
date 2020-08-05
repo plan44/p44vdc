@@ -513,7 +513,6 @@ namespace p44 {
   private:
 
     void parseVarDefs();
-    void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
 
     #if ENABLE_P44SCRIPT
     void handleTrigger(ScriptObjPtr aResult);
@@ -521,6 +520,7 @@ namespace p44 {
     void testTriggerActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
     #else
     void reCheckTimed();
+    void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     void triggerEvaluationExecuted(ExpressionValue aEvaluationResult);
     void triggerActionExecuted(ExpressionValue aEvaluationResult);
     void testTriggerActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);

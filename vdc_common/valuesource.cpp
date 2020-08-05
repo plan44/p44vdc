@@ -129,7 +129,15 @@ bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, ValueListener
       if (vs) {
         // value source exists
         // - add listener
-        vs->addSourceListener(aCallback, this);
+        #if ENABLE_P44SCRIPT
+        if (aCallback==NULL) {
+          vs->addSourceListener(boost::bind(&ValueSourceMapper::informEventSources, this, _1, _2), this);
+        }
+        else
+        #endif
+        {
+          vs->addSourceListener(aCallback, this);
+        }
         // - add source to my map
         valueMap[valuealias] = vs;
         LOG(LOG_INFO, "- alias '%s' connected to source '%s'", valuealias.c_str(), vs->getSourceName().c_str());
@@ -229,13 +237,21 @@ class ValueSourceObj : public NumericValue
   typedef NumericValue inherited;
   MLMicroSeconds mLastUpdate;
   int mOpLevel;
+  const EventSource* mEventSourceP;
 public:
-  ValueSourceObj(ValueSource* aValueSourceP) :
+  ValueSourceObj(ValueSource* aValueSourceP, const EventSource* aEventSourceP) :
     inherited(aValueSourceP->getSourceValue()),
     mLastUpdate(aValueSourceP->getSourceLastUpdate()),
-    mOpLevel(aValueSourceP->getSourceOpLevel())
+    mOpLevel(aValueSourceP->getSourceOpLevel()),
+    mEventSourceP(aEventSourceP)
   {
   };
+
+  /// @return a souce of events for this object
+  virtual EventSource *eventSource() const P44_OVERRIDE
+  {
+    return const_cast<EventSource *>(mEventSourceP);
+  }
 
   virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) P44_OVERRIDE
   {
@@ -256,15 +272,31 @@ public:
 };
 
 
-
 ScriptObjPtr ValueSourceMapper::memberByNameFrom(ScriptObjPtr aThisObj, const string aName, TypeInfo aTypeRequirements) const
 {
   ScriptObjPtr vsMember;
   ValueSource* vs = valueSourceByAlias(aName);
   if (vs) {
-    vsMember = new ValueSourceObj(vs);
+    vsMember = new ValueSourceObj(vs, static_cast<const EventSource*>(this));
   }
   return vsMember;
+}
+
+
+void ValueSourceMapper::informEventSources(ValueSource &aValueSource, ValueListenerEvent aEvent)
+{
+  if (aEvent==valueevent_removed) {
+    // must remove this source from the map
+    for (ValueSourcesMap::iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
+      if (pos->second==&aValueSource) {
+        valueMap.erase(pos);
+        break;
+      }
+    }
+  }
+  else {
+    sendEvent(NULL); // no actual event data, just inform event sinks that
+  }
 }
 
 

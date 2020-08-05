@@ -266,13 +266,12 @@ namespace p44 {
 
     void parseVarDefs();
 
-    void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
-
     #if ENABLE_P44SCRIPT
     void evaluateConditions(EvaluationFlags aRunMode);
     void changedConditions();
     void calculateEvaluatorState();
     #else
+    void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
     void evaluateConditions(Tristate aRefState, EvalMode aEvalMode);
     void calculateEvaluatorState(Tristate aRefState, EvalMode aEvalMode);
     Tristate evaluateBooleanNow(EvaluationContext &aEvalCtx, EvalMode aEvalMode, bool aScheduleReEval);

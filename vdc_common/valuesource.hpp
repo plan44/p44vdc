@@ -103,7 +103,7 @@ namespace p44 {
 
   class ValueSourceMapper
     #if ENABLE_P44SCRIPT
-    : public MemberLookup
+    : public MemberLookup, public EventSource
     #endif
   {
 
@@ -121,7 +121,9 @@ namespace p44 {
     /// parse mapping definition string
     /// @param aMappingDefs string associating simple alias names with valuedefs IDs
     ///    Syntax is: <valuealias>:<valuesourceid> [, <valuealias>:valuesourceid> ...]
-    /// @param aValueCallback will be called when any of the mapped values changes or is deleted
+    /// @param aValueCallback will be called when any of the mapped values changes or is deleted.
+    ///    When using p44Script EventSource/EventSink mechanism, pass NULL to use automatic event propagation to
+    ///    registered EventSinks
     /// @param aMigratedValueDefsP if not NULL, this string will be set empty if no migration is needed,
     ///    and contain the migrated valuedefs otherwise
     /// @note will cause current mappings to get overwritten (forgetMapping is called implicitly)
@@ -146,14 +148,12 @@ namespace p44 {
     #endif // ENABLE_EXPRESSIONS
 
     #if ENABLE_P44SCRIPT
-
     /// get object subfield/member by name
     /// @param aThisObj the object _instance_ of which we want to access a member (can be NULL in case of singletons)
     /// @param aName name of the member to find
     /// @param aTypeRequirements what type and type attributes the returned member must have, defaults to no restriction
     /// @return ScriptObj representing the member, or NULL if none
     virtual ScriptObjPtr memberByNameFrom(ScriptObjPtr aThisObj, const string aName, TypeInfo aTypeRequirements) const P44_OVERRIDE;
-
     #endif // ENABLE_P44SCRIPT
 
     /// get info about all mapped sources (everything needed for editing mappingdefs)
@@ -164,6 +164,13 @@ namespace p44 {
     /// short (text without LFs!) description of this object, mainly for referencing it in log messages
     /// @return textual description of valuemapper in name=value list form
     string shortDesc() const;
+
+  private:
+
+    #if ENABLE_P44SCRIPT
+    /// will be called when any mapped value source is updated or disappears
+    void informEventSources(ValueSource &aValueSource, ValueListenerEvent aEvent);
+    #endif
 
   };
 
