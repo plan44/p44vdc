@@ -292,7 +292,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     aRequest->sendResult(checkResult);
     return ErrorPtr();
   }
-  #if EXPRESSION_SCRIPT_SUPPORT
+  #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
   else if (aMethod=="x-p44-testEvaluatorAction") {
     ApiValuePtr vp = aParams->get("result");
     Tristate state = currentState;
@@ -300,21 +300,53 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       state = vp->boolValue() ? yes : no;
     }
     // now test
+    #if ENABLE_P44SCRIPT
+    evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(state==yes));
+    evaluatorSettings()->action.run(stopall, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1), Infinite);
+    #else
     executeAction(state, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1));
+    #endif
     return ErrorPtr();
   }
   else if (aMethod=="x-p44-stopEvaluatorAction") {
+    #if ENABLE_P44SCRIPT
+    evaluatorSettings()->evaluatorContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "evaluator action stopped"));
+    #else
     evaluatorSettings()->action.abort(false);
+    #endif
     return Error::ok();
   }
-  #endif
+  #endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
   else {
     return inherited::handleMethod(aRequest, aMethod, aParams);
   }
 }
 
 
-#if EXPRESSION_SCRIPT_SUPPORT
+#if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+
+#if ENABLE_P44SCRIPT
+
+void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
+{
+  ApiValuePtr testResult = aRequest->newApiValue();
+  testResult->setType(apivalue_object);
+  if (!aResult->isErr()) {
+    testResult->add("result", testResult->newScriptValue(aResult));
+  }
+  else {
+    testResult->add("error", testResult->newString(aResult->errorValue()->getErrorMessage()));
+    SourceCursor* cursor = aResult->cursor();
+    if (cursor) {
+      testResult->add("at", testResult->newUint64(cursor->textpos()));
+      testResult->add("line", testResult->newUint64(cursor->lineno()));
+      testResult->add("char", testResult->newUint64(cursor->charpos()));
+    }
+  }
+  aRequest->sendResult(testResult);
+}
+
+#else
 
 void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult)
 {
@@ -331,6 +363,7 @@ void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ExpressionVa
 }
 
 #endif // EXPRESSION_SCRIPT_SUPPORT
+#endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
 
 
 #define REPARSE_DELAY (30*Second)
@@ -535,13 +568,14 @@ void EvaluatorDevice::calculateEvaluatorState()
         }
         break;
       }
-      #if EXPRESSION_SCRIPT_SUPPORT
+      #if P44SCRIPT_FULL_SUPPORT
       case evaluator_internalaction: {
         // execute action
-        executeAction(currentState, boost::bind(&EvaluatorDevice::actionExecuted, this, _1));
+        evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(currentState==yes));
+        evaluatorSettings()->action.run(stopall, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), Infinite);
         break;
       }
-      #endif
+      #endif // P44SCRIPT_FULL_SUPPORT
       default: break;
     }
     // done reporting, critical phase is over
@@ -549,6 +583,13 @@ void EvaluatorDevice::calculateEvaluatorState()
   }
 }
 
+
+#if P44SCRIPT_FULL_SUPPORT
+void EvaluatorDevice::actionExecuted(ScriptObjPtr aResult)
+{
+  OLOG(LOG_INFO, "evaluator action script completed with result: %s", ScriptObj::describe(aResult).c_str());
+}
+#endif // P44SCRIPT_FULL_SUPPORT
 
 
 #else
@@ -755,7 +796,7 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
         executeAction(currentState, boost::bind(&EvaluatorDevice::actionExecuted, this, _1));
         break;
       }
-      #endif
+      #endif // EXPRESSION_SCRIPT_SUPPORT
       default: break;
     }
     // done reporting, critical phase is over
@@ -764,12 +805,10 @@ void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEval
 }
 
 #if EXPRESSION_SCRIPT_SUPPORT
-
 void EvaluatorDevice::actionExecuted(ExpressionValue aEvaluationResult)
 {
   OLOG(LOG_INFO, "evaluator action script completed with result: '%s', error: %s", aEvaluationResult.stringValue().c_str(), Error::text(aEvaluationResult.error()));
 }
-
 #endif // EXPRESSION_SCRIPT_SUPPORT
 
 
@@ -1077,7 +1116,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         #if P44SCRIPT_FULL_SUPPORT
         case action_key:
-          if (evaluatorSettings()->action.setSource(aPropValue->stringValue(), scriptbody)) {
+          if (evaluatorSettings()->action.setSource(aPropValue->stringValue())) {
             evaluatorSettings()->markDirty();
           }
           return true;
@@ -1129,7 +1168,7 @@ EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bo
   onCondition("onCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onChangingBool, expression|synchronously),
   offCondition("offCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onChangingBool, expression|synchronously),
   #if P44SCRIPT_FULL_SUPPORT
-  action("action", &device),
+  action(scriptbody+regular, "action", &device),
   #endif
   #elif ENABLE_EXPRESSIONS
   onCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation),
@@ -1212,7 +1251,7 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOnTime);
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOffTime);
   #if P44SCRIPT_FULL_SUPPORT
-  action.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)), scriptbody);
+  action.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #elif EXPRESSION_SCRIPT_SUPPORT
   action.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #else

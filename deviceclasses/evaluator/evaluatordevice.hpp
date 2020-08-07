@@ -280,10 +280,15 @@ namespace p44 {
     void changedConditions();
     #endif
 
-    #if EXPRESSION_SCRIPT_SUPPORT
+    #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+    #if ENABLE_P44SCRIPT
+    void actionExecuted(ScriptObjPtr aResult);
+    void testActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
+    #else
     ErrorPtr executeAction(Tristate aState, EvaluationResultCB aResultCB);
     void actionExecuted(ExpressionValue aEvaluationResult);
     void testActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
+    #endif
     #endif // EXPRESSION_SCRIPT_SUPPORT
 
   };

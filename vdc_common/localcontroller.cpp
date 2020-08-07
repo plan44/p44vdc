@@ -1033,8 +1033,8 @@ Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   triggerId(0),
   #if ENABLE_P44SCRIPT
-  triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, expression|synchronously),
-  triggerAction("action", this),
+  triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, expression+synchronously),
+  triggerAction(sourcecode+regular, "action", this),
   #else
   triggerCondition(*this, &VdcHost::sharedVdcHost()->geolocation),
   triggerAction(*this, &VdcHost::sharedVdcHost()->geolocation),
@@ -1200,7 +1200,7 @@ void Trigger::handleTrigger(ScriptObjPtr aResult)
   // a trigger fire is an activity
   LocalController::sharedLocalController()->signalActivity();
   // launch action
-  triggerAction.run(regular|stopall, boost::bind(&Trigger::triggerActionExecuted, this, _1), Infinite);
+  triggerAction.run(stopall, boost::bind(&Trigger::triggerActionExecuted, this, _1), Infinite);
 }
 
 
@@ -1253,7 +1253,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 
 ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 {
-  triggerAction.run(regular|stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), Infinite);
+  triggerAction.run(stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), Infinite);
   return ErrorPtr(); // will send result later
 }
 
@@ -1280,7 +1280,7 @@ void Trigger::testTriggerActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr 
 
 void Trigger::stopActions()
 {
-  triggerContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "trigger actions stopped"));
+  triggerContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "trigger action stopped"));
 }
 
 #else
@@ -1668,7 +1668,7 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   name = nonNullCStr(aRow->get<const char *>(aIndex++));
   #if ENABLE_P44SCRIPT
   triggerCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  triggerAction.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)), sourcecode);
+  triggerAction.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #else
   triggerCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   triggerAction.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
@@ -1768,7 +1768,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
             markDirty();
           }
           return true;
-        case triggerAction_key: if (triggerAction.setSource(aPropValue->stringValue()), sourcecode) markDirty(); return true;
+        case triggerAction_key: if (triggerAction.setSource(aPropValue->stringValue())) markDirty(); return true;
         #else
         case triggerCondition_key:
           if (triggerCondition.setCode(aPropValue->stringValue())) {

@@ -146,6 +146,9 @@ typedef boost::intrusive_ptr<SceneChannels> SceneChannelsPtr;
 
 DsScene::DsScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inheritedParams(aSceneDeviceSettings.paramStore),
+  #if P44SCRIPT_FULL_SUPPORT
+  sceneScript(scriptbody+regular, "scenescript", &aSceneDeviceSettings.device),
+  #endif
   sceneDeviceSettings(aSceneDeviceSettings),
   sceneNo(aSceneNo),
   sceneArea(0), // not area scene by default
@@ -296,7 +299,7 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   globalSceneFlags = aRow->get<int>(aIndex++);
   #if ENABLE_SCENE_SCRIPT
   #if ENABLE_P44SCRIPT
-  sceneScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)), scriptbody);
+  sceneScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #else
   sceneScript.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #endif
@@ -501,7 +504,7 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         #if ENABLE_SCENE_SCRIPT
         case sceneScript_key:
           #if ENABLE_P44SCRIPT
-          if (sceneScript.setSource(aPropValue->stringValue(), scriptbody)) {
+          if (sceneScript.setSource(aPropValue->stringValue())) {
             markDirty();
           }
           #else

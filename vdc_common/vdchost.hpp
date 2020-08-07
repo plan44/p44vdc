@@ -182,6 +182,14 @@ namespace p44 {
     LocalControllerPtr localController;
     #endif
 
+    #if P44SCRIPT_FULL_SUPPORT
+    ScriptSource mainScript; ///< global init/main script stored in settings
+    ScriptMainContextPtr vdcHostScriptContext; ///< context for global vdc scripts
+    #endif
+    #if EXPRESSION_SCRIPT_SUPPORT
+    ScriptQueue globalScripts;
+    #endif
+
   public:
 
     VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false);
@@ -559,6 +567,10 @@ namespace p44 {
     // post a vdchost (global) event to all vdcs and via event monitor callback
     void postEvent(VdchostEvent aEvent);
 
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
+
     /// add a vDC container
     /// @param aVdcPtr a intrusive_ptr to a vDC container
     /// @note this is a one-time initialisation. Device class containers are not meant to be removed at runtime
@@ -659,7 +671,112 @@ namespace p44 {
     /// @param aApiObjectValue must be an object typed API value, will receive available value sources as valueSourceID/description key/values
     void createValueSourcesList(ApiValuePtr aApiObjectValue);
 
+    #if P44SCRIPT_FULL_SUPPORT
+    void runGlobalScripts();
+    void globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel);
+    void scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
+    #endif
+    #if EXPRESSION_SCRIPT_SUPPORT
+    void runGlobalScripts();
+    #endif
   };
+
+
+  #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+
+  /// Dummy api call from script "connection" object
+  class ScriptCallConnection : public VdcApiConnection
+  {
+    typedef VdcApiConnection inherited;
+
+  public:
+
+    ScriptCallConnection();
+
+    /// install callback for received API requests
+    /// @param aApiRequestHandler will be called when a API request has been received
+    void setRequestHandler(VdcApiRequestCB aApiRequestHandler);
+
+    /// The underlying socket connection
+    /// @return socket connection
+    virtual SocketCommPtr socketConnection() P44_OVERRIDE { return SocketCommPtr(); };
+
+    /// Cannot send a API request
+    /// @return empty or Error object in case of error
+    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE
+      { return TextError::err("can't send request to script API"); };
+
+    /// request closing connection after last message has been sent
+    virtual void closeAfterSend() P44_OVERRIDE {};
+
+    /// get a new API value suitable for this connection
+    /// @return new API value of suitable internal implementation to be used on this API connection
+    virtual ApiValuePtr newApiValue() P44_OVERRIDE;
+  };
+
+
+  /// API JSON request from script
+  class ScriptApiRequest : public VdcApiRequest
+  {
+    typedef VdcApiRequest inherited;
+
+    #if ENABLE_P44SCRIPT
+    BuiltinFunctionContextPtr mBuiltinFunctionContext;
+    #else
+    ScriptExecutionContextPtr scriptContext;
+    #endif
+
+  public:
+
+    /// constructor
+    #if ENABLE_P44SCRIPT
+    ScriptApiRequest(BuiltinFunctionContextPtr aBuiltinFunctionContext) : mBuiltinFunctionContext(aBuiltinFunctionContext) {};
+    #else
+    ScriptApiRequest(ScriptExecutionContextPtr aScriptContext) : scriptContext(aScriptContext) {};
+    #endif
+
+    /// return the request ID as a string
+    /// @return request ID as string
+    virtual string requestId()  P44_OVERRIDE { return ""; }
+
+    /// get the API connection this request originates from
+    /// @return API connection
+    virtual VdcApiConnectionPtr connection() P44_OVERRIDE;
+
+    /// send a vDC API result (answer for successful method call)
+    /// @param aResult the result as a ApiValue. Can be NULL for procedure calls without return value
+    /// @result empty or Error object in case of error sending result response
+    virtual ErrorPtr sendResult(ApiValuePtr aResult) P44_OVERRIDE;
+
+    /// send a error to the vDC API (answer for unsuccesful method call)
+    /// @param aError the error object
+    /// @note depending on the Error object's subclass and the vDC API kind (protobuf, json...),
+    ///   different information is transmitted. ErrorCode and ErrorMessage are always sent,
+    ///   Errors based on class VdcApiError will also include errorType, errorData and userFacingMessage
+    /// @note if aError is NULL, a generic "OK" error condition is sent
+    /// @result empty or Error object in case of error sending error response
+    virtual ErrorPtr sendError(ErrorPtr aError) P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<ScriptApiRequest> ScriptApiRequestPtr;
+
+  #endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+
+
+
+  #if P44SCRIPT_FULL_SUPPORT
+  namespace P44Script {
+
+    class VdcHostLookup : public BuiltInMemberLookup {
+      typedef BuiltInMemberLookup inherited;
+      VdcHostLookup();
+    public:
+      static MemberLookupPtr sharedLookup();
+    };
+
+  }
+  #endif
+
 
 } // namespace p44
 
