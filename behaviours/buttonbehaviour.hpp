@@ -294,7 +294,6 @@ namespace p44 {
     /// @}
 
   };
-
   typedef boost::intrusive_ptr<ButtonBehaviour> ButtonBehaviourPtr;
 
 }

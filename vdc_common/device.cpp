@@ -421,7 +421,7 @@ void Device::addBehaviour(DsBehaviourPtr aBehaviour)
 }
 
 
-static DsBehaviourPtr getFromBehaviourVector(BehaviourVector &aBV, int aIndex, const string &aId)
+DsBehaviourPtr Device::getFromBehaviourVector(BehaviourVector &aBV, int aIndex, const string &aId)
 {
   if (aIndex==Device::by_id_or_index) {
     if (isdigit(*aId.c_str())) {
@@ -2478,9 +2478,43 @@ static ScriptObjPtr output_accessor(BuiltInMemberLookup& aMemberLookup, ScriptOb
   return new AnnotatedNullValue("device has no output");
 }
 
+static ScriptObjPtr name_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite)
+{
+  DeviceObj* d = dynamic_cast<DeviceObj*>(aParentObj.get());
+  assert(d);
+  return new StringValue(d->device()->getName());
+}
+
+
+// button(id_or_index)
+// sensor(id_or_index)
+// input(id_or_index)
+static const BuiltInArgDesc behaviour_args[] = { { text } };
+static const size_t behaviour_numargs = sizeof(behaviour_args)/sizeof(BuiltInArgDesc);
+static void inputValueSource_func(BuiltinFunctionContextPtr f)
+{
+  string fn = f->funcObj()->getIdentifier(); // function name determines behaviour type to get
+  DeviceObj* dev = dynamic_cast<DeviceObj *>(f->thisObj().get());
+  DevicePtr device = dev->device();
+  DsBehaviourPtr b;
+  if (uequals(fn, "button")) b = device->getButton(Device::by_id_or_index, f->arg(0)->stringValue());
+  else if (uequals(fn, "sensor")) b = device->getSensor(Device::by_id_or_index, f->arg(0)->stringValue());
+  else if (uequals(fn, "input")) b = device->getInput(Device::by_id_or_index, f->arg(0)->stringValue());
+  ValueSource* vs = dynamic_cast<ValueSource *>(b.get());
+  if (!vs) {
+    f->finish(new ErrorValue(ScriptError::NotFound, "%s '%s' not found in device '%s'", fn.c_str(), f->arg(0)->stringValue().c_str(), device->getName().c_str()));
+    return;
+  }
+  // return the value source corresponding with this input behaviour
+  f->finish(new ValueSourceObj(vs, NULL)); // FIXME: we need an event source, eventually
+}
 
 static const BuiltinMemberDescriptor deviceMembers[] = {
   { "output", builtinmember, 0, NULL, .accessor = &output_accessor },
+  { "name", builtinmember, 0, NULL, .accessor = &name_accessor },
+  { "button", any, behaviour_numargs, behaviour_args, &inputValueSource_func },
+  { "sensor", any, behaviour_numargs, behaviour_args, &inputValueSource_func },
+  { "input", any, behaviour_numargs, behaviour_args, &inputValueSource_func },
   { NULL } // terminator
 };
 

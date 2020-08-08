@@ -359,6 +359,7 @@ namespace p44 {
     ButtonBehaviourPtr getButton(int aIndex, const string aId = "");
     SensorBehaviourPtr getSensor(int aIndex, const string aId = "");
     BinaryInputBehaviourPtr getInput(int aIndex, const string aId = "");
+    static DsBehaviourPtr getFromBehaviourVector(BehaviourVector &aBV, int aIndex, const string &aId);
 
     /// get a behaviour (any type) by id
     /// @param aId the behaviour id. For the output, the id is always "output"
@@ -811,7 +812,6 @@ namespace p44 {
 
   } // namespace P44Script
   #endif
-
 
 
 } // namespace p44

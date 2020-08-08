@@ -232,44 +232,26 @@ bool ValueSourceMapper::valueLookup(ExpressionValue &aValue, const string aVarSp
 
 #if ENABLE_P44SCRIPT
 
-class ValueSourceObj : public NumericValue
+EventSource *ValueSourceObj::eventSource() const
 {
-  typedef NumericValue inherited;
-  MLMicroSeconds mLastUpdate;
-  int mOpLevel;
-  const EventSource* mEventSourceP;
-public:
-  ValueSourceObj(ValueSource* aValueSourceP, const EventSource* aEventSourceP) :
-    inherited(aValueSourceP->getSourceValue()),
-    mLastUpdate(aValueSourceP->getSourceLastUpdate()),
-    mOpLevel(aValueSourceP->getSourceOpLevel()),
-    mEventSourceP(aEventSourceP)
-  {
-  };
+  return const_cast<EventSource *>(mEventSourceP);
+}
 
-  /// @return a souce of events for this object
-  virtual EventSource *eventSource() const P44_OVERRIDE
-  {
-    return const_cast<EventSource *>(mEventSourceP);
+const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMemberAccessFlags)
+{
+  ScriptObjPtr val;
+  if (uequals(aName, "age")) {
+    if (mLastUpdate!=Never) val = new NumericValue((double)(MainLoop::now()-mLastUpdate)/Second);
+    else val = new AnnotatedNullValue("unseen");
   }
-
-  virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) P44_OVERRIDE
-  {
-    ScriptObjPtr val;
-    if (uequals(aName, "age")) {
-      if (mLastUpdate!=Never) val = new NumericValue((double)(MainLoop::now()-mLastUpdate)/Second);
-      else val = new AnnotatedNullValue("unseen");
-    }
-    else if (uequals(aName, "valid")) {
-      val = new NumericValue(mLastUpdate!=Never);
-    }
-    else if (uequals(aName, "oplevel")) {
-      val = new NumericValue(num);
-    }
-    return val;
+  else if (uequals(aName, "valid")) {
+    val = new NumericValue(mLastUpdate!=Never);
   }
-
-};
+  else if (uequals(aName, "oplevel")) {
+    val = new NumericValue(num);
+  }
+  return val;
+}
 
 
 ScriptObjPtr ValueSourceMapper::memberByNameFrom(ScriptObjPtr aThisObj, const string aName, TypeInfo aTypeRequirements) const

@@ -1072,5 +1072,3 @@ string ButtonBehaviour::description()
   return s;
 }
 
-
-

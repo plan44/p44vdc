@@ -170,11 +170,35 @@ namespace p44 {
     #if ENABLE_P44SCRIPT
     /// will be called when any mapped value source is updated or disappears
     void informEventSources(ValueSource &aValueSource, ValueListenerEvent aEvent);
-    #endif
+    #endif // ENABLE_P44SCRIPT
 
   };
 
+  #if ENABLE_P44SCRIPT
 
+  class ValueSourceObj : public NumericValue
+  {
+    typedef NumericValue inherited;
+    MLMicroSeconds mLastUpdate;
+    int mOpLevel;
+    const EventSource* mEventSourceP;
+  public:
+    ValueSourceObj(ValueSource* aValueSourceP, const EventSource* aEventSourceP) :
+      inherited(aValueSourceP->getSourceValue()),
+      mLastUpdate(aValueSourceP->getSourceLastUpdate()),
+      mOpLevel(aValueSourceP->getSourceOpLevel()),
+      mEventSourceP(aEventSourceP)
+    {
+    };
+
+    /// @return a souce of events for this object
+    virtual EventSource *eventSource() const P44_OVERRIDE;
+
+    virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) P44_OVERRIDE;
+
+  };
+
+  #endif // ENABLE_P44SCRIPT
 
 } // namespace p44
 
