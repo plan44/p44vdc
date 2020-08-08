@@ -163,7 +163,13 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
     pushInput(changedState);
   }
   // notify listeners
+  #if ENABLE_P44SCRIPT
+  // send event
+  sendValueEvent();
+  #else
+  // notify listeners
   notifyListeners(changedState ? valueevent_changed : valueevent_confirmed);
+  #endif
 }
 
 
@@ -220,7 +226,11 @@ void BinaryInputBehaviour::invalidateInputState()
       lastPush = now;
     }
     // notify listeners
+    #if ENABLE_P44SCRIPT
+    sendValueEvent();
+    #else
     notifyListeners(valueevent_changed);
+    #endif
   }
 }
 

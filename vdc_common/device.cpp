@@ -2506,7 +2506,7 @@ static void inputValueSource_func(BuiltinFunctionContextPtr f)
     return;
   }
   // return the value source corresponding with this input behaviour
-  f->finish(new ValueSourceObj(vs, NULL)); // FIXME: we need an event source, eventually
+  f->finish(new ValueSourceObj(vs));
 }
 
 static const BuiltinMemberDescriptor deviceMembers[] = {

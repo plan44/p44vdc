@@ -602,8 +602,13 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     // issue a state property push
     pushBehaviourState();
     #if ENABLE_LOCALCONTROLLER
+    #if ENABLE_P44SCRIPT
+    // send event
+    if (clickType!=ct_hold_repeat) sendValueEvent();
+    #else
     // notify listeners
     notifyListeners(clickType!=ct_hold_repeat ? valueevent_changed : valueevent_confirmed);
+    #endif
     #endif
     // also let vdchost know for local click handling
     // TODO: more elegant solution for this
@@ -615,8 +620,13 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
 void ButtonBehaviour::keyOpComplete()
 {
   #if ENABLE_LOCALCONTROLLER
+  #if ENABLE_P44SCRIPT
+  // send event
+  sendValueEvent();
+  #else
   // notify listeners
   notifyListeners(valueevent_changed);
+  #endif
   #endif
 }
 

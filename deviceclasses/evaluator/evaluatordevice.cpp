@@ -396,7 +396,6 @@ void EvaluatorDevice::parseVarDefs()
   #if ENABLE_P44SCRIPT
   bool foundall = valueMapper.parseMappingDefs(
     evaluatorSettings()->varDefs,
-    NULL, // use EventSource/EventSink notification
     &newValueDefs
   );
   #else

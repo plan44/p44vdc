@@ -455,8 +455,12 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   if (aPush) {
     pushSensor();
   }
+  #if ENABLE_P44SCRIPT
+  sendValueEvent();
+  #else
   // notify listeners
   notifyListeners(changedValue ? valueevent_changed : valueevent_confirmed);
+  #endif
   // possibly log value
   #if ENABLE_RRDB
   logSensorValue(now, aValue, currentValue, lastPushedValue);
@@ -562,7 +566,12 @@ void SensorBehaviour::invalidateSensorValue(bool aPush)
       pushSensor(true);
     }
     // notify listeners
+    #if ENABLE_P44SCRIPT
+    sendValueEvent();
+    #else
+    // notify listeners
     notifyListeners(valueevent_changed);
+    #endif
   }
 }
 

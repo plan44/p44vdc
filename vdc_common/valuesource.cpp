@@ -31,6 +31,8 @@ ValueSource::ValueSource()
 }
 
 
+#if !ENABLE_P44SCRIPT
+
 ValueSource::~ValueSource()
 {
   // inform all of the listeners that the value is gone, unless app is about to terminate
@@ -53,7 +55,6 @@ void ValueSource::removeSourceListener(void *aListener)
 }
 
 
-
 void ValueSource::notifyListeners(ValueListenerEvent aEvent)
 {
   if (aEvent==valueevent_removed) {
@@ -73,9 +74,18 @@ void ValueSource::notifyListeners(ValueListenerEvent aEvent)
   }
 }
 
+#else
+
+void ValueSource::sendValueEvent()
+{
+  if (!hasSinks()) return; // optimisation
+  sendEvent(new ValueSourceObj(this));
+}
+
+#endif
+
 
 // MARK: - ValueSourceMapper
-
 
 ValueSourceMapper::ValueSourceMapper()
 {
@@ -90,9 +100,11 @@ ValueSourceMapper::~ValueSourceMapper()
 
 void ValueSourceMapper::forgetMappings()
 {
+  #if !ENABLE_P44SCRIPT
   for (ValueSourcesMap::iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
     pos->second->removeSourceListener(this);
   }
+  #endif
   valueMap.clear();
 }
 
@@ -107,7 +119,11 @@ ValueSource* ValueSourceMapper::valueSourceByAlias(const string aAlias) const
 }
 
 
+#if ENABLE_P44SCRIPT
+bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, string *aMigratedValueDefsP)
+#else
 bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, ValueListenerCB aCallback, string *aMigratedValueDefsP)
+#endif
 {
   LOG(LOG_INFO, "Parsing alias to value source mappings");
   forgetMappings(); // forget previous mappings
@@ -128,16 +144,10 @@ bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, ValueListener
       ValueSource *vs = VdcHost::sharedVdcHost()->getValueSourceById(valuesourceid);
       if (vs) {
         // value source exists
+        #if !ENABLE_P44SCRIPT
         // - add listener
-        #if ENABLE_P44SCRIPT
-        if (aCallback==NULL) {
-          vs->addSourceListener(boost::bind(&ValueSourceMapper::informEventSources, this, _1, _2), this);
-        }
-        else
+        vs->addSourceListener(aCallback, this);
         #endif
-        {
-          vs->addSourceListener(aCallback, this);
-        }
         // - add source to my map
         valueMap[valuealias] = vs;
         LOG(LOG_INFO, "- alias '%s' connected to source '%s'", valuealias.c_str(), vs->getSourceName().c_str());
@@ -232,9 +242,30 @@ bool ValueSourceMapper::valueLookup(ExpressionValue &aValue, const string aVarSp
 
 #if ENABLE_P44SCRIPT
 
+ValueSourceObj::ValueSourceObj(ValueSource* aValueSourceP) :
+  inherited(aValueSourceP->getSourceValue()),
+  mLastUpdate(aValueSourceP->getSourceLastUpdate()),
+  mOpLevel(aValueSourceP->getSourceOpLevel())
+{
+  mEventSource = dynamic_cast<EventSource*>(aValueSourceP);
+}
+
+
+string ValueSourceObj::getAnnotation() const
+{
+  return mLastUpdate==Never ? "unknown hardware state" : "input value";
+}
+
+
+TypeInfo ValueSourceObj::getTypeInfo() const
+{
+  return mLastUpdate==Never ? null : numeric;
+}
+
+
 EventSource *ValueSourceObj::eventSource() const
 {
-  return const_cast<EventSource *>(mEventSourceP);
+  return mEventSource;
 }
 
 const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMemberAccessFlags)
@@ -259,28 +290,10 @@ ScriptObjPtr ValueSourceMapper::memberByNameFrom(ScriptObjPtr aThisObj, const st
   ScriptObjPtr vsMember;
   ValueSource* vs = valueSourceByAlias(aName);
   if (vs) {
-    vsMember = new ValueSourceObj(vs, static_cast<const EventSource*>(this));
+    vsMember = new ValueSourceObj(vs);
   }
   return vsMember;
 }
-
-
-void ValueSourceMapper::informEventSources(ValueSource &aValueSource, ValueListenerEvent aEvent)
-{
-  if (aEvent==valueevent_removed) {
-    // must remove this source from the map
-    for (ValueSourcesMap::iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
-      if (pos->second==&aValueSource) {
-        valueMap.erase(pos);
-        break;
-      }
-    }
-  }
-  else {
-    sendEvent(NULL); // no actual event data, just inform event sinks that
-  }
-}
-
 
 #endif // ENABLE_P44SCRIPT
 

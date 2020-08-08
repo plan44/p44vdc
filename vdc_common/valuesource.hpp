@@ -47,18 +47,25 @@ namespace p44 {
 
   /// @note this class does NOT derive from P44Obj, so it can be added as "interface" using multiple-inheritance
   class ValueSource
+    #if ENABLE_P44SCRIPT
+    : public EventSource
+    #endif
   {
 
+    #if !ENABLE_P44SCRIPT
     // map of listeners
     ListenerMap listeners;
+    #endif
 
   public:
 
     /// constructor
     ValueSource();
 
+    #if !ENABLE_P44SCRIPT
     /// destructor
     virtual ~ValueSource();
+    #endif
 
     /// return true only if enabled for being used
     /// @return true if enabled for use (e.g. non-app buttons are not enabled)
@@ -84,6 +91,7 @@ namespace p44 {
     /// @return the operation level (0..100) of the value source
     virtual int getSourceOpLevel() = 0;
 
+    #if !ENABLE_P44SCRIPT
     /// add listener
     /// @param aCallback will be called when value has changed, or disappears
     /// @param aListener unique identification of the listener (usually its memory address)
@@ -97,13 +105,18 @@ namespace p44 {
 
     /// notify all listeners
     void notifyListeners(ValueListenerEvent aEvent);
+    #else
+
+    /// send event with current getSourceValue()
+    void sendValueEvent();
+    #endif
 
   };
 
 
   class ValueSourceMapper
     #if ENABLE_P44SCRIPT
-    : public MemberLookup, public EventSource
+    : public MemberLookup
     #endif
   {
 
@@ -118,6 +131,16 @@ namespace p44 {
     /// forget current value mappings, unsubscribe from all value observations
     void forgetMappings();
 
+    #if ENABLE_P44SCRIPT
+    /// parse mapping definition string
+    /// @param aMappingDefs string associating simple alias names with valuedefs IDs
+    ///    Syntax is: <valuealias>:<valuesourceid> [, <valuealias>:valuesourceid> ...]
+    /// @note will cause current mappings to get overwritten (forgetMapping is called implicitly)
+    /// @result returns true if all definitions could be mapped, false otherwise
+    /// @param aMigratedValueDefsP if not NULL, this string will be set empty if no migration is needed,
+    ///    and contain the migrated valuedefs otherwise
+    bool parseMappingDefs(const string &aValueDefs, string *aMigratedValueDefsP = NULL);
+    #else
     /// parse mapping definition string
     /// @param aMappingDefs string associating simple alias names with valuedefs IDs
     ///    Syntax is: <valuealias>:<valuesourceid> [, <valuealias>:valuesourceid> ...]
@@ -129,6 +152,7 @@ namespace p44 {
     /// @note will cause current mappings to get overwritten (forgetMapping is called implicitly)
     /// @result returns true if all definitions could be mapped, false otherwise
     bool parseMappingDefs(const string &aValueDefs, ValueListenerCB aCallback, string *aMigratedValueDefsP = NULL);
+    #endif
 
     /// find value source by alias
     /// @param aAlias alias name
@@ -138,13 +162,11 @@ namespace p44 {
     ValueSource* valueSourceByAlias(const string aAlias) const;
 
     #if ENABLE_EXPRESSIONS
-
     /// get value (or meta information such as .age, .oplevel and .valid subfields) of mapped value source
     /// @param aValue will be set to the variable's value or error if aVarSpec identifies a known variable
     /// @param aVarSpec variable specification
     /// @return true if aValue was set, false if further sources for the variable should be searched (if any)
     bool valueLookup(ExpressionValue &aValue, const string aVarSpec);
-
     #endif // ENABLE_EXPRESSIONS
 
     #if ENABLE_P44SCRIPT
@@ -165,13 +187,6 @@ namespace p44 {
     /// @return textual description of valuemapper in name=value list form
     string shortDesc() const;
 
-  private:
-
-    #if ENABLE_P44SCRIPT
-    /// will be called when any mapped value source is updated or disappears
-    void informEventSources(ValueSource &aValueSource, ValueListenerEvent aEvent);
-    #endif // ENABLE_P44SCRIPT
-
   };
 
   #if ENABLE_P44SCRIPT
@@ -181,15 +196,11 @@ namespace p44 {
     typedef NumericValue inherited;
     MLMicroSeconds mLastUpdate;
     int mOpLevel;
-    const EventSource* mEventSourceP;
+    EventSource* mEventSource;
   public:
-    ValueSourceObj(ValueSource* aValueSourceP, const EventSource* aEventSourceP) :
-      inherited(aValueSourceP->getSourceValue()),
-      mLastUpdate(aValueSourceP->getSourceLastUpdate()),
-      mOpLevel(aValueSourceP->getSourceOpLevel()),
-      mEventSourceP(aEventSourceP)
-    {
-    };
+    ValueSourceObj(ValueSource* aValueSourceP);
+    virtual string getAnnotation() const P44_OVERRIDE;
+    virtual TypeInfo getTypeInfo() const P44_OVERRIDE;
 
     /// @return a souce of events for this object
     virtual EventSource *eventSource() const P44_OVERRIDE;
