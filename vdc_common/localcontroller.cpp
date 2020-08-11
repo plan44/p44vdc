@@ -1045,7 +1045,6 @@ Trigger::Trigger() :
   valueMapper.isMemberVariable();
   triggerContext = triggerCondition.domain()->newContext(); // common context for condition and action
   triggerContext->registerMemberLookup(&valueMapper); // allow context to access the mapped values
-  triggerContext->registerMemberLookup(LocalControllerLookup::sharedLookup()); // allow context to access the mapped values
   triggerCondition.setSharedMainContext(triggerContext);
   triggerAction.setSharedMainContext(triggerContext);
   #else
@@ -1965,6 +1964,9 @@ LocalController::LocalController(VdcHost &aVdcHost) :
   localZones.isMemberVariable();
   localScenes.isMemberVariable();
   localTriggers.isMemberVariable();
+  #if ENABLE_P44SCRIPT
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(LocalControllerLookup::sharedLookup());
+  #endif
 }
 
 
