@@ -1562,6 +1562,33 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     mainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mainScript.getOriginLabel()), Infinite);
     return Error::ok();
   }
+  if (aMethod=="x-p44-stopMain") {
+    // re-run the main script
+    OLOG(LOG_NOTICE, "Stopping global main script");
+    vdcHostScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "main script stopped"));
+    return Error::ok();
+  }
+  if (aMethod=="x-p44-checkMain") {
+    // re-run the main script
+    ScriptObjPtr res = mainScript.syntaxcheck();
+    if (!res || !res->isErr()) {
+      return Error::ok();
+      OLOG(LOG_NOTICE, "Checked global main script: syntax OK");
+    }
+    else {
+      OLOG(LOG_NOTICE, "Error in global main script: %s", res->errorValue()->text());
+      ApiValuePtr checkResult = aRequest->newApiValue();
+      checkResult->setType(apivalue_object);
+      checkResult->add("error", checkResult->newString(res->errorValue()->getErrorMessage()));
+      SourceCursor* cursor = res->cursor();
+      if (cursor) {
+        checkResult->add("at", checkResult->newUint64(cursor->textpos()));
+        checkResult->add("line", checkResult->newUint64(cursor->lineno()));
+        checkResult->add("char", checkResult->newUint64(cursor->charpos()));
+      }
+      aRequest->sendResult(checkResult);
+    }
+  }
   #endif // P44SCRIPT_FULL_SUPPORT
   return inherited::handleMethod(aRequest, aMethod, aParams);
 }
