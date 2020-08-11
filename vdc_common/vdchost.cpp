@@ -41,6 +41,9 @@
 #include "localcontroller.hpp"
 #endif
 
+#if ENABLE_P44SCRIPT
+#include "httpcomm.hpp"
+#endif
 
 
 using namespace p44;
@@ -116,7 +119,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if ENABLE_HTTP_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::HttpLookup);
   #endif // ENABLE_HTTP_SCRIPT_FUNCS
-  #endif // ENABLE_HTTP_SCRIPT_FUNCS
+  #endif // P44SCRIPT_FULL_SUPPORT
   #endif
   // remember singleton's address
   sharedVdcHostP = this;
@@ -1569,7 +1572,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     return Error::ok();
   }
   if (aMethod=="x-p44-checkMain") {
-    // re-run the main script
+    // check the main script for syntax errors (but do not re-start it)
     ScriptObjPtr res = mainScript.syntaxcheck();
     if (!res || !res->isErr()) {
       return Error::ok();
