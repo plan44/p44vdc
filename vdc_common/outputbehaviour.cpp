@@ -884,7 +884,7 @@ static void syncchannels_func(BuiltinFunctionContextPtr f)
 // channel(channelid)               - return the value of the specified channel
 // [dim]channel(channelid, value)   - set the channel value to the specified value or dim it relatively
 // [dim]channel(channelid, value, transitiontime)
-static const BuiltInArgDesc channel_args[] = { { text }, { numeric+optional }, { numeric+optional } };
+static const BuiltInArgDesc channel_args[] = { { text }, { numeric|optional }, { numeric|optional } };
 static const size_t channel_numargs = sizeof(channel_args)/sizeof(BuiltInArgDesc);
 static void channel_funcImpl(bool aDim, BuiltinFunctionContextPtr f)
 {
@@ -927,10 +927,10 @@ static void dimchannel_func(BuiltinFunctionContextPtr f)
 }
 
 static const BuiltinMemberDescriptor outputMembers[] = {
-  { "applychannels", null, 0, NULL, &applychannels_func },
-  { "syncchannels", null, 0, NULL, &syncchannels_func },
-  { "channel", numeric, channel_numargs, channel_args, &channel_func },
-  { "dimchannel", numeric, channel_numargs, channel_args, &dimchannel_func },
+  { "applychannels", executable|null, 0, NULL, &applychannels_func },
+  { "syncchannels", executable|null, 0, NULL, &syncchannels_func },
+  { "channel", executable|numeric, channel_numargs, channel_args, &channel_func },
+  { "dimchannel", executable|numeric, channel_numargs, channel_args, &dimchannel_func },
   { NULL } // terminator
 };
 

@@ -2247,10 +2247,10 @@ void VdcHost::scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
 }
 
 
-// MARK: - VdcHost global members and functions
+// MARK: - VdcHost global script members and functions
 
 // vdcapi(jsoncall)
-static const BuiltInArgDesc vdcapi_args[] = { { json+structured } };
+static const BuiltInArgDesc vdcapi_args[] = { { json|structured } };
 static const size_t vdcapi_numargs = sizeof(vdcapi_args)/sizeof(BuiltInArgDesc);
 static void vdcapi_func(BuiltinFunctionContextPtr f)
 {
@@ -2312,8 +2312,8 @@ static void device_func(BuiltinFunctionContextPtr f)
 
 
 static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
-  { "vdcapi", json, vdcapi_numargs, vdcapi_args, &vdcapi_func },
-  { "device", any, device_numargs, device_args, &device_func },
+  { "vdcapi", executable|json, vdcapi_numargs, vdcapi_args, &vdcapi_func },
+  { "device", executable|any, device_numargs, device_args, &device_func },
   { NULL } // terminator
 };
 
