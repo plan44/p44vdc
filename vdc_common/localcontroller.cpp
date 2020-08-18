@@ -2728,7 +2728,7 @@ static void trigger_func(BuiltinFunctionContextPtr f)
 // scene(id, zone)
 // scene(id, zone, transition_time)
 // scene(id, zone, transition_time, group)
-static const BuiltInArgDesc scene_args[] = { { text|numeric }, { text|numeric|optional }, { numeric|optional }, { text|numeric|optional } };
+static const BuiltInArgDesc scene_args[] = { { text|numeric }, { text|numeric|optionalarg }, { numeric|optionalarg }, { text|numeric|optionalarg } };
 static const size_t scene_numargs = sizeof(scene_args)/sizeof(BuiltInArgDesc);
 static void scene_func(BuiltinFunctionContextPtr f)
 {
@@ -2788,7 +2788,7 @@ static void scene_func(BuiltinFunctionContextPtr f)
 // set(zone_or_device, value, transitiontime)
 // set(zone_or_device, value, transitiontime, channelid)
 // set(zone, value, transitiontime, channelid, group)
-static const BuiltInArgDesc set_args[] = { { text|numeric }, { numeric }, { numeric|optional }, { text|optional }, { text|numeric|optional } };
+static const BuiltInArgDesc set_args[] = { { text|numeric }, { numeric }, { numeric|optionalarg }, { text|optionalarg }, { text|numeric|optionalarg } };
 static const size_t set_numargs = sizeof(set_args)/sizeof(BuiltInArgDesc);
 static void set_func(BuiltinFunctionContextPtr f)
 {
