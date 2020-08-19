@@ -33,11 +33,32 @@ using namespace std;
 namespace p44 {
 
   class LedChainVdc;
+  class LedChainDevice;
+
+  #if ENABLE_P44SCRIPT
+
+  /// represents the objects related to a ledchaindevice
+  class LedChainDeviceLookup : public BuiltInMemberLookup
+  {
+    typedef BuiltInMemberLookup inherited;
+    LedChainDevice& mLedChainDevice;
+  public:
+    LedChainDeviceLookup(LedChainDevice& aLedChainDevice);
+    LedChainDevice& ledChainDevice() { return mLedChainDevice; };
+  };
+
+
+  #endif
 
   class LedChainDevice : public Device
   {
     typedef Device inherited;
     friend class LedChainVdc;
+    #if ENABLE_P44SCRIPT
+    friend class LedChainDeviceLookup;
+
+    LedChainDeviceLookup ledChainDeviceLookup;
+    #endif
 
     P44ViewPtr lightView; ///< the view representing the light
 
@@ -89,6 +110,13 @@ namespace p44 {
     /// @}
 
     LedChainVdc &getLedChainVdc();
+
+    P44ViewPtr getLightView() { return lightView; }
+
+    #if P44SCRIPT_FULL_SUPPORT
+    /// @return a new script object representing this device. Derived device classes might return different types of device object.
+    virtual ScriptObjPtr newDeviceObj();
+    #endif
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object

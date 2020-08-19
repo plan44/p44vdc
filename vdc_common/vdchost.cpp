@@ -2307,7 +2307,7 @@ static void device_func(BuiltinFunctionContextPtr f)
     f->finish(new ErrorValue(ScriptError::NotFound, "no device '%s' found", f->arg(0)->stringValue().c_str()));
     return;
   }
-  f->finish(new DeviceObj(device));
+  f->finish(device->newDeviceObj());
 }
 
 

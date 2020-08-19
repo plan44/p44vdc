@@ -289,6 +289,7 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
     // run scene script
     #if ENABLE_P44SCRIPT
     OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->sceneScript.getSource().c_str(), true, 80).c_str() );
+    simpleScene->sceneScript.setSharedMainContext(sceneScriptContext);
     simpleScene->sceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), Infinite);
     #else
     sceneScriptContext.abort(false); // abort previous, no callback

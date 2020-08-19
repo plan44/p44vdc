@@ -2467,6 +2467,12 @@ string Device::getStatusText()
 
 using namespace P44Script;
 
+ScriptObjPtr Device::newDeviceObj()
+{
+  return new DeviceObj(this);
+}
+
+
 static ScriptObjPtr output_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite)
 {
   DeviceObj* d = dynamic_cast<DeviceObj*>(aParentObj.get());

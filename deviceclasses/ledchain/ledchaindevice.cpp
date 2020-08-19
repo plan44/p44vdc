@@ -83,7 +83,13 @@ public:
 
 LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int aDy, const string &aDeviceConfig) :
   inherited(aVdcP)
+  #if P44SCRIPT_FULL_SUPPORT
+  ,ledChainDeviceLookup(*this)
+  #endif
 {
+  #if P44SCRIPT_FULL_SUPPORT
+  ledChainDeviceLookup.isMemberVariable();
+  #endif
   RGBColorLightBehaviourPtr behaviour;
   // aDeviceConfig syntax:
   //   [#uniqueid:]lighttype:config_for_lighttype
@@ -193,9 +199,7 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
       boost::bind(&p44::evaluateViewFunctions, _1, _2, _3, _4, lightView, vl)
     );
     #endif
-    #if ENABLE_P44SCRIPT
-    // FIXME: do we need to register a lookup here?
-    #endif
+    // Note: in p44script case, the LedChainDeviceObj() provides this at the device level
   }
   // - is RGB
   colorClass = class_yellow_light;
@@ -219,6 +223,55 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     dSUID.setNameInSpace(ii, vdcNamespace);
   }
 }
+
+
+#if P44SCRIPT_FULL_SUPPORT
+
+class LedChainDeviceObj : public DeviceObj
+{
+  typedef DeviceObj inherited;
+public:
+  LedChainDeviceObj(DevicePtr aDevice);
+  P44lrgViewObj getLightView() { return boost::dynamic_pointer_cast<LedChainDevice>(mDevice)->getLightView(); }
+};
+
+
+static ScriptObjPtr view_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite)
+{
+  LedChainDeviceObj* d = dynamic_cast<LedChainDeviceObj*>(aParentObj.get());
+  return new P44lrgViewObj(d->getLightView());
+}
+
+
+static const BuiltinMemberDescriptor ledChainMembers[] = {
+  { "view", builtinmember, 0, NULL, (BuiltinFunctionImplementation)&view_accessor }, // Note: correct '.accessor=&lrg_accessor' form does not work with OpenWrt g++, so need ugly cast here
+  { NULL } // terminator
+};
+
+LedChainDeviceLookup::LedChainDeviceLookup(LedChainDevice& aLedChainDevice) :
+  inherited(ledChainMembers),
+  mLedChainDevice(aLedChainDevice)
+{
+}
+
+static BuiltInMemberLookup* sharedLedChainDeviceMemberLookupP = NULL;
+
+LedChainDeviceObj::LedChainDeviceObj(DevicePtr aDevice) : inherited(aDevice)
+{
+  if (sharedLedChainDeviceMemberLookupP==NULL) {
+    sharedLedChainDeviceMemberLookupP = new BuiltInMemberLookup(ledChainMembers);
+    sharedLedChainDeviceMemberLookupP->isMemberVariable(); // disable refcounting
+  }
+  registerMemberLookup(sharedLedChainDeviceMemberLookupP);
+};
+
+ScriptObjPtr LedChainDevice::newDeviceObj()
+{
+  return new LedChainDeviceObj(this);
+}
+
+#endif // P44SCRIPT_FULL_SUPPORT
+
 
 #if ENABLE_EXPRESSIONS
 bool LedChainDevice::viewCfgSubstLookup(const string &aName, ExpressionValue &aResult)

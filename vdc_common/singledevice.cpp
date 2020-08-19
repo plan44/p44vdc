@@ -46,10 +46,6 @@ DeviceAction::DeviceAction(SingleDevice &aSingleDevice, const string aId, const 
   actionTitle(aTitle),
   actionCategory(aCategory)
 {
-  // FIXME: remove later: warning indicating not-yet-converted vdc implementations
-  if (actionId.substr(0,4)=="std.") {
-    SOLOG(aSingleDevice, LOG_WARNING, "old style device implementation: actions should not have 'std.' prefix in the id!");
-  }
   // install value list for parameters
   actionParams = ValueListPtr(new ValueList);
 }
@@ -543,10 +539,6 @@ ErrorPtr ActionMacro::configureMacro(const string aDeviceActionId, JsonObjectPtr
     // try without possibly historically present "std." prefix
     // (for custom actions created before separating standard actions from device actions)
     action = singleDevice.deviceActions->getAction(aDeviceActionId.substr(4));
-    // FIXME: remove later: warning indicating macro definition (=last saved when deviceActions still had the 'std.' prefix)
-    if (action) {
-      SOLOG(singleDevice, LOG_INFO, "old-style macro '%s' still uses 'std.' prefix for deviceAction -> last saved before standardActions", actionId.c_str());
-    }
   }
   if (action) {
     // get and validate params

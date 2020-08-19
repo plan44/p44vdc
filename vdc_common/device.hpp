@@ -585,6 +585,11 @@ namespace p44 {
     /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
     virtual string getStatusText() P44_OVERRIDE;
 
+    #if P44SCRIPT_FULL_SUPPORT
+    /// @return a new script object representing this device. Derived device classes might return different types of device object.
+    virtual ScriptObjPtr newDeviceObj();
+    #endif
+
   protected:
 
     /// @name low level hardware access
@@ -763,7 +768,6 @@ namespace p44 {
     /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
     virtual bool canIdentifyToUser() P44_OVERRIDE;
 
-
   private:
 
     DsGroupMask behaviourGroups();
@@ -803,6 +807,7 @@ namespace p44 {
     class DeviceObj : public StructuredLookupObject
     {
       typedef P44Script::StructuredLookupObject inherited;
+    protected:
       DevicePtr mDevice;
     public:
       DeviceObj(DevicePtr aDevice);
