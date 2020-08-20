@@ -2472,6 +2472,16 @@ ScriptObjPtr Device::newDeviceObj()
   return new DeviceObj(this);
 }
 
+ScriptMainContextPtr Device::getDeviceScriptContext()
+{
+  if (!deviceScriptContext) {
+    // create on demand, such that only devices actually using scripts get a context
+    deviceScriptContext = StandardScriptingDomain::sharedDomain().newContext(newDeviceObj());
+  }
+  return deviceScriptContext;
+}
+
+
 
 static ScriptObjPtr output_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite)
 {

@@ -47,13 +47,9 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   resetGroupMembership();
   // set default hardware default configuration
   setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
-  #if ENABLE_SCENE_SCRIPT
-  #if ENABLE_P44SCRIPT
-  sceneScriptContext = StandardScriptingDomain::sharedDomain().newContext(new P44Script::OutputObj(this)); // common context for (scene)scripts of this output
-  #else
+  #if ENABLE_SCENE_SCRIPT && !ENABLE_P44SCRIPT
   sceneScriptContext.isMemberVariable();
   sceneScriptContext.setContextInfo("scenescript", this);
-  #endif
   #endif
 }
 
@@ -289,7 +285,7 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
     // run scene script
     #if ENABLE_P44SCRIPT
     OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->sceneScript.getSource().c_str(), true, 80).c_str() );
-    simpleScene->sceneScript.setSharedMainContext(sceneScriptContext);
+    simpleScene->sceneScript.setSharedMainContext(device.getDeviceScriptContext());
     simpleScene->sceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), Infinite);
     #else
     sceneScriptContext.abort(false); // abort previous, no callback
@@ -328,7 +324,7 @@ void OutputBehaviour::stopSceneActions()
 {
   #if ENABLE_SCENE_SCRIPT
   #if ENABLE_P44SCRIPT
-  sceneScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
+  device.getDeviceScriptContext()->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
   #else
   sceneScriptContext.abort(false); // do not call back
   #endif

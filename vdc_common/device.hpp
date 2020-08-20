@@ -151,6 +151,10 @@ namespace p44 {
     // volatile device configurations list (created when property actually accessed)
     DeviceConfigurationsVector cachedConfigurations;
 
+    #if P44SCRIPT_FULL_SUPPORT
+    ScriptMainContextPtr deviceScriptContext; ///< script context to run device scripts (such as scene scripts)
+    #endif
+
   public:
 
 
@@ -586,9 +590,14 @@ namespace p44 {
     virtual string getStatusText() P44_OVERRIDE;
 
     #if P44SCRIPT_FULL_SUPPORT
+
     /// @return a new script object representing this device. Derived device classes might return different types of device object.
     virtual ScriptObjPtr newDeviceObj();
-    #endif
+
+    /// @return on-demand common script context for device scripts
+    ScriptMainContextPtr getDeviceScriptContext();
+
+    #endif // P44SCRIPT_FULL_SUPPORT
 
   protected:
 

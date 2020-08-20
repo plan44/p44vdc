@@ -71,12 +71,8 @@ namespace p44 {
 
   public:
     
-    #if ENABLE_SCENE_SCRIPT
-    #if ENABLE_P44SCRIPT
-    ScriptMainContextPtr sceneScriptContext; ///< script context to run scene scripts of this output
-    #else
+    #if ENABLE_SCENE_SCRIPT && !ENABLE_P44SCRIPT
     SceneScriptContext sceneScriptContext; ///< script context to run scene scripts
-    #endif
     #endif
 
   protected:
