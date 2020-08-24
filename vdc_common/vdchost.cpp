@@ -1574,14 +1574,14 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
   if (aMethod=="x-p44-checkMain") {
     // check the main script for syntax errors (but do not re-start it)
     ScriptObjPtr res = mainScript.syntaxcheck();
+    ApiValuePtr checkResult = aRequest->newApiValue();
+    checkResult->setType(apivalue_object);
     if (!res || !res->isErr()) {
-      return Error::ok();
       OLOG(LOG_NOTICE, "Checked global main script: syntax OK");
+      checkResult->add("result", checkResult->newNull());
     }
     else {
       OLOG(LOG_NOTICE, "Error in global main script: %s", res->errorValue()->text());
-      ApiValuePtr checkResult = aRequest->newApiValue();
-      checkResult->setType(apivalue_object);
       checkResult->add("error", checkResult->newString(res->errorValue()->getErrorMessage()));
       SourceCursor* cursor = res->cursor();
       if (cursor) {
@@ -1589,8 +1589,8 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
         checkResult->add("line", checkResult->newUint64(cursor->lineno()));
         checkResult->add("char", checkResult->newUint64(cursor->charpos()));
       }
-      aRequest->sendResult(checkResult);
     }
+    aRequest->sendResult(checkResult);
   }
   #endif // P44SCRIPT_FULL_SUPPORT
   return inherited::handleMethod(aRequest, aMethod, aParams);
