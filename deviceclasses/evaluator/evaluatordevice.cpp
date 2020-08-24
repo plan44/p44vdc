@@ -215,9 +215,10 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     // Conditions
     ApiValuePtr cond;
     #if ENABLE_P44SCRIPT
+    ScriptObjPtr res;
     // - on condition (or calculation for sensors)
     cond = checkResult->newObject();
-    ScriptObjPtr res = evaluatorSettings()->onCondition.run(initial|synchronously, NULL, 2*Second);
+    res = evaluatorSettings()->onCondition.run(initial|synchronously, NULL, 2*Second);
     cond->add("expression", checkResult->newString(evaluatorSettings()->onCondition.getSource()));
     if (!res->isErr()) {
       cond->add("result", cond->newScriptValue(res));
@@ -234,10 +235,10 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       }
     }
     checkResult->add("onCondition", cond);
-    if (evaluatorType!=evaluator_sensor || evaluatorType!=evaluator_internalsensor) {
+    if (evaluatorType!=evaluator_sensor && evaluatorType!=evaluator_internalsensor) {
       // - off condition
       cond = checkResult->newObject();
-      ScriptObjPtr res = evaluatorSettings()->onCondition.run(initial|synchronously, NULL, 2*Second);
+      res = evaluatorSettings()->offCondition.run(initial|synchronously, NULL, 2*Second);
       cond->add("expression", checkResult->newString(evaluatorSettings()->offCondition.getSource()));
       if (!res->isErr()) {
         cond->add("result", cond->newScriptValue(res));
@@ -271,7 +272,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       cond->add("at", cond->newUint64(evaluatorSettings()->onCondition.getPos()));
     }
     checkResult->add("onCondition", cond);
-    if (evaluatorType!=evaluator_sensor || evaluatorType!=evaluator_internalsensor) {
+    if (evaluatorType!=evaluator_sensor && evaluatorType!=evaluator_internalsensor) {
       // - off condition
       cond = checkResult->newObject();
       res = evaluatorSettings()->offCondition.evaluateSynchronously(evalmode_initial);
