@@ -321,6 +321,7 @@ bool ValueSourceMapper::getMappedSourcesInfo(ApiValuePtr aInfoObject)
 
 string ValueSourceMapper::shortDesc() const
 {
+  if (valueMap.empty()) return "<no values>";
   string s;
   const char *sep = "";
   for (ValueSourcesMap::const_iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
