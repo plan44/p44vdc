@@ -2046,7 +2046,10 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
   SceneNo scene2click = INVALID_SCENE_NO;
   SceneNo scene3click = INVALID_SCENE_NO;
   SceneNo scene4click = INVALID_SCENE_NO;
-  if (group==group_black_variable) {
+  if (aButtonBehaviour.buttonFunc==buttonFunc_app) {
+    return false; // we do not handle app buttons
+  }
+  else if (group==group_black_variable) {
     switch (aButtonBehaviour.buttonFunc) {
       case buttonFunc_alarm:
         scene1click = ALARM1;
