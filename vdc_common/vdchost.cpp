@@ -864,6 +864,9 @@ bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsCl
 void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
   #if ENABLE_LOCAL_BEHAVIOUR
+  if (aButtonBehaviour.buttonFunc==buttonFunc_app || aButtonBehaviour.buttonGroup!=group_yellow_light) {
+    return; // do not try to handle non-light or app buttons
+  }
   // TODO: Not really conforming to ds-light yet...
   int scene = -1; // none
   // if button has up/down, direction is derived from button
@@ -906,15 +909,15 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
     // some action to perform on every light device
     for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
       DevicePtr dev = pos->second;
-      ChannelBehaviourPtr channel = dev->getChannelByType(aButtonBehaviour.buttonChannel);
-      if (scene==STOP_S) {
-        // stop dimming
-        dev->dimChannelForArea(channel, dimmode_stop, 0, 0);
-      }
-      else {
-        // call scene or start dimming
-        LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(dev->getOutput());
-        if (l) {
+      LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(dev->getOutput());
+      if (l) {
+        ChannelBehaviourPtr channel = dev->getChannelByType(aButtonBehaviour.buttonChannel);
+        if (scene==STOP_S) {
+          // stop dimming
+          dev->dimChannelForArea(channel, dimmode_stop, 0, 0);
+        }
+        else {
+          // call scene or start dimming
           // - figure out direction if not already known
           if (localDimDirection==0 && l->brightness->getLastSync()!=Never) {
             // get initial direction from current value of first encountered light with synchronized brightness value
