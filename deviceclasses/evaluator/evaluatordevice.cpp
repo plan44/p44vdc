@@ -45,10 +45,12 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   evaluatorID(aEvaluatorID),
   evaluatorType(evaluator_unknown),
   currentState(undefined),
+  #if !ENABLE_P44SCRIPT
   currentOn(undefined),
   currentOff(undefined),
   conditionMetSince(Never),
   onConditionMet(false),
+  #endif
   reporting(false)
 {
   #if ENABLE_P44SCRIPT
@@ -222,8 +224,8 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     cond->add("expression", checkResult->newString(evaluatorSettings()->onCondition.getSource()));
     if (!res->isErr()) {
       cond->add("result", cond->newScriptValue(res));
-      cond->add("text", cond->newString(res->stringValue()));
-      LOG(LOG_INFO, "- onCondition '%s' -> %s", evaluatorSettings()->onCondition.getSource().c_str(), res->stringValue().c_str());
+      cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));
+      LOG(LOG_INFO, "- onCondition '%s' -> %s", evaluatorSettings()->onCondition.getSource().c_str(), ScriptObj::describe(res).c_str());
     }
     else {
       cond->add("error", cond->newString(res->errorValue()->getErrorMessage()));
@@ -242,8 +244,8 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       cond->add("expression", checkResult->newString(evaluatorSettings()->offCondition.getSource()));
       if (!res->isErr()) {
         cond->add("result", cond->newScriptValue(res));
-        cond->add("text", cond->newString(res->stringValue()));
-        LOG(LOG_INFO, "- offCondition '%s' -> %s", evaluatorSettings()->offCondition.getSource().c_str(), res->stringValue().c_str());
+        cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));
+        LOG(LOG_INFO, "- offCondition '%s' -> %s", evaluatorSettings()->offCondition.getSource().c_str(), ScriptObj::describe(res).c_str());
       }
       else {
         cond->add("error", cond->newString(res->errorValue()->getErrorMessage()));
@@ -431,8 +433,6 @@ void EvaluatorDevice::parseVarDefs()
 
 void EvaluatorDevice::changedConditions()
 {
-  conditionMetSince = Never;
-  onConditionMet = false;
   currentState = undefined;
   evaluateConditions(P44Script::initial);
 }
@@ -467,124 +467,91 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
   }
   else {
     // binary evaluator expression was re-evaluated
-    Tristate r = undefined;
-    if (aResult->defined()) r = aResult->boolValue() ? yes : no;
-    if (aOnCondition) currentOn = r;
-    else currentOff = r;
-    calculateEvaluatorState();
-  }
-}
-
-
-void EvaluatorDevice::calculateEvaluatorState()
-{
-  // now derive decision
-  Tristate prevState = currentState;
-  bool decisionMade = false;
-  MLMicroSeconds now = MainLoop::currentMainLoop().now();
-  if (!decisionMade && prevState!=yes) {
-    // off or unknown: check for switching on
-    OLOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.getSource().c_str(), currentOn==undefined ? "<undefined>" : (currentOn==yes ? "true -> switching ON" : "false"));
-    if (currentOn!=yes) {
-      // not met now -> reset if we are currently timing this condition
-      if (onConditionMet) conditionMetSince = Never;
-    }
-    else {
-      if (!onConditionMet || conditionMetSince==Never) {
-        // we see this condition newly met now
-        onConditionMet = true; // seen ON condition met
-        conditionMetSince = now;
-      }
-      // check timing
-      MLMicroSeconds metAt = conditionMetSince+evaluatorSettings()->minOnTime;
-      if (now>=metAt || prevState==undefined) {
-        // condition met long enough or no state known yet (initial run)
+    Tristate newConditionState = undefined;
+    if (aResult->defined()) newConditionState = aResult->boolValue() ? yes : no;
+    // now derive decision
+    Tristate prevState = currentState;
+    bool decisionMade = false;
+    if (!decisionMade && prevState!=yes && aOnCondition) {
+      // off or unknown, and on condition has changed: check for switching on
+      OLOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.getSource().c_str(), newConditionState==undefined ? "<undefined>" : (newConditionState==yes ? "true -> switching ON" : "false"));
+      if (newConditionState==yes) {
         currentState = yes;
         decisionMade = true;
       }
-      else {
-        // condition not met long enough yet, need to re-check later
-        OLOG(LOG_INFO, "- ON condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-        evaluatorSettings()->onCondition.nextEvaluationNotLaterThan(metAt);
-        return;
-      }
     }
-  }
-  if (!decisionMade && prevState!=no) {
-    // on or unknown: check for switching off
-    OLOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.getSource().c_str(), currentOff==undefined ? "<undefined>" : (currentOff==yes ? "true -> switching OFF" : "false"));
-    if (currentOff!=yes) {
-      // not met now -> reset if we are currently timing this condition
-      if (!onConditionMet) conditionMetSince = Never;
-    }
-    else {
-      if (onConditionMet || conditionMetSince==Never) {
-        // we see this condition newly met now
-        onConditionMet = false; // seen OFF condition met
-        conditionMetSince = now;
-      }
-      // check timing
-      MLMicroSeconds metAt = conditionMetSince+evaluatorSettings()->minOffTime;
-      if (now>=metAt || prevState==undefined) {
-        // condition met long enough or initial evaluation that always applies immediately
+    if (!decisionMade && prevState!=no && !aOnCondition) {
+      // on or unknown, and off condition has changed: check for switching off
+      OLOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.getSource().c_str(), newConditionState==undefined ? "<undefined>" : (newConditionState==yes ? "true -> switching OFF" : "false"));
+      if (newConditionState==yes) {
         currentState = no;
         decisionMade = true;
       }
-      else {
-        // condition not met long enough yet, need to re-check later
-        OLOG(LOG_INFO, "- OFF condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-        evaluatorSettings()->offCondition.nextEvaluationNotLaterThan(metAt);
-        return;
-      }
     }
-  }
-  if (decisionMade && currentState!=undefined) {
-    // protect against state updates triggering evaluation again via cyclic references
-    reporting = true;
-    // give some context info
-    OLOG(LOG_NOTICE, "new evaluation: %s based on %s values: %s",
-      currentState==yes ? "TRUE" : "FALSE",
-      prevState==undefined ? "new" : "timing and",
-      valueMapper.shortDesc().c_str()
-    );
-    // report it
-    switch (evaluatorType) {
-      case evaluator_input :
-      case evaluator_internalinput :
-      {
-        BinaryInputBehaviourPtr b = getInput(0);
-        if (b) {
-          b->updateInputState(currentState==yes);
-        }
-        break;
-      }
-      case evaluator_rocker : {
-        if (currentState!=prevState) {
-          // virtually click up or down button
-          ButtonBehaviourPtr b = getButton(currentState==no ? 0 : 1);
-          if (b) {
-            b->sendClick(ct_tip_1x);
+    if (currentState!=undefined) {
+      // re-check opposite condition as "triggered" in case it is static (such as default fallbacks to true or false)
+      MainLoop::currentMainLoop().executeNow(boost::bind(
+        &TriggerSource::evaluate,
+        aOnCondition ? evaluatorSettings()->offCondition : evaluatorSettings()->onCondition,
+        triggered
+      ));
+      // report new decision
+      if (decisionMade) {
+        // protect against state updates triggering evaluation again via cyclic references
+        reporting = true;
+        // give some context info
+        OLOG(LOG_NOTICE, "new evaluation: %s based on %s values: %s",
+          currentState==yes ? "TRUE" : "FALSE",
+          prevState==undefined ? "new" : "timing and",
+          valueMapper.shortDesc().c_str()
+        );
+        // report it
+        switch (evaluatorType) {
+          case evaluator_input :
+          case evaluator_internalinput :
+          {
+            BinaryInputBehaviourPtr b = getInput(0);
+            if (b) {
+              b->updateInputState(currentState==yes);
+            }
+            break;
           }
+          case evaluator_rocker : {
+            if (currentState!=prevState) {
+              // virtually click up or down button
+              ButtonBehaviourPtr b = getButton(currentState==no ? 0 : 1);
+              if (b) {
+                b->sendClick(ct_tip_1x);
+              }
+            }
+            break;
+          }
+          #if P44SCRIPT_FULL_SUPPORT
+          case evaluator_internalaction: {
+            // execute action (but let triggers actually finish first)
+            MainLoop::currentMainLoop().executeNow(boost::bind(&EvaluatorDevice::executeActions, this));
+            break;
+          }
+          #endif // P44SCRIPT_FULL_SUPPORT
+          default: break;
         }
-        break;
+        // done reporting, critical phase is over
+        reporting = false;
       }
-      #if P44SCRIPT_FULL_SUPPORT
-      case evaluator_internalaction: {
-        // execute action
-        evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(currentState==yes));
-        evaluatorSettings()->action.run(stopall, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), Infinite);
-        break;
-      }
-      #endif // P44SCRIPT_FULL_SUPPORT
-      default: break;
     }
-    // done reporting, critical phase is over
-    reporting = false;
   }
 }
 
 
 #if P44SCRIPT_FULL_SUPPORT
+
+void EvaluatorDevice::executeActions()
+{
+  evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(currentState==yes));
+  evaluatorSettings()->action.run(stopall, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), Infinite);
+}
+
+
 void EvaluatorDevice::actionExecuted(ScriptObjPtr aResult)
 {
   OLOG(LOG_INFO, "evaluator action script completed with result: %s", ScriptObj::describe(aResult).c_str());
@@ -1078,8 +1045,8 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case varDefs_key: aPropValue->setStringValue(evaluatorSettings()->varDefs); return true;
         case onCondition_key: aPropValue->setStringValue(evaluatorSettings()->onCondition.getSource()); return true;
         case offCondition_key: aPropValue->setStringValue(evaluatorSettings()->offCondition.getSource()); return true;
-        case minOnTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->minOnTime)/Second); return true;
-        case minOffTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->minOffTime)/Second); return true;
+        case minOnTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->onCondition.getTriggerHoldoff())/Second); return true;
+        case minOffTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->offCondition.getTriggerHoldoff())/Second); return true;
         #if P44SCRIPT_FULL_SUPPORT
         case action_key: aPropValue->setStringValue(evaluatorSettings()->action.getSource()); return true;
         #endif
@@ -1107,12 +1074,14 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           }
           return true;
         case minOnTime_key:
-          if (evaluatorSettings()->setPVar(evaluatorSettings()->minOnTime, (MLMicroSeconds)(aPropValue->doubleValue()*Second)))
-            changedConditions();  // changed conditions, re-evaluate output
+          if (evaluatorSettings()->onCondition.setTriggerHoldoff((MLMicroSeconds)(aPropValue->doubleValue()*Second), true)) {
+            evaluatorSettings()->markDirty();
+          }
           return true;
         case minOffTime_key:
-          if (evaluatorSettings()->setPVar(evaluatorSettings()->minOffTime, (MLMicroSeconds)(aPropValue->doubleValue()*Second)))
-            changedConditions();  // changed conditions, re-evaluate output
+          if (evaluatorSettings()->offCondition.setTriggerHoldoff((MLMicroSeconds)(aPropValue->doubleValue()*Second), true)) {
+            evaluatorSettings()->markDirty();
+          }
           return true;
         #if P44SCRIPT_FULL_SUPPORT
         case action_key:
@@ -1163,22 +1132,22 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bool aIsSensor) :
-  inherited(aEvaluator),
+  inherited(aEvaluator)
   #if ENABLE_P44SCRIPT
-  onCondition("onCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onChangingBool, expression|synchronously),
-  offCondition("offCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onChangingBool, expression|synchronously),
+  ,onCondition("onCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onGettingTrue, Never, expression|synchronously|keepvars)
+  ,offCondition("offCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onGettingTrue, Never, expression|synchronously|keepvars)
   #if P44SCRIPT_FULL_SUPPORT
-  action(scriptbody+regular, "action", &device),
+  ,action(scriptbody|regular|keepvars, "action", &device)
   #endif
   #elif ENABLE_EXPRESSIONS
-  onCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation),
-  offCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation),
+  ,onCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation)
+  ,offCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation)
+  ,minOnTime(0) // trigger immediately
+  ,minOffTime(0) // trigger immediately
   #if EXPRESSION_SCRIPT_SUPPORT
-  action(aEvaluator, &aEvaluator.getVdcHost().geolocation),
+  ,action(aEvaluator, &aEvaluator.getVdcHost().geolocation)
   #endif
   #endif
-  minOnTime(0), // trigger immediately
-  minOffTime(0) // trigger immediately
 {
   #if ENABLE_P44SCRIPT
   evaluatorContext = onCondition.domain()->newContext(); // common context for triggers and action
@@ -1242,14 +1211,16 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   // get the field values
   varDefs.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #if ENABLE_P44SCRIPT
-  onCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++))); // do not initialize at load yet
-  offCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++))); // do not initialize at load yet
+  onCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
+  offCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
+  onCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
+  offCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
   #else
   onCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   offCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  #endif
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOnTime);
   aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOffTime);
+  #endif
   #if P44SCRIPT_FULL_SUPPORT
   action.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #elif EXPRESSION_SCRIPT_SUPPORT
@@ -1269,12 +1240,14 @@ void EvaluatorDeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, 
   #if ENABLE_P44SCRIPT
   aStatement.bind(aIndex++, onCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, offCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, (long long int)onCondition.getTriggerHoldoff());
+  aStatement.bind(aIndex++, (long long int)offCondition.getTriggerHoldoff());
   #else
   aStatement.bind(aIndex++, onCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, offCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  #endif
   aStatement.bind(aIndex++, (long long int)minOnTime);
   aStatement.bind(aIndex++, (long long int)minOffTime);
+  #endif
   #if P44SCRIPT_FULL_SUPPORT
   aStatement.bind(aIndex++, action.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #elif EXPRESSION_SCRIPT_SUPPORT

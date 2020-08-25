@@ -102,11 +102,11 @@ namespace p44 {
     #elif ENABLE_EXPRESSIONS
     EvaluatorExpressionContext onCondition; ///< expression that must evaluate to true for output to get active
     EvaluatorExpressionContext offCondition; ///< expression that must evaluate to true for output to get inactive
+    MLMicroSeconds minOnTime; ///< how long the on condition must be present before triggering the result change
+    MLMicroSeconds minOffTime; ///< how long the on condition must be present before triggering the result change
     #else
     #error "Evaluators need ENABLE_P44SCRIPT or legacy ENABLE_EXPRESSIONS"
     #endif
-    MLMicroSeconds minOnTime; ///< how long the on condition must be present before triggering the result change
-    MLMicroSeconds minOffTime; ///< how long the on condition must be present before triggering the result change
     #if P44SCRIPT_FULL_SUPPORT
     ScriptSource action;
     #elif EXPRESSION_SCRIPT_SUPPORT
@@ -160,13 +160,13 @@ namespace p44 {
     MLTicket valueParseTicket;
 
     Tristate currentState; ///< latest evaluator state
-    Tristate currentOn; ///< latest evaluation result of the On expression
-    Tristate currentOff; ///< latest evaluation result of the Off expression
 
-    MLMicroSeconds conditionMetSince; ///< since when do we see condition permanently met
-    bool onConditionMet; ///< true: conditionMetSince relates to ON-condition, false: conditionMetSince relates to OFF-condition
     bool reporting; ///< set while reporting evaluation result to sensor or binary input, to prevent infinitite loop though cyclic references
     #if ENABLE_EXPRESSIONS
+    Tristate currentOn; ///< latest evaluation result of the On expression
+    Tristate currentOff; ///< latest evaluation result of the Off expression
+    MLMicroSeconds conditionMetSince; ///< since when do we see condition permanently met
+    bool onConditionMet; ///< true: conditionMetSince relates to ON-condition, false: conditionMetSince relates to OFF-condition
     MLTicket evaluateTicket;
     #endif
 
@@ -282,6 +282,7 @@ namespace p44 {
 
     #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
     #if ENABLE_P44SCRIPT
+    void executeActions();
     void actionExecuted(ScriptObjPtr aResult);
     void testActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
     #else

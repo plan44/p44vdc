@@ -1033,7 +1033,7 @@ Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   triggerId(0),
   #if ENABLE_P44SCRIPT
-  triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, expression+synchronously+concurrently), // concurrently: because action might still be running
+  triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+synchronously+concurrently), // concurrently: because action might still be running
   triggerAction(sourcecode+regular, "action", this),
   #else
   triggerCondition(*this, &VdcHost::sharedVdcHost()->geolocation),
@@ -1231,7 +1231,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   cond->add("expression", checkResult->newString(triggerCondition.getSource().c_str()));
   if (!res->isErr()) {
     cond->add("result", cond->newScriptValue(res));
-    cond->add("text", cond->newString(res->stringValue()));
+    cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));
     OLOG(LOG_INFO, "condition '%s' -> %s", triggerCondition.getSource().c_str(), res->stringValue().c_str());
   }
   else {
