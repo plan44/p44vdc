@@ -115,7 +115,7 @@ namespace p44 {
 
     #if P44SCRIPT_FULL_SUPPORT
     /// @return a new script object representing this device. Derived device classes might return different types of device object.
-    virtual ScriptObjPtr newDeviceObj();
+    virtual ScriptObjPtr newDeviceObj() P44_OVERRIDE;
     #endif
 
     /// description of object, mainly for debug and logging

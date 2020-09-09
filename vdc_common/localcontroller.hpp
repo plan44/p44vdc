@@ -54,29 +54,6 @@ namespace p44 {
 
   class Trigger;
 
-  /// Scene kind flags
-  enum {
-    // scope
-    scene_global = 0x01, ///< set for global scenes
-    scene_room = 0x02, ///< set for room scenes
-    scene_area = 0x04, ///< set for area scenes (together with scene_room)
-    // type
-    scene_preset = 0x10, ///< preset
-    scene_off = 0x20, ///< off (together with scene_preset)
-    scene_extended = 0x40, ///< extended
-    // extra flag for excluding user-named scenes from non-extended list
-    scene_usernamed = 0x80, ///< user-named scene, can be used with getZoneScenes()
-  };
-  typedef uint8_t SceneKind;
-
-  /// Scene kind
-  typedef struct {
-    SceneNo no;
-    SceneKind kind;
-    const char *actionName;
-  } SceneKindDescriptor;
-
-
   /// Group kind flags
   enum {
     group_standard = 0x01, ///< standard group with direct scene calls

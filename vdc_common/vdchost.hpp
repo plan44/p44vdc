@@ -82,6 +82,31 @@ namespace p44 {
     virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
+  /// Scene kind flags
+  enum {
+    // scope
+    scene_global = 0x01, ///< set for global scenes
+    scene_room = 0x02, ///< set for room scenes
+    scene_area = 0x04, ///< set for area scenes (together with scene_room)
+    scene_overlap = 0x08, ///< set for global scenes that also exist with same ID as room scene (together with scene_global)
+    // type
+    scene_preset = 0x10, ///< preset
+    scene_off = 0x20, ///< off (together with scene_preset)
+    scene_extended = 0x40, ///< extended
+    // extra flag for excluding user-named scenes from non-extended list
+    scene_usernamed = 0x80, ///< user-named scene, can be used with getZoneScenes()
+  };
+  typedef uint8_t SceneKind;
+
+  /// Scene kind
+  typedef struct {
+    SceneNo no;
+    SceneKind kind;
+    const char *actionName;
+  } SceneKindDescriptor;
+
+  extern const SceneKindDescriptor roomScenes[];
+  extern const SceneKindDescriptor globalScenes[];
 
 
   class VdcHost;
@@ -671,6 +696,11 @@ namespace p44 {
     /// @param aApiObjectValue must be an object typed API value, will receive available value sources as valueSourceID/description key/values
     void createValueSourcesList(ApiValuePtr aApiObjectValue);
 
+    #if !REDUCED_FOOTPRINT
+    /// get a list of scene number/name associations
+    /// @param aApiObjectValue must be an object typed API value, will receive a list of scenes with dS-id, name etc.
+    void createScenesList(ApiValuePtr aApiObjectValue);
+    #endif
     #if P44SCRIPT_FULL_SUPPORT
     void runGlobalScripts();
     void globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel);

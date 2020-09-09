@@ -1628,6 +1628,9 @@ enum {
   #if ENABLE_LOCALCONTROLLER
   localController_key,
   #endif
+  #if !REDUCED_FOOTPRINT
+  scenesList_key,
+  #endif
   numVdcHostProperties
 };
 
@@ -1658,6 +1661,9 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
     #endif
     #if ENABLE_LOCALCONTROLLER
     { "x-p44-localController", apivalue_object, localController_key, OKEY(localController_obj) },
+    #endif
+    #if !REDUCED_FOOTPRINT
+    { "x-p44-scenesList", apivalue_null, scenesList_key, OKEY(vdchost_obj) },
     #endif
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
@@ -1719,6 +1725,12 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
           createValueSourcesList(aPropValue);
           return true;
+        #if !REDUCED_FOOTPRINT
+        case scenesList_key:
+          aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
+          createScenesList(aPropValue);
+          return true;
+        #endif
         case persistentChannels_key:
           aPropValue->setBoolValue(persistentChannels);
           return true;
@@ -2027,6 +2039,115 @@ string VdcHost::description()
   }
   return d;
 }
+
+
+#if !REDUCED_FOOTPRINT
+
+// MARK: - scene names
+
+const SceneKindDescriptor p44::roomScenes[] = {
+  { ROOM_OFF, scene_room|scene_preset|scene_off , "off"},
+  { AUTO_OFF, scene_room|scene_preset|scene_off|scene_extended , "slow off"},
+  { ROOM_ON, scene_room|scene_preset, "preset 1" },
+  { PRESET_2, scene_room|scene_preset, "preset 2" },
+  { PRESET_3, scene_room|scene_preset, "preset 3" },
+  { PRESET_4, scene_room|scene_preset, "preset 4" },
+  { STANDBY, scene_room|scene_preset|scene_off|scene_extended, "standby" },
+  { DEEP_OFF, scene_room|scene_preset|scene_off|scene_extended, "deep off" },
+  { SLEEPING, scene_room|scene_preset|scene_off|scene_extended, "sleeping" },
+  { WAKE_UP, scene_room|scene_preset|scene_extended, "wakeup" },
+  { AREA_1_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 1 off" },
+  { AREA_1_ON, scene_room|scene_preset|scene_area|scene_extended, "area 1 on" },
+  { AREA_2_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 2 off" },
+  { AREA_2_ON, scene_room|scene_preset|scene_area|scene_extended, "area 2 on" },
+  { AREA_3_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 3 off" },
+  { AREA_3_ON, scene_room|scene_preset|scene_area|scene_extended, "area 3 on" },
+  { AREA_4_OFF, scene_room|scene_preset|scene_off|scene_area|scene_extended, "area 4 off" },
+  { AREA_4_ON, scene_room|scene_preset|scene_area|scene_extended, "area 4 on" },
+  { PRESET_OFF_10, scene_room|scene_preset|scene_off|scene_extended, "off 10" },
+  { PRESET_11, scene_room|scene_preset|scene_extended, "preset 11" },
+  { PRESET_12, scene_room|scene_preset|scene_extended, "preset 12" },
+  { PRESET_13, scene_room|scene_preset|scene_extended, "preset 13" },
+  { PRESET_14, scene_room|scene_preset|scene_extended, "preset 14" },
+  { PRESET_OFF_20, scene_room|scene_preset|scene_off|scene_extended, "off 20" },
+  { PRESET_21, scene_room|scene_preset|scene_extended, "preset 21" },
+  { PRESET_22, scene_room|scene_preset|scene_extended, "preset 22" },
+  { PRESET_23, scene_room|scene_preset|scene_extended, "preset 23" },
+  { PRESET_24, scene_room|scene_preset|scene_extended, "preset 24" },
+  { PRESET_OFF_30, scene_room|scene_preset|scene_off|scene_extended, "off 30" },
+  { PRESET_31, scene_room|scene_preset|scene_extended, "preset 31" },
+  { PRESET_32, scene_room|scene_preset|scene_extended, "preset 32" },
+  { PRESET_33, scene_room|scene_preset|scene_extended, "preset 33" },
+  { PRESET_34, scene_room|scene_preset|scene_extended, "preset 34" },
+  { PRESET_OFF_40, scene_room|scene_preset|scene_off|scene_extended, "off 40" },
+  { PRESET_41, scene_room|scene_preset|scene_extended, "preset 41" },
+  { PRESET_42, scene_room|scene_preset|scene_extended, "preset 42" },
+  { PRESET_43, scene_room|scene_preset|scene_extended, "preset 43" },
+  { PRESET_44, scene_room|scene_preset|scene_extended, "preset 44" },
+  { INVALID_SCENE_NO, 0, NULL } // terminator
+};
+
+
+const SceneKindDescriptor p44::globalScenes[] = {
+  { ROOM_OFF, scene_global|scene_preset|scene_overlap|scene_off|scene_extended , "all off"},
+  { ROOM_ON, scene_global|scene_preset|scene_overlap|scene_extended, "global preset 1" },
+  { PRESET_2, scene_global|scene_preset|scene_overlap|scene_extended, "global preset 2" },
+  { PRESET_3, scene_global|scene_preset|scene_overlap|scene_extended, "global preset 3" },
+  { PRESET_4, scene_global|scene_preset|scene_overlap|scene_extended, "global preset 4" },
+  { AUTO_STANDBY, scene_global, "auto-standby" },
+  { STANDBY, scene_global|scene_preset|scene_overlap|scene_off, "standby" },
+  { DEEP_OFF, scene_global|scene_preset|scene_overlap|scene_off, "deep off" },
+  { SLEEPING, scene_global|scene_preset|scene_overlap|scene_off, "sleeping" },
+  { WAKE_UP, scene_global|scene_preset|scene_overlap, "wakeup" },
+  { PRESENT, scene_global|scene_preset, "present" },
+  { ABSENT, scene_global|scene_preset, "absent" },
+  { ZONE_ACTIVE, scene_global, "zone active" },
+  { BELL1, scene_global|scene_preset, "bell 1" },
+  { BELL2, scene_global|scene_preset|scene_extended, "bell 2" },
+  { BELL3, scene_global|scene_preset|scene_extended, "bell 3" },
+  { BELL4, scene_global|scene_preset|scene_extended, "bell 4" },
+  { PANIC, scene_global|scene_preset, "panic" },
+  { ALARM1, scene_global, "alarm 1" },
+  { ALARM2, scene_global|scene_extended, "alarm 2" },
+  { ALARM3, scene_global|scene_extended, "alarm 3" },
+  { ALARM4, scene_global|scene_extended, "alarm 4" },
+  { FIRE, scene_global, "fire" },
+  { SMOKE, scene_global, "smoke" },
+  { WATER, scene_global, "water" },
+  { GAS, scene_global, "gas" },
+  { WIND, scene_global, "wind" },
+  { NO_WIND, scene_global, "no wind" },
+  { RAIN, scene_global, "rain" },
+  { NO_RAIN, scene_global, "no rain" },
+  { HAIL, scene_global, "hail" },
+  { NO_HAIL, scene_global, "no hail" },
+  { POLLUTION, scene_global, "pollution" },
+  { INVALID_SCENE_NO, 0 } // terminator
+};
+
+
+void VdcHost::createScenesList(ApiValuePtr aApiObjectValue)
+{
+  const SceneKindDescriptor* scenes = roomScenes;
+  int idx = 0; // to keep the order
+  for (int glob=0; glob<2; glob++) {
+    while (scenes->no!=INVALID_SCENE_NO) {
+      if ((scenes->kind&scene_overlap)==0) {
+        ApiValuePtr sc = aApiObjectValue->newObject();
+        sc->add("index", sc->newInt64(idx));
+        sc->add("name", sc->newString(scenes->actionName));
+        sc->add("kind", sc->newInt64(scenes->kind));
+        aApiObjectValue->add(string_format("%d",scenes->no), sc);
+        idx++;
+      }
+      scenes++;
+    }
+    scenes = globalScenes;
+  }
+}
+
+#endif // REDUCED_FOOTPRINT
+
 
 
 #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
