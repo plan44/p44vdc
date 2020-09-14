@@ -1717,7 +1717,7 @@ private:
       return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at shortAddress %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK1_MINBYTES));
     }
     // append actual bank contents
-    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Data, this, _1, _2), busAddress, 0, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank1Data);
+    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Data, this, _1, _2), busAddress, 1, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank1Data);
     return;
   }
 
