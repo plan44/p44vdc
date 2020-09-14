@@ -1582,10 +1582,10 @@ string DaliSingleControllerDevice::modelName()
 {
   string s = "DALI";
   if (daliController->supportsDT8) {
-    if (daliController->dt8Color) s += " color";
+    if (daliController->dt8Color || daliController->dt8RGBWAFchannels>=3 || daliController->dt8PrimaryColors>=3) s += " color";
     if (daliController->dt8CT) s += " tunable white";
   }
-  else if (daliController->supportsLED) {
+  if (daliController->supportsLED) {
     s += " LED";
   }
   s += " dimmer";
