@@ -148,7 +148,7 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     }
   }
   // update map of groups and scenes used by manually configured groups and scene-listening input devices
-  loadLocallyUsedGroupsAndScenes();
+  reserveLocallyUsedGroupsAndScenes();
   // return status of DB init
 	aCompletedCB(error);
 }
@@ -1036,7 +1036,7 @@ void DaliVdc::markUsed(DaliAddress aSceneOrGroup, bool aUsed)
   else if ((aSceneOrGroup&DaliAddressTypeMask)==DaliGroup) {
     uint16_t m = 1<<(aSceneOrGroup & DaliGroupMask);
     if (aUsed) usedDaliGroupsMask |= m; else usedDaliGroupsMask &= ~m;
-    LOG(LOG_INFO,"marked DALI group %d %s, new mask = 0x%04hX", aSceneOrGroup & DaliGroupMask, aUsed ? "IN USE" : "FREE", usedDaliScenesMask);
+    LOG(LOG_INFO,"marked DALI group %d %s, new mask = 0x%04hX", aSceneOrGroup & DaliGroupMask, aUsed ? "IN USE" : "FREE", usedDaliGroupsMask);
   }
 }
 
@@ -1057,10 +1057,8 @@ void DaliVdc::removeMemberships(DaliAddress aSceneOrGroup)
 
 
 
-void DaliVdc::loadLocallyUsedGroupsAndScenes()
+void DaliVdc::reserveLocallyUsedGroupsAndScenes()
 {
-  usedDaliGroupsMask = 0;
-  usedDaliScenesMask = 0;
   sqlite3pp::query qry(db);
   if (qry.prepare("SELECT DISTINCT groupNo FROM compositeDevices WHERE dimmerType='GRP'")==SQLITE_OK) {
     for (sqlite3pp::query::iterator i = qry.begin(); i!=qry.end(); ++i) {

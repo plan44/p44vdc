@@ -177,7 +177,7 @@ namespace p44 {
 
     void groupCollected(VdcApiRequestPtr aRequest);
 
-    void loadLocallyUsedGroupsAndScenes();
+    void reserveLocallyUsedGroupsAndScenes();
     void markUsed(DaliAddress aSceneOrGroup, bool aUsed);
     void removeMemberships(DaliAddress aSceneOrGroup);
 
