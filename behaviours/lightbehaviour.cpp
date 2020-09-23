@@ -127,7 +127,7 @@ void LightBehaviour::initMinBrightness(Brightness aMin)
 
 Brightness LightBehaviour::brightnessForHardware(bool aFinal)
 {
-  return outputValueAccordingToMode(aFinal ? brightness->getChannelValue() : brightness->getTransitionalValue(), brightness->getChannelIndex());
+  return outputValueAccordingToMode(brightness->getChannelValue(!aFinal), brightness->getChannelIndex());
 }
 
 

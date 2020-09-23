@@ -269,18 +269,18 @@ namespace p44 {
     /// @param aCieX will receive CIE X component, 0..1
     /// @param aCieY will receive CIE Y component, 0..1
     /// @return false if values are not available
-    bool getCIExy(double &aCieX, double &aCieY);
+    bool getCIExy(double &aCieX, double &aCieY, bool aTransitional);
 
     /// get Color Temperature from current color mode
     /// @param aCT will receive color temperature in mired
     /// @return false if values are not available
-    bool getCT(double &aCT);
+    bool getCT(double &aCT, bool aTransitional);
 
     /// get Hue+Saturation from current color mode
     /// @param aHue will receive hue component, 0..360
     /// @param aSaturation will receive saturation component, 0..100%
     /// @return false if values are not available
-    bool getHueSaturation(double &aHue, double &aSaturation);
+    bool getHueSaturation(double &aHue, double &aSaturation, bool aTransitional);
 
     /// @}
 
@@ -333,7 +333,7 @@ namespace p44 {
     /// @param aRed,aGreen,aBlue will receive the R,G,B values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue
     /// @param aNoBrightness if set, RGB is calculated at full brightness
-    void getRGB(double &aRed, double &aGreen, double &aBlue, double aMax, bool aNoBrightness = false);
+    void getRGB(double &aRed, double &aGreen, double &aBlue, double aMax, bool aNoBrightness, bool aTransitional);
 
     /// set RGB values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue current R,G,B values to be converted to color channel settings
@@ -344,7 +344,7 @@ namespace p44 {
     /// @param aRed,aGreen,aBlue,aWhite will receive the R,G,B,W values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite
     /// @param aNoBrightness if set, RGBW is calculated at full brightness
-    void getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax, bool aNoBrightness = false);
+    void getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax, bool aNoBrightness, bool aTransitional);
 
     /// set RGBW values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue,aWhite current R,G,B,W values to be converted to color channel settings
@@ -355,7 +355,7 @@ namespace p44 {
     /// @param aRed,aGreen,aBlue,aWhite,aAmber will receive the R,G,B,W,A values corresponding to current channels
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite,aAmber
     /// @param aNoBrightness if set, RGBWA is calculated at full brightness
-    void getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax, bool aNoBrightness = false);
+    void getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax, bool aNoBrightness, bool aTransitional);
 
     /// set RGBWA values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue,aWhite,aAmber current R,G,B,W,A values to be converted to color channel settings
@@ -365,7 +365,7 @@ namespace p44 {
     /// get Cool White and Warm White colors (from current CT + brightness) for applying to lamp
     /// @param aCW,aWW will receive the CW and WW values corresponding to current channels
     /// @param aMax max value for aCW,aWW
-    void getCWWW(double &aCW, double &aWW, double aMax);
+    void getCWWW(double &aCW, double &aWW, double aMax, bool aTransitional);
 
     /// set Cool White and Warm White values from lamp  (to update channel values from actual lamp setting)
     /// @param aCW,aWW current CW and WW values

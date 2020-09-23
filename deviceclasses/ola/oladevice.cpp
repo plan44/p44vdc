@@ -268,18 +268,18 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     if (whiteChannel!=dmxNone) {
       if (amberChannel!=dmxNone) {
         // RGBW
-        cl->getRGBWA(r, g, b, w, a, 255);
+        cl->getRGBWA(r, g, b, w, a, 255, false, true);
         setDMXChannel(amberChannel,(DmxValue)a);
       }
       else {
         // RGBW
-        cl->getRGBW(r, g, b, w, 255);
+        cl->getRGBW(r, g, b, w, 255, false, true);
       }
       setDMXChannel(whiteChannel,(DmxValue)w);
     }
     else {
       // RGB
-      cl->getRGB(r, g, b, 255); // get brightness per R,G,B channel
+      cl->getRGB(r, g, b, 255, false, true); // get brightness per R,G,B channel
     }
     // There's always RGB
     setDMXChannel(redChannel,(DmxValue)r);

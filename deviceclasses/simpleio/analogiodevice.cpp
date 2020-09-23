@@ -210,7 +210,7 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // direct single channel PWM output, no smooth transitions
     ChannelBehaviourPtr ch = getChannelByIndex(0);
     if (ch && ch->needsApplying()) {
-      double chVal = ch->getTransitionalValue()-ch->getMin();
+      double chVal = ch->getChannelValue(true)-ch->getMin();
       double chSpan = ch->getMax()-ch->getMin();
       analogIO->setValue(chVal/chSpan*100); // 0..100%
       ch->channelValueApplied(); // confirm having applied the value
@@ -254,13 +254,13 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     double w = 0;
     if (analogIO4) {
       // RGBW lamp
-      cl->getRGBW(r, g, b, w, 100); // get brightness for R,G,B,W channels
+      cl->getRGBW(r, g, b, w, 100, false, true); // get brightness for R,G,B,W channels
       pwm = cl->brightnessToPWM(w, 100);
       analogIO4->setValue(pwm);
     }
     else {
       // RGB only
-      cl->getRGB(r, g, b, 100); // get brightness for R,G,B channels
+      cl->getRGB(r, g, b, 100, false, true); // get brightness for R,G,B channels
     }
     // - red
     pwm = cl->brightnessToPWM(r, 100);

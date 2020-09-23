@@ -157,20 +157,18 @@ namespace p44 {
     /// @return new channel value after increment/decrement
     double dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime);
 
-    /// get current value of channel. This is always the target value, even if channel is still in transition
+    /// get current value of channel.
+    /// @param aTransitional if set and the channel is in transition, a calculated intermediate value
+    ///   between a previous value and the current target value is returned.
+    ///   Otherwise, the target value is returned, even if channel is still in transition
     /// @note does not trigger a device read, but returns chached value
-    //   (initialized from actual value only at startup via initChannelValue(), updated when using setChannelValue)
-    double getChannelValue();
+    ///   (initialized from actual value only at startup via initChannelValue(), updated when using setChannelValue)
+    double getChannelValue(bool aTransitional = false);
 
     /// get as boolean value
     /// @return true when channel indicates "on" state
     /// @note standard behaviour is returning true when value is at 50% or more of the available range
     virtual bool getChannelValueBool();
-
-    /// get current value of channel, which might be a calculated intermediate value between a previous value and getChannelValue()
-    /// @note does not trigger a device read, but returns chached value
-    //   (initialized from actual value only at startup via initChannelValue(), updated when using setChannelValue)
-    double getTransitionalValue();
 
     /// step through transitions
     /// @param aStepSize how much to step. Default is zero and means starting transition

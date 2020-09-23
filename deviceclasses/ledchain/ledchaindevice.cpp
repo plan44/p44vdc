@@ -364,13 +364,13 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     }
   }
   // RGB light, get basic color
-  FOCUSLOG("Ledchain: brightness = %f, hue=%f, saturation=%f", cl->brightness->getTransitionalValue(), cl->hue->getTransitionalValue(), cl->saturation->getTransitionalValue());
+  FOCUSLOG("Ledchain: brightness = %f, hue=%f, saturation=%f", cl->brightness->getChannelValue(true), cl->hue->getChannelValue(true), cl->saturation->getChannelValue(true));
   double r, g, b, w;
   if (getLedChainVdc().hasWhite()) {
-    cl->getRGBW(r, g, b, w, 255, true); // get R,G,B,W values, but at full brightness
+    cl->getRGBW(r, g, b, w, 255, true, true); // get R,G,B,W values, but at full brightness
   }
   else {
-    cl->getRGB(r, g, b, 255, true); // get R,G,B at full brightness
+    cl->getRGB(r, g, b, 255, true, true); // get R,G,B at full brightness
     w = 0;
   }
   // the view's foreground color is the color
@@ -385,14 +385,14 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   if (ml) {
     // moving light, has position, common to all views
     targetView->setRelativeContentOrigin(
-      (fl->horizontalPosition->getTransitionalValue()-50)/50,
-      (fl->verticalPosition->getTransitionalValue()-50)/50,
+      (fl->horizontalPosition->getChannelValue(true)-50)/50,
+      (fl->verticalPosition->getChannelValue(true)-50)/50,
       true // centered
     );
     if (fl) {
       // feature light with extra channels
       // - rotation is common to all views
-      targetView->setContentRotation(fl->rotation->getTransitionalValue());
+      targetView->setContentRotation(fl->rotation->getChannelValue(true));
       ColorEffectViewPtr cev = boost::dynamic_pointer_cast<ColorEffectView>(targetView);
       if (cev) {
         // features available only in ColorEffectView
@@ -401,15 +401,15 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
         PixelPoint sz = cev->getFrameSize();
         int maxD = max(sz.x, sz.y);
         cev->setExtent({
-          (int)(maxD*fl->horizontalZoom->getTransitionalValue()*0.01),
-          (int)(maxD*fl->verticalZoom->getTransitionalValue()*0.01)
+          (int)(maxD*fl->horizontalZoom->getChannelValue(true)*0.01),
+          (int)(maxD*fl->verticalZoom->getChannelValue(true)*0.01)
         });
         uint32_t mode = fl->featureMode->getChannelValue();
         cev->setColoringParameters(
           pix,
-          fl->brightnessGradient->getTransitionalValue()/100, mode & 0xFF,
-          fl->hueGradient->getTransitionalValue()/100, (mode>>8) & 0xFF,
-          fl->saturationGradient->getTransitionalValue()/100, (mode>>16) & 0xFF,
+          fl->brightnessGradient->getChannelValue(true)/100, mode & 0xFF,
+          fl->hueGradient->getChannelValue(true)/100, (mode>>8) & 0xFF,
+          fl->saturationGradient->getChannelValue(true)/100, (mode>>16) & 0xFF,
           (mode & 0x01000000)==0 // not radial
         );
         cev->setWrapMode((cev->getWrapMode()&~P44View::clipMask) | ((mode & 0x02000000)==0 ? P44View::clipXY : 0));

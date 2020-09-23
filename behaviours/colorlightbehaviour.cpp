@@ -429,25 +429,25 @@ bool ColorLightBehaviour::deriveColorMode()
 }
 
 
-bool ColorLightBehaviour::getCIExy(double &aCieX, double &aCieY)
+bool ColorLightBehaviour::getCIExy(double &aCieX, double &aCieY, bool aTransitional)
 {
   Row3 HSV;
   Row3 xyV;
   switch (colorMode) {
     case colorLightModeHueSaturation:
-      HSV[0] = hue->getTransitionalValue(); // 0..360
-      HSV[1] = saturation->getTransitionalValue()/100; // 0..1
+      HSV[0] = hue->getChannelValue(aTransitional); // 0..360
+      HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
       HSV[2] = 1;
       HSVtoxyV(HSV, xyV);
       aCieX = xyV[0];
       aCieY = xyV[1];
       break;
     case colorLightModeXY:
-      aCieX = cieX->getTransitionalValue();
-      aCieY = cieY->getTransitionalValue();
+      aCieX = cieX->getChannelValue(aTransitional);
+      aCieY = cieY->getChannelValue(aTransitional);
       break;
     case colorLightModeCt:
-      CTtoxyV(ct->getTransitionalValue(), xyV);
+      CTtoxyV(ct->getChannelValue(aTransitional), xyV);
       aCieX = xyV[0];
       aCieY = xyV[1];
       break;
@@ -458,27 +458,27 @@ bool ColorLightBehaviour::getCIExy(double &aCieX, double &aCieY)
 }
 
 
-bool ColorLightBehaviour::getCT(double &aCT)
+bool ColorLightBehaviour::getCT(double &aCT, bool aTransitional)
 {
   Row3 HSV;
   Row3 xyV;
   switch (colorMode) {
     case colorLightModeHueSaturation:
-      HSV[0] = hue->getTransitionalValue(); // 0..360
-      HSV[1] = saturation->getTransitionalValue()/100; // 0..1
+      HSV[0] = hue->getChannelValue(aTransitional); // 0..360
+      HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
       HSV[2] = 1;
       HSVtoxyV(HSV, xyV);
       xyVtoCT(xyV, aCT);
       break;
     case colorLightModeXY:
       // missing HSV and ct
-      xyV[0] = cieX->getTransitionalValue();
-      xyV[1] = cieY->getTransitionalValue();
+      xyV[0] = cieX->getChannelValue(aTransitional);
+      xyV[1] = cieY->getChannelValue(aTransitional);
       xyV[2] = 1;
       xyVtoCT(xyV, aCT);
       break;
     case colorLightModeCt:
-      aCT = ct->getTransitionalValue();
+      aCT = ct->getChannelValue(aTransitional);
       break;
     default:
       return false; // unknown color mode
@@ -487,18 +487,18 @@ bool ColorLightBehaviour::getCT(double &aCT)
 }
 
 
-bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation)
+bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation, bool aTransitional)
 {
   Row3 HSV;
   Row3 xyV;
   switch (colorMode) {
     case colorLightModeHueSaturation:
-      aHue = hue->getTransitionalValue(); // 0..360
-      aSaturation = saturation->getTransitionalValue();
+      aHue = hue->getChannelValue(aTransitional); // 0..360
+      aSaturation = saturation->getChannelValue(aTransitional);
       break;
     case colorLightModeXY:
-      xyV[0] = cieX->getTransitionalValue();
-      xyV[1] = cieY->getTransitionalValue();
+      xyV[0] = cieX->getChannelValue(aTransitional);
+      xyV[1] = cieY->getChannelValue(aTransitional);
       xyV[2] = 1;
     xyVtoHSV:
       xyVtoHSV(xyV, HSV);
@@ -506,7 +506,7 @@ bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation)
       aSaturation = HSV[1]*100; // 0..100%
       break;
     case colorLightModeCt:
-      CTtoxyV(ct->getTransitionalValue(), xyV);
+      CTtoxyV(ct->getChannelValue(aTransitional), xyV);
       goto xyVtoHSV;
     default:
       return false; // unknown color mode
@@ -700,7 +700,7 @@ static double colorCompScaled(double aColorComp, double aMax)
   return aColorComp;
 }
 
-void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue, double aMax, bool aNoBrightness)
+void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue, double aMax, bool aNoBrightness, bool aTransitional)
 {
   Row3 RGB;
   Row3 xyV;
@@ -709,16 +709,16 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
   double scale = 1;
   switch (colorMode) {
     case colorLightModeHueSaturation: {
-      HSV[0] = hue->getTransitionalValue(); // 0..360
-      HSV[1] = saturation->getTransitionalValue()/100; // 0..1
-      HSV[2] = aNoBrightness ? 1 : brightness->getTransitionalValue()/100; // 0..1
+      HSV[0] = hue->getChannelValue(aTransitional); // 0..360
+      HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
+      HSV[2] = aNoBrightness ? 1 : brightness->getChannelValue(aTransitional)/100; // 0..1
       HSVtoRGB(HSV, RGB);
       break;
     }
     case colorLightModeCt: {
       // Note: for some reason, passing brightness to V gives bad results,
       // so for now we always assume 1 and scale resulting RGB
-      CTtoxyV(ct->getTransitionalValue(), xyV);
+      CTtoxyV(ct->getChannelValue(aTransitional), xyV);
       xyVtoXYZ(xyV, XYZ);
       XYZtoRGB(calibration, XYZ, RGB);
       // get maximum component brightness -> gives 100% brightness point, will be scaled down according to actual brightness
@@ -727,24 +727,24 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
       if (RGB[1]>m) m = RGB[1];
       if (RGB[2]>m) m = RGB[2];
       // include actual brightness into scale calculation
-      if (!aNoBrightness) scale = brightness->getTransitionalValue()/100/m;
+      if (!aNoBrightness) scale = brightness->getChannelValue(aTransitional)/100/m;
       break;
     }
     case colorLightModeXY: {
       // Note: for some reason, passing brightness to V gives bad results,
       // so for now we always assume 1 and scale resulting RGB
-      xyV[0] = cieX->getTransitionalValue();
-      xyV[1] = cieY->getTransitionalValue();
+      xyV[0] = cieX->getChannelValue(aTransitional);
+      xyV[1] = cieY->getChannelValue(aTransitional);
       xyV[2] = 1;
       xyVtoXYZ(xyV, XYZ);
       // convert using calibration for this lamp
       XYZtoRGB(calibration, XYZ, RGB);
-      if (!aNoBrightness) scale = brightness->getTransitionalValue()/100; // 0..1
+      if (!aNoBrightness) scale = brightness->getChannelValue(aTransitional)/100; // 0..1
       break;
     }
     default: {
       // no color, just set R=G=B=brightness
-      RGB[0] = aNoBrightness ? 1 : brightness->getTransitionalValue()/100;
+      RGB[0] = aNoBrightness ? 1 : brightness->getChannelValue(aTransitional)/100;
       RGB[1] = RGB[0];
       RGB[2] = RGB[0];
       break;
@@ -828,11 +828,11 @@ static void transferFromColor(Row3 &aCol, double aAmount, double &aRed, double &
 
 
 
-void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax, bool aNoBrightness)
+void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue, double &aWhite, double aMax, bool aNoBrightness, bool aTransitional)
 {
   // first get 0..1 RGB
   double r,g,b;
-  getRGB(r, g, b, 1, aNoBrightness);
+  getRGB(r, g, b, 1, aNoBrightness, aTransitional);
   // transfer as much as possible to the white channel
   double w = transferToColor(whiteRGB, r, g, b);
   // Finally scale as requested
@@ -843,11 +843,11 @@ void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue
 }
 
 
-void RGBColorLightBehaviour::getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax, bool aNoBrightness)
+void RGBColorLightBehaviour::getRGBWA(double &aRed, double &aGreen, double &aBlue, double &aWhite, double &aAmber, double aMax, bool aNoBrightness, bool aTransitional)
 {
   // first get RGBW
   double r,g,b;
-  getRGB(r, g, b, 1, aNoBrightness);
+  getRGB(r, g, b, 1, aNoBrightness, aTransitional);
   // transfer as much as possible to the white channel
   double w = transferToColor(whiteRGB, r, g, b);
   // then transfer as much as possible to the amber channel
@@ -919,7 +919,7 @@ void RGBColorLightBehaviour::setRGBWA(double aRed, double aGreen, double aBlue, 
 #define CW_MIN (0.5)
 
 
-void RGBColorLightBehaviour::getCWWW(double &aCW, double &aWW, double aMax)
+void RGBColorLightBehaviour::getCWWW(double &aCW, double &aWW, double aMax, bool aTransitional)
 {
   Row3 xyV;
   Row3 HSV;
@@ -927,21 +927,21 @@ void RGBColorLightBehaviour::getCWWW(double &aCW, double &aWW, double aMax)
   switch (colorMode) {
     case colorLightModeCt: {
       // we have mired, use it
-      mired = ct->getTransitionalValue();
+      mired = ct->getChannelValue(aTransitional);
       break;
     }
     case colorLightModeXY: {
       // get mired from x,y
-      xyV[0] = cieX->getTransitionalValue();
-      xyV[1] = cieY->getTransitionalValue();
+      xyV[0] = cieX->getChannelValue(aTransitional);
+      xyV[1] = cieY->getChannelValue(aTransitional);
       xyV[2] = 1;
       xyVtoCT(xyV, mired);
       break;
     }
     case colorLightModeHueSaturation: {
       // get mired from HS
-      HSV[0] = hue->getTransitionalValue(); // 0..360
-      HSV[1] = saturation->getTransitionalValue()/100; // 0..1
+      HSV[0] = hue->getChannelValue(aTransitional); // 0..360
+      HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
       HSV[2] = 1;
       HSVtoxyV(HSV,xyV);
       xyVtoCT(xyV, mired);
@@ -952,7 +952,7 @@ void RGBColorLightBehaviour::getCWWW(double &aCW, double &aWW, double aMax)
     }
   }
   // mired to CW/WW
-  double b = brightness->getTransitionalValue()/100; // 0..1
+  double b = brightness->getChannelValue(aTransitional)/100; // 0..1
   double t = (mired-ct->getMin()) / (ct->getMax()-ct->getMin()); // 0..1 scale of possible mireds, 0=coldest, 1=warmest
   // Equations:
   aWW = t * b;

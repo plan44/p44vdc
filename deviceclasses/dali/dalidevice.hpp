@@ -164,17 +164,27 @@ namespace p44 {
     /// @return true if brightness has changed
     bool setBrightness(Brightness aBrightness);
 
+    /// set color parameters from behaviour
+    /// @param aColorLight the color light
+    /// @param aTransitional set to use transitional channel values
+    /// @param aAlways set to always write color registers, even if unchanged
+    /// @param aSilent set to suppress log messages
+    /// @return true if any color parameters were changed in the device
+    bool setColorParamsFromChannels(ColorLightBehaviourPtr aColorLight, bool aTransitional, bool aAlways, bool aSilent);
+
     /// set new color parameters as CIE x/y or CT
     /// @param aMode new color mode
     /// @param aCieXorCT CIE X coordinate (0..1) or CT in mired
     /// @param aCieY CIE Y coordinate (0..1)
-    /// @return true if parameters have changed
-    bool setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY = 0);
+    /// @param aAlways set to always write color registers, even if unchanged
+    /// @return true if any color parameters were changed in the device
+    bool setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY, bool aAlways);
 
     /// set new color parameters in raw RGBWA
     /// @param aR,aG,aB,aW,aA new values
-    /// @return true if parameters have changed
-    bool setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t aW = 0, uint8_t aA = 0);
+    /// @param aAlways set to always write color registers, even if unchanged
+    /// @return true if any color parameters were changed in the device
+    bool setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t aW, uint8_t aA, bool aAlways);
 
     /// activate new color parameters
     void activateColorParams();

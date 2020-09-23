@@ -762,9 +762,9 @@ void DaliBusDevice::setDefaultBrightness(Brightness aBrightness)
 
 
 
-bool DaliBusDevice::setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY)
+bool DaliBusDevice::setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY, bool aAlways)
 {
-  bool changed = false;
+  bool changed = aAlways;
   dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (supportsDT8) {
     if (currentColorMode!=aMode) {
@@ -799,9 +799,9 @@ bool DaliBusDevice::setColorParams(ColorLightMode aMode, double aCieXorCT, doubl
 }
 
 
-bool DaliBusDevice::setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t aW, uint8_t aA)
+bool DaliBusDevice::setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t aW, uint8_t aA, bool aAlways)
 {
-  bool changed = false;
+  bool changed = aAlways;
   dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (supportsDT8) {
     if (currentColorMode!=colorLightModeRGBWA) {
@@ -1383,6 +1383,58 @@ void DaliSingleControllerDevice::disconnectableHandler(bool aForgetParams, Disco
 }
 
 
+bool DaliBusDevice::setColorParamsFromChannels(ColorLightBehaviourPtr aColorLight, bool aTransitional, bool aAlways, bool aSilent)
+{
+  bool hasNewColors = false;
+  RGBColorLightBehaviourPtr rgbl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(aColorLight);
+  if (rgbl) {
+    // DALI controller needs direct RGBWA(F)
+    double r=0,g=0,b=0,w=0,a=0;
+    if (dt8RGBWAFchannels>3) {
+      // RGBW or RGBWA
+      if (dt8RGBWAFchannels>4) {
+        // RGBWA
+        rgbl->getRGBWA(r, g, b, w, a, 127, true, aTransitional);
+        if (!aSilent) {
+          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
+        }
+      }
+      else {
+        // RGBW
+        rgbl->getRGBW(r, g, b, w, 127, true, aTransitional);
+        if (!aSilent) {
+          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
+        }
+      }
+    }
+    else {
+      // RGB
+      rgbl->getRGB(r, g, b, 127, true, aTransitional);
+      if (!aSilent) {
+        SOLOG(rgbl->getDevice(), LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
+      }
+    }
+    hasNewColors = setRGBWAParams(r, g, b, w, a, aAlways);
+  }
+  else {
+    // DALI controller understands Cie and/or Ct directly
+    if (dt8Color && (aColorLight->colorMode!=colorLightModeCt || !dt8CT)) {
+      // color is requested or CT is requested but controller cannot do CT natively -> send CieX/Y
+      double cieX, cieY;
+      aColorLight->getCIExy(cieX, cieY, aTransitional);
+      hasNewColors = setColorParams(colorLightModeXY, cieX, cieY, aAlways);
+    }
+    else {
+      // CT is requested and controller can do CT natively, or color is requested but controller can ONLY do CT
+      double mired;
+      aColorLight->getCT(mired, aTransitional);
+      hasNewColors = setColorParams(colorLightModeCt, mired, 0, aAlways);
+    }
+  }
+  return hasNewColors;
+}
+
+
 void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize)
 {
   LightBehaviourPtr l = getOutput<LightBehaviour>();
@@ -1394,51 +1446,7 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
     cl = getOutput<ColorLightBehaviour>();
     moreSteps = cl->colorTransitionStep(aStepSize);
     neednewbrightness = l->brightness->inTransition(); // could be color transition only
-    RGBColorLightBehaviourPtr rgbl = getOutput<RGBColorLightBehaviour>();
-    if (rgbl) {
-      // DALI controller needs direct RGBWA(F)
-      double r=0,g=0,b=0,w=0,a=0;
-      if (daliController->dt8RGBWAFchannels>3) {
-        // RGBW or RGBWA
-        if (daliController->dt8RGBWAFchannels>4) {
-          // RGBWA
-          rgbl->getRGBWA(r, g, b, w, a, 127, true);
-          if (!aForDimming) {
-            OLOG(LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
-          }
-        }
-        else {
-          // RGBW
-          rgbl->getRGBW(r, g, b, w, 127, true);
-          if (!aForDimming) {
-            OLOG(LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
-          }
-        }
-      }
-      else {
-        // RGB
-        rgbl->getRGB(r, g, b, 127, true);
-        if (!aForDimming) {
-          OLOG(LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
-        }
-      }
-      needactivation = daliController->setRGBWAParams(r, g, b, w, a);
-    }
-    else {
-      // DALI controller understands Cie and/or Ct directly
-      if (daliController->dt8Color && (cl->colorMode!=colorLightModeCt || !daliController->dt8CT)) {
-        // color is requested or CT is requested but controller cannot do CT natively -> send CieX/Y
-        double cieX, cieY;
-        cl->getCIExy(cieX, cieY); // transitional values calculated from actually changed original channels transitioning
-        needactivation = daliController->setColorParams(colorLightModeXY, cieX, cieY);
-      }
-      else {
-        // CT is requested and controller can do CT natively, or color is requested but controller can ONLY do CT
-        double mired;
-        cl->getCT(mired); // transitional value calculated from actually changed original channels transitioning
-        needactivation = daliController->setColorParams(colorLightModeCt, mired);
-      }
-    }
+    needactivation = daliController->setColorParamsFromChannels(cl, true, false, aForDimming); // activation needed when color has changed
   }
   // handle brightness
   if (neednewbrightness || needactivation) {
@@ -1447,7 +1455,7 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
     bool sentDAPC = daliController->setBrightness(l->brightnessForHardware());
     if (sentDAPC && daliController->dt8autoactivation) needactivation = false; // prevent activating twice!
   }
-  // activate color params in case brightness has not changed or device is not in auto-activation mode (we don't set this)
+  // activate color params in case brightness has not changed or device is not in auto-activation mode
   if (needactivation) {
     daliController->activateColorParams();
   }
@@ -1902,21 +1910,21 @@ void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithCol
       // RGBWA or CT
       if (cl->isCtOnly()) {
         // CT
-        cl->getCWWW(w, a, 100); // dali dimmers use abstracted 0..100% brightness as input
+        cl->getCWWW(w, a, 100, true); // dali dimmers use abstracted 0..100% brightness as input
         if (!aForDimming) {
           OLOG(LOG_INFO, "DALI composite CWWW: CW=%d, WW=%d", (int)w, (int)a);
         }
       }
       else {
         // RGBWA
-        cl->getRGBWA(r, g, b, w, a, 100); // dali dimmers use abstracted 0..100% brightness as input
+        cl->getRGBWA(r, g, b, w, a, 100, false, true); // dali dimmers use abstracted 0..100% brightness as input
         if (!aForDimming) {
           OLOG(LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
         }
       }
     }
     else {
-      cl->getRGBW(r, g, b, w, 100); // dali dimmers use abstracted 0..100% brightness as input
+      cl->getRGBW(r, g, b, w, 100, false, true); // dali dimmers use abstracted 0..100% brightness as input
       if (!aForDimming) {
         OLOG(LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
       }
@@ -1924,7 +1932,7 @@ void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithCol
   }
   else {
     // RGB
-    cl->getRGB(r, g, b, 100); // dali dimmers use abstracted 0..100% brightness as input
+    cl->getRGB(r, g, b, 100, false, true); // dali dimmers use abstracted 0..100% brightness as input
     if (!aForDimming) {
       OLOG(LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
     }

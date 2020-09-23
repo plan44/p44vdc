@@ -1284,6 +1284,11 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
       if (dev && dev->daliController) {
         LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
         if (l) {
+          ColorLightBehaviourPtr cl = dev->getOutput<ColorLightBehaviour>();
+          if (cl) {
+            // need to set up the temp color param registers before storing the scene
+            dev->daliController->setColorParamsFromChannels(cl, false, true, false); // non-transitional, always set, not silent
+          }
           uint8_t power = dev->daliController->brightnessToArcpower(l->brightnessForHardware(true)); // non-transitional, final
           daliComm->daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_SCENE+(a&DaliSceneMask), power);
         }

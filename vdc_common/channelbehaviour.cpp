@@ -176,23 +176,15 @@ bool ChannelBehaviour::inTransition()
 }
 
 
-double ChannelBehaviour::getChannelValue()
-{
-  // current value is cached value
-  return cachedChannelValue;
-}
-
-
 bool ChannelBehaviour::getChannelValueBool()
 {
   return getChannelValue() >= (getMax()-getMin())/2;
 }
 
 
-
-double ChannelBehaviour::getTransitionalValue()
+double ChannelBehaviour::getChannelValue(bool aTransitional)
 {
-  if (inTransition()) {
+  if (inTransition() && aTransitional) {
     double d = cachedChannelValue-previousChannelValue;
     if (wrapsAround()) {
       // wraparound channels - use shorter distance
@@ -269,7 +261,7 @@ void ChannelBehaviour::syncChannelValueBool(bool aValue, bool aAlwaysSync)
 
 void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply)
 {
-  setChannelValue(aNewValue, aNewValue>getTransitionalValue() ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
+  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
 }
 
 
@@ -277,7 +269,7 @@ bool ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aN
 {
   if (aScene->isSceneValueFlagSet(getChannelIndex(), valueflags_dontCare))
     return false; // don't care, don't set
-  setChannelValue(aNewValue, aNewValue>getTransitionalValue() ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
+  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
   return true; // actually set
 }
 
@@ -318,7 +310,7 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
       cachedChannelValue, aNewValue, (int)(aTransitionTime/MilliSecond)
     );
     // setting new value captures current (possibly transitional) value as previous and completes transition
-    previousChannelValue = channelLastSync!=Never ? getTransitionalValue() : aNewValue; // If there is no valid previous value, set current as previous.
+    previousChannelValue = channelLastSync!=Never ? getChannelValue(true) : aNewValue; // If there is no valid previous value, set current as previous.
     transitionProgress = 1; // consider done
     // save target parameters for next transition
     setPVar(cachedChannelValue, aNewValue); // might need to be persisted
@@ -353,7 +345,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
   // apply (silently), only if value has actually changed (but even if change is below resolution)
   if (newValue!=cachedChannelValue) {
     // setting new value captures current (possibly transitional) value as previous and completes transition
-    previousChannelValue = channelLastSync!=Never ? getTransitionalValue() : newValue; // If there is no valid previous value, set current as previous.
+    previousChannelValue = channelLastSync!=Never ? getChannelValue(true) : newValue; // If there is no valid previous value, set current as previous.
     transitionProgress = 1; // consider done
     // save target parameters for next transition
     setPVar(cachedChannelValue, newValue); // might need to be persisted
