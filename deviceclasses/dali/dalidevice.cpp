@@ -1527,8 +1527,7 @@ bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStat
   // check general exclude reasons
   if (
     !daliController || // safety - need a controller to optimize
-    daliController->isGrouped() || // already grouped devices cannot be optimized
-    daliController->supportsDT8 // FIXME: exclude DT8 for now until we can test color scenes with a sample device
+    daliController->isGrouped() // already grouped devices cannot be optimized
   ) {
     return false;
   }

@@ -1123,14 +1123,27 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
       groupDimTicket.cancel(); // just safety, should be cancelled already
       // set fade time according to scene transition time (usually: already ok, so no time wasted)
       // note: dalicomm will make sure the fade time adjustments are sent before the scene call
+      bool needDT8Activation = false;
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
         if (dev && dev->daliController) {
           dev->daliController->setTransitionTime(dev->transitionTimeForPreparedScene(true)); // including override value
+          if (dev->daliController->supportsDT8 && !dev->daliController->dt8autoactivation) {
+            needDT8Activation = true; // device does NOT have auto-activation, so we'll need to activate the called scene's
+          }
         }
       }
       // Broadcast scene call: DALICMD_GO_TO_SCENE
-      daliComm->daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask), boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+      if (needDT8Activation) {
+        // call scene
+        daliComm->daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask));
+        // activate the colors the scene call might have set into temporary color registers (not affected devices should have set no temp colors at this point!)
+        daliComm->daliSendCommand(DaliBroadcast, DALICMD_DT8_ACTIVATE, boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+      }
+      else {
+        // just call the scene
+        daliComm->daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask), boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+      }
       return;
     }
     else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
@@ -1273,6 +1286,13 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
         if (l) {
           uint8_t power = dev->daliController->brightnessToArcpower(l->brightnessForHardware(true)); // non-transitional, final
           daliComm->daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_SCENE+(a&DaliSceneMask), power);
+        }
+        // in case this is a DT8 device, enable automatic activation at scene call (and at brightness changes)
+        // Note: before here, i.e. when the optimizer is used, we don't touch the auto-activation bit and just use it as-is
+        if (dev->daliController->supportsDT8 && !dev->daliController->dt8autoactivation) {
+          OLOG(LOG_INFO,"enabling color auto-activation for device %d", dev->daliController->deviceInfo->shortAddress);
+          dev->daliController->dt8autoactivation = true; // now enabled
+          daliComm->daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_DT8_SET_GEAR_FEATURES, 0x01); // Bit0 = auto activation
         }
       }
     }
