@@ -126,7 +126,8 @@ namespace p44 {
       actionVariant(0),
       repeatAfter(Never),
       repeatVariant(0),
-      pendingCount(0)
+      pendingCount(0),
+      optimizeHint(undefined)
     {};
 
     ~NotificationDeliveryState();
@@ -139,6 +140,7 @@ namespace p44 {
     int contentId; ///< this represents the ID of the content, such a scene number
     uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
     NotificationType callType; ///< type of notification as originally called
+    Tristate optimizeHint; ///< if not undefined, this requests or prevents optimisation of the called scene (when possible)
 
   public:
 

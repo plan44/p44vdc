@@ -273,6 +273,10 @@ void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aA
   if (aNotification=="callScene") {
     // call scene
     NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState(*this));
+    ApiValuePtr o = aParams->get("optimize");
+    if (o) {
+      nds->optimizeHint = o->boolValue() ? yes : no;
+    }
     nds->audience = aAudience;
     nds->callType = ntfy_callscene;
     nds->callParams = aParams;
@@ -396,8 +400,11 @@ void Vdc::preparedOperationExecuted(DevicePtr aDevice)
 bool Vdc::shouldUseOptimizerFor(NotificationDeliveryStatePtr aDeliveryState)
 {
   // simple base class strategy: at least MIN_DEVICES_TO_OPTIMIZE devices must be involved.
+  // explicit optimizeHint will force or prevent optimisation
   // derived classes can use refined strategy more suitable for the hardware
-  return aDeliveryState->affectedDevices.size()>=minDevicesForOptimizing;
+  return
+    aDeliveryState->optimizeHint==yes || // forced yes
+    (aDeliveryState->affectedDevices.size()>=minDevicesForOptimizing && aDeliveryState->optimizeHint!=no); // enough devices and not explicitly prevented
 }
 
 
@@ -432,7 +439,7 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
           }
         }
       }
-      if (!entry && optimizerMode==opt_auto) {
+      if (!entry && (optimizerMode==opt_auto || (optimizerMode>opt_frozen && aDeliveryState->optimizeHint==yes))) {
         FOCUSOLOG("- creating new cache entry");
         entry = OptimizerEntryPtr(new OptimizerEntry);
         entry->type = aDeliveryState->optimizedType;
@@ -497,8 +504,14 @@ void Vdc::executePreparedNotification(NotificationDeliveryStatePtr aDeliveryStat
       else {
         // affected device set/contentId has no native scene/group installed yet
         FOCUSOLOG("- no native action assigned yet -> checking statistics to see if we should add one");
-        if (optimizerMode==opt_auto && entry->timeWeightedCallCount()>=minCallsBeforeOptimizing) {
-          OLOG(LOG_NOTICE, "Optimizer: %s for these devices has occurred repeatedly (weighted: %ld times) -> optimzing it using native action", NotificationNames[aDeliveryState->optimizedType], entry->timeWeightedCallCount());
+        if (
+          (optimizerMode==opt_auto && entry->timeWeightedCallCount()>=minCallsBeforeOptimizing) ||
+          (optimizerMode>opt_frozen && aDeliveryState->optimizeHint==yes)
+        ) {
+          OLOG(LOG_NOTICE, "Optimizer: %s for these devices has occurred repeatedly (weighted: %ld times) -> %soptimzing it using native action",
+            NotificationNames[aDeliveryState->optimizedType], entry->timeWeightedCallCount(),
+            aDeliveryState->optimizeHint==yes ? "FORCE-" : ""
+          );
           finalizePreparedNotification(entry, aDeliveryState, Error::err<VdcError>(VdcError::AddAction, "Request adding native action"));
           return;
         }
