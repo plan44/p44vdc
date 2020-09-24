@@ -1522,7 +1522,9 @@ void DaliSingleControllerDevice::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr
   if (aIndirectly) {
     // some values were applied indirectly (e.g. optimized group/scene), need to read back from hardware into
     // Note: delay to make sure operation has completed (usually)
-    outputSyncTicket.executeOnce(boost::bind(&DaliBusDevice::updateParams, daliController, StatusCB()), 3*Second);
+    #warning "re-enable"
+    // FIXME: make configurable
+    //outputSyncTicket.executeOnce(boost::bind(&DaliBusDevice::updateParams, daliController, StatusCB()), 3*Second);
   }
   inherited::sceneValuesApplied(aDoneCB, aScene, aIndirectly);
 }
