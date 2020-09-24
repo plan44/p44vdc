@@ -560,8 +560,8 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
   // check for global vdc errors now
   ErrorPtr vdcInitErr;
   for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); pos++) {
-    if (Error::notOK(pos->second->getVdcStatus())) {
-      vdcInitErr = pos->second->getVdcStatus();
+    if (Error::notOK(pos->second->getVdcErr())) {
+      vdcInitErr = pos->second->getVdcErr();
       LOG(LOG_ERR, "*** initial device collecting incomplete because of error: %s", vdcInitErr->text());
       break;
     }

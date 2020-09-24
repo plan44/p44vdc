@@ -904,7 +904,7 @@ void Vdc::collectedDevices(StatusCB aCompletedCB, ErrorPtr aError)
 {
   // call back
   if (aCompletedCB) aCompletedCB(aError);
-  // store as global error
+  // store as global error (possibly already stored)
   setVdcError(aError);
   // done
   collecting = false;
@@ -1561,7 +1561,7 @@ string Vdc::description()
 
 int Vdc::opStateLevel()
 {
-  return Error::isOK(vdcErr) ? (collecting ? 50 : 100) : 0;
+  return Error::isOK(vdcErr) ? (collecting ? 66 : 100) : 33;
 }
 
 

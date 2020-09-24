@@ -252,6 +252,7 @@ void DaliVdc::recollectDevices(StatusCB aCompletedCB)
 
 void DaliVdc::deviceListReceived(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aDeviceListPtr, DaliComm::ShortAddressListPtr aUnreliableDeviceListPtr, ErrorPtr aError)
 {
+  setVdcError(aError); // even if not fatal, pass errors
   // check if any devices
   if (aDeviceListPtr->size()==0) {
     return aCompletedCB(aError); // just no devices to query, nothing more to do no matter if error or not
@@ -499,7 +500,7 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
     simpleIdentifyAndAddDevice(daliSingleControllerDevice);
   }
   // collecting complete
-  aCompletedCB(ErrorPtr());
+  aCompletedCB(getVdcErr());
 }
 
 

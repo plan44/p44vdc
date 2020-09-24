@@ -80,7 +80,7 @@ private:
       greenLED->steadyOn();
       redLED->blinkFor(Infinite, 600*MilliSecond, 50);
       // - check for init errors
-      ErrorPtr vdcErr = nextVdc->second->getVdcStatus();
+      ErrorPtr vdcErr = nextVdc->second->getVdcErr();
       if (Error::isOK(vdcErr)) {
         // - run the test
         LOG(LOG_WARNING, "Starting Test of %s (Tag=%d, %s)", nextVdc->second->vdcClassIdentifier(), nextVdc->second->getTag(), nextVdc->second->shortDesc().c_str());

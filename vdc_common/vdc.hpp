@@ -241,8 +241,7 @@ namespace p44 {
     long totalOptimizableCalls; ///< total of optimizable calls
     MLTicket optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
     bool delivering; ///< set while the delivery/optimization process is running
-
-    ErrorPtr vdcErr; ///< global error, set when something prevents the vdc from working at all
+    ErrorPtr vdcErr; ///< global error, set when something prevents or limits the vdc from working
 
   protected:
   
@@ -289,8 +288,8 @@ namespace p44 {
     /// get number of devices
     size_t getNumberOfDevices() const { return devices.size(); };
 
-    /// get vDC status or error
-    ErrorPtr getVdcStatus() { return vdcErr; }
+    /// get vDC status/error
+    ErrorPtr getVdcErr() { return vdcErr; }
 
     /// @}
 		
