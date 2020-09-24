@@ -253,8 +253,14 @@ void DaliVdc::recollectDevices(StatusCB aCompletedCB)
 void DaliVdc::deviceListReceived(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr aDeviceListPtr, DaliComm::ShortAddressListPtr aUnreliableDeviceListPtr, ErrorPtr aError)
 {
   // check if any devices
-  if (aError || aDeviceListPtr->size()==0)
-    return aCompletedCB(aError); // no devices to query, completed
+  if (aDeviceListPtr->size()==0) {
+    return aCompletedCB(aError); // just no devices to query, nothing more to do no matter if error or not
+  }
+  // there are some devices
+  if (aError) {
+    // but we also had an error
+    LOG(LOG_WARNING, "DALI bus scan with some problems, but using found OK devices. Full bus scan recommended! - %s", aError->text());
+  }
   // create a Dali bus device for every detected device
   DaliBusDeviceListPtr busDevices(new DaliBusDeviceList);
   for (DaliComm::ShortAddressList::iterator pos = aDeviceListPtr->begin(); pos!=aDeviceListPtr->end(); ++pos) {

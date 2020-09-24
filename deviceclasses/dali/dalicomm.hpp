@@ -109,6 +109,7 @@ namespace p44 {
       SetShortAddress,
       BusOverload,
       DataUnreliable,
+      DataMissing,
       numErrorCodes
     } ErrorCodes;
 
@@ -135,6 +136,7 @@ namespace p44 {
       "SetShortAddress",
       "BusOverload",
       "DataUnreliable",
+      "DataMissing",
     };
     #endif // ENABLE_NAMED_ERRORS
   };

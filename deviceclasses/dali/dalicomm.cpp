@@ -664,10 +664,10 @@ public:
   };
 private:
   DaliBusDataTester(DaliComm &aDaliComm, StatusCB aResultCB, DaliAddress aAddress, uint8_t aNumCycles) :
-  daliComm(aDaliComm),
-  callback(aResultCB),
-  busAddress(aAddress),
-  numCycles(aNumCycles)
+    daliComm(aDaliComm),
+    callback(aResultCB),
+    busAddress(aAddress),
+    numCycles(aNumCycles)
   {
     daliComm.startProcedure();
     FOCUSLOG("Before R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
@@ -712,7 +712,7 @@ private:
     if (numErrors>0) {
       LOG(LOG_ERR, "Unreliable data access for DALI bus address %d - %d of %d R/W tests have failed!", busAddress, numErrors, numCycles);
       FOCUSLOG("After failed R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
-      if (callback) callback(Error::err<DaliCommError>(DaliCommError::DataUnreliable, "DALI R/W tests: %d of %d failed", numErrors, numCycles));
+      if (callback) callback(Error::err<DaliCommError>(numErrors>=numCycles ? DaliCommError::DataMissing : DaliCommError::DataUnreliable, "DALI R/W tests: %d of %d failed", numErrors, numCycles));
     }
     else {
       // everything is fine
@@ -999,15 +999,11 @@ private:
     // Strategy:
     // - when short scan reports devices with no short address, trigger a random binary serach FOR THOSE ONLY (case: new devices)
     // - when short scan reports another error: just report back, UNLESS unconditional full scan is requested
-    if (aError && !missingAddrs && fullScanOnlyIfNeeded) {
-      // not enough reason for triggering a random search
-      return completed(aError);
-    }
-    // exit now if full binary search is not explicitly requested (!fullScanOnlyIfNeeded) and no new devices to be given address
     if (!missingAddrs && fullScanOnlyIfNeeded) {
-      // just use the short address scan result
-      foundDevicesPtr = aShortAddressListPtr;
-      completed(ErrorPtr()); return;
+      // not enough reason for triggering a random search, with or without error
+      foundDevicesPtr = aShortAddressListPtr; // but return those that are reliable
+      completed(aError);
+      return;
     }
     // save the short address list
     usedShortAddrsPtr = aShortAddressListPtr;
