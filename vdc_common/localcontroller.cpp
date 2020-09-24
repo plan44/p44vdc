@@ -2644,6 +2644,41 @@ static void trigger_func(BuiltinFunctionContextPtr f)
 }
 
 
+
+// helper for callScene and saveScene
+static bool findScene(int &ai, BuiltinFunctionContextPtr f, SceneNo &sceneNo, int &zoneid)
+{
+  if (f->numArgs()>1 && f->arg(1)->hasType(text)) {
+    // second param is a zone
+    // - ..so first one must be a scene number or name
+    sceneNo = LocalController::sharedLocalController()->localScenes.getSceneIdByKind(f->arg(0)->stringValue());
+    if (sceneNo==INVALID_SCENE_NO) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
+      return false;
+    }
+    // - check zone
+    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(f->arg(1)->stringValue());
+    if (!zone) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "Zone '%s' not found", f->arg(1)->stringValue().c_str()));
+      return false;
+    }
+    zoneid = zone->getZoneId();
+    ai++;
+  }
+  else {
+    // first param is a named scene that includes the zone
+    SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(f->arg(0)->stringValue());
+    if (!scene) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
+      return false;
+    }
+    zoneid = scene->getZoneID();
+    sceneNo = scene->getSceneNo();
+  }
+  return true;
+}
+
+
 // scene(name)
 // scene(name, transition_time)
 // scene(id, zone)
@@ -2658,33 +2693,7 @@ static void scene_func(BuiltinFunctionContextPtr f)
   SceneNo sceneNo = INVALID_SCENE_NO;
   MLMicroSeconds transitionTime = Infinite; // use scene's standard time
   DsGroup group = group_yellow_light; // default to light
-  if (f->numArgs()>1 && f->arg(1)->hasType(text)) {
-    // second param is a zone
-    // - ..so first one must be a scene number or name
-    sceneNo = LocalController::sharedLocalController()->localScenes.getSceneIdByKind(f->arg(0)->stringValue());
-    if (sceneNo==INVALID_SCENE_NO) {
-      f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
-      return;
-    }
-    // - check zone
-    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(f->arg(1)->stringValue());
-    if (!zone) {
-      f->finish(new ErrorValue(ScriptError::NotFound, "Zone '%s' not found", f->arg(1)->stringValue().c_str()));
-      return;
-    }
-    zoneid = zone->getZoneId();
-    ai++;
-  }
-  else {
-    // first param is a named scene that includes the zone
-    SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(f->arg(0)->stringValue());
-    if (!scene) {
-      f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
-      return;
-    }
-    zoneid = scene->getZoneID();
-    sceneNo = scene->getSceneNo();
-  }
+  if (!findScene(ai, f, sceneNo, zoneid)) return;
   if (f->numArgs()>ai) {
     transitionTime = f->arg(ai)->doubleValue()*Second;
     if (transitionTime<0) transitionTime = Infinite; // use default
@@ -2700,6 +2709,38 @@ static void scene_func(BuiltinFunctionContextPtr f)
   }
   // execute the scene
   LocalController::sharedLocalController()->callScene(sceneNo, zoneid, group, transitionTime);
+  f->finish();
+}
+
+
+// savescene(name [, group]])
+// savescene(id, zone [, group]])
+static const BuiltInArgDesc savescene_args[] = { { text|numeric }, { text|numeric|optionalarg }, { text|numeric|optionalarg } };
+static const size_t savescene_numargs = sizeof(savescene_args)/sizeof(BuiltInArgDesc);
+static void savescene_func(BuiltinFunctionContextPtr f)
+{
+  int ai = 1;
+  int zoneid = -1; // none specified
+  SceneNo sceneNo = INVALID_SCENE_NO;
+  DsGroup group = group_yellow_light; // default to light
+  if (!findScene(ai, f, sceneNo, zoneid)) return;
+  if (f->numArgs()>ai) {
+    const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(ai)->stringValue());
+    if (!gdP) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(ai)->stringValue().c_str()));
+      return;
+    }
+    group = gdP->no;
+  }
+  // save the scene
+  NotificationAudience audience;
+  VdcHost::sharedVdcHost()->addToAudienceByZoneAndGroup(audience, zoneid, group);
+  JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
+  params->setType(apivalue_object);
+  // { "notification":"saveScene", "zone_id":0, "group":1, "scene":5 }
+  string method = "saveScene";
+  params->add("scene", params->newUint64(sceneNo));
+  VdcHost::sharedVdcHost()->deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
   f->finish();
 }
 
@@ -2760,6 +2801,7 @@ static void set_func(BuiltinFunctionContextPtr f)
 static const BuiltinMemberDescriptor localControllerFuncs[] = {
   { "trigger", executable|any, trigger_numargs, trigger_args, &trigger_func },
   { "scene", executable|any, scene_numargs, scene_args, &scene_func },
+  { "savescene", executable|any, savescene_numargs, savescene_args, &savescene_func },
   { "set", executable|any, set_numargs, set_args, &set_func },
   { NULL } // terminator
 };
