@@ -103,7 +103,8 @@ namespace p44 {
 
   enum {
     vdcflag_flagsinitialized = 0x00000001, ///< if set, the flags saved in the DB are initialized (and not the default 0 coming from the ages before 10/2019 where vdcflags were unused)
-    vdcflag_hidewhenempty = 0x00000002 ///< if set, vdc will not be announced towards dS as long as it has no devices
+    vdcflag_hidewhenempty = 0x00000002, ///< if set, vdc will not be announced towards dS as long as it has no devices
+    vdcflag_effectSpeedOptimized = 0x00000004 ///< if set, vdc will optimize for effect playback speed (possibly reducing accuray of knowing actual output states due to less reading back from HW)
   };
   typedef uint32_t VdcFlags;
 
