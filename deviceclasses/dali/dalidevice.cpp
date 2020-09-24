@@ -1394,24 +1394,24 @@ bool DaliBusDevice::setColorParamsFromChannels(ColorLightBehaviourPtr aColorLigh
       // RGBW or RGBWA
       if (dt8RGBWAFchannels>4) {
         // RGBWA
-        rgbl->getRGBWA(r, g, b, w, a, 127, true, aTransitional);
+        rgbl->getRGBWA(r, g, b, w, a, 254, true, aTransitional);
         if (!aSilent) {
-          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI composite RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
+          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
         }
       }
       else {
         // RGBW
-        rgbl->getRGBW(r, g, b, w, 127, true, aTransitional);
+        rgbl->getRGBW(r, g, b, w, 254, true, aTransitional);
         if (!aSilent) {
-          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI composite RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
+          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
         }
       }
     }
     else {
       // RGB
-      rgbl->getRGB(r, g, b, 127, true, aTransitional);
+      rgbl->getRGB(r, g, b, 254, true, aTransitional);
       if (!aSilent) {
-        SOLOG(rgbl->getDevice(), LOG_INFO, "DALI composite RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
+        SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
       }
     }
     hasNewColors = setRGBWAParams(r, g, b, w, a, aAlways);
