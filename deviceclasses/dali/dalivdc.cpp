@@ -735,9 +735,10 @@ ErrorPtr DaliVdc::daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 
 void DaliVdc::daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError)
 {
+  ApiValuePtr res = aRequest->newApiValue();
+  res->setType(apivalue_object);
   if (Error::notOK(aError)) {
-    aRequest->sendError(aError);
-    return;
+    res->add("errormessage", res->newString(aError->text()));
   }
   u_int64_t listedDevices = 0;
   ApiValuePtr summary = aRequest->newApiValue();
@@ -779,7 +780,8 @@ void DaliVdc::daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddr
     }
   }
   // return
-  aRequest->sendResult(summary);
+  res->add("summary", summary);
+  aRequest->sendResult(res);
 }
 
 
