@@ -77,6 +77,22 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
 }
 
 
+string DaliBusDevice::logContextPrefix()
+{
+  return string_format("DaliBusDevice %02d: ", deviceInfo ? deviceInfo->shortAddress : 99);
+}
+
+
+int DaliBusDevice::getLogLevelOffset()
+{
+  if (logLevelOffset==0) {
+    // no own offset - inherit vdc's
+    return daliVdc.getLogLevelOffset();
+  }
+  return inherited::getLogLevelOffset();
+}
+
+
 /* Snippet to show brightness/DALI arcpower conversion tables in both directions
 
   dt6LinearDim = false;
@@ -201,7 +217,7 @@ void DaliBusDevice::deriveDsUid()
         if (n.length()>0) {
           // shortAddr based device has already been named. So keep that, and don't generate a devInf based dSUID
           deviceInfo->devInfStatus = DaliDeviceInfo::devinf_notForID;
-          LOG(LOG_WARNING, "DaliBusDevice shortaddr %d kept with shortaddr-based dSUID because it is already named: '%s'", deviceInfo->shortAddress, n.c_str());
+          OLOG(LOG_WARNING, "kept with shortaddr-based dSUID because it is already named: '%s'", n.c_str());
         }
       }
     }
@@ -239,7 +255,7 @@ void DaliBusDevice::dsUidForDeviceInfoStatus(DsUid &aDsUid, DaliDeviceInfo::Dali
 
 void DaliBusDevice::registerDeviceType(uint8_t aDeviceType)
 {
-  LOG(LOG_INFO, "DALI bus device with shortaddr %d supports device type %d", deviceInfo->shortAddress, aDeviceType);
+  OLOG(LOG_INFO, "supports device type %d", aDeviceType);
   switch (aDeviceType) {
     case 6: // DALI DT6 is LED support
       supportsLED = true;
@@ -336,7 +352,7 @@ void DaliBusDevice::dt8FeaturesResponse(StatusCB aCompletedCB, bool aNoOrTimeout
     dt8CT = (aResponse & 0x02)!=0; // mired color temperature capable
     dt8PrimaryColors = (aResponse>>2) & 0x07; // bits 2..4 is the number of primary color channels available
     dt8RGBWAFchannels = (aResponse>>5) & 0x07; // bits 5..7 is the number of RGBWAF channels available
-    LOG(LOG_INFO, "- DALI DT8 bus device with shortaddr %d: features byte = 0x%02X", deviceInfo->shortAddress, aResponse);
+    OLOG(LOG_INFO, "DT8 features byte = 0x%02X", aResponse);
     daliVdc.daliComm->daliSendQuery(
       deviceInfo->shortAddress,
       DALICMD_DT8_QUERY_GEAR_STATUS,
@@ -354,7 +370,7 @@ void DaliBusDevice::dt8GearStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeo
   if (Error::isOK(aError) && !aNoOrTimeout) {
     // DT8 gear status response
     dt8autoactivation = (aResponse & 0x01)!=0;
-    LOG(LOG_INFO, "- DALI DT8 bus device has auto-activation on DAPC %sABLED", dt8autoactivation ? "EN" : "DIS");
+    OLOG(LOG_INFO, "DT8 has auto-activation on DAPC %sABLED", dt8autoactivation ? "EN" : "DIS");
   }
   if (aCompletedCB) aCompletedCB(aError);
 }
@@ -498,7 +514,7 @@ void DaliBusDevice::queryActualLevelResponse(StatusCB aCompletedCB, bool aNoOrTi
     isPresent = true; // answering a query means presence
     // this is my current arc power, save it as brightness for dS system side queries
     currentBrightness = arcpowerToBrightness(aResponse);
-    LOG(LOG_INFO, "DaliBusDevice: retrieved current dimming level: arc power = %d, brightness = %0.1f", aResponse, currentBrightness);
+    OLOG(LOG_INFO, "retrieved current dimming level: arc power = %d, brightness = %0.1f", aResponse, currentBrightness);
   }
   // next: query the minimum dimming level
   daliVdc.daliComm->daliSendQuery(
@@ -516,7 +532,7 @@ void DaliBusDevice::queryMinLevelResponse(StatusCB aCompletedCB, bool aNoOrTimeo
     isPresent = true; // answering a query means presence
     // this is my current arc power, save it as brightness for dS system side queries
     minBrightness = arcpowerToBrightness(aResponse);
-    LOG(LOG_INFO, "DaliBusDevice: retrieved minimum dimming level: arc power = %d, brightness = %0.1f", aResponse, minBrightness);
+    OLOG(LOG_INFO, "retrieved minimum dimming level: arc power = %d, brightness = %0.1f", aResponse, minBrightness);
   }
   if (supportsDT8) {
     // more queries on DT8 devices:
@@ -616,7 +632,7 @@ void DaliBusDevice::queryYCoordResponse(StatusCB aCompletedCB, uint16_t aRespons
 {
   if (Error::isOK(aError)) {
     currentY = aResponse16;
-    LOG(LOG_INFO, "DaliBusDevice: DT8 - is in CIE X/Y color mode, X=%.3f, Y=%.3f", (double)currentXorCT/65536, (double)currentY/65536);
+    OLOG(LOG_INFO, "DT8 is in CIE X/Y color mode, X=%.3f, Y=%.3f", (double)currentXorCT/65536, (double)currentY/65536);
   }
   if (aCompletedCB) aCompletedCB(aError);
 }
@@ -630,7 +646,7 @@ void DaliBusDevice::queryCTResponse(StatusCB aCompletedCB, uint16_t aResponse16,
     }
     else {
       currentXorCT = aResponse16;
-      LOG(LOG_INFO, "DaliBusDevice: DT8 - is in Tunable White mode, CT=%hd mired", currentXorCT);
+      OLOG(LOG_INFO, "DT8 is in Tunable White mode, CT=%hd mired", currentXorCT);
     }
   }
   if (aCompletedCB) aCompletedCB(aError);
@@ -651,12 +667,12 @@ void DaliBusDevice::queryRGBWAFResponse(StatusCB aCompletedCB, uint16_t aResInde
     }
   }
   else {
-    LOG(LOG_DEBUG, "DaliBusDevice: querying DT8 color value %d returned error: %s", aResIndex, aError->text());
+    OLOG(LOG_DEBUG, "querying DT8 color value %d returned error: %s", aResIndex, aError->text());
   }
   aResIndex++;
   if (aResIndex>=dt8RGBWAFchannels) {
     // all values queried
-    LOG(LOG_INFO, "DaliBusDevice: DT8 - is in RGBWAF mode, R=%d, G=%d, B=%d, W=%d, A=%d", currentR, currentG, currentB, currentW, currentA);
+    OLOG(LOG_INFO, "DT8 is in RGBWAF mode, R=%d, G=%d, B=%d, W=%d, A=%d", currentR, currentG, currentB, currentW, currentA);
   }
   else {
     // query next component
@@ -720,12 +736,12 @@ void DaliBusDevice::setTransitionTime(MLMicroSeconds aTransitionTime)
       // Fade time: T = 0.5 * SQRT(2^X) [seconds] -> x = ln2((T/0.5)^2) : T=0.25 [sec] -> x = -2, T=10 -> 8.64
       double h = (((double)aTransitionTime/Second)/0.5);
       h = h*h;
-      h = log(h)/log(2);
+      h = ::log(h)/::log(2);
       tr = h>1 ? (uint8_t)h : 1;
-      LOG(LOG_DEBUG, "DaliDevice: new transition time = %.1f mS, calculated FADE_TIME setting = %f (rounded %d)", (double)aTransitionTime/MilliSecond, h, (int)tr);
+      OLOG(LOG_DEBUG, "new transition time = %.1f mS, calculated FADE_TIME setting = %f (rounded %d)", (double)aTransitionTime/MilliSecond, h, (int)tr);
     }
     if (tr!=currentFadeTime || currentTransitionTime==Infinite) {
-      LOG(LOG_INFO, "DaliDevice %d: setting DALI FADE_TIME from %d to %d (for transition time %.1f mS)", deviceInfo->shortAddress, currentFadeTime, (int)tr, (double)aTransitionTime/MilliSecond);
+      OLOG(LOG_INFO, "setting DALI FADE_TIME from %d to %d (for transition time %.1f mS)", currentFadeTime, (int)tr, (double)aTransitionTime/MilliSecond);
       daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_TIME, tr);
       currentFadeTime = tr;
     }
@@ -741,7 +757,7 @@ bool DaliBusDevice::setBrightness(Brightness aBrightness)
   if (currentBrightness!=aBrightness) {
     currentBrightness = aBrightness;
     uint8_t power = brightnessToArcpower(aBrightness);
-    LOG(LOG_INFO, "Dali dimmer at shortaddr=%d: setting new brightness = %0.2f, arc power = %d", (int)deviceInfo->shortAddress, aBrightness, (int)power);
+    OLOG(LOG_INFO, "setting new brightness = %0.2f, arc power = %d", aBrightness, (int)power);
     daliVdc.daliComm->daliSendDirectPower(deviceInfo->shortAddress, power);
     return true; // changed
   }
@@ -755,7 +771,7 @@ void DaliBusDevice::setDefaultBrightness(Brightness aBrightness)
   dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (aBrightness<0) aBrightness = currentBrightness; // use current brightness
   uint8_t power = brightnessToArcpower(aBrightness);
-  LOG(LOG_INFO, "Dali dimmer at shortaddr=%d: setting default/failure brightness = %0.2f, arc power = %d", (int)deviceInfo->shortAddress, aBrightness, (int)power);
+  OLOG(LOG_INFO, "setting default/failure brightness = %0.2f, arc power = %d", aBrightness, (int)power);
   daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_POWER_ON_LEVEL, power);
   daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FAILURE_LEVEL, power);
 }
@@ -882,11 +898,11 @@ void DaliBusDevice::dimPrepare(VdcDimMode aDimMode, double aDimPerMS, StatusCB a
       currentDimPerMS = aDimPerMS;
       //   Fade rate: R = 506/SQRT(2^X) [steps/second] -> x = ln2((506/R)^2) : R=44 [steps/sec] -> x = 7
       double h = 506.0/(currentDimPerMS*1000);
-      h = log(h*h)/log(2);
+      h = ::log(h*h)/::log(2);
       uint8_t fr = h>0 ? (uint8_t)h : 0;
-      LOG(LOG_DEBUG, "DaliDevice: new dimming rate = %f steps/second, calculated FADE_RATE setting = %f (rounded %d)", currentDimPerMS*1000, h, fr);
+      OLOG(LOG_DEBUG, "new dimming rate = %f steps/second, calculated FADE_RATE setting = %f (rounded %d)", currentDimPerMS*1000, h, fr);
       if (fr!=currentFadeRate) {
-        LOG(LOG_INFO, "DaliDevice shortaddr %d: setting DALI FADE_RATE to %d for dimming at %f steps/second", deviceInfo->shortAddress, fr, currentDimPerMS*1000);
+        OLOG(LOG_INFO, "setting DALI FADE_RATE to %d for dimming at %f steps/second", fr, currentDimPerMS*1000);
         currentFadeRate = fr;
         daliVdc.daliComm->daliSendDtrAndConfigCommand(deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_FADE_RATE, fr, boost::bind(&DaliBusDevice::dimPrepared, this, aCompletedCB, _1));
         return;
@@ -1342,7 +1358,7 @@ void DaliSingleControllerDevice::processUpdatedParams(ErrorPtr aError)
     }
   }
   else {
-    LOG(LOG_ERR, "DaliDevice: error getting state/params from dimmer: %s", aError->text());
+    OLOG(LOG_ERR, "Single controller: Error getting state/params from dimmer: %s", aError->text());
   }
 }
 
@@ -1800,7 +1816,7 @@ void DaliCompositeDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryR
 void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryReset, DimmerIndex aDimmerIndex, ErrorPtr aError)
 {
   if (Error::notOK(aError)) {
-    LOG(LOG_ERR, "DaliCompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->text());
+    OLOG(LOG_ERR, "CompositeDevice: error getting state/params from dimmer#%d: %s", aDimmerIndex-1, aError->text());
   }
   while (aDimmerIndex<numDimmers) {
     DaliBusDevicePtr di = dimmers[aDimmerIndex];

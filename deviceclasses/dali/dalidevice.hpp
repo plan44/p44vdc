@@ -48,9 +48,9 @@ namespace p44 {
   typedef boost::intrusive_ptr<DaliCompositeDevice> DaliCompositeDevicePtr;
   typedef boost::intrusive_ptr<DaliInputDevice> DaliInputDevicePtr;
 
-  class DaliBusDevice : public P44Obj
+  class DaliBusDevice : public P44LoggingObj
   {
-    typedef P44Obj inherited;
+    typedef P44LoggingObj inherited;
     friend class DaliBusDeviceGroup;
     friend class DaliOutputDevice;
     friend class DaliCompositeDevice;
@@ -103,6 +103,13 @@ namespace p44 {
   public:
 
     DaliBusDevice(DaliVdc &aDaliVdc);
+
+    /// @return the prefix to be used for logging from this object
+    virtual string logContextPrefix() P44_OVERRIDE;
+
+    /// @return the per-instance log level offset
+    /// @note is virtual because some objects might want to use the log level offset of another object
+    virtual int getLogLevelOffset() P44_OVERRIDE;
 
     /// use passed device info and derive dSUID from it
     void setDeviceInfo(DaliDeviceInfoPtr aDeviceInfo);
