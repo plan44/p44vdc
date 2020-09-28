@@ -592,6 +592,9 @@ namespace p44 {
     /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
     virtual int opStateLevel() P44_OVERRIDE;
 
+    /// @param aFlagMask mask for flag to check, see VdcFlag type and related enum
+    /// @return state of a vdc flag
+    bool getVdcFlag(VdcFlags aFlagMask) { return (vdcFlags & aFlagMask)!=0; }
 
   protected:
 
@@ -609,7 +612,6 @@ namespace p44 {
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
-    bool getVdcFlag(VdcFlags aFlagMask) { return (vdcFlags & aFlagMask)!=0; }
     void setVdcFlag(VdcFlags aFlagMask, bool aNewValue) { setPVar(vdcFlags, (vdcFlags & ~aFlagMask) | (aNewValue ? aFlagMask : 0)); }
 
     // derive dSUID

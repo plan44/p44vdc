@@ -64,6 +64,7 @@ namespace p44 {
     DaliVdc &daliVdc;
 
     MLTicket dimRepeaterTicket; ///< DALI dimming and repeater ticket
+    MLTicket outputSyncTicket; ///< output value sync-back ticket
     VdcDimMode currentDimMode; ///< current dim mode
 
     /// feature set
@@ -88,6 +89,7 @@ namespace p44 {
     uint8_t currentFadeRate; ///< currently set DALI fade rate
 
     /// cached parameters (call updateParams() to update these)
+    bool staleParams; ///< set if cached parameters might be stale and should not be used for deciding incremental changes to HW
     Brightness currentBrightness; ///< current brightness
     Brightness minBrightness; ///< currently set minimal brightness
     // - DT8 params
@@ -344,7 +346,6 @@ namespace p44 {
   protected:
 
     MLTicket transitionTicket; ///< transition timing ticket
-    MLTicket outputSyncTicket; ///< output value sync-back ticket
 
   public:
 

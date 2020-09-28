@@ -54,6 +54,7 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   isDummy(false),
   isPresent(false),
   lampFailure(false),
+  staleParams(true),
   currentTransitionTime(Infinite), // invalid
   currentDimPerMS(0), // none
   currentFadeRate(0xFF), currentFadeTime(0xFF), // unlikely values
@@ -493,6 +494,7 @@ void DaliBusDevice::initializeFeatures(StatusCB aCompletedCB)
 
 void DaliBusDevice::updateParams(StatusCB aCompletedCB)
 {
+  outputSyncTicket.cancel(); // cancel possibly scheduled update
   if (isDummy) {
     if (aCompletedCB) aCompletedCB(ErrorPtr());
     return;
@@ -544,6 +546,7 @@ void DaliBusDevice::queryMinLevelResponse(StatusCB aCompletedCB, bool aNoOrTimeo
     );
     return;
   }
+  staleParams = false;
   if (aCompletedCB) aCompletedCB(aError);
 }
 
@@ -603,6 +606,7 @@ void DaliBusDevice::queryColorStatusResponse(StatusCB aCompletedCB, bool aNoOrTi
     }
   }
   // no more queries
+  staleParams = false;
   if (aCompletedCB) aCompletedCB(aError);
 }
 
@@ -624,6 +628,7 @@ void DaliBusDevice::queryXCoordResponse(StatusCB aCompletedCB, uint16_t aRespons
       return;
     }
   }
+  staleParams = false;
   if (aCompletedCB) aCompletedCB(aError);
 }
 
@@ -634,6 +639,7 @@ void DaliBusDevice::queryYCoordResponse(StatusCB aCompletedCB, uint16_t aRespons
     currentY = aResponse16;
     OLOG(LOG_INFO, "DT8 is in CIE X/Y color mode, X=%.3f, Y=%.3f", (double)currentXorCT/65536, (double)currentY/65536);
   }
+  staleParams = false;
   if (aCompletedCB) aCompletedCB(aError);
 }
 
@@ -649,6 +655,7 @@ void DaliBusDevice::queryCTResponse(StatusCB aCompletedCB, uint16_t aResponse16,
       OLOG(LOG_INFO, "DT8 is in Tunable White mode, CT=%hd mired", currentXorCT);
     }
   }
+  staleParams = false;
   if (aCompletedCB) aCompletedCB(aError);
 }
 
@@ -683,6 +690,7 @@ void DaliBusDevice::queryRGBWAFResponse(StatusCB aCompletedCB, uint16_t aResInde
     );
     return;
   }
+  staleParams = false;
   if (aCompletedCB) aCompletedCB(aError);
 }
 
@@ -754,7 +762,9 @@ bool DaliBusDevice::setBrightness(Brightness aBrightness)
 {
   if (isDummy) return false;
   dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
-  if (currentBrightness!=aBrightness) {
+  outputSyncTicket.cancel(); // setting new values now, no need to sync
+  if (currentBrightness!=aBrightness || staleParams) {
+    staleParams = false; // consider everything applied now
     currentBrightness = aBrightness;
     uint8_t power = brightnessToArcpower(aBrightness);
     OLOG(LOG_INFO, "setting new brightness = %0.2f, arc power = %d", aBrightness, (int)power);
@@ -780,7 +790,8 @@ void DaliBusDevice::setDefaultBrightness(Brightness aBrightness)
 
 bool DaliBusDevice::setColorParams(ColorLightMode aMode, double aCieXorCT, double aCieY, bool aAlways)
 {
-  bool changed = aAlways;
+  bool changed = aAlways || staleParams;
+  outputSyncTicket.cancel(); // setting new values now, no need to sync
   dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (supportsDT8) {
     if (currentColorMode!=aMode) {
@@ -817,7 +828,7 @@ bool DaliBusDevice::setColorParams(ColorLightMode aMode, double aCieXorCT, doubl
 
 bool DaliBusDevice::setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t aW, uint8_t aA, bool aAlways)
 {
-  bool changed = aAlways;
+  bool changed = aAlways || staleParams;
   dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (supportsDT8) {
     if (currentColorMode!=colorLightModeRGBWA) {
@@ -846,11 +857,63 @@ bool DaliBusDevice::setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t a
 }
 
 
+bool DaliBusDevice::setColorParamsFromChannels(ColorLightBehaviourPtr aColorLight, bool aTransitional, bool aAlways, bool aSilent)
+{
+  bool hasNewColors = false;
+  RGBColorLightBehaviourPtr rgbl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(aColorLight);
+  if (rgbl) {
+    // DALI controller needs direct RGBWA(F)
+    double r=0,g=0,b=0,w=0,a=0;
+    if (dt8RGBWAFchannels>3) {
+      // RGBW or RGBWA
+      if (dt8RGBWAFchannels>4) {
+        // RGBWA
+        rgbl->getRGBWA(r, g, b, w, a, 254, true, aTransitional);
+        if (!aSilent) {
+          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
+        }
+      }
+      else {
+        // RGBW
+        rgbl->getRGBW(r, g, b, w, 254, true, aTransitional);
+        if (!aSilent) {
+          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
+        }
+      }
+    }
+    else {
+      // RGB
+      rgbl->getRGB(r, g, b, 254, true, aTransitional);
+      if (!aSilent) {
+        SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
+      }
+    }
+    hasNewColors = setRGBWAParams(r, g, b, w, a, aAlways);
+  }
+  else {
+    // DALI controller understands Cie and/or Ct directly
+    if (dt8Color && (aColorLight->colorMode!=colorLightModeCt || !dt8CT)) {
+      // color is requested or CT is requested but controller cannot do CT natively -> send CieX/Y
+      double cieX, cieY;
+      aColorLight->getCIExy(cieX, cieY, aTransitional);
+      hasNewColors = setColorParams(colorLightModeXY, cieX, cieY, aAlways);
+    }
+    else {
+      // CT is requested and controller can do CT natively, or color is requested but controller can ONLY do CT
+      double mired;
+      aColorLight->getCT(mired, aTransitional);
+      hasNewColors = setColorParams(colorLightModeCt, mired, 0, aAlways);
+    }
+  }
+  return hasNewColors;
+}
 
 
 void DaliBusDevice::activateColorParams()
 {
   dimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
+  outputSyncTicket.cancel(); // setting new values now, no need to sync
+  staleParams = false; // new params activated, not stale any more
   if (supportsDT8) {
     daliVdc.daliComm->daliSendCommand(deviceInfo->shortAddress, DALICMD_DT8_ACTIVATE);
   }
@@ -1399,58 +1462,6 @@ void DaliSingleControllerDevice::disconnectableHandler(bool aForgetParams, Disco
 }
 
 
-bool DaliBusDevice::setColorParamsFromChannels(ColorLightBehaviourPtr aColorLight, bool aTransitional, bool aAlways, bool aSilent)
-{
-  bool hasNewColors = false;
-  RGBColorLightBehaviourPtr rgbl = boost::dynamic_pointer_cast<RGBColorLightBehaviour>(aColorLight);
-  if (rgbl) {
-    // DALI controller needs direct RGBWA(F)
-    double r=0,g=0,b=0,w=0,a=0;
-    if (dt8RGBWAFchannels>3) {
-      // RGBW or RGBWA
-      if (dt8RGBWAFchannels>4) {
-        // RGBWA
-        rgbl->getRGBWA(r, g, b, w, a, 254, true, aTransitional);
-        if (!aSilent) {
-          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
-        }
-      }
-      else {
-        // RGBW
-        rgbl->getRGBW(r, g, b, w, 254, true, aTransitional);
-        if (!aSilent) {
-          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
-        }
-      }
-    }
-    else {
-      // RGB
-      rgbl->getRGB(r, g, b, 254, true, aTransitional);
-      if (!aSilent) {
-        SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
-      }
-    }
-    hasNewColors = setRGBWAParams(r, g, b, w, a, aAlways);
-  }
-  else {
-    // DALI controller understands Cie and/or Ct directly
-    if (dt8Color && (aColorLight->colorMode!=colorLightModeCt || !dt8CT)) {
-      // color is requested or CT is requested but controller cannot do CT natively -> send CieX/Y
-      double cieX, cieY;
-      aColorLight->getCIExy(cieX, cieY, aTransitional);
-      hasNewColors = setColorParams(colorLightModeXY, cieX, cieY, aAlways);
-    }
-    else {
-      // CT is requested and controller can do CT natively, or color is requested but controller can ONLY do CT
-      double mired;
-      aColorLight->getCT(mired, aTransitional);
-      hasNewColors = setColorParams(colorLightModeCt, mired, 0, aAlways);
-    }
-  }
-  return hasNewColors;
-}
-
-
 void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize)
 {
   LightBehaviourPtr l = getOutput<LightBehaviour>();
@@ -1520,9 +1531,16 @@ void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDim
 void DaliSingleControllerDevice::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndirectly)
 {
   if (aIndirectly) {
-    // some values were applied indirectly (e.g. optimized group/scene), need to read back from hardware into
-    // Note: delay to make sure operation has completed (usually)
-    outputSyncTicket.executeOnce(boost::bind(&DaliBusDevice::updateParams, daliController, StatusCB()), 3*Second);
+    // some values were applied indirectly (e.g. optimized group/scene)
+    // This makes the controller parameters stale
+    daliController->staleParams = true;
+    // We might want to read back the actual parameters now
+    if (!daliVdc().getVdcFlag(vdcflag_effectSpeedOptimized)) {
+      // Only if not aiming for maximum effect speed (rapid sequences of scene calls)
+      // we can afford spending bus bandwidth with reading back parameters
+      // (but only after a delay to make sure current operation has likely ended already)
+      daliController->outputSyncTicket.executeOnce(boost::bind(&DaliBusDevice::updateParams, daliController, StatusCB()), 3*Second);
+    }
   }
   inherited::sceneValuesApplied(aDoneCB, aScene, aIndirectly);
 }
@@ -1562,6 +1580,7 @@ bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStat
   }
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
     // only brightness dimming optimizable for now
+    // TODO: extend to also optimize DT8 channels dimming
     return currentDimChannel && currentDimChannel->getChannelType()==channeltype_brightness;
   }
   return false;
