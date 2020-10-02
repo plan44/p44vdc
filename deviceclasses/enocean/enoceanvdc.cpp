@@ -75,12 +75,23 @@ string EnoceanVdc::vdcModelVersion() const
 //  4 : first actually used schema
 //  5 : subdevice indices of 2-way enocean buttons must be adjusted (now 2-spaced to leave room for single button mode)
 //  6 : added additional table for secure device info
+//  7 : bugfix, secureDevices table was not created on new devices, only in updates from V5->V6
+//      i.e. starting at V0 created a V6 w/o secureDevices. V7 means the secureDevices table is certainly there
 #define ENOCEAN_SCHEMA_MIN_VERSION 4 // minimally supported version, anything older will be deleted
-#define ENOCEAN_SCHEMA_VERSION 6 // current version
+#define ENOCEAN_SCHEMA_VERSION 7 // current version
 
 string EnoceanPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
+  const char *secureDevicesSchema =
+    " secureDevices ("
+    "  enoceanAddress INTEGER,"
+    "  slf INTEGER,"
+    "  rlc INTEGER,"
+    "  key BLOB,"
+    "  teachInInfo INTEGER,"
+    "  PRIMARY KEY (enoceanAddress)"
+    ");";
   if (aFromVersion==0) {
     // create DB from scratch
 		// - use standard globs table for schema version
@@ -95,6 +106,8 @@ string EnoceanPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
       " PRIMARY KEY (enoceanAddress, subdevice)"
 			");"
 		);
+    sql.append("CREATE TABLE");
+    sql.append(secureDevicesSchema);
     // reached final version in one step
     aToVersion = ENOCEAN_SCHEMA_VERSION;
   }
@@ -106,19 +119,14 @@ string EnoceanPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
     // reached version 5
     aToVersion = 5;
   }
-  else if (aFromVersion==5) {
-    // V5->V6: add security info table
-    sql =
-			"CREATE TABLE secureDevices ("
-			" enoceanAddress INTEGER,"
-      " slf INTEGER,"
-      " rlc INTEGER,"
-      " key BLOB,"
-      " teachInInfo INTEGER,"
-      " PRIMARY KEY (enoceanAddress)"
-			");";
-    // reached version 6
-    aToVersion = 6;
+  else if (aFromVersion==5 || aFromVersion==6) {
+    // V5/6->V7: make sure that security info table exists
+    // Note: it will already exists in V6, when that V6 was create by upgrading from V5,
+    //   but will not exist in V6 created from scratch because creation was missing in aFromVersion==0 case above.
+    sql = "CREATE TABLE IF NOT EXISTS"; // IF NOT EXISTS available from SQLite 3.3, we have 3.8 in DigiESP -> safe
+    sql.append(secureDevicesSchema);
+    // reached version 7 (possibly in one step from V5)
+    aToVersion = 7;
   }
   return sql;
 }
