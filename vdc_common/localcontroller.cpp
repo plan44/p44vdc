@@ -2163,32 +2163,32 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
         sceneToCall = sceneOffclick;
       }
     }
-    // now perform actions
-    if (sceneToCall!=INVALID_SCENE_NO) {
-      callScene(sceneToCall, zoneID, group);
-      return true; // handled
-    }
-    else if (doDim) {
-      // deliver
-      NotificationAudience audience;
-      vdcHost.addToAudienceByZoneAndGroup(audience, zoneID, group);
-      JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
-      params->setType(apivalue_object);
-      // - define audience
-      params->add("zone_id", params->newUint64(zoneID));
-      params->add("group", params->newUint64(group));
-      string method = "dimChannel";
-      params->add("mode", params->newInt64(direction));
-      params->add("autostop", params->newBool(false)); // prevent stop dimming event w/o repeating command
-      params->add("channel", params->newUint64(channelType));
-      params->add("area", params->newUint64(area));
-      // - deliver
-      vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
-      return true; // handled
-    }
-    else {
-      return true; // NOP, but handled
-    }
+  }
+  // now perform actions
+  if (sceneToCall!=INVALID_SCENE_NO) {
+    callScene(sceneToCall, zoneID, group);
+    return true; // handled
+  }
+  else if (doDim) {
+    // deliver
+    NotificationAudience audience;
+    vdcHost.addToAudienceByZoneAndGroup(audience, zoneID, group);
+    JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
+    params->setType(apivalue_object);
+    // - define audience
+    params->add("zone_id", params->newUint64(zoneID));
+    params->add("group", params->newUint64(group));
+    string method = "dimChannel";
+    params->add("mode", params->newInt64(direction));
+    params->add("autostop", params->newBool(false)); // prevent stop dimming event w/o repeating command
+    params->add("channel", params->newUint64(channelType));
+    params->add("area", params->newUint64(area));
+    // - deliver
+    vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
+    return true; // handled
+  }
+  else {
+    return true; // NOP, but handled
   }
   return false; // not handled so far
 }
@@ -2519,7 +2519,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
         ApiValuePtr g = result->newObject();
         g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
         g->add("kind", g->newUint64(gi ? gi->kind : 0));
-        g->add("color", g->newString(string_format("#%06X", gi->hexcolor)));
+        g->add("color", g->newString(string_format("#%06X", gi ? gi->hexcolor : 0x999999)));
         result->add(string_format("%d", i), g);
       }
     }
