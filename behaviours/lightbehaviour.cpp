@@ -211,7 +211,7 @@ static MLMicroSeconds transitionTimeFromDimTime(uint8_t aDimTime)
 
 MLMicroSeconds LightBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool aDimUp)
 {
-  uint8_t dimTimeIndex;
+  uint8_t dimTimeIndex = 0;
   SimpleScenePtr ssc = boost::dynamic_pointer_cast<SimpleScene>(aScene);
   if (ssc) {
     switch (ssc->effect) {
