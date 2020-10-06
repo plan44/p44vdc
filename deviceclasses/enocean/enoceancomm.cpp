@@ -1112,9 +1112,9 @@ uint8_t EnOceanSecurity::rlcSize()
 }
 
 
-void EnOceanSecurity::incrementRlc(int aIncrement)
+void EnOceanSecurity::incrementRlc(int32_t aIncrement)
 {
-  rollingCounter += aIncrement;
+  rollingCounter += (uint32_t)aIncrement;
   // mask
   rollingCounter &= (0xFFFFFFFF>>((4-rlcSize())*8));
 }
@@ -1321,9 +1321,9 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
   }
   // verify CMAC
   if (macsz) {
-    int rlcRetries = RLC_WINDOW_SIZE;
+    int rlcRetries = 0;
     while(true) {
-      if (rlcRetries<=0) {
+      if (rlcRetries>=RLC_WINDOW_SIZE) {
         LOG(LOG_INFO, "No matching CMAC %X found within RLC window of %d", cmac_sent, RLC_WINDOW_SIZE);
         return Esp3PacketPtr(); // invalid CMAC
       }
@@ -1338,9 +1338,29 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
         LOG(LOG_INFO, "No CMAC %X match with transmitted RLC %X", cmac_sent, rollingCounter);
         return Esp3PacketPtr(); // invalid CMAC
       }
+      if (rlcRetries==0 && aSecureMsg->radioRepeaterCount()>0) {
+        // this repeated packet could be that one we already did receive and incremented the RLC for
+        // if it is, we must NOT move the RLC forward, otherwise we'd loose sync with further packets
+        // (But we must NOT process a backward RLC packet, because it could also be a replay attack
+        //  -> just ignore and leave RLC untouched)
+        bool backmatch = false;
+        uint32_t origRLC = rollingCounter;
+        for (int r=0; r<aSecureMsg->radioRepeaterCount(); r++) {
+          incrementRlc(-1);
+          if (cmac_sent==calcCMAC(privateKey, subKey1, subKey2, rollingCounter, rlcsz, macsz, org, d, n)) {
+            backmatch = true;
+            break;
+          }
+        }
+        rollingCounter = origRLC;
+        if (backmatch) {
+          LOG(LOG_INFO, "Repeated packet CMAC %X matches for a previous RLC -> ignoring to prevent replay attack (but keep RLC unchanged)", cmac_sent);
+          return Esp3PacketPtr(); // invalid CMAC
+        }
+      }
       LOG(LOG_DEBUG, "No matching CMAC %X for current RLC, check next RLC in window", cmac_sent);
       incrementRlc();
-      rlcRetries--;
+      rlcRetries++;
     }
   }
   // check decryption: n bytes at d

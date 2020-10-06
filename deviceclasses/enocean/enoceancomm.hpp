@@ -507,7 +507,7 @@ namespace p44 {
 
     /// increment RLC with proper wraparound
     /// @param aIncrement how much to increment (signed)
-    void incrementRlc(int aIncrement=1);
+    void incrementRlc(int32_t aIncrement=1);
 
     /// size of MAC
     /// @return size of MAC in bytes, 0 if none in use
