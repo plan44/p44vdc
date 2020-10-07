@@ -483,8 +483,6 @@ void EnoceanVdc::loadSecurityInfos()
 }
 
 
-#define MIN_RLC_DISTANCE_FOR_SAVE 100 // a flash write every 50 clicks (press+release) seems ok
-
 bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aEnoceanAddress, bool aRLCOnly, bool aOnlyIfNeeded)
 {
   if (aOnlyIfNeeded) {

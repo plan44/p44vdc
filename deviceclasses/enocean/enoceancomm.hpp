@@ -464,6 +464,9 @@ namespace p44 {
 
   #if ENABLE_ENOCEAN_SECURE
 
+  #define RLC_WINDOW_SIZE 128 // defined in the "Security of Enocean Networks" spec, pg 27
+  #define MIN_RLC_DISTANCE_FOR_SAVE 100 // a flash write every 50 clicks (press+release) seems ok
+
   const uint8_t maxTeachInDataSize = 32;
   typedef struct {
     uint8_t teachInData[maxTeachInDataSize]; ///< accumulated teach-in data (excluding TEACH_IN_INFO)
@@ -491,6 +494,7 @@ namespace p44 {
     // persistence management
     uint32_t lastSavedRLC; ///< last saved RLC
     MLMicroSeconds lastSave; ///< when was the RLC saved last time
+    bool rlcVerified; ///< actually verified RLC was correct (at least one message authenticated successfully since last restart)
 
   private:
 

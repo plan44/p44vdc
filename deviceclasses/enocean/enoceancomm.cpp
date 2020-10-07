@@ -1075,14 +1075,13 @@ const char *EnoceanComm::manufacturerName(EnoceanManufacturer aManufacturerCode)
 
 #if ENABLE_ENOCEAN_SECURE
 
-#define RLC_WINDOW_SIZE 128 // defined in the "Security of Enocean Networks" spec, pg 27
-
 EnOceanSecurity::EnOceanSecurity() :
   securityLevelFormat(0),
   teachInInfo(0),
   rollingCounter(0),
   lastSavedRLC(0),
   lastSave(Never),
+  rlcVerified(false),
   teachInP(NULL)
 {
   memset(&privateKey, 0, AES128BlockLen);
@@ -1313,7 +1312,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
     }
     // transmitted RLC must be higher than last known
     if (!rlcInWindow(rlc)) {
-      LOG(LOG_INFO, "Transmitted RLC is not within allowed window of %d", RLC_WINDOW_SIZE);
+      LOG(LOG_NOTICE, "Transmitted RLC is not within allowed window of %d", RLC_WINDOW_SIZE);
       return Esp3PacketPtr(); // invalid CMAC
     }
     // update RLC
@@ -1322,41 +1321,29 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
   // verify CMAC
   if (macsz) {
     int rlcRetries = 0;
+    uint32_t origRLC = rollingCounter;
+    // Note: allow for more retries when we might have lost RLC increments because of lazy persistence
+    int maxRetries = rlcVerified ? RLC_WINDOW_SIZE : RLC_WINDOW_SIZE+MIN_RLC_DISTANCE_FOR_SAVE;
     while(true) {
-      if (rlcRetries>=RLC_WINDOW_SIZE) {
-        LOG(LOG_INFO, "No matching CMAC %X found within RLC window of %d", cmac_sent, RLC_WINDOW_SIZE);
+      if (rlcRetries>=maxRetries) {
+        LOG(LOG_NOTICE, "No matching CMAC %X found within window of current RLC + %d", cmac_sent, maxRetries);
+        rollingCounter = origRLC; // do not change RLC
         return Esp3PacketPtr(); // invalid CMAC
       }
       // calc CMAC
       uint32_t cmac_calc = calcCMAC(privateKey, subKey1, subKey2, rollingCounter, rlcsz, macsz, org, d, n);
       if (cmac_calc==cmac_sent) {
         // CMAC matches
+        rlcVerified = true; // this RLC matches
+        if (rlcRetries>0) {
+          LOG(LOG_NOTICE, "RLC increment of %d required to match CMAC %X (indicates missing packets)", rlcRetries, cmac_sent);
+        }
         break;
       }
       // no match
       if (transmittedRlc) {
-        LOG(LOG_INFO, "No CMAC %X match with transmitted RLC %X", cmac_sent, rollingCounter);
+        LOG(LOG_NOTICE, "No CMAC %X match with transmitted RLC %X", cmac_sent, rollingCounter);
         return Esp3PacketPtr(); // invalid CMAC
-      }
-      if (rlcRetries==0 && aSecureMsg->radioRepeaterCount()>0) {
-        // this repeated packet could be that one we already did receive and incremented the RLC for
-        // if it is, we must NOT move the RLC forward, otherwise we'd loose sync with further packets
-        // (But we must NOT process a backward RLC packet, because it could also be a replay attack
-        //  -> just ignore and leave RLC untouched)
-        bool backmatch = false;
-        uint32_t origRLC = rollingCounter;
-        for (int r=0; r<aSecureMsg->radioRepeaterCount(); r++) {
-          incrementRlc(-1);
-          if (cmac_sent==calcCMAC(privateKey, subKey1, subKey2, rollingCounter, rlcsz, macsz, org, d, n)) {
-            backmatch = true;
-            break;
-          }
-        }
-        rollingCounter = origRLC;
-        if (backmatch) {
-          LOG(LOG_INFO, "Repeated packet CMAC %X matches for a previous RLC -> ignoring to prevent replay attack (but keep RLC unchanged)", cmac_sent);
-          return Esp3PacketPtr(); // invalid CMAC
-        }
       }
       LOG(LOG_DEBUG, "No matching CMAC %X for current RLC, check next RLC in window", cmac_sent);
       incrementRlc();
