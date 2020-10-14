@@ -493,6 +493,7 @@ namespace p44 {
 
     #if ENABLE_P44SCRIPT
     void handleTrigger(ScriptObjPtr aResult);
+    void executeTriggerAction();
     void triggerActionExecuted(ScriptObjPtr aResult);
     void testTriggerActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
     #else

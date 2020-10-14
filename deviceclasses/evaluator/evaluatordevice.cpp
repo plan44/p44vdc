@@ -528,7 +528,7 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
           }
           #if P44SCRIPT_FULL_SUPPORT
           case evaluator_internalaction: {
-            // execute action (but let triggers actually finish first)
+            // execute actions (but let trigger evaluation IN SAME CONTEXT actually finish first)
             MainLoop::currentMainLoop().executeNow(boost::bind(&EvaluatorDevice::executeActions, this));
             break;
           }

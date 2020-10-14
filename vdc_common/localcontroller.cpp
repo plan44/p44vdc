@@ -1114,9 +1114,15 @@ void Trigger::handleTrigger(ScriptObjPtr aResult)
   OLOG(LOG_NOTICE, "triggers based on values (and maybe timing): %s",
     valueMapper.shortDesc().c_str()
   );
+  // launch action (but let trigger evaluation IN SAME CONTEXT actually finish first)
+  MainLoop::currentMainLoop().executeNow(boost::bind(&Trigger::executeTriggerAction, this));
+}
+
+
+void Trigger::executeTriggerAction()
+{
   // a trigger fire is an activity
   LocalController::sharedLocalController()->signalActivity();
-  // launch action
   triggerAction.run(stopall, boost::bind(&Trigger::triggerActionExecuted, this, _1), Infinite);
 }
 
