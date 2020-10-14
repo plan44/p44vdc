@@ -1274,11 +1274,11 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
 {
   RadioOrg org = aSecureMsg->eepRorg();
   if (org!=rorg_SEC_ENCAPS && org!=rorg_SEC) {
-    LOG(LOG_WARNING, "Non-secure radio packet seemingly coming from %08X, but device is secure -> ignored", aSecureMsg->radioSender());
+    LOG(LOG_WARNING, "%08X: Non-secure radio packet, but device is secure -> ignored", aSecureMsg->radioSender());
     return Esp3PacketPtr(); // none
   }
   if (teachInP) {
-    LOG(LOG_NOTICE, "Incomplete security info for %08X -> packet ignored", aSecureMsg->radioSender());
+    LOG(LOG_NOTICE, "%08X: Incomplete security info -> packet ignored", aSecureMsg->radioSender());
     return Esp3PacketPtr(); // none
   }
   // something to decrypt
@@ -1312,7 +1312,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
     }
     // transmitted RLC must be higher than last known
     if (!rlcInWindow(rlc)) {
-      LOG(LOG_NOTICE, "Transmitted RLC is not within allowed window of %d", RLC_WINDOW_SIZE);
+      LOG(LOG_NOTICE, "%08X: Transmitted RLC is not within allowed window of %d", aSecureMsg->radioSender(), RLC_WINDOW_SIZE);
       return Esp3PacketPtr(); // invalid CMAC
     }
     // update RLC
@@ -1326,7 +1326,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
     int maxRetries = rlcVerified ? RLC_WINDOW_SIZE : RLC_WINDOW_SIZE+MIN_RLC_DISTANCE_FOR_SAVE;
     while(true) {
       if (rlcRetries>=maxRetries) {
-        LOG(LOG_NOTICE, "No matching CMAC %X found within window of current RLC + %d", cmac_sent, maxRetries);
+        LOG(LOG_NOTICE, "%08X: No matching CMAC %X found within window of current RLC + %d", aSecureMsg->radioSender(), cmac_sent, maxRetries);
         rollingCounter = origRLC; // do not change RLC
         return Esp3PacketPtr(); // invalid CMAC
       }
@@ -1336,23 +1336,23 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
         // CMAC matches
         rlcVerified = true; // this RLC matches
         if (rlcRetries>0) {
-          LOG(LOG_NOTICE, "RLC increment of %d required to match CMAC %X (indicates missing packets)", rlcRetries, cmac_sent);
+          LOG(LOG_NOTICE, "%08X: RLC increment of %d required to match CMAC %X (indicates missing packets)", aSecureMsg->radioSender(), rlcRetries, cmac_sent);
         }
         break;
       }
       // no match
       if (transmittedRlc) {
-        LOG(LOG_NOTICE, "No CMAC %X match with transmitted RLC %X", cmac_sent, rollingCounter);
+        LOG(LOG_NOTICE, "%08X: No CMAC %X match with transmitted RLC %X", aSecureMsg->radioSender(), cmac_sent, rollingCounter);
         return Esp3PacketPtr(); // invalid CMAC
       }
-      LOG(LOG_DEBUG, "No matching CMAC %X for current RLC, check next RLC in window", cmac_sent);
+      LOG(LOG_DEBUG, "- No matching CMAC %X for current RLC, check next RLC in window", cmac_sent);
       incrementRlc();
       rlcRetries++;
     }
   }
   // check decryption: n bytes at d
   if (n==0) {
-    LOG(LOG_INFO, "packet has no payload");
+    LOG(LOG_INFO, "%08X: packet has no payload", aSecureMsg->radioSender());
     return Esp3PacketPtr(); // invalid CMAC
   }
   uint8_t encMode = securityLevelFormat & 0x07;
@@ -1367,7 +1367,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
   }
   else {
     // TODO: support other modes
-    LOG(LOG_WARNING, "encrypted radio package with unsupported encryption mode %d", encMode);
+    LOG(LOG_WARNING, "%08X: encrypted radio package with unsupported encryption mode %d", aSecureMsg->radioSender(), encMode);
   }
   d = outd;
   // - now that we have decoded the payload: increment RLC for next packet
