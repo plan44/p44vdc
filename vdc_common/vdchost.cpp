@@ -424,12 +424,13 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // Log start message
   LOG(LOG_NOTICE,
     "\n\n\n*** starting initialisation of vcd host '%s' (Instance #%d)"
-    "\n*** Product name: '%s', Product Version: '%s', Device Hardware ID: '%s'"
+    "\n*** Product name: '%s', Product Version: '%s', App Version: '%s', Device Hardware ID: '%s'"
     "\n*** dSUID (%s) = %s, MAC: %s, IP = %s\n",
     publishedDescription().c_str(),
     vdcHostInstance,
     productName.c_str(),
     productVersion.c_str(),
+    Application::sharedApplication()->version().c_str(),
     deviceHardwareId.c_str(),
     externalDsuid ? "external" : "MAC-derived",
     shortDesc().c_str(),
