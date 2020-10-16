@@ -951,7 +951,7 @@ Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   triggerId(0),
   #if ENABLE_P44SCRIPT
-  triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+synchronously+concurrently), // concurrently: because action might still be running
+  triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
   triggerAction(sourcecode+regular, "action", this),
   #else
   triggerCondition(*this, &VdcHost::sharedVdcHost()->geolocation),
