@@ -154,12 +154,22 @@ namespace p44 {
 
     /// get security info for given sender
     /// @param aSender enocean device address
-    /// @param aCreateNew create new security info for the sender if there is none present already
     /// @note this method has a dummy implementation when ENABLE_ENOCEAN_SECURE is not set
-    /// @return the security info
-    EnOceanSecurityPtr securityInfoForSender(EnoceanAddress aSender, bool aCreateNew);
+    /// @return the security info or NULL if none exists
+    EnOceanSecurityPtr findSecurityInfoForSender(EnoceanAddress aSender);
 
     #if ENABLE_ENOCEAN_SECURE
+
+    /// create new security info record for given sender
+    /// @param aSender enocean device address
+    /// @return the new security info
+    EnOceanSecurityPtr newSecurityInfoForSender(EnoceanAddress aSender);
+
+    /// associate security info with devices related to the sender address
+    /// @note before calling this, security info record might already exist for collecting further segments of the teachin
+    /// @param aSecurityInfo completely and valid security info
+    /// @param aSender enocean device address
+    void associateSecurityInfoWithSender(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aSender);
 
     /// load the security infos from DB
     void loadSecurityInfos();
@@ -176,15 +186,15 @@ namespace p44 {
     /// @param aDevice the enocean device that is now being deleted
     void removeUnusedSecurity(EnoceanDevice &aDevice);
 
+  private:
+
     /// drop (forget) security info for given sender
     /// @param aSender enocean device address
     /// @return true if successfully deleted
+    /// @note this MUST NOT not be called for senders that still have devices! Use removeUnusedSecurity() instead
     bool dropSecurityInfoForSender(EnoceanAddress aSender);
 
-
     #endif
-
-  private:
 
     void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);
     void handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);

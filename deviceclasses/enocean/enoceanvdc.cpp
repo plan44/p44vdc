@@ -210,8 +210,9 @@ bool EnoceanVdc::addKnownDevice(EnoceanDevicePtr aEnoceanDevice)
     enoceanDevices.insert(make_pair(aEnoceanDevice->getAddress(), aEnoceanDevice));
     #if ENABLE_ENOCEAN_SECURE
     // set device security info if available
-    EnOceanSecurityPtr sec = securityInfoForSender(aEnoceanDevice->getAddress(), false);
+    EnOceanSecurityPtr sec = findSecurityInfoForSender(aEnoceanDevice->getAddress());
     if (sec) {
+      // associate with device
       aEnoceanDevice->setSecurity(sec);
     }
     #endif
@@ -407,21 +408,31 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
 
 #if ENABLE_ENOCEAN_SECURE
 
-EnOceanSecurityPtr EnoceanVdc::securityInfoForSender(EnoceanAddress aSender, bool aCreateNew)
+EnOceanSecurityPtr EnoceanVdc::findSecurityInfoForSender(EnoceanAddress aSender)
 {
   EnoceanSecurityMap::iterator pos = securityInfos.find(aSender);
   if (pos==securityInfos.end()) {
-    if (!aCreateNew) return EnOceanSecurityPtr(); // none
-    // create new
-    EnOceanSecurityPtr sec = EnOceanSecurityPtr(new EnOceanSecurity);
-    securityInfos[aSender] = sec;
-    // - link all existing devices to this security info
-    for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aSender); pos!=enoceanDevices.upper_bound(aSender); ++pos) {
-      pos->second->setSecurity(sec);
-    }
-    return sec;
+    return EnOceanSecurityPtr(); // none
   }
   return pos->second;
+}
+
+
+EnOceanSecurityPtr EnoceanVdc::newSecurityInfoForSender(EnoceanAddress aSender)
+{
+  // create new
+  EnOceanSecurityPtr sec = EnOceanSecurityPtr(new EnOceanSecurity);
+  securityInfos[aSender] = sec;
+  return sec;
+}
+
+
+void EnoceanVdc::associateSecurityInfoWithSender(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aSender)
+{
+  // - link all existing devices to this security info
+  for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aSender); pos!=enoceanDevices.upper_bound(aSender); ++pos) {
+    pos->second->setSecurity(aSecurityInfo);
+  }
 }
 
 
@@ -474,6 +485,7 @@ void EnoceanVdc::loadSecurityInfos()
       // derived values
       sec->lastSavedRLC = sec->rollingCounter; // this value is saved
       sec->lastSave = now;
+      sec->established = true;
       sec->deriveSubkeysFromPrivateKey();
       // store in list
       securityInfos[addr] = sec;
@@ -485,6 +497,9 @@ void EnoceanVdc::loadSecurityInfos()
 
 bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aEnoceanAddress, bool aRLCOnly, bool aOnlyIfNeeded)
 {
+  if (!aSecurityInfo->established) {
+    LOG(LOG_INFO, "Not saving security info for %08X because not yet fully established", aEnoceanAddress);
+  }
   if (aOnlyIfNeeded) {
     // avoid too many saves
     uint32_t d = aSecurityInfo->rlcDistance(aSecurityInfo->rollingCounter, aSecurityInfo->lastSavedRLC);
@@ -531,7 +546,7 @@ bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddre
 #else
 
 // dummy when no real security is implemented
-EnOceanSecurityPtr EnoceanVdc::securityInfoForSender(EnoceanAddress aSender, bool aCreateNew)
+EnOceanSecurityPtr EnoceanVdc::findSecurityInfoForSender(EnoceanAddress aSender)
 {
   return NULL;
 }
@@ -640,15 +655,19 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
   if (rorg==rorg_SEC_TEACHIN) {
     LOG(LOG_NOTICE, "Secure teach-in packet received from %08X", sender);
     bool known = enoceanDevices.find(sender)!=enoceanDevices.end();
-    // allow creating new security info records in learning mode or for known devices (=upgrade to secure mode)
-    sec = securityInfoForSender(sender, learningMode || known);
+    // look for security info
+    sec = findSecurityInfoForSender(sender);
+    bool alreadySecure = sec && sec->established;
+    // allow creating new security info records in learning mode or for known, but not already secured devices (=upgrade to secure mode)
+    if (!sec && (learningMode || known&&!alreadySecure)) {
+      sec = newSecurityInfoForSender(sender);
+    }
     if (sec) {
-      Tristate res = sec->processTeachInMsg(aEsp3PacketPtr, NULL); // TODO: pass in PSK once we have one
-      // TODO: for bidirectional teach-in, generate and send back my own teach-in message
+      Tristate res = sec->processTeachInMsg(aEsp3PacketPtr, NULL, learningMode); // TODO: pass in PSK once we have one
       if (res==yes) {
-        // complete secure teach-in info found
+        // complete secure teach-in info or RLC refresh found
         if ((sec->teachInInfo & 0x07)==0x01) {
-          // bidirectional teach-in requested - send immediately because it must occur not later than 500mS after receiving teach-in (750mS device side timeout)
+          // bidirectional teach-in (or refresh) requested - send immediately because it must occur not later than 500mS after receiving teach-in (750mS device side timeout)
           LOG(LOG_NOTICE, "- Device %08X requests bidirectional secure teach-in, sending response now", sender);
           for (int seg=0; seg<2; seg++) {
             Esp3PacketPtr secTeachInResponse = sec->teachInMessage(seg);
@@ -658,12 +677,18 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
           }
         }
         if (!learningMode) {
-          // just refreshing or adding security info outside of actually adding/removing device
-          LOG(LOG_NOTICE, "- Device %08X upgraded to EnOcean security or refreshed security info", sender);
-          saveSecurityInfo(sec, sender, false, false);
+          // the only valid thing that can happen outside learning mode is a RLC refresh
+          if (alreadySecure || known) {
+            // just refreshing or adding security info outside of actually adding/removing device
+            LOG(LOG_NOTICE, "- Device %08X upgraded to EnOcean security or refreshed security info", sender);
+            saveSecurityInfo(sec, sender, false, false);
+          }
         }
         else {
           // actual secure teach-in (or out)
+          if (!alreadySecure) {
+            associateSecurityInfoWithSender(sec, sender);
+          }
           // - check type
           if ((sec->teachInInfo & 0x06)==0x04) {
             // PTM implicit teach-in (PTM: bit2=1, INFO: bit1==0, bit0==X)
@@ -682,8 +707,11 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
         }
       }
       else if (res==no) {
-        // invalid secure teach-in, discard info
-        dropSecurityInfoForSender(sender);
+        // invalid secure teach-in, discard partial (but not previously already fully established!) info
+        // Note: invalid re-learn and RLC update attempts must be discarded
+        if (!alreadySecure) {
+          dropSecurityInfoForSender(sender);
+        }
       }
     }
     else {
@@ -694,7 +722,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
   }
   else {
     // not secure teach-in, just look up from existing security infos
-    sec = securityInfoForSender(sender, false);
+    sec = findSecurityInfoForSender(sender);
   }
   // unwrap secure telegrams, if any
   if (sec) {
@@ -823,7 +851,7 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
       }
       // try to process
       // Note: processLearn will always confirm the SA_CONFIRM_LEARN event (even if failing)
-      EnOceanSecurityPtr sec = securityInfoForSender(deviceAddress, false);
+      EnOceanSecurityPtr sec = findSecurityInfoForSender(deviceAddress);
       processLearn(deviceAddress, profile, manufacturer, undefined, learn_smartack, aEsp3PacketPtr, sec); // smart ack
     }
     else {

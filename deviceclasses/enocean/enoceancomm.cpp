@@ -1114,6 +1114,7 @@ EnOceanSecurity::EnOceanSecurity() :
   lastSavedRLC(0),
   lastSave(Never),
   rlcVerified(false),
+  established(false),
   teachInP(NULL)
 {
   memset(&privateKey, 0, AES128BlockLen);
@@ -1123,6 +1124,13 @@ EnOceanSecurity::EnOceanSecurity() :
 
 EnOceanSecurity::~EnOceanSecurity()
 {
+  reset();
+}
+
+
+void EnOceanSecurity::reset()
+{
+  established = false;
   if (teachInP) delete teachInP;
 }
 
@@ -1215,7 +1223,7 @@ Esp3PacketPtr EnOceanSecurity::teachInMessage(int aSegment)
 }
 
 
-Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Block *aPskP)
+Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Block *aPskP, bool aLearning)
 {
   if (aTeachInMsg->eepRorg()!=rorg_SEC_TEACHIN) return no; // not a secure teach-in message
   // R-ORG TS | TEACH_IN_INFO | SLF | RLC | KEY
@@ -1227,6 +1235,7 @@ Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Blo
   uint8_t sidx = (ti>>6) & 0x03; // IDX
   if (sidx==0) {
     // IDX=0, new teach-in begins
+    if (aLearning) reset(); // if learning, this replaces earlier established info
     if (teachInP) delete teachInP;
     teachInP = new SecureTeachInData;
     teachInInfo = ti;
@@ -1250,10 +1259,19 @@ Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Blo
   uint8_t numSegments = (teachInInfo>>4) & 0x03;
   if (teachInP->segmentIndex+1>=numSegments) {
     // all teach-in data accumulated
+    // Note: if this is already an established security info at this point
+    //       only RLC can be updated, if and only if private key matches
     int b = teachInP->numTeachInBytes;
     int idx = 0; // start with SLF
     // - get SLF
-    securityLevelFormat = teachInP->teachInData[idx++]; b--;
+    if (!established) {
+      securityLevelFormat = teachInP->teachInData[idx];
+    }
+    else if (securityLevelFormat!=teachInP->teachInData[idx]) {
+      LOG(LOG_WARNING, "%08X: RLC update attempt with non-matching security level -> ignored", aTeachInMsg->radioSender());
+      return no; // not a valid security info update
+    }
+    idx++; b--;
     // - RLC and key
     if (teachInInfo & 0x08) {
       // teach-in data is encrypted by preshared key (PSK)
@@ -1263,18 +1281,37 @@ Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Blo
       VAEScrypt(*aPskP, 0x0000, 2, di, &teachInP->teachInData[idx], b); // decrypt
     }
     // - RLC if set
-    rollingCounter = 0; // init with zero
+    uint32_t newRollingCounter = 0; // init with zero
     for (int i=0; i<rlcSize(); i++) {
       if (b<=0) return no; // not enough bytes
-      rollingCounter = (rollingCounter<<8) + teachInP->teachInData[idx++]; b--;
+      newRollingCounter = (newRollingCounter<<8) + teachInP->teachInData[idx++]; b--;
     }
     // - private key
     for (int i=0; i<AES128BlockLen; i++) {
       if (b<=0) return no; // not enough bytes
-      privateKey[i] = teachInP->teachInData[idx++]; b--;
+      if (!established) {
+        privateKey[i] = teachInP->teachInData[idx];
+      }
+      else {
+        if (privateKey[i]!=teachInP->teachInData[idx]) {
+          LOG(LOG_ERR, "%08X: RLC update attempt with wrong private key -> ignored", aTeachInMsg->radioSender());
+          return no; // not a valid security info update -> abort
+        }
+      }
+      idx++; b--;
     }
-    // - derive subkeys
-    deriveSubkeysFromPrivateKey();
+    if (!established) {
+      // - now established
+      established = true;
+      // - store RLC
+      rollingCounter = newRollingCounter;
+      // - derive subkeys
+      deriveSubkeysFromPrivateKey();
+    }
+    else if (rlcSize()>0) {
+      // was already established, only update RLC (matching key was checked above)
+      rollingCounter = newRollingCounter;
+    }
     // Security info is now complete
     delete teachInP; teachInP = NULL;
     return yes;

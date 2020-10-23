@@ -490,6 +490,7 @@ namespace p44 {
     AES128Block subKey1; ///< subkey1 derived from private key
     AES128Block subKey2; ///< subkey2 derived from private key
     uint32_t rollingCounter; ///< RLC
+    bool established; ///< set if this info is complete and established, and only RLC might get refreshed
 
     // persistence management
     uint32_t lastSavedRLC; ///< last saved RLC
@@ -522,10 +523,15 @@ namespace p44 {
     EnOceanSecurity();
     virtual ~EnOceanSecurity();
 
+    /// reset to non-established state
+    void reset();
+
     /// process a secure teach-in message
     /// @param aTeachInMsg a R-ORG TS (0x32) message to process (possibly only a segment)
+    /// @param aPskP pointer to a preshared paring key, NULL if none
+    /// @param aLearning set when learning is active (i.e. processing this teachin is allowed to replace previously established info)
     /// @return yes when security info is now complete, no when processing has failed and undefined when more segments are needed
-    Tristate processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Block *aPskP=NULL);
+    Tristate processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Block *aPskP, bool aLearning);
 
     /// create a secure teach-in message for aEnoceanAddress
     /// @param aSegment the segment to create (0,1)
