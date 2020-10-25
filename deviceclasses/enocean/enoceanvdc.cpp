@@ -658,8 +658,8 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     // look for security info
     sec = findSecurityInfoForSender(sender);
     bool alreadySecure = sec && sec->established;
-    // allow creating new security info records in learning mode or for known, but not already secured devices (=upgrade to secure mode)
-    if (!sec && (learningMode || known&&!alreadySecure)) {
+    // allow creating new security info records in learning mode only. This can be teach-in or upgrade to secure mode
+    if (!sec && learningMode) {
       sec = newSecurityInfoForSender(sender);
     }
     if (sec) {
@@ -678,16 +678,26 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
         }
         if (!learningMode) {
           // the only valid thing that can happen outside learning mode is a RLC refresh
-          if (alreadySecure || known) {
-            // just refreshing or adding security info outside of actually adding/removing device
-            LOG(LOG_NOTICE, "- Device %08X upgraded to EnOcean security or refreshed security info", sender);
+          if (alreadySecure && known) {
+            LOG(LOG_NOTICE, "- Device %08X refreshed RLC", sender);
             saveSecurityInfo(sec, sender, false, false);
           }
         }
         else {
           // actual secure teach-in (or out)
-          if (!alreadySecure) {
+          if (!alreadySecure && known) {
+            // this is an update from unencrypted to encrypted.
+            // Note that this must not be allowed outside learning, because that would provide a way
+            // for an attacker to permanently disable non-encrypted devices, by sending fake crypto
+            // updates making the system no longer respond to the original device's unencrypted messages.
+            LOG(LOG_NOTICE, "- Device %08X upgraded to secure communication", sender);
             associateSecurityInfoWithSender(sec, sender);
+            // do NOT process the actual learn-in (neither implicit, nor subseqent)
+            // exit learning mode here
+            learningMode = false;
+            // - report it as a kind of learn-in for the user (which will in turn disable smart-ack learn)
+            getVdcHost().reportLearnEvent(true, ErrorPtr());
+            return;
           }
           // - check type
           if ((sec->teachInInfo & 0x06)==0x04) {
@@ -725,8 +735,8 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     sec = findSecurityInfoForSender(sender);
   }
   // unwrap secure telegrams, if any
-  if (sec) {
-    // security context for that device exists -> only encrypted messages are allowed
+  if (sec && sec->established) {
+    // established security context for that device exists -> only encrypted messages are allowed
     Esp3PacketPtr unpackedMsg = sec->unpackSecureMessage(aEsp3PacketPtr);
     if (!unpackedMsg) {
       LOG(LOG_NOTICE, "Ignoring invalid packet for secure device (not secure or not authenticated):\n%s", aEsp3PacketPtr->description().c_str());

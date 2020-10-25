@@ -1131,7 +1131,10 @@ EnOceanSecurity::~EnOceanSecurity()
 void EnOceanSecurity::reset()
 {
   established = false;
-  if (teachInP) delete teachInP;
+  if (teachInP) {
+    delete teachInP;
+    teachInP = NULL;
+  }
 }
 
 
@@ -1257,6 +1260,7 @@ Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Blo
   }
   // check if all segments received
   uint8_t numSegments = (teachInInfo>>4) & 0x03;
+  //DBGLOG(LOG_INFO, "%08X: teach-in segment %d/%d received", aTeachInMsg->radioSender(), teachInP->segmentIndex+1, numSegments);
   if (teachInP->segmentIndex+1>=numSegments) {
     // all teach-in data accumulated
     // Note: if this is already an established security info at this point
@@ -1346,7 +1350,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
     LOG(LOG_WARNING, "%08X: Non-secure radio packet, but device is secure -> ignored", aSecureMsg->radioSender());
     return Esp3PacketPtr(); // none
   }
-  if (teachInP) {
+  if (!established) {
     LOG(LOG_NOTICE, "%08X: Incomplete security info -> packet ignored", aSecureMsg->radioSender());
     return Esp3PacketPtr(); // none
   }
