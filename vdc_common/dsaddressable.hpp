@@ -52,8 +52,8 @@ namespace p44 {
     vdchost_vdcapi_connected, ///< the VDC API is connected (to a vdsm using it)
     vdchost_vdcapi_disconnected, ///< the VDC API was disconnected
     vdchost_vdcs_initialized, ///< all vdcs are initialized now
-    vdchost_devices_collected, ///< initial device collection run is complete
-    vdchost_devices_initialized, ///< initial device initialisation run is complete
+    vdchost_devices_collected, ///< a device collection run is complete (initial or later)
+    vdchost_devices_initialized, ///< a device initialisation run is complete (initial or later)
   } VdchostEvent;
 
 

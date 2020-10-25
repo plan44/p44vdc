@@ -103,6 +103,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if P44SCRIPT_FULL_SUPPORT
   mainScript(sourcecode+regular, "main", this),
   #endif
+  #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+  globalScriptsStarted(false),
+  #endif
   productName(DEFAULT_PRODUCT_NAME),
   geolocation() // default location will be set from timeutils
 {
@@ -206,8 +209,12 @@ void VdcHost::handleGlobalEvent(VdchostEvent aEvent)
 {
   if (aEvent==vdchost_devices_initialized) {
     #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
-    // this is the moment to start global scripts
-    runGlobalScripts();
+    // after the first device initialisation run, it is the moment to start global scripts
+    if (!globalScriptsStarted) {
+      // only once
+      globalScriptsStarted = true;
+      runGlobalScripts();
+    }
     #endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
   }
   inherited::handleGlobalEvent(aEvent);

@@ -214,6 +214,9 @@ namespace p44 {
     #if EXPRESSION_SCRIPT_SUPPORT
     ScriptQueue globalScripts;
     #endif
+    #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+    bool globalScriptsStarted; ///< global scripts have been started
+    #endif
 
   public:
 
