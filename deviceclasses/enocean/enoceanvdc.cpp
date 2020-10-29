@@ -649,15 +649,14 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     return;
   }
   // check encrypted packets
-  EnOceanSecurityPtr sec;
   RadioOrg rorg = aEsp3PacketPtr->eepRorg();
   #if ENABLE_ENOCEAN_SECURE
+  // look for existing security info for this device
+  EnOceanSecurityPtr sec = findSecurityInfoForSender(sender);
   if (rorg==rorg_SEC_TEACHIN) {
-    LOG(LOG_NOTICE, "Secure teach-in packet received from %08X", sender);
     bool known = enoceanDevices.find(sender)!=enoceanDevices.end();
-    // look for security info
-    sec = findSecurityInfoForSender(sender);
     bool alreadySecure = sec && sec->established;
+    LOG(LOG_NOTICE, "Secure teach-in packet received from %08X (%sknown%s)", sender, known ? "" : "un", alreadySecure ? ", already secure" : "");
     // allow creating new security info records in learning mode only. This can be teach-in or upgrade to secure mode
     if (!sec && learningMode) {
       sec = newSecurityInfoForSender(sender);
@@ -692,6 +691,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
             // updates making the system no longer respond to the original device's unencrypted messages.
             LOG(LOG_NOTICE, "- Device %08X upgraded to secure communication", sender);
             associateSecurityInfoWithSender(sec, sender);
+            saveSecurityInfo(sec, sender, false, false);
             // do NOT process the actual learn-in (neither implicit, nor subseqent)
             // exit learning mode here
             learningMode = false;
@@ -729,10 +729,6 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     }
     // no other processing for rorg_SEC_TEACHIN
     return;
-  }
-  else {
-    // not secure teach-in, just look up from existing security infos
-    sec = findSecurityInfoForSender(sender);
   }
   // unwrap secure telegrams, if any
   if (sec && sec->established) {

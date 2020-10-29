@@ -315,7 +315,7 @@ namespace p44 {
     /// @param aSecurityInfo set secure info for this device or NULL to remove security
     /// @note aSecurityInfo that is not established will be treated like NULL to avoid devices getting blocked with incomplete security info
     /// @note if security info is set, the device will not get any non-secure radio packets any more
-    void setSecurity(EnOceanSecurityPtr aSecurityInfo) { securityInfo = aSecurityInfo->established ? aSecurityInfo : NULL; };
+    void setSecurity(EnOceanSecurityPtr aSecurityInfo) { securityInfo = aSecurityInfo && aSecurityInfo->established ? aSecurityInfo : NULL; };
 
     /// check for secure device
     /// @return true if this device has valid security info (i.e. MUST NOT accept any insecure packets)

@@ -1124,13 +1124,6 @@ EnOceanSecurity::EnOceanSecurity() :
 
 EnOceanSecurity::~EnOceanSecurity()
 {
-  reset();
-}
-
-
-void EnOceanSecurity::reset()
-{
-  established = false;
   if (teachInP) {
     delete teachInP;
     teachInP = NULL;
@@ -1238,7 +1231,6 @@ Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Blo
   uint8_t sidx = (ti>>6) & 0x03; // IDX
   if (sidx==0) {
     // IDX=0, new teach-in begins
-    if (aLearning) reset(); // if learning, this replaces earlier established info
     if (teachInP) delete teachInP;
     teachInP = new SecureTeachInData;
     teachInInfo = ti;
@@ -1262,6 +1254,8 @@ Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Blo
   uint8_t numSegments = (teachInInfo>>4) & 0x03;
   //DBGLOG(LOG_INFO, "%08X: teach-in segment %d/%d received", aTeachInMsg->radioSender(), teachInP->segmentIndex+1, numSegments);
   if (teachInP->segmentIndex+1>=numSegments) {
+    // if learning, this replaces earlier established info
+    if (aLearning) established = false;
     // all teach-in data accumulated
     // Note: if this is already an established security info at this point
     //       only RLC can be updated, if and only if private key matches

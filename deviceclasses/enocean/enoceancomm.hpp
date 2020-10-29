@@ -523,9 +523,6 @@ namespace p44 {
     EnOceanSecurity();
     virtual ~EnOceanSecurity();
 
-    /// reset to non-established state
-    void reset();
-
     /// process a secure teach-in message
     /// @param aTeachInMsg a R-ORG TS (0x32) message to process (possibly only a segment)
     /// @param aPskP pointer to a preshared paring key, NULL if none
