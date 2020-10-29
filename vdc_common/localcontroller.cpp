@@ -1093,9 +1093,9 @@ void Trigger::processGlobalEvent(VdchostEvent aActivity)
     // change in local time
     if (!varParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
-      //   Otherwise: have condition re-evaluated (because it possibly contain references to local time)
+      //   Otherwise: have condition re-evaluated (because it possibly contains references to local time)
       #if ENABLE_P44SCRIPT
-      triggerCondition.nextEvaluationNotLaterThan(REPARSE_DELAY);
+      triggerCondition.nextEvaluationNotLaterThan(MainLoop::now()+REPARSE_DELAY);
       #else
       varParseTicket.executeOnce(boost::bind(&Trigger::reCheckTimed, this), REPARSE_DELAY);
       #endif
