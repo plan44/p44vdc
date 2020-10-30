@@ -313,8 +313,6 @@ void LedChainDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
 }
 
 
-#define TRANSITION_STEP_TIME (10*MilliSecond)
-
 void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   MLMicroSeconds transitionTime = 0;
@@ -336,7 +334,7 @@ void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         fl->positionTransitionStep();
         fl->featureTransitionStep();
       }
-      applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)TRANSITION_STEP_TIME/transitionTime);
+      applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)(getLedChainVdc().ledArrangement->minUpdateInterval)/transitionTime);
     }
     // consider applied
     cl->appliedColorValues();
@@ -431,7 +429,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     // not yet complete, schedule next step
     transitionTicket.executeOnce(
       boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
-      TRANSITION_STEP_TIME
+      getLedChainVdc().ledArrangement->minUpdateInterval
     );
     return; // will be called later again
   }
