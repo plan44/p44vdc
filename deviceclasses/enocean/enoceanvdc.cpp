@@ -498,7 +498,7 @@ void EnoceanVdc::loadSecurityInfos()
 bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aEnoceanAddress, bool aRLCOnly, bool aOnlyIfNeeded)
 {
   if (!aSecurityInfo->established) {
-    LOG(LOG_INFO, "Not saving security info for %08X because not yet fully established", aEnoceanAddress);
+    OLOG(LOG_INFO, "Not saving security info for %08X because not yet fully established", aEnoceanAddress);
   }
   if (aOnlyIfNeeded) {
     // avoid too many saves
