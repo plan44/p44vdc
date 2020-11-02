@@ -43,6 +43,7 @@
 
 #if ENABLE_P44SCRIPT
 #include "httpcomm.hpp"
+#include "socketcomm.hpp"
 #endif
 
 
@@ -122,6 +123,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if ENABLE_HTTP_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::HttpLookup);
   #endif // ENABLE_HTTP_SCRIPT_FUNCS
+  #if ENABLE_SOCKET_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SocketLookup);
+  #endif // ENABLE_SOCKET_SCRIPT_FUNCS
   #endif // P44SCRIPT_FULL_SUPPORT
   #endif
   // remember singleton's address
