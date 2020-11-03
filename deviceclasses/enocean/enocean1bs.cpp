@@ -50,7 +50,7 @@ EnoceanDevicePtr Enocean1BSDevice::newDevice(
   EepType type = EEP_TYPE(aEEProfile);
   EnoceanDevicePtr newDev; // none so far
   // At this time, only the "single input contact" profile is defined in EEP: D5-00-01
-  // Note: two variants exist, one with inverted contact signal (e.g. for window contacts)
+  // Note: two variants exist, one with inverted contact signal (reporting 1 for open contact)
   if (func==0x00 && type==0x01) {
     // single input contact, always consists of a single device
     if (aSubDeviceIndex<1) {
@@ -86,8 +86,8 @@ EnoceanDevicePtr Enocean1BSDevice::newDevice(
 
 static const ProfileVariantEntry E1BSprofileVariants[] = {
   // single contact alternatives
-  { 1, 0x00D50001, 0, "single contact", NULL },
-  { 1, 0x01D50001, 0, "single contact (inverted, e.g. for window contact)", NULL },
+  { 1, 0x00D50001, 0, "single contact (closed = 1)", NULL },
+  { 1, 0x01D50001, 0, "single contact, inverted (open = 1)", NULL },
   { 0, 0, 0, NULL, NULL } // terminator
 };
 

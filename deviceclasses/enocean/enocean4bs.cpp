@@ -218,8 +218,8 @@ static void condDB0Bit2Handler(const struct EnoceanInputDescriptor &aInputDescri
 using namespace EnoceanInputs;
 
 static const char *vibrationText = "Vibration";
-static const char *lockText = "Lock";
-static const char *doorText = "Door";
+static const char *lockText = "Locked";
+static const char *doorText = "Door closed";
 static const char *windowText = "Window open/tilted";
 static const char *feedText = "feed temperature";
 
@@ -572,12 +572,12 @@ const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   { 0, 0x14, 0x06, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  vibrationText },
   { 0, 0x14, 0x06, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-07: Dual door contact for door and lock, 0=door closed/locked, 1=door open/unlocked
-  { 0, 0x14, 0x07, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_doorOpen,       usage_undefined,  0,    1, DB(0,2), DB(0,2), 100, 40*60, &stdInputHandler,  doorText },
-  { 0, 0x14, 0x07, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  lockText },
+  { 0, 0x14, 0x07, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_doorClosed,     usage_undefined,  1,    0, DB(0,2), DB(0,2), 100, 40*60, &stdInputHandler,  doorText },
+  { 0, 0x14, 0x07, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  1,    0, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  lockText },
   { 0, 0x14, 0x07, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-08: Dual door contact for door and lock plus vibration, 0=door closed/locked, 1=door open/unlocked
-  { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_doorOpen,       usage_undefined,  0,    1, DB(0,2), DB(0,2), 100, 40*60, &stdInputHandler,  doorText },
-  { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  lockText },
+  { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_doorClosed,     usage_undefined,  1,    0, DB(0,2), DB(0,2), 100, 40*60, &stdInputHandler,  doorText },
+  { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  1,    0, DB(0,1), DB(0,1), 100, 40*60, &stdInputHandler,  lockText },
   { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
   { 0, 0x14, 0x08, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // A5-14-09: Window state, 0=closed, 1=open, 2=tilted

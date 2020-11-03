@@ -570,7 +570,7 @@ void EldatWindowContact::handleFunction(EldatFunction aFunction)
   // eldat_windowcontact_offon: B = contact/window opened, A = contact/window closed
   BinaryInputBehaviourPtr ib = getInput(0);
   if (ib) {
-    ib->updateInputState(aFunction==(eldatDeviceType==eldat_windowcontact_onoff || eldatDeviceType==eldat_windowcontact_onoff_s ? 'A' : 'B') ? 1 : 0);
+    ib->updateInputState(aFunction==(eldatDeviceType==eldat_windowcontact_onoff || eldatDeviceType==eldat_windowcontact_onoff_s ? 'A' : 'B') ? 0 : 1);
   }
 }
 
@@ -794,8 +794,8 @@ EldatDevicePtr EldatDevice::newDevice(
       newDev->setColorClass(class_black_joker);
       // Create one input behaviour
       BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"")); // automatic id
-      ib->setHardwareInputConfig(binInpType_windowOpen, usage_room, true, Never, hasStatus ? 24*Hour : Never);
-      ib->setHardwareName("window open");
+      ib->setHardwareInputConfig(binInpType_windowClosed, usage_room, true, Never, hasStatus ? 24*Hour : Never);
+      ib->setHardwareName("window closed");
       newDev->addBehaviour(ib);
       // - window contact uses two indices (it uses A+B functions)
       aSubDeviceIndex+=2;
