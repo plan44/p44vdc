@@ -211,13 +211,15 @@ namespace p44 {
     /// initialisation of hardware-specific constants for this sensor
     /// @param aType the sensor type (Note: not the same as dS sensor types, needs mapping)
     /// @param aUsage how this input is normally used (indoor/outdoor etc.)
-    /// @param aMin minimum value)
-    /// @param aMax maximum value)
+    /// @param aMin minimum value
+    /// @param aMax maximum value
     /// @param aResolution resolution (smallest step) of this sensor's value
-    /// @param aUpdateInterval how often an update can be expected from this sensor normally. If 0, this means that no
-    ///   regular updates can be expected.
-    /// @param aAliveSignInterval how often the sensor will send an update in all cases. If 0, this means that no regular
-    ///   update interval can be expected.
+    /// @param aUpdateInterval approximate time resolution of the sensor (how fast the sensor can track values).
+    ///   Note that this does not mean the sensor actually pushes values this fast - e.g. when value does not change,
+    ///   there might be no updates at all.
+    ///   If set to 0, this means we have no information about time resolution
+    /// @param aAliveSignInterval how often the sensor will send an update in all cases.
+    ///   If set to 0, this means that no regular update interval can be expected.
     /// @param aDefaultChangesOnlyInterval the minimum time between two pushes with the same value. If the sensor hardware
     ///   sends updates more frequently, these are only pushed when the value has actually changed.
     /// @note this must be called once before the device gets added to the device container. Implementation might
