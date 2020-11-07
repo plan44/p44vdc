@@ -1134,10 +1134,13 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bool aIsSensor) :
   inherited(aEvaluator)
   #if ENABLE_P44SCRIPT
-  ,onCondition("onCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onGettingTrue, Never, expression|synchronously|keepvars)
-  ,offCondition("offCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onGettingTrue, Never, expression|synchronously|keepvars)
+  // Note: conditions are synchronously evaluated, but action might be running when a condition wants evaluation, so we allow concurrent evaluation in that case
+  ,onCondition("onCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
+  ,offCondition("offCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
   #if P44SCRIPT_FULL_SUPPORT
-  ,action(scriptbody|regular|keepvars, "action", &device)
+  // Only thing that might run when action tries to run is an earlier invocation of the action.
+  // If that happens -> kill the old action first, BUT NOT possibly queued condition evaluations
+  ,action(scriptbody|regular|keepvars|stoprunning, "action", &device)
   #endif
   #elif ENABLE_EXPRESSIONS
   ,onCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation)
