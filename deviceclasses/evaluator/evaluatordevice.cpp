@@ -441,7 +441,7 @@ void EvaluatorDevice::changedConditions()
 void EvaluatorDevice::evaluateConditions(EvaluationFlags aRunMode)
 {
   evaluatorSettings()->onCondition.evaluate(aRunMode);
-  evaluatorSettings()->offCondition.evaluate(aRunMode);
+  if (!evaluatorSettings()->offCondition.empty()) evaluatorSettings()->offCondition.evaluate(aRunMode);
 }
 
 
@@ -549,6 +549,11 @@ void EvaluatorDevice::executeActions()
 {
   evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(currentState==yes));
   evaluatorSettings()->action.run(inherit, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), Infinite);
+  if (evaluatorSettings()->offCondition.empty()) {
+    // there is no off condition, so we just set the state back to NO
+    OLOG(LOG_INFO, "offCondition is empty for action evaluator: state auto-reset to OFF");
+    currentState = no;
+  }
 }
 
 
