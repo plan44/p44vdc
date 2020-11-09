@@ -548,7 +548,7 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
 void EvaluatorDevice::executeActions()
 {
   evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(currentState==yes));
-  evaluatorSettings()->action.run(stopall, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), Infinite);
+  evaluatorSettings()->action.run(inherit, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), Infinite);
 }
 
 
@@ -1139,8 +1139,8 @@ EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bo
   ,offCondition("offCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
   #if P44SCRIPT_FULL_SUPPORT
   // Only thing that might run when action tries to run is an earlier invocation of the action.
-  // If that happens -> kill the old action first, BUT NOT possibly queued condition evaluations
-  ,action(scriptbody|regular|keepvars|stoprunning, "action", &device)
+  // However this might be a previous on-action, while the new action is a NOP off-action, so both must be allowed to run concurrently
+  ,action(scriptbody|regular|keepvars|concurrently, "action", &device)
   #endif
   #elif ENABLE_EXPRESSIONS
   ,onCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation)
