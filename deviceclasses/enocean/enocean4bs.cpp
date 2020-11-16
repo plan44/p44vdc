@@ -1351,8 +1351,8 @@ EnoceanDevicePtr EnoceanA52006Handler::newDevice(
   EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer,
   bool aSendTeachInResponse
 ) {
-  // A5-20-04: heating valve actuator
-  // - e.g. Hora SmartDrive MX aka Eltako TF-FKS
+  // A5-20-06: harvesting heating valve with local offset control
+  // - e.g. Micropelt MVA005
   // create device
   EnoceanDevicePtr newDev; // none so far
   if (aSubDeviceIndex<1) {
