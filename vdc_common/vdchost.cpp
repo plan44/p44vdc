@@ -2447,9 +2447,17 @@ static void device_func(BuiltinFunctionContextPtr f)
 }
 
 
+// macaddress()
+static void macaddress_func(BuiltinFunctionContextPtr f)
+{
+  f->finish(new StringValue(macAddressToString(macAddress(),0)));
+}
+
+
 static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   { "vdcapi", executable|json, vdcapi_numargs, vdcapi_args, &vdcapi_func },
   { "device", executable|any, device_numargs, device_args, &device_func },
+  { "macaddress", executable|text, 0, NULL, &macaddress_func },
   { NULL } // terminator
 };
 
