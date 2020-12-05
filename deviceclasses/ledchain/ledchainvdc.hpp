@@ -82,10 +82,6 @@ namespace p44 {
     /// @return minimum brightness that will just barely keep the LEDs on
     Brightness getMinBrightness();
 
-    /// get minimum brigthness for dimming
-    /// @return true if LEDs have a separate white channel
-    bool hasWhite();
-
     /// vdc level methods (p44 specific, JSON only, for creating LED chain devices)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 

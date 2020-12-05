@@ -117,14 +117,6 @@ Brightness LedChainVdc::getMinBrightness()
 }
 
 
-bool LedChainVdc::hasWhite()
-{
-  // so far, only SK6812 have white
-  return ledArrangement ? ledArrangement->hasWhite() : false;
-}
-
-
-
 bool LedChainVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   if (getIcon("vdc_rgbchain", aIcon, aWithData, aResolutionPrefix))
