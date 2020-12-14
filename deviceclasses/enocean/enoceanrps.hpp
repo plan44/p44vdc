@@ -80,7 +80,9 @@ namespace p44 {
     friend class EnoceanRPSDevice;
 
     /// private constructor, create new channels using factory static method
-    EnoceanRpsButtonHandler(EnoceanDevice &aDevice);
+    EnoceanRpsButtonHandler(EnoceanDevice &aDevice, Tristate aBinContactClosedValue);
+
+    Tristate mBinContactClosedValue; // if YES or NO the button is handled as binary input, with 1 or 0, resp as "closed/pressed" contact value
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information

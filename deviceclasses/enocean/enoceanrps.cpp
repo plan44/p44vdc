@@ -59,6 +59,10 @@ static const ProfileVariantEntry RPSprofileVariants[] = {
   { 2, 0x00F603FF, 2, "quad rocker switch (as 2-way rockers)", DeviceConfigurations::buttonTwoWay }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
   { 2, 0x02F603FF, 2, "quad rocker switch (2-way, reversed)", DeviceConfigurations::buttonTwoWayReversed }, // rocker switches affect 2 indices (of which odd one does not exist in 2-way mode)
   { 2, 0x01F603FF, 2, "quad rocker switch (up and down as separate buttons)", DeviceConfigurations::buttonSingle },
+  // single RPS button alternatives
+  { 3, 0x00F60101, 2, "single button", DeviceConfigurations::buttonSingle }, // use as single button (oneWay)
+  { 3, 0x01F60101, 2, "single contact (closed = 1)", NULL }, // use as generic contact input
+  { 3, 0x02F60101, 2, "single contact, inverted (open = 1)", NULL }, // use as generic contact input with inverted polarity
   { 0, 0, 0, NULL, NULL } // terminator
 };
 
@@ -69,6 +73,7 @@ const ProfileVariantEntry *EnoceanRPSDevice::profileVariantsTable()
 }
 
 
+#define CONTACT_UPDATE_INTERVAL (15*Minute)
 
 EnoceanDevicePtr EnoceanRPSDevice::newDevice(
   EnoceanVdc *aVdcP,
@@ -79,7 +84,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
 ) {
   EnoceanDevicePtr newDev; // none so far
   EnoceanProfile functionProfile = EEP_UNTYPED(aEEProfile);
-  if (aEEProfile==0xF60101) {
+  if (aEEProfile==0x00F60101) {
     // F6-01-01 single button
     if (aSubDeviceIndex<1) {
       // create EnoceanRPSDevice device
@@ -95,14 +100,42 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       newDev->setIconInfo("button", true);
       // RPS switches can be used for anything
       newDev->setColorClass(class_black_joker);
-      // Create single handler, up button for even aSubDevice, down button for odd aSubDevice
-      EnoceanRpsButtonHandlerPtr buttonHandler = EnoceanRpsButtonHandlerPtr(new EnoceanRpsButtonHandler(*newDev.get()));
+      // Create single button handler
+      EnoceanRpsButtonHandlerPtr buttonHandler = EnoceanRpsButtonHandlerPtr(new EnoceanRpsButtonHandler(*newDev.get(), undefined));
       ButtonBehaviourPtr buttonBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
       buttonBhvr->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, 0); // not combinable
       buttonBhvr->setGroup(group_yellow_light); // pre-configure for light
       buttonBhvr->setHardwareName("button");
       buttonHandler->behaviour = buttonBhvr;
       newDev->addChannelHandler(buttonHandler);
+      // count it
+      aSubDeviceIndex++;
+    }
+  }
+  else if (aEEProfile==0x01F60101 || aEEProfile==0x02F60101) {
+    // F6-01-01 used as contact input, eg. Eltako FPE-1 (normal) and FPE-2 (inverted)
+    if (aSubDeviceIndex<1) {
+      // create device
+      newDev = EnoceanDevicePtr(new EnoceanRPSDevice(aVdcP));
+      // standard device settings without scene table
+      newDev->installSettings();
+      // assign channel and address
+      newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
+      // assign EPP information
+      newDev->setEEPInfo(aEEProfile, aEEManufacturer);
+      newDev->setFunctionDesc("single contact");
+      // joker by default, we don't know what kind of contact this is
+      newDev->setColorClass(class_black_joker);
+      // create channel handler, EEP variant 2 means inverted state interpretation
+      EnoceanRpsButtonHandlerPtr newHandler = EnoceanRpsButtonHandlerPtr(new EnoceanRpsButtonHandler(*newDev.get(), aEEProfile==0x02F60101 ? no : yes));
+      // create the behaviour
+      BinaryInputBehaviourPtr bb = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*newDev.get(),"contact"));
+      bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, CONTACT_UPDATE_INTERVAL, CONTACT_UPDATE_INTERVAL*3);
+      bb->setGroup(group_black_variable); // joker by default
+      bb->setHardwareName(newHandler->shortDesc());
+      newHandler->behaviour = bb;
+      // add channel to device
+      newDev->addChannelHandler(newHandler);
       // count it
       aSubDeviceIndex++;
     }
@@ -336,8 +369,9 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
 
 // MARK: - single button
 
-EnoceanRpsButtonHandler::EnoceanRpsButtonHandler(EnoceanDevice &aDevice) :
-  inherited(aDevice)
+EnoceanRpsButtonHandler::EnoceanRpsButtonHandler(EnoceanDevice &aDevice, Tristate aBinContactClosedValue) :
+  inherited(aDevice),
+  mBinContactClosedValue(aBinContactClosedValue)
 {
 }
 
@@ -351,10 +385,20 @@ void EnoceanRpsButtonHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
   // decode
   if (rpsStatus==status_T21) {
     bool pressed = data==0x10;
-    ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(behaviour);
-    if (b) {
-      LOG(LOG_INFO, "Enocean Button %s - %08X: reports state %s", b->getHardwareName().c_str(), device.getAddress(), pressed ? "PRESSED" : "RELEASED");
-      b->updateButtonState(pressed);
+    if (mBinContactClosedValue==undefined) {
+      // handle as button
+      ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(behaviour);
+      if (b) {
+        LOG(LOG_INFO, "Enocean Button %s - %08X: reports state %s", b->getHardwareName().c_str(), device.getAddress(), pressed ? "PRESSED" : "RELEASED");
+        b->updateButtonState(pressed);
+      }
+    }
+    else {
+      // handle as contact
+      BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
+      if (bb) {
+        bb->updateInputState(pressed==(mBinContactClosedValue==yes));
+      }
     }
   }
 }
