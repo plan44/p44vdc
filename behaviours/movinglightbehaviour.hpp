@@ -230,8 +230,8 @@ namespace p44 {
   public:
     GradientChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 0.1; /* arbitrary */ };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual double getMin() P44_OVERRIDE { return -100; }; ///< rotation goes from 0 to 360 degrees, with 0 and 360 meaning the same.
-    virtual double getMax() P44_OVERRIDE { return 100; }; ///< Note the max value will never be actually reached, as it wraps around to min
+    virtual double getMin() P44_OVERRIDE { return -100; }; ///< gradients go from -100 to +100
+    virtual double getMax() P44_OVERRIDE { return 100; }; ///< gradients go from -100 to +100
   };
 
 
