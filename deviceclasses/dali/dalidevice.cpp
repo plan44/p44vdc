@@ -1065,7 +1065,7 @@ string DaliBusDeviceGroup::description()
     if (!g.empty()) g +=", ";
     string_format_append(g, "%02d", *pos);
   }
-  string s = "\n- DALI group - device bus addresses: " + g;
+  string s = string_format("\n- DALI group #%d - device bus addresses: %s", deviceInfo->shortAddress & DaliGroupMask, g.c_str());
   s + inherited::description();
   return s;
 }
@@ -2118,8 +2118,18 @@ string DaliCompositeDevice::oemModelGUID()
 string DaliCompositeDevice::description()
 {
   string s = inherited::description();
-  DaliBusDevicePtr dimmer = firstBusDevice();
-  if (dimmer) s.append(dimmer->description());
+  for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
+    DaliBusDevicePtr dim = dimmers[idx];
+    s.append("\nChannel %s", dimmerChannelNames[idx]);
+    if (dim) {
+      // add busdevice info
+      s.append(dim->description());
+    }
+    else {
+      // missing bus device
+      s.append("\n- missing dimmer");
+    }
+  }
   return s;
 }
 
