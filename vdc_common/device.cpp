@@ -663,6 +663,17 @@ void Device::allChannelsApplied(bool aAnyway)
 }
 
 
+void Device::invalidateAllChannels()
+{
+  for (int i=0; i<numChannels(); i++) {
+    ChannelBehaviourPtr ch = getChannelByIndex(i, false);
+    if (ch) {
+      ch->makeApplyPending();
+    }
+  }
+}
+
+
 ChannelBehaviourPtr Device::getChannelByIndex(int aChannelIndex, bool aPendingApplyOnly)
 {
   if (!output) return ChannelBehaviourPtr();

@@ -208,6 +208,9 @@ namespace p44 {
     /// @return true if the cached channel value was changed and should be applied to hardware via device's applyChannelValues()
     bool needsApplying() { return channelUpdatePending; }
 
+    /// make channel value pending for sending to hardware
+    bool makeApplyPending() { channelUpdatePending = true; }
+
     /// to be called when channel value has been successfully applied to hardware
     /// @param aAnyWay if true, lastSent state will be set even if channel was not in needsApplying() state
     void channelValueApplied(bool aAnyWay = false);

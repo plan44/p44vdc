@@ -860,10 +860,17 @@ static void channelOpComplete(BuiltinFunctionContextPtr f, OutputBehaviourPtr aO
 }
 
 // applychannels()
+// applychannels(forced)
+static const BuiltInArgDesc applychannels_args[] = { { numeric|optionalarg } };
+static const size_t applychannels_numargs = sizeof(applychannels_args)/sizeof(BuiltInArgDesc);
 static void applychannels_func(BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
   assert(o);
+  if (f->arg(0)->boolValue()) {
+    // force apply, invalidate all channels first
+    o->output()->getDevice().invalidateAllChannels();
+  }
   SPLOG(o->output(), LOG_INFO, "scene script: applychannels() requests applying channels now");
   o->output()->getDevice().requestApplyingChannels(boost::bind(&channelOpComplete, f, o->output()), false);
 }
@@ -924,7 +931,7 @@ static void dimchannel_func(BuiltinFunctionContextPtr f)
 }
 
 static const BuiltinMemberDescriptor outputMembers[] = {
-  { "applychannels", executable|null, 0, NULL, &applychannels_func },
+  { "applychannels", executable|null, applychannels_numargs, applychannels_args, &applychannels_func },
   { "syncchannels", executable|null, 0, NULL, &syncchannels_func },
   { "channel", executable|numeric, channel_numargs, channel_args, &channel_func },
   { "dimchannel", executable|numeric, channel_numargs, channel_args, &dimchannel_func },

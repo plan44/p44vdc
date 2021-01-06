@@ -561,6 +561,9 @@ namespace p44 {
     /// @param aAnyWay if true, lastSent state will be set even for channels that were not in needsApplying() state
     void allChannelsApplied(bool aAnyway = false);
 
+    /// flag all channels unconditionally for re-applying to hardware
+    void invalidateAllChannels();
+
     /// get channel by index
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @param aPendingApplyOnly if true, only channels with pending values to be applied are returned
