@@ -80,7 +80,7 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
 
 string DaliBusDevice::logContextPrefix()
 {
-  return string_format("DaliBusDevice %02d: ", deviceInfo ? deviceInfo->shortAddress : 99);
+  return string_format("DaliBusDevice %02d", deviceInfo ? deviceInfo->shortAddress : 99);
 }
 
 
@@ -2120,7 +2120,7 @@ string DaliCompositeDevice::description()
   string s = inherited::description();
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     DaliBusDevicePtr dim = dimmers[idx];
-    s.append("\nChannel %s", dimmerChannelNames[idx]);
+    string_format_append(s, "\nChannel %s", dimmerChannelNames[idx]);
     if (dim) {
       // add busdevice info
       s.append(dim->description());
