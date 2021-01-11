@@ -38,7 +38,6 @@ namespace p44 {
   class HueComm;
 
 
-
   typedef boost::intrusive_ptr<HueDevice> HueDevicePtr;
   class HueDevice : public Device
   {
@@ -68,7 +67,16 @@ namespace p44 {
     MLTicket dimTicket;
 
   public:
-    HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool aCTOnly, const string &aUniqueID);
+
+    typedef enum {
+      unknownhue,
+      fullcolor,
+      colortemperature,
+      dimmable,
+      onoff
+    } HueType;
+
+    HueDevice(HueVdc *aVdcP, const string &aLightID, HueType aHueType, const string &aUniqueID);
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;

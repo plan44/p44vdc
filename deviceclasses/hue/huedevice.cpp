@@ -59,7 +59,7 @@ using namespace p44;
 // MARK: - HueDevice
 
 
-HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool aCTOnly, const string &aUniqueID) :
+HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, HueType aHueType, const string &aUniqueID) :
   inherited(aVdcP),
   lightID(aLightID),
   uniqueID(aUniqueID),
@@ -71,25 +71,31 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, bool aIsColor, bool 
 {
   // hue devices are lights
   setColorClass(class_yellow_light);
-  if (aIsColor || aCTOnly) {
+  if (aHueType==fullcolor || aHueType==colortemperature) {
     // color lamp
     // - use color light settings, which include a color scene table
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // - set the behaviour
-    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, aCTOnly));
-    cl->setHardwareOutputConfig(aCTOnly ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
-    cl->setHardwareName(string_format("%s light #%s", aCTOnly ? "tunable white" : "color", lightID.c_str()));
+    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, aHueType==colortemperature));
+    cl->setHardwareOutputConfig(aHueType==colortemperature ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
+    cl->setHardwareName(string_format("%s light #%s", aHueType==colortemperature ? "tunable white" : "color", lightID.c_str()));
     cl->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness
     addBehaviour(cl);
   }
   else {
-    // dimmable lamp
+    // model as dimmable lamp (but onoff-only will use dim level threshold for switching on)
     // - use normal light settings
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
     // - set the behaviour
     LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
-    l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
-    l->setHardwareName(string_format("monochrome light #%s", lightID.c_str()));
+    if (aHueType==onoff) {
+      l->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
+      l->setHardwareName(string_format("on/off switch #%s", lightID.c_str()));
+    }
+    else {
+      l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
+      l->setHardwareName(string_format("monochrome light #%s", lightID.c_str()));
+    }
     l->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness
     addBehaviour(l);
   }
@@ -399,51 +405,57 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
     if (aReapply || !aForDimming || l->brightness->needsApplying()) {
       Brightness b = l->brightnessForHardware();
       lightIsOn = b>=DS_BRIGHTNESS_STEP;
-      if (!lightIsOn) {
-        // light should be off, no other parameters
-        if (separateOnAndChannels) {
-          newState->add("bri", JsonObject::newInt32(1));
-          lastSentBri = 1;
-        }
-        newState->add("on", JsonObject::newBool(false));
-        currentlyOn = no; // assume off from now on (actual response might change it)
+      if (l->getOutputFunction()==outputFunction_switch) {
+        // just on and off
+        newState->add("on", JsonObject::newBool(lightIsOn));
       }
       else {
-        // light on
-        uint8_t newBri = b*HUEAPI_FACTOR_BRIGHTNESS+HUEAPI_OFFSET_BRIGHTNESS+0.5; // DS_BRIGHTNESS_STEP..100 -> 1..254
-        if (separateOnAndChannels) {
-          // known broken light, make sure on is never sent together with brightness, but always separately before
-          if (currentlyOn!=yes || aReapply) {
-            if (lastSentBri!=newBri || aReapply) {
-              // both on and bri changes -> need to send "on" ahead
-              OLOG(LOG_INFO, "light with known broken API: send \"on\":true separately, transition %d mS", (int)(aTransitionTime/MilliSecond));
-              JsonObjectPtr onState = JsonObject::newObj();
-              onState->add("on", JsonObject::newBool(true));
-              onState->add("bri", JsonObject::newInt32(newBri)); // send it here already a first time
-              onState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
-              // just send, don't care about the answer
-              hueComm().apiAction(httpMethodPUT, url.c_str(), onState, NULL);
-              // Note: hueComm will make sure next API command is paced in >=100mS distance,
-              // so we can go on creating the bri/color state change right now
-              newState->add("bri", JsonObject::newInt32(newBri));
+        if (!lightIsOn) {
+          // light should be off, no other parameters
+          if (separateOnAndChannels) {
+            newState->add("bri", JsonObject::newInt32(1));
+            lastSentBri = 1;
+          }
+          newState->add("on", JsonObject::newBool(false));
+          currentlyOn = no; // assume off from now on (actual response might change it)
+        }
+        else {
+          // light on
+          uint8_t newBri = b*HUEAPI_FACTOR_BRIGHTNESS+HUEAPI_OFFSET_BRIGHTNESS+0.5; // DS_BRIGHTNESS_STEP..100 -> 1..254
+          if (separateOnAndChannels) {
+            // known broken light, make sure on is never sent together with brightness, but always separately before
+            if (currentlyOn!=yes || aReapply) {
+              if (lastSentBri!=newBri || aReapply) {
+                // both on and bri changes -> need to send "on" ahead
+                OLOG(LOG_INFO, "light with known broken API: send \"on\":true separately, transition %d mS", (int)(aTransitionTime/MilliSecond));
+                JsonObjectPtr onState = JsonObject::newObj();
+                onState->add("on", JsonObject::newBool(true));
+                onState->add("bri", JsonObject::newInt32(newBri)); // send it here already a first time
+                onState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
+                // just send, don't care about the answer
+                hueComm().apiAction(httpMethodPUT, url.c_str(), onState, NULL);
+                // Note: hueComm will make sure next API command is paced in >=100mS distance,
+                // so we can go on creating the bri/color state change right now
+                newState->add("bri", JsonObject::newInt32(newBri));
+              }
+              else {
+                // no brightness change, safe to send on now (no matter if changed or not)
+                newState->add("on", JsonObject::newBool(true));
+              }
             }
             else {
-              // no brightness change, safe to send on now (no matter if changed or not)
-              newState->add("on", JsonObject::newBool(true));
+              // no "on" change, just send brightness (no matter if changed or not)
+              newState->add("bri", JsonObject::newInt32(newBri));
             }
           }
           else {
-            // no "on" change, just send brightness (no matter if changed or not)
+            // normal light, can send on and bri together
+            newState->add("on", JsonObject::newBool(true));
             newState->add("bri", JsonObject::newInt32(newBri));
           }
+          currentlyOn = yes; // assume off from now on (actual response might change it)
+          lastSentBri = newBri;
         }
-        else {
-          // normal light, can send on and bri together
-          newState->add("on", JsonObject::newBool(true));
-          newState->add("bri", JsonObject::newInt32(newBri));
-        }
-        currentlyOn = yes; // assume off from now on (actual response might change it)
-        lastSentBri = newBri;
       }
     }
     // for color lights, also check color (but not if light is off)

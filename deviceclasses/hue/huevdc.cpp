@@ -529,15 +529,25 @@ void HueVdc::collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aR
       if (lightInfo) {
         // pre 1.3 bridges, which do not know yet hue Lux, don't have the "state" -> no state == all lights have color (hue or living color)
         // 1.3 and later bridges do have "state", and if "state" contains "colormode", it's a color light or a tunable white
-        bool hasColor = true; // assume color (default if no "state" delivered in answer)
-        bool ctOnly = false; // not tunable white only (default if no "state" delivered in answer)
+        HueDevice::HueType hueType = HueDevice::fullcolor; // assume color (default if no "state" delivered in answer)
         JsonObjectPtr o = lightInfo->get("state");
         if (o) {
-          JsonObjectPtr o2 = o->get("colormode");
-          if (!o2) hasColor = false; // lamp without colormode -> just brightness (hue lux)
-          if (hasColor) {
-            o2 = o->get("hue");
-            if (!o2) ctOnly = true; // lamp with colormode, but without hue -> tunable white (hue ambiance)
+          JsonObjectPtr o2 = o->get("bri");
+          if (!o2) {
+            // not dimmable: must be on/off switch
+            hueType = HueDevice::onoff;
+          }
+          else {
+            // is at least dimmable
+            o2 = o->get("colormode");
+            if (!o2) {
+              hueType = HueDevice::dimmable; // lamp without colormode -> just brightness (hue lux)
+            }
+            else {
+              // has color mode, but might be CT only
+              o2 = o->get("hue");
+              if (!o2) hueType = HueDevice::colortemperature; // lamp with colormode, but without hue -> tunable white (hue ambiance)
+            }
           }
         }
         // 1.4 and later FINALLY have a "uniqueid"!
@@ -545,7 +555,7 @@ void HueVdc::collectedLightsHandler(StatusCB aCollectedHandler, JsonObjectPtr aR
         o = lightInfo->get("uniqueid");
         if (o) uniqueID = o->stringValue();
         // create device now
-        HueDevicePtr newDev = HueDevicePtr(new HueDevice(this, lightID, hasColor, ctOnly, uniqueID));
+        HueDevicePtr newDev = HueDevicePtr(new HueDevice(this, lightID, hueType, uniqueID));
         if (simpleIdentifyAndAddDevice(newDev)) {
           // actually added, no duplicate, set the name
           // (otherwise, this is an incremental collect and we knew this light already)
