@@ -382,7 +382,7 @@ void EvaluatorDevice::handleGlobalEvent(VdchostEvent aEvent)
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
       //   Otherwise: have condition re-evaluated (because it possibly contain references to local time)
       #if ENABLE_P44SCRIPT
-      valueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::evaluateConditions, this, P44Script::timed), REPARSE_DELAY);
+      valueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::evaluateConditions, this, (EvaluationFlags)P44Script::timed), REPARSE_DELAY);
       #else
       valueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::evaluateConditions, this, currentState, evalmode_timed), REPARSE_DELAY);
       #endif
@@ -493,7 +493,7 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
       MainLoop::currentMainLoop().executeNow(boost::bind(
         &TriggerSource::evaluate,
         aOnCondition ? evaluatorSettings()->offCondition : evaluatorSettings()->onCondition,
-        triggered
+        (EvaluationFlags)triggered
       ));
       // report new decision
       if (decisionMade) {

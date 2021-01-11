@@ -60,7 +60,7 @@ string EnoceanVdc::vdcModelVersion() const
   if (v==0) return inherited::vdcModelVersion();
   return string_format(
     "%d.%d.%d.%d/%d.%d.%d.%d",
-    (v>>24)&0xFF, (v>>16)&0xFF, (v>>8)&0xFF, v&0xFF, 
+    (v>>24)&0xFF, (v>>16)&0xFF, (v>>8)&0xFF, v&0xFF,
     (a>>24)&0xFF, (a>>16)&0xFF, (a>>8)&0xFF, a&0xFF
   );
 };
@@ -650,7 +650,9 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
   }
   // check encrypted packets
   RadioOrg rorg = aEsp3PacketPtr->eepRorg();
-  #if ENABLE_ENOCEAN_SECURE
+  #if !ENABLE_ENOCEAN_SECURE
+  EnOceanSecurityPtr sec = NULL; // w/o security, this is a dummy void*
+  #else
   // look for existing security info for this device
   EnOceanSecurityPtr sec = findSecurityInfoForSender(sender);
   if (rorg==rorg_SEC_TEACHIN) {
