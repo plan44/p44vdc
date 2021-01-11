@@ -111,6 +111,8 @@ namespace p44 {
     ScriptSource action;
     #elif EXPRESSION_SCRIPT_SUPPORT
     EvaluatorActionContext action; ///< (additional) action to fire when evaluator changes state
+    #else
+    string oldAction; ///< just retain action string, but is NOP
     #endif
 
   protected:
@@ -139,7 +141,7 @@ namespace p44 {
     #endif
 
     long long evaluatorDeviceRowID; ///< the ROWID this device was created from (0=none)
-    
+
     typedef enum {
       evaluator_unknown,
       evaluator_rocker, ///< output is a simulated two-way rocket button

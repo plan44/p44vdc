@@ -112,11 +112,11 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
 {
   #if ENABLE_P44SCRIPT
   P44Script::StandardScriptingDomain::sharedDomain().setGeoLocation(&geolocation);
+  #if P44SCRIPT_FULL_SUPPORT
   // vdchost is the global context for this app, so register its members in the standard scripting
   // domain making them accessible in all scripts
   StandardScriptingDomain::sharedDomain().registerMemberLookup(VdcHostLookup::sharedLookup());
   vdcHostScriptContext = StandardScriptingDomain::sharedDomain().newContext();
-  #if P44SCRIPT_FULL_SUPPORT
   // init main script source
   mainScript.setSharedMainContext(vdcHostScriptContext);
   // Add some extras
