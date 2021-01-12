@@ -526,7 +526,10 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       }
     }
     // use transition time from (1/10 = 100mS resolution)
-    newState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
+    if (l->getOutputFunction()!=outputFunction_switch) {
+      newState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
+    }
+    // send the command
     hueComm().apiAction(httpMethodPUT, url.c_str(), newState, boost::bind(&HueDevice::channelValuesSent, this, l, aDoneCB, _1, _2));
   }
   return true;
