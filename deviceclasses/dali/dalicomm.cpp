@@ -502,6 +502,10 @@ void DaliComm::daliSendAndReceive(uint8_t aDali1, uint8_t aDali2, DaliQueryResul
 
 void DaliComm::daliSendQuery(DaliAddress aAddress, DaliCommand aQueryCommand, DaliQueryResultCB aResultCB, int aWithDelay)
 {
+  if (aAddress==NoDaliAddress) {
+    if (aResultCB) aResultCB(true, 0, Error::err<DaliCommError>(DaliCommError::NoAddress, "no valid DALI address"), false);
+    return;
+  }
   daliPrepareForCommand(aQueryCommand, aWithDelay);
   daliSendAndReceive(dali1FromAddress(aAddress)+1, aQueryCommand, aResultCB, aWithDelay);
 }
@@ -628,7 +632,10 @@ DaliAddress DaliComm::addressFromDaliResponse(uint8_t aResponse)
 
 string DaliComm::formatDaliAddress(DaliAddress aAddress)
 {
-  if (aAddress==DaliBroadcast) {
+  if (aAddress==NoDaliAddress) {
+    return "not a DALI address";
+  }
+  else if (aAddress==DaliBroadcast) {
     return "broadcast";
   }
   else if (aAddress & DaliGroup) {
@@ -1050,8 +1057,8 @@ private:
         return newAddr;
       }
     }
-    // return broadcast if none available
-    return DaliBroadcast;
+    // return NoDaliAddress if none available
+    return NoDaliAddress;
   }
 
 
@@ -1184,14 +1191,14 @@ private:
     }
     else {
       // response is short address in 0AAAAAA1 format or DALIVALUE_MASK (no adress)
-      newAddress = DaliBroadcast; // none
+      newAddress = NoDaliAddress; // none
       DaliAddress shortAddress = newAddress; // none
       bool needsNewAddress = false;
       if (aResponse==DALIVALUE_MASK) {
         // device has no short address yet, assign one
         needsNewAddress = true;
         newAddress = newShortAddress();
-        LOG(LOG_NOTICE, "- Device at 0x%06X has NO short address -> assigning new short address = %d", searchAddr, newAddress);
+        LOG(LOG_NOTICE, "- Device at 0x%06X has NO short address -> assigning new address");
       }
       else {
         shortAddress = DaliComm::addressFromDaliResponse(aResponse);
@@ -1200,20 +1207,25 @@ private:
         if (isShortAddressInList(shortAddress, foundDevicesPtr)) {
           newAddress = newShortAddress();
           needsNewAddress = true;
-          LOG(LOG_NOTICE, "- Collision on short address %d -> assigning new short address = %d", shortAddress, newAddress);
+          LOG(LOG_NOTICE, "- Collision on short address %d -> assigning new address");
         }
       }
       // check if we need to re-assign the short address
       if (needsNewAddress) {
-        if (newAddress==DaliBroadcast) {
+        uint8_t addrProg;
+        if (newAddress==NoDaliAddress) {
           // no more short addresses available
-          LOG(LOG_ERR, "Bus has too many devices, device 0x%06X cannot be assigned a short address and will not be usable", searchAddr);
+          LOG(LOG_ERR, "Bus has too many devices, device 0x%06X cannot be assigned a new short address and will not be usable", searchAddr);
+          addrProg = 0xFF; // programming 0xFF means NO address
         }
-        // new address must be assigned (or in case none is available, a possibly
-        // existing short address will be removed by assigning DaliBroadcast==0xFF)
-        daliComm.daliSend(DALICMD_PROGRAM_SHORT_ADDRESS, DaliComm::dali1FromAddress(newAddress)+1);
+        else {
+          LOG(LOG_NOTICE, "- assigning new free address %d to device", newAddress);
+          addrProg = DaliComm::dali1FromAddress(newAddress)+1;
+        }
+        // new address (or explicit no-address==DaliBroadcast) must be assigned
+        daliComm.daliSend(DALICMD_PROGRAM_SHORT_ADDRESS, addrProg);
         daliComm.daliSendAndReceive(
-          DALICMD_VERIFY_SHORT_ADDRESS, DaliComm::dali1FromAddress(newAddress)+1,
+          DALICMD_VERIFY_SHORT_ADDRESS, addrProg,
           boost::bind(&DaliFullBusScanner::handleNewShortAddressVerify, this, _1, _2, _3),
           1000 // delay one second before querying for new short address
         );
@@ -1227,7 +1239,7 @@ private:
 
   void handleNewShortAddressVerify(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
   {
-    if (newAddress==DaliBroadcast || DaliComm::isYes(aNoOrTimeout, aResponse, aError, false)) {
+    if (newAddress==NoDaliAddress || DaliComm::isYes(aNoOrTimeout, aResponse, aError, false)) {
       // address was deleted, not added in the first place (more than 64 devices)
       // OR real clean YES - new short address verified
       deviceFound(newAddress);
@@ -1235,7 +1247,7 @@ private:
     else {
       // short address verification failed
       LOG(LOG_ERR, "Error - could not assign new short address %d", newAddress);
-      deviceFound(DaliBroadcast); // not really a usable device, but withdraw it and continue searching
+      deviceFound(NoDaliAddress); // not really a usable device, but withdraw it and continue searching
     }
   }
 
@@ -1243,7 +1255,7 @@ private:
   {
     // store short address if real address
     // (if broadcast, means that this device is w/o short address because >64 devices are on the bus, or short address could not be programmed)
-    if (aShortAddress!=DaliBroadcast) {
+    if (aShortAddress!=NoDaliAddress) {
       foundDevicesPtr->push_back(aShortAddress);
     }
     // withdraw this device from further searches
@@ -1817,7 +1829,7 @@ void DaliComm::daliReadDeviceInfo(DaliDeviceInfoCB aResultCB, DaliAddress aAddre
 DaliDeviceInfo::DaliDeviceInfo()
 {
   clear();
-  shortAddress = DaliBroadcast; // undefined short address
+  shortAddress = NoDaliAddress; // undefined short address
 }
 
 
@@ -1839,7 +1851,7 @@ void DaliDeviceInfo::clear()
 
 string DaliDeviceInfo::description()
 {
-  string s = string_format("\n- DaliDeviceInfo for shortAddress %d", shortAddress);
+  string s = string_format("\n- DaliDeviceInfo for %s", DaliComm::formatDaliAddress(shortAddress).c_str());
   string_format_append(s, "\n  - is %suniquely defining the device", devInfStatus==devinf_solid ? "" : "NOT ");
   string_format_append(s, "\n  - GTIN       : %lld", gtin);
   string_format_append(s, "\n  - Serial     : %lld", serialNo);

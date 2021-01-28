@@ -110,6 +110,7 @@ namespace p44 {
       BusOverload,
       DataUnreliable,
       DataMissing,
+      NoAddress,
       numErrorCodes
     } ErrorCodes;
 
@@ -137,6 +138,7 @@ namespace p44 {
       "BusOverload",
       "DataUnreliable",
       "DataMissing",
+      "NoAddress"
     };
     #endif // ENABLE_NAMED_ERRORS
   };

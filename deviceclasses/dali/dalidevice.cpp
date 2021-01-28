@@ -1024,7 +1024,7 @@ void DaliBusDevice::dimRepeater(DaliAddress aDaliAddress, DaliCommand aCommand, 
 
 DaliBusDeviceGroup::DaliBusDeviceGroup(DaliVdc &aDaliVdc, uint8_t aGroupNo) :
   inherited(aDaliVdc),
-  groupMaster(DaliBroadcast)
+  groupMaster(NoDaliAddress)
 {
   mixID.erase(); // no members yet
   // assume max features, will be reduced to what all group members are capable in addDaliBusDevice()
@@ -1040,10 +1040,10 @@ DaliBusDeviceGroup::DaliBusDeviceGroup(DaliVdc &aDaliVdc, uint8_t aGroupNo) :
 void DaliBusDeviceGroup::addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice)
 {
   // add the ID to the mix
-  LOG(LOG_NOTICE, "- DALI bus device with shortaddr %d is grouped in DALI group %d", aDaliBusDevice->deviceInfo->shortAddress, deviceInfo->shortAddress & DaliGroupMask);
+  LOG(LOG_NOTICE, "- DALI bus device %s is grouped in DALI group %d", DaliComm::formatDaliAddress(aDaliBusDevice->deviceInfo->shortAddress).c_str(), deviceInfo->shortAddress & DaliGroupMask);
   aDaliBusDevice->dSUID.xorDsUidIntoMix(mixID, false);
   // if this is the first valid device, use it as master
-  if (groupMaster==DaliBroadcast && !aDaliBusDevice->isDummy) {
+  if (groupMaster==NoDaliAddress && !aDaliBusDevice->isDummy) {
     // this is the master device
     LOG(LOG_INFO, "- DALI bus device with shortaddr %d is master of the group (queried for brightness, mindim)", aDaliBusDevice->deviceInfo->shortAddress);
     groupMaster = aDaliBusDevice->deviceInfo->shortAddress;
@@ -1053,7 +1053,7 @@ void DaliBusDeviceGroup::addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice)
   if (!aDaliBusDevice->supportsDT8) supportsDT8 = false;
   if (!aDaliBusDevice->dt8Color) supportsDT8 = false;
   if (!aDaliBusDevice->dt8CT) dt8CT = false;
-  // add member
+  // add member (can be dummy with shortaddress NoDaliAddress)
   groupMembers.push_back(aDaliBusDevice->deviceInfo->shortAddress);
 }
 
@@ -1063,7 +1063,8 @@ string DaliBusDeviceGroup::description()
   string g;
   for (DaliComm::ShortAddressList::const_iterator pos = groupMembers.begin(); pos!=groupMembers.end(); ++pos) {
     if (!g.empty()) g +=", ";
-    string_format_append(g, "%02d", *pos);
+    if (*pos==NoDaliAddress) g += "<missing>"; // dummy
+    else string_format_append(g, "%02d", *pos);
   }
   string s = string_format("\n- DALI group #%d - device bus addresses: %s", deviceInfo->shortAddress & DaliGroupMask, g.c_str());
   s + inherited::description();
