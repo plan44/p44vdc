@@ -301,28 +301,27 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
         return;
       }
     }
-    // all done successfully, complete bus info now available in aBusDevices
-    // - look for dimmers that are to be addressed as a group
-    DaliBusDeviceListPtr dimmerDevices = DaliBusDeviceListPtr(new DaliBusDeviceList());
-    uint16_t groupsInUse = 0; // groups in use for configured groups
-    while (aBusDevices->size()>0) {
-      // get first remaining
-      DaliBusDevicePtr busDevice = aBusDevices->front();
+    // all devices queried successfully, complete bus info now available in aBusDevices
+    // - BEFORE looking up any dSUID-based grouping, check for possible devinf-based dSUID duplicates
+    //   and apply fallbacks to shortaddress based dSUIDs
+    for (DaliBusDeviceList::iterator busdevpos = aBusDevices->begin(); busdevpos!=aBusDevices->end(); ++busdevpos) {
       // duplicate dSUID check for devInf-based IDs (if devinf is already detected unusable here, there's no need for checking)
-      if (busDevice->deviceInfo->devInfStatus>=DaliDeviceInfo::devinf_solid) {
+      if ((*busdevpos)->deviceInfo->devInfStatus>=DaliDeviceInfo::devinf_solid) {
         DsUid thisDsuid;
         #if OLD_BUGGY_CHKSUM_COMPATIBLE
-        if (busDevice->deviceInfo->devInfStatus==DaliDeviceInfo::devinf_notForID) {
+        if ((*busdevpos)->deviceInfo->devInfStatus==DaliDeviceInfo::devinf_notForID) {
           // check native dsuid, not shortaddress based fallback
-          busDevice->dsUidForDeviceInfoStatus(thisDsuid, DaliDeviceInfo::devinf_solid);
+          (*busdevpos)->dsUidForDeviceInfoStatus(thisDsuid, DaliDeviceInfo::devinf_solid);
         }
         else
         #endif
         {
-          thisDsuid = busDevice->dSUID;
+          thisDsuid = (*busdevpos)->dSUID;
         }
         bool anyDuplicates = false;
-        for (DaliBusDeviceList::iterator refpos = ++aBusDevices->begin(); refpos!=aBusDevices->end(); ++refpos) {
+        // compare this busdevices with all following ones (previous ones are already checked)
+        DaliBusDeviceList::iterator refpos = busdevpos;
+        for (refpos++; refpos!=aBusDevices->end(); ++refpos) {
           DsUid otherDsuid;
           #if OLD_BUGGY_CHKSUM_COMPATIBLE
           if ((*refpos)->deviceInfo->devInfStatus==DaliDeviceInfo::devinf_notForID) {
@@ -336,17 +335,27 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
           }
           if (thisDsuid==otherDsuid) {
             // duplicate dSUID, indicates DALI devices with invalid device info that slipped all heuristics
-            LOG(LOG_ERR, "Bus devices #%d and #%d have same devinf-based dSUID -> assuming invalid device info, forcing both to short address based dSUID", busDevice->deviceInfo->shortAddress, (*refpos)->deviceInfo->shortAddress);
-            // - clear all device info except short address and revert to short address derived dSUID
-            (*refpos)->clearDeviceInfo();
+            LOG(LOG_ERR, "Bus devices #%d and #%d have same devinf-based dSUID -> assuming invalid device info, forcing both to short address based dSUID", (*busdevpos)->deviceInfo->shortAddress, (*refpos)->deviceInfo->shortAddress);
+            LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%lld and Serial=%lld", (*busdevpos)->deviceInfo->shortAddress, (*busdevpos)->deviceInfo->gtin, (*busdevpos)->deviceInfo->serialNo);
+            LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%lld and Serial=%lld", (*refpos)->deviceInfo->shortAddress, (*refpos)->deviceInfo->gtin, (*refpos)->deviceInfo->serialNo);
+            // - invalidate device info (but keep GTIN) and revert to short address derived dSUID
+            (*refpos)->invalidateDeviceInfoSerial();
             anyDuplicates = true; // at least one found
           }
         }
         if (anyDuplicates) {
           // consider my own info invalid as well
-          busDevice->clearDeviceInfo();
+          (*busdevpos)->invalidateDeviceInfoSerial();
         }
       }
+    }
+    // At this point, all bus device dSUIDs can be considered stable for further use (all fallbacks due to duplicate serials in devinf applied)
+    // - look for dimmers that are to be addressed as a group
+    DaliBusDeviceListPtr dimmerDevices = DaliBusDeviceListPtr(new DaliBusDeviceList());
+    uint16_t groupsInUse = 0; // groups in use for configured groups
+    while (aBusDevices->size()>0) {
+      // get first remaining
+      DaliBusDevicePtr busDevice = aBusDevices->front();
       // check if this device is part of a DALI group
       sqlite3pp::query qry(db);
       string sql = string_format("SELECT groupNo FROM compositeDevices WHERE dimmerUID = '%s' AND dimmerType='GRP'", busDevice->dSUID.getString().c_str());
@@ -401,6 +410,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
       }
     }
     // initialize dimmer devices
+    LOG(LOG_NOTICE, "Groups in use by manually grouped DALI bus devices (bitmask): 0x%04x", groupsInUse);
     initializeNextDimmer(dimmerDevices, groupsInUse, dimmerDevices->begin(), aCompletedCB, ErrorPtr());
   }
   else {
@@ -514,7 +524,7 @@ void DaliVdc::deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDevice
     return aCompletedCB(aError);
   }
   // no error, or error but due to missing or bad data -> device exists and possibly still has ok device info
-  if (missingData) { LOG(LOG_INFO, "Device at shortAddress %d is missing all or some device info data",aDaliDeviceInfoPtr->shortAddress); }
+  if (missingData) { LOG(LOG_INFO, "Device at shortAddress %d is missing all or some device info data in at least one info bank",aDaliDeviceInfoPtr->shortAddress); }
   if (badData) { LOG(LOG_INFO, "Device at shortAddress %d has bad data in at least in one info bank",aDaliDeviceInfoPtr->shortAddress); }
   // update entry in the cache
   // Note: callback always gets a deviceInfo back, possibly with devinf_none if device does not have devInf at all (or garbage)

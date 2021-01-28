@@ -186,6 +186,8 @@ namespace p44 {
     DaliDeviceInfo();
     /// clear everything except short address
     void clear();
+    /// invalidate info that claims to be a unique serial (usually because we found it's NOT unique)
+    void invalidateSerial();
     /// short address
     DaliAddress shortAddress;
     // DALI device information

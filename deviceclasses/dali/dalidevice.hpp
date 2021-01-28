@@ -117,7 +117,7 @@ namespace p44 {
     void setDeviceInfo(DaliDeviceInfoPtr aDeviceInfo);
 
     /// clear all device info except short address and revert to short address derived dSUID
-    void clearDeviceInfo();
+    void invalidateDeviceInfoSerial();
 
     /// derive the dSUID from collected device info
     virtual void deriveDsUid();

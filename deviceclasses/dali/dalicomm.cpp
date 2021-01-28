@@ -1849,6 +1849,20 @@ void DaliDeviceInfo::clear()
 }
 
 
+void DaliDeviceInfo::invalidateSerial()
+{
+  // reduce devinf to state that does not allow to base a dSUID on
+  // - assume serials are garbage/not unique -> nobody should ever see them
+  serialNo = 0;
+  oem_serialNo = 0;
+  // - make sure status gets downgraded (but keep other info such as GTIN which is likely valid)
+  if (devInfStatus>=devinf_only_gtin) {
+    devInfStatus = devinf_only_gtin;
+  }
+}
+
+
+
 string DaliDeviceInfo::description()
 {
   string s = string_format("\n- DaliDeviceInfo for %s", DaliComm::formatDaliAddress(shortAddress).c_str());

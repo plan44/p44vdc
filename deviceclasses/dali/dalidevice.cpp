@@ -185,9 +185,9 @@ void DaliBusDevice::setDeviceInfo(DaliDeviceInfoPtr aDeviceInfo)
 }
 
 
-void DaliBusDevice::clearDeviceInfo()
+void DaliBusDevice::invalidateDeviceInfoSerial()
 {
-  deviceInfo->clear();
+  deviceInfo->invalidateSerial();
   deriveDsUid();
 }
 
@@ -415,6 +415,11 @@ void DaliBusDevice::queryGroup8to15Response(DaliGroupsCB aDaliGroupsCB, DaliAddr
 
 void DaliBusDevice::initialize(StatusCB aCompletedCB, uint16_t aUsedGroupsMask)
 {
+  if (isDummy) {
+    // dummies have no hardware to initialize
+    if (aCompletedCB) aCompletedCB(ErrorPtr());
+    return;
+  }
   // make sure device is in none of the used groups
   if (aUsedGroupsMask==0) {
     // no groups in use at all, continue to initializing features
@@ -1108,19 +1113,23 @@ void DaliBusDeviceGroup::initialize(StatusCB aCompletedCB, uint16_t aUsedGroupsM
 
 void DaliBusDeviceGroup::initNextGroupMember(StatusCB aCompletedCB, DaliComm::ShortAddressList::iterator aNextMember)
 {
-  if (aNextMember!=groupMembers.end()) {
+  while (aNextMember!=groupMembers.end()) {
     // another member, query group membership, then adjust if needed
+    if (*aNextMember==NoDaliAddress) {
+      // skip dummies
+      ++aNextMember;
+      continue;
+    }
     // need to query current groups
     getGroupMemberShip(
       boost::bind(&DaliBusDeviceGroup::groupMembershipResponse, this, aCompletedCB, aNextMember, _1, _2),
       *aNextMember
     );
+    return;
   }
-  else {
-    // group membership is now configured correctly
-    // Now we can initialize the features for the entire group
-    initializeFeatures(aCompletedCB);
-  }
+  // group membership is now configured correctly
+  // Now we can initialize the features for the entire group
+  initializeFeatures(aCompletedCB);
 }
 
 
