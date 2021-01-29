@@ -72,8 +72,9 @@ bool DaliVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResoluti
 //  2 : added groupNo (0..15) for DALI groups
 //  3 : added support for input devices
 //  4 : added dali2ScanLock to keep compatibility with old installations that might have scanned DALI 2.x devices as 1.0
+//  5 : extended dali2ScanLock to also use bit1 as dali2LUNLock
 #define DALI_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
-#define DALI_SCHEMA_VERSION 4 // current version
+#define DALI_SCHEMA_VERSION 5 // current version
 
 string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
@@ -104,7 +105,7 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 		// - add dali2ScanLock to globs table and set it to 0 (this is a fresh installation)
     sql.append(
       "ALTER TABLE globs ADD dali2ScanLock INTEGER;"
-      "UPDATE globs SET dali2ScanLock=0;" // not locked
+      "UPDATE globs SET dali2ScanLock=0;" // nothing locked
     );
     // reached final version in one step
     aToVersion = DALI_SCHEMA_VERSION;
@@ -130,6 +131,13 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
     // reached version 4
     aToVersion = 4;
   }
+  else if (aFromVersion==4) {
+    // V4->V5: extended dali2ScanLock for dali2LUNLock
+    sql =
+      "UPDATE globs SET dali2ScanLock=dali2ScanLock | 2;"; // this is an upgrade: lock DALI2 LUN support
+    // reached version 5
+    aToVersion = 5;
+  }
   return sql;
 }
 
@@ -144,7 +152,10 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   if (qry.prepare("SELECT dali2ScanLock FROM globs")==SQLITE_OK) {
     sqlite3pp::query::iterator i = qry.begin();
     if (i!=qry.end()) {
-      daliComm->dali2ScanLock = i->get<bool>(0);
+      // dali2ScanLock DB field contains dali2ScanLock flag in bit 0 and dali2LUNLock in bit 1
+      int lockFlags = i->get<int>(0);
+      daliComm->dali2ScanLock = lockFlags & 0x01;
+      daliComm->dali2LUNLock = lockFlags & 0x02;
     }
   }
   // update map of groups and scenes used by manually configured groups and scene-listening input devices
@@ -187,10 +198,11 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     #endif
   }
   if (aRescanFlags & (rescanmode_exhaustive|rescanmode_reenumerate)) {
-    // user is actively risking addressing changes, so we can enable DALI 2.0 scanning from now on
-    if (daliComm->dali2ScanLock) {
+    // user is actively risking addressing changes, so we can enable DALI 2.0 scanning and LUN usage from now on
+    if (daliComm->dali2ScanLock || daliComm->dali2LUNLock) {
       daliComm->dali2ScanLock = false;
-      db.execute("UPDATE globs SET dali2ScanLock=0");
+      daliComm->dali2LUNLock = false;
+      db.execute("UPDATE globs SET dali2ScanLock=0"); // clear DALI2.0 scan lock and LUN lock
     }
   }
   // wipe bus addresses
@@ -336,8 +348,8 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
           if (thisDsuid==otherDsuid) {
             // duplicate dSUID, indicates DALI devices with invalid device info that slipped all heuristics
             LOG(LOG_ERR, "Bus devices #%d and #%d have same devinf-based dSUID -> assuming invalid device info, forcing both to short address based dSUID", (*busdevpos)->deviceInfo->shortAddress, (*refpos)->deviceInfo->shortAddress);
-            LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%lld and Serial=%lld", (*busdevpos)->deviceInfo->shortAddress, (*busdevpos)->deviceInfo->gtin, (*busdevpos)->deviceInfo->serialNo);
-            LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%lld and Serial=%lld", (*refpos)->deviceInfo->shortAddress, (*refpos)->deviceInfo->gtin, (*refpos)->deviceInfo->serialNo);
+            LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%llu and Serial=%llu", (*busdevpos)->deviceInfo->shortAddress, (*busdevpos)->deviceInfo->gtin, (*busdevpos)->deviceInfo->serialNo);
+            LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%llu and Serial=%llu", (*refpos)->deviceInfo->shortAddress, (*refpos)->deviceInfo->gtin, (*refpos)->deviceInfo->serialNo);
             // - invalidate device info (but keep GTIN) and revert to short address derived dSUID
             (*refpos)->invalidateDeviceInfoSerial();
             anyDuplicates = true; // at least one found
@@ -872,6 +884,8 @@ bool DaliVdc::daliInfoSummary(DaliDeviceInfoPtr aDeviceInfo, ApiValuePtr aInfo)
       if (aDeviceInfo->vers_101) aInfo->add("version_101", aInfo->newString(string_format("%d.%d", DALI_STD_VERS_MAJOR(aDeviceInfo->vers_101), DALI_STD_VERS_MINOR(aDeviceInfo->vers_101))));
       if (aDeviceInfo->vers_102) aInfo->add("version_102", aInfo->newString(string_format("%d.%d", DALI_STD_VERS_MAJOR(aDeviceInfo->vers_102), DALI_STD_VERS_MINOR(aDeviceInfo->vers_102))));
       if (aDeviceInfo->vers_103) aInfo->add("version_103", aInfo->newString(string_format("%d.%d", DALI_STD_VERS_MAJOR(aDeviceInfo->vers_103), DALI_STD_VERS_MINOR(aDeviceInfo->vers_103))));
+      // logical unit index
+      aInfo->add("lunIndex", aInfo->newUint64(aDeviceInfo->lunIndex));
       break;
   }
   aInfo->add("devInfStatus", aInfo->newString(devInfStatus));

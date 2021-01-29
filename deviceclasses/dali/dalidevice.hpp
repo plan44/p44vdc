@@ -590,9 +590,6 @@ namespace p44 {
 		/// @return constant identifier for this type of device (one container might contain more than one type)
     virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "dali_rgbw"; };
 
-    /// get typed container reference
-    DaliVdc &daliVdc();
-
     /// description of object, mainly for debug and logging
     /// @return textual description of object
     virtual string description() P44_OVERRIDE;

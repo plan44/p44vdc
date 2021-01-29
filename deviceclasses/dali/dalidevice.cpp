@@ -249,6 +249,10 @@ void DaliBusDevice::dsUidForDeviceInfoStatus(DsUid &aDsUid, DaliDeviceInfo::Dali
     string_format_append(s, "::%d", deviceInfo->shortAddress);
   }
   aDsUid.setNameInSpace(s, vdcNamespace);
+  if (!daliVdc.daliComm->dali2LUNLock) {
+    // DALI2 devices might have multiple logical units -> set subdevice index
+    aDsUid.setSubdeviceIndex(deviceInfo->lunIndex);
+  }
 }
 
 
@@ -1046,7 +1050,11 @@ void DaliBusDeviceGroup::addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice)
 {
   // add the ID to the mix
   LOG(LOG_NOTICE, "- DALI bus device %s is grouped in DALI group %d", DaliComm::formatDaliAddress(aDaliBusDevice->deviceInfo->shortAddress).c_str(), deviceInfo->shortAddress & DaliGroupMask);
-  aDaliBusDevice->dSUID.xorDsUidIntoMix(mixID, false);
+  // - when completely unlocked (no backward compatibility needed), use the improved mix which adds a FNV hash
+  //   including the subdevice index, so mixing multiple dSUIDs only differing in subdevice byte
+  //   don't cancel each other out completely (even #) or match the original dSUID {odd # of mixed dSUIDs)
+  bool lunSafeMix = !daliVdc.daliComm->dali2ScanLock && !daliVdc.daliComm->dali2LUNLock;
+  aDaliBusDevice->dSUID.xorDsUidIntoMix(mixID, lunSafeMix);
   // if this is the first valid device, use it as master
   if (groupMaster==NoDaliAddress && !aDaliBusDevice->isDummy) {
     // this is the master device
@@ -1798,19 +1806,19 @@ string DaliCompositeDevice::getExtraInfo()
 {
   string s = "DALI short addresses: ";
   if (dimmers[dimmer_red]) {
-    string_format_append(s, " Red:%d", dimmers[dimmer_red]->deviceInfo->shortAddress);
+    s += "Red:"+DaliComm::formatDaliAddress(dimmers[dimmer_red]->deviceInfo->shortAddress);
   }
   if (dimmers[dimmer_green]) {
-    string_format_append(s, " Green:%d", dimmers[dimmer_green]->deviceInfo->shortAddress);
+    s += " Green:"+DaliComm::formatDaliAddress(dimmers[dimmer_green]->deviceInfo->shortAddress);
   }
   if (dimmers[dimmer_blue]) {
-    string_format_append(s, " Blue:%d", dimmers[dimmer_blue]->deviceInfo->shortAddress);
+    s += " Blue:"+DaliComm::formatDaliAddress(dimmers[dimmer_blue]->deviceInfo->shortAddress);
   }
   if (dimmers[dimmer_white]) {
-    string_format_append(s, " White:%d", dimmers[dimmer_white]->deviceInfo->shortAddress);
+    s += " White:"+DaliComm::formatDaliAddress(dimmers[dimmer_white]->deviceInfo->shortAddress);
   }
   if (dimmers[dimmer_amber]) {
-    string_format_append(s, " Warmwhite/amber:%d", dimmers[dimmer_amber]->deviceInfo->shortAddress);
+    s += " Warmwhite/amber:"+DaliComm::formatDaliAddress(dimmers[dimmer_amber]->deviceInfo->shortAddress);
   }
   return s;
 }
@@ -2030,7 +2038,11 @@ void DaliCompositeDevice::deriveDsUid()
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (dimmers[idx]) {
       // use this dimmer's dSUID as part of the mix
-      dimmers[idx]->dSUID.xorDsUidIntoMix(mixID, false);
+      // - when completely unlocked (no backward compatibility needed), use the improved mix which adds a FNV hash
+      //   including the subdevice index, so mixing multiple dSUIDs only differing in subdevice byte
+      //   don't cancel each other out completely (even #) or match the original dSUID {odd # of mixed dSUIDs)
+      bool lunSafeMix = !daliVdc().daliComm->dali2ScanLock && !daliVdc().daliComm->dali2LUNLock;
+      dimmers[idx]->dSUID.xorDsUidIntoMix(mixID, lunSafeMix);
     }
   }
   // use xored ID as base for creating UUIDv5 in vdcNamespace

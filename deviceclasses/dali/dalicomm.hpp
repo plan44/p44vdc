@@ -198,6 +198,7 @@ namespace p44 {
     uint8_t fw_version_major; /// < major firmware version
     uint8_t fw_version_minor; /// < minor firmware version
     uint64_t serialNo; /// < unique serial number
+    uint8_t lunIndex; ///< index of logical unit within device with multiple indices
     // OEM product information
     uint64_t oem_gtin; /// < 48 bit global trade identification number of OEM product (GTIN / EAN)
     uint64_t oem_serialNo; /// < unique serial number
@@ -251,6 +252,7 @@ namespace p44 {
     long retriedWrites;
 
     bool dali2ScanLock; ///< if set, scanner will interpret memory bank 0 as DALI 1.0 (because there is no real backwards compatibility between 1.0 and 2.0)
+    bool dali2LUNLock; ///< if set, logical unit index will not be used as dSUID subdeviceindex, and old dSUID mix algrorithm (w/o added FNV) will be used
 
     DaliComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
     virtual ~DaliComm();

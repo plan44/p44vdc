@@ -46,6 +46,7 @@ DaliComm::DaliComm(MainLoop &aMainLoop) :
 	inherited(aMainLoop),
   runningProcedures(0),
   dali2ScanLock(false),
+  dali2LUNLock(false),
   retriedReads(0),
   retriedWrites(0),
   closeAfterIdleTime(Never),
@@ -1458,6 +1459,7 @@ private:
         // IEC 62386-102:2014 says the response is content of bank0 offset 0x16 (6 bits major, 2 bits minor version)
         deviceInfo->vers_102 = DALI_STD_VERS_NONEIS0(aResponse);
       }
+      LOG(LOG_INFO,"DALI device at shortaddress %d has DALI Version %d.%d", busAddress, DALI_STD_VERS_MAJOR(deviceInfo->vers_102), DALI_STD_VERS_MINOR(deviceInfo->vers_102));
       dali2 = deviceInfo->vers_102>=DALI_STD_VERS_BYTE(2, 0);
       if (dali2 && daliComm.dali2ScanLock) {
         // this looks like a DALI 2 device, but scanning is locked to ensure backwards compatibility
@@ -1572,6 +1574,8 @@ private:
       // Note: vers_102 decides about scanning for DALI2 infos at all and is retrieved with QUERY_VERSION_NUMBER above, not saved again here!
       deviceInfo->vers_101 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x15].b);
       deviceInfo->vers_103 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x17].b);
+      // save logical unit index within single device
+      deviceInfo->lunIndex = (*aBank0Data)[0x1A].b;
     }
     // check plausibility of GTIN/Version/SN data
     // Know bad signatures we must catch:
@@ -1788,15 +1792,18 @@ private:
     daliComm.endProcedure();
     if (Error::isOK(aError)) {
       LOG(LOG_NOTICE,
-        "Successfully read device info from shortAddress %d - %s data: GTIN=%lld, Serial=%lld",
+        "Successfully read DALI%d device info %sfrom shortAddress %d - %s data: GTIN=%llu, Serial=%llu, LUN=%d",
+        deviceInfo->vers_102>=DALI_STD_VERS_BYTE(2, 0) ? 2 : 1,
+        dali2 ? "" : "in DALI1 mode ",
         busAddress,
         deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid
         #if OLD_BUGGY_CHKSUM_COMPATIBLE
         || deviceInfo->devInfStatus==DaliDeviceInfo::devinf_maybe
         #endif
-        ? "valid" : "GARBAGE",
+        ? "valid" : "UNRELIABLE",
         deviceInfo->gtin,
-        deviceInfo->serialNo
+        deviceInfo->serialNo,
+        deviceInfo->lunIndex
       );
     }
     // clean device info in case it has been detected invalid by now
@@ -1843,6 +1850,7 @@ void DaliDeviceInfo::clear()
   fw_version_major = 0;
   fw_version_minor = 0;
   serialNo = 0;
+  lunIndex = 0;
   oem_gtin = 0;
   oem_serialNo = 0;
   devInfStatus = devinf_none;
@@ -1867,10 +1875,11 @@ string DaliDeviceInfo::description()
 {
   string s = string_format("\n- DaliDeviceInfo for %s", DaliComm::formatDaliAddress(shortAddress).c_str());
   string_format_append(s, "\n  - is %suniquely defining the device", devInfStatus==devinf_solid ? "" : "NOT ");
-  string_format_append(s, "\n  - GTIN       : %lld", gtin);
-  string_format_append(s, "\n  - Serial     : %lld", serialNo);
-  string_format_append(s, "\n  - OEM GTIN   : %lld", oem_gtin);
-  string_format_append(s, "\n  - OEM Serial : %lld", oem_serialNo);
+  string_format_append(s, "\n  - GTIN       : %llu", gtin);
+  string_format_append(s, "\n  - Serial     : %llu", serialNo);
+  string_format_append(s, "\n  - LUN index  : %d", lunIndex);
+  string_format_append(s, "\n  - OEM GTIN   : %llu", oem_gtin);
+  string_format_append(s, "\n  - OEM Serial : %llu", oem_serialNo);
   string_format_append(s, "\n  - Firmware   : %d.%d", fw_version_major, fw_version_minor);
   string_format_append(s, "\n  - DALI vers  : 101:%d.%d, 102:%d.%d, 103:%d.%d",
     DALI_STD_VERS_MAJOR(vers_101), DALI_STD_VERS_MINOR(vers_101),
