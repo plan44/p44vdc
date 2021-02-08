@@ -1643,6 +1643,7 @@ enum {
   #if !REDUCED_FOOTPRINT
   scenesList_key,
   #endif
+  nextVersion_key,
   numVdcHostProperties
 };
 
@@ -1677,6 +1678,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
     #if !REDUCED_FOOTPRINT
     { "x-p44-scenesList", apivalue_null, scenesList_key, OKEY(vdchost_obj) },
     #endif
+    { "x-p44-nextVersion", apivalue_string, nextVersion_key, OKEY(vdchost_obj) },
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -1760,6 +1762,9 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           aPropValue->setStringValue(mainScript.getSource());
           return true;
         #endif
+        case nextVersion_key:
+          aPropValue->setStringValue(nextModelVersion());
+          return true;
       }
     }
     else {
@@ -2453,10 +2458,23 @@ static void macaddress_func(BuiltinFunctionContextPtr f)
   f->finish(new StringValue(macAddressToString(macAddress(),0)));
 }
 
+// productversion()
+static void productversion_func(BuiltinFunctionContextPtr f)
+{
+  f->finish(new StringValue(VdcHost::sharedVdcHost()->modelVersion()));
+}
+
+// nextversion()
+static void nextversion_func(BuiltinFunctionContextPtr f)
+{
+  f->finish(new StringValue(VdcHost::sharedVdcHost()->nextModelVersion()));
+}
 
 static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   { "vdcapi", executable|json, vdcapi_numargs, vdcapi_args, &vdcapi_func },
   { "device", executable|any, device_numargs, device_args, &device_func },
+  { "productversion", executable|text, 0, NULL, &productversion_func },
+  { "nextversion", executable|text, 0, NULL, &nextversion_func },
   { "macaddress", executable|text, 0, NULL, &macaddress_func },
   { NULL } // terminator
 };

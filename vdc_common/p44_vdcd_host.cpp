@@ -197,6 +197,18 @@ string P44VdcHost::webuiURLString()
 }
 
 
+string P44VdcHost::nextModelVersion() const
+{
+  // check for nextversion file to read to obtain next available version
+  string nextVersionFile;
+  string nextVersion;
+  if (CmdLineApp::sharedCmdLineApp()->getStringOption("nextversionfile", nextVersionFile)) {
+    string_fgetfirstline(nextVersionFile, nextVersion);
+  }
+  return nextVersion;
+}
+
+
 void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   #if ENABLE_JSONCFGAPI

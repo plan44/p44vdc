@@ -163,6 +163,7 @@ namespace p44 {
 
     string productName; ///< the name of the vdc host product (model name) as a a whole
     string productVersion; ///< the version string of the vdc host product as a a whole
+
     string deviceHardwareId; ///< the device hardware id (such as a serial number) of the vdc host product as a a whole
     string descriptionTemplate; ///< how to describe the vdc host (e.g. in service announcements)
     string vdcModelNameTemplate; ///< how to generate vdc model names (that's what shows up in HW-Info in dS)
@@ -539,6 +540,9 @@ namespace p44 {
     /// @return human readable product version string
     /// @note it is important to override this here in vdchost, because would loop otherwise when base class calls vdchost's implementation
     virtual string modelVersion() const P44_OVERRIDE { return productVersion; }
+
+    /// @return human readable product version string of next available (installable) product version, if any
+    virtual string nextModelVersion() const { return ""; /* none by default */ }
 
     /// @return unique ID for the functional model of this entity
     virtual string modelUID() P44_OVERRIDE { return DSUID_P44VDC_MODELUID_UUID; /* using the p44 modelUID namespace UUID itself */ }

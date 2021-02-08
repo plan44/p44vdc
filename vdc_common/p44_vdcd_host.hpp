@@ -253,6 +253,9 @@ namespace p44 {
     /// @return URL for Web-UI (for access from local LAN)
     virtual string webuiURLString() P44_OVERRIDE;
 
+    /// @return human readable product version string of next available (installable) product version, if any
+    virtual string nextModelVersion() const P44_OVERRIDE;
+
     /// initialize
     /// @param aCompletedCB will be called when the entire container is initialized or has been aborted with a fatal error
     /// @param aFactoryReset if set, database will be reset
