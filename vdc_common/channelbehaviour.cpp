@@ -649,6 +649,8 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
   return false;
 }
 
+
+#if !REDUCED_FOOTPRINT
 // MARK: - string channel behaviour
 
 bool StringChannel::setChannelValueIfNotDontCare(DsScenePtr aScene, const string& aNewValue, bool aAlwaysApply)
@@ -689,13 +691,11 @@ string StringChannel::getChannelValueString()
   return stringValue;
 }
 
-#if !REDUCED_FOOTPRINT
 void StringChannel::setValueOptions(const vector<const char*>& aValues)
 {
   enumList = EnumListPtr(new EnumList(false));
   enumList->addEnumTexts(aValues);
 }
-#endif
 
 static const size_t numStringChannelFields = 1;
 
@@ -766,4 +766,6 @@ bool StringChannel::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
   }
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
+
+#endif // !REDUCED_FOOTPRINT
 
