@@ -279,7 +279,7 @@ const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMe
     val = new NumericValue(mLastUpdate!=Never);
   }
   else if (uequals(aName, "oplevel")) {
-    val = new NumericValue(num);
+    val = new NumericValue(mOpLevel);
   }
   return val;
 }
