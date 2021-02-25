@@ -1519,7 +1519,7 @@ void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool 
         waitForApplyComplete(boost::bind(&Device::requestApplyingChannels, this, dd, false, false));
       }
       else {
-        OLOG(LOG_WARNING, "generic dimChannel() without apply -> unlikely (optimized generic dimming??)");
+        OLOG(LOG_WARNING, "generic dimChannel() without apply -> unlikely (optimized generic dimming?)");
       }
     }
   }

@@ -209,7 +209,7 @@ namespace p44 {
     bool needsApplying() { return channelUpdatePending; }
 
     /// make channel value pending for sending to hardware
-    bool makeApplyPending() { channelUpdatePending = true; }
+    void makeApplyPending() { channelUpdatePending = true; }
 
     /// to be called when channel value has been successfully applied to hardware
     /// @param aAnyWay if true, lastSent state will be set even if channel was not in needsApplying() state
