@@ -1833,6 +1833,10 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
         aApiObjectValue->add(vs->getSourceId(), aApiObjectValue->newString(vs->getSourceName().c_str()));
       }
     }
+    #if P44SCRIPT_FULL_SUPPORT
+    // Channels
+    // Note: we do not (yet) expose channels in the list. Channels can be explicitly referenced using p44script device(x).output.channel(y)
+    #endif // P44SCRIPT_FULL_SUPPORT
   }
 }
 
@@ -1841,8 +1845,10 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
 {
   ValueSource *valueSource = NULL;
   // value source ID is
-  //  dSUID:Sx for sensors (x=sensor index)
-  //  dSUID:Ix for inputs (x=input index)
+  //  dSUID_Sx for sensors (x=sensor index)
+  //  dSUID_Ix for inputs (x=input index)
+  //  dSUID_Bx for buttons (x=button index)
+  //  dSUID_Ciii for channels (ii=channel id)
   // - extract dSUID
   size_t i = aValueSourceID.find("_");
   if (i!=string::npos) {
@@ -1860,6 +1866,15 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
           case 'S' : bhv = dev->getSensor(Device::by_id_or_index, string(p)); break;
           case 'I' : bhv = dev->getInput(Device::by_id_or_index, string(p)); break;
           case 'B' : bhv = dev->getButton(Device::by_id_or_index, string(p)); break;
+          #if P44SCRIPT_FULL_SUPPORT
+          case 'C' : {
+            ChannelBehaviourPtr cbhv = dev->getChannelById(p);
+            if (cbhv) {
+              valueSource = dynamic_cast<ValueSource *>(cbhv.get());
+            }
+            break;
+          }
+          #endif // P44SCRIPT_FULL_SUPPORT
         }
         if (bhv) {
           valueSource = dynamic_cast<ValueSource *>(bhv.get());
@@ -2451,6 +2466,21 @@ static void device_func(BuiltinFunctionContextPtr f)
   f->finish(device->newDeviceObj());
 }
 
+#if P44SCRIPT_FULL_SUPPORT
+
+static const BuiltInArgDesc valuesource_args[] = { { text } };
+static const size_t valuesource_numargs = sizeof(valuesource_args)/sizeof(BuiltInArgDesc);
+static void valuesource_func(BuiltinFunctionContextPtr f)
+{
+  ValueSource* valueSource = VdcHost::sharedVdcHost()->getValueSourceById(f->arg(0)->stringValue());
+  if (!valueSource) {
+    f->finish(new ErrorValue(ScriptError::NotFound, "no value source '%s' found", f->arg(0)->stringValue().c_str()));
+    return;
+  }
+  f->finish(new ValueSourceObj(valueSource));
+}
+
+#endif
 
 // macaddress()
 static void macaddress_func(BuiltinFunctionContextPtr f)
@@ -2473,6 +2503,9 @@ static void nextversion_func(BuiltinFunctionContextPtr f)
 static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   { "vdcapi", executable|json, vdcapi_numargs, vdcapi_args, &vdcapi_func },
   { "device", executable|any, device_numargs, device_args, &device_func },
+  #if P44SCRIPT_FULL_SUPPORT
+  { "valuesource", executable|any, valuesource_numargs, valuesource_args, &valuesource_func },
+  #endif
   { "productversion", executable|text, 0, NULL, &productversion_func },
   { "nextversion", executable|text, 0, NULL, &nextversion_func },
   { "macaddress", executable|text, 0, NULL, &macaddress_func },

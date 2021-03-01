@@ -903,7 +903,18 @@ static void channel_funcImpl(bool aDim, BuiltinFunctionContextPtr f)
     // channel found
     if (f->numArgs()==1) {
       // return channel value
-      f->finish(new NumericValue(channel->getChannelValueCalculated()));
+      #if P44SCRIPT_FULL_SUPPORT
+      // value source representing the channel
+      ValueSource* vs = dynamic_cast<ValueSource *>(channel.get());
+      if (vs) {
+        f->finish(new ValueSourceObj(vs));
+      }
+      else
+      #endif
+      {
+        // is not a value source, return numeric value only
+        f->finish(new NumericValue(channel->getChannelValueCalculated()));
+      }
       return;
     }
     else {

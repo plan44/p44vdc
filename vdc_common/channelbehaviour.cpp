@@ -118,6 +118,49 @@ void ChannelBehaviour::addEnum(const char *aEnumText, uint32_t aEnumValue)
 }
 
 
+#if P44SCRIPT_FULL_SUPPORT
+
+// MARK: - value source implementation
+
+string ChannelBehaviour::getSourceId()
+{
+  return string_format("%s_C%s", output.device.getDsUid().getString().c_str(), getId().c_str());
+}
+
+
+string ChannelBehaviour::getSourceName()
+{
+  // get device name or dSUID for context
+  string n = output.device.getAssignedName();
+  if (n.empty()) {
+    // use abbreviated dSUID instead
+    string d = output.device.getDsUid().getString();
+    n = d.substr(0,8) + "..." + d.substr(d.size()-2,2);
+  }
+  // append behaviour description
+  string_format_append(n, ": %s", getId().c_str());
+  return n;
+}
+
+
+double ChannelBehaviour::getSourceValue()
+{
+  return getChannelValueCalculated();
+}
+
+
+MLMicroSeconds ChannelBehaviour::getSourceLastUpdate()
+{
+  return channelLastSync;
+}
+
+
+int ChannelBehaviour::getSourceOpLevel()
+{
+  return output.device.opStateLevel();
+}
+
+#endif // P44SCRIPT_FULL_SUPPORT
 
 
 
@@ -240,6 +283,9 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     else {
       setPVar(cachedChannelValue, aActualChannelValue);
     }
+    #if P44SCRIPT_FULL_SUPPORT
+    sendValueEvent();
+    #endif
     // reset transitions and pending updates
     previousChannelValue = cachedChannelValue;
     transitionProgress = 1; // not in transition
@@ -363,6 +409,9 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
   if (channelUpdatePending || aAnyWay) {
     channelUpdatePending = false; // applied (might still be in transition, though)
     channelLastSync = MainLoop::now(); // now we know that we are in sync
+    #if P44SCRIPT_FULL_SUPPORT
+    sendValueEvent();
+    #endif
     if (!aAnyWay) {
       // only log when actually of importance (to prevent messages for devices that apply mostly immediately)
       OLOG(LOG_INFO,

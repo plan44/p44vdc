@@ -48,7 +48,11 @@ namespace p44 {
   ///   be implemented in derived Device classes' methods which are passed channels to process.
   ///   The ChannelBehaviour objects only represent the dS interface to channels, not the
   ///   device specific interface from dS channels to actual device hardware.
-  class ChannelBehaviour : public PropertyContainer, public PersistentParams
+  class ChannelBehaviour :
+    public PropertyContainer, public PersistentParams
+    #if P44SCRIPT_FULL_SUPPORT
+    ,public ValueSource
+    #endif
   {
     typedef PropertyContainer inheritedProps;
     typedef PersistentParams inheritedParams;
@@ -287,6 +291,30 @@ namespace p44 {
 
     /// forget any parameters stored in persistent DB
     ErrorPtr forget();
+
+    #if P44SCRIPT_FULL_SUPPORT
+
+    /// @name ValueSource interface
+    /// @{
+
+    /// get id - unique at least in the vdhost's scope
+    virtual string getSourceId() P44_OVERRIDE;
+
+    /// get descriptive name identifying the source within the entire vdc host (for using in selection lists)
+    virtual string getSourceName() P44_OVERRIDE;
+
+    /// get value
+    virtual double getSourceValue() P44_OVERRIDE;
+
+    /// get time of last update
+    virtual MLMicroSeconds getSourceLastUpdate() P44_OVERRIDE;
+
+    /// get operation level (how good/critical the operation state of the underlying device is)
+    virtual int getSourceOpLevel() P44_OVERRIDE;
+
+    /// @}
+
+    #endif // P44SCRIPT_FULL_SUPPORT
 
   protected:
 
