@@ -940,6 +940,28 @@ void RGBColorLightBehaviour::setCWWW(double aCW, double aWW, double aMax)
 }
 
 
+void RGBColorLightBehaviour::getBriCool(double &aBri, double &aCool, double aMax, bool aTransitional)
+{
+  double b = brightness->getChannelValue(aTransitional)/100; // 0..1
+  aBri = b*aMax;
+  double ctval;
+  getCT(ctval, aTransitional);
+  // assume cool 1..0 goes over min..max of CT channel
+  double cool = 1-(ctval-ct->getMin())/(ct->getMax()-ct->getMin());
+  if (cool<0) cool = 0;
+  else if (cool>1) cool = 1;
+  aBri = aMax*b;
+  aCool = aMax*cool;
+}
+
+
+void RGBColorLightBehaviour::setBriCool(double aBri, double aCool, double aMax)
+{
+  // assume cool 1..0 goes over min..max of CT channel
+  brightness->syncChannelValue(aBri/aMax*100);
+  ct->syncChannelValue((1-aCool/aMax)*(ct->getMax()-ct->getMin())+ct->getMin());
+}
+
 
 
 // MARK: - persistence implementation

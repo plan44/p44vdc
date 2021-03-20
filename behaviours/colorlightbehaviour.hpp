@@ -372,6 +372,17 @@ namespace p44 {
     /// @param aMax max value for aCW,aWW
     void setCWWW(double aCW, double aWW, double aMax);
 
+    /// get Brigthness and "coolness" for applying to lamp
+    /// @param aBri,aCool will receive brightness and "coolness"
+    /// @param aMax max value for aBri,aCool
+    void getBriCool(double &aBri, double &aCool, double aMax, bool aTransitional);
+
+    /// set Brigthness and "coolness" from lamp (to update channel values from actual lamp setting)
+    /// @param aBri,aCool current brightness and "coolness"
+    /// @param aMax max value for aBri,aCool
+    void setBriCool(double aBri, double aCool, double aMax);
+
+
     /// @}
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
