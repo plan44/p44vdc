@@ -2311,10 +2311,14 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
             zone->zoneState.lastGlobalScene = calledScene.sceneNo;
           }
           // group specific
+          bool isOffScene = calledScene.getKindFlags()&scene_off;
           if (g==group_yellow_light) {
             zone->zoneState.lastLightScene = calledScene.sceneNo;
+            // calling on scenes is remembered as dimming default channel up (so next dim will go down)
+            zone->zoneState.lastDimChannel = channeltype_default;
+            zone->zoneState.lastDim = isOffScene ? dimmode_down : dimmode_up;
           }
-          zone->zoneState.setStateFor(g, area, !(calledScene.getKindFlags()&scene_off));
+          zone->zoneState.setStateFor(g, area, !isOffScene);
           if (calledScene.sceneNo==DEEP_OFF) {
             // force areas off as well
             zone->zoneState.setStateFor(g, 1, false);
@@ -2333,9 +2337,11 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
       }
     }
     LOG(LOG_INFO,
-      "Zone '%s' (%d) state updated: lastLightScene:%d, lastGlobalScene:%d, lightOn=%d/areas1234=%d%d%d%d, shadesOpen=%d/%d%d%d%d",
+      "Zone '%s' (%d) state updated: lastLightScene:%d, lastDim=%d, lastGlobalScene:%d, lightOn=%d/areas1234=%d%d%d%d, shadesOpen=%d/%d%d%d%d",
       zone->getName().c_str(), zone->getZoneId(),
-      zone->zoneState.lastLightScene, zone->zoneState.lastGlobalScene,
+      zone->zoneState.lastLightScene,
+      (int)zone->zoneState.lastDim,
+      zone->zoneState.lastGlobalScene,
       zone->zoneState.lightOn[0],
       zone->zoneState.lightOn[1], zone->zoneState.lightOn[2], zone->zoneState.lightOn[3], zone->zoneState.lightOn[4],
       zone->zoneState.shadesOpen[0],
