@@ -1706,7 +1706,8 @@ string DaliSingleControllerDevice::description()
 
 
 DaliCompositeDevice::DaliCompositeDevice(DaliVdc *aVdcP) :
-  DaliOutputDevice(aVdcP)
+  DaliOutputDevice(aVdcP),
+  mBriCool(false)
 {
 }
 
@@ -1717,7 +1718,7 @@ bool DaliCompositeDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
   // set up dS behaviour for color lights, which include a color scene table
   installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
   // set the behaviour
-  bool ctOnly = dimmers[dimmer_white] && dimmers[dimmer_amber] && !dimmers[dimmer_red];
+  bool ctOnly = dimmers[dimmer_white] && dimmers[dimmer_amber] && !dimmers[dimmer_red]; // no red -> must be CT only
   RGBColorLightBehaviourPtr cl = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, ctOnly));
   cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 0); // DALI lights are always dimmable, no power known
   cl->setHardwareName(string_format("DALI composite color light"));
@@ -1815,10 +1816,14 @@ string DaliCompositeDevice::getExtraInfo()
     s += " Blue:"+DaliComm::formatDaliAddress(dimmers[dimmer_blue]->deviceInfo->shortAddress);
   }
   if (dimmers[dimmer_white]) {
-    s += " White:"+DaliComm::formatDaliAddress(dimmers[dimmer_white]->deviceInfo->shortAddress);
+    if (mBriCool) s += " Brightness:";
+    else s += " White:";
+    s += DaliComm::formatDaliAddress(dimmers[dimmer_white]->deviceInfo->shortAddress);
   }
   if (dimmers[dimmer_amber]) {
-    s += " Warmwhite/amber:"+DaliComm::formatDaliAddress(dimmers[dimmer_amber]->deviceInfo->shortAddress);
+    if (mBriCool) s += " Coolness:";
+    else s += " Warmwhite/amber:";
+    s += DaliComm::formatDaliAddress(dimmers[dimmer_amber]->deviceInfo->shortAddress);
   }
   return s;
 }
@@ -1836,6 +1841,14 @@ bool DaliCompositeDevice::addDimmer(DaliBusDevicePtr aDimmerBusDevice, string aD
     dimmers[dimmer_white] = aDimmerBusDevice;
   else if (aDimmerType=="A")
     dimmers[dimmer_amber] = aDimmerBusDevice;
+  else if (aDimmerType=="BRI") {
+    mBriCool = true; // this is a brightness (amber channel) + coolness (white channel) type light
+    dimmers[dimmer_amber] = aDimmerBusDevice;
+  }
+  else if (aDimmerType=="COOL") {
+    mBriCool = true; // this is a brightness (amber channel) + coolness (white channel) type light
+    dimmers[dimmer_white] = aDimmerBusDevice;
+  }
   else
     return false; // cannot add
   return true; // added ok
@@ -1875,8 +1888,14 @@ void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryR
       double a = dimmers[dimmer_amber]->currentBrightness;
       // could be CT only
       if (cl->isCtOnly()) {
-        // treat as two-channel tunable white
-        cl->setCWWW(w, a, 100); // dali dimmers use abstracted 0..100% brightness
+        if (mBriCool) {
+          // treat as two-channel tunable white (one channel being brightness, the other CT)
+          cl->setBriCool(a, w, 100);
+        }
+        else {
+          // treat as two-channel tunable white (one channel being CW, the other WW)
+          cl->setCWWW(w, a, 100); // dali dimmers use abstracted 0..100% brightness
+        }
       }
       else {
         // RGBWA
@@ -1963,9 +1982,19 @@ void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithCol
       // RGBWA or CT
       if (cl->isCtOnly()) {
         // CT
-        cl->getCWWW(w, a, 100, true); // dali dimmers use abstracted 0..100% brightness as input
-        if (!aForDimming) {
-          OLOG(LOG_INFO, "DALI composite CWWW: CW=%d, WW=%d", (int)w, (int)a);
+        if (mBriCool) {
+          // treat as two-channel tunable white (one channel being brightness, the other CT)
+          cl->getBriCool(a, w, 100, true); // dali dimmers use abstracted 0..100% brightness as input
+          if (!aForDimming) {
+            OLOG(LOG_INFO, "DALI composite BriCool: Bri=%d, Cool=%d", (int)a, (int)w);
+          }
+        }
+        else {
+          // treat as two-channel tunable white (one channel being CW, the other WW)
+          cl->getCWWW(w, a, 100, true); // dali dimmers use abstracted 0..100% brightness as input
+          if (!aForDimming) {
+            OLOG(LOG_INFO, "DALI composite CWWW: CW=%d, WW=%d", (int)w, (int)a);
+          }
         }
       }
       else {
@@ -2011,10 +2040,11 @@ void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithCol
 /// @param aBrightness new brightness to set
 void DaliCompositeDevice::saveAsDefaultBrightness()
 {
-  dimmers[dimmer_red]->setDefaultBrightness(-1);
-  dimmers[dimmer_green]->setDefaultBrightness(-1);
-  dimmers[dimmer_blue]->setDefaultBrightness(-1);
+  if (dimmers[dimmer_red]) dimmers[dimmer_red]->setDefaultBrightness(-1);
+  if (dimmers[dimmer_green]) dimmers[dimmer_green]->setDefaultBrightness(-1);
+  if (dimmers[dimmer_blue]) dimmers[dimmer_blue]->setDefaultBrightness(-1);
   if (dimmers[dimmer_white]) dimmers[dimmer_white]->setDefaultBrightness(-1);
+  if (dimmers[dimmer_amber]) dimmers[dimmer_amber]->setDefaultBrightness(-1);
 }
 
 
@@ -2055,7 +2085,7 @@ static const char* dimmerChannelNames[DaliCompositeDevice::numDimmers] = {
   "green",
   "blue",
   "white/CW",
-  "amber/WW"
+  "amber/WW/CT"
 };
 
 

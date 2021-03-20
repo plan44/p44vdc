@@ -562,6 +562,7 @@ namespace p44 {
     friend class DaliVdc;
 
     uint32_t collectionID; ///< the ID of the collection that created this composite device
+    bool mBriCool; ///< if set, this is a tunable white where the W dimmer is brightness, and the A dimmer directly controls the "coolness"
 
   public:
 
