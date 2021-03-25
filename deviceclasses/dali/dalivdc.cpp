@@ -669,9 +669,9 @@ ErrorPtr DaliVdc::daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
   string cmd;
   ApiValuePtr p = aParams->get("bridgecmd");
   if (p) {
-    // direct bridge command as 3 byte hex string
+    // direct bridge command as 3 byte hex string, can be repeated, result of last command is returned
     // bb1122 (bb=bridge command, 11=first DALI, 22=second DALI
-    cmd = hexToBinaryString(p->stringValue().c_str(), true, 3);
+    cmd = hexToBinaryString(p->stringValue().c_str(), true);
     if ((cmd.size()%3)!=0) {
       respErr = WebError::webErr(500, "bridgecmd must be integer multiple of 3 hex bytes (one or multiple DALI bridge commands)");
     }
