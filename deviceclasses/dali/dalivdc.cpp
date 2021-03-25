@@ -31,11 +31,12 @@ using namespace p44;
 DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
   usedDaliScenesMask(0),
-  usedDaliGroupsMask(0)
+  usedDaliGroupsMask(0),
+  daliComm(MainLoop::currentMainLoop())
 {
-  daliComm = DaliCommPtr(new 	DaliComm(MainLoop::currentMainLoop()));
+  daliComm.isMemberVariable();
   #if ENABLE_DALI_INPUTS
-  daliComm->setBridgeEventHandler(boost::bind(&DaliVdc::daliEventHandler, this, _1, _2, _3));
+  daliComm.setBridgeEventHandler(boost::bind(&DaliVdc::daliEventHandler, this, _1, _2, _3));
   #endif
   // set default optimisation mode
   optimizerMode = opt_disabled; // FIXME: once we are confident, make opt_auto the default
@@ -46,6 +47,13 @@ DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 
 DaliVdc::~DaliVdc()
 {
+}
+
+
+void DaliVdc::setLogLevelOffset(int aLogLevelOffset)
+{
+  daliComm.setLogLevelOffset(aLogLevelOffset);
+  inherited::setLogLevelOffset(aLogLevelOffset);
 }
 
 
@@ -154,8 +162,8 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     if (i!=qry.end()) {
       // dali2ScanLock DB field contains dali2ScanLock flag in bit 0 and dali2LUNLock in bit 1
       int lockFlags = i->get<int>(0);
-      daliComm->dali2ScanLock = lockFlags & 0x01;
-      daliComm->dali2LUNLock = lockFlags & 0x02;
+      daliComm.dali2ScanLock = lockFlags & 0x01;
+      daliComm.dali2LUNLock = lockFlags & 0x02;
     }
   }
   // update map of groups and scenes used by manually configured groups and scene-listening input devices
@@ -199,9 +207,9 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
   }
   if (aRescanFlags & (rescanmode_exhaustive|rescanmode_reenumerate)) {
     // user is actively risking addressing changes, so we can enable DALI 2.0 scanning and LUN usage from now on
-    if (daliComm->dali2ScanLock || daliComm->dali2LUNLock) {
-      daliComm->dali2ScanLock = false;
-      daliComm->dali2LUNLock = false;
+    if (daliComm.dali2ScanLock || daliComm.dali2LUNLock) {
+      daliComm.dali2ScanLock = false;
+      daliComm.dali2LUNLock = false;
       db.execute("UPDATE globs SET dali2ScanLock=0"); // clear DALI2.0 scan lock and LUN lock
     }
   }
@@ -209,12 +217,12 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
   if (aRescanFlags & rescanmode_reenumerate) {
     // first reset ALL short addresses on the bus
     LOG(LOG_WARNING, "DALI Bus short address re-enumeration requested -> all short addresses will be re-assigned now (dSUIDs might change)!");
-    daliComm->daliSendDtrAndConfigCommand(DaliBroadcast, DALICMD_STORE_DTR_AS_SHORT_ADDRESS, DALIVALUE_MASK);
+    daliComm.daliSendDtrAndConfigCommand(DaliBroadcast, DALICMD_STORE_DTR_AS_SHORT_ADDRESS, DALIVALUE_MASK);
   }
   // start collecting, allow quick scan when not exhaustively collecting (will still use full scan when bus collisions are detected)
   // Note: only in rescanmode_exhaustive, existing short addresses might get reassigned. In all other cases, only devices with no short
   //   address at all, will be assigned a short address.
-  daliComm->daliFullBusScan(boost::bind(&DaliVdc::deviceListReceived, this, aCompletedCB, _1, _2, _3), !(aRescanFlags & rescanmode_exhaustive));
+  daliComm.daliFullBusScan(boost::bind(&DaliVdc::deviceListReceived, this, aCompletedCB, _1, _2, _3), !(aRescanFlags & rescanmode_exhaustive));
 }
 
 
@@ -309,7 +317,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
       }
       else {
         // we need to fetch it from device
-        daliComm->daliReadDeviceInfo(boost::bind(&DaliVdc::deviceInfoReceived, this, aBusDevices, aNextDev, aCompletedCB, _1, _2), addr);
+        daliComm.daliReadDeviceInfo(boost::bind(&DaliVdc::deviceInfoReceived, this, aBusDevices, aNextDev, aCompletedCB, _1, _2), addr);
         return;
       }
     }
@@ -619,7 +627,7 @@ void DaliVdc::daliScanNext(VdcApiRequestPtr aRequest, DaliAddress aShortAddress,
 {
   if (aShortAddress<64) {
     // scan next
-    daliComm->daliSendQuery(
+    daliComm.daliSendQuery(
       aShortAddress, DALICMD_QUERY_CONTROL_GEAR,
       boost::bind(&DaliVdc::handleDaliScanResult, this, aRequest, aShortAddress, aResult, _1, _2, _3)
     );
@@ -679,10 +687,10 @@ ErrorPtr DaliVdc::daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
       // - process all but last cmd w/o returning result
       int c;
       for (c=0; c<cmd.size()-3; c+=3) {
-        daliComm->sendBridgeCommand(cmd[c+0], cmd[c+1], cmd[c+2], NULL);
+        daliComm.sendBridgeCommand(cmd[c+0], cmd[c+1], cmd[c+2], NULL);
       }
       // - last cmd: return result
-      daliComm->sendBridgeCommand(cmd[c+0], cmd[c+1], cmd[c+2], boost::bind(&DaliVdc::bridgeCmdSent, this, aRequest, _1, _2, _3));
+      daliComm.sendBridgeCommand(cmd[c+0], cmd[c+1], cmd[c+2], boost::bind(&DaliVdc::bridgeCmdSent, this, aRequest, _1, _2, _3));
     }
   }
   else {
@@ -694,17 +702,17 @@ ErrorPtr DaliVdc::daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
       if (Error::isOK(respErr)) {
         // command
         if (cmd=="max") {
-          daliComm->daliSendDirectPower(shortAddress, 0xFE);
+          daliComm.daliSendDirectPower(shortAddress, 0xFE);
         }
         else if (cmd=="min") {
-          daliComm->daliSendDirectPower(shortAddress, 0x01);
+          daliComm.daliSendDirectPower(shortAddress, 0x01);
         }
         else if (cmd=="off") {
-          daliComm->daliSendDirectPower(shortAddress, 0x00);
+          daliComm.daliSendDirectPower(shortAddress, 0x00);
         }
         else if (cmd=="pulse") {
-          daliComm->daliSendDirectPower(shortAddress, 0xFE);
-          daliComm->daliSendDirectPower(shortAddress, 0x01, NULL, 1200*MilliSecond);
+          daliComm.daliSendDirectPower(shortAddress, 0xFE);
+          daliComm.daliSendDirectPower(shortAddress, 0x01, NULL, 1200*MilliSecond);
         }
         else {
           respErr = WebError::webErr(500, "unknown cmd");
@@ -749,7 +757,7 @@ ErrorPtr DaliVdc::daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
   }
   else {
     // want info about entire bus - do a raw bus scan to learn what devices are there
-    daliComm->daliBusScan(boost::bind(&DaliVdc::daliSummaryScanDone, this, aRequest, _1, _2, _3));
+    daliComm.daliBusScan(boost::bind(&DaliVdc::daliSummaryScanDone, this, aRequest, _1, _2, _3));
   }
   return ErrorPtr(); // already sent response or callback will send response
 }
@@ -1078,11 +1086,11 @@ void DaliVdc::removeMemberships(DaliAddress aSceneOrGroup)
 {
   if ((aSceneOrGroup&DaliAddressTypeMask)==DaliScene) {
     // make sure no old scene settings remain in any device -> broadcast DALICMD_REMOVE_FROM_SCENE
-    daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(aSceneOrGroup&DaliSceneMask));
+    daliComm.daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(aSceneOrGroup&DaliSceneMask));
   }
   else if ((aSceneOrGroup&DaliAddressTypeMask)==DaliGroup) {
     // Make sure no old group settings remain -> broadcast DALICMD_REMOVE_FROM_GROUP
-    daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_GROUP+(aSceneOrGroup&DaliGroupMask));
+    daliComm.daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_GROUP+(aSceneOrGroup&DaliGroupMask));
   }
 }
 
@@ -1169,13 +1177,13 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
       // Broadcast scene call: DALICMD_GO_TO_SCENE
       if (needDT8Activation) {
         // call scene
-        daliComm->daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask));
+        daliComm.daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask));
         // activate the colors the scene call might have set into temporary color registers (not affected devices should have set no temp colors at this point!)
-        daliComm->daliSendCommand(DaliBroadcast, DALICMD_DT8_ACTIVATE, boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+        daliComm.daliSendCommand(DaliBroadcast, DALICMD_DT8_ACTIVATE, boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
       }
       else {
         // just call the scene
-        daliComm->daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask), boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+        daliComm.daliSendCommand(DaliBroadcast, DALICMD_GO_TO_SCENE+(a&DaliSceneMask), boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
       }
       return;
     }
@@ -1220,7 +1228,7 @@ void DaliVdc::groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, Not
     // - cancel repeater ticket
     groupDimTicket.cancel();
     // - send MASK to group
-    daliComm->daliSendDirectPower(aDaliAddress, DALIVALUE_MASK, boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
+    daliComm.daliSendDirectPower(aDaliAddress, DALIVALUE_MASK, boost::bind(&DaliVdc::nativeActionDone, this, aStatusCB, _1));
     return;
   }
   else {
@@ -1235,7 +1243,7 @@ void DaliVdc::groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, Not
 
 void DaliVdc::groupDimRepeater(DaliAddress aDaliAddress, uint8_t aCommand, MLTimer &aTimer)
 {
-  daliComm->daliSendCommand(aDaliAddress, aCommand);
+  daliComm.daliSendCommand(aDaliAddress, aCommand);
   MainLoop::currentMainLoop().retriggerTimer(aTimer, 200*MilliSecond);
 }
 
@@ -1284,19 +1292,19 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
     OLOG(LOG_INFO,"creating action '%s' (DaliAddress=0x%02X)", aOptimizerEntry->nativeActionId.c_str(), a);
     if (aDeliveryState->optimizedType==ntfy_callscene) {
       // make sure no old scene settings remain in any device -> broadcast DALICMD_REMOVE_FROM_SCENE
-      daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(a&DaliSceneMask));
+      daliComm.daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(a&DaliSceneMask));
       // now update this scene's values
       updateNativeAction(aStatusCB, aOptimizerEntry, aDeliveryState);
       return;
     }
     else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
       // Make sure no old group settings remain -> broadcast DALICMD_REMOVE_FROM_GROUP
-      daliComm->daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_GROUP+(a&DaliGroupMask));
+      daliComm.daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_GROUP+(a&DaliGroupMask));
       // now create new group -> for each affected device sent DALICMD_ADD_TO_GROUP
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
         if (dev && dev->daliController) {
-          daliComm->daliSendConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_ADD_TO_GROUP+(a&DaliGroupMask));
+          daliComm.daliSendConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_ADD_TO_GROUP+(a&DaliGroupMask));
         }
       }
     }
@@ -1323,14 +1331,14 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
             dev->daliController->setColorParamsFromChannels(cl, false, true, false); // non-transitional, always set, not silent
           }
           uint8_t power = dev->daliController->brightnessToArcpower(l->brightnessForHardware(true)); // non-transitional, final
-          daliComm->daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_SCENE+(a&DaliSceneMask), power);
+          daliComm.daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_STORE_DTR_AS_SCENE+(a&DaliSceneMask), power);
         }
         // in case this is a DT8 device, enable automatic activation at scene call (and at brightness changes)
         // Note: before here, i.e. when the optimizer is used, we don't touch the auto-activation bit and just use it as-is
         if (dev->daliController->supportsDT8 && !dev->daliController->dt8autoactivation) {
           OLOG(LOG_INFO,"enabling color auto-activation for device %d", dev->daliController->deviceInfo->shortAddress);
           dev->daliController->dt8autoactivation = true; // now enabled
-          daliComm->daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_DT8_SET_GEAR_FEATURES, 0x01); // Bit0 = auto activation
+          daliComm.daliSendDtrAndConfigCommand(dev->daliController->deviceInfo->shortAddress, DALICMD_DT8_SET_GEAR_FEATURES, 0x01); // Bit0 = auto activation
         }
       }
     }
@@ -1361,7 +1369,7 @@ void DaliVdc::freeNativeAction(StatusCB aStatusCB, const string aNativeActionId)
 void DaliVdc::selfTest(StatusCB aCompletedCB)
 {
   // do bus short address scan
-  daliComm->daliBusScan(boost::bind(&DaliVdc::testScanDone, this, aCompletedCB, _1, _2, _3));
+  daliComm.daliBusScan(boost::bind(&DaliVdc::testScanDone, this, aCompletedCB, _1, _2, _3));
 }
 
 
@@ -1371,8 +1379,8 @@ void DaliVdc::testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr 
     // found at least one device, do a R/W test using the DTR
     DaliAddress testAddr = aShortAddressListPtr->front();
     LOG(LOG_NOTICE, "- DALI self test: switch all lights on, then do R/W tests with DTR of device short address %d",testAddr);
-    daliComm->daliSendDirectPower(DaliBroadcast, 0, NULL); // off
-    daliComm->daliSendDirectPower(DaliBroadcast, 254, NULL, 2*Second); // max
+    daliComm.daliSendDirectPower(DaliBroadcast, 0, NULL); // off
+    daliComm.daliSendDirectPower(DaliBroadcast, 254, NULL, 2*Second); // max
     testRW(aCompletedCB, testAddr, 0x55); // use first found device
   }
   else {
@@ -1386,9 +1394,9 @@ void DaliVdc::testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr 
 void DaliVdc::testRW(StatusCB aCompletedCB, DaliAddress aShortAddr, uint8_t aTestByte)
 {
   // set DTR
-  daliComm->daliSend(DALICMD_SET_DTR, aTestByte);
+  daliComm.daliSend(DALICMD_SET_DTR, aTestByte);
   // query DTR again, with 200mS delay
-  daliComm->daliSendQuery(aShortAddr, DALICMD_QUERY_CONTENT_DTR, boost::bind(&DaliVdc::testRWResponse, this, aCompletedCB, aShortAddr, aTestByte, _1, _2, _3), 200*MilliSecond);
+  daliComm.daliSendQuery(aShortAddr, DALICMD_QUERY_CONTENT_DTR, boost::bind(&DaliVdc::testRWResponse, this, aCompletedCB, aShortAddr, aTestByte, _1, _2, _3), 200*MilliSecond);
 }
 
 
@@ -1408,7 +1416,7 @@ void DaliVdc::testRWResponse(StatusCB aCompletedCB, DaliAddress aShortAddr, uint
         // all tests done
         aCompletedCB(aError);
         // turn off lights
-        daliComm->daliSendDirectPower(DaliBroadcast, 0); // off
+        daliComm.daliSendDirectPower(DaliBroadcast, 0); // off
         return;
     }
     // launch next test

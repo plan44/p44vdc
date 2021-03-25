@@ -87,6 +87,9 @@ namespace p44 {
 		EldatComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
 		virtual ~EldatComm();
 		
+    /// @return the prefix to be used for logging from this object
+    virtual string logContextPrefix() P44_OVERRIDE;
+
     /// set the connection parameters to connect to the ELDAT modem
     /// @param aConnectionSpec serial device path (/dev/...) or host name/address[:port] (1.2.3.4 or xxx.yy)
     /// @param aDefaultPort default port number for TCP connection (irrelevant for direct serial device connection)

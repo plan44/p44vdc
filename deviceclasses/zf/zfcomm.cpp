@@ -167,9 +167,16 @@ ZfComm::~ZfComm()
 }
 
 
+string ZfComm::logContextPrefix()
+{
+  return "ZF";
+}
+
+
+
 void ZfComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort)
 {
-  FOCUSLOG("ZfComm::setConnectionSpecification: %s", aConnectionSpec);
+  FOCUSOLOG("setConnectionSpecification: %s", aConnectionSpec);
   serialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, ZF_COMMAPARMS);
 	// open connection so we can receive
 	serialComm->requestConnection();
@@ -194,7 +201,7 @@ ssize_t ZfComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
   ZfPacketPtr packet;
   size_t ret = ZfPacket::getPacket(aNumBytes, aBytes, packet);
   if (packet) {
-    FOCUSLOG("ZF: received message: %s", packet->description().c_str());
+    FOCUSOLOG("received message: %s", packet->description().c_str());
     if (receivedPacketHandler) {
       receivedPacketHandler(packet, ErrorPtr());
     }
@@ -209,7 +216,7 @@ void ZfComm::commandResponseHandler(ZfMessageCB aResponseCB, SerialOperationPtr 
 {
   ZfResponsePtr r = boost::dynamic_pointer_cast<ZfResponse>(aResponse);
   if (r) {
-    FOCUSLOG("ZF: received answer: %s", r->response.c_str());
+    FOCUSOLOG("received answer: %s", r->response.c_str());
   }
   if (aResponseCB) {
     if (Error::isOK(aError) && aResponse) {

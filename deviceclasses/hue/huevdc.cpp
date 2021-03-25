@@ -54,6 +54,12 @@ HueVdc::~HueVdc()
 }
 
 
+void HueVdc::setLogLevelOffset(int aLogLevelOffset)
+{
+  hueComm.setLogLevelOffset(aLogLevelOffset);
+  inherited::setLogLevelOffset(aLogLevelOffset);
+}
+
 
 const char *HueVdc::vdcClassIdentifier() const
 {

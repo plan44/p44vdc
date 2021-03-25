@@ -99,7 +99,7 @@ bool HueApiOperation::initiate()
     default : methodStr = "GET"; data.reset(); break;
   }
   if (method==httpMethodPUT) {
-    LOG(LOG_INFO, "Sending hue API action (PUT) command: %s: %s", url.c_str(), data ? data->c_strValue() : "<no data>");
+    SOLOG(hueComm, LOG_INFO, "Sending API action (PUT) command: %s: %s", url.c_str(), data ? data->c_strValue() : "<no data>");
   }
   hueComm.bridgeAPIComm.jsonRequest(url.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, data);
   // executed
@@ -112,7 +112,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
 {
   error = aError;
   if (Error::isOK(error)) {
-    LOG(LOG_INFO, "Receiving hue API response: %s", aJsonResponse ? aJsonResponse->c_strValue() : "<no data>");
+    SOLOG(hueComm, LOG_INFO, "Receiving API response: %s", aJsonResponse ? aJsonResponse->c_strValue() : "<no data>");
     // pre-process response in case of non-GET
     if (method!=httpMethodGET) {
       // Expected:
@@ -156,7 +156,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
     }
   }
   else {
-    LOG(LOG_WARNING, "hue API error: %s", error->text());
+    SOLOG(hueComm, LOG_WARNING, "API error: %s", error->text());
   }
   // done
   completed = true;
@@ -280,7 +280,7 @@ public:
     else {
       // we have a pre-known base URL for the hue API, use this without any find operation
       // - do a check
-      FOCUSLOG("Using fixed hue API URL %s: %s -> testing if accessible...", hueComm.uuid.c_str(), hueComm.fixedBaseURL.c_str());
+      FOCUSSOLOG(hueComm, "Using fixed API URL %s: %s -> testing if accessible...", hueComm.uuid.c_str(), hueComm.fixedBaseURL.c_str());
       keepAlive = BridgeFinderPtr(this);
       hueComm.apiAction(httpMethodGET, hueComm.fixedBaseURL.c_str(), JsonObjectPtr(), boost::bind(&BridgeFinder::apiTested, this, _2), true); // no auto url = works w/o API ready
     }
@@ -290,12 +290,12 @@ public:
   void apiTested(ErrorPtr aError)
   {
     if (Error::isOK(aError)) {
-      FOCUSLOG("hue API URL %s tested accessible ok", hueComm.fixedBaseURL.c_str());
+      FOCUSSOLOG(hueComm, "API URL %s tested accessible ok", hueComm.fixedBaseURL.c_str());
       hueComm.baseURL = hueComm.fixedBaseURL; // use it
       hueComm.apiReady = true; // can use API now
     }
     else {
-      LOG(LOG_WARNING, "hue API URL %s is not accessible: %s", hueComm.fixedBaseURL.c_str(), aError->text());
+      SOLOG(hueComm, LOG_WARNING, "API URL %s is not accessible: %s", hueComm.fixedBaseURL.c_str(), aError->text());
     }
     callback(aError); // success
     keepAlive.reset(); // will delete object if nobody else keeps it
@@ -333,13 +333,13 @@ public:
     if (Error::isOK(aError)) {
       // check device for possibility of being a hue bridge
       if (aSsdpSearch->server.find("IpBridge")!=string::npos) {
-        LOG(LOG_INFO, "hue bridge candidate device found at %s, server=%s, uuid=%s", aSsdpSearch->locationURL.c_str(), aSsdpSearch->server.c_str(), aSsdpSearch->uuid.c_str());
+        SOLOG(hueComm, LOG_INFO, "bridge candidate device found at %s, server=%s, uuid=%s", aSsdpSearch->locationURL.c_str(), aSsdpSearch->server.c_str(), aSsdpSearch->uuid.c_str());
         // put into map
         bridgeCandiates[aSsdpSearch->locationURL] = aSsdpSearch->uuid;
       }
     }
     else {
-      FOCUSLOG("discovery ended, error = %s (usually: timeout)", aError->text());
+      FOCUSSOLOG(hueComm, "discovery ended, error = %s (usually: timeout)", aError->text());
       aSsdpSearch->stopSearch();
       if (hueComm.useNUPnP) {
         // also try N-UPnP
@@ -430,8 +430,8 @@ public:
   {
     if (Error::isOK(aError)) {
       // show
-      //FOCUSLOG("Received bridge description:\n%s", aResponse.c_str());
-      FOCUSLOG("Received service description XML");
+      //FOCUSSOLOG(hueComm, "Received bridge description:\n%s", aResponse.c_str());
+      FOCUSSOLOG(hueComm, "Received service description XML");
 
       string manufacturer;
       string model;
@@ -456,20 +456,20 @@ public:
           // that's my known hue bridge, save the URL and report success
           hueComm.baseURL = url; // save it
           hueComm.apiReady = true; // can use API now
-          FOCUSLOG("pre-known hue Bridge %s found at %s", hueComm.uuid.c_str(), hueComm.baseURL.c_str());
+          FOCUSSOLOG(hueComm, "pre-known bridge %s found at %s", hueComm.uuid.c_str(), hueComm.baseURL.c_str());
           callback(ErrorPtr()); // success
           keepAlive.reset(); // will delete object if nobody else keeps it
           return; // done
         }
         else {
           // that's a hue bridge, remember it for trying to authorize
-          FOCUSLOG("- Seems to be a hue bridge at %s", url.c_str());
+          FOCUSSOLOG(hueComm, "- Seems to be a bridge at %s", url.c_str());
           authCandidates[currentBridgeCandidate->second] = url;
         }
       }
     }
     else {
-      FOCUSLOG("Error accessing bridge description: %s", aError->text());
+      FOCUSSOLOG(hueComm, "Error accessing bridge description: %s", aError->text());
     }
     // try next
     ++currentBridgeCandidate;
@@ -488,7 +488,7 @@ public:
   {
     if (currentAuthCandidate!=authCandidates.end() && hueComm.findInProgress) {
       // try to authorize
-      FOCUSLOG("Auth candidate: uuid=%s, baseURL=%s -> try creating user", currentAuthCandidate->first.c_str(), currentAuthCandidate->second.c_str());
+      FOCUSSOLOG(hueComm, "Auth candidate: uuid=%s, baseURL=%s -> try creating user", currentAuthCandidate->first.c_str(), currentAuthCandidate->second.c_str());
       JsonObjectPtr request = JsonObject::newObj();
       request->add("devicetype", JsonObject::newString(deviceType));
       hueComm.apiAction(httpMethodPOST, currentAuthCandidate->second.c_str(), request, boost::bind(&BridgeFinder::handleCreateUserAnswer, this, _1, _2), true);
@@ -502,7 +502,7 @@ public:
       }
       else {
         // all candidates tried, nothing found in given time
-        LOG(LOG_NOTICE, "Could not register with a hue bridge");
+        SOLOG(hueComm, LOG_NOTICE, "Could not register with a bridge");
         hueComm.findInProgress = false;
         callback(Error::err<HueCommError>(HueCommError::NoRegistration, "No hue bridge found ready to register"));
         // done!
@@ -516,7 +516,7 @@ public:
   void handleCreateUserAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError)
   {
     if (Error::isOK(aError)) {
-      FOCUSLOG("Received success answer:\n%s", aJsonResponse->json_c_str());
+      FOCUSSOLOG(hueComm, "Received success answer:\n%s", aJsonResponse->json_c_str());
       JsonObjectPtr s = HueComm::getSuccessItem(aJsonResponse);
       // apparently successful, extract user name
       if (s) {
@@ -526,7 +526,7 @@ public:
           hueComm.uuid = currentAuthCandidate->first;
           hueComm.baseURL = currentAuthCandidate->second;
           hueComm.apiReady = true; // can use API now
-          FOCUSLOG("hue Bridge %s @ %s: successfully registered as user %s", hueComm.uuid.c_str(), hueComm.baseURL.c_str(), hueComm.userName.c_str());
+          FOCUSSOLOG(hueComm, "Bridge %s @ %s: successfully registered as user %s", hueComm.uuid.c_str(), hueComm.baseURL.c_str(), hueComm.userName.c_str());
           // successfully registered with hue bridge, let caller know
           callback(ErrorPtr());
           // done!
@@ -536,7 +536,7 @@ public:
       }
     }
     else {
-      LOG(LOG_INFO, "hue Bridge: Cannot create user: %s", aError->text());
+      SOLOG(hueComm, LOG_INFO, "Bridge: Cannot create user: %s", aError->text());
     }
     // try next
     ++currentAuthCandidate;
@@ -567,6 +567,13 @@ HueComm::HueComm() :
 HueComm::~HueComm()
 {
 }
+
+
+string HueComm::logContextPrefix()
+{
+  return "hue";
+}
+
 
 
 void HueComm::apiQuery(const char* aUrlSuffix, HueApiResultCB aResultHandler)

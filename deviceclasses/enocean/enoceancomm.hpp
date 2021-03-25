@@ -475,7 +475,7 @@ namespace p44 {
   } SecureTeachInData;
 
 
-  class EnOceanSecurity : public P44Obj
+  class EnOceanSecurity : public P44LoggingObj
   {
     typedef P44Obj inherited;
 
@@ -522,6 +522,9 @@ namespace p44 {
   public:
     EnOceanSecurity();
     virtual ~EnOceanSecurity();
+
+    /// @return the prefix to be used for logging from this object
+    virtual string logContextPrefix() P44_OVERRIDE;
 
     /// process a secure teach-in message
     /// @param aTeachInMsg a R-ORG TS (0x32) message to process (possibly only a segment)
@@ -635,7 +638,10 @@ namespace p44 {
 		
 		EnoceanComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
 		virtual ~EnoceanComm();
-		
+
+    /// @return the prefix to be used for logging from this object
+    virtual string logContextPrefix() P44_OVERRIDE;
+
     /// set the connection parameters to connect to the EnOcean TCM310 modem
     /// @param aConnectionSpec serial device path (/dev/...) or host name/address[:port] (1.2.3.4 or xxx.yy)
     /// @param aDefaultPort default port number for TCP connection (irrelevant for direct serial device connection)
@@ -665,7 +671,7 @@ namespace p44 {
     /// @param aNumBytes number of bytes ready for accepting
     /// @param aBytes pointer to bytes buffer
     /// @return number of bytes parser could accept (normally, all)
-    virtual size_t acceptBytes(size_t aNumBytes, uint8_t *aBytes);
+    virtual size_t acceptBytes(size_t aNumBytes, uint8_t *aBytes) P44_OVERRIDE;
 
     /// set callback to handle received radio packets
     /// @param aRadioPacketCB callback to deliver radio packets to

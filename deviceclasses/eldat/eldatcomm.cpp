@@ -135,9 +135,15 @@ EldatComm::~EldatComm()
 }
 
 
+string EldatComm::logContextPrefix()
+{
+  return "Eldat";
+}
+
+
 void EldatComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort)
 {
-  FOCUSLOG("EldatComm::setConnectionSpecification: %s", aConnectionSpec);
+  FOCUSOLOG("setConnectionSpecification: %s", aConnectionSpec);
   serialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, ELDAT_COMMAPARMS);
 	// open connection so we can receive
 	serialComm->requestConnection();
@@ -165,7 +171,7 @@ void EldatComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aErr
   // error querying version
   aRetriesLeft--;
   if (aRetriesLeft>=0) {
-    LOG(LOG_WARNING, "EldatComm: Initialisation: command failed: %s -> retrying again", aError->text());
+    OLOG(LOG_WARNING, "Initialisation: command failed: %s -> retrying again", aError->text());
     serialComm->setDTR(false); // should cause reset
     serialComm->closeConnection(); // also close and re-open later
     // retry initializing later
@@ -173,7 +179,7 @@ void EldatComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aErr
   }
   else {
     // no more retries, just return
-    LOG(LOG_ERR, "EldatComm: Initialisation: %d attempts failed to send commands -> initialisation failed", ELDAT_INIT_RETRIES);
+    OLOG(LOG_ERR, "Initialisation: %d attempts failed to send commands -> initialisation failed", ELDAT_INIT_RETRIES);
     if (aCompletedCB) aCompletedCB(aError);
   }
   return; // done
@@ -186,7 +192,7 @@ void EldatComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, string 
   if (Error::isOK(aError)) {
     uint16_t vid;
     if (sscanf(aAnswer.c_str(), "ID,%hX,%hX,%hX", &vid, &usbPid, &appVersion)==3) {
-      LOG(LOG_INFO, "ELDAT module info (ID): vid=0x%04hX, usbPid=0x%04hX, version=0x%04hX", vid, usbPid, appVersion);
+      OLOG(LOG_INFO, "module info (ID): vid=0x%04hX, usbPid=0x%04hX, version=0x%04hX", vid, usbPid, appVersion);
       if (vid!=ELDAT_VID) {
         initError(aCompletedCB, 0, Error::err<EldatCommError>(EldatCommError::Compatibility, "Invalid Vendor ID 0x%04hX", vid));
         return;
@@ -196,7 +202,7 @@ void EldatComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, string 
         return;
       }
     }
-    FOCUSLOG("Received ID answer: %s", aAnswer.c_str());
+    FOCUSOLOG("Received ID answer: %s", aAnswer.c_str());
   }
   else {
     initError(aCompletedCB, aRetriesLeft, aError);
@@ -212,7 +218,7 @@ void EldatComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, string 
 
 void EldatComm::aliveCheck()
 {
-  FOCUSLOG("EldatComm: checking ELDAT module operation by sending ID command");
+  FOCUSOLOG("checking ELDAT module operation by sending ID command");
   // issue command
   sendCommand("ID?", boost::bind(&EldatComm::aliveCheckResponse, this, _1, _2));
 }
@@ -222,7 +228,7 @@ void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
 {
   if (Error::notOK(aError)) {
     // alive check failed, try to recover ELDAT interface
-    LOG(LOG_ERR, "EldatComm: alive check of ELDAT module failed -> restarting module");
+    OLOG(LOG_ERR, "alive check of ELDAT module failed -> restarting module");
     serialComm->setDTR(false); // release DTR, this should reset the ELDAT interface
     // - using alive check ticket for reset sequence
     aliveCheckTicket.executeOnce(boost::bind(&EldatComm::resetDone, this), 2*Second);
@@ -230,7 +236,7 @@ void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
   else {
     // response received, should be ID
     if (!(aAnswer.substr(0,3)=="ID,")) {
-      FOCUSLOG("Alive check received answer after sending 'ID?', but got unexpected answer '%s'", aAnswer.c_str());
+      FOCUSOLOG("Alive check received answer after sending 'ID?', but got unexpected answer '%s'", aAnswer.c_str());
     }
     // also schedule the next alive check
     aliveCheckTicket.executeOnce(boost::bind(&EldatComm::aliveCheck, this), ELDAT_ALIVECHECK_INTERVAL);
@@ -240,7 +246,7 @@ void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
 
 void EldatComm::resetDone()
 {
-  LOG(LOG_NOTICE, "EldatComm: re-asserting DTR");
+  OLOG(LOG_NOTICE, "re-asserting DTR");
   serialComm->setDTR(true); // should restart the ELDAT interface
   // wait a little, then re-open connection
   aliveCheckTicket.executeOnce(boost::bind(&EldatComm::reopenConnection, this), 2*Second);
@@ -249,7 +255,7 @@ void EldatComm::resetDone()
 
 void EldatComm::reopenConnection()
 {
-  LOG(LOG_NOTICE, "EldatComm: re-opening connection");
+  OLOG(LOG_NOTICE, "re-opening connection");
 	serialComm->requestConnection(); // re-open connection
   // restart alive checks, not too soon after reset
   aliveCheckTicket.executeOnce(boost::bind(&EldatComm::aliveCheck, this), 10*Second);
@@ -267,7 +273,7 @@ ssize_t EldatComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
   string msg;
   size_t ret = getMessage(aNumBytes, aBytes, msg);
   if (ret!=NOT_ENOUGH_BYTES) {
-    FOCUSLOG("ELDAT: received message: %s", msg.c_str());
+    FOCUSOLOG("received message: %s", msg.c_str());
     if (receivedMessageHandler) {
       receivedMessageHandler(msg, ErrorPtr());
     }
@@ -279,7 +285,7 @@ ssize_t EldatComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
 void EldatComm::sendCommand(string aCommand, EldatMessageCB aResponseCB)
 {
   // queue command
-  FOCUSLOG("ELDAT: sending command: %s", aCommand.c_str());
+  FOCUSOLOG("sending command: %s", aCommand.c_str());
   SerialOperationPtr req = SerialOperationPtr(new EldatCommand(aCommand));
   // all commands expect an answer
   SerialOperationPtr resp = SerialOperationPtr(new EldatResponse);
@@ -295,7 +301,7 @@ void EldatComm::commandResponseHandler(EldatMessageCB aResponseCB, SerialOperati
 {
   EldatResponsePtr r = boost::dynamic_pointer_cast<EldatResponse>(aResponse);
   if (r) {
-    FOCUSLOG("ELDAT: received answer: %s", r->response.c_str());
+    FOCUSOLOG("received answer: %s", r->response.c_str());
   }
   if (aResponseCB) {
     if (Error::isOK(aError) && aResponse) {

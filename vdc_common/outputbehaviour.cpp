@@ -855,7 +855,7 @@ using namespace P44Script;
 
 static void channelOpComplete(BuiltinFunctionContextPtr f, OutputBehaviourPtr aOutput)
 {
-  SPLOG(aOutput, LOG_INFO, "scene script: channel operation complete");
+  POLOG(aOutput, LOG_INFO, "scene script: channel operation complete");
   f->finish();
 }
 
@@ -871,7 +871,7 @@ static void applychannels_func(BuiltinFunctionContextPtr f)
     // force apply, invalidate all channels first
     o->output()->getDevice().invalidateAllChannels();
   }
-  SPLOG(o->output(), LOG_INFO, "scene script: applychannels() requests applying channels now");
+  POLOG(o->output(), LOG_INFO, "scene script: applychannels() requests applying channels now");
   o->output()->getDevice().requestApplyingChannels(boost::bind(&channelOpComplete, f, o->output()), false);
 }
 
@@ -880,7 +880,7 @@ static void syncchannels_func(BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
   assert(o);
-  SPLOG(o->output(), LOG_INFO, "scene script: syncchannels() requests applying channels now");
+  POLOG(o->output(), LOG_INFO, "scene script: syncchannels() requests applying channels now");
   o->output()->getDevice().requestUpdatingChannels(boost::bind(&channelOpComplete, f, o->output()));
 }
 

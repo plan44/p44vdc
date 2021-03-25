@@ -257,6 +257,9 @@ namespace p44 {
     DaliComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
     virtual ~DaliComm();
 
+    /// @return the prefix to be used for logging from this object
+    virtual string logContextPrefix() P44_OVERRIDE;
+
     void startProcedure();
     void endProcedure();
 
@@ -270,7 +273,7 @@ namespace p44 {
     void setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, MLMicroSeconds aCloseAfterIdleTime);
 
     /// accept extra bytes to resynchronize bridge
-    virtual ssize_t acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes);
+    virtual ssize_t acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes) P44_OVERRIDE;
 
     /// set DALI edge adjustment
     /// @param how much (in 1/256th DALI bit time units) to delay the going inactive edge of the sending signal, to compensate for slow falling (going active) edge on the bus

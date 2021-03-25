@@ -99,6 +99,10 @@ namespace p44 {
   public:
 
     EldatVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
+
+    /// set the log level offset on this logging object (and possibly contained sub-objects)
+    /// @param aLogLevelOffset the new log level offset
+    virtual void setLogLevelOffset(int aLogLevelOffset) P44_OVERRIDE;
 		
 		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 

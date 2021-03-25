@@ -80,13 +80,16 @@ namespace p44 {
 
   public:
     DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
-
     virtual ~DaliVdc();
+
+    /// set the log level offset on this logging object (and possibly contained sub-objects)
+    /// @param aLogLevelOffset the new log level offset
+    virtual void setLogLevelOffset(int aLogLevelOffset) P44_OVERRIDE;
 
 		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     // the DALI communication object
-    DaliCommPtr daliComm;
+    DaliComm daliComm;
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 

@@ -87,6 +87,13 @@ LedChainVdc::LedChainVdc(int aInstanceNumber, LEDChainArrangementPtr aLedArrange
 }
 
 
+void LedChainVdc::setLogLevelOffset(int aLogLevelOffset)
+{
+  if (ledArrangement) ledArrangement->setLogLevelOffset(aLogLevelOffset);
+  inherited::setLogLevelOffset(aLogLevelOffset);
+}
+
+
 void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   ErrorPtr err;

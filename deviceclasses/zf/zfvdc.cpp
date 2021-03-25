@@ -35,6 +35,12 @@ ZfVdc::ZfVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 }
 
 
+void ZfVdc::setLogLevelOffset(int aLogLevelOffset)
+{
+  zfComm.setLogLevelOffset(aLogLevelOffset);
+  inherited::setLogLevelOffset(aLogLevelOffset);
+}
+
 
 const char *ZfVdc::vdcClassIdentifier() const
 {
@@ -135,7 +141,7 @@ void ZfVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
           addKnownDevice(newdev);
         }
         else {
-          LOG(LOG_ERR,
+          OLOG(LOG_ERR,
             "ZF device could not be created for addr=%08X, subdevice=%d, deviceType=%d",
             i->get<int>(0), // address
             subDeviceIndex, // subdeviceIndex
@@ -290,7 +296,7 @@ void ZfVdc::dispatchPacket(ZfPacketPtr aPacket)
     reachedDevice = true;
   }
   if (!reachedDevice) {
-    LOG(LOG_INFO, "Received ZF message with sender-ID=%08X not directed to any known device -> ignored", aPacket->uid);
+    OLOG(LOG_INFO, "Received ZF message with sender-ID=%08X not directed to any known device -> ignored", aPacket->uid);
   }
 }
 
@@ -414,7 +420,7 @@ void ZfVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tris
 //        // uninstall handler
 //        enoceanComm.setRadioPacketHandler(NULL);
 //        // seen both watchdog response (modem works) and independent RPS telegram (RF is ok)
-//        LOG(LOG_NOTICE,
+//        OLOG(LOG_NOTICE,
 //          "- enocean modem info: appVersion=0x%08X, apiVersion=0x%08X, modemAddress=0x%08X, idBase=0x%08X",
 //          enoceanComm.modemAppVersion(), enoceanComm.modemApiVersion(), enoceanComm.modemAddress(), enoceanComm.idBase()
 //        );
@@ -424,7 +430,7 @@ void ZfVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tris
 //      }
 //    }
 //    // - still waiting
-//    LOG(LOG_NOTICE, "- enocean test: still waiting for RPS telegram in learn distance");
+//    OLOG(LOG_NOTICE, "- enocean test: still waiting for RPS telegram in learn distance");
 //  }
 
 #endif // ENABLE_ZF

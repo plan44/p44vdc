@@ -36,6 +36,12 @@ EldatVdc::EldatVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 }
 
 
+void EldatVdc::setLogLevelOffset(int aLogLevelOffset)
+{
+  eldatComm.setLogLevelOffset(aLogLevelOffset);
+  inherited::setLogLevelOffset(aLogLevelOffset);
+}
+
 
 const char *EldatVdc::vdcClassIdentifier() const
 {

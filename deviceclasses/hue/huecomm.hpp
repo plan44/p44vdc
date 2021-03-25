@@ -139,6 +139,9 @@ namespace p44 {
     HueComm();
     virtual ~HueComm();
 
+    /// @return the prefix to be used for logging from this object
+    virtual string logContextPrefix() P44_OVERRIDE;
+
     // HTTP communication object
     JsonWebClient bridgeAPIComm;
 
