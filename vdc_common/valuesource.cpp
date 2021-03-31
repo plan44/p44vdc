@@ -253,7 +253,7 @@ ValueSourceObj::ValueSourceObj(ValueSource* aValueSourceP) :
 
 string ValueSourceObj::getAnnotation() const
 {
-  return mLastUpdate==Never ? "unknown hardware state" : "input value";
+  return mLastUpdate==Never ? "unknown hardware state" : "value source";
 }
 
 
