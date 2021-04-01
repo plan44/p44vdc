@@ -335,17 +335,6 @@ ApiValuePtr ApiValue::newNull()
 }
 
 
-#if ENABLE_EXPRESSIONS
-
-ApiValuePtr ApiValue::newExpressionValue(ExpressionValue& aValue)
-{
-  if (aValue.isNull()) return newNull();
-  else if (aValue.isString()) return newString(aValue.stringValue());
-  else return newDouble(aValue.numValue());
-}
-
-#endif
-
 #if ENABLE_P44SCRIPT
 
 ApiValuePtr ApiValue::newScriptValue(P44Script::ScriptObjPtr aValue)

@@ -211,11 +211,6 @@ namespace p44 {
     #if P44SCRIPT_FULL_SUPPORT
     ScriptSource mainScript; ///< global init/main script stored in settings
     ScriptMainContextPtr vdcHostScriptContext; ///< context for global vdc scripts
-    #endif
-    #if EXPRESSION_SCRIPT_SUPPORT
-    ScriptQueue globalScripts;
-    #endif
-    #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
     bool globalScriptsStarted; ///< global scripts have been started
     #endif
 
@@ -713,13 +708,10 @@ namespace p44 {
     void globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel);
     void scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
     #endif
-    #if EXPRESSION_SCRIPT_SUPPORT
-    void runGlobalScripts();
-    #endif
   };
 
 
-  #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+  #if P44SCRIPT_FULL_SUPPORT
 
   /// Dummy api call from script "connection" object
   class ScriptCallConnection : public VdcApiConnection
@@ -757,20 +749,12 @@ namespace p44 {
   {
     typedef VdcApiRequest inherited;
 
-    #if ENABLE_P44SCRIPT
     BuiltinFunctionContextPtr mBuiltinFunctionContext;
-    #else
-    ScriptExecutionContextPtr scriptContext;
-    #endif
 
   public:
 
     /// constructor
-    #if ENABLE_P44SCRIPT
     ScriptApiRequest(BuiltinFunctionContextPtr aBuiltinFunctionContext) : mBuiltinFunctionContext(aBuiltinFunctionContext) {};
-    #else
-    ScriptApiRequest(ScriptExecutionContextPtr aScriptContext) : scriptContext(aScriptContext) {};
-    #endif
 
     /// return the request ID as a string
     /// @return request ID as string
@@ -797,11 +781,7 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<ScriptApiRequest> ScriptApiRequestPtr;
 
-  #endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
 
-
-
-  #if P44SCRIPT_FULL_SUPPORT
   namespace P44Script {
 
     class VdcHostLookup : public BuiltInMemberLookup {
@@ -812,7 +792,8 @@ namespace p44 {
     };
 
   }
-  #endif
+
+  #endif // P44SCRIPT_FULL_SUPPORT
 
 
 } // namespace p44

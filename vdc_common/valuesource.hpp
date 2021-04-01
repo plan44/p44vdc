@@ -24,7 +24,6 @@
 
 #include "p44vdc_common.hpp"
 #include "vdcapi.hpp"
-#include "expressions.hpp"
 #include "p44script.hpp"
 
 using namespace std;
@@ -46,26 +45,13 @@ namespace p44 {
   typedef multimap<void *,ValueListenerCB> ListenerMap;
 
   /// @note this class does NOT derive from P44Obj, so it can be added as "interface" using multiple-inheritance
-  class ValueSource
-    #if ENABLE_P44SCRIPT
-    : public EventSource
-    #endif
+  class ValueSource : public EventSource
   {
-
-    #if !ENABLE_P44SCRIPT
-    // map of listeners
-    ListenerMap listeners;
-    #endif
 
   public:
 
     /// constructor
     ValueSource();
-
-    #if !ENABLE_P44SCRIPT
-    /// destructor
-    virtual ~ValueSource();
-    #endif
 
     /// return true only if enabled for being used
     /// @return true if enabled for use (e.g. non-app buttons are not enabled)
@@ -91,33 +77,13 @@ namespace p44 {
     /// @return the operation level (0..100) of the value source
     virtual int getSourceOpLevel() = 0;
 
-    #if !ENABLE_P44SCRIPT
-    /// add listener
-    /// @param aCallback will be called when value has changed, or disappears
-    /// @param aListener unique identification of the listener (usually its memory address)
-    void addSourceListener(ValueListenerCB aCallback, void *aListener);
-
-    /// remove listener
-    /// @param aListener unique identification of the listener (usually its memory address)
-    void removeSourceListener(void *aListener);
-
-  protected:
-
-    /// notify all listeners
-    void notifyListeners(ValueListenerEvent aEvent);
-    #else
-
     /// send event with current getSourceValue()
     void sendValueEvent();
-    #endif
 
   };
 
 
-  class ValueSourceMapper
-    #if ENABLE_P44SCRIPT
-    : public MemberLookup
-    #endif
+  class ValueSourceMapper : public MemberLookup
   {
 
     typedef map<string, ValueSource *, lessStrucmp> ValueSourcesMap;
@@ -131,7 +97,6 @@ namespace p44 {
     /// forget current value mappings, unsubscribe from all value observations
     void forgetMappings();
 
-    #if ENABLE_P44SCRIPT
     /// parse mapping definition string
     /// @param aMappingDefs string associating simple alias names with valuedefs IDs
     ///    Syntax is: <valuealias>:<valuesourceid> [, <valuealias>:valuesourceid> ...]
@@ -140,19 +105,6 @@ namespace p44 {
     /// @param aMigratedValueDefsP if not NULL, this string will be set empty if no migration is needed,
     ///    and contain the migrated valuedefs otherwise
     bool parseMappingDefs(const string &aValueDefs, string *aMigratedValueDefsP = NULL);
-    #else
-    /// parse mapping definition string
-    /// @param aMappingDefs string associating simple alias names with valuedefs IDs
-    ///    Syntax is: <valuealias>:<valuesourceid> [, <valuealias>:valuesourceid> ...]
-    /// @param aValueCallback will be called when any of the mapped values changes or is deleted.
-    ///    When using p44Script EventSource/EventSink mechanism, pass NULL to use automatic event propagation to
-    ///    registered EventSinks
-    /// @param aMigratedValueDefsP if not NULL, this string will be set empty if no migration is needed,
-    ///    and contain the migrated valuedefs otherwise
-    /// @note will cause current mappings to get overwritten (forgetMapping is called implicitly)
-    /// @result returns true if all definitions could be mapped, false otherwise
-    bool parseMappingDefs(const string &aValueDefs, ValueListenerCB aCallback, string *aMigratedValueDefsP = NULL);
-    #endif
 
     /// find value source by alias
     /// @param aAlias alias name
@@ -161,22 +113,12 @@ namespace p44 {
     ///   get deleted when control is passed to mainloop
     ValueSource* valueSourceByAlias(const string aAlias) const;
 
-    #if ENABLE_EXPRESSIONS
-    /// get value (or meta information such as .age, .oplevel and .valid subfields) of mapped value source
-    /// @param aValue will be set to the variable's value or error if aVarSpec identifies a known variable
-    /// @param aVarSpec variable specification
-    /// @return true if aValue was set, false if further sources for the variable should be searched (if any)
-    bool valueLookup(ExpressionValue &aValue, const string aVarSpec);
-    #endif // ENABLE_EXPRESSIONS
-
-    #if ENABLE_P44SCRIPT
     /// get object subfield/member by name
     /// @param aThisObj the object _instance_ of which we want to access a member (can be NULL in case of singletons)
     /// @param aName name of the member to find
     /// @param aTypeRequirements what type and type attributes the returned member must have, defaults to no restriction
     /// @return ScriptObj representing the member, or NULL if none
     virtual ScriptObjPtr memberByNameFrom(ScriptObjPtr aThisObj, const string aName, TypeInfo aTypeRequirements) const P44_OVERRIDE;
-    #endif // ENABLE_P44SCRIPT
 
     /// get info about all mapped sources (everything needed for editing mappingdefs)
     /// @param the api object to add info for mappings to
@@ -188,8 +130,6 @@ namespace p44 {
     string shortDesc() const;
 
   };
-
-  #if ENABLE_P44SCRIPT
 
   class ValueSourceObj : public NumericValue
   {
@@ -208,8 +148,6 @@ namespace p44 {
     virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) P44_OVERRIDE;
 
   };
-
-  #endif // ENABLE_P44SCRIPT
 
 } // namespace p44
 

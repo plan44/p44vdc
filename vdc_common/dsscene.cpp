@@ -298,11 +298,7 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   // then proceed with loading other fields
   globalSceneFlags = aRow->get<int>(aIndex++);
   #if ENABLE_SCENE_SCRIPT
-  #if ENABLE_P44SCRIPT
   sceneScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  #else
-  sceneScript.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  #endif
   #endif
 }
 
@@ -315,10 +311,6 @@ void DsScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, (int)globalSceneFlags);
   #if ENABLE_SCENE_SCRIPT
   aStatement.bind(aIndex++, sceneScript.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  #if ENABLE_P44SCRIPT
-  #else
-  aStatement.bind(aIndex++, sceneScript.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  #endif
   #endif
 }
 
@@ -483,11 +475,7 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           return true;
         #if ENABLE_SCENE_SCRIPT
         case sceneScript_key:
-          #if ENABLE_P44SCRIPT
           aPropValue->setStringValue(sceneScript.getSource());
-          #else
-          aPropValue->setStringValue(sceneScript);
-          #endif
           return true;
         #endif
       }
@@ -503,13 +491,9 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           return true;
         #if ENABLE_SCENE_SCRIPT
         case sceneScript_key:
-          #if ENABLE_P44SCRIPT
           if (sceneScript.setSource(aPropValue->stringValue())) {
             markDirty();
           }
-          #else
-          setPVar(sceneScript, aPropValue->stringValue());
-          #endif
           return true;
         #endif
       }

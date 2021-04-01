@@ -31,59 +31,11 @@ ValueSource::ValueSource()
 }
 
 
-#if !ENABLE_P44SCRIPT
-
-ValueSource::~ValueSource()
-{
-  // inform all of the listeners that the value is gone, unless app is about to terminate
-  if (Application::isRunning()) {
-    notifyListeners(valueevent_removed);
-  }
-  listeners.clear();
-}
-
-
-void ValueSource::addSourceListener(ValueListenerCB aCallback, void *aListener)
-{
-  listeners.insert(make_pair(aListener, aCallback));
-}
-
-
-void ValueSource::removeSourceListener(void *aListener)
-{
-  listeners.erase(aListener);
-}
-
-
-void ValueSource::notifyListeners(ValueListenerEvent aEvent)
-{
-  if (aEvent==valueevent_removed) {
-    // neeed to operate on a copy of the map because removal could cause callbacks to add/remove
-    ListenerMap tempMap = listeners;
-    for (ListenerMap::iterator pos=tempMap.begin(); pos!=tempMap.end(); ++pos) {
-      ValueListenerCB cb = pos->second;
-      cb(*this, aEvent);
-    }
-  }
-  else {
-    // optimisation - no need to copy the map
-    for (ListenerMap::iterator pos=listeners.begin(); pos!=listeners.end(); ++pos) {
-      ValueListenerCB cb = pos->second;
-      cb(*this, aEvent);
-    }
-  }
-}
-
-#else
-
 void ValueSource::sendValueEvent()
 {
   if (!hasSinks()) return; // optimisation
   sendEvent(new ValueSourceObj(this));
 }
-
-#endif
-
 
 // MARK: - ValueSourceMapper
 
@@ -100,11 +52,6 @@ ValueSourceMapper::~ValueSourceMapper()
 
 void ValueSourceMapper::forgetMappings()
 {
-  #if !ENABLE_P44SCRIPT
-  for (ValueSourcesMap::iterator pos = valueMap.begin(); pos!=valueMap.end(); ++pos) {
-    pos->second->removeSourceListener(this);
-  }
-  #endif
   valueMap.clear();
 }
 
@@ -119,11 +66,7 @@ ValueSource* ValueSourceMapper::valueSourceByAlias(const string aAlias) const
 }
 
 
-#if ENABLE_P44SCRIPT
 bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, string *aMigratedValueDefsP)
-#else
-bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, ValueListenerCB aCallback, string *aMigratedValueDefsP)
-#endif
 {
   LOG(LOG_INFO, "Parsing alias to value source mappings");
   forgetMappings(); // forget previous mappings
@@ -144,10 +87,6 @@ bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, ValueListener
       ValueSource *vs = VdcHost::sharedVdcHost()->getValueSourceById(valuesourceid);
       if (vs) {
         // value source exists
-        #if !ENABLE_P44SCRIPT
-        // - add listener
-        vs->addSourceListener(aCallback, this);
-        #endif
         // - add source to my map
         valueMap[valuealias] = vs;
         LOG(LOG_INFO, "- alias '%s' connected to source '%s'", valuealias.c_str(), vs->getSourceName().c_str());
@@ -177,70 +116,6 @@ bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, ValueListener
   return foundall;
 }
 
-
-#if ENABLE_EXPRESSIONS
-
-bool ValueSourceMapper::valueLookup(ExpressionValue &aValue, const string aVarSpec)
-{
-  // value specfications can be simple valuesource alias names, or alias names with sub-field specifications:
-  // alias               returns the value of the valuesource itself
-  // alias.valid         returns 1 if valuesource has a valid value, 0 otherwise
-  // alias.oplevel       returns the operation level of the valuesource (0..100%)
-  // alias.age           returns the age of the valuesource's value in seconds
-  string subfield;
-  string name;
-  size_t i = aVarSpec.find('.');
-  if (i!=string::npos) {
-    subfield = aVarSpec.substr(i+1);
-    name = aVarSpec.substr(0,i);
-  }
-  else {
-    name = aVarSpec;
-  }
-  ValueSource* vs = valueSourceByAlias(name);
-  if (vs==NULL) {
-    // not found
-    return false;
-  }
-  // value found
-  if (subfield.empty()) {
-    // value itself is requested
-    if (vs->getSourceLastUpdate()!=Never) {
-      aValue = ExpressionValue(vs->getSourceValue());
-      return true;
-    }
-  }
-  else if (subfield=="valid") {
-    aValue = ExpressionValue(vs->getSourceLastUpdate()!=Never ? 1 : 0);
-    return true;
-  }
-  else if (subfield=="oplevel") {
-    int lvl = vs->getSourceOpLevel();
-    if (lvl>=0) {
-      aValue = ExpressionValue(lvl);
-      return true;
-    }
-    // otherwise: no known value
-  }
-  else if (subfield=="age") {
-    if (vs->getSourceLastUpdate()!=Never) {
-      aValue = ExpressionValue(((double)(MainLoop::now()-vs->getSourceLastUpdate()))/Second);
-      return true;
-    }
-  }
-  else {
-    aValue.setSyntaxError("Unknown subfield '%s' for alias '%s'", subfield.c_str(), name.c_str());
-    return true;
-  }
-  // no value (yet)
-  aValue.setNull(string_format("'%s' has no known value yet", aVarSpec.c_str()).c_str());
-  return true;
-}
-
-#endif // ENABLE_EXPRESSIONS
-
-
-#if ENABLE_P44SCRIPT
 
 ValueSourceObj::ValueSourceObj(ValueSource* aValueSourceP) :
   inherited(aValueSourceP->getSourceValue()),
@@ -296,7 +171,6 @@ ScriptObjPtr ValueSourceMapper::memberByNameFrom(ScriptObjPtr aThisObj, const st
   return vsMember;
 }
 
-#endif // ENABLE_P44SCRIPT
 
 bool ValueSourceMapper::getMappedSourcesInfo(ApiValuePtr aInfoObject)
 {

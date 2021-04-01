@@ -39,18 +39,11 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   // volatile state
   localPriority(false), // no local priority
   transitionTime(0) // immediate transitions by default
-  #if ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
-  ,sceneScriptContext(*this, &VdcHost::sharedVdcHost()->geolocation)
-  #endif
 {
   // set default group membership (which is group_undefined)
   resetGroupMembership();
   // set default hardware default configuration
   setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
-  #if ENABLE_SCENE_SCRIPT && !ENABLE_P44SCRIPT
-  sceneScriptContext.isMemberVariable();
-  sceneScriptContext.setContextInfo("scenescript", this);
-  #endif
 }
 
 
@@ -283,39 +276,22 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
   SimpleScenePtr simpleScene = boost::dynamic_pointer_cast<SimpleScene>(aScene);
   if (simpleScene && simpleScene->effect==scene_effect_script) {
     // run scene script
-    #if ENABLE_P44SCRIPT
     OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->sceneScript.getSource().c_str(), true, 80).c_str() );
     simpleScene->sceneScript.setSharedMainContext(device.getDeviceScriptContext());
     simpleScene->sceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), Infinite);
-    #else
-    sceneScriptContext.abort(false); // abort previous, no callback
-    OLOG(LOG_INFO, "Starting Scene Script: '%.40s...'", simpleScene->sceneScript.c_str());
-    sceneScriptContext.releaseState();
-    sceneScriptContext.setCode(simpleScene->sceneScript);
-    sceneScriptContext.execute(true, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1));
-    return;
-    #endif
   }
-  #endif
+  #endif // ENABLE_SCENE_SCRIPT
   if (aDoneCB) aDoneCB(); // NOP
 }
 
 
 #if ENABLE_SCENE_SCRIPT
 
-#if ENABLE_P44SCRIPT
 void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ScriptObjPtr aResult)
 {
   OLOG(LOG_INFO, "Scene Script completed, returns: '%s'", aResult->stringValue().c_str());
   if (aDoneCB) aDoneCB();
 }
-#else
-void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluationResult)
-{
-  OLOG(LOG_INFO, "Scene Script completed, returns: '%s'", aEvaluationResult.stringValue().c_str());
-  if (aDoneCB) aDoneCB();
-}
-#endif
 
 #endif // ENABLE_SCENE_SCRIPT
 
@@ -323,12 +299,8 @@ void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluat
 void OutputBehaviour::stopSceneActions()
 {
   #if ENABLE_SCENE_SCRIPT
-  #if ENABLE_P44SCRIPT
   device.getDeviceScriptContext()->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
-  #else
-  sceneScriptContext.abort(false); // do not call back
-  #endif
-  #endif
+  #endif // ENABLE_SCENE_SCRIPT
 }
 
 
@@ -430,95 +402,6 @@ MLMicroSeconds OutputBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool 
   }
   return 0; // no known effect -> just return 0 for transition time
 }
-
-
-
-// MARK: - scene script context
-
-#if ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
-
-
-SceneScriptContext::SceneScriptContext(OutputBehaviour &aOutput, const GeoLocation* aGeoLocationP) :
-  inherited(aGeoLocationP),
-  output(aOutput)
-{
-}
-
-
-bool SceneScriptContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
-{
-  if (aFunc=="applychannels" && aArgs.size()==0) {
-    SOLOG(output, LOG_INFO, "scene script: applychannels() requests applying channels now");
-    output.device.requestApplyingChannels(boost::bind(&SceneScriptContext::channelOpComplete, this), false);
-    aNotYielded = false; // yielded execution
-  }
-  else if (aFunc=="syncchannels" && aArgs.size()==0) {
-    SOLOG(output, LOG_INFO, "scene script: syncchannels() requests updating channels from device");
-    output.device.requestUpdatingChannels(boost::bind(&SceneScriptContext::channelOpComplete, this));
-    aNotYielded = false; // yielded execution
-  }
-  else {
-    return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
-  }
-  return true; // found
-}
-
-
-void SceneScriptContext::channelOpComplete()
-{
-  SOLOG(output, LOG_INFO, "scene script: channel operation complete");
-  ExpressionValue res;
-  continueWithAsyncFunctionResult(res);
-}
-
-
-
-bool SceneScriptContext::evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult)
-{
-  bool isDimchannel = aFunc=="dimchannel";
-  if ((isDimchannel || aFunc=="channel") && (aArgs.size()>=isDimchannel ? 2 : 1) && aArgs.size()<=3) {
-    // channel(channelid)               - return the value of the specified channel
-    // [dim]channel(channelid, value)   - set the channel value to the specified value or dim it relatively
-    // [dim]channel(channelid, value, transitiontime)
-    if (aArgs[0].notValue()) return errorInArg(aArgs[0], aResult); // return error/null from argument
-    ChannelBehaviourPtr channel = output.getChannelById(aArgs[0].stringValue());
-    if (!channel) {
-      aResult.setNull("unknown channel");
-    }
-    else {
-      // channel found
-      if (aArgs.size()==1) {
-        // return channel value
-        aResult.setNumber(channel->getChannelValueCalculated());
-      }
-      else {
-        // set value
-        if (aArgs[1].notValue()) return errorInArg(aArgs[0], aResult); // return error/null from argument
-        MLMicroSeconds transitionTime = 0; // default to immediate
-        if (aArgs.size()>2) {
-          if (!aArgs[2].isNull()) {
-            if (aArgs[2].notValue()) return errorInArg(aArgs[2], aResult); // return error/null from argument
-            transitionTime = aArgs[2].numValue()*Second;
-          }
-        }
-        if (isDimchannel)
-          channel->dimChannelValue(aArgs[1].numValue(), transitionTime);
-        else
-          channel->setChannelValue(aArgs[1].numValue(), transitionTime, true); // always apply
-        aResult.setBool(true);
-      }
-    }
-  }
-  else {
-    return inherited::evaluateFunction(aFunc, aArgs, aResult);
-  }
-  return true; // found
-}
-
-
-#endif // ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
-
-
 
 
 // MARK: - persistence implementation
@@ -849,7 +732,7 @@ string OutputBehaviour::getStatusText()
 
 // MARK: - Output scripting object
 
-#if ENABLE_SCENE_SCRIPT && ENABLE_P44SCRIPT
+#if ENABLE_SCENE_SCRIPT
 
 using namespace P44Script;
 
@@ -963,4 +846,4 @@ OutputObj::OutputObj(OutputBehaviourPtr aOutput) :
 }
 
 
-#endif // ENABLE_SCENE_SCRIPT && ENABLE_P44SCRIPT
+#endif // ENABLE_SCENE_SCRIPT

@@ -24,7 +24,6 @@
 
 #include "p44utils_common.hpp"
 
-#include "expressions.hpp"
 #include "p44script.hpp"
 
 using namespace std;
@@ -165,9 +164,6 @@ namespace p44 {
     ApiValuePtr newObject();
     ApiValuePtr newArray();
     ApiValuePtr newNull();
-    #if ENABLE_EXPRESSIONS
-    ApiValuePtr newExpressionValue(ExpressionValue& aValue);
-    #endif
     #if ENABLE_P44SCRIPT
     ApiValuePtr newScriptValue(P44Script::ScriptObjPtr aValue);
     #endif

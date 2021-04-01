@@ -104,7 +104,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if P44SCRIPT_FULL_SUPPORT
   mainScript(sourcecode+regular, "main", this),
   #endif
-  #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+  #if P44SCRIPT_FULL_SUPPORT
   globalScriptsStarted(false),
   #endif
   productName(DEFAULT_PRODUCT_NAME),
@@ -212,14 +212,14 @@ void VdcHost::postEvent(VdchostEvent aEvent)
 void VdcHost::handleGlobalEvent(VdchostEvent aEvent)
 {
   if (aEvent==vdchost_devices_initialized) {
-    #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+    #if P44SCRIPT_FULL_SUPPORT
     // after the first device initialisation run, it is the moment to start global scripts
     if (!globalScriptsStarted) {
       // only once
       globalScriptsStarted = true;
       runGlobalScripts();
     }
-    #endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+    #endif // P44SCRIPT_FULL_SUPPORT
   }
   inherited::handleGlobalEvent(aEvent);
 }
@@ -2182,7 +2182,9 @@ void VdcHost::createScenesList(ApiValuePtr aApiObjectValue)
 
 
 
-#if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+#if P44SCRIPT_FULL_SUPPORT
+
+using namespace P44Script;
 
 // MARK: - script API - ScriptCallConnection
 
@@ -2199,9 +2201,6 @@ ApiValuePtr ScriptCallConnection::newApiValue()
 
 
 // MARK: - global vdc host scripts
-
-
-#if ENABLE_P44SCRIPT
 
 void VdcHost::runGlobalScripts()
 {
@@ -2233,104 +2232,6 @@ void VdcHost::globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel)
 {
   OLOG(aResult && aResult->isErr() ? LOG_WARNING : LOG_NOTICE, "Global %s script finished running, result=%s", aOriginLabel, ScriptObj::describe(aResult).c_str());
 }
-
-
-#else
-
-class VdcHostScriptContext : public ScriptExecutionContext
-{
-  typedef ScriptExecutionContext inherited;
-  VdcHost &p44VdcHost;
-
-public:
-
-  VdcHostScriptContext(P44VdcHost &aP44VdcHost) :
-    inherited(&aP44VdcHost.geolocation),
-    p44VdcHost(aP44VdcHost)
-  {
-  }
-
-  bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
-  {
-    if (aFunc=="vdcapi" && aArgs.size()==1) {
-      // vdcapi(jsoncall)
-      if (aArgs[0].notValue()) return errorInArg(aArgs[0], false); // return error from argument
-      // get method/notification and params
-      JsonObjectPtr rq = aArgs[0].jsonValue();
-      JsonObjectPtr m = rq->get("method");
-      bool isMethod = false;
-      ErrorPtr err;
-      if (m) {
-        isMethod = true;
-      }
-      else {
-        m = rq->get("notification");
-      }
-      if (!m) {
-        return throwError(Error::err<P44VdcError>(400, "invalid API request, must specify 'method' or 'notification'"));
-      }
-      else {
-        // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
-        ApiValuePtr params = JsonApiValue::newValueFromJson(rq);
-        VdcApiRequestPtr request = VdcApiRequestPtr(new ScriptApiRequest(this));
-        if (isMethod) {
-          err = p44VdcHost.handleMethodForParams(request, m->stringValue(), params);
-          // Note: if method returns NULL, it has sent or will send results itself.
-          //   Otherwise, even if Error is ErrorOK we must send a generic response
-        }
-        else {
-          // handle notification
-          err = p44VdcHost.handleNotificationForParams(request->connection(), m->stringValue(), params);
-          // Notifications are always immediately confirmed, so make sure there's an explicit ErrorOK
-          if (!err) {
-            err = ErrorPtr(new Error(Error::OK));
-          }
-        }
-        if (!err) {
-          // API result will arrive later and complete function then
-          aNotYielded = false;
-        }
-        else {
-          request->sendError(err);
-        }
-      }
-      return true;
-    }
-    return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
-  }
-
-};
-
-void P44VdcHost::runGlobalScripts()
-{
-  globalScripts.clear();
-  // command line provided script
-  string scriptFn;
-  string script;
-  if (CmdLineApp::sharedCmdLineApp()->getStringOption("initscript", scriptFn)) {
-    scriptFn = Application::sharedApplication()->resourcePath(scriptFn);
-    ErrorPtr err = string_fromfile(scriptFn, script);
-    if (Error::notOK(err)) {
-      OLOG(LOG_ERR, "cannot open initscript: %s", err->text());
-    }
-    else {
-      ScriptExecutionContextPtr s = ScriptExecutionContextPtr(new VdcHostScriptContext(*this));
-      s->setCode(script);
-      s->setContextInfo("initscript", this);
-      OLOG(LOG_NOTICE, "Starting initscript specified on commandline '%s'", scriptFn.c_str());
-      globalScripts.queueScript(s);
-    }
-  }
-}
-
-#endif // EXPRESSION_SCRIPT_SUPPORT
-
-#endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
-
-
-#if P44SCRIPT_FULL_SUPPORT
-
-using namespace P44Script;
 
 
 // MARK: - script API - ScriptApiRequest
@@ -2466,8 +2367,6 @@ static void device_func(BuiltinFunctionContextPtr f)
   f->finish(device->newDeviceObj());
 }
 
-#if P44SCRIPT_FULL_SUPPORT
-
 static const BuiltInArgDesc valuesource_args[] = { { text } };
 static const size_t valuesource_numargs = sizeof(valuesource_args)/sizeof(BuiltInArgDesc);
 static void valuesource_func(BuiltinFunctionContextPtr f)
@@ -2479,8 +2378,6 @@ static void valuesource_func(BuiltinFunctionContextPtr f)
   }
   f->finish(new ValueSourceObj(valueSource));
 }
-
-#endif
 
 // macaddress()
 static void macaddress_func(BuiltinFunctionContextPtr f)
@@ -2503,9 +2400,7 @@ static void nextversion_func(BuiltinFunctionContextPtr f)
 static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   { "vdcapi", executable|json, vdcapi_numargs, vdcapi_args, &vdcapi_func },
   { "device", executable|any, device_numargs, device_args, &device_func },
-  #if P44SCRIPT_FULL_SUPPORT
   { "valuesource", executable|any, valuesource_numargs, valuesource_args, &valuesource_func },
-  #endif
   { "productversion", executable|text, 0, NULL, &productversion_func },
   { "nextversion", executable|text, 0, NULL, &nextversion_func },
   { "macaddress", executable|text, 0, NULL, &macaddress_func },
@@ -2527,6 +2422,5 @@ MemberLookupPtr VdcHostLookup::sharedLookup()
   }
   return sharedVdcHostLookup;
 }
-
 
 #endif // P44SCRIPT_FULL_SUPPORT

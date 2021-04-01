@@ -47,8 +47,8 @@ namespace p44 {
     LedChainDevice& ledChainDevice() { return mLedChainDevice; };
   };
 
-
   #endif
+
 
   class LedChainDevice : public Device
   {
@@ -161,10 +161,6 @@ namespace p44 {
   private:
 
     virtual void applyChannelValueSteps(bool aForDimming, double aStepSize);
-
-    #if ENABLE_EXPRESSIONS
-    bool viewCfgSubstLookup(const string &aName, ExpressionValue &aResult);
-    #endif
 
   };
   typedef boost::intrusive_ptr<LedChainDevice> LedChainDevicePtr;

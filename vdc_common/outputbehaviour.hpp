@@ -31,33 +31,6 @@ namespace p44 {
 
   class OutputBehaviour;
 
-  #if ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
-
-  class SceneScriptContext : public ScriptExecutionContext
-  {
-    typedef ScriptExecutionContext inherited;
-    OutputBehaviour &output;
-
-  public:
-
-    SceneScriptContext(OutputBehaviour &aOutput, const GeoLocation* aGeoLocationP);
-
-    /// evaluation of synchronously implemented functions which immediately return a result
-    virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
-
-    /// evaluation of asynchronously implemented functions which may yield execution and resume later
-    bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
-
-  private:
-
-    void channelOpComplete();
-
-  };
-
-  #endif // ENABLE_SCENE_SCRIPT && ENABLE_EXPRESSIONS
-
-
-
   /// Implements the basic behaviour of an output with one or multiple output channels
   class OutputBehaviour : public DsBehaviour
   {
@@ -69,14 +42,7 @@ namespace p44 {
     /// channels
     ChannelBehaviourVector channels;
 
-  public:
-    
-    #if ENABLE_SCENE_SCRIPT && !ENABLE_P44SCRIPT
-    SceneScriptContext sceneScriptContext; ///< script context to run scene scripts
-    #endif
-
   protected:
-
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
@@ -361,19 +327,15 @@ namespace p44 {
     string parentIdForChannels();
 
     #if ENABLE_SCENE_SCRIPT
-    #if ENABLE_P44SCRIPT
     void sceneScriptDone(SimpleCB aDoneCB, ScriptObjPtr aResult);
-    #else
-    void sceneScriptDone(SimpleCB aDoneCB, ExpressionValue aEvaluationResult);
-    #endif
     #endif
 
   };
   
   typedef boost::intrusive_ptr<OutputBehaviour> OutputBehaviourPtr;
 
+  #if ENABLE_SCENE_SCRIPT
 
-  #if ENABLE_P44SCRIPT
   namespace P44Script {
 
     /// represents a output behaviour of a p44vdc device
@@ -388,8 +350,8 @@ namespace p44 {
     };
 
   } // namespace P44Script
-  #endif
 
+  #endif // ENABLE_SCENE_SCRIPT
 
 } // namespace p44
 

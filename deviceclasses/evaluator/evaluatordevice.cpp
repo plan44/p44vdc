@@ -65,7 +65,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     evaluatorType = evaluator_input;
   else if (aEvaluatorConfig=="internal" || aEvaluatorConfig=="internalinput") // "internal" must be still recognized for backwards compatibility with existing settings!
     evaluatorType = evaluator_internalinput;
-  #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+  #if P44SCRIPT_FULL_SUPPORT
   else if (aEvaluatorConfig=="internalaction")
     evaluatorType = evaluator_internalaction;
   #endif
@@ -216,7 +216,6 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     }
     // Conditions
     ApiValuePtr cond;
-    #if ENABLE_P44SCRIPT
     ScriptObjPtr res;
     // - on condition (or calculation for sensors)
     cond = checkResult->newObject();
@@ -258,44 +257,11 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       }
       checkResult->add("offCondition", cond);
     }
-    #else
-    ExpressionValue res;
-    // - on condition (or calculation for sensors)
-    cond = checkResult->newObject();
-    res = evaluatorSettings()->onCondition.evaluateSynchronously(evalmode_initial);
-    cond->add("expression", checkResult->newString(evaluatorSettings()->onCondition.getCode()));
-    if (res.isOK()) {
-      cond->add("result", cond->newExpressionValue(res));
-      cond->add("text", cond->newString(res.stringValue()));
-      LOG(LOG_INFO, "- onCondition '%s' -> %s", evaluatorSettings()->onCondition.getCode(), res.stringValue().c_str());
-    }
-    else {
-      cond->add("error", cond->newString(res.error()->getErrorMessage()));
-      cond->add("at", cond->newUint64(evaluatorSettings()->onCondition.getPos()));
-    }
-    checkResult->add("onCondition", cond);
-    if (evaluatorType!=evaluator_sensor && evaluatorType!=evaluator_internalsensor) {
-      // - off condition
-      cond = checkResult->newObject();
-      res = evaluatorSettings()->offCondition.evaluateSynchronously(evalmode_initial);
-      cond->add("expression", checkResult->newString(evaluatorSettings()->offCondition.getCode()));
-      if (res.isOK()) {
-        cond->add("result", cond->newExpressionValue(res));
-        cond->add("text", cond->newString(res.stringValue()));
-        LOG(LOG_INFO, "- offCondition '%s' -> %s", evaluatorSettings()->offCondition.getCode(), res.stringValue().c_str());
-      }
-      else {
-        cond->add("error", cond->newString(res.error()->getErrorMessage()));
-        cond->add("at", cond->newUint64(evaluatorSettings()->offCondition.getPos()));
-      }
-      checkResult->add("offCondition", cond);
-    }
-    #endif
     // return the result
     aRequest->sendResult(checkResult);
     return ErrorPtr();
   }
-  #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+  #if P44SCRIPT_FULL_SUPPORT
   else if (aMethod=="x-p44-testEvaluatorAction") {
     ApiValuePtr vp = aParams->get("result");
     Tristate state = currentState;
@@ -303,32 +269,22 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       state = vp->boolValue() ? yes : no;
     }
     // now test
-    #if ENABLE_P44SCRIPT
     evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(state==yes));
     evaluatorSettings()->action.run(stopall, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1), Infinite);
-    #else
-    executeAction(state, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1));
-    #endif
     return ErrorPtr();
   }
   else if (aMethod=="x-p44-stopEvaluatorAction") {
-    #if ENABLE_P44SCRIPT
     evaluatorSettings()->evaluatorContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "evaluator action stopped"));
-    #else
-    evaluatorSettings()->action.abort(false);
-    #endif
     return Error::ok();
   }
-  #endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+  #endif // P44SCRIPT_FULL_SUPPORT
   else {
     return inherited::handleMethod(aRequest, aMethod, aParams);
   }
 }
 
 
-#if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
-
-#if ENABLE_P44SCRIPT
+#if P44SCRIPT_FULL_SUPPORT
 
 void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
 {
@@ -349,24 +305,7 @@ void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr
   aRequest->sendResult(testResult);
 }
 
-#else
-
-void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult)
-{
-  ApiValuePtr testResult = aRequest->newApiValue();
-  testResult->setType(apivalue_object);
-  if (aEvaluationResult.isOK()) {
-    testResult->add("result", testResult->newExpressionValue(aEvaluationResult));
-  }
-  else {
-    testResult->add("error", testResult->newString(aEvaluationResult.error()->getErrorMessage()));
-    testResult->add("at", testResult->newUint64(evaluatorSettings()->action.getPos()));
-  }
-  aRequest->sendResult(testResult);
-}
-
-#endif // EXPRESSION_SCRIPT_SUPPORT
-#endif // P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+#endif // P44SCRIPT_FULL_SUPPORT
 
 
 #define REPARSE_DELAY (30*Second)
@@ -381,11 +320,7 @@ void EvaluatorDevice::handleGlobalEvent(VdchostEvent aEvent)
     if (!valueParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
       //   Otherwise: have condition re-evaluated (because it possibly contain references to local time)
-      #if ENABLE_P44SCRIPT
       valueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::evaluateConditions, this, (EvaluationFlags)P44Script::timed), REPARSE_DELAY);
-      #else
-      valueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::evaluateConditions, this, currentState, evalmode_timed), REPARSE_DELAY);
-      #endif
     }
   }
   inherited::handleGlobalEvent(aEvent);
@@ -396,18 +331,10 @@ void EvaluatorDevice::parseVarDefs()
 {
   valueParseTicket.cancel();
   string newValueDefs; // re-created value defs using sensor ids rather than indices, for migration
-  #if ENABLE_P44SCRIPT
   bool foundall = valueMapper.parseMappingDefs(
     evaluatorSettings()->varDefs,
     &newValueDefs
   );
-  #else
-  bool foundall = valueMapper.parseMappingDefs(
-    evaluatorSettings()->varDefs,
-    boost::bind(&EvaluatorDevice::dependentValueNotification, this, _1, _2),
-    &newValueDefs
-  );
-  #endif
   if (!newValueDefs.empty()) {
     // migrate old definitions (when re-created definitions are not equal to stored ones)
     // Note: even migrate partially, when not all defs could be resolved yet
@@ -420,16 +347,10 @@ void EvaluatorDevice::parseVarDefs()
   }
   else {
     // run an initial evaluation to calculate default values and possibly schedule timed re-evaluations
-    #if ENABLE_P44SCRIPT
     evaluateConditions(P44Script::timed);
-    #else
-    evaluateConditions(currentState, evalmode_initial);
-    #endif
   }
 }
 
-
-#if ENABLE_P44SCRIPT
 
 void EvaluatorDevice::changedConditions()
 {
@@ -561,386 +482,8 @@ void EvaluatorDevice::actionExecuted(ScriptObjPtr aResult)
 {
   OLOG(LOG_INFO, "evaluator action script completed with result: %s", ScriptObj::describe(aResult).c_str());
 }
+
 #endif // P44SCRIPT_FULL_SUPPORT
-
-
-#else
-
-void EvaluatorDevice::dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent)
-{
-  if (aEvent==valueevent_removed) {
-    // a value has been removed, update my map
-    parseVarDefs();
-  }
-  else {
-    OLOG(LOG_INFO, "value source '%s' reports value %f", aValueSource.getSourceName().c_str(), aValueSource.getSourceValue());
-    if (reporting) {
-      OLOG(LOG_WARNING, "value source '%s' is part of cyclic reference -> not evaluating any further", aValueSource.getSourceName().c_str());
-    }
-    else {
-      evaluateConditions(currentState, evalmode_externaltrigger);
-    }
-  }
-}
-
-
-void EvaluatorDevice::changedConditions()
-{
-  conditionMetSince = Never;
-  onConditionMet = false;
-  evaluateConditions(undefined, evalmode_initial);
-}
-
-
-Tristate EvaluatorDevice::evaluateBooleanNow(EvaluationContext &aEvalCtx, EvalMode aEvalMode, bool aScheduleReEval)
-{
-  FOCUSOLOG("----- Starting expression evaluation: '%s'", aEvalCtx.getCode());
-  ExpressionValue res = aEvalCtx.evaluateSynchronously(aEvalMode, aScheduleReEval);
-  if (res.isValue()) {
-    // evaluation successful
-    FOCUSOLOG("===== expression result: '%s' = %s = %s", aEvalCtx.getCode(), res.stringValue().c_str(), res.boolValue() ? "true" : "false");
-    return res.boolValue() ? yes : no;
-  }
-  else {
-    OLOG(LOG_INFO,"Expression '%s' evaluation undefined: %s", aEvalCtx.getCode(), res.stringValue().c_str());
-    return undefined;
-  }
-}
-
-
-ErrorPtr EvaluatorDevice::handleReEvaluationResult(bool aIsOffCondition, ExpressionValue aEvaluationResult, EvaluationContext &aContext)
-{
-  if (evaluatorType==evaluator_sensor || evaluatorType==evaluator_internalsensor) {
-    // sensor evaluator was re-evaluated
-    SensorBehaviourPtr s = getSensor(0);
-    if (s) {
-      // protect against state updates triggering evaluation again via cyclic references
-      reporting = true;
-      if (aEvaluationResult.isValue()) {
-        FOCUSOLOG("===== sensor expression result: '%s' = '%s' = %f", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.numValue());
-        s->updateSensorValue(aEvaluationResult.numValue());
-      }
-      else {
-        OLOG(LOG_INFO,"Sensor expression '%s' evaluation status: %s", evaluatorSettings()->onCondition.getCode(), aEvaluationResult.stringValue().c_str());
-        s->invalidateSensorValue();
-      }
-      // done reporting, critical phase is over
-      reporting = false;
-    }
-  }
-  else {
-    // binary evaluator expression was re-evaluated
-    Tristate b;
-    if (aEvaluationResult.isValue()) {
-      // evaluation successful
-      FOCUSOLOG("===== timed re-evaluation: '%s' = %s = %s", aContext.getCode(), aEvaluationResult.stringValue().c_str(), aEvaluationResult.boolValue() ? "true" : "false");
-      b = aEvaluationResult.boolValue() ? yes : no;
-    }
-    else {
-      OLOG(LOG_INFO,"Expression '%s' re-evaluation status: %s", aContext.getCode(), aEvaluationResult.stringValue().c_str());
-      b = undefined;
-    }
-    if (aIsOffCondition) currentOff = b;
-    else currentOn = b;
-    calculateEvaluatorState(currentState, evalmode_timed);
-  }
-  return ErrorPtr();
-}
-
-
-
-void EvaluatorDevice::evaluateConditions(Tristate aRefState, EvalMode aEvalMode)
-{
-  if (evaluatorType==evaluator_sensor || evaluatorType==evaluator_internalsensor) {
-    // trigger updating the sensor value
-    evaluatorSettings()->onCondition.triggerEvaluation(aEvalMode);
-    // callback will handle everything
-  }
-  else {
-    // evaluate binary state and report it
-    if (aEvalMode==evalmode_initial) {
-      OLOG(LOG_INFO, "Initial evaluation (after startup or expression changes) -> delays inactive");
-    }
-    // always evaluate both conditions because they could contain timed subexpressions that need to be scheduled
-    currentOn = evaluateBooleanNow(evaluatorSettings()->onCondition, aEvalMode, true);
-    currentOff = evaluateBooleanNow(evaluatorSettings()->offCondition, aEvalMode, true);
-    calculateEvaluatorState(aRefState, aEvalMode);
-  }
-}
-
-
-void EvaluatorDevice::calculateEvaluatorState(Tristate aRefState, EvalMode aEvalMode)
-{
-  // now derive decision
-  Tristate prevState = currentState;
-  bool decisionMade = false;
-  MLMicroSeconds now = MainLoop::currentMainLoop().now();
-  evaluateTicket.cancel();
-  if (!decisionMade && aRefState!=yes) {
-    // off or unknown: check for switching on
-    OLOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->onCondition.getCode(), currentOn==undefined ? "<undefined>" : (currentOn==yes ? "true -> switching ON" : "false"));
-    if (currentOn!=yes) {
-      // not met now -> reset if we are currently timing this condition
-      if (onConditionMet) conditionMetSince = Never;
-    }
-    else {
-      if (!onConditionMet || conditionMetSince==Never) {
-        // we see this condition newly met now
-        onConditionMet = true; // seen ON condition met
-        conditionMetSince = now;
-      }
-      // check timing
-      MLMicroSeconds metAt = conditionMetSince+evaluatorSettings()->minOnTime;
-      if (now>=metAt || aEvalMode==evalmode_initial) {
-        // condition met long enough or initial evaluation that always applies immediately
-        currentState = yes;
-        decisionMade = true;
-      }
-      else {
-        // condition not met long enough yet, need to re-check later
-        OLOG(LOG_INFO, "- ON condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-        evaluatorSettings()->onCondition.scheduleLatestEvaluation(metAt);
-        return;
-      }
-    }
-  }
-  if (!decisionMade && aRefState!=no) {
-    // on or unknown: check for switching off
-    OLOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->offCondition.getCode(), currentOff==undefined ? "<undefined>" : (currentOff==yes ? "true -> switching OFF" : "false"));
-    if (currentOff!=yes) {
-      // not met now -> reset if we are currently timing this condition
-      if (!onConditionMet) conditionMetSince = Never;
-    }
-    else {
-      if (onConditionMet || conditionMetSince==Never) {
-        // we see this condition newly met now
-        onConditionMet = false; // seen OFF condition met
-        conditionMetSince = now;
-      }
-      // check timing
-      MLMicroSeconds metAt = conditionMetSince+evaluatorSettings()->minOffTime;
-      if (now>=metAt || aEvalMode==evalmode_initial) {
-        // condition met long enough or initial evaluation that always applies immediately
-        currentState = no;
-        decisionMade = true;
-      }
-      else {
-        // condition not met long enough yet, need to re-check later
-        OLOG(LOG_INFO, "- OFF condition not yet met long enough -> must remain stable another %.2f seconds", (double)(metAt-now)/Second);
-        evaluatorSettings()->offCondition.scheduleLatestEvaluation(metAt);
-        return;
-      }
-    }
-  }
-  if (decisionMade && currentState!=undefined) {
-    // protect against state updates triggering evaluation again via cyclic references
-    reporting = true;
-    // give some context info
-    OLOG(LOG_NOTICE, "new evaluation: %s based on %s values: %s",
-      currentState==yes ? "TRUE" : "FALSE",
-      aEvalMode==evalmode_timed ? "timing and" : "new",
-      valueMapper.shortDesc().c_str()
-    );
-    // report it
-    switch (evaluatorType) {
-      case evaluator_input :
-      case evaluator_internalinput :
-      {
-        BinaryInputBehaviourPtr b = getInput(0);
-        if (b) {
-          b->updateInputState(currentState==yes);
-        }
-        break;
-      }
-      case evaluator_rocker : {
-        if (currentState!=prevState) {
-          // virtually click up or down button
-          ButtonBehaviourPtr b = getButton(currentState==no ? 0 : 1);
-          if (b) {
-            b->sendClick(ct_tip_1x);
-          }
-        }
-        break;
-      }
-      #if EXPRESSION_SCRIPT_SUPPORT
-      case evaluator_internalaction: {
-        // execute action
-        executeAction(currentState, boost::bind(&EvaluatorDevice::actionExecuted, this, _1));
-        break;
-      }
-      #endif // EXPRESSION_SCRIPT_SUPPORT
-      default: break;
-    }
-    // done reporting, critical phase is over
-    reporting = false;
-  }
-}
-
-#if EXPRESSION_SCRIPT_SUPPORT
-void EvaluatorDevice::actionExecuted(ExpressionValue aEvaluationResult)
-{
-  OLOG(LOG_INFO, "evaluator action script completed with result: '%s', error: %s", aEvaluationResult.stringValue().c_str(), Error::text(aEvaluationResult.error()));
-}
-#endif // EXPRESSION_SCRIPT_SUPPORT
-
-
-// MARK: - EvaluatorExpressionContext
-
-
-EvaluatorExpressionContext::EvaluatorExpressionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP) :
-  inherited(aGeoLocationP),
-  evaluator(aEvaluator)
-{
-}
-
-
-bool EvaluatorExpressionContext::valueLookup(const string &aName, ExpressionValue &aResult)
-{
-  if (strucmp(aName.c_str(),"oncondition")==0) {
-    aResult.setBool(evaluator.currentOn);
-    return true;
-  }
-  if (evaluator.valueMapper.valueLookup(aResult, aName)) return true;
-  return inherited::valueLookup(aName, aResult);
-}
-
-
-#if EXPRESSION_SCRIPT_SUPPORT
-
-// MARK: - EvaluatorActionContext
-
-
-EvaluatorActionContext::EvaluatorActionContext(EvaluatorDevice &aEvaluator, const GeoLocation* aGeoLocationP) :
-  inherited(aGeoLocationP),
-  evaluator(aEvaluator),
-  execState(undefined)
-{
-}
-
-bool EvaluatorActionContext::valueLookup(const string &aName, ExpressionValue &aResult)
-{
-  if (strucmp(aName.c_str(),"result")==0) {
-    aResult.setBool(execState==yes);
-    return true;
-  }
-  if (evaluator.valueMapper.valueLookup(aResult, aName)) return true;
-  return inherited::valueLookup(aName, aResult);
-}
-
-
-bool EvaluatorActionContext::evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded)
-{
-  if (HttpComm::evaluateAsyncHttpFunctions(this, aFunc, aArgs, aNotYielded, &httpAction)) return true;
-  return inherited::evaluateAsyncFunction(aFunc, aArgs, aNotYielded);
-}
-
-
-bool EvaluatorActionContext::abort(bool aDoCallBack)
-{
-  if (httpAction) {
-    httpAction->cancelRequest();
-  }
-  return inherited::abort(aDoCallBack);
-}
-
-#endif // ENABLE_EXPRESSIONS
-
-
-
-// MARK: - actions
-
-#define LEGACY_ACTIONS_REWRITING 1
-
-ErrorPtr EvaluatorDevice::executeAction(Tristate aState, EvaluationResultCB aResultCB)
-{
-  ErrorPtr err;
-  if (aState==undefined) return err; // NOP
-  #if LEGACY_ACTIONS_REWRITING
-  const char *p = evaluatorSettings()->action.getCode();
-  while (*p && (*p==' ' || *p=='\t')) p++;
-  if (strucmp(p, "getURL:", 7)==0 || strucmp(p, "postURL:", 8)==0 || strucmp(p, "putURL:", 7)==0) {
-    // old syntax, convert
-    string actionScript;
-    // basic action syntax:
-    //   <action>
-    // or:
-    //   <onaction>|<offaction>
-    string singleaction;
-    bool isOn = true; // on comes first
-    while (nextPart(p, singleaction, '|')) {
-      if (*p=='|') {
-        if (singleaction.empty()) {
-          // off action only
-          actionScript = "if (result==false) ";
-          isOn = false;
-          p++;
-        }
-        else {
-          // no condition for action
-          isOn = false;
-        }
-      }
-      else if (isOn) {
-        // on action is first action
-        actionScript = "if (result==true) ";
-      }
-      else {
-        actionScript += " else ";
-      }
-      // single action syntax:
-      //   <command>:<commandparams>
-      // available commands:
-      // - getURL:<url>
-      // - postURL:<url>;<raw postdata>
-      // - putURL:<url>;<raw putdata>
-      string cmd;
-      string cmdparams;
-      string url;
-      string data;
-      if (keyAndValue(singleaction, cmd, cmdparams, ':')) {
-        actionScript += cmd + '(';
-        if (cmd=="getURL") {
-          url = cmdparams;
-        }
-        else {
-          keyAndValue(cmdparams, url, data, ';');
-        }
-        url = shellQuote(url);
-        // replace @{expr} by '"+ string(expr) + "'
-        size_t i = 0;
-        while ((i = url.find("@{",i))!=string::npos) {
-          size_t e = url.find("}",i+2);
-          string expr = "\"+string(" + url.substr(i+2,e==string::npos ? e : e-2-i) +")+\"";
-          url.replace(i, e-i+1, expr);
-        }
-        actionScript += url;
-        if (!data.empty()) {
-          data = shellQuote(data);
-          // replace @{expr} by '"+ string(expr) + "'
-          size_t i = 0;
-          while ((i = data.find("@{",i))!=string::npos) {
-            size_t e = data.find("}",i+2);
-            string expr = "\"+string(" + data.substr(i+2,e==string::npos ? e : e-2-i) +")+\"";
-            data.replace(i, e-i+1, expr);
-          }
-          actionScript += ", " + data;
-        }
-        actionScript += ");";
-      }
-      isOn = false;
-    } // while legacy actions
-    LOG(LOG_WARNING, "rewritten legacy action: '%s' -> '%s'", evaluatorSettings()->action.getCode(), actionScript.c_str());
-    evaluatorSettings()->action.setCode(actionScript);
-    evaluatorSettings()->markDirty();
-  }
-  #endif // LEGACY_ACTIONS_REWRITING
-  evaluatorSettings()->action.execState = aState;
-  evaluatorSettings()->action.execute(true, aResultCB);
-  return err;
-}
-
-#endif // EXPRESSION_SCRIPT_SUPPORT
-
 
 
 void EvaluatorDevice::deriveDsUid()
@@ -990,7 +533,7 @@ enum {
   offCondition_key,
   minOnTime_key,
   minOffTime_key,
-  #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+  #if P44SCRIPT_FULL_SUPPORT
   action_key,
   #endif
   numProperties
@@ -1020,7 +563,7 @@ PropertyDescriptorPtr EvaluatorDevice::getDescriptorByIndex(int aPropIndex, int 
     { "x-p44-offCondition", apivalue_string, offCondition_key, OKEY(evaluatorDevice_key) },
     { "x-p44-minOnTime", apivalue_double, minOnTime_key, OKEY(evaluatorDevice_key) },
     { "x-p44-minOffTime", apivalue_double, minOffTime_key, OKEY(evaluatorDevice_key) },
-    #if P44SCRIPT_FULL_SUPPORT || EXPRESSION_SCRIPT_SUPPORT
+    #if P44SCRIPT_FULL_SUPPORT
     { "x-p44-action", apivalue_string, action_key, OKEY(evaluatorDevice_key) },
     #endif
   };
@@ -1055,9 +598,6 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         #if P44SCRIPT_FULL_SUPPORT
         case action_key: aPropValue->setStringValue(evaluatorSettings()->action.getSource()); return true;
         #endif
-        #if EXPRESSION_SCRIPT_SUPPORT
-        case action_key: aPropValue->setStringValue(evaluatorSettings()->action.getCode()); return true;
-        #endif
       }
     }
     else {
@@ -1067,7 +607,6 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (evaluatorSettings()->setPVar(evaluatorSettings()->varDefs, aPropValue->stringValue()))
             parseVarDefs(); // changed varDefs, re-parse them
           return true;
-        #if ENABLE_P44SCRIPT
         case onCondition_key:
           if (evaluatorSettings()->onCondition.setTriggerSource(aPropValue->stringValue(), true)) {
             evaluatorSettings()->markDirty();
@@ -1095,35 +634,6 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           }
           return true;
         #endif
-        #else
-        case onCondition_key:
-          if (evaluatorSettings()->onCondition.setCode(aPropValue->stringValue())) {
-            evaluatorSettings()->markDirty();
-            changedConditions();  // changed conditions, re-evaluate output
-          }
-          return true;
-        case offCondition_key:
-          if (evaluatorSettings()->offCondition.setCode(aPropValue->stringValue())) {
-            evaluatorSettings()->markDirty();
-            changedConditions();  // changed conditions, re-evaluate output
-          }
-          return true;
-        case minOnTime_key:
-          if (evaluatorSettings()->setPVar(evaluatorSettings()->minOnTime, (MLMicroSeconds)(aPropValue->doubleValue()*Second)))
-            changedConditions();  // changed conditions, re-evaluate output
-          return true;
-        case minOffTime_key:
-          if (evaluatorSettings()->setPVar(evaluatorSettings()->minOffTime, (MLMicroSeconds)(aPropValue->doubleValue()*Second)))
-            changedConditions();  // changed conditions, re-evaluate output
-          return true;
-        #if EXPRESSION_SCRIPT_SUPPORT
-        case action_key:
-          if (evaluatorSettings()->action.setCode(aPropValue->stringValue())) {
-            evaluatorSettings()->markDirty();
-          }
-          return true;
-        #endif
-        #endif
       }
     }
   }
@@ -1138,7 +648,6 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bool aIsSensor) :
   inherited(aEvaluator)
-  #if ENABLE_P44SCRIPT
   // Note: conditions are synchronously evaluated, but action might be running when a condition wants evaluation, so we allow concurrent evaluation in that case
   ,onCondition("onCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
   ,offCondition("offCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
@@ -1147,31 +656,13 @@ EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bo
   // However this might be a previous on-action, while the new action is a NOP off-action, so both must be allowed to run concurrently
   ,action(scriptbody|regular|keepvars|concurrently, "action", &device)
   #endif
-  #elif ENABLE_EXPRESSIONS
-  ,onCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation)
-  ,offCondition(aEvaluator, &aEvaluator.getVdcHost().geolocation)
-  ,minOnTime(0) // trigger immediately
-  ,minOffTime(0) // trigger immediately
-  #if EXPRESSION_SCRIPT_SUPPORT
-  ,action(aEvaluator, &aEvaluator.getVdcHost().geolocation)
-  #endif
-  #endif
 {
-  #if ENABLE_P44SCRIPT
   evaluatorContext = onCondition.domain()->newContext(); // common context for triggers and action
   evaluatorContext->registerMemberLookup(&aEvaluator.valueMapper);
   onCondition.setSharedMainContext(evaluatorContext);
   offCondition.setSharedMainContext(evaluatorContext);
   #if P44SCRIPT_FULL_SUPPORT
   action.setSharedMainContext(evaluatorContext);
-  #endif
-  #else
-  #if EXPRESSION_SCRIPT_SUPPORT
-  action.isMemberVariable();
-  action.setContextInfo("action", &device);
-  #endif
-  onCondition.setEvaluationResultHandler(boost::bind(&EvaluatorDevice::handleReEvaluationResult, &aEvaluator, false, _1, _2));
-  offCondition.setEvaluationResultHandler(boost::bind(&EvaluatorDevice::handleReEvaluationResult, &aEvaluator, true, _1, _2));
   #endif
 }
 
@@ -1201,7 +692,7 @@ const FieldDefinition *EvaluatorDeviceSettings::getFieldDef(size_t aIndex)
     { "offCondition", SQLITE_TEXT },
     { "minOnTime", SQLITE_INTEGER },
     { "minOffTime", SQLITE_INTEGER },
-    { "action", SQLITE_TEXT }, // note: this is a dummy if we don't have EXPRESSION_SCRIPT_SUPPORT
+    { "action", SQLITE_TEXT }, // note: this is a dummy if we don't have P44SCRIPT_FULL_SUPPORT
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
@@ -1218,21 +709,12 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field values
   varDefs.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  #if ENABLE_P44SCRIPT
   onCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
   offCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
   onCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
   offCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
-  #else
-  onCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  offCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOnTime);
-  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minOffTime);
-  #endif
   #if P44SCRIPT_FULL_SUPPORT
   action.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  #elif EXPRESSION_SCRIPT_SUPPORT
-  action.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #else
   oldAction = nonNullCStr(aRow->get<const char *>(aIndex++));
   #endif
@@ -1245,26 +727,16 @@ void EvaluatorDeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, 
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, varDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  #if ENABLE_P44SCRIPT
   aStatement.bind(aIndex++, onCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, offCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (long long int)onCondition.getTriggerHoldoff());
   aStatement.bind(aIndex++, (long long int)offCondition.getTriggerHoldoff());
-  #else
-  aStatement.bind(aIndex++, onCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, offCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, (long long int)minOnTime);
-  aStatement.bind(aIndex++, (long long int)minOffTime);
-  #endif
   #if P44SCRIPT_FULL_SUPPORT
   aStatement.bind(aIndex++, action.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  #elif EXPRESSION_SCRIPT_SUPPORT
-  aStatement.bind(aIndex++, action.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #else
   aStatement.bind(aIndex++, oldAction.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #endif
 }
-
 
 
 #endif // ENABLE_EVALUATORS

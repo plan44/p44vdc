@@ -25,13 +25,6 @@
 #include "device.hpp"
 #include "vdchost.hpp"
 
-#include "expressions.hpp"
-
-#if EXPRESSION_SCRIPT_SUPPORT
-#include "httpcomm.hpp"
-#endif
-
-
 #if ENABLE_LOCALCONTROLLER
 
 using namespace std;
@@ -359,69 +352,12 @@ namespace p44 {
   typedef boost::intrusive_ptr<SceneList> SceneListPtr;
 
 
-  #if ENABLE_EXPRESSIONS
-
-  class TriggerExpressionContext : public TimedEvaluationContext
-  {
-    typedef TimedEvaluationContext inherited;
-    Trigger &trigger;
-
-  public:
-
-    TriggerExpressionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP);
-
-  protected:
-
-    /// lookup variables by name
-    /// @param aName the name of the value/variable to look up
-    /// @param aResult set the value here
-    /// @return true if function executed, false if value is unknown
-    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
-
-  };
-
-
-  class TriggerActionContext : public ScriptExecutionContext
-  {
-    typedef ScriptExecutionContext inherited;
-    Trigger &trigger;
-
-    #if EXPRESSION_SCRIPT_SUPPORT
-    HttpCommPtr httpAction; ///< in case trigger actions uses http functions
-    #endif
-
-  public:
-
-    TriggerActionContext(Trigger &aTrigger, const GeoLocation* aGeoLocationP);
-
-    /// abort action
-    virtual bool abort(bool aDoCallBack = true) P44_OVERRIDE;
-
-    /// lookup variables by name
-    virtual bool valueLookup(const string &aName, ExpressionValue &aResult) P44_OVERRIDE;
-
-    /// evaluation of synchronously implemented functions which immediately return a result
-    virtual bool evaluateFunction(const string &aFunc, const FunctionArguments &aArgs, ExpressionValue &aResult) P44_OVERRIDE;
-
-  protected:
-
-    /// evaluation of asynchronously implemented functions which may yield execution and resume later
-    bool evaluateAsyncFunction(const string &aFunc, const FunctionArguments &aArgs, bool &aNotYielded) P44_OVERRIDE;
-    void triggerFuncExecuted(ExpressionValue aEvaluationResult);
-
-  };
-
-  #endif
-
-
   /// trigger
   class Trigger : public PropertyContainer, public PersistentParams
   {
     typedef PropertyContainer inherited;
     typedef PersistentParams inheritedParams;
     friend class TriggerList;
-    friend class TriggerExpressionContext;
-    friend class TriggerActionContext;
 
     int triggerId; ///< the immutable ID of this trigger
     string name;
@@ -433,14 +369,9 @@ namespace p44 {
 
   public:
 
-    #if ENABLE_P44SCRIPT
     ScriptMainContextPtr triggerContext; ///< context shared for all scripts in this trigger
     TriggerSource triggerCondition;
     ScriptSource triggerAction;
-    #else
-    TriggerExpressionContext triggerCondition; ///< expression that must evaluate to true to trigger the action
-    TriggerActionContext triggerAction; ///< the trigger action script
-    #endif
 
     Trigger();
     virtual ~Trigger();
@@ -448,18 +379,6 @@ namespace p44 {
     /// called when vdc host event occurs
     /// @param aActivity the activity that occurred at the vdc host level
     void processGlobalEvent(VdchostEvent aActivity);
-
-    #if ENABLE_EXPRESSIONS
-
-    /// check trigger and fire actions when condition transitions from non-met to met
-    /// @param aEvalMode the evaluation mode to use
-    /// @return ok or error in case expression evaluation failed
-    ErrorPtr checkAndFire(EvalMode aEvalMode);
-
-    /// execute the trigger actions
-    bool executeActions(EvaluationResultCB aCallback = NULL);
-
-    #endif
 
     /// stop running trigger actions
     void stopActions();
@@ -491,18 +410,10 @@ namespace p44 {
 
     void parseVarDefs();
 
-    #if ENABLE_P44SCRIPT
     void handleTrigger(ScriptObjPtr aResult);
     void executeTriggerAction();
     void triggerActionExecuted(ScriptObjPtr aResult);
     void testTriggerActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
-    #else
-    void reCheckTimed();
-    void dependentValueNotification(ValueSource &aValueSource, ValueListenerEvent aEvent);
-    void triggerEvaluationExecuted(ExpressionValue aEvaluationResult);
-    void triggerActionExecuted(ExpressionValue aEvaluationResult);
-    void testTriggerActionExecuted(VdcApiRequestPtr aRequest, ExpressionValue aEvaluationResult);
-    #endif
 
   };
   typedef boost::intrusive_ptr<Trigger> TriggerPtr;
@@ -567,7 +478,6 @@ namespace p44 {
     friend class ZoneDescriptor;
     friend class Trigger;
     friend class TriggerList;
-    friend class TriggerActionContext;
 
     VdcHost &vdcHost; ///< local reference to vdc host
     bool devicesReady; ///< set when vdchost reports devices initialized
@@ -671,7 +581,6 @@ namespace p44 {
   };
 
 
-  #if ENABLE_P44SCRIPT
   namespace P44Script {
 
     /// represents the global objects related to localController
@@ -684,7 +593,6 @@ namespace p44 {
     };
 
   }
-  #endif
 
 } // namespace p44
 
