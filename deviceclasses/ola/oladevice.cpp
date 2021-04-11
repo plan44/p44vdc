@@ -289,9 +289,9 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     double h = 0;
     double v = 0;
     if (ml) {
-      h = ml->horizontalPosition->getTransitionalValue()/100*255;
+      h = ml->horizontalPosition->getChannelValue(true)/100*255;
       setDMXChannel(hPosChannel,(DmxValue)h);
-      v = ml->verticalPosition->getTransitionalValue()/100*255;
+      v = ml->verticalPosition->getChannelValue(true)/100*255;
       setDMXChannel(vPosChannel,(DmxValue)v);
     }
     // next step
