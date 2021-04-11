@@ -278,7 +278,7 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
     // run scene script
     OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->sceneScript.getSource().c_str(), true, 80).c_str() );
     simpleScene->sceneScript.setSharedMainContext(device.getDeviceScriptContext());
-    simpleScene->sceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), Infinite);
+    simpleScene->sceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), ScriptObjPtr(), Infinite);
   }
   #endif // ENABLE_SCENE_SCRIPT
   if (aDoneCB) aDoneCB(); // NOP

@@ -1055,7 +1055,7 @@ void Trigger::executeTriggerAction()
 {
   // a trigger fire is an activity
   LocalController::sharedLocalController()->signalActivity();
-  triggerAction.run(stopall, boost::bind(&Trigger::triggerActionExecuted, this, _1), Infinite);
+  triggerAction.run(stopall, boost::bind(&Trigger::triggerActionExecuted, this, _1), ScriptObjPtr(), Infinite);
 }
 
 
@@ -1083,7 +1083,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   }
   // Condition
   ApiValuePtr cond = checkResult->newObject();
-  ScriptObjPtr res = triggerCondition.run(initial|synchronously, NULL, 2*Second);
+  ScriptObjPtr res = triggerCondition.run(initial|synchronously, NULL, ScriptObjPtr(), 2*Second);
   cond->add("expression", checkResult->newString(triggerCondition.getSource().c_str()));
   if (!res->isErr()) {
     cond->add("result", cond->newScriptValue(res));
@@ -1108,7 +1108,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 
 ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
 {
-  triggerAction.run(stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), Infinite);
+  triggerAction.run(stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), ScriptObjPtr(), Infinite);
   return ErrorPtr(); // will send result later
 }
 
@@ -2265,7 +2265,7 @@ static void trigger_func(BuiltinFunctionContextPtr f)
     f->finish(new ErrorValue(ScriptError::NotFound, "No trigger named '%s' found", f->arg(0)->stringValue().c_str()));
     return;
   }
-  targetTrigger->triggerAction.run(regular|stopall, boost::bind(&trigger_funcExecuted, f, _1), Infinite);
+  targetTrigger->triggerAction.run(regular|stopall, boost::bind(&trigger_funcExecuted, f, _1), ScriptObjPtr(), Infinite);
 }
 
 

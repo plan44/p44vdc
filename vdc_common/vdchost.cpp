@@ -1577,7 +1577,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
   if (aMethod=="x-p44-restartMain") {
     // re-run the main script
     OLOG(LOG_NOTICE, "Re-starting global main script");
-    mainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mainScript.getOriginLabel()), Infinite);
+    mainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mainScript.getOriginLabel()), ScriptObjPtr(), Infinite);
     return Error::ok();
   }
   if (aMethod=="x-p44-stopMain") {
@@ -2218,13 +2218,13 @@ void VdcHost::runGlobalScripts()
       initScript.setSource(script, scriptbody|floatingGlobs);
       initScript.setSharedMainContext(vdcHostScriptContext);
       OLOG(LOG_NOTICE, "Starting initscript specified on commandline '%s'", scriptFn.c_str());
-      initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel()), Infinite);
+      initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel()), ScriptObjPtr(), Infinite);
     }
   }
   // stored global script
   if (!mainScript.getSource().empty()) {
     OLOG(LOG_NOTICE, "Starting global main script");
-    mainScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, mainScript.getOriginLabel()), Infinite);
+    mainScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, mainScript.getOriginLabel()), ScriptObjPtr(), Infinite);
   }
 }
 

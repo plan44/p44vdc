@@ -219,7 +219,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     ScriptObjPtr res;
     // - on condition (or calculation for sensors)
     cond = checkResult->newObject();
-    res = evaluatorSettings()->onCondition.run(initial|synchronously, NULL, 2*Second);
+    res = evaluatorSettings()->onCondition.run(initial|synchronously, NULL, ScriptObjPtr(), 2*Second);
     cond->add("expression", checkResult->newString(evaluatorSettings()->onCondition.getSource()));
     if (!res->isErr()) {
       cond->add("result", cond->newScriptValue(res));
@@ -239,7 +239,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     if (evaluatorType!=evaluator_sensor && evaluatorType!=evaluator_internalsensor) {
       // - off condition
       cond = checkResult->newObject();
-      res = evaluatorSettings()->offCondition.run(initial|synchronously, NULL, 2*Second);
+      res = evaluatorSettings()->offCondition.run(initial|synchronously, NULL, ScriptObjPtr(), 2*Second);
       cond->add("expression", checkResult->newString(evaluatorSettings()->offCondition.getSource()));
       if (!res->isErr()) {
         cond->add("result", cond->newScriptValue(res));
@@ -270,7 +270,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     }
     // now test
     evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(state==yes));
-    evaluatorSettings()->action.run(stopall, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1), Infinite);
+    evaluatorSettings()->action.run(stopall, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1), ScriptObjPtr(), Infinite);
     return ErrorPtr();
   }
   else if (aMethod=="x-p44-stopEvaluatorAction") {
@@ -469,7 +469,7 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
 void EvaluatorDevice::executeActions()
 {
   evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(currentState==yes));
-  evaluatorSettings()->action.run(inherit, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), Infinite);
+  evaluatorSettings()->action.run(inherit, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), ScriptObjPtr(), Infinite);
   if (evaluatorSettings()->offCondition.empty()) {
     // there is no off condition, so we just set the state back to NO
     OLOG(LOG_INFO, "offCondition is empty for action evaluator: state auto-reset to OFF");
