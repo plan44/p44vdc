@@ -285,11 +285,8 @@ namespace p44 {
 
   private:
 
-    void handleDeviceApiJsonMessage(JsonObjectPtr aMessage);
-    void handleDeviceApiSimpleMessage(string aMessage);
     void sendDeviceApiJsonMessage(JsonObjectPtr aMessage);
     void sendDeviceApiSimpleMessage(string aMessage);
-    void sendDeviceApiStatusMessage(ErrorPtr aError);
     void sendDeviceApiFlagMessage(string aFlagWord);
 
     ErrorPtr configureDevice(JsonObjectPtr aInitParams);
@@ -311,7 +308,7 @@ namespace p44 {
 
   typedef map<string,ExternalDevicePtr> ExternalDevicesMap;
 
-  class ExternalDeviceConnector : public P44Obj
+  class ExternalDeviceConnector : public P44LoggingObj
   {
     friend class ExternalDevice;
 
@@ -326,6 +323,10 @@ namespace p44 {
 
     ExternalDeviceConnector(ExternalVdc &aExternalVdc, JsonCommPtr aDeviceConnection);
     virtual ~ExternalDeviceConnector();
+
+    /// @return the per-instance log level offset
+    /// @note is virtual because some objects might want to use the log level offset of another object
+    virtual int getLogLevelOffset();
 
   private:
 

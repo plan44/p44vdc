@@ -245,46 +245,6 @@ ExternalVdc &ExternalDevice::getExternalVdc()
 }
 
 
-
-void ExternalDevice::handleDeviceApiJsonMessage(JsonObjectPtr aMessage)
-{
-  ErrorPtr err;
-  LOG(LOG_INFO, "device -> externalVdc (JSON) message received: %s", aMessage->c_strValue());
-  // extract message type
-  JsonObjectPtr o = aMessage->get("message");
-  if (o) {
-    err = processJsonMessage(o->stringValue(), aMessage);
-  }
-  else {
-    sendDeviceApiStatusMessage(TextError::err("missing 'message' field"));
-  }
-  // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
-  if (err) {
-    sendDeviceApiStatusMessage(err);
-  }
-}
-
-
-void ExternalDevice::handleDeviceApiSimpleMessage(string aMessage)
-{
-  ErrorPtr err;
-  LOG(LOG_INFO, "device -> externalVdc (simple) message received: %s", aMessage.c_str());
-  // extract message type
-  string msg;
-  string val;
-  if (keyAndValue(aMessage, msg, val, '=')) {
-    err = processSimpleMessage(msg,val);
-  }
-  else {
-    err = processSimpleMessage(aMessage,"");
-  }
-  // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
-  if (err) {
-    sendDeviceApiStatusMessage(err);
-  }
-}
-
-
 void ExternalDevice::sendDeviceApiJsonMessage(JsonObjectPtr aMessage)
 {
   // add in tag if device has one
@@ -292,7 +252,7 @@ void ExternalDevice::sendDeviceApiJsonMessage(JsonObjectPtr aMessage)
     aMessage->add("tag", JsonObject::newString(tag));
   }
   // now show and send
-  LOG(LOG_INFO, "device <- externalVdc (JSON) message sent: %s", aMessage->c_strValue());
+  POLOG(deviceConnector, LOG_INFO, "device <- externalVdc (JSON) message sent: %s", aMessage->c_strValue());
   deviceConnector->deviceConnection->sendMessage(aMessage);
 }
 
@@ -303,16 +263,9 @@ void ExternalDevice::sendDeviceApiSimpleMessage(string aMessage)
   if (!tag.empty()) {
     aMessage = tag+":"+aMessage;
   }
-  LOG(LOG_INFO, "device <- externalVdc (simple) message sent: %s", aMessage.c_str());
+  POLOG(deviceConnector, LOG_INFO, "device <- externalVdc (simple) message sent: %s", aMessage.c_str());
   aMessage += "\n";
   deviceConnector->deviceConnection->sendRaw(aMessage);
-}
-
-
-
-void ExternalDevice::sendDeviceApiStatusMessage(ErrorPtr aError)
-{
-  deviceConnector->sendDeviceApiStatusMessage(aError, tag.c_str());
 }
 
 
@@ -320,7 +273,6 @@ void ExternalDevice::sendDeviceApiFlagMessage(string aFlagWord)
 {
   deviceConnector->sendDeviceApiFlagMessage(aFlagWord, tag.c_str());
 }
-
 
 
 ErrorPtr ExternalDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMessage)
@@ -1338,13 +1290,21 @@ ExternalDeviceConnector::ExternalDeviceConnector(ExternalVdc &aExternalVdc, Json
   deviceConnection->setConnectionStatusHandler(boost::bind(&ExternalDeviceConnector::handleDeviceConnectionStatus, this, _2));
   deviceConnection->setMessageHandler(boost::bind(&ExternalDeviceConnector::handleDeviceApiJsonMessage, this, _1, _2));
   deviceConnection->setClearHandlersAtClose(); // close must break retain cycles so this object won't cause a mem leak
-  LOG(LOG_DEBUG, "external device connector %p -> created", this);
+  OLOG(LOG_DEBUG, "external device connector %p -> created", this);
 }
+
+
+int ExternalDeviceConnector::getLogLevelOffset()
+{
+  // follows vdc
+  return externalVdc.getLogLevelOffset();
+}
+
 
 
 ExternalDeviceConnector::~ExternalDeviceConnector()
 {
-  LOG(LOG_DEBUG, "external device connector %p -> destructed", this);
+  OLOG(LOG_DEBUG, "external device connector %p -> destructed", this);
 }
 
 
@@ -1352,7 +1312,7 @@ void ExternalDeviceConnector::handleDeviceConnectionStatus(ErrorPtr aError)
 {
   if (Error::notOK(aError)) {
     closeConnection();
-    LOG(LOG_NOTICE, "external device connection closed (%s) -> disconnecting all devices", aError->text());
+    OLOG(LOG_NOTICE, "external device connection closed (%s) -> disconnecting all devices", aError->text());
     // devices have vanished for now, but will keep parameters in case it reconnects later
     while (externalDevices.size()>0) {
       externalDevices.begin()->second->hasVanished(false); // keep config
@@ -1392,7 +1352,7 @@ void ExternalDeviceConnector::sendDeviceApiJsonMessage(JsonObjectPtr aMessage, c
     aMessage->add("tag", JsonObject::newString(aTag));
   }
   // now show and send
-  LOG(LOG_INFO, "device <- externalVdc (JSON) message sent: %s", aMessage->c_strValue());
+  OLOG(LOG_INFO, "device <- externalVdc (JSON) message sent: %s", aMessage->c_strValue());
   deviceConnection->sendMessage(aMessage);
 }
 
@@ -1404,7 +1364,7 @@ void ExternalDeviceConnector::sendDeviceApiSimpleMessage(string aMessage, const 
     aMessage.insert(0, ":");
     aMessage.insert(0, aTag);
   }
-  LOG(LOG_INFO, "device <- externalVdc (simple) message sent: %s", aMessage.c_str());
+  OLOG(LOG_INFO, "device <- externalVdc (simple) message sent: %s", aMessage.c_str());
   aMessage += "\n";
   deviceConnection->sendRaw(aMessage);
 }
@@ -1428,7 +1388,7 @@ void ExternalDeviceConnector::sendDeviceApiStatusMessage(ErrorPtr aError, const 
     JsonObjectPtr message = JsonObject::newObj();
     message->add("message", JsonObject::newString("status"));
     if (Error::notOK(aError)) {
-      LOG(LOG_INFO, "device API error: %s", aError->text());
+      OLOG(LOG_INFO, "device API error: %s", aError->text());
       // error, return error response
       message->add("status", JsonObject::newString("error"));
       message->add("errorcode", JsonObject::newInt32((int32_t)aError->getErrorCode()));
@@ -1491,7 +1451,7 @@ void ExternalDeviceConnector::handleDeviceApiJsonMessage(ErrorPtr aError, JsonOb
   ExternalDevicePtr extDev;
   if (Error::isOK(aError)) {
     // not JSON level error, try to process
-    LOG(LOG_INFO, "device -> externalVdc (JSON) message received: %s", aMessage->c_strValue());
+    OLOG(LOG_INFO, "device -> externalVdc (JSON) message received: %s", aMessage->c_strValue());
     // JSON array can carry multiple messages
     if (aMessage->arrayLength()>0) {
       for (int i=0; i<aMessage->arrayLength(); ++i) {
@@ -1613,8 +1573,8 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       o = aMessage->get("text");
       if (o) {
         DsAddressablePtr a = findDeviceByTag(tag, true);
-        if (a) { LOG(logLevel,"External Device %s: %s", a->shortDesc().c_str(), o->c_strValue()); }
-        else { LOG(logLevel,"External Device vDC %s: %s", externalVdc.shortDesc().c_str(), o->c_strValue()); }
+        if (a) { OLOG(logLevel,"External Device %s: %s", a->shortDesc().c_str(), o->c_strValue()); }
+        else { OLOG(logLevel,"External Device vDC %s: %s", externalVdc.shortDesc().c_str(), o->c_strValue()); }
       }
     }
     else {
@@ -1642,7 +1602,7 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
   if (Error::isOK(aError)) {
     // not connection level error, try to process
     aMessage = trimWhiteSpace(aMessage);
-    LOG(LOG_INFO, "device -> externalVdc (simple) message received: %s", aMessage.c_str());
+    OLOG(LOG_INFO, "device -> externalVdc (simple) message received: %s", aMessage.c_str());
     // extract message type
     string taggedmsg;
     string val;
@@ -1662,8 +1622,8 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
       int level = LOG_ERR;
       sscanf(msg.c_str()+1, "%d", &level);
       DsAddressablePtr a = findDeviceByTag(tag, true);
-      if (a) { LOG(level,"External Device %s: %s", a->shortDesc().c_str(), val.c_str()); }
-      else { LOG(level,"External Device vDC %s: %s", externalVdc.shortDesc().c_str(), val.c_str()); }
+      if (a) { OLOG(level,"External Device %s: %s", a->shortDesc().c_str(), val.c_str()); }
+      else { OLOG(level,"External Device vDC %s: %s", externalVdc.shortDesc().c_str(), val.c_str()); }
     }
     else {
       extDev = findDeviceByTag(tag, false);
@@ -1774,7 +1734,7 @@ void ExternalVdc::identifyToUser()
   if (forwardIdentify) {
     // TODO: %%% send "VDCIDENTIFY" or maybe "vdc:IDENTIFY"
     //   to all connectors - we need to implement a connector list for that
-    LOG(LOG_WARNING, "vdc level identify forwarding not yet implemented")
+    OLOG(LOG_WARNING, "vdc level identify forwarding not yet implemented")
   }
   else {
     inherited::identifyToUser();
