@@ -174,6 +174,10 @@ P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) 
   inherited(aWithLocalController, aWithPersistentChannels),
   webUiPort(0)
 {
+  #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
+  mScriptedApiLookup.isMemberVariable();
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(&mScriptedApiLookup);
+  #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
 }
 
 
@@ -476,6 +480,20 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         aError = processP44Request(aJsonComm, request);
       }
       #endif
+      #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
+      else if (apiselector=="scriptapi") {
+        // scripted parts of the (web) API
+        if (!mScriptedApiLookup.hasSinks()) {
+          // no script API active
+          aError = WebError::webErr(500, "script API not active");
+        }
+        else {
+          mScriptedApiLookup.mPendingConnection = aJsonComm;
+          mScriptedApiLookup.mPendingRequest = request;
+          mScriptedApiLookup.sendEvent(new ApiRequestObj(aJsonComm, request, &mScriptedApiLookup));
+        }
+      }
+      #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
       else {
         // unknown API selector
         aError = Error::err<P44VdcError>(400, "invalid URI, unknown API");
@@ -757,3 +775,103 @@ void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
   setUserActionMonitor(NULL);
   learnIdentifyRequest.reset();
 }
+
+
+
+// MARK: - Scripted Custom API Support
+
+#if P44SCRIPT_IMPLEMENTED_CUSTOM_API
+
+using namespace P44Script;
+
+ApiRequestObj::ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest, EventSource* aApiEventSource) :
+  inherited(aRequest),
+  mConnection(aConnection),
+  mEventSource(aApiEventSource)
+{
+}
+
+void ApiRequestObj::sendResponse(JsonObjectPtr aResponse, ErrorPtr aError)
+{
+  if (mConnection) P44VdcHost::sendCfgApiResponse(mConnection, aResponse, aError);
+  mConnection.reset(); // done now
+}
+
+string ApiRequestObj::getAnnotation() const
+{
+  return "API request";
+}
+
+TypeInfo ApiRequestObj::getTypeInfo() const
+{
+  return inherited::getTypeInfo()|oneshot|keeporiginal; // returns the request only once, must keep the original
+}
+
+EventSource* ApiRequestObj::eventSource() const
+{
+  return mEventSource;
+}
+
+
+// answer([answer value])        answer the request
+static const BuiltInArgDesc answer_args[] = { { any|optionalarg } };
+static const size_t answer_numargs = sizeof(answer_args)/sizeof(BuiltInArgDesc);
+static void answer_func(BuiltinFunctionContextPtr f)
+{
+  ApiRequestObj* reqObj = dynamic_cast<ApiRequestObj *>(f->thisObj().get());
+  if (f->arg(0)->isErr()) {
+    reqObj->sendResponse(JsonObjectPtr(), f->arg(0)->errorValue());
+  }
+  else {
+    reqObj->sendResponse(f->arg(0)->jsonValue(), ErrorPtr());
+  }
+  f->finish();
+}
+static const BuiltinMemberDescriptor answer_desc =
+  { "answer", executable|any, answer_numargs, answer_args, &answer_func };
+
+
+const ScriptObjPtr ApiRequestObj::memberByName(const string aName, TypeInfo aMemberAccessFlags)
+{
+  ScriptObjPtr val;
+  if (uequals(aName, "answer")) {
+    val = new BuiltinFunctionObj(&answer_desc, this, NULL);
+  }
+  else {
+    val = inherited::memberByName(aName, aMemberAccessFlags);
+  }
+  return val;
+}
+
+
+// webrequest()        return latest unprocessed script (web) api request
+static void webrequest_func(BuiltinFunctionContextPtr f)
+{
+  // return latest unprocessed API request
+  JsonCommPtr c;
+  P44VdcHost* h = dynamic_cast<P44VdcHost*>(VdcHost::sharedVdcHost().get());
+  JsonObjectPtr r;
+  if (h) r = h->mScriptedApiLookup.pendingRequest(c);
+  f->finish(new ApiRequestObj(c, r, &h->mScriptedApiLookup));
+}
+
+static const BuiltinMemberDescriptor scriptApiGlobals[] = {
+  { "webrequest", executable|json|null, 0, NULL, &webrequest_func },
+  { NULL } // terminator
+};
+
+
+ScriptApiLookup::ScriptApiLookup() : inherited(scriptApiGlobals)
+{
+}
+
+JsonObjectPtr ScriptApiLookup::pendingRequest(JsonCommPtr &aConnection)
+{
+  aConnection = mPendingConnection;
+  JsonObjectPtr r = mPendingRequest;
+  mPendingConnection.reset();
+  mPendingRequest.reset();
+  return r;
+}
+
+#endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API

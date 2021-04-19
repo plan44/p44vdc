@@ -39,10 +39,17 @@
   #include "ubus.hpp"
 #endif
 
+#if P44SCRIPT_FULL_SUPPORT && !defined(P44SCRIPT_IMPLEMENTED_CUSTOM_API)
+  #define P44SCRIPT_IMPLEMENTED_CUSTOM_API 1
+#endif
+
+
 
 using namespace std;
 
 namespace p44 {
+
+  class P44VdcHost;
 
   class P44VdcError : public Error
   {
@@ -205,6 +212,48 @@ namespace p44 {
   #endif // ENABLE_UBUS
 
 
+  #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
+
+  namespace P44Script {
+
+    /// represents an API request
+    class ApiRequestObj : public JsonValue
+    {
+      typedef JsonValue inherited;
+
+      EventSource* mEventSource;
+      JsonCommPtr mConnection;
+
+    public:
+      ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest, EventSource* aApiEventSource);
+      void sendResponse(JsonObjectPtr aResponse, ErrorPtr aError);
+      virtual string getAnnotation() const P44_OVERRIDE;
+      virtual TypeInfo getTypeInfo() const P44_OVERRIDE;
+      virtual EventSource *eventSource() const P44_OVERRIDE;
+      virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) P44_OVERRIDE;
+    };
+
+    /// represents the global objects related to p44features
+    class ScriptApiLookup : public BuiltInMemberLookup, public EventSource
+    {
+      typedef BuiltInMemberLookup inherited;
+      friend class p44::P44VdcHost;
+
+      JsonCommPtr mPendingConnection;
+      JsonObjectPtr mPendingRequest;
+
+    public:
+      ScriptApiLookup();
+
+      JsonObjectPtr pendingRequest(JsonCommPtr &aConnection);
+    };
+
+  }
+
+  #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
+
+
+
 
   /// plan44 specific implementation of a vdc host, with a separate API used by WebUI components.
   class P44VdcHost : public VdcHost
@@ -223,6 +272,10 @@ namespace p44 {
     #endif
 
   public:
+
+    #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
+    ScriptApiLookup mScriptedApiLookup; ///< custom API implemented via p44script
+    #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
 
     int webUiPort; ///< port number of the web-UI (on the same host). 0 if no Web-UI present
     string webUiPath; ///< path to be used in the webuiURLString
@@ -289,7 +342,6 @@ namespace p44 {
 
   };
   typedef boost::intrusive_ptr<P44VdcHost> P44VdcHostPtr;
-
 
 }
 
