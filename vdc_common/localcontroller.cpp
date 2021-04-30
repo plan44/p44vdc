@@ -950,28 +950,15 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   triggerId(0),
-  #if ENABLE_P44SCRIPT
   triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
   triggerAction(sourcecode+regular, "action", this),
-  #else
-  triggerCondition(*this, &VdcHost::sharedVdcHost()->geolocation),
-  triggerAction(*this, &VdcHost::sharedVdcHost()->geolocation),
-  #endif
   conditionMet(undefined)
 {
-  #if ENABLE_P44SCRIPT
   valueMapper.isMemberVariable();
   triggerContext = triggerCondition.domain()->newContext(); // common context for condition and action
   triggerContext->registerMemberLookup(&valueMapper); // allow context to access the mapped values
   triggerCondition.setSharedMainContext(triggerContext);
   triggerAction.setSharedMainContext(triggerContext);
-  #else
-  triggerCondition.isMemberVariable();
-  triggerCondition.setContextInfo("condition", this);
-  triggerAction.isMemberVariable();
-  triggerAction.setContextInfo("action", this);
-  triggerCondition.setEvaluationResultHandler(boost::bind(&Trigger::triggerEvaluationExecuted, this, _1));
-  #endif
 }
 
 
@@ -994,25 +981,14 @@ string Trigger::logContextPrefix()
 void Trigger::parseVarDefs()
 {
   varParseTicket.cancel();
-  #if ENABLE_P44SCRIPT
   bool foundall = valueMapper.parseMappingDefs(triggerVarDefs, NULL); // use EventSource/EventSink notification
-  #else
-  bool foundall = valueMapper.parseMappingDefs(
-    triggerVarDefs,
-    boost::bind(&Trigger::dependentValueNotification, this, _1, _2)
-  );
-  #endif
   if (!foundall) {
     // schedule a re-parse later
     varParseTicket.executeOnce(boost::bind(&Trigger::parseVarDefs, this), REPARSE_DELAY);
   }
   else if (LocalController::sharedLocalController()->devicesReady) {
     // do not run checks (and fire triggers too early) before devices are reported initialized
-    #if ENABLE_P44SCRIPT
     triggerCondition.compileAndInit();
-    #else
-    checkAndFire(evalmode_initial);
-    #endif
   }
 }
 
@@ -1028,11 +1004,7 @@ void Trigger::processGlobalEvent(VdchostEvent aActivity)
     if (!varParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
       //   Otherwise: have condition re-evaluated (because it possibly contains references to local time)
-      #if ENABLE_P44SCRIPT
       triggerCondition.nextEvaluationNotLaterThan(MainLoop::now()+REPARSE_DELAY);
-      #else
-      varParseTicket.executeOnce(boost::bind(&Trigger::reCheckTimed, this), REPARSE_DELAY);
-      #endif
     }
   }
 }
@@ -1202,13 +1174,8 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   triggerId = aRow->getWithDefault<int>(aIndex++, 0);
   // the fields
   name = nonNullCStr(aRow->get<const char *>(aIndex++));
-  #if ENABLE_P44SCRIPT
   triggerCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   triggerAction.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  #else
-  triggerCondition.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  triggerAction.setCode(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  #endif
   triggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
   // initiate evaluation, first vardefs and eventually trigger expression to get timers started
   parseVarDefs();
@@ -1222,13 +1189,8 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, triggerId);
   // the fields
   aStatement.bind(aIndex++, name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  #if ENABLE_P44SCRIPT
   aStatement.bind(aIndex++, triggerCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerAction.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  #else
-  aStatement.bind(aIndex++, triggerCondition.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, triggerAction.getCode(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  #endif
   aStatement.bind(aIndex++, triggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
@@ -1278,13 +1240,8 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: aPropValue->setStringValue(name); return true;
         case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
-        #if ENABLE_P44SCRIPT
         case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getSource().c_str()); return true;
         case triggerAction_key: aPropValue->setStringValue(triggerAction.getSource().c_str()); return true;
-        #else
-        case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getCode()); return true;
-        case triggerAction_key: aPropValue->setStringValue(triggerAction.getCode()); return true;
-        #endif
         case logLevelOffset_key: aPropValue->setInt32Value(getLocalLogLevelOffset()); return true;
       }
     }
@@ -1298,22 +1255,12 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
             parseVarDefs(); // changed variable mappings, re-parse them
           }
           return true;
-        #if ENABLE_P44SCRIPT
         case triggerCondition_key:
           if (triggerCondition.setTriggerSource(aPropValue->stringValue(), true)) {
             markDirty();
           }
           return true;
         case triggerAction_key: if (triggerAction.setSource(aPropValue->stringValue())) markDirty(); return true;
-        #else
-        case triggerCondition_key:
-          if (triggerCondition.setCode(aPropValue->stringValue())) {
-            markDirty();
-            checkAndFire(evalmode_initial);
-          }
-          return true;
-        case triggerAction_key: if (triggerAction.setCode(aPropValue->stringValue())) markDirty(); return true;
-        #endif
         case logLevelOffset_key: setLogLevelOffset(aPropValue->int32Value()); return true;
       }
     }
@@ -1501,9 +1448,7 @@ LocalController::LocalController(VdcHost &aVdcHost) :
   localZones.isMemberVariable();
   localScenes.isMemberVariable();
   localTriggers.isMemberVariable();
-  #if ENABLE_P44SCRIPT
   StandardScriptingDomain::sharedDomain().registerMemberLookup(LocalControllerLookup::sharedLookup());
-  #endif
 }
 
 
@@ -2245,8 +2190,6 @@ PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr &
 }
 
 
-#if ENABLE_P44SCRIPT
-
 using namespace P44Script;
 
 // MARK: - Local controller specific functions
@@ -2446,7 +2389,5 @@ MemberLookupPtr LocalControllerLookup::sharedLookup()
   }
   return sharedLocalControllerLookup;
 }
-
-#endif // ENABLE_P44SCRIPT
 
 #endif // ENABLE_LOCALCONTROLLER

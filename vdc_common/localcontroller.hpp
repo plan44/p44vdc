@@ -27,6 +27,10 @@
 
 #if ENABLE_LOCALCONTROLLER
 
+#if !ENABLE_P44SCRIPT
+  #error "localcontroller needs ENABLE_P44SCRIPT"
+#endif
+
 using namespace std;
 
 namespace p44 {
