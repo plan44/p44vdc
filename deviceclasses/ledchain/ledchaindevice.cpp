@@ -226,14 +226,14 @@ class LedChainDeviceObj : public DeviceObj
   typedef DeviceObj inherited;
 public:
   LedChainDeviceObj(DevicePtr aDevice);
-  P44lrgViewObj getLightView() { return boost::dynamic_pointer_cast<LedChainDevice>(mDevice)->getLightView(); }
+  P44ViewPtr getLightView() { return boost::dynamic_pointer_cast<LedChainDevice>(mDevice)->getLightView(); }
 };
 
 
 static ScriptObjPtr view_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite)
 {
   LedChainDeviceObj* d = dynamic_cast<LedChainDeviceObj*>(aParentObj.get());
-  return new P44lrgViewObj(d->getLightView());
+  return d->getLightView()->newViewObj();
 }
 
 
