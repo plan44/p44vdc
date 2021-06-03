@@ -75,7 +75,7 @@ namespace p44 {
     // - evaluation
     MLMicroSeconds evalWin; ///< evaluation window size (time)
     MLMicroSeconds collWin; ///< subdatapoint collection time
-    EvaluationType evalType; ///< type of evaluation
+    WinEvalMode evalType; ///< type of evaluation
 
     // - defaults for settings
     MLMicroSeconds pushIntvl; ///< default setting for minPushInterval, 0 = use global default
@@ -215,7 +215,7 @@ namespace p44 {
     /// @param aDataPointCollTime within that timespan, new values reported will be collected into a single datapoint
     /// @note this overrides any filtering that may have been set via sensor profiles at instantiation of the sensor
     ///   (setting eval_none restores sensor-type specific filtering, if any)
-    void setFilter(EvaluationType aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime);
+    void setFilter(WinEvalMode aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime);
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{

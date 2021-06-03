@@ -255,7 +255,7 @@ void SensorBehaviour::setSensorNameWithRange(const char *aName)
 }
 
 
-void SensorBehaviour::setFilter(EvaluationType aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime)
+void SensorBehaviour::setFilter(WinEvalMode aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime)
 {
   if (aEvalType==eval_none) {
     filter.reset(); // remove, standard filter (if any) will be re-installed at next datapoint
