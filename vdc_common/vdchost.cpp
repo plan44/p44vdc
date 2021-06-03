@@ -44,6 +44,9 @@
 #if ENABLE_P44SCRIPT
 #include "httpcomm.hpp"
 #include "socketcomm.hpp"
+#include "analogio.hpp"
+#include "digitalio.hpp"
+#include "dcmotor.hpp"
 #endif
 
 
@@ -126,6 +129,15 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if ENABLE_SOCKET_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SocketLookup);
   #endif // ENABLE_SOCKET_SCRIPT_FUNCS
+  #if ENABLE_ANALOGIO_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new AnalogIoLookup);
+  #endif
+  #if ENABLE_DIGITALIO_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new DigitalIoLookup);
+  #endif
+  #if ENABLE_DCMOTOR_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new DcMotorLookup);
+  #endif
   #endif // P44SCRIPT_FULL_SUPPORT
   #endif
   // remember singleton's address
