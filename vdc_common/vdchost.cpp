@@ -153,6 +153,8 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   // initialize real time jump detection as early as possible (to catch changes happening during initialisation)
   timeOfDayDiff = Infinite;
   checkTimeOfDayChange(); // will not post a event when timeOfDayDiff is Infinite
+  // ensure save when we quit
+  MainLoop::currentMainLoop().registerCleanupHandler(boost::bind(&VdcHost::save, this));
 }
 
 
@@ -813,6 +815,7 @@ bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
 
 #define ACTIVITY_PAUSE_INTERVAL (1*Second)
 
+
 void VdcHost::periodicTask(MLMicroSeconds aNow)
 {
   // cancel any pending executions
@@ -831,19 +834,7 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
       // check again for devices and vdcs that need to be announced
       startAnnouncing();
       // do a save run as well
-      // - myself
       save();
-      #if ENABLE_LOCALCONTROLLER
-      if (localController) localController->save();
-      #endif
-      // - device containers
-      for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
-        pos->second->save();
-      }
-      // - devices
-      for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
-        pos->second->save();
-      }
     }
   }
   if (mainloopStatsInterval>0) {
@@ -1936,7 +1927,7 @@ ErrorPtr VdcHost::loadAndFixDsUID()
     else {
       // no stored dSUID was found so far -> we need to save the current one
       markDirty();
-      save();
+      savePrivate();
     }
   }
   #if ENABLE_LOCALCONTROLLER
@@ -1947,13 +1938,32 @@ ErrorPtr VdcHost::loadAndFixDsUID()
 
 
 
-ErrorPtr VdcHost::save()
+void VdcHost::savePrivate()
 {
-  ErrorPtr err;
   // save the vdc settings
-  err = saveToStore(entityType(), false); // is a singleton, identify by type, single instance
-  return ErrorPtr();
+  saveToStore(entityType(), false); // is a singleton, identify by type, single instance
 }
+
+
+void VdcHost::save()
+{
+  savePrivate();
+  #if ENABLE_LOCALCONTROLLER
+  if (localController) localController->save();
+  #endif
+  // - device containers
+  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+    pos->second->save();
+  }
+  // - devices
+  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+    pos->second->save();
+  }
+}
+
+
+
+
 
 
 ErrorPtr VdcHost::forget()

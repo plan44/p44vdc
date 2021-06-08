@@ -578,8 +578,8 @@ namespace p44 {
     ErrorPtr loadAndFixDsUID();
 
     /// save unsaved parameters to persistent DB
-    /// @note this is usually called from the device container in regular intervals
-    ErrorPtr save();
+    /// @note this is usually called from periodicTask in regular intervals
+    void save();
 
     /// forget any parameters stored in persistent DB
     ErrorPtr forget();
@@ -651,6 +651,7 @@ namespace p44 {
 
     // derive dSUID
     void deriveDsUid();
+    void savePrivate();
 
     // initializing and collecting
     void initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc);
