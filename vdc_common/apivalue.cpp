@@ -342,7 +342,8 @@ ApiValuePtr ApiValue::newScriptValue(P44Script::ScriptObjPtr aValue)
   if (!aValue || aValue->undefined()) return newNull();
   else if (aValue->hasType(P44Script::text)) return newString(aValue->stringValue());
   #if SCRIPTING_JSON_SUPPORT
-  else if (aValue->hasType(P44Script::json)) {
+  else if (aValue->hasType(P44Script::structured|P44Script::json)) {
+    // render native JSON as well as any other objects/arrays as JSON
     ApiValuePtr j = newNull();
     *j = *JsonApiValue::newValueFromJson(aValue->jsonValue());
     return j;
