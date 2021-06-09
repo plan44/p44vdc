@@ -1142,7 +1142,7 @@ const FieldDefinition *Trigger::getKeyDef(size_t aIndex)
 
 // data field definitions
 
-static const size_t numTriggerFields = 6;
+static const size_t numTriggerFields = 7;
 
 size_t Trigger::numFieldDefs()
 {
@@ -1158,7 +1158,8 @@ const FieldDefinition *Trigger::getFieldDef(size_t aIndex)
     { "triggerActions", SQLITE_TEXT }, // note: only historically: triggerActionsS (plural)
     { "triggerVarDefs", SQLITE_TEXT },
     { "triggerMode", SQLITE_INTEGER },
-    { "triggerHoldoffTime", SQLITE_INTEGER }
+    { "triggerHoldoffTime", SQLITE_INTEGER },
+    { "uiparams", SQLITE_TEXT }, // usually JSON info used to render this trigger in WebUI
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1181,6 +1182,7 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   triggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerCondition.setTriggerMode(aRow->getCastedWithDefault<TriggerMode, int>(aIndex++, onGettingTrue), false); // do not initialize at load yet
   triggerCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, 0), false); // do not initialize at load yet
+  mUiParams = nonNullCStr(aRow->get<const char *>(aIndex++));
   // initiate evaluation, first vardefs and eventually trigger expression to get timers started
   parseVarDefs();
 }
@@ -1198,6 +1200,7 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, triggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (int)triggerCondition.getTriggerMode());
   aStatement.bind(aIndex++, (long long int)triggerCondition.getTriggerHoldoff());
+  aStatement.bind(aIndex++, mUiParams.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
@@ -1205,6 +1208,7 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 
 enum {
   triggerName_key,
+  uiParams_key,
   triggerCondition_key,
   triggerMode_key,
   triggerHoldOff_key,
@@ -1228,6 +1232,7 @@ PropertyDescriptorPtr Trigger::getDescriptorByIndex(int aPropIndex, int aDomain,
 {
   static const PropertyDescription properties[numTriggerProperties] = {
     { "name", apivalue_string, triggerName_key, OKEY(trigger_key) },
+    { "uiparams", apivalue_string, uiParams_key, OKEY(trigger_key) },
     { "condition", apivalue_string, triggerCondition_key, OKEY(trigger_key) },
     { "mode", apivalue_int64, triggerMode_key, OKEY(trigger_key) },
     { "holdofftime", apivalue_double, triggerHoldOff_key, OKEY(trigger_key) },
@@ -1249,6 +1254,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key: aPropValue->setStringValue(name); return true;
+        case uiParams_key: aPropValue->setStringValue(mUiParams); return true;
         case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
         case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getSource().c_str()); return true;
         case triggerMode_key: aPropValue->setInt32Value(triggerCondition.getTriggerMode()); return true;
@@ -1261,6 +1267,9 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key:
           setPVar(name, aPropValue->stringValue());
+          return true;
+        case uiParams_key:
+          setPVar(mUiParams, aPropValue->stringValue());
           return true;
         case triggerVarDefs_key:
           if (setPVar(triggerVarDefs, aPropValue->stringValue())) {

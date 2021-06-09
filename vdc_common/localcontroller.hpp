@@ -366,6 +366,7 @@ namespace p44 {
     int triggerId; ///< the immutable ID of this trigger
     string name;
     string triggerVarDefs; ///< variable to valueSource mappings
+    string mUiParams; ///< free-form (but usually JSON) string for rendering this trigger in the (custom) Web-UI
 
     ValueSourceMapper valueMapper;
     MLTicket varParseTicket;
