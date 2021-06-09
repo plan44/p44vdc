@@ -76,14 +76,14 @@ namespace p44 {
   public:
 
     // global state
-    SceneNo lastGlobalScene; ///< last global scene called
+    SceneNo mLastGlobalScene; ///< last global scene called
 
     // Light state
-    VdcDimMode lastDim; ///< last dimming direction in this zone
-    DsChannelType lastDimChannel; ///< last dimming channel in this zone
-    SceneNo lastLightScene; ///< last light scene called
-    bool lightOn[5]; ///< set if light is on in this zone and area
-    bool shadesOpen[5]; ///< set if shades are open in this zone and area
+    VdcDimMode mLastDim; ///< last dimming direction in this zone
+    DsChannelType mLastDimChannel; ///< last dimming channel in this zone
+    SceneNo mLastLightScene; ///< last light scene called
+    bool mLightOn[5]; ///< set if light is on in this zone and area
+    bool mShadesOpen[5]; ///< set if shades are open in this zone and area
 
     ZoneState();
     bool stateFor(int aGroup, int aArea);
@@ -101,12 +101,12 @@ namespace p44 {
     friend class ZoneList;
     friend class LocalController;
 
-    DsZoneID zoneID; ///< global dS zone ID, zero = "all" zone
-    string zoneName; ///< the name of the zone
+    DsZoneID mZoneID; ///< global dS zone ID, zero = "all" zone
+    string mZoneName; ///< the name of the zone
 
-    DeviceVector devices; ///< devices in this zone
+    DeviceVector mDevices; ///< devices in this zone
 
-    ZoneState zoneState; ///< current state of the zone
+    ZoneState mZoneState; ///< current state of the zone
 
   public:
 
@@ -115,11 +115,11 @@ namespace p44 {
 
     /// get the name
     /// @return name of this zone
-    string getName() const { return zoneName; };
+    string getName() const { return mZoneName; };
 
     /// get the zoneID
     /// @return ID of this zone
-    DsZoneID getZoneId() const { return zoneID; };
+    DsZoneID getZoneId() const { return mZoneID; };
 
     /// register as in-use or non-in-use-any-more by a device
     void usedByDevice(DevicePtr aDevice, bool aInUse);
@@ -170,7 +170,7 @@ namespace p44 {
 
     typedef vector<ZoneDescriptorPtr> ZonesVector;
 
-    ZonesVector zones;
+    ZonesVector mZones;
 
     /// load zones
     ErrorPtr load();
@@ -215,12 +215,12 @@ namespace p44 {
   public:
 
     // identification
-    SceneNo sceneNo;
-    DsZoneID zoneID;
-    DsGroup group;
+    SceneNo mSceneNo;
+    DsZoneID mZoneID;
+    DsGroup mGroup;
     // name
-    const SceneKindDescriptor* sceneKindP; ///< the scene kind
-    string name;
+    const SceneKindDescriptor* mSceneKindP; ///< the scene kind
+    string mName;
 
     SceneIdentifier();
     SceneIdentifier(const SceneKindDescriptor &aSceneKind, DsZoneID aZone, DsGroup aGroup);
@@ -242,7 +242,7 @@ namespace p44 {
     string getActionName() const;
 
     /// get the scene's kind flags
-    SceneKind getKindFlags() { return sceneKindP ? sceneKindP->kind : 0; };
+    SceneKind getKindFlags() { return mSceneKindP ? mSceneKindP->kind : 0; };
 
   };
 
@@ -255,7 +255,7 @@ namespace p44 {
     typedef PersistentParams inheritedParams;
     friend class SceneList;
 
-    SceneIdentifier sceneId; ///< the scene identification
+    SceneIdentifier mSceneIdentifier; ///< the scene identification
 
   public:
 
@@ -264,30 +264,30 @@ namespace p44 {
 
     /// get the name
     /// @return name of this scene (if no name was set, the default name will be returned)
-    string getSceneName() const { return sceneId.getName(); };
+    string getSceneName() const { return mSceneIdentifier.getName(); };
 
     /// get the action name
     /// @return action name of this scene
-    string getActionName() const { return sceneId.getActionName(); };
+    string getActionName() const { return mSceneIdentifier.getActionName(); };
 
     /// get the dS scene number
     /// @return scene number (INVALID_SCENE_NO in case of invalid scene (no kind found)
-    int getSceneNo() const { return sceneId.sceneNo; };
+    int getSceneNo() const { return mSceneIdentifier.mSceneNo; };
 
     /// get the Zone ID
     /// @return zone ID (0 for global scenes)
-    DsZoneID getZoneID() const { return sceneId.zoneID; };
+    DsZoneID getZoneID() const { return mSceneIdentifier.mZoneID; };
 
     /// get the dS group number
     /// @return group number
-    DsGroup getGroup() const { return sceneId.group; };
+    DsGroup getGroup() const { return mSceneIdentifier.mGroup; };
 
     /// get the sceneId
-    SceneIdentifier getIdentifier() { return sceneId; };
+    SceneIdentifier getIdentifier() { return mSceneIdentifier; };
 
     /// get the scene's ID
     /// @return a string ID uniquely defining this scene in this localcontroller (zone, group, sceneNo)
-    string getStringID() const { return sceneId.stringId(); }
+    string getStringID() const { return mSceneIdentifier.stringId(); }
 
   protected:
 
@@ -316,7 +316,7 @@ namespace p44 {
 
   public:
 
-    ScenesVector scenes;
+    ScenesVector mScenes;
 
     /// load zones
     ErrorPtr load();
@@ -363,14 +363,14 @@ namespace p44 {
     typedef PersistentParams inheritedParams;
     friend class TriggerList;
 
-    int triggerId; ///< the immutable ID of this trigger
-    string name;
-    string triggerVarDefs; ///< variable to valueSource mappings
+    int mTriggerId; ///< the immutable ID of this trigger
+    string mName;
+    string mTriggerVarDefs; ///< variable to valueSource mappings
     string mUiParams; ///< free-form (but usually JSON) string for rendering this trigger in the (custom) Web-UI
 
-    ValueSourceMapper valueMapper;
-    MLTicket varParseTicket;
-    Tristate conditionMet;
+    ValueSourceMapper mValueMapper;
+    MLTicket mVarParseTicket;
+    Tristate mConditionMet;
 
   public:
 
@@ -430,14 +430,11 @@ namespace p44 {
   {
     typedef PropertyContainer inherited;
 
-    MLTicket checkTicket;
-
-
   public:
 
     typedef vector<TriggerPtr> TriggersVector;
 
-    TriggersVector triggers;
+    TriggersVector mTriggers;
 
     /// load triggers
     ErrorPtr load();
@@ -484,14 +481,14 @@ namespace p44 {
     friend class Trigger;
     friend class TriggerList;
 
-    VdcHost &vdcHost; ///< local reference to vdc host
-    bool devicesReady; ///< set when vdchost reports devices initialized
+    VdcHost &mVdcHost; ///< local reference to vdc host
+    bool mDevicesReady; ///< set when vdchost reports devices initialized
 
   public:
 
-    ZoneList localZones; ///< the locally used/defined zones
-    SceneList localScenes; ///< the locally defined scenes
-    TriggerList localTriggers; ///< the locally defined triggers
+    ZoneList mLocalZones; ///< the locally used/defined zones
+    SceneList mLocalScenes; ///< the locally defined scenes
+    TriggerList mLocalTriggers; ///< the locally defined triggers
 
     LocalController(VdcHost &aVdcHost);
     virtual ~LocalController();

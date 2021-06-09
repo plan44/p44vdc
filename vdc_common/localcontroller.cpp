@@ -44,13 +44,13 @@ using namespace p44;
 // MARK: - ZoneState
 
 ZoneState::ZoneState() :
-  lastGlobalScene(INVALID_SCENE_NO),
-  lastDim(dimmode_stop),
-  lastLightScene(INVALID_SCENE_NO)
+  mLastGlobalScene(INVALID_SCENE_NO),
+  mLastDim(dimmode_stop),
+  mLastLightScene(INVALID_SCENE_NO)
 {
   for (SceneArea i=0; i<=num_areas; ++i) {
-    lightOn[i] = false;
-    shadesOpen[i] = false;
+    mLightOn[i] = false;
+    mShadesOpen[i] = false;
   }
 }
 
@@ -58,8 +58,8 @@ ZoneState::ZoneState() :
 bool ZoneState::stateFor(int aGroup, int aArea)
 {
   switch(aGroup) {
-    case group_yellow_light : return lightOn[aArea];
-    case group_grey_shadow : return shadesOpen[aArea];
+    case group_yellow_light : return mLightOn[aArea];
+    case group_grey_shadow : return mShadesOpen[aArea];
     default: return false;
   }
 }
@@ -68,8 +68,8 @@ bool ZoneState::stateFor(int aGroup, int aArea)
 void ZoneState::setStateFor(int aGroup, int aArea, bool aState)
 {
   switch(aGroup) {
-    case group_yellow_light : lightOn[aArea] = aState;
-    case group_grey_shadow : shadesOpen[aArea] = aState;
+    case group_yellow_light : mLightOn[aArea] = aState;
+    case group_grey_shadow : mShadesOpen[aArea] = aState;
   }
 }
 
@@ -90,18 +90,18 @@ ZoneDescriptor::~ZoneDescriptor()
 
 void ZoneDescriptor::usedByDevice(DevicePtr aDevice, bool aInUse)
 {
-  if (zoneID==zoneId_global) return; // global zone always contains all devices, no need to maintain a list
-  for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+  if (mZoneID==zoneId_global) return; // global zone always contains all devices, no need to maintain a list
+  for (DeviceVector::iterator pos = mDevices.begin(); pos!=mDevices.end(); ++pos) {
     if (*pos==aDevice) {
       if (aInUse) return; // already here -> NOP
       // not in use any more, remove it
-      devices.erase(pos);
+      mDevices.erase(pos);
       return;
     }
   }
   // not yet in my list
   if (aInUse) {
-    devices.push_back(aDevice);
+    mDevices.push_back(aDevice);
   }
 }
 
@@ -109,8 +109,8 @@ void ZoneDescriptor::usedByDevice(DevicePtr aDevice, bool aInUse)
 DsGroupMask ZoneDescriptor::getZoneGroups()
 {
   DsGroupMask zoneGroups = 0;
-  if (zoneID==zoneId_global) return 0; // groups are not relevant in zone0
-  for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+  if (mZoneID==zoneId_global) return 0; // groups are not relevant in zone0
+  for (DeviceVector::iterator pos = mDevices.begin(); pos!=mDevices.end(); ++pos) {
     OutputBehaviourPtr ob = (*pos)->getOutput();
     if (ob) zoneGroups |= ob->groupMemberships();
   }
@@ -123,7 +123,7 @@ SceneIdsVector ZoneDescriptor::getZoneScenes(DsGroup aForGroup, SceneKind aRequi
   SceneIdsVector zoneScenes;
   // create list of scenes
   const SceneKindDescriptor *sceneKindP = NULL;
-  if (zoneID==zoneId_global) {
+  if (mZoneID==zoneId_global) {
     // global scenes
     aRequiredKinds |= scene_global;
     sceneKindP = globalScenes;
@@ -136,14 +136,14 @@ SceneIdsVector ZoneDescriptor::getZoneScenes(DsGroup aForGroup, SceneKind aRequi
   aForbiddenKinds &= ~aRequiredKinds; // required ones must be allowed
   while (sceneKindP && sceneKindP->no!=INVALID_SCENE_NO) {
     // get identifier
-    SceneIdentifier si(*sceneKindP, zoneID, aForGroup);
+    SceneIdentifier si(*sceneKindP, mZoneID, aForGroup);
     SceneKind k = sceneKindP->kind;
     // look up in user-defined scenes
-    SceneDescriptorPtr userscene = LocalController::sharedLocalController()->localScenes.getScene(si);
+    SceneDescriptorPtr userscene = LocalController::sharedLocalController()->mLocalScenes.getScene(si);
     SceneKind forbiddenKinds = aForbiddenKinds;
     if (userscene) {
-      si.name = userscene->getSceneName();
-      if (!si.name.empty()) {
+      si.mName = userscene->getSceneName();
+      if (!si.mName.empty()) {
         k |= scene_usernamed;
         forbiddenKinds &= ~(scene_extended|scene_area); // usernamed overrides extended/area exclusion
       }
@@ -162,11 +162,11 @@ SceneIdsVector ZoneDescriptor::getZoneScenes(DsGroup aForGroup, SceneKind aRequi
 
 size_t ZoneDescriptor::devicesInZone() const
 {
-  if (zoneID==zoneId_global) {
+  if (mZoneID==zoneId_global) {
     return LocalController::sharedLocalController()->totalDevices();
   }
   else {
-    return devices.size();
+    return mDevices.size();
   }
 }
 
@@ -231,9 +231,9 @@ void ZoneDescriptor::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
 {
   inheritedParams::loadFromRowWithoutParentId(aRow, aIndex, aCommonFlagsP);
   // get zoneID
-  zoneID = aRow->getWithDefault(aIndex++, 0);
+  mZoneID = aRow->getWithDefault(aIndex++, 0);
   // the name
-  zoneName = nonNullCStr(aRow->get<const char *>(aIndex++));
+  mZoneName = nonNullCStr(aRow->get<const char *>(aIndex++));
 }
 
 
@@ -241,9 +241,9 @@ void ZoneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // - my own id
-  aStatement.bind(aIndex++, zoneID);
+  aStatement.bind(aIndex++, mZoneID);
   // - title
-  aStatement.bind(aIndex++, zoneName.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mZoneName.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
@@ -293,7 +293,7 @@ PropertyContainerPtr ZoneDescriptor::getContainer(const PropertyDescriptorPtr &a
   }
   else if (aPropertyDescriptor->hasObjectKey(zonedevice_key)) {
     // - get device
-    PropertyContainerPtr container = devices[aPropertyDescriptor->fieldKey()];
+    PropertyContainerPtr container = mDevices[aPropertyDescriptor->fieldKey()];
     return container;
   }
   // unknown here
@@ -320,9 +320,9 @@ PropertyDescriptorPtr ZoneDescriptor::getDescriptorByIndex(int aPropIndex, int a
 
 void ZoneDescriptor::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
 {
-  if (aPropertyDescriptor->hasObjectKey(zonedevices_container_key) && zoneID==zoneId_global) {
+  if (aPropertyDescriptor->hasObjectKey(zonedevices_container_key) && mZoneID==zoneId_global) {
     // for global zone: create temporary list of all devices
-    LocalController::sharedLocalController()->vdcHost.createDeviceList(devices);
+    LocalController::sharedLocalController()->mVdcHost.createDeviceList(mDevices);
   }
   // in any case: let inherited handle the callback
   inherited::prepareAccess(aMode, aPropertyDescriptor, aPreparedCB);
@@ -331,9 +331,9 @@ void ZoneDescriptor::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorP
 
 void ZoneDescriptor::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor)
 {
-  if (aPropertyDescriptor->hasObjectKey(zonedevices_container_key) && zoneID==zoneId_global) {
+  if (aPropertyDescriptor->hasObjectKey(zonedevices_container_key) && mZoneID==zoneId_global) {
     // list is only temporary
-    devices.clear();
+    mDevices.clear();
   }
 }
 
@@ -344,13 +344,13 @@ bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
   if (aPropertyDescriptor->hasObjectKey(zonedescriptor_key)) {
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
-        case zoneName_key: aPropValue->setStringValue(zoneName); return true;
+        case zoneName_key: aPropValue->setStringValue(mZoneName); return true;
         case deviceCount_key: aPropValue->setUint64Value(devicesInZone()); return true;
       }
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
-        case zoneName_key: setPVar(zoneName, aPropValue->stringValue()); return true;
+        case zoneName_key: setPVar(mZoneName, aPropValue->stringValue()); return true;
       }
     }
   }
@@ -364,8 +364,8 @@ bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
 ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotExisting)
 {
   ZoneDescriptorPtr zone;
-  for (ZonesVector::iterator pos = zones.begin(); pos!=zones.end(); ++pos) {
-    if ((*pos)->zoneID==aZoneId) {
+  for (ZonesVector::iterator pos = mZones.begin(); pos!=mZones.end(); ++pos) {
+    if ((*pos)->mZoneID==aZoneId) {
       zone = *pos;
       break;
     }
@@ -373,10 +373,10 @@ ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotEx
   if (!zone && aCreateNewIfNotExisting) {
     // create new zone descriptor on the fly
     zone = ZoneDescriptorPtr(new ZoneDescriptor);
-    zone->zoneID = aZoneId;
-    zone->zoneName = aZoneId==0 ? "[global]" : string_format("Zone #%d", aZoneId);
+    zone->mZoneID = aZoneId;
+    zone->mZoneName = aZoneId==0 ? "[global]" : string_format("Zone #%d", aZoneId);
     zone->markClean(); // not modified yet, no need to save
-    zones.push_back(zone);
+    mZones.push_back(zone);
   }
   return zone;
 }
@@ -386,7 +386,7 @@ ZoneDescriptorPtr ZoneList::getZoneByName(const string aZoneName)
 {
   int numName = -1;
   sscanf(aZoneName.c_str(), "%d", &numName);
-  for (ZonesVector::iterator pos = zones.begin(); pos!=zones.end(); ++pos) {
+  for (ZonesVector::iterator pos = mZones.begin(); pos!=mZones.end(); ++pos) {
     if (strucmp((*pos)->getName().c_str(),aZoneName.c_str())==0) {
       return *pos;
     }
@@ -430,7 +430,7 @@ ErrorPtr ZoneList::load()
       int index = 0;
       newZone->loadFromRow(row, index, NULL);
       // - put custom action into container
-      zones.push_back(newZone);
+      mZones.push_back(newZone);
       // - fresh object for next row
       newZone = ZoneDescriptorPtr(new ZoneDescriptor());
     }
@@ -447,9 +447,9 @@ ErrorPtr ZoneList::save()
   ErrorPtr err;
 
   // save all elements (only dirty ones will be actually stored to DB)
-  for (ZonesVector::iterator pos = zones.begin(); pos!=zones.end(); ++pos) {
+  for (ZonesVector::iterator pos = mZones.begin(); pos!=mZones.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving zone %d: %s", (*pos)->zoneID, err->text());
+    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving zone %d: %s", (*pos)->mZoneID, err->text());
   }
   return err;
 }
@@ -459,7 +459,7 @@ ErrorPtr ZoneList::save()
 
 int ZoneList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  return (int)zones.size();
+  return (int)mZones.size();
 }
 
 
@@ -467,11 +467,11 @@ static char zonelist_key;
 
 PropertyDescriptorPtr ZoneList::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aPropIndex<zones.size()) {
+  if (aPropIndex<mZones.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("%hu", zones[aPropIndex]->zoneID);
+    descP->propertyName = string_format("%hu", mZones[aPropIndex]->mZoneID);
     descP->propertyType = apivalue_object;
-    descP->deletable = zones[aPropIndex]->devices.size()==0; // zone is deletable when no device uses it
+    descP->deletable = mZones[aPropIndex]->mDevices.size()==0; // zone is deletable when no device uses it
     descP->propertyFieldKey = aPropIndex;
     descP->propertyObjectKey = OKEY(zonelist_key);
     return descP;
@@ -488,7 +488,7 @@ PropertyDescriptorPtr ZoneList::getDescriptorByName(string aPropMatch, int &aSta
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyType = apivalue_object;
     descP->deletable = true; // new zones are deletable
-    descP->propertyFieldKey = zones.size(); // new zone will be appended, so index is current size
+    descP->propertyFieldKey = mZones.size(); // new zone will be appended, so index is current size
     descP->propertyObjectKey = OKEY(zonelist_key);
     DsZoneID newId = 0;
     if (sscanf(aPropMatch.c_str(), "%hu", &newId)!=1) {
@@ -512,9 +512,9 @@ bool ZoneList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pro
 {
   if (aPropertyDescriptor->hasObjectKey(zonelist_key) && aMode==access_delete) {
     // only field-level access is deleting a zone
-    ZoneDescriptorPtr dz = zones[aPropertyDescriptor->fieldKey()];
+    ZoneDescriptorPtr dz = mZones[aPropertyDescriptor->fieldKey()];
     dz->deleteFromStore(); // remove from store
-    zones.erase(zones.begin()+aPropertyDescriptor->fieldKey()); // remove from container
+    mZones.erase(mZones.begin()+aPropertyDescriptor->fieldKey()); // remove from container
     return true;
   }
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
@@ -524,7 +524,7 @@ bool ZoneList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pro
 PropertyContainerPtr ZoneList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(zonelist_key)) {
-    return zones[aPropertyDescriptor->fieldKey()];
+    return mZones[aPropertyDescriptor->fieldKey()];
   }
   return NULL;
 }
@@ -535,27 +535,27 @@ PropertyContainerPtr ZoneList::getContainer(const PropertyDescriptorPtr &aProper
 
 SceneIdentifier::SceneIdentifier()
 {
-  sceneKindP = NULL;
-  sceneNo = INVALID_SCENE_NO;
-  zoneID = scene_global;
-  group = group_undefined;
+  mSceneKindP = NULL;
+  mSceneNo = INVALID_SCENE_NO;
+  mZoneID = scene_global;
+  mGroup = group_undefined;
 }
 
 
 SceneIdentifier::SceneIdentifier(const SceneKindDescriptor &aSceneKind, DsZoneID aZone, DsGroup aGroup)
 {
-  sceneKindP = &aSceneKind;
-  sceneNo = sceneKindP->no;
-  zoneID = aZone;
-  group = aGroup;
+  mSceneKindP = &aSceneKind;
+  mSceneNo = mSceneKindP->no;
+  mZoneID = aZone;
+  mGroup = aGroup;
 }
 
 
 SceneIdentifier::SceneIdentifier(SceneNo aNo, DsZoneID aZone, DsGroup aGroup)
 {
-  sceneNo = aNo;
-  zoneID = aZone;
-  group = aGroup;
+  mSceneNo = aNo;
+  mZoneID = aZone;
+  mGroup = aGroup;
   deriveSceneKind();
 }
 
@@ -566,29 +566,29 @@ SceneIdentifier::SceneIdentifier(const string aStringId)
   uint16_t tmpZoneID = scene_global;
   uint16_t tmpGroup = group_undefined;
   sscanf(aStringId.c_str(), "%hu_%hu_%hu", &tmpSceneNo, &tmpZoneID, &tmpGroup);
-  sceneNo = tmpSceneNo;
-  zoneID = tmpZoneID;
-  group = (DsGroup)tmpGroup;
+  mSceneNo = tmpSceneNo;
+  mZoneID = tmpZoneID;
+  mGroup = (DsGroup)tmpGroup;
   deriveSceneKind();
 }
 
 
 string SceneIdentifier::stringId() const
 {
-  return string_format("%hu_%hu_%hu", (uint16_t)sceneNo, (uint16_t)zoneID, (uint16_t)group);
+  return string_format("%hu_%hu_%hu", (uint16_t)mSceneNo, (uint16_t)mZoneID, (uint16_t)mGroup);
 }
 
 
 
 string SceneIdentifier::getActionName() const
 {
-  return sceneKindP ? sceneKindP->actionName : string_format("scene %d", sceneNo);
+  return mSceneKindP ? mSceneKindP->actionName : string_format("scene %d", mSceneNo);
 }
 
 
 string SceneIdentifier::getName() const
 {
-  return name;
+  return mName;
 }
 
 
@@ -596,15 +596,15 @@ string SceneIdentifier::getName() const
 
 bool SceneIdentifier::deriveSceneKind()
 {
-  const SceneKindDescriptor *sk = sceneNo>=START_APARTMENT_SCENES ? globalScenes : roomScenes;
+  const SceneKindDescriptor *sk = mSceneNo>=START_APARTMENT_SCENES ? globalScenes : roomScenes;
   while (sk->no<MAX_SCENE_NO) {
-    if (sk->no==sceneNo) {
-      sceneKindP = sk;
+    if (sk->no==mSceneNo) {
+      mSceneKindP = sk;
       return true;
     }
     sk++;
   }
-  sceneKindP = NULL; // unknown
+  mSceneKindP = NULL; // unknown
   return false;
 }
 
@@ -682,12 +682,12 @@ void SceneDescriptor::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
 {
   inheritedParams::loadFromRowWithoutParentId(aRow, aIndex, aCommonFlagsP);
   // get key fields
-  sceneId.sceneNo = aRow->getCastedWithDefault<SceneNo, int>(aIndex++, 0);
-  sceneId.zoneID = aRow->getCastedWithDefault<DsZoneID, int>(aIndex++, 0);
-  sceneId.group = aRow->getCastedWithDefault<DsGroup, int>(aIndex++, group_undefined);
-  sceneId.deriveSceneKind();
+  mSceneIdentifier.mSceneNo = aRow->getCastedWithDefault<SceneNo, int>(aIndex++, 0);
+  mSceneIdentifier.mZoneID = aRow->getCastedWithDefault<DsZoneID, int>(aIndex++, 0);
+  mSceneIdentifier.mGroup = aRow->getCastedWithDefault<DsGroup, int>(aIndex++, group_undefined);
+  mSceneIdentifier.deriveSceneKind();
   // the name
-  sceneId.name = nonNullCStr(aRow->get<const char *>(aIndex++));
+  mSceneIdentifier.mName = nonNullCStr(aRow->get<const char *>(aIndex++));
 }
 
 
@@ -695,11 +695,11 @@ void SceneDescriptor::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // - my own id
-  aStatement.bind(aIndex++, sceneId.sceneNo);
-  aStatement.bind(aIndex++, sceneId.zoneID);
-  aStatement.bind(aIndex++, sceneId.group);
+  aStatement.bind(aIndex++, mSceneIdentifier.mSceneNo);
+  aStatement.bind(aIndex++, mSceneIdentifier.mZoneID);
+  aStatement.bind(aIndex++, mSceneIdentifier.mGroup);
   // - title
-  aStatement.bind(aIndex++, sceneId.name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mSceneIdentifier.mName.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
@@ -749,13 +749,13 @@ bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case sceneNo_key: aPropValue->setUint16Value(getSceneNo()); return true;
         case sceneName_key: aPropValue->setStringValue(getSceneName()); return true;
         case sceneAction_key: aPropValue->setStringValue(getActionName()); return true;
-        case sceneZoneID_key: aPropValue->setUint16Value(sceneId.zoneID); return true;
-        case sceneGroup_key: aPropValue->setUint8Value(sceneId.group); return true;
+        case sceneZoneID_key: aPropValue->setUint16Value(mSceneIdentifier.mZoneID); return true;
+        case sceneGroup_key: aPropValue->setUint8Value(mSceneIdentifier.mGroup); return true;
       }
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
-        case sceneName_key: setPVar(sceneId.name, aPropValue->stringValue()); return true;
+        case sceneName_key: setPVar(mSceneIdentifier.mName, aPropValue->stringValue()); return true;
       }
     }
   }
@@ -769,9 +769,9 @@ bool SceneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 SceneDescriptorPtr SceneList::getSceneByName(const string aSceneName)
 {
   SceneDescriptorPtr scene;
-  for (int i = 0; i<scenes.size(); ++i) {
-    SceneDescriptorPtr sc = scenes[i];
-    if (strucmp(sc->sceneId.name.c_str(), aSceneName.c_str())==0) {
+  for (int i = 0; i<mScenes.size(); ++i) {
+    SceneDescriptorPtr sc = mScenes[i];
+    if (strucmp(sc->mSceneIdentifier.mName.c_str(), aSceneName.c_str())==0) {
       scene = sc;
       break;
     }
@@ -806,22 +806,22 @@ SceneNo SceneList::getSceneIdByKind(const string aSceneKindName)
 SceneDescriptorPtr SceneList::getScene(const SceneIdentifier &aSceneId, bool aCreateNewIfNotExisting, size_t *aSceneIndexP)
 {
   SceneDescriptorPtr scene;
-  for (int i = 0; i<scenes.size(); ++i) {
-    SceneDescriptorPtr sc = scenes[i];
-    if (sc->sceneId.sceneNo==aSceneId.sceneNo && sc->sceneId.zoneID==aSceneId.zoneID && sc->sceneId.group==aSceneId.group) {
+  for (int i = 0; i<mScenes.size(); ++i) {
+    SceneDescriptorPtr sc = mScenes[i];
+    if (sc->mSceneIdentifier.mSceneNo==aSceneId.mSceneNo && sc->mSceneIdentifier.mZoneID==aSceneId.mZoneID && sc->mSceneIdentifier.mGroup==aSceneId.mGroup) {
       scene = sc;
       if (aSceneIndexP) *aSceneIndexP = i;
       break;
     }
   }
-  if (!scene && aCreateNewIfNotExisting && aSceneId.sceneNo<MAX_SCENE_NO) {
+  if (!scene && aCreateNewIfNotExisting && aSceneId.mSceneNo<MAX_SCENE_NO) {
     // create new scene descriptor
     scene = SceneDescriptorPtr(new SceneDescriptor);
-    scene->sceneId = aSceneId;
-    if (scene->sceneId.deriveSceneKind()) {
+    scene->mSceneIdentifier = aSceneId;
+    if (scene->mSceneIdentifier.deriveSceneKind()) {
       scene->markClean(); // not modified yet, no need to save
-      if (aSceneIndexP) *aSceneIndexP = scenes.size();
-      scenes.push_back(scene);
+      if (aSceneIndexP) *aSceneIndexP = mScenes.size();
+      mScenes.push_back(scene);
     }
   }
   return scene;
@@ -849,7 +849,7 @@ ErrorPtr SceneList::load()
       int index = 0;
       newScene->loadFromRow(row, index, NULL);
       // - put custom action into container
-      scenes.push_back(newScene);
+      mScenes.push_back(newScene);
       // - fresh object for next row
       newScene = SceneDescriptorPtr(new SceneDescriptor());
     }
@@ -864,9 +864,9 @@ ErrorPtr SceneList::save()
   ErrorPtr err;
 
   // save all elements (only dirty ones will be actually stored to DB)
-  for (ScenesVector::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
+  for (ScenesVector::iterator pos = mScenes.begin(); pos!=mScenes.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->sceneId.sceneNo, err->text());
+    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->mSceneIdentifier.mSceneNo, err->text());
   }
   return err;
 }
@@ -876,7 +876,7 @@ ErrorPtr SceneList::save()
 
 int SceneList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  return (int)scenes.size();
+  return (int)mScenes.size();
 }
 
 
@@ -884,9 +884,9 @@ static char scenelist_key;
 
 PropertyDescriptorPtr SceneList::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aPropIndex<scenes.size()) {
+  if (aPropIndex<mScenes.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = scenes[aPropIndex]->getStringID();
+    descP->propertyName = mScenes[aPropIndex]->getStringID();
     descP->propertyType = apivalue_object;
     descP->deletable = true; // scene is deletable
     descP->propertyFieldKey = aPropIndex;
@@ -926,9 +926,9 @@ bool SceneList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pr
 {
   if (aPropertyDescriptor->hasObjectKey(scenelist_key) && aMode==access_delete) {
     // only field-level access is deleting a zone
-    SceneDescriptorPtr ds = scenes[aPropertyDescriptor->fieldKey()];
+    SceneDescriptorPtr ds = mScenes[aPropertyDescriptor->fieldKey()];
     ds->deleteFromStore(); // remove from store
-    scenes.erase(scenes.begin()+aPropertyDescriptor->fieldKey()); // remove from container
+    mScenes.erase(mScenes.begin()+aPropertyDescriptor->fieldKey()); // remove from container
     return true;
   }
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
@@ -938,7 +938,7 @@ bool SceneList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pr
 PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(scenelist_key)) {
-    return scenes[aPropertyDescriptor->fieldKey()];
+    return mScenes[aPropertyDescriptor->fieldKey()];
   }
   return NULL;
 }
@@ -949,14 +949,14 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
-  triggerId(0),
+  mTriggerId(0),
   triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
   triggerAction(sourcecode+regular, "action", this),
-  conditionMet(undefined)
+  mConditionMet(undefined)
 {
-  valueMapper.isMemberVariable();
+  mValueMapper.isMemberVariable();
   triggerContext = triggerCondition.domain()->newContext(); // common context for condition and action
-  triggerContext->registerMemberLookup(&valueMapper); // allow context to access the mapped values
+  triggerContext->registerMemberLookup(&mValueMapper); // allow context to access the mapped values
   triggerCondition.setSharedMainContext(triggerContext);
   triggerAction.setSharedMainContext(triggerContext);
 }
@@ -969,7 +969,7 @@ Trigger::~Trigger()
 
 string Trigger::logContextPrefix()
 {
-  return string_format("Trigger '%s'", name.c_str());
+  return string_format("Trigger '%s'", mName.c_str());
 }
 
 
@@ -980,13 +980,13 @@ string Trigger::logContextPrefix()
 
 void Trigger::parseVarDefs()
 {
-  varParseTicket.cancel();
-  bool foundall = valueMapper.parseMappingDefs(triggerVarDefs, NULL); // use EventSource/EventSink notification
+  mVarParseTicket.cancel();
+  bool foundall = mValueMapper.parseMappingDefs(mTriggerVarDefs, NULL); // use EventSource/EventSink notification
   if (!foundall) {
     // schedule a re-parse later
-    varParseTicket.executeOnce(boost::bind(&Trigger::parseVarDefs, this), REPARSE_DELAY);
+    mVarParseTicket.executeOnce(boost::bind(&Trigger::parseVarDefs, this), REPARSE_DELAY);
   }
-  else if (LocalController::sharedLocalController()->devicesReady) {
+  else if (LocalController::sharedLocalController()->mDevicesReady) {
     // do not run checks (and fire triggers too early) before devices are reported initialized
     triggerCondition.compileAndInit();
   }
@@ -1001,7 +1001,7 @@ void Trigger::processGlobalEvent(VdchostEvent aActivity)
   }
   else if (aActivity==vdchost_timeofday_changed) {
     // change in local time
-    if (!varParseTicket) {
+    if (!mVarParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
       //   Otherwise: have condition re-evaluated (because it possibly contains references to local time)
       triggerCondition.nextEvaluationNotLaterThan(MainLoop::now()+REPARSE_DELAY);
@@ -1016,7 +1016,7 @@ void Trigger::handleTrigger(ScriptObjPtr aResult)
 {
   // note: is a onGettingTrue trigger, no further result evaluation needed
   OLOG(LOG_NOTICE, "triggers based on values (and maybe timing): %s",
-    valueMapper.shortDesc().c_str()
+    mValueMapper.shortDesc().c_str()
   );
   // launch action (but let trigger evaluation IN SAME CONTEXT actually finish first)
   MainLoop::currentMainLoop().executeNow(boost::bind(&Trigger::executeTriggerAction, this));
@@ -1050,7 +1050,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   checkResult->setType(apivalue_object);
   ApiValuePtr mappingInfo = checkResult->newObject();
   parseVarDefs(); // reparse
-  if (valueMapper.getMappedSourcesInfo(mappingInfo)) {
+  if (mValueMapper.getMappedSourcesInfo(mappingInfo)) {
     checkResult->add("varDefs", mappingInfo);
   }
   // Condition
@@ -1174,12 +1174,12 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
 {
   inheritedParams::loadFromRowWithoutParentId(aRow, aIndex, aCommonFlagsP);
   // get key fields
-  triggerId = aRow->getWithDefault<int>(aIndex++, 0);
+  mTriggerId = aRow->getWithDefault<int>(aIndex++, 0);
   // the fields
-  name = nonNullCStr(aRow->get<const char *>(aIndex++));
+  mName = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   triggerAction.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  triggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
+  mTriggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerCondition.setTriggerMode(aRow->getCastedWithDefault<TriggerMode, int>(aIndex++, onGettingTrue), false); // do not initialize at load yet
   triggerCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, 0), false); // do not initialize at load yet
   mUiParams = nonNullCStr(aRow->get<const char *>(aIndex++));
@@ -1192,12 +1192,12 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // - my own id
-  aStatement.bind(aIndex++, triggerId);
+  aStatement.bind(aIndex++, mTriggerId);
   // the fields
-  aStatement.bind(aIndex++, name.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mName.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, triggerAction.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, triggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mTriggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (int)triggerCondition.getTriggerMode());
   aStatement.bind(aIndex++, (long long int)triggerCondition.getTriggerHoldoff());
   aStatement.bind(aIndex++, mUiParams.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
@@ -1253,9 +1253,9 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
   if (aPropertyDescriptor->hasObjectKey(trigger_key)) {
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
-        case triggerName_key: aPropValue->setStringValue(name); return true;
+        case triggerName_key: aPropValue->setStringValue(mName); return true;
         case uiParams_key: aPropValue->setStringValue(mUiParams); return true;
-        case triggerVarDefs_key: aPropValue->setStringValue(triggerVarDefs); return true;
+        case triggerVarDefs_key: aPropValue->setStringValue(mTriggerVarDefs); return true;
         case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getSource().c_str()); return true;
         case triggerMode_key: aPropValue->setInt32Value(triggerCondition.getTriggerMode()); return true;
         case triggerHoldOff_key: aPropValue->setDoubleValue(triggerCondition.getTriggerHoldoff()/Second); return true;
@@ -1266,13 +1266,13 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
     else {
       switch (aPropertyDescriptor->fieldKey()) {
         case triggerName_key:
-          setPVar(name, aPropValue->stringValue());
+          setPVar(mName, aPropValue->stringValue());
           return true;
         case uiParams_key:
           setPVar(mUiParams, aPropValue->stringValue());
           return true;
         case triggerVarDefs_key:
-          if (setPVar(triggerVarDefs, aPropValue->stringValue())) {
+          if (setPVar(mTriggerVarDefs, aPropValue->stringValue())) {
             parseVarDefs(); // changed variable mappings, re-parse them
           }
           return true;
@@ -1309,21 +1309,21 @@ TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting,
   TriggerPtr trig;
   int highestId = 0;
   size_t tidx = 0;
-  for (tidx=0; tidx<triggers.size(); ++tidx) {
-    int tid = triggers[tidx]->triggerId;
+  for (tidx=0; tidx<mTriggers.size(); ++tidx) {
+    int tid = mTriggers[tidx]->mTriggerId;
     if (aTriggerId!=0 && tid==aTriggerId) {
       // found
       break;
     }
     if (tid>=highestId) highestId = tid;
   }
-  if (tidx>=triggers.size() && aCreateNewIfNotExisting) {
+  if (tidx>=mTriggers.size() && aCreateNewIfNotExisting) {
     TriggerPtr newTrigger = TriggerPtr(new Trigger);
-    newTrigger->triggerId = highestId+1;
-    triggers.push_back(newTrigger);
+    newTrigger->mTriggerId = highestId+1;
+    mTriggers.push_back(newTrigger);
   }
-  if (tidx<triggers.size()) {
-    trig = triggers[tidx];
+  if (tidx<mTriggers.size()) {
+    trig = mTriggers[tidx];
     if (aTriggerIndexP) *aTriggerIndexP = tidx;
   }
   return trig;
@@ -1332,8 +1332,8 @@ TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting,
 
 TriggerPtr TriggerList::getTriggerByName(const string aTriggerName)
 {
-  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
-    if (strucmp((*pos)->name.c_str(),aTriggerName.c_str())==0) {
+  for (TriggersVector::iterator pos = mTriggers.begin(); pos!=mTriggers.end(); ++pos) {
+    if (strucmp((*pos)->mName.c_str(),aTriggerName.c_str())==0) {
       return *pos;
     }
   }
@@ -1363,7 +1363,7 @@ ErrorPtr TriggerList::load()
       int index = 0;
       newTrigger->loadFromRow(row, index, NULL);
       // - put custom action into container
-      triggers.push_back(newTrigger);
+      mTriggers.push_back(newTrigger);
       // - fresh object for next row
       newTrigger = TriggerPtr(new Trigger);
     }
@@ -1378,9 +1378,9 @@ ErrorPtr TriggerList::save()
   ErrorPtr err;
 
   // save all elements (only dirty ones will be actually stored to DB)
-  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
+  for (TriggersVector::iterator pos = mTriggers.begin(); pos!=mTriggers.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving trigger %d: %s", (*pos)->triggerId, err->text());
+    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving trigger %d: %s", (*pos)->mTriggerId, err->text());
   }
   return err;
 }
@@ -1390,7 +1390,7 @@ ErrorPtr TriggerList::save()
 
 int TriggerList::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  return (int)triggers.size();
+  return (int)mTriggers.size();
 }
 
 
@@ -1398,9 +1398,9 @@ static char triggerlist_key;
 
 PropertyDescriptorPtr TriggerList::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aPropIndex<triggers.size()) {
+  if (aPropIndex<mTriggers.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("%d",triggers[aPropIndex]->triggerId);
+    descP->propertyName = string_format("%d",mTriggers[aPropIndex]->mTriggerId);
     descP->propertyType = apivalue_object;
     descP->deletable = true; // trigger is deletable
     descP->propertyFieldKey = aPropIndex;
@@ -1427,7 +1427,7 @@ PropertyDescriptorPtr TriggerList::getDescriptorByName(string aPropMatch, int &a
     if (trg) {
       // valid new trigger
       descP->propertyFieldKey = ti; // the scene's index
-      descP->propertyName = string_format("%d", trg->triggerId);
+      descP->propertyName = string_format("%d", trg->mTriggerId);
       descP->createdNew = true;
       p = descP;
     }
@@ -1443,9 +1443,9 @@ bool TriggerList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 {
   if (aPropertyDescriptor->hasObjectKey(triggerlist_key) && aMode==access_delete) {
     // only field-level access is deleting a zone
-    TriggerPtr ds = triggers[aPropertyDescriptor->fieldKey()];
+    TriggerPtr ds = mTriggers[aPropertyDescriptor->fieldKey()];
     ds->deleteFromStore(); // remove from store
-    triggers.erase(triggers.begin()+aPropertyDescriptor->fieldKey()); // remove from container
+    mTriggers.erase(mTriggers.begin()+aPropertyDescriptor->fieldKey()); // remove from container
     return true;
   }
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
@@ -1455,7 +1455,7 @@ bool TriggerList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 PropertyContainerPtr TriggerList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(triggerlist_key)) {
-    return triggers[aPropertyDescriptor->fieldKey()];
+    return mTriggers[aPropertyDescriptor->fieldKey()];
   }
   return NULL;
 }
@@ -1463,7 +1463,7 @@ PropertyContainerPtr TriggerList::getContainer(const PropertyDescriptorPtr &aPro
 
 void TriggerList::processGlobalEvent(VdchostEvent aActivity)
 {
-  for (TriggersVector::iterator pos = triggers.begin(); pos!=triggers.end(); ++pos) {
+  for (TriggersVector::iterator pos = mTriggers.begin(); pos!=mTriggers.end(); ++pos) {
     (*pos)->processGlobalEvent(aActivity);
   }
 }
@@ -1473,12 +1473,12 @@ void TriggerList::processGlobalEvent(VdchostEvent aActivity)
 // MARK: - LocalController
 
 LocalController::LocalController(VdcHost &aVdcHost) :
-  vdcHost(aVdcHost),
-  devicesReady(false)
+  mVdcHost(aVdcHost),
+  mDevicesReady(false)
 {
-  localZones.isMemberVariable();
-  localScenes.isMemberVariable();
-  localTriggers.isMemberVariable();
+  mLocalZones.isMemberVariable();
+  mLocalScenes.isMemberVariable();
+  mLocalTriggers.isMemberVariable();
   StandardScriptingDomain::sharedDomain().registerMemberLookup(LocalControllerLookup::sharedLookup());
 }
 
@@ -1498,7 +1498,7 @@ LocalControllerPtr LocalController::sharedLocalController()
 
 void LocalController::signalActivity()
 {
-  vdcHost.signalActivity();
+  mVdcHost.signalActivity();
 }
 
 
@@ -1506,12 +1506,12 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
 {
   if (aActivity==vdchost_devices_initialized) {
     // from now on, triggers can/should fire
-    devicesReady = true;
+    mDevicesReady = true;
   }
   if (aActivity>=vdchost_redistributed_events) {
     // only process events that should be redistributed to all objects
     LOG(LOG_INFO, ">>> localcontroller starts processing global event %d", (int)aActivity);
-    localTriggers.processGlobalEvent(aActivity);
+    mLocalTriggers.processGlobalEvent(aActivity);
     LOG(LOG_INFO, ">>> localcontroller done processing event %d", (int)aActivity);
   }
 }
@@ -1688,13 +1688,13 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     // room scene
     zoneID = aButtonBehaviour.device.getZoneID();
     channelType = aButtonBehaviour.buttonChannel;
-    ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
+    ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
     if (!zone) return false; // button in a non-local zone, cannot handle
     if (group!=group_yellow_light && group!=group_grey_shadow) return true; // NOP because we don't support anything except light and shadow for now, but handled
     // evaluate click
     if (aClickType==ct_hold_start) {
       // start dimming if not off (or if it is specifically the up-key of a rocker)
-      if (!zone->zoneState.stateFor(group, area)) {
+      if (!zone->mZoneState.stateFor(group, area)) {
         // light is currently off
         if (direction==dimmode_up) {
           // holding specific up-key can start dimming even if light was off
@@ -1711,7 +1711,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       }
       if (doDim && direction==dimmode_stop) {
         // single button, no explicit direction -> use inverse of last dim
-        direction = zone->zoneState.lastDim==dimmode_up ? dimmode_down : dimmode_up;
+        direction = zone->mZoneState.mLastDim==dimmode_up ? dimmode_down : dimmode_up;
       }
     }
     else if (aClickType==ct_hold_end) {
@@ -1746,7 +1746,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       }
       if (direction==dimmode_stop) {
         // single button, no explicit direction
-        direction = zone->zoneState.stateFor(group,area) ? dimmode_down : dimmode_up;
+        direction = zone->mZoneState.stateFor(group,area) ? dimmode_down : dimmode_up;
       }
       // local
       if (direction==dimmode_up) {
@@ -1767,7 +1767,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
   else if (doDim) {
     // deliver
     NotificationAudience audience;
-    vdcHost.addToAudienceByZoneAndGroup(audience, zoneID, group);
+    mVdcHost.addToAudienceByZoneAndGroup(audience, zoneID, group);
     JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
     params->setType(apivalue_object);
     // - define audience
@@ -1779,7 +1779,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     params->add("channel", params->newUint64(channelType));
     params->add("area", params->newUint64(area));
     // - deliver
-    vdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
+    mVdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
     return true; // handled
   }
   else {
@@ -1791,14 +1791,14 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
 
 void LocalController::callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride)
 {
-  callScene(aScene.sceneNo, aScene.zoneID, aScene.group, aTransitionTimeOverride);
+  callScene(aScene.mSceneNo, aScene.mZoneID, aScene.mGroup, aTransitionTimeOverride);
 }
 
 
 void LocalController::callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride)
 {
   NotificationAudience audience;
-  vdcHost.addToAudienceByZoneAndGroup(audience, aZone, aGroup);
+  mVdcHost.addToAudienceByZoneAndGroup(audience, aZone, aGroup);
   callScene(aSceneNo, audience, aTransitionTimeOverride);
 }
 
@@ -1816,14 +1816,14 @@ void LocalController::callScene(SceneNo aSceneNo, NotificationAudience &aAudienc
     params->add("transitionTime", params->newDouble((double)aTransitionTimeOverride/Second));
   }
   // - deliver
-  vdcHost.deliverToAudience(aAudience, VdcApiConnectionPtr(), method, params);
+  mVdcHost.deliverToAudience(aAudience, VdcApiConnectionPtr(), method, params);
 }
 
 
 void LocalController::setOutputChannelValues(DsZoneID aZone, DsGroup aGroup, string aChannelId, double aValue, MLMicroSeconds aTransitionTimeOverride)
 {
   NotificationAudience audience;
-  vdcHost.addToAudienceByZoneAndGroup(audience, aZone, aGroup);
+  mVdcHost.addToAudienceByZoneAndGroup(audience, aZone, aGroup);
   setOutputChannelValues(audience, aChannelId, aValue, aTransitionTimeOverride);
 }
 
@@ -1840,7 +1840,7 @@ void LocalController::setOutputChannelValues(NotificationAudience &aAudience, st
     params->add("transitionTime", params->newDouble((double)aTransitionTimeOverride/Second));
   }
   // - deliver
-  vdcHost.deliverToAudience(aAudience, VdcApiConnectionPtr(), method, params);
+  mVdcHost.deliverToAudience(aAudience, VdcApiConnectionPtr(), method, params);
 }
 
 
@@ -1849,7 +1849,7 @@ void LocalController::deviceAdded(DevicePtr aDevice)
 {
   FOCUSLOG("deviceAdded: device = %s", aDevice->shortDesc().c_str());
   // make sure this device's zone exists in the global list
-  ZoneDescriptorPtr deviceZone = localZones.getZoneById(aDevice->getZoneID(), true);
+  ZoneDescriptorPtr deviceZone = mLocalZones.getZoneById(aDevice->getZoneID(), true);
   deviceZone->usedByDevice(aDevice, true);
 }
 
@@ -1857,7 +1857,7 @@ void LocalController::deviceAdded(DevicePtr aDevice)
 void LocalController::deviceRemoved(DevicePtr aDevice)
 {
   FOCUSLOG("deviceRemoved: device = %s", aDevice->shortDesc().c_str());
-  ZoneDescriptorPtr deviceZone = localZones.getZoneById(aDevice->getZoneID(), false);
+  ZoneDescriptorPtr deviceZone = mLocalZones.getZoneById(aDevice->getZoneID(), false);
   if (deviceZone) deviceZone->usedByDevice(aDevice, false);
 }
 
@@ -1867,10 +1867,10 @@ void LocalController::deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, D
   FOCUSLOG("deviceChangesZone: device = %s, zone %d -> %d", aDevice->shortDesc().c_str(), aFromZone, aToZone);
   if (aFromZone!=aToZone) {
     // - remove from old
-    ZoneDescriptorPtr deviceZone = localZones.getZoneById(aFromZone, false);
+    ZoneDescriptorPtr deviceZone = mLocalZones.getZoneById(aFromZone, false);
     if (deviceZone) deviceZone->usedByDevice(aDevice, false);
     // - add to new (and create it in case it is new)
-    deviceZone = localZones.getZoneById(aToZone, true);
+    deviceZone = mLocalZones.getZoneById(aToZone, true);
     deviceZone->usedByDevice(aDevice, true);
   }
 }
@@ -1878,7 +1878,7 @@ void LocalController::deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, D
 
 void LocalController::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState)
 {
-  ZoneDescriptorPtr zone = localZones.getZoneById(aDevice->getZoneID(), false);
+  ZoneDescriptorPtr zone = mLocalZones.getZoneById(aDevice->getZoneID(), false);
   if (zone && aDevice->getOutput()) {
     DsGroupMask affectedGroups = aDevice->getOutput()->groupMemberships();
     if (aDeliveryState.optimizedType==ntfy_callscene) {
@@ -1887,33 +1887,33 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
         if (affectedGroups & 1) {
           SceneIdentifier calledScene(aDeliveryState.contentId, zone->getZoneId(), (DsGroup)g);
           // general
-          int area = SimpleScene::areaForScene(calledScene.sceneNo);
+          int area = SimpleScene::areaForScene(calledScene.mSceneNo);
           if (calledScene.getKindFlags()&scene_off) {
             // is a off scene (area or not), cancels the local priority
             aDevice->getOutput()->setLocalPriority(false);
           }
           else if (area!=0) {
             // is area on scene, set local priority in the device
-            aDevice->setLocalPriority(calledScene.sceneNo);
+            aDevice->setLocalPriority(calledScene.mSceneNo);
           }
           if (calledScene.getKindFlags()&scene_global) {
-            zone->zoneState.lastGlobalScene = calledScene.sceneNo;
+            zone->mZoneState.mLastGlobalScene = calledScene.mSceneNo;
           }
           // group specific
           bool isOffScene = calledScene.getKindFlags()&scene_off;
           if (g==group_yellow_light) {
-            zone->zoneState.lastLightScene = calledScene.sceneNo;
+            zone->mZoneState.mLastLightScene = calledScene.mSceneNo;
             // calling on scenes is remembered as dimming default channel up (so next dim will go down)
-            zone->zoneState.lastDimChannel = channeltype_default;
-            zone->zoneState.lastDim = isOffScene ? dimmode_down : dimmode_up;
+            zone->mZoneState.mLastDimChannel = channeltype_default;
+            zone->mZoneState.mLastDim = isOffScene ? dimmode_down : dimmode_up;
           }
-          zone->zoneState.setStateFor(g, area, !isOffScene);
-          if (calledScene.sceneNo==DEEP_OFF) {
+          zone->mZoneState.setStateFor(g, area, !isOffScene);
+          if (calledScene.mSceneNo==DEEP_OFF) {
             // force areas off as well
-            zone->zoneState.setStateFor(g, 1, false);
-            zone->zoneState.setStateFor(g, 2, false);
-            zone->zoneState.setStateFor(g, 3, false);
-            zone->zoneState.setStateFor(g, 4, false);
+            zone->mZoneState.setStateFor(g, 1, false);
+            zone->mZoneState.setStateFor(g, 2, false);
+            zone->mZoneState.setStateFor(g, 3, false);
+            zone->mZoneState.setStateFor(g, 4, false);
           }
         }
       }
@@ -1921,20 +1921,20 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
     else if (aDeliveryState.optimizedType==ntfy_dimchannel) {
       // dimming
       if (aDeliveryState.actionVariant!=dimmode_stop) {
-        zone->zoneState.lastDimChannel = (DsChannelType)aDeliveryState.actionParam;
-        zone->zoneState.lastDim = (VdcDimMode)aDeliveryState.actionVariant;
+        zone->mZoneState.mLastDimChannel = (DsChannelType)aDeliveryState.actionParam;
+        zone->mZoneState.mLastDim = (VdcDimMode)aDeliveryState.actionVariant;
       }
     }
     LOG(LOG_INFO,
       "Zone '%s' (%d) state updated: lastLightScene:%d, lastDim=%d, lastGlobalScene:%d, lightOn=%d/areas1234=%d%d%d%d, shadesOpen=%d/%d%d%d%d",
       zone->getName().c_str(), zone->getZoneId(),
-      zone->zoneState.lastLightScene,
-      (int)zone->zoneState.lastDim,
-      zone->zoneState.lastGlobalScene,
-      zone->zoneState.lightOn[0],
-      zone->zoneState.lightOn[1], zone->zoneState.lightOn[2], zone->zoneState.lightOn[3], zone->zoneState.lightOn[4],
-      zone->zoneState.shadesOpen[0],
-      zone->zoneState.shadesOpen[1], zone->zoneState.shadesOpen[2], zone->zoneState.shadesOpen[3], zone->zoneState.shadesOpen[4]
+      zone->mZoneState.mLastLightScene,
+      (int)zone->mZoneState.mLastDim,
+      zone->mZoneState.mLastGlobalScene,
+      zone->mZoneState.mLightOn[0],
+      zone->mZoneState.mLightOn[1], zone->mZoneState.mLightOn[2], zone->mZoneState.mLightOn[3], zone->mZoneState.mLightOn[4],
+      zone->mZoneState.mShadesOpen[0],
+      zone->mZoneState.mShadesOpen[1], zone->mZoneState.mShadesOpen[2], zone->mZoneState.mShadesOpen[3], zone->mZoneState.mShadesOpen[4]
     );
   }
 }
@@ -1944,7 +1944,7 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
 
 size_t LocalController::totalDevices() const
 {
-  return vdcHost.dSDevices.size();
+  return mVdcHost.dSDevices.size();
 }
 
 
@@ -1958,11 +1958,11 @@ void LocalController::startRunning()
 ErrorPtr LocalController::load()
 {
   ErrorPtr err;
-  err = localZones.load();
+  err = mLocalZones.load();
   if (Error::notOK(err)) LOG(LOG_ERR, "could not load localZones: %s", err->text());
-  err = localScenes.load();
+  err = mLocalScenes.load();
   if (Error::notOK(err)) LOG(LOG_ERR, "could not load localScenes: %s", err->text());
-  err = localTriggers.load();
+  err = mLocalTriggers.load();
   if (Error::notOK(err)) LOG(LOG_ERR, "could not load localTriggers: %s", err->text());
   return err;
 }
@@ -1971,11 +1971,11 @@ ErrorPtr LocalController::load()
 ErrorPtr LocalController::save()
 {
   ErrorPtr err;
-  err = localZones.save();
+  err = mLocalZones.save();
   if (Error::notOK(err)) LOG(LOG_ERR, "could not save localZones: %s", err->text());
-  err = localScenes.save();
+  err = mLocalScenes.save();
   if (Error::notOK(err)) LOG(LOG_ERR, "could not save localScenes: %s", err->text());
-  err = localTriggers.save();
+  err = mLocalTriggers.save();
   if (Error::notOK(err)) LOG(LOG_ERR, "could not save localTriggers: %s", err->text());
   return err;
 }
@@ -2053,7 +2053,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
     if (Error::isOK(aError)) {
       DsZoneID zoneID = (DsZoneID)o->uint16Value();
       // get zone
-      ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
+      ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
       if (!zone) {
         aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
       }
@@ -2074,7 +2074,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
           for (size_t i = 0; i<scenes.size(); ++i) {
             ApiValuePtr s = result->newObject();
             s->add("id", s->newString(scenes[i].stringId()));
-            s->add("no", s->newUint64(scenes[i].sceneNo));
+            s->add("no", s->newUint64(scenes[i].mSceneNo));
             s->add("name", s->newString(scenes[i].getName()));
             s->add("action", s->newString(scenes[i].getActionName()));
             s->add("kind", s->newUint64(scenes[i].getKindFlags()));
@@ -2094,7 +2094,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
     if (o) {
       // specific zone
       DsZoneID zoneID = (DsZoneID)o->uint16Value();
-      ZoneDescriptorPtr zone = localZones.getZoneById(zoneID, false);
+      ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
       if (!zone) {
         aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
         return true;
@@ -2103,7 +2103,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
     }
     else {
       // globally
-      for (DsDeviceMap::iterator pos = vdcHost.dSDevices.begin(); pos!=vdcHost.dSDevices.end(); ++pos) {
+      for (DsDeviceMap::iterator pos = mVdcHost.dSDevices.begin(); pos!=mVdcHost.dSDevices.end(); ++pos) {
         OutputBehaviourPtr ob = pos->second->getOutput();
         if (ob) groups |= ob->groupMemberships();
       }
@@ -2134,7 +2134,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
     aError = DsAddressable::checkParam(aParams, "triggerID", o);
     if (Error::isOK(aError)) {
       int triggerId = o->int32Value();
-      TriggerPtr trig = localTriggers.getTrigger(triggerId);
+      TriggerPtr trig = mLocalTriggers.getTrigger(triggerId);
       if (!trig) {
         aError = WebError::webErr(400, "Trigger %d not found", triggerId);
       }
@@ -2209,11 +2209,11 @@ PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr &
   if (aPropertyDescriptor->parentDescriptor->isRootOfObject()) {
     switch (aPropertyDescriptor->fieldKey()) {
       case zones_key:
-        return ZoneListPtr(&localZones);
+        return ZoneListPtr(&mLocalZones);
       case scenes_key:
-        return SceneListPtr(&localScenes);
+        return SceneListPtr(&mLocalScenes);
       case triggers_key:
-        return TriggerListPtr(&localTriggers);
+        return TriggerListPtr(&mLocalTriggers);
     }
   }
   // unknown here
@@ -2234,7 +2234,7 @@ static void trigger_funcExecuted(BuiltinFunctionContextPtr f, ScriptObjPtr aResu
 }
 static void trigger_func(BuiltinFunctionContextPtr f)
 {
-  TriggerPtr targetTrigger = LocalController::sharedLocalController()->localTriggers.getTriggerByName(f->arg(0)->stringValue());
+  TriggerPtr targetTrigger = LocalController::sharedLocalController()->mLocalTriggers.getTriggerByName(f->arg(0)->stringValue());
   if (!targetTrigger) {
     f->finish(new ErrorValue(ScriptError::NotFound, "No trigger named '%s' found", f->arg(0)->stringValue().c_str()));
     return;
@@ -2250,13 +2250,13 @@ static bool findScene(int &ai, BuiltinFunctionContextPtr f, SceneNo &sceneNo, in
   if (f->numArgs()>1 && f->arg(1)->hasType(text)) {
     // second param is a zone
     // - ..so first one must be a scene number or name
-    sceneNo = LocalController::sharedLocalController()->localScenes.getSceneIdByKind(f->arg(0)->stringValue());
+    sceneNo = LocalController::sharedLocalController()->mLocalScenes.getSceneIdByKind(f->arg(0)->stringValue());
     if (sceneNo==INVALID_SCENE_NO) {
       f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
       return false;
     }
     // - check zone
-    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(f->arg(1)->stringValue());
+    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByName(f->arg(1)->stringValue());
     if (!zone) {
       f->finish(new ErrorValue(ScriptError::NotFound, "Zone '%s' not found", f->arg(1)->stringValue().c_str()));
       return false;
@@ -2266,7 +2266,7 @@ static bool findScene(int &ai, BuiltinFunctionContextPtr f, SceneNo &sceneNo, in
   }
   else {
     // first param is a named scene that includes the zone
-    SceneDescriptorPtr scene = LocalController::sharedLocalController()->localScenes.getSceneByName(f->arg(0)->stringValue());
+    SceneDescriptorPtr scene = LocalController::sharedLocalController()->mLocalScenes.getSceneByName(f->arg(0)->stringValue());
     if (!scene) {
       f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
       return false;
@@ -2366,7 +2366,7 @@ static void set_func(BuiltinFunctionContextPtr f)
     channelId = f->arg(3)->stringValue();
   }
   // get zone or device
-  if (ZoneDescriptorPtr zone = LocalController::sharedLocalController()->localZones.getZoneByName(f->arg(0)->stringValue())) {
+  if (ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByName(f->arg(0)->stringValue())) {
     // - might have an optional group argument
     DsGroup group = group_yellow_light; // default to light
     if (f->numArgs()>4) {
