@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2015-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2015-2021 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -19,30 +19,30 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __p44vdc__externalvdc__
-#define __p44vdc__externalvdc__
+#ifndef __p44vdc__customdevice__
+#define __p44vdc__customdevice__
 
 #include "p44vdc_common.hpp"
 
-#if ENABLE_EXTERNAL
+#if ENABLE_EXTERNAL || ENABLE_SCRIPTED
 
-#ifndef ENABLE_EXTERNAL_SINGLEDEVICE
-  #define ENABLE_EXTERNAL_SINGLEDEVICE 1
+#ifndef ENABLE_CUSTOM_SINGLEDEVICE
+  #define ENABLE_CUSTOM_SINGLEDEVICE 1
 #endif
 #ifndef ENABLE_FCU_SUPPORT
   #define ENABLE_FCU_SUPPORT 1
 #endif
-#ifndef ENABLE_EXTERNAL_EXOTIC
-  #define ENABLE_EXTERNAL_EXOTIC 1
+#ifndef ENABLE_CUSTOM_EXOTIC
+  #define ENABLE_CUSTOM_EXOTIC 1
 #endif
 
 
 #include "vdc.hpp"
 #include "device.hpp"
-#include "jsoncomm.hpp"
+#include "jsonobject.hpp"
 
 #include "buttonbehaviour.hpp"
-#if ENABLE_EXTERNAL_SINGLEDEVICE
+#if ENABLE_CUSTOM_SINGLEDEVICE
 #include "singledevice.hpp"
 #endif
 
@@ -50,13 +50,12 @@ using namespace std;
 
 namespace p44 {
 
-  class ExternalDeviceConnector;
   class ExternalVdc;
-  class ExternalDevice;
+  class CustomDevice;
 
-  #if ENABLE_EXTERNAL_SINGLEDEVICE
+  #if ENABLE_CUSTOM_SINGLEDEVICE
 
-  class ExternalDeviceAction : public DeviceAction
+  class CustomDeviceAction : public DeviceAction
   {
     typedef DeviceAction inherited;
 
@@ -68,11 +67,11 @@ namespace p44 {
     /// @param aSingleDevice the single device this action belongs to
     /// @param aName the name of the action.
     /// @param aDescription a description string for the action.
-    ExternalDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle, const string aCategory);
+    CustomDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle, const string aCategory);
 
-    virtual ~ExternalDeviceAction();
+    virtual ~CustomDeviceAction();
 
-    ExternalDevice &getExternalDevice();
+    CustomDevice &getCustomDevice();
 
     /// implementation of action
     virtual void performCall(ApiValuePtr aParams, StatusCB aCompletedCB) P44_OVERRIDE;
@@ -83,45 +82,38 @@ namespace p44 {
   private:
 
   };
-  typedef boost::intrusive_ptr<ExternalDeviceAction> ExternalDeviceActionPtr;
+  typedef boost::intrusive_ptr<CustomDeviceAction> CustomDeviceActionPtr;
 
-  #endif // ENABLE_EXTERNAL_SINGLEDEVICE
+  #endif // ENABLE_CUSTOM_SINGLEDEVICE
 
-
-
-  typedef boost::intrusive_ptr<ExternalDeviceConnector> ExternalDeviceConnectorPtr;
-
-  typedef boost::intrusive_ptr<ExternalDevice> ExternalDevicePtr;
-  class ExternalDevice :
-    #if ENABLE_EXTERNAL_SINGLEDEVICE
+  typedef boost::intrusive_ptr<CustomDevice> CustomDevicePtr;
+  class CustomDevice :
+    #if ENABLE_CUSTOM_SINGLEDEVICE
     public SingleDevice
     #else
     public Device
     #endif
   {
-    #if ENABLE_EXTERNAL_SINGLEDEVICE
+    #if ENABLE_CUSTOM_SINGLEDEVICE
     typedef SingleDevice inherited;
-    friend class ExternalDeviceAction;
+    friend class CustomDeviceAction;
     #else
     typedef Device inherited;
     #endif
     friend class ExternalVdc;
-    friend class ExternalDeviceConnector;
-
-    ExternalDeviceConnectorPtr deviceConnector;
-    string tag; ///< the tag to address the device within the devices on the same connection
+    friend class CustomDeviceConnector;
 
     string iconBaseName; ///< the base icon name
     string modelNameString; ///< the string to be returned by modelName()
     string modelVersionString; ///< the string to be returned by modelVersion()
     string vendorNameString; ///< the vendor name
     string oemModelGUIDString; ///< the OEM model GUID, which is used to match devices with dS database
-    string typeIdentifier; ///< the type identifier
     string devClass; ///< device class
     string configUrl; ///< custom value for configURL if not empty
     uint32_t devClassVersion; ///< device class version
 
 
+    bool mSimpletext; ///< set when communication with this device is simple text
     bool configured; ///< set when device is configured (init message received and device added to vdc)
     bool useMovement; ///< if set, device communication uses MV/move command for dimming and shadow device operation
     bool controlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
@@ -129,12 +121,12 @@ namespace p44 {
     bool sceneCommands; ///< if set, scene commands are forwarded to the external device
     bool forwardIdentify; ///< if set, "IDENTIFY" messages will be sent, and device will show the "identification" modelfeature in the vDC API
 
-    #if ENABLE_EXTERNAL_EXOTIC
+    #if ENABLE_CUSTOM_EXOTIC
     string configurationId; ///< current configuration's id
     DeviceConfigurationsVector configurations; ///< the device's possible configurations
     #endif
 
-    #if ENABLE_EXTERNAL_SINGLEDEVICE
+    #if ENABLE_CUSTOM_SINGLEDEVICE
     bool noConfirmAction; ///< if set, device implementation is not expected to use
     #endif
 
@@ -142,10 +134,14 @@ namespace p44 {
 
     MLTicket buttonReleaseTicket; ///< for automatically releasing buttons
 
+  protected:
+
+    string typeIdentifier; ///< the type identifier
+
   public:
 
-    ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag);
-    virtual ~ExternalDevice();
+    CustomDevice(Vdc *aVdcP, bool aSimpleText);
+    virtual ~CustomDevice();
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
@@ -153,7 +149,7 @@ namespace p44 {
     ExternalVdc &getExternalVdc();
 
     /// device type identifier
-		/// @return constant identifier for this type of device (one container might contain more than one type)
+    /// @return constant identifier for this type of device (one container might contain more than one type)
     virtual string deviceTypeIdentifier() const  P44_OVERRIDE { return typeIdentifier; };
 
     /// @return human readable model name/short description
@@ -265,14 +261,14 @@ namespace p44 {
     ///   aDevice argument to the DisconnectCB handler.
     virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
 
-    #if ENABLE_EXTERNAL_EXOTIC
+    #if ENABLE_CUSTOM_EXOTIC
     /// device configurations implementation
     virtual string getDeviceConfigurationId() P44_OVERRIDE;
     virtual ErrorPtr switchConfiguration(const string aConfigurationId) P44_OVERRIDE;
     virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB) P44_OVERRIDE;
     #endif
 
-    #if ENABLE_EXTERNAL_SINGLEDEVICE
+    #if ENABLE_CUSTOM_SINGLEDEVICE
     /// @name factory methods for elements configured via dynamic JSON config
     /// @{
 
@@ -282,20 +278,30 @@ namespace p44 {
     /// @}
     #endif
 
+    /// for vdc, to configure the device
+    ErrorPtr configureDevice(JsonObjectPtr aInitParams);
+
+    /// @return true if successfully configured
+    bool isConfigured() { return configured; }
+
+    /// for vdc, to have JSON message processed
+    ErrorPtr processJsonMessage(string aMessageType, JsonObjectPtr aMessage);
+
+    /// for vdc, to have simple message processed
+    ErrorPtr processSimpleMessage(string aMessageType, string aValue);
+
+  protected:
+
+    virtual void sendDeviceApiJsonMessage(JsonObjectPtr aMessage) = 0;
+    virtual void sendDeviceApiSimpleMessage(string aMessage) = 0;
+    virtual void sendDeviceApiFlagMessage(string aFlagWord) = 0;
 
   private:
 
-    void sendDeviceApiJsonMessage(JsonObjectPtr aMessage);
-    void sendDeviceApiSimpleMessage(string aMessage);
-    void sendDeviceApiFlagMessage(string aFlagWord);
-
-    ErrorPtr configureDevice(JsonObjectPtr aInitParams);
-    ErrorPtr processJsonMessage(string aMessageType, JsonObjectPtr aMessage);
-    ErrorPtr processSimpleMessage(string aMessageType, string aValue);
     ErrorPtr processInputJson(char aInputType, JsonObjectPtr aParams);
     ErrorPtr processInput(char aInputType, uint32_t aIndex, double aValue);
 
-    #if ENABLE_EXTERNAL_SINGLEDEVICE
+    #if ENABLE_CUSTOM_SINGLEDEVICE
     ErrorPtr parseParam(const string aParamName, JsonObjectPtr aParamDetails, ValueDescriptorPtr &aParam);
     void propertyChanged(ValueDescriptorPtr aChangedProperty);
     #endif
@@ -305,125 +311,8 @@ namespace p44 {
 
   };
 
-
-  typedef map<string,ExternalDevicePtr> ExternalDevicesMap;
-
-  class ExternalDeviceConnector : public P44LoggingObj
-  {
-    friend class ExternalDevice;
-
-    ExternalVdc &externalVdc;
-
-    bool simpletext; ///< if set, device communication uses very simple text messages rather than JSON
-
-    JsonCommPtr deviceConnection;
-    ExternalDevicesMap externalDevices;
-
-  public:
-
-    ExternalDeviceConnector(ExternalVdc &aExternalVdc, JsonCommPtr aDeviceConnection);
-    virtual ~ExternalDeviceConnector();
-
-    /// @return the per-instance log level offset
-    /// @note is virtual because some objects might want to use the log level offset of another object
-    virtual int getLogLevelOffset();
-
-  private:
-
-    void removeDevice(ExternalDevicePtr aExtDev);
-    void closeConnection();
-    void handleDeviceConnectionStatus(ErrorPtr aError);
-    void handleDeviceApiJsonMessage(ErrorPtr aError, JsonObjectPtr aMessage);
-    ErrorPtr handleDeviceApiJsonSubMessage(JsonObjectPtr aMessage);
-    void handleDeviceApiSimpleMessage(ErrorPtr aError, string aMessage);
-
-    ExternalDevicePtr findDeviceByTag(string aTag, bool aNoError);
-    void sendDeviceApiJsonMessage(JsonObjectPtr aMessage, const char *aTag = NULL);
-    void sendDeviceApiSimpleMessage(string aMessage, const char *aTag = NULL);
-    void sendDeviceApiStatusMessage(ErrorPtr aError, const char *aTag = NULL);
-    void sendDeviceApiFlagMessage(string aFlagWord, const char *aTag = NULL);
-
-  };
-
-
-
-
-  typedef boost::intrusive_ptr<ExternalVdc> ExternalVdcPtr;
-  class ExternalVdc : public Vdc
-  {
-    typedef Vdc inherited;
-    friend class ExternalDevice;
-    friend class ExternalDeviceConnector;
-
-    SocketCommPtr externalDeviceApiServer;
-
-    string iconBaseName; ///< the base icon name
-    string modelNameString; ///< the string to be returned by modelName()
-    string modelVersionString; ///< the string to be returned by vdcModelVersion()
-    string configUrl; ///< custom value for configURL if not empty
-    bool forwardIdentify; ///< if set, "VDCIDENTIFY" messages will be sent, and vdc will show the "identification" capability in the vDC API
-
-  public:
-    ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
-
-    void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
-
-    virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
-
-    /// scan for (collect) devices and add them to the vdc
-    virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
-
-    /// @return human readable, language independent suffix to explain vdc functionality.
-    ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() const P44_OVERRIDE { return "external"; }
-
-    /// get supported rescan modes for this vDC. This indicates (usually to a web-UI) which
-    /// of the flags to collectDevices() make sense for this vDC.
-    /// @return a combination of rescanmode_xxx bits
-    virtual int getRescanModes() const P44_OVERRIDE { return rescanmode_exhaustive; }; // only exhaustive makes sense
-
-    /// Custom identification for external vDCs
-    /// @{
-
-    /// @return human readable, language independent model name/short description
-    /// @note when no specific modelNameString is set via external API,
-    ///   base class will construct this from global product name and vdcModelSuffix()
-    virtual string modelName() P44_OVERRIDE;
-
-    /// @return human readable model version specific to that vDC, meaning for example a firmware version
-    ///    of external hardware governing the access to a device bus/network such as a hue bridge.
-    ///    If not empty, this will be appended to the modelVersion() string.
-    virtual string vdcModelVersion() const P44_OVERRIDE;
-
-    /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() P44_OVERRIDE;
-
-    /// Get icon data or name
-    /// @param aIcon string to put result into (when method returns true)
-    /// - if aWithData is set, binary PNG icon data for given resolution prefix is returned
-    /// - if aWithData is not set, only the icon name (without file extension) is returned
-    /// @param aWithData if set, PNG data is returned, otherwise only name
-    /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
-
-    /// identify the vdc to the user in some way
-    /// @note usually, this would be a LED or buzzer in the vdc device (bridge, gateway etc.)
-    virtual void identifyToUser() P44_OVERRIDE;
-
-    /// check if identifyToUser() has an actual implementation
-    virtual bool canIdentifyToUser() P44_OVERRIDE;
-
-    /// @}
-
-
-  private:
-
-    SocketCommPtr deviceApiConnectionHandler(SocketCommPtr aServerSocketCommP);
-
-  };
-
 } // namespace p44
 
 
-#endif // ENABLE_EXTERNAL
-#endif // __p44vdc__externalvdc__
+#endif // ENABLE_EXTERNAL || ENABLE_SCRIPTED
+#endif // __p44vdc__customdevice__
