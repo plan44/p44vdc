@@ -59,7 +59,7 @@ namespace p44 {
   {
     typedef DeviceAction inherited;
 
-    StatusCB callback;
+    StatusCB mCallback;
 
   public:
 
@@ -78,8 +78,6 @@ namespace p44 {
 
     /// process action call confirmation message from external device
     void callPerformed(JsonObjectPtr aStatusInfo);
-
-  private:
 
   };
   typedef boost::intrusive_ptr<CustomDeviceAction> CustomDeviceActionPtr;
@@ -103,40 +101,40 @@ namespace p44 {
     friend class ExternalVdc;
     friend class CustomDeviceConnector;
 
-    string iconBaseName; ///< the base icon name
-    string modelNameString; ///< the string to be returned by modelName()
-    string modelVersionString; ///< the string to be returned by modelVersion()
-    string vendorNameString; ///< the vendor name
-    string oemModelGUIDString; ///< the OEM model GUID, which is used to match devices with dS database
-    string devClass; ///< device class
-    string configUrl; ///< custom value for configURL if not empty
-    uint32_t devClassVersion; ///< device class version
+    string mIconBaseName; ///< the base icon name
+    string mModelNameString; ///< the string to be returned by modelName()
+    string mModelVersionString; ///< the string to be returned by modelVersion()
+    string mVendorNameString; ///< the vendor name
+    string mOemModelGUIDString; ///< the OEM model GUID, which is used to match devices with dS database
+    string mDevClass; ///< device class
+    string mConfigUrl; ///< custom value for configURL if not empty
+    uint32_t mDevClassVersion; ///< device class version
 
 
     bool mSimpletext; ///< set when communication with this device is simple text
-    bool configured; ///< set when device is configured (init message received and device added to vdc)
-    bool useMovement; ///< if set, device communication uses MV/move command for dimming and shadow device operation
-    bool controlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
-    bool querySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
-    bool sceneCommands; ///< if set, scene commands are forwarded to the external device
-    bool forwardIdentify; ///< if set, "IDENTIFY" messages will be sent, and device will show the "identification" modelfeature in the vDC API
+    bool mConfigured; ///< set when device is configured (init message received and device added to vdc)
+    bool mUseMovement; ///< if set, device communication uses MV/move command for dimming and shadow device operation
+    bool mControlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
+    bool mQuerySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
+    bool mSceneCommands; ///< if set, scene commands are forwarded to the external device
+    bool mForwardIdentify; ///< if set, "IDENTIFY" messages will be sent, and device will show the "identification" modelfeature in the vDC API
 
     #if ENABLE_CUSTOM_EXOTIC
-    string configurationId; ///< current configuration's id
-    DeviceConfigurationsVector configurations; ///< the device's possible configurations
+    string mConfigurationId; ///< current configuration's id
+    DeviceConfigurationsVector mConfigurations; ///< the device's possible configurations
     #endif
 
     #if ENABLE_CUSTOM_SINGLEDEVICE
-    bool noConfirmAction; ///< if set, device implementation is not expected to use
+    bool mNoConfirmAction; ///< if set, device implementation is not expected to use
     #endif
 
-    SimpleCB syncedCB; ///< will be called when device confirms "SYNC" message with "SYNCED" response
+    SimpleCB mSyncedCB; ///< will be called when device confirms "SYNC" message with "SYNCED" response
 
-    MLTicket buttonReleaseTicket; ///< for automatically releasing buttons
+    MLTicket mButtonReleaseTicket; ///< for automatically releasing buttons
 
   protected:
 
-    string typeIdentifier; ///< the type identifier
+    string mTypeIdentifier; ///< the type identifier
 
   public:
 
@@ -150,7 +148,7 @@ namespace p44 {
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const  P44_OVERRIDE { return typeIdentifier; };
+    virtual string deviceTypeIdentifier() const  P44_OVERRIDE { return mTypeIdentifier; };
 
     /// @return human readable model name/short description
     virtual string modelName() P44_OVERRIDE;
@@ -167,13 +165,13 @@ namespace p44 {
     /// device class (for grouping functionally equivalent single devices)
     /// @note usually, only single devices do have a deviceClass
     /// @return name of the device class, such as "washingmachine" or "kettle" or "oven". Empty string if no device class exists.
-    virtual string deviceClass() P44_OVERRIDE { return devClass; }
+    virtual string deviceClass() P44_OVERRIDE { return mDevClass; }
 
     /// device class version number.
     /// @note This allows different versions of the functional representation of the device class
     ///   to coexist in a system.
     /// @return version or 0 if no version exists
-    virtual uint32_t deviceClassVersion() P44_OVERRIDE { return devClassVersion; }
+    virtual uint32_t deviceClassVersion() P44_OVERRIDE { return mDevClassVersion; }
 
     /// @return URL for Web-UI (for access from local LAN)
     virtual string webuiURLString() P44_OVERRIDE;
@@ -282,7 +280,7 @@ namespace p44 {
     ErrorPtr configureDevice(JsonObjectPtr aInitParams);
 
     /// @return true if successfully configured
-    bool isConfigured() { return configured; }
+    bool isConfigured() { return mConfigured; }
 
     /// for vdc, to have JSON message processed
     ErrorPtr processJsonMessage(string aMessageType, JsonObjectPtr aMessage);

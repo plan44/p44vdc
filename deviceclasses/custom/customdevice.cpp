@@ -53,7 +53,7 @@ using namespace p44;
 
 CustomDeviceAction::CustomDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle, const string aCategory) :
   inherited(aSingleDevice, aName, aDescription, aTitle, aCategory),
-  callback(NULL)
+  mCallback(NULL)
 {
 }
 
@@ -61,7 +61,7 @@ CustomDeviceAction::CustomDeviceAction(SingleDevice &aSingleDevice, const string
 CustomDeviceAction::~CustomDeviceAction()
 {
   // execute callback if still pending
-  if (callback) callback(WebError::webErr(410, "device gone"));
+  if (mCallback) mCallback(WebError::webErr(410, "device gone"));
 }
 
 
@@ -73,9 +73,9 @@ CustomDevice &CustomDeviceAction::getCustomDevice()
 
 void CustomDeviceAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
 {
-  if (!getCustomDevice().noConfirmAction) {
+  if (!getCustomDevice().mNoConfirmAction) {
     // remember callback
-    callback = aCompletedCB;
+    mCallback = aCompletedCB;
   }
   // create JSON response
   JsonObjectPtr message = JsonObject::newObj();
@@ -89,7 +89,7 @@ void CustomDeviceAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
   }
   // send it
   getCustomDevice().sendDeviceApiJsonMessage(message);
-  if (getCustomDevice().noConfirmAction) {
+  if (getCustomDevice().mNoConfirmAction) {
     // immediately confirm
     if (aCompletedCB) aCompletedCB(ErrorPtr());
   }
@@ -113,9 +113,9 @@ void CustomDeviceAction::callPerformed(JsonObjectPtr aStatusInfo)
       err = WebError::webErr(ec,"%s: %s", actionId.c_str(), et.c_str());
     }
   }
-  if (callback) {
-    callback(err); // will return status to caller of action
-    callback = NULL;
+  if (mCallback) {
+    mCallback(err); // will return status to caller of action
+    mCallback = NULL;
   }
 }
 
@@ -130,22 +130,22 @@ void CustomDeviceAction::callPerformed(JsonObjectPtr aStatusInfo)
 CustomDevice::CustomDevice(Vdc *aVdcP, bool aSimpleText) :
   #if ENABLE_CUSTOM_SINGLEDEVICE
   inherited(aVdcP, false), // do not enable single device mechanisms by default
-  noConfirmAction(false), // expect action execution to be confirmed
+  mNoConfirmAction(false), // expect action execution to be confirmed
   #else
   inherited(aVdcP),
   #endif
   mSimpletext(aSimpleText),
-  typeIdentifier("custom"),
-  useMovement(false), // no movement by default
-  querySync(false), // no sync query by default
-  sceneCommands(false), // no scene commands by default
-  forwardIdentify(false), // no identification forward by default
-  controlValues(false), // no control values by default
-  configured(false),
-  iconBaseName("ext"), // default icon name
-  modelNameString("plan44 p44vdc external device"),
-  vendorNameString("plan44.ch"),
-  devClassVersion(0)
+  mTypeIdentifier("custom"),
+  mUseMovement(false), // no movement by default
+  mQuerySync(false), // no sync query by default
+  mSceneCommands(false), // no scene commands by default
+  mForwardIdentify(false), // no identification forward by default
+  mControlValues(false), // no control values by default
+  mConfigured(false),
+  mIconBaseName("ext"), // default icon name
+  mModelNameString("plan44 p44vdc external device"),
+  mVendorNameString("plan44.ch"),
+  mDevClassVersion(0)
 {
 }
 
@@ -164,14 +164,14 @@ bool CustomDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 string CustomDevice::modelName()
 {
-  return modelNameString;
+  return mModelNameString;
 }
 
 
 string CustomDevice::modelVersion() const
 {
-  if (!modelVersionString.empty()) {
-    return modelVersionString;
+  if (!mModelVersionString.empty()) {
+    return mModelVersionString;
   }
   return inherited::modelVersion();
 }
@@ -179,20 +179,20 @@ string CustomDevice::modelVersion() const
 
 string CustomDevice::vendorName()
 {
-  return vendorNameString;
+  return mVendorNameString;
 }
 
 
 string CustomDevice::oemModelGUID()
 {
-  return oemModelGUIDString;
+  return mOemModelGUIDString;
 }
 
 
 string CustomDevice::webuiURLString()
 {
-  if (!configUrl.empty())
-    return configUrl;
+  if (!mConfigUrl.empty())
+    return mConfigUrl;
   else
     return inherited::webuiURLString();
 }
@@ -210,7 +210,7 @@ void CustomDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResult
 
 bool CustomDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getClassColoredIcon(iconBaseName.c_str(), getDominantColorClass(), aIcon, aWithData, aResolutionPrefix))
+  if (getClassColoredIcon(mIconBaseName.c_str(), getDominantColorClass(), aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
@@ -219,13 +219,13 @@ bool CustomDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aRes
 
 bool CustomDevice::canIdentifyToUser()
 {
-  return forwardIdentify || inherited::canIdentifyToUser();
+  return mForwardIdentify || inherited::canIdentifyToUser();
 }
 
 
 void CustomDevice::identifyToUser()
 {
-  if (forwardIdentify) {
+  if (mForwardIdentify) {
     sendDeviceApiFlagMessage("IDENTIFY");
   }
   else {
@@ -245,15 +245,15 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
 {
   ErrorPtr err;
   if (aMessageType=="bye") {
-    configured = false; // cause device to get removed
+    mConfigured = false; // cause device to get removed
     err = Error::ok(); // explicit ok
   }
   else {
-    if (configured) {
+    if (mConfigured) {
       if (aMessageType=="synced") {
         // device confirms having reported all channel states (in response to "sync" command)
-        if (syncedCB) syncedCB();
-        syncedCB = NULL;
+        if (mSyncedCB) mSyncedCB();
+        mSyncedCB = NULL;
         return ErrorPtr(); // no answer
       }
       else if (aMessageType=="active") {
@@ -379,13 +379,13 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
 ErrorPtr CustomDevice::processSimpleMessage(string aMessageType, string aValue)
 {
   if (aMessageType=="BYE") {
-    configured = false; // cause device to get removed
+    mConfigured = false; // cause device to get removed
     return Error::ok(); // explicit ok
   }
   else if (aMessageType=="SYNCED") {
     // device confirms having reported all channel states (in response to "SYNC" command)
-    if (syncedCB) syncedCB();
-    syncedCB = NULL;
+    if (mSyncedCB) mSyncedCB();
+    mSyncedCB = NULL;
     return ErrorPtr(); // no answer
   }
   else if (aMessageType=="ACTIVE") {
@@ -468,7 +468,7 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
         if (aValue>2) {
           // simulate a keypress of defined length in milliseconds
           bb->updateButtonState(true);
-          buttonReleaseTicket.executeOnce(boost::bind(&CustomDevice::releaseButton, this, bb), aValue*MilliSecond);
+          mButtonReleaseTicket.executeOnce(boost::bind(&CustomDevice::releaseButton, this, bb), aValue*MilliSecond);
         }
         else {
           bb->updateButtonState(aValue!=0);
@@ -546,8 +546,8 @@ void CustomDevice::releaseButton(ButtonBehaviourPtr aButtonBehaviour)
 
 void CustomDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB)
 {
-  if (configurations.size()>0) {
-    aConfigurations = configurations;
+  if (mConfigurations.size()>0) {
+    aConfigurations = mConfigurations;
   }
   else {
     aConfigurations.clear(); // prevent singular config
@@ -558,16 +558,16 @@ void CustomDevice::getDeviceConfigurations(DeviceConfigurationsVector &aConfigur
 
 string CustomDevice::getDeviceConfigurationId()
 {
-  return configurationId;
+  return mConfigurationId;
 }
 
 
 ErrorPtr CustomDevice::switchConfiguration(const string aConfigurationId)
 {
-  for (DeviceConfigurationsVector::iterator pos=configurations.begin(); pos!=configurations.end(); ++pos) {
+  for (DeviceConfigurationsVector::iterator pos=mConfigurations.begin(); pos!=mConfigurations.end(); ++pos) {
     if ((*pos)->getId()==aConfigurationId) {
       // known configuration, apply it
-      if (aConfigurationId==configurationId) return ErrorPtr(); // no need to switch
+      if (aConfigurationId==mConfigurationId) return ErrorPtr(); // no need to switch
       if (!mSimpletext) {
         JsonObjectPtr message = JsonObject::newObj();
         message->add("message", JsonObject::newString("setConfiguration"));
@@ -588,7 +588,7 @@ ErrorPtr CustomDevice::switchConfiguration(const string aConfigurationId)
 
 bool CustomDevice::prepareSceneCall(DsScenePtr aScene)
 {
-  if (sceneCommands) {
+  if (mSceneCommands) {
     // forward (built-in, behaviour-defined) scene commands to external device
     const char *sceneCommandStr = NULL;
     switch (aScene->sceneCmd) {
@@ -630,7 +630,7 @@ bool CustomDevice::prepareSceneCall(DsScenePtr aScene)
 bool CustomDevice::prepareSceneApply(DsScenePtr aScene)
 {
   // only implemented to catch "UNDO"
-  if (sceneCommands && aScene->sceneCmd==scene_cmd_undo) {
+  if (mSceneCommands && aScene->sceneCmd==scene_cmd_undo) {
     if (mSimpletext) {
       string m = string_format("SCMD=UNDO");
       sendDeviceApiSimpleMessage(m);
@@ -652,7 +652,7 @@ void CustomDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // special behaviour for shadow behaviour
   ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
-  if (sb && useMovement) {
+  if (sb && mUseMovement) {
     // ask shadow behaviour to start movement sequence on default channel
     sb->applyBlindChannels(boost::bind(&CustomDevice::changeChannelMovement, this, 0, _1, _2), aDoneCB, aForDimming);
   }
@@ -698,11 +698,11 @@ void CustomDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode,
   if (aChannel) {
     // start dimming
     ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
-    if (sb && useMovement && aDoApply) {
+    if (sb && mUseMovement && aDoApply) {
       // no channel check, there's only global dimming of the blind, no separate position/angle
       sb->dimBlind(boost::bind(&CustomDevice::changeChannelMovement, this, 0, _1, _2), aDimMode);
     }
-    else if (useMovement && aDoApply) {
+    else if (mUseMovement && aDoApply) {
       // not shadow, but still use movement for dimming
       changeChannelMovement(aChannel->getChannelIndex(), NULL, aDimMode);
     }
@@ -732,9 +732,9 @@ void CustomDevice::changeChannelMovement(int aChannelIndex, SimpleCB aDoneCB, in
 
 void CustomDevice::syncChannelValues(SimpleCB aDoneCB)
 {
-  if (querySync) {
+  if (mQuerySync) {
     // save callback, to be called when "synced" message confirms sync done
-    syncedCB = aDoneCB;
+    mSyncedCB = aDoneCB;
     // send sync command
     sendDeviceApiFlagMessage("SYNC");
   }
@@ -746,7 +746,7 @@ void CustomDevice::syncChannelValues(SimpleCB aDoneCB)
 
 bool CustomDevice::processControlValue(const string &aName, double aValue)
 {
-  if (controlValues) {
+  if (mControlValues) {
     // forward control messages
     if (mSimpletext) {
       string m = string_format("CTRL.%s=%lf", aName.c_str(), aValue);
@@ -796,10 +796,10 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   ErrorPtr err;
 
   // options
-  if (aInitParams->get("sync", o)) querySync = o->boolValue();
-  if (aInitParams->get("move", o)) useMovement = o->boolValue();
-  if (aInitParams->get("scenecommands", o)) sceneCommands = o->boolValue();
-  if (aInitParams->get("identification", o)) forwardIdentify = o->boolValue();
+  if (aInitParams->get("sync", o)) mQuerySync = o->boolValue();
+  if (aInitParams->get("move", o)) mUseMovement = o->boolValue();
+  if (aInitParams->get("scenecommands", o)) mSceneCommands = o->boolValue();
+  if (aInitParams->get("identification", o)) mForwardIdentify = o->boolValue();
   // get unique ID
   if (!aInitParams->get("uniqueid", o)) {
     return TextError::err("missing 'uniqueid'");
@@ -840,39 +840,39 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   }
   // - get model name
   if (aInitParams->get("modelname", o)) {
-    modelNameString = o->stringValue();
+    mModelNameString = o->stringValue();
   }
   // - get model version
   if (aInitParams->get("modelversion", o)) {
-    modelVersionString = o->stringValue();
+    mModelVersionString = o->stringValue();
   }
   // - get vendor name
   if (aInitParams->get("vendorname", o)) {
-    vendorNameString = o->stringValue();
+    mVendorNameString = o->stringValue();
   }
   // - get OEM model guid
   if (aInitParams->get("oemmodelguid", o)) {
-    oemModelGUIDString = o->stringValue();
+    mOemModelGUIDString = o->stringValue();
   }
   // - get icon base name
   if (aInitParams->get("iconname", o)) {
-    iconBaseName = o->stringValue();
+    mIconBaseName = o->stringValue();
   }
   // - get type identifier
   if (aInitParams->get("typeidentifier", o)) {
-    typeIdentifier = o->stringValue();
+    mTypeIdentifier = o->stringValue();
   }
   // - get device class
   if (aInitParams->get("deviceclass", o)) {
-    devClass = o->stringValue();
+    mDevClass = o->stringValue();
   }
   // - get device class version
   if (aInitParams->get("deviceclassversion", o)) {
-    devClassVersion = o->int32Value();
+    mDevClassVersion = o->int32Value();
   }
   // - get config URI
   if (aInitParams->get("configurl", o)) {
-    configUrl = o->stringValue();
+    mConfigUrl = o->stringValue();
   }
   // - basic output behaviour
   VdcOutputFunction outputFunction = outputFunction_custom; // not defined yet
@@ -978,7 +978,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   #if ENABLE_FCU_SUPPORT
   else if (outputType=="fancoilunit") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
-    controlValues = true; // fan coil unit usually needs control values
+    mControlValues = true; // fan coil unit usually needs control values
     // - FCU device settings with scene table
     installSettings(DeviceSettingsPtr(new FanCoilUnitDeviceSettings(*this)));
     // - create climate control fan coil unit output
@@ -1031,7 +1031,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     if (aInitParams->get("endcontacts", o)) {
       endContacts = o->boolValue();
     }
-    sb->setDeviceParams(sk, endContacts, 0, 0, 0, !useMovement); // no restrictions for move times, when "move" is not specified, device can do absolute positioning
+    sb->setDeviceParams(sk, endContacts, 0, 0, 0, !mUseMovement); // no restrictions for move times, when "move" is not specified, device can do absolute positioning
     sb->position->syncChannelValue(100, false, true); // assume fully up at beginning
     sb->angle->syncChannelValue(100, false, true); // assume fully open at beginning
     addBehaviour(sb);
@@ -1057,7 +1057,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     installSettings();
   }
   // set options that might have a default set by the output type
-  if (aInitParams->get("controlvalues", o)) controlValues = o->boolValue();
+  if (aInitParams->get("controlvalues", o)) mControlValues = o->boolValue();
   // set primary group to black if group is not yet defined so far
   if (defaultGroup==group_undefined) defaultGroup = group_black_variable;
   if (colorClass==class_undefined) colorClass = colorClassFromGroup(defaultGroup);
@@ -1175,7 +1175,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   #if ENABLE_CUSTOM_EXOTIC
   // device configurations
   if (aInitParams->get("currentConfigId", o)) {
-    configurationId = o->stringValue();
+    mConfigurationId = o->stringValue();
   }
   if (aInitParams->get("configurations", o)) {
     if (mSimpletext) return TextError::err("Devices with multiple configurations must use JSON protocol");
@@ -1187,13 +1187,13 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
       // - optional params
       if (o2->get("id", o3)) id = o3->stringValue();
       if (o2->get("description", o3)) description = o3->stringValue();
-      configurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, description)));
+      mConfigurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, description)));
     }
   }
   #endif // ENABLE_CUSTOM_EXOTIC
   #if ENABLE_CUSTOM_SINGLEDEVICE
   // create actions/states/events and properties from JSON
-  if (aInitParams->get("noconfirmaction", o)) noConfirmAction = o->boolValue();
+  if (aInitParams->get("noconfirmaction", o)) mNoConfirmAction = o->boolValue();
   err = configureFromJSON(aInitParams);
   if (Error::notOK(err)) return err;
   err = standardActionsFromJSON(aInitParams);
@@ -1209,7 +1209,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     initializeName(o->stringValue());
   }
   // configured
-  configured = true;
+  mConfigured = true;
   //#if DEBUG
   //boost::intrusive_ptr<VideoDeviceSettings> vs = boost::dynamic_pointer_cast<VideoDeviceSettings>(deviceSettings);
   //if (vs) {

@@ -47,8 +47,8 @@ namespace p44 {
     friend class ExternalVdc;
     friend class ExternalDeviceConnector;
 
-    ExternalDeviceConnectorPtr deviceConnector;
-    string tag; ///< the tag to address the device within the devices on the same connection
+    ExternalDeviceConnectorPtr mDeviceConnector;
+    string mTag; ///< the tag to address the device within the devices on the same connection
 
   public:
 
@@ -87,12 +87,12 @@ namespace p44 {
   {
     friend class ExternalDevice;
 
-    ExternalVdc &externalVdc;
+    ExternalVdc &mExternalVdc;
 
-    bool simpletext; ///< if set, device communication uses very simple text messages rather than JSON
+    bool mSimpletext; ///< if set, device communication uses very simple text messages rather than JSON
 
-    JsonCommPtr deviceConnection;
-    ExternalDevicesMap externalDevices;
+    JsonCommPtr mDeviceConnection;
+    ExternalDevicesMap mExternalDevices;
 
   public:
 
@@ -130,13 +130,13 @@ namespace p44 {
     friend class ExternalDevice;
     friend class ExternalDeviceConnector;
 
-    SocketCommPtr externalDeviceApiServer;
+    SocketCommPtr mExternalDeviceApiServer;
 
-    string iconBaseName; ///< the base icon name
-    string modelNameString; ///< the string to be returned by modelName()
-    string modelVersionString; ///< the string to be returned by vdcModelVersion()
-    string configUrl; ///< custom value for configURL if not empty
-    bool forwardIdentify; ///< if set, "VDCIDENTIFY" messages will be sent, and vdc will show the "identification" capability in the vDC API
+    string mIconBaseName; ///< the base icon name
+    string mModelNameString; ///< the string to be returned by modelName()
+    string mModelVersionString; ///< the string to be returned by vdcModelVersion()
+    string mConfigUrl; ///< custom value for configURL if not empty
+    bool mForwardIdentify; ///< if set, "VDCIDENTIFY" messages will be sent, and vdc will show the "identification" capability in the vDC API
 
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);

@@ -31,10 +31,10 @@ using namespace p44;
 
 ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag, bool aSimpleText) :
   inherited(aVdcP, aSimpleText),
-  deviceConnector(aDeviceConnector),
-  tag(aTag)
+  mDeviceConnector(aDeviceConnector),
+  mTag(aTag)
 {
-  typeIdentifier = "external";
+  mTypeIdentifier = "external";
 }
 
 
@@ -47,7 +47,7 @@ ExternalDevice::~ExternalDevice()
 void ExternalDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
   // remove from connector
-  deviceConnector->removeDevice(this);
+  mDeviceConnector->removeDevice(this);
   // otherwise perform normal disconnect
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);
 }
@@ -63,30 +63,30 @@ ExternalVdc &ExternalDevice::getExternalVdc()
 void ExternalDevice::sendDeviceApiJsonMessage(JsonObjectPtr aMessage)
 {
   // add in tag if device has one
-  if (!tag.empty()) {
-    aMessage->add("tag", JsonObject::newString(tag));
+  if (!mTag.empty()) {
+    aMessage->add("tag", JsonObject::newString(mTag));
   }
   // now show and send
-  POLOG(deviceConnector, LOG_INFO, "device <- externalVdc (JSON) message sent: %s", aMessage->c_strValue());
-  deviceConnector->deviceConnection->sendMessage(aMessage);
+  POLOG(mDeviceConnector, LOG_INFO, "device <- externalVdc (JSON) message sent: %s", aMessage->c_strValue());
+  mDeviceConnector->mDeviceConnection->sendMessage(aMessage);
 }
 
 
 void ExternalDevice::sendDeviceApiSimpleMessage(string aMessage)
 {
   // prefix with tag if device has one
-  if (!tag.empty()) {
-    aMessage = tag+":"+aMessage;
+  if (!mTag.empty()) {
+    aMessage = mTag+":"+aMessage;
   }
-  POLOG(deviceConnector, LOG_INFO, "device <- externalVdc (simple) message sent: %s", aMessage.c_str());
+  POLOG(mDeviceConnector, LOG_INFO, "device <- externalVdc (simple) message sent: %s", aMessage.c_str());
   aMessage += "\n";
-  deviceConnector->deviceConnection->sendRaw(aMessage);
+  mDeviceConnector->mDeviceConnection->sendRaw(aMessage);
 }
 
 
 void ExternalDevice::sendDeviceApiFlagMessage(string aFlagWord)
 {
-  deviceConnector->sendDeviceApiFlagMessage(aFlagWord, tag.c_str());
+  mDeviceConnector->sendDeviceApiFlagMessage(aFlagWord, mTag.c_str());
 }
 
 
@@ -94,15 +94,15 @@ void ExternalDevice::sendDeviceApiFlagMessage(string aFlagWord)
 // MARK: - external device connector
 
 ExternalDeviceConnector::ExternalDeviceConnector(ExternalVdc &aExternalVdc, JsonCommPtr aDeviceConnection) :
-  externalVdc(aExternalVdc),
-  deviceConnection(aDeviceConnection),
-  simpletext(false)
+  mExternalVdc(aExternalVdc),
+  mDeviceConnection(aDeviceConnection),
+  mSimpletext(false)
 {
-  deviceConnection->relatedObject = this;
+  mDeviceConnection->relatedObject = this;
   // install handlers on device connection
-  deviceConnection->setConnectionStatusHandler(boost::bind(&ExternalDeviceConnector::handleDeviceConnectionStatus, this, _2));
-  deviceConnection->setMessageHandler(boost::bind(&ExternalDeviceConnector::handleDeviceApiJsonMessage, this, _1, _2));
-  deviceConnection->setClearHandlersAtClose(); // close must break retain cycles so this object won't cause a mem leak
+  mDeviceConnection->setConnectionStatusHandler(boost::bind(&ExternalDeviceConnector::handleDeviceConnectionStatus, this, _2));
+  mDeviceConnection->setMessageHandler(boost::bind(&ExternalDeviceConnector::handleDeviceApiJsonMessage, this, _1, _2));
+  mDeviceConnection->setClearHandlersAtClose(); // close must break retain cycles so this object won't cause a mem leak
   OLOG(LOG_DEBUG, "external device connector %p -> created", this);
 }
 
@@ -110,7 +110,7 @@ ExternalDeviceConnector::ExternalDeviceConnector(ExternalVdc &aExternalVdc, Json
 int ExternalDeviceConnector::getLogLevelOffset()
 {
   // follows vdc
-  return externalVdc.getLogLevelOffset();
+  return mExternalVdc.getLogLevelOffset();
 }
 
 
@@ -127,8 +127,8 @@ void ExternalDeviceConnector::handleDeviceConnectionStatus(ErrorPtr aError)
     closeConnection();
     OLOG(LOG_NOTICE, "external device connection closed (%s) -> disconnecting all devices", aError->text());
     // devices have vanished for now, but will keep parameters in case it reconnects later
-    while (externalDevices.size()>0) {
-      externalDevices.begin()->second->hasVanished(false); // keep config
+    while (mExternalDevices.size()>0) {
+      mExternalDevices.begin()->second->hasVanished(false); // keep config
     }
   }
 }
@@ -136,9 +136,9 @@ void ExternalDeviceConnector::handleDeviceConnectionStatus(ErrorPtr aError)
 
 void ExternalDeviceConnector::removeDevice(ExternalDevicePtr aExtDev)
 {
-  for (ExternalDevicesMap::iterator pos = externalDevices.begin(); pos!=externalDevices.end(); ++pos) {
+  for (ExternalDevicesMap::iterator pos = mExternalDevices.begin(); pos!=mExternalDevices.end(); ++pos) {
     if (pos->second==aExtDev) {
-      externalDevices.erase(pos);
+      mExternalDevices.erase(pos);
       break;
     }
   }
@@ -148,13 +148,13 @@ void ExternalDeviceConnector::removeDevice(ExternalDevicePtr aExtDev)
 void ExternalDeviceConnector::closeConnection()
 {
   // prevent further connection status callbacks
-  deviceConnection->setConnectionStatusHandler(NULL);
+  mDeviceConnection->setConnectionStatusHandler(NULL);
   // close connection
-  deviceConnection->closeConnection();
+  mDeviceConnection->closeConnection();
   // release the connection
   // Note: this should cause the connection to get deleted, which in turn also releases the relatedObject,
   //   so the device is only kept by the container (or not at all if it has not yet registered)
-  deviceConnection.reset();
+  mDeviceConnection.reset();
 }
 
 
@@ -166,7 +166,7 @@ void ExternalDeviceConnector::sendDeviceApiJsonMessage(JsonObjectPtr aMessage, c
   }
   // now show and send
   OLOG(LOG_INFO, "device <- externalVdc (JSON) message sent: %s", aMessage->c_strValue());
-  deviceConnection->sendMessage(aMessage);
+  mDeviceConnection->sendMessage(aMessage);
 }
 
 
@@ -179,14 +179,14 @@ void ExternalDeviceConnector::sendDeviceApiSimpleMessage(string aMessage, const 
   }
   OLOG(LOG_INFO, "device <- externalVdc (simple) message sent: %s", aMessage.c_str());
   aMessage += "\n";
-  deviceConnection->sendRaw(aMessage);
+  mDeviceConnection->sendRaw(aMessage);
 }
 
 
 
 void ExternalDeviceConnector::sendDeviceApiStatusMessage(ErrorPtr aError, const char *aTag)
 {
-  if (simpletext) {
+  if (mSimpletext) {
     // simple text message
     string msg;
     if (Error::isOK(aError))
@@ -220,7 +220,7 @@ void ExternalDeviceConnector::sendDeviceApiStatusMessage(ErrorPtr aError, const 
 
 void ExternalDeviceConnector::sendDeviceApiFlagMessage(string aFlagWord, const char *aTag)
 {
-  if (simpletext) {
+  if (mSimpletext) {
     sendDeviceApiSimpleMessage(aFlagWord, aTag);
   }
   else {
@@ -234,20 +234,20 @@ void ExternalDeviceConnector::sendDeviceApiFlagMessage(string aFlagWord, const c
 ExternalDevicePtr ExternalDeviceConnector::findDeviceByTag(string aTag, bool aNoError)
 {
   ExternalDevicePtr dev;
-  if (aTag.empty() && externalDevices.size()>1) {
+  if (aTag.empty() && mExternalDevices.size()>1) {
     if (!aNoError) sendDeviceApiStatusMessage(TextError::err("missing 'tag' field"));
   }
   else {
-    ExternalDevicesMap::iterator pos = externalDevices.end();
-    if (externalDevices.size()>1 || !aTag.empty()) {
+    ExternalDevicesMap::iterator pos = mExternalDevices.end();
+    if (mExternalDevices.size()>1 || !aTag.empty()) {
       // device must be addressed by tag
-      pos = externalDevices.find(aTag);
+      pos = mExternalDevices.find(aTag);
     }
-    else if (externalDevices.size()==1) {
+    else if (mExternalDevices.size()==1) {
       // just one device, always use that
-      pos = externalDevices.begin();
+      pos = mExternalDevices.begin();
     }
-    if (pos==externalDevices.end()) {
+    if (pos==mExternalDevices.end()) {
       if (!aNoError) sendDeviceApiStatusMessage(TextError::err("no device tagged '%s' found", aTag.c_str()));
     }
     else {
@@ -282,7 +282,7 @@ void ExternalDeviceConnector::handleDeviceApiJsonMessage(ErrorPtr aError, JsonOb
     // send response
     sendDeviceApiStatusMessage(aError);
     // make sure we disconnect after response is fully sent
-    if (externalDevices.size()==0) deviceConnection->closeAfterSend();
+    if (mExternalDevices.size()==0) mDeviceConnection->closeAfterSend();
   }
 }
 
@@ -305,45 +305,45 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
     string msg = o->stringValue();
     if (msg=="init") {
       // only first device can set protocol type or vDC model
-      if (externalDevices.size()==0) {
+      if (mExternalDevices.size()==0) {
         if (aMessage->get("protocol", o)) {
           string p = o->stringValue();
           if (p=="json")
-            simpletext = false;
+            mSimpletext = false;
           else if (p=="simple")
-            simpletext = true;
+            mSimpletext = true;
           else
             err = TextError::err("unknown protocol '%s'", p.c_str());
         }
         // switch message decoder if we have simpletext
-        if (simpletext) {
-          deviceConnection->setRawMessageHandler(boost::bind(&ExternalDeviceConnector::handleDeviceApiSimpleMessage, this, _1, _2));
+        if (mSimpletext) {
+          mDeviceConnection->setRawMessageHandler(boost::bind(&ExternalDeviceConnector::handleDeviceApiSimpleMessage, this, _1, _2));
         }
       }
       // check for tag, we need one if this is not the first (and only) device
-      if (externalDevices.size()>0) {
+      if (mExternalDevices.size()>0) {
         if (tag.empty()) {
           err = TextError::err("missing tag (needed for multiple devices on this connection)");
         }
-        else if (externalDevices.find(tag)!=externalDevices.end()) {
+        else if (mExternalDevices.find(tag)!=mExternalDevices.end()) {
           err = TextError::err("device with tag '%s' already exists", tag.c_str());
         }
       }
       if (Error::isOK(err)) {
         // ok to create new device
-        extDev = ExternalDevicePtr(new ExternalDevice(&externalVdc, this, tag, simpletext));
+        extDev = ExternalDevicePtr(new ExternalDevice(&mExternalVdc, this, tag, mSimpletext));
         // - let it initalize
         err = extDev->configureDevice(aMessage);
       }
       if (Error::isOK(err)) {
         // device configured, add it now
-        if (!externalVdc.simpleIdentifyAndAddDevice(extDev)) {
+        if (!mExternalVdc.simpleIdentifyAndAddDevice(extDev)) {
           err = TextError::err("device could not be added (duplicate uniqueid could be a reason, see p44vdc log)");
           extDev.reset(); // forget it
         }
         else {
           // added ok, also add to my own list
-          externalDevices[tag] = extDev;
+          mExternalDevices[tag] = extDev;
         }
       }
     }
@@ -351,31 +351,31 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       // vdc-level information
       // - model name
       if (aMessage->get("modelname", o)) {
-        externalVdc.modelNameString = o->stringValue();
+        mExternalVdc.mModelNameString = o->stringValue();
       }
       if (aMessage->get("modelversion", o)) {
-        externalVdc.modelVersionString = o->stringValue();
+        mExternalVdc.mModelVersionString = o->stringValue();
       }
       // - get icon base name
       if (aMessage->get("iconname", o)) {
-        externalVdc.iconBaseName = o->stringValue();
+        mExternalVdc.mIconBaseName = o->stringValue();
       }
       // - get config URI
       if (aMessage->get("configurl", o)) {
-        externalVdc.configUrl = o->stringValue();
+        mExternalVdc.mConfigUrl = o->stringValue();
       }
       // - get default name
       if (aMessage->get("name", o)) {
-        externalVdc.initializeName(o->stringValue());
+        mExternalVdc.initializeName(o->stringValue());
       }
       // - always visible (even when empty)
       if (aMessage->get("alwaysVisible", o)) {
         // Note: this is now a (persistent!) vdc level property, which can be set from external API this way
-        externalVdc.setVdcFlag(vdcflag_hidewhenempty, !o->boolValue());
+        mExternalVdc.setVdcFlag(vdcflag_hidewhenempty, !o->boolValue());
       }
       // - forward vdc-level identification
       if (aMessage->get("identification", o)) {
-        externalVdc.forwardIdentify = o->boolValue();
+        mExternalVdc.mForwardIdentify = o->boolValue();
       }
     }
     else if (msg=="log") {
@@ -387,7 +387,7 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       if (o) {
         DsAddressablePtr a = findDeviceByTag(tag, true);
         if (a) { OLOG(logLevel,"External Device %s: %s", a->shortDesc().c_str(), o->c_strValue()); }
-        else { OLOG(logLevel,"External Device vDC %s: %s", externalVdc.shortDesc().c_str(), o->c_strValue()); }
+        else { OLOG(logLevel,"External Device vDC %s: %s", mExternalVdc.shortDesc().c_str(), o->c_strValue()); }
       }
     }
     else {
@@ -436,7 +436,7 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
       sscanf(msg.c_str()+1, "%d", &level);
       DsAddressablePtr a = findDeviceByTag(tag, true);
       if (a) { OLOG(level,"External Device %s: %s", a->shortDesc().c_str(), val.c_str()); }
-      else { OLOG(level,"External Device vDC %s: %s", externalVdc.shortDesc().c_str(), val.c_str()); }
+      else { OLOG(level,"External Device vDC %s: %s", mExternalVdc.shortDesc().c_str(), val.c_str()); }
     }
     else {
       extDev = findDeviceByTag(tag, false);
@@ -455,7 +455,7 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
     // send response
     sendDeviceApiStatusMessage(aError, tag.c_str());
     // make sure we disconnect after response is fully sent
-    if (externalDevices.size()==0) deviceConnection->closeAfterSend();
+    if (mExternalDevices.size()==0) mDeviceConnection->closeAfterSend();
   }
 }
 
@@ -467,20 +467,20 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  forwardIdentify(false),
-  iconBaseName("vdc_ext") // default icon name
+  mForwardIdentify(false),
+  mIconBaseName("vdc_ext") // default icon name
 {
   // create device API server and set connection specifications
-  externalDeviceApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
-  externalDeviceApiServer->setConnectionParams(NULL, aSocketPathOrPort.c_str(), SOCK_STREAM, PF_UNSPEC);
-  externalDeviceApiServer->setAllowNonlocalConnections(aNonLocal);
+  mExternalDeviceApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
+  mExternalDeviceApiServer->setConnectionParams(NULL, aSocketPathOrPort.c_str(), SOCK_STREAM, PF_UNSPEC);
+  mExternalDeviceApiServer->setAllowNonlocalConnections(aNonLocal);
 }
 
 
 void ExternalVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // start device API server
-  ErrorPtr err = externalDeviceApiServer->startServer(boost::bind(&ExternalVdc::deviceApiConnectionHandler, this, _1), 10);
+  ErrorPtr err = mExternalDeviceApiServer->startServer(boost::bind(&ExternalVdc::deviceApiConnectionHandler, this, _1), 10);
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(err); // return status of starting server
 }
@@ -497,15 +497,15 @@ SocketCommPtr ExternalVdc::deviceApiConnectionHandler(SocketCommPtr aServerSocke
 
 string ExternalVdc::modelName()
 {
-  if (!modelNameString.empty())
-    return modelNameString;
+  if (!mModelNameString.empty())
+    return mModelNameString;
   return inherited::modelName();
 }
 
 
 string ExternalVdc::vdcModelVersion() const
 {
-  return modelVersionString;
+  return mModelVersionString;
 };
 
 
@@ -513,7 +513,7 @@ string ExternalVdc::vdcModelVersion() const
 
 bool ExternalVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getIcon(iconBaseName.c_str(), aIcon, aWithData, aResolutionPrefix))
+  if (getIcon(mIconBaseName.c_str(), aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
@@ -529,8 +529,8 @@ const char *ExternalVdc::vdcClassIdentifier() const
 
 string ExternalVdc::webuiURLString()
 {
-  if (!configUrl.empty())
-    return configUrl;
+  if (!mConfigUrl.empty())
+    return mConfigUrl;
   else
     return inherited::webuiURLString();
 }
@@ -538,13 +538,13 @@ string ExternalVdc::webuiURLString()
 
 bool ExternalVdc::canIdentifyToUser()
 {
-  return forwardIdentify || inherited::canIdentifyToUser();
+  return mForwardIdentify || inherited::canIdentifyToUser();
 }
 
 
 void ExternalVdc::identifyToUser()
 {
-  if (forwardIdentify) {
+  if (mForwardIdentify) {
     // TODO: %%% send "VDCIDENTIFY" or maybe "vdc:IDENTIFY"
     //   to all connectors - we need to implement a connector list for that
     OLOG(LOG_WARNING, "vdc level identify forwarding not yet implemented")
