@@ -35,6 +35,8 @@ ExternalDevice::ExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceCon
   mTag(aTag)
 {
   mTypeIdentifier = "external";
+  mModelNameString = "custom external device";
+  mIconBaseName = "ext";
 }
 
 
@@ -82,13 +84,6 @@ void ExternalDevice::sendDeviceApiSimpleMessage(string aMessage)
   aMessage += "\n";
   mDeviceConnector->mDeviceConnection->sendRaw(aMessage);
 }
-
-
-void ExternalDevice::sendDeviceApiFlagMessage(string aFlagWord)
-{
-  mDeviceConnector->sendDeviceApiFlagMessage(aFlagWord, mTag.c_str());
-}
-
 
 
 // MARK: - external device connector
@@ -218,19 +213,6 @@ void ExternalDeviceConnector::sendDeviceApiStatusMessage(ErrorPtr aError, const 
 }
 
 
-void ExternalDeviceConnector::sendDeviceApiFlagMessage(string aFlagWord, const char *aTag)
-{
-  if (mSimpletext) {
-    sendDeviceApiSimpleMessage(aFlagWord, aTag);
-  }
-  else {
-    JsonObjectPtr message = JsonObject::newObj();
-    message->add("message", JsonObject::newString(lowerCase(aFlagWord)));
-    sendDeviceApiJsonMessage(message, aTag);
-  }
-}
-
-
 ExternalDevicePtr ExternalDeviceConnector::findDeviceByTag(string aTag, bool aNoError)
 {
   ExternalDevicePtr dev;
@@ -306,18 +288,12 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
     if (msg=="init") {
       // only first device can set protocol type or vDC model
       if (mExternalDevices.size()==0) {
-        if (aMessage->get("protocol", o)) {
-          string p = o->stringValue();
-          if (p=="json")
-            mSimpletext = false;
-          else if (p=="simple")
-            mSimpletext = true;
-          else
-            err = TextError::err("unknown protocol '%s'", p.c_str());
-        }
-        // switch message decoder if we have simpletext
-        if (mSimpletext) {
-          mDeviceConnection->setRawMessageHandler(boost::bind(&ExternalDeviceConnector::handleDeviceApiSimpleMessage, this, _1, _2));
+        mSimpletext = CustomDevice::checkSimple(aMessage, err);
+        if (Error::isOK(err)) {
+          // switch message decoder if we have simpletext
+          if (mSimpletext) {
+            mDeviceConnection->setRawMessageHandler(boost::bind(&ExternalDeviceConnector::handleDeviceApiSimpleMessage, this, _1, _2));
+          }
         }
       }
       // check for tag, we need one if this is not the first (and only) device
@@ -348,35 +324,7 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       }
     }
     else if (msg=="initvdc") {
-      // vdc-level information
-      // - model name
-      if (aMessage->get("modelname", o)) {
-        mExternalVdc.mModelNameString = o->stringValue();
-      }
-      if (aMessage->get("modelversion", o)) {
-        mExternalVdc.mModelVersionString = o->stringValue();
-      }
-      // - get icon base name
-      if (aMessage->get("iconname", o)) {
-        mExternalVdc.mIconBaseName = o->stringValue();
-      }
-      // - get config URI
-      if (aMessage->get("configurl", o)) {
-        mExternalVdc.mConfigUrl = o->stringValue();
-      }
-      // - get default name
-      if (aMessage->get("name", o)) {
-        mExternalVdc.initializeName(o->stringValue());
-      }
-      // - always visible (even when empty)
-      if (aMessage->get("alwaysVisible", o)) {
-        // Note: this is now a (persistent!) vdc level property, which can be set from external API this way
-        mExternalVdc.setVdcFlag(vdcflag_hidewhenempty, !o->boolValue());
-      }
-      // - forward vdc-level identification
-      if (aMessage->get("identification", o)) {
-        mExternalVdc.mForwardIdentify = o->boolValue();
-      }
+      mExternalVdc.handleInitVdcMessage(aMessage);
     }
     else if (msg=="log") {
       // log something
@@ -466,10 +414,10 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 
 ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
-  Vdc(aInstanceNumber, aVdcHostP, aTag),
-  mForwardIdentify(false),
-  mIconBaseName("vdc_ext") // default icon name
+  CustomVdc(aInstanceNumber, aVdcHostP, aTag)
 {
+  // set default icon base name
+  mIconBaseName = "vdc_ext";
   // create device API server and set connection specifications
   mExternalDeviceApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
   mExternalDeviceApiServer->setConnectionParams(NULL, aSocketPathOrPort.c_str(), SOCK_STREAM, PF_UNSPEC);
@@ -495,51 +443,11 @@ SocketCommPtr ExternalVdc::deviceApiConnectionHandler(SocketCommPtr aServerSocke
 }
 
 
-string ExternalVdc::modelName()
-{
-  if (!mModelNameString.empty())
-    return mModelNameString;
-  return inherited::modelName();
-}
-
-
-string ExternalVdc::vdcModelVersion() const
-{
-  return mModelVersionString;
-};
-
-
-
-
-bool ExternalVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
-{
-  if (getIcon(mIconBaseName.c_str(), aIcon, aWithData, aResolutionPrefix))
-    return true;
-  else
-    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
-}
-
-
-
 const char *ExternalVdc::vdcClassIdentifier() const
 {
   return "External_Device_Container";
 }
 
-
-string ExternalVdc::webuiURLString()
-{
-  if (!mConfigUrl.empty())
-    return mConfigUrl;
-  else
-    return inherited::webuiURLString();
-}
-
-
-bool ExternalVdc::canIdentifyToUser()
-{
-  return mForwardIdentify || inherited::canIdentifyToUser();
-}
 
 
 void ExternalVdc::identifyToUser()

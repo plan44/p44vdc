@@ -142,8 +142,8 @@ CustomDevice::CustomDevice(Vdc *aVdcP, bool aSimpleText) :
   mForwardIdentify(false), // no identification forward by default
   mControlValues(false), // no control values by default
   mConfigured(false),
-  mIconBaseName("ext"), // default icon name
-  mModelNameString("plan44 p44vdc external device"),
+  mIconBaseName("cust"), // default icon name
+  mModelNameString("custom device"),
   mVendorNameString("plan44.ch"),
   mDevClassVersion(0)
 {
@@ -234,11 +234,17 @@ void CustomDevice::identifyToUser()
 }
 
 
-
-//CustomDevicesVdc &CustomDevice::getCustomDevicesVdc()
-//{
-//  return *(static_cast<CustomDevicesVdc *>(vdcP));
-//}
+void CustomDevice::sendDeviceApiFlagMessage(string aFlagWord)
+{
+  if (mSimpletext) {
+    sendDeviceApiSimpleMessage(aFlagWord);
+  }
+  else {
+    JsonObjectPtr message = JsonObject::newObj();
+    message->add("message", JsonObject::newString(lowerCase(aFlagWord)));
+    sendDeviceApiJsonMessage(message);
+  }
+}
 
 
 ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMessage)
@@ -683,6 +689,8 @@ void CustomDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
           message->add("type", JsonObject::newInt32(cb->getChannelType())); // informational
           message->add("id", JsonObject::newString(cb->getApiId(3))); // informational
           message->add("value", JsonObject::newDouble(cb->getChannelValue()));
+          message->add("transition", JsonObject::newDouble((double)cb->transitionTimeToNewValue()/Second));
+          message->add("dimming", JsonObject::newBool(aForDimming));
           sendDeviceApiJsonMessage(message);
         }
         cb->channelValueApplied();
@@ -789,6 +797,22 @@ ErrorPtr CustomDevice::dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjec
 
 #endif
 
+bool CustomDevice::checkSimple(JsonObjectPtr aInitMsg, ErrorPtr &aErr)
+{
+  JsonObjectPtr o;
+  bool simple = false;
+  if (aInitMsg->get("protocol", o)) {
+    string p = o->stringValue();
+    if (p=="json")
+      simple = false;
+    else if (p=="simple")
+      simple = true;
+    else
+      aErr = TextError::err("unknown protocol '%s'", p.c_str());
+  }
+  return simple;
+}
+
 
 ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
 {
@@ -801,17 +825,24 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("scenecommands", o)) mSceneCommands = o->boolValue();
   if (aInitParams->get("identification", o)) mForwardIdentify = o->boolValue();
   // get unique ID
+  string uniqueid;
   if (!aInitParams->get("uniqueid", o)) {
+    uniqueid = defaultUniqueId();
+  }
+  else {
+    uniqueid = o->stringValue();
+  }
+  if (uniqueid.empty()) {
     return TextError::err("missing 'uniqueid'");
   }
   // - try it natively (can be a dSUID or a UUID)
-  if (!dSUID.setAsString(o->stringValue())) {
+  if (!dSUID.setAsString(uniqueid)) {
     // not suitable dSUID or UUID syntax, create hashed dSUID
     DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
     //   UUIDv5 with name = classcontainerinstanceid:uniqueid
     string s = vdcP->vdcInstanceIdentifier();
     s += ':';
-    s += o->stringValue();
+    s += uniqueid;
     dSUID.setNameInSpace(s, vdcNamespace);
   }
   // - subdevice index can be set separately
@@ -1240,5 +1271,103 @@ void CustomDevice::propertyChanged(ValueDescriptorPtr aChangedProperty)
 
 
 #endif // ENABLE_CUSTOM_SINGLEDEVICE
+
+
+// MARK: - custom device container
+
+
+CustomVdc::CustomVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
+  Vdc(aInstanceNumber, aVdcHostP, aTag),
+  mForwardIdentify(false)
+{
+  mIconBaseName = "vdc_cust";
+}
+
+
+void CustomVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
+{
+  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
+  aCompletedCB(ErrorPtr()); // ok by default
+}
+
+
+string CustomVdc::modelName()
+{
+  if (!mModelNameString.empty())
+    return mModelNameString;
+  return inherited::modelName();
+}
+
+
+string CustomVdc::vdcModelVersion() const
+{
+  return mModelVersionString;
+};
+
+
+bool CustomVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
+{
+  if (getIcon(mIconBaseName.c_str(), aIcon, aWithData, aResolutionPrefix))
+    return true;
+  else
+    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+}
+
+
+
+string CustomVdc::webuiURLString()
+{
+  if (!mConfigUrl.empty())
+    return mConfigUrl;
+  else
+    return inherited::webuiURLString();
+}
+
+
+bool CustomVdc::canIdentifyToUser()
+{
+  return mForwardIdentify || inherited::canIdentifyToUser();
+}
+
+
+
+
+ErrorPtr CustomVdc::handleInitVdcMessage(JsonObjectPtr aVdcInitMessage)
+{
+  ErrorPtr err;
+
+  // vdc-level information
+  // - model name
+  JsonObjectPtr o;
+  if (aVdcInitMessage->get("modelname", o)) {
+    mModelNameString = o->stringValue();
+  }
+  if (aVdcInitMessage->get("modelversion", o)) {
+    mModelVersionString = o->stringValue();
+  }
+  // - get icon base name
+  if (aVdcInitMessage->get("iconname", o)) {
+    mIconBaseName = o->stringValue();
+  }
+  // - get config URI
+  if (aVdcInitMessage->get("configurl", o)) {
+    mConfigUrl = o->stringValue();
+  }
+  // - get default name
+  if (aVdcInitMessage->get("name", o)) {
+    initializeName(o->stringValue());
+  }
+  // - always visible (even when empty)
+  if (aVdcInitMessage->get("alwaysVisible", o)) {
+    // Note: this is now a (persistent!) vdc level property, which can be set from external API this way
+    setVdcFlag(vdcflag_hidewhenempty, !o->boolValue());
+  }
+  // - forward vdc-level identification
+  if (aVdcInitMessage->get("identification", o)) {
+    mForwardIdentify = o->boolValue();
+  }
+}
+
+
 
 #endif // ENABLE_EXTERNAL || ENABLE_SCRIPTED

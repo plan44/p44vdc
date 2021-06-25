@@ -37,7 +37,8 @@ using namespace p44;
 
 
 StaticDevice::StaticDevice(Vdc *aVdcP) :
-  Device(aVdcP), staticDeviceRowID(0)
+  Device(aVdcP),
+  staticDeviceRowID(0)
 {
 }
 

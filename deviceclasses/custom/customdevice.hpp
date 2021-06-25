@@ -50,7 +50,7 @@ using namespace std;
 
 namespace p44 {
 
-  class ExternalVdc;
+  class CustomVdc;
   class CustomDevice;
 
   #if ENABLE_CUSTOM_SINGLEDEVICE
@@ -98,11 +98,9 @@ namespace p44 {
     #else
     typedef Device inherited;
     #endif
-    friend class ExternalVdc;
+    friend class CustomVdc;
     friend class CustomDeviceConnector;
 
-    string mIconBaseName; ///< the base icon name
-    string mModelNameString; ///< the string to be returned by modelName()
     string mModelVersionString; ///< the string to be returned by modelVersion()
     string mVendorNameString; ///< the vendor name
     string mOemModelGUIDString; ///< the OEM model GUID, which is used to match devices with dS database
@@ -111,7 +109,6 @@ namespace p44 {
     uint32_t mDevClassVersion; ///< device class version
 
 
-    bool mSimpletext; ///< set when communication with this device is simple text
     bool mConfigured; ///< set when device is configured (init message received and device added to vdc)
     bool mUseMovement; ///< if set, device communication uses MV/move command for dimming and shadow device operation
     bool mControlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
@@ -134,7 +131,13 @@ namespace p44 {
 
   protected:
 
+    bool mSimpletext; ///< set when communication with this device is simple text
     string mTypeIdentifier; ///< the type identifier
+    string mIconBaseName; ///< the base icon name
+    string mModelNameString; ///< the string to be returned by modelName()
+
+    /// return a default unique id for the device
+    virtual string defaultUniqueId() { return ""; /* none in base class */ }
 
   public:
 
@@ -144,7 +147,7 @@ namespace p44 {
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
-    ExternalVdc &getExternalVdc();
+    CustomVdc &getCustomVdc();
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
@@ -190,6 +193,9 @@ namespace p44 {
 
     /// check if identifyToUser() has an actual implementation
     virtual bool canIdentifyToUser() P44_OVERRIDE;
+
+    /// for factory
+    static bool checkSimple(JsonObjectPtr aInitMsg, ErrorPtr &aErr);
 
   protected:
 
@@ -292,7 +298,8 @@ namespace p44 {
 
     virtual void sendDeviceApiJsonMessage(JsonObjectPtr aMessage) = 0;
     virtual void sendDeviceApiSimpleMessage(string aMessage) = 0;
-    virtual void sendDeviceApiFlagMessage(string aFlagWord) = 0;
+
+    void sendDeviceApiFlagMessage(string aFlagWord);
 
   private:
 
@@ -308,6 +315,77 @@ namespace p44 {
     void releaseButton(ButtonBehaviourPtr aButtonBehaviour);
 
   };
+
+  typedef boost::intrusive_ptr<CustomVdc> CustomVdcPtr;
+  class CustomVdc : public Vdc
+  {
+    typedef Vdc inherited;
+    friend class CustomDevice;
+
+  protected:
+
+    string mIconBaseName; ///< the base icon name
+    string mModelNameString; ///< the string to be returned by modelName()
+    string mModelVersionString; ///< the string to be returned by vdcModelVersion()
+    string mConfigUrl; ///< custom value for configURL if not empty
+    bool mForwardIdentify; ///< if set, "VDCIDENTIFY" messages will be sent, and vdc will show the "identification" capability in the vDC API
+
+  public:
+
+    CustomVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
+
+    void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+
+    virtual const char *vdcClassIdentifier() const P44_OVERRIDE = 0;
+
+    /// scan for (collect) devices and add them to the vdc
+    virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE = 0;
+
+    /// @return human readable, language independent suffix to explain vdc functionality.
+    ///   Will be appended to product name to create modelName() for vdcs
+    virtual string vdcModelSuffix() const P44_OVERRIDE = 0;
+
+    /// get supported rescan modes for this vDC. This indicates (usually to a web-UI) which
+    /// of the flags to collectDevices() make sense for this vDC.
+    /// @return a combination of rescanmode_xxx bits
+    virtual int getRescanModes() const P44_OVERRIDE = 0;
+
+    /// check if identifyToUser() has an actual implementation
+    virtual bool canIdentifyToUser() P44_OVERRIDE;
+
+    /// Custom identification for external vDCs
+    /// @{
+
+    /// @return human readable, language independent model name/short description
+    /// @note when no specific modelNameString is set via external API,
+    ///   base class will construct this from global product name and vdcModelSuffix()
+    virtual string modelName() P44_OVERRIDE;
+
+    /// @return human readable model version specific to that vDC, meaning for example a firmware version
+    ///    of external hardware governing the access to a device bus/network such as a hue bridge.
+    ///    If not empty, this will be appended to the modelVersion() string.
+    virtual string vdcModelVersion() const P44_OVERRIDE;
+
+    /// @return URL for Web-UI (for access from local LAN)
+    virtual string webuiURLString() P44_OVERRIDE;
+
+    /// Get icon data or name
+    /// @param aIcon string to put result into (when method returns true)
+    /// - if aWithData is set, binary PNG icon data for given resolution prefix is returned
+    /// - if aWithData is not set, only the icon name (without file extension) is returned
+    /// @param aWithData if set, PNG data is returned, otherwise only name
+    /// @return true if there is an icon, false if not
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+    /// @}
+
+  protected:
+
+    ErrorPtr handleInitVdcMessage(JsonObjectPtr aMessage);
+
+  };
+
+
 
 } // namespace p44
 

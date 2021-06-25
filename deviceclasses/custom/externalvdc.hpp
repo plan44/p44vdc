@@ -75,8 +75,6 @@ namespace p44 {
 
     virtual void sendDeviceApiJsonMessage(JsonObjectPtr aMessage) P44_OVERRIDE;
     virtual void sendDeviceApiSimpleMessage(string aMessage) P44_OVERRIDE;
-    virtual void sendDeviceApiFlagMessage(string aFlagWord) P44_OVERRIDE;
-
 
   };
 
@@ -116,7 +114,6 @@ namespace p44 {
     void sendDeviceApiJsonMessage(JsonObjectPtr aMessage, const char *aTag = NULL);
     void sendDeviceApiSimpleMessage(string aMessage, const char *aTag = NULL);
     void sendDeviceApiStatusMessage(ErrorPtr aError, const char *aTag = NULL);
-    void sendDeviceApiFlagMessage(string aFlagWord, const char *aTag = NULL);
 
   };
 
@@ -124,19 +121,13 @@ namespace p44 {
 
 
   typedef boost::intrusive_ptr<ExternalVdc> ExternalVdcPtr;
-  class ExternalVdc : public Vdc
+  class ExternalVdc : public CustomVdc
   {
-    typedef Vdc inherited;
+    typedef CustomVdc inherited;
     friend class ExternalDevice;
     friend class ExternalDeviceConnector;
 
     SocketCommPtr mExternalDeviceApiServer;
-
-    string mIconBaseName; ///< the base icon name
-    string mModelNameString; ///< the string to be returned by modelName()
-    string mModelVersionString; ///< the string to be returned by vdcModelVersion()
-    string mConfigUrl; ///< custom value for configURL if not empty
-    bool mForwardIdentify; ///< if set, "VDCIDENTIFY" messages will be sent, and vdc will show the "identification" capability in the vDC API
 
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
@@ -157,39 +148,9 @@ namespace p44 {
     /// @return a combination of rescanmode_xxx bits
     virtual int getRescanModes() const P44_OVERRIDE { return rescanmode_exhaustive; }; // only exhaustive makes sense
 
-    /// Custom identification for external vDCs
-    /// @{
-
-    /// @return human readable, language independent model name/short description
-    /// @note when no specific modelNameString is set via external API,
-    ///   base class will construct this from global product name and vdcModelSuffix()
-    virtual string modelName() P44_OVERRIDE;
-
-    /// @return human readable model version specific to that vDC, meaning for example a firmware version
-    ///    of external hardware governing the access to a device bus/network such as a hue bridge.
-    ///    If not empty, this will be appended to the modelVersion() string.
-    virtual string vdcModelVersion() const P44_OVERRIDE;
-
-    /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() P44_OVERRIDE;
-
-    /// Get icon data or name
-    /// @param aIcon string to put result into (when method returns true)
-    /// - if aWithData is set, binary PNG icon data for given resolution prefix is returned
-    /// - if aWithData is not set, only the icon name (without file extension) is returned
-    /// @param aWithData if set, PNG data is returned, otherwise only name
-    /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
-
     /// identify the vdc to the user in some way
     /// @note usually, this would be a LED or buzzer in the vdc device (bridge, gateway etc.)
     virtual void identifyToUser() P44_OVERRIDE;
-
-    /// check if identifyToUser() has an actual implementation
-    virtual bool canIdentifyToUser() P44_OVERRIDE;
-
-    /// @}
-
 
   private:
 
