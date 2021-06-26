@@ -238,7 +238,7 @@ namespace p44 {
     /// get the scene's name
     string getName() const;
 
-    /// get the action name (describing what this scene kind is form, such as "presetXY", "off" etc.)
+    /// get the action name (describing what this scene kind is for, such as "presetXY", "off" etc.)
     string getActionName() const;
 
     /// get the scene's kind flags
@@ -335,13 +335,6 @@ namespace p44 {
     /// @param aSceneName a user-assigned scene name to look for
     /// @return scene or NULL if none with this name is found
     SceneDescriptorPtr getSceneByName(const string aSceneName);
-
-
-    /// get scene id (dS global scene number, not related to a specific zone) by kind
-    /// @param aSceneSpec name of scene kind like "preset 1", "standby" etc. or dS scene number)
-    /// @return dS scene number or INVALID_SCENE_NO if none is found
-    SceneNo getSceneIdByKind(const string aSceneKindName);
-
 
   protected:
 

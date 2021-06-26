@@ -196,6 +196,10 @@ namespace p44 {
     /// @note this is a OutputBehaviour level wrapper and preparator for behaviour-specific performApplySceneToChannels().
     bool applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTransitionTimeOverride);
 
+    /// Override transition time for all channels that need to be applied
+    /// @param aTransitionTimeOverride if not Infinite, this overrides the transition time for all channels
+    void setTransitionTimeOverride(MLMicroSeconds aTransitionTimeOverride);
+
     /// capture current state into passed scene object
     /// @param aScene the scene object to update
     /// @param aFromDevice true to request real values read back from device hardware (if possible), false to

@@ -279,6 +279,7 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
     OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->sceneScript.getSource().c_str(), true, 80).c_str() );
     simpleScene->sceneScript.setSharedMainContext(device.getDeviceScriptContext());
     simpleScene->sceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), ScriptObjPtr(), Infinite);
+    return;
   }
   #endif // ENABLE_SCENE_SCRIPT
   if (aDoneCB) aDoneCB(); // NOP
@@ -305,17 +306,23 @@ void OutputBehaviour::stopSceneActions()
 
 
 
+void OutputBehaviour::setTransitionTimeOverride(MLMicroSeconds aTransitionTimeOverride)
+{
+  if (aTransitionTimeOverride!=Infinite) {
+    OLOG(LOG_INFO, "Transition times of all changing channels overridden: actual transition time is now %d mS", (int)(aTransitionTimeOverride/MilliSecond));
+    // override the transition time in all channels that now need to be applied
+    for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+      if ((*pos)->needsApplying()) (*pos)->setTransitionTime(aTransitionTimeOverride);
+    }
+  }
+}
+
+
 bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTransitionTimeOverride)
 {
   if (aScene) {
     bool ok = performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
-    if (aTransitionTimeOverride!=Infinite) {
-      OLOG(LOG_INFO, "Transition times of all changing channels overridden: actual transition time is now %d mS", (int)(aTransitionTimeOverride/MilliSecond));
-      // override the transition time in all channels that now need to be applied
-      for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
-        if ((*pos)->needsApplying()) (*pos)->setTransitionTime(aTransitionTimeOverride);
-      }
-    }
+    setTransitionTimeOverride(aTransitionTimeOverride);
     return ok;
   }
   return false; // no scene to apply
@@ -736,15 +743,76 @@ string OutputBehaviour::getStatusText()
 
 using namespace P44Script;
 
-static void channelOpComplete(BuiltinFunctionContextPtr f, OutputBehaviourPtr aOutput)
+static void outputOpComplete(BuiltinFunctionContextPtr f, OutputBehaviourPtr aOutput)
 {
-  POLOG(aOutput, LOG_INFO, "scene script: channel operation complete");
+  POLOG(aOutput, LOG_INFO, "output operation complete");
   f->finish();
 }
 
+// helper for loadscene, runactions
+static DsScenePtr findScene(OutputObj* o, const string aSceneId)
+{
+  DsScenePtr scene;
+  SceneDeviceSettingsPtr scenes;
+  scenes = o->output()->getDevice().getScenes();
+  if (scenes) {
+    SceneNo sceneNo = VdcHost::sharedVdcHost()->getSceneIdByKind(aSceneId);
+    if (sceneNo!=INVALID_SCENE_NO) {
+      scene = scenes->getScene(sceneNo);
+    }
+  }
+  return scene;
+}
+
+// loadscene(sceneNoOrName [, transitionTimeOverride])
+static const BuiltInArgDesc loadscene_args[] = { { numeric|text }, { numeric|optionalarg} };
+static const size_t loadscene_numargs = sizeof(loadscene_args)/sizeof(BuiltInArgDesc);
+static void loadscene_func(BuiltinFunctionContextPtr f)
+{
+  OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
+  assert(o);
+  DsScenePtr scene = findScene(o, f->arg(0)->stringValue());
+  if (scene) {
+    MLMicroSeconds transition = Infinite; // no override
+    if (f->numArgs()>=2) transition = f->arg(1)->doubleValue()*Second;
+    POLOG(o->output(), LOG_INFO, "loadscene(%d) loads channels values", scene->sceneNo);
+    o->output()->applySceneToChannels(scene, transition);
+  }
+  f->finish();
+}
+
+
+// runactions(sceneNoOrName)
+static const BuiltInArgDesc runactions_args[] = { { numeric|optionalarg } };
+static const size_t runactions_numargs = sizeof(runactions_args)/sizeof(BuiltInArgDesc);
+static void runactions_func(BuiltinFunctionContextPtr f)
+{
+  OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
+  assert(o);
+  DsScenePtr scene = findScene(o, f->arg(0)->stringValue());
+  if (scene) {
+    POLOG(o->output(), LOG_INFO, "runactions(%d) starts scene actions", scene->sceneNo);
+    o->output()->performSceneActions(scene, boost::bind(&outputOpComplete, f, o->output()));
+    return;
+  }
+  f->finish();
+}
+
+
+// stopactions()
+static void stopactions_func(BuiltinFunctionContextPtr f)
+{
+  OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
+  assert(o);
+  POLOG(o->output(), LOG_INFO, "stopping all scene actions");
+  o->output()->stopSceneActions();
+  f->finish();
+}
+
+
 // applychannels()
-// applychannels(forced)
-static const BuiltInArgDesc applychannels_args[] = { { numeric|optionalarg } };
+// applychannels(forced [, transitionTimeOverride])
+static const BuiltInArgDesc applychannels_args[] = { { numeric|optionalarg }, { numeric|optionalarg } };
 static const size_t applychannels_numargs = sizeof(applychannels_args)/sizeof(BuiltInArgDesc);
 static void applychannels_func(BuiltinFunctionContextPtr f)
 {
@@ -754,8 +822,11 @@ static void applychannels_func(BuiltinFunctionContextPtr f)
     // force apply, invalidate all channels first
     o->output()->getDevice().invalidateAllChannels();
   }
-  POLOG(o->output(), LOG_INFO, "scene script: applychannels() requests applying channels now");
-  o->output()->getDevice().requestApplyingChannels(boost::bind(&channelOpComplete, f, o->output()), false);
+  if (f->numArgs()>=2) {
+    o->output()->setTransitionTimeOverride(f->arg(1)->doubleValue()*Second);
+  }
+  POLOG(o->output(), LOG_INFO, "applychannels() requests applying channels now");
+  o->output()->getDevice().requestApplyingChannels(boost::bind(&outputOpComplete, f, o->output()), false);
 }
 
 // syncchannels()
@@ -763,8 +834,8 @@ static void syncchannels_func(BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
   assert(o);
-  POLOG(o->output(), LOG_INFO, "scene script: syncchannels() requests applying channels now");
-  o->output()->getDevice().requestUpdatingChannels(boost::bind(&channelOpComplete, f, o->output()));
+  POLOG(o->output(), LOG_INFO, "syncchannels() requests reading channels now");
+  o->output()->getDevice().requestUpdatingChannels(boost::bind(&outputOpComplete, f, o->output()));
 }
 
 
@@ -825,6 +896,9 @@ static void dimchannel_func(BuiltinFunctionContextPtr f)
 }
 
 static const BuiltinMemberDescriptor outputMembers[] = {
+  { "loadscene", executable|null, loadscene_numargs, loadscene_args, &loadscene_func },
+  { "runactions", executable|null, runactions_numargs, runactions_args, &runactions_func },
+  { "stopactions", executable|null, 0, NULL, &stopactions_func },
   { "applychannels", executable|null, applychannels_numargs, applychannels_args, &applychannels_func },
   { "syncchannels", executable|null, 0, NULL, &syncchannels_func },
   { "channel", executable|numeric, channel_numargs, channel_args, &channel_func },

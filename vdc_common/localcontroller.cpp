@@ -780,29 +780,6 @@ SceneDescriptorPtr SceneList::getSceneByName(const string aSceneName)
 }
 
 
-SceneNo SceneList::getSceneIdByKind(const string aSceneKindName)
-{
-  const SceneKindDescriptor* skP = roomScenes;
-  for (int i=0; i<2; i++) {
-    while (skP->no!=INVALID_SCENE_NO) {
-      if (strucmp(aSceneKindName.c_str(), skP->actionName)==0) {
-        return skP->no;
-      }
-      skP++;
-    }
-    // try globals
-    skP = globalScenes;
-  }
-  // try just using integer
-  int sceneNo;
-  if (sscanf(aSceneKindName.c_str(), "%d", &sceneNo)==1) {
-    if (sceneNo>=0 && sceneNo<MAX_SCENE_NO) return sceneNo;
-  }
-  return INVALID_SCENE_NO;
-}
-
-
-
 SceneDescriptorPtr SceneList::getScene(const SceneIdentifier &aSceneId, bool aCreateNewIfNotExisting, size_t *aSceneIndexP)
 {
   SceneDescriptorPtr scene;
@@ -2250,7 +2227,7 @@ static bool findScene(int &ai, BuiltinFunctionContextPtr f, SceneNo &sceneNo, in
   if (f->numArgs()>1 && f->arg(1)->hasType(text)) {
     // second param is a zone
     // - ..so first one must be a scene number or name
-    sceneNo = LocalController::sharedLocalController()->mLocalScenes.getSceneIdByKind(f->arg(0)->stringValue());
+    sceneNo = VdcHost::sharedVdcHost()->getSceneIdByKind(f->arg(0)->stringValue());
     if (sceneNo==INVALID_SCENE_NO) {
       f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
       return false;
@@ -2278,6 +2255,20 @@ static bool findScene(int &ai, BuiltinFunctionContextPtr f, SceneNo &sceneNo, in
 }
 
 
+// sceneid(name)
+static const BuiltInArgDesc sceneid_args[] = { { text } };
+static const size_t sceneid_numargs = sizeof(sceneid_args)/sizeof(BuiltInArgDesc);
+static void sceneid_func(BuiltinFunctionContextPtr f)
+{
+  SceneDescriptorPtr scene = LocalController::sharedLocalController()->mLocalScenes.getSceneByName(f->arg(0)->stringValue());
+  if (scene) {
+    f->finish(new StringValue(scene->getActionName()));
+    return;
+  }
+  f->finish(new AnnotatedNullValue("no such scene"));
+}
+
+
 // scene(name)
 // scene(name, transition_time)
 // scene(id, zone)
@@ -2292,7 +2283,7 @@ static void scene_func(BuiltinFunctionContextPtr f)
   SceneNo sceneNo = INVALID_SCENE_NO;
   MLMicroSeconds transitionTime = Infinite; // use scene's standard time
   DsGroup group = group_yellow_light; // default to light
-  if (!findScene(ai, f, sceneNo, zoneid)) return;
+  if (!findScene(ai, f, sceneNo, zoneid)) return; // finish already done by findScene helper
   if (f->numArgs()>ai) {
     transitionTime = f->arg(ai)->doubleValue()*Second;
     if (transitionTime<0) transitionTime = Infinite; // use default
@@ -2322,7 +2313,7 @@ static void savescene_func(BuiltinFunctionContextPtr f)
   int zoneid = -1; // none specified
   SceneNo sceneNo = INVALID_SCENE_NO;
   DsGroup group = group_yellow_light; // default to light
-  if (!findScene(ai, f, sceneNo, zoneid)) return;
+  if (!findScene(ai, f, sceneNo, zoneid)) return;  // finish already done by findScene helper
   if (f->numArgs()>ai) {
     const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(ai)->stringValue());
     if (!gdP) {
@@ -2400,6 +2391,7 @@ static void set_func(BuiltinFunctionContextPtr f)
 static const BuiltinMemberDescriptor localControllerFuncs[] = {
   { "trigger", executable|any, trigger_numargs, trigger_args, &trigger_func },
   { "scene", executable|any, scene_numargs, scene_args, &scene_func },
+  { "sceneid", executable|numeric, sceneid_numargs, sceneid_args, &sceneid_func },
   { "savescene", executable|any, savescene_numargs, savescene_args, &savescene_func },
   { "set", executable|any, set_numargs, set_args, &set_func },
   { NULL } // terminator
