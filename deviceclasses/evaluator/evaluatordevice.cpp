@@ -164,9 +164,6 @@ void EvaluatorDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
 }
 
 
-
-
-
 string EvaluatorDevice::modelName()
 {
   switch (evaluatorType) {

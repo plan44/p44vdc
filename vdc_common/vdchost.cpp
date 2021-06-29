@@ -1584,7 +1584,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     return Error::ok();
   }
   if (aMethod=="x-p44-stopMain") {
-    // re-run the main script
+    // stop the main script
     OLOG(LOG_NOTICE, "Stopping global main script");
     vdcHostScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "main script stopped"));
     return Error::ok();
@@ -1609,6 +1609,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
       }
     }
     aRequest->sendResult(checkResult);
+    return ErrorPtr();
   }
   #endif // P44SCRIPT_FULL_SUPPORT
   return inherited::handleMethod(aRequest, aMethod, aParams);

@@ -1956,7 +1956,6 @@ bool Device::processControlValue(const string &aName, double aValue)
 // MARK: - persistent device params
 
 
-// load device settings - beaviours + scenes
 ErrorPtr Device::load()
 {
   ErrorPtr err;
@@ -2017,7 +2016,7 @@ void Device::markClean()
   for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->markClean();
   for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->markClean();
   for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->markClean();
-  if (output) output->save();
+  if (output) output->markClean();
 }
 
 
