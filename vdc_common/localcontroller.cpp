@@ -1235,7 +1235,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case triggerVarDefs_key: aPropValue->setStringValue(mTriggerVarDefs); return true;
         case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getSource().c_str()); return true;
         case triggerMode_key: aPropValue->setInt32Value(triggerCondition.getTriggerMode()); return true;
-        case triggerHoldOff_key: aPropValue->setDoubleValue(triggerCondition.getTriggerHoldoff()/Second); return true;
+        case triggerHoldOff_key: aPropValue->setDoubleValue((double)triggerCondition.getTriggerHoldoff()/Second); return true;
         case triggerAction_key: aPropValue->setStringValue(triggerAction.getSource().c_str()); return true;
         case logLevelOffset_key: aPropValue->setInt32Value(getLocalLogLevelOffset()); return true;
       }

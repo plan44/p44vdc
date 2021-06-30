@@ -511,10 +511,10 @@ void ShadowBehaviour::endReached(bool aTop)
       MLMicroSeconds fullRangeTime = MainLoop::now()-referenceTime;
       LOG(LOG_INFO, "- is end of a full range movement : measured move time %.1f -> updating settings", (double)fullRangeTime/Second);
       if (aTop) {
-        openTime = fullRangeTime/Second; // update opening time
+        openTime = (double)fullRangeTime/Second; // update opening time
       }
       else {
-        closeTime = fullRangeTime/Second; // update closing time
+        closeTime = (double)fullRangeTime/Second; // update closing time
       }
     }
     // update positions
