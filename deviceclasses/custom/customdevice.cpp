@@ -409,7 +409,7 @@ ErrorPtr CustomDevice::processSimpleMessage(string aMessageType, string aValue)
       // must be input
       double value = 0;
       sscanf(aValue.c_str(), "%lf", &value);
-      return processInput(iotype, index, value);
+      return processInput(iotype, index, value, false);
     }
   }
   return TextError::err("Unknown message '%s'", aMessageType.c_str());
@@ -423,6 +423,7 @@ static int channelIndexById(OutputBehaviourPtr aOB, const string aId)
 }
 
 
+// MARK: - process input (or log)
 
 ErrorPtr CustomDevice::processInputJson(char aInputType, JsonObjectPtr aParams)
 {
@@ -449,29 +450,33 @@ ErrorPtr CustomDevice::processInputJson(char aInputType, JsonObjectPtr aParams)
     }
   }
   if (index<0) {
-    return TextError::err("missing id, index or type");
+    return TextError::err("missing 'id', 'index' or 'type'");
   }
-  o = aParams->get("value");
-  if (o) {
-    double value = o->doubleValue();
-    return processInput(aInputType, index, value);
+  if (aParams->get("value", o, false)) {
+    // explicit NULL is allowed to set input to "undefined"
+    double value = 0;
+    if (o) {
+      value = o->doubleValue();
+    }
+    return processInput(aInputType, index, value, !o);
   }
   else {
-    return TextError::err("missing value");
+    return TextError::err("missing 'value'");
   }
   return ErrorPtr();
 }
 
 
-// MARK: - process input (or log)
-
-ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aValue)
+ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aValue, bool aUndefined)
 {
   switch (aInputType) {
     case 'B': {
       ButtonBehaviourPtr bb = getButton(aIndex);
       if (bb) {
-        if (aValue>2) {
+        if (aUndefined) {
+          // FIXME: buttons can get undefined, too
+        }
+        else if (aValue>2) {
           // simulate a keypress of defined length in milliseconds
           bb->updateButtonState(true);
           mButtonReleaseTicket.executeOnce(boost::bind(&CustomDevice::releaseButton, this, bb), aValue*MilliSecond);
@@ -485,14 +490,24 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
     case 'I': {
       BinaryInputBehaviourPtr ib = getInput(aIndex);
       if (ib) {
-        ib->updateInputState(aValue!=0);
+        if (aUndefined) {
+          ib->invalidateInputState();
+        }
+        else {
+          ib->updateInputState(aValue);
+        }
       }
       break;
     }
     case 'S': {
       SensorBehaviourPtr sb = getSensor(aIndex);
       if (sb) {
-        sb->updateSensorValue(aValue);
+        if (aUndefined) {
+          sb->invalidateSensorValue();
+        }
+        else {
+          sb->updateSensorValue(aValue);
+        }
       }
       break;
     }

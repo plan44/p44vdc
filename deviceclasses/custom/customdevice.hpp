@@ -304,7 +304,7 @@ namespace p44 {
   private:
 
     ErrorPtr processInputJson(char aInputType, JsonObjectPtr aParams);
-    ErrorPtr processInput(char aInputType, uint32_t aIndex, double aValue);
+    ErrorPtr processInput(char aInputType, uint32_t aIndex, double aValue, bool aUndefined);
 
     #if ENABLE_CUSTOM_SINGLEDEVICE
     ErrorPtr parseParam(const string aParamName, JsonObjectPtr aParamDetails, ValueDescriptorPtr &aParam);
