@@ -45,7 +45,8 @@ string EvaluatorDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aTo
     // - create my tables
     sql.append(
       "CREATE TABLE evaluators ("
-      " evaluatorid, config TEXT"
+      " evaluatorid, config TEXT,"
+      " PRIMARY KEY (evaluatorid)"
       ");"
     );
     // reached final version in one step
