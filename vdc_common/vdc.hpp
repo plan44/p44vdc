@@ -89,7 +89,7 @@ namespace p44 {
 
 
   /// notification types
-  /// @note: only add new ones at the end, these are persisted in optimizer cache!
+  /// @note only add new ones at the end, these are persisted in optimizer cache!
   typedef enum {
     ntfy_undefined,
     ntfy_none,
