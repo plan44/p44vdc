@@ -219,6 +219,7 @@ void BinaryInputBehaviour::invalidateInputState()
     lastUpdate = Never;
     currentState = 0;
     updateTicket.cancel();
+    OLOG(LOG_NOTICE, "reports input state no longer available");
     // push invalidation (primitive clients not capable of NULL will at least see state==false)
     MLMicroSeconds now = MainLoop::now();
     // push the invalid state
