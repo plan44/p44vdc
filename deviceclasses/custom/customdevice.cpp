@@ -409,7 +409,7 @@ ErrorPtr CustomDevice::processSimpleMessage(string aMessageType, string aValue)
       // must be input
       double value = 0;
       sscanf(aValue.c_str(), "%lf", &value);
-      return processInput(iotype, index, value, false);
+      return processInput(iotype, index, value, aValue=="undefined");
     }
   }
   return TextError::err("Unknown message '%s'", aMessageType.c_str());
