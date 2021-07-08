@@ -217,7 +217,7 @@ void BinaryInputBehaviour::invalidateInputState()
   if (hasDefinedState()) {
     // currently valid -> invalidate
     lastUpdate = Never;
-    currentState = 0;
+    //currentState = 0; // do NOT reset the state, it is better to use the last known state (for the valuesource value in p44scripts)
     updateTicket.cancel();
     OLOG(LOG_NOTICE, "reports input state no longer available");
     // push invalidation (primitive clients not capable of NULL will at least see state==false)
