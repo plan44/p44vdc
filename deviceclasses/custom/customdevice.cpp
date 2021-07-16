@@ -1381,6 +1381,7 @@ ErrorPtr CustomVdc::handleInitVdcMessage(JsonObjectPtr aVdcInitMessage)
   if (aVdcInitMessage->get("identification", o)) {
     mForwardIdentify = o->boolValue();
   }
+  return err;
 }
 
 
