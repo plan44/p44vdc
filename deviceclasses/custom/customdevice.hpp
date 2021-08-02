@@ -114,6 +114,7 @@ namespace p44 {
     bool mControlValues; ///< if set, device communication uses CTRL/control command to forward system control values such as "heatingLevel" and "TemperatureZone"
     bool mQuerySync; ///< if set, device is asked for synchronizing actual values of channels when needed (e.g. before saveScene)
     bool mSceneCommands; ///< if set, scene commands are forwarded to the external device
+    bool mSceneCalls; ///< if set, dS scene calls are forwarded to the external device
     bool mForwardIdentify; ///< if set, "IDENTIFY" messages will be sent, and device will show the "identification" modelfeature in the vDC API
 
     #if ENABLE_CUSTOM_EXOTIC

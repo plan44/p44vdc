@@ -139,6 +139,7 @@ CustomDevice::CustomDevice(Vdc *aVdcP, bool aSimpleText) :
   mUseMovement(false), // no movement by default
   mQuerySync(false), // no sync query by default
   mSceneCommands(false), // no scene commands by default
+  mSceneCalls(false), // no scene calls forwarded by default
   mForwardIdentify(false), // no identification forward by default
   mControlValues(false), // no control values by default
   mConfigured(false),
@@ -609,6 +610,18 @@ ErrorPtr CustomDevice::switchConfiguration(const string aConfigurationId)
 
 bool CustomDevice::prepareSceneCall(DsScenePtr aScene)
 {
+  if (mSceneCalls) {
+    if (mSimpletext) {
+      string m = string_format("CALLSCENE=%d", aScene->sceneNo);
+      sendDeviceApiSimpleMessage(m);
+    }
+    else {
+      JsonObjectPtr message = JsonObject::newObj();
+      message->add("message", JsonObject::newString("callscene"));
+      message->add("sceneno", JsonObject::newInt32(aScene->sceneNo));
+      sendDeviceApiJsonMessage(message);
+    }
+  }
   if (mSceneCommands) {
     // forward (built-in, behaviour-defined) scene commands to external device
     const char *sceneCommandStr = NULL;
@@ -838,6 +851,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("sync", o)) mQuerySync = o->boolValue();
   if (aInitParams->get("move", o)) mUseMovement = o->boolValue();
   if (aInitParams->get("scenecommands", o)) mSceneCommands = o->boolValue();
+  if (aInitParams->get("scenecalls", o)) mSceneCalls = o->boolValue();
   if (aInitParams->get("identification", o)) mForwardIdentify = o->boolValue();
   // get unique ID
   string uniqueid;
