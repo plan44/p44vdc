@@ -433,14 +433,14 @@ SocketCommPtr P44VdcHost::configApiConnectionHandler(SocketCommPtr aServerSocket
 void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonObject)
 {
   ErrorPtr err;
-  // when coming from mg44, requests have the following form
+  // when coming from mg44, requests have the following form (peer from mg44 3.9 onwards)
   // - for GET requests like http://localhost:8080/api/json/myuri?foo=bar&this=that
-  //   {"method":"GET","uri":"myuri","uri_params":{"foo":"bar","this":"that"}}
+  //   {"method":"GET", "uri":"myuri", "peer":"ip_addr", "uri_params":{"foo":"bar", "this":"that"}}
   // - for POST requests like
   //   curl "http://localhost:8080/api/json/myuri?foo=bar&this=that" --data-ascii "{ \"content\":\"data\", \"important\":false }"
-  //   {"method":"POST","uri":"myuri","uri_params":{"foo":"bar","this":"that"},"data":{"content":"data","important":false}}
+  //   {"method":"POST", "uri":"myuri", "peer":"ip_addr", "uri_params":{"foo":"bar","this":"that"},"data":{"content":"data","important":false}}
   //   curl "http://localhost:8080/api/json/myuri" --data-ascii "{ \"content\":\"data\", \"important\":false }"
-  //   {"method":"POST","uri":"myuri","data":{"content":"data","important":false}}
+  //   {"method":"POST", "uri":"myuri", "peer":"ip_addr", "data":{"content":"data","important":false}}
   // processing:
   // - a JSON request must be either specified in the URL or in the POST data, not both
   // - if POST data ("data" member in the incoming request) is present, "uri_params" is ignored
@@ -461,6 +461,11 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
       aError = Error::err<P44VdcError>(415, "empty request");
     }
     else {
+      // include the peer into request if we have it
+      JsonObjectPtr o;
+      if (aJsonObject->get("peer", o)) {
+        request->add("peer", o);
+      }
       // have the request processed
       string apiselector;
       JsonObjectPtr uri = aJsonObject->get("uri");
