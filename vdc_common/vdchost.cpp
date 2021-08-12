@@ -44,6 +44,7 @@
 #if ENABLE_P44SCRIPT
 #include "httpcomm.hpp"
 #include "socketcomm.hpp"
+#include "websocket.hpp"
 #include "analogio.hpp"
 #include "digitalio.hpp"
 #include "dcmotor.hpp"
@@ -129,6 +130,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if ENABLE_SOCKET_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SocketLookup);
   #endif // ENABLE_SOCKET_SCRIPT_FUNCS
+  #if ENABLE_WEBSOCKET_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::WebSocketLookup);
+  #endif // ENABLE_WEBSOCKET_SCRIPT_FUNCS
   #if ENABLE_ANALOGIO_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new AnalogIoLookup);
   #endif
