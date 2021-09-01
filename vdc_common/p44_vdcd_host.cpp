@@ -28,6 +28,10 @@
 
 #include "macaddress.hpp"
 
+#if ENABLE_P44FEATURES
+  #include "featureapi.hpp"
+#endif
+
 #if ENABLE_P44SCRIPT
   // global script extras
   #include "httpcomm.hpp"
@@ -225,6 +229,12 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // start ubus API, if we have it
   if (ubusApiServer) {
     ubusApiServer->startServer();
+  }
+  #endif
+  #if ENABLE_P44FEATURES && ENABLE_P44SCRIPT
+  // register script access
+  if (FeatureApi::existingSharedApi()) {
+    StandardScriptingDomain::sharedDomain().registerMemberLookup(new FeatureApiLookup);
   }
   #endif
   // now init rest of vdc host
@@ -483,6 +493,19 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
       else if (apiselector=="p44") {
         // process p44 specific requests
         aError = processP44Request(aJsonComm, request);
+      }
+      #endif
+      #if ENABLE_P44FEATURES
+      else if (apiselector=="featureapi") {
+        // p44featured API wrapper
+        FeatureApiPtr featureApi = FeatureApi::existingSharedApi();
+        if (!featureApi) {
+          aError = WebError::webErr(500, "no features instantiated, API not active");
+        }
+        else {
+          ApiRequestPtr req = ApiRequestPtr(new APICallbackRequest(request, boost::bind(&P44VdcHost::sendCfgApiResponse, aJsonComm, _1, _2)));
+          featureApi->handleRequest(req);
+        }
       }
       #endif
       #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
