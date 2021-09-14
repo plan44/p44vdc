@@ -94,8 +94,8 @@ namespace p44 {
     Brightness minBrightness; ///< currently set minimal brightness
     // - DT8 params
     ColorLightMode currentColorMode; ///< current color mode
-    uint16_t currentXorCT; ///< current CIE X or CT or Red
-    uint16_t currentY; ///< current CIE Y or Green
+    uint16_t currentXorCT; ///< current CIE X or CT
+    uint16_t currentY; ///< current CIE Y
     uint8_t currentR; ///< current Red
     uint8_t currentG; ///< current Green
     uint8_t currentB; ///< current Blue
