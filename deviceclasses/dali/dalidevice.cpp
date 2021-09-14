@@ -844,16 +844,19 @@ bool DaliBusDevice::setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t a
       changed = true; // change in mode always means change in parameter
       currentColorMode = colorLightModeRGBWA;
     }
+    if (changed || aR!=currentR || aG!=currentG || aB!=currentB || aW!=currentW || aA!=currentA) {
+      // set the mode (channel control)
+      daliVdc.daliComm.daliSendDtrAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_RGBWAF_CTRL, 0x0<<6); // all not linked, channel control
       if (changed || aR!=currentR || aG!=currentG || aB!=currentB) {
+        // set the RGB color values
         currentR = aR;
         currentG = aG;
         currentB = aB;
-      // set the mode (channel control)
-      daliVdc.daliComm.daliSendDtrAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_RGBWAF_CTRL, 0x0<<6); // all not linked, channel control
-      // set the color values
         daliVdc.daliComm.daliSend3x8BitValueAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_RGB, currentR, currentG, currentB);
+      }
       if (dt8RGBWAFchannels>3) {
         if (changed || aW!=currentW || aA!=currentA) {
+          // set W and A values (we don't have F)
           currentW = aW;
           currentA = aA;
           daliVdc.daliComm.daliSend3x8BitValueAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_WAF, currentW, currentA, 0); // no F
