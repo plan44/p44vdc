@@ -756,7 +756,7 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
 }
 
 
-void RGBColorLightBehaviour::setRGB(double aRed, double aGreen, double aBlue, double aMax)
+void RGBColorLightBehaviour::setRGB(double aRed, double aGreen, double aBlue, double aMax, bool aNoBrightness)
 {
   Row3 RGB;
   RGB[0] = aRed/aMax;
@@ -768,7 +768,7 @@ void RGBColorLightBehaviour::setRGB(double aRed, double aGreen, double aBlue, do
   // set the channels
   hue->syncChannelValue(HSV[0]);
   saturation->syncChannelValue(HSV[1]*100);
-  brightness->syncChannelValue(HSV[2]*100);
+  if (!aNoBrightness) brightness->syncChannelValue(HSV[2]*100);
   // change the mode if needed
   if (colorMode!=colorLightModeHueSaturation) {
     colorMode = colorLightModeHueSaturation;
@@ -811,7 +811,7 @@ void RGBColorLightBehaviour::getRGBWA(double &aRed, double &aGreen, double &aBlu
 }
 
 
-void RGBColorLightBehaviour::setRGBW(double aRed, double aGreen, double aBlue, double aWhite, double aMax)
+void RGBColorLightBehaviour::setRGBW(double aRed, double aGreen, double aBlue, double aWhite, double aMax, bool aNoBrightness)
 {
   Row3 RGB;
   RGB[0] = aRed/aMax;
@@ -824,7 +824,7 @@ void RGBColorLightBehaviour::setRGBW(double aRed, double aGreen, double aBlue, d
   // set the channels
   hue->syncChannelValue(HSV[0]);
   saturation->syncChannelValue(HSV[1]*100);
-  brightness->syncChannelValue(HSV[2]*100);
+  if (!aNoBrightness) brightness->syncChannelValue(HSV[2]*100);
   // change the mode if needed
   if (colorMode!=colorLightModeHueSaturation) {
     colorMode = colorLightModeHueSaturation;
@@ -834,7 +834,7 @@ void RGBColorLightBehaviour::setRGBW(double aRed, double aGreen, double aBlue, d
 }
 
 
-void RGBColorLightBehaviour::setRGBWA(double aRed, double aGreen, double aBlue, double aWhite, double aAmber, double aMax)
+void RGBColorLightBehaviour::setRGBWA(double aRed, double aGreen, double aBlue, double aWhite, double aAmber, double aMax, bool aNoBrightness)
 {
   Row3 RGB;
   RGB[0] = aRed/aMax;
@@ -850,7 +850,7 @@ void RGBColorLightBehaviour::setRGBWA(double aRed, double aGreen, double aBlue, 
   // set the channels
   hue->syncChannelValue(HSV[0]);
   saturation->syncChannelValue(HSV[1]*100);
-  brightness->syncChannelValue(HSV[2]*100);
+  if (!aNoBrightness) brightness->syncChannelValue(HSV[2]*100);
   // change the mode if needed
   if (colorMode!=colorLightModeHueSaturation) {
     colorMode = colorLightModeHueSaturation;

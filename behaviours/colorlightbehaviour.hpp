@@ -338,7 +338,8 @@ namespace p44 {
     /// set RGB values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue current R,G,B values to be converted to color channel settings
     /// @param aMax max value for aRed,aGreen,aBlue
-    void setRGB(double aRed, double aGreen, double aBlue, double aMax);
+    /// @param aNoBrightness do not update brightness channel (when RGB are modulated by a separate brightness)
+    void setRGB(double aRed, double aGreen, double aBlue, double aMax, bool aNoBrightness);
 
     /// get RGBW colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue,aWhite will receive the R,G,B,W values corresponding to current channels
@@ -349,7 +350,8 @@ namespace p44 {
     /// set RGBW values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue,aWhite current R,G,B,W values to be converted to color channel settings
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite
-    void setRGBW(double aRed, double aGreen, double aBlue, double aWhite, double aMax);
+    /// @param aNoBrightness do not update brightness channel (when RGB are modulated by a separate brightness)
+    void setRGBW(double aRed, double aGreen, double aBlue, double aWhite, double aMax, bool aNoBrightness);
 
     /// get RGBWA colors (from current channel settings, HSV, CIE, CT + brightness) for applying to lamp
     /// @param aRed,aGreen,aBlue,aWhite,aAmber will receive the R,G,B,W,A values corresponding to current channels
@@ -360,7 +362,8 @@ namespace p44 {
     /// set RGBWA values from lamp (to update channel values from actual lamp setting)
     /// @param aRed,aGreen,aBlue,aWhite,aAmber current R,G,B,W,A values to be converted to color channel settings
     /// @param aMax max value for aRed,aGreen,aBlue,aWhite
-    void setRGBWA(double aRed, double aGreen, double aBlue, double aWhite, double aAmber, double aMax);
+    /// @param aNoBrightness do not update brightness channel (when RGB are modulated by a separate brightness)
+    void setRGBWA(double aRed, double aGreen, double aBlue, double aWhite, double aAmber, double aMax, bool aNoBrightness);
 
     /// get Cool White and Warm White colors (from current CT + brightness) for applying to lamp
     /// @param aCW,aWW will receive the CW and WW values corresponding to current channels

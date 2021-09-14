@@ -844,14 +844,14 @@ bool DaliBusDevice::setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t a
       changed = true; // change in mode always means change in parameter
       currentColorMode = colorLightModeRGBWA;
     }
-    if (changed || aR!=currentR || aG!=currentG || aB!=currentB) {
-      currentR = aR;
-      currentG = aG;
-      currentB = aB;
+      if (changed || aR!=currentR || aG!=currentG || aB!=currentB) {
+        currentR = aR;
+        currentG = aG;
+        currentB = aB;
       // set the mode (channel control)
       daliVdc.daliComm.daliSendDtrAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_RGBWAF_CTRL, 0x0<<6); // all not linked, channel control
       // set the color values
-      daliVdc.daliComm.daliSend3x8BitValueAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_RGB, currentR, currentG, currentB);
+        daliVdc.daliComm.daliSend3x8BitValueAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_RGB, currentR, currentG, currentB);
       if (dt8RGBWAFchannels>3) {
         if (changed || aW!=currentW || aA!=currentA) {
           currentW = aW;
@@ -1403,15 +1403,15 @@ void DaliSingleControllerDevice::processUpdatedParams(ErrorPtr aError)
       if (daliController->dt8RGBWAFchannels>3) {
         if (daliController->dt8RGBWAFchannels>4) {
           // RGBWA
-          rgbl->setRGBWA(daliController->currentR, daliController->currentG, daliController->currentB, daliController->currentW, daliController->currentA, 255);
+          rgbl->setRGBWA(daliController->currentR, daliController->currentG, daliController->currentB, daliController->currentW, daliController->currentA, 255, true);
         }
         else {
           // RGBW
-          rgbl->setRGBW(daliController->currentR, daliController->currentG, daliController->currentB, daliController->currentW, 255);
+          rgbl->setRGBW(daliController->currentR, daliController->currentG, daliController->currentB, daliController->currentW, 255, true);
         }
       }
       else {
-        rgbl->setRGB(daliController->currentR, daliController->currentG, daliController->currentB, 255);
+        rgbl->setRGB(daliController->currentR, daliController->currentG, daliController->currentB, 255, true);
       }
       // color tone is set, now sync back current brightness, as RGBWA values are not absolute, but relative to brightness
       getOutput()->getChannelByIndex(0)->syncChannelValue(daliController->currentBrightness);
@@ -1899,16 +1899,16 @@ void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryR
       }
       else {
         // RGBWA
-        cl->setRGBWA(r, g, b, w, a, 100); // dali dimmers use abstracted 0..100% brightness
+        cl->setRGBWA(r, g, b, w, a, 100, false); // dali dimmers use abstracted 0..100% brightness
       }
     }
     else {
       // RGBW
-      cl->setRGBW(r, g, b, w, 100); // dali dimmers use abstracted 0..100% brightness
+      cl->setRGBW(r, g, b, w, 100, false); // dali dimmers use abstracted 0..100% brightness
     }
   }
   else {
-    cl->setRGB(r, g, b, 100); // dali dimmers use abstracted 0..100% brightness
+    cl->setRGB(r, g, b, 100, false); // dali dimmers use abstracted 0..100% brightness
   }
   // complete - continue with initialisation in superclasses
   inherited::initializeDevice(aCompletedCB, aFactoryReset);
