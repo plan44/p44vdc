@@ -39,7 +39,7 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   sensorGroup(group_black_variable), // default to joker
   minPushInterval(30*Second), // default unless sensor type profile sets another value
   maxPushInterval(0),
-  changesOnlyInterval(0), // report every sensor update (even if value unchanged)
+  changesOnlyInterval(30*Minute), // report unchanged values only rarely by default (note: before 2021-09-16 we did not have a default limit here)
   // state
   #if ENABLE_RRDB
   loggingReady(false),
@@ -156,10 +156,15 @@ static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
   { sensorType_wind_direction, usage_outdoors, 10*Minute, 1*Minute,        eval_timeweighted_average, 10*Minute, 60*Minute,    20,        tr_absolute,                -1,     1*Minute },
   { sensorType_gust_speed,     usage_outdoors, 3*Second,  200*MilliSecond, eval_max,                  10*Minute, 60*Minute,    0.1,       tr_relative|tr_unipolar,    0.1,    1*Second /* = "immediate" */},
   // FIXME: rule says "accumulation", but as long as sensors deliver intensity in mm/h, it is in fact a window average over an hour
-  { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,        eval_timeweighted_average, 60*Minute, 60*Minute,    0,         tr_absolute,   0,      0 },
+  { sensorType_precipitation,  usage_outdoors, 60*Minute, 2*Minute,        eval_timeweighted_average, 60*Minute, 60*Minute,    0,         tr_absolute,                0,      0 },
+
+  // Plan44 additions
+  // - some sensors are overactive in reporting their unchanged supply voltage, 4 times a day is enough!.
+  //   Report changes with standard rate (30sec) though, because there are generic input devices using this sensor type for other than battery.
+  { sensorType_supplyVoltage,  usage_undefined,0,         0,               eval_none,                 30*Second, 6*Hour,       0,         tr_absolute,                0,      0 },
 
   // terminator
-  { sensorType_none,           usage_undefined,0,         0,               eval_none,                 0,         0,            0,         tr_absolute,   0,      0 },
+  { sensorType_none,           usage_undefined,0,         0,               eval_none,                 0,         0,            0,         tr_absolute,                0,      0 },
 };
 
 
@@ -354,7 +359,9 @@ bool SensorBehaviour::pushSensor(bool aAlways)
     if (now>lastPush+minPushInterval) {
       // Minimal push interval is over -> push...
       // - if value has changed or
-      // - changesOnlyInterval has been exceeded
+      // - if maxPushInterval has passed or
+      // - if changesOnlyInterval has been exceeded
+      // - if aliveSignInterval is defined and has been exceeded
       doPush =
         changed || // when changed
         (maxPushInterval!=Never && now>lastPush+maxPushInterval) || // when interval for max push interval has passed (similar, but not quite the same as changesOnlyInterval)

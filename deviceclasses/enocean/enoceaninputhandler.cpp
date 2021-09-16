@@ -321,7 +321,13 @@ DsBehaviourPtr EnoceanInputHandler::newInputChannelBehaviour(const EnoceanInputD
       SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*aDevice.get(), nonNullCStr(aId)));
       int numBits = (aInputDescriptor.msBit-aInputDescriptor.lsBit)+1; // number of bits
       double resolution = (aInputDescriptor.max-aInputDescriptor.min) / ((1<<numBits)-1); // units per LSB
-      sb->setHardwareSensorConfig((VdcSensorType)aInputDescriptor.behaviourParam, aInputDescriptor.usage, aInputDescriptor.min, aInputDescriptor.max, resolution, aInputDescriptor.updateInterval*Second, aInputDescriptor.aliveSignInterval*Second);
+      sb->setHardwareSensorConfig(
+        (VdcSensorType)aInputDescriptor.behaviourParam, aInputDescriptor.usage,
+        aInputDescriptor.min, aInputDescriptor.max, resolution,
+        aInputDescriptor.updateInterval*Second,
+        aInputDescriptor.aliveSignInterval*Second,
+        fmin(aInputDescriptor.updateInterval*18,3600)*Second // limit unchanged value reporting to 1/18 frequency by default (gives 30min for usual 100sec updateinterval)
+      );
       sb->setGroup(aInputDescriptor.channelGroup);
       sb->setSensorNameWithRange(aInputDescriptor.typeText);
       return sb;

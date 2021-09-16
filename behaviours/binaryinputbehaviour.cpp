@@ -32,7 +32,7 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
   configuredInputType(binInpType_none),
   minPushInterval(2*Second), // don't push more often than every 2 seconds
   maxPushInterval(0),
-  changesOnlyInterval(15*Minute), // report unchanged state updates max once every 15 minutes
+  changesOnlyInterval(30*Minute), // report unchanged state updates max once every 30 minutes
   autoResetTo(-1), // no auto reset
   // state
   lastUpdate(Never),
