@@ -106,7 +106,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mainLoopStatsCounter(0),
   persistentChannels(aWithPersistentChannels),
   #if P44SCRIPT_FULL_SUPPORT
-  mainScript(sourcecode+regular, "main", this),
+  mainScript(sourcecode+regular, "mainscript", this),
   #endif
   #if P44SCRIPT_FULL_SUPPORT
   globalScriptsStarted(false),
@@ -1571,7 +1571,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     // direct execution of a script command line in the common main/initscript context
     ApiValuePtr o = aParams->get("script");
     if (o) {
-      ScriptSource src(sourcecode+regular+keepvars+concurrently+floatingGlobs, "scriptExec", this);
+      ScriptSource src(sourcecode+regular+keepvars+concurrently+floatingGlobs, "scriptExec/REPL", this);
       src.setSource(o->stringValue());
       src.setSharedMainContext(vdcHostScriptContext);
       src.run(inherit, boost::bind(&VdcHost::scriptExecHandler, this, aRequest, _1));
