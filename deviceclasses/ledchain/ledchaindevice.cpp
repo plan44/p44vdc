@@ -144,8 +144,10 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
       // light spot
       lightType = lighttype_feature;
       installSettings(DeviceSettingsPtr(new FeatureLightDeviceSettings(*this)));
-      behaviour = FeatureLightBehaviourPtr(new FeatureLightBehaviour(*this, false));
+      FeatureLightBehaviour* fl = new FeatureLightBehaviour(*this, false);
+      behaviour = FeatureLightBehaviourPtr(fl);
       // create the root view (not necessarily a ColorEffectView, but likely so
+      bool origincentered = true;
       JsonObjectPtr cfg;
       ErrorPtr err;
       if (*p=='{') {
@@ -158,7 +160,11 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
       }
       else {
         string vty = "lightspot"; // default to lightspot
-        if (*p) vty = p;
+        if (*p) {
+          // but can override it with a custom type
+          vty = p;
+          origincentered = false; // custom view type does not use centered positioning by default
+        }
         cfg = JsonObject::newObj();
         cfg->add("type", cfg->newString(vty));
       }
@@ -168,13 +174,30 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
         cfg->add("y", cfg->newInt32(aY));
         cfg->add("dx", cfg->newInt32(aDx));
         cfg->add("dy", cfg->newInt32(aDy));
+        // - set some defaults if not defined in cfg
         if (!cfg->get("fullframe")) cfg->add("fullframe", cfg->newBool(true));
         if (!cfg->get("type")) cfg->add("type", cfg->newString("stack"));
+        // - origin handling
+        JsonObjectPtr o;
+        if (cfg->get("origincentered", o)) {
+          origincentered = o->boolValue();
+        }
         // - create
         err = createViewFromConfig(cfg, lightView, P44ViewPtr());
       }
       if (Error::notOK(err)) {
         OLOG(LOG_WARNING, "Invalid feature light config: %s", err->text());
+      }
+      // set feature channel default
+      if (fl && lightView) {
+        P44ViewPtr lv = lightView->getView("LIGHT"); // actual light view might be nested
+        if (!lv) lv = lightView;
+        fl->featureMode->syncChannelValue(
+          DEFAULT_FEATURE_MODE | // basic default features
+          (origincentered ? 0 : 0x04000000) | // from pseudo-property "origincentered", or true for lightspot, false for all others
+          (lv && (lv->getWrapMode() & P44View::clipMask)==P44View::clipXY ? 0 : 0x02000000), // depending on actual view's clipping bits
+          true, true // always + volatile
+        );
       }
     }
     #endif
@@ -360,12 +383,25 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   P44ViewPtr targetView = lightView->getView("LIGHT"); // where to direct extras to
   if (!targetView) targetView = lightView;
   if (ml) {
-    // moving light, has position, common to all views
+    bool centered;
+    uint32_t mode;
+    if (fl) {
+      mode = fl->featureMode->getChannelValue(false); // always final value, not transitional!
+      centered = (mode & 0x04000000)==0;
+    }
+    else {
+      mode = 0;
+      centered = false;
+    }
+    // moving light
+    // - has position, common to all views
     targetView->setRelativeContentOrigin(
       (fl->horizontalPosition->getChannelValue(true)-50)/50,
       (fl->verticalPosition->getChannelValue(true)-50)/50,
-      true // centered
+      centered
     );
+    // - has clip/noclip
+    targetView->setWrapMode((targetView->getWrapMode()&~P44View::clipMask) | ((mode & 0x02000000)==0 ? P44View::clipXY : 0));
     if (fl) {
       // feature light with extra channels
       // - rotation is common to all views
@@ -381,7 +417,6 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
           (int)(maxD*fl->horizontalZoom->getChannelValue(true)*0.01),
           (int)(maxD*fl->verticalZoom->getChannelValue(true)*0.01)
         });
-        uint32_t mode = fl->featureMode->getChannelValue();
         cev->setColoringParameters(
           pix,
           fl->brightnessGradient->getChannelValue(true)/100, mode & 0xFF,
@@ -389,7 +424,6 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
           fl->saturationGradient->getChannelValue(true)/100, (mode>>16) & 0xFF,
           (mode & 0x01000000)==0 // not radial
         );
-        cev->setWrapMode((cev->getWrapMode()&~P44View::clipMask) | ((mode & 0x02000000)==0 ? P44View::clipXY : 0));
       }
       else {
         // not a ColorEffectView, just set foreground color

@@ -173,8 +173,8 @@ namespace p44 {
   #define DEFAULT_BRIGHTNESS_GRADIENT -30  // dimming down a bit towards the edges
   #define DEFAULT_HUE_GRADIENT 0
   #define DEFAULT_SATURATION_GRADIENT 0
-  #define MAX_FEATURE_MODE 0x3FFFFFF
-  #define DEFAULT_FEATURE_MODE 0x0222222  // linear, oscillating, radial, clipped
+  #define MAX_FEATURE_MODE 0x07FFFFFF
+  #define DEFAULT_FEATURE_MODE 0x00222222  // linear, oscillating, radial, clipped, centered
 
 
   class VZoomChannel : public ChannelBehaviour
