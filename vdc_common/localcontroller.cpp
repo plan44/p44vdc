@@ -2222,23 +2222,32 @@ static void trigger_func(BuiltinFunctionContextPtr f)
 
 
 // helper for callScene and saveScene
-static bool findScene(int &ai, BuiltinFunctionContextPtr f, SceneNo &sceneNo, int &zoneid)
+static bool findSceneAndTarget(int &ai, BuiltinFunctionContextPtr f, SceneNo &sceneNo, int &zoneid, DevicePtr &aDevice)
 {
   if (f->numArgs()>1 && f->arg(1)->hasType(text)) {
-    // second param is a zone
+    // second param is text, cannot be transition time, must be a zone or device specification
     // - ..so first one must be a scene number or name
     sceneNo = VdcHost::sharedVdcHost()->getSceneIdByKind(f->arg(0)->stringValue());
     if (sceneNo==INVALID_SCENE_NO) {
       f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
       return false;
     }
-    // - check zone
+    // get zone or device
+    aDevice.reset();
     ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByName(f->arg(1)->stringValue());
-    if (!zone) {
-      f->finish(new ErrorValue(ScriptError::NotFound, "Zone '%s' not found", f->arg(1)->stringValue().c_str()));
-      return false;
+    if (zone) {
+      // is a zone
+      zoneid = zone->getZoneId();
     }
-    zoneid = zone->getZoneId();
+    else {
+      // might be a device
+      DevicePtr device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(f->arg(1)->stringValue());
+      if (!device) {
+        f->finish(new ErrorValue(ScriptError::NotFound, "Zone or Device '%s' not found", f->arg(1)->stringValue().c_str()));
+        return false;
+      }
+      aDevice = device;
+    }
     ai++;
   }
   else {
@@ -2271,9 +2280,9 @@ static void sceneid_func(BuiltinFunctionContextPtr f)
 
 // scene(name)
 // scene(name, transition_time)
-// scene(id, zone)
-// scene(id, zone, transition_time)
-// scene(id, zone, transition_time, group)
+// scene(id, zone_or_device)
+// scene(id, zone_or_device, transition_time)
+// scene(id, zone_or_device, transition_time, group)
 static const BuiltInArgDesc scene_args[] = { { text|numeric }, { text|numeric|optionalarg }, { numeric|optionalarg }, { text|numeric|optionalarg } };
 static const size_t scene_numargs = sizeof(scene_args)/sizeof(BuiltInArgDesc);
 static void scene_func(BuiltinFunctionContextPtr f)
@@ -2283,19 +2292,28 @@ static void scene_func(BuiltinFunctionContextPtr f)
   SceneNo sceneNo = INVALID_SCENE_NO;
   MLMicroSeconds transitionTime = Infinite; // use scene's standard time
   DsGroup group = group_yellow_light; // default to light
-  if (!findScene(ai, f, sceneNo, zoneid)) return; // finish already done by findScene helper
+  DevicePtr dev;
+  if (!findSceneAndTarget(ai, f, sceneNo, zoneid, dev)) return; // finish already done by findScene helper
   if (f->numArgs()>ai) {
+    // custom transition time
     transitionTime = f->arg(ai)->doubleValue()*Second;
     if (transitionTime<0) transitionTime = Infinite; // use default
     ai++;
-    if (f->numArgs()>ai) {
-      const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(ai)->stringValue());
-      if (!gdP) {
-        f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(ai)->stringValue().c_str()));
-        return;
-      }
-      group = gdP->no;
+  }
+  if (dev) {
+    // targeting single device
+    dev->callScene(sceneNo, true, transitionTime); // force call when targeting single device
+    f->finish();
+    return;
+  }
+  // targeting zone, there might be an extra group arg
+  if (f->numArgs()>ai) {
+    const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(ai)->stringValue());
+    if (!gdP) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(ai)->stringValue().c_str()));
+      return;
     }
+    group = gdP->no;
   }
   // execute the scene
   LocalController::sharedLocalController()->callScene(sceneNo, zoneid, group, transitionTime);
@@ -2304,7 +2322,7 @@ static void scene_func(BuiltinFunctionContextPtr f)
 
 
 // savescene(name [, group]])
-// savescene(id, zone [, group]])
+// savescene(id, zone_or_device [, group]])
 static const BuiltInArgDesc savescene_args[] = { { text|numeric }, { text|numeric|optionalarg }, { text|numeric|optionalarg } };
 static const size_t savescene_numargs = sizeof(savescene_args)/sizeof(BuiltInArgDesc);
 static void savescene_func(BuiltinFunctionContextPtr f)
@@ -2313,7 +2331,15 @@ static void savescene_func(BuiltinFunctionContextPtr f)
   int zoneid = -1; // none specified
   SceneNo sceneNo = INVALID_SCENE_NO;
   DsGroup group = group_yellow_light; // default to light
-  if (!findScene(ai, f, sceneNo, zoneid)) return;  // finish already done by findScene helper
+  DevicePtr dev;
+  if (!findSceneAndTarget(ai, f, sceneNo, zoneid, dev)) return;  // finish already done by findScene helper
+  if (dev) {
+    // targeting single device
+    dev->saveScene(sceneNo);
+    f->finish();
+    return;
+  }
+  // targeting zone, there might be an extra group arg
   if (f->numArgs()>ai) {
     const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(ai)->stringValue());
     if (!gdP) {
