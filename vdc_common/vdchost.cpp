@@ -2107,6 +2107,7 @@ string VdcHost::description()
 const SceneKindDescriptor p44::roomScenes[] = {
   { ROOM_OFF, scene_room|scene_preset|scene_off , "off"},
   { AUTO_OFF, scene_room|scene_preset|scene_off|scene_extended , "slow off"},
+  { STOP_S, scene_room|scene_extended , "stop"},
   { ROOM_ON, scene_room|scene_preset, "preset 1" },
   { PRESET_2, scene_room|scene_preset, "preset 2" },
   { PRESET_3, scene_room|scene_preset, "preset 3" },
@@ -2149,6 +2150,7 @@ const SceneKindDescriptor p44::roomScenes[] = {
 
 const SceneKindDescriptor p44::globalScenes[] = {
   { ROOM_OFF, scene_global|scene_preset|scene_overlap|scene_off|scene_extended , "all off"},
+  { STOP_S, scene_global|scene_extended , "stop"},
   { ROOM_ON, scene_global|scene_preset|scene_overlap|scene_extended, "global preset 1" },
   { PRESET_2, scene_global|scene_preset|scene_overlap|scene_extended, "global preset 2" },
   { PRESET_3, scene_global|scene_preset|scene_overlap|scene_extended, "global preset 3" },
