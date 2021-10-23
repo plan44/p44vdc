@@ -94,6 +94,13 @@ void DsAddressable::reportVanished()
 }
 
 
+bool DsAddressable::isPublicDS()
+{
+  // public dS when vdchost has API enabled at all (i.e. not localcontroller-only mode)
+  return vdcHostP && vdcHostP->vdcApiServer;
+}
+
+
 // MARK: - vDC API
 
 

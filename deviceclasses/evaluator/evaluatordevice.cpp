@@ -140,8 +140,9 @@ bool EvaluatorDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 bool EvaluatorDevice::isPublicDS()
 {
-  // public if it's not an internal-only evaluator
-  return evaluatorType!=evaluator_internalinput && evaluatorType!=evaluator_internalsensor && evaluatorType!=evaluator_internalaction;
+  return
+    evaluatorType!=evaluator_internalinput && evaluatorType!=evaluator_internalsensor && evaluatorType!=evaluator_internalaction && // not internal-only...
+    inherited::isPublicDS(); // ...and base class has dS enabled
 }
 
 

@@ -88,7 +88,7 @@ namespace p44 {
 
     /// check if this is a public dS addressable (usually: device or vdc) - which should be registered with vdSM
     /// @return true if addressable is public
-    virtual bool isPublicDS() { return true; }; // base class assumes that all devices are public
+    virtual bool isPublicDS();
 
     /// called when vdsm acknowledges announcement of this addressable. Can be used in subclasses to
     /// re-trigger pushing sensor values etc.
