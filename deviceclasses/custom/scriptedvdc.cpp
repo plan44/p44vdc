@@ -174,7 +174,7 @@ void ScriptedDevice::stopImplementation()
   OLOG(LOG_NOTICE, "Stopping device implementation script");
   mImplementation.mRestartTicket.cancel();
   if (!mImplementation.mContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "device implementation script stopped"))) {
-    // nothing to abort, make sure handlers are gone
+    // nothing to abort, make sure handlers are gone (otherwise, they will get cleared in implementationEnds())
     mImplementation.mContext->clearVars();
   }
 }
