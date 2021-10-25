@@ -1571,7 +1571,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     // direct execution of a script command line in the common main/initscript context
     ApiValuePtr o = aParams->get("script");
     if (o) {
-      ScriptSource src(sourcecode+regular+keepvars+concurrently+floatingGlobs, "scriptExec/REPL", this);
+      ScriptSource src(sourcecode+regular+keepvars+concurrently+ephemeralSource, "scriptExec/REPL", this);
       src.setSource(o->stringValue());
       src.setSharedMainContext(vdcHostScriptContext);
       src.run(inherit, boost::bind(&VdcHost::scriptExecHandler, this, aRequest, _1));
@@ -2268,7 +2268,7 @@ void VdcHost::runGlobalScripts()
     }
     else {
       ScriptSource initScript(sourcecode+regular, "initscript", this);
-      initScript.setSource(script, scriptbody|floatingGlobs);
+      initScript.setSource(script, scriptbody|ephemeralSource);
       initScript.setSharedMainContext(vdcHostScriptContext);
       OLOG(LOG_NOTICE, "Starting initscript specified on commandline '%s'", scriptFn.c_str());
       initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel()), ScriptObjPtr(), Infinite);
