@@ -334,7 +334,7 @@ namespace p44 {
     #endif
 
     #if ENABLE_UBUS
-    void ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string aMethod, JsonObjectPtr aJsonRequest);
+    void ubusApiRequestHandler(UbusRequestPtr aUbusRequest);
     #endif
 
     void learnHandler(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError);

@@ -266,8 +266,8 @@ void P44VdcHost::enableUbusApi()
 {
   if (!ubusApiServer) {
     // can be enabled only once
-    ubusApiServer = UbusServerPtr(new UbusServer(MainLoop::currentMainLoop()));
-    UbusObjectPtr u = new UbusObject("vdcd", boost::bind(&P44VdcHost::ubusApiRequestHandler, this, _1, _2, _3));
+    ubusApiServer = UbusServerPtr(new UbusServer());
+    UbusObjectPtr u = new UbusObject("vdcd", boost::bind(&P44VdcHost::ubusApiRequestHandler, this, _1));
     u->addMethod("api", vdcapi_policy);
 //    u->addMethod("cfg", cfgapi_policy);
     ubusApiServer->registerObject(u);
@@ -275,29 +275,29 @@ void P44VdcHost::enableUbusApi()
 }
 
 
-void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string aMethod, JsonObjectPtr aJsonRequest)
+void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest)
 {
   signalActivity(); // ubus API calls are activity as well
-  if (!aJsonRequest) {
+  if (!aUbusRequest->msg()) {
     // we always need a ubus message containing actual call method/notification and params
     aUbusRequest->sendResponse(JsonObjectPtr(), UBUS_STATUS_INVALID_ARGUMENT);
     return;
   }
-  LOG(LOG_DEBUG, "ubus -> vdcd (JSON) request received: %s", aJsonRequest->c_strValue());
+  LOG(LOG_DEBUG, "ubus -> vdcd (JSON) request received: %s", aUbusRequest->msg()->c_strValue());
   ErrorPtr err;
   UbusApiRequestPtr request = UbusApiRequestPtr(new UbusApiRequest(aUbusRequest));
-  if (aMethod=="api") {
+  if (aUbusRequest->method()=="api") {
     string cmd;
     bool isMethod = false;
     // get method/notification and params
-    JsonObjectPtr m = aJsonRequest->get("method");
+    JsonObjectPtr m = aUbusRequest->msg()->get("method");
     if (m) {
       // is a method call, expects answer
       isMethod = true;
     }
     else {
       // not method, may be notification
-      m = aJsonRequest->get("notification");
+      m = aUbusRequest->msg()->get("notification");
     }
     if (!m) {
       err = Error::err<P44VdcError>(400, "invalid request, must specify 'method' or 'notification'");
@@ -307,7 +307,7 @@ void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest, const string
       cmd = m->stringValue();
       // get params
       // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
-      ApiValuePtr params = JsonApiValue::newValueFromJson(aJsonRequest);
+      ApiValuePtr params = JsonApiValue::newValueFromJson(aUbusRequest->msg());
       if (Error::isOK(err)) {
         if (isMethod) {
           // have method handled

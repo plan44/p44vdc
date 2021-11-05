@@ -48,6 +48,9 @@
 #include "analogio.hpp"
 #include "digitalio.hpp"
 #include "dcmotor.hpp"
+#include "i2c.hpp"
+#include "spi.hpp"
+#include "modbus.hpp"
 #endif
 
 
@@ -134,14 +137,23 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::WebSocketLookup);
   #endif // ENABLE_WEBSOCKET_SCRIPT_FUNCS
   #if ENABLE_ANALOGIO_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new AnalogIoLookup);
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::AnalogIoLookup);
   #endif
   #if ENABLE_DIGITALIO_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new DigitalIoLookup);
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::DigitalIoLookup);
   #endif
   #if ENABLE_DCMOTOR_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new DcMotorLookup);
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::DcMotorLookup);
   #endif
+  #if ENABLE_I2C_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::I2CLookup());
+  #endif
+  #if ENABLE_SPI_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SPILookup());
+  #endif
+  #if ENABLE_MODBUS_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::ModbusLookup);
+  #endif // ENABLE_HTTP_SCRIPT_FUNCS
   #endif // P44SCRIPT_FULL_SUPPORT
   #endif
   // remember singleton's address
