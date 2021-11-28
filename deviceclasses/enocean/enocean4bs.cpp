@@ -221,7 +221,7 @@ static const char *vibrationText = "Vibration";
 static const char *lockText = "Locked";
 static const char *doorText = "Door closed";
 static const char *windowText = "Window open/tilted";
-static const char *feedText = "feed temperature";
+static const char *feedText = "Feed temperature";
 
 
 const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
@@ -597,9 +597,10 @@ const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_undefined,  0,    1, DB(0,0), DB(0,0), 100, 40*60, &stdInputHandler,  vibrationText },
   { 1, 0x14, 0x0A, 0, class_red_security, group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
 
-  // A5-30-03: generic temperature + 4 digital inputs
-  // - variant for Afriso water sensor with Wake==0 -> water detected
-  { 0, 0x30, 0x03, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_user,       1,    0, DB(1,4), DB(1,4), 100, 40*60, &stdInputHandler,  "Water detected" },
+  // A5-30-03: generic temperature + 4 digital inputs + 1 inverse "wake" input for ultra low standby sensors like water and smoke detectors
+  // - e.g. Afriso water sensor with Wake==0 -> water detected
+  // - e.g. Eltako FRWB smoke detector with Wake==0 -> smoke detected
+  { 0, 0x30, 0x03, 0, class_blue_climate, group_black_variable,          behaviour_binaryinput, binInpType_none,           usage_user,       1,    0, DB(1,4), DB(1,4), 100, 40*60, &stdInputHandler,  "Alert" },
   { 0, 0x30, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature,    usage_room,       0,   40, DB(2,7), DB(2,0), 100, 40*60, &invSensorHandler,  tempText },
 
   // A5-3F-7F: manufacturer specific
