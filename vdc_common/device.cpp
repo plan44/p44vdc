@@ -1630,14 +1630,14 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
 {
   SceneArea area = aScene->sceneArea;
   SceneNo sceneNo = aScene->sceneNo;
-  OLOG(LOG_INFO, "Evaluating CallScene(%d)", sceneNo);
+  OLOG(LOG_INFO, "Evaluating CallScene(%s)", VdcHost::sceneText(sceneNo).c_str());
   // filter area scene calls via area main scene's (area x on, Tx_S1) dontCare flag
   if (area) {
     LOG(LOG_INFO, "- callScene(%d): is area #%d scene", sceneNo, area);
     // check if device is in area (criteria used is dontCare flag OF THE AREA ON SCENE (other don't care flags are irrelevant!)
     DsScenePtr areamainscene = getScenes()->getScene(mainSceneForArea(area));
     if (areamainscene->isDontCare()) {
-      LOG(LOG_INFO, "- area main scene(%d) is dontCare -> suppress", areamainscene->sceneNo);
+      LOG(LOG_INFO, "- area main scene(%s) is dontCare -> suppress", VdcHost::sceneText(areamainscene->sceneNo).c_str());
       aPreparedCB(ntfy_none); // not in this area, suppress callScene entirely
       return;
     }
@@ -1665,7 +1665,7 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
       }
     }
     // we get here only if callScene is actually affecting this device
-    OLOG(LOG_NOTICE, "affected by CallScene(%d)", sceneNo);
+    OLOG(LOG_NOTICE, "affected by CallScene(%s)", VdcHost::sceneText(sceneNo).c_str());
     // - make sure we have the lastState pseudo-scene for undo
     if (!previousState) {
       previousState = getScenes()->newUndoStateScene();
@@ -1772,7 +1772,7 @@ void Device::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndir
 void Device::sceneActionsComplete(SimpleCB aDoneCB, DsScenePtr aScene)
 {
   // scene actions are now complete
-  OLOG(LOG_INFO, "Scene actions for callScene(%d) complete -> now in final state", aScene->sceneNo);
+  OLOG(LOG_INFO, "Scene actions for callScene(%s) complete -> now in final state", VdcHost::sceneText(aScene->sceneNo).c_str());
   if (aDoneCB) aDoneCB();
 }
 
@@ -1815,7 +1815,7 @@ bool Device::prepareSceneApply(DsScenePtr aScene)
 
 void Device::undoScene(SceneNo aSceneNo)
 {
-  OLOG(LOG_NOTICE, "UndoScene(%d):", aSceneNo);
+  OLOG(LOG_NOTICE, "UndoScene(%s):", VdcHost::sceneText(aSceneNo).c_str());
   if (previousState && previousState->sceneNo==aSceneNo) {
     // there is an undo pseudo scene we can apply
     // scene found, now apply it to the output (if any)
@@ -1835,7 +1835,7 @@ void Device::setLocalPriority(SceneNo aSceneNo)
 {
   SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
   if (scenes) {
-    OLOG(LOG_NOTICE, "SetLocalPriority(%d):", aSceneNo);
+    OLOG(LOG_NOTICE, "SetLocalPriority(%s):", VdcHost::sceneText(aSceneNo).c_str());
     // we have a device-wide scene table, get the scene object
     DsScenePtr scene = scenes->getScene(aSceneNo);
     if (scene && !scene->isDontCare()) {
@@ -1850,7 +1850,7 @@ void Device::callSceneMin(SceneNo aSceneNo)
 {
   SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
   if (scenes) {
-    OLOG(LOG_NOTICE, "CallSceneMin(%d):", aSceneNo);
+    OLOG(LOG_NOTICE, "CallSceneMin(%s):", VdcHost::sceneText(aSceneNo).c_str());
     // we have a device-wide scene table, get the scene object
     DsScenePtr scene = scenes->getScene(aSceneNo);
     if (scene && !scene->isDontCare()) {
@@ -1886,7 +1886,7 @@ bool Device::canIdentifyToUser()
 void Device::saveScene(SceneNo aSceneNo)
 {
   // see if we have a scene table at all
-  OLOG(LOG_NOTICE, "SaveScene(%d)", aSceneNo);
+  OLOG(LOG_NOTICE, "SaveScene(%s)", VdcHost::sceneText(aSceneNo).c_str());
   SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
   if (scenes) {
     // we have a device-wide scene table, get the scene object

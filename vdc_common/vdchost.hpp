@@ -623,11 +623,20 @@ namespace p44 {
     /// @}
 
     #if !REDUCED_FOOTPRINT
+
     /// get scene id (dS global scene number, not related to a specific zone) by kind
     /// @param aSceneSpec name of scene kind like "preset 1", "standby" etc. or dS scene number)
     /// @return dS scene number or INVALID_SCENE_NO if none is found
-    SceneNo getSceneIdByKind(string aSceneKindName);
+    static SceneNo getSceneIdByKind(string aSceneKindName);
+
     #endif
+
+    /// get a text description for a scene number
+    /// @param aSceneNo the scene number to get a description text for
+    /// @param aIsGlobal if set, global names are used for ambiguous scenes
+    ///   (those that have different meaning in room context vs. in global context),
+    ///   otherwise, room scene names are used in the description text
+    static string sceneText(SceneNo aSceneNo, bool aIsGlobal = false);
 
   protected:
 

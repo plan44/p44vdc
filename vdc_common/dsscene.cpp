@@ -417,6 +417,9 @@ enum {
   channels_key,
   ignoreLocalPriority_key,
   dontCare_key,
+  #if !REDUCED_FOOTPRINT
+  sceneDesc_key,
+  #endif
   #if ENABLE_SCENE_SCRIPT
   sceneScript_key,
   #endif
@@ -440,6 +443,9 @@ PropertyDescriptorPtr DsScene::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "channels", apivalue_object+propflag_container, channels_key, OKEY(dsscene_channels_key) },
     { "ignoreLocalPriority", apivalue_bool, ignoreLocalPriority_key, OKEY(dsscene_key) },
     { "dontCare", apivalue_bool, dontCare_key, OKEY(dsscene_key) },
+    #if !REDUCED_FOOTPRINT
+    { "x-p44-sceneDesc", apivalue_string, sceneDesc_key, OKEY(dsscene_key) },
+    #endif
     #if ENABLE_SCENE_SCRIPT
     { "x-p44-sceneScript", apivalue_string, sceneScript_key, OKEY(dsscene_key) },
     #endif
@@ -473,6 +479,11 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case dontCare_key:
           aPropValue->setBoolValue(isDontCare());
           return true;
+        #if !REDUCED_FOOTPRINT
+        case sceneDesc_key:
+          aPropValue->setStringValue(VdcHost::sceneText(sceneNo));
+          return true;
+        #endif
         #if ENABLE_SCENE_SCRIPT
         case sceneScript_key:
           aPropValue->setStringValue(sceneScript.getSource());

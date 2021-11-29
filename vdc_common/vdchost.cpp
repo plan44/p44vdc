@@ -2156,6 +2156,28 @@ const SceneKindDescriptor p44::roomScenes[] = {
   { PRESET_42, scene_room|scene_preset|scene_extended, "preset 42" },
   { PRESET_43, scene_room|scene_preset|scene_extended, "preset 43" },
   { PRESET_44, scene_room|scene_preset|scene_extended, "preset 44" },
+  { T1234_CONT, 0, "T1234_CONT" },
+  { DEC_S, 0, "dec" },
+  { INC_S, 0, "inc" },
+  { MIN_S, 0, "min" },
+  { MAX_S, 0, "max" },
+  { STOP_S, 0, "stop" },
+  { ALERT_S, 0, "alert" },
+  { AREA_1_DEC, 0, "area 1 dec" },
+  { AREA_2_DEC, 0, "area 2 dec" },
+  { AREA_3_DEC, 0, "area 3 dec" },
+  { AREA_4_DEC, 0, "area 4 dec" },
+  { AREA_1_INC, 0, "area 1 inc" },
+  { AREA_2_INC, 0, "area 2 inc" },
+  { AREA_3_INC, 0, "area 3 inc" },
+  { AREA_4_INC, 0, "area 4 inc" },
+  { AREA_1_STOP_S, 0, "area 1 stop" },
+  { AREA_2_STOP_S, 0, "area 2 stop" },
+  { AREA_3_STOP_S, 0, "area 3 stop" },
+  { AREA_4_STOP_S, 0, "area 4 stop" },
+  { LOCAL_ON, 0, "local on" },
+  { LOCAL_OFF, 0, "local off" },
+  { INC_S, 0, "inc" },
   { INVALID_SCENE_NO, 0, NULL } // terminator
 };
 
@@ -2195,6 +2217,7 @@ const SceneKindDescriptor p44::globalScenes[] = {
   { HAIL, scene_global, "hail" },
   { NO_HAIL, scene_global, "no hail" },
   { POLLUTION, scene_global, "pollution" },
+  { ENERGY_OL, 0, "energy overload" },
   { INVALID_SCENE_NO, 0 } // terminator
 };
 
@@ -2242,8 +2265,30 @@ SceneNo VdcHost::getSceneIdByKind(string aSceneKindName)
   return INVALID_SCENE_NO;
 }
 
-
 #endif // REDUCED_FOOTPRINT
+
+string VdcHost::sceneText(SceneNo aSceneNo, bool aIsGlobal)
+{
+  #if !REDUCED_FOOTPRINT
+  // look up info from scene description tables
+  const SceneKindDescriptor* skP = aIsGlobal ? globalScenes : roomScenes;
+  for (int i=0; i<2; i++) {
+    while (skP->no!=INVALID_SCENE_NO) {
+      if (skP->no==aSceneNo) {
+        // found
+        return string_format("%s (#%d)", skP->actionName, aSceneNo);
+      }
+      skP++;
+    }
+    // try other table
+    skP = !aIsGlobal ? globalScenes : roomScenes;
+  }
+  // no description found
+  #endif
+  // we don't have anything but the scene number
+  return string_format("#%d", aSceneNo);
+}
+
 
 
 
