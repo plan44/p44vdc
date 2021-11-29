@@ -2265,8 +2265,9 @@ static bool findSceneAndTarget(int &ai, BuiltinFunctionContextPtr f, SceneNo &sc
 
 
 // sceneid(name)
-static const BuiltInArgDesc sceneid_args[] = { { text } };
-static const size_t sceneid_numargs = sizeof(sceneid_args)/sizeof(BuiltInArgDesc);
+// sceneno(name_or_id)
+static const BuiltInArgDesc sceneid_no_args[] = { { text } };
+static const size_t sceneid_no_numargs = sizeof(sceneid_no_args)/sizeof(BuiltInArgDesc);
 static void sceneid_func(BuiltinFunctionContextPtr f)
 {
   SceneDescriptorPtr scene = LocalController::sharedLocalController()->mLocalScenes.getSceneByName(f->arg(0)->stringValue());
@@ -2275,6 +2276,23 @@ static void sceneid_func(BuiltinFunctionContextPtr f)
     return;
   }
   f->finish(new AnnotatedNullValue("no such scene"));
+}
+static void sceneno_func(BuiltinFunctionContextPtr f)
+{
+  SceneDescriptorPtr scene = LocalController::sharedLocalController()->mLocalScenes.getSceneByName(f->arg(0)->stringValue());
+  SceneNo sceneNo = INVALID_SCENE_NO;
+  if (scene) {
+    sceneNo = scene->getSceneNo();
+  }
+  else {
+    sceneNo = VdcHost::getSceneIdByKind(f->arg(0)->stringValue());
+  }
+  if (sceneNo!=INVALID_SCENE_NO) {
+    f->finish(new NumericValue(sceneNo));
+  }
+  else {
+    f->finish(new AnnotatedNullValue("no such scene"));
+  }
 }
 
 
@@ -2417,7 +2435,8 @@ static void set_func(BuiltinFunctionContextPtr f)
 static const BuiltinMemberDescriptor localControllerFuncs[] = {
   { "trigger", executable|any, trigger_numargs, trigger_args, &trigger_func },
   { "scene", executable|any, scene_numargs, scene_args, &scene_func },
-  { "sceneid", executable|numeric, sceneid_numargs, sceneid_args, &sceneid_func },
+  { "sceneid", executable|text, sceneid_no_numargs, sceneid_no_args, &sceneid_func },
+  { "sceneno", executable|numeric, sceneid_no_numargs, sceneid_no_args, &sceneno_func },
   { "savescene", executable|any, savescene_numargs, savescene_args, &savescene_func },
   { "set", executable|any, set_numargs, set_args, &set_func },
   { NULL } // terminator
