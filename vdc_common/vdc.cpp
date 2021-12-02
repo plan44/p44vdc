@@ -937,7 +937,7 @@ void Vdc::initiateRecollect(RescanMode aRescanMode)
     schedulePeriodicRecollecting();
   }
   else {
-    OLOG(LOG_NOTICE, "starting in-operation recollect");
+    OLOG(LOG_INFO, "starting in-operation recollect");
     collectDevices(boost::bind(&Vdc::recollectDone, this), aRescanMode);
     // end of collect will schedule periodic recollect again
   }
@@ -946,7 +946,7 @@ void Vdc::initiateRecollect(RescanMode aRescanMode)
 
 void Vdc::recollectDone()
 {
-  OLOG(LOG_NOTICE, "in-operation recollect done");
+  OLOG(LOG_INFO, "in-operation recollect done");
 }
 
 

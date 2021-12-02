@@ -232,7 +232,7 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
     // found already registered bridge again
-    OLOG(LOG_NOTICE,
+    OLOG(LOG_INFO,
       "Hue bridge uuid '%s' found again:\n"
       "- userName = %s\n"
       "- API base URL = %s",
@@ -262,14 +262,14 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
     // - if URL does not work, clear cached IP and try again (unless IP is user-provided)
     if (!bridgeApiURL.empty() && !fixedURL) {
       // forget the cached IP
-      OLOG(LOG_NOTICE, "Could not access bridge API at %s - revert to finding bridge by UUID", bridgeApiURL.c_str());
+      OLOG(LOG_WARNING, "Could not access bridge API at %s - revert to finding bridge by UUID", bridgeApiURL.c_str());
       bridgeApiURL.clear();
       // retry searching by uuid
       refindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), 500*MilliSecond);
       return;
     }
     else {
-      OLOG(LOG_NOTICE, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->text());
+      OLOG(LOG_WARNING, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->text());
     }
     if (aCompletedCB) aCompletedCB(ErrorPtr()); // no hue bridge to collect lights from (but this is not a collect error)
   }
