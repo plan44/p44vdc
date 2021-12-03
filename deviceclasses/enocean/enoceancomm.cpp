@@ -566,6 +566,7 @@ RadioOrg Esp3Packet::eepRorg()
 //  Signature: 0   1   xxx0xxxx  F6-03-xx   4-Rocker released (1 or 2 actions)
 //
 //  Signature: 0   0   xxx00000  F6-03-xx   4-Rocker released (2-8 simultaneously)
+//           - 0   0   xxx00000  F6-05-02   Apparently (evidence of HPZ 2021-12-03): F6-05-02 teach-in
 //
 //  Signature: 1   0   00010001  F6-05-01   Water Leakage reset (or test switch off)
 
@@ -642,6 +643,13 @@ EnoceanProfile Esp3Packet::eepProfile()
         else if (rpsData==0x11) {
           // F6-05-01 : Water Leakage detected (or test switch on)
           profile = ((EnoceanProfile)rorg<<16) | ((EnoceanProfile)0x05<<8) | (0x01);
+        }
+      }
+      else if (rpsStatus==0) {
+        // T21/NU = 0/0
+        if ((rpsData & 0x9F)==0x00) {
+          // F6-05-02 : smoke detector (Afriso ASD20, by example)
+          profile = ((EnoceanProfile)rorg<<16) | ((EnoceanProfile)0x05<<8) | (0x02);
         }
       }
     }
