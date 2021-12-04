@@ -208,6 +208,9 @@ namespace p44 {
 
     ErrorPtr addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
     ErrorPtr simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
+    ErrorPtr sendCommand(VdcApiRequestPtr aRequest, ApiValuePtr aParams);
+    void sendCommandResponse(VdcApiRequestPtr aRequest, Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError);
+
   };
 
 } // namespace p44

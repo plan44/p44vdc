@@ -311,6 +311,10 @@ ErrorPtr EnoceanVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMeth
     // simulate reception of a ESP packet
     respErr = simulatePacket(aRequest, aParams);
   }
+  else if (aMethod=="x-p44-sendCommand") {
+    // send a ESP command
+    respErr = sendCommand(aRequest, aParams);
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
@@ -413,6 +417,64 @@ ErrorPtr EnoceanVdc::simulatePacket(VdcApiRequestPtr aRequest, ApiValuePtr aPara
     }
   }
   return respErr;
+}
+
+
+ErrorPtr EnoceanVdc::sendCommand(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
+{
+  ErrorPtr respErr;
+  ApiValuePtr o;
+  respErr = checkParam(aParams, "data", o); // ESP packet data, no need for matching CRCs
+  if (Error::isOK(respErr)) {
+    PacketType pt = pt_radio_erp1;
+    ApiValuePtr o2 = aParams->get("type");
+    if (o2) {
+      pt = (PacketType)o2->int8Value();
+    }
+    // input string is hex bytes, optionally separated by spaces, colons or dashes
+    Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet);
+    string dStr;
+    packet->setPacketType(pt);
+    dStr = o->stringValue();
+    string data = hexToBinaryString(dStr.c_str(), true);
+    packet->setDataLength(data.size());
+    string optdata;
+    o2 = aParams->get("optdata");
+    if (o2) {
+      dStr = o2->stringValue();
+      optdata = hexToBinaryString(dStr.c_str(), true);
+      packet->setOptDataLength(optdata.size());
+    }
+    // fill in data
+    for (int i=0; i<data.size(); ++i) packet->data()[i]=data[i];
+    for (int i=0; i<optdata.size(); ++i) packet->optData()[i]=optdata[i];
+    enoceanComm.sendCommand(packet, boost::bind(&EnoceanVdc::sendCommandResponse, this, aRequest, _1, _2));
+    OLOG(LOG_INFO, "x-p44-sendCommand sent ESP3 command:\n%s", packet->description().c_str());
+  }
+  return respErr;
+}
+
+
+void EnoceanVdc::sendCommandResponse(VdcApiRequestPtr aRequest, Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError)
+{
+  if (Error::notOK(aError)) {
+    OLOG(LOG_INFO, "x-p44-sendCommand error: %s", aError->text());
+    aRequest->sendError(aError);
+  }
+  else {
+    ApiValuePtr pdata;
+    if (aEsp3PacketPtr) {
+      OLOG(LOG_INFO, "x-p44-sendCommand received ESP3 response:\n%s", aEsp3PacketPtr->description().c_str());
+      pdata = aRequest->newApiValue();
+      pdata->setType(apivalue_object);
+      pdata->add("type", pdata->newInt64(aEsp3PacketPtr->packetType()));
+      string data((const char *)aEsp3PacketPtr->data(), aEsp3PacketPtr->dataLength());
+      pdata->add("data", pdata->newString(binaryToHexString(data,' ')));
+      string optdata((const char *)aEsp3PacketPtr->optData(), aEsp3PacketPtr->optDataLength());
+      pdata->add("optdata", pdata->newString(binaryToHexString(optdata,' ')));
+    }
+    aRequest->sendResult(pdata);
+  }
 }
 
 
