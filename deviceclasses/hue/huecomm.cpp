@@ -516,7 +516,7 @@ public:
   void handleCreateUserAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError)
   {
     if (Error::isOK(aError)) {
-      FOCUSSOLOG(hueComm, "Received success answer:\n%s", aJsonResponse->json_c_str());
+      FOCUSSOLOG(hueComm, "Received success answer:\n%s", JsonObject::text(aJsonResponse));
       JsonObjectPtr s = HueComm::getSuccessItem(aJsonResponse);
       // apparently successful, extract user name
       if (s) {

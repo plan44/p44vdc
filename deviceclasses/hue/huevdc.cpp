@@ -872,7 +872,7 @@ void HueVdc::nativeActionUpdated(uint64_t aNewHash, OptimizerEntryPtr aOptimizer
     // [{ "success": { "id": "Abc123Def456Ghi" } }]
     // TODO: details checks - for now just assume update has worked when request did not produce an error
     aOptimizerEntry->lastNativeChange = MainLoop::now();
-    OLOG(LOG_INFO,"updated hue scene");
+    OLOG(LOG_INFO,"updated hue scene, result: %s", JsonObject::text(aResult));
     // done, update entry
     aOptimizerEntry->contentsHash = aNewHash;
     aOptimizerEntry->lastNativeChange = MainLoop::now();
