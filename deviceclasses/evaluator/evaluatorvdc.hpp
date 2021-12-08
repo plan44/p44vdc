@@ -51,7 +51,7 @@ namespace p44 {
     typedef Vdc inherited;
     friend class EvaluatorDevice;
 
-    EvaluatorDevicePersistence db;
+    EvaluatorDevicePersistence mDb;
 
   public:
     EvaluatorVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);

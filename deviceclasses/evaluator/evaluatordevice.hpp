@@ -40,14 +40,14 @@ namespace p44 {
     typedef DeviceSettings inherited;
     friend class EvaluatorDevice;
 
-    string varDefs; ///< mapping of variable names to ValueSources
-    ScriptMainContextPtr evaluatorContext; ///< context shared for all scripts in this evaluator
-    TriggerSource onCondition;
-    TriggerSource offCondition;
+    string mVarDefs; ///< mapping of variable names to ValueSources
+    ScriptMainContextPtr mEvaluatorContext; ///< context shared for all scripts in this evaluator
+    TriggerSource mOnCondition;
+    TriggerSource mOffCondition;
     #if P44SCRIPT_FULL_SUPPORT
-    ScriptSource action;
+    ScriptSource mAction;
     #else
-    string oldAction; ///< just retain action string, but is NOP
+    string mOldAction; ///< just retain action string, but is NOP
     #endif
 
   protected:
@@ -83,18 +83,18 @@ namespace p44 {
       evaluator_internalsensor ///< the device is not published to dS, can only be used as input for other evaluators
     } EvaluatorType;
 
-    EvaluatorType evaluatorType;
-    string evaluatorID;
-    VdcSensorType sensorType;
-    VdcUsageHint sensorUsage;
+    EvaluatorType mEvaluatorType;
+    string mEvaluatorID;
+    VdcSensorType mSensorType;
+    VdcUsageHint mSensorUsage;
 
     /// active value sources
-    ValueSourceMapper valueMapper;
-    MLTicket valueParseTicket;
+    ValueSourceMapper mValueMapper;
+    MLTicket mValueParseTicket;
 
-    Tristate currentState; ///< latest evaluator state
+    Tristate mEvaluatorState; ///< latest evaluator state
 
-    bool reporting; ///< set while reporting evaluation result to sensor or binary input, to prevent infinitite loop though cyclic references
+    bool mReporting; ///< set while reporting evaluation result to sensor or binary input, to prevent infinitite loop though cyclic references
 
     EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(deviceSettings); };
 

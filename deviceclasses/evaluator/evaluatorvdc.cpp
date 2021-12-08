@@ -67,7 +67,7 @@ void EvaluatorVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   string databaseName = getPersistentDataDir();
   string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), EVALUATORDEVICES_SCHEMA_VERSION, EVALUATORDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
+  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), EVALUATORDEVICES_SCHEMA_VERSION, EVALUATORDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(error); // return status of DB init
 }
@@ -101,7 +101,7 @@ void EvaluatorVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // add from the DB
-    sqlite3pp::query qry(db);
+    sqlite3pp::query qry(mDb);
     if (qry.prepare("SELECT evaluatorid, config, rowid FROM evaluators")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         EvaluatorDevicePtr dev = EvaluatorDevicePtr(new EvaluatorDevice(this, i->get<string>(0), i->get<string>(1)));
@@ -139,14 +139,14 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
         // set name
         if (name.size()>0) dev->setName(name);
         // insert into database
-        if (db.executef(
+        if (mDb.executef(
           "INSERT OR REPLACE INTO evaluators (evaluatorId, config) VALUES ('%q','%q')",
           evaluatorId.c_str(), evaluatorType.c_str()
         )!=SQLITE_OK) {
-          respErr = db.error("saving evaluator");
+          respErr = mDb.error("saving evaluator");
         }
         else {
-          dev->evaluatorDeviceRowID = db.last_insert_rowid();
+          dev->evaluatorDeviceRowID = mDb.last_insert_rowid();
           simpleIdentifyAndAddDevice(dev);
           // confirm
           ApiValuePtr r = aRequest->newApiValue();
