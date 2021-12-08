@@ -237,20 +237,26 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     if (evaluatorType!=evaluator_sensor && evaluatorType!=evaluator_internalsensor) {
       // - off condition
       cond = checkResult->newObject();
-      res = evaluatorSettings()->offCondition.run(initial|synchronously, NULL, ScriptObjPtr(), 2*Second);
       cond->add("expression", checkResult->newString(evaluatorSettings()->offCondition.getSource()));
-      if (!res->isErr()) {
-        cond->add("result", cond->newScriptValue(res));
-        cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));
-        LOG(LOG_INFO, "- offCondition '%s' -> %s", evaluatorSettings()->offCondition.getSource().c_str(), ScriptObj::describe(res).c_str());
+      if (evaluatorSettings()->offCondition.empty()) {
+        res.reset();
+        LOG(LOG_INFO, "- offCondition is empty -> disabled");
       }
       else {
-        cond->add("error", cond->newString(res->errorValue()->getErrorMessage()));
-        SourceCursor* cursor = res->cursor();
-        if (cursor) {
-          cond->add("at", cond->newUint64(cursor->textpos()));
-          cond->add("line", cond->newUint64(cursor->lineno()));
-          cond->add("char", cond->newUint64(cursor->charpos()));
+        res = evaluatorSettings()->offCondition.run(initial|synchronously, NULL, ScriptObjPtr(), 2*Second);
+        if (!res->isErr()) {
+          cond->add("result", cond->newScriptValue(res));
+          cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));
+          LOG(LOG_INFO, "- offCondition '%s' -> %s", evaluatorSettings()->offCondition.getSource().c_str(), ScriptObj::describe(res).c_str());
+        }
+        else {
+          cond->add("error", cond->newString(res->errorValue()->getErrorMessage()));
+          SourceCursor* cursor = res->cursor();
+          if (cursor) {
+            cond->add("at", cond->newUint64(cursor->textpos()));
+            cond->add("line", cond->newUint64(cursor->lineno()));
+            cond->add("char", cond->newUint64(cursor->charpos()));
+          }
         }
       }
       checkResult->add("offCondition", cond);
