@@ -474,17 +474,21 @@ void EvaluatorDevice::executeActions()
 {
   evaluatorSettings()->evaluatorContext->setMemberByName("result", new NumericValue(currentState==yes));
   evaluatorSettings()->action.run(inherit, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), ScriptObjPtr(), Infinite);
-  if (evaluatorSettings()->offCondition.empty()) {
-    // there is no off condition, so we just set the state back to NO
-    OLOG(LOG_INFO, "offCondition is empty for action evaluator: state auto-reset to OFF");
-    currentState = no;
-  }
 }
 
 
 void EvaluatorDevice::actionExecuted(ScriptObjPtr aResult)
 {
   OLOG(LOG_INFO, "evaluator action script completed with result: %s", ScriptObj::describe(aResult).c_str());
+  if (evaluatorSettings()->offCondition.empty()) {
+    // there is no off condition, so we just set the state back to NO
+    OLOG(LOG_INFO, "offCondition is empty for action evaluator: one-shot behaviour, re-evaluate trigger condition");
+    // give trigger condition chance to see changes done by action script, i.e. to become false
+    // (but because currentState is still YES, this cannot cause a re-trigger regardless of what is the result
+    evaluatorSettings()->onCondition.evaluate();
+    // only now do we reset the evaluator state, so NEXT trigger evaluation would be able to re-trigger
+    currentState = no;
+  }
 }
 
 #endif // P44SCRIPT_FULL_SUPPORT
