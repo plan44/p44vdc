@@ -2276,7 +2276,7 @@ string VdcHost::sceneText(SceneNo aSceneNo, bool aIsGlobal)
     while (skP->no!=INVALID_SCENE_NO) {
       if (skP->no==aSceneNo) {
         // found
-        return string_format("%s (#%d)", skP->actionName, aSceneNo);
+        return string_format("#%d: %s", aSceneNo, skP->actionName);
       }
       skP++;
     }
