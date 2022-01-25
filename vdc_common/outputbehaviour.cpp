@@ -348,12 +348,12 @@ bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aS
   ) {
     // apply stored scene value(s) to channels
     loadChannelsFromScene(aScene);
-    LOG(LOG_INFO, "- Scene(%d): new channel value(s) loaded from scene, ready to apply", aScene->sceneNo);
+    LOG(LOG_INFO, "- Scene(%s): new channel value(s) loaded from scene, ready to apply",  VdcHost::sceneText(aScene->sceneNo).c_str());
     return true;
   }
   else {
     // no channel changes
-    LOG(LOG_INFO, "- Scene(%d): no invoke/off/min/max (but cmd=%d) -> no channels loaded", aScene->sceneNo, aSceneCmd);
+    LOG(LOG_INFO, "- Scene(%s): no invoke/off/min/max (but cmd=%d) -> no channels loaded", VdcHost::sceneText(aScene->sceneNo).c_str(), aSceneCmd);
     return false;
   }
 }
@@ -775,7 +775,7 @@ static void loadscene_func(BuiltinFunctionContextPtr f)
   if (scene) {
     MLMicroSeconds transition = Infinite; // no override
     if (f->numArgs()>=2) transition = f->arg(1)->doubleValue()*Second;
-    POLOG(o->output(), LOG_INFO, "loadscene(%d) loads channels values", scene->sceneNo);
+    POLOG(o->output(), LOG_INFO, "loadscene(%s) loads channel values", VdcHost::sceneText(scene->sceneNo).c_str());
     o->output()->applySceneToChannels(scene, transition);
   }
   f->finish();
@@ -791,7 +791,7 @@ static void runactions_func(BuiltinFunctionContextPtr f)
   assert(o);
   DsScenePtr scene = findScene(o, f->arg(0)->stringValue());
   if (scene) {
-    POLOG(o->output(), LOG_INFO, "runactions(%d) starts scene actions", scene->sceneNo);
+    POLOG(o->output(), LOG_INFO, "runactions(%s) starts scene actions", VdcHost::sceneText(scene->sceneNo).c_str());
     o->output()->performSceneActions(scene, boost::bind(&outputOpComplete, f, o->output()));
     return;
   }
