@@ -516,9 +516,8 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
           aError = WebError::webErr(500, "script API not active");
         }
         else {
-          mScriptedApiLookup.mPendingConnection = aJsonComm;
-          mScriptedApiLookup.mPendingRequest = request;
-          mScriptedApiLookup.sendEvent(new ApiRequestObj(aJsonComm, request, &mScriptedApiLookup));
+          // API active, send request object to event sinks
+          mScriptedApiLookup.sendEvent(new ApiRequestObj(&mScriptedApiLookup, aJsonComm, request));
         }
       }
       #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
@@ -812,7 +811,7 @@ void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
 
 using namespace P44Script;
 
-ApiRequestObj::ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest, EventSource* aApiEventSource) :
+ApiRequestObj::ApiRequestObj(EventSource* aApiEventSource, JsonCommPtr aConnection, JsonObjectPtr aRequest) :
   inherited(aRequest),
   mConnection(aConnection),
   mEventSource(aApiEventSource)
@@ -832,7 +831,7 @@ string ApiRequestObj::getAnnotation() const
 
 TypeInfo ApiRequestObj::getTypeInfo() const
 {
-  return inherited::getTypeInfo()|oneshot|keeporiginal; // returns the request only once, must keep the original
+  return inherited::getTypeInfo()|oneshot|keeporiginal|freezable; // returns the request only once, must keep the original
 }
 
 EventSource* ApiRequestObj::eventSource() const
@@ -872,15 +871,13 @@ const ScriptObjPtr ApiRequestObj::memberByName(const string aName, TypeInfo aMem
 }
 
 
-// webrequest()        return latest unprocessed script (web) api request
+// webrequest()        event source for (script API) web request
 static void webrequest_func(BuiltinFunctionContextPtr f)
 {
-  // return latest unprocessed API request
-  JsonCommPtr c;
+  // return API request event source place holder (no connection, no request JSON yet)
+  // actual value will be delivered via event
   P44VdcHost* h = dynamic_cast<P44VdcHost*>(VdcHost::sharedVdcHost().get());
-  JsonObjectPtr r;
-  if (h) r = h->mScriptedApiLookup.pendingRequest(c);
-  f->finish(new ApiRequestObj(c, r, &h->mScriptedApiLookup));
+  f->finish(new ApiRequestObj(&h->mScriptedApiLookup, JsonCommPtr(), JsonObjectPtr()));
 }
 
 static const BuiltinMemberDescriptor scriptApiGlobals[] = {
@@ -891,15 +888,6 @@ static const BuiltinMemberDescriptor scriptApiGlobals[] = {
 
 ScriptApiLookup::ScriptApiLookup() : inherited(scriptApiGlobals)
 {
-}
-
-JsonObjectPtr ScriptApiLookup::pendingRequest(JsonCommPtr &aConnection)
-{
-  aConnection = mPendingConnection;
-  JsonObjectPtr r = mPendingRequest;
-  mPendingConnection.reset();
-  mPendingRequest.reset();
-  return r;
 }
 
 #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
