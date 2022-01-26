@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2014-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2014-2022 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -221,15 +221,12 @@ namespace p44 {
     {
       typedef JsonValue inherited;
 
-      EventSource* mEventSource;
       JsonCommPtr mConnection;
 
     public:
-      ApiRequestObj(EventSource* aApiEventSource, JsonCommPtr aConnection, JsonObjectPtr aRequest);
+      ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest);
       void sendResponse(JsonObjectPtr aResponse, ErrorPtr aError);
       virtual string getAnnotation() const P44_OVERRIDE;
-      virtual TypeInfo getTypeInfo() const P44_OVERRIDE;
-      virtual EventSource *eventSource() const P44_OVERRIDE;
       virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) P44_OVERRIDE;
     };
 
@@ -268,7 +265,7 @@ namespace p44 {
   public:
 
     #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
-    ScriptApiLookup mScriptedApiLookup; ///< custom API implemented via p44script
+    ScriptApiLookup mScriptedApiLookup; ///< custom API implemented via p44script, is also the event source for requests
     #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
 
     int webUiPort; ///< port number of the web-UI (on the same host). 0 if no Web-UI present

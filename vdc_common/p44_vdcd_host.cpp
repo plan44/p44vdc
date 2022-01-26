@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2014-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2014-2022 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -517,7 +517,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         }
         else {
           // API active, send request object to event sinks
-          mScriptedApiLookup.sendEvent(new ApiRequestObj(&mScriptedApiLookup, aJsonComm, request));
+          mScriptedApiLookup.sendEvent(new ApiRequestObj(aJsonComm, request));
         }
       }
       #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
@@ -811,10 +811,9 @@ void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
 
 using namespace P44Script;
 
-ApiRequestObj::ApiRequestObj(EventSource* aApiEventSource, JsonCommPtr aConnection, JsonObjectPtr aRequest) :
+ApiRequestObj::ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest) :
   inherited(aRequest),
-  mConnection(aConnection),
-  mEventSource(aApiEventSource)
+  mConnection(aConnection)
 {
 }
 
@@ -828,17 +827,6 @@ string ApiRequestObj::getAnnotation() const
 {
   return "API request";
 }
-
-TypeInfo ApiRequestObj::getTypeInfo() const
-{
-  return inherited::getTypeInfo()|oneshot|keeporiginal|freezable; // returns the request only once, must keep the original
-}
-
-EventSource* ApiRequestObj::eventSource() const
-{
-  return mEventSource;
-}
-
 
 // answer([answer value])        answer the request
 static const BuiltInArgDesc answer_args[] = { { any|optionalarg } };
@@ -874,10 +862,9 @@ const ScriptObjPtr ApiRequestObj::memberByName(const string aName, TypeInfo aMem
 // webrequest()        event source for (script API) web request
 static void webrequest_func(BuiltinFunctionContextPtr f)
 {
-  // return API request event source place holder (no connection, no request JSON yet)
-  // actual value will be delivered via event
+  // return API request event source place holder, actual value will be delivered via event
   P44VdcHost* h = dynamic_cast<P44VdcHost*>(VdcHost::sharedVdcHost().get());
-  f->finish(new ApiRequestObj(&h->mScriptedApiLookup, JsonCommPtr(), JsonObjectPtr()));
+  f->finish(new OneShotEventNullValue(&h->mScriptedApiLookup, "web request"));
 }
 
 static const BuiltinMemberDescriptor scriptApiGlobals[] = {
