@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2021-2022 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -41,20 +41,6 @@ public:
 };
 
 
-/// represents a message from a socket
-class VdcMessageObj : public JsonValue
-{
-  typedef JsonValue inherited;
-  ScriptedDevice* mScriptedDevice;
-public:
-  VdcMessageObj(ScriptedDevice* aScriptedDevice) : inherited(JsonObjectPtr()), mScriptedDevice(aScriptedDevice) {};
-  virtual string getAnnotation() const P44_OVERRIDE { return "vdc message"; };
-  virtual TypeInfo getTypeInfo() const P44_OVERRIDE { return inherited::getTypeInfo()|oneshot|keeporiginal; }; // returns the request only once, must keep the original
-  virtual EventSource *eventSource() const P44_OVERRIDE { return static_cast<EventSource*>(mScriptedDevice); }
-  virtual JsonObjectPtr jsonValue() const P44_OVERRIDE { return mScriptedDevice->lastVdcMessage(); } // native
-};
-
-
 // message()
 // message(messagetosend)
 static const BuiltInArgDesc message_args[] = { { json|object|text|optionalarg } };
@@ -64,8 +50,8 @@ static void message_func(BuiltinFunctionContextPtr f)
   ScriptedDeviceObj* d = dynamic_cast<ScriptedDeviceObj*>(f->thisObj().get());
   assert(d);
   if (f->numArgs()==0) {
-    // get last message received from vdc
-    f->finish(new VdcMessageObj(d->scriptedDevice().get()));
+    // return the value source to receive messages from vDC
+    f->finish(new OneShotEventNullValue(d->scriptedDevice().get(), "vdc message"));
   }
   else {
     // send messages to vdc
@@ -233,16 +219,14 @@ void ScriptedDevice::sendDeviceApiJsonMessage(JsonObjectPtr aMessage)
 {
   // now show and send
   OLOG(LOG_INFO, "device <- ScriptedVdc (JSON) message sent: %s", aMessage->c_strValue());
-  mLastVdcMessage = aMessage;
-  sendEvent(new VdcMessageObj(this));
+  sendEvent(new JsonValue(aMessage));
 }
 
 
 void ScriptedDevice::sendDeviceApiSimpleMessage(string aMessage)
 {
   OLOG(LOG_INFO, "device <- ScriptedVdc (simple) message sent: %s", aMessage.c_str());
-  mLastVdcMessage = JsonObject::newString(aMessage);
-  sendEvent(new VdcMessageObj(this));
+  sendEvent(new StringValue(aMessage));
 }
 
 

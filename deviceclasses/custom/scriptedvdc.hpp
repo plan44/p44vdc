@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2021-2022 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -98,7 +98,6 @@ namespace p44 {
     string aDefaultUniqueId; ///< the default unique ID, generated at creation
     long long mScriptedDeviceRowID; ///< the ROWID this device was created from (0=none)
     string mInitMessageText; ///< the init message text (for reference)
-    JsonObjectPtr mLastVdcMessage; ///< last message sent to device from vdc
 
   public:
 
@@ -112,9 +111,6 @@ namespace p44 {
 
     /// device level API methods (p44 specific, JSON only, for debugging script implementations)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-
-    /// return last vdc message received for device
-    JsonObjectPtr lastVdcMessage() { return mLastVdcMessage; };
 
     /// send message from implementation to device
     ErrorPtr sendDeviceMesssage(JsonObjectPtr aMessage);
