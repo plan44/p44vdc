@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2016-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2016-2022 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -134,7 +134,7 @@ string ValueSourceObj::getAnnotation() const
 
 TypeInfo ValueSourceObj::getTypeInfo() const
 {
-  return mLastUpdate==Never ? null : numeric;
+  return (mLastUpdate==Never ? null : numeric)|freezable|keeporiginal;
 }
 
 
