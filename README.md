@@ -26,7 +26,7 @@ Features
 --------
 
 - Implements the complete digitalSTROM vDC API including behaviours for buttons, binary inputs, lights, color lights, sensors, heating valves and shadow blinds.
-- Provides the *plan44 vdcd external device API* for easily building custom devices as external scripts or programs.
+- Provides the *plan44 vdcd external device API* for easily building custom devices as external scripts or programs, or implemented in the built-in [p44script](https://plan44.ch/p44-techdocs/en/script_ref/) language.
 - Supports EnOcean TCM310 based gateway modules, connected via serial port or network
 - Supports Philips hue lights via the hue bridge and its JSON API
 - Supports building really fancy effect color LED lights out WS281x LED chip based LED chains/matrices, with moving segments, lightspots, gradients etc.
@@ -44,4 +44,14 @@ Getting Started
 
 This is not a full vdc program, only important parts of it. Please go to the [**vdcd main project**](https://github.com/plan44/vdcd) for a ready-to-build (and run) program.
 
-*(c) 2013-2019 by Lukas Zeller / [plan44.ch](http://www.plan44.ch/automation)*
+Supporting p44vdc
+-----------------
+
+1. use it!
+2. support development via [github sponsors](https://github.com/sponsors/plan44) or [flattr](https://flattr.com/@luz)
+3. Discuss it in the [plan44 community forum](https://forum.plan44.ch/t/opensource-c-vdcd).
+3. contribute patches, report issues and suggest new functionality [on github](https://github.com/plan44/p44vdc) or in the [forum](https://forum.plan44.ch/t/opensource-c-vdcd).
+5. Buy plan44.ch [products](https://plan44.ch/automation/products.php) - sales revenue is paying the time for contributing to opensource projects :-)
+
+
+*(c) 2013-2022 by Lukas Zeller / [plan44.ch](http://www.plan44.ch/automation)*
