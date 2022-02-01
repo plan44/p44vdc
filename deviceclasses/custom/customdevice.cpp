@@ -486,6 +486,9 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
           bb->updateButtonState(aValue!=0);
         }
       }
+      else {
+        return TextError::err("no button #%d", aIndex);
+      }
       break;
     }
     case 'I': {
@@ -498,6 +501,9 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
           ib->updateInputState(aValue);
         }
       }
+      else {
+        return TextError::err("no input #%d", aIndex);
+      }
       break;
     }
     case 'S': {
@@ -509,6 +515,9 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
         else {
           sb->updateSensorValue(aValue);
         }
+      }
+      else {
+        return TextError::err("no sensor #%d", aIndex);
       }
       break;
     }
@@ -544,6 +553,9 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
               break;
           }
         }
+      }
+      else {
+        return TextError::err("no channel #%d", aIndex);
       }
       break;
     }
