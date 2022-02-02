@@ -101,6 +101,8 @@ namespace p44 {
     /// @note is virtual because some objects might want to use the log level offset of another object
     virtual int getLogLevelOffset();
 
+    virtual string logContextPrefix();
+
   private:
 
     void removeDevice(ExternalDevicePtr aExtDev);

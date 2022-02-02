@@ -109,6 +109,11 @@ int ExternalDeviceConnector::getLogLevelOffset()
 }
 
 
+string ExternalDeviceConnector::logContextPrefix()
+{
+  return string_format("API socket #%d", mDeviceConnection ? mDeviceConnection->getFd() : -1);
+}
+
 
 ExternalDeviceConnector::~ExternalDeviceConnector()
 {
