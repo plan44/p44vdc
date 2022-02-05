@@ -639,10 +639,11 @@ bool Device::needsToApplyChannels(MLMicroSeconds* aTransitionTimeP)
     ChannelBehaviourPtr ch = getChannelByIndex(i, true);
     if (ch) {
       // at least this channel needs update
-      LOG(LOG_DEBUG, "needsToApplyChannels() returns true because of %s", ch->description().c_str());
+      LOG(LOG_DEBUG, "needsToApplyChannels() will return true because of %s", ch->description().c_str());
       if (!aTransitionTimeP) return true; // no need to check more channels
       needsApply = true;
       if (ch->transitionTimeToNewValue()>tt) {
+        LOG(LOG_DEBUG, "- channel increases transition time from %lld to %lld mS", tt/MilliSecond, ch->transitionTimeToNewValue());
         tt = ch->transitionTimeToNewValue();
       }
     }

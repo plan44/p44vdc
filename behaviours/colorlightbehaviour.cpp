@@ -578,13 +578,26 @@ void ColorLightBehaviour::appliedColorValues()
     case colorLightModeHueSaturation:
       hue->channelValueApplied(true);
       saturation->channelValueApplied(true);
+      // reset others in case these were falsely triggered for update
+      ct->makeApplyPending(false);
+      cieX->makeApplyPending(false);
+      cieY->makeApplyPending(false);
       break;
     case colorLightModeCt:
       ct->channelValueApplied(true);
+      // reset others in case these were falsely triggered for update
+      hue->makeApplyPending(false);
+      saturation->makeApplyPending(false);
+      cieX->makeApplyPending(false);
+      cieY->makeApplyPending(false);
       break;
     case colorLightModeXY:
       cieX->channelValueApplied(true);
       cieY->channelValueApplied(true);
+      // reset others in case these were falsely triggered for update
+      hue->makeApplyPending(false);
+      saturation->makeApplyPending(false);
+      ct->makeApplyPending(false);
       break;
     default:
       // no color
