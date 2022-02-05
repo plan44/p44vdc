@@ -170,6 +170,17 @@ int ChannelBehaviour::getSourceOpLevel()
 bool ChannelBehaviour::transitionStep(double aStepSize)
 {
   if (aStepSize<=0) {
+    // Initialize a transition
+    if (inTransition()) {
+      // a previous transition is still running.
+      // This can only happen if no new target value has been set for this channel, which
+      // means that the transition should not run further. But...
+      if (!channelUpdatePending) { // ..check, just to make sure
+        cachedChannelValue = getChannelValue(true); // get current transitional value
+        setTransitionProgress(1); // stop transition early, keeping current value
+        return false; // no transition
+      }
+    }
     transitionProgress = 0; // start
     return true; // in transition
   }
