@@ -217,7 +217,7 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     lightView->hide();
   }
   // - is RGB
-  colorClass = class_yellow_light;
+  mColorClass = class_yellow_light;
   // - set minimum brightness
   behaviour->initMinBrightness(getLedChainVdc().getMinBrightness());
   addBehaviour(behaviour);
@@ -235,7 +235,7 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     //   UUIDv5 with name = <classcontainerinstanceid><uniqueid> (separator missing for backwards compatibility)
     //   Note: for backwards compatibility, when no uniqueid ist set, <ledchainType>:<firstLED>:<lastLED> is used
     DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-    string ii = vdcP->vdcInstanceIdentifier();
+    string ii = mVdcP->vdcInstanceIdentifier();
     ii += uniqueId;
     dSUID.setNameInSpace(ii, vdcNamespace);
   }
@@ -304,7 +304,7 @@ bool LedChainDevice::isSoftwareDisconnectable()
 
 LedChainVdc &LedChainDevice::getLedChainVdc()
 {
-  return *(static_cast<LedChainVdc *>(vdcP));
+  return *(static_cast<LedChainVdc *>(mVdcP));
 }
 
 

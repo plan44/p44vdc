@@ -120,13 +120,13 @@ string HueDevice::getExtraInfo()
 
 HueVdc &HueDevice::hueVdc()
 {
-  return *(static_cast<HueVdc *>(vdcP));
+  return *(static_cast<HueVdc *>(mVdcP));
 }
 
 
 HueComm &HueDevice::hueComm()
 {
-  return (static_cast<HueVdc *>(vdcP))->hueComm;
+  return (static_cast<HueVdc *>(mVdcP))->hueComm;
 }
 
 
@@ -242,10 +242,10 @@ bool HueDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliverySta
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
     // only brightness, saturation and hue dimming is optimizable for now
     return
-      currentDimChannel && // actually prepared for dimming
-      (currentDimChannel->getChannelType()==channeltype_brightness ||
-       currentDimChannel->getChannelType()==channeltype_hue ||
-       currentDimChannel->getChannelType()==channeltype_saturation);
+      mCurrentDimChannel && // actually prepared for dimming
+      (mCurrentDimChannel->getChannelType()==channeltype_brightness ||
+       mCurrentDimChannel->getChannelType()==channeltype_hue ||
+       mCurrentDimChannel->getChannelType()==channeltype_saturation);
   }
   return false;
 }
@@ -693,7 +693,7 @@ void HueDevice::deriveDsUid()
   string s;
   if (uniqueID.empty()) {
     // we don't have an unique ID, identify relative to bridge's UUID
-    s = vdcP->vdcInstanceIdentifier();
+    s = mVdcP->vdcInstanceIdentifier();
     s += "::" + hueVdc().bridgeUuid;
     s += ":" + lightID;
   }

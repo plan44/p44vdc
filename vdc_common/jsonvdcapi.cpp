@@ -96,12 +96,12 @@ void JsonApiValue::setJsonObject(JsonObjectPtr aJsonObject)
   }
   else {
     switch (jsonObj->type()) {
-      case json_type_boolean: objectType = apivalue_bool; break;
-      case json_type_double: objectType = apivalue_double; break;
-      case json_type_int: objectType = apivalue_int64; break;
-      case json_type_object: objectType = apivalue_object; break;
-      case json_type_array: objectType = apivalue_array; break;
-      case json_type_string: objectType = apivalue_string; break;
+      case json_type_boolean: mObjectType = apivalue_bool; break;
+      case json_type_double: mObjectType = apivalue_double; break;
+      case json_type_int: mObjectType = apivalue_int64; break;
+      case json_type_object: mObjectType = apivalue_object; break;
+      case json_type_array: mObjectType = apivalue_array; break;
+      case json_type_string: mObjectType = apivalue_string; break;
       case json_type_null:
       default:
         setType(apivalue_null);

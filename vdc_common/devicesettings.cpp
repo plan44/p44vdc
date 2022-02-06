@@ -28,8 +28,8 @@ using namespace p44;
 
 DeviceSettings::DeviceSettings(Device &aDevice) :
   inherited(aDevice.getVdcHost().getDsParamStore()),
-  device(aDevice),
-  deviceFlags(0),
+  mDevice(aDevice),
+  mDeviceFlags(0),
   zoneID(0)
 {
 }
@@ -74,8 +74,8 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field value
-  aRow->getIfNotNull<int>(aIndex++, deviceFlags);
-  device.initializeName(nonNullCStr(aRow->get<const char *>(aIndex++))); // do not propagate to HW!
+  aRow->getIfNotNull<int>(aIndex++, mDeviceFlags);
+  mDevice.initializeName(nonNullCStr(aRow->get<const char *>(aIndex++))); // do not propagate to HW!
   aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, zoneID);
 }
 
@@ -85,7 +85,7 @@ void DeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, deviceFlags);
-  aStatement.bind(aIndex++, device.getAssignedName().c_str(), false);  // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mDeviceFlags);
+  aStatement.bind(aIndex++, mDevice.getAssignedName().c_str(), false);  // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (int)zoneID);
 }

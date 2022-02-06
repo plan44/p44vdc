@@ -96,7 +96,7 @@ namespace p44 {
 
     bool mReporting; ///< set while reporting evaluation result to sensor or binary input, to prevent infinitite loop though cyclic references
 
-    EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(deviceSettings); };
+    EvaluatorDeviceSettingsPtr evaluatorSettings() { return boost::dynamic_pointer_cast<EvaluatorDeviceSettings>(mDeviceSettings); };
 
   public:
 

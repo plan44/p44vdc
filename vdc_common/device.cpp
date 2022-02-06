@@ -78,7 +78,7 @@ bool DeviceConfigurationDescriptor::accessField(PropertyAccessMode aMode, ApiVal
 {
   if (aPropertyDescriptor->hasObjectKey(dcd_key) && aMode==access_read) {
     switch (aPropertyDescriptor->fieldKey()) {
-      case dcd_description_key: aPropValue->setStringValue(description); return true;
+      case dcd_description_key: aPropValue->setStringValue(mDescription); return true;
     }
   }
   return false;
@@ -101,28 +101,28 @@ namespace p44 { namespace DeviceConfigurations {
 
 
 Device::Device(Vdc *aVdcP) :
-  progMode(false),
-  isDimming(false),
-  currentDimMode(dimmode_stop),
-  areaDimmed(0),
-  areaDimMode(dimmode_stop),
-  preparedDim(false),
-  vdcP(aVdcP),
+  mProgMode(false),
+  mIsDimming(false),
+  mCurrentDimMode(dimmode_stop),
+  mAreaDimmed(0),
+  mAreaDimMode(dimmode_stop),
+  mPreparedDim(false),
+  mVdcP(aVdcP),
   DsAddressable(&aVdcP->getVdcHost()),
-  colorClass(class_black_joker),
-  applyInProgress(false),
-  missedApplyAttempts(0),
-  updateInProgress(false)
+  mColorClass(class_black_joker),
+  mApplyInProgress(false),
+  mMissedApplyAttempts(0),
+  mUpdateInProgress(false)
 {
 }
 
 
 Device::~Device()
 {
-  buttons.clear();
-  inputs.clear();
-  sensors.clear();
-  output.reset();
+  mButtons.clear();
+  mInputs.clear();
+  mSensors.clear();
+  mOutput.reset();
 }
 
 
@@ -149,8 +149,8 @@ void Device::identificationOK(IdentifyDeviceCB aIdentifyCB, Device *aActualDevic
 void Device::addedAndInitialized()
 {
   // trigger re-applying channel values if this feature is enabled in the vdchost
-  if (output && getVdcHost().doPersistChannels()) {
-    if (output->reapplyRestoredChannels()) {
+  if (mOutput && getVdcHost().doPersistChannels()) {
+    if (mOutput->reapplyRestoredChannels()) {
       OLOG(LOG_INFO, "requesting re-applying last known channel values to hardware");
       requestApplyingChannels(boost::bind(&Device::channelValuesRestored, this), false);
     }
@@ -180,12 +180,12 @@ string Device::modelUID()
 
 void Device::addToModelUIDHash(string &aHashedString)
 {
-  string_format_append(aHashedString, "%s:%d:", deviceTypeIdentifier().c_str(), colorClass);
+  string_format_append(aHashedString, "%s:%d:", deviceTypeIdentifier().c_str(), mColorClass);
   // behaviours
-  for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
-  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
-  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
-  if (output) aHashedString += output->behaviourTypeIdentifier();
+  for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
+  for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
+  for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) aHashedString += (*pos)->behaviourTypeIdentifier();
+  if (mOutput) aHashedString += mOutput->behaviourTypeIdentifier();
   // model features
   for (int f=0; f<numModelFeatures; f++) {
     aHashedString += hasModelFeature((DsModelFeatures)f)==yes ? 'T' : 'F';
@@ -195,8 +195,8 @@ void Device::addToModelUIDHash(string &aHashedString)
 
 DsZoneID Device::getZoneID()
 {
-  if (deviceSettings) {
-    return deviceSettings->zoneID;
+  if (mDeviceSettings) {
+    return mDeviceSettings->zoneID;
   }
   return 0; // not assigned to a zone
 }
@@ -204,11 +204,11 @@ DsZoneID Device::getZoneID()
 
 void Device::setZoneID(DsZoneID aZoneId)
 {
-  if (deviceSettings) {
+  if (mDeviceSettings) {
     #if ENABLE_LOCALCONTROLLER
     // must report changes of zone usage to local controller
     DsZoneID previousZone = getZoneID();
-    if (deviceSettings->setPVar(deviceSettings->zoneID, aZoneId)) {
+    if (mDeviceSettings->setPVar(mDeviceSettings->zoneID, aZoneId)) {
       LocalControllerPtr lc = getVdcHost().getLocalController();
       if (lc) {
         lc->deviceChangesZone(DevicePtr(this), previousZone, aZoneId);
@@ -226,7 +226,7 @@ void Device::setZoneID(DsZoneID aZoneId)
 string Device::vendorName()
 {
   // default to same vendor as class container
-  return vdcP->vendorName();
+  return mVdcP->vendorName();
 }
 
 
@@ -236,8 +236,8 @@ void Device::setName(const string &aName)
     // has changed
     inherited::setName(aName);
     // make sure it will be saved
-    if (deviceSettings) {
-      deviceSettings->markDirty();
+    if (mDeviceSettings) {
+      mDeviceSettings->markDirty();
     }
   }
 }
@@ -245,7 +245,7 @@ void Device::setName(const string &aName)
 
 void Device::setColorClass(DsClass aColorClass)
 {
-  colorClass = aColorClass;
+  mColorClass = aColorClass;
 }
 
 
@@ -284,10 +284,10 @@ DsClass Device::getDominantColorClass()
 {
   // check if group determines apparent (icon color) class
   DsGroup group = group_undefined;
-  if (output) {
+  if (mOutput) {
     // lowest group of output determines dominant color
     for (int i = group_yellow_light; i<numColorClasses; i++) {
-      if (output->isMember((DsGroup)i)) {
+      if (mOutput->isMember((DsGroup)i)) {
         group = (DsGroup)i;
         break;
       }
@@ -311,7 +311,7 @@ DsClass Device::getDominantColorClass()
   }
   // Return color class the dominant group belongs to
   DsClass cl = colorClassFromGroup(group);
-  return cl!=class_undefined ? cl : colorClass;
+  return cl!=class_undefined ? cl : mColorClass;
 }
 
 
@@ -352,11 +352,11 @@ ErrorPtr Device::switchConfiguration(const string aConfigurationId)
 void Device::installSettings(DeviceSettingsPtr aDeviceSettings)
 {
   if (aDeviceSettings) {
-    deviceSettings = aDeviceSettings;
+    mDeviceSettings = aDeviceSettings;
   }
   else {
     // use standard settings
-    deviceSettings = DeviceSettingsPtr(new DeviceSettings(*this));
+    mDeviceSettings = DeviceSettingsPtr(new DeviceSettings(*this));
   }
 }
 
@@ -369,37 +369,37 @@ void Device::addBehaviour(DsBehaviourPtr aBehaviour)
     BehaviourVector *bvP = NULL;
     switch (aBehaviour->getType()) {
       case behaviour_button:
-        bvP = &buttons;
+        bvP = &mButtons;
         goto addbehaviour;
       case behaviour_binaryinput:
-        bvP = &inputs;
+        bvP = &mInputs;
         goto addbehaviour;
       case behaviour_sensor:
-        bvP = &sensors;
+        bvP = &mSensors;
         goto addbehaviour;
       addbehaviour:
       {
         // set automatic id if none set before
-        if (aBehaviour->behaviourId.empty()) {
-          aBehaviour->behaviourId = aBehaviour->getAutoId();
+        if (aBehaviour->mBehaviourId.empty()) {
+          aBehaviour->mBehaviourId = aBehaviour->getAutoId();
         }
         // check for duplicate id
         int instance = 1;
-        string id = aBehaviour->behaviourId; // start with plain ID
+        string id = aBehaviour->mBehaviourId; // start with plain ID
         BehaviourVector::iterator pos = bvP->begin();
         while (pos!=bvP->end()) {
-          if ((*pos)->behaviourId==id) {
+          if ((*pos)->mBehaviourId==id) {
             // duplicate
             instance++;
-            id = string_format("%s_%d", aBehaviour->behaviourId.c_str(), instance);
+            id = string_format("%s_%d", aBehaviour->mBehaviourId.c_str(), instance);
             pos = bvP->begin(); // re-check from beginning
           }
           ++pos;
         }
         // now the id is unique for sure
-        aBehaviour->behaviourId = id; // assign it
+        aBehaviour->mBehaviourId = id; // assign it
         // assign the index
-        aBehaviour->index = bvP->size();
+        aBehaviour->mIndex = bvP->size();
         // add it
         bvP->push_back(aBehaviour);
         break;
@@ -407,8 +407,8 @@ void Device::addBehaviour(DsBehaviourPtr aBehaviour)
       case behaviour_output:
       case behaviour_actionOutput:
       {
-        aBehaviour->index = 0;
-        output = boost::dynamic_pointer_cast<OutputBehaviour>(aBehaviour);
+        aBehaviour->mIndex = 0;
+        mOutput = boost::dynamic_pointer_cast<OutputBehaviour>(aBehaviour);
         break;
       }
       default:
@@ -449,35 +449,35 @@ DsBehaviourPtr Device::getFromBehaviourVector(BehaviourVector &aBV, int aIndex, 
 
 ButtonBehaviourPtr Device::getButton(int aIndex, const string aId)
 {
-  return boost::dynamic_pointer_cast<ButtonBehaviour>(getFromBehaviourVector(buttons, aIndex, aId));
+  return boost::dynamic_pointer_cast<ButtonBehaviour>(getFromBehaviourVector(mButtons, aIndex, aId));
 }
 
 
 SensorBehaviourPtr Device::getSensor(int aIndex, const string aId)
 {
-  return boost::dynamic_pointer_cast<SensorBehaviour>(getFromBehaviourVector(sensors, aIndex, aId));
+  return boost::dynamic_pointer_cast<SensorBehaviour>(getFromBehaviourVector(mSensors, aIndex, aId));
 }
 
 
 BinaryInputBehaviourPtr Device::getInput(int aIndex, const string aId)
 {
-  return boost::dynamic_pointer_cast<BinaryInputBehaviour>(getFromBehaviourVector(inputs, aIndex, aId));
+  return boost::dynamic_pointer_cast<BinaryInputBehaviour>(getFromBehaviourVector(mInputs, aIndex, aId));
 }
 
 
 OutputBehaviourPtr Device::getOutput()
 {
-  return output;
+  return mOutput;
 }
 
 
 DsBehaviourPtr Device::behaviourById(const string aId)
 {
   DsBehaviourPtr b;
-  if (output && output->behaviourId==aId) b = output;
-  if (!b) b = getFromBehaviourVector(sensors, by_id, aId);
-  if (!b) b = getFromBehaviourVector(inputs, by_id, aId);
-  if (!b) b = getFromBehaviourVector(buttons, by_id, aId);
+  if (mOutput && mOutput->mBehaviourId==aId) b = mOutput;
+  if (!b) b = getFromBehaviourVector(mSensors, by_id, aId);
+  if (!b) b = getFromBehaviourVector(mInputs, by_id, aId);
+  if (!b) b = getFromBehaviourVector(mButtons, by_id, aId);
   return b;
 }
 
@@ -485,10 +485,10 @@ DsBehaviourPtr Device::behaviourById(const string aId)
 void Device::announcementAcknowledged()
 {
   // Push current values of all sensors and inputs
-  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) {
+  for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) {
     if ((*pos)->hasDefinedState()) (*pos)->pushBehaviourState();
   }
-  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) {
+  for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) {
     if ((*pos)->hasDefinedState()) (*pos)->pushBehaviourState();
   }
 }
@@ -543,8 +543,8 @@ static const char *modelFeatureNames[numModelFeatures] = {
 Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
 {
   // ask output first, might have more specific info
-  if (output) {
-    Tristate hasFeature = output->hasModelFeature(aFeatureIndex);
+  if (mOutput) {
+    Tristate hasFeature = mOutput->hasModelFeature(aFeatureIndex);
     if (hasFeature!=undefined) return hasFeature; // output has a say about the feature, no need to check at device level
   }
   // now check for device level features
@@ -553,7 +553,7 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       return canIdentifyToUser() ? yes : no;
     case modelFeature_dontcare:
       // Generic: all devices with scene table have the ability to set scene's don't care flag
-      return boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings)!=NULL ? yes : no;
+      return boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings)!=NULL ? yes : no;
     case modelFeature_ledauto:
     case modelFeature_leddark:
       // Virtual devices do not have the standard dS LED at all
@@ -562,12 +562,12 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_pushbarea:
     case modelFeature_pushbadvanced:
       // Assumption: any device with a buttonInputBehaviour has these props
-      return buttons.size()>0 ? yes : no;
+      return mButtons.size()>0 ? yes : no;
     case modelFeature_pushbsensor:
       return no; // we definitely don't have buttons that can be converted to sensors
     case modelFeature_pushbdevice:
       // Check if any of the buttons has localbutton functionality available
-      for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) {
+      for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) {
         ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(*pos);
         if (b && b->supportsLocalKeyMode) {
           return yes; // there is a button with local key mode support
@@ -578,20 +578,20 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       return no; // this is for SDS200 only, does not make sense with vdcs at all
     case modelFeature_twowayconfig: {
       // devices with one button that has combinables>1 can possibly be combined and thus need this modelfeature to show the UI
-      if (buttons.size()!=1) return no; // none or multiple buttons in this device -> not combinable
+      if (mButtons.size()!=1) return no; // none or multiple buttons in this device -> not combinable
       ButtonBehaviourPtr b = getButton(0);
       return b->combinables>1 ? yes : no;
     }
     case modelFeature_highlevel:
       // Assumption: only black joker devices can have a high-level (app) functionality
-      return colorClass==class_black_joker ? yes : no;
+      return mColorClass==class_black_joker ? yes : no;
     case modelFeature_jokerconfig:
       // Assumption: black joker devices need joker config (setting color) only if there are buttons or an output.
       // Pure sensors or binary inputs don't need color config
-      return colorClass==class_black_joker && (output || buttons.size()>0) ? yes : no;
+      return mColorClass==class_black_joker && (mOutput || mButtons.size()>0) ? yes : no;
     case modelFeature_akmsensor:
       // current dSS state is that it can only provide function setting for binary input 0
-      if (inputs.size()>0) {
+      if (mInputs.size()>0) {
         BinaryInputBehaviourPtr b = getInput(0);
         if (b->getHardwareInputType()==binInpType_none) {
           return yes; // Input 0 has no predefined function, "akmsensor" can provide setting UI for that
@@ -624,8 +624,8 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
 
 int Device::numChannels()
 {
-  if (output)
-    return (int)output->numChannels();
+  if (mOutput)
+    return (int)mOutput->numChannels();
   else
     return 0;
 }
@@ -677,22 +677,22 @@ void Device::invalidateAllChannels()
 
 ChannelBehaviourPtr Device::getChannelByIndex(int aChannelIndex, bool aPendingApplyOnly)
 {
-  if (!output) return ChannelBehaviourPtr();
-  return output->getChannelByIndex(aChannelIndex, aPendingApplyOnly);
+  if (!mOutput) return ChannelBehaviourPtr();
+  return mOutput->getChannelByIndex(aChannelIndex, aPendingApplyOnly);
 }
 
 
 ChannelBehaviourPtr Device::getChannelByType(DsChannelType aChannelType, bool aPendingApplyOnly)
 {
-  if (!output) return ChannelBehaviourPtr();
-  return output->getChannelByType(aChannelType, aPendingApplyOnly);
+  if (!mOutput) return ChannelBehaviourPtr();
+  return mOutput->getChannelByType(aChannelType, aPendingApplyOnly);
 }
 
 
 ChannelBehaviourPtr Device::getChannelById(const string aChannelId, bool aPendingApplyOnly)
 {
-  if (!output) return ChannelBehaviourPtr();
-  return output->getChannelById(aChannelId, aPendingApplyOnly);
+  if (!mOutput) return ChannelBehaviourPtr();
+  return mOutput->getChannelById(aChannelId, aPendingApplyOnly);
 }
 
 
@@ -873,9 +873,9 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
           apply_now = o->boolValue();
         }
         o = aParams->get("transitionTime");
-        MLMicroSeconds oldTT = getOutput()->transitionTime;
+        MLMicroSeconds oldTT = getOutput()->mTransitionTime;
         if (o) {
-          getOutput()->transitionTime = o->doubleValue()*Second;
+          getOutput()->mTransitionTime = o->doubleValue()*Second;
         }
         // reverse build the correctly structured property value: { channelStates: { <channel>: { value:<value> } } }
         // - value
@@ -890,7 +890,7 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         // now access the property for write
         accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, 3, NULL); // no callback
         // restore the transition time
-        getOutput()->transitionTime = oldTT;
+        getOutput()->mTransitionTime = oldTT;
       }
     }
     if (Error::notOK(err)) {
@@ -908,7 +908,7 @@ void Device::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandle
 {
   // remove from container management
   DevicePtr dev = DevicePtr(this);
-  vdcP->removeDevice(dev, aForgetParams);
+  mVdcP->removeDevice(dev, aForgetParams);
   // that's all for the base class
   if (aDisconnectResultHandler)
     aDisconnectResultHandler(true);
@@ -927,7 +927,7 @@ void Device::hasVanished(bool aForgetParams)
 
 void Device::scheduleVanish(bool aForgetParams, MLMicroSeconds aDelay)
 {
-  vanishTicket.executeOnce(boost::bind(&Device::hasVanished, this, aForgetParams), aDelay);
+  mVanishTicket.executeOnce(boost::bind(&Device::hasVanished, this, aForgetParams), aDelay);
 }
 
 
@@ -1034,12 +1034,12 @@ void Device::optimizerRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState)
 
 void Device::executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
-  if (preparedScene) {
+  if (mPreparedScene) {
     callSceneExecutePrepared(aDoneCB, aWhatToApply);
-    preparedDim = false; // calling scene always cancels prepared dimming
+    mPreparedDim = false; // calling scene always cancels prepared dimming
     return;
   }
-  else if (preparedDim) {
+  else if (mPreparedDim) {
     dimChannelExecutePrepared(aDoneCB, aWhatToApply);
     return;
   }
@@ -1049,19 +1049,19 @@ void Device::executePreparedOperation(SimpleCB aDoneCB, NotificationType aWhatTo
 
 void Device::releasePreparedOperation()
 {
-  preparedScene.reset();
-  preparedTransitionOverride = Infinite; // none
+  mPreparedScene.reset();
+  mPreparedTransitionOverride = Infinite; // none
 }
 
 
 bool Device::updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bool aForOptimisation)
 {
   if (aDeliveryState->optimizedType==ntfy_callscene) {
-    if (!preparedScene) return false; // no prepared scene -> not part of optimized set
-    aDeliveryState->contentId = preparedScene->sceneNo; // to re-identify the scene (the contents might have changed...)
+    if (!mPreparedScene) return false; // no prepared scene -> not part of optimized set
+    aDeliveryState->contentId = mPreparedScene->mSceneNo; // to re-identify the scene (the contents might have changed...)
     if (aForOptimisation && prepareForOptimizedSet(aDeliveryState)) {
       // content hash must represent the contents of the called scenes in all affected devices
-      Fnv64 sh(preparedScene->sceneHash());
+      Fnv64 sh(mPreparedScene->sceneHash());
       if (sh.getHash()==0) return false; // scene not hashable -> not part of optimized set
       sh.addString(dSUID.getBinary()); // add device dSUID to make it "mixable" (i.e. combine into one hash via XOR in any order)
       aDeliveryState->contentsHash ^= sh.getHash(); // mix
@@ -1069,14 +1069,14 @@ bool Device::updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bo
     }
   }
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
-    if (!preparedDim) return false; // no prepared scene -> not part of optimized set
+    if (!mPreparedDim) return false; // no prepared scene -> not part of optimized set
     aDeliveryState->contentId = 0; // no different content ids
-    aDeliveryState->actionVariant = currentDimMode; // to actually apply the dim mode to the optimized group later
-    aDeliveryState->actionParam = currentDimChannel ? currentDimChannel->getChannelType() : channeltype_default;
+    aDeliveryState->actionVariant = mCurrentDimMode; // to actually apply the dim mode to the optimized group later
+    aDeliveryState->actionParam = mCurrentDimChannel ? mCurrentDimChannel->getChannelType() : channeltype_default;
     if (aForOptimisation && prepareForOptimizedSet(aDeliveryState)) {
-      if (currentDimMode!=dimmode_stop) {
+      if (mCurrentDimMode!=dimmode_stop) {
         aDeliveryState->repeatVariant = dimmode_stop; // auto-stop
-        aDeliveryState->repeatAfter = currentAutoStopTime; // after this time
+        aDeliveryState->repeatAfter = mCurrentAutoStopTime; // after this time
       }
       return true;
     }
@@ -1109,7 +1109,7 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 
 void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForDimming, bool aModeChange)
 {
-  if (!aModeChange && output && !output->isEnabled()) {
+  if (!aModeChange && mOutput && !mOutput->isEnabled()) {
     // disabled output and not a mode change -> no operation
     FOCUSOLOG("requestApplyingChannels called with output disabled -> NOP");
     // - just call back immediately
@@ -1122,41 +1122,41 @@ void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForD
   // a) hardware is busy applying new values already -> confirm previous request to apply as superseded
   // b) hardware is busy updating values -> wait until this is done
   // c) hardware is not busy -> start apply right now
-  if (applyInProgress) {
+  if (mApplyInProgress) {
     FOCUSLOG("- requestApplyingChannels called while apply already running");
     // case a) confirm previous request because superseded
-    if (appliedOrSupersededCB) {
+    if (mAppliedOrSupersededCB) {
       FOCUSLOG("- confirming previous (superseded) apply request");
-      SimpleCB cb = appliedOrSupersededCB;
-      appliedOrSupersededCB = aAppliedOrSupersededCB; // in case current callback should request another change, callback is already installed
+      SimpleCB cb = mAppliedOrSupersededCB;
+      mAppliedOrSupersededCB = aAppliedOrSupersededCB; // in case current callback should request another change, callback is already installed
       cb(); // call back now, values have been superseded
       FOCUSLOG("- previous (superseded) apply request confirmed");
     }
     else {
-      appliedOrSupersededCB = aAppliedOrSupersededCB;
+      mAppliedOrSupersededCB = aAppliedOrSupersededCB;
     }
     // - when previous request actually terminates, we need another update to make sure finally settled values are correct
-    missedApplyAttempts++;
-    FOCUSLOG("- missed requestApplyingChannels requests now %d", missedApplyAttempts);
+    mMissedApplyAttempts++;
+    FOCUSLOG("- missed requestApplyingChannels requests now %d", mMissedApplyAttempts);
   }
-  else if (updateInProgress) {
+  else if (mUpdateInProgress) {
     FOCUSLOG("- requestApplyingChannels called while update running -> postpone apply");
     // case b) cannot execute until update finishes
-    missedApplyAttempts++;
-    appliedOrSupersededCB = aAppliedOrSupersededCB;
-    applyInProgress = true;
+    mMissedApplyAttempts++;
+    mAppliedOrSupersededCB = aAppliedOrSupersededCB;
+    mApplyInProgress = true;
   }
   else {
     // case c) applying is not currently in progress, can start updating hardware now
     FOCUSOLOG("ready, calling applyChannelValues()");
     #if SERIALIZER_WATCHDOG
     // - start watchdog
-    serializerWatchdogTicket.executeOnce(boost::bind(&Device::serializerWatchdog, this), 10*Second); // new
-    FOCUSLOG("+++++ Serializer watchdog started for apply with ticket #%ld", (MLTicketNo)serializerWatchdogTicket);
+    mSerializerWatchdogTicket.executeOnce(boost::bind(&Device::serializerWatchdog, this), 10*Second); // new
+    FOCUSLOG("+++++ Serializer watchdog started for apply with ticket #%ld", (MLTicketNo)mSerializerWatchdogTicket);
     #endif
     // - start applying
-    appliedOrSupersededCB = aAppliedOrSupersededCB;
-    applyInProgress = true;
+    mAppliedOrSupersededCB = aAppliedOrSupersededCB;
+    mApplyInProgress = true;
     applyChannelValues(boost::bind(&Device::applyingChannelsComplete, this), aForDimming);
   }
 }
@@ -1164,21 +1164,21 @@ void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForD
 
 void Device::waitForApplyComplete(SimpleCB aApplyCompleteCB)
 {
-  if (!applyInProgress) {
+  if (!mApplyInProgress) {
     // not applying anything, immediately call back
     FOCUSLOG("- waitForApplyComplete() called while no apply in progress -> immediately call back");
     aApplyCompleteCB();
   }
   else {
     // apply in progress, save callback, will be called once apply is complete
-    if (applyCompleteCB) {
+    if (mApplyCompleteCB) {
       // already regeistered, chain it
       FOCUSLOG("- waitForApplyComplete() called while apply in progress and another callback already set -> install callback fork");
-      applyCompleteCB = boost::bind(&Device::forkDoneCB, this, applyCompleteCB, aApplyCompleteCB);
+      mApplyCompleteCB = boost::bind(&Device::forkDoneCB, this, mApplyCompleteCB, aApplyCompleteCB);
     }
     else {
       FOCUSLOG("- waitForApplyComplete() called while apply in progress and no callback already set -> install callback");
-      applyCompleteCB = aApplyCompleteCB;
+      mApplyCompleteCB = aApplyCompleteCB;
     }
   }
 }
@@ -1198,15 +1198,15 @@ void Device::forkDoneCB(SimpleCB aOriginalCB, SimpleCB aNewCallback)
 void Device::serializerWatchdog()
 {
   #if SERIALIZER_WATCHDOG
-  FOCUSLOG("##### Serializer watchdog ticket #%ld expired", (MLTicketNo)serializerWatchdogTicket);
-  serializerWatchdogTicket = 0;
-  if (applyInProgress) {
-    OLOG(LOG_WARNING, "##### Serializer watchdog force-ends apply with %d missed attempts", missedApplyAttempts);
-    missedApplyAttempts = 0;
+  FOCUSLOG("##### Serializer watchdog ticket #%ld expired", (MLTicketNo)mSerializerWatchdogTicket);
+  mSerializerWatchdogTicket = 0;
+  if (mApplyInProgress) {
+    OLOG(LOG_WARNING, "##### Serializer watchdog force-ends apply with %d missed attempts", mMissedApplyAttempts);
+    mMissedApplyAttempts = 0;
     applyingChannelsComplete();
     FOCUSLOG("##### Force-ending apply complete");
   }
-  if (updateInProgress) {
+  if (mUpdateInProgress) {
     OLOG(LOG_WARNING, "##### Serializer watchdog force-ends update");
     updatingChannelsComplete();
     FOCUSLOG("##### Force-ending complete");
@@ -1217,14 +1217,14 @@ void Device::serializerWatchdog()
 
 bool Device::checkForReapply()
 {
-  OLOG(LOG_DEBUG, "checkForReapply - missed %d apply attempts in between", missedApplyAttempts);
-  if (missedApplyAttempts>0) {
+  OLOG(LOG_DEBUG, "checkForReapply - missed %d apply attempts in between", mMissedApplyAttempts);
+  if (mMissedApplyAttempts>0) {
     // request applying again to make sure final values are applied
     // - re-use callback of most recent requestApplyingChannels(), will be called once this attempt has completed (or superseded again)
     FOCUSLOG("- checkForReapply now requesting final channel apply");
-    missedApplyAttempts = 0; // clear missed
-    applyInProgress = false; // must be cleared for requestApplyingChannels() to actually do something
-    requestApplyingChannels(appliedOrSupersededCB, false); // final apply after missing other apply commands may not optimize for dimming
+    mMissedApplyAttempts = 0; // clear missed
+    mApplyInProgress = false; // must be cleared for requestApplyingChannels() to actually do something
+    requestApplyingChannels(mAppliedOrSupersededCB, false); // final apply after missing other apply commands may not optimize for dimming
     // - done for now
     return true; // reapply needed and started
   }
@@ -1238,29 +1238,29 @@ void Device::applyingChannelsComplete()
 {
   FOCUSOLOG("applyingChannelsComplete entered");
   #if SERIALIZER_WATCHDOG
-  if (serializerWatchdogTicket) {
-    FOCUSLOG("----- Serializer watchdog ticket #%ld cancelled - apply complete", (MLTicketNo)serializerWatchdogTicket);
-    serializerWatchdogTicket.cancel(); // cancel watchdog
+  if (mSerializerWatchdogTicket) {
+    FOCUSLOG("----- Serializer watchdog ticket #%ld cancelled - apply complete", (MLTicketNo)mSerializerWatchdogTicket);
+    mSerializerWatchdogTicket.cancel(); // cancel watchdog
   }
   #endif
-  applyInProgress = false;
+  mApplyInProgress = false;
   // if more apply request have happened in the meantime, we need to reapply now
   if (!checkForReapply()) {
     // apply complete and no final re-apply pending
     // - confirm because finally applied
     FOCUSLOG("- applyingChannelsComplete - really completed, now checking callbacks");
     SimpleCB cb;
-    if (appliedOrSupersededCB) {
+    if (mAppliedOrSupersededCB) {
       FOCUSLOG("- confirming apply (really) finalized");
-      cb = appliedOrSupersededCB;
-      appliedOrSupersededCB = NULL; // ready for possibly taking new callback in case current callback should request another change
+      cb = mAppliedOrSupersededCB;
+      mAppliedOrSupersededCB = NULL; // ready for possibly taking new callback in case current callback should request another change
       cb(); // call back now, values have been superseded
     }
     // check for independent operation waiting for apply complete
-    if (applyCompleteCB) {
+    if (mApplyCompleteCB) {
       FOCUSLOG("- confirming apply (really) finalized to waitForApplyComplete() client");
-      cb = applyCompleteCB;
-      applyCompleteCB = NULL;
+      cb = mApplyCompleteCB;
+      mApplyCompleteCB = NULL;
       cb();
     }
     FOCUSLOG("- confirmed apply (really) finalized");
@@ -1277,21 +1277,21 @@ void Device::requestUpdatingChannels(SimpleCB aUpdatedOrCachedCB)
   // a) hardware is busy updating values already -> serve previous callback (with stale values) and install new callback
   // b) hardware is busy applying new values -> consider cache most recent
   // c) hardware is not busy -> start reading values
-  if (updateInProgress) {
+  if (mUpdateInProgress) {
     // case a) serialize updates: terminate previous callback with stale values and install new one
-    if (updatedOrCachedCB) {
+    if (mUpdatedOrCachedCB) {
       FOCUSLOG("- confirming channels updated for PREVIOUS request with stale values (as asked again)");
-      SimpleCB cb = updatedOrCachedCB;
-      updatedOrCachedCB = aUpdatedOrCachedCB; // install new
+      SimpleCB cb = mUpdatedOrCachedCB;
+      mUpdatedOrCachedCB = aUpdatedOrCachedCB; // install new
       cb(); // execute old
       FOCUSLOG("- confirmed channels updated for PREVIOUS request with stale values (as asked again)");
     }
     else {
-      updatedOrCachedCB = aUpdatedOrCachedCB; // install new
+      mUpdatedOrCachedCB = aUpdatedOrCachedCB; // install new
     }
     // done, actual results will serve most recent request for values
   }
-  else if (applyInProgress) {
+  else if (mApplyInProgress) {
     // case b) no update pending, but applying values right now: return current values as hardware values are in
     //   process of being overwritten by those
     if (aUpdatedOrCachedCB) {
@@ -1303,12 +1303,12 @@ void Device::requestUpdatingChannels(SimpleCB aUpdatedOrCachedCB)
   else {
     // case c) hardware is not busy, start reading back current values
     FOCUSOLOG("requestUpdatingChannels: hardware ready, calling syncChannelValues()");
-    updatedOrCachedCB = aUpdatedOrCachedCB; // install new callback
-    updateInProgress = true;
+    mUpdatedOrCachedCB = aUpdatedOrCachedCB; // install new callback
+    mUpdateInProgress = true;
     #if SERIALIZER_WATCHDOG
     // - start watchdog
-    serializerWatchdogTicket.executeOnce(boost::bind(&Device::serializerWatchdog, this), SERIALIZER_WATCHDOG_TIMEOUT);
-    FOCUSLOG("+++++ Serializer watchdog started for update with ticket #%ld", (MLTicketNo)serializerWatchdogTicket);
+    mSerializerWatchdogTicket.executeOnce(boost::bind(&Device::serializerWatchdog, this), SERIALIZER_WATCHDOG_TIMEOUT);
+    FOCUSLOG("+++++ Serializer watchdog started for update with ticket #%ld", (MLTicketNo)mSerializerWatchdogTicket);
     #endif
     // - trigger querying hardware
     syncChannelValues(boost::bind(&Device::updatingChannelsComplete, this));
@@ -1319,18 +1319,18 @@ void Device::requestUpdatingChannels(SimpleCB aUpdatedOrCachedCB)
 void Device::updatingChannelsComplete()
 {
   #if SERIALIZER_WATCHDOG
-  if (serializerWatchdogTicket) {
-    FOCUSLOG("----- Serializer watchdog ticket #%ld cancelled - update complete", (MLTicketNo)serializerWatchdogTicket);
-    serializerWatchdogTicket.cancel(); // cancel watchdog
+  if (mSerializerWatchdogTicket) {
+    FOCUSLOG("----- Serializer watchdog ticket #%ld cancelled - update complete", (MLTicketNo)mSerializerWatchdogTicket);
+    mSerializerWatchdogTicket.cancel(); // cancel watchdog
   }
   #endif
-  if (updateInProgress) {
+  if (mUpdateInProgress) {
     FOCUSOLOG("endUpdatingChannels (while actually waiting for these updates!)");
-    updateInProgress = false;
-    if (updatedOrCachedCB) {
+    mUpdateInProgress = false;
+    if (mUpdatedOrCachedCB) {
       FOCUSLOG("- confirming channels updated from hardware (= calling callback now)");
-      SimpleCB cb = updatedOrCachedCB;
-      updatedOrCachedCB = NULL; // ready for possibly taking new callback in case current callback should request another change
+      SimpleCB cb = mUpdatedOrCachedCB;
+      mUpdatedOrCachedCB = NULL; // ready for possibly taking new callback in case current callback should request another change
       cb(); // call back now, cached values are either updated from hardware or superseded by pending updates TO hardware
       FOCUSLOG("- confirmed channels updated from hardware (= callback has possibly launched apply already and returned now)");
     }
@@ -1363,18 +1363,18 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
   if (!aChannel) { aPreparedCB(ntfy_none); return; } // no channel, no dimming
   LOG(LOG_DEBUG, "dimChannelForArea: aChannel=%s, aDimMode=%d, aArea=%d", aChannel->getName(), aDimMode, aArea);
   // check basic dimmability (e.g. avoid dimming brightness for lights that are off)
-  if (aDimMode!=dimmode_stop && !(output->canDim(aChannel))) {
+  if (aDimMode!=dimmode_stop && !(mOutput->canDim(aChannel))) {
     LOG(LOG_DEBUG, "- behaviour does not allow dimming channel '%s' now (e.g. because light is off)", aChannel->getName());
     aPreparedCB(ntfy_none); // cannot dim
     return;
   }
   // always update which area was the last requested to be dimmed for this device (even if device is not in the area)
   // (otherwise, dimming of a previously dimmed area might get restarted by a T1234_CONT for another area)
-  areaDimmed = aArea;
-  areaDimMode = dimmode_stop; // but do not assume dimming before we've checked the area dontCare flags
+  mAreaDimmed = aArea;
+  mAreaDimMode = dimmode_stop; // but do not assume dimming before we've checked the area dontCare flags
   // check area if any
   if (aArea>0) {
-    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
     if (scenes) {
       // check area first
       SceneNo areaScene = mainSceneForArea(aArea);
@@ -1386,12 +1386,12 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
       }
     }
     // dimMode does affect the area, update
-    areaDimMode = aDimMode;
+    mAreaDimMode = aDimMode;
   }
   else {
     // non-area dimming: suppress if device is in local priority
     // Note: aArea can be set -1 to override local priority checking, for example when using method for identify purposes
-    if (aArea==0 && output->hasLocalPriority()) {
+    if (aArea==0 && mOutput->hasLocalPriority()) {
       LOG(LOG_DEBUG, "- Non-area dimming, localPriority set -> suppressed");
       aPreparedCB(ntfy_none); // local priority active, suppress dimming
       return;
@@ -1402,32 +1402,32 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     stopSceneActions();
   }
   // requested dimming this device, no area suppress active
-  if (aDimMode!=currentDimMode || aChannel!=currentDimChannel) {
+  if (aDimMode!=mCurrentDimMode || aChannel!=mCurrentDimChannel) {
     // mode changes
     if (aDimMode!=dimmode_stop) {
       // start or change direction
-      if (currentDimMode!=dimmode_stop) {
+      if (mCurrentDimMode!=dimmode_stop) {
         // changed dimming direction or channel without having stopped first
         // - stop previous dimming operation here
-        dimChannel(currentDimChannel, dimmode_stop, true);
+        dimChannel(mCurrentDimChannel, dimmode_stop, true);
       }
     }
     // fully prepared now
     // - save parameters for executing dimming now
-    currentDimMode = aDimMode;
-    currentDimChannel = aChannel;
-    currentAutoStopTime = aAutoStopAfter;
-    preparedDim = true;
-    preparedScene.reset(); // to make sure there's no leftover
+    mCurrentDimMode = aDimMode;
+    mCurrentDimChannel = aChannel;
+    mCurrentAutoStopTime = aAutoStopAfter;
+    mPreparedDim = true;
+    mPreparedScene.reset(); // to make sure there's no leftover
     aPreparedCB(ntfy_dimchannel); // needs to start or stop dimming
     return;
   }
   else {
     // same dim mode, just retrigger if dimming right now
     if (aDimMode!=dimmode_stop) {
-      currentAutoStopTime = aAutoStopAfter;
+      mCurrentAutoStopTime = aAutoStopAfter;
       // if we have a local timer running, reschedule it
-      MainLoop::currentMainLoop().rescheduleExecutionTicket(dimTimeoutTicket, currentAutoStopTime);
+      MainLoop::currentMainLoop().rescheduleExecutionTicket(mDimTimeoutTicket, mCurrentAutoStopTime);
       // also indicate to optimizer it must reschedule its repeater
       aPreparedCB(ntfy_retrigger); // retrigger repeater
       return;
@@ -1442,32 +1442,32 @@ void Device::dimRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState)
 {
   // we get here ONLY during optimized dimming.
   // This means that this is a request to put device back into non-dimming state
-  if (currentDimMode!=dimmode_stop) {
+  if (mCurrentDimMode!=dimmode_stop) {
     // prepare to go back to stop state
     // (without applying to hardware, but possibly device-specific dimChannel() methods fetching actual dim state from hardware)
-    currentDimMode = dimmode_stop;
-    currentAutoStopTime = Never;
-    preparedDim = true;
+    mCurrentDimMode = dimmode_stop;
+    mCurrentAutoStopTime = Never;
+    mPreparedDim = true;
   }
 }
 
 
 void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
-  if (preparedDim) {
+  if (mPreparedDim) {
     // call actual dimming method, which will update state in all cases, but start/stop dimming only when not already done (aDoApply)
-    dimChannel(currentDimChannel, currentDimMode, aWhatToApply!=ntfy_none);
+    dimChannel(mCurrentDimChannel, mCurrentDimMode, aWhatToApply!=ntfy_none);
     if (aWhatToApply!=ntfy_none) {
-      if (currentDimMode!=dimmode_stop) {
+      if (mCurrentDimMode!=dimmode_stop) {
         // starting
-        dimTimeoutTicket.executeOnce(boost::bind(&Device::dimAutostopHandler, this, currentDimChannel), currentAutoStopTime);
+        mDimTimeoutTicket.executeOnce(boost::bind(&Device::dimAutostopHandler, this, mCurrentDimChannel), mCurrentAutoStopTime);
       }
       else {
         // stopping
-        dimTimeoutTicket.cancel();
+        mDimTimeoutTicket.cancel();
       }
     }
-    preparedDim = false;
+    mPreparedDim = false;
   }
   if (aDoneCB) aDoneCB();
 }
@@ -1480,9 +1480,9 @@ void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatT
 void Device::dimAutostopHandler(ChannelBehaviourPtr aChannel)
 {
   // timeout: stop dimming immediately
-  dimTimeoutTicket = 0;
+  mDimTimeoutTicket = 0;
   dimChannel(aChannel, dimmode_stop, true);
-  currentDimMode = dimmode_stop; // stopped now
+  mCurrentDimMode = dimmode_stop; // stopped now
 }
 
 
@@ -1502,12 +1502,12 @@ void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool 
     // Simple base class implementation just increments/decrements channel values periodically (and skips steps when applying values is too slow)
     if (aDimMode==dimmode_stop) {
       // stop dimming
-      isDimming = false;
-      dimHandlerTicket.cancel();
+      mIsDimming = false;
+      mDimHandlerTicket.cancel();
     }
     else {
       // start dimming
-      isDimming = true;
+      mIsDimming = true;
       if (aDoApply) {
         // make sure the start point is calculated if needed
         aChannel->getChannelValueCalculated();
@@ -1546,9 +1546,9 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
     aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL);
     aNextDimAt += DIM_STEP_INTERVAL;
   }
-  if (isDimming) {
+  if (mIsDimming) {
     // now schedule next inc/update step
-    dimHandlerTicket.executeOnceAt(boost::bind(&Device::dimHandler, this, aChannel, aIncrement, _2), aNextDimAt);
+    mDimHandlerTicket.executeOnceAt(boost::bind(&Device::dimHandler, this, aChannel, aIncrement, _2), aNextDimAt);
   }
 }
 
@@ -1567,20 +1567,20 @@ void Device::callScene(SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransition
 void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransitionTimeOverride)
 {
   // see if we have a scene table at all
-  preparedScene.reset(); // clear possibly previously prepared scene
-  preparedTransitionOverride = aTransitionTimeOverride; // save for later
-  preparedDim = false; // no dimming prepared
+  mPreparedScene.reset(); // clear possibly previously prepared scene
+  mPreparedTransitionOverride = aTransitionTimeOverride; // save for later
+  mPreparedDim = false; // no dimming prepared
   SceneDeviceSettingsPtr scenes = getScenes();
-  if (output && scenes) {
+  if (mOutput && scenes) {
     DsScenePtr scene = scenes->getScene(aSceneNo);
-    SceneCmd cmd = scene->sceneCmd;
-    SceneArea area = scene->sceneArea;
+    SceneCmd cmd = scene->mSceneCmd;
+    SceneArea area = scene->mSceneArea;
     // check special scene commands first
     if (cmd==scene_cmd_area_continue) {
       // area dimming continuation
-      if (areaDimmed!=0 && areaDimMode!=dimmode_stop) {
+      if (mAreaDimmed!=0 && mAreaDimMode!=dimmode_stop) {
         // continue or restart area dimming
-        dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), areaDimMode, areaDimmed, LEGACY_DIM_STEP_TIMEOUT);
+        dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), mAreaDimMode, mAreaDimmed, LEGACY_DIM_STEP_TIMEOUT);
         return;
       }
       // - otherwise: NOP
@@ -1604,10 +1604,10 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
       return;
     }
     // make sure dimming stops for any non-dimming scene call
-    if (currentDimMode!=dimmode_stop) {
+    if (mCurrentDimMode!=dimmode_stop) {
       // any non-dimming scene call stops dimming
       OLOG(LOG_NOTICE, "CallScene(%d) interrupts dimming in progress", aSceneNo);
-      dimChannelForAreaPrepare(boost::bind(&Device::callSceneDimStop, this, aPreparedCB, scene, aForce), currentDimChannel, dimmode_stop, area, 0);
+      dimChannelForAreaPrepare(boost::bind(&Device::callSceneDimStop, this, aPreparedCB, scene, aForce), mCurrentDimChannel, dimmode_stop, area, 0);
       return;
     }
     else {
@@ -1629,8 +1629,8 @@ void Device::callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aF
 
 void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce)
 {
-  SceneArea area = aScene->sceneArea;
-  SceneNo sceneNo = aScene->sceneNo;
+  SceneArea area = aScene->mSceneArea;
+  SceneNo sceneNo = aScene->mSceneNo;
   OLOG(LOG_INFO, "Evaluating CallScene(%s)", VdcHost::sceneText(sceneNo).c_str());
   // filter area scene calls via area main scene's (area x on, Tx_S1) dontCare flag
   if (area) {
@@ -1638,21 +1638,21 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
     // check if device is in area (criteria used is dontCare flag OF THE AREA ON SCENE (other don't care flags are irrelevant!)
     DsScenePtr areamainscene = getScenes()->getScene(mainSceneForArea(area));
     if (areamainscene->isDontCare()) {
-      LOG(LOG_INFO, "- area main scene(%s) is dontCare -> suppress", VdcHost::sceneText(areamainscene->sceneNo).c_str());
+      LOG(LOG_INFO, "- area main scene(%s) is dontCare -> suppress", VdcHost::sceneText(areamainscene->mSceneNo).c_str());
       aPreparedCB(ntfy_none); // not in this area, suppress callScene entirely
       return;
     }
     // call applies, if it is a off scene, it resets localPriority
-    if (aScene->sceneCmd==scene_cmd_off) {
+    if (aScene->mSceneCmd==scene_cmd_off) {
       // area is switched off -> end local priority
       LOG(LOG_INFO, "- is area off scene -> ends localPriority now");
-      output->setLocalPriority(false);
+      mOutput->setLocalPriority(false);
     }
   }
   if (!aScene->isDontCare()) {
     // Scene found and dontCare not set, check details
     // - check and update local priority
-    if (!area && output->hasLocalPriority()) {
+    if (!area && mOutput->hasLocalPriority()) {
       // non-area scene call, but device is in local priority
       if (!aForce && !aScene->ignoresLocalPriority()) {
         // not forced nor localpriority ignored, localpriority prevents applying non-area scene
@@ -1662,20 +1662,20 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
       }
       else {
         // forced or scene ignores local priority, scene is applied anyway, and also clears localPriority
-        output->setLocalPriority(false);
+        mOutput->setLocalPriority(false);
       }
     }
     // we get here only if callScene is actually affecting this device
     OLOG(LOG_NOTICE, "affected by CallScene(%s)", VdcHost::sceneText(sceneNo).c_str());
     // - make sure we have the lastState pseudo-scene for undo
-    if (!previousState) {
-      previousState = getScenes()->newUndoStateScene();
+    if (!mPreviousState) {
+      mPreviousState = getScenes()->newUndoStateScene();
     }
     // we remember the scene for which these are undo values in sceneNo of the pseudo scene
     // (but without actually re-configuring the scene according to that number!)
-    previousState->sceneNo = sceneNo;
+    mPreviousState->mSceneNo = sceneNo;
     // - now capture current values and then apply to output
-    if (output) {
+    if (mOutput) {
       // Non-dimming scene: have output save its current state into the previousState pseudo scene
       // Note: we only ask updating from device for scenes that are likely to be undone, and thus important
       //   to capture perfectly. For all others, it is sufficient to just capture the cached output channel
@@ -1683,7 +1683,7 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
       // Note: the actual updating is allowed to happen later (when the hardware responds) but
       //   if so, implementations must make sure access to the hardware is serialized such that
       //   the values are captured before values from performApplySceneToChannels() below are applied.
-      output->captureScene(previousState, aScene->preciseUndoImportant(), boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
+      mOutput->captureScene(mPreviousState, aScene->preciseUndoImportant(), boost::bind(&Device::outputUndoStateSaved, this, aPreparedCB, aScene)); // apply only after capture is complete
     } // if output
   } // not dontCare
   else {
@@ -1702,12 +1702,12 @@ void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
   // now let device level implementation prepare for scene call and decide if normal apply should follow
   if (prepareSceneCall(aScene)) {
     // this scene should be applied, keep it ready for callSceneExecute()
-    preparedScene = aScene;
+    mPreparedScene = aScene;
     aPreparedCB(ntfy_callscene);
   }
   else {
     OLOG(LOG_DEBUG, "Device level prepareSceneCall() returns false -> no more actions");
-    preparedScene.reset();
+    mPreparedScene.reset();
     aPreparedCB(ntfy_none);
   }
 }
@@ -1716,12 +1716,12 @@ void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
 MLMicroSeconds Device::transitionTimeForPreparedScene(bool aIncludingOverride)
 {
   MLMicroSeconds tt = 0;
-  if (preparedScene) {
-    if (aIncludingOverride && preparedTransitionOverride!=Infinite) {
-      tt = preparedTransitionOverride;
+  if (mPreparedScene) {
+    if (aIncludingOverride && mPreparedTransitionOverride!=Infinite) {
+      tt = mPreparedTransitionOverride;
     }
-    else if (output) {
-      tt = output->transitionTimeFromScene(preparedScene, true);
+    else if (mOutput) {
+      tt = mOutput->transitionTimeFromScene(mPreparedScene, true);
     }
   }
   return tt;
@@ -1730,10 +1730,10 @@ MLMicroSeconds Device::transitionTimeForPreparedScene(bool aIncludingOverride)
 
 void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply)
 {
-  if (preparedScene) {
-    DsScenePtr scene = preparedScene;
+  if (mPreparedScene) {
+    DsScenePtr scene = mPreparedScene;
     // apply scene logically
-    if (output->applySceneToChannels(scene, preparedTransitionOverride)) {
+    if (mOutput->applySceneToChannels(scene, mPreparedTransitionOverride)) {
       // prepare for apply (but do NOT yet apply!) on device hardware level)
       if (prepareSceneApply(scene)) {
         // now we can apply values to hardware
@@ -1773,7 +1773,7 @@ void Device::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndir
 void Device::sceneActionsComplete(SimpleCB aDoneCB, DsScenePtr aScene)
 {
   // scene actions are now complete
-  OLOG(LOG_INFO, "Scene actions for callScene(%s) complete -> now in final state", VdcHost::sceneText(aScene->sceneNo).c_str());
+  OLOG(LOG_INFO, "Scene actions for callScene(%s) complete -> now in final state", VdcHost::sceneText(aScene->mSceneNo).c_str());
   if (aDoneCB) aDoneCB();
 }
 
@@ -1782,8 +1782,8 @@ void Device::sceneActionsComplete(SimpleCB aDoneCB, DsScenePtr aScene)
 
 void Device::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 {
-  if (output) {
-    output->performSceneActions(aScene, aDoneCB);
+  if (mOutput) {
+    mOutput->performSceneActions(aScene, aDoneCB);
   }
   else {
     if (aDoneCB) aDoneCB(); // nothing to do
@@ -1793,8 +1793,8 @@ void Device::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 
 void Device::stopSceneActions()
 {
-  if (output) {
-    output->stopSceneActions();
+  if (mOutput) {
+    mOutput->stopSceneActions();
   }
 }
 
@@ -1817,14 +1817,14 @@ bool Device::prepareSceneApply(DsScenePtr aScene)
 void Device::undoScene(SceneNo aSceneNo)
 {
   OLOG(LOG_NOTICE, "UndoScene(%s):", VdcHost::sceneText(aSceneNo).c_str());
-  if (previousState && previousState->sceneNo==aSceneNo) {
+  if (mPreviousState && mPreviousState->mSceneNo==aSceneNo) {
     // there is an undo pseudo scene we can apply
     // scene found, now apply it to the output (if any)
-    if (output) {
+    if (mOutput) {
       // now apply the pseudo state
-      output->applySceneToChannels(previousState, Infinite); // no transition time override
+      mOutput->applySceneToChannels(mPreviousState, Infinite); // no transition time override
       // apply the values now, not dimming
-      if (prepareSceneApply(previousState)) {
+      if (prepareSceneApply(mPreviousState)) {
         requestApplyingChannels(NULL, false);
       }
     }
@@ -1834,14 +1834,14 @@ void Device::undoScene(SceneNo aSceneNo)
 
 void Device::setLocalPriority(SceneNo aSceneNo)
 {
-  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
   if (scenes) {
     OLOG(LOG_NOTICE, "SetLocalPriority(%s):", VdcHost::sceneText(aSceneNo).c_str());
     // we have a device-wide scene table, get the scene object
     DsScenePtr scene = scenes->getScene(aSceneNo);
     if (scene && !scene->isDontCare()) {
       LOG(LOG_DEBUG, "- setLocalPriority(%d): localPriority set", aSceneNo);
-      output->setLocalPriority(true);
+      mOutput->setLocalPriority(true);
     }
   }
 }
@@ -1849,14 +1849,14 @@ void Device::setLocalPriority(SceneNo aSceneNo)
 
 void Device::callSceneMin(SceneNo aSceneNo)
 {
-  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
   if (scenes) {
     OLOG(LOG_NOTICE, "CallSceneMin(%s):", VdcHost::sceneText(aSceneNo).c_str());
     // we have a device-wide scene table, get the scene object
     DsScenePtr scene = scenes->getScene(aSceneNo);
     if (scene && !scene->isDontCare()) {
-      if (output) {
-        output->onAtMinBrightness(scene);
+      if (mOutput) {
+        mOutput->onAtMinBrightness(scene);
         // apply the values now, not dimming
         if (prepareSceneApply(scene)) {
           requestApplyingChannels(NULL, false);
@@ -1870,7 +1870,7 @@ void Device::callSceneMin(SceneNo aSceneNo)
 void Device::identifyToUser()
 {
   if (canIdentifyToUser()) {
-    output->identifyToUser(); // pass on to behaviour by default
+    mOutput->identifyToUser(); // pass on to behaviour by default
   }
   else {
     inherited::identifyToUser();
@@ -1880,7 +1880,7 @@ void Device::identifyToUser()
 
 bool Device::canIdentifyToUser()
 {
-  return output && output->canIdentifyToUser();
+  return mOutput && mOutput->canIdentifyToUser();
 }
 
 
@@ -1888,15 +1888,15 @@ void Device::saveScene(SceneNo aSceneNo)
 {
   // see if we have a scene table at all
   OLOG(LOG_NOTICE, "SaveScene(%s)", VdcHost::sceneText(aSceneNo).c_str());
-  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
   if (scenes) {
     // we have a device-wide scene table, get the scene object
     DsScenePtr scene = scenes->getScene(aSceneNo);
     if (scene) {
       // scene found, now capture to all of our outputs
-      if (output) {
+      if (mOutput) {
         // capture value from this output, reading from device (if possible) to catch e.g. color changes applied via external means (hue remote app etc.)
-        output->captureScene(scene, true, boost::bind(&Device::outputSceneValueSaved, this, scene));
+        mOutput->captureScene(scene, true, boost::bind(&Device::outputSceneValueSaved, this, scene));
       }
     }
   }
@@ -1906,19 +1906,19 @@ void Device::saveScene(SceneNo aSceneNo)
 void Device::outputSceneValueSaved(DsScenePtr aScene)
 {
   // Check special area scene case: dontCare need to be updated depending on brightness (if zero, set don't care)
-  SceneNo sceneNo = aScene->sceneNo;
-  int area = aScene->sceneArea;
+  SceneNo sceneNo = aScene->mSceneNo;
+  int area = aScene->mSceneArea;
   if (area) {
     // detail check - set don't care when saving Area On-Scene
     if (sceneNo==mainSceneForArea(area)) {
       // saving Main ON scene - set dontCare flag when main/default channel is zero, otherwise clear dontCare
-      ChannelBehaviourPtr ch = output->getChannelByType(channeltype_default);
+      ChannelBehaviourPtr ch = mOutput->getChannelByType(channeltype_default);
       if (ch) {
         bool mustBeDontCare = ch->getChannelValue()==0;
         // update this main scene's dontCare
         aScene->setDontCare(mustBeDontCare);
         // also update the off scene's dontCare
-        SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+        SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
         DsScenePtr offScene = scenes->getScene(offSceneForArea(area));
         if (offScene) {
           offScene->setDontCare(mustBeDontCare);
@@ -1935,7 +1935,7 @@ void Device::outputSceneValueSaved(DsScenePtr aScene)
 
 void Device::updateSceneIfDirty(DsScenePtr aScene)
 {
-  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
   if (scenes && aScene->isDirty()) {
     scenes->updateScene(aScene);
   }
@@ -1946,8 +1946,8 @@ void Device::updateSceneIfDirty(DsScenePtr aScene)
 bool Device::processControlValue(const string &aName, double aValue)
 {
   // default base class behaviour is letting know the output behaviour
-  if (output) {
-    return output->processControlValue(aName, aValue);
+  if (mOutput) {
+    return mOutput->processControlValue(aName, aValue);
   }
   return false; // nothing to process
 }
@@ -1961,20 +1961,20 @@ ErrorPtr Device::load()
 {
   ErrorPtr err;
   // if we don't have device settings at this point (created by subclass), this is a misconfigured device!
-  if (!deviceSettings) {
+  if (!mDeviceSettings) {
     OLOG(LOG_ERR, "***** no settings at load() time! -> probably misconfigured");
     return WebError::webErr(500,"missing settings");
   }
   // load the device settings
-  if (deviceSettings) {
-    err = deviceSettings->loadFromStore(dSUID.getString().c_str());
+  if (mDeviceSettings) {
+    err = mDeviceSettings->loadFromStore(dSUID.getString().c_str());
     if (Error::notOK(err)) OLOG(LOG_ERR,"Error loading settings: %s", err->text());
   }
   // load the behaviours
-  for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->load();
-  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->load();
-  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->load();
-  if (output) output->load();
+  for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) (*pos)->load();
+  for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) (*pos)->load();
+  for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) (*pos)->load();
+  if (mOutput) mOutput->load();
   // load settings from files
   #if ENABLE_SETTINGS_FROM_FILES
   loadSettingsFromFiles();
@@ -1987,13 +1987,13 @@ ErrorPtr Device::save()
 {
   ErrorPtr err;
   // save the device settings
-  if (deviceSettings) err = deviceSettings->saveToStore(dSUID.getString().c_str(), false); // only one record per device
+  if (mDeviceSettings) err = mDeviceSettings->saveToStore(dSUID.getString().c_str(), false); // only one record per device
   if (Error::notOK(err)) OLOG(LOG_ERR,"Error saving settings: %s", err->text());
   // save the behaviours
-  for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->save();
-  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->save();
-  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->save();
-  if (output) output->save();
+  for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) (*pos)->save();
+  for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) (*pos)->save();
+  for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) (*pos)->save();
+  if (mOutput) mOutput->save();
   return ErrorPtr();
 }
 
@@ -2001,11 +2001,11 @@ ErrorPtr Device::save()
 bool Device::isDirty()
 {
   // check the device settings
-  if (deviceSettings && deviceSettings->isDirty()) return true;
-  for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) if ((*pos)->isDirty()) return true;
-  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) if ((*pos)->isDirty()) return true;
-  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) if ((*pos)->isDirty()) return true;
-  if (output && output->isDirty()) return true;
+  if (mDeviceSettings && mDeviceSettings->isDirty()) return true;
+  for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) if ((*pos)->isDirty()) return true;
+  for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) if ((*pos)->isDirty()) return true;
+  for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) if ((*pos)->isDirty()) return true;
+  if (mOutput && mOutput->isDirty()) return true;
   return false;
 }
 
@@ -2013,23 +2013,23 @@ bool Device::isDirty()
 void Device::markClean()
 {
   // check the device settings
-  if (deviceSettings) deviceSettings->markClean();
-  for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->markClean();
-  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->markClean();
-  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->markClean();
-  if (output) output->markClean();
+  if (mDeviceSettings) mDeviceSettings->markClean();
+  for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) (*pos)->markClean();
+  for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) (*pos)->markClean();
+  for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) (*pos)->markClean();
+  if (mOutput) mOutput->markClean();
 }
 
 
 ErrorPtr Device::forget()
 {
   // delete the device settings
-  if (deviceSettings) deviceSettings->deleteFromStore();
+  if (mDeviceSettings) mDeviceSettings->deleteFromStore();
   // delete the behaviours
-  for (BehaviourVector::iterator pos = buttons.begin(); pos!=buttons.end(); ++pos) (*pos)->forget();
-  for (BehaviourVector::iterator pos = inputs.begin(); pos!=inputs.end(); ++pos) (*pos)->forget();
-  for (BehaviourVector::iterator pos = sensors.begin(); pos!=sensors.end(); ++pos) (*pos)->forget();
-  if (output) output->forget();
+  for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) (*pos)->forget();
+  for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) (*pos)->forget();
+  for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) (*pos)->forget();
+  if (mOutput) mOutput->forget();
   return ErrorPtr();
 }
 
@@ -2050,12 +2050,12 @@ void Device::loadSettingsFromFiles()
   levelids[0] = "vdsd_" + getDsUid().getString();
   levelids[1] = string_format("%s_%d_class", deviceClass().c_str(), deviceClassVersion());
   levelids[2] = string_format("%s_device", deviceTypeIdentifier().c_str());
-  levelids[3] = vdcP->vdcClassIdentifier();
+  levelids[3] = mVdcP->vdcClassIdentifier();
   for(int i=0; i<numLevels; ++i) {
     // try to open config file
     string fn = dir+"devicesettings_"+levelids[i]+".csv";
     // if device has already stored properties, only explicitly marked properties will be applied
-    if (loadSettingsFromFile(fn.c_str(), deviceSettings->rowid!=0)) markClean();
+    if (loadSettingsFromFile(fn.c_str(), mDeviceSettings->rowid!=0)) markClean();
   }
 }
 
@@ -2122,22 +2122,22 @@ int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
     return numModelFeatures;
   }
   else if (aParentDescriptor->hasObjectKey(device_buttons_key)) {
-    return (int)buttons.size();
+    return (int)mButtons.size();
   }
   else if (aParentDescriptor->hasObjectKey(device_inputs_key)) {
-    return (int)inputs.size();
+    return (int)mInputs.size();
   }
   else if (aParentDescriptor->hasObjectKey(device_sensors_key)) {
-    return (int)sensors.size();
+    return (int)mSensors.size();
   }
   else if (aParentDescriptor->hasObjectKey(device_channels_key)) {
     return numChannels(); // if no output, this returns 0
   }
   else if (aParentDescriptor->hasObjectKey(device_configurations_key)) {
-    return (int)cachedConfigurations.size();
+    return (int)mCachedConfigurations.size();
   }
   else if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
-    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
     if (scenes)
       return INVALID_SCENE_NO;
     else
@@ -2213,13 +2213,13 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     // accessing one of the other containers: channels, buttons/inputs/sensors, scenes or configurations
     string id;
     if (aParentDescriptor->hasObjectKey(device_buttons_key)) {
-      id = buttons[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
+      id = mButtons[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_inputs_key)) {
-      id = inputs[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
+      id = mInputs[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_sensors_key)) {
-      id = sensors[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
+      id = mSensors[aPropIndex]->getApiId(aParentDescriptor->getApiVersion());
     }
     else if (aParentDescriptor->hasObjectKey(device_channels_key)) {
       id = getChannelByIndex(aPropIndex)->getApiId(aParentDescriptor->getApiVersion());
@@ -2229,7 +2229,7 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
       id = string_format("%d", aPropIndex);
     }
     else if (aParentDescriptor->hasObjectKey(device_configurations_key)) {
-      id = cachedConfigurations[aPropIndex]->getId();
+      id = mCachedConfigurations[aPropIndex]->getId();
     }
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
     descP->propertyName = id;
@@ -2272,8 +2272,8 @@ PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStart
     aParentDescriptor->hasObjectKey(device_channels_key) &&
     aStartIndex==0 &&
     aPropMatch=="0" &&
-    output &&
-    output->numChannels()>0
+    mOutput &&
+    mOutput->numChannels()>0
   ) {
     // special case for backwards compatibility: channel with id "0" is the default (first) channel
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
@@ -2300,37 +2300,37 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aProperty
   }
   // containers are elements from the behaviour arrays
   else if (aPropertyDescriptor->hasObjectKey(device_buttons_key)) {
-    return buttons[aPropertyDescriptor->fieldKey()];
+    return mButtons[aPropertyDescriptor->fieldKey()];
   }
   else if (aPropertyDescriptor->hasObjectKey(device_inputs_key)) {
-    return inputs[aPropertyDescriptor->fieldKey()];
+    return mInputs[aPropertyDescriptor->fieldKey()];
   }
   else if (aPropertyDescriptor->hasObjectKey(device_sensors_key)) {
-    return sensors[aPropertyDescriptor->fieldKey()];
+    return mSensors[aPropertyDescriptor->fieldKey()];
   }
   else if (aPropertyDescriptor->hasObjectKey(device_channels_key)) {
-    if (!output) return PropertyContainerPtr(); // none
-    return output->getChannelByIndex((int)aPropertyDescriptor->fieldKey());
+    if (!mOutput) return PropertyContainerPtr(); // none
+    return mOutput->getChannelByIndex((int)aPropertyDescriptor->fieldKey());
   }
   else if (aPropertyDescriptor->hasObjectKey(device_scenes_key)) {
-    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
     if (scenes) {
       return scenes->getScene(aPropertyDescriptor->fieldKey());
     }
   }
   else if (aPropertyDescriptor->hasObjectKey(device_output_key)) {
-    if (output && output->numDescProps()>0) {
-      return output;
+    if (mOutput && mOutput->numDescProps()>0) {
+      return mOutput;
     }
     return NULL; // no output or special output with no standard properties (e.g. actionOutput)
   }
   else if (aPropertyDescriptor->hasObjectKey(device_configurations_key)) {
-    return cachedConfigurations[aPropertyDescriptor->fieldKey()];
+    return mCachedConfigurations[aPropertyDescriptor->fieldKey()];
   }
   else if (aPropertyDescriptor->hasObjectKey(device_obj)) {
     // device level object properties
     if (aPropertyDescriptor->fieldKey()==undoState_key) {
-      return previousState;
+      return mPreviousState;
     }
   }
   // unknown here
@@ -2343,7 +2343,7 @@ void Device::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aProp
 {
   if (aPropertyDescriptor->hasObjectKey(device_configurations_key)) {
     // have device create these
-    getDeviceConfigurations(cachedConfigurations, aPreparedCB);
+    getDeviceConfigurations(mCachedConfigurations, aPreparedCB);
     return;
   }
   // nothing to do here, let inherited handle it
@@ -2355,7 +2355,7 @@ void Device::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPrope
 {
   if (aPropertyDescriptor->hasObjectKey(device_configurations_key)) {
     // we dont need these any more
-    cachedConfigurations.clear();
+    mCachedConfigurations.clear();
   }
 }
 
@@ -2373,7 +2373,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
         case zoneID_key:
           aPropValue->setUint16Value(getZoneID()); return true;
         case progMode_key:
-          aPropValue->setBoolValue(progMode); return true;
+          aPropValue->setBoolValue(mProgMode); return true;
         case implementationId_key:
           aPropValue->setStringValue(deviceTypeIdentifier()); return true;
         case deviceClass_key:
@@ -2396,7 +2396,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           setZoneID(aPropValue->int32Value());
           return true;
         case progMode_key:
-          progMode = aPropValue->boolValue();
+          mProgMode = aPropValue->boolValue();
           return true;
       }
     }
@@ -2423,7 +2423,7 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
   if (aPropertyDescriptor->hasObjectKey(device_scenes_key)) {
     // a scene was written, update needed if dirty
     DsScenePtr scene = boost::dynamic_pointer_cast<DsScene>(aContainer);
-    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings);
+    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
     if (scenes && scene && scene->isDirty()) {
       scenes->updateScene(scene);
       return ErrorPtr();
@@ -2435,7 +2435,7 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
     aMode==access_write // ...got a non-preload write
   ) {
     // apply new channel values to hardware, not dimming
-    vdcP->cancelNativeActionUpdate(); // still delayed native scene updates must be cancelled before changing channel values
+    mVdcP->cancelNativeActionUpdate(); // still delayed native scene updates must be cancelled before changing channel values
     requestApplyingChannels(NULL, false);
   }
   return inherited::writtenProperty(aMode, aPropertyDescriptor, aDomain, aContainer);
@@ -2448,9 +2448,9 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
 string Device::description()
 {
   string s = inherited::description(); // DsAdressable
-  if (buttons.size()>0) string_format_append(s, "\n- Buttons: %lu", buttons.size());
-  if (inputs.size()>0) string_format_append(s, "\n- Binary Inputs: %lu", inputs.size());
-  if (sensors.size()>0) string_format_append(s, "\n- Sensors: %lu", sensors.size());
+  if (mButtons.size()>0) string_format_append(s, "\n- Buttons: %lu", mButtons.size());
+  if (mInputs.size()>0) string_format_append(s, "\n- Binary Inputs: %lu", mInputs.size());
+  if (mSensors.size()>0) string_format_append(s, "\n- Sensors: %lu", mSensors.size());
   if (numChannels()>0) string_format_append(s, "\n- Output Channels: %d", numChannels());
   return s;
 }
@@ -2459,14 +2459,14 @@ string Device::description()
 string Device::getStatusText()
 {
   string s;
-  if (output) {
-    s = output->getStatusText();
+  if (mOutput) {
+    s = mOutput->getStatusText();
   }
-  if (s.empty() && sensors.size()>0) {
-    s = sensors[0]->getStatusText();
+  if (s.empty() && mSensors.size()>0) {
+    s = mSensors[0]->getStatusText();
   }
-  if (s.empty() && inputs.size()>0) {
-    s = inputs[0]->getStatusText();
+  if (s.empty() && mInputs.size()>0) {
+    s = mInputs[0]->getStatusText();
   }
   return s;
 }
@@ -2485,11 +2485,11 @@ ScriptObjPtr Device::newDeviceObj()
 
 ScriptMainContextPtr Device::getDeviceScriptContext()
 {
-  if (!deviceScriptContext) {
+  if (!mDeviceScriptContext) {
     // create on demand, such that only devices actually using scripts get a context
-    deviceScriptContext = StandardScriptingDomain::sharedDomain().newContext(newDeviceObj());
+    mDeviceScriptContext = StandardScriptingDomain::sharedDomain().newContext(newDeviceObj());
   }
-  return deviceScriptContext;
+  return mDeviceScriptContext;
 }
 
 

@@ -40,32 +40,32 @@ namespace p44 {
     friend class SceneScriptContext;
 
     /// channels
-    ChannelBehaviourVector channels;
+    ChannelBehaviourVector mChannels;
 
   protected:
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
-    VdcOutputFunction outputFunction; ///< the function of the output
-    VdcUsageHint outputUsage; ///< the input type when device has hardwired functions
-    VdcOutputMode defaultOutputMode; ///< the default mode of the output - this mode ist used when outputMode is set to outputmode_default
-    bool variableRamp; ///< output has variable ramp times
-    double maxPower; ///< max power in Watts the output can control
+    VdcOutputFunction mOutputFunction; ///< the function of the output
+    VdcUsageHint mOutputUsage; ///< the input type when device has hardwired functions
+    VdcOutputMode mDefaultOutputMode; ///< the default mode of the output - this mode ist used when outputMode is set to outputmode_default
+    bool mVariableRamp; ///< output has variable ramp times
+    double mMaxPower; ///< max power in Watts the output can control
     /// @}
 
 
     /// @name persistent settings
     /// @{
-    VdcOutputMode outputMode; ///< the mode of the output. Can be outputmode_default to have device to use its preferred (or only possible) mode
-    bool pushChanges; ///< if set, local changes to output will be pushed upstreams
-    DsGroupMask outputGroups; ///< mask for group memberships (0..63)
+    VdcOutputMode mOutputMode; ///< the mode of the output. Can be outputmode_default to have device to use its preferred (or only possible) mode
+    bool mPushChanges; ///< if set, local changes to output will be pushed upstreams
+    DsGroupMask mOutputGroups; ///< mask for group memberships (0..63)
     /// @}
 
 
     /// @name internal volatile state
     /// @{
-    bool localPriority; ///< if set device is in local priority mode
-    MLMicroSeconds transitionTime; ///< default transition time when changing this output
+    bool mLocalPriority; ///< if set device is in local priority mode
+    MLMicroSeconds mTransitionTime; ///< default transition time when changing this output
     /// @}
 
   public:
@@ -118,13 +118,13 @@ namespace p44 {
     void setHardwareOutputConfig(VdcOutputFunction aOutputFunction, VdcOutputMode aDefaultOutputMode, VdcUsageHint aUsage, bool aVariableRamp, double aMaxPower);
 
     /// @param aLocalPriority true to set local priority mode, false to clear it
-    void setLocalPriority(bool aLocalPriority) { localPriority = aLocalPriority; };
+    void setLocalPriority(bool aLocalPriority) { mLocalPriority = aLocalPriority; };
 
     /// @return true if device is in local priority mode
-    bool hasLocalPriority() { return localPriority; };
+    bool hasLocalPriority() { return mLocalPriority; };
 
     /// @return true if output is enabled
-    bool isEnabled() { return outputMode!=outputmode_disabled; };
+    bool isEnabled() { return mOutputMode!=outputmode_disabled; };
 
     /// set new output mode
     /// @param aOutputMode new output mode (including outputmode_disabled, and outputmode_default to generically enable)
@@ -132,7 +132,7 @@ namespace p44 {
     virtual void setOutputMode(VdcOutputMode aOutputMode);
 
     /// @return output functionality the hardware provides
-    VdcOutputFunction getOutputFunction() { return outputFunction; };
+    VdcOutputFunction getOutputFunction() { return mOutputFunction; };
 
     /// Apply output-mode specific output value transformation
     /// @param aChannelValue channel value
@@ -161,7 +161,7 @@ namespace p44 {
 
     /// get group membership bits
     /// @return mask of bits, set bit numbers corresponds to DsGroup numbers the output is member of
-    DsGroupMask groupMemberships() const { return outputGroups; };
+    DsGroupMask groupMemberships() const { return mOutputGroups; };
 
     /// set group membership
     /// @param aGroup group number to set or remove

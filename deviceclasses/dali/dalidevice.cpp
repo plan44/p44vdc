@@ -1193,7 +1193,7 @@ DaliOutputDevice::DaliOutputDevice(DaliVdc *aVdcP) :
 
 DaliVdc &DaliOutputDevice::daliVdc()
 {
-  return *(static_cast<DaliVdc *>(vdcP));
+  return *(static_cast<DaliVdc *>(mVdcP));
 }
 
 
@@ -1602,7 +1602,7 @@ bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStat
   else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
     // only brightness dimming optimizable for now
     // TODO: extend to also optimize DT8 channels dimming
-    return currentDimChannel && currentDimChannel->getChannelType()==channeltype_brightness;
+    return mCurrentDimChannel && mCurrentDimChannel->getChannelType()==channeltype_brightness;
   }
   return false;
 }
@@ -2225,7 +2225,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   // create behaviours
   if (inputType==input_button) {
     // Simple single button device
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // - standard device settings without scene table
     installSettings();
     // - create one button input
@@ -2238,7 +2238,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   else if (inputType==input_rocker) {
     // Two-way Rocker Button device
     numAddresses = 2;
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // - standard device settings without scene table
     installSettings();
     // - create down button (index 0)
@@ -2256,7 +2256,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   }
   else if (inputType==input_motion) {
     // Standard device settings without scene table
-    colorClass = class_red_security;
+    mColorClass = class_red_security;
     installSettings();
     // - create one binary input
     BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
@@ -2266,7 +2266,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   }
   else if (inputType==input_illumination) {
     // Standard device settings without scene table
-    colorClass = class_yellow_light;
+    mColorClass = class_yellow_light;
     installSettings();
     // - create one binary input
     BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
@@ -2276,7 +2276,7 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   }
   else if (inputType==input_bistable || inputType==input_pulse) {
     // Standard device settings without scene table
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     installSettings();
     // - create one binary input
     BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
@@ -2313,7 +2313,7 @@ bool DaliInputDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 DaliVdc &DaliInputDevice::daliVdc()
 {
-  return *(static_cast<DaliVdc *>(vdcP));
+  return *(static_cast<DaliVdc *>(mVdcP));
 }
 
 
@@ -2544,7 +2544,7 @@ void DaliInputDevice::deriveDsUid()
   // vDC implementation specific UUID:
   //   UUIDv5 with name = classcontainerinstanceid::baseAddress:inputType
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s = vdcP->vdcInstanceIdentifier();
+  string s = mVdcP->vdcInstanceIdentifier();
   string_format_append(s, "::%u:%u", baseAddress, inputType);
   dSUID.setNameInSpace(s, vdcNamespace);
 }

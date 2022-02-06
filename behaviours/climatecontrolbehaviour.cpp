@@ -44,50 +44,50 @@ void ClimateControlScene::setDefaultSceneValues(SceneNo aSceneNo)
     case CLIMATE_HEAT_TEMP_COMFORT:
     case CLIMATE_HEAT_TEMP_ECO:
     case CLIMATE_HEAT_TEMP_NIGHT:
-      sceneCmd = scene_cmd_climatecontrol_mode_heating;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_mode_heating;
+      mSceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_HEAT_TEMP_NOTUSED:
     case CLIMATE_HEAT_TEMP_HOLIDAY:
-      sceneCmd = scene_cmd_climatecontrol_mode_protective_heating;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_mode_protective_heating;
+      mSceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_COOL_TEMP_OFF:
     case CLIMATE_COOL_TEMP_COMFORT:
     case CLIMATE_COOL_TEMP_ECO:
     case CLIMATE_COOL_TEMP_NIGHT:
-      sceneCmd = scene_cmd_climatecontrol_mode_cooling;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_mode_cooling;
+      mSceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_COOL_TEMP_NOTUSED:
     case CLIMATE_COOL_TEMP_HOLIDAY:
-      sceneCmd = scene_cmd_climatecontrol_mode_protective_cooling;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_mode_protective_cooling;
+      mSceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_COOL_PASSIVE_ON:
     case CLIMATE_COOL_PASSIVE_OFF:
-      sceneCmd = scene_cmd_climatecontrol_mode_passive_cooling;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_mode_passive_cooling;
+      mSceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_ENABLE:
-      sceneCmd = scene_cmd_climatecontrol_enable;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_enable;
+      mSceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_DISABLE:
-      sceneCmd = scene_cmd_climatecontrol_disable;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_disable;
+      mSceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_VALVE_PROPHYLAXIS:
-      sceneCmd = scene_cmd_climatecontrol_valve_prophylaxis;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_valve_prophylaxis;
+      mSceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_VALVE_OPEN:
-      sceneCmd = scene_cmd_climatecontrol_valve_service_open;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_valve_service_open;
+      mSceneArea = 0; // not an area scene any more
       break;
     case CLIMATE_VALVE_CLOSE:
-      sceneCmd = scene_cmd_climatecontrol_valve_service_close;
-      sceneArea = 0; // not an area scene any more
+      mSceneCmd = scene_cmd_climatecontrol_valve_service_close;
+      mSceneArea = 0; // not an area scene any more
       break;
     default:
       break;
@@ -138,16 +138,16 @@ void FanCoilUnitScene::setDefaultSceneValues(SceneNo aSceneNo)
       // heating off
       powerState = powerState_off;
       operationMode = fcuOperatingMode_heat;
-      sceneCmd = scene_cmd_off;
+      mSceneCmd = scene_cmd_off;
       break;
     case CLIMATE_HEAT_TEMP_COMFORT:
     case CLIMATE_HEAT_TEMP_ECO:
     case CLIMATE_HEAT_TEMP_NIGHT:
-      sceneCmd = scene_cmd_climatecontrol_mode_heating;
+      mSceneCmd = scene_cmd_climatecontrol_mode_heating;
       goto heating;
     case CLIMATE_HEAT_TEMP_NOTUSED:
     case CLIMATE_HEAT_TEMP_HOLIDAY:
-      sceneCmd = scene_cmd_climatecontrol_mode_protective_heating;
+      mSceneCmd = scene_cmd_climatecontrol_mode_protective_heating;
     heating:
       // heating on
       powerState = powerState_on;
@@ -157,16 +157,16 @@ void FanCoilUnitScene::setDefaultSceneValues(SceneNo aSceneNo)
       // cooling off
       powerState = powerState_off;
       operationMode = fcuOperatingMode_cool;
-      sceneCmd = scene_cmd_off;
+      mSceneCmd = scene_cmd_off;
       break;
     case CLIMATE_COOL_TEMP_COMFORT:
     case CLIMATE_COOL_TEMP_ECO:
     case CLIMATE_COOL_TEMP_NIGHT:
-      sceneCmd = scene_cmd_climatecontrol_mode_cooling;
+      mSceneCmd = scene_cmd_climatecontrol_mode_cooling;
       goto cooling;
     case CLIMATE_COOL_TEMP_NOTUSED:
     case CLIMATE_COOL_TEMP_HOLIDAY:
-      sceneCmd = scene_cmd_climatecontrol_mode_protective_cooling;
+      mSceneCmd = scene_cmd_climatecontrol_mode_protective_cooling;
     cooling:
       // cooling on
       powerState = powerState_on;
@@ -175,7 +175,7 @@ void FanCoilUnitScene::setDefaultSceneValues(SceneNo aSceneNo)
     case CLIMATE_DISABLE:
       powerState = powerState_off;
       operationMode = fcuOperatingMode_off;
-      sceneCmd = scene_cmd_off;
+      mSceneCmd = scene_cmd_off;
       break;
     case CLIMATE_FAN_ONLY:
       powerState = powerState_on;
@@ -365,7 +365,7 @@ bool ClimateControlBehaviour::processControlValue(const string &aName, double aV
             break;
         }
         // adapt to hardware capabilities
-        if (outputFunction!=outputFunction_bipolar_positional) {
+        if (mOutputFunction!=outputFunction_bipolar_positional) {
           // non-bipolar valves can only handle positive values, even for cooling
           aValue = fabs(aValue);
         }
@@ -399,7 +399,7 @@ bool ClimateControlBehaviour::checkForcedOffWake()
       if (forcedOffWakeMode*temp < forcedOffWakeMode*setpoint) {
         // need to wake the device from powerState_forcedOff
         OLOG(LOG_NOTICE, "waking FCU from forced off mode by applying scene #%d - because in a protective mode and temperature requires action", forceOffWakeSceneNo);
-        DsScenePtr wakeScene = device.getScenes()->getScene(forceOffWakeSceneNo);
+        DsScenePtr wakeScene = mDevice.getScenes()->getScene(forceOffWakeSceneNo);
         if (wakeScene) {
           // bypass our local implementation, just invoke
           return inherited::performApplySceneToChannels(wakeScene, scene_cmd_invoke);
@@ -573,14 +573,14 @@ bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene, Sce
         // enables waking from powerState_forcedOff when temperature falls below set point
         OLOG(LOG_INFO, "Entering protective heating mode - wake on temperature drop enabled");
         forcedOffWakeMode = 1;
-        forceOffWakeSceneNo = aScene->sceneNo;
+        forceOffWakeSceneNo = aScene->mSceneNo;
         aSceneCmd = scene_cmd_invoke;
         break;
       case scene_cmd_climatecontrol_mode_protective_cooling:
         // enables waking from powerState_forcedOff when temperature rises above set point
         OLOG(LOG_INFO, "Entering protective cooling mode - wake on temperature rise enabled");
         forcedOffWakeMode = -1;
-        forceOffWakeSceneNo = aScene->sceneNo;
+        forceOffWakeSceneNo = aScene->mSceneNo;
         aSceneCmd = scene_cmd_invoke; // otherwise, treat like invoke
         break;
       case scene_cmd_climatecontrol_mode_heating:

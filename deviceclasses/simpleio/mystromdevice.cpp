@@ -71,7 +71,7 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   // configure device now
   if (isLight) {
     // light device
-    colorClass = class_yellow_light;
+    mColorClass = class_yellow_light;
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
     LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
     l->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
@@ -80,7 +80,7 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   }
   else {
     // general purpose relay
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
     o->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
@@ -269,7 +269,7 @@ void MyStromDevice::deriveDsUid()
   // vDC implementation specific UUID:
   //   UUIDv5 with name = classcontainerinstanceid::mystromhost_xxxx where xxxx=IP address or host name
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s = vdcP->vdcInstanceIdentifier();
+  string s = mVdcP->vdcInstanceIdentifier();
   s += "::mystromhost_" + deviceHostName;
   dSUID.setNameInSpace(s, vdcNamespace);
 }

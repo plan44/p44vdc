@@ -57,7 +57,7 @@ bool StaticDevice::isSoftwareDisconnectable()
 
 StaticVdc &StaticDevice::getStaticVdc()
 {
-  return *(static_cast<StaticVdc *>(vdcP));
+  return *(static_cast<StaticVdc *>(mVdcP));
 }
 
 

@@ -190,7 +190,7 @@ void VideoScene::setDefaultSceneValues(SceneNo aSceneNo)
   // set the common simple scene defaults
   inherited::setDefaultSceneValues(aSceneNo);
   // Add special video scene behaviour
-  effect = scene_effect_none; // no smooth transitions
+  mEffect = scene_effect_none; // no smooth transitions
   bool psi = true; // default: ignore power state
   bool sci = true; // default: ignore content source
   bool voli = true; // default:ignore volume
@@ -205,8 +205,8 @@ void VideoScene::setDefaultSceneValues(SceneNo aSceneNo)
   switch (aSceneNo) {
     case AUTO_OFF :
       voli = false; // apply zero volume
-      effect = scene_effect_transition; // transition...
-      effectParam = 30*Minute; // ...of 30min
+      mEffect = scene_effect_transition; // transition...
+      mEffectParam = 30*Minute; // ...of 30min
       break;
     case ROOM_OFF :
     case PRESET_OFF_10:
@@ -233,30 +233,30 @@ void VideoScene::setDefaultSceneValues(SceneNo aSceneNo)
     case MIN_S :
     case MAX_S :
       voli = false;
-      globalSceneFlags |= videoflags_fixvol;
+      mGlobalSceneFlags |= videoflags_fixvol;
       break;
     // group related scenes
-    case AUDIO_PREV_TITLE: voli = true; sceneCmd = scene_cmd_audio_previous_title; break;
-    case AUDIO_NEXT_TITLE: voli = true; sceneCmd = scene_cmd_audio_next_title; break;
-    case AUDIO_PREV_CHANNEL: voli = true; sceneCmd = scene_cmd_audio_previous_channel; break;
-    case AUDIO_NEXT_CHANNEL: voli = true; sceneCmd = scene_cmd_audio_next_channel; break;
+    case AUDIO_PREV_TITLE: voli = true; mSceneCmd = scene_cmd_audio_previous_title; break;
+    case AUDIO_NEXT_TITLE: voli = true; mSceneCmd = scene_cmd_audio_next_title; break;
+    case AUDIO_PREV_CHANNEL: voli = true; mSceneCmd = scene_cmd_audio_previous_channel; break;
+    case AUDIO_NEXT_CHANNEL: voli = true; mSceneCmd = scene_cmd_audio_next_channel; break;
     case AUDIO_MUTE:
-      sceneCmd = scene_cmd_audio_mute;
+      mSceneCmd = scene_cmd_audio_mute;
       value = 0;
       voli = false;
-      globalSceneFlags |= videoflags_fixvol;
+      mGlobalSceneFlags |= videoflags_fixvol;
       psi = true;
       break;
-    case AUDIO_UNMUTE: sceneCmd = scene_cmd_audio_unmute; break;
-    case AUDIO_PLAY: sceneCmd = scene_cmd_audio_play; break;
-    case AUDIO_PAUSE: sceneCmd = scene_cmd_audio_pause; break;
-    case AUDIO_SHUFFLE_OFF: sceneCmd = scene_cmd_audio_shuffle_off; break;
-    case AUDIO_SHUFFLE_ON: sceneCmd = scene_cmd_audio_shuffle_on; break;
-    case AUDIO_RESUME_OFF: sceneCmd = scene_cmd_audio_resume_off; break;
-    case AUDIO_RESUME_ON: sceneCmd = scene_cmd_audio_resume_on; break;
+    case AUDIO_UNMUTE: mSceneCmd = scene_cmd_audio_unmute; break;
+    case AUDIO_PLAY: mSceneCmd = scene_cmd_audio_play; break;
+    case AUDIO_PAUSE: mSceneCmd = scene_cmd_audio_pause; break;
+    case AUDIO_SHUFFLE_OFF: mSceneCmd = scene_cmd_audio_shuffle_off; break;
+    case AUDIO_SHUFFLE_ON: mSceneCmd = scene_cmd_audio_shuffle_on; break;
+    case AUDIO_RESUME_OFF: mSceneCmd = scene_cmd_audio_resume_off; break;
+    case AUDIO_RESUME_ON: mSceneCmd = scene_cmd_audio_resume_on; break;
     // group independent scenes
     case PANIC:
-      globalSceneFlags |= videoflags_message;
+      mGlobalSceneFlags |= videoflags_message;
       powerState = powerState_on;
       psi = false;
       voli = true;
@@ -283,7 +283,7 @@ void VideoScene::setDefaultSceneValues(SceneNo aSceneNo)
     case GAS:
     case HAIL:
       voli = true; // messages (if possible) are visual, so no volume change!
-      globalSceneFlags |= videoflags_message;
+      mGlobalSceneFlags |= videoflags_message;
       break;
   }
   // in general, power state follows actively set volume
@@ -292,7 +292,7 @@ void VideoScene::setDefaultSceneValues(SceneNo aSceneNo)
     psi = false;
     // fixvol for mute scenes
     if (value==0) {
-      globalSceneFlags |= videoflags_fixvol;
+      mGlobalSceneFlags |= videoflags_fixvol;
     }
   }
   // adjust per-channel dontcare
@@ -329,7 +329,7 @@ void VideoDeviceSettings::dumpDefaultScenes()
     string_format_append(s, "%s\t", voli ? "1" : "-"); // VolI = volume ignore flag
     string_format_append(s, "%s\t", videoScene->hasFixVol() ? "1" : "-"); // VolF = fixvol
     string_format_append(s, "%s\t", videoScene->isMessage() ? "1" : "-"); // MM = message
-    string_format_append(s, "%.3f\t", (double)device.getOutput()->transitionTimeFromScene(videoScene, true)/Second);
+    string_format_append(s, "%.3f\t", (double)mDevice.getOutput()->transitionTimeFromScene(videoScene, true)/Second);
     if (csi) s+="-\t"; else string_format_append(s, "%d\t", (int)videoScene->sceneValue(2)); // CS = content source
     string_format_append(s, "%s\t", csi ? "1" : "-"); // CSI = content source ignore flag
     printf("%s\n", s.c_str());
@@ -345,7 +345,7 @@ void VideoDeviceSettings::dumpDefaultScenes()
 
 bool VideoScene::hasFixVol()
 {
-  return (globalSceneFlags & videoflags_fixvol)!=0;
+  return (mGlobalSceneFlags & videoflags_fixvol)!=0;
 }
 
 void VideoScene::setFixVol(bool aNewValue)
@@ -356,7 +356,7 @@ void VideoScene::setFixVol(bool aNewValue)
 
 bool VideoScene::isMessage()
 {
-  return (globalSceneFlags & videoflags_message)!=0;
+  return (mGlobalSceneFlags & videoflags_message)!=0;
 }
 
 void VideoScene::setMessage(bool aNewValue)
@@ -498,12 +498,12 @@ void VideoBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     // - powerstate
     powerState->setChannelValueIfNotDontCare(aScene, videoScene->powerState, 0, 0, false);
     // - tv station
-    station->setChannelValueIfNotDontCare(aScene, videoScene->station, 0, 0, !videoScene->command.empty()); // always apply if there is a command
+    station->setChannelValueIfNotDontCare(aScene, videoScene->station, 0, 0, !videoScene->mCommand.empty()); // always apply if there is a command
     // - tv input source
-    inputSource->setChannelValueIfNotDontCare(aScene, videoScene->inputSource, 0, 0, !videoScene->command.empty()); // always apply if there is a command
+    inputSource->setChannelValueIfNotDontCare(aScene, videoScene->inputSource, 0, 0, !videoScene->mCommand.empty()); // always apply if there is a command
     // - state restore command
-    stateRestoreCmd = videoScene->command;
-    stateRestoreCmdValid = !videoScene->command.empty(); // only non-empty command is considered valid
+    stateRestoreCmd = videoScene->mCommand;
+    stateRestoreCmdValid = !videoScene->mCommand.empty(); // only non-empty command is considered valid
   }
 }
 
@@ -523,7 +523,7 @@ void VideoBehaviour::saveChannelsToScene(DsScenePtr aScene)
     videoScene->setSceneValueFlags(inputSource->getChannelIndex(), valueflags_dontCare, false);
     // save command from scene if there is one
     if (stateRestoreCmdValid) {
-      videoScene->setPVar(videoScene->command, stateRestoreCmd);
+      videoScene->setPVar(videoScene->mCommand, stateRestoreCmd);
     }
   }
 }

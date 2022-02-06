@@ -214,7 +214,7 @@ MLMicroSeconds LightBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool a
   uint8_t dimTimeIndex = 0;
   SimpleScenePtr ssc = boost::dynamic_pointer_cast<SimpleScene>(aScene);
   if (ssc) {
-    switch (ssc->effect) {
+    switch (ssc->mEffect) {
       case scene_effect_smooth :
         dimTimeIndex = 0; break;
       case scene_effect_slow :
@@ -260,14 +260,14 @@ void LightBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 {
   // we can only handle light scenes
   LightScenePtr lightScene = boost::dynamic_pointer_cast<LightScene>(aScene);
-  if (lightScene && lightScene->effect==scene_effect_alert) {
+  if (lightScene && lightScene->mEffect==scene_effect_alert) {
     // run blink effect
     // - set defaults
     int rep = 2;
     MLMicroSeconds period = 2*Second;
     int onratio = 50;
     // - can be parametrized: effectParam!=0 -> 0xrroopppp : rr=repetitions, oo=ontime ration, pppp=period in milliseconds
-    uint32_t ep = lightScene->effectParam;
+    uint32_t ep = lightScene->mEffectParam;
     if (ep!=0) {
       rep = (ep>>24) & 0xFF;
       onratio = (ep>>16) & 0xFF;
@@ -352,10 +352,10 @@ void LightBehaviour::blink(MLMicroSeconds aDuration, LightScenePtr aParamScene, 
   // save new handler now
   blinkDoneHandler = aDoneCB;
   // check for saving current before-blink state
-  SceneDeviceSettingsPtr scenes = device.getScenes();
+  SceneDeviceSettingsPtr scenes = mDevice.getScenes();
   if (scenes && !blinkRestoreScene) {
     // device has scenes, and blink not in progress already -> capture current state
-    blinkRestoreScene = boost::dynamic_pointer_cast<LightScene>(device.getScenes()->newDefaultScene(ROOM_OFF)); // main off as template to store state
+    blinkRestoreScene = boost::dynamic_pointer_cast<LightScene>(mDevice.getScenes()->newDefaultScene(ROOM_OFF)); // main off as template to store state
     captureScene(blinkRestoreScene, false, boost::bind(&LightBehaviour::beforeBlinkStateSavedHandler, this, aDuration, aParamScene, aBlinkPeriod, aOnRatioPercent));
   }
   else {
@@ -394,7 +394,7 @@ void LightBehaviour::blinkHandler(MLMicroSeconds aEndTime, bool aState, MLMicroS
     if (blinkRestoreScene) {
       loadChannelsFromScene(blinkRestoreScene);
       blinkRestoreScene.reset();
-      device.requestApplyingChannels(NULL, false); // apply to hardware, not dimming
+      mDevice.requestApplyingChannels(NULL, false); // apply to hardware, not dimming
     }
     // done, call end handler if any
     if (blinkDoneHandler) {
@@ -415,7 +415,7 @@ void LightBehaviour::blinkHandler(MLMicroSeconds aEndTime, bool aState, MLMicroS
     brightness->markClean(); // do not save blink states
   }
   // apply to hardware
-  device.requestApplyingChannels(NULL, false); // not dimming
+  mDevice.requestApplyingChannels(NULL, false); // not dimming
   aState = !aState; // toggle
   // schedule next event
   blinkTicket.executeOnce(

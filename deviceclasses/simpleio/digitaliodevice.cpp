@@ -77,7 +77,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
   }
   // basically act as black device so we can configure colors
   if (digitalIoType==digitalio_button) {
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // Standard device settings without scene table
     installSettings();
     // Digital input as button
@@ -91,7 +91,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     addBehaviour(b);
   }
   else if (digitalIoType==digitalio_input) {
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // Standard device settings without scene table
     installSettings();
     // Digital input as binary input (AKM, automation block type)
@@ -105,7 +105,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
   }
   else if (digitalIoType==digitalio_light) {
     // Digital output as light on/off switch
-    colorClass = class_yellow_light;
+    mColorClass = class_yellow_light;
     indicatorOutput = IndicatorOutputPtr(new IndicatorOutput(ioname.c_str(), false));
     // - use light settings, which include a scene table
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
@@ -116,7 +116,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     addBehaviour(l);
   }
   else if (digitalIoType==digitalio_relay) {
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // Digital output
@@ -130,7 +130,7 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     addBehaviour(o);
   }
   else if (digitalIoType==digitalio_blind) {
-    colorClass = class_grey_shadow;
+    mColorClass = class_grey_shadow;
     installSettings(DeviceSettingsPtr(new ShadowDeviceSettings(*this)));
     blindsOutputUp = DigitalIoPtr(new DigitalIo(upName.c_str(), true, false));
     blindsOutputDown = DigitalIoPtr(new DigitalIo(downName.c_str(), true, false));
@@ -247,7 +247,7 @@ void DigitalIODevice::deriveDsUid()
   // vDC implementation specific UUID:
   //   UUIDv5 with name = classcontainerinstanceid::ioname[:ioname ...]
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s = vdcP->vdcInstanceIdentifier();
+  string s = mVdcP->vdcInstanceIdentifier();
   s += ':';
   if (buttonInput) { s += ":"; s += buttonInput->getName(); }
   if (indicatorOutput) { s += ":"; s += indicatorOutput->getName(); }

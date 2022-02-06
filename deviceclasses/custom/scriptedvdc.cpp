@@ -109,7 +109,7 @@ ScriptedDevice::ScriptedDevice(Vdc *aVdcP, const string aDefaultUniqueId, bool a
 
 ScriptedVdc &ScriptedDevice::getScriptedVdc()
 {
-  return *(static_cast<ScriptedVdc *>(vdcP));
+  return *(static_cast<ScriptedVdc *>(mVdcP));
 }
 
 

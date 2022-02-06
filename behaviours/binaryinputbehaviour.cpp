@@ -151,7 +151,7 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
   bool changedState = aNewState!=currentState;
   if (changedState) {
     // input state change is considered a (regular!) user action, have it checked globally first
-    device.getVdcHost().signalDeviceUserAction(device, true);
+    mDevice.getVdcHost().signalDeviceUserAction(mDevice, true);
     // Note: even if global identify handler processes this, still report state changes (otherwise upstream could get out of sync)
   }
   OLOG(changedState ? LOG_NOTICE : LOG_INFO, "reports %s state = %d", changedState ? "NEW" : "same", aNewState);
@@ -187,7 +187,7 @@ bool BinaryInputBehaviour::pushInput(bool aChanged)
       }
       return true;
     }
-    else if (device.isPublicDS()) {
+    else if (mDevice.isPublicDS()) {
       OLOG(LOG_NOTICE, "could not be pushed");
     }
   }
@@ -266,17 +266,17 @@ string BinaryInputBehaviour::getStatusText()
 
 string BinaryInputBehaviour::getSourceId()
 {
-  return string_format("%s_I%s", device.getDsUid().getString().c_str(), getId().c_str());
+  return string_format("%s_I%s", mDevice.getDsUid().getString().c_str(), getId().c_str());
 }
 
 
 string BinaryInputBehaviour::getSourceName()
 {
   // get device name or dSUID for context
-  string n = device.getAssignedName();
+  string n = mDevice.getAssignedName();
   if (n.empty()) {
     // use abbreviated dSUID instead
-    string d = device.getDsUid().getString();
+    string d = mDevice.getDsUid().getString();
     n = d.substr(0,8) + "..." + d.substr(d.size()-2,2);
   }
   // append behaviour description
@@ -299,7 +299,7 @@ MLMicroSeconds BinaryInputBehaviour::getSourceLastUpdate()
 
 int BinaryInputBehaviour::getSourceOpLevel()
 {
-  return device.opStateLevel();
+  return mDevice.opStateLevel();
 }
 
 

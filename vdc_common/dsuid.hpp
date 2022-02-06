@@ -81,9 +81,9 @@ namespace p44 {
 
   private:
 
-    DsUidType idType; ///< the type of ID
-    uint8_t idBytes; ///< the length of the ID in bytes
-    RawID raw; ///< the raw dSUID
+    DsUidType mIdType; ///< the type of ID
+    uint8_t mIdBytes; ///< the length of the ID in bytes
+    RawID mRaw; ///< the raw dSUID
 
     void internalInit();
 

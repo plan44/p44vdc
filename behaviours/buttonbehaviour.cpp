@@ -520,8 +520,8 @@ bool ButtonBehaviour::isLocalButtonEnabled()
 
 bool ButtonBehaviour::isOutputOn()
 {
-  if (device.getOutput()) {
-    ChannelBehaviourPtr ch = device.getOutput()->getChannelByType(channeltype_default);
+  if (mDevice.getOutput()) {
+    ChannelBehaviourPtr ch = mDevice.getOutput()->getChannelByType(channeltype_default);
     if (ch) {
       return ch->getChannelValue()>0; // on if channel is above zero
     }
@@ -547,11 +547,11 @@ void ButtonBehaviour::localSwitchOutput()
     dir = isOutputOn() ? -1 : 1;
   }
   // actually switch output
-  if (device.getOutput()) {
-    ChannelBehaviourPtr ch = device.getOutput()->getChannelByType(channeltype_default);
+  if (mDevice.getOutput()) {
+    ChannelBehaviourPtr ch = mDevice.getOutput()->getChannelByType(channeltype_default);
     if (ch) {
       ch->setChannelValue(dir>0 ? ch->getMax() : ch->getMin());
-      device.requestApplyingChannels(NULL, false);
+      mDevice.requestApplyingChannels(NULL, false);
     }
   }
   // send status
@@ -562,7 +562,7 @@ void ButtonBehaviour::localSwitchOutput()
 void ButtonBehaviour::localDim(bool aStart)
 {
   OLOG(LOG_NOTICE, "Local dim %s", aStart ? "START" : "STOP");
-  ChannelBehaviourPtr channel = device.getChannelByIndex(0); // default channel
+  ChannelBehaviourPtr channel = mDevice.getChannelByIndex(0); // default channel
   if (channel) {
     if (aStart) {
       // start dimming, determine direction (directly from two-way buttons or via toggling direction for single buttons)
@@ -572,11 +572,11 @@ void ButtonBehaviour::localDim(bool aStart)
         dimmingUp = !dimmingUp; // change direction
         dm = dimmingUp ? dimmode_up : dimmode_down;
       }
-      device.dimChannel(channel, dm, true);
+      mDevice.dimChannel(channel, dm, true);
     }
     else {
       // just stop
-      device.dimChannel(channel, dimmode_stop, true);
+      mDevice.dimChannel(channel, dimmode_stop, true);
     }
   }
 }
@@ -596,7 +596,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
   clickType = aClickType;
   actionMode = buttonActionMode_none;
   // button press is considered a (regular!) user action, have it checked globally first
-  if (!device.getVdcHost().signalDeviceUserAction(device, true)) {
+  if (!mDevice.getVdcHost().signalDeviceUserAction(mDevice, true)) {
     // button press not consumed on global level, forward to upstream dS
     OLOG(LOG_NOTICE, "pushes value = %d, clickType %d", buttonPressed, aClickType);
     // issue a state property push
@@ -612,7 +612,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     #endif
     // also let vdchost know for local click handling
     // TODO: more elegant solution for this
-    device.getVdcHost().checkForLocalClickHandling(*this, aClickType);
+    mDevice.getVdcHost().checkForLocalClickHandling(*this, aClickType);
   }
 }
 
@@ -662,17 +662,17 @@ bool ButtonBehaviour::isEnabled()
 
 string ButtonBehaviour::getSourceId()
 {
-  return string_format("%s_B%s", device.getDsUid().getString().c_str(), getId().c_str());
+  return string_format("%s_B%s", mDevice.getDsUid().getString().c_str(), getId().c_str());
 }
 
 
 string ButtonBehaviour::getSourceName()
 {
   // get device name or dSUID for context
-  string n = device.getAssignedName();
+  string n = mDevice.getAssignedName();
   if (n.empty()) {
     // use abbreviated dSUID instead
-    string d = device.getDsUid().getString();
+    string d = mDevice.getDsUid().getString();
     n = d.substr(0,8) + "..." + d.substr(d.size()-2,2);
   }
   // append behaviour description
@@ -717,7 +717,7 @@ MLMicroSeconds ButtonBehaviour::getSourceLastUpdate()
 
 int ButtonBehaviour::getSourceOpLevel()
 {
-  return device.opStateLevel();
+  return mDevice.opStateLevel();
 }
 
 #endif // ENABLE_LOCALCONTROLLER
@@ -1010,12 +1010,12 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
             // also change group in button1
             OLOG(LOG_NOTICE,"paired button group changed in button0 -> also changed in button1");
-            ButtonBehaviourPtr bb = device.getButton(1); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
+            ButtonBehaviourPtr bb = mDevice.getButton(1); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
           }
           else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
             // also change group in button0
             OLOG(LOG_NOTICE,"paired button group changed in button1 -> also changed in button0");
-            ButtonBehaviourPtr bb = device.getButton(0); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
+            ButtonBehaviourPtr bb = mDevice.getButton(0); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
           }
           return true;
         case mode_key+settings_key_offset: {
@@ -1033,12 +1033,12 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
             // also change function in button1
             OLOG(LOG_NOTICE,"paired button function changed in button0 -> also changed in button1");
-            ButtonBehaviourPtr bb = device.getButton(1); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
+            ButtonBehaviourPtr bb = mDevice.getButton(1); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
           }
           else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
             // also change function in button0
             OLOG(LOG_NOTICE,"paired button function changed in button1 -> also changed in button0");
-            ButtonBehaviourPtr bb = device.getButton(0); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
+            ButtonBehaviourPtr bb = mDevice.getButton(0); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
           }
           return true;
         case channel_key+settings_key_offset:

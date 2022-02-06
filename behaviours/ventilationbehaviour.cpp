@@ -118,7 +118,7 @@ void VentilationScene::setDefaultSceneValues(SceneNo aSceneNo)
       aSceneNo = NUMGROUPSCENES; // last entry in the table is the default for all higher scene numbers
     const DefaultVentilationSceneParams &p = defaultGroupScenes[aSceneNo];
     // init values from it
-    sceneCmd = p.sceneCmd;
+    mSceneCmd = p.sceneCmd;
     bool afi = false;
     bool adi = false;
     bool lpi = false;
@@ -177,8 +177,8 @@ double VentilationScene::sceneValue(int aChannelIndex)
     case channeltype_airflow_intensity: return airflowIntensity;
     case channeltype_airflow_direction: return airflowDirection;
     case channeltype_airflow_louver_position: return louverPosition;
-    case channeltype_airflow_louver_auto: return globalSceneFlags & ventilationflags_louverauto ? 1 : 0;
-    case channeltype_airflow_intensity_auto: return globalSceneFlags & ventilationflags_airflowauto ? 1 : 0;
+    case channeltype_airflow_louver_auto: return mGlobalSceneFlags & ventilationflags_louverauto ? 1 : 0;
+    case channeltype_airflow_intensity_auto: return mGlobalSceneFlags & ventilationflags_airflowauto ? 1 : 0;
   }
   return 0;
 }
@@ -348,13 +348,13 @@ void VentilationBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     // - air flow intensity
     airflowIntensity->setChannelValueIfNotDontCare(aScene, ventilationScene->airflowIntensity, 0, 0, true);
     // - air flow intensity automatic
-    airflowAuto->setChannelValueIfNotDontCare(aScene, ventilationScene->globalSceneFlags & ventilationflags_airflowauto ? 1 : 0, 0, 0, true);
+    airflowAuto->setChannelValueIfNotDontCare(aScene, ventilationScene->mGlobalSceneFlags & ventilationflags_airflowauto ? 1 : 0, 0, 0, true);
     // - air flow direction
     airflowDirection->setChannelValueIfNotDontCare(aScene, ventilationScene->airflowDirection, 0, 0, true);
     // - louver position
     louverPosition->setChannelValueIfNotDontCare(aScene, ventilationScene->louverPosition, 0, 0, true);
     // - louver position automatic
-    louverAuto->setChannelValueIfNotDontCare(aScene, ventilationScene->globalSceneFlags & ventilationflags_louverauto ? 1 : 0, 0, 0, true);
+    louverAuto->setChannelValueIfNotDontCare(aScene, ventilationScene->mGlobalSceneFlags & ventilationflags_louverauto ? 1 : 0, 0, 0, true);
   }
 }
 

@@ -147,13 +147,13 @@ typedef boost::intrusive_ptr<SceneChannels> SceneChannelsPtr;
 DsScene::DsScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inheritedParams(aSceneDeviceSettings.paramStore),
   #if P44SCRIPT_FULL_SUPPORT
-  sceneScript(scriptbody+regular, "scenescript", &aSceneDeviceSettings.device),
+  mSceneScript(scriptbody+regular, "scenescript", &aSceneDeviceSettings.mDevice),
   #endif
   sceneDeviceSettings(aSceneDeviceSettings),
-  sceneNo(aSceneNo),
-  sceneArea(0), // not area scene by default
-  sceneCmd(scene_cmd_invoke), // simple invoke command by default
-  globalSceneFlags(0)
+  mSceneNo(aSceneNo),
+  mSceneArea(0), // not area scene by default
+  mSceneCmd(scene_cmd_invoke), // simple invoke command by default
+  mGlobalSceneFlags(0)
 {
   sceneChannels = SceneChannelsPtr(new SceneChannels(*this));
 }
@@ -161,21 +161,21 @@ DsScene::DsScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
 
 Device &DsScene::getDevice()
 {
-  return sceneDeviceSettings.device;
+  return sceneDeviceSettings.mDevice;
 }
 
 
 OutputBehaviourPtr DsScene::getOutputBehaviour()
 {
-  return sceneDeviceSettings.device.getOutput();
+  return sceneDeviceSettings.mDevice.getOutput();
 }
 
 
 void DsScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
-  sceneNo = aSceneNo; // usually already set, but still make sure
-  sceneCmd = scene_cmd_invoke; // assume invoke type
-  sceneArea = 0; // no area scene by default
+  mSceneNo = aSceneNo; // usually already set, but still make sure
+  mSceneCmd = scene_cmd_invoke; // assume invoke type
+  mSceneArea = 0; // no area scene by default
   markClean(); // default values are always clean
 }
 
@@ -185,15 +185,15 @@ bool DsScene::preciseUndoImportant()
   // by default, only alarm scenes are likely to be undone at all, and thus should precisely capture previous output state
   // (for other scenes, capturing the last-known cached output state is sufficient, and much less expensive)
   return
-    sceneNo==PANIC ||
-    sceneNo==ALARM1 ||
-    sceneNo==FIRE ||
-    sceneNo==SMOKE ||
-    sceneNo==WATER ||
-    sceneNo==GAS ||
-    sceneNo==ALARM2 ||
-    sceneNo==ALARM3 ||
-    sceneNo==ALARM4;
+    mSceneNo==PANIC ||
+    mSceneNo==ALARM1 ||
+    mSceneNo==FIRE ||
+    mSceneNo==SMOKE ||
+    mSceneNo==WATER ||
+    mSceneNo==GAS ||
+    mSceneNo==ALARM2 ||
+    mSceneNo==ALARM3 ||
+    mSceneNo==ALARM4;
 }
 
 
@@ -290,15 +290,15 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
 {
   inheritedParams::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the scene number
-  sceneNo = aRow->get<int>(aIndex++);
+  mSceneNo = aRow->get<int>(aIndex++);
   // as the scene is loaded into a object which did not yet have the correct scene number
   // default values must be set again now that the sceneNo is known
   // Note: this is important to make sure those fields which are not stored have the correct scene related value (sceneCmd, sceneArea)
-  setDefaultSceneValues(sceneNo);
+  setDefaultSceneValues(mSceneNo);
   // then proceed with loading other fields
-  globalSceneFlags = aRow->get<int>(aIndex++);
+  mGlobalSceneFlags = aRow->get<int>(aIndex++);
   #if ENABLE_SCENE_SCRIPT
-  sceneScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  mSceneScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #endif
 }
 
@@ -307,10 +307,10 @@ void DsScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, (int)sceneNo);
-  aStatement.bind(aIndex++, (int)globalSceneFlags);
+  aStatement.bind(aIndex++, (int)mSceneNo);
+  aStatement.bind(aIndex++, (int)mGlobalSceneFlags);
   #if ENABLE_SCENE_SCRIPT
-  aStatement.bind(aIndex++, sceneScript.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mSceneScript.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #endif
 }
 
@@ -320,15 +320,15 @@ void DsScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 
 void DsScene::setGlobalSceneFlag(uint32_t aMask, bool aNewValue)
 {
-  uint32_t newFlags = (globalSceneFlags & ~aMask) | (aNewValue ? aMask : 0);
-  setPVar(globalSceneFlags, newFlags);
+  uint32_t newFlags = (mGlobalSceneFlags & ~aMask) | (aNewValue ? aMask : 0);
+  setPVar(mGlobalSceneFlags, newFlags);
 }
 
 
 
 bool DsScene::isDontCare()
 {
-  return globalSceneFlags & globalflags_sceneDontCare;
+  return mGlobalSceneFlags & globalflags_sceneDontCare;
 }
 
 void DsScene::setDontCare(bool aDontCare)
@@ -340,13 +340,13 @@ void DsScene::setDontCare(bool aDontCare)
 
 bool DsScene::ignoresLocalPriority()
 {
-  return globalSceneFlags & globalflags_ignoreLocalPriority;
+  return mGlobalSceneFlags & globalflags_ignoreLocalPriority;
 }
 
 void DsScene::setIgnoreLocalPriority(bool aIgnoreLocalPriority)
 {
-  uint32_t newFlags = (globalSceneFlags & ~globalflags_ignoreLocalPriority) | (aIgnoreLocalPriority ? globalflags_ignoreLocalPriority : 0);
-  setPVar(globalSceneFlags, newFlags);
+  uint32_t newFlags = (mGlobalSceneFlags & ~globalflags_ignoreLocalPriority) | (aIgnoreLocalPriority ? globalflags_ignoreLocalPriority : 0);
+  setPVar(mGlobalSceneFlags, newFlags);
 }
 
 
@@ -364,7 +364,7 @@ uint32_t DsScene::sceneValueFlags(int aChannelIndex)
   uint32_t flags = 0;
   // up to 16 channel's dontCare flags are mapped into globalSceneFlags
   if (aChannelIndex<numSceneValues()) {
-    if (globalSceneFlags & (globalflags_valueDontCare0<<aChannelIndex)) {
+    if (mGlobalSceneFlags & (globalflags_valueDontCare0<<aChannelIndex)) {
       flags |= valueflags_dontCare; // this value's dontCare is set
     }
   }
@@ -379,12 +379,12 @@ void DsScene::setSceneValueFlags(int aChannelIndex, uint32_t aFlagMask, bool aSe
     uint32_t flagmask = globalflags_valueDontCare0<<aChannelIndex;
     uint32_t newFlags;
     if (aSet)
-      newFlags = globalSceneFlags | ((aFlagMask & valueflags_dontCare) ? flagmask : 0);
+      newFlags = mGlobalSceneFlags | ((aFlagMask & valueflags_dontCare) ? flagmask : 0);
     else
-      newFlags = globalSceneFlags & ~((aFlagMask & valueflags_dontCare) ? flagmask : 0);
-    if (newFlags!=globalSceneFlags) {
+      newFlags = mGlobalSceneFlags & ~((aFlagMask & valueflags_dontCare) ? flagmask : 0);
+    if (newFlags!=mGlobalSceneFlags) {
       // actually changed
-      globalSceneFlags = newFlags;
+      mGlobalSceneFlags = newFlags;
       markDirty();
     }
   }
@@ -481,12 +481,12 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           return true;
         #if !REDUCED_FOOTPRINT
         case sceneDesc_key:
-          aPropValue->setStringValue(VdcHost::sceneText(sceneNo));
+          aPropValue->setStringValue(VdcHost::sceneText(mSceneNo));
           return true;
         #endif
         #if ENABLE_SCENE_SCRIPT
         case sceneScript_key:
-          aPropValue->setStringValue(sceneScript.getSource());
+          aPropValue->setStringValue(mSceneScript.getSource());
           return true;
         #endif
       }
@@ -502,7 +502,7 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           return true;
         #if ENABLE_SCENE_SCRIPT
         case sceneScript_key:
-          if (sceneScript.setSource(aPropValue->stringValue())) {
+          if (mSceneScript.setSource(aPropValue->stringValue())) {
             markDirty();
           }
           return true;
@@ -537,8 +537,8 @@ DsScenePtr SceneDeviceSettings::newUndoStateScene()
 {
   DsScenePtr undoStateScene = newDefaultScene(ROOM_ON); // use main on as template
   // to make sure: the "previous" pseudo-screne must always be "invoke" type (restoring output values)
-  undoStateScene->sceneCmd = scene_cmd_undo;
-  undoStateScene->sceneArea = 0; // no area
+  undoStateScene->mSceneCmd = scene_cmd_undo;
+  undoStateScene->mSceneArea = 0; // no area
   return undoStateScene;
 }
 
@@ -548,8 +548,8 @@ DsScenePtr SceneDeviceSettings::newUndoStateScene()
 DsScenePtr SceneDeviceSettings::getScene(SceneNo aSceneNo)
 {
   // see if we have a stored version different from the default
-  DsSceneMap::iterator pos = scenes.find(aSceneNo);
-  if (pos!=scenes.end()) {
+  DsSceneMap::iterator pos = mScenes.find(aSceneNo);
+  if (pos!=mScenes.end()) {
     // found scene params in map
     return pos->second;
   }
@@ -565,7 +565,7 @@ void SceneDeviceSettings::updateScene(DsScenePtr aScene)
 {
   if (aScene->rowid==0) {
     // unstored so far, add to map of non-default scenes
-    scenes[aScene->sceneNo] = aScene;
+    mScenes[aScene->mSceneNo] = aScene;
   }
   // anyway, mark scene dirty
   aScene->markDirty();
@@ -616,7 +616,7 @@ ErrorPtr SceneDeviceSettings::loadChildren()
       uint64_t flags;
       scene->loadFromRow(row, index, &flags);
       // - put scene into map of non-default scenes
-      scenes[scene->sceneNo] = scene;
+      mScenes[scene->mSceneNo] = scene;
       // - fresh object for next row
       scene = newDefaultScene(0);
     }
@@ -638,9 +638,9 @@ ErrorPtr SceneDeviceSettings::saveChildren()
     // my own ROWID is the parent key for the children
     string parentID = parentIdForScenes();
     // save all elements of the map (only dirty ones will be actually stored to DB
-    for (DsSceneMap::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
+    for (DsSceneMap::iterator pos = mScenes.begin(); pos!=mScenes.end(); ++pos) {
       err = pos->second->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed
-      if (Error::notOK(err)) SOLOG(device, LOG_ERR,"Error saving scene %d: %s", pos->second->sceneNo, err->text());
+      if (Error::notOK(err)) SOLOG(mDevice, LOG_ERR,"Error saving scene %d: %s", pos->second->mSceneNo, err->text());
     }
   }
   return err;
@@ -650,7 +650,7 @@ ErrorPtr SceneDeviceSettings::saveChildren()
 ErrorPtr SceneDeviceSettings::deleteChildren()
 {
   ErrorPtr err;
-  for (DsSceneMap::iterator pos = scenes.begin(); pos!=scenes.end(); ++pos) {
+  for (DsSceneMap::iterator pos = mScenes.begin(); pos!=mScenes.end(); ++pos) {
     err = pos->second->deleteFromStore();
   }
   return err;
@@ -664,7 +664,7 @@ ErrorPtr SceneDeviceSettings::deleteChildren()
 
 void SceneDeviceSettings::loadScenesFromFiles()
 {
-  string dir = device.getVdcHost().getConfigDir();
+  string dir = mDevice.getVdcHost().getConfigDir();
   const int numLevels = 5;
   string levelids[numLevels];
   // Level strategy: most specialized will be active, unless lower levels specify explicit override
@@ -674,11 +674,11 @@ void SceneDeviceSettings::loadScenesFromFiles()
   // - Level 2 are scenes related to the device class/version (deviceClass()_deviceClassVersion())
   // - Level 3 are scenes related to the behaviour (behaviourTypeIdentifier())
   // - Level 4 are scenes related to the vDC (vdcClassIdentifier())
-  levelids[0] = "vdsd_" + device.getDsUid().getString();
-  levelids[1] = string(device.deviceTypeIdentifier()) + "_device";
-  levelids[2] = string_format("%s_%d_class", device.deviceClass().c_str(), device.deviceClassVersion());
-  levelids[3] = string(device.getOutput()->behaviourTypeIdentifier()) + "_behaviour";
-  levelids[4] = device.vdcP->vdcClassIdentifier();
+  levelids[0] = "vdsd_" + mDevice.getDsUid().getString();
+  levelids[1] = string(mDevice.deviceTypeIdentifier()) + "_device";
+  levelids[2] = string_format("%s_%d_class", mDevice.deviceClass().c_str(), mDevice.deviceClassVersion());
+  levelids[3] = string(mDevice.getOutput()->behaviourTypeIdentifier()) + "_behaviour";
+  levelids[4] = mDevice.mVdcP->vdcClassIdentifier();
   for(int i=0; i<numLevels; ++i) {
     // try to open config file
     string fn = dir+"scenes_"+levelids[i]+".csv";
@@ -689,14 +689,14 @@ void SceneDeviceSettings::loadScenesFromFiles()
       int syserr = errno;
       if (syserr!=ENOENT) {
         // file not existing is ok, all other errors must be reported
-        SOLOG(device, LOG_ERR, "failed opening file '%s' - %s", fn.c_str(), strerror(syserr));
+        SOLOG(mDevice, LOG_ERR, "failed opening file '%s' - %s", fn.c_str(), strerror(syserr));
       }
       // don't process, try next
-      SOLOG(device, LOG_DEBUG, "loadScenesFromFiles: tried '%s' - not found", fn.c_str());
+      SOLOG(mDevice, LOG_DEBUG, "loadScenesFromFiles: tried '%s' - not found", fn.c_str());
     }
     else {
       // file opened
-      SOLOG(device, LOG_DEBUG, "loadScenesFromFiles: found '%s' - processing", fn.c_str());
+      SOLOG(mDevice, LOG_DEBUG, "loadScenesFromFiles: found '%s' - processing", fn.c_str());
       while (string_fgetline(file, line)) {
         lineNo++;
         // skip empty lines and those starting with #, allowing to format and comment CSV
@@ -719,13 +719,13 @@ void SceneDeviceSettings::loadScenesFromFiles()
           // read scene number
           int sceneNo;
           if (sscanf(fp, "%d", &sceneNo)!=1) {
-            SOLOG(device, LOG_ERR, "%s:%d - no or invalid scene number", fn.c_str(), lineNo);
+            SOLOG(mDevice, LOG_ERR, "%s:%d - no or invalid scene number", fn.c_str(), lineNo);
             continue; // no valid scene number -> invalid line
           }
           // check if this scene is already in the list (i.e. already has non-hardwired settings)
-          DsSceneMap::iterator pos = scenes.find(sceneNo);
+          DsSceneMap::iterator pos = mScenes.find(sceneNo);
           DsScenePtr scene;
-          if (pos!=scenes.end()) {
+          if (pos!=mScenes.end()) {
             // this scene already has settings, only apply if this is an overridden
             if (!overridden) continue; // scene already configured by more specialized level -> dont apply
             scene = pos->second;
@@ -739,8 +739,8 @@ void SceneDeviceSettings::loadScenesFromFiles()
           // these changes are NOT to be made persistent in DB!
           scene->markClean();
           // put scene into table
-          scenes[sceneNo] = scene;
-          SOLOG(device, LOG_INFO, "Customized scene %d %sfrom config file %s", sceneNo, overridden ? "(with override) " : "", fn.c_str());
+          mScenes[sceneNo] = scene;
+          SOLOG(mDevice, LOG_INFO, "Customized scene %d %sfrom config file %s", sceneNo, overridden ? "(with override) " : "", fn.c_str());
         }
       }
       fclose(file);

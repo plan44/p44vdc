@@ -88,7 +88,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   if (mEvaluatorType==evaluator_rocker) {
     // Simulate Two-way Rocker Button device
     // - defaults to black (generic button)
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // - create down button (index 0)
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"evaldown"));
     b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, 0); // counterpart up-button has buttonIndex 1, fixed mode
@@ -104,7 +104,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   }
   else if (mEvaluatorType==evaluator_input || mEvaluatorType==evaluator_internalinput) {
     // Standard device settings without scene table (internal differs only from not getting announced with vdsm)
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"evalresult"));
     b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
@@ -113,7 +113,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   }
   else if (mEvaluatorType==evaluator_sensor  || mEvaluatorType==evaluator_internalsensor) {
     // Standard device settings without scene table (internal differs only from not getting announced with vdsm)
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // - create one sensor
     SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this,"evalresult"));
     s->setHardwareSensorConfig(mSensorType, mSensorUsage, 0, 0, 0, 100*MilliSecond, 0);
@@ -148,7 +148,7 @@ bool EvaluatorDevice::isPublicDS()
 
 EvaluatorVdc &EvaluatorDevice::getEvaluatorVdc()
 {
-  return *(static_cast<EvaluatorVdc *>(vdcP));
+  return *(static_cast<EvaluatorVdc *>(mVdcP));
 }
 
 
@@ -499,7 +499,7 @@ void EvaluatorDevice::deriveDsUid()
   // vDC implementation specific UUID:
   //   UUIDv5 with name = classcontainerinstanceid::evaluatorID
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s = vdcP->vdcInstanceIdentifier();
+  string s = mVdcP->vdcInstanceIdentifier();
   s += "::" + mEvaluatorID;
   dSUID.setNameInSpace(s, vdcNamespace);
 }
@@ -657,12 +657,12 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bool aIsSensor) :
   inherited(aEvaluator)
   // Note: conditions are synchronously evaluated, but action might be running when a condition wants evaluation, so we allow concurrent evaluation in that case
-  ,mOnCondition("onCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
-  ,mOffCondition("offCondition", &device, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
+  ,mOnCondition("onCondition", &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
+  ,mOffCondition("offCondition", &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
   #if P44SCRIPT_FULL_SUPPORT
   // Only thing that might run when action tries to run is an earlier invocation of the action.
   // However this might be a previous on-action, while the new action is a NOP off-action, so both must be allowed to run concurrently
-  ,mAction(scriptbody|regular|keepvars|concurrently, "action", &device)
+  ,mAction(scriptbody|regular|keepvars|concurrently, "action", &mDevice)
   #endif
 {
   mEvaluatorContext = mOnCondition.domain()->newContext(); // common context for triggers and action

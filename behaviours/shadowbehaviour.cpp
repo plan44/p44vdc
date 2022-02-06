@@ -848,14 +848,14 @@ void ShadowBehaviour::identifyToUser()
 {
   VdcDimMode dimMode = position->getChannelValue()>50 ? dimmode_down : dimmode_up;
   // move a little
-  device.dimChannelForArea(device.getChannelByIndex(0), dimMode, -1, IDENTITY_MOVE_TIME);
+  mDevice.dimChannelForArea(mDevice.getChannelByIndex(0), dimMode, -1, IDENTITY_MOVE_TIME);
   sequenceTicket.executeOnce(boost::bind(&ShadowBehaviour::reverseIdentify, this, dimMode==dimmode_up ? dimmode_down : dimmode_up), IDENTITY_MOVE_TIME*2);
 }
 
 
 void ShadowBehaviour::reverseIdentify(VdcDimMode aDimMode)
 {
-  device.dimChannelForArea(device.getChannelByIndex(0), aDimMode, -1, IDENTITY_MOVE_TIME);
+  mDevice.dimChannelForArea(mDevice.getChannelByIndex(0), aDimMode, -1, IDENTITY_MOVE_TIME);
 }
 
 

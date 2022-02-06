@@ -28,17 +28,17 @@ using namespace p44;
 OutputBehaviour::OutputBehaviour(Device &aDevice) :
   inherited(aDevice, "output"),
   // hardware derived params
-  outputFunction(outputFunction_dimmer),
-  outputUsage(usage_undefined),
-  variableRamp(true),
-  maxPower(-1),
+  mOutputFunction(outputFunction_dimmer),
+  mOutputUsage(usage_undefined),
+  mVariableRamp(true),
+  mMaxPower(-1),
   // persistent settings
-  outputMode(outputmode_default), // use the default
-  defaultOutputMode(outputmode_disabled), // none by default, hardware should set a default matching the actual HW capabilities
-  pushChanges(false), // do not push changes
+  mOutputMode(outputmode_default), // use the default
+  mDefaultOutputMode(outputmode_disabled), // none by default, hardware should set a default matching the actual HW capabilities
+  mPushChanges(false), // do not push changes
   // volatile state
-  localPriority(false), // no local priority
-  transitionTime(0) // immediate transitions by default
+  mLocalPriority(false), // no local priority
+  mTransitionTime(0) // immediate transitions by default
 {
   // set default group membership (which is group_undefined)
   resetGroupMembership();
@@ -70,33 +70,33 @@ Tristate OutputBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 
 void OutputBehaviour::setHardwareOutputConfig(VdcOutputFunction aOutputFunction, VdcOutputMode aDefaultOutputMode, VdcUsageHint aUsage, bool aVariableRamp, double aMaxPower)
 {
-  outputFunction = aOutputFunction;
-  outputUsage = aUsage;
-  variableRamp = aVariableRamp;
-  maxPower = aMaxPower;
-  defaultOutputMode = aDefaultOutputMode;
+  mOutputFunction = aOutputFunction;
+  mOutputUsage = aUsage;
+  mVariableRamp = aVariableRamp;
+  mMaxPower = aMaxPower;
+  mDefaultOutputMode = aDefaultOutputMode;
   // Note: actual outputMode is outputmode_default by default, so without modifying settings, defaultOutputMode applies
 }
 
 
 void OutputBehaviour::addChannel(ChannelBehaviourPtr aChannel)
 {
-  aChannel->channelIndex = (int)channels.size();
-  channels.push_back(aChannel);
+  aChannel->mChannelIndex = (int)mChannels.size();
+  mChannels.push_back(aChannel);
 }
 
 
 size_t OutputBehaviour::numChannels()
 {
-  return channels.size();
+  return mChannels.size();
 }
 
 
 
 ChannelBehaviourPtr OutputBehaviour::getChannelByIndex(int aChannelIndex, bool aPendingApplyOnly)
 {
-  if (aChannelIndex<channels.size()) {
-    ChannelBehaviourPtr ch = channels[aChannelIndex];
+  if (aChannelIndex<mChannels.size()) {
+    ChannelBehaviourPtr ch = mChannels[aChannelIndex];
     if (!aPendingApplyOnly || ch->needsApplying())
       return ch;
     // found but has no apply pending -> return no channel
@@ -110,7 +110,7 @@ ChannelBehaviourPtr OutputBehaviour::getChannelByType(DsChannelType aChannelType
   if (aChannelType==channeltype_default)
     return getChannelByIndex(0, aPendingApplyOnly); // first channel is primary/default channel by internal convention
   // look for channel with matching type
-  for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+  for (ChannelBehaviourVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
     if ((*pos)->getChannelType()==aChannelType) {
       if (!aPendingApplyOnly || (*pos)->needsApplying())
         return *pos; // found
@@ -132,8 +132,8 @@ ChannelBehaviourPtr OutputBehaviour::getChannelById(const string aChannelId, boo
       return getChannelByIndex(ci);
     }
   }
-  for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
-    if ((*pos)->channelId==aChannelId) {
+  for (ChannelBehaviourVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
+    if ((*pos)->mChannelId==aChannelId) {
       if (!aPendingApplyOnly || (*pos)->needsApplying())
         return *pos; // found
       break; // found but has no apply pending -> return no channel
@@ -148,13 +148,13 @@ bool OutputBehaviour::isMember(DsGroup aGroup)
 {
   return
     // Output group membership determines function, so primary color is not included by default, only if explicitly set
-    (outputGroups & (0x1ll<<aGroup))!=0; // explicit extra membership flag set
+    (mOutputGroups & (0x1ll<<aGroup))!=0; // explicit extra membership flag set
 }
 
 
 void OutputBehaviour::setGroupMembership(DsGroup aGroup, bool aIsMember)
 {
-  DsGroupMask newGroups = outputGroups;
+  DsGroupMask newGroups = mOutputGroups;
   if (aIsMember) {
     // make explicitly member of a group
     newGroups |= (0x1ll<<aGroup);
@@ -163,24 +163,24 @@ void OutputBehaviour::setGroupMembership(DsGroup aGroup, bool aIsMember)
     // not explicitly member
     newGroups &= ~(0x1ll<<aGroup);
   }
-  setPVar(outputGroups, newGroups);
+  setPVar(mOutputGroups, newGroups);
 }
 
 
 void OutputBehaviour::resetGroupMembership()
 {
   // group_undefined (aka "variable" in old defs) must always be set
-  setPVar(outputGroups, (DsGroupMask)(1<<group_undefined));
+  setPVar(mOutputGroups, (DsGroupMask)(1<<group_undefined));
 }
 
 
 VdcOutputMode OutputBehaviour::actualOutputMode()
 {
-  if (outputMode==outputmode_default) {
-    return defaultOutputMode; // default mode
+  if (mOutputMode==outputmode_default) {
+    return mDefaultOutputMode; // default mode
   }
   else {
-    return outputMode; // specifically set mode
+    return mOutputMode; // specifically set mode
   }
 }
 
@@ -188,16 +188,16 @@ VdcOutputMode OutputBehaviour::actualOutputMode()
 void OutputBehaviour::setOutputMode(VdcOutputMode aOutputMode)
 {
   // base class marks all channels needing re-apply and triggers a apply if mode changes
-  if (outputMode!=aOutputMode) {
+  if (mOutputMode!=aOutputMode) {
     bool actualChanged = actualOutputMode()!=aOutputMode; // check if actual mode also changes (because explicit setting could be same as default)
     // mode setting has changed
-    outputMode = aOutputMode;
+    mOutputMode = aOutputMode;
     // if actual mode of output has changed, make sure outputs get chance to apply it
     if (actualChanged) {
-      for (ChannelBehaviourVector::iterator pos=channels.begin(); pos!=channels.end(); ++pos) {
+      for (ChannelBehaviourVector::iterator pos=mChannels.begin(); pos!=mChannels.end(); ++pos) {
         (*pos)->setNeedsApplying(0); // needs immediate re-apply
       }
-      device.requestApplyingChannels(NULL, false, true); // apply, for mode change
+      mDevice.requestApplyingChannels(NULL, false, true); // apply, for mode change
     }
     markDirty();
   }
@@ -274,11 +274,11 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 {
   #if ENABLE_SCENE_SCRIPT
   SimpleScenePtr simpleScene = boost::dynamic_pointer_cast<SimpleScene>(aScene);
-  if (simpleScene && simpleScene->effect==scene_effect_script) {
+  if (simpleScene && simpleScene->mEffect==scene_effect_script) {
     // run scene script
-    OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->sceneScript.getSource().c_str(), true, 80).c_str() );
-    simpleScene->sceneScript.setSharedMainContext(device.getDeviceScriptContext());
-    simpleScene->sceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), ScriptObjPtr(), Infinite);
+    OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->mSceneScript.getSource().c_str(), true, 80).c_str() );
+    simpleScene->mSceneScript.setSharedMainContext(mDevice.getDeviceScriptContext());
+    simpleScene->mSceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), ScriptObjPtr(), Infinite);
     return;
   }
   #endif // ENABLE_SCENE_SCRIPT
@@ -300,7 +300,7 @@ void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ScriptObjPtr aResult)
 void OutputBehaviour::stopSceneActions()
 {
   #if ENABLE_SCENE_SCRIPT
-  device.getDeviceScriptContext()->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
+  mDevice.getDeviceScriptContext()->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
   #endif // ENABLE_SCENE_SCRIPT
 }
 
@@ -311,7 +311,7 @@ void OutputBehaviour::setTransitionTimeOverride(MLMicroSeconds aTransitionTimeOv
   if (aTransitionTimeOverride!=Infinite) {
     OLOG(LOG_INFO, "Transition times of all changing channels overridden: actual transition time is now %d mS", (int)(aTransitionTimeOverride/MilliSecond));
     // override the transition time in all channels that now need to be applied
-    for (ChannelBehaviourVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+    for (ChannelBehaviourVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
       if ((*pos)->needsApplying()) (*pos)->setTransitionTime(aTransitionTimeOverride);
     }
   }
@@ -321,7 +321,7 @@ void OutputBehaviour::setTransitionTimeOverride(MLMicroSeconds aTransitionTimeOv
 bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTransitionTimeOverride)
 {
   if (aScene) {
-    bool ok = performApplySceneToChannels(aScene, aScene->sceneCmd); // actually apply
+    bool ok = performApplySceneToChannels(aScene, aScene->mSceneCmd); // actually apply
     setTransitionTimeOverride(aTransitionTimeOverride);
     return ok;
   }
@@ -336,7 +336,7 @@ bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aS
   stopSceneActions();
   // scenes with invoke functionality will apply channel values by default
   if (aSceneCmd==scene_cmd_none) {
-    aSceneCmd = aScene->sceneCmd;
+    aSceneCmd = aScene->mSceneCmd;
   }
   if (
     aSceneCmd==scene_cmd_invoke ||
@@ -348,12 +348,12 @@ bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aS
   ) {
     // apply stored scene value(s) to channels
     loadChannelsFromScene(aScene);
-    LOG(LOG_INFO, "- Scene(%s): new channel value(s) loaded from scene, ready to apply",  VdcHost::sceneText(aScene->sceneNo).c_str());
+    LOG(LOG_INFO, "- Scene(%s): new channel value(s) loaded from scene, ready to apply",  VdcHost::sceneText(aScene->mSceneNo).c_str());
     return true;
   }
   else {
     // no channel changes
-    LOG(LOG_INFO, "- Scene(%s): no invoke/off/min/max (but cmd=%d) -> no channels loaded", VdcHost::sceneText(aScene->sceneNo).c_str(), aSceneCmd);
+    LOG(LOG_INFO, "- Scene(%s): no invoke/off/min/max (but cmd=%d) -> no channels loaded", VdcHost::sceneText(aScene->mSceneNo).c_str(), aSceneCmd);
     return false;
   }
 }
@@ -365,7 +365,7 @@ void OutputBehaviour::captureScene(DsScenePtr aScene, bool aFromDevice, SimpleCB
 {
   if (aFromDevice) {
     // make sure channel values are updated
-    device.requestUpdatingChannels(boost::bind(&OutputBehaviour::channelValuesCaptured, this, aScene, aFromDevice, aDoneCB));
+    mDevice.requestUpdatingChannels(boost::bind(&OutputBehaviour::channelValuesCaptured, this, aScene, aFromDevice, aDoneCB));
   }
   else {
     // just capture the cached channel values
@@ -390,7 +390,7 @@ MLMicroSeconds OutputBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool 
 {
   SimpleScenePtr ssc = boost::dynamic_pointer_cast<SimpleScene>(aScene);
   if (ssc) {
-    switch (ssc->effect) {
+    switch (ssc->mEffect) {
       // Note: light scenes have their own timing for these, here we just return the defaults
       // - smooth = 100mS
       // - slow   = 1min (60800mS)
@@ -402,7 +402,7 @@ MLMicroSeconds OutputBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool 
       case scene_effect_custom :
         return 5*Second;
       case scene_effect_transition:
-        return ssc->effectParam*MilliSecond; // transition time is just the effect param (in milliseconds)
+        return ssc->mEffectParam*MilliSecond; // transition time is just the effect param (in milliseconds)
       default:
         break;
     }
@@ -452,11 +452,11 @@ void OutputBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
 {
   inherited::loadFromRow(aRow, aIndex, NULL); // common flags are loaded here, not in superclasses
   // get the fields
-  aRow->getCastedIfNotNull<VdcOutputMode, int>(aIndex++, outputMode);
+  aRow->getCastedIfNotNull<VdcOutputMode, int>(aIndex++, mOutputMode);
   uint64_t flags = aRow->getCastedWithDefault<uint64_t, long long int>(aIndex++, 0);
-  aRow->getCastedIfNotNull<uint64_t, long long int>(aIndex++, outputGroups);
+  aRow->getCastedIfNotNull<uint64_t, long long int>(aIndex++, mOutputGroups);
   // decode my own flags
-  pushChanges = flags & outputflag_pushChanges;
+  mPushChanges = flags & outputflag_pushChanges;
   // pass the flags out to subclass which called this superclass to get the flags (and decode themselves)
   if (aCommonFlagsP) *aCommonFlagsP = flags;
 }
@@ -467,18 +467,18 @@ void OutputBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // encode the flags
-  if (pushChanges) aCommonFlags |= outputflag_pushChanges;
+  if (mPushChanges) aCommonFlags |= outputflag_pushChanges;
   // bind the fields
-  aStatement.bind(aIndex++, outputMode);
+  aStatement.bind(aIndex++, mOutputMode);
   aStatement.bind(aIndex++, (long long int)aCommonFlags);
-  aStatement.bind(aIndex++, (long long int)outputGroups);
+  aStatement.bind(aIndex++, (long long int)mOutputGroups);
 }
 
 
 ErrorPtr OutputBehaviour::loadChildren()
 {
-  if (device.getVdcHost().doPersistChannels()) {
-    for (ChannelBehaviourVector::iterator pos=channels.begin(); pos!=channels.end(); ++pos) {
+  if (mDevice.getVdcHost().doPersistChannels()) {
+    for (ChannelBehaviourVector::iterator pos=mChannels.begin(); pos!=mChannels.end(); ++pos) {
       (*pos)->load();
     }
   }
@@ -488,8 +488,8 @@ ErrorPtr OutputBehaviour::loadChildren()
 
 ErrorPtr OutputBehaviour::saveChildren()
 {
-  if (device.getVdcHost().doPersistChannels()) {
-    for (ChannelBehaviourVector::iterator pos=channels.begin(); pos!=channels.end(); ++pos) {
+  if (mDevice.getVdcHost().doPersistChannels()) {
+    for (ChannelBehaviourVector::iterator pos=mChannels.begin(); pos!=mChannels.end(); ++pos) {
       (*pos)->save();
     }
   }
@@ -498,7 +498,7 @@ ErrorPtr OutputBehaviour::saveChildren()
 
 ErrorPtr OutputBehaviour::deleteChildren()
 {
-  for (ChannelBehaviourVector::iterator pos=channels.begin(); pos!=channels.end(); ++pos) {
+  for (ChannelBehaviourVector::iterator pos=mChannels.begin(); pos!=mChannels.end(); ++pos) {
     (*pos)->forget();
   }
   return inherited::deleteChildren();
@@ -655,30 +655,30 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       switch (aPropertyDescriptor->fieldKey()) {
         // Description properties
         case outputFunction_key+descriptions_key_offset:
-          aPropValue->setUint8Value(outputFunction);
+          aPropValue->setUint8Value(mOutputFunction);
           return true;
         case outputUsage_key+descriptions_key_offset:
-          aPropValue->setUint16Value(outputUsage);
+          aPropValue->setUint16Value(mOutputUsage);
           return true;
         case variableRamp_key+descriptions_key_offset:
-          aPropValue->setBoolValue(variableRamp);
+          aPropValue->setBoolValue(mVariableRamp);
           return true;
         case maxPower_key+descriptions_key_offset:
-          aPropValue->setDoubleValue(maxPower);
+          aPropValue->setDoubleValue(mMaxPower);
           return true;
         // Settings properties
         case mode_key+settings_key_offset:
           aPropValue->setUint8Value(actualOutputMode()); // return actual mode, never outputmode_default
           return true;
         case pushChanges_key+settings_key_offset:
-          aPropValue->setBoolValue(pushChanges);
+          aPropValue->setBoolValue(mPushChanges);
           return true;
         // State properties
         case localPriority_key+states_key_offset:
-          aPropValue->setBoolValue(localPriority);
+          aPropValue->setBoolValue(mLocalPriority);
           return true;
         case transitiontime_key+states_key_offset:
-          aPropValue->setDoubleValue((double)transitionTime/Second);
+          aPropValue->setDoubleValue((double)mTransitionTime/Second);
           return true;
       }
     }
@@ -690,14 +690,14 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           setOutputMode((VdcOutputMode)aPropValue->int32Value());
           return true;
         case pushChanges_key+settings_key_offset:
-          setPVar(pushChanges, aPropValue->boolValue());
+          setPVar(mPushChanges, aPropValue->boolValue());
           return true;
         // State properties
         case localPriority_key+states_key_offset:
-          localPriority = aPropValue->boolValue();
+          mLocalPriority = aPropValue->boolValue();
           return true;
         case transitiontime_key+states_key_offset:
-          transitionTime = aPropValue->doubleValue()*Second;
+          mTransitionTime = aPropValue->doubleValue()*Second;
           return true;
       }
     }
@@ -712,7 +712,7 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 
 string OutputBehaviour::logContextPrefix()
 {
-  return string_format("%s: %s", device.logContextPrefix().c_str(), getTypeName());
+  return string_format("%s: %s", mDevice.logContextPrefix().c_str(), getTypeName());
 }
 
 
@@ -720,7 +720,7 @@ string OutputBehaviour::logContextPrefix()
 string OutputBehaviour::description()
 {
   string s = string_format("%s behaviour", shortDesc().c_str());
-  string_format_append(s, "\n- hardware output function: %d, default output mode: %d", outputFunction, defaultOutputMode);
+  string_format_append(s, "\n- hardware output function: %d, default output mode: %d", mOutputFunction, mDefaultOutputMode);
   s.append(inherited::description());
   return s;
 }
@@ -775,7 +775,7 @@ static void loadscene_func(BuiltinFunctionContextPtr f)
   if (scene) {
     MLMicroSeconds transition = Infinite; // no override
     if (f->numArgs()>=2) transition = f->arg(1)->doubleValue()*Second;
-    POLOG(o->output(), LOG_INFO, "loadscene(%s) loads channel values", VdcHost::sceneText(scene->sceneNo).c_str());
+    POLOG(o->output(), LOG_INFO, "loadscene(%s) loads channel values", VdcHost::sceneText(scene->mSceneNo).c_str());
     o->output()->applySceneToChannels(scene, transition);
   }
   f->finish();
@@ -791,7 +791,7 @@ static void runactions_func(BuiltinFunctionContextPtr f)
   assert(o);
   DsScenePtr scene = findScene(o, f->arg(0)->stringValue());
   if (scene) {
-    POLOG(o->output(), LOG_INFO, "runactions(%s) starts scene actions", VdcHost::sceneText(scene->sceneNo).c_str());
+    POLOG(o->output(), LOG_INFO, "runactions(%s) starts scene actions", VdcHost::sceneText(scene->mSceneNo).c_str());
     o->output()->performSceneActions(scene, boost::bind(&outputOpComplete, f, o->output()));
     return;
   }

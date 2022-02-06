@@ -119,7 +119,7 @@ namespace p44 {
 
     /// generic DB persisted scene flag word, can be used by subclasses to map flags onto in loadFromRow() and bindToStatement()
     /// @note base class already maps some flags, see globalflags_xxx enum in implementation.
-    uint32_t globalSceneFlags;
+    uint32_t mGlobalSceneFlags;
 
     /// sets or resets global scene flag indicated by mask, sets dirty if global flags actually changed
     void setGlobalSceneFlag(uint32_t aMask, bool aNewValue);
@@ -131,11 +131,11 @@ namespace p44 {
     /// @name common scene values (available in all scene objects)
     /// @{
 
-    SceneNo sceneNo; ///< scene number
-    SceneCmd sceneCmd; ///< scene command
-    SceneArea sceneArea; ///< scene area, 0 if none
+    SceneNo mSceneNo; ///< scene number
+    SceneCmd mSceneCmd; ///< scene command
+    SceneArea mSceneArea; ///< scene area, 0 if none
     #if ENABLE_SCENE_SCRIPT
-    P44Script::ScriptSource sceneScript; ///< scene script
+    P44Script::ScriptSource mSceneScript; ///< scene script
     #endif
 
     /// @}
@@ -276,7 +276,7 @@ namespace p44 {
     friend class Device;
     friend class SceneChannels;
 
-    DsSceneMap scenes; ///< the user defined scenes (default scenes will be created on the fly)
+    DsSceneMap mScenes; ///< the user defined scenes (default scenes will be created on the fly)
 
   public:
     SceneDeviceSettings(Device &aDevice);

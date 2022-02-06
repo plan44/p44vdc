@@ -416,7 +416,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
       }
       return true;
     }
-    else if (device.isPublicDS()) {
+    else if (mDevice.isPublicDS()) {
       OLOG(LOG_NOTICE, "could not be pushed");
     }
   }
@@ -486,17 +486,17 @@ void SensorBehaviour::revalidateState()
 
 string SensorBehaviour::getSourceId()
 {
-  return string_format("%s_S%s", device.getDsUid().getString().c_str(), getId().c_str());
+  return string_format("%s_S%s", mDevice.getDsUid().getString().c_str(), getId().c_str());
 }
 
 
 string SensorBehaviour::getSourceName()
 {
   // get device name or dSUID for context
-  string n = device.getAssignedName();
+  string n = mDevice.getAssignedName();
   if (n.empty()) {
     // use abbreviated dSUID instead
-    string d = device.getDsUid().getString();
+    string d = mDevice.getDsUid().getString();
     n = d.substr(0,8) + "..." + d.substr(d.size()-2,2);
   }
   // append behaviour description
@@ -519,7 +519,7 @@ MLMicroSeconds SensorBehaviour::getSourceLastUpdate()
 
 int SensorBehaviour::getSourceOpLevel()
 {
-  return device.opStateLevel();
+  return mDevice.opStateLevel();
 }
 
 #if ENABLE_RRDB

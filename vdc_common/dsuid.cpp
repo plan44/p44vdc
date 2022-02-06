@@ -41,10 +41,10 @@ using namespace p44;
 
 void DsUid::internalInit()
 {
-  idType = idtype_undefined;
+  mIdType = idtype_undefined;
   // init such that what we'd read out will be all-zero dSUID
-  idBytes = dsuidBytes;
-  memset(raw, 0, sizeof(raw));
+  mIdBytes = dsuidBytes;
+  memset(mRaw, 0, sizeof(mRaw));
 }
 
 
@@ -57,7 +57,7 @@ DsUid::DsUid()
 
 bool DsUid::empty() const
 {
-  return idType==idtype_undefined;
+  return mIdType==idtype_undefined;
 }
 
 
@@ -75,21 +75,21 @@ void DsUid::clear()
 
 void DsUid::setIdType(DsUidType aIdType)
 {
-  if (aIdType!=idType) {
+  if (aIdType!=mIdType) {
     // new type, reset
-    idType = aIdType;
-    memset(raw, 0, sizeof(raw));
-    switch (idType) {
+    mIdType = aIdType;
+    memset(mRaw, 0, sizeof(mRaw));
+    switch (mIdType) {
       // dSUID
       case idtype_sgtin:
-        raw[0] = SGTIN96Header;
+        mRaw[0] = SGTIN96Header;
         // fall through
       case idtype_uuid:
       case idtype_gid:
-        idBytes = dsuidBytes;
+        mIdBytes = dsuidBytes;
         break;
       default:
-        idBytes = 0; // no content
+        mIdBytes = 0; // no content
         break;
     }
   }
@@ -98,9 +98,9 @@ void DsUid::setIdType(DsUidType aIdType)
 
 void DsUid::setSubdeviceIndex(uint8_t aSubDeviceIndex)
 {
-  if (idBytes==dsuidBytes) {
+  if (mIdBytes==dsuidBytes) {
     // is a dSUID, can set subdevice index
-    raw[16] = aSubDeviceIndex;
+    mRaw[16] = aSubDeviceIndex;
   }
 }
 
@@ -129,16 +129,16 @@ void DsUid::setGTIN(uint64_t aGCP, uint64_t aItemRef, uint8_t aPartition)
   uint64_t binaryGtin = aGCP<<(44-gcpBitLength[aPartition]) | aItemRef;
   // now put into bytes
   // - filter (fixed to 1), partition and upper 2 bits of binaryGtin go into raw[1]
-  raw[1] = (0x1<<5) | ((aPartition&0x07)<<2) | (binaryGtin>>42);
+  mRaw[1] = (0x1<<5) | ((aPartition&0x07)<<2) | (binaryGtin>>42);
   // - raw[2..5]
-  raw[2] = (binaryGtin>>34) & 0xFF;
-  raw[3] = (binaryGtin>>26) & 0xFF;
-  raw[4] = (binaryGtin>>18) & 0xFF;
-  raw[5] = (binaryGtin>>10) & 0xFF;
+  mRaw[2] = (binaryGtin>>34) & 0xFF;
+  mRaw[3] = (binaryGtin>>26) & 0xFF;
+  mRaw[4] = (binaryGtin>>18) & 0xFF;
+  mRaw[5] = (binaryGtin>>10) & 0xFF;
   // - raw[6..9] are left 0 to mark it as non-UUID
   // - raw[10..11] contain more GTIN information
-  raw[10] = (binaryGtin>>2) & 0xFF;
-  raw[11] = (raw[11] & 0x3F) | ((binaryGtin & 0x03)<<6); // combine lowest 2 bits of GTIN with highest 6 of serial
+  mRaw[10] = (binaryGtin>>2) & 0xFF;
+  mRaw[11] = (mRaw[11] & 0x3F) | ((binaryGtin & 0x03)<<6); // combine lowest 2 bits of GTIN with highest 6 of serial
 }
 
 
@@ -146,11 +146,11 @@ void DsUid::setSerial(uint64_t aSerial)
 {
   // setting GTIN switches to sgtin dSUID
   setIdType(idtype_sgtin);
-  raw[11] = (raw[11] & 0xC0) | ((aSerial>>32)&0x3F); // combine lowest 2 bits of GTIN with highest 6 of serial
-  raw[12] = (aSerial>>24)&0xFF;
-  raw[13] = (aSerial>>16)&0xFF;
-  raw[14] = (aSerial>>8)&0xFF;
-  raw[15] = aSerial&0xFF;
+  mRaw[11] = (mRaw[11] & 0xC0) | ((aSerial>>32)&0x3F); // combine lowest 2 bits of GTIN with highest 6 of serial
+  mRaw[12] = (aSerial>>24)&0xFF;
+  mRaw[13] = (aSerial>>16)&0xFF;
+  mRaw[14] = (aSerial>>8)&0xFF;
+  mRaw[15] = aSerial&0xFF;
 }
 
 
@@ -204,7 +204,7 @@ void DsUid::setNameInSpace(const string &aName, const DsUid &aNameSpace)
   // calculate the hash used as basis for a UUIDv5
   SHA1_Init(&sha_context);
   // - hash the name space UUID
-  SHA1_Update(&sha_context, &aNameSpace.raw, uuidBytes);
+  SHA1_Update(&sha_context, &aNameSpace.mRaw, uuidBytes);
   // - hash the name
   SHA1_Update(&sha_context, aName.c_str(), (unsigned int)aName.size());
   SHA1_Final(sha1, &sha_context);
@@ -216,14 +216,14 @@ void DsUid::setNameInSpace(const string &aName, const DsUid &aNameSpace)
   // - Set the clock_seq_low field to octet 9 of the hash.
   // - Set octets zero through five of the node field to octets 10 through 15 of the hash.
   // ...which means: copy byte 0..15 of the sha1 into the UUID bytes 0..15
-  memcpy(raw, sha1, uuidBytes);
+  memcpy(mRaw, sha1, uuidBytes);
   // Then:
   // - Set the four most significant bits (bits 12 through 15) of the time_hi_and_version field to the appropriate 4-bit version number from Section 4.1.3.
   // ...means: set the UUID version, is 0x5 here
-  raw[6] = (raw[6] & 0x0F) | (0x5<<4);
+  mRaw[6] = (mRaw[6] & 0x0F) | (0x5<<4);
   // - Set the two most significant bits (bits 6 and 7) of the clock_seq_hi_and_reserved to zero and one, respectively.
   // ...means: mark the UUID as RFC4122 type/variant
-  raw[8] = (raw[8] & 0xC0) | (0x2<<6);
+  mRaw[8] = (mRaw[8] & 0xC0) | (0x2<<6);
 }
 
 
@@ -233,8 +233,8 @@ void DsUid::setNameInSpace(const string &aName, const DsUid &aNameSpace)
 bool DsUid::setAsBinary(const string &aBinary)
 {
   if (aBinary.size()==dsuidBytes) {
-    idBytes = dsuidBytes;
-    memcpy(raw, aBinary.c_str(), idBytes);
+    mIdBytes = dsuidBytes;
+    memcpy(mRaw, aBinary.c_str(), mIdBytes);
     detectSubType();
     return true;
   }
@@ -244,7 +244,7 @@ bool DsUid::setAsBinary(const string &aBinary)
 
 string DsUid::getBinary() const
 {
-  return string((const char *)raw,idBytes);
+  return string((const char *)mRaw,mIdBytes);
 }
 
 
@@ -268,16 +268,16 @@ DsUid::DsUid(const char *aString)
 
 void DsUid::detectSubType()
 {
-  if (raw[6]==0 && raw[7]==0 && raw[8]==0 && raw[9]==0) {
+  if (mRaw[6]==0 && mRaw[7]==0 && mRaw[8]==0 && mRaw[9]==0) {
     // EPC96, check which one
-    if (raw[0]==SGTIN96Header)
-      idType = idtype_sgtin;
-    else if (raw[0]==GID96Header)
-      idType = idtype_gid;
+    if (mRaw[0]==SGTIN96Header)
+      mIdType = idtype_sgtin;
+    else if (mRaw[0]==GID96Header)
+      mIdType = idtype_gid;
   }
   else {
     // UUID
-    idType = idtype_uuid;
+    mIdType = idtype_uuid;
   }
 }
 
@@ -305,19 +305,19 @@ bool DsUid::setAsString(const string &aString)
     }
     else {
       b |= c;
-      raw[byteIndex++]=b;
+      mRaw[byteIndex++]=b;
       firstNibble = true;
     }
   }
   // determine type of dSUID
   if (byteIndex==dsuidBytes || (hasDashes && byteIndex==uuidBytes)) {
     // must be a dSUID (when read with dashes, it can also be a pure UUID without the subdevice index byte)
-    idType = idtype_other;
-    idBytes = dsuidBytes;
+    mIdType = idtype_other;
+    mIdBytes = dsuidBytes;
     // - determine subtype
     detectSubType();
     if (byteIndex==uuidBytes)
-      raw[16] = 0; // specified as pure UUID, set subdevice index == 0
+      mRaw[16] = 0; // specified as pure UUID, set subdevice index == 0
   }
   else {
     // unknown format
@@ -336,8 +336,8 @@ bool DsUid::setAsString(const string &aString)
 string DsUid::getString() const
 {
   string s;
-  for (int i=0; i<idBytes; i++) {
-    string_format_append(s, "%02X", raw[i]);
+  for (int i=0; i<mIdBytes; i++) {
+    string_format_append(s, "%02X", mRaw[i]);
   }
   return s;
 }
@@ -348,17 +348,17 @@ string DsUid::getString() const
 
 bool DsUid::operator== (const DsUid &aDsUid) const
 {
-  if (idType!=aDsUid.idType) return false;
-  return memcmp(raw, aDsUid.raw, idBytes)==0;
+  if (mIdType!=aDsUid.mIdType) return false;
+  return memcmp(mRaw, aDsUid.mRaw, mIdBytes)==0;
 }
 
 
 bool DsUid::operator< (const DsUid &aDsUid) const
 {
-  if (idType==aDsUid.idType)
-    return memcmp(raw, aDsUid.raw, idBytes)<0;
+  if (mIdType==aDsUid.mIdType)
+    return memcmp(mRaw, aDsUid.mRaw, mIdBytes)<0;
   else
-    return idType<aDsUid.idType;
+    return mIdType<aDsUid.mIdType;
 }
 
 
@@ -368,7 +368,7 @@ bool DsUid::operator< (const DsUid &aDsUid) const
 void DsUid::xorDsUidIntoMix(string &aMix, bool aHashSubDeviceIndex)
 {
   string b = getBinary(); // will always be of size dsuidBytes
-  if (aHashSubDeviceIndex && idBytes==dsuidBytes) {
+  if (aHashSubDeviceIndex && mIdBytes==dsuidBytes) {
     // add a fnv hash over the complete dsuid including subdevice index into the last 4 bytes
     // (this reduces collision probability when mixing multiple subdevices from the same device)
     Fnv32 fnv;

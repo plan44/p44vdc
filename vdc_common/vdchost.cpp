@@ -877,7 +877,7 @@ bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsCl
   #if ENABLE_LOCALCONTROLLER
   if (localController) {
     if (localController->processButtonClick(aButtonBehaviour, aClickType)) {
-      LOG(LOG_NOTICE, "localcontroller has handled clicktype %d from Button[%zu] '%s' in %s", aClickType, aButtonBehaviour.index, aButtonBehaviour.getHardwareName().c_str(), aButtonBehaviour.device.shortDesc().c_str());
+      LOG(LOG_NOTICE, "localcontroller has handled clicktype %d from Button[%zu] '%s' in %s", aClickType, aButtonBehaviour.mIndex, aButtonBehaviour.getHardwareName().c_str(), aButtonBehaviour.mDevice.shortDesc().c_str());
       return true; // handled
     }
   }
@@ -997,7 +997,7 @@ void VdcHost::addTargetToAudience(NotificationAudience &aAudience, DsAddressable
   DevicePtr dev = boost::dynamic_pointer_cast<Device>(aTarget);
   if (dev) {
     // is a device, associated with a vDC
-    vdc = dev->vdcP;
+    vdc = dev->mVdcP;
   }
   // search for notification group for this vdc (for devices, vdc!=NULL) or none (for other addressables, vdc==NULL)
   for (NotificationAudience::iterator pos = aAudience.begin(); pos!=aAudience.end(); ++pos) {
@@ -1522,7 +1522,7 @@ void VdcHost::announceNext()
     DevicePtr dev = pos->second;
     if (
       dev->isPublicDS() && // only public ones
-      (dev->vdcP->isAnnounced()) && // class container must have already completed an announcement...
+      (dev->mVdcP->isAnnounced()) && // class container must have already completed an announcement...
       !dev->isAnnounced() && // ...but not yet device...
       (dev->announcing==Never || MainLoop::now()>dev->announcing+ANNOUNCE_RETRY_TIMEOUT) // ...and not too soon after last attempt to announce
     ) {
@@ -1532,7 +1532,7 @@ void VdcHost::announceNext()
       ApiValuePtr params = getVdcHost().getSessionConnection()->newApiValue();
       params->setType(apivalue_object);
       // include link to vdc for device announcements
-      params->add("vdc_dSUID", params->newBinary(dev->vdcP->getDsUid().getBinary()));
+      params->add("vdc_dSUID", params->newBinary(dev->mVdcP->getDsUid().getBinary()));
       if (!dev->sendRequest("announcedevice", params, boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
         LOG(LOG_ERR, "Could not send device announcement message for %s %s", dev->entityType(), dev->shortDesc().c_str());
         dev->announcing = Never; // not announcing
@@ -1830,7 +1830,7 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
   for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
     DevicePtr dev = pos->second;
     // Sensors
-    for (BehaviourVector::iterator pos2 = dev->sensors.begin(); pos2!=dev->sensors.end(); ++pos2) {
+    for (BehaviourVector::iterator pos2 = dev->mSensors.begin(); pos2!=dev->mSensors.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
       if (vs && vs->isEnabled()) {
@@ -1838,7 +1838,7 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
       }
     }
     // Inputs
-    for (BehaviourVector::iterator pos2 = dev->inputs.begin(); pos2!=dev->inputs.end(); ++pos2) {
+    for (BehaviourVector::iterator pos2 = dev->mInputs.begin(); pos2!=dev->mInputs.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
       if (vs && vs->isEnabled()) {
@@ -1846,7 +1846,7 @@ void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
       }
     }
     // Buttons
-    for (BehaviourVector::iterator pos2 = dev->buttons.begin(); pos2!=dev->buttons.end(); ++pos2) {
+    for (BehaviourVector::iterator pos2 = dev->mButtons.begin(); pos2!=dev->mButtons.end(); ++pos2) {
       DsBehaviourPtr b = *pos2;
       ValueSource *vs = dynamic_cast<ValueSource *>(b.get());
       if (vs && vs->isEnabled()) {

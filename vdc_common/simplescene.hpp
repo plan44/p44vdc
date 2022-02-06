@@ -40,8 +40,8 @@ namespace p44 {
     /// @{
 
     double value; ///< scene value
-    VdcSceneEffect effect; ///< scene effect (transition or alert)
-    uint32_t effectParam; ///< parameter for the effect (such as per-scene transition time)
+    VdcSceneEffect mEffect; ///< scene effect (transition or alert)
+    uint32_t mEffectParam; ///< parameter for the effect (such as per-scene transition time)
 
     /// @}
 
@@ -95,7 +95,7 @@ namespace p44 {
     /// @name SimpleCmdScene specific values
     /// @{
 
-    string command;
+    string mCommand;
 
     /// @}
 

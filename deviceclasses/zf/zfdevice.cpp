@@ -51,7 +51,7 @@ ZfDevice::ZfDevice(ZfVdc *aVdcP, ZfDeviceType aDeviceType) :
 
 ZfVdc &ZfDevice::getZfVdc()
 {
-  return *(static_cast<ZfVdc *>(vdcP));
+  return *(static_cast<ZfVdc *>(mVdcP));
 }
 
 
@@ -80,7 +80,7 @@ void ZfDevice::deriveDsUid()
   // vDC implementation specific UUID:
   //   UUIDv5 with name = vdcClassIdentifier::unique_zf_address
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s = vdcP->vdcClassIdentifier();
+  string s = mVdcP->vdcClassIdentifier();
   string_format_append(s, "%08X", getAddress()); // hashed part of dSUID comes from unique ZF address
   dSUID.setNameInSpace(s, vdcNamespace);
   dSUID.setSubdeviceIndex(getSubDevice()); // subdevice index is represented in the dSUID subdevice index byte
@@ -429,15 +429,15 @@ void ZfDevice::switchTypes(const ZfTypeVariantEntry &aFromVariant, const ZfTypeV
       hasNameOrZone = true;
       newDev->initializeName(getAssignedName());
     }
-    if (newDev->deviceSettings && getZoneID()!=0) {
+    if (newDev->mDeviceSettings && getZoneID()!=0) {
       hasNameOrZone = true;
-      newDev->deviceSettings->zoneID = getZoneID();
+      newDev->mDeviceSettings->zoneID = getZoneID();
     }
     // - add it to the container
     getZfVdc().addAndRememberDevice(newDev);
     // - make it dirty if we have set zone or name
-    if (hasNameOrZone && newDev->deviceSettings) {
-      newDev->deviceSettings->markDirty(); // make sure name and/or zone are saved permanently
+    if (hasNameOrZone && newDev->mDeviceSettings) {
+      newDev->mDeviceSettings->markDirty(); // make sure name and/or zone are saved permanently
     }
     // Note: subDeviceIndex is incremented according to device's index space requirements by newDevice() implementation
   }

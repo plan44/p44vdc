@@ -39,7 +39,7 @@ namespace p44 {
   public:
     ShadowPositionChannel(OutputBehaviour &aOutput) : inherited(aOutput, "shadePositionOutside")
     {
-      resolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
+      mResolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
       fullRangeTime = 50*Second; // just an average blind full range time
     };
 
@@ -66,7 +66,7 @@ namespace p44 {
   public:
     ShadowAngleChannel(OutputBehaviour &aOutput) : inherited(aOutput, "shadeOpeningAngleOutside")
     {
-      resolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
+      mResolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
       fullRangeTime = 1.5*Second; // just an average blind angle turn time
     };
 

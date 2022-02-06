@@ -31,12 +31,12 @@ using namespace p44;
 
 DsBehaviour::DsBehaviour(Device &aDevice, const string aBehaviourId) :
   inheritedParams(aDevice.getVdcHost().getDsParamStore()),
-  behaviourId(aBehaviourId),
-  index(0),
-  device(aDevice),
-  hardwareName(""), // empty, will show behaviour ID by default
-  hardwareError(hardwareError_none),
-  hardwareErrorUpdated(p44::Never)
+  mBehaviourId(aBehaviourId),
+  mIndex(0),
+  mDevice(aDevice),
+  mHardwareName(""), // empty, will show behaviour ID by default
+  mHardwareError(hardwareError_none),
+  mHardwareErrorUpdated(p44::Never)
 {
 }
 
@@ -48,10 +48,10 @@ DsBehaviour::~DsBehaviour()
 
 void DsBehaviour::setHardwareError(VdcHardwareError aHardwareError)
 {
-  if (aHardwareError!=hardwareError) {
+  if (aHardwareError!=mHardwareError) {
     // error status has changed
-    hardwareError = aHardwareError;
-    hardwareErrorUpdated = MainLoop::now();
+    mHardwareError = aHardwareError;
+    mHardwareErrorUpdated = MainLoop::now();
     // push the error status change
     pushBehaviourState();
   }
@@ -60,14 +60,14 @@ void DsBehaviour::setHardwareError(VdcHardwareError aHardwareError)
 
 bool DsBehaviour::pushBehaviourState()
 {
-  VdcApiConnectionPtr api = device.getVdcHost().getSessionConnection();
+  VdcApiConnectionPtr api = mDevice.getVdcHost().getSessionConnection();
   if (api) {
     ApiValuePtr query = api->newApiValue();
     query->setType(apivalue_object);
     ApiValuePtr subQuery = query->newValue(apivalue_object);
     subQuery->add(getApiId(api->getApiVersion()), subQuery->newValue(apivalue_null));
     query->add(string(getTypeName()).append("States"), subQuery);
-    return device.pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
+    return mDevice.pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
   }
   // could not push
   return false;
@@ -76,7 +76,7 @@ bool DsBehaviour::pushBehaviourState()
 
 string DsBehaviour::getDbKey()
 {
-  return string_format("%s_%zu",device.dSUID.getString().c_str(),index);
+  return string_format("%s_%zu",mDevice.dSUID.getString().c_str(),mIndex);
 }
 
 
@@ -107,8 +107,8 @@ ErrorPtr DsBehaviour::forget()
 
 string DsBehaviour::getApiId(int aApiVersion)
 {
-  if (aApiVersion>=3 && !behaviourId.empty()) {
-    return behaviourId;
+  if (aApiVersion>=3 && !mBehaviourId.empty()) {
+    return mBehaviourId;
   }
   else {
     // no channel ID set, default to decimal string representation of channel type
@@ -249,7 +249,7 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
         // settings
         case logLevelOffset_key+settings_key_offset: { int o=getLocalLogLevelOffset(); if (o==0) return false; else aPropValue->setInt32Value(o); return true; }
         // state
-        case error_key+states_key_offset: aPropValue->setUint16Value(hardwareError); return true;
+        case error_key+states_key_offset: aPropValue->setUint16Value(mHardwareError); return true;
       }
     }
     else {
@@ -279,7 +279,7 @@ string DsBehaviour::shortDesc()
 string DsBehaviour::description()
 {
   string s = string_format("\n- behaviour hardware name: '%s'", getHardwareName().c_str());
-  string_format_append(s, "\n- hardwareError: %d\n", hardwareError);
+  string_format_append(s, "\n- hardwareError: %d\n", mHardwareError);
   return s;
 }
 
@@ -288,7 +288,7 @@ int DsBehaviour::getLogLevelOffset()
 {
   if (logLevelOffset==0) {
     // no own offset - inherit device's
-    return device.getLogLevelOffset();
+    return mDevice.getLogLevelOffset();
   }
   return inheritedProps::getLogLevelOffset();
 }
@@ -296,7 +296,7 @@ int DsBehaviour::getLogLevelOffset()
 
 string DsBehaviour::logContextPrefix()
 {
-  return string_format("%s: %s[%zu] %s '%s'", device.logContextPrefix().c_str(), getTypeName(), getIndex(), getApiId(3).c_str(), getHardwareName().c_str());
+  return string_format("%s: %s[%zu] %s '%s'", mDevice.logContextPrefix().c_str(), getTypeName(), getIndex(), getApiId(3).c_str(), getHardwareName().c_str());
 }
 
 

@@ -72,7 +72,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   if (consoleIoType==consoleio_button) {
     // Simulate Button device
     // - defaults to black (generic button)
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // - standard device settings without scene table
     installSettings();
     // - console key input as button
@@ -88,7 +88,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   if (consoleIoType==consoleio_rocker) {
     // Simulate Two-way Rocker Button device
     // - defaults to black (generic button)
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     // - standard device settings without scene table
     installSettings();
     // - create down button (index 0)
@@ -110,7 +110,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   }
   else if (consoleIoType==consoleio_input) {
     // Standard device settings without scene table
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     installSettings();
     // Digital input as binary input (AKM, automation block type)
     consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
@@ -122,7 +122,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   }
   else if (consoleIoType==consoleio_sensor) {
     // Standard device settings without scene table
-    colorClass = class_black_joker;
+    mColorClass = class_black_joker;
     installSettings();
     // Analog sensor value, which can be changed up and down with two keys
     consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
@@ -139,7 +139,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   else if (consoleIoType==consoleio_valve) {
     // simulate heating valve with lo bat (like thermokon SAB02,SAB05 or Kieback+Peter MD15-FTL)
     // - is heating
-    colorClass = class_blue_climate;
+    mColorClass = class_blue_climate;
     // - valve needs climate control scene table (ClimateControlScene)
     installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*this)));
     // - create climate control outout
@@ -172,7 +172,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   else if (consoleIoType==consoleio_dimmer) {
     // Simple single-channel light
     // - defaults to yellow (light)
-    colorClass = class_yellow_light;
+    mColorClass = class_yellow_light;
     // - use light settings, which include a scene table
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
     // - add simple single-channel light behaviour
@@ -183,7 +183,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   else if (consoleIoType==consoleio_colordimmer) {
     // Color light
     // - defaults to yellow (light)
-    colorClass = class_yellow_light;
+    mColorClass = class_yellow_light;
     // - use color light settings, which include a color scene table
     installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
     // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
@@ -325,7 +325,7 @@ void ConsoleDevice::deriveDsUid()
   // vDC implementation specific UUID:
   //   UUIDv5 with name = classcontainerinstanceid::consoledevicename
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s = vdcP->vdcInstanceIdentifier();
+  string s = mVdcP->vdcInstanceIdentifier();
   s += "::" + consoleName;
   dSUID.setNameInSpace(s, vdcNamespace);
 }

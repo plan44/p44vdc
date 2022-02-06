@@ -1727,11 +1727,11 @@ bool SingleDevice::prepareSceneCall(DsScenePtr aScene)
   bool continueApply = true;
   if (cs) {
     // execute custom scene commands
-    if (!cs->command.empty()) {
+    if (!cs->mCommand.empty()) {
       // special case: singledevice also directly executes non-prefixed commands,
       string cmd, cmdargs;
       bool isDeviceAction = false;
-      if (keyAndValue(cs->command, cmd, cmdargs, ':')) {
+      if (keyAndValue(cs->mCommand, cmd, cmdargs, ':')) {
         if (cmd==SCENECMD_DEVICE_ACTION) {
           // prefixed
           isDeviceAction = true;
@@ -1742,14 +1742,14 @@ bool SingleDevice::prepareSceneCall(DsScenePtr aScene)
             // prefix contains things that can't be a prefix -> assume entire string is a deviceAction
             // Note: dS internally used actions are prefixed with "std." or "cust.", so these always work as direct deviceActions
             isDeviceAction = true;
-            cmdargs = cs->command; // entire string as device action
+            cmdargs = cs->mCommand; // entire string as device action
           }
         }
       }
       else {
         // no prefix at all -> default to deviceaction anyway
         isDeviceAction = true;
-        cmdargs = cs->command; // entire string as device action
+        cmdargs = cs->mCommand; // entire string as device action
       }
       if (isDeviceAction) {
         // Syntax: actionid[:<JSON object with params>]
@@ -1772,7 +1772,7 @@ bool SingleDevice::prepareSceneCall(DsScenePtr aScene)
           j = JsonObject::newObj();
         }
         actionParams = JsonApiValue::newValueFromJson(j);
-        OLOG(LOG_NOTICE, "invoking action via scene %d command: %s:%s", aScene->sceneNo, actionid.c_str(), actionParams->description().c_str());
+        OLOG(LOG_NOTICE, "invoking action via scene %d command: %s:%s", aScene->mSceneNo, actionid.c_str(), actionParams->description().c_str());
         call(actionid, actionParams, boost::bind(&SingleDevice::sceneInvokedActionComplete, this, _1));
         return false; // do not continue applying
       }

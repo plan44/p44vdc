@@ -59,12 +59,12 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     LOG(LOG_ERR, "unknown analog IO type: %s", mode.c_str());
   }
   // by default, act as black device so we can configure colors
-  colorClass = class_black_joker;
+  mColorClass = class_black_joker;
   if (analogIOType==analogio_dimmer) {
     // Analog output as dimmer
     analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
     // - is light
-    colorClass = class_yellow_light;
+    mColorClass = class_yellow_light;
     // - use light settings, which include a scene table
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
     // - add simple single-channel light behaviour
@@ -74,7 +74,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   }
   else if (analogIOType==analogio_rgbdimmer) {
     // - is light
-    colorClass = class_yellow_light;
+    mColorClass = class_yellow_light;
     // - need 3 IO names for R,G,B, optional fourth for W
     size_t p;
     p = ioname.find("|");
@@ -111,7 +111,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     // Analog output as valve controlling output
     analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
     // - is heating
-    colorClass = class_blue_climate;
+    mColorClass = class_blue_climate;
     // - valve needs climate control scene table (ClimateControlScene)
     installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*this)));
     // - create climate control outout
@@ -293,7 +293,7 @@ void AnalogIODevice::deriveDsUid()
   // vDC implementation specific UUID:
   //   UUIDv5 with name = classcontainerinstanceid::ioname[:ioname ...]
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s = vdcP->vdcInstanceIdentifier();
+  string s = mVdcP->vdcInstanceIdentifier();
   string_format_append(s, ":%d:", (int)analogIOType);
   if (analogIO) { s += ":"; s += analogIO->getName(); }
   if (analogIO2) { s += ":"; s += analogIO2->getName(); }

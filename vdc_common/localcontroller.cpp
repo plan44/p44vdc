@@ -1663,7 +1663,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
   }
   else {
     // room scene
-    zoneID = aButtonBehaviour.device.getZoneID();
+    zoneID = aButtonBehaviour.mDevice.getZoneID();
     channelType = aButtonBehaviour.buttonChannel;
     ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
     if (!zone) return false; // button in a non-local zone, cannot handle

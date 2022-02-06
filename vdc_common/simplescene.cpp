@@ -33,8 +33,8 @@ SimpleScene::SimpleScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSce
   inherited(aSceneDeviceSettings, aSceneNo)
 {
   value = 0;
-  effect = scene_effect_smooth;
-  effectParam = 0;
+  mEffect = scene_effect_smooth;
+  mEffectParam = 0;
 }
 
 
@@ -59,8 +59,8 @@ uint64_t SimpleScene::sceneHash()
 {
   // generic implementation: hash over all values and all flags, plus simplescene specific effect/effectparam
   Fnv64 hash(inherited::sceneHash());
-  hash.addBytes(sizeof(effect), (uint8_t *)&effect); // is platform dependent, but does not matter - this is for caching only
-  hash.addBytes(sizeof(effectParam), (uint8_t *)&effectParam); // is platform dependent, but does not matter - this is for caching only
+  hash.addBytes(sizeof(mEffect), (uint8_t *)&mEffect); // is platform dependent, but does not matter - this is for caching only
+  hash.addBytes(sizeof(mEffectParam), (uint8_t *)&mEffectParam); // is platform dependent, but does not matter - this is for caching only
   return hash.getHash();
 }
 
@@ -105,8 +105,8 @@ void SimpleScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uin
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
   value = aRow->get<double>(aIndex++);
-  effect = (VdcSceneEffect)aRow->get<int>(aIndex++);
-  effectParam = aRow->getWithDefault(aIndex++,(int)0);
+  mEffect = (VdcSceneEffect)aRow->get<int>(aIndex++);
+  mEffectParam = aRow->getWithDefault(aIndex++,(int)0);
 }
 
 
@@ -116,8 +116,8 @@ void SimpleScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex,
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, value);
-  aStatement.bind(aIndex++, effect);
-  aStatement.bind(aIndex++, (int)effectParam);
+  aStatement.bind(aIndex++, mEffect);
+  aStatement.bind(aIndex++, (int)mEffectParam);
 }
 
 
@@ -160,10 +160,10 @@ bool SimpleScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case effect_key:
-          aPropValue->setUint8Value(effect);
+          aPropValue->setUint8Value(mEffect);
           return true;
         case effectParam_key:
-          aPropValue->setUint32Value(effectParam);
+          aPropValue->setUint32Value(mEffectParam);
           return true;
       }
     }
@@ -171,10 +171,10 @@ bool SimpleScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         case effect_key:
-          setPVar(effect, (VdcSceneEffect)aPropValue->uint8Value());
+          setPVar(mEffect, (VdcSceneEffect)aPropValue->uint8Value());
           return true;
         case effectParam_key:
-          setPVar(effectParam, aPropValue->uint32Value());
+          setPVar(mEffectParam, aPropValue->uint32Value());
           return true;
       }
     }
@@ -327,11 +327,11 @@ void SimpleScene::setDefaultSceneValues(SceneNo aSceneNo)
   setIgnoreLocalPriority(p.ignoreLocalPriority);
   setDontCare(p.dontCare);
   // - common scene immutable values
-  sceneCmd = p.sceneCmd;
-  sceneArea = p.sceneArea;
+  mSceneCmd = p.sceneCmd;
+  mSceneArea = p.sceneArea;
   // - simple scene specifics
   value = p.value;
-  effect = p.effect;
+  mEffect = p.effect;
   markClean(); // default values are always clean (but setIgnoreLocalPriority sets dirty)
 }
 
@@ -343,7 +343,7 @@ void SimpleScene::setDefaultSceneValues(SceneNo aSceneNo)
 SimpleCmdScene::SimpleCmdScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo)
 {
-  command.clear();
+  mCommand.clear();
 }
 
 const char *SimpleCmdScene::tableName()
@@ -379,7 +379,7 @@ void SimpleCmdScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
-  command = nonNullCStr(aRow->get<const char *>(aIndex++));
+  mCommand = nonNullCStr(aRow->get<const char *>(aIndex++));
 }
 
 
@@ -388,7 +388,7 @@ void SimpleCmdScene::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, command.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mCommand.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
@@ -418,7 +418,7 @@ int SimpleCmdScene::substitutePlaceholders(string &aCommandStr)
     string k,chv,rep;
     rep.clear(); // by default: no replacement string
     if (v=="sceneno") {
-      rep = string_format("%d", sceneNo);
+      rep = string_format("%d", mSceneNo);
     }
     else if (keyAndValue(v, k, chv, ':')) {
       // scan channel number with optional scaling and offset
@@ -508,7 +508,7 @@ bool SimpleCmdScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case command_key:
-          aPropValue->setStringValue(command);
+          aPropValue->setStringValue(mCommand);
           return true;
       }
     }
@@ -516,7 +516,7 @@ bool SimpleCmdScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         case effect_key:
-          setPVar(command, aPropValue->stringValue());
+          setPVar(mCommand, aPropValue->stringValue());
           return true;
       }
     }

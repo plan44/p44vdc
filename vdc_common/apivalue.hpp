@@ -58,7 +58,7 @@ namespace p44 {
   {
   protected:
 
-    ApiValueType objectType;
+    ApiValueType mObjectType;
 
   public:
 

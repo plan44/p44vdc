@@ -37,7 +37,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    VPosChannel(OutputBehaviour &aOutput) : inherited(aOutput, "vPos") { resolution = 0.01; cachedChannelValue = 50; };
+    VPosChannel(OutputBehaviour &aOutput) : inherited(aOutput, "vPos") { mResolution = 0.01; mCachedChannelValue = 50; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_position_v; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
@@ -52,7 +52,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    HPosChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hPos") { resolution = 0.01; cachedChannelValue = 50; };
+    HPosChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hPos") { mResolution = 0.01; mCachedChannelValue = 50; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_position_h; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
@@ -182,7 +182,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    VZoomChannel(OutputBehaviour &aOutput) : inherited(aOutput, "vZoom") { resolution = 0.01; cachedChannelValue = DEFAULT_ZOOM; };
+    VZoomChannel(OutputBehaviour &aOutput) : inherited(aOutput, "vZoom") { mResolution = 0.01; mCachedChannelValue = DEFAULT_ZOOM; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_zoom_v; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
@@ -197,7 +197,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    HZoomChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hZoom") { resolution = 0.01; cachedChannelValue = DEFAULT_ZOOM; };
+    HZoomChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hZoom") { mResolution = 0.01; mCachedChannelValue = DEFAULT_ZOOM; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_zoom_h; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
@@ -212,7 +212,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    RotationChannel(OutputBehaviour &aOutput) : inherited(aOutput, "rotation") { resolution = 1; };
+    RotationChannel(OutputBehaviour &aOutput) : inherited(aOutput, "rotation") { mResolution = 1; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_rotation; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_degree, unitScaling_1); };
@@ -228,7 +228,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    GradientChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 0.1; /* arbitrary */ };
+    GradientChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 0.1; /* arbitrary */ };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual double getMin() P44_OVERRIDE { return -100; }; ///< gradients go from -100 to +100
     virtual double getMax() P44_OVERRIDE { return 100; }; ///< gradients go from -100 to +100
@@ -240,7 +240,7 @@ namespace p44 {
     typedef GradientChannel inherited;
 
   public:
-    BrightnessGradientChannel(OutputBehaviour &aOutput) : inherited(aOutput, "brightnessGradient") { cachedChannelValue = DEFAULT_BRIGHTNESS_GRADIENT; };
+    BrightnessGradientChannel(OutputBehaviour &aOutput) : inherited(aOutput, "brightnessGradient") { mCachedChannelValue = DEFAULT_BRIGHTNESS_GRADIENT; };
     virtual const char *getName() P44_OVERRIDE { return "brightness gradient"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_brightness_gradient; }; ///< the dS channel type
   };
@@ -250,7 +250,7 @@ namespace p44 {
     typedef GradientChannel inherited;
 
   public:
-    HueGradientChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hueGradient") { cachedChannelValue = DEFAULT_HUE_GRADIENT; };
+    HueGradientChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hueGradient") { mCachedChannelValue = DEFAULT_HUE_GRADIENT; };
     virtual const char *getName() P44_OVERRIDE { return "hue gradient"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_hue_gradient; }; ///< the dS channel type
   };
@@ -260,7 +260,7 @@ namespace p44 {
     typedef GradientChannel inherited;
 
   public:
-    SaturationGradientChannel(OutputBehaviour &aOutput) : inherited(aOutput, "saturationGradient") { cachedChannelValue = DEFAULT_SATURATION_GRADIENT; };
+    SaturationGradientChannel(OutputBehaviour &aOutput) : inherited(aOutput, "saturationGradient") { mCachedChannelValue = DEFAULT_SATURATION_GRADIENT; };
     virtual const char *getName() P44_OVERRIDE { return "saturation gradient"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_saturation_gradient; }; ///< the dS channel type
   };
@@ -271,7 +271,7 @@ namespace p44 {
     typedef DialChannel inherited;
 
   public:
-    FeatureModeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "featureMode") { setMax(MAX_FEATURE_MODE); cachedChannelValue = DEFAULT_FEATURE_MODE; };
+    FeatureModeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "featureMode") { setMax(MAX_FEATURE_MODE); mCachedChannelValue = DEFAULT_FEATURE_MODE; };
     virtual const char *getName() P44_OVERRIDE { return "feature mode"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_feature_mode; }; ///< the dS channel type
   };

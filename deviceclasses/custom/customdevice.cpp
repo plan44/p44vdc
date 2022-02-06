@@ -624,20 +624,20 @@ bool CustomDevice::prepareSceneCall(DsScenePtr aScene)
 {
   if (mSceneCalls) {
     if (mSimpletext) {
-      string m = string_format("CALLSCENE=%d", aScene->sceneNo);
+      string m = string_format("CALLSCENE=%d", aScene->mSceneNo);
       sendDeviceApiSimpleMessage(m);
     }
     else {
       JsonObjectPtr message = JsonObject::newObj();
       message->add("message", JsonObject::newString("callscene"));
-      message->add("sceneno", JsonObject::newInt32(aScene->sceneNo));
+      message->add("sceneno", JsonObject::newInt32(aScene->mSceneNo));
       sendDeviceApiJsonMessage(message);
     }
   }
   if (mSceneCommands) {
     // forward (built-in, behaviour-defined) scene commands to external device
     const char *sceneCommandStr = NULL;
-    switch (aScene->sceneCmd) {
+    switch (aScene->mSceneCmd) {
       case scene_cmd_none: break; // explicit NOP
       case scene_cmd_invoke: break; // no need to forward, the semantics are fully covered by applying channels
       case scene_cmd_off: sceneCommandStr = "OFF"; break;
@@ -676,7 +676,7 @@ bool CustomDevice::prepareSceneCall(DsScenePtr aScene)
 bool CustomDevice::prepareSceneApply(DsScenePtr aScene)
 {
   // only implemented to catch "UNDO"
-  if (mSceneCommands && aScene->sceneCmd==scene_cmd_undo) {
+  if (mSceneCommands && aScene->mSceneCmd==scene_cmd_undo) {
     if (mSimpletext) {
       string m = string_format("SCMD=UNDO");
       sendDeviceApiSimpleMessage(m);
@@ -881,7 +881,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     // not suitable dSUID or UUID syntax, create hashed dSUID
     DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
     //   UUIDv5 with name = classcontainerinstanceid:uniqueid
-    string s = vdcP->vdcInstanceIdentifier();
+    string s = mVdcP->vdcInstanceIdentifier();
     s += ':';
     s += uniqueid;
     dSUID.setNameInSpace(s, vdcNamespace);
@@ -892,13 +892,13 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   }
   // Output
   // - get group (overridden for some output types)
-  colorClass = class_undefined; // none set so far
+  mColorClass = class_undefined; // none set so far
   DsGroup defaultGroup = group_undefined; // none set so far
   if (aInitParams->get("group", o)) {
     defaultGroup = (DsGroup)o->int32Value(); // custom output color
   }
   if (aInitParams->get("colorclass", o)) {
-    colorClass = (DsClass)o->int32Value(); // custom color class
+    mColorClass = (DsClass)o->int32Value(); // custom color class
   }
   // - get output type
   string outputType;
@@ -958,7 +958,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   #if ENABLE_CUSTOM_SINGLEDEVICE
   if (outputType=="action") {
     enableAsSingleDevice(); // even without actions defines, this makes the device a single device
-    if (colorClass==class_undefined) colorClass = class_white_singledevices;
+    if (mColorClass==class_undefined) mColorClass = class_white_singledevices;
     if (defaultGroup==group_undefined) defaultGroup = group_black_variable;
     // - use command scene device settings
     installSettings(DeviceSettingsPtr(new CmdSceneDeviceSettings(*this)));
@@ -1132,7 +1132,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("controlvalues", o)) mControlValues = o->boolValue();
   // set primary group to black if group is not yet defined so far
   if (defaultGroup==group_undefined) defaultGroup = group_black_variable;
-  if (colorClass==class_undefined) colorClass = colorClassFromGroup(defaultGroup);
+  if (mColorClass==class_undefined) mColorClass = colorClassFromGroup(defaultGroup);
   // check for groups definition, will override anything set so far
   if (aInitParams->get("groups", o) && getOutput()) {
     getOutput()->resetGroupMembership(); // clear all

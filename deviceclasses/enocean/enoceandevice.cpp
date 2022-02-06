@@ -106,7 +106,7 @@ bool EnoceanDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 EnoceanVdc &EnoceanDevice::getEnoceanVdc()
 {
-  return *(static_cast<EnoceanVdc *>(vdcP));
+  return *(static_cast<EnoceanVdc *>(mVdcP));
 }
 
 
@@ -584,15 +584,15 @@ void EnoceanDevice::switchProfiles(const ProfileVariantEntry &aFromVariant, cons
       hasNameOrZone = true;
       newDev->initializeName(getAssignedName());
     }
-    if (newDev->deviceSettings && getZoneID()!=0) {
+    if (newDev->mDeviceSettings && getZoneID()!=0) {
       hasNameOrZone = true;
-      newDev->deviceSettings->zoneID = getZoneID();
+      newDev->mDeviceSettings->zoneID = getZoneID();
     }
     // - add it to the container
     getEnoceanVdc().addAndRememberDevice(newDev);
     // - make it dirty if we have set zone or name
-    if (hasNameOrZone && newDev->deviceSettings) {
-      newDev->deviceSettings->markDirty(); // make sure name and/or zone are saved permanently
+    if (hasNameOrZone && newDev->mDeviceSettings) {
+      newDev->mDeviceSettings->markDirty(); // make sure name and/or zone are saved permanently
     }
     // Note: subDeviceIndex is incremented according to device's index space requirements by newDevice() implementation
   }

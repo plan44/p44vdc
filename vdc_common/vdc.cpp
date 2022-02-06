@@ -366,9 +366,9 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
   aDeliveryState->audience.pop_front(); // processed, remove from list
   if (aNotificationToApply==ntfy_retrigger) {
     // nothing to apply, retrigger repeat when it is running
-    if (optimizedCallRepeaterTicket && dev->currentAutoStopTime!=Never) {
-      FOCUSOLOG("- retriggering repeater for another %.2f seconds", (double)(dev->currentAutoStopTime)/Second);
-      MainLoop::currentMainLoop().rescheduleExecutionTicket(optimizedCallRepeaterTicket, dev->currentAutoStopTime);
+    if (optimizedCallRepeaterTicket && dev->mCurrentAutoStopTime!=Never) {
+      FOCUSOLOG("- retriggering repeater for another %.2f seconds", (double)(dev->mCurrentAutoStopTime)/Second);
+      MainLoop::currentMainLoop().rescheduleExecutionTicket(optimizedCallRepeaterTicket, dev->mCurrentAutoStopTime);
     }
   }
   else if (aNotificationToApply!=ntfy_none) {

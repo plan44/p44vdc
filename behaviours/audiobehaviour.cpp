@@ -219,33 +219,33 @@ void AudioScene::setDefaultSceneValues(SceneNo aSceneNo)
   bool sci = false; // default: dont ignore content source
   switch (aSceneNo) {
     // group related scenes
-    case AUDIO_REPEAT_OFF: sceneCmd = scene_cmd_audio_repeat_off; break;
-    case AUDIO_REPEAT_1: sceneCmd = scene_cmd_audio_repeat_1; break;
-    case AUDIO_REPEAT_ALL: sceneCmd = scene_cmd_audio_repeat_all; break;
-    case AUDIO_PREV_TITLE: sceneCmd = scene_cmd_audio_previous_title; break;
-    case AUDIO_NEXT_TITLE: sceneCmd = scene_cmd_audio_next_title; break;
-    case AUDIO_PREV_CHANNEL: sceneCmd = scene_cmd_audio_previous_channel; break;
-    case AUDIO_NEXT_CHANNEL: sceneCmd = scene_cmd_audio_next_channel; break;
-    case AUDIO_MUTE: sceneCmd = scene_cmd_audio_mute; break;
-    case AUDIO_UNMUTE: sceneCmd = scene_cmd_audio_unmute; break;
-    case AUDIO_PLAY: sceneCmd = scene_cmd_audio_play; break;
-    case AUDIO_PAUSE: sceneCmd = scene_cmd_audio_pause; break;
-    case AUDIO_SHUFFLE_OFF: sceneCmd = scene_cmd_audio_shuffle_off; break;
-    case AUDIO_SHUFFLE_ON: sceneCmd = scene_cmd_audio_shuffle_on; break;
-    case AUDIO_RESUME_OFF: sceneCmd = scene_cmd_audio_resume_off; break;
-    case AUDIO_RESUME_ON: sceneCmd = scene_cmd_audio_resume_on; break;
+    case AUDIO_REPEAT_OFF: mSceneCmd = scene_cmd_audio_repeat_off; break;
+    case AUDIO_REPEAT_1: mSceneCmd = scene_cmd_audio_repeat_1; break;
+    case AUDIO_REPEAT_ALL: mSceneCmd = scene_cmd_audio_repeat_all; break;
+    case AUDIO_PREV_TITLE: mSceneCmd = scene_cmd_audio_previous_title; break;
+    case AUDIO_NEXT_TITLE: mSceneCmd = scene_cmd_audio_next_title; break;
+    case AUDIO_PREV_CHANNEL: mSceneCmd = scene_cmd_audio_previous_channel; break;
+    case AUDIO_NEXT_CHANNEL: mSceneCmd = scene_cmd_audio_next_channel; break;
+    case AUDIO_MUTE: mSceneCmd = scene_cmd_audio_mute; break;
+    case AUDIO_UNMUTE: mSceneCmd = scene_cmd_audio_unmute; break;
+    case AUDIO_PLAY: mSceneCmd = scene_cmd_audio_play; break;
+    case AUDIO_PAUSE: mSceneCmd = scene_cmd_audio_pause; break;
+    case AUDIO_SHUFFLE_OFF: mSceneCmd = scene_cmd_audio_shuffle_off; break;
+    case AUDIO_SHUFFLE_ON: mSceneCmd = scene_cmd_audio_shuffle_on; break;
+    case AUDIO_RESUME_OFF: mSceneCmd = scene_cmd_audio_resume_off; break;
+    case AUDIO_RESUME_ON: mSceneCmd = scene_cmd_audio_resume_on; break;
     // group independent scenes
     case BELL1:
     case BELL2:
     case BELL3:
     case BELL4:
       // Non-Standard: simple messages
-      globalSceneFlags |= audioflags_fixvol|audioflags_message;
+      mGlobalSceneFlags |= audioflags_fixvol|audioflags_message;
       value = 30;
       break;
     case PANIC:
       value = 0; // silent on panic
-      globalSceneFlags |= audioflags_fixvol;
+      mGlobalSceneFlags |= audioflags_fixvol;
       sci = true;
       psi = true;
       break;
@@ -268,17 +268,17 @@ void AudioScene::setDefaultSceneValues(SceneNo aSceneNo)
     case FIRE:
     case SMOKE:
     case WATER:
-      globalSceneFlags |= audioflags_paused_restore;
+      mGlobalSceneFlags |= audioflags_paused_restore;
       // fall through
     case ALARM1:
     case ALARM2:
     case ALARM3:
     case ALARM4:
-      globalSceneFlags |= audioflags_priority;
+      mGlobalSceneFlags |= audioflags_priority;
       // fall through
     case HAIL:
       value = 30;
-      globalSceneFlags |= audioflags_fixvol|audioflags_message;
+      mGlobalSceneFlags |= audioflags_fixvol|audioflags_message;
       break;
   }
   // adjust volume default setting
@@ -294,7 +294,7 @@ void AudioScene::setDefaultSceneValues(SceneNo aSceneNo)
     powerState = value>0 ? powerState_on : powerState_off;
     // fixvol for mute scenes
     if (value==0) {
-      globalSceneFlags |= audioflags_fixvol;
+      mGlobalSceneFlags |= audioflags_fixvol;
     }
   }
   // adjust per-channel dontcare
@@ -311,7 +311,7 @@ void AudioScene::setDefaultSceneValues(SceneNo aSceneNo)
 
 bool AudioScene::hasFixVol()
 {
-  return (globalSceneFlags & audioflags_fixvol)!=0;
+  return (mGlobalSceneFlags & audioflags_fixvol)!=0;
 }
 
 void AudioScene::setFixVol(bool aNewValue)
@@ -322,7 +322,7 @@ void AudioScene::setFixVol(bool aNewValue)
 
 bool AudioScene::isMessage()
 {
-  return (globalSceneFlags & audioflags_message)!=0;
+  return (mGlobalSceneFlags & audioflags_message)!=0;
 }
 
 void AudioScene::setMessage(bool aNewValue)
@@ -333,7 +333,7 @@ void AudioScene::setMessage(bool aNewValue)
 
 bool AudioScene::hasPriority()
 {
-  return (globalSceneFlags & audioflags_priority)!=0;
+  return (mGlobalSceneFlags & audioflags_priority)!=0;
 }
 
 void AudioScene::setPriority(bool aNewValue)
@@ -344,7 +344,7 @@ void AudioScene::setPriority(bool aNewValue)
 
 bool AudioScene::isInterruptible()
 {
-  return (globalSceneFlags & audioflags_interruptible)!=0;
+  return (mGlobalSceneFlags & audioflags_interruptible)!=0;
 }
 
 void AudioScene::setInterruptible(bool aNewValue)
@@ -355,7 +355,7 @@ void AudioScene::setInterruptible(bool aNewValue)
 
 bool AudioScene::hasPausedRestore()
 {
-  return (globalSceneFlags & audioflags_paused_restore)!=0;
+  return (mGlobalSceneFlags & audioflags_paused_restore)!=0;
 }
 
 void AudioScene::setPausedRestore(bool aNewValue)
@@ -495,10 +495,10 @@ void AudioBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     // - powerstate
     powerState->setChannelValueIfNotDontCare(aScene, audioScene->powerState, 0, 0, false);
     // - content source
-    contentSource->setChannelValueIfNotDontCare(aScene, audioScene->contentSource, !audioScene->command.empty()); // always apply if there is a command
+    contentSource->setChannelValueIfNotDontCare(aScene, audioScene->contentSource, !audioScene->mCommand.empty()); // always apply if there is a command
     // - state restore command
-    stateRestoreCmd = audioScene->command;
-    stateRestoreCmdValid = !audioScene->command.empty(); // only non-empty command is considered valid
+    stateRestoreCmd = audioScene->mCommand;
+    stateRestoreCmdValid = !audioScene->mCommand.empty(); // only non-empty command is considered valid
   }
 }
 
@@ -516,7 +516,7 @@ void AudioBehaviour::saveChannelsToScene(DsScenePtr aScene)
     audioScene->setSceneValueFlags(contentSource->getChannelIndex(), valueflags_dontCare, false);
     // save command from scene if there is one
     if (stateRestoreCmdValid) {
-      audioScene->setPVar(audioScene->command, stateRestoreCmd);
+      audioScene->setPVar(audioScene->mCommand, stateRestoreCmd);
     }
   }
 }

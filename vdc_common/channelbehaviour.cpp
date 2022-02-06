@@ -28,24 +28,24 @@ using namespace p44;
 // MARK: - channel behaviour
 
 ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChannelId) :
-  inheritedParams(aOutput.device.getVdcHost().getDsParamStore()),
-  output(aOutput),
-  channelId(aChannelId),
-  channelUpdatePending(false), // no output update pending
-  nextTransitionTime(0), // none
-  channelLastSync(Never), // we don't known nor have we sent the output state
-  cachedChannelValue(0), // channel output value cache
-  volatileValue(true), // not worth saving yet
-  previousChannelValue(0), // previous output value
-  transitionProgress(1), // no transition in progress
-  resolution(1) // dummy default resolution (derived classes must provide sensible defaults)
+  inheritedParams(aOutput.mDevice.getVdcHost().getDsParamStore()),
+  mOutput(aOutput),
+  mChannelId(aChannelId),
+  mChannelUpdatePending(false), // no output update pending
+  mNextTransitionTime(0), // none
+  mChannelLastSync(Never), // we don't known nor have we sent the output state
+  mCachedChannelValue(0), // channel output value cache
+  mIsVolatileValue(true), // not worth saving yet
+  mPreviousChannelValue(0), // previous output value
+  mTransitionProgress(1), // no transition in progress
+  mResolution(1) // dummy default resolution (derived classes must provide sensible defaults)
 {
 }
 
 
 void ChannelBehaviour::setResolution(double aResolution)
 {
-  resolution = aResolution;
+  mResolution = aResolution;
 }
 
 
@@ -58,8 +58,8 @@ string ChannelBehaviour::getId()
 
 string ChannelBehaviour::getApiId(int aApiVersion)
 {
-  if (aApiVersion>=3 && !channelId.empty()) {
-    return channelId;
+  if (aApiVersion>=3 && !mChannelId.empty()) {
+    return mChannelId;
   }
   else {
     // no channel ID set, default to decimal string representation of channel type
@@ -71,7 +71,7 @@ string ChannelBehaviour::getApiId(int aApiVersion)
 bool ChannelBehaviour::isPrimary()
 {
   // internal convention: first channel is the default channel
-  return channelIndex==0;
+  return mChannelIndex==0;
 }
 
 
@@ -87,13 +87,13 @@ string ChannelBehaviour::description()
 
 string ChannelBehaviour::logContextPrefix()
 {
-  return string_format("%s: channel[%d] %s", output.device.logContextPrefix().c_str(), channelIndex, getName());
+  return string_format("%s: channel[%d] %s", mOutput.mDevice.logContextPrefix().c_str(), mChannelIndex, getName());
 }
 
 
 int ChannelBehaviour::getLogLevelOffset()
 {
-  return output.getLogLevelOffset();
+  return mOutput.getLogLevelOffset();
 }
 
 
@@ -102,9 +102,9 @@ int ChannelBehaviour::getLogLevelOffset()
 
 string ChannelBehaviour::getStatusText()
 {
-  int fracDigits = (int)(-::log(resolution)/::log(10)+0.99);
+  int fracDigits = (int)(-::log(mResolution)/::log(10)+0.99);
   if (fracDigits<0) fracDigits=0;
-  return string_format("%0.*f %s", fracDigits, cachedChannelValue, valueUnitName(getChannelUnit(), true).c_str());
+  return string_format("%0.*f %s", fracDigits, mCachedChannelValue, valueUnitName(getChannelUnit(), true).c_str());
 }
 
 
@@ -112,8 +112,8 @@ void ChannelBehaviour::addEnum(const char *aEnumText, uint32_t aEnumValue)
 {
   // in reduced footprint, this is a NOP, we don't have the EnumList
   #if !REDUCED_FOOTPRINT
-  if (!enumList) enumList = EnumListPtr(new EnumList(true));
-  enumList->addMapping(aEnumText, aEnumValue);
+  if (!mEnumList) mEnumList = EnumListPtr(new EnumList(true));
+  mEnumList->addMapping(aEnumText, aEnumValue);
   #endif
 }
 
@@ -124,17 +124,17 @@ void ChannelBehaviour::addEnum(const char *aEnumText, uint32_t aEnumValue)
 
 string ChannelBehaviour::getSourceId()
 {
-  return string_format("%s_C%s", output.device.getDsUid().getString().c_str(), getId().c_str());
+  return string_format("%s_C%s", mOutput.mDevice.getDsUid().getString().c_str(), getId().c_str());
 }
 
 
 string ChannelBehaviour::getSourceName()
 {
   // get device name or dSUID for context
-  string n = output.device.getAssignedName();
+  string n = mOutput.mDevice.getAssignedName();
   if (n.empty()) {
     // use abbreviated dSUID instead
-    string d = output.device.getDsUid().getString();
+    string d = mOutput.mDevice.getDsUid().getString();
     n = d.substr(0,8) + "..." + d.substr(d.size()-2,2);
   }
   // append behaviour description
@@ -151,13 +151,13 @@ double ChannelBehaviour::getSourceValue()
 
 MLMicroSeconds ChannelBehaviour::getSourceLastUpdate()
 {
-  return channelLastSync;
+  return mChannelLastSync;
 }
 
 
 int ChannelBehaviour::getSourceOpLevel()
 {
-  return output.device.opStateLevel();
+  return mOutput.mDevice.opStateLevel();
 }
 
 #endif // P44SCRIPT_FULL_SUPPORT
@@ -175,17 +175,17 @@ bool ChannelBehaviour::transitionStep(double aStepSize)
       // a previous transition is still running.
       // This can only happen if no new target value has been set for this channel, which
       // means that the transition should not run further. But...
-      if (!channelUpdatePending) { // ..check, just to make sure
-        cachedChannelValue = getChannelValue(true); // get current transitional value
+      if (!mChannelUpdatePending) { // ..check, just to make sure
+        mCachedChannelValue = getChannelValue(true); // get current transitional value
         setTransitionProgress(1); // stop transition early, keeping current value
         return false; // no transition
       }
     }
-    transitionProgress = 0; // start
+    mTransitionProgress = 0; // start
     return true; // in transition
   }
   if (inTransition()) {
-    setTransitionProgress(transitionProgress+aStepSize);
+    setTransitionProgress(mTransitionProgress+aStepSize);
     return inTransition(); // transition might be complete with this step
   }
   // no longer in transition
@@ -197,11 +197,11 @@ void ChannelBehaviour::setTransitionProgress(double aProgress)
 {
   if (aProgress<0) aProgress = 0;
   // set
-  transitionProgress = aProgress;
-  if (transitionProgress>=1) {
+  mTransitionProgress = aProgress;
+  if (mTransitionProgress>=1) {
     // transition complete
-    transitionProgress=1;
-    previousChannelValue = cachedChannelValue; // end of transition reached, old previous value is no longer needed
+    mTransitionProgress=1;
+    mPreviousChannelValue = mCachedChannelValue; // end of transition reached, old previous value is no longer needed
   }
 }
 
@@ -211,13 +211,13 @@ void ChannelBehaviour::setTransitionValue(double aCurrentValue, bool aIsInitial)
 {
   if (aIsInitial) {
     // initial value of transition (rather than previously known cached one)
-    previousChannelValue = aCurrentValue;
-    transitionProgress = 0; // start of transition
+    mPreviousChannelValue = aCurrentValue;
+    mTransitionProgress = 0; // start of transition
   }
   else {
     // intermediate value within transition
-    double d = cachedChannelValue-previousChannelValue;
-    setTransitionProgress(d==0 ? 1 : aCurrentValue/d-previousChannelValue);
+    double d = mCachedChannelValue-mPreviousChannelValue;
+    setTransitionProgress(d==0 ? 1 : aCurrentValue/d-mPreviousChannelValue);
   }
 }
 
@@ -226,7 +226,7 @@ void ChannelBehaviour::setTransitionValue(double aCurrentValue, bool aIsInitial)
 
 bool ChannelBehaviour::inTransition()
 {
-  return transitionProgress<1;
+  return mTransitionProgress<1;
 }
 
 
@@ -239,7 +239,7 @@ bool ChannelBehaviour::getChannelValueBool()
 double ChannelBehaviour::getChannelValue(bool aTransitional)
 {
   if (inTransition() && aTransitional) {
-    double d = cachedChannelValue-previousChannelValue;
+    double d = mCachedChannelValue-mPreviousChannelValue;
     if (wrapsAround()) {
       // wraparound channels - use shorter distance
       double r = getMax()-getMin();
@@ -250,7 +250,7 @@ double ChannelBehaviour::getChannelValue(bool aTransitional)
         ad = r-ad; // shorter way
         d = ad * (d>=0 ? -1 : 1); // opposite sign of original
       }
-      double res = previousChannelValue+transitionProgress*d;
+      double res = mPreviousChannelValue+mTransitionProgress*d;
       // - wraparound
       if (res>=getMax()) res -= r;
       else if (res<getMin()) res += r;
@@ -258,12 +258,12 @@ double ChannelBehaviour::getChannelValue(bool aTransitional)
     }
     else {
       // simple non-wrapping transition
-      return previousChannelValue+transitionProgress*d;
+      return mPreviousChannelValue+mTransitionProgress*d;
     }
   }
   else {
     // current value is cached value
-    return cachedChannelValue;
+    return mCachedChannelValue;
   }
 }
 
@@ -272,12 +272,12 @@ double ChannelBehaviour::getChannelValue(bool aTransitional)
 // NOT to be used to change the hardware channel value!
 void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlwaysSync, bool aVolatile)
 {
-  if (!channelUpdatePending || aAlwaysSync) {
-    if (cachedChannelValue!=aActualChannelValue || OLOGENABLED(LOG_DEBUG)) {
+  if (!mChannelUpdatePending || aAlwaysSync) {
+    if (mCachedChannelValue!=aActualChannelValue || OLOGENABLED(LOG_DEBUG)) {
       // show only changes except if debugging
       OLOG(LOG_INFO,
         "cached value synchronized from %0.2f -> %0.2f%s",
-        cachedChannelValue, aActualChannelValue,
+        mCachedChannelValue, aActualChannelValue,
         aVolatile ? " (derived/volatile)" : ""
       );
     }
@@ -287,21 +287,21 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     else if (aActualChannelValue<getMin())
       aActualChannelValue = getMin();
     // apply
-    setPVar(volatileValue, aVolatile); // valatile status is persisted as NULL value, so must mark dirty on change
-    if (volatileValue) {
-      cachedChannelValue = aActualChannelValue; // when volatile, the actual channel value is not persisted, just updated
+    setPVar(mIsVolatileValue, aVolatile); // valatile status is persisted as NULL value, so must mark dirty on change
+    if (mIsVolatileValue) {
+      mCachedChannelValue = aActualChannelValue; // when volatile, the actual channel value is not persisted, just updated
     }
     else {
-      setPVar(cachedChannelValue, aActualChannelValue);
+      setPVar(mCachedChannelValue, aActualChannelValue);
     }
     #if P44SCRIPT_FULL_SUPPORT
     sendValueEvent();
     #endif
     // reset transitions and pending updates
-    previousChannelValue = cachedChannelValue;
-    transitionProgress = 1; // not in transition
-    channelUpdatePending = false; // we are in sync
-    channelLastSync = MainLoop::now(); // value is current
+    mPreviousChannelValue = mCachedChannelValue;
+    mTransitionProgress = 1; // not in transition
+    mChannelUpdatePending = false; // we are in sync
+    mChannelLastSync = MainLoop::now(); // value is current
   }
 }
 
@@ -361,26 +361,26 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     }
   }
   // prevent propagating changes smaller than device resolution, but always apply when transition is in progress
-  if (aAlwaysApply || inTransition() || fabs(aNewValue-cachedChannelValue)>=getResolution()) {
+  if (aAlwaysApply || inTransition() || fabs(aNewValue-mCachedChannelValue)>=getResolution()) {
     OLOG(LOG_INFO,
       "is requested to change from %0.2f ->  %0.2f (transition time=%d mS)",
-      cachedChannelValue, aNewValue, (int)(aTransitionTime/MilliSecond)
+      mCachedChannelValue, aNewValue, (int)(aTransitionTime/MilliSecond)
     );
     // setting new value captures current (possibly transitional) value as previous and completes transition
-    previousChannelValue = channelLastSync!=Never ? getChannelValue(true) : aNewValue; // If there is no valid previous value, set current as previous.
-    transitionProgress = 1; // consider done
+    mPreviousChannelValue = mChannelLastSync!=Never ? getChannelValue(true) : aNewValue; // If there is no valid previous value, set current as previous.
+    mTransitionProgress = 1; // consider done
     // save target parameters for next transition
-    setPVar(cachedChannelValue, aNewValue); // might need to be persisted
-    nextTransitionTime = aTransitionTime;
-    channelUpdatePending = true; // pending to be sent to the device
+    setPVar(mCachedChannelValue, aNewValue); // might need to be persisted
+    mNextTransitionTime = aTransitionTime;
+    mChannelUpdatePending = true; // pending to be sent to the device
   }
-  setPVar(volatileValue, false); // channel actively set, is not volatile
+  setPVar(mIsVolatileValue, false); // channel actively set, is not volatile
 }
 
 
 double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime)
 {
-  double newValue = cachedChannelValue+aIncrement;
+  double newValue = mCachedChannelValue+aIncrement;
   if (wrapsAround()) {
     // In wrap-around mode, the max value is considered identical to the min value, so already REACHING it must wrap around
     if (newValue>=getMax()) {
@@ -400,16 +400,16 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     }
   }
   // apply (silently), only if value has actually changed (but even if change is below resolution)
-  if (newValue!=cachedChannelValue) {
+  if (newValue!=mCachedChannelValue) {
     // setting new value captures current (possibly transitional) value as previous and completes transition
-    previousChannelValue = channelLastSync!=Never ? getChannelValue(true) : newValue; // If there is no valid previous value, set current as previous.
-    transitionProgress = 1; // consider done
+    mPreviousChannelValue = mChannelLastSync!=Never ? getChannelValue(true) : newValue; // If there is no valid previous value, set current as previous.
+    mTransitionProgress = 1; // consider done
     // save target parameters for next transition
-    setPVar(cachedChannelValue, newValue); // might need to be persisted
-    nextTransitionTime = aTransitionTime;
-    channelUpdatePending = true; // pending to be sent to the device
+    setPVar(mCachedChannelValue, newValue); // might need to be persisted
+    mNextTransitionTime = aTransitionTime;
+    mChannelUpdatePending = true; // pending to be sent to the device
   }
-  setPVar(volatileValue, false); // channel actively dimmed, is not volatile
+  setPVar(mIsVolatileValue, false); // channel actively dimmed, is not volatile
   return newValue;
 }
 
@@ -417,9 +417,9 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
 
 void ChannelBehaviour::channelValueApplied(bool aAnyWay)
 {
-  if (channelUpdatePending || aAnyWay) {
-    channelUpdatePending = false; // applied (might still be in transition, though)
-    channelLastSync = MainLoop::now(); // now we know that we are in sync
+  if (mChannelUpdatePending || aAnyWay) {
+    mChannelUpdatePending = false; // applied (might still be in transition, though)
+    mChannelLastSync = MainLoop::now(); // now we know that we are in sync
     #if P44SCRIPT_FULL_SUPPORT
     sendValueEvent();
     #endif
@@ -427,7 +427,7 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
       // only log when actually of importance (to prevent messages for devices that apply mostly immediately)
       OLOG(LOG_INFO,
         "applied new value %0.2f to hardware%s",
-        cachedChannelValue, inTransition() ? " (still in transition)" : " (complete)"
+        mCachedChannelValue, inTransition() ? " (still in transition)" : " (complete)"
       );
     }
   }
@@ -472,13 +472,13 @@ void ChannelBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex
 {
   inheritedParams::loadFromRow(aRow, aIndex, NULL); // no common flags
   // get the fields
-  if (aRow->getIfNotNull<double>(aIndex++, cachedChannelValue)) {
+  if (aRow->getIfNotNull<double>(aIndex++, mCachedChannelValue)) {
     // loading a non-NULL persistent channel value always means it must be propagated to the hardware
-    channelUpdatePending = true;
-    volatileValue = false;
+    mChannelUpdatePending = true;
+    mIsVolatileValue = false;
   }
   else {
-    volatileValue = true;
+    mIsVolatileValue = true;
   }
 }
 
@@ -488,11 +488,11 @@ void ChannelBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aI
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  if (volatileValue) {
+  if (mIsVolatileValue) {
     aStatement.bind(aIndex++); // volatile values are not saved
   }
   else {
-    aStatement.bind(aIndex++, cachedChannelValue);
+    aStatement.bind(aIndex++, mCachedChannelValue);
   }
 }
 
@@ -502,7 +502,7 @@ string ChannelBehaviour::getDbKey()
   // Note - we do not key the channel persistence with output behaviour settings' ROWID,
   //   as this often does not exist at all, but use the deviceID+channelID as key, so
   //   channels can be persisted independently of device settings.
-  return string_format("%s_%s",output.device.getDsUid().getString().c_str(),getId().c_str());
+  return string_format("%s_%s",mOutput.mDevice.getDsUid().getString().c_str(),getId().c_str());
 }
 
 
@@ -570,7 +570,7 @@ int ChannelBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
   #if !REDUCED_FOOTPRINT
   if (aParentDescriptor->hasObjectKey(channel_enumvalues_key)) {
     // number of enum values
-    return enumList ? enumList->numProps() : 0;
+    return mEnumList ? mEnumList->numProps() : 0;
   }
   #endif
   switch (aParentDescriptor->parentDescriptor->fieldKey()) {
@@ -605,7 +605,7 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
   };
   #if !REDUCED_FOOTPRINT
   if (aParentDescriptor->hasObjectKey(channel_enumvalues_key)) {
-    return enumList ? enumList->getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor) : NULL;
+    return mEnumList ? mEnumList->getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor) : NULL;
   }
   #endif
   if (aPropIndex>=numProps(aDomain, aParentDescriptor))
@@ -627,7 +627,7 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
 PropertyContainerPtr ChannelBehaviour::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(channel_enumvalues_key)) {
-    return enumList ? PropertyContainerPtr(this) : PropertyContainerPtr(); // handle enum values array myself
+    return mEnumList ? PropertyContainerPtr(this) : PropertyContainerPtr(); // handle enum values array myself
   }
   // unknown here
   return inheritedProps::getContainer(aPropertyDescriptor, aDomain);
@@ -639,8 +639,8 @@ PropertyContainerPtr ChannelBehaviour::getContainer(const PropertyDescriptorPtr 
 bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
   #if !REDUCED_FOOTPRINT
-  if (aPropertyDescriptor->hasObjectKey(INSTANCE_OKEY(enumList.get()))) {
-    return enumList ? enumList->accessField(aMode, aPropValue, aPropertyDescriptor) : false;
+  if (aPropertyDescriptor->hasObjectKey(INSTANCE_OKEY(mEnumList.get()))) {
+    return mEnumList ? mEnumList->accessField(aMode, aPropValue, aPropertyDescriptor) : false;
   }
   else
   #endif
@@ -654,10 +654,10 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
           return true;
         case channelIndex_key+descriptions_key_offset:
           if (aPropertyDescriptor->getApiVersion()>=3) return false; // property does not exist any more in v3 and later
-          aPropValue->setUint8Value(channelIndex);
+          aPropValue->setUint8Value(mChannelIndex);
           return true;
         case dsIndex_key+descriptions_key_offset:
-          aPropValue->setUint8Value(channelIndex);
+          aPropValue->setUint8Value(mChannelIndex);
           return true;
         case channelType_key+descriptions_key_offset:
           aPropValue->setUint8Value(getChannelType());
@@ -686,10 +686,10 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
           aPropValue->setDoubleValue(getChannelValueCalculated());
           return true;
         case age_key+states_key_offset:
-          if (channelLastSync==Never || volatileValue)
+          if (mChannelLastSync==Never || mIsVolatileValue)
             aPropValue->setNull(); // no value known, or volatile
           else
-            aPropValue->setDoubleValue((double)(MainLoop::now()-channelLastSync)/Second); // time of last sync (does not necessarily relate to currently visible "value", as this might be a to-be-applied new value already)
+            aPropValue->setDoubleValue((double)(MainLoop::now()-mChannelLastSync)/Second); // time of last sync (does not necessarily relate to currently visible "value", as this might be a to-be-applied new value already)
           return true;
       }
     }
@@ -700,7 +700,7 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         // - none for now
         // States properties
         case value_key+states_key_offset:
-          setChannelValue(aPropValue->doubleValue(), output.transitionTime, true); // always apply, default transition time (normally 0, unless set in outputState)
+          setChannelValue(aPropValue->doubleValue(), mOutput.mTransitionTime, true); // always apply, default transition time (normally 0, unless set in outputState)
           return true;
       }
     }
@@ -723,38 +723,38 @@ bool StringChannel::setChannelValueIfNotDontCare(DsScenePtr aScene, const string
 
 void StringChannel::syncChannelValueString(const string& aActualChannelValue, bool aAlwaysSync)
 {
-  if (!channelUpdatePending || aAlwaysSync) {
-    if (stringValue!=aActualChannelValue || OLOGENABLED(LOG_DEBUG)) {
+  if (!mChannelUpdatePending || aAlwaysSync) {
+    if (mStringValue!=aActualChannelValue || OLOGENABLED(LOG_DEBUG)) {
       // show only changes except if debugging
       OLOG(LOG_INFO, "cached value synchronized from %s -> %s",
-        stringValue.c_str(), aActualChannelValue.c_str()
+        mStringValue.c_str(), aActualChannelValue.c_str()
       );
     }
-    setPVar(stringValue, aActualChannelValue);
+    setPVar(mStringValue, aActualChannelValue);
     // reset pending updates
-    channelUpdatePending = false; // we are in sync
-    channelLastSync = MainLoop::now(); // value is current
+    mChannelUpdatePending = false; // we are in sync
+    mChannelLastSync = MainLoop::now(); // value is current
   }
 }
 
 void StringChannel::setChannelValueString(const string& aNewValue, bool aAlwaysApply)
 {
-  if (aAlwaysApply || (aNewValue!=stringValue)) {
-    OLOG(LOG_INFO, "is requested to change from %s ->  %s", stringValue.c_str(), aNewValue.c_str());
-    setPVar(stringValue, aNewValue); // might need to be persisted
-    channelUpdatePending = true; // pending to be sent to the device
+  if (aAlwaysApply || (aNewValue!=mStringValue)) {
+    OLOG(LOG_INFO, "is requested to change from %s ->  %s", mStringValue.c_str(), aNewValue.c_str());
+    setPVar(mStringValue, aNewValue); // might need to be persisted
+    mChannelUpdatePending = true; // pending to be sent to the device
   }
 }
 
 string StringChannel::getChannelValueString()
 {
-  return stringValue;
+  return mStringValue;
 }
 
 void StringChannel::setValueOptions(const vector<const char*>& aValues)
 {
-  enumList = EnumListPtr(new EnumList(false));
-  enumList->addEnumTexts(aValues);
+  mEnumList = EnumListPtr(new EnumList(false));
+  mEnumList->addEnumTexts(aValues);
 }
 
 static const size_t numStringChannelFields = 1;
@@ -784,8 +784,8 @@ void StringChannel::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, u
 {
   inheritedParams::loadFromRow(aRow, aIndex, NULL); // no common flags
   string newValue = nonNullCStr(aRow->get<const char *>(aIndex++));
-  if (newValue != stringValue) {
-    channelUpdatePending = true;
+  if (newValue != mStringValue) {
+    mChannelUpdatePending = true;
   }
 }
 
@@ -795,7 +795,7 @@ void StringChannel::bindToStatement(sqlite3pp::statement &aStatement, int &aInde
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, stringValue.c_str(), false);
+  aStatement.bind(aIndex++, mStringValue.c_str(), false);
 }
 
 
@@ -810,7 +810,7 @@ bool StringChannel::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         // States properties
         case value_key+states_key_offset:
           aPropValue->setType(apivalue_string);
-          aPropValue->setStringValue(stringValue);
+          aPropValue->setStringValue(mStringValue);
           return true;
       }
     }

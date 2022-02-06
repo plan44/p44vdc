@@ -60,16 +60,16 @@ namespace p44 {
 
   protected:
 
-    OutputBehaviour &output;
+    OutputBehaviour &mOutput;
     #if !REDUCED_FOOTPRINT
-    EnumListPtr enumList;
+    EnumListPtr mEnumList;
     #endif
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
-    int channelIndex; ///< the index of the channel within the device
-    double resolution; ///< actual resolution within the device
-    string channelId; ///< string identifier for this channel. If string is empty, getApiId() will return decimal string representation of channelType()
+    int mChannelIndex; ///< the index of the channel within the device
+    double mResolution; ///< actual resolution within the device
+    string mChannelId; ///< string identifier for this channel. If string is empty, getApiId() will return decimal string representation of channelType()
     /// @}
 
     /// @name persistent settings
@@ -79,13 +79,13 @@ namespace p44 {
 
     /// @name internal volatile state
     /// @{
-    bool channelUpdatePending; ///< set if cachedOutputValue represents a value to be transmitted to the hardware
-    bool volatileValue; ///< set if value is not a defining part of the output state (not to be persisted, not necessarily valid)
-    double cachedChannelValue; ///< the cached channel value
-    double previousChannelValue; ///< the previous channel value, can be used for performing transitions
-    double transitionProgress; ///< how much the transition has progressed so far (0..1)
-    MLMicroSeconds channelLastSync; ///< Never if the cachedChannelValue is not yet applied to the hardware or retrieved from hardware, otherwise when it was last synchronized
-    MLMicroSeconds nextTransitionTime; ///< the transition time to use for the next channel value change
+    bool mChannelUpdatePending; ///< set if cachedOutputValue represents a value to be transmitted to the hardware
+    bool mIsVolatileValue; ///< set if value is not a defining part of the output state (not to be persisted, not necessarily valid)
+    double mCachedChannelValue; ///< the cached channel value
+    double mPreviousChannelValue; ///< the previous channel value, can be used for performing transitions
+    double mTransitionProgress; ///< how much the transition has progressed so far (0..1)
+    MLMicroSeconds mChannelLastSync; ///< Never if the cachedChannelValue is not yet applied to the hardware or retrieved from hardware, otherwise when it was last synchronized
+    MLMicroSeconds mNextTransitionTime; ///< the transition time to use for the next channel value change
     /// @}
 
   public:
@@ -195,26 +195,26 @@ namespace p44 {
 
     /// get time of last sync with hardware (applied or synchronized back)
     /// @return time of last sync, p44::Never if value never synchronized
-    MLMicroSeconds getLastSync() { return channelLastSync; };
+    MLMicroSeconds getLastSync() { return mChannelLastSync; };
 
     /// get current value of this channel - and calculate it if it is not set in the device, but must be calculated from other channels
     virtual double getChannelValueCalculated() { return getChannelValue(); /* no calculated channels in base class */ };
 
     /// the transition time to use to change value in the hardware
     /// @return time to be used to transition to new value
-    MLMicroSeconds transitionTimeToNewValue() { return nextTransitionTime; };
+    MLMicroSeconds transitionTimeToNewValue() { return mNextTransitionTime; };
 
     /// set time for next transition (for overrides - normally, setChannelValue() sets the transition time)
     /// @param aTransitionTime transition time
-    void setTransitionTime(MLMicroSeconds aTransitionTime) { nextTransitionTime = aTransitionTime; }
+    void setTransitionTime(MLMicroSeconds aTransitionTime) { mNextTransitionTime = aTransitionTime; }
 
     /// check if channel value needs to be sent to device hardware
     /// @return true if the cached channel value was changed and should be applied to hardware via device's applyChannelValues()
-    bool needsApplying() { return channelUpdatePending; }
+    bool needsApplying() { return mChannelUpdatePending; }
 
     /// make channel value pending for sending to hardware (or reset pending state)
     /// @param aPending if set to false, channel pending flag will be reset
-    void makeApplyPending(bool aPending = true) { channelUpdatePending = aPending; }
+    void makeApplyPending(bool aPending = true) { mChannelUpdatePending = aPending; }
 
     /// to be called when channel value has been successfully applied to hardware
     /// @param aAnyWay if true, lastSent state will be set even if channel was not in needsApplying() state
@@ -223,7 +223,7 @@ namespace p44 {
     /// can be called to explicitly set a channel's volatile flag, which means it is not carrying relevant data
     /// for defining the output state (e.g. CIE x,y channels when light is in HSV mode)
     /// @param aVolatile true to set volatile, false otherwise
-    void setVolatile(bool aVolatile) { setPVar(volatileValue, aVolatile); }
+    void setVolatile(bool aVolatile) { setPVar(mIsVolatileValue, aVolatile); }
 
     /// add an enumeration mapping for the channel value
     /// @note normally, channels do not have an enumeration description ("values" in channel description), but
@@ -249,15 +249,15 @@ namespace p44 {
 
     /// get the channel index
     /// @return the channel index (0..N, 0=primary)
-    int getChannelIndex() { return channelIndex; };
+    int getChannelIndex() { return mChannelIndex; };
 
     /// get the channel id (may be empty)
     /// @return the channelId string
-    const string& getChannelId() { return channelId; }
+    const string& getChannelId() { return mChannelId; }
 
     /// get the resolution this channel has in the hardware of this particular device
     /// @return resolution of channel value (size of smallest step output can take, LSB)
-    double getResolution() { return resolution; }; ///< actual resolution of the hardware
+    double getResolution() { return mResolution; }; ///< actual resolution of the hardware
 
     /// check if this is the primary channel
     /// @return true if this is the primary (default) channel of a device
@@ -265,7 +265,7 @@ namespace p44 {
 
     /// call to make update pending
     /// @param aTransitionTime if >=0, sets new transition time (useful when re-applying values)
-    void setNeedsApplying(MLMicroSeconds aTransitionTime = -1) { channelUpdatePending = true; if (aTransitionTime>=0) nextTransitionTime = aTransitionTime; }
+    void setNeedsApplying(MLMicroSeconds aTransitionTime = -1) { mChannelUpdatePending = true; if (aTransitionTime>=0) mNextTransitionTime = aTransitionTime; }
 
     /// @}
 
@@ -353,19 +353,19 @@ namespace p44 {
   {
     typedef ChannelBehaviour inherited;
 
-    uint32_t numIndices; ///< number of valid indices (indices are 0..numIndices-1)
+    uint32_t mNumIndices; ///< number of valid indices (indices are 0..numIndices-1)
 
   public:
-    IndexChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 1; numIndices = 0; };
+    IndexChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 1; mNumIndices = 0; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "index"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // 0..numIndices-1
-    virtual double getMax() P44_OVERRIDE { return numIndices>0 ? numIndices-1 : 0; };
+    virtual double getMax() P44_OVERRIDE { return mNumIndices>0 ? mNumIndices-1 : 0; };
     int getIndex() { return getChannelValue(); }; // return as int for convenience
     virtual double getDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
 
-    void setNumIndices(uint32_t aNumIndices) { numIndices = aNumIndices; };
+    void setNumIndices(uint32_t aNumIndices) { mNumIndices = aNumIndices; };
 
   };
   typedef boost::intrusive_ptr<IndexChannel> IndexChannelPtr;
@@ -377,7 +377,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    FlagChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 1; };
+    FlagChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 1; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "flag"; };
@@ -396,7 +396,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    DigitalChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 100; /* on or off */ };
+    DigitalChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 100; /* on or off */ };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "switch"; };
@@ -413,17 +413,17 @@ namespace p44 {
   {
     typedef ChannelBehaviour inherited;
 
-    double max; ///< maximum value
+    double mMax; ///< maximum value
 
   public:
-    DialChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { max=100; /* standard dimmer range */ resolution = 1; /* integer by default */ };
+    DialChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mMax=100; /* standard dimmer range */ mResolution = 1; /* integer by default */ };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "dial"; };
     virtual double getMin() P44_OVERRIDE { return 0; };
-    virtual double getMax() P44_OVERRIDE { return max; };
+    virtual double getMax() P44_OVERRIDE { return mMax; };
 
-    void setMax(double aMax) { max = aMax; };
+    void setMax(double aMax) { mMax = aMax; };
   };
   typedef boost::intrusive_ptr<DialChannel> DialChannelPtr;
 
@@ -456,13 +456,13 @@ namespace p44 {
   class AudioVolumeChannel : public ChannelBehaviour
   {
     typedef ChannelBehaviour inherited;
-    double dimPerMS;
+    double mDimPerMS;
 
   public:
     AudioVolumeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "audioVolume")
     {
-      resolution = 0.1; // arbitrary, 1:1000 seems ok
-      dimPerMS = (getMax()-getMin())/7000; // standard 7 seconds for full scale by default
+      mResolution = 0.1; // arbitrary, 1:1000 seems ok
+      mDimPerMS = (getMax()-getMin())/7000; // standard 7 seconds for full scale by default
     };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_audio_volume; }; ///< the dS channel type
@@ -470,9 +470,9 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "volume"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS volume goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
-    virtual double getDimPerMS() P44_OVERRIDE { return dimPerMS; }; ///< value to step up or down per Millisecond
+    virtual double getDimPerMS() P44_OVERRIDE { return mDimPerMS; }; ///< value to step up or down per Millisecond
 
-    virtual void setDimPerMS(double aDimPerMS) { dimPerMS = aDimPerMS; }; ///< set dimming per MS to make actual audio steps and dimming steps align better than with standard step
+    virtual void setDimPerMS(double aDimPerMS) { mDimPerMS = aDimPerMS; }; ///< set dimming per MS to make actual audio steps and dimming steps align better than with standard step
 
   };
   typedef boost::intrusive_ptr<AudioVolumeChannel> AudioVolumeChannelPtr;
@@ -486,10 +486,10 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
     typedef PersistentParams inheritedParams;
 
-    string stringValue;
+    string mStringValue;
 
   public:
-    StringChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { resolution = 0; }
+    StringChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 0; }
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; } ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); }
     virtual const char *getName() P44_OVERRIDE { return "stringChannel"; }

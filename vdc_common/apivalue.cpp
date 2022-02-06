@@ -30,27 +30,27 @@ using namespace p44;
 
 
 ApiValue::ApiValue() :
-  objectType(apivalue_null)
+  mObjectType(apivalue_null)
 {
 }
 
 
 bool ApiValue::isType(ApiValueType aObjectType)
 {
-  return (objectType==aObjectType);
+  return (mObjectType==aObjectType);
 }
 
 
 ApiValueType ApiValue::getType()
 {
-  return objectType;
+  return mObjectType;
 }
 
 
 void ApiValue::setType(ApiValueType aType)
 {
-  if (aType!=objectType) {
-    objectType = aType;
+  if (aType!=mObjectType) {
+    mObjectType = aType;
     // type has changed, make sure internals are cleared
     clear();
   }
@@ -106,7 +106,7 @@ int ApiValue::arrayLength()
 
 void ApiValue::clear()
 {
-  switch (objectType) {
+  switch (mObjectType) {
     // "Zero" simple values
     case apivalue_bool:
       setBoolValue(false);
@@ -133,7 +133,7 @@ void ApiValue::clear()
 
 string ApiValue::stringValue()
 {
-  switch (objectType) {
+  switch (mObjectType) {
     case apivalue_bool:
       return boolValue() ? "true" : "false";
     case apivalue_int64:
@@ -159,7 +159,7 @@ string ApiValue::stringValue()
 bool ApiValue::setStringValue(const string &aString)
 {
   int n;
-  switch (objectType) {
+  switch (mObjectType) {
     case apivalue_bool: {
       string s = lowerCase(aString);
       setBoolValue(s.length()>0 && s!="false" && s!="0" && s!="no");
@@ -195,7 +195,7 @@ string ApiValue::description()
 {
   string s;
   bool firstElem = true;
-  if (objectType==apivalue_object) {
+  if (mObjectType==apivalue_object) {
     string k;
     ApiValuePtr v;
     resetKeyIteration();
@@ -211,7 +211,7 @@ string ApiValue::description()
     }
     s += " }";
   }
-  else if(objectType==apivalue_array) {
+  else if(mObjectType==apivalue_array) {
     ApiValuePtr v;
     int i = 0;
     s = "[ ";
@@ -225,7 +225,7 @@ string ApiValue::description()
     }
     s += " ]";
   }
-  else if (objectType==apivalue_string) {
+  else if (mObjectType==apivalue_string) {
     string s2 = stringValue();
     size_t l = s2.size();
     if (l>100) {
@@ -234,7 +234,7 @@ string ApiValue::description()
     }
     s = shellQuote(s2);
   }
-  else if (objectType==apivalue_binary) {
+  else if (mObjectType==apivalue_binary) {
     string b = binaryValue();
     if (b.size()>20) {
       long sz = b.size();
@@ -246,7 +246,7 @@ string ApiValue::description()
       s = binaryToHexString(b);
     }
   }
-  else if (objectType==apivalue_null) {
+  else if (mObjectType==apivalue_null) {
     // show NULL explicitly
     s = "null"; // JSON parser compatible, lowercase
   }

@@ -46,10 +46,10 @@ namespace p44 {
 
   protected:
 
-    Device &device;
+    Device &mDevice;
 
     /// generic device flag word, can be used by subclasses to map flags onto at loadFromRow() and bindToStatement()
-    int deviceFlags;
+    int mDeviceFlags;
 
   public:
     DeviceSettings(Device &aDevice);

@@ -79,22 +79,22 @@ namespace p44 {
   protected:
 
     /// the device this behaviour belongs to
-    Device &device;
+    Device &mDevice;
 
     /// the index of this behaviour in the device's vector
     /// @note the indices of behaviours are relevant for dS backwards compatibility, because
     ///   older dS systems used the indices for idenitification of buttons/inputs/sensors
-    size_t index;
+    size_t mIndex;
 
     /// the ID of the behaviour
     /// @note If string is empty, getApiId() will return decimal string representation of getIndex(), for backwards compatibility
-    string behaviourId;
+    string mBehaviourId;
 
 
     /// @name behaviour description, constants or variables
     ///   set by device implementations when adding a Behaviour.
     /// @{
-    string hardwareName; ///< name that identifies this behaviour among others for the human user (terminal label text etc)
+    string mHardwareName; ///< name that identifies this behaviour among others for the human user (terminal label text etc)
     /// @}
 
     /// @name persistent settings
@@ -103,8 +103,8 @@ namespace p44 {
 
     /// @name internal volatile state
     /// @{
-    VdcHardwareError hardwareError; ///< hardware error
-    MLMicroSeconds hardwareErrorUpdated; ///< when was hardware error last updated
+    VdcHardwareError mHardwareError; ///< hardware error
+    MLMicroSeconds mHardwareErrorUpdated; ///< when was hardware error last updated
     /// @}
 
 
@@ -122,11 +122,11 @@ namespace p44 {
     /// initialisation of hardware-specific constants for this behaviour
     /// @param aHardwareName name to identify this functionality in hardware (like input terminal label, button label or kind etc.)
     /// @note this must be called once before the device gets added to the device container.
-    void setHardwareName(const string &aHardwareName) { hardwareName = aHardwareName; };
+    void setHardwareName(const string &aHardwareName) { mHardwareName = aHardwareName; };
 
     /// @return hardware name
     /// @note if no specific name was set with setHardwareName(), this returns the behaviourId
-    string getHardwareName() { return hardwareName.empty() ? behaviourId : hardwareName; };
+    string getHardwareName() { return mHardwareName.empty() ? mBehaviourId : mHardwareName; };
 
     /// update of hardware status
     void setHardwareError(VdcHardwareError aHardwareError);
@@ -149,7 +149,7 @@ namespace p44 {
     /// @return string, really short, intended to be shown as a narrow column in a list
     virtual string getStatusText() { return ""; };
 
-    virtual Device& getDevice() { return device; };
+    virtual Device& getDevice() { return mDevice; };
 
 
 
@@ -169,11 +169,11 @@ namespace p44 {
 
     /// get the index value
     /// @return index of this behaviour in one of the owning device's behaviour lists
-    size_t getIndex() { return index; };
+    size_t getIndex() { return mIndex; };
 
     /// get the identifier (unique within this device instance)
     /// @return behaviour id string
-    string getId() { return behaviourId; };
+    string getId() { return mBehaviourId; };
 
     /// get the behaviour ID
     /// @param aApiVersion the API version to get the ID for. APIs before v3 always return the behaviour index as a numeric string

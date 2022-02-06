@@ -48,11 +48,11 @@ namespace p44 {
   class DeviceConfigurationDescriptor : public PropertyContainer
   {
     string id;
-    string description;
+    string mDescription;
 
   public:
 
-    DeviceConfigurationDescriptor(const string aId, const string aDescription) : id(aId), description(aDescription) {};
+    DeviceConfigurationDescriptor(const string aId, const string aDescription) : id(aId), mDescription(aDescription) {};
 
     string getId() { return id; };
 
@@ -101,58 +101,58 @@ namespace p44 {
     friend class SceneDeviceSettings;
     friend class ButtonBehaviour;
 
-    BehaviourVector buttons; ///< buttons and switches (user interaction)
-    BehaviourVector inputs; ///< binary inputs (not for user interaction)
-    BehaviourVector sensors; ///< sensors (measurements)
-    OutputBehaviourPtr output; ///< the output (if any)
+    BehaviourVector mButtons; ///< buttons and switches (user interaction)
+    BehaviourVector mInputs; ///< binary inputs (not for user interaction)
+    BehaviourVector mSensors; ///< sensors (measurements)
+    OutputBehaviourPtr mOutput; ///< the output (if any)
 
   protected:
 
     /// the class container
-    Vdc *vdcP;
+    Vdc *mVdcP;
 
     /// device global parameters (for all behaviours), in particular the scene table
     /// @note devices assign this with a derived class which is specialized
     ///   for the device type and, if needed, proper type of scenes (light, blinds, RGB light etc. have different scene tables)
-    DeviceSettingsPtr deviceSettings;
+    DeviceSettingsPtr mDeviceSettings;
 
     // volatile r/w properties
-    bool progMode; ///< if set, device is in programming mode
-    DsScenePtr previousState; ///< a pseudo scene which holds the device state before the last performApplySceneToChannels() call, used to do undoScene()
+    bool mProgMode; ///< if set, device is in programming mode
+    DsScenePtr mPreviousState; ///< a pseudo scene which holds the device state before the last performApplySceneToChannels() call, used to do undoScene()
 
     // variables set by concrete devices (=hardware dependent)
-    DsClass colorClass; ///< basic color of the device (can be black)
+    DsClass mColorClass; ///< basic color of the device (can be black)
 
     // volatile internal state
-    MLTicket dimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
-    VdcDimMode currentDimMode; ///< current dimming in progress
-    MLMicroSeconds currentAutoStopTime; ///< time after which dimming must stop
-    ChannelBehaviourPtr currentDimChannel; ///< currently dimmed channel (if dimming in progress)
-    bool isDimming; ///< if set, dimming is in progress
-    uint8_t areaDimmed; ///< last dimmed area (so continue know which dimming command to re-start in case it comes late)
-    VdcDimMode areaDimMode; ///< last area dim mode
-    MLTicket dimHandlerTicket; ///< for standard dimming
-    MLTicket vanishTicket; ///< for self-vanishing
+    MLTicket mDimTimeoutTicket; ///< for timing out dimming operations (autostop when no INC/DEC is received)
+    VdcDimMode mCurrentDimMode; ///< current dimming in progress
+    MLMicroSeconds mCurrentAutoStopTime; ///< time after which dimming must stop
+    ChannelBehaviourPtr mCurrentDimChannel; ///< currently dimmed channel (if dimming in progress)
+    bool mIsDimming; ///< if set, dimming is in progress
+    uint8_t mAreaDimmed; ///< last dimmed area (so continue know which dimming command to re-start in case it comes late)
+    VdcDimMode mAreaDimMode; ///< last area dim mode
+    MLTicket mDimHandlerTicket; ///< for standard dimming
+    MLTicket mVanishTicket; ///< for self-vanishing
 
     // prepared operations
-    DsScenePtr preparedScene; ///< set if this scene must be applied at executePreparedOperation()
-    bool preparedDim; ///< set if currentDimMode/currentDimChannel must be applied at executePreparedOperation()
-    MLMicroSeconds preparedTransitionOverride; ///< prepared override for transition time
+    DsScenePtr mPreparedScene; ///< set if this scene must be applied at executePreparedOperation()
+    bool mPreparedDim; ///< set if currentDimMode/currentDimChannel must be applied at executePreparedOperation()
+    MLMicroSeconds mPreparedTransitionOverride; ///< prepared override for transition time
 
     // hardware access serializer/pacer
-    SimpleCB appliedOrSupersededCB; ///< will be called when values are either applied or ignored because a subsequent change is already pending
-    SimpleCB applyCompleteCB; ///< will be called when apply is complete (set by waitForApplyComplete())
-    bool applyInProgress; ///< set when applying values is in progress
-    int missedApplyAttempts; ///< number of apply attempts that could not be executed. If>0, completing next apply will trigger a re-apply to finalize values
-    SimpleCB updatedOrCachedCB; ///< will be called when current values are either read from hardware, or new values have been requested for applying
-    bool updateInProgress; ///< set when updating channel values from hardware is in progress
-    MLTicket serializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
+    SimpleCB mAppliedOrSupersededCB; ///< will be called when values are either applied or ignored because a subsequent change is already pending
+    SimpleCB mApplyCompleteCB; ///< will be called when apply is complete (set by waitForApplyComplete())
+    bool mApplyInProgress; ///< set when applying values is in progress
+    int mMissedApplyAttempts; ///< number of apply attempts that could not be executed. If>0, completing next apply will trigger a re-apply to finalize values
+    SimpleCB mUpdatedOrCachedCB; ///< will be called when current values are either read from hardware, or new values have been requested for applying
+    bool mUpdateInProgress; ///< set when updating channel values from hardware is in progress
+    MLTicket mSerializerWatchdogTicket; ///< watchdog terminating non-responding hardware requests
 
     // volatile device configurations list (created when property actually accessed)
-    DeviceConfigurationsVector cachedConfigurations;
+    DeviceConfigurationsVector mCachedConfigurations;
 
     #if P44SCRIPT_FULL_SUPPORT
-    ScriptMainContextPtr deviceScriptContext; ///< script context to run device scripts (such as scene scripts)
+    ScriptMainContextPtr mDeviceScriptContext; ///< script context to run device scripts (such as scene scripts)
     #endif
 
   public:
@@ -314,7 +314,7 @@ namespace p44 {
 
     /// get basic device color class (basically, color of the virtual plastic enclosing the device...)
     /// @return color class number
-    DsClass getColorClass() { return colorClass; };
+    DsClass getColorClass() { return mColorClass; };
 
     /// get default class for given group
     /// @param aGroup group number
@@ -339,7 +339,7 @@ namespace p44 {
     virtual void setName(const string &aName) P44_OVERRIDE;
 
     /// get reference to vDC host
-    VdcHost &getVdcHost() const { return vdcP->getVdcHost(); };
+    VdcHost &getVdcHost() const { return mVdcP->getVdcHost(); };
 
     /// install specific or standard device settings
     /// @param aDeviceSettings specific device settings, if NULL, standard minimal settings will be used
@@ -373,7 +373,7 @@ namespace p44 {
     /// get specifically subtyped output behaviour
     /// @return the output behaviour or NULL if there is no output of the specified type
     template <typename T> boost::intrusive_ptr<T> getOutput() {
-      return boost::dynamic_pointer_cast<T>(output);
+      return boost::dynamic_pointer_cast<T>(mOutput);
     }
 
     /// get basic output behaviour
@@ -381,7 +381,7 @@ namespace p44 {
 
     /// get scenes
     /// @return NULL if device has no scenes, scene device settings otherwise 
-    SceneDeviceSettingsPtr getScenes() { return boost::dynamic_pointer_cast<SceneDeviceSettings>(deviceSettings); };
+    SceneDeviceSettingsPtr getScenes() { return boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings); };
 
     /// send a signal needed for some devices to get learned into other devices, or query availability of teach-in signals
     /// @param aVariant -1 to just get number of available teach-in variants. 0..n to send teach-in signal;
@@ -468,7 +468,7 @@ namespace p44 {
     MLMicroSeconds transitionTimeForPreparedScene(bool aIncludingOverride);
 
     /// @return transition time override value, if there is any, Infinite otherwise
-    MLMicroSeconds transitionTimeOverride() { return preparedScene ? preparedTransitionOverride : 0; };
+    MLMicroSeconds transitionTimeOverride() { return mPreparedScene ? mPreparedTransitionOverride : 0; };
 
     /// undo scene call on this device (i.e. revert outputs to values present immediately before calling that scene)
     /// @param aSceneNo the scene call to undo (needs to be specified to prevent undoing the wrong scene)

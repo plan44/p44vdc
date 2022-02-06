@@ -43,8 +43,8 @@ namespace p44 {
   public:
     BrightnessChannel(OutputBehaviour &aOutput) : inherited(aOutput, "brightness")
     {
-      resolution = DS_BRIGHTNESS_STEP; // light defaults to historic dS scale resolution
-      minDim = getMin()+resolution; // min dimming level defaults to one resolution step above zero
+      mResolution = DS_BRIGHTNESS_STEP; // light defaults to historic dS scale resolution
+      minDim = getMin()+mResolution; // min dimming level defaults to one resolution step above zero
     };
 
     void setDimMin(double aMinDim) { minDim = aMinDim; };
@@ -138,7 +138,7 @@ namespace p44 {
     /// @{
 
     /// @return true if device is dimmable
-    bool isDimmable() { return outputFunction!=outputFunction_switch && actualOutputMode()!=outputmode_binary; };
+    bool isDimmable() { return mOutputFunction!=outputFunction_switch && actualOutputMode()!=outputmode_binary; };
 
     /// initialize behaviour with actual device's brightness parameters
     /// @param aMin minimal brightness that can be set

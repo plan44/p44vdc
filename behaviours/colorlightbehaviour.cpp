@@ -31,7 +31,7 @@ using namespace p44;
 double ColorChannel::getChannelValueCalculated()
 {
   // check with behaviour first
-  ColorLightBehaviour *cl = dynamic_cast<ColorLightBehaviour *>(&output);
+  ColorLightBehaviour *cl = dynamic_cast<ColorLightBehaviour *>(&mOutput);
   if (cl) {
     if (cl->colorMode!=colorMode()) {
       // asking for a color channel that is not native -> have it calculated

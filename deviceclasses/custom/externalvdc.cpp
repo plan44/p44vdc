@@ -57,7 +57,7 @@ void ExternalDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
 
 ExternalVdc &ExternalDevice::getExternalVdc()
 {
-  return *(static_cast<ExternalVdc *>(vdcP));
+  return *(static_cast<ExternalVdc *>(mVdcP));
 }
 
 
