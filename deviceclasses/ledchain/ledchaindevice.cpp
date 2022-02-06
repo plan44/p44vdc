@@ -379,7 +379,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   pix.g = g;
   pix.b = b;
   pix.a = 255;
-  lightView->setAlpha(cl->brightnessForHardware()*getLedChainVdc().ledArrangement->getMaxOutValue()/100); // alpha is brightness, scaled down to maxOutValue
+  lightView->setAlpha(cl->brightnessForHardware()*255/100); // alpha is brightness, scaled down to 0..255
   P44ViewPtr targetView = lightView->getView("LIGHT"); // where to direct extras to
   if (!targetView) targetView = lightView;
   if (ml) {

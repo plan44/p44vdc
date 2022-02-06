@@ -120,7 +120,7 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 Brightness LedChainVdc::getMinBrightness()
 {
   // scale up according to scaled down maximum, and make it 0..100
-  return ledArrangement ? ledArrangement->getMinVisibleColorIntensity()*100.0/(double)ledArrangement->getMaxOutValue() : 0;
+  return ledArrangement ? ledArrangement->getMinVisibleColorIntensity()*100.0/255.0 : 0;
 }
 
 
