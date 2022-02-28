@@ -147,6 +147,10 @@ CustomDevice::CustomDevice(Vdc *aVdcP, bool aSimpleText) :
   mModelNameString("custom device"),
   mVendorNameString("plan44.ch"),
   mDevClassVersion(0)
+  #if ENABLE_CUSTOM_EXOTIC
+  ,mExtraModelFeatures(0)
+  ,mMutedModelFeatures(0)
+  #endif
 {
 }
 
@@ -233,6 +237,26 @@ void CustomDevice::identifyToUser()
     inherited::identifyToUser();
   }
 }
+
+
+#if ENABLE_CUSTOM_EXOTIC
+
+static_assert(numModelFeatures<=64, "Too many modelfeatures, don't fit into 64bit mask");
+
+Tristate CustomDevice::hasModelFeature(DsModelFeatures aFeatureIndex)
+{
+  // explicitly set or muted features override automatically derived ones in all cases
+  if (mExtraModelFeatures & (1ll<<aFeatureIndex)) {
+    return yes;
+  }
+  if (mMutedModelFeatures & (1ll<<aFeatureIndex)) {
+    return no;
+  }
+  return inherited::hasModelFeature(aFeatureIndex);
+}
+
+
+#endif // ENABLE_CUSTOM_EXOTIC
 
 
 void CustomDevice::sendDeviceApiFlagMessage(string aFlagWord)
@@ -1260,6 +1284,27 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
       if (o2->get("id", o3)) id = o3->stringValue();
       if (o2->get("description", o3)) description = o3->stringValue();
       mConfigurations.push_back(DeviceConfigurationDescriptorPtr(new DeviceConfigurationDescriptor(id, description)));
+    }
+  }
+  // explicit modelfeature control (mainly for debugging)
+  if (aInitParams->get("modelfeatures", o)) {
+    o->resetKeyIteration();
+    string hn;
+    JsonObjectPtr hv;
+    while (o->nextKeyValue(hn, hv)) {
+      // find feature
+      for (int idx=0; idx<numModelFeatures; idx++) {
+        if (strucmp(modelFeatureNames[idx], hn.c_str())==0) {
+          if (hv && hv->boolValue()) {
+            // explicitly set feature
+            mExtraModelFeatures |= (1ll<<idx);
+          }
+          else {
+            // explicitly mute feature
+            mMutedModelFeatures &= ~(1ll<<idx);
+          }
+        }
+      }
     }
   }
   #endif // ENABLE_CUSTOM_EXOTIC

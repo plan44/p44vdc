@@ -80,6 +80,8 @@ namespace p44 {
   /// @}
 
 
+  extern const char *modelFeatureNames[numModelFeatures];
+
   /// Handler for scene/dim preparation
   typedef boost::function<void (NotificationType aNotificationToApply)> PreparedCB;
 

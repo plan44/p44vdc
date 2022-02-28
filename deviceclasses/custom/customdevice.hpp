@@ -120,6 +120,8 @@ namespace p44 {
     #if ENABLE_CUSTOM_EXOTIC
     string mConfigurationId; ///< current configuration's id
     DeviceConfigurationsVector mConfigurations; ///< the device's possible configurations
+    uint64_t mExtraModelFeatures; ///< extra model features
+    uint64_t mMutedModelFeatures; ///< explicitly disabled model features
     #endif
 
     #if ENABLE_CUSTOM_SINGLEDEVICE
@@ -197,6 +199,11 @@ namespace p44 {
 
     /// for factory
     static bool checkSimple(JsonObjectPtr aInitMsg, ErrorPtr &aErr);
+
+    /// check for presence of model feature (flag in dSS visibility matrix)
+    /// @param aFeatureIndex the feature to check for
+    /// @return yes if this output behaviour has the feature, no if (explicitly) not, undefined if asked entity does not know
+    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex) P44_OVERRIDE;
 
   protected:
 
