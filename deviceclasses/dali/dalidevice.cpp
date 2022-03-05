@@ -589,13 +589,7 @@ void DaliBusDevice::queryColorStatusResponse(StatusCB aCompletedCB, bool aNoOrTi
     // TODO: implement
 //    else if (aResponse & 0x40) {
 //      // Primary N is active
-//      currentColorMode = colorLightModeCt;
-//      // - query CT
-//      daliVdc.daliComm.daliSendDtrAnd16BitQuery(
-//        addressForQuery(),
-//        DALICMD_DT8_QUERY_COLOR_VALUE, 2, // DTR==2 -> CT value
-//        boost::bind(&DaliBusDevice::queryCTResponse,this, aCompletedCB, _1, _2)
-//      );
+//      %%% retrieve it
 //      return;
 //    }
     else if (aResponse & 0x80) {
@@ -603,7 +597,7 @@ void DaliBusDevice::queryColorStatusResponse(StatusCB aCompletedCB, bool aNoOrTi
       currentColorMode = colorLightModeRGBWA;
       currentW = 0;
       currentA = 0;
-      // - query RGBWA (no F supported, WF optional, RGB mandatory)
+      // - query RGBWA (no F supported, WA optional, RGB mandatory)
       if (dt8RGBWAFchannels>=3) {
         daliVdc.daliComm.daliSendDtrAnd16BitQuery(
           addressForQuery(),
@@ -846,7 +840,7 @@ bool DaliBusDevice::setRGBWAParams(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t a
     }
     if (changed || aR!=currentR || aG!=currentG || aB!=currentB || aW!=currentW || aA!=currentA) {
       // set the mode (channel control)
-      daliVdc.daliComm.daliSendDtrAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_RGBWAF_CTRL, 0x0<<6); // all not linked, channel control
+      daliVdc.daliComm.daliSendDtrAndCommand(deviceInfo->shortAddress, DALICMD_DT8_SET_TEMP_RGBWAF_CTRL, 0x2<<6); // all not linked, normalised colour control
       if (changed || aR!=currentR || aG!=currentG || aB!=currentB) {
         // set the RGB color values
         currentR = aR;
