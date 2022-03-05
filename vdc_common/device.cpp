@@ -215,7 +215,7 @@ void Device::setZoneID(DsZoneID aZoneId)
       }
     }
     #else
-    deviceSettings->setPVar(deviceSettings->zoneID, aZoneId);
+    mDeviceSettings->setPVar(mDeviceSettings->zoneID, aZoneId);
     #endif
   }
 }
