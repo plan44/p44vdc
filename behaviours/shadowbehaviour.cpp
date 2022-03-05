@@ -336,13 +336,17 @@ Tristate ShadowBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
     case modelFeature_outvalue8:
       // Shade outputs are 16bit resolution and be labelled "Position", not "Value"
       return no; // suppress general 8-bit outmode assumption
-    case modelFeature_shadeprops:
     case modelFeature_shadeposition:
       // Shade output. Should be 16bit resolution and be labelled "Position", not "Value"
       return yes;
     case modelFeature_shadebladeang:
       // Jalousie also has blade angle, other kinds don't
       return shadowDeviceKind==shadowdevice_jalousie ? yes : no;
+    case modelFeature_shadeprops:
+    case modelFeature_motiontimefins:
+      // TODO: once dS support is here for propagating moving times etc, enable this
+      // For now, shadow device property dialog makes no sense as it does not work at all
+      return no;
     default:
       // not available at this level, ask base class
       return inherited::hasModelFeature(aFeatureIndex);
