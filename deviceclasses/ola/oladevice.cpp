@@ -164,7 +164,7 @@ bool OlaDevice::isSoftwareDisconnectable()
 
 OlaVdc &OlaDevice::getOlaVdc()
 {
-  return *(static_cast<OlaVdc *>(vdcP));
+  return *(static_cast<OlaVdc *>(mVdcP));
 }
 
 
@@ -327,7 +327,7 @@ void OlaDevice::deriveDsUid()
   // vDC implementation specific UUID:
   //   UUIDv5 with name = classcontainerinstanceid::olaType:white[:red:green:blue][:amber]
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
-  string s = vdcP->vdcInstanceIdentifier();
+  string s = mVdcP->vdcInstanceIdentifier();
   string_format_append(s, ":%d:%d", (int)olaType, whiteChannel);
   if (olaType==ola_fullcolordimmer)
     string_format_append(s, ":%d:%d:%d", redChannel, greenChannel, blueChannel);
