@@ -26,7 +26,27 @@
 
 #if ENABLE_HUE
 
+#if !defined(HUE_DNSSD_DISCOVERY) && !DISABLE_DISCOVERY
+  // modern hue bridge discovery is DNS-SD (Bonjour/Zeroconf)
+  #define HUE_DNSSD_DISCOVERY 1
+#endif
+#ifndef HUE_SSDP_DISCOVERY
+  // legacy hue bridge discovery is SSDP (UPnP)
+  #define HUE_SSDP_DISCOVERY 1
+#endif
+#ifndef HUE_CLOUD_DISCOVERY
+  // discovery via Philips/Signify cloud
+  #define HUE_CLOUD_DISCOVERY 1
+#endif
+
+#if HUE_DNSSD_DISCOVERY
+#include "dnssd.hpp"
+#endif
+
+#if HUE_SSDP_DISCOVERY
 #include "ssdpsearch.hpp"
+#endif
+
 #include "jsonwebclient.hpp"
 #include "operationqueue.hpp"
 
@@ -154,7 +174,7 @@ namespace p44 {
     string fixedBaseURL; ///< fixed hue API base URL, bypasses any SSDP searches
     string uuid; ///< the UUID for searching the hue bridge via SSDP
     string userName; ///< the user name
-    bool useNUPnP; ///< if set, N-UPnP is used as a fallback to find bridges
+    bool useHueCloudDiscovery; ///< if set, N-UPnP is used as a fallback to find bridges
 
     /// @}
 
@@ -205,12 +225,6 @@ namespace p44 {
     /// @note ssdpUuid and apiToken member variables must be set to the pre-know bridge's parameters before calling this
     void refindBridge(HueBridgeFindCB aFindHandler);
 
-    typedef std::list<std::string> NupnpResult;
-    typedef boost::function<void (NupnpResult)> HueBridgeNupnpFindCB;
-    void findBridgesNupnp(HueBridgeNupnpFindCB aFindHandler);
-
-  private:
-    void gotBridgeNupnpResponse(JsonObjectPtr aResult, ErrorPtr aError, HueBridgeNupnpFindCB aFindHandler);
     /// @}
 
   };

@@ -90,7 +90,7 @@ void ServiceAnnouncer::advertiseVdcHostDevice(
 }
 
 
-void ServiceAnnouncer::serviceCallback(ErrorPtr aStatus)
+bool ServiceAnnouncer::serviceCallback(ErrorPtr aStatus)
 {
   if (Error::isOK(aStatus)) {
     // successful (re)start of service
@@ -132,10 +132,12 @@ void ServiceAnnouncer::serviceCallback(ErrorPtr aStatus)
     }
     if (Error::isOK(aStatus)) {
       sg->startAdvertising(boost::bind(&ServiceAnnouncer::advertisingCallback, this, _1));
+      return true; // call me again in case service goes down and up later
     }
   }
   // something went wrong, restart service
   DnsSdManager::sharedDnsSdManager().restartServiceBecause(aStatus);
+  return true; // keep calling back!
 }
 
 

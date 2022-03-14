@@ -81,7 +81,7 @@ namespace p44 {
 
   private:
 
-    void serviceCallback(ErrorPtr aStatus);
+    bool serviceCallback(ErrorPtr aStatus);
     void advertisingCallback(ErrorPtr aStatus);
 
   };

@@ -41,7 +41,7 @@ HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   has_1_11_api(false)
 {
   hueComm.isMemberVariable();
-  hueComm.useNUPnP = getVdcHost().cloudAllowed();
+  hueComm.useHueCloudDiscovery = getVdcHost().cloudAllowed();
   optimizerMode = opt_disabled; // optimizer disabled by default, but available
   // defaults
   maxOptimizerScenes = DEFAULT_HUE_MAX_OPTIMIZER_SCENES;
