@@ -56,36 +56,36 @@ namespace p44 {
     typedef Vdc inherited;
     friend class HueDevice;
 
-    HuePersistence db;
+    HuePersistence mDb;
 
     /// @name persistent parameters
     /// @{
 
-    string bridgeUuid; ///< the UUID for searching the hue bridge via SSDP
-    string bridgeUserName; ///< the user name registered with the bridge
-    string bridgeApiURL; ///< URL for the hue bridge (cache or user provided)
-    bool fixedURL; ///< if set, bridgeApiURL is user provided and must not be updated
+    string mBridgeIdentifier; ///< the identifier for finding the hue bridge (via SSDP: uuid, via DNS-SD or hue cloud: bridgeId)
+    string mBridgeUserName; ///< the user name registered with the bridge
+    string mBridgeApiURL; ///< URL for the hue bridge (cache or user provided)
+    bool mFixedURL; ///< if set, bridgeApiURL is user provided and must not be updated
 
     /// @}
 
     /// @name other info retrieved from bridge
     /// @{
 
-    uint64_t bridgeMacAddress; ///< the mac address of this hue bridge
-    string swVersion; ///< bridge software version
-    string apiVersion; ///< bridge API version
-    bool has_1_11_api; ///< set if bridge has at least 1.11 API
+    uint64_t mBridgeMacAddress; ///< the mac address of this hue bridge
+    string mSwVersion; ///< bridge software version
+    string mApiVersion; ///< bridge API version
+    bool mHas_1_11_api; ///< set if bridge has at least 1.11 API
 
     /// @}
 
     /// @name internal state
     /// @{
 
-    int numOptimizerScenes; ///< how many scenes are in use by the optimizer
-    int numOptimizerGroups; ///< how many groups are in use by the optimizer
-    MLTicket groupDimTicket; ///< for group dimming repeater
-    MLTicket refindTicket; ///< for delayed bridge re-find
-    MLTicket delayedSceneUpdateTicket; ///< timer for delayed native scene update
+    int mNumOptimizerScenes; ///< how many scenes are in use by the optimizer
+    int mNumOptimizerGroups; ///< how many groups are in use by the optimizer
+    MLTicket mGroupDimTicket; ///< for group dimming repeater
+    MLTicket mRefindTicket; ///< for delayed bridge re-find
+    MLTicket mDelayedSceneUpdateTicket; ///< timer for delayed native scene update
 
     /// @}
 
@@ -100,7 +100,7 @@ namespace p44 {
     /// @param aLogLevelOffset the new log level offset
     virtual void setLogLevelOffset(int aLogLevelOffset) P44_OVERRIDE;
 
-    HueComm hueComm;
+    HueComm mHueComm;
 
 		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
@@ -128,7 +128,7 @@ namespace p44 {
     virtual string vdcModelSuffix() const P44_OVERRIDE { return "hue"; }
 
     /// @return human readable model version specific to that vDC
-    virtual string vdcModelVersion() const P44_OVERRIDE { return apiVersion.empty() ? swVersion : swVersion + "/" + apiVersion; };
+    virtual string vdcModelVersion() const P44_OVERRIDE { return mApiVersion.empty() ? mSwVersion : mSwVersion + "/" + mApiVersion; };
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - uuid:UUUUUUU = UUID

@@ -34,14 +34,14 @@ using namespace p44;
 
 HueVdc::HueVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   inherited(aInstanceNumber, aVdcHostP, aTag),
-  hueComm(),
-  bridgeMacAddress(0),
-  numOptimizerScenes(0),
-  numOptimizerGroups(0),
-  has_1_11_api(false)
+  mHueComm(),
+  mBridgeMacAddress(0),
+  mNumOptimizerScenes(0),
+  mNumOptimizerGroups(0),
+  mHas_1_11_api(false)
 {
-  hueComm.isMemberVariable();
-  hueComm.useHueCloudDiscovery = getVdcHost().cloudAllowed();
+  mHueComm.isMemberVariable();
+  mHueComm.mUseHueCloudDiscovery = getVdcHost().cloudAllowed();
   optimizerMode = opt_disabled; // optimizer disabled by default, but available
   // defaults
   maxOptimizerScenes = DEFAULT_HUE_MAX_OPTIMIZER_SCENES;
@@ -56,7 +56,7 @@ HueVdc::~HueVdc()
 
 void HueVdc::setLogLevelOffset(int aLogLevelOffset)
 {
-  hueComm.setLogLevelOffset(aLogLevelOffset);
+  mHueComm.setLogLevelOffset(aLogLevelOffset);
   inherited::setLogLevelOffset(aLogLevelOffset);
 }
 
@@ -78,16 +78,16 @@ bool HueVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutio
 
 string HueVdc::getExtraInfo()
 {
-  return string_format("hue api%s: %s", fixedURL ? " (fixed)" : "", hueComm.baseURL.c_str());
+  return string_format("hue api%s: %s", mFixedURL ? " (fixed)" : "", mHueComm.mBaseURL.c_str());
 }
 
 
 string HueVdc::hardwareGUID()
 {
   string s;
-  if (bridgeMacAddress) {
+  if (mBridgeMacAddress) {
     s = "macaddress:";
-    s += macAddressToString(bridgeMacAddress,':');
+    s += macAddressToString(mBridgeMacAddress,':');
   }
   return s;
 };
@@ -148,7 +148,7 @@ void HueVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
 	string databaseName = getPersistentDataDir();
 	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), HUE_SCHEMA_VERSION, HUE_SCHEMA_MIN_VERSION, aFactoryReset);
+  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), HUE_SCHEMA_VERSION, HUE_SCHEMA_MIN_VERSION, aFactoryReset);
 	aCompletedCB(error); // return status of DB init
   // schedule rescans
   setPeriodicRecollection(HUE_RECOLLECT_INTERVAL, rescanmode_incremental);
@@ -173,21 +173,21 @@ void HueVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
   // load hue bridge uuid and token
-  sqlite3pp::query qry(db);
+  sqlite3pp::query qry(mDb);
   if (qry.prepare("SELECT hueBridgeUUID, hueBridgeUser, hueApiURL, fixedURL FROM globs")==SQLITE_OK) {
     sqlite3pp::query::iterator i = qry.begin();
     if (i!=qry.end()) {
-      bridgeUuid = nonNullCStr(i->get<const char *>(0));
-      bridgeUserName = nonNullCStr(i->get<const char *>(1));
-      bridgeApiURL = nonNullCStr(i->get<const char *>(2));
-      fixedURL = i->get<bool>(3);
+      mBridgeIdentifier = nonNullCStr(i->get<const char *>(0));
+      mBridgeUserName = nonNullCStr(i->get<const char *>(1));
+      mBridgeApiURL = nonNullCStr(i->get<const char *>(2));
+      mFixedURL = i->get<bool>(3);
     }
   }
-  if ((aRescanFlags & rescanmode_exhaustive) && !fixedURL) {
+  if ((aRescanFlags & rescanmode_exhaustive) && !mFixedURL) {
     // exhaustive rescan means we need to search for the bridge API
-    bridgeApiURL.clear();
+    mBridgeApiURL.clear();
   }
-  if (bridgeUuid.length()>0 || bridgeApiURL.length()>0) {
+  if (mBridgeIdentifier.length()>0 || mBridgeApiURL.length()>0) {
     // we know a bridge by UUID or API URL, try to refind it
     refindBridge(aCompletedCB);
   }
@@ -216,14 +216,14 @@ void HueVdc::refindBridge(StatusCB aCompletedCB)
   if (!getVdcHost().isNetworkConnected()) {
     // TODO: checking IPv4 only at this time, need to add IPv6 later
     OLOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
-    refindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), REFIND_RETRY_DELAY);
+    mRefindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), REFIND_RETRY_DELAY);
     return;
   }
   // actually refind
-  hueComm.uuid = bridgeUuid;
-  hueComm.userName = bridgeUserName;
-  hueComm.fixedBaseURL = bridgeApiURL;
-  hueComm.refindBridge(boost::bind(&HueVdc::refindResultHandler, this, aCompletedCB, _1));
+  mHueComm.mBridgeIdentifier = mBridgeIdentifier;
+  mHueComm.mUserName = mBridgeUserName;
+  mHueComm.mFixedBaseURL = mBridgeApiURL;
+  mHueComm.refindBridge(boost::bind(&HueVdc::refindResultHandler, this, aCompletedCB, _1));
 }
 
 
@@ -236,20 +236,20 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
       "Hue bridge uuid '%s' found again:\n"
       "- userName = %s\n"
       "- API base URL = %s",
-      hueComm.uuid.c_str(),
-      hueComm.userName.c_str(),
-      hueComm.baseURL.c_str()
+      mHueComm.mBridgeIdentifier.c_str(),
+      mHueComm.mUserName.c_str(),
+      mHueComm.mBaseURL.c_str()
     );
     // save the current URL
-    if (!fixedURL && hueComm.baseURL!=bridgeApiURL) {
-      bridgeApiURL = hueComm.baseURL;
+    if (!mFixedURL && mHueComm.mBaseURL!=mBridgeApiURL) {
+      mBridgeApiURL = mHueComm.mBaseURL;
       // save back into database
-      if(db.executef(
+      if(mDb.executef(
         "UPDATE globs SET hueBridgeUUID='%q', hueApiURL='%q', fixedURL=0",
-        bridgeUuid.c_str(),
-        bridgeApiURL.c_str()
+        mBridgeIdentifier.c_str(),
+        mBridgeApiURL.c_str()
       )!=SQLITE_OK) {
-        OLOG(LOG_ERR, "Error saving hue bridge url: %s", db.error()->description().c_str());
+        OLOG(LOG_ERR, "Error saving hue bridge url: %s", mDb.error()->description().c_str());
       }
     }
     // collect existing lights
@@ -260,16 +260,16 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
   else {
     // not found (usually timeout)
     // - if URL does not work, clear cached IP and try again (unless IP is user-provided)
-    if (!bridgeApiURL.empty() && !fixedURL) {
+    if (!mBridgeApiURL.empty() && !mFixedURL) {
       // forget the cached IP
-      OLOG(LOG_WARNING, "Could not access bridge API at %s - revert to finding bridge by UUID", bridgeApiURL.c_str());
-      bridgeApiURL.clear();
+      OLOG(LOG_WARNING, "Could not access bridge API at %s - revert to finding bridge by UUID", mBridgeApiURL.c_str());
+      mBridgeApiURL.clear();
       // retry searching by uuid
-      refindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), 500*MilliSecond);
+      mRefindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), 500*MilliSecond);
       return;
     }
     else {
-      OLOG(LOG_WARNING, "Error refinding hue bridge uuid '%s', error = %s", hueComm.uuid.c_str(), aError->text());
+      OLOG(LOG_WARNING, "Error refinding hue bridge uuid '%s', error = %s", mHueComm.mBridgeIdentifier.c_str(), aError->text());
     }
     if (aCompletedCB) aCompletedCB(ErrorPtr()); // no hue bridge to collect lights from (but this is not a collect error)
   }
@@ -286,25 +286,25 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       // needs new pairing, forget current devices
       removeDevices(false);
       // register by bridge API URL (or remove with empty string)
-      bridgeUserName.clear();
-      bridgeUuid.clear();
-      bridgeApiURL = a->stringValue();
-      fixedURL = false;
-      if (!bridgeApiURL.empty()) {
+      mBridgeUserName.clear();
+      mBridgeIdentifier.clear();
+      mBridgeApiURL = a->stringValue();
+      mFixedURL = false;
+      if (!mBridgeApiURL.empty()) {
         // make full API URL if it's just a IP or host name
-        if (bridgeApiURL.substr(0,4)!="http") {
-          bridgeApiURL = "http://" + bridgeApiURL + ":80/api";
+        if (mBridgeApiURL.substr(0,4)!="http") {
+          mBridgeApiURL = "http://" + mBridgeApiURL + ":80/api";
         }
         // register
-        bridgeUuid = PSEUDO_UUID_FOR_FIXED_API;
-        fixedURL = true;
+        mBridgeIdentifier = PSEUDO_UUID_FOR_FIXED_API;
+        mFixedURL = true;
         // save the bridge parameters
-        if(db.executef(
+        if(mDb.executef(
           "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='', hueApiURL='%q', fixedURL=1",
-          bridgeUuid.c_str(),
-          bridgeApiURL.c_str()
+          mBridgeIdentifier.c_str(),
+          mBridgeApiURL.c_str()
         )!=SQLITE_OK) {
-          respErr = db.error("saving hue bridge params");
+          respErr = mDb.error("saving hue bridge params");
         }
         else {
           // done (separate learn-in required, because button press at the bridge is required)
@@ -313,9 +313,9 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       }
       else {
         // unregister
-        fixedURL = false;
-        if(db.executef("UPDATE globs SET hueBridgeUUID='', hueBridgeUser='', hueApiURL='', fixedURL=0")!=SQLITE_OK) {
-          respErr = db.error("clearing hue bridge params");
+        mFixedURL = false;
+        if(mDb.executef("UPDATE globs SET hueBridgeUUID='', hueBridgeUser='', hueApiURL='', fixedURL=0")!=SQLITE_OK) {
+          respErr = mDb.error("clearing hue bridge params");
         }
         else {
           // done
@@ -325,17 +325,17 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
     }
     else {
       // register by uuid/username (for migration)
-      respErr = checkStringParam(aParams, "bridgeUuid", bridgeUuid);
+      respErr = checkStringParam(aParams, "bridgeUuid", mBridgeIdentifier);
       if (Error::notOK(respErr)) return respErr;
-      respErr = checkStringParam(aParams, "bridgeUsername", bridgeUserName);
+      respErr = checkStringParam(aParams, "bridgeUsername", mBridgeUserName);
       if (Error::notOK(respErr)) return respErr;
       // save the bridge parameters
-      if(db.executef(
+      if(mDb.executef(
         "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='', fixedURL=0",
-        bridgeUuid.c_str(),
-        bridgeUserName.c_str()
+        mBridgeIdentifier.c_str(),
+        mBridgeUserName.c_str()
       )!=SQLITE_OK) {
-        respErr = db.error("saving hue bridge migration params");
+        respErr = mDb.error("saving hue bridge migration params");
       }
       else {
         // now collect the lights from the new bridge, remove all settings from previous bridge
@@ -353,17 +353,17 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
 void HueVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
 {
   if (aEnableLearning) {
-    if (!fixedURL || bridgeUserName.empty()) {
+    if (!mFixedURL || mBridgeUserName.empty()) {
       // no IP known or not logged in: actually search for bridge to learn/unlearn
-      if (fixedURL) {
+      if (mFixedURL) {
         // use the user-defined URL
-        hueComm.fixedBaseURL = bridgeApiURL;
+        mHueComm.mFixedBaseURL = mBridgeApiURL;
       }
       else {
         // do not use a chached (but not explicitly user-configured) URL
-        hueComm.fixedBaseURL.clear();
+        mHueComm.mFixedBaseURL.clear();
       }
-      hueComm.findNewBridge(
+      mHueComm.findNewBridge(
         string_format("%s#%s", getVdcHost().modelName().c_str(), getVdcHost().getDeviceHardwareId().c_str()).c_str(),
         15*Second, // try to login for 15 secs
         boost::bind(&HueVdc::searchResultHandler, this, aOnlyEstablish, _1)
@@ -372,7 +372,7 @@ void HueVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tri
   }
   else {
     // stop learning
-    hueComm.stopFind();
+    mHueComm.stopFind();
   }
 }
 
@@ -386,37 +386,37 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
       "- uuid = %s\n"
       "- userName = %s\n"
       "- API base URL = %s",
-      hueComm.uuid.c_str(),
-      hueComm.userName.c_str(),
-      hueComm.baseURL.c_str()
+      mHueComm.mBridgeIdentifier.c_str(),
+      mHueComm.mUserName.c_str(),
+      mHueComm.mBaseURL.c_str()
     );
     // check if we found the already learned-in bridge
     Tristate learnedIn = undefined;
-    if (hueComm.uuid==bridgeUuid && !fixedURL) {
+    if (mHueComm.mBridgeIdentifier==mBridgeIdentifier && !mFixedURL) {
       // this is the bridge that was learned in previously. Learn it out
       if (aOnlyEstablish!=yes) {
         learnedIn = no;
         // - delete it from the whitelist
-        string url = "/config/whitelist/" + hueComm.userName;
-        hueComm.apiAction(httpMethodDELETE, url.c_str(), JsonObjectPtr(), NULL);
+        string url = "/config/whitelist/" + mHueComm.mUserName;
+        mHueComm.apiAction(httpMethodDELETE, url.c_str(), JsonObjectPtr(), NULL);
         // - forget uuid + user name
-        bridgeUuid.clear();
-        bridgeUserName.clear();
+        mBridgeIdentifier.clear();
+        mBridgeUserName.clear();
         // - also clear base URL
-        hueComm.baseURL.clear();
+        mHueComm.mBaseURL.clear();
       }
     }
     else {
       // new bridge found
       if (aOnlyEstablish!=no) {
         learnedIn = yes;
-        if (hueComm.uuid!=PSEUDO_UUID_FOR_FIXED_API) {
+        if (mHueComm.mBridgeIdentifier!=PSEUDO_UUID_FOR_FIXED_API) {
           // only update if it is a real UUID.
-          bridgeUuid = hueComm.uuid;
+          mBridgeIdentifier = mHueComm.mBridgeIdentifier;
         }
-        bridgeUserName = hueComm.userName;
-        if (!fixedURL) {
-          bridgeApiURL = hueComm.baseURL;
+        mBridgeUserName = mHueComm.mUserName;
+        if (!mFixedURL) {
+          mBridgeApiURL = mHueComm.mBaseURL;
         }
       }
     }
@@ -425,18 +425,18 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
       // (on learn-in, the bridge's devices will be added afterwards)
       removeDevices(false);
       // actual learn-in or -out has happened
-      if (learnedIn==no && !fixedURL) {
+      if (learnedIn==no && !mFixedURL) {
         // forget cached URL (but keep fixed ones!)
-        bridgeApiURL.clear();
+        mBridgeApiURL.clear();
       }
       // save the bridge parameters
-      if(db.executef(
+      if(mDb.executef(
         "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='%q', fixedURL=0",
-        bridgeUuid.c_str(),
-        bridgeUserName.c_str(),
-        bridgeApiURL.c_str()
+        mBridgeIdentifier.c_str(),
+        mBridgeUserName.c_str(),
+        mBridgeApiURL.c_str()
       )!=SQLITE_OK) {
-        OLOG(LOG_ERR, "Error saving hue bridge learn params: %s", db.error()->description().c_str());
+        OLOG(LOG_ERR, "Error saving hue bridge learn params: %s", mDb.error()->description().c_str());
       }
       // now process the learn in/out
       if (learnedIn==yes) {
@@ -446,7 +446,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
       }
       if (learnedIn!=undefined) {
         // learn out clears MAC
-        bridgeMacAddress = 0;
+        mBridgeMacAddress = 0;
       }
       // report successful learn event
       getVdcHost().reportLearnEvent(learnedIn==yes, ErrorPtr());
@@ -471,7 +471,7 @@ void HueVdc::queryBridgeAndLights(StatusCB aCollectedHandler)
 {
   // query bridge config
   OLOG(LOG_INFO, "Querying hue bridge for config...");
-  hueComm.apiQuery("/config", boost::bind(&HueVdc::gotBridgeConfig, this, aCollectedHandler, _1, _2));
+  mHueComm.apiQuery("/config", boost::bind(&HueVdc::gotBridgeConfig, this, aCollectedHandler, _1, _2));
 }
 
 
@@ -481,17 +481,17 @@ void HueVdc::gotBridgeConfig(StatusCB aCollectedHandler, JsonObjectPtr aResult, 
     JsonObjectPtr o;
     // get mac address
     if (aResult->get("mac", o)) {
-      bridgeMacAddress = stringToMacAddress(o->stringValue().c_str());
+      mBridgeMacAddress = stringToMacAddress(o->stringValue().c_str());
     }
     if (aResult->get("swversion", o)) {
-      swVersion = o->stringValue();
+      mSwVersion = o->stringValue();
     }
     if (aResult->get("apiversion", o)) {
-      apiVersion = o->stringValue();
+      mApiVersion = o->stringValue();
       // check features this version has
       int maj = 0, min = 0, patch = 0;
-      if (sscanf(apiVersion.c_str(), "%d.%d.%d", &maj, &min, &patch)==3) {
-        has_1_11_api = maj>1 || (maj==1 && min>=11);
+      if (sscanf(mApiVersion.c_str(), "%d.%d.%d", &maj, &min, &patch)==3) {
+        mHas_1_11_api = maj>1 || (maj==1 && min>=11);
       }
     }
     // get name
@@ -502,15 +502,15 @@ void HueVdc::gotBridgeConfig(StatusCB aCollectedHandler, JsonObjectPtr aResult, 
       }
     }
   }
-  if (has_1_11_api) {
+  if (mHas_1_11_api) {
     // query scenes (in parallel to lights!)
     OLOG(LOG_INFO, "Querying hue bridge for available scenes...");
-    hueComm.apiQuery("/scenes", boost::bind(&HueVdc::collectedScenesHandler, this, aCollectedHandler, _1, _2));
+    mHueComm.apiQuery("/scenes", boost::bind(&HueVdc::collectedScenesHandler, this, aCollectedHandler, _1, _2));
   }
   // Note: can be used to incrementally search additional lights
   // - issue lights query
   OLOG(LOG_INFO, "Querying hue bridge for available lights...");
-  hueComm.apiQuery("/lights", boost::bind(&HueVdc::collectedLightsHandler, this, aCollectedHandler, _1, _2));
+  mHueComm.apiQuery("/lights", boost::bind(&HueVdc::collectedLightsHandler, this, aCollectedHandler, _1, _2));
 }
 
 
@@ -601,11 +601,11 @@ ErrorPtr HueVdc::announceNativeAction(const string aNativeActionId)
 {
   if (!hueSceneIdFromActionId(aNativeActionId).empty()) {
     // just count to see how many
-    numOptimizerScenes++;
+    mNumOptimizerScenes++;
   }
   else if (!hueGroupIdFromActionId(aNativeActionId).empty()) {
     // just count to see how many
-    numOptimizerGroups++;
+    mNumOptimizerGroups++;
   }
   return ErrorPtr();
 }
@@ -617,7 +617,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
   if (aDeliveryState->optimizedType==ntfy_callscene) {
     hueActionId = hueSceneIdFromActionId(aNativeActionId);
     if (!hueActionId.empty()) {
-      groupDimTicket.cancel(); // just safety, should be cancelled already
+      mGroupDimTicket.cancel(); // just safety, should be cancelled already
       JsonObjectPtr setGroupState = JsonObject::newObj();
       // PUT /api/<username>/groups/<groupid>/action
       // { "scene": "AB34EF5", "transitiontime":60 }
@@ -631,7 +631,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
       //   if (devtt>maxtt) maxtt = devtt;
       // }
       // setGroupState->add("transitiontime", JsonObject::newInt64(maxtt*10/Second)); // 100mS resolution
-      hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
+      mHueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
       return;
     }
   }
@@ -661,11 +661,11 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
           setGroupState->add("hue_inc", JsonObject::newInt32(dm*6553));
           tt = FULL_SCALE_DIM_TIME_MS/100/15; // 1/15 of full scale, unit is 100mS
           if (dm==dimmode_stop) {
-            groupDimTicket.cancel();
+            mGroupDimTicket.cancel();
           }
           else {
             setGroupState->add("transitiontime", JsonObject::newInt32(tt));
-            groupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, setGroupState, tt, _1));
+            mGroupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, setGroupState, tt, _1));
             aStatusCB(ErrorPtr());
           }
           break;
@@ -676,7 +676,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
       if (dm!=dimmode_stop) {
         setGroupState->add("transitiontime", JsonObject::newInt32(tt));
       }
-      hueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
+      mHueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
       return;
     }
   }
@@ -686,8 +686,8 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
 
 void HueVdc::groupDimRepeater(JsonObjectPtr aDimState, int aTransitionTime, MLTimer &aTimer)
 {
-  hueComm.apiAction(httpMethodPUT, "/groups/0/action", aDimState, NULL);
-  groupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, aDimState, aTransitionTime, _1), aTransitionTime*Second/10);
+  mHueComm.apiAction(httpMethodPUT, "/groups/0/action", aDimState, NULL);
+  mGroupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, aDimState, aTransitionTime, _1), aTransitionTime*Second/10);
 }
 
 
@@ -713,7 +713,7 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
   ErrorPtr err;
   if (aOptimizerEntry->type==ntfy_callscene) {
     // need a free scene
-    if (numOptimizerScenes>=maxOptimizerScenes) {
+    if (mNumOptimizerScenes>=maxOptimizerScenes) {
       // too many already
       err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer scenes (%d) already exist", maxOptimizerScenes);
     }
@@ -728,8 +728,8 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       MLMicroSeconds maxtt = 0;
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
-        lights->arrayAppend(JsonObject::newString(dev->lightID));
-        sceneName += ":" + dev->lightID;
+        lights->arrayAppend(JsonObject::newString(dev->mLightID));
+        sceneName += ":" + dev->mLightID;
         if (sceneName.size()>32) {
           sceneName.erase(29);
           sceneName += "..."; // exactly 32
@@ -742,13 +742,13 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       newScene->add("name", JsonObject::newString(sceneName)); // must be max 32 chars
       newScene->add("lights", lights);
       newScene->add("recycle", JsonObject::newBool(false));
-      hueComm.apiAction(httpMethodPOST, "/scenes", newScene, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
+      mHueComm.apiAction(httpMethodPOST, "/scenes", newScene, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
       return;
     }
   }
   else if (aOptimizerEntry->type==ntfy_dimchannel) {
     // need a free group
-    if (numOptimizerGroups>=maxOptimizerGroups) {
+    if (mNumOptimizerGroups>=maxOptimizerGroups) {
       // too many already
       err = Error::err<VdcError>(VdcError::NoMoreActions, "hue: max number of optimizer groups (%d) already exist", maxOptimizerGroups);
     }
@@ -761,8 +761,8 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       JsonObjectPtr lights = JsonObject::newArray();
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
-        lights->arrayAppend(JsonObject::newString(dev->lightID));
-        groupName += ":" + dev->lightID;
+        lights->arrayAppend(JsonObject::newString(dev->mLightID));
+        groupName += ":" + dev->mLightID;
         if (groupName.size()>32) {
           groupName.erase(29);
           groupName += "..."; // exactly 32
@@ -770,7 +770,7 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       }
       newGroup->add("name", JsonObject::newString(groupName));
       newGroup->add("lights", lights);
-      hueComm.apiAction(httpMethodPOST, "/groups", newGroup, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
+      mHueComm.apiAction(httpMethodPOST, "/groups", newGroup, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
       return;
     }
 
@@ -792,14 +792,14 @@ void HueVdc::nativeActionCreated(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
       if (i) {
         if (aOptimizerEntry->type==ntfy_callscene) {
           // successfully created scene
-          numOptimizerScenes++;
+          mNumOptimizerScenes++;
           aOptimizerEntry->nativeActionId = "hue_scene_" + i->stringValue();
           OLOG(LOG_INFO,"created new hue scene '%s'", aOptimizerEntry->nativeActionId.c_str());
           // TODO: if hue scene saves transitional values, we might need to call updateNativeAction() here
         }
         else if (aOptimizerEntry->type==ntfy_dimchannel) {
           // successfully created group
-          numOptimizerGroups++;
+          mNumOptimizerGroups++;
           aOptimizerEntry->nativeActionId = "hue_group_" + i->stringValue();
           OLOG(LOG_INFO,"created new hue group '%s'", aOptimizerEntry->nativeActionId.c_str());
         }
@@ -830,7 +830,7 @@ void HueVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
         HueDevicePtr dev = boost::dynamic_pointer_cast<HueDevice>(*pos);
         // collect id to update
-        lights->arrayAppend(JsonObject::newString(dev->lightID));
+        lights->arrayAppend(JsonObject::newString(dev->mLightID));
         // find longest transition
         MLMicroSeconds devtt = dev->transitionTimeForPreparedScene(false); // without transition time override
         if (devtt>maxtt) maxtt = devtt;
@@ -840,7 +840,7 @@ void HueVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       // actually perform scene update only after transitions are all complete (50% safety margin)
       uint64_t newHash = aOptimizerEntry->contentsHash; // remember the correct hash for the case we can execute the delayed update
       aOptimizerEntry->contentsHash = 0; // reset for now, scene is not up-to-date yet
-      delayedSceneUpdateTicket.executeOnce(boost::bind(&HueVdc::performNativeSceneUpdate, this, newHash, sceneId, updatedScene, aDeliveryState->affectedDevices, aOptimizerEntry), maxtt*3/2);
+      mDelayedSceneUpdateTicket.executeOnce(boost::bind(&HueVdc::performNativeSceneUpdate, this, newHash, sceneId, updatedScene, aDeliveryState->affectedDevices, aOptimizerEntry), maxtt*3/2);
       aStatusCB(ErrorPtr());
       return;
     }
@@ -852,7 +852,7 @@ void HueVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
 void HueVdc::cancelNativeActionUpdate()
 {
   // the lights will change, do not update the scene
-  delayedSceneUpdateTicket.cancel();
+  mDelayedSceneUpdateTicket.cancel();
 }
 
 
@@ -860,7 +860,7 @@ void HueVdc::performNativeSceneUpdate(uint64_t aNewHash, string aSceneId, JsonOb
 {
   // actually post update
   string url = "/scenes/" + aSceneId;
-  hueComm.apiAction(httpMethodPUT, url.c_str(), aSceneUpdate, boost::bind(&HueVdc::nativeActionUpdated, this, aNewHash, aOptimizerEntry, _1, _2));
+  mHueComm.apiAction(httpMethodPUT, url.c_str(), aSceneUpdate, boost::bind(&HueVdc::nativeActionUpdated, this, aNewHash, aOptimizerEntry, _1, _2));
   return;
 }
 
@@ -887,11 +887,11 @@ void HueVdc::freeNativeAction(StatusCB aStatusCB, const string aNativeActionId)
   if (!(id = hueSceneIdFromActionId(aNativeActionId)).empty()) {
     // is a scene, delete it
     string url = "/scenes/" + id;
-    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
+    mHueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
   }
   else if (!(id = hueGroupIdFromActionId(aNativeActionId)).empty()) {
     string url = "/groups/" + id;
-    hueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
+    mHueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
   }
 }
 
@@ -921,9 +921,9 @@ void HueVdc::nativeActionFreed(StatusCB aStatusCB, const string aUrl, JsonObject
   if (deleted) {
     // action is considered gone (actually deleted or no longer existing), so count it
     if (isScene)
-      numOptimizerScenes--;
+      mNumOptimizerScenes--;
     else
-      numOptimizerGroups--;
+      mNumOptimizerGroups--;
   }
   if (aStatusCB) aStatusCB(aError);
 }

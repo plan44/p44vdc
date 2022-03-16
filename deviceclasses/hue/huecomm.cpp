@@ -24,7 +24,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 7
+#define FOCUSLOGLEVEL 6
 
 #include "huecomm.hpp"
 
@@ -71,12 +71,12 @@ const char* HueCommError::errorName() const
 // MARK: - HueApiOperation
 
 HueApiOperation::HueApiOperation(HueComm &aHueComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, HueApiResultCB aResultHandler) :
-  hueComm(aHueComm),
-  method(aMethod),
-  url(aUrl),
-  data(aData),
-  resultHandler(aResultHandler),
-  completed(false)
+  mHueComm(aHueComm),
+  mMethod(aMethod),
+  mUrl(aUrl),
+  mData(aData),
+  mResultHandler(aResultHandler),
+  mCompleted(false)
 {
 }
 
@@ -93,16 +93,16 @@ bool HueApiOperation::initiate()
 {
   // initiate the web request
   const char *methodStr;
-  switch (method) {
+  switch (mMethod) {
     case httpMethodPOST : methodStr = "POST"; break;
     case httpMethodPUT : methodStr = "PUT"; break;
     case httpMethodDELETE : methodStr = "DELETE"; break;
-    default : methodStr = "GET"; data.reset(); break;
+    default : methodStr = "GET"; mData.reset(); break;
   }
-  if (method==httpMethodPUT) {
-    SOLOG(hueComm, LOG_INFO, "Sending API action (PUT) command: %s: %s", url.c_str(), data ? data->c_strValue() : "<no data>");
+  if (mMethod==httpMethodPUT) {
+    SOLOG(mHueComm, LOG_INFO, "Sending API action (PUT) command: %s: %s", mUrl.c_str(), mData ? mData->c_strValue() : "<no data>");
   }
-  hueComm.bridgeAPIComm.jsonRequest(url.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, data);
+  mHueComm.mBridgeAPIComm.jsonRequest(mUrl.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, mData);
   // executed
   return inherited::initiate();
 }
@@ -111,11 +111,11 @@ bool HueApiOperation::initiate()
 
 void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError)
 {
-  error = aError;
-  if (Error::isOK(error)) {
-    SOLOG(hueComm, LOG_INFO, "Receiving API response: %s", aJsonResponse ? aJsonResponse->c_strValue() : "<no data>");
+  mError = aError;
+  if (Error::isOK(mError)) {
+    SOLOG(mHueComm, LOG_INFO, "Receiving API response: %s", aJsonResponse ? aJsonResponse->c_strValue() : "<no data>");
     // pre-process response in case of non-GET
-    if (method!=httpMethodGET) {
+    if (mMethod!=httpMethodGET) {
       // Expected:
       //  [{"error":{"type":xxx,"address":"yyy","description":"zzz"}}]
       // or
@@ -131,7 +131,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
           if (statusToken=="success" && responseParams) {
             // apparently successful, return entire response
             // Note: use getSuccessItem() to get success details
-            data = aJsonResponse;
+            mData = aJsonResponse;
             errCode = HueCommError::OK; // ok
             break;
           }
@@ -148,37 +148,37 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
         }
       } // for
       if (errCode!=HueCommError::OK) {
-        error = Error::err_str<HueCommError>(errCode, errMessage);
+        mError = Error::err_str<HueCommError>(errCode, errMessage);
       }
     }
     else {
       // GET, just return entire data
-      data = aJsonResponse;
+      mData = aJsonResponse;
     }
   }
   else {
-    SOLOG(hueComm, LOG_WARNING, "API error: %s", error->text());
+    SOLOG(mHueComm, LOG_WARNING, "API error: %s", mError->text());
   }
   // done
-  completed = true;
+  mCompleted = true;
   // have queue reprocessed
-  hueComm.processOperations();
+  mHueComm.processOperations();
 }
 
 
 
 bool HueApiOperation::hasCompleted()
 {
-  return completed;
+  return mCompleted;
 }
 
 
 
 OperationPtr HueApiOperation::finalize()
 {
-  if (resultHandler) {
-    resultHandler(data, error);
-    resultHandler = NULL; // call once only
+  if (mResultHandler) {
+    mResultHandler(mData, mError);
+    mResultHandler = NULL; // call once only
   }
   return inherited::finalize();
 }
@@ -188,12 +188,12 @@ OperationPtr HueApiOperation::finalize()
 void HueApiOperation::abortOperation(ErrorPtr aError)
 {
   if (!aborted) {
-    if (!completed) {
-      hueComm.bridgeAPIComm.cancelRequest();
+    if (!mCompleted) {
+      mHueComm.mBridgeAPIComm.cancelRequest();
     }
-    if (resultHandler && aError) {
-      resultHandler(JsonObjectPtr(), aError);
-      resultHandler = NULL; // call once only
+    if (mResultHandler && aError) {
+      mResultHandler(JsonObjectPtr(), aError);
+      mResultHandler = NULL; // call once only
     }
   }
   inherited::abortOperation(aError);
@@ -206,10 +206,10 @@ void HueApiOperation::abortOperation(ErrorPtr aError)
 
 class p44::BridgeFinder : public P44Obj
 {
-  HueComm &hueComm;
-  HueComm::HueBridgeFindCB callback;
+  HueComm &mHueComm;
+  HueComm::HueBridgeFindCB mCallback;
 
-  BridgeFinderPtr keepAlive;
+  BridgeFinderPtr mKeepAlive;
 
 public:
 
@@ -235,8 +235,8 @@ public:
   string mDeviceType; ///< app description for login
 
   BridgeFinder(HueComm &aHueComm, HueComm::HueBridgeFindCB aFindHandler) :
-    callback(aFindHandler),
-    hueComm(aHueComm),
+    mCallback(aFindHandler),
+    mHueComm(aHueComm),
     mStartedAuth(Never)
   {
     mBridgeDetector = SsdpSearchPtr(new SsdpSearch(MainLoop::currentMainLoop()));
@@ -248,12 +248,12 @@ public:
 
   void findNewBridge(const char *aDeviceType, MLMicroSeconds aAuthTimeWindow, HueComm::HueBridgeFindCB aFindHandler)
   {
-    callback = aFindHandler;
+    mCallback = aFindHandler;
     mUserName.clear();
     mDeviceType = nonNullCStr(aDeviceType);
     mAuthTimeWindow = aAuthTimeWindow;
-    keepAlive = BridgeFinderPtr(this);
-    if (hueComm.fixedBaseURL.empty()) {
+    mKeepAlive = BridgeFinderPtr(this);
+    if (mHueComm.mFixedBaseURL.empty()) {
       // actually search for a new bridge
       searchForBridges("");
     }
@@ -261,7 +261,7 @@ public:
       // we have a pre-known base URL for the hue API, use this without any find operation
       // - just put it in as the only auth candidate
       mAuthCandidates.clear();
-      mAuthCandidates[normalizedBridgeId(hueComm.uuid)] = hueComm.fixedBaseURL;
+      mAuthCandidates[normalizedBridgeId(mHueComm.mBridgeIdentifier)] = mHueComm.mFixedBaseURL;
       startPairingWithCandidates();
     }
   };
@@ -269,19 +269,19 @@ public:
 
   void refindBridge(HueComm::HueBridgeFindCB aFindHandler)
   {
-    callback = aFindHandler;
-    mUuid = hueComm.uuid;
-    mUserName = hueComm.userName;
-    keepAlive = BridgeFinderPtr(this);
-    if (hueComm.fixedBaseURL.empty()) {
+    mCallback = aFindHandler;
+    mUuid = mHueComm.mBridgeIdentifier;
+    mUserName = mHueComm.mUserName;
+    mKeepAlive = BridgeFinderPtr(this);
+    if (mHueComm.mFixedBaseURL.empty()) {
       // actually search for bridge
-      searchForBridges(hueComm.uuid);
+      searchForBridges(mHueComm.mBridgeIdentifier);
     }
     else {
       // we have a pre-known base URL for the hue API, use this without any find operation
       // - do a check
-      FOCUSSOLOG(hueComm, "Using fixed API URL %s: %s -> testing if accessible...", hueComm.uuid.c_str(), hueComm.fixedBaseURL.c_str());
-      hueComm.apiAction(httpMethodGET, hueComm.fixedBaseURL.c_str(), JsonObjectPtr(), boost::bind(&BridgeFinder::apiTested, this, _2), true); // no auto url = works w/o API ready
+      FOCUSSOLOG(mHueComm, "Using fixed API URL %s: %s -> testing if accessible...", mHueComm.mBridgeIdentifier.c_str(), mHueComm.mFixedBaseURL.c_str());
+      mHueComm.apiAction(httpMethodGET, mHueComm.mFixedBaseURL.c_str(), JsonObjectPtr(), boost::bind(&BridgeFinder::apiTested, this, _2), true); // no auto url = works w/o API ready
     }
   };
 
@@ -289,15 +289,15 @@ public:
   void apiTested(ErrorPtr aError)
   {
     if (Error::isOK(aError)) {
-      FOCUSSOLOG(hueComm, "API URL %s tested accessible ok", hueComm.fixedBaseURL.c_str());
-      hueComm.baseURL = hueComm.fixedBaseURL; // use it
-      hueComm.apiReady = true; // can use API now
+      FOCUSSOLOG(mHueComm, "API URL %s tested accessible ok", mHueComm.mFixedBaseURL.c_str());
+      mHueComm.mBaseURL = mHueComm.mFixedBaseURL; // use it
+      mHueComm.mApiReady = true; // can use API now
     }
     else {
-      SOLOG(hueComm, LOG_WARNING, "API URL %s is not accessible: %s", hueComm.fixedBaseURL.c_str(), aError->text());
+      SOLOG(mHueComm, LOG_WARNING, "API URL %s is not accessible: %s", mHueComm.mFixedBaseURL.c_str(), aError->text());
     }
-    callback(aError); // success
-    keepAlive.reset(); // will delete object if nobody else keeps it
+    mCallback(aError); // success
+    mKeepAlive.reset(); // will delete object if nobody else keeps it
   };
 
 
@@ -399,7 +399,7 @@ public:
   void searchBridgesViaHueCloud(const string& aBridgeSearchId)
   {
     // call hue cloud
-    hueComm.bridgeAPIComm.httpRequest(
+    mHueComm.mBridgeAPIComm.httpRequest(
       NUPNP_PATH.c_str(),
       boost::bind(&BridgeFinder::gotBridgeNupnpResponse, this, _1, _2, aBridgeSearchId),
       "GET"
@@ -438,7 +438,7 @@ public:
             else {
               // discovering bridges
               // - put directly into auth candidates (overwriting same URL obtained via other methods)
-              SOLOG(hueComm, LOG_INFO, "hue cloud: bridge found at %s bridgeid=%s", url.c_str(), bridgeId.c_str());
+              SOLOG(mHueComm, LOG_INFO, "hue cloud: bridge found at %s bridgeid=%s", url.c_str(), bridgeId.c_str());
               registerAuthCandidate(bridgeId, url, true);
             }
           }
@@ -469,8 +469,8 @@ public:
       candidatesCollectedFor(aBridgeSearchId);
     }
     else {
-    mBridgeDetector->startSearch(boost::bind(&BridgeFinder::bridgeSSDPDiscoveryHandler, this, _1, _2, aBridgeSearchId), aBridgeSearchId.empty() ? NULL : aBridgeSearchId.c_str());
-  }
+      mBridgeDetector->startSearch(boost::bind(&BridgeFinder::bridgeSSDPDiscoveryHandler, this, _1, _2, aBridgeSearchId), aBridgeSearchId.empty() ? NULL : aBridgeSearchId.c_str());
+    }
   }
 
 
@@ -487,14 +487,14 @@ public:
         processBridgeCandidates(aBridgeSearchId);
       }
       else {
-        if (hueComm.useHueCloudDiscovery) {
+        if (mHueComm.mUseHueCloudDiscovery) {
           // could not find bridge, try N-UPnP
           searchBridgesViaHueCloud(aBridgeSearchId);
         }
         else {
           // no bridge found
-          callback(ErrorPtr(new HueCommError(HueCommError::UuidNotFound)));
-          keepAlive.reset(); // will delete object if nobody else keeps it
+          mCallback(ErrorPtr(new HueCommError(HueCommError::UuidNotFound)));
+          mKeepAlive.reset(); // will delete object if nobody else keeps it
         }
       }
     }
@@ -503,16 +503,16 @@ public:
       if (Error::isOK(aError)) {
         // check device for possibility of being a hue bridge
         if (aSsdpSearch->server.find("IpBridge")!=string::npos) {
-          SOLOG(hueComm, LOG_INFO, "SSDP: bridge candidate device found at %s, server=%s, uuid=%s", aSsdpSearch->locationURL.c_str(), aSsdpSearch->server.c_str(), aSsdpSearch->uuid.c_str());
+          SOLOG(mHueComm, LOG_INFO, "SSDP: bridge candidate device found at %s, server=%s, uuid=%s", aSsdpSearch->locationURL.c_str(), aSsdpSearch->server.c_str(), aSsdpSearch->uuid.c_str());
           // put into map
           mBridgeCandiates[aSsdpSearch->locationURL] = aSsdpSearch->uuid;
         }
       }
       else {
-        FOCUSSOLOG(hueComm, "discovery ended, error = %s (usually: timeout)", aError->text());
+        FOCUSSOLOG(mHueComm, "discovery ended, error = %s (usually: timeout)", aError->text());
         aSsdpSearch->stopSearch();
         #if HUE_CLOUD_DISCOVERY
-        if (hueComm.useHueCloudDiscovery) {
+        if (mHueComm.mUseHueCloudDiscovery) {
           // first try cloud to get more bridges
           searchBridgesViaHueCloud("");
         }
@@ -538,7 +538,7 @@ public:
   {
     if (mCurrentBridgeCandidate!=mBridgeCandiates.end()) {
       // request description XML
-      hueComm.bridgeAPIComm.httpRequest(
+      mHueComm.mBridgeAPIComm.httpRequest(
         (mCurrentBridgeCandidate->first).c_str(),
         boost::bind(&BridgeFinder::handleServiceDescriptionAnswer, this, _1, _2, aBridgeSearchId),
         "GET"
@@ -557,7 +557,7 @@ public:
     if (Error::isOK(aError)) {
       // show
       //FOCUSSOLOG(hueComm, "Received bridge description:\n%s", aResponse.c_str());
-      FOCUSSOLOG(hueComm, "Received service description XML");
+      FOCUSSOLOG(mHueComm, "Received service description XML");
       string manufacturer;
       string model;
       string urlbase;
@@ -582,13 +582,13 @@ public:
         }
         else {
           // finding bridges: that's a hue bridge, remember it for trying to authorize
-          SOLOG(hueComm, LOG_INFO, "SSDP: bridge device found at %s, bridgeid=%s", urlbase.c_str(), mCurrentBridgeCandidate->second.c_str());
+          SOLOG(mHueComm, LOG_INFO, "SSDP: bridge device found at %s, bridgeid=%s", urlbase.c_str(), mCurrentBridgeCandidate->second.c_str());
           registerAuthCandidate(mCurrentBridgeCandidate->second, urlbase, false);
         }
       }
     }
     else {
-      FOCUSSOLOG(hueComm, "Error accessing bridge description: %s", aError->text());
+      FOCUSSOLOG(mHueComm, "Error accessing bridge description: %s", aError->text());
     }
     // try next
     ++mCurrentBridgeCandidate;
@@ -620,11 +620,11 @@ public:
 
   void foundSpecificBridgeAt(const string &urlbase)
   {
-    hueComm.baseURL = urlbase; // save it
-    hueComm.apiReady = true; // can use API now
-    FOCUSSOLOG(hueComm, "pre-known bridge %s found at %s", hueComm.uuid.c_str(), hueComm.baseURL.c_str());
-    callback(ErrorPtr()); // success
-    keepAlive.reset(); // will delete object if nobody else keeps it
+    mHueComm.mBaseURL = urlbase; // save it
+    mHueComm.mApiReady = true; // can use API now
+    FOCUSSOLOG(mHueComm, "pre-known bridge %s found at %s", mHueComm.mBridgeIdentifier.c_str(), mHueComm.mBaseURL.c_str());
+    mCallback(ErrorPtr()); // success
+    mKeepAlive.reset(); // will delete object if nobody else keeps it
   }
 
 
@@ -636,8 +636,8 @@ public:
     }
     else {
       // searching for a specific bridge, but none found (if we'd found it, we'd not get here)
-      callback(ErrorPtr(new HueCommError(HueCommError::UuidNotFound)));
-      keepAlive.reset(); // will delete object if nobody else keeps it
+      mCallback(ErrorPtr(new HueCommError(HueCommError::UuidNotFound)));
+      mKeepAlive.reset(); // will delete object if nobody else keeps it
     }
   }
 
@@ -658,27 +658,27 @@ public:
 
   void processCurrentAuthCandidate()
   {
-    if (mCurrentAuthCandidate!=mAuthCandidates.end() && hueComm.findInProgress) {
+    if (mCurrentAuthCandidate!=mAuthCandidates.end() && mHueComm.mFindInProgress) {
       // try to authorize
-      FOCUSSOLOG(hueComm, "Auth candidate: bridgeid=%s, baseURL=%s -> try creating user", mCurrentAuthCandidate->first.c_str(), mCurrentAuthCandidate->second.c_str());
+      FOCUSSOLOG(mHueComm, "Auth candidate: bridgeid=%s, baseURL=%s -> try creating user", mCurrentAuthCandidate->first.c_str(), mCurrentAuthCandidate->second.c_str());
       JsonObjectPtr request = JsonObject::newObj();
       request->add("devicetype", JsonObject::newString(mDeviceType));
-      hueComm.apiAction(httpMethodPOST, mCurrentAuthCandidate->second.c_str(), request, boost::bind(&BridgeFinder::handleCreateUserAnswer, this, _1, _2), true);
+      mHueComm.apiAction(httpMethodPOST, mCurrentAuthCandidate->second.c_str(), request, boost::bind(&BridgeFinder::handleCreateUserAnswer, this, _1, _2), true);
     }
     else {
       // done with all candidates (or find aborted in hueComm)
-      if (mAuthCandidates.size()>0 && MainLoop::now()<mStartedAuth+mAuthTimeWindow && hueComm.findInProgress) {
+      if (mAuthCandidates.size()>0 && MainLoop::now()<mStartedAuth+mAuthTimeWindow && mHueComm.mFindInProgress) {
         // we have still candidates and time to do a retry in a second, and find is not aborted
         mRetryLoginTicket.executeOnce(boost::bind(&BridgeFinder::processAuthCandidates, this), 1*Second);
         return;
       }
       else {
         // all candidates tried, nothing found in given time
-        SOLOG(hueComm, LOG_NOTICE, "Could not register with a bridge");
-        hueComm.findInProgress = false;
-        callback(Error::err<HueCommError>(HueCommError::NoRegistration, "No hue bridge found ready to register"));
+        SOLOG(mHueComm, LOG_NOTICE, "Could not register with a bridge");
+        mHueComm.mFindInProgress = false;
+        mCallback(Error::err<HueCommError>(HueCommError::NoRegistration, "No hue bridge found ready to register"));
         // done!
-        keepAlive.reset(); // will delete object if nobody else keeps it
+        mKeepAlive.reset(); // will delete object if nobody else keeps it
         return;
       }
     }
@@ -688,27 +688,27 @@ public:
   void handleCreateUserAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError)
   {
     if (Error::isOK(aError)) {
-      FOCUSSOLOG(hueComm, "Received success answer:\n%s", JsonObject::text(aJsonResponse));
+      FOCUSSOLOG(mHueComm, "Received success answer:\n%s", JsonObject::text(aJsonResponse));
       JsonObjectPtr s = HueComm::getSuccessItem(aJsonResponse);
       // apparently successful, extract user name
       if (s) {
         JsonObjectPtr u = s->get("username");
         if (u) {
-          hueComm.userName = u->stringValue();
-          hueComm.uuid = mCurrentAuthCandidate->first;
-          hueComm.baseURL = mCurrentAuthCandidate->second;
-          hueComm.apiReady = true; // can use API now
-          FOCUSSOLOG(hueComm, "Bridge %s @ %s: successfully registered as user %s", hueComm.uuid.c_str(), hueComm.baseURL.c_str(), hueComm.userName.c_str());
+          mHueComm.mUserName = u->stringValue();
+          mHueComm.mBridgeIdentifier = mCurrentAuthCandidate->first;
+          mHueComm.mBaseURL = mCurrentAuthCandidate->second;
+          mHueComm.mApiReady = true; // can use API now
+          FOCUSSOLOG(mHueComm, "Bridge %s @ %s: successfully registered as user %s", mHueComm.mBridgeIdentifier.c_str(), mHueComm.mBaseURL.c_str(), mHueComm.mUserName.c_str());
           // successfully registered with hue bridge, let caller know
-          callback(ErrorPtr());
+          mCallback(ErrorPtr());
           // done!
-          keepAlive.reset(); // will delete object if nobody else keeps it
+          mKeepAlive.reset(); // will delete object if nobody else keeps it
           return;
         }
       }
     }
     else {
-      SOLOG(hueComm, LOG_INFO, "Bridge: Cannot create user: %s", aError->text());
+      SOLOG(mHueComm, LOG_INFO, "Bridge: Cannot create user: %s", aError->text());
     }
     // try next
     ++mCurrentAuthCandidate;
@@ -724,15 +724,15 @@ public:
 
 HueComm::HueComm() :
   inherited(MainLoop::currentMainLoop()),
-  bridgeAPIComm(MainLoop::currentMainLoop()),
-  findInProgress(false),
-  apiReady(false),
-  useHueCloudDiscovery(false)
+  mBridgeAPIComm(MainLoop::currentMainLoop()),
+  mFindInProgress(false),
+  mApiReady(false),
+  mUseHueCloudDiscovery(false)
 {
-  bridgeAPIComm.setServerCertVfyDir("");
-  bridgeAPIComm.isMemberVariable();
+  mBridgeAPIComm.setServerCertVfyDir("");
+  mBridgeAPIComm.isMemberVariable();
   // do not wait too long for API responses, but long enough to tolerate some lag in slow bridge or wifi network
-  bridgeAPIComm.setTimeout(10*Second);
+  mBridgeAPIComm.setTimeout(10*Second);
 }
 
 
@@ -756,7 +756,7 @@ void HueComm::apiQuery(const char* aUrlSuffix, HueApiResultCB aResultHandler)
 
 void HueComm::apiAction(HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, HueApiResultCB aResultHandler, bool aNoAutoURL)
 {
-  if (!apiReady && !aNoAutoURL) {
+  if (!mApiReady && !aNoAutoURL) {
     if (aResultHandler) aResultHandler(JsonObjectPtr(), ErrorPtr(new HueCommError(HueCommError::ApiNotReady)));
   }
   string url;
@@ -764,9 +764,9 @@ void HueComm::apiAction(HttpMethods aMethod, const char* aUrlSuffix, JsonObjectP
     url = aUrlSuffix;
   }
   else {
-    url = baseURL;
-    if (userName.length()>0)
-      url += "/" + userName;
+    url = mBaseURL;
+    if (mUserName.length()>0)
+      url += "/" + mUserName;
     url += nonNullCStr(aUrlSuffix);
   }
   HueApiOperationPtr op = HueApiOperationPtr(new HueApiOperation(*this, aMethod, url.c_str(), aData, aResultHandler));
@@ -798,7 +798,7 @@ JsonObjectPtr HueComm::getSuccessItem(JsonObjectPtr aResult, int aIndex)
 
 void HueComm::findNewBridge(const char *aDeviceType, MLMicroSeconds aAuthTimeWindow, HueBridgeFindCB aFindHandler)
 {
-  findInProgress = true;
+  mFindInProgress = true;
   BridgeFinderPtr bridgeFinder = BridgeFinderPtr(new BridgeFinder(*this, aFindHandler));
   bridgeFinder->findNewBridge(aDeviceType, aAuthTimeWindow, aFindHandler);
 };
@@ -806,13 +806,13 @@ void HueComm::findNewBridge(const char *aDeviceType, MLMicroSeconds aAuthTimeWin
 
 void HueComm::stopFind()
 {
-  findInProgress = false;
+  mFindInProgress = false;
 }
 
 
 void HueComm::refindBridge(HueBridgeFindCB aFindHandler)
 {
-  apiReady = false; // not yet found, API disabled
+  mApiReady = false; // not yet found, API disabled
   BridgeFinderPtr bridgeFinder = BridgeFinderPtr(new BridgeFinder(*this, aFindHandler));
   bridgeFinder->refindBridge(aFindHandler);
 };

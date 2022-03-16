@@ -120,13 +120,13 @@ namespace p44 {
   {
     typedef Operation inherited;
 
-    HueComm &hueComm;
-    HttpMethods method;
-    string url;
-    JsonObjectPtr data;
-    bool completed;
-    ErrorPtr error;
-    HueApiResultCB resultHandler;
+    HueComm &mHueComm;
+    HttpMethods mMethod;
+    string mUrl;
+    JsonObjectPtr mData;
+    bool mCompleted;
+    ErrorPtr mError;
+    HueApiResultCB mResultHandler;
 
     void processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError);
 
@@ -151,8 +151,8 @@ namespace p44 {
     typedef OperationQueue inherited;
     friend class BridgeFinder;
 
-    bool findInProgress;
-    bool apiReady;
+    bool mFindInProgress;
+    bool mApiReady;
 
   public:
 
@@ -163,18 +163,18 @@ namespace p44 {
     virtual string logContextPrefix() P44_OVERRIDE;
 
     // HTTP communication object
-    JsonWebClient bridgeAPIComm;
+    JsonWebClient mBridgeAPIComm;
 
     // volatile vars
-    string baseURL; ///< base URL for API calls
+    string mBaseURL; ///< base URL for API calls
 
     /// @name settings
     /// @{
 
-    string fixedBaseURL; ///< fixed hue API base URL, bypasses any SSDP searches
-    string uuid; ///< the UUID for searching the hue bridge via SSDP
-    string userName; ///< the user name
-    bool useHueCloudDiscovery; ///< if set, N-UPnP is used as a fallback to find bridges
+    string mFixedBaseURL; ///< fixed hue API base URL, bypasses any SSDP/DNS-SD/hue cloud discovery methods
+    string mBridgeIdentifier; ///< the identifier for finding the hue bridge (via SSDP: uuid, via DNS-SD or hue cloud: bridgeId)
+    string mUserName; ///< the user name
+    bool mUseHueCloudDiscovery; ///< if set, N-UPnP is used as a fallback to find bridges
 
     /// @}
 

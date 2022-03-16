@@ -44,27 +44,27 @@ namespace p44 {
     typedef Device inherited;
     friend class HueVdc;
 
-    string lightID; ///< the ID as used in the hue bridge
-    string uniqueID; ///< the unique light ID (which is available in v1.4 and later APIs)
+    string mLightID; ///< the ID as used in the hue bridge
+    string mUniqueID; ///< the unique light ID (which is available in v1.4 and later APIs)
 
     // information from the device itself
-    string hueModel;
-    string hueVendor;
-    Tristate hueCertified; // yes/no/unknown for certified hue lights
+    string mHueModel;
+    string mHueVendor;
+    Tristate mHueCertified; // yes/no/unknown for certified hue lights
 
     // model software version
-    string swVersion;
+    string mSwVersion;
 
     // mechanisms for difficult devices
-    MLMicroSeconds reapplyAfter;
-    MLTicket reapplyTicket;
-    bool separateOnAndChannels;
+    MLMicroSeconds mReapplyAfter;
+    MLTicket mReapplyTicket;
+    bool mSeparateOnAndChannels;
 
     // internal state
-    Tristate currentlyOn; ///< current "on" status
-    uint8_t lastSentBri; ///< last sent "bri", 0=undefined
+    Tristate mCurrentlyOn; ///< current "on" status
+    uint8_t mLastSentBri; ///< last sent "bri", 0=undefined
 
-    MLTicket dimTicket;
+    MLTicket mDimTicket;
 
   public:
 

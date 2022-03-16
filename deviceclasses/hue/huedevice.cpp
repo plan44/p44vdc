@@ -61,13 +61,13 @@ using namespace p44;
 
 HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, HueType aHueType, const string &aUniqueID) :
   inherited(aVdcP),
-  lightID(aLightID),
-  uniqueID(aUniqueID),
-  hueCertified(undefined),
-  reapplyAfter(DEFAULT_REAPPLY_DELAY),
-  currentlyOn(undefined),
-  lastSentBri(0), // undefined (bri starts at 1)
-  separateOnAndChannels(false)
+  mLightID(aLightID),
+  mUniqueID(aUniqueID),
+  mHueCertified(undefined),
+  mReapplyAfter(DEFAULT_REAPPLY_DELAY),
+  mCurrentlyOn(undefined),
+  mLastSentBri(0), // undefined (bri starts at 1)
+  mSeparateOnAndChannels(false)
 {
   // hue devices are lights
   setColorClass(class_yellow_light);
@@ -78,7 +78,7 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, HueType aHueType, co
     // - set the behaviour
     ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, aHueType==colortemperature));
     cl->setHardwareOutputConfig(aHueType==colortemperature ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
-    cl->setHardwareName(string_format("%s light #%s", aHueType==colortemperature ? "tunable white" : "color", lightID.c_str()));
+    cl->setHardwareName(string_format("%s light #%s", aHueType==colortemperature ? "tunable white" : "color", mLightID.c_str()));
     cl->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness
     addBehaviour(cl);
   }
@@ -90,11 +90,11 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, HueType aHueType, co
     LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
     if (aHueType==onoff) {
       l->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
-      l->setHardwareName(string_format("on/off switch #%s", lightID.c_str()));
+      l->setHardwareName(string_format("on/off switch #%s", mLightID.c_str()));
     }
     else {
       l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 8.5); // hue lights are always dimmable, one hue = 8.5W
-      l->setHardwareName(string_format("monochrome light #%s", lightID.c_str()));
+      l->setHardwareName(string_format("monochrome light #%s", mLightID.c_str()));
     }
     l->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness
     addBehaviour(l);
@@ -113,7 +113,7 @@ bool HueDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 string HueDevice::getExtraInfo()
 {
-  return string_format("Light #%s", lightID.c_str());
+  return string_format("Light #%s", mLightID.c_str());
 }
 
 
@@ -126,7 +126,7 @@ HueVdc &HueDevice::hueVdc()
 
 HueComm &HueDevice::hueComm()
 {
-  return (static_cast<HueVdc *>(mVdcP))->hueComm;
+  return (static_cast<HueVdc *>(mVdcP))->mHueComm;
 }
 
 
@@ -139,7 +139,7 @@ void HueDevice::setName(const string &aName)
     // really changed, propagate to hue
     JsonObjectPtr params = JsonObject::newObj();
     params->add("name", JsonObject::newString(getName()));
-    string url = string_format("/lights/%s", lightID.c_str());
+    string url = string_format("/lights/%s", mLightID.c_str());
     hueComm().apiAction(httpMethodPUT, url.c_str(), params, NULL);
   }
 }
@@ -154,8 +154,8 @@ void HueDevice::checkBrokenDevices(JsonObjectPtr aDeviceInfo)
     aDeviceInfo->get("modelid", o) && o->stringValue()=="VOLARE ZB3" &&
     aDeviceInfo->get("swversion", o) && o->stringValue()=="v.1.2"
   ) {
-    OLOG(LOG_WARNING, "Model %s is known broken, enabling tweaks. device info:\n%s", hueModel.c_str(), aDeviceInfo->c_strValue());
-    separateOnAndChannels = true;
+    OLOG(LOG_WARNING, "Model %s is known broken, enabling tweaks. device info:\n%s", mHueModel.c_str(), aDeviceInfo->c_strValue());
+    mSeparateOnAndChannels = true;
   }
 }
 
@@ -164,7 +164,7 @@ void HueDevice::checkBrokenDevices(JsonObjectPtr aDeviceInfo)
 void HueDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // query light attributes and state
-  string url = string_format("/lights/%s", lightID.c_str());
+  string url = string_format("/lights/%s", mLightID.c_str());
   hueComm().apiQuery(url.c_str(), boost::bind(&HueDevice::deviceStateReceived, this, aCompletedCB, aFactoryReset, _1, _2));
 }
 
@@ -175,23 +175,23 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
   if (Error::isOK(aError) && aDeviceInfo) {
     JsonObjectPtr o;
     // get model name from device (note: with 1.3 bridge and later this could be read at collection, but pre-1.3 needs this separate call)
-    hueModel.clear();
-    hueVendor.clear();
+    mHueModel.clear();
+    mHueVendor.clear();
     o = aDeviceInfo->get("type");
     if (o) {
-      hueModel = o->stringValue();
+      mHueModel = o->stringValue();
     }
     o = aDeviceInfo->get("modelid");
     if (o) {
-      hueModel += ": " + o->stringValue();
+      mHueModel += ": " + o->stringValue();
     }
     o = aDeviceInfo->get("swversion");
     if (o) {
-      swVersion = o->stringValue();
+      mSwVersion = o->stringValue();
     }
     o = aDeviceInfo->get("manufacturername");
     if (o) {
-      hueVendor = o->stringValue();
+      mHueVendor = o->stringValue();
     }
     // check capabilities
     o = aDeviceInfo->get("capabilities");
@@ -199,7 +199,7 @@ void HueDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, J
       // certified state
       JsonObjectPtr o2 = o->get("certified");
       if (o2) {
-        hueCertified = o2->boolValue() ? yes : no;
+        mHueCertified = o2->boolValue() ? yes : no;
       }
     }
     // look for known bad devices and possibly enable tweaks
@@ -233,7 +233,7 @@ bool HueDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolu
 bool HueDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 {
   // in general, we don't optimize for APIs before 1.11
-  if (!hueVdc().has_1_11_api) return false;
+  if (!hueVdc().mHas_1_11_api) return false;
   if (aDeliveryState->optimizedType==ntfy_callscene) {
     // scenes are generally optimizable, unless there is a transition time override
     // TODO: remove the condition once hue bridge allows overriding scene transition times
@@ -263,7 +263,7 @@ void HueDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bo
     if (aDimMode==dimmode_stop) {
       // retrieve status at end of dimming
       // Note: does not work when called immediately - so we delay that a bit
-      dimTicket.executeOnce(boost::bind(&HueDevice::syncChannelValues, this, SimpleCB()), 3*Second);
+      mDimTicket.executeOnce(boost::bind(&HueDevice::syncChannelValues, this, SimpleCB()), 3*Second);
     }
   }
 }
@@ -271,40 +271,40 @@ void HueDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bo
 
 string HueDevice::modelName()
 {
-  return hueModel;
+  return mHueModel;
 }
 
 
 string HueDevice::hardwareGUID()
 {
-  if (!uniqueID.empty())
-    return string_format("hueuid:%s", uniqueID.c_str());
+  if (!mUniqueID.empty())
+    return string_format("hueuid:%s", mUniqueID.c_str());
   else
     return inherited::hardwareGUID();
 }
 
 string HueDevice::modelVersion() const
 {
-  return swVersion;
+  return mSwVersion;
 }
 
 
 string HueDevice::vendorName()
 {
-  return hueVendor;
+  return mHueVendor;
 };
 
 
 int HueDevice::opStateLevel()
 {
-  return hueCertified==no ? 80 : 100; // explicitly non-certified lights are given some negative points
+  return mHueCertified==no ? 80 : 100; // explicitly non-certified lights are given some negative points
 }
 
 
 string HueDevice::getOpStateText()
 {
   string t;
-  if (hueCertified==no) {
+  if (mHueCertified==no) {
     t += "not certified";
   }
   return t;
@@ -316,7 +316,7 @@ string HueDevice::getOpStateText()
 void HueDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
   // query the device
-  string url = string_format("/lights/%s", lightID.c_str());
+  string url = string_format("/lights/%s", mLightID.c_str());
   hueComm().apiQuery(url.c_str(), boost::bind(&HueDevice::presenceStateReceived, this, aPresenceResultHandler, _1, _2));
 }
 
@@ -363,13 +363,13 @@ void HueDevice::disconnectableHandler(bool aForgetParams, DisconnectCB aDisconne
 
 void HueDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  reapplyTicket.cancel();
+  mReapplyTicket.cancel();
   MLMicroSeconds tt = 0; // none so far, applyLigtState will determine highest time
   if (applyLightState(aDoneCB, aForDimming, false, tt)) {
     // actually applied something, schedule reapply if enabled and not dimming
-    if (!aForDimming && reapplyAfter!=Never) {
+    if (!aForDimming && mReapplyAfter!=Never) {
       // initially re-apply shortly after, but not before transition time is over
-      reapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this, tt), tt>reapplyAfter ? tt : reapplyAfter);
+      mReapplyTicket.executeOnce(boost::bind(&HueDevice::reapplyTimerHandler, this, tt), tt>mReapplyAfter ? tt : mReapplyAfter);
     }
   }
 }
@@ -378,7 +378,7 @@ void HueDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 
 void HueDevice::reapplyTimerHandler(MLMicroSeconds aTransitionTime)
 {
-  reapplyTicket.cancel();
+  mReapplyTicket.cancel();
   OLOG(LOG_INFO, "Re-applying values to hue to make sure light actually is udpated");
   applyLightState(NULL, false, true, aTransitionTime);
 }
@@ -398,10 +398,10 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
     }
     ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
     // build hue API light state
-    string url = string_format("/lights/%s/state", lightID.c_str());
+    string url = string_format("/lights/%s/state", mLightID.c_str());
     JsonObjectPtr newState = JsonObject::newObj();
     // brightness is always re-applied unless it's dimming
-    bool lightIsOn = currentlyOn!=no; // assume on even if unknown
+    bool lightIsOn = mCurrentlyOn!=no; // assume on even if unknown
     if (aReapply || !aForDimming || l->brightness->needsApplying()) {
       Brightness b = l->brightnessForHardware();
       lightIsOn = b>=DS_BRIGHTNESS_STEP;
@@ -412,20 +412,20 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       else {
         if (!lightIsOn) {
           // light should be off, no other parameters
-          if (separateOnAndChannels) {
+          if (mSeparateOnAndChannels) {
             newState->add("bri", JsonObject::newInt32(1));
-            lastSentBri = 1;
+            mLastSentBri = 1;
           }
           newState->add("on", JsonObject::newBool(false));
-          currentlyOn = no; // assume off from now on (actual response might change it)
+          mCurrentlyOn = no; // assume off from now on (actual response might change it)
         }
         else {
           // light on
           uint8_t newBri = b*HUEAPI_FACTOR_BRIGHTNESS+HUEAPI_OFFSET_BRIGHTNESS+0.5; // DS_BRIGHTNESS_STEP..100 -> 1..254
-          if (separateOnAndChannels) {
+          if (mSeparateOnAndChannels) {
             // known broken light, make sure on is never sent together with brightness, but always separately before
-            if (currentlyOn!=yes || aReapply) {
-              if (lastSentBri!=newBri || aReapply) {
+            if (mCurrentlyOn!=yes || aReapply) {
+              if (mLastSentBri!=newBri || aReapply) {
                 // both on and bri changes -> need to send "on" ahead
                 OLOG(LOG_INFO, "light with known broken API: send \"on\":true separately, transition %d mS", (int)(aTransitionTime/MilliSecond));
                 JsonObjectPtr onState = JsonObject::newObj();
@@ -453,8 +453,8 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
             newState->add("on", JsonObject::newBool(true));
             newState->add("bri", JsonObject::newInt32(newBri));
           }
-          currentlyOn = yes; // assume off from now on (actual response might change it)
-          lastSentBri = newBri;
+          mCurrentlyOn = yes; // assume off from now on (actual response might change it)
+          mLastSentBri = newBri;
         }
       }
     }
@@ -539,7 +539,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
 
 void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aDoneCB, JsonObjectPtr aResult, ErrorPtr aError)
 {
-  if (!reapplyTicket) {
+  if (!mReapplyTicket) {
     // synchronize actual channel values as hue delivers them back, but only if not re-apply still pending
     if (aResult) {
       ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(aLightBehaviour);
@@ -571,8 +571,8 @@ void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aD
               cl->ct->syncChannelValue(val->int32Value(), false); // only sync if no new value pending already, volatile
             }
             else if (param=="on") {
-              currentlyOn = val->boolValue() ? yes : no;
-              if (currentlyOn==no) {
+              mCurrentlyOn = val->boolValue() ? yes : no;
+              if (mCurrentlyOn==no) {
                 aLightBehaviour->syncBrightnessFromHardware(0, false); // only sync if no new value pending already, volatile
                 blockBrightness = true; // prevent syncing brightness, lamp is off, logical brightness is 0
               }
@@ -609,7 +609,7 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
       o = state->get("on");
       if (o && o->boolValue()) {
         // lamp is on, get brightness
-        currentlyOn = yes;
+        mCurrentlyOn = yes;
         o = state->get("bri");
         if (o) {
           double hb = o->int32Value(); // hue brightness from 1..254
@@ -618,7 +618,7 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
         }
       }
       else {
-        currentlyOn = o ? no : undefined; // if no "on" field was included, consider undefined
+        mCurrentlyOn = o ? no : undefined; // if no "on" field was included, consider undefined
         l->syncBrightnessFromHardware(0); // off
       }
       ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(l);
@@ -663,7 +663,7 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
 void HueDevice::syncChannelValues(SimpleCB aDoneCB)
 {
   // query light attributes and state
-  string url = string_format("/lights/%s", lightID.c_str());
+  string url = string_format("/lights/%s", mLightID.c_str());
   hueComm().apiQuery(url.c_str(), boost::bind(&HueDevice::channelValuesReceived, this, aDoneCB, _1, _2));
 }
 
@@ -691,16 +691,16 @@ void HueDevice::deriveDsUid()
   //   UUIDv5 with name = hueUniqueID::uniqueID
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s;
-  if (uniqueID.empty()) {
+  if (mUniqueID.empty()) {
     // we don't have an unique ID, identify relative to bridge's UUID
     s = mVdcP->vdcInstanceIdentifier();
-    s += "::" + hueVdc().bridgeUuid;
-    s += ":" + lightID;
+    s += "::" + hueVdc().mBridgeIdentifier;
+    s += ":" + mLightID;
   }
   else {
     // we have a unique ID for the lamp itself, identify trough that
     s = "hueUniqueID::";
-    s += uniqueID;
+    s += mUniqueID;
   }
   dSUID.setNameInSpace(s, vdcNamespace);
 }
@@ -709,7 +709,7 @@ void HueDevice::deriveDsUid()
 string HueDevice::description()
 {
   string s = inherited::description();
-  string_format_append(s, "\n- hue unique ID: %s", uniqueID.c_str());
+  string_format_append(s, "\n- hue unique ID: %s", mUniqueID.c_str());
   return s;
 }
 
