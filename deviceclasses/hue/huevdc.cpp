@@ -240,9 +240,13 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
       mHueComm.mUserName.c_str(),
       mHueComm.mBaseURL.c_str()
     );
-    // save the current URL
-    if (!mFixedURL && mHueComm.mBaseURL!=mBridgeApiURL) {
+    // save the current URL and possibly upgraded bridge identifier
+    if (
+      !mFixedURL &&
+      (mHueComm.mBaseURL!=mBridgeApiURL || mHueComm.mBridgeIdentifier!=mBridgeIdentifier)
+    ) {
       mBridgeApiURL = mHueComm.mBaseURL;
+      mBridgeIdentifier = mHueComm.mBridgeIdentifier;
       // save back into database
       if(mDb.executef(
         "UPDATE globs SET hueBridgeUUID='%q', hueApiURL='%q', fixedURL=0",

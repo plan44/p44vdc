@@ -229,7 +229,6 @@ public:
   MLTicket mRetryLoginTicket;
 
   // params and results
-  string mUuid; ///< the UUID for searching the hue bridge via SSDP
   string mUserName; ///< the user name / token
   string mBaseURL; ///< base URL for API calls
   string mDeviceType; ///< app description for login
@@ -270,7 +269,6 @@ public:
   void refindBridge(HueComm::HueBridgeFindCB aFindHandler)
   {
     mCallback = aFindHandler;
-    mUuid = mHueComm.mBridgeIdentifier;
     mUserName = mHueComm.mUserName;
     mKeepAlive = BridgeFinderPtr(this);
     if (mHueComm.mFixedBaseURL.empty()) {
@@ -354,14 +352,14 @@ public:
         string bridgeid = normalizedBridgeId(b->second);
         string url = aServiceInfo->url()+"/"+HUE_API_V1_PATH;
         if (aBridgeSearchId.empty()) {
-          SOLOG(hueComm, LOG_INFO, "DNS-SD: bridge device found at %s, bridgeid=%s", aServiceInfo->url().c_str(), b->second.c_str());
+          SOLOG(mHueComm, LOG_INFO, "DNS-SD: bridge device found at %s, bridgeid=%s", aServiceInfo->url().c_str(), b->second.c_str());
           // put directly into auth candidates
           registerAuthCandidate(bridgeid, url, true);
         }
         else {
           // searching a specific one
           if (bridgeid==normalizedBridgeId(aBridgeSearchId)) {
-            foundSpecificBridgeAt(url);
+            foundSpecificBridgeAt(url, bridgeid); // pass normalized id, as we want to migrate from uuid-based SSDP to DNSSD when possible
             return false; // no need to look further
           }
         }
@@ -369,7 +367,7 @@ public:
       return true; // continue looking for hue bridges
     }
     else {
-      FOCUSSOLOG(hueComm, "discovery ended, error = %s (usually: allfornow)", aError->text());
+      FOCUSSOLOG(mHueComm, "discovery ended, error = %s (usually: allfornow)", aError->text());
       #if !HUE_SSDP_DISCOVERY
       // we just have hue discovery, no SSDP to wait for
       #if HUE_CLOUD_DISCOVERY
@@ -431,7 +429,7 @@ public:
               // searching for specific bridge
               if (bridgeId==normalizedBridgeId(aBridgeSearchId)) {
                 // searched-for bridge found: success!
-                foundSpecificBridgeAt(url);
+                foundSpecificBridgeAt(url, aBridgeSearchId); // keep original search id, as we do NOT want to migrate from SSDP to NuPNP/cloud permanently
                 return;
               }
             }
@@ -576,7 +574,7 @@ public:
           // looking for one specific bridge only
           if (aBridgeSearchId==mCurrentBridgeCandidate->second) {
             // that's my known hue bridge, save the URL and report success
-            foundSpecificBridgeAt(urlbase);
+            foundSpecificBridgeAt(urlbase, aBridgeSearchId); // keep original search id (which is an uuid for SSDP)
             return;
           }
         }
@@ -618,9 +616,10 @@ public:
   }
 
 
-  void foundSpecificBridgeAt(const string &urlbase)
+  void foundSpecificBridgeAt(const string &aUrlbase, const string aBridgeIdentifier)
   {
-    mHueComm.mBaseURL = urlbase; // save it
+    mHueComm.mBaseURL = aUrlbase; // save it
+    mHueComm.mBridgeIdentifier = aBridgeIdentifier; // also the bridgeId relevant for the successful find method
     mHueComm.mApiReady = true; // can use API now
     FOCUSSOLOG(mHueComm, "pre-known bridge %s found at %s", mHueComm.mBridgeIdentifier.c_str(), mHueComm.mBaseURL.c_str());
     mCallback(ErrorPtr()); // success
