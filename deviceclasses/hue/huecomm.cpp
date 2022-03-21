@@ -350,6 +350,12 @@ public:
       DnsSdServiceInfo::TxtRecordsMap::iterator b = aServiceInfo->txtRecords.find("bridgeid");
       if (b!=aServiceInfo->txtRecords.end()) {
         string bridgeid = normalizedBridgeId(b->second);
+        #if P44_BUILD_DIGI
+        if (aServiceInfo->port==443) {
+          // old digiESP platform does not have proper crypto for https with hue bridge
+          aServiceInfo->port = 80; // degrade to plain http
+        }
+        #endif
         string url = aServiceInfo->url()+"/"+HUE_API_V1_PATH;
         if (aBridgeSearchId.empty()) {
           SOLOG(mHueComm, LOG_INFO, "DNS-SD: bridge device found at %s, bridgeid=%s", aServiceInfo->url().c_str(), b->second.c_str());
@@ -524,7 +530,7 @@ public:
     }
   }
 
-  
+
   void processBridgeCandidates(const string &aBridgeSearchId)
   {
     mCurrentBridgeCandidate = mBridgeCandiates.begin();
