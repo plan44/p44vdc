@@ -341,6 +341,8 @@ bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTr
 bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd)
 {
   // stop any actions still ongoing from a previous call
+  // Note: we do NOT stop transitions here, those channels affected by a new scene value
+  //   will stop or retarget anyway, unaffected channels may continue running.
   stopSceneActions();
   // scenes with invoke functionality will apply channel values by default
   if (aSceneCmd==scene_cmd_none) {
@@ -814,7 +816,8 @@ static void stopactions_func(BuiltinFunctionContextPtr f)
   assert(o);
   POLOG(o->output(), LOG_INFO, "stopping all scene actions");
   // Note: call this on device level, so device implementations
-  //   have the chance to stop device-specific ongoing actions (such as transitions)
+  //   have the chance to stop device-specific ongoing actions and transition
+  o->output()->getDevice().stopTransitions();
   o->output()->getDevice().stopSceneActions();
   f->finish();
 }

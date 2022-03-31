@@ -196,7 +196,7 @@ namespace p44 {
     /// @note this is a OutputBehaviour level wrapper and preparator for behaviour-specific performApplySceneToChannels().
     bool applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTransitionTimeOverride);
 
-    /// will be called to stop ongoing transitions (e.g. as part of device's stopSceneActions())
+    /// will be called to stop ongoing transitions
     void stopTransitions();
 
     /// Override transition time for all channels that need to be applied

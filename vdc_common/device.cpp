@@ -744,6 +744,8 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
     }
   }
   else if (aMethod=="x-p44-stopSceneActions") {
+    // we want everything to stop
+    stopTransitions();
     stopSceneActions();
     respErr = Error::ok();
   }
@@ -1799,7 +1801,6 @@ void Device::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 
 void Device::stopSceneActions()
 {
-  stopTransitions();
   if (mOutput) {
     mOutput->stopSceneActions();
   }

@@ -571,6 +571,7 @@ namespace p44 {
     virtual void stopSceneActions();
 
     /// stop running transitions
+    /// @note base class just calls stopTransitions() on the output
     virtual void stopTransitions();
 
     /// get channel by index

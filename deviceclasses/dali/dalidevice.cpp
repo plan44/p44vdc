@@ -1529,7 +1529,7 @@ void DaliSingleControllerDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDim
   // start dimming
   if (aChannel) {
     if (aChannel->getChannelType()==channeltype_brightness) {
-      // start dimming
+      // start or stop dimming
       if (aDoApply) {
         OLOG(LOG_INFO,
           "dimChannel (DALI): channel '%s' %s",

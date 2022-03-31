@@ -283,8 +283,6 @@ void LightBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 
 void LightBehaviour::stopSceneActions()
 {
-  // stop fading down
-  fadeDownTicket.cancel();
   // stop blink
   if (blinkTicket) stopBlink();
   // let inherited stop as well

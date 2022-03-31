@@ -119,7 +119,6 @@ namespace p44 {
     MLTicket blinkTicket; ///< when blinking
     SimpleCB blinkDoneHandler; ///< called when blinking done
     LightScenePtr blinkRestoreScene; ///< scene to restore
-    MLTicket fadeDownTicket; ///< for slow fading operations
     bool hardwareHasSetMinDim; ///< if set, hardware has set minDim (prevents loading from DB)
     /// @}
 
