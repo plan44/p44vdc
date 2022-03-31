@@ -331,26 +331,25 @@ void LedChainDevice::stopTransitions()
 
 void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  MLMicroSeconds transitionTime = 0;
   // abort previous transition
   transitionTicket.cancel();
   // full color device
   RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
   FeatureLightBehaviourPtr fl = getOutput<FeatureLightBehaviour>();
   if (cl) {
-    if (needsToApplyChannels(&transitionTime)) {
+    if (needsToApplyChannels()) {
       // needs update
       // - derive (possibly new) color mode from changed channels
       cl->deriveColorMode();
       // - calculate and start transition
-      cl->brightnessTransitionStep(); // init
-      cl->colorTransitionStep(); // init
+      cl->updateBrightnessTransition(); // init
+      cl->updateColorTransition(); // init
       if (fl) {
         // also apply extra channels
-        fl->positionTransitionStep();
-        fl->featureTransitionStep();
+        fl->updatePositionTransition();
+        fl->updateFeatureTransition();
       }
-      applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)(getLedChainVdc().ledArrangement->mMinUpdateInterval)/transitionTime);
+      applyChannelValueSteps(aForDimming);
     }
     // consider applied
     cl->appliedColorValues();
@@ -363,18 +362,19 @@ void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 }
 
 
-void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
+void LedChainDevice::applyChannelValueSteps(bool aForDimming)
 {
+  MLMicroSeconds now = MainLoop::now();
   // RGB or RGBW dimmer
   RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
   MovingLightBehaviourPtr ml = getOutput<MovingLightBehaviour>();
   FeatureLightBehaviourPtr fl = getOutput<FeatureLightBehaviour>();
-  bool moreSteps = cl->colorTransitionStep(aStepSize);
-  if (cl->brightnessTransitionStep(aStepSize)) moreSteps = true;
+  bool moreSteps = cl->updateColorTransition(now);
+  if (cl->updateBrightnessTransition(now)) moreSteps = true;
   if (ml) {
-    if (ml->positionTransitionStep(aStepSize)) moreSteps = true;
+    if (ml->updatePositionTransition(now)) moreSteps = true;
     if (fl) {
-      if (fl->featureTransitionStep(aStepSize)) moreSteps = true;
+      if (fl->updateFeatureTransition(now)) moreSteps = true;
     }
   }
   // RGB light, get basic color
@@ -449,7 +449,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     OLOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
     // not yet complete, schedule next step
     transitionTicket.executeOnce(
-      boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
+      boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming),
       getLedChainVdc().ledArrangement->mMinUpdateInterval
     );
     return; // will be called later again

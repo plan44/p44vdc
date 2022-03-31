@@ -24,7 +24,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 7
+#define FOCUSLOGLEVEL 0
 
 #include "channelbehaviour.hpp"
 #include "outputbehaviour.hpp"
@@ -44,7 +44,8 @@ ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChann
   mCachedChannelValue(0), // channel output value cache
   mIsVolatileValue(true), // not worth saving yet
   mPreviousChannelValue(0), // previous output value
-  mTransitionProgress(1), // no transition in progress
+  mTransitionStarted(Never), // no transition in progress
+  mProgress(1), // no transition in progress
   mResolution(1) // dummy default resolution (derived classes must provide sensible defaults)
 {
 }
@@ -54,7 +55,6 @@ void ChannelBehaviour::setResolution(double aResolution)
 {
   mResolution = aResolution;
 }
-
 
 
 string ChannelBehaviour::getId()
@@ -102,9 +102,6 @@ int ChannelBehaviour::getLogLevelOffset()
 {
   return mOutput.getLogLevelOffset();
 }
-
-
-
 
 
 string ChannelBehaviour::getStatusText()
@@ -170,84 +167,69 @@ int ChannelBehaviour::getSourceOpLevel()
 #endif // P44SCRIPT_FULL_SUPPORT
 
 
+// MARK: - transition management
 
-// MARK: - channel value handling
+// Note: transition management is for rendering software transitions for ouputs that don't have native transitions.
+//   Hardware implementations might choose not to use it, in favor of a hardware-specific transition mechanism.
 
 
-bool ChannelBehaviour::transitionStep(double aStepSize)
+bool ChannelBehaviour::updateTransition(MLMicroSeconds aNow)
 {
-  if (aStepSize<=0) {
-    // Initialize a transition
-    FOCUSOLOG("transitionStep(<=0): initialize");
-    if (inTransition()) {
-      // a previous transition is still running.
-      // This can only happen if no new target value has been set for this channel, which
-      // means that the transition should not run further. But...
-      if (!mChannelUpdatePending) { // ..check, just to make sure
-        FOCUSOLOG("!!! no channel update pending: stop previous transition");
-        mCachedChannelValue = getChannelValue(true); // get current transitional value
-        setTransitionProgress(1); // stop transition early, keeping current value
-        return false; // no transition
+  if (aNow<=0) {
+    if (!inTransition() || mChannelUpdatePending) {
+      // initialize transition
+      if (mNextTransitionTime<=0 || aNow<0 || mCachedChannelValue==mPreviousChannelValue) {
+        // no transitiontime or explicitly no transition requested or no value change: set transition to completed
+        OLOG(LOG_INFO, "no or immediate transition");
+        return setTransitionProgress(1);
       }
+      // start transition NOW
+      OLOG(LOG_INFO, "initialized for transition in %d mS", (int)(mNextTransitionTime/MilliSecond));
+      mTransitionStarted = MainLoop::now();
+      mProgress = 0;
+      return true;
     }
-    mTransitionProgress = 0; // start
-    return true; // in transition
+    // a previous transition is still running, but no channel update is pending
+    // This means the transition should just keep running without re-initializing
+    OLOG(LOG_INFO, "no channel update pending: keep previous transition running");
   }
-  if (inTransition()) {
-    setTransitionProgress(mTransitionProgress+aStepSize);
-    return inTransition(); // transition might be complete with this step
-  }
-  // no longer in transition
-  return false;
+  // calculate new progress
+  return setTransitionProgress(mNextTransitionTime==0 ? 1 : (double)(aNow-mTransitionStarted)/mNextTransitionTime);
 }
 
 
 void ChannelBehaviour::stopTransition()
 {
   if (inTransition()) {
+    // capture current transitional value as new current value
     mCachedChannelValue = getChannelValue(true);
     setTransitionProgress(1);
   }
 }
 
 
-
-void ChannelBehaviour::setTransitionProgress(double aProgress)
+bool ChannelBehaviour::setTransitionProgress(double aProgress)
 {
   if (aProgress<0) aProgress = 0;
-  // set
-  mTransitionProgress = aProgress;
-  if (mTransitionProgress>=1) {
+  mProgress = aProgress;
+  if (mProgress>=1) {
     // transition complete
-    mTransitionProgress=1;
+    mProgress=1;
+    mTransitionStarted = Never;
     mPreviousChannelValue = mCachedChannelValue; // end of transition reached, old previous value is no longer needed
+    return false; // no longer in transition
   }
+  return true; // still in transition
 }
-
-
-
-void ChannelBehaviour::setTransitionValue(double aCurrentValue, bool aIsInitial)
-{
-  if (aIsInitial) {
-    // initial value of transition (rather than previously known cached one)
-    mPreviousChannelValue = aCurrentValue;
-    mTransitionProgress = 0; // start of transition
-  }
-  else {
-    // intermediate value within transition
-    double d = mCachedChannelValue-mPreviousChannelValue;
-    setTransitionProgress(d==0 ? 1 : aCurrentValue/d-mPreviousChannelValue);
-  }
-}
-
-
 
 
 bool ChannelBehaviour::inTransition()
 {
-  return mTransitionProgress<1;
+  return mProgress<1;
 }
 
+
+// MARK: - channel value handling
 
 bool ChannelBehaviour::getChannelValueBool()
 {
@@ -269,7 +251,7 @@ double ChannelBehaviour::getChannelValue(bool aTransitional)
         ad = r-ad; // shorter way
         d = ad * (d>=0 ? -1 : 1); // opposite sign of original
       }
-      double res = mPreviousChannelValue+mTransitionProgress*d;
+      double res = mPreviousChannelValue+mProgress*d;
       // - wraparound
       if (res>=getMax()) res -= r;
       else if (res<getMin()) res += r;
@@ -277,7 +259,7 @@ double ChannelBehaviour::getChannelValue(bool aTransitional)
     }
     else {
       // simple non-wrapping transition
-      return mPreviousChannelValue+mTransitionProgress*d;
+      return mPreviousChannelValue+mProgress*d;
     }
   }
   else {
@@ -318,7 +300,7 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     #endif
     // reset transitions and pending updates
     mPreviousChannelValue = mCachedChannelValue;
-    mTransitionProgress = 1; // not in transition
+    mProgress = 1; // not in transition
     mChannelUpdatePending = false; // we are in sync
     mChannelLastSync = MainLoop::now(); // value is current
   }
@@ -331,8 +313,6 @@ void ChannelBehaviour::syncChannelValueBool(bool aValue, bool aAlwaysSync)
     syncChannelValue(aValue ? getMax() : getMin(), aAlwaysSync);
   }
 }
-
-
 
 
 void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply)
@@ -348,8 +328,6 @@ bool ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aN
   setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
   return true; // actually set
 }
-
-
 
 
 void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime, bool aAlwaysApply)
@@ -387,7 +365,7 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     );
     // setting new value captures current (possibly transitional) value as previous and completes transition
     mPreviousChannelValue = mChannelLastSync!=Never ? getChannelValue(true) : aNewValue; // If there is no valid previous value, set current as previous.
-    mTransitionProgress = 1; // consider done
+    mProgress = 1; // consider done
     // save target parameters for next transition
     setPVar(mCachedChannelValue, aNewValue); // might need to be persisted
     mNextTransitionTime = aTransitionTime;
@@ -426,7 +404,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     );
     // setting new value captures current (possibly transitional) value as previous and completes transition
     mPreviousChannelValue = mChannelLastSync!=Never ? getChannelValue(true) : newValue; // If there is no valid previous value, set current as previous.
-    mTransitionProgress = 1; // consider done
+    mProgress = 1; // consider done
     // save target parameters for next transition
     setPVar(mCachedChannelValue, newValue); // might need to be persisted
     mNextTransitionTime = aTransitionTime;
@@ -435,7 +413,6 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
   setPVar(mIsVolatileValue, false); // channel actively dimmed, is not volatile
   return newValue;
 }
-
 
 
 void ChannelBehaviour::channelValueApplied(bool aAnyWay)
@@ -457,9 +434,7 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
 }
 
 
-
 // MARK: - channel persistence
-
 
 const char *ChannelBehaviour::tableName()
 {
@@ -549,8 +524,6 @@ ErrorPtr ChannelBehaviour::forget()
 {
   return deleteFromStore();
 }
-
-
 
 
 // MARK: - channel property access

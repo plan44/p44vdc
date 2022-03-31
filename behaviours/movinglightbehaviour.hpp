@@ -140,10 +140,10 @@ namespace p44 {
     /// @return textual description of object
     virtual string shortDesc();
 
-    /// step through transitions
-    /// @param aStepSize how much to step. Default is zero and means starting transition
-    /// @return true if there's another step to take, false if end of transition already reached
-    bool positionTransitionStep(double aStepSize = 0);
+    /// initialize a transition or update its progress over time
+    /// @param aNow current time, used to calculate progress. Default is 0 and means starting a new transition NOW
+    /// @return true if the transition must be updated again, false if end of transition already reached
+    bool updatePositionTransition(MLMicroSeconds aNow = 0);
 
     /// mark horizontal and vertical position values applied
     void appliedPosition();
@@ -367,10 +367,10 @@ namespace p44 {
     /// @return textual description of object
     virtual string shortDesc();
 
-    /// step through transitions
-    /// @param aStepSize how much to step. Default is zero and means starting transition
-    /// @return true if there's another step to take, false if end of transition already reached
-    bool featureTransitionStep(double aStepSize = 0);
+    /// initialize a transition or update its progress over time
+    /// @param aNow current time, used to calculate progress. Default is 0 and means starting a new transition NOW
+    /// @return true if the transition must be updated again, false if end of transition already reached
+    bool updateFeatureTransition(MLMicroSeconds aNow = 0);
 
     /// mark horizontal and vertical position values applied
     void appliedFeatures();

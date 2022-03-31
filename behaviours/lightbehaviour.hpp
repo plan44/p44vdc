@@ -171,10 +171,10 @@ namespace p44 {
     /// @return true if brightness has pending change
     bool brightnessNeedsApplying() { return brightness->needsApplying(); };
 
-    /// step through transitions
-    /// @param aStepSize how much to step. Default is zero and means starting transition
-    /// @return true if there's another step to take, false if end of transition already reached
-    bool brightnessTransitionStep(double aStepSize = 0) { return brightness->transitionStep(aStepSize); };
+    /// initialize a transition or update its progress over time
+    /// @param aNow current time, used to calculate progress. Default is 0 and means starting a new transition NOW
+    /// @return true if the transition must be updated again, false if end of transition already reached
+    bool updateBrightnessTransition(MLMicroSeconds aNow = 0) { return brightness->updateTransition(aNow); }
 
     /// wrapper to confirm having applied brightness
     void brightnessApplied() { brightness->channelValueApplied(); };

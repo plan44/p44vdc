@@ -82,10 +82,11 @@ namespace p44 {
     bool mChannelUpdatePending; ///< set if cachedOutputValue represents a value to be transmitted to the hardware
     bool mIsVolatileValue; ///< set if value is not a defining part of the output state (not to be persisted, not necessarily valid)
     double mCachedChannelValue; ///< the cached channel value
-    double mPreviousChannelValue; ///< the previous channel value, can be used for performing transitions
-    double mTransitionProgress; ///< how much the transition has progressed so far (0..1)
     MLMicroSeconds mChannelLastSync; ///< Never if the cachedChannelValue is not yet applied to the hardware or retrieved from hardware, otherwise when it was last synchronized
     MLMicroSeconds mNextTransitionTime; ///< the transition time to use for the next channel value change
+    MLMicroSeconds mTransitionStarted; ///< time of when current transition has started
+    double mPreviousChannelValue; ///< the previous channel value, can be used for performing transitions
+    double mProgress; ///< transition progress between 0..1, 1=finished
     /// @}
 
   public:
@@ -174,24 +175,20 @@ namespace p44 {
     /// @note standard behaviour is returning true when value is at 50% or more of the available range
     virtual bool getChannelValueBool();
 
-    /// step through transitions
-    /// @param aStepSize how much to step. Default is zero and means starting transition
-    /// @return true if there's another step to take, false if end of transition already reached
-    bool transitionStep(double aStepSize=0);
+    /// initialize a transition or update its progress over time
+    /// @param aNow current time, used to calculate progress. Default is 0 and means starting a new transition NOW,
+    ///   negative means completing transition immediately.
+    /// @return true if the transition must be updated again, false if end of transition already reached
+    bool updateTransition(MLMicroSeconds aNow = 0);
 
     /// set transition progress
     /// @param aProgress progress between 0 (just started) to 1 (completed).
-    void setTransitionProgress(double aProgress);
+    /// @return true if no longer in transition (aProgress>=1)
+    bool setTransitionProgress(double aProgress);
 
     /// end transition, making current transitional value the cached one
     /// @note this may be called from device implementations that actually use calculated transitions
     void stopTransition();
-
-    /// set transition progress from intermediate value (instead of 0..1 progress as with setTransitionProgress())
-    /// @param aCurrentValue value actually reached in transition right now, will update internal transition progress accordingly
-    /// @param aIsInitial if set, this is considered the start value of the transition
-    ///   (rather than as intermediate value between previously established start and target value)
-    void setTransitionValue(double aCurrentValue, bool aIsInitial);
 
     /// check if in transition
     /// @return true if transition not complete and getTransitionalValue() will return a intermediate value

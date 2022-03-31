@@ -606,20 +606,20 @@ void ColorLightBehaviour::appliedColorValues()
 }
 
 
-bool ColorLightBehaviour::colorTransitionStep(double aStepSize)
+bool ColorLightBehaviour::updateColorTransition(MLMicroSeconds aNow)
 {
   bool moreSteps = false;
   switch (colorMode) {
     case colorLightModeHueSaturation:
-      if (hue->transitionStep(aStepSize)) moreSteps = true;
-      if (saturation->transitionStep(aStepSize)) moreSteps = true;
+      if (hue->updateTransition(aNow)) moreSteps = true;
+      if (saturation->updateTransition(aNow)) moreSteps = true;
       break;
     case colorLightModeCt:
-      if (ct->transitionStep(aStepSize)) moreSteps = true;
+      if (ct->updateTransition(aNow)) moreSteps = true;
       break;
     case colorLightModeXY:
-      if (cieX->transitionStep(aStepSize)) moreSteps = true;
-      if (cieY->transitionStep(aStepSize)) moreSteps = true;
+      if (cieX->updateTransition(aNow)) moreSteps = true;
+      if (cieY->updateTransition(aNow)) moreSteps = true;
       break;
     default:
       // no color

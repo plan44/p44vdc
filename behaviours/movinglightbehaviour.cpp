@@ -214,10 +214,10 @@ void MovingLightBehaviour::saveChannelsToScene(DsScenePtr aScene)
 
 
 
-bool MovingLightBehaviour::positionTransitionStep(double aStepSize)
+bool MovingLightBehaviour::updatePositionTransition(MLMicroSeconds aNow)
 {
-  bool moreSteps = horizontalPosition->transitionStep(aStepSize);
-  if (verticalPosition->transitionStep(aStepSize)) moreSteps = true;
+  bool moreSteps = horizontalPosition->updateTransition(aNow);
+  if (verticalPosition->updateTransition(aNow)) moreSteps = true;
   return moreSteps;
 }
 
@@ -494,14 +494,14 @@ void FeatureLightBehaviour::saveChannelsToScene(DsScenePtr aScene)
 }
 
 
-bool FeatureLightBehaviour::featureTransitionStep(double aStepSize)
+bool FeatureLightBehaviour::updateFeatureTransition(MLMicroSeconds aNow)
 {
-  bool moreSteps = horizontalZoom->transitionStep(aStepSize);
-  if (verticalZoom->transitionStep(aStepSize)) moreSteps = true;
-  if (rotation->transitionStep(aStepSize)) moreSteps = true;
-  if (brightnessGradient->transitionStep(aStepSize)) moreSteps = true;
-  if (hueGradient->transitionStep(aStepSize)) moreSteps = true;
-  if (saturationGradient->transitionStep(aStepSize)) moreSteps = true;
+  bool moreSteps = horizontalZoom->updateTransition(aNow);
+  if (verticalZoom->updateTransition(aNow)) moreSteps = true;
+  if (rotation->updateTransition(aNow)) moreSteps = true;
+  if (brightnessGradient->updateTransition(aNow)) moreSteps = true;
+  if (hueGradient->updateTransition(aNow)) moreSteps = true;
+  if (saturationGradient->updateTransition(aNow)) moreSteps = true;
   return moreSteps;
 }
 

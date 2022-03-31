@@ -191,7 +191,6 @@ void OlaDevice::setDMXChannel(DmxChannel aChannel, DmxValue aChannelValue)
 
 void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  MLMicroSeconds transitionTime = 0;
   // abort previous transition
   transitionTicket.cancel();
   // generic device, show changed channels
@@ -199,9 +198,8 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // single channel dimmer
     LightBehaviourPtr l = getOutput<LightBehaviour>();
     if (l && l->brightnessNeedsApplying()) {
-      transitionTime = l->transitionTimeToNewBrightness();
-      l->brightnessTransitionStep(); // init
-      applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)TRANSITION_STEP_TIME/transitionTime);
+      l->updateBrightnessTransition(); // init
+      applyChannelValueSteps(aForDimming);
     }
     // consider applied
     l->brightnessApplied();
@@ -211,15 +209,15 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     if (cl) {
       MovingLightBehaviourPtr ml = getOutput<MovingLightBehaviour>();
-      if (needsToApplyChannels(&transitionTime)) {
+      if (needsToApplyChannels()) {
         // needs update
         // - derive (possibly new) color mode from changed channels
         cl->deriveColorMode();
         // - calculate and start transition
-        cl->brightnessTransitionStep(); // init
-        cl->colorTransitionStep(); // init
-        if (ml) ml->positionTransitionStep(); // init
-        applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)TRANSITION_STEP_TIME/transitionTime);
+        cl->updateBrightnessTransition(); // init
+        cl->updateColorTransition(); // init
+        if (ml) ml->updatePositionTransition(); // init
+        applyChannelValueSteps(aForDimming);
       }
       // consider applied
       if (ml) ml->appliedPosition();
@@ -230,13 +228,14 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 }
 
 
-void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
+void OlaDevice::applyChannelValueSteps(bool aForDimming)
 {
+  MLMicroSeconds now = MainLoop::now();
   // generic device, show changed channels
   if (olaType==ola_dimmer) {
     // single channel dimmer
     LightBehaviourPtr l = getOutput<LightBehaviour>();
-    bool moreSteps = l->brightnessTransitionStep(aStepSize);
+    bool moreSteps = l->updateBrightnessTransition(now);
     double w = l->brightnessForHardware()*255/100;
     setDMXChannel(whiteChannel,(DmxValue)w);
     // next step
@@ -244,7 +243,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       OLOG(LOG_DEBUG, "transitional DMX512 value %d=%d", whiteChannel, (int)w);
       // not yet complete, schedule next step
       transitionTicket.executeOnce(
-        boost::bind(&OlaDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
+        boost::bind(&OlaDevice::applyChannelValueSteps, this, aForDimming),
         TRANSITION_STEP_TIME
       );
       return; // will be called later again
@@ -258,9 +257,9 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
     // RGB, RGBW or RGBWA dimmer
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     MovingLightBehaviourPtr ml = getOutput<MovingLightBehaviour>();
-    bool moreSteps = cl->brightnessTransitionStep(aStepSize);
-    if (cl->colorTransitionStep(aStepSize)) moreSteps = true;
-    if (ml && ml->positionTransitionStep(aStepSize)) moreSteps = true;
+    bool moreSteps = cl->updateBrightnessTransition(now);
+    if (cl->updateColorTransition(now)) moreSteps = true;
+    if (ml && ml->updatePositionTransition(now)) moreSteps = true;
     // RGB lamp, get components
     double r,g,b;
     double w = 0;
@@ -304,7 +303,7 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       );
       // not yet complete, schedule next step
       transitionTicket.executeOnce(
-        boost::bind(&OlaDevice::applyChannelValueSteps, this, aForDimming, aStepSize),
+        boost::bind(&OlaDevice::applyChannelValueSteps, this, aForDimming),
         TRANSITION_STEP_TIME
       );
       return; // will be called later again

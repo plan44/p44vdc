@@ -163,7 +163,7 @@ namespace p44 {
 
   private:
 
-    virtual void applyChannelValueSteps(bool aForDimming, double aStepSize);
+    virtual void applyChannelValueSteps(bool aForDimming);
 
   };
   typedef boost::intrusive_ptr<LedChainDevice> LedChainDevicePtr;

@@ -392,7 +392,7 @@ namespace p44 {
     virtual void setTransitionTime(MLMicroSeconds aTransitionTime) = 0;
 
     /// internal implementation for running even very slow light transitions
-    virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) = 0;
+    virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor) = 0;
 
     /// add dS device level context summary (but no *bus* device level info)
     virtual void daliDeviceContextSummary(ApiValuePtr aInfo) const;
@@ -535,7 +535,7 @@ namespace p44 {
     virtual void setTransitionTime(MLMicroSeconds aTransitionTime) P44_OVERRIDE;
 
     /// internal implementation for running even very slow light transitions
-    virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) P44_OVERRIDE;
+    virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor) P44_OVERRIDE;
 
     /// let device implementation prepare for (and possibly reject) optimized set
     /// @param aDeliveryState can be inspected to see the scene or dim parameters
@@ -689,7 +689,7 @@ namespace p44 {
     virtual void setTransitionTime(MLMicroSeconds aTransitionTime) P44_OVERRIDE;
 
     /// internal implementation for running even very slow light transitions
-    virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor, double aStepSize) P44_OVERRIDE;
+    virtual void applyChannelValueSteps(bool aForDimming, bool aWithColor) P44_OVERRIDE;
 
     /// let device implementation prepare for (and possibly reject) optimized set
     /// @param aDeliveryState can be inspected to see the scene or dim parameters

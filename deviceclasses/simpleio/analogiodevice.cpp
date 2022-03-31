@@ -182,9 +182,8 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // single channel PWM dimmer
     LightBehaviourPtr l = getOutput<LightBehaviour>();
     if (l && l->brightnessNeedsApplying()) {
-      transitionTime = l->transitionTimeToNewBrightness();
-      l->brightnessTransitionStep(); // init
-      applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)TRANSITION_STEP_TIME/transitionTime);
+      l->updateBrightnessTransition(); // init
+      applyChannelValueSteps(aForDimming);
     }
     // consider applied
     l->brightnessApplied();
@@ -198,9 +197,9 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         // - derive (possibly new) color mode from changed channels
         cl->deriveColorMode();
         // - calculate and start transition
-        cl->brightnessTransitionStep(); // init
-        cl->colorTransitionStep(); // init
-        applyChannelValueSteps(aForDimming, transitionTime==0 ? 1 : (double)TRANSITION_STEP_TIME/transitionTime);
+        cl->updateBrightnessTransition(); // init
+        cl->updateColorTransition(); // init
+        applyChannelValueSteps(aForDimming);
       } // if needs update
       // consider applied
       cl->appliedColorValues();
@@ -222,13 +221,14 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 
 
 
-void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
+void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
 {
+  MLMicroSeconds now = MainLoop::now();
   // generic device, show changed channels
   if (analogIOType==analogio_dimmer) {
     // single channel PWM dimmer
     LightBehaviourPtr l = getOutput<LightBehaviour>();
-    bool moreSteps = l->brightnessTransitionStep(aStepSize);
+    bool moreSteps = l->updateBrightnessTransition(now);
     double w = l->brightnessForHardware();
     double pwm = l->brightnessToPWM(w, 100);
     analogIO->setValue(pwm);
@@ -237,7 +237,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       OLOG(LOG_DEBUG, "AnalogIO transitional brightness value: %.2f", w);
       // not yet complete, schedule next step
       timerTicket.executeOnce(
-        boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
+        boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming),
         TRANSITION_STEP_TIME
       );
       return; // will be called later again
@@ -247,8 +247,8 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
   else if (analogIOType==analogio_rgbdimmer) {
     // three channel RGB PWM dimmer
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
-    bool moreSteps = cl->brightnessTransitionStep(aStepSize);
-    if (cl->colorTransitionStep(aStepSize)) moreSteps = true;
+    bool moreSteps = cl->updateBrightnessTransition(now);
+    if (cl->updateColorTransition(now)) moreSteps = true;
     // RGB lamp, get components
     double r, g, b, pwm;
     double w = 0;
@@ -276,7 +276,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming, double aStepSize)
       OLOG(LOG_DEBUG, "AnalogIO transitional RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
       // not yet complete, schedule next step
       timerTicket.executeOnce(
-        boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming, aStepSize),
+        boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming),
         TRANSITION_STEP_TIME
       );
       return; // will be called later again

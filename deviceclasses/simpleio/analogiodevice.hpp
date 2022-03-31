@@ -106,9 +106,7 @@ namespace p44 {
   private:
 
     void analogInputPoll(MLTimer &aTimer, MLMicroSeconds aNow);
-
-
-    virtual void applyChannelValueSteps(bool aForDimming, double aStepSize);
+    virtual void applyChannelValueSteps(bool aForDimming);
 
   };
 
