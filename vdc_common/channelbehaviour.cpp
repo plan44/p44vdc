@@ -19,6 +19,13 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
+// File scope debugging options
+// - Set ALWAYS_DEBUG to 1 to enable DBGLOG output even in non-DEBUG builds of this file
+#define ALWAYS_DEBUG 0
+// - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
+//   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
+#define FOCUSLOGLEVEL 7
+
 #include "channelbehaviour.hpp"
 #include "outputbehaviour.hpp"
 #include "math.h"
@@ -171,11 +178,13 @@ bool ChannelBehaviour::transitionStep(double aStepSize)
 {
   if (aStepSize<=0) {
     // Initialize a transition
+    FOCUSOLOG("transitionStep(<=0): initialize");
     if (inTransition()) {
       // a previous transition is still running.
       // This can only happen if no new target value has been set for this channel, which
       // means that the transition should not run further. But...
       if (!mChannelUpdatePending) { // ..check, just to make sure
+        FOCUSOLOG("!!! no channel update pending: stop previous transition");
         mCachedChannelValue = getChannelValue(true); // get current transitional value
         setTransitionProgress(1); // stop transition early, keeping current value
         return false; // no transition
@@ -191,6 +200,16 @@ bool ChannelBehaviour::transitionStep(double aStepSize)
   // no longer in transition
   return false;
 }
+
+
+void ChannelBehaviour::stopTransition()
+{
+  if (inTransition()) {
+    mCachedChannelValue = getChannelValue(true);
+    setTransitionProgress(1);
+  }
+}
+
 
 
 void ChannelBehaviour::setTransitionProgress(double aProgress)
@@ -401,6 +420,10 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
   }
   // apply (silently), only if value has actually changed (but even if change is below resolution)
   if (newValue!=mCachedChannelValue) {
+    FOCUSOLOG(
+      "is requested to dim by %f from %0.2f ->  %0.2f (transition time=%d mS)",
+      aIncrement, mCachedChannelValue, newValue, (int)(aTransitionTime/MilliSecond)
+    );
     // setting new value captures current (possibly transitional) value as previous and completes transition
     mPreviousChannelValue = mChannelLastSync!=Never ? getChannelValue(true) : newValue; // If there is no valid previous value, set current as previous.
     mTransitionProgress = 1; // consider done

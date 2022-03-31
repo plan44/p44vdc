@@ -321,6 +321,14 @@ void LedChainDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
 }
 
 
+void LedChainDevice::stopTransitions()
+{
+  inherited::stopTransitions();
+  // stop any ongoing transition
+  transitionTicket.cancel();
+}
+
+
 void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   MLMicroSeconds transitionTime = 0;

@@ -566,6 +566,13 @@ namespace p44 {
     /// flag all channels unconditionally for re-applying to hardware
     void invalidateAllChannels();
 
+    /// abort any currently ongoing scene action
+    /// @note base class just calls stopSceneActions() on the output
+    virtual void stopSceneActions();
+
+    /// stop running transitions
+    virtual void stopTransitions();
+
     /// get channel by index
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)
     /// @param aPendingApplyOnly if true, only channels with pending values to be applied are returned
@@ -637,10 +644,6 @@ namespace p44 {
     /// @note base class implementation just calls performSceneActions() on output
     /// @note this is called after scene values have been applied already (or as only action if dontCare has prevented applying values)
     virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB);
-
-    /// abort any currently ongoing scene action
-    /// @note base class just calls stopSceneActions() on the output
-    virtual void stopSceneActions();
 
 
     /// apply all pending channel value updates to the device's hardware

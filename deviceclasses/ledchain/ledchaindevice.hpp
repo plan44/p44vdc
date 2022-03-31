@@ -89,6 +89,9 @@ namespace p44 {
     /// @name interaction with subclasses, actually representing physical I/O
     /// @{
 
+    /// stop running transitions
+    virtual void stopTransitions() P44_OVERRIDE;
+
     /// apply all pending channel value updates to the device's hardware
     /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
     ///   ChannelBehaviours and check isChannelUpdatePending(), and send new values to the device hardware. After successfully

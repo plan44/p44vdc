@@ -305,6 +305,14 @@ void OutputBehaviour::stopSceneActions()
 }
 
 
+void OutputBehaviour::stopTransitions()
+{
+  OLOG(LOG_INFO, "stopping channel transitions");
+  for (ChannelBehaviourVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
+    (*pos)->stopTransition();
+  }
+}
+
 
 void OutputBehaviour::setTransitionTimeOverride(MLMicroSeconds aTransitionTimeOverride)
 {
@@ -745,7 +753,7 @@ using namespace P44Script;
 
 static void outputOpComplete(BuiltinFunctionContextPtr f, OutputBehaviourPtr aOutput)
 {
-  POLOG(aOutput, LOG_INFO, "output operation complete");
+  POLOG(aOutput, LOG_INFO, "scripted operation complete");
   f->finish();
 }
 

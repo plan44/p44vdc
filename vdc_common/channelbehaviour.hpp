@@ -183,6 +183,10 @@ namespace p44 {
     /// @param aProgress progress between 0 (just started) to 1 (completed).
     void setTransitionProgress(double aProgress);
 
+    /// end transition, making current transitional value the cached one
+    /// @note this may be called from device implementations that actually use calculated transitions
+    void stopTransition();
+
     /// set transition progress from intermediate value (instead of 0..1 progress as with setTransitionProgress())
     /// @param aCurrentValue value actually reached in transition right now, will update internal transition progress accordingly
     /// @param aIsInitial if set, this is considered the start value of the transition

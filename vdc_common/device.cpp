@@ -1238,9 +1238,15 @@ bool Device::checkForReapply()
 void Device::applyingChannelsComplete()
 {
   FOCUSOLOG("applyingChannelsComplete entered");
+  #if FOCUSLOGGING
+  MLTicketNo ticketNo = 0;
+  #endif
   #if SERIALIZER_WATCHDOG
   if (mSerializerWatchdogTicket) {
     FOCUSLOG("----- Serializer watchdog ticket #%ld cancelled - apply complete", (MLTicketNo)mSerializerWatchdogTicket);
+    #if FOCUSLOGGING
+    ticketNo = (MLTicketNo)mSerializerWatchdogTicket;
+    #endif
     mSerializerWatchdogTicket.cancel(); // cancel watchdog
   }
   #endif
@@ -1502,9 +1508,8 @@ void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool 
     );
     // Simple base class implementation just increments/decrements channel values periodically (and skips steps when applying values is too slow)
     if (aDimMode==dimmode_stop) {
-      // stop dimming
-      mIsDimming = false;
-      mDimHandlerTicket.cancel();
+      // stop dimming (including possibly running transitions on the device implementation level)
+      stopTransitions();
     }
     else {
       // start dimming
@@ -1794,11 +1799,22 @@ void Device::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 
 void Device::stopSceneActions()
 {
+  stopTransitions();
   if (mOutput) {
     mOutput->stopSceneActions();
   }
 }
 
+
+void Device::stopTransitions()
+{
+  // in the base class, this is just cancelling possibly running default dimming
+  mIsDimming = false;
+  mDimHandlerTicket.cancel();
+  if (mOutput) {
+    mOutput->stopTransitions();
+  }
+}
 
 
 bool Device::prepareSceneCall(DsScenePtr aScene)
