@@ -1255,22 +1255,22 @@ void Device::applyingChannelsComplete()
   if (!checkForReapply()) {
     // apply complete and no final re-apply pending
     // - confirm because finally applied
-    FOCUSLOG("- applyingChannelsComplete - really completed, now checking callbacks");
+    FOCUSLOG("- applyingChannelsComplete - really completed, now checking callbacks (ticket #%ld)", ticketNo);
     SimpleCB cb;
     if (mAppliedOrSupersededCB) {
-      FOCUSLOG("- confirming apply (really) finalized");
+      FOCUSLOG("- confirming apply (really) finalized (ticket #%ld)", ticketNo);
       cb = mAppliedOrSupersededCB;
       mAppliedOrSupersededCB = NULL; // ready for possibly taking new callback in case current callback should request another change
       cb(); // call back now, values have been superseded
     }
     // check for independent operation waiting for apply complete
     if (mApplyCompleteCB) {
-      FOCUSLOG("- confirming apply (really) finalized to waitForApplyComplete() client");
+      FOCUSLOG("- confirming apply (really) finalized to waitForApplyComplete() client (ticket #%ld)", ticketNo);
       cb = mApplyCompleteCB;
       mApplyCompleteCB = NULL;
       cb();
     }
-    FOCUSLOG("- confirmed apply (really) finalized");
+    FOCUSLOG("- confirmed apply (really) finalized (ticket #%ld)", ticketNo);
   }
 }
 
