@@ -813,7 +813,9 @@ static void stopactions_func(BuiltinFunctionContextPtr f)
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
   assert(o);
   POLOG(o->output(), LOG_INFO, "stopping all scene actions");
-  o->output()->stopSceneActions();
+  // Note: call this on device level, so device implementations
+  //   have the chance to stop device-specific ongoing actions (such as transitions)
+  o->output()->getDevice().stopSceneActions();
   f->finish();
 }
 
