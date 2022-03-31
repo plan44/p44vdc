@@ -367,7 +367,7 @@ namespace p44 {
     /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
     ///   ChannelBehaviours and check isChannelUpdatePending(), and send new values to the device hardware. After successfully
     ///   updating the device hardware, channelValueApplied() must be called on the channels that had isChannelUpdatePending().
-    /// @param aCompletedCB if not NULL, must be called when values are applied
+    /// @param aDoneCB if not NULL, must be called when values are applied
     /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
     ///   in a single channel (and not switching between color modes etc.)
     virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_FINAL;
@@ -525,6 +525,9 @@ namespace p44 {
     /// @param aInfo ApiValue object, info fields will be added to it
     virtual void daliDeviceSummary(ApiValuePtr aInfo) const P44_OVERRIDE;
 
+    /// stop running transitions
+    virtual void stopTransitions() P44_OVERRIDE;
+
   protected:
 
     /// save current brightness as default for DALI dimmer to use after powerup and at failure
@@ -678,6 +681,9 @@ namespace p44 {
     /// return information about all bus devices related to this device
     /// @param aInfo ApiValue object, info fields will be added to it
     virtual void daliDeviceSummary(ApiValuePtr aInfo) const P44_OVERRIDE;
+
+    /// stop running transitions
+    virtual void stopTransitions() P44_OVERRIDE;
 
   protected:
 

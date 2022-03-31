@@ -1477,6 +1477,14 @@ void DaliSingleControllerDevice::disconnectableHandler(bool aForgetParams, Disco
 }
 
 
+void DaliSingleControllerDevice::stopTransitions()
+{
+  inherited::stopTransitions();
+  // stop any ongoing dimming/transitioning operation
+  daliController->dim(dimmode_stop, 0);
+}
+
+
 void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool aWithColor)
 {
   MLMicroSeconds now = MainLoop::now();
@@ -1964,6 +1972,18 @@ void DaliCompositeDevice::disconnectableHandler(bool aForgetParams, DisconnectCB
       aDisconnectResultHandler(false);
     }
   }
+}
+
+
+void DaliCompositeDevice::stopTransitions()
+{
+  inherited::stopTransitions();
+  // stop any ongoing dimming/transitioning operation
+  if (dimmers[dimmer_red]) dimmers[dimmer_red]->dim(dimmode_stop, 0);
+  if (dimmers[dimmer_green]) dimmers[dimmer_green]->dim(dimmode_stop, 0);
+  if (dimmers[dimmer_blue]) dimmers[dimmer_blue]->dim(dimmode_stop, 0);
+  if (dimmers[dimmer_white]) dimmers[dimmer_white]->dim(dimmode_stop, 0);
+  if (dimmers[dimmer_amber]) dimmers[dimmer_amber]->dim(dimmode_stop, 0);
 }
 
 
