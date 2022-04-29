@@ -360,7 +360,6 @@ namespace p44 {
     string mName;
     string mTriggerVarDefs; ///< variable to valueSource mappings
     string mUiParams; ///< free-form (but usually JSON) string for rendering this trigger in the (custom) Web-UI
-
     ValueSourceMapper mValueMapper;
     MLTicket mVarParseTicket;
     Tristate mConditionMet;
@@ -383,7 +382,7 @@ namespace p44 {
 
     // API method handlers
     ErrorPtr handleCheckCondition(VdcApiRequestPtr aRequest);
-    ErrorPtr handleTestActions(VdcApiRequestPtr aRequest);
+    ErrorPtr handleTestActions(VdcApiRequestPtr aRequest, ScriptObjPtr aTriggerParam);
 
     /// @return a prefix for log messages from this addressable
     virtual string logContextPrefix() P44_OVERRIDE;

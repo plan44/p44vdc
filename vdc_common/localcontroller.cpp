@@ -1055,9 +1055,14 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
 }
 
 
-ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest)
+ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest, ScriptObjPtr aTriggerParam)
 {
-  triggerAction.run(stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), ScriptObjPtr(), Infinite);
+  ScriptObjPtr threadLocals;
+  if (aTriggerParam) {
+    threadLocals = new SimpleVarContainer();
+    threadLocals->setMemberByName("triggerparam", aTriggerParam);
+  }
+  triggerAction.run(stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), threadLocals, Infinite);
   return ErrorPtr(); // will send result later
 }
 
@@ -2117,7 +2122,13 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
       }
       else {
         if (aMethod=="x-p44-testTriggerAction") {
-          trig->handleTestActions(aRequest); // asynchronous!
+          ScriptObjPtr triggerParam;
+          ApiValuePtr o = aParams->get("triggerParam");
+          if (o) {
+            // has a trigger parameter
+            triggerParam = new StringValue(o->stringValue());
+          }
+          trig->handleTestActions(aRequest, triggerParam); // asynchronous!
         }
         else if (aMethod=="x-p44-stopTriggerAction") {
           trig->stopActions();
