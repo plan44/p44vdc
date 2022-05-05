@@ -311,6 +311,11 @@ void Vdc::queueDelivery(NotificationDeliveryStatePtr aDeliveryState)
     // queue for when current delivery is done
     pendingDeliveries.push_back(aDeliveryState);
     OLOG(LOG_INFO, "'%s' delivery queued (previous delivery still running) - now %lu queued deliveries", NotificationNames[aDeliveryState->callType], pendingDeliveries.size());
+    // now make sure delivery is not blocked by previous delivery waiting for long-running scene actions
+    // Note: iterate only as long as still delivering 
+    for (DeviceVector::iterator pos = devices.begin(); delivering && pos!=devices.end(); ++pos) {
+      (*pos)->finishSceneActionWaiting();
+    }
   }
   else {
     // optimization - start right now

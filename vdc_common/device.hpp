@@ -140,6 +140,7 @@ namespace p44 {
     DsScenePtr mPreparedScene; ///< set if this scene must be applied at executePreparedOperation()
     bool mPreparedDim; ///< set if currentDimMode/currentDimChannel must be applied at executePreparedOperation()
     MLMicroSeconds mPreparedTransitionOverride; ///< prepared override for transition time
+    SimpleCB mSceneActionCompleteCB; ///< this needs to be called when scene apply completes
 
     // hardware access serializer/pacer
     SimpleCB mAppliedOrSupersededCB; ///< will be called when values are either applied or ignored because a subsequent change is already pending
@@ -646,6 +647,9 @@ namespace p44 {
     /// @note this is called after scene values have been applied already (or as only action if dontCare has prevented applying values)
     virtual void performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB);
 
+    /// finish waiting for any long- or indefinitely running scene actions that might block next scene delivery
+    /// and consider scene actions done (if that did not happen before already)
+    void finishSceneActionWaiting();
 
     /// apply all pending channel value updates to the device's hardware
     /// @param aDoneCB will called when values are actually applied, or hardware reports an error/timeout
@@ -801,7 +805,8 @@ namespace p44 {
     void dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);
     void outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene);
 
-    void sceneActionsComplete(SimpleCB aDoneCB, DsScenePtr aScene);
+    void sceneActionsComplete(DsScenePtr aScene);
+    void confirmSceneActionsComplete();
     void dimAutostopHandler(ChannelBehaviourPtr aChannel);
     void dimHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNow);
     void dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNextDimAt);

@@ -1410,6 +1410,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
   if (aDimMode==dimmode_stop) {
     stopSceneActions();
   }
+  finishSceneActionWaiting(); // finish things possibly still waiting for previous call's scene actions to complete
   // requested dimming this device, no area suppress active
   if (aDimMode!=mCurrentDimMode || aChannel!=mCurrentDimChannel) {
     // mode changes
@@ -1574,11 +1575,12 @@ void Device::callScene(SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransition
 
 void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aForce, MLMicroSeconds aTransitionTimeOverride)
 {
-  // see if we have a scene table at all
+  finishSceneActionWaiting(); // finish things possibly still waiting for previous call's scene actions to complete
   mPreparedScene.reset(); // clear possibly previously prepared scene
   mPreparedTransitionOverride = aTransitionTimeOverride; // save for later
   mPreparedDim = false; // no dimming prepared
   SceneDeviceSettingsPtr scenes = getScenes();
+  // see if we have a scene table at all
   if (mOutput && scenes) {
     DsScenePtr scene = scenes->getScene(aSceneNo);
     SceneCmd cmd = scene->mSceneCmd;
@@ -1699,7 +1701,7 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
     // - do not include in apply
     aPreparedCB(ntfy_none);
     // - but possibly still do other scene actions now, although scene was not applied
-    performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, SimpleCB(), aScene));
+    performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aScene));
   }
 }
 
@@ -1770,22 +1772,47 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatTo
   if (aDoneCB) aDoneCB();
 }
 
+void Device::confirmSceneActionsComplete()
+{
+  if (mSceneActionCompleteCB) {
+    SimpleCB cb = mSceneActionCompleteCB;
+    mSceneActionCompleteCB = NULL;
+    OLOG(LOG_INFO, "- confirming scene actions complete");
+    cb();
+  }
+}
+
+
+void Device::finishSceneActionWaiting()
+{
+  if (mSceneActionCompleteCB) {
+    OLOG(LOG_WARNING, "Was still waiting for unfinished scene actions from earlier call -> consider done now");
+    confirmSceneActionsComplete();
+  }
+}
+
 
 void Device::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndirectly)
 {
   // now perform scene special actions such as blinking
-  performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aDoneCB, aScene));
+  // Note: scene actions might be ongoing, while apply should no go on forever.
+  //   Therefore, we store the done callback device-globally to be able to continue before
+  //   scene actions are complete
+  // confirm previous pending one, if any
+  confirmSceneActionsComplete();
+  // store new callback
+  mSceneActionCompleteCB = aDoneCB;
+  // launch new scene actions
+  performSceneActions(aScene, boost::bind(&Device::sceneActionsComplete, this, aScene));
 }
 
 
-void Device::sceneActionsComplete(SimpleCB aDoneCB, DsScenePtr aScene)
+void Device::sceneActionsComplete(DsScenePtr aScene)
 {
   // scene actions are now complete
   OLOG(LOG_INFO, "Scene actions for callScene(%s) complete -> now in final state", VdcHost::sceneText(aScene->mSceneNo).c_str());
-  if (aDoneCB) aDoneCB();
+  confirmSceneActionsComplete();
 }
-
-
 
 
 void Device::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
