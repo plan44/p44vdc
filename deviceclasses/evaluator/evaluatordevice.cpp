@@ -413,6 +413,18 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
         decisionMade = true;
       }
     }
+    // one condition side getting false while the other side is ALREADY true must be handled, too
+    if (!decisionMade && newConditionState==no) {
+      // check if the opposite is true
+      Tristate otherConditionState = (aOnCondition ? evaluatorSettings()->mOffCondition : evaluatorSettings()->mOnCondition).lastBoolResult();
+      if (otherConditionState==yes) {
+        mEvaluatorState = aOnCondition ? no : yes; // the OTHER condition causes a state change!
+        if (mEvaluatorState!=prevState) {
+          OLOG(LOG_INFO, "%sCondition was already true while %sCondition gets false -> switching %s", aOnCondition ? "off" : "om", aOnCondition ? "on" : "off", mEvaluatorState==yes ? "ON" : "OFF");
+          decisionMade = true;
+        }
+      }
+    }
     if (mEvaluatorState!=undefined) {
       // re-check opposite condition as "triggered" in case it is static (such as default fallbacks to true or false)
       MainLoop::currentMainLoop().executeNow(boost::bind(
@@ -657,8 +669,8 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bool aIsSensor) :
   inherited(aEvaluator)
   // Note: conditions are synchronously evaluated, but action might be running when a condition wants evaluation, so we allow concurrent evaluation in that case
-  ,mOnCondition("onCondition", &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
-  ,mOffCondition("offCondition", &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onGettingTrue, Never, expression|synchronously|keepvars|concurrently)
+  ,mOnCondition("onCondition", &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onChangingBoolRisingHoldoffOnly, Never, expression|synchronously|keepvars|concurrently)
+  ,mOffCondition("offCondition", &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onChangingBoolRisingHoldoffOnly, Never, expression|synchronously|keepvars|concurrently)
   #if P44SCRIPT_FULL_SUPPORT
   // Only thing that might run when action tries to run is an earlier invocation of the action.
   // However this might be a previous on-action, while the new action is a NOP off-action, so both must be allowed to run concurrently
