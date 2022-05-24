@@ -320,6 +320,14 @@ const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   //   - Alternate profile is indoor
   { 1, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
   { 1, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,          0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText },
+  //   - Eltako FAFT60 is outdoor and has battery voltage in DB3 (with strange scaling, 2.5V=0x59, 4V=0x9B)
+  { 2, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
+  { 2, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_outdoors,      0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText },
+  { 2, 0x04, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage, usage_undefined, 0.477, 6.273, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
+  //   - Eltako FIFT65S is indoor and has battery voltage in DB3 (with strange scaling, 2.5V=0x59, 4V=0x9B)
+  { 3, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
+  { 3, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_outdoors,      0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText },
+  { 3, 0x04, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage, usage_undefined, 0.477, 6.273, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
   // - -20..60 degree with 10 bit resolution
   //   - Default profile is outdoor
   { 0, 0x04, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20,   60, DB(2,1), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
@@ -692,6 +700,8 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   { 29, 0x01A50401, 0, outdoorText, NULL },
   { 30, 0x00A50402, 0, outdoorText, NULL }, // outdoor is default!
   { 30, 0x01A50402, 0, indoorText, NULL },
+  { 30, 0x02A50402, 0, "Eltako FAFT", NULL },
+  { 30, 0x03A50402, 0, "Eltako FIFT", NULL },
   { 31, 0x00A50403, 0, outdoorText, NULL }, // outdoor is default!
   { 31, 0x01A50403, 0, indoorText, NULL },
   // heating valve alternatives
