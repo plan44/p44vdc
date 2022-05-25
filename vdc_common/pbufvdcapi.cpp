@@ -1197,7 +1197,7 @@ ErrorPtr VdcPbufApiConnection::sendMessage(const Vdcapi__Message *aVdcApiMessage
 			else {
 				// all sent
 				// - disable transmit handler
-        socketComm->setTransmitHandler(NULL);
+        socketComm->setTransmitHandler(NoOP);
 			}
     }
   }
@@ -1219,7 +1219,7 @@ void VdcPbufApiConnection::canSendData(ErrorPtr aError)
         // all sent
         transmitBuffer.erase();
 				// - disable transmit handler
-        socketComm->setTransmitHandler(NULL);
+        socketComm->setTransmitHandler(NoOP);
       }
       else {
         // partially sent, remove sent bytes

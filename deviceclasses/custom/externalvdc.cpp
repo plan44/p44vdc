@@ -148,7 +148,7 @@ void ExternalDeviceConnector::removeDevice(ExternalDevicePtr aExtDev)
 void ExternalDeviceConnector::closeConnection()
 {
   // prevent further connection status callbacks
-  mDeviceConnection->setConnectionStatusHandler(NULL);
+  mDeviceConnection->setConnectionStatusHandler(NoOP);
   // close connection
   mDeviceConnection->closeConnection();
   // release the connection

@@ -202,7 +202,7 @@ void HueVdc::handleGlobalEvent(VdchostEvent aEvent)
 {
   if (aEvent==vdchost_network_reconnected) {
     // re-connecting to network should re-scan for hue bridge
-    collectDevices(NULL, rescanmode_incremental);
+    collectDevices(NoOP, rescanmode_incremental);
   }
   inherited::handleGlobalEvent(aEvent);
 }
@@ -402,7 +402,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
         learnedIn = no;
         // - delete it from the whitelist
         string url = "/config/whitelist/" + mHueComm.mUserName;
-        mHueComm.apiAction(httpMethodDELETE, url.c_str(), JsonObjectPtr(), NULL);
+        mHueComm.apiAction(httpMethodDELETE, url.c_str(), JsonObjectPtr(), NoOP);
         // - forget uuid + user name
         mBridgeIdentifier.clear();
         mBridgeUserName.clear();
@@ -690,7 +690,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
 
 void HueVdc::groupDimRepeater(JsonObjectPtr aDimState, int aTransitionTime, MLTimer &aTimer)
 {
-  mHueComm.apiAction(httpMethodPUT, "/groups/0/action", aDimState, NULL);
+  mHueComm.apiAction(httpMethodPUT, "/groups/0/action", aDimState, NoOP);
   mGroupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, aDimState, aTransitionTime, _1), aTransitionTime*Second/10);
 }
 

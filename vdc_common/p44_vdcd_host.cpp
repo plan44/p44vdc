@@ -745,7 +745,7 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
     if (o) seconds = o->int32Value();
     if (seconds==0) {
       // end reporting user activity
-      setUserActionMonitor(NULL);
+      setUserActionMonitor(NoOP);
       learnIdentifyTicket.cancel();
       // - close still running identify request
       if (learnIdentifyRequest) {
@@ -799,7 +799,7 @@ void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
     aRequest->sendError(Error::err<P44VdcError>(408, "identify timeout"));
   }
   // end monitor mode
-  setUserActionMonitor(NULL);
+  setUserActionMonitor(NoOP);
   learnIdentifyRequest.reset();
 }
 

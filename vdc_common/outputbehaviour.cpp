@@ -197,7 +197,7 @@ void OutputBehaviour::setOutputMode(VdcOutputMode aOutputMode)
       for (ChannelBehaviourVector::iterator pos=mChannels.begin(); pos!=mChannels.end(); ++pos) {
         (*pos)->setNeedsApplying(0); // needs immediate re-apply
       }
-      mDevice.requestApplyingChannels(NULL, false, true); // apply, for mode change
+      mDevice.requestApplyingChannels(NoOP, false, true); // apply, for mode change
     }
     markDirty();
   }

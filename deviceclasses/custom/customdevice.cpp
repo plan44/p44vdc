@@ -53,7 +53,7 @@ using namespace p44;
 
 CustomDeviceAction::CustomDeviceAction(SingleDevice &aSingleDevice, const string aName, const string aDescription, const string aTitle, const string aCategory) :
   inherited(aSingleDevice, aName, aDescription, aTitle, aCategory),
-  mCallback(NULL)
+  mCallback(NoOP)
 {
 }
 
@@ -115,7 +115,7 @@ void CustomDeviceAction::callPerformed(JsonObjectPtr aStatusInfo)
   }
   if (mCallback) {
     mCallback(err); // will return status to caller of action
-    mCallback = NULL;
+    mCallback = NoOP;
   }
 }
 
@@ -284,7 +284,7 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
       if (aMessageType=="synced") {
         // device confirms having reported all channel states (in response to "sync" command)
         if (mSyncedCB) mSyncedCB();
-        mSyncedCB = NULL;
+        mSyncedCB = NoOP;
         return ErrorPtr(); // no answer
       }
       else if (aMessageType=="active") {
@@ -416,7 +416,7 @@ ErrorPtr CustomDevice::processSimpleMessage(string aMessageType, string aValue)
   else if (aMessageType=="SYNCED") {
     // device confirms having reported all channel states (in response to "SYNC" command)
     if (mSyncedCB) mSyncedCB();
-    mSyncedCB = NULL;
+    mSyncedCB = NoOP;
     return ErrorPtr(); // no answer
   }
   else if (aMessageType=="ACTIVE") {
@@ -776,7 +776,7 @@ void CustomDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode,
     }
     else if (mUseMovement && aDoApply) {
       // not shadow, but still use movement for dimming
-      changeChannelMovement(aChannel->getChannelIndex(), NULL, aDimMode);
+      changeChannelMovement(aChannel->getChannelIndex(), NoOP, aDimMode);
     }
     else {
       inherited::dimChannel(aChannel, aDimMode, aDoApply);

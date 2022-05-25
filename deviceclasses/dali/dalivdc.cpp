@@ -687,7 +687,7 @@ ErrorPtr DaliVdc::daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
       // - process all but last cmd w/o returning result
       int c;
       for (c=0; c<cmd.size()-3; c+=3) {
-        daliComm.sendBridgeCommand(cmd[c+0], cmd[c+1], cmd[c+2], NULL);
+        daliComm.sendBridgeCommand(cmd[c+0], cmd[c+1], cmd[c+2], NoOP);
       }
       // - last cmd: return result
       daliComm.sendBridgeCommand(cmd[c+0], cmd[c+1], cmd[c+2], boost::bind(&DaliVdc::bridgeCmdSent, this, aRequest, _1, _2, _3));
@@ -712,7 +712,7 @@ ErrorPtr DaliVdc::daliCmd(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         }
         else if (cmd=="pulse") {
           daliComm.daliSendDirectPower(shortAddress, 0xFE);
-          daliComm.daliSendDirectPower(shortAddress, 0x01, NULL, 1200*MilliSecond);
+          daliComm.daliSendDirectPower(shortAddress, 0x01, NoOP, 1200*MilliSecond);
         }
         else {
           respErr = WebError::webErr(500, "unknown cmd");
@@ -1379,8 +1379,8 @@ void DaliVdc::testScanDone(StatusCB aCompletedCB, DaliComm::ShortAddressListPtr 
     // found at least one device, do a R/W test using the DTR
     DaliAddress testAddr = aShortAddressListPtr->front();
     LOG(LOG_NOTICE, "- DALI self test: switch all lights on, then do R/W tests with DTR of device short address %d",testAddr);
-    daliComm.daliSendDirectPower(DaliBroadcast, 0, NULL); // off
-    daliComm.daliSendDirectPower(DaliBroadcast, 254, NULL, 2*Second); // max
+    daliComm.daliSendDirectPower(DaliBroadcast, 0, NoOP); // off
+    daliComm.daliSendDirectPower(DaliBroadcast, 254, NoOP, 2*Second); // max
     testRW(aCompletedCB, testAddr, 0x55); // use first found device
   }
   else {

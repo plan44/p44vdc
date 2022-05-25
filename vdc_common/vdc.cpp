@@ -559,7 +559,7 @@ void Vdc::finalizeRepeatedNotification(OptimizerEntryPtr aEntry, NotificationDel
   // let all devices know operation has repeated
   for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
     // Note: vdchost does not need to be informed about repeated notifications (so deviceProcessedNotification is not called here)
-    (*pos)->executePreparedOperation(NULL, ntfy_none);
+    (*pos)->executePreparedOperation(NoOP, ntfy_none);
   }
 }
 
@@ -1051,7 +1051,7 @@ void Vdc::identifyDeviceFailed(DevicePtr aNewDevice, ErrorPtr aError, IdentifyDe
 
 bool Vdc::simpleIdentifyAndAddDevice(DevicePtr aNewDevice)
 {
-  if (!aNewDevice->identifyDevice(NULL)) {
+  if (!aNewDevice->identifyDevice(NoOP)) {
     // error: device does not support simple identification
     LOG(LOG_WARNING, "Could not identify device or device not supported -> ignored");
     return false;

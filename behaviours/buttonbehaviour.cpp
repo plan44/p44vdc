@@ -551,7 +551,7 @@ void ButtonBehaviour::localSwitchOutput()
     ChannelBehaviourPtr ch = mDevice.getOutput()->getChannelByType(channeltype_default);
     if (ch) {
       ch->setChannelValue(dir>0 ? ch->getMax() : ch->getMin());
-      mDevice.requestApplyingChannels(NULL, false);
+      mDevice.requestApplyingChannels(NoOP, false);
     }
   }
   // send status

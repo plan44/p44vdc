@@ -249,7 +249,7 @@ ErrorPtr VdcJsonApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
   else {
     // notification
     LOG(LOG_INFO, "vdSM <- vDC (JSON): sending notification '%s', params=%s", aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
-    err = jsonRpcComm->sendRequest(aMethod.c_str(), params->jsonObject(), NULL);
+    err = jsonRpcComm->sendRequest(aMethod.c_str(), params->jsonObject(), NoOP);
   }
   return err;
 }

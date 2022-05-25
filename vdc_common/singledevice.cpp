@@ -1907,7 +1907,7 @@ ErrorPtr SingleDevice::parameterFromJSON(ValueDescriptorPtr &aParameter, JsonObj
 ErrorPtr SingleDevice::stateFromJSON(DeviceStatePtr &aState, JsonObjectPtr aJSONConfig, const string aStateId, const string aDescription, ValueDescriptorPtr aStateDescriptor)
 {
   // base class just creates a unspecific state without push handler
-  aState = DeviceStatePtr(new DeviceState(*this, aStateId, aDescription, aStateDescriptor, NULL));
+  aState = DeviceStatePtr(new DeviceState(*this, aStateId, aDescription, aStateDescriptor, NoOP));
   return ErrorPtr();
 }
 

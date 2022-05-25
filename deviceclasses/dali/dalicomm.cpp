@@ -384,13 +384,13 @@ void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aR
   }
   // send next reset command with a longer delay, to give bridge time to process possibly buffered commands
   // (p44dbr does not execute next command until return code for previous command has been read from /dev/daliX)
-  sendBridgeCommand(CMD_CODE_RESET, 0, 0, NULL, 1*Second);
+  sendBridgeCommand(CMD_CODE_RESET, 0, 0, NoOP, 1*Second);
   // another reset to make sure
-  sendBridgeCommand(CMD_CODE_RESET, 0, 0, NULL, 100*MilliSecond);
+  sendBridgeCommand(CMD_CODE_RESET, 0, 0, NoOP, 100*MilliSecond);
   // make sure bus overload protection is active, autoreset enabled, reset to operating
-  sendBridgeCommand(CMD_CODE_OVLRESET, 0, 0, NULL);
+  sendBridgeCommand(CMD_CODE_OVLRESET, 0, 0, NoOP);
   // set DALI signal edge adjustments (available from fim_dali v3 onwards)
-  sendBridgeCommand(CMD_CODE_EDGEADJ, sendEdgeAdj, samplePointAdj, NULL);
+  sendBridgeCommand(CMD_CODE_EDGEADJ, sendEdgeAdj, samplePointAdj, NoOP);
   // terminate any special commands on the DALI bus
   daliSend(DALICMD_TERMINATE, 0, aStatusCB);
   // re-start PING if single master
@@ -403,7 +403,7 @@ void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aR
 
 void DaliComm::singleMasterPing(MLTimer &aMLTimer)
 {
-  if (!isBusy()) daliSend(DALICMD_PING, 0, NULL);
+  if (!isBusy()) daliSend(DALICMD_PING, 0, NoOP);
   MainLoop::currentMainLoop().retriggerTimer(aMLTimer, DALI_SINGLE_MASTER_PING_INTERVAL);
 }
 
@@ -429,7 +429,7 @@ void DaliComm::daliPrepareForCommand(DaliCommand &aCommand, int &aWithDelay)
     // command has a device type
     uint8_t dt = aCommand>>8;
     if (dt==0xFF) dt=0; // 0xFF is used to code DT0, to allow 0 meaning "no DT prefix" (DT0 is not in frequent use anyway)
-    daliSend(DALICMD_ENABLE_DEVICE_TYPE, dt, NULL, aWithDelay); // apply delay to prefix command!
+    daliSend(DALICMD_ENABLE_DEVICE_TYPE, dt, NoOP, aWithDelay); // apply delay to prefix command!
     aWithDelay = 0; // no further delay for actual command after prefix
     aCommand &= 0xFF; // mask out device type, is now consumed
   }
@@ -446,7 +446,7 @@ void DaliComm::daliSendCommand(DaliAddress aAddress, DaliCommand aCommand, DaliC
 
 void DaliComm::daliSendDtrAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
-  daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay); // apply delay to DTR setting command
+  daliSend(DALICMD_SET_DTR, aDTRValue, NoOP, aWithDelay); // apply delay to DTR setting command
   aWithDelay = 0; // delay already consumed for setting DTR
   daliPrepareForCommand(aCommand, aWithDelay);
   daliSendCommand(aAddress, aCommand, aStatusCB);
@@ -470,7 +470,7 @@ void DaliComm::daliSendConfigCommand(DaliAddress aAddress, DaliCommand aCommand,
 
 void DaliComm::daliSendDtrAndConfigCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
-  daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay);
+  daliSend(DALICMD_SET_DTR, aDTRValue, NoOP, aWithDelay);
   aWithDelay = 0; // delay already consumed for setting DTR
   daliPrepareForCommand(aCommand, aWithDelay);
   daliSendConfigCommand(aAddress, aCommand, aStatusCB, aWithDelay);
@@ -479,7 +479,7 @@ void DaliComm::daliSendDtrAndConfigCommand(DaliAddress aAddress, DaliCommand aCo
 
 void DaliComm::daliSend16BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint16_t aValue16, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
-  daliSend(DALICMD_SET_DTR1, aValue16>>8, NULL, aWithDelay); // MSB->DTR1 - apply delay to DTR1 setting command
+  daliSend(DALICMD_SET_DTR1, aValue16>>8, NoOP, aWithDelay); // MSB->DTR1 - apply delay to DTR1 setting command
   daliSend(DALICMD_SET_DTR, aValue16&0xFF); // LSB->DTR
   aWithDelay = 0; // delay already consumed for setting DTR1
   daliPrepareForCommand(aCommand, aWithDelay);
@@ -489,7 +489,7 @@ void DaliComm::daliSend16BitValueAndCommand(DaliAddress aAddress, DaliCommand aC
 
 void DaliComm::daliSend3x8BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aValue0, uint8_t aValue1, uint8_t aValue2, DaliCommandStatusCB aStatusCB, int aWithDelay)
 {
-  daliSend(DALICMD_SET_DTR, aValue0, NULL, aWithDelay);
+  daliSend(DALICMD_SET_DTR, aValue0, NoOP, aWithDelay);
   daliSend(DALICMD_SET_DTR1, aValue1);
   daliSend(DALICMD_SET_DTR2, aValue2);
   aWithDelay = 0; // delay already consumed for setting DTR
@@ -520,7 +520,7 @@ void DaliComm::daliSendQuery(DaliAddress aAddress, DaliCommand aQueryCommand, Da
 
 void DaliComm::daliSendDtrAndQuery(DaliAddress aAddress, DaliCommand aQueryCommand, uint8_t aDTRValue, DaliQueryResultCB aResultCB, int aWithDelay)
 {
-  daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay);
+  daliSend(DALICMD_SET_DTR, aDTRValue, NoOP, aWithDelay);
   daliSendQuery(aAddress, aQueryCommand, aResultCB, 0); // delay already consumed for setting DTR
 }
 
@@ -566,7 +566,7 @@ void DaliComm::lsbOf16BitQueryReceived(uint16_t aResult16, Dali16BitValueQueryRe
 
 void DaliComm::daliSendDtrAnd16BitQuery(DaliAddress aAddress, DaliCommand aQueryCommand, uint8_t aDTRValue, Dali16BitValueQueryResultCB aResultCB, int aWithDelay)
 {
-  daliSend(DALICMD_SET_DTR, aDTRValue, NULL, aWithDelay);
+  daliSend(DALICMD_SET_DTR, aDTRValue, NoOP, aWithDelay);
   daliSend16BitQuery(aAddress, aQueryCommand, aResultCB, 0); // delay already consumed for setting DTR
 }
 
@@ -1032,8 +1032,8 @@ private:
     // Terminate any special modes first
     daliComm.daliSend(DALICMD_TERMINATE, 0x00);
     // initialize entire system for random address selection process. Unless full scan explicitly requested, only unaddressed devices will be included
-    daliComm.daliSendTwice(DALICMD_INITIALISE, fullScanOnlyIfNeeded ? 0xFF : 0x00, NULL, 100*MilliSecond); // 0xFF = only those w/o short address
-    daliComm.daliSendTwice(DALICMD_RANDOMISE, 0x00, NULL, 100*MilliSecond);
+    daliComm.daliSendTwice(DALICMD_INITIALISE, fullScanOnlyIfNeeded ? 0xFF : 0x00, NoOP, 100*MilliSecond); // 0xFF = only those w/o short address
+    daliComm.daliSendTwice(DALICMD_RANDOMISE, 0x00, NoOP, 100*MilliSecond);
     // start search at lowest address
     restarts = 0;
     // - as specs say DALICMD_RANDOMISE might need 100mS until new random addresses are ready, wait a little before actually starting

@@ -842,7 +842,7 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
           // apply the values
           OLOG(LOG_NOTICE, "processControlValue(%s, %f) completed -> requests applying channels now", controlValueName.c_str(), value);
           stopSceneActions();
-          requestApplyingChannels(NULL, false);
+          requestApplyingChannels(NoOP, false);
         }
       }
     }
@@ -891,7 +891,7 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
         ApiValuePtr propValue = ch->newObject();
         propValue->add("channelStates", ch);
         // now access the property for write
-        accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, 3, NULL); // no callback
+        accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, 3, NoOP); // no callback
         // restore the transition time
         getOutput()->mTransitionTime = oldTT;
       }
@@ -924,7 +924,7 @@ void Device::hasVanished(bool aForgetParams)
   reportVanished();
   // then disconnect it in software
   // Note that disconnect() might delete the Device object (so 'this' gets invalid)
-  disconnect(aForgetParams, NULL);
+  disconnect(aForgetParams, NoOP);
 }
 
 
@@ -1262,14 +1262,14 @@ void Device::applyingChannelsComplete()
     if (mAppliedOrSupersededCB) {
       FOCUSLOG("- confirming apply (really) finalized (ticket #%ld)", ticketNo);
       cb = mAppliedOrSupersededCB;
-      mAppliedOrSupersededCB = NULL; // ready for possibly taking new callback in case current callback should request another change
+      mAppliedOrSupersededCB = NoOP; // ready for possibly taking new callback in case current callback should request another change
       cb(); // call back now, values have been superseded
     }
     // check for independent operation waiting for apply complete
     if (mApplyCompleteCB) {
       FOCUSLOG("- confirming apply (really) finalized to waitForApplyComplete() client (ticket #%ld)", ticketNo);
       cb = mApplyCompleteCB;
-      mApplyCompleteCB = NULL;
+      mApplyCompleteCB = NoOP;
       cb();
     }
     FOCUSLOG("- confirmed apply (really) finalized (ticket #%ld)", ticketNo);
@@ -1339,7 +1339,7 @@ void Device::updatingChannelsComplete()
     if (mUpdatedOrCachedCB) {
       FOCUSLOG("- confirming channels updated from hardware (= calling callback now)");
       SimpleCB cb = mUpdatedOrCachedCB;
-      mUpdatedOrCachedCB = NULL; // ready for possibly taking new callback in case current callback should request another change
+      mUpdatedOrCachedCB = NoOP; // ready for possibly taking new callback in case current callback should request another change
       cb(); // call back now, cached values are either updated from hardware or superseded by pending updates TO hardware
       FOCUSLOG("- confirmed channels updated from hardware (= callback has possibly launched apply already and returned now)");
     }
@@ -1632,7 +1632,7 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
 
 void Device::callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce)
 {
-  dimChannelExecutePrepared(NULL, ntfy_dimchannel);
+  dimChannelExecutePrepared(NoOP, ntfy_dimchannel);
   callScenePrepare2(aPreparedCB, aScene, aForce);
 }
 
@@ -1776,7 +1776,7 @@ void Device::confirmSceneActionsComplete()
 {
   if (mSceneActionCompleteCB) {
     SimpleCB cb = mSceneActionCompleteCB;
-    mSceneActionCompleteCB = NULL;
+    mSceneActionCompleteCB = NoOP;
     OLOG(LOG_INFO, "- confirming scene actions complete");
     cb();
   }
@@ -1870,7 +1870,7 @@ void Device::undoScene(SceneNo aSceneNo)
       mOutput->applySceneToChannels(mPreviousState, Infinite); // no transition time override
       // apply the values now, not dimming
       if (prepareSceneApply(mPreviousState)) {
-        requestApplyingChannels(NULL, false);
+        requestApplyingChannels(NoOP, false);
       }
     }
   }
@@ -1904,7 +1904,7 @@ void Device::callSceneMin(SceneNo aSceneNo)
         mOutput->onAtMinBrightness(scene);
         // apply the values now, not dimming
         if (prepareSceneApply(scene)) {
-          requestApplyingChannels(NULL, false);
+          requestApplyingChannels(NoOP, false);
         }
       }
     }
@@ -2481,7 +2481,7 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
   ) {
     // apply new channel values to hardware, not dimming
     mVdcP->cancelNativeActionUpdate(); // still delayed native scene updates must be cancelled before changing channel values
-    requestApplyingChannels(NULL, false);
+    requestApplyingChannels(NoOP, false);
   }
   return inherited::writtenProperty(aMode, aPropertyDescriptor, aDomain, aContainer);
 }

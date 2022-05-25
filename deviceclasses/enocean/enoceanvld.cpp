@@ -357,7 +357,7 @@ void EnoceanD201XXHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     }
     if (syncChannelCB) {
       SimpleCB cb = syncChannelCB;
-      syncChannelCB = NULL;
+      syncChannelCB = NoOP;
       cb();
     }
   }
@@ -417,7 +417,7 @@ void EnoceanD201XXDevice::configureD201XX()
   (0<<6) | // Bit 6: PF: disable power failure detection for now
   (2<<4) | // Bits 5..4: default state: 0=off, 1=100% on, 2=previous state, 3=not used
   (1<<0); // Bits 3..0: dim timer 0, fast, use min = 0.5sec, 0..15 = 0sec..7.5sec (0.5 sec/digit)
-  sendCommand(packet, NULL);
+  sendCommand(packet, NoOP);
 }
 
 
@@ -487,7 +487,7 @@ void EnoceanD201XXDevice::updateOutput(uint8_t aPercentOn, uint8_t aDimTimeSelec
   (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
   ((aDimTimeSelector & 0x07)<<5);
   packet->radioUserData()[2] = aPercentOn; // 0=off, 1..100 = 1..100% on
-  sendCommand(packet, NULL);
+  sendCommand(packet, NoOP);
 }
 
 
@@ -504,7 +504,7 @@ void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
     packet->setRadioDestination(getAddress());
     packet->radioUserData()[0] = 0x03; // CMD 0x3 - Actuator Status Query
     packet->radioUserData()[1] = (getSubDevice() & 0x1F); // Bits 0..4: output channel number (1E & 1F reserved)
-    sendCommand(packet, NULL);
+    sendCommand(packet, NoOP);
     return;
   }
   inherited::syncChannelValues(aDoneCB);

@@ -190,7 +190,7 @@ namespace p44 {
 
     /// clear all callbacks
     /// @note this is important because handlers might cause retain cycles when they have smart ptr arguments
-    virtual void clearCallbacks() { apiConnectionStatusHandler = NULL; inherited::clearCallbacks(); }
+    virtual void clearCallbacks() { apiConnectionStatusHandler = NoOP; inherited::clearCallbacks(); }
 
     /// get a new API value suitable for connections on this server
     /// @return new API value of suitable internal implementation to be with connections on this server

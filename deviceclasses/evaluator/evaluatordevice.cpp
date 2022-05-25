@@ -217,7 +217,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     ScriptObjPtr res;
     // - on condition (or calculation for sensors)
     cond = checkResult->newObject();
-    res = evaluatorSettings()->mOnCondition.run(initial|synchronously, NULL, ScriptObjPtr(), 2*Second);
+    res = evaluatorSettings()->mOnCondition.run(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
     cond->add("expression", checkResult->newString(evaluatorSettings()->mOnCondition.getSource()));
     if (!res->isErr()) {
       cond->add("result", cond->newScriptValue(res));
@@ -243,7 +243,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
         LOG(LOG_INFO, "- offCondition is empty -> disabled");
       }
       else {
-        res = evaluatorSettings()->mOffCondition.run(initial|synchronously, NULL, ScriptObjPtr(), 2*Second);
+        res = evaluatorSettings()->mOffCondition.run(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
         if (!res->isErr()) {
           cond->add("result", cond->newScriptValue(res));
           cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));

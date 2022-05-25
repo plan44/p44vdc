@@ -978,7 +978,7 @@ void EnoceanVdc::handleTestRadioPacket(StatusCB aCompletedCB, Esp3PacketPtr aEsp
   if (Error::isOK(aError)) {
     if (aEsp3PacketPtr->eepRorg()==rorg_RPS && aEsp3PacketPtr->radioDBm()>MIN_LEARN_DBM && enoceanComm.modemAppVersion()>0) {
       // uninstall handler
-      enoceanComm.setRadioPacketHandler(NULL);
+      enoceanComm.setRadioPacketHandler(NoOP);
       // seen both watchdog response (modem works) and independent RPS telegram (RF is ok)
       OLOG(LOG_NOTICE,
         "- modem info: appVersion=0x%08X, apiVersion=0x%08X, modemAddress=0x%08X, idBase=0x%08X",

@@ -453,13 +453,13 @@ void ShadowBehaviour::dimBlind(MovementChangeCB aMovementCB, VdcDimMode aDimMode
   if (aDimMode==dimmode_stop) {
     // simply stop
     movementCB = aMovementCB; // install new
-    stop(NULL);
+    stop(NoOP);
   }
   else {
     if (movementCB) {
       // already running - just consider stopped to sample current positions
       blindState = blind_idle;
-      stopped(NULL);
+      stopped(NoOP);
     }
     // install new callback (likely same as before, if any)
     movementCB = aMovementCB;
@@ -475,7 +475,7 @@ void ShadowBehaviour::dimBlind(MovementChangeCB aMovementCB, VdcDimMode aDimMode
     }
     // start moving
     blindState = blind_dimming;
-    startMoving(stopIn, NULL);
+    startMoving(stopIn, NoOP);
   }
 }
 
@@ -590,7 +590,7 @@ void ShadowBehaviour::processStopped(SimpleCB aApplyDoneCB)
 void ShadowBehaviour::allDone(SimpleCB aApplyDoneCB)
 {
   moveTimerStop();
-  movementCB = NULL;
+  movementCB = NoOP;
   blindState = blind_idle;
   OLOG(LOG_INFO, "End of movement sequence, reached position=%.1f%%, angle=%.1f", referencePosition, referenceAngle);
   if (aApplyDoneCB) aApplyDoneCB();
@@ -764,7 +764,7 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
       FOCUSLOG("- is long move, should be interruptable -> confirming applied now");
       if (aApplyDoneCB) aApplyDoneCB();
       // - and prevent calling back again later
-      aApplyDoneCB = NULL;
+      aApplyDoneCB = NoOP;
     }
     FOCUSLOG("- move started, scheduling stop in %.3f Seconds", (double)aStopIn/Second);
     movingTicket.executeOnce(boost::bind(&ShadowBehaviour::endMove, this, remaining, aApplyDoneCB), aStopIn);
@@ -844,7 +844,7 @@ void ShadowBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 void ShadowBehaviour::stopSceneActions()
 {
   // stop
-  stop(NULL);
+  stop(NoOP);
   // let inherited stop as well
   inherited::stopSceneActions();
 }

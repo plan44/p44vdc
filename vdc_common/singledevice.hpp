@@ -653,7 +653,7 @@ namespace p44 {
 
   public:
 
-    DeviceProperties(SingleDevice &aSingleDevice) : singleDeviceP(&aSingleDevice), propertyChangeHandler(NULL) {};
+    DeviceProperties(SingleDevice &aSingleDevice) : singleDeviceP(&aSingleDevice), propertyChangeHandler(NoOP) {};
 
     /// set a property change handler
     void setPropertyChangedHandler(PropertyChangedCB aPropertyChangedHandler) { propertyChangeHandler = aPropertyChangedHandler; };

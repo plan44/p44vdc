@@ -813,7 +813,7 @@ bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
     VdcApiConnectionPtr api = getSessionConnection();
     if (api) {
       // send an identify notification
-      aDevice.sendRequest("identify", ApiValuePtr(), NULL);
+      aDevice.sendRequest("identify", ApiValuePtr(), NoOP);
     }
     return true; // no normal action, prevent further processing
   }

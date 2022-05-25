@@ -305,47 +305,47 @@ namespace p44 {
     /// @param aDali2 second DALI byte
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSend(uint8_t aDali1, uint8_t aDali2, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSend(uint8_t aDali1, uint8_t aDali2, DaliCommandStatusCB aStatusCB = NoOP, int aWithDelay = -1);
 
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aPower Arc power
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendDirectPower(DaliAddress aAddress, uint8_t aPower, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendDirectPower(DaliAddress aAddress, uint8_t aPower, DaliCommandStatusCB aStatusCB = NoOP, int aWithDelay = -1);
 
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendCommand(DaliAddress aAddress, DaliCommand aCommand, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendCommand(DaliAddress aAddress, DaliCommand aCommand, DaliCommandStatusCB aStatusCB = NoOP, int aWithDelay = -1);
 
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aDTRValue the value to be sent to DTR before executing aCommand
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendDtrAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendDtrAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NoOP, int aWithDelay = -1);
 
     /// Send two byte DALI bus command twice within 100ms
     /// @param aDali1 first DALI byte
     /// @param aDali2 second DALI byte
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendTwice(uint8_t aDali1, uint8_t aDali2, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendTwice(uint8_t aDali1, uint8_t aDali2, DaliCommandStatusCB aStatusCB = NoOP, int aWithDelay = -1);
 
     /// Send DALI config command (send twice within 100ms)
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendConfigCommand(DaliAddress aAddress, DaliCommand aCommand, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendConfigCommand(DaliAddress aAddress, DaliCommand aCommand, DaliCommandStatusCB aStatusCB = NoOP, int aWithDelay = -1);
 
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aDTRValue the value to be sent to DTR before executing aCommand
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSendDtrAndConfigCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSendDtrAndConfigCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aDTRValue, DaliCommandStatusCB aStatusCB = NoOP, int aWithDelay = -1);
 
     /// callback function for daliSendXXX methods returning data
     typedef boost::function<void (bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError, bool aRetried)> DaliQueryResultCB;
@@ -377,14 +377,14 @@ namespace p44 {
     /// @param aValue16 a 16-bit value to be put into DTR1 (MSB) and DTR (LSB) before sending the command
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSend16BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint16_t aValue16, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSend16BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint16_t aValue16, DaliCommandStatusCB aStatusCB = NoOP, int aWithDelay = -1);
 
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)
     /// @param aCommand command (LSB=DALI command, MSB=device type to be selected first (0:no device type, 0xFF:DT0, other x=DTx)
     /// @param aValue0,1,2 3 8-bit values to be put into DTR, DTR1, DTR2 before sending the command
     /// @param aStatusCB status callback
     /// @param aWithDelay if>0, time (in microseconds) to delay BEFORE sending the command
-    void daliSend3x8BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aValue0, uint8_t aValue1, uint8_t aValue2, DaliCommandStatusCB aStatusCB = NULL, int aWithDelay = -1);
+    void daliSend3x8BitValueAndCommand(DaliAddress aAddress, DaliCommand aCommand, uint8_t aValue0, uint8_t aValue1, uint8_t aValue2, DaliCommandStatusCB aStatusCB = NoOP, int aWithDelay = -1);
 
     /// Send DALI query for 16-bit value, when MSB is returned by query and LSB is returned in DTR
     /// @param aAddress DALI address (device short address, or group address + DaliGroup, or DaliBroadcast)

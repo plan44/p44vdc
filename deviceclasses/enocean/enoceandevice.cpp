@@ -291,7 +291,7 @@ void EnoceanDevice::sendOutgoingUpdate()
       // set destination
       outgoingEsp3Packet->setRadioDestination(enoceanAddress); // the target is the device I manage
       // send it
-      sendCommand(outgoingEsp3Packet, NULL);
+      sendCommand(outgoingEsp3Packet, NoOP);
     }
   }
 }

@@ -1790,7 +1790,7 @@ void EnoceanComm::smartAckLearnMode(bool aEnabled, MLMicroSeconds aTimeout)
   saPacket->data()[5] = (toMs>>8) & 0xFF;
   saPacket->data()[6] = toMs & 0xFF;
   // issue command
-  sendCommand(saPacket, NULL); // we don't need the response (but there is one)
+  sendCommand(saPacket, NoOP); // we don't need the response (but there is one)
 }
 
 
@@ -1832,7 +1832,7 @@ void EnoceanComm::confirmUTE(uint8_t aConfirmCode, Esp3PacketPtr aUTEPacket)
     uteRespPacket->setRadioDestination(aUTEPacket->radioSender());
     // now send
     OLOG(LOG_INFO, "Sending UTE teach-in response for EEP %06X", EEP_PURE(uteRespPacket->eepProfile()));
-    sendCommand(uteRespPacket, NULL);
+    sendCommand(uteRespPacket, NoOP);
   }
 }
 

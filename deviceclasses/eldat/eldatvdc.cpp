@@ -460,7 +460,7 @@ void EldatVdc::handleTestMessage(StatusCB aCompletedCB, string aEldatMessage, Er
       LOG(LOG_NOTICE, "Received REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
       if (rssi>=MIN_LEARN_DBM) {
         // uninstall handler
-        eldatComm.setReceivedMessageHandler(NULL);
+        eldatComm.setReceivedMessageHandler(NoOP);
         // seen both init response and independent REC message with sufficient RSSI (RF is ok)
         aCompletedCB(ErrorPtr());
         // done

@@ -294,7 +294,7 @@ void LightBehaviour::stopSceneActions()
 void LightBehaviour::identifyToUser()
 {
   // simple, non-parametrized blink, 6 seconds, 1.5 second period, 0.75 second on
-  blink(6*Second, LightScenePtr(), NULL, 1.5*Second, 50);
+  blink(6*Second, LightScenePtr(), NoOP, 1.5*Second, 50);
 }
 
 
@@ -344,7 +344,7 @@ void LightBehaviour::blink(MLMicroSeconds aDuration, LightScenePtr aParamScene, 
   // confirm end of previous blink if any handler was set for that
   if (blinkDoneHandler) {
     SimpleCB h = blinkDoneHandler;
-    blinkDoneHandler = NULL;
+    blinkDoneHandler = NoOP;
     h();
   }
   // save new handler now
@@ -392,12 +392,12 @@ void LightBehaviour::blinkHandler(MLMicroSeconds aEndTime, bool aState, MLMicroS
     if (blinkRestoreScene) {
       loadChannelsFromScene(blinkRestoreScene);
       blinkRestoreScene.reset();
-      mDevice.requestApplyingChannels(NULL, false); // apply to hardware, not dimming
+      mDevice.requestApplyingChannels(NoOP, false); // apply to hardware, not dimming
     }
     // done, call end handler if any
     if (blinkDoneHandler) {
       SimpleCB h = blinkDoneHandler;
-      blinkDoneHandler = NULL;
+      blinkDoneHandler = NoOP;
       h();
     }
     return;
@@ -413,7 +413,7 @@ void LightBehaviour::blinkHandler(MLMicroSeconds aEndTime, bool aState, MLMicroS
     brightness->markClean(); // do not save blink states
   }
   // apply to hardware
-  mDevice.requestApplyingChannels(NULL, false); // not dimming
+  mDevice.requestApplyingChannels(NoOP, false); // not dimming
   aState = !aState; // toggle
   // schedule next event
   blinkTicket.executeOnce(

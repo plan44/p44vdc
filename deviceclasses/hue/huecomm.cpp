@@ -178,7 +178,7 @@ OperationPtr HueApiOperation::finalize()
 {
   if (mResultHandler) {
     mResultHandler(mData, mError);
-    mResultHandler = NULL; // call once only
+    mResultHandler = NoOP; // call once only
   }
   return inherited::finalize();
 }
@@ -193,7 +193,7 @@ void HueApiOperation::abortOperation(ErrorPtr aError)
     }
     if (mResultHandler && aError) {
       mResultHandler(JsonObjectPtr(), aError);
-      mResultHandler = NULL; // call once only
+      mResultHandler = NoOP; // call once only
     }
   }
   inherited::abortOperation(aError);
