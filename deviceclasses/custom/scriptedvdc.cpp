@@ -94,7 +94,7 @@ ScriptedDeviceObj::ScriptedDeviceObj(DevicePtr aDevice) : inherited(aDevice)
 
 ScriptedDevice::ScriptedDevice(Vdc *aVdcP, const string aDefaultUniqueId, bool aSimpleText) :
   inherited(aVdcP, aSimpleText),
-  aDefaultUniqueId(aDefaultUniqueId),
+  mDefaultUniqueId(aDefaultUniqueId),
   mScriptedDeviceRowID(0),
   mScriptedDeviceLookup(*this),
   mImplementation(*this)

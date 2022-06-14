@@ -95,7 +95,7 @@ namespace p44 {
     ScriptedDeviceLookup mScriptedDeviceLookup;
     ScriptedDeviceImplementation mImplementation;
 
-    string aDefaultUniqueId; ///< the default unique ID, generated at creation
+    string mDefaultUniqueId; ///< the default unique ID, generated at creation
     long long mScriptedDeviceRowID; ///< the ROWID this device was created from (0=none)
     string mInitMessageText; ///< the init message text (for reference)
 
@@ -170,7 +170,7 @@ namespace p44 {
     virtual void markClean() P44_OVERRIDE;
 
     /// return a default unique id for the device
-    virtual string defaultUniqueId() P44_OVERRIDE { return aDefaultUniqueId; };
+    virtual string defaultUniqueId() P44_OVERRIDE { return mDefaultUniqueId; };
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
