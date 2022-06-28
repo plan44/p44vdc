@@ -877,7 +877,7 @@ bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsCl
   #if ENABLE_LOCALCONTROLLER
   if (localController) {
     if (localController->processButtonClick(aButtonBehaviour, aClickType)) {
-      LOG(LOG_NOTICE, "localcontroller has handled clicktype %d from Button[%zu] '%s' in %s", aClickType, aButtonBehaviour.mIndex, aButtonBehaviour.getHardwareName().c_str(), aButtonBehaviour.mDevice.shortDesc().c_str());
+      LOG(aClickType!=ct_hold_repeat ? LOG_NOTICE : LOG_INFO, "localcontroller has handled clicktype %d from Button[%zu] '%s' in %s", aClickType, aButtonBehaviour.mIndex, aButtonBehaviour.getHardwareName().c_str(), aButtonBehaviour.mDevice.shortDesc().c_str());
       return true; // handled
     }
   }

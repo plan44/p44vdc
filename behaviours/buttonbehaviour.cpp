@@ -598,9 +598,9 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
   // button press is considered a (regular!) user action, have it checked globally first
   if (!mDevice.getVdcHost().signalDeviceUserAction(mDevice, true)) {
     // button press not consumed on global level, forward to upstream dS
-    OLOG(LOG_NOTICE, "pushes value = %d, clickType %d", buttonPressed, aClickType);
-    // issue a state property push
-    pushBehaviourState();
+    if (pushBehaviourState()) {
+      OLOG(clickType==ct_hold_repeat ? LOG_INFO : LOG_NOTICE, "successfully pushed state = %d, clickType %d", buttonPressed, aClickType);
+    }
     #if ENABLE_LOCALCONTROLLER
     #if ENABLE_P44SCRIPT
     // send event
