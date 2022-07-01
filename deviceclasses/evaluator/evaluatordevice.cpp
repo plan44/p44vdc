@@ -273,7 +273,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       state = vp->boolValue() ? yes : no;
     }
     // now test
-    evaluatorSettings()->mEvaluatorContext->setMemberByName("result", new NumericValue(state==yes));
+    evaluatorSettings()->mEvaluatorContext->setMemberByName("result", new BoolValue(state==yes));
     evaluatorSettings()->mAction.run(stopall, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1), ScriptObjPtr(), Infinite);
     return ErrorPtr();
   }
@@ -484,7 +484,7 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
 
 void EvaluatorDevice::executeActions()
 {
-  evaluatorSettings()->mEvaluatorContext->setMemberByName("result", new NumericValue(mEvaluatorState==yes));
+  evaluatorSettings()->mEvaluatorContext->setMemberByName("result", new BoolValue(mEvaluatorState==yes));
   evaluatorSettings()->mAction.run(inherit, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), ScriptObjPtr(), Infinite);
 }
 

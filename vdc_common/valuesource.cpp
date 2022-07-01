@@ -151,7 +151,7 @@ const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMe
     else val = new AnnotatedNullValue("unseen");
   }
   else if (uequals(aName, "valid")) {
-    val = new NumericValue(mLastUpdate!=Never);
+    val = new BoolValue(mLastUpdate!=Never);
   }
   else if (uequals(aName, "oplevel")) {
     if (mOpLevel>=0) val = new NumericValue(mOpLevel);
