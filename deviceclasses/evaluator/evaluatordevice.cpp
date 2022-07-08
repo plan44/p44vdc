@@ -416,11 +416,11 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
     // one condition side getting false while the other side is ALREADY true must be handled, too
     if (!decisionMade && newConditionState==no) {
       // check if the opposite is true
-      Tristate otherConditionState = (aOnCondition ? evaluatorSettings()->mOffCondition : evaluatorSettings()->mOnCondition).lastBoolResult();
+      Tristate otherConditionState = (aOnCondition ? evaluatorSettings()->mOffCondition : evaluatorSettings()->mOnCondition).currentBoolState();
       if (otherConditionState==yes) {
         mEvaluatorState = aOnCondition ? no : yes; // the OTHER condition causes a state change!
         if (mEvaluatorState!=prevState) {
-          OLOG(LOG_INFO, "%sCondition was already true while %sCondition gets false -> switching %s", aOnCondition ? "off" : "om", aOnCondition ? "on" : "off", mEvaluatorState==yes ? "ON" : "OFF");
+          OLOG(LOG_INFO, "%sCondition was already true while %sCondition gets false -> switching %s", aOnCondition ? "off" : "on", aOnCondition ? "on" : "off", mEvaluatorState==yes ? "ON" : "OFF");
           decisionMade = true;
         }
       }
