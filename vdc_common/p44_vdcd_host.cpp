@@ -237,6 +237,12 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     StandardScriptingDomain::sharedDomain().registerMemberLookup(new FeatureApiLookup);
   }
   #endif
+  #if ENABLE_JSONBRIDGEAPI
+  // start bridge API, if we have one
+  if (bridgeApiServer) {
+    bridgeApiServer->startServer(boost::bind(&P44VdcHost::bridgeApiConnectionHandler, this, _1), 3);
+  }
+  #endif
   // now init rest of vdc host
   inherited::initialize(aCompletedCB, aFactoryReset);
 }
@@ -487,7 +493,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         // Notes:
         // - if dSUID is specified invalid or empty, the vdc host itself is addressed.
         // - use x-p44-vdcs and x-p44-devices properties to find dsuids
-        aError = processVdcRequest(aJsonComm, request);
+        aError = processVdcRequest(aJsonComm, request, false);
       }
       #if ENABLE_LEGACY_P44CFGAPI
       else if (apiselector=="p44") {
@@ -534,6 +540,36 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
 }
 
 
+#if ENABLE_LEGACY_P44CFGAPI
+
+// lecacy access to plan44 extras that historically were not part of the vdc API
+ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aRequest)
+{
+  ErrorPtr err;
+  JsonObjectPtr m = aRequest->get("method");
+  if (!m) {
+    err = Error::err<P44VdcError>(400, "missing 'method'");
+  }
+  else {
+    string method = "x-p44-" + m->stringValue();
+    ApiValuePtr params = JsonApiValue::newValueFromJson(aRequest);
+    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm));
+    // directly handle as vdchost method
+    err = handleMethod(request, method, params);
+  }
+  // returning NULL means caller should not do anything more
+  // returning an Error object (even ErrorOK) means caller should return status
+  return err;
+}
+
+#endif // ENABLE_LEGACY_P44CFGAPI
+#endif // ENABLE_JSONCFGAPI
+
+
+#if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
+
+// MARK: - methods for JSON APIs
+
 void P44VdcHost::sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError)
 {
   // create response
@@ -559,7 +595,7 @@ void P44VdcHost::sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult
 
 
 // access to vdc API methods and notifications via web requests
-ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aRequest)
+ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aRequest, bool aBridgeApi)
 {
   ErrorPtr err;
   string cmd;
@@ -583,7 +619,7 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
     // get params
     // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
     ApiValuePtr params = JsonApiValue::newValueFromJson(aRequest);
-    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm));
+    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm, aBridgeApi));
     if (isMethod) {
       // create request
       // check for old-style name/index and generate basic query (1 or 2 levels)
@@ -621,32 +657,7 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
 }
 
 
-#if ENABLE_LEGACY_P44CFGAPI
-
-// lecacy access to plan44 extras that historically were not part of the vdc API
-ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aRequest)
-{
-  ErrorPtr err;
-  JsonObjectPtr m = aRequest->get("method");
-  if (!m) {
-    err = Error::err<P44VdcError>(400, "missing 'method'");
-  }
-  else {
-    string method = "x-p44-" + m->stringValue();
-    ApiValuePtr params = JsonApiValue::newValueFromJson(aRequest);
-    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm));
-    // directly handle as vdchost method
-    err = handleMethod(request, method, params);
-  }
-  // returning NULL means caller should not do anything more
-  // returning an Error object (even ErrorOK) means caller should return status
-  return err;
-}
-
-#endif // ENABLE_LEGACY_P44CFGAPI
-
-
-// MARK: - config API - P44JsonApiConnection
+// MARK: - P44JsonApiConnection
 
 P44JsonApiConnection::P44JsonApiConnection()
 {
@@ -660,11 +671,12 @@ ApiValuePtr P44JsonApiConnection::newApiValue()
 }
 
 
-// MARK: - config API - P44JsonApiRequest
+// MARK: - P44JsonApiRequest
 
-P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aJsonComm)
+P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aJsonComm, bool aBridgeApi) :
+  mBridgeApi(aBridgeApi),
+  mJsonComm(aJsonComm)
 {
-  jsonComm = aJsonComm;
 }
 
 
@@ -676,14 +688,14 @@ VdcApiConnectionPtr P44JsonApiRequest::connection()
 
 ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
 {
-  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) result: %s", aResult ? aResult->description().c_str() : "<none>");
+  LOG(LOG_DEBUG, "%s <- vdcd (JSON) result: %s", mBridgeApi ? "bridge" : "cfg", aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   if (result) {
-    P44VdcHost::sendCfgApiResponse(jsonComm, result->jsonObject(), ErrorPtr());
+    P44VdcHost::sendCfgApiResponse(mJsonComm, result->jsonObject(), ErrorPtr());
   }
-  else {
-    // always return SOMETHING
-    P44VdcHost::sendCfgApiResponse(jsonComm, JsonObject::newNull(), ErrorPtr());
+  else if (!mBridgeApi) {
+    // cfg API: always return SOMETHING
+    P44VdcHost::sendCfgApiResponse(mJsonComm, JsonObject::newNull(), ErrorPtr());
   }
   return ErrorPtr();
 }
@@ -695,12 +707,54 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
   if (!aError) {
     aError = Error::ok();
   }
-  LOG(LOG_DEBUG, "cfg <- vdcd (JSON) error: %ld (%s)", aError->getErrorCode(), aError->getErrorMessage());
-  P44VdcHost::sendCfgApiResponse(jsonComm, JsonObjectPtr(), aError);
+  LOG(LOG_DEBUG, "%s <- vdcd (JSON) error: %ld (%s)", mBridgeApi ? "bridge" : "cfg", aError->getErrorCode(), aError->getErrorMessage());
+  P44VdcHost::sendCfgApiResponse(mJsonComm, JsonObjectPtr(), aError);
   return ErrorPtr();
 }
 
-#endif // ENABLE_JSONCFGAPI
+#endif // ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
+
+
+#if ENABLE_JSONBRIDGEAPI
+
+// MARK: - Bridge config API
+
+void P44VdcHost::enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllowed)
+{
+  if (!bridgeApiServer) {
+    // can be enabled only once
+    bridgeApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
+    bridgeApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, AF_INET);
+    bridgeApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
+  }
+}
+
+
+SocketCommPtr P44VdcHost::bridgeApiConnectionHandler(SocketCommPtr aServerSocketCommP)
+{
+  JsonCommPtr conn = JsonCommPtr(new JsonComm(MainLoop::currentMainLoop()));
+  conn->setMessageHandler(boost::bind(&P44VdcHost::bridgeApiRequestHandler, this, conn, _1, _2));
+  conn->setClearHandlersAtClose(); // close must break retain cycles so this object won't cause a mem leak
+  return conn;
+}
+
+
+void P44VdcHost::bridgeApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonRequest)
+{
+  ErrorPtr err;
+  signalActivity(); // bridge API calls are activity as well
+  if (Error::isOK(aError)) {
+    // not JSON level error, try to process
+    LOG(LOG_DEBUG, "bridge -> vdcd (JSON) request received: %s", aJsonRequest->c_strValue());
+    aError = processVdcRequest(aJsonComm, aJsonRequest, true);
+  }
+  // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
+  if (aError) {
+    sendCfgApiResponse(aJsonComm, JsonObjectPtr(), aError);
+  }
+}
+
+#endif // ENABLE_JSONBRIDGEAPI
 
 
 // MARK: - P44 specific vdchost level methods

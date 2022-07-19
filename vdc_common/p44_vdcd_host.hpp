@@ -62,7 +62,7 @@ namespace p44 {
   };
 
 
-  #if ENABLE_JSONCFGAPI
+  #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
 
   /// Dummy config API "connection" object
   class P44JsonApiConnection : public VdcApiConnection
@@ -84,7 +84,7 @@ namespace p44 {
     /// Cannot send a API request
     /// @return empty or Error object in case of error
     virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE
-      { return TextError::err("cant send request to config API"); };
+      { return TextError::err("can't send request to API"); };
 
     /// request closing connection after last message has been sent
     virtual void closeAfterSend() P44_OVERRIDE {};
@@ -99,12 +99,13 @@ namespace p44 {
   class P44JsonApiRequest : public VdcApiRequest
   {
     typedef VdcApiRequest inherited;
-    JsonCommPtr jsonComm;
+    JsonCommPtr mJsonComm;
+    bool mBridgeApi;
 
   public:
 
     /// constructor
-    P44JsonApiRequest(JsonCommPtr aJsonComm);
+    P44JsonApiRequest(JsonCommPtr aJsonComm, bool aBridgeApi);
 
     /// return the request ID as a string
     /// @return request ID as string
@@ -131,7 +132,7 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;
 
-  #endif // ENABLE_JSONCFGAPI
+  #endif // ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
 
 
   #if ENABLE_UBUS
@@ -262,6 +263,10 @@ namespace p44 {
     UbusServerPtr ubusApiServer; ///< ubus API for openwrt web interface
     #endif
 
+    #if ENABLE_JSONBRIDGEAPI
+    SocketCommPtr bridgeApiServer; ///< JSON API for bridge access
+    #endif
+
   public:
 
     #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
@@ -287,6 +292,14 @@ namespace p44 {
     void enableUbusApi();
     #endif
 
+    #if ENABLE_JSONBRIDGEAPI
+    /// enable bridge API
+    /// @param aServiceOrPort port number or service string
+    /// @param aNonLocalAllowed if set, non-local clients are allowed to connect to the bridge API
+    /// @note API server will be started only at initialize()
+    void enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllowed);
+    #endif
+
 		/// perform self testing
     /// @param aCompletedCB will be called when the entire self test is done
     /// @param aButton button for interacting with tests
@@ -305,7 +318,7 @@ namespace p44 {
     /// @param aFactoryReset if set, database will be reset
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
-    #if ENABLE_JSONCFGAPI
+    #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
     static void sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError);
     #endif
 
@@ -315,10 +328,13 @@ namespace p44 {
 
   private:
 
+    #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
+    void configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonObject);
+    ErrorPtr processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aRequest, bool aBridgeApi);
+    #endif
+
     #if ENABLE_JSONCFGAPI
     SocketCommPtr configApiConnectionHandler(SocketCommPtr aServerSocketComm);
-    void configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonObject);
-    ErrorPtr processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
     #if ENABLE_LEGACY_P44CFGAPI
     ErrorPtr processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
     #endif
@@ -326,6 +342,11 @@ namespace p44 {
 
     #if ENABLE_UBUS
     void ubusApiRequestHandler(UbusRequestPtr aUbusRequest);
+    #endif
+
+    #if ENABLE_JSONBRIDGEAPI
+    SocketCommPtr bridgeApiConnectionHandler(SocketCommPtr aServerSocketCommP);
+    void bridgeApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonRequest);
     #endif
 
     void learnHandler(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError);
