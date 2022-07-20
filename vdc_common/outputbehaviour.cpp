@@ -235,12 +235,49 @@ double OutputBehaviour::channelValueAccordingToMode(double aOutputValue, int aCh
 }
 
 
+bool OutputBehaviour::pushChannelStates(bool aDS, bool aBridges)
+{
+  bool requestedPushDone = true;
+
+  if (aDS) {
+    requestedPushDone = false; // TODO: remove and re-enable dead code below, should dS-vDC-API ever evolve to allow this
+    /*
+    // push to vDC API
+    VdcApiConnectionPtr api = mDevice.getVdcHost().getVdsmSessionConnection();
+    if (api) {
+     ApiValuePtr query = api->newApiValue();
+     query->setType(apivalue_object);
+     query->add("channelStates", query->newValue(apivalue_null));
+     if (!mDevice.pushNotification(api, query, ApiValuePtr())) requestedPushDone = false;
+    }
+    else {
+      requestedPushDone = false;
+    }
+    */
+  }
+  #if ENABLE_JSONBRIDGEAPI
+  if (aBridges && mDevice.isBridged()) {
+    // push to bridges
+    VdcApiConnectionPtr api = mDevice.getVdcHost().getBridgeApi();
+    if (api) {
+      ApiValuePtr query = api->newApiValue();
+      query->setType(apivalue_object);
+      query->add("channelStates", query->newValue(apivalue_null));
+      if (!mDevice.pushNotification(api, query, ApiValuePtr())) requestedPushDone = false;
+    }
+    else {
+      requestedPushDone = false;
+    }
+  }
+  #endif
+  // true if requested pushes are done or irrelevant (e.g. bridge push requested w/o bridging enabled at all)
+  return requestedPushDone;
+}
+
 
 
 
 // MARK: - scene handling
-
-
 
 // default loader for single-value outputs. Note that this is overridden by more complex behaviours such as light
 void OutputBehaviour::loadChannelsFromScene(DsScenePtr aScene)

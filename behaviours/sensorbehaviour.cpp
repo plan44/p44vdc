@@ -406,7 +406,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
   }
   if (doPush) {
     // push the new value
-    if (pushBehaviourState()) {
+    if (pushBehaviourState(true, true)) {
       lastPush = now;
       lastPushedValue = currentValue;
       OLOG(LOG_NOTICE, "successfully pushed value = %0.3f %s", lastPushedValue, getSensorUnitText().c_str());
@@ -416,7 +416,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
       }
       return true;
     }
-    else if (mDevice.isPublicDS()) {
+    else if (mDevice.isPublicDS() || mDevice.isBridged()) {
       OLOG(LOG_NOTICE, "could not be pushed");
     }
   }
@@ -427,7 +427,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
 void SensorBehaviour::reportFinalValue()
 {
   // push the current value (after awaiting minPushInterval)
-  if (pushBehaviourState()) {
+  if (pushBehaviourState(true, true)) {
     OLOG(LOG_NOTICE, "now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", currentValue, getSensorUnitText().c_str());
     lastPush = MainLoop::currentMainLoop().now();
     lastPushedValue = currentValue;

@@ -52,25 +52,50 @@ void DsBehaviour::setHardwareError(VdcHardwareError aHardwareError)
     // error status has changed
     mHardwareError = aHardwareError;
     mHardwareErrorUpdated = MainLoop::now();
-    // push the error status change
-    pushBehaviourState();
+    // push the error status change to dS and bridges
+    pushBehaviourState(true, true);
   }
 }
 
 
-bool DsBehaviour::pushBehaviourState()
+bool DsBehaviour::pushBehaviourState(bool aDS, bool aBridges)
 {
-  VdcApiConnectionPtr api = mDevice.getVdcHost().getSessionConnection();
-  if (api) {
-    ApiValuePtr query = api->newApiValue();
-    query->setType(apivalue_object);
-    ApiValuePtr subQuery = query->newValue(apivalue_object);
-    subQuery->add(getApiId(api->getApiVersion()), subQuery->newValue(apivalue_null));
-    query->add(string(getTypeName()).append("States"), subQuery);
-    return mDevice.pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
+  bool requestedPushDone = true;
+
+  if (aDS) {
+    // push to vDC API
+    VdcApiConnectionPtr api = mDevice.getVdcHost().getVdsmSessionConnection();
+    if (api) {
+      ApiValuePtr query = api->newApiValue();
+      query->setType(apivalue_object);
+      ApiValuePtr subQuery = query->newValue(apivalue_object);
+      subQuery->add(getApiId(api->getApiVersion()), subQuery->newValue(apivalue_null));
+      query->add(string(getTypeName()).append("States"), subQuery);
+      if (!mDevice.pushNotification(api, query, ApiValuePtr())) requestedPushDone = false;
+    }
+    else {
+      requestedPushDone = false;
+    }
   }
-  // could not push
-  return false;
+  #if ENABLE_JSONBRIDGEAPI
+  if (aBridges && mDevice.isBridged()) {
+    // push to bridges
+    VdcApiConnectionPtr api = mDevice.getVdcHost().getBridgeApi();
+    if (api) {
+      ApiValuePtr query = api->newApiValue();
+      query->setType(apivalue_object);
+      ApiValuePtr subQuery = query->newValue(apivalue_object);
+      subQuery->add(getApiId(api->getApiVersion()), subQuery->newValue(apivalue_null));
+      query->add(string(getTypeName()).append("States"), subQuery);
+      if (!mDevice.pushNotification(api, query, ApiValuePtr())) requestedPushDone = false;
+    }
+    else {
+      requestedPushDone = false;
+    }
+  }
+  #endif
+  // true if requested pushes are done or irrelevant (e.g. bridge push requested w/o bridging enabled at all)
+  return requestedPushDone;
 }
 
 

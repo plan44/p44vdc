@@ -788,7 +788,7 @@ ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, Api
     RescanMode mode = rescanmode_none;
     checkBoolParam(aParams, "incremental", incremental);
     // prevent more dangerous scans from vDC API
-    if (aRequest->connection()!=getVdcHost().getSessionConnection()) {
+    if (aRequest->connection()!=getVdcHost().getVdsmSessionConnection()) {
       checkBoolParam(aParams, "exhaustive", exhaustive);
       checkBoolParam(aParams, "reenumerate", reenumerate);
       checkBoolParam(aParams, "clearconfig", clear);

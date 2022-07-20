@@ -350,7 +350,7 @@ bool DynamicDeviceActions::pushActionChange(DeviceActionPtr aAction, bool aRemov
 {
   if (!aAction) return false;
   SingleDevice &sd = *aAction->singleDeviceP;
-  VdcApiConnectionPtr api = sd.getVdcHost().getSessionConnection();
+  VdcApiConnectionPtr api = sd.getVdcHost().getVdsmSessionConnection();
   SOLOG((sd), LOG_NOTICE, "%spushing: dynamic action '%s' was %s", api ? "" : "Not announced, not ", aAction->getId().c_str(), aRemoved ? "removed" : "added or changed");
   // try to push to connected vDC API client
   if (api) {
@@ -361,7 +361,7 @@ bool DynamicDeviceActions::pushActionChange(DeviceActionPtr aAction, bool aRemov
     subQuery->add(aAction->getId(), subQuery->newValue(apivalue_null));
     query->add(string("dynamicActionDescriptions"), subQuery);
     // let pushNotification execute the query and
-    return sd.pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion(), aRemoved);
+    return sd.pushNotification(api, query, ApiValuePtr(), aRemoved);
   }
   // no API, cannot not push
   return false;
@@ -1023,7 +1023,7 @@ bool DeviceState::pushWithEvent(DeviceEventPtr aEvent)
 
 bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
 {
-  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
+  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getVdsmSessionConnection();
   SOLOG((*singleDeviceP), LOG_NOTICE, "%spushing: state '%s' changed to '%s'", api ? "" : "Not announced, not ", stateId.c_str(), stateDescriptor->getStringValue().c_str());
   // update for every push attempt, as this are "events"
   lastPush = MainLoop::currentMainLoop().now();
@@ -1051,7 +1051,7 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
       events->add((*pos)->eventId, event);
       SOLOG((*singleDeviceP), LOG_NOTICE, "- pushing event '%s' along with state change", (*pos)->eventId.c_str());
     }
-    return singleDeviceP->pushNotification(query, events, VDC_API_DOMAIN, api->getApiVersion());
+    return singleDeviceP->pushNotification(api, query, events, VDC_API_DOMAIN);
   }
   else {
     for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
@@ -1392,7 +1392,7 @@ bool DeviceEvents::pushEvent(DeviceEventPtr aEvent)
 bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
 {
   // try to push to connected vDC API client
-  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
+  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getVdsmSessionConnection();
   if (!aEventList.empty()) {
     // add events
     SOLOG((*singleDeviceP), LOG_NOTICE, "%spushing: independent event(s):", api ? "" : "Not announced, not ");
@@ -1408,7 +1408,7 @@ bool DeviceEvents::pushEvents(DeviceEventsList aEventList)
         events->add((*pos)->eventId, event);
         SOLOG((*singleDeviceP), LOG_NOTICE, "- event '%s'", (*pos)->eventId.c_str());
       }
-      return singleDeviceP->pushNotification(ApiValuePtr(), events, VDC_API_DOMAIN, api->getApiVersion());
+      return singleDeviceP->pushNotification(api, ApiValuePtr(), events);
     }
     else {
       for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
@@ -1454,7 +1454,7 @@ ValueDescriptorPtr DeviceProperties::getProperty(const string aPropertyId)
 bool DeviceProperties::pushProperty(ValueDescriptorPtr aPropertyDesc)
 {
   // try to push to connected vDC API client
-  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getSessionConnection();
+  VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getVdsmSessionConnection();
   if (api) {
     // create query for device property to get pushed
     ApiValuePtr query = api->newApiValue();
@@ -1462,7 +1462,7 @@ bool DeviceProperties::pushProperty(ValueDescriptorPtr aPropertyDesc)
     ApiValuePtr subQuery = query->newValue(apivalue_object);
     subQuery->add(aPropertyDesc->getName(), subQuery->newValue(apivalue_null));
     query->add(string("deviceProperties"), subQuery);
-    return singleDeviceP->pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
+    return singleDeviceP->pushNotification(api, query, ApiValuePtr());
   }
   return false; // cannot push
 }

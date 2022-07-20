@@ -135,8 +135,10 @@ namespace p44 {
     virtual void setGroup(DsGroup aGroup) { /* NOP in base class */ };
 
     /// push state
-    /// @return true if API was connected and push could be sent
-    bool pushBehaviourState();
+    /// @param aDS push to dS (vDSM)
+    /// @param aDS push to bridges
+    /// @return true if selected API was connected and push could be sent
+    bool pushBehaviourState(bool aDS, bool aBridges);
 
     /// check for defined state
     /// @return true if behaviour has a defined (non-NULL) state

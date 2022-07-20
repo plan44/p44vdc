@@ -251,6 +251,9 @@ namespace p44 {
     /// request closing connection after last message has been sent
     virtual void closeAfterSend() P44_OVERRIDE;
 
+    /// the name of the API or the API's peer for logging
+    virtual const char* apiName() P44_OVERRIDE { return "vdSM (pbuf)"; };
+
     /// send a API request
     /// @param aMethod the vDC API method or notification name to be sent
     /// @param aParams the parameters for the method or notification request. Can be NULL.

@@ -375,7 +375,7 @@ string VdcHost::publishedDescription()
 
 bool VdcHost::isApiConnected()
 {
-  return getSessionConnection()!=NULL;
+  return getVdsmSessionConnection()!=NULL;
 }
 
 
@@ -543,11 +543,11 @@ void VdcHost::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     collecting = true;
     if ((aRescanFlags & rescanmode_incremental)==0) {
       // only for non-incremental collect, close vdsm connection
-      if (activeSessionConnection) {
+      if (mVdsmSessionConnection) {
         LOG(LOG_NOTICE, "requested to re-collect devices -> closing vDC API connection");
-        activeSessionConnection->closeConnection(); // close the API connection
+        mVdsmSessionConnection->closeConnection(); // close the API connection
         resetAnnouncing();
-        activeSessionConnection.reset(); // forget connection
+        mVdsmSessionConnection.reset(); // forget connection
         postEvent(vdchost_vdcapi_disconnected);
       }
       dSDevices.clear(); // forget existing ones
@@ -810,10 +810,10 @@ bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
   }
   if (!aRegular) {
     // this is a non-regular user action, i.e. one for identification purposes. Generate special identification notification
-    VdcApiConnectionPtr api = getSessionConnection();
+    VdcApiConnectionPtr api = getVdsmSessionConnection();
     if (api) {
       // send an identify notification
-      aDevice.sendRequest("identify", ApiValuePtr(), NoOP);
+      aDevice.sendRequest(api, "identify", ApiValuePtr(), NoOP);
     }
     return true; // no normal action, prevent further processing
   }
@@ -883,7 +883,7 @@ bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsCl
   }
   #endif
   // not handled by local controller
-  if (!activeSessionConnection) {
+  if (!mVdsmSessionConnection) {
     // not connected to a vdSM, handle clicks locally
     handleClickLocally(aButtonBehaviour, aClickType);
     return true; // handled
@@ -1092,17 +1092,6 @@ void VdcHost::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliver
 // MARK: - vDC API
 
 
-bool VdcHost::sendApiRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
-{
-  if (activeSessionConnection) {
-    signalActivity();
-    return Error::isOK(activeSessionConnection->sendRequest(aMethod, aParams, aResponseHandler));
-  }
-  // cannot send
-  return false;
-}
-
-
 void VdcHost::vdcApiConnectionStatusHandler(VdcApiConnectionPtr aApiConnection, ErrorPtr &aError)
 {
   if (Error::isOK(aError)) {
@@ -1116,10 +1105,10 @@ void VdcHost::vdcApiConnectionStatusHandler(VdcApiConnectionPtr aApiConnection, 
     }
     // - close if not already closed
     aApiConnection->closeConnection();
-    if (aApiConnection==activeSessionConnection) {
+    if (aApiConnection==mVdsmSessionConnection) {
       // this is the active session connection
       resetAnnouncing(); // stop possibly ongoing announcing
-      activeSessionConnection.reset();
+      mVdsmSessionConnection.reset();
       postEvent(vdchost_vdcapi_disconnected);
       LOG(LOG_NOTICE, "=== vDC API session ends because connection closed");
     }
@@ -1145,7 +1134,7 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
       respErr = byeHandler(aRequest, aParams);
     }
     else {
-      if (activeSessionConnection) {
+      if (mVdsmSessionConnection) {
         // session active
         respErr = handleMethodForParams(aRequest, aMethod, aParams);
       }
@@ -1158,7 +1147,7 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
   else {
     // Notifications
     // Note: out of session, notifications are simply ignored
-    if (activeSessionConnection) {
+    if (mVdsmSessionConnection) {
       respErr = handleNotificationForParams(aApiConnection, aMethod, aParams);
     }
     else {
@@ -1205,26 +1194,26 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
       DsUid vdsmDsUid;
       if (Error::isOK(respErr = checkDsuidParam(aParams, "dSUID", vdsmDsUid))) {
         // same vdSM can restart session any time. Others will be rejected
-        if (!activeSessionConnection || vdsmDsUid==connectedVdsm) {
+        if (!mVdsmSessionConnection || vdsmDsUid==connectedVdsm) {
           // ok to start new session
-          if (activeSessionConnection) {
+          if (mVdsmSessionConnection) {
             // session connection was already there, re-announce
             resetAnnouncing();
           }
           // - start session with this vdSM
           connectedVdsm = vdsmDsUid;
           // - remember the session's connection
-          activeSessionConnection = aRequest->connection();
+          mVdsmSessionConnection = aRequest->connection();
           // - log connection
           const char *ip = "<unknown>";
-          if (activeSessionConnection->socketConnection()) {
-            ip = activeSessionConnection->socketConnection()->getHost();
+          if (mVdsmSessionConnection->socketConnection()) {
+            ip = mVdsmSessionConnection->socketConnection()->getHost();
           }
-          LOG(LOG_NOTICE, "=== vdSM %s (%s) starts new session with API Version %d", vdsmDsUid.getString().c_str(), ip, version);
+          LOG(LOG_NOTICE, "=== %s %s (%s) starts new session with API Version %d", mVdsmSessionConnection->apiName(), vdsmDsUid.getString().c_str(), ip, version);
           // - inform interested objects
           postEvent(vdchost_vdcapi_connected);
           // - create answer
-          ApiValuePtr result = activeSessionConnection->newApiValue();
+          ApiValuePtr result = mVdsmSessionConnection->newApiValue();
           result->setType(apivalue_object);
           result->add("dSUID", aParams->newBinary(getDsUid().getBinary()));
           aRequest->sendResult(result);
@@ -1233,7 +1222,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         }
         else {
           // not ok to start new session, reject
-          respErr = Error::err<VdcApiError>(503, "this vDC already has an active session with vdSM %s",connectedVdsm.getString().c_str());
+          respErr = Error::err<VdcApiError>(503, "this vDC already has an active session with %s %s", mVdsmSessionConnection->apiName() ,connectedVdsm.getString().c_str());
           LOG(LOG_WARNING, "=== hello rejected: %s", respErr->text());
           aRequest->sendError(respErr);
           // close after send
@@ -1477,7 +1466,7 @@ void VdcHost::resetAnnouncing()
 /// start announcing all not-yet announced entities to the vdSM
 void VdcHost::startAnnouncing()
 {
-  if (!collecting && !announcementTicket && activeSessionConnection) {
+  if (!collecting && !announcementTicket && mVdsmSessionConnection) {
     // start announcing
     announceNext();
   }
@@ -1486,7 +1475,7 @@ void VdcHost::startAnnouncing()
 
 void VdcHost::announceNext()
 {
-  if (collecting) return; // prevent announcements during collect.
+  if (collecting || !mVdsmSessionConnection) return; // prevent announcements during collect or without connection
   // cancel re-announcing
   announcementTicket.cancel();
   // announce vdcs first
@@ -1501,10 +1490,10 @@ void VdcHost::announceNext()
       // mark device as being in process of getting announced
       vdc->announcing = MainLoop::now();
       // send announcevdc request
-      ApiValuePtr params = getSessionConnection()->newApiValue();
+      ApiValuePtr params = getVdsmSessionConnection()->newApiValue();
       params->setType(apivalue_object);
       params->add("dSUID", params->newBinary(vdc->getDsUid().getBinary()));
-      if (!sendApiRequest("announcevdc", params, boost::bind(&VdcHost::announceResultHandler, this, vdc, _2, _3, _4))) {
+      if (!vdc->sendRequest(mVdsmSessionConnection, "announcevdc", params, boost::bind(&VdcHost::announceResultHandler, this, vdc, _2, _3, _4))) {
         LOG(LOG_ERR, "Could not send vdc announcement message for %s %s", vdc->entityType(), vdc->shortDesc().c_str());
         vdc->announcing = Never; // not registering
       }
@@ -1529,11 +1518,11 @@ void VdcHost::announceNext()
       // mark device as being in process of getting announced
       dev->announcing = MainLoop::now();
       // send announcedevice request
-      ApiValuePtr params = getVdcHost().getSessionConnection()->newApiValue();
+      ApiValuePtr params = getVdcHost().getVdsmSessionConnection()->newApiValue();
       params->setType(apivalue_object);
       // include link to vdc for device announcements
       params->add("vdc_dSUID", params->newBinary(dev->mVdcP->getDsUid().getBinary()));
-      if (!dev->sendRequest("announcedevice", params, boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
+      if (!dev->sendRequest(mVdsmSessionConnection, "announcedevice", params, boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
         LOG(LOG_ERR, "Could not send device announcement message for %s %s", dev->entityType(), dev->shortDesc().c_str());
         dev->announcing = Never; // not announcing
       }
@@ -1556,7 +1545,7 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
     LOG(LOG_NOTICE, "Announcement for %s %s acknowledged by vdSM", aAddressable->entityType(), aAddressable->shortDesc().c_str());
     aAddressable->announced = MainLoop::now();
     aAddressable->announcing = Never; // not announcing any more
-    aAddressable->announcementAcknowledged(); // give instance opportunity to do things following an announcement
+    aAddressable->vdSMAnnouncementAcknowledged(); // give instance opportunity to do things following an announcement
   }
   // cancel retry timer
   announcementTicket.cancel();

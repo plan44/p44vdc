@@ -108,6 +108,9 @@ namespace p44 {
     /// @return the actual output mode, never returns outputmode_default
     VdcOutputMode actualOutputMode();
 
+    /// push current channel states
+    bool pushChannelStates(bool aDS, bool aBridges);
+
     /// @}
 
 

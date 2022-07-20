@@ -221,8 +221,8 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   #if ENABLE_JSONCFGAPI
   // start config API, if we have one
-  if (configApiServer) {
-    configApiServer->startServer(boost::bind(&P44VdcHost::configApiConnectionHandler, this, _1), 3);
+  if (mConfigApi) {
+    mConfigApi->mJsonApiServer->startServer(boost::bind(&P44VdcHost::configApiConnectionHandler, this, _1), 3);
   }
   #endif
   #if ENABLE_UBUS
@@ -239,8 +239,8 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   #endif
   #if ENABLE_JSONBRIDGEAPI
   // start bridge API, if we have one
-  if (bridgeApiServer) {
-    bridgeApiServer->startServer(boost::bind(&P44VdcHost::bridgeApiConnectionHandler, this, _1), 3);
+  if (mBridgeApi) {
+    mBridgeApi->mJsonApiServer->startServer(boost::bind(&P44VdcHost::bridgeApiConnectionHandler, this, _1), 3);
   }
   #endif
   // now init rest of vdc host
@@ -428,11 +428,11 @@ void UbusApiRequest::sendResponse(JsonObjectPtr aResult, ErrorPtr aError)
 
 void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed)
 {
-  if (!configApiServer) {
+  if (!mConfigApi) {
     // can be enabled only once
-    configApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
-    configApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, AF_INET);
-    configApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
+    mConfigApi = new P44CfgApiConnection(new SocketComm(MainLoop::currentMainLoop()));
+    mConfigApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, AF_INET);
+    mConfigApi->mJsonApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
   }
 }
 
@@ -493,7 +493,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         // Notes:
         // - if dSUID is specified invalid or empty, the vdc host itself is addressed.
         // - use x-p44-vdcs and x-p44-devices properties to find dsuids
-        aError = processVdcRequest(aJsonComm, request, false);
+        aError = processVdcRequest(mConfigApi, aJsonComm, request);
       }
       #if ENABLE_LEGACY_P44CFGAPI
       else if (apiselector=="p44") {
@@ -509,7 +509,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
           aError = WebError::webErr(500, "no features instantiated, API not active");
         }
         else {
-          ApiRequestPtr req = ApiRequestPtr(new APICallbackRequest(request, boost::bind(&P44VdcHost::sendCfgApiResponse, aJsonComm, _1, _2)));
+          ApiRequestPtr req = ApiRequestPtr(new APICallbackRequest(request, boost::bind(&P44VdcHost::sendJsonApiResponse, aJsonComm, _1, _2)));
           featureApi->handleRequest(req);
         }
       }
@@ -535,7 +535,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   }
   // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
   if (aError) {
-    sendCfgApiResponse(aJsonComm, JsonObjectPtr(), aError);
+    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError);
   }
 }
 
@@ -570,7 +570,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
 
 // MARK: - methods for JSON APIs
 
-void P44VdcHost::sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError)
+void P44VdcHost::sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError)
 {
   // create response
   JsonObjectPtr response = JsonObject::newObj();
@@ -589,13 +589,13 @@ void P44VdcHost::sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult
     // no error, return result (if any)
     response->add("result", aResult);
   }
-  LOG(LOG_DEBUG, "Config API response: %s", response->c_strValue());
+  LOG(LOG_DEBUG, "JSON API response: %s", response->c_strValue());
   aJsonComm->sendMessage(response);
 }
 
 
 // access to vdc API methods and notifications via web requests
-ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aRequest, bool aBridgeApi)
+ErrorPtr P44VdcHost::processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest)
 {
   ErrorPtr err;
   string cmd;
@@ -619,7 +619,7 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
     // get params
     // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
     ApiValuePtr params = JsonApiValue::newValueFromJson(aRequest);
-    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm, aBridgeApi));
+    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm, aApi));
     if (isMethod) {
       // create request
       // check for old-style name/index and generate basic query (1 or 2 levels)
@@ -659,8 +659,10 @@ ErrorPtr P44VdcHost::processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aReq
 
 // MARK: - P44JsonApiConnection
 
-P44JsonApiConnection::P44JsonApiConnection()
+P44JsonApiConnection::P44JsonApiConnection(SocketCommPtr aJsonApiServer) :
+  mJsonApiServer(aJsonApiServer)
 {
+  // JSON APIs always use the newest version
   setApiVersion(VDC_API_VERSION_MAX);
 }
 
@@ -673,29 +675,29 @@ ApiValuePtr P44JsonApiConnection::newApiValue()
 
 // MARK: - P44JsonApiRequest
 
-P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aJsonComm, bool aBridgeApi) :
-  mBridgeApi(aBridgeApi),
-  mJsonComm(aJsonComm)
+P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aRequestJsonComm, VdcApiConnectionPtr aJsonApi) :
+  mJsonComm(aRequestJsonComm),
+  mJsonApi(aJsonApi)
 {
 }
 
 
 VdcApiConnectionPtr P44JsonApiRequest::connection()
 {
-  return VdcApiConnectionPtr(new P44JsonApiConnection());
+  return mJsonApi;
 }
 
 
 ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
 {
-  LOG(LOG_DEBUG, "%s <- vdcd (JSON) result: %s", mBridgeApi ? "bridge" : "cfg", aResult ? aResult->description().c_str() : "<none>");
+  LOG(LOG_DEBUG, "%s <- vdcd (JSON) result: %s", mJsonApi->apiName(), aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   if (result) {
-    P44VdcHost::sendCfgApiResponse(mJsonComm, result->jsonObject(), ErrorPtr());
+    P44VdcHost::sendJsonApiResponse(mJsonComm, result->jsonObject(), ErrorPtr());
   }
-  else if (!mBridgeApi) {
-    // cfg API: always return SOMETHING
-    P44VdcHost::sendCfgApiResponse(mJsonComm, JsonObject::newNull(), ErrorPtr());
+  else {
+    // JSON APIs: always return SOMETHING as result
+    P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObject::newNull(), ErrorPtr());
   }
   return ErrorPtr();
 }
@@ -707,25 +709,26 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
   if (!aError) {
     aError = Error::ok();
   }
-  LOG(LOG_DEBUG, "%s <- vdcd (JSON) error: %ld (%s)", mBridgeApi ? "bridge" : "cfg", aError->getErrorCode(), aError->getErrorMessage());
-  P44VdcHost::sendCfgApiResponse(mJsonComm, JsonObjectPtr(), aError);
+  LOG(LOG_DEBUG, "%s <- vdcd (JSON) error: %ld (%s)", mJsonApi->apiName(), aError->getErrorCode(), aError->getErrorMessage());
+  P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObjectPtr(), aError);
   return ErrorPtr();
 }
+
 
 #endif // ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
 
 
 #if ENABLE_JSONBRIDGEAPI
 
-// MARK: - Bridge config API
+// MARK: - Bridge API
 
 void P44VdcHost::enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllowed)
 {
-  if (!bridgeApiServer) {
+  if (!mBridgeApi) {
     // can be enabled only once
-    bridgeApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
-    bridgeApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, AF_INET);
-    bridgeApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
+    mBridgeApi = new BridgeApiConnection(new SocketComm(MainLoop::currentMainLoop()));
+    mBridgeApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, AF_INET);
+    mBridgeApi->mJsonApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
   }
 }
 
@@ -746,13 +749,42 @@ void P44VdcHost::bridgeApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   if (Error::isOK(aError)) {
     // not JSON level error, try to process
     LOG(LOG_DEBUG, "bridge -> vdcd (JSON) request received: %s", aJsonRequest->c_strValue());
-    aError = processVdcRequest(aJsonComm, aJsonRequest, true);
+    aError = processVdcRequest(mBridgeApi, aJsonComm, aJsonRequest);
   }
   // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
   if (aError) {
-    sendCfgApiResponse(aJsonComm, JsonObjectPtr(), aError);
+    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError);
   }
 }
+
+
+
+ErrorPtr BridgeApiConnection::sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
+{
+  // send to all connected bridges
+  mJsonApiServer->eachClient(boost::bind(&BridgeApiConnection::notifyBridgeClient, this, _1, aMethod, aParams));
+  // Note: we don't support responses, so ignoring aResponseHandler completely here
+  return ErrorPtr();
+}
+
+
+void BridgeApiConnection::notifyBridgeClient(SocketCommPtr aSocketComm, const string &aNotification, ApiValuePtr aParams)
+{
+  if (!aParams) {
+    // create params object because we need it for the notification
+    aParams = newApiValue();
+    aParams->setType(apivalue_object);
+  }
+  aParams->add("notification", aParams->newString(aNotification));
+  JsonApiValuePtr notification = boost::dynamic_pointer_cast<JsonApiValue>(aParams);
+  JsonCommPtr comm = dynamic_pointer_cast<JsonComm>(aSocketComm);
+  if (comm && notification) {
+    LOG(LOG_DEBUG, "JSON API notification: %s", notification->jsonObject()->c_strValue());
+    comm->sendMessage(notification->jsonObject());
+  }
+}
+
+
 
 #endif // ENABLE_JSONBRIDGEAPI
 
@@ -873,7 +905,7 @@ ApiRequestObj::ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest) :
 
 void ApiRequestObj::sendResponse(JsonObjectPtr aResponse, ErrorPtr aError)
 {
-  if (mConnection) P44VdcHost::sendCfgApiResponse(mConnection, aResponse, aError);
+  if (mConnection) P44VdcHost::sendJsonApiResponse(mConnection, aResponse, aError);
   mConnection.reset(); // done now
 }
 

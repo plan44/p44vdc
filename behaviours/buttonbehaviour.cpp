@@ -597,8 +597,8 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
   actionMode = buttonActionMode_none;
   // button press is considered a (regular!) user action, have it checked globally first
   if (!mDevice.getVdcHost().signalDeviceUserAction(mDevice, true)) {
-    // button press not consumed on global level, forward to upstream dS
-    if (pushBehaviourState()) {
+    // button press not consumed on global level, forward to upstream dS (and bridges, if not just hold-repeat)
+    if (pushBehaviourState(true, clickType!=ct_hold_repeat)) {
       OLOG(clickType==ct_hold_repeat ? LOG_INFO : LOG_NOTICE, "successfully pushed state = %d, clickType %d", buttonPressed, aClickType);
     }
     #if ENABLE_LOCALCONTROLLER
@@ -643,8 +643,8 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
   actionMode = aActionMode;
   actionId = aActionId;
   OLOG(LOG_NOTICE, "pushes actionMode = %d, actionId %d", actionMode, actionId);
-  // issue a state property push
-  pushBehaviourState();
+  // issue a state property push to dS (this is dS specific, no push to bridges)
+  pushBehaviourState(true, false);
 }
 
 

@@ -32,9 +32,6 @@ using namespace std;
 
 namespace p44 {
 
-  #define VDC_API_DOMAIN 0x0000
-  #define VDC_CFG_DOMAIN 0x1000
-
   class VdcHost;
 
   /// global events that DsAddressables might receive
@@ -78,8 +75,12 @@ namespace p44 {
   protected:
     VdcHost *vdcHostP;
 
-    /// the actual (modern) dSUID
+    /// the dSUID for accessing this addressable
     DsUid dSUID;
+
+    #if ENABLE_JSONBRIDGEAPI
+    bool mBridged; ///< this addressable is currently bridged, so should report relevant changes to bridge API
+    #endif
 
   public:
 
@@ -90,9 +91,21 @@ namespace p44 {
     /// @return true if addressable is public
     virtual bool isPublicDS();
 
+    #if ENABLE_JSONBRIDGEAPI
+    /// @return true if addressable can be bridged
+    virtual bool bridgeable() { return false; } // by default, bridging an addressable is not possible
+    #endif
+
+    #if ENABLE_JSONBRIDGEAPI
+    /// @return true if addressable is currently bridged
+    bool isBridged() { return mBridged; }
+    #else
+    bool isBridged() { return false; } // for simplicity, this is available even if bridging support is not compiled in
+    #endif
+
     /// called when vdsm acknowledges announcement of this addressable. Can be used in subclasses to
     /// re-trigger pushing sensor values etc.
-    virtual void announcementAcknowledged() { /* NOP in base class */ }
+    virtual void vdSMAnnouncementAcknowledged() { /* NOP in base class */ }
 
     /// check if this instance (device or vdc) has been announced
     /// @return true if device has been announced
@@ -190,22 +203,22 @@ namespace p44 {
     ///   used already to route the notification to this DsAddressable.
     virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
 
-    /// send a DsAddressable method or notification to vdSM
+    /// send a DsAddressable method or notification to specified API
+    /// @param aApi the API
     /// @param aMethod the method or notification
     /// @param aParams the parameters object, or NULL if none
     /// @param aResponseHandler handler for response. If not set, request is sent as notification
     /// @return true if message could be sent, false otherwise (e.g. no vdSM connection)
     /// @note the dSUID will be automatically added to aParams (generating a params object if none was passed)
-    bool sendRequest(const char *aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB());
+    bool sendRequest(VdcApiConnectionPtr aApi, const char *aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB());
 
     /// push notification (changed property value and/or events)
+    /// @param aApi the API for which to access properties (different APIs might have different properties and API versions for the same PropertyContainer)
     /// @param aPropertyQuery description of what property change should be pushed (same syntax as in getProperty API), can be NULL
     /// @param aEvents list of events to be pushed, can be NULL
-    /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
-    /// @param aApiVersion the API version relevant for this push notification
     /// @param aDeletedProperty if set, the aPropertyQuery describes a property that has been deleted
     /// @return true if push could be sent, false otherwise (e.g. no vdSM connection, or device not yet announced)
-    bool pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain, int aApiVersion, bool aDeletedProperty = false);
+    bool pushNotification(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aDeletedProperty = false);
 
     /// @}
 
@@ -406,7 +419,7 @@ namespace p44 {
   private:
 
     void propertyAccessed(VdcApiRequestPtr aRequest, ApiValuePtr aResultObject, ErrorPtr aError);
-    void pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultObject, ErrorPtr aError);
+    void pushPropertyReady(VdcApiConnectionPtr aApi, ApiValuePtr aEvents, ApiValuePtr aResultObject, ErrorPtr aError);
     void pingResultHandler(bool aIsPresent);
     void presenceSampleHandler(StatusCB aPreparedCB, bool aIsPresent);
 

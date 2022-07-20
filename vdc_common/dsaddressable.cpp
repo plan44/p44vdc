@@ -42,6 +42,9 @@ DsAddressable::DsAddressable(VdcHost *aVdcHostP) :
   announcing(Never),
   present(true), // by default, consider addressable present
   lastPresenceUpdate(Never)
+  #if ENABLE_JSONBRIDGEAPI
+  , mBridged(false) // by default, addressable is not bridged
+  #endif
 {
 }
 
@@ -89,7 +92,11 @@ void DsAddressable::reportVanished()
 {
   if (isAnnounced()) {
     // report to vDC API client that the device is now offline
-    sendRequest("vanish", ApiValuePtr());
+    sendRequest(getVdcHost().getVdsmSessionConnection(), "vanish", ApiValuePtr());
+    #if ENABLE_JSONBRIDGEAPI
+    // also report to connected bridges
+    sendRequest(getVdcHost().getBridgeApi(), "vanish", ApiValuePtr());
+    #endif
   }
 }
 
@@ -271,31 +278,32 @@ void DsAddressable::methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError)
 
 
 
-bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, int aDomain, int aApiVersion, bool aDeletedProperty)
+bool DsAddressable::pushNotification(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aDeletedProperty)
 {
-  if (isAnnounced()) {
+  if (!aApi) return false; // safety
+  if (aApi->domain()!=VDC_API_DOMAIN || isAnnounced()) {
     // device is announced: push can take place
     if (aPropertyQuery) {
       if (aDeletedProperty) {
         // a property deletion is to be notified -> the query itself is what needs to be pushed
-        pushPropertyReady(aEvents, aPropertyQuery, ErrorPtr());
+        pushPropertyReady(aApi, aEvents, aPropertyQuery, ErrorPtr());
       }
       else {
         // a property change is to be notified -> read the property
         accessProperty(
-          access_read, aPropertyQuery, aDomain, aApiVersion,
-          boost::bind(&DsAddressable::pushPropertyReady, this, aEvents, _1, _2)
+          access_read, aPropertyQuery, aApi->domain(), aApi->getApiVersion(),
+          boost::bind(&DsAddressable::pushPropertyReady, this, aApi, aEvents, _1, _2)
         );
       }
     }
     else {
       // no property query, event-only -> send events right away
-      pushPropertyReady(aEvents, ApiValuePtr(), ErrorPtr());
+      pushPropertyReady(aApi, aEvents, ApiValuePtr(), ErrorPtr());
     }
     return true; // although possibly (when we have properties to push) not yet sent now, assume push will be ok
   }
   else {
-    if (isPublicDS()) {
+    if (isPublicDS() && aApi->domain()==VDC_API_DOMAIN) {
       // is public, but not yet announced, show warning (non-public devices never push and must not log anything here)
       OLOG(LOG_WARNING, "pushNotification suppressed - is not yet announced");
     }
@@ -304,7 +312,7 @@ bool DsAddressable::pushNotification(ApiValuePtr aPropertyQuery, ApiValuePtr aEv
 }
 
 
-void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultObject, ErrorPtr aError)
+void DsAddressable::pushPropertyReady(VdcApiConnectionPtr aApi, ApiValuePtr aEvents, ApiValuePtr aResultObject, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
     // - send pushNotification
@@ -317,7 +325,7 @@ void DsAddressable::pushPropertyReady(ApiValuePtr aEvents, ApiValuePtr aResultOb
       if (!pushParams) pushParams = aEvents->newValue(apivalue_object);
       pushParams->add("deviceevents", aEvents);
     }
-    sendRequest("pushNotification", pushParams);
+    sendRequest(aApi, "pushNotification", pushParams);
   }
   else {
     OLOG(LOG_WARNING, "push failed because to-be-pushed property could not be accessed: %s", aError->text());
@@ -354,19 +362,20 @@ void DsAddressable::identifyToUser()
 }
 
 
-bool DsAddressable::sendRequest(const char *aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
+bool DsAddressable::sendRequest(VdcApiConnectionPtr aApi, const char *aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
 {
-  VdcApiConnectionPtr api = getVdcHost().getSessionConnection();
-  if (api) {
+  if (aApi) {
     if (!aParams) {
       // create params object because we need it for the dSUID
-      aParams = api->newApiValue();
+      aParams = aApi->newApiValue();
       aParams->setType(apivalue_object);
     }
     aParams->add("dSUID", aParams->newBinary(getDsUid().getBinary()));
-    return getVdcHost().sendApiRequest(aMethod, aParams, aResponseHandler);
+    ErrorPtr err = aApi->sendRequest(aMethod, aParams, aResponseHandler);
+    if (Error::isOK(err)) return true;
+    LOG(LOG_ERR, "Failed to send request to %s-API (domain 0x%x)", aApi->apiName(), aApi->domain());
   }
-  return false; // no connection
+  return false; // no API/connection
 }
 
 
@@ -379,7 +388,7 @@ void DsAddressable::pingResultHandler(bool aIsPresent)
   if (aIsPresent) {
     // send back Pong notification
     OLOG(LOG_INFO, "is present -> sending pong");
-    sendRequest("pong", ApiValuePtr());
+    sendRequest(getVdcHost().getVdsmSessionConnection(), "pong", ApiValuePtr());
   }
   else {
     OLOG(LOG_NOTICE, "is NOT present -> no Pong sent");
@@ -396,14 +405,26 @@ void DsAddressable::updatePresenceState(bool aPresent)
     // change in presence
     present = aPresent;
     OLOG(LOG_NOTICE, "changes to %s", aPresent ? "PRESENT" : "OFFLINE");
-    // push change in presence
-    VdcApiConnectionPtr api = getVdcHost().getSessionConnection();
+    // push change in presence to vdSM
+    VdcApiConnectionPtr api = getVdcHost().getVdsmSessionConnection();
     if (api) {
       ApiValuePtr query = api->newApiValue();
       query->setType(apivalue_object);
       query->add("active", query->newValue(apivalue_null));
-      pushNotification(query, ApiValuePtr(), VDC_API_DOMAIN, api->getApiVersion());
+      pushNotification(api, query, ApiValuePtr(), VDC_API_DOMAIN);
     }
+    // also push change in presence to bridgeAPI
+    #if ENABLE_JSONBRIDGEAPI
+    if (isBridged()) {
+      VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
+      if (api) {
+        ApiValuePtr query = api->newApiValue();
+        query->setType(apivalue_object);
+        query->add("active", query->newValue(apivalue_null));
+        pushNotification(api, query, ApiValuePtr());
+      }
+    }
+    #endif
   }
 }
 
@@ -446,6 +467,10 @@ enum {
   iconName_key,
   name_key,
   active_key,
+  #if ENABLE_JSONBRIDGEAPI
+  isBridged_key,
+  bridgeable_key,
+  #endif
   numDsAddressableProperties
 };
 
@@ -484,7 +509,11 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     { "deviceIcon16", apivalue_binary, deviceIcon16_key, OKEY(dsAddressable_key) },
     { "deviceIconName", apivalue_string, iconName_key, OKEY(dsAddressable_key) },
     { "name", apivalue_string, name_key, OKEY(dsAddressable_key) },
-    { "active", apivalue_bool+propflag_needsreadprep, active_key, OKEY(dsAddressable_key) }
+    { "active", apivalue_bool+propflag_needsreadprep, active_key, OKEY(dsAddressable_key) },
+    #if ENABLE_JSONBRIDGEAPI
+    { "x-p44-bridged", apivalue_bool, isBridged_key, OKEY(dsAddressable_key) },
+    { "x-p44-bridgeable", apivalue_bool, bridgeable_key, OKEY(dsAddressable_key) },
+    #endif
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -526,6 +555,9 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
       switch (aPropertyDescriptor->fieldKey()) {
         case name_key: setName(aPropValue->stringValue()); return true;
         case logLevelOffset_key: setLogLevelOffset(aPropValue->int32Value()); return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case isBridged_key: if (bridgeable()) { mBridged = aPropValue->boolValue(); return true; } else return false;
+        #endif
       }
     }
     else {
@@ -554,6 +586,10 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case iconName_key: { string iconName; if (getDeviceIcon(iconName, false, "icon16")) { aPropValue->setStringValue(iconName); return true; } else return false; }
         case name_key: aPropValue->setStringValue(getName()); return true;
         case active_key: aPropValue->setBoolValue(present); return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case isBridged_key: aPropValue->setBoolValue(mBridged); return true;
+        case bridgeable_key: aPropValue->setBoolValue(bridgeable()); return true;
+        #endif
       }
       return true;
     }

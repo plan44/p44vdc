@@ -482,14 +482,14 @@ DsBehaviourPtr Device::behaviourById(const string aId)
 }
 
 
-void Device::announcementAcknowledged()
+void Device::vdSMAnnouncementAcknowledged()
 {
   // Push current values of all sensors and inputs
   for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) {
-    if ((*pos)->hasDefinedState()) (*pos)->pushBehaviourState();
+    if ((*pos)->hasDefinedState()) (*pos)->pushBehaviourState(true, false);
   }
   for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) {
-    if ((*pos)->hasDefinedState()) (*pos)->pushBehaviourState();
+    if ((*pos)->hasDefinedState()) (*pos)->pushBehaviourState(true, false);
   }
 }
 
@@ -1273,6 +1273,8 @@ void Device::applyingChannelsComplete()
       cb();
     }
     FOCUSLOG("- confirmed apply (really) finalized (ticket #%ld)", ticketNo);
+    // report channel changes to bridges, but not to dS
+    getOutput()->pushChannelStates(false, true);
   }
 }
 
@@ -2232,7 +2234,7 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     { "configurationId", apivalue_string, configurationId_key, OKEY(device_obj) },
     // device class
     { "deviceClass", apivalue_string, deviceClass_key, OKEY(device_obj) },
-    { "deviceClassVersion", apivalue_uint64, deviceClassVersion_key, OKEY(device_obj) }
+    { "deviceClassVersion", apivalue_uint64, deviceClassVersion_key, OKEY(device_obj) },
   };
   // C++ object manages different levels, check aParentDescriptor
   if (aParentDescriptor->isRootOfObject()) {

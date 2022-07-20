@@ -137,14 +137,17 @@ namespace p44 {
     /// @return socket connection
     virtual SocketCommPtr socketConnection() = 0;
 
-    /// send a API request
+    /// send a API request (method call or notification)
     /// @param aMethod the vDC API method or notification name to be sent
     /// @param aParams the parameters for the method or notification request. Can be NULL.
     /// @param aResponseHandler if the request is a method call, this handler will be called when the method result arrives
     ///   Note that the aResponseHandler might not be called at all in case of lost messages etc. So do not rely on
     ///   this callback for chaining a execution thread.
     /// @return empty or Error object in case of error
-    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) = 0;
+    /// @note it depends on the API what exactly are the targets. Some APIs might send the request (which then
+    ///   should be a notification) to all connected clients.
+    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB())
+      { return TextError::err("can't initiate request/notification to %s API", apiName()); }; // by default API cannot initiate requests itself
 
     /// request closing connection after last message has been sent
     virtual void closeAfterSend() = 0;
@@ -152,6 +155,12 @@ namespace p44 {
     /// get a new API value suitable for this connection
     /// @return new API value of suitable internal implementation to be used on this API connection
     virtual ApiValuePtr newApiValue();
+
+    /// the API domain code for this API
+    virtual int domain() { return VDC_API_DOMAIN; }
+
+    /// the name of the API or the API's peer for logging
+    virtual const char* apiName() { return "(JSON)"; }; // it is json, but we don't know the peer here
 
     /// get API version
     /// @return API version for this connection
@@ -254,6 +263,10 @@ namespace p44 {
     /// get API version
     /// @return API version for this request
     virtual int getApiVersion() { return connection()->getApiVersion(); }; // default is asking connection (but p44 web api will override this)
+
+    /// get API / peer name
+    /// @return API name for logging
+    const char* apiName() { return connection()->apiName(); };
 
   };
 

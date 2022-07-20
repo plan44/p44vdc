@@ -988,13 +988,13 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
   if (!aResult || aResult->isNull()) {
     // empty result is like sending no error
     err = sendError(0);
-    LOG(LOG_INFO, "vdSM <- vDC (pbuf), id=%d: generic OK", reqId);
+    LOG(LOG_INFO, "%s <- vDC, id=%d: generic OK", apiName(), reqId);
   }
   else if (responseType==VDCAPI__TYPE__GENERIC_RESPONSE) {
     // non-empty result, but pbuf API does not have a response message to deliver it -> just acknowledge OK
     // Note: this can be the case for setProperty creating new object, where result is the created object's id
     err = sendError(0);
-    LOG(LOG_INFO, "vdSM <- vDC (pbuf), id=%d, generic OK sent: UNSENT result=%s", reqId, aResult->description().c_str());
+    LOG(LOG_INFO, "%s <- vDC, id=%d, generic OK sent: UNSENT result=%s", apiName(), reqId, aResult->description().c_str());
   }
   else {
     // we might have a specific result
@@ -1026,7 +1026,7 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
         }
         break;
       default:
-        LOG(LOG_INFO, "vdSM <- vDC (pbuf): response '%s' cannot be sent because no message is implemented for it at the pbuf level", aResult->description().c_str());
+        LOG(LOG_INFO, "%s <- vDC: response '%s' cannot be sent because no message is implemented for it at the pbuf level", apiName(), aResult->description().c_str());
         return Error::err<VdcApiError>(500,"Error: Method is not implemented in the pbuf API");
     }
     // send
@@ -1034,7 +1034,7 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
     // dispose allocated submessage
     protobuf_c_message_free_unpacked(subMessageP, NULL);
     // log
-    LOG(LOG_INFO, "vdSM <- vDC (pbuf), id=%d: result=%s", reqId, aResult->description().c_str());
+    LOG(LOG_INFO, "%s <- vDC, id=%d: result=%s", apiName(), reqId, aResult->description().c_str());
   }
   return err;
 }
@@ -1063,10 +1063,10 @@ ErrorPtr VdcPbufApiRequest::sendError(ErrorPtr aError)
   // log (if not just OK)
   if (Error::notOK(aError)) {
     if (vdcApiErr) {
-      LOG(LOG_INFO, "vdSM <- vDC (pbuf) id=%d: error=%ld (%s) - type=%d (%s)", reqId, vdcApiErr->getErrorCode(), vdcApiErr->getErrorMessage(), vdcApiErr->getErrorType(), vdcApiErr->getUserFacingMessage().c_str());
+      LOG(LOG_INFO, "%s <- vDC id=%d: error=%ld (%s) - type=%d (%s)", apiName(), reqId, vdcApiErr->getErrorCode(), vdcApiErr->getErrorMessage(), vdcApiErr->getErrorType(), vdcApiErr->getUserFacingMessage().c_str());
     }
     else {
-      LOG(LOG_INFO, "vdSM <- vDC (pbuf) id=%d: error=%ld (%s)", reqId, aError->getErrorCode(), aError->getErrorMessage());
+      LOG(LOG_INFO, "%s <- vDC id=%d: error=%ld (%s)", apiName(), reqId, aError->getErrorCode(), aError->getErrorMessage());
     }
   }
   // done
@@ -1455,7 +1455,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
       PendingAnswerMap::iterator pos = pendingAnswers.find(responseForId);
       if (pos==pendingAnswers.end()) {
         // errors without ID cannot be associated with calls made earlier, so just log the error
-        LOG(LOG_WARNING, "vdSM -> vDC (pbuf) error: Received response with unknown 'id'=%d, error=%s", responseForId, Error::isOK(err) ? "<none>" : err->text());
+        LOG(LOG_WARNING, "%s -> vDC error: Received response with unknown 'id'=%d, error=%s", apiName(), responseForId, Error::isOK(err) ? "<none>" : err->text());
       }
       else {
         // found callback
@@ -1464,10 +1464,10 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         // create request object just to hold the response ID
         VdcPbufApiRequestPtr request = VdcPbufApiRequestPtr(new VdcPbufApiRequest(VdcPbufApiConnectionPtr(this), responseForId));
         if (Error::isOK(err)) {
-          LOG(LOG_INFO, "vdSM -> vDC (pbuf) result received: id='%s', result=%s", request->requestId().c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+          LOG(LOG_INFO, "%s -> vDC result received: id='%s', result=%s", apiName(), request->requestId().c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
         }
         else {
-          LOG(LOG_INFO, "vdSM -> vDC (pbuf) error received: id='%s', error=%s, errordata=%s", request->requestId().c_str(), err->text(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+          LOG(LOG_INFO, "%s -> vDC error received: id='%s', error=%s, errordata=%s", apiName(), request->requestId().c_str(), err->text(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
         }
         cb(this, request, err, msgFieldsObj); // call handler
       }
@@ -1485,10 +1485,10 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         // method call, we need a request reference object
         request = VdcPbufApiRequestPtr(new VdcPbufApiRequest(VdcPbufApiConnectionPtr(this), decodedMsg->message_id));
         request->responseType = (Vdcapi__Type)responseType; // save the response type for sending answers later
-        LOG(LOG_INFO, "vdSM -> vDC (pbuf) method call received: requestid='%d', method='%s', params=%s", request->reqId, method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+        LOG(LOG_INFO, "%s -> vDC method call received: requestid='%d', method='%s', params=%s", apiName(), request->reqId, method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
       }
       else {
-        LOG(LOG_INFO, "vdSM -> vDC (pbuf) notification received: method='%s', params=%s", method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+        LOG(LOG_INFO, "%s -> vDC notification received: method='%s', params=%s", apiName(), method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
       }
       if (Error::notOK(err)) {
         // error decoding message
@@ -1570,7 +1570,7 @@ ErrorPtr VdcPbufApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
   }
   else {
     // no suitable submessage, cannot send
-    LOG(LOG_INFO, "vdSM <- vDC (pbuf) method '%s' cannot be sent because no message is implemented for it at the pbuf level", aMethod.c_str());
+    LOG(LOG_INFO, "%s <- vDC method '%s' cannot be sent because no message is implemented for it at the pbuf level", apiName(), aMethod.c_str());
     return Error::err<VdcApiError>(500, "Error: Method is not implemented in the pbuf API");
   }
   if (Error::isOK(err)) {
@@ -1591,10 +1591,10 @@ ErrorPtr VdcPbufApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
     protobuf_c_message_free_unpacked(subMessageP, NULL);
     // log
     if (aResponseHandler) {
-      LOG(LOG_INFO, "vdSM <- vDC (pbuf) id=%d: method='%s', params=%s", requestIdCounter, aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s <- vDC id=%d: method='%s', params=%s", apiName(), requestIdCounter, aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
     }
     else {
-      LOG(LOG_INFO, "vdSM <- vDC (pbuf): notification='%s', params=%s", aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s <- vDC: notification='%s', params=%s", apiName(), aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
     }
   }
   // done

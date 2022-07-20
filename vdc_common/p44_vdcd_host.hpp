@@ -64,14 +64,16 @@ namespace p44 {
 
   #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
 
-  /// Dummy config API "connection" object
+  /// API connection object for JSON APIs
   class P44JsonApiConnection : public VdcApiConnection
   {
     typedef VdcApiConnection inherited;
 
   public:
 
-    P44JsonApiConnection();
+    SocketCommPtr mJsonApiServer;
+
+    P44JsonApiConnection(SocketCommPtr aJsonApiServer);
 
     /// install callback for received API requests
     /// @param aApiRequestHandler will be called when a API request has been received
@@ -80,11 +82,6 @@ namespace p44 {
     /// The underlying socket connection
     /// @return socket connection
     virtual SocketCommPtr socketConnection() P44_OVERRIDE { return SocketCommPtr(); };
-
-    /// Cannot send a API request
-    /// @return empty or Error object in case of error
-    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE
-      { return TextError::err("can't send request to API"); };
 
     /// request closing connection after last message has been sent
     virtual void closeAfterSend() P44_OVERRIDE {};
@@ -95,17 +92,20 @@ namespace p44 {
   };
 
 
-  /// plan44 specific config API JSON request
+  /// plan44 specific JSON API request
   class P44JsonApiRequest : public VdcApiRequest
   {
     typedef VdcApiRequest inherited;
+
+  protected:
+
     JsonCommPtr mJsonComm;
-    bool mBridgeApi;
+    VdcApiConnectionPtr mJsonApi;
 
   public:
 
     /// constructor
-    P44JsonApiRequest(JsonCommPtr aJsonComm, bool aBridgeApi);
+    P44JsonApiRequest(JsonCommPtr aRequestJsonComm, VdcApiConnectionPtr aJsonApi);
 
     /// return the request ID as a string
     /// @return request ID as string
@@ -133,6 +133,52 @@ namespace p44 {
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;
 
   #endif // ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
+
+  #if ENABLE_JSONCFGAPI
+
+  /// API connection object for cfg (=webUI) JSON API
+  class P44CfgApiConnection : public P44JsonApiConnection
+  {
+    typedef P44JsonApiConnection inherited;
+
+  public:
+
+    P44CfgApiConnection(SocketCommPtr aJsonApiServer) : inherited(aJsonApiServer) {};
+
+    virtual int domain() P44_OVERRIDE { return VDC_API_DOMAIN; };
+    virtual const char* apiName() P44_OVERRIDE { return "cfg"; };
+  };
+  typedef boost::intrusive_ptr<P44CfgApiConnection> P44CfgApiConnectionPtr;
+
+  #endif // ENABLE_JSONCFGAPI
+
+
+  #if ENABLE_JSONBRIDGEAPI
+
+  /// API connection object for bridge JSON API
+  class BridgeApiConnection : public P44JsonApiConnection
+  {
+    typedef P44JsonApiConnection inherited;
+
+  public:
+
+    BridgeApiConnection(SocketCommPtr aJsonApiServer) : inherited(aJsonApiServer) {};
+
+    /// Send API notification to (all) connected clients
+    /// @return empty or Error object in case of error
+    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE;
+
+    virtual int domain() P44_OVERRIDE { return BRIDGE_DOMAIN; };
+    virtual const char* apiName() P44_OVERRIDE { return "bridge"; };
+
+  private:
+
+    void notifyBridgeClient(SocketCommPtr aSocketComm, const string &aNotification, ApiValuePtr aParams);
+
+  };
+  typedef boost::intrusive_ptr<BridgeApiConnection> BridgeApiConnectionPtr;
+
+  #endif // ENABLE_JSONBRIDGEAPI
 
 
   #if ENABLE_UBUS
@@ -256,7 +302,7 @@ namespace p44 {
     VdcApiRequestPtr learnIdentifyRequest;
 
     #if ENABLE_JSONCFGAPI
-    SocketCommPtr configApiServer; ///< JSON API for legacy web interface
+    P44CfgApiConnectionPtr mConfigApi; ///< JSON API for legacy web interface
     #endif
 
     #if ENABLE_UBUS
@@ -264,7 +310,7 @@ namespace p44 {
     #endif
 
     #if ENABLE_JSONBRIDGEAPI
-    SocketCommPtr bridgeApiServer; ///< JSON API for bridge access
+    BridgeApiConnectionPtr mBridgeApi; ///< JSON API for bridge access
     #endif
 
   public:
@@ -284,6 +330,9 @@ namespace p44 {
     /// @param aNonLocalAllowed if set, non-local clients are allowed to connect to the config API
     /// @note API server will be started only at initialize()
     void enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed);
+
+    /// get the config API
+    VdcApiConnectionPtr getConfigApi() { return mConfigApi; }
     #endif
 
     #if ENABLE_UBUS
@@ -298,6 +347,9 @@ namespace p44 {
     /// @param aNonLocalAllowed if set, non-local clients are allowed to connect to the bridge API
     /// @note API server will be started only at initialize()
     void enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllowed);
+
+    /// get the bridge API
+    virtual VdcApiConnectionPtr getBridgeApi() P44_OVERRIDE { return mBridgeApi; }
     #endif
 
 		/// perform self testing
@@ -319,7 +371,7 @@ namespace p44 {
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
-    static void sendCfgApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError);
+    static void sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError);
     #endif
 
   protected:
@@ -330,7 +382,7 @@ namespace p44 {
 
     #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
     void configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonObject);
-    ErrorPtr processVdcRequest(JsonCommPtr aJsonComm, JsonObjectPtr aRequest, bool aBridgeApi);
+    ErrorPtr processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
     #endif
 
     #if ENABLE_JSONCFGAPI

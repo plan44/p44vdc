@@ -199,7 +199,7 @@ namespace p44 {
     int maxApiVersion; // limit for API version to support (for testing client's backwards compatibility), 0=no limit
     DsUid connectedVdsm;
     MLTicket sessionActivityTicket;
-    VdcApiConnectionPtr activeSessionConnection;
+    VdcApiConnectionPtr mVdsmSessionConnection;
 
     // settings
     bool persistentChannels;
@@ -237,8 +237,11 @@ namespace p44 {
     /// API for vdSM
     VdcApiServerPtr vdcApiServer;
 
-    /// active session
-    VdcApiConnectionPtr getSessionConnection() { return activeSessionConnection; };
+    /// active vDSM session
+    VdcApiConnectionPtr getVdsmSessionConnection() { return mVdsmSessionConnection; };
+
+    /// get the bridge API (if any)
+    virtual VdcApiConnectionPtr getBridgeApi() { return VdcApiConnectionPtr(); /* none in this base class */ }
 
     /// get an API value that would work for the session connection if we had one
     /// @return an API value of the same type as session connection will use
@@ -607,13 +610,6 @@ namespace p44 {
     /// @note sending results/errors is done via the VcdApiRequest object
     /// @{
 
-    /// send a API method or notification call to the vdSM
-    /// @param aMethod the method or notification
-    /// @param aParams the parameters object, or NULL if none
-    /// @param aResponseHandler handler for response. If not set, request is sent as notification
-    /// @return true if message could be sent, false otherwise (e.g. no vdSM connection)
-    bool sendApiRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB());
-
     // method and notification dispatching
     ErrorPtr handleMethodForParams(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
     ErrorPtr handleNotificationForParams(VdcApiConnectionPtr aApiConnection, const string &aMethod, ApiValuePtr aParams);
@@ -747,17 +743,18 @@ namespace p44 {
     /// @return socket connection
     virtual SocketCommPtr socketConnection() P44_OVERRIDE { return SocketCommPtr(); };
 
-    /// Cannot send a API request
-    /// @return empty or Error object in case of error
-    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE
-      { return TextError::err("can't send request to script API"); };
-
     /// request closing connection after last message has been sent
     virtual void closeAfterSend() P44_OVERRIDE {};
+
+    /// the name of the API or the API's peer for logging
+    virtual const char* apiName() P44_OVERRIDE { return "script"; };
 
     /// get a new API value suitable for this connection
     /// @return new API value of suitable internal implementation to be used on this API connection
     virtual ApiValuePtr newApiValue() P44_OVERRIDE;
+
+    virtual int domain() P44_OVERRIDE { return VDC_CFG_DOMAIN; };
+
   };
 
 

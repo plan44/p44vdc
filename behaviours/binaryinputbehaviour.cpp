@@ -178,7 +178,7 @@ bool BinaryInputBehaviour::pushInput(bool aChanged)
   MLMicroSeconds now = MainLoop::now();
   if (lastPush==Never || now>lastPush+minPushInterval) {
     // push the new value right now
-    if (pushBehaviourState()) {
+    if (pushBehaviourState(true, true)) {
       lastPush = now;
       OLOG(LOG_NOTICE, "successfully pushed state = %d", currentState);
       if (hasDefinedState() && maxPushInterval!=Never) {
@@ -187,7 +187,7 @@ bool BinaryInputBehaviour::pushInput(bool aChanged)
       }
       return true;
     }
-    else if (mDevice.isPublicDS()) {
+    else if (mDevice.isPublicDS() || mDevice.isBridged()) {
       OLOG(LOG_NOTICE, "could not be pushed");
     }
   }
@@ -205,7 +205,7 @@ void BinaryInputBehaviour::reportFinalState()
 {
   // push the current value (after awaiting minPushInterval or after maxPushInterval has passed)
   updateTicket.cancel();
-  if (pushBehaviourState()) {
+  if (pushBehaviourState(true, true)) {
     OLOG(LOG_NOTICE, "now pushes current state (%d) after awaiting minPushInterval", currentState);
     lastPush = MainLoop::currentMainLoop().now();
   }
@@ -223,7 +223,7 @@ void BinaryInputBehaviour::invalidateInputState()
     // push invalidation (primitive clients not capable of NULL will at least see state==false)
     MLMicroSeconds now = MainLoop::now();
     // push the invalid state
-    if (pushBehaviourState()) {
+    if (pushBehaviourState(true, true)) {
       lastPush = now;
     }
     // notify listeners

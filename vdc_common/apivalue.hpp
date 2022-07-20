@@ -30,7 +30,12 @@ using namespace std;
 
 namespace p44 {
 
+  /// API domains
+  #define VDC_API_DOMAIN 0x0042
+  #define VDC_CFG_DOMAIN 0x1000
+  #define BRIDGE_DOMAIN 0x2000
 
+  /// API Value types
   typedef enum {
     apivalue_null,
     apivalue_bool,

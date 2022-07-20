@@ -203,7 +203,7 @@ namespace p44 {
     void identificationOK(IdentifyDeviceCB aIdentifyCB, Device *aActualDevice = NULL);
 
     /// called when vdsm acknowledges announcement of this device.
-    virtual void announcementAcknowledged() P44_OVERRIDE;
+    virtual void vdSMAnnouncementAcknowledged() P44_OVERRIDE;
 
     /// load parameters from persistent DB
     /// @note this is usually called from the device container when device is added (detected), before initializeDevice() and after identifyDevice()
@@ -399,6 +399,11 @@ namespace p44 {
     /// @note devices returning false here might still be disconnectable using disconnect() triggered
     ///   by vDC API "remove" method.
     virtual bool isSoftwareDisconnectable() { return false; }; // by default, devices cannot be removed via Web-UI
+
+    #if ENABLE_JSONBRIDGEAPI
+    /// @return true if addressable can be bridged
+    virtual bool bridgeable() P44_OVERRIDE { return true; } // by default, devices are bridgeable
+    #endif
 
     /// report that device has vanished (disconnected without being told so via vDC API)
     /// This will call disconnect() on the device, and remove it from all vDC container lists
