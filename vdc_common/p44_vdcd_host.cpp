@@ -449,6 +449,7 @@ SocketCommPtr P44VdcHost::configApiConnectionHandler(SocketCommPtr aServerSocket
 void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonObject)
 {
   ErrorPtr err;
+  string reqid; // not really needed for cfg API, but might be helpful for debugging
   // when coming from mg44, requests have the following form (peer from mg44 3.9 onwards)
   // - for GET requests like http://localhost:8080/api/json/myuri?foo=bar&this=that
   //   {"method":"GET", "uri":"myuri", "peer":"ip_addr", "uri_params":{"foo":"bar", "this":"that"}}
@@ -493,7 +494,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         // Notes:
         // - if dSUID is specified invalid or empty, the vdc host itself is addressed.
         // - use x-p44-vdcs and x-p44-devices properties to find dsuids
-        aError = processVdcRequest(mConfigApi, aJsonComm, request);
+        aError = processVdcRequest(mConfigApi, aJsonComm, request, reqid);
       }
       #if ENABLE_LEGACY_P44CFGAPI
       else if (apiselector=="p44") {
@@ -509,7 +510,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
           aError = WebError::webErr(500, "no features instantiated, API not active");
         }
         else {
-          ApiRequestPtr req = ApiRequestPtr(new APICallbackRequest(request, boost::bind(&P44VdcHost::sendJsonApiResponse, aJsonComm, _1, _2)));
+          ApiRequestPtr req = ApiRequestPtr(new APICallbackRequest(request, boost::bind(&P44VdcHost::sendJsonApiResponse, aJsonComm, _1, _2, "")));
           featureApi->handleRequest(req);
         }
       }
@@ -535,7 +536,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   }
   // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
   if (aError) {
-    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError);
+    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError, reqid);
   }
 }
 
@@ -570,7 +571,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
 
 // MARK: - methods for JSON APIs
 
-void P44VdcHost::sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError)
+void P44VdcHost::sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError, string aReqId)
 {
   // create response
   JsonObjectPtr response = JsonObject::newObj();
@@ -589,17 +590,23 @@ void P44VdcHost::sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResul
     // no error, return result (if any)
     response->add("result", aResult);
   }
+  if (!aReqId.empty()) {
+    response->add("id", JsonObject::newString(aReqId));
+  }
   LOG(LOG_DEBUG, "JSON API response: %s", response->c_strValue());
   aJsonComm->sendMessage(response);
 }
 
 
 // access to vdc API methods and notifications via web requests
-ErrorPtr P44VdcHost::processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest)
+ErrorPtr P44VdcHost::processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest, string &aReqId)
 {
   ErrorPtr err;
   string cmd;
   bool isMethod = false;
+  // requests might have an id which is reflected in answers
+  JsonObjectPtr r = aRequest->get("id");
+  if (r) aReqId = r->stringValue();
   // get method/notification and params
   JsonObjectPtr m = aRequest->get("method");
   if (m) {
@@ -619,7 +626,7 @@ ErrorPtr P44VdcHost::processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJs
     // get params
     // Note: the "method" or "notification" param will also be in the params, but should not cause any problem
     ApiValuePtr params = JsonApiValue::newValueFromJson(aRequest);
-    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm, aApi));
+    P44JsonApiRequestPtr request = P44JsonApiRequestPtr(new P44JsonApiRequest(aJsonComm, aApi, aReqId));
     if (isMethod) {
       // create request
       // check for old-style name/index and generate basic query (1 or 2 levels)
@@ -675,9 +682,10 @@ ApiValuePtr P44JsonApiConnection::newApiValue()
 
 // MARK: - P44JsonApiRequest
 
-P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aRequestJsonComm, VdcApiConnectionPtr aJsonApi) :
+P44JsonApiRequest::P44JsonApiRequest(JsonCommPtr aRequestJsonComm, VdcApiConnectionPtr aJsonApi, string aRequestId) :
   mJsonComm(aRequestJsonComm),
-  mJsonApi(aJsonApi)
+  mJsonApi(aJsonApi),
+  mRequestId(aRequestId)
 {
 }
 
@@ -693,11 +701,11 @@ ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
   LOG(LOG_DEBUG, "%s <- vdcd (JSON) result: %s", mJsonApi->apiName(), aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   if (result) {
-    P44VdcHost::sendJsonApiResponse(mJsonComm, result->jsonObject(), ErrorPtr());
+    P44VdcHost::sendJsonApiResponse(mJsonComm, result->jsonObject(), ErrorPtr(), mRequestId);
   }
   else {
     // JSON APIs: always return SOMETHING as result
-    P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObject::newNull(), ErrorPtr());
+    P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObject::newNull(), ErrorPtr(), mRequestId);
   }
   return ErrorPtr();
 }
@@ -710,7 +718,7 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
     aError = Error::ok();
   }
   LOG(LOG_DEBUG, "%s <- vdcd (JSON) error: %ld (%s)", mJsonApi->apiName(), aError->getErrorCode(), aError->getErrorMessage());
-  P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObjectPtr(), aError);
+  P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObjectPtr(), aError, mRequestId);
   return ErrorPtr();
 }
 
@@ -746,14 +754,15 @@ void P44VdcHost::bridgeApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
 {
   ErrorPtr err;
   signalActivity(); // bridge API calls are activity as well
+  string reqid;
   if (Error::isOK(aError)) {
     // not JSON level error, try to process
     LOG(LOG_DEBUG, "bridge -> vdcd (JSON) request received: %s", aJsonRequest->c_strValue());
-    aError = processVdcRequest(mBridgeApi, aJsonComm, aJsonRequest);
+    aError = processVdcRequest(mBridgeApi, aJsonComm, aJsonRequest, reqid);
   }
   // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
   if (aError) {
-    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError);
+    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError, reqid);
   }
 }
 
@@ -905,7 +914,7 @@ ApiRequestObj::ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest) :
 
 void ApiRequestObj::sendResponse(JsonObjectPtr aResponse, ErrorPtr aError)
 {
-  if (mConnection) P44VdcHost::sendJsonApiResponse(mConnection, aResponse, aError);
+  if (mConnection) P44VdcHost::sendJsonApiResponse(mConnection, aResponse, aError, 0 /* no reqno */);
   mConnection.reset(); // done now
 }
 

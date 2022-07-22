@@ -239,6 +239,18 @@ void Device::setName(const string &aName)
     if (mDeviceSettings) {
       mDeviceSettings->markDirty();
     }
+    #if ENABLE_JSONBRIDGEAPI
+    // inform bridges
+    if (isBridged()) {
+      VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
+      if (api) {
+        ApiValuePtr query = api->newApiValue();
+        query->setType(apivalue_object);
+        query->add("name", query->newNull());
+        pushNotification(api, query, ApiValuePtr());
+      }
+    }
+    #endif
   }
 }
 

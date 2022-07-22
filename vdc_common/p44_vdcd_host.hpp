@@ -101,15 +101,16 @@ namespace p44 {
 
     JsonCommPtr mJsonComm;
     VdcApiConnectionPtr mJsonApi;
+    string mRequestId;
 
   public:
 
     /// constructor
-    P44JsonApiRequest(JsonCommPtr aRequestJsonComm, VdcApiConnectionPtr aJsonApi);
+    P44JsonApiRequest(JsonCommPtr aRequestJsonComm, VdcApiConnectionPtr aJsonApi, string aRequestId);
 
     /// return the request ID as a string
     /// @return request ID as string
-    virtual string requestId()  P44_OVERRIDE { return ""; }
+    virtual string requestId()  P44_OVERRIDE { return mRequestId; }
 
     /// get the API connection this request originates from
     /// @return API connection
@@ -371,7 +372,7 @@ namespace p44 {
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
-    static void sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError);
+    static void sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError, string aRequestId);
     #endif
 
   protected:
@@ -382,7 +383,7 @@ namespace p44 {
 
     #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
     void configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonObject);
-    ErrorPtr processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
+    ErrorPtr processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest, string &aReqId);
     #endif
 
     #if ENABLE_JSONCFGAPI
