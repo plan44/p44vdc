@@ -224,7 +224,7 @@ ErrorPtr OlaVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
             // confirm
             ApiValuePtr r = aRequest->newApiValue();
             r->setType(apivalue_object);
-            r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
+            r->add("dSUID", r->newBinary(dev->mDSUID.getBinary()));
             r->add("rowid", r->newUint64(dev->olaDeviceRowID));
             r->add("name", r->newString(dev->getName()));
             aRequest->sendResult(r);

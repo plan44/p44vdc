@@ -811,7 +811,7 @@ ErrorPtr CustomActions::load()
   ErrorPtr err;
 
   // custom actions are stored by dSUID
-  string parentID = singleDevice.dSUID.getString();
+  string parentID = singleDevice.mDSUID.getString();
   // create a template
   CustomActionPtr newAction = CustomActionPtr(new CustomAction(singleDevice));
   // get the query
@@ -842,7 +842,7 @@ ErrorPtr CustomActions::save()
   ErrorPtr err;
 
   // custom actions are stored by dSUID
-  string parentID = singleDevice.dSUID.getString();
+  string parentID = singleDevice.mDSUID.getString();
   // save all elements of the map (only dirty ones will be actually stored to DB
   for (CustomActionsVector::iterator pos = customActions.begin(); pos!=customActions.end(); ++pos) {
     err = (*pos)->saveToStore(parentID.c_str(), true); // multiple children of same parent allowed

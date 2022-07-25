@@ -71,14 +71,14 @@ private:
     realTests(0)
   {
     // start testing
-    nextVdc = vdcHost.vdcs.begin();
+    nextVdc = vdcHost.mVdcs.begin();
     testNextVdc();
   }
 
 
   void testNextVdc()
   {
-    if (nextVdc!=vdcHost.vdcs.end()) {
+    if (nextVdc!=vdcHost.mVdcs.end()) {
       // ok, test next
       // - start green/yellow blinking = test in progress
       greenLED->steadyOn();

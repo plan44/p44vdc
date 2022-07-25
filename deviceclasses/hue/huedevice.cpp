@@ -702,7 +702,7 @@ void HueDevice::deriveDsUid()
     s = "hueUniqueID::";
     s += mUniqueID;
   }
-  dSUID.setNameInSpace(s, vdcNamespace);
+  mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 

@@ -30,7 +30,7 @@ DeviceSettings::DeviceSettings(Device &aDevice) :
   inherited(aDevice.getVdcHost().getDsParamStore()),
   mDevice(aDevice),
   mDeviceFlags(0),
-  zoneID(0)
+  mZoneID(0)
 {
 }
 
@@ -76,7 +76,7 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
   // get the field value
   aRow->getIfNotNull<int>(aIndex++, mDeviceFlags);
   mDevice.initializeName(nonNullCStr(aRow->get<const char *>(aIndex++))); // do not propagate to HW!
-  aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, zoneID);
+  aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, mZoneID);
 }
 
 
@@ -87,5 +87,5 @@ void DeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
   // bind the fields
   aStatement.bind(aIndex++, mDeviceFlags);
   aStatement.bind(aIndex++, mDevice.getAssignedName().c_str(), false);  // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, (int)zoneID);
+  aStatement.bind(aIndex++, (int)mZoneID);
 }

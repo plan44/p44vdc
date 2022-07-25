@@ -1078,7 +1078,7 @@ bool Device::updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bo
       // content hash must represent the contents of the called scenes in all affected devices
       Fnv64 sh(mPreparedScene->sceneHash());
       if (sh.getHash()==0) return false; // scene not hashable -> not part of optimized set
-      sh.addString(dSUID.getBinary()); // add device dSUID to make it "mixable" (i.e. combine into one hash via XOR in any order)
+      sh.addString(mDSUID.getBinary()); // add device dSUID to make it "mixable" (i.e. combine into one hash via XOR in any order)
       aDeliveryState->contentsHash ^= sh.getHash(); // mix
       return true;
     }
@@ -1105,7 +1105,7 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
   bool include = updateDeliveryState(aDeliveryState, true);
   if (include) {
     // the device must be added to the device hash
-    dSUID.xorDsUidIntoMix(aDeliveryState->affectedDevicesHash, true); // subdevice-safe mixing
+    mDSUID.xorDsUidIntoMix(aDeliveryState->affectedDevicesHash, true); // subdevice-safe mixing
     aDeliveryState->affectedDevices.push_back(DevicePtr(this));
     return true;
   }
@@ -2026,7 +2026,7 @@ ErrorPtr Device::load()
   }
   // load the device settings
   if (mDeviceSettings) {
-    err = mDeviceSettings->loadFromStore(dSUID.getString().c_str());
+    err = mDeviceSettings->loadFromStore(mDSUID.getString().c_str());
     if (Error::notOK(err)) OLOG(LOG_ERR,"Error loading settings: %s", err->text());
   }
   // load the behaviours
@@ -2046,7 +2046,7 @@ ErrorPtr Device::save()
 {
   ErrorPtr err;
   // save the device settings
-  if (mDeviceSettings) err = mDeviceSettings->saveToStore(dSUID.getString().c_str(), false); // only one record per device
+  if (mDeviceSettings) err = mDeviceSettings->saveToStore(mDSUID.getString().c_str(), false); // only one record per device
   if (Error::notOK(err)) OLOG(LOG_ERR,"Error saving settings: %s", err->text());
   // save the behaviours
   for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) (*pos)->save();
@@ -2456,12 +2456,12 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
         case zoneName_key:
           LocalControllerPtr lc = getVdcHost().getLocalController();
           if (!lc) return false; // only available with localcontroller
-          ZoneDescriptorPtr z = LocalController::sharedLocalController()->mLocalZones.getZoneById(mDeviceSettings->zoneID, false);
+          ZoneDescriptorPtr z = LocalController::sharedLocalController()->mLocalZones.getZoneById(mDeviceSettings->mZoneID, false);
           string zn;
-          if (mDeviceSettings->zoneID!=0) {
+          if (mDeviceSettings->mZoneID!=0) {
             // no name for devices without zone assignment (even if localcontroller does have a name for those)
             if (z) zn = z->getName();
-            else zn = string_format("Zone_#%d", mDeviceSettings->zoneID);
+            else zn = string_format("Zone_#%d", mDeviceSettings->mZoneID);
           }
           aPropValue->setStringValue(zn);
           return true;

@@ -91,41 +91,41 @@ using namespace p44;
 static VdcHost *sharedVdcHostP = NULL;
 
 VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
-  inheritedParams(dsParamStore),
+  inheritedParams(mDSParamStore),
   mac(0),
-  networkConnected(true), // start with the assumption of a connected network
-  maxApiVersion(0), // no API version limit
-  externalDsuid(false),
-  vdcHostInstance(0),
-  storedDsuid(false),
-  allowCloud(false),
+  mNetworkConnected(true), // start with the assumption of a connected network
+  mMaxApiVersion(0), // no API version limit
+  mExternalDsuid(false),
+  mVdcHostInstance(0),
+  mStoredDsuid(false),
+  mAllowCloud(false),
   DsAddressable(this),
-  collecting(false),
-  lastActivity(Never),
-  lastPeriodicRun(Never),
-  learningMode(false),
-  localDimDirection(0), // undefined
-  mainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
-  mainLoopStatsCounter(0),
-  persistentChannels(aWithPersistentChannels),
+  mCollecting(false),
+  mLastActivity(Never),
+  mLastPeriodicRun(Never),
+  mLearningMode(false),
+  mLocalDimDirection(0), // undefined
+  mMainloopStatsInterval(DEFAULT_MAINLOOP_STATS_INTERVAL),
+  mMainLoopStatsCounter(0),
+  mPersistentChannels(aWithPersistentChannels),
   #if P44SCRIPT_FULL_SUPPORT
-  mainScript(sourcecode+regular, "mainscript", this),
+  mMainScript(sourcecode+regular, "mainscript", this),
   #endif
   #if P44SCRIPT_FULL_SUPPORT
-  globalScriptsStarted(false),
+  mGlobalScriptsStarted(false),
   #endif
-  productName(DEFAULT_PRODUCT_NAME),
-  geolocation() // default location will be set from timeutils
+  mProductName(DEFAULT_PRODUCT_NAME),
+  mGeolocation() // default location will be set from timeutils
 {
   #if ENABLE_P44SCRIPT
-  P44Script::StandardScriptingDomain::sharedDomain().setGeoLocation(&geolocation);
+  P44Script::StandardScriptingDomain::sharedDomain().setGeoLocation(&mGeolocation);
   #if P44SCRIPT_FULL_SUPPORT
   // vdchost is the global context for this app, so register its members in the standard scripting
   // domain making them accessible in all scripts
   StandardScriptingDomain::sharedDomain().registerMemberLookup(VdcHostLookup::sharedLookup());
-  vdcHostScriptContext = StandardScriptingDomain::sharedDomain().newContext();
+  mVdcHostScriptContext = StandardScriptingDomain::sharedDomain().newContext();
   // init main script source
-  mainScript.setSharedMainContext(vdcHostScriptContext);
+  mMainScript.setSharedMainContext(mVdcHostScriptContext);
   // Add some extras
   #if ENABLE_HTTP_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::HttpLookup);
@@ -163,11 +163,11 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if ENABLE_LOCALCONTROLLER
   if (aWithLocalController) {
     // create it
-    localController = LocalControllerPtr(new LocalController(*this));
+    mLocalController = LocalControllerPtr(new LocalController(*this));
   }
   #endif
   // initialize real time jump detection as early as possible (to catch changes happening during initialisation)
-  timeOfDayDiff = Infinite;
+  mTimeOfDayDiff = Infinite;
   checkTimeOfDayChange(); // will not post a event when timeOfDayDiff is Infinite
   // ensure save when we quit
   MainLoop::currentMainLoop().registerCleanupHandler(boost::bind(&VdcHost::save, this));
@@ -177,7 +177,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
 VdcHost::~VdcHost()
 {
   #if ENABLE_LOCALCONTROLLER
-  if (localController) localController.reset();
+  if (mLocalController) mLocalController.reset();
   #endif
 }
 
@@ -191,14 +191,14 @@ VdcHostPtr VdcHost::sharedVdcHost()
 #if ENABLE_LOCALCONTROLLER
 LocalControllerPtr VdcHost::getLocalController()
 {
-  return localController;
+  return mLocalController;
 }
 #endif
 
 
 void VdcHost::setEventMonitor(VdchostEventCB aEventCB)
 {
-  eventMonitorHandler = aEventCB;
+  mEventMonitorHandler = aEventCB;
 }
 
 
@@ -212,7 +212,7 @@ void VdcHost::identifyToUser()
 bool VdcHost::canIdentifyToUser()
 {
   // assume vdchost can identify itself when it has a event monitor installed which will actually see vdchost_identify
-  return eventMonitorHandler!=NULL;
+  return mEventMonitorHandler!=NULL;
 }
 
 
@@ -222,19 +222,19 @@ void VdcHost::postEvent(VdchostEvent aEvent)
   if (aEvent>=vdchost_redistributed_events) {
     // let all vdcs (and their devices) know
     LOG(LOG_INFO, ">>> vdcs start processing global event %d", (int)aEvent);
-    for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
+    for (VdcMap::iterator pos = mVdcs.begin(); pos != mVdcs.end(); ++pos) {
       pos->second->handleGlobalEvent(aEvent);
     }
     LOG(LOG_INFO, ">>> vdcs done processing event %d", (int)aEvent);
   }
   #if ENABLE_LOCALCONTROLLER
-  if (localController) localController->processGlobalEvent(aEvent);
+  if (mLocalController) mLocalController->processGlobalEvent(aEvent);
   #endif
   // let vdchost itself know
   handleGlobalEvent(aEvent);
   // also let app-level event monitor know
-  if (eventMonitorHandler) {
-    eventMonitorHandler(aEvent);
+  if (mEventMonitorHandler) {
+    mEventMonitorHandler(aEvent);
   }
 }
 
@@ -244,9 +244,9 @@ void VdcHost::handleGlobalEvent(VdchostEvent aEvent)
   if (aEvent==vdchost_devices_initialized) {
     #if P44SCRIPT_FULL_SUPPORT
     // after the first device initialisation run, it is the moment to start global scripts
-    if (!globalScriptsStarted) {
+    if (!mGlobalScriptsStarted) {
       // only once
-      globalScriptsStarted = true;
+      mGlobalScriptsStarted = true;
       runGlobalScripts();
     }
     #endif // P44SCRIPT_FULL_SUPPORT
@@ -257,7 +257,7 @@ void VdcHost::handleGlobalEvent(VdchostEvent aEvent)
 
 ApiValuePtr VdcHost::newApiValue()
 {
-  return vdcApiServer ? vdcApiServer->newApiValue() : ApiValuePtr(new JsonApiValue);
+  return mVdcApiServer ? mVdcApiServer->newApiValue() : ApiValuePtr(new JsonApiValue);
 }
 
 
@@ -277,14 +277,14 @@ void VdcHost::setName(const string &aName)
 
 void VdcHost::setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC, int aInstance)
 {
-  vdcHostInstance = aInstance;
+  mVdcHostInstance = aInstance;
   if (!aIfNameForMAC.empty()) {
     // use MAC from specific interface
     mac = macAddress(aIfNameForMAC.c_str());
   }
   if (aExternalDsUid) {
-    externalDsuid = true;
-    dSUID = *aExternalDsUid;
+    mExternalDsuid = true;
+    mDSUID = *aExternalDsUid;
   }
 }
 
@@ -292,51 +292,51 @@ void VdcHost::setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC, int
 
 void VdcHost::addVdc(VdcPtr aVdcPtr)
 {
-  vdcs[aVdcPtr->getDsUid()] = aVdcPtr;
+  mVdcs[aVdcPtr->getDsUid()] = aVdcPtr;
 }
 
 
 
 void VdcHost::setIconDir(const char *aIconDir)
 {
-	iconDir = nonNullCStr(aIconDir);
-	if (!iconDir.empty() && iconDir[iconDir.length()-1]!='/') {
-		iconDir.append("/");
+	mIconDir = nonNullCStr(aIconDir);
+	if (!mIconDir.empty() && mIconDir[mIconDir.length()-1]!='/') {
+		mIconDir.append("/");
 	}
 }
 
 
 const char *VdcHost::getIconDir()
 {
-	return iconDir.c_str();
+	return mIconDir.c_str();
 }
 
 
 
 void VdcHost::setPersistentDataDir(const char *aPersistentDataDir)
 {
-	persistentDataDir = nonNullCStr(aPersistentDataDir);
-  pathstring_format_append(persistentDataDir,""); // make sure filenames can be appended without adding a delimiter
+	mPersistentDataDir = nonNullCStr(aPersistentDataDir);
+  pathstring_format_append(mPersistentDataDir,""); // make sure filenames can be appended without adding a delimiter
 }
 
 
 const char *VdcHost::getPersistentDataDir()
 {
-	return persistentDataDir.c_str();
+	return mPersistentDataDir.c_str();
 }
 
 
 
 void VdcHost::setConfigDir(const char *aConfigDir)
 {
-  configDir = nonNullCStr(aConfigDir);
-  pathstring_format_append(configDir,""); // make sure filenames can be appended without adding a delimiter
+  mConfigDir = nonNullCStr(aConfigDir);
+  pathstring_format_append(mConfigDir,""); // make sure filenames can be appended without adding a delimiter
 }
 
 
 const char *VdcHost::getConfigDir()
 {
-  return configDir.c_str();
+  return mConfigDir.c_str();
 }
 
 
@@ -346,7 +346,7 @@ string VdcHost::publishedDescription()
 {
   // derive the descriptive name
   // "%V %M%N %S"
-  string n = descriptionTemplate;
+  string n = mDescriptionTemplate;
   if (n.empty()) n = DEFAULT_DESCRIPTION_TEMPLATE;
   string s;
   size_t i;
@@ -381,7 +381,7 @@ bool VdcHost::isApiConnected()
 
 uint32_t VdcHost::getIpV4Address()
 {
-  return ipv4Address(ifNameForConn.c_str());
+  return ipv4Address(mIfNameForConn.c_str());
 }
 
 
@@ -391,13 +391,13 @@ bool VdcHost::isNetworkConnected()
   // Only consider connected if we have a IP address, and none from the 169.254.0.0/16
   // link-local autoconfigured ones (RFC 3927/APIPA).
   bool nowConnected = (ipv4!=0) && ((ipv4 & 0xFFFF0000)!=0xA9FE0000);
-  if (nowConnected!=networkConnected) {
+  if (nowConnected!=mNetworkConnected) {
     // change in connection status - post it
-    networkConnected = nowConnected;
-    LOG(LOG_NOTICE, "*** Network connection %s", networkConnected ? "re-established" : "lost");
-    postEvent(networkConnected ? vdchost_network_reconnected : vdchost_network_lost);
+    mNetworkConnected = nowConnected;
+    LOG(LOG_NOTICE, "*** Network connection %s", mNetworkConnected ? "re-established" : "lost");
+    postEvent(mNetworkConnected ? vdchost_network_reconnected : vdchost_network_lost);
   }
-  return networkConnected;
+  return mNetworkConnected;
 }
 
 
@@ -407,15 +407,15 @@ void VdcHost::checkTimeOfDayChange()
   MainLoop::getLocalTime(lt);
   long long lm = ((((long long)lt.tm_year*366+lt.tm_yday)*24+lt.tm_hour)*60+lt.tm_min)*60+lt.tm_sec; // local time fingerprint (not monotonic, not accurate)
   MLMicroSeconds td = MainLoop::now()-lm*Second;
-  if (timeOfDayDiff==Infinite) {
-    timeOfDayDiff = td; // first time
+  if (mTimeOfDayDiff==Infinite) {
+    mTimeOfDayDiff = td; // first time
   }
   else {
-    MLMicroSeconds d = timeOfDayDiff-td;
+    MLMicroSeconds d = mTimeOfDayDiff-td;
     if (d<0) d = -d;
     if (d>5*Second) {
-      LOG(LOG_NOTICE, "*** Time-Of-Day has changed by %.f seconds", (double)(timeOfDayDiff-td)/Second);
-      timeOfDayDiff = td;
+      LOG(LOG_NOTICE, "*** Time-Of-Day has changed by %.f seconds", (double)(mTimeOfDayDiff-td)/Second);
+      mTimeOfDayDiff = td;
       postEvent(vdchost_timeofday_changed);
     }
   }
@@ -454,7 +454,7 @@ void VdcHost::prepareForVdcs(bool aFactoryReset)
   // initialize dsParamsDB database
   string databaseName = getPersistentDataDir();
   string_format_append(databaseName, "DsParams.sqlite3");
-  ErrorPtr error = dsParamStore.connectAndInitialize(databaseName.c_str(), DSPARAMS_SCHEMA_VERSION, DSPARAMS_SCHEMA_MIN_VERSION, aFactoryReset);
+  ErrorPtr error = mDSParamStore.connectAndInitialize(databaseName.c_str(), DSPARAMS_SCHEMA_VERSION, DSPARAMS_SCHEMA_MIN_VERSION, aFactoryReset);
   // load the vdc host settings and determine the dSUID (external > stored > mac-derived)
   loadAndFixDsUID();
 }
@@ -468,23 +468,23 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     "\n*** Product name: '%s', Product Version: '%s', App Version: '%s', Device Hardware ID: '%s'"
     "\n*** dSUID (%s) = %s, MAC: %s, IP = %s\n",
     publishedDescription().c_str(),
-    vdcHostInstance,
-    productName.c_str(),
-    productVersion.c_str(),
+    mVdcHostInstance,
+    mProductName.c_str(),
+    mProductVersion.c_str(),
     Application::sharedApplication()->version().c_str(),
-    deviceHardwareId.c_str(),
-    externalDsuid ? "external" : "MAC-derived",
+    mDeviceHardwareId.c_str(),
+    mExternalDsuid ? "external" : "MAC-derived",
     shortDesc().c_str(),
     macAddressToString(mac, ':').c_str(),
     ipv4ToString(getIpV4Address()).c_str()
   );
   // start the API server if API is enabled
-  if (vdcApiServer) {
-    vdcApiServer->setConnectionStatusHandler(boost::bind(&VdcHost::vdcApiConnectionStatusHandler, this, _1, _2));
-    vdcApiServer->start();
+  if (mVdcApiServer) {
+    mVdcApiServer->setConnectionStatusHandler(boost::bind(&VdcHost::vdcApiConnectionStatusHandler, this, _1, _2));
+    mVdcApiServer->start();
   }
   // start initialisation of vDCs
-  initializeNextVdc(aCompletedCB, aFactoryReset, vdcs.begin());
+  initializeNextVdc(aCompletedCB, aFactoryReset, mVdcs.begin());
 }
 
 
@@ -492,7 +492,7 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc)
 {
   // initialize all vDCs, even when some have errors
-  if (aNextVdc!=vdcs.end()) {
+  if (aNextVdc!=mVdcs.end()) {
     // load persistent params for vdc (dSUID is already stable at this point, cannot depend on initialize()!)
     aNextVdc->second->load();
     // initialize with parameters already loaded
@@ -526,9 +526,9 @@ void VdcHost::startRunning()
   //   but will post network lost event if we do NOT have a connection now.
   isNetworkConnected();
   // start periodic tasks needed during normal running like announcement checking and saving parameters
-  periodicTaskTicket.executeOnce(boost::bind(&VdcHost::periodicTask, vdcHostP, _2), 1*Second);
+  mPeriodicTaskTicket.executeOnce(boost::bind(&VdcHost::periodicTask, mVdcHostP, _2), 1*Second);
   #if ENABLE_LOCALCONTROLLER
-  if (localController) localController->startRunning();
+  if (mLocalController) mLocalController->startRunning();
   #endif
 }
 
@@ -539,8 +539,8 @@ void VdcHost::startRunning()
 
 void VdcHost::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
-  if (!collecting) {
-    collecting = true;
+  if (!mCollecting) {
+    mCollecting = true;
     if ((aRescanFlags & rescanmode_incremental)==0) {
       // only for non-incremental collect, close vdsm connection
       if (mVdsmSessionConnection) {
@@ -550,16 +550,16 @@ void VdcHost::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
         mVdsmSessionConnection.reset(); // forget connection
         postEvent(vdchost_vdcapi_disconnected);
       }
-      dSDevices.clear(); // forget existing ones
+      mDSDevices.clear(); // forget existing ones
     }
-    collectFromNextVdc(aCompletedCB, aRescanFlags, vdcs.begin());
+    collectFromNextVdc(aCompletedCB, aRescanFlags, mVdcs.begin());
   }
 }
 
 
 void VdcHost::collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc)
 {
-  if (aNextVdc!=vdcs.end()) {
+  if (aNextVdc!=mVdcs.end()) {
     VdcPtr vdc = aNextVdc->second;
     LOG(LOG_NOTICE,
       "=== collecting devices from vdc %s (%s #%d)",
@@ -574,7 +574,7 @@ void VdcHost::collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags,
   postEvent(vdchost_devices_collected);
   LOG(LOG_NOTICE, "=== collected devices from all vdcs -> initializing devices now\n");
   // now initialize devices (which are already identified by now!)
-  initializeNextDevice(aCompletedCB, dSDevices.begin());
+  initializeNextDevice(aCompletedCB, mDSDevices.begin());
 }
 
 
@@ -592,7 +592,7 @@ void VdcHost::vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMa
 
 void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice)
 {
-  if (aNextDevice!=dSDevices.end()) {
+  if (aNextDevice!=mDSDevices.end()) {
     // TODO: now never doing factory reset init, maybe parametrize later
     aNextDevice->second->initializeDevice(boost::bind(&VdcHost::nextDeviceInitialized, this, aCompletedCB, aNextDevice, _1), false);
     return;
@@ -601,7 +601,7 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
   postEvent(vdchost_devices_initialized);
   // check for global vdc errors now
   ErrorPtr vdcInitErr;
-  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); pos++) {
+  for (VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); pos++) {
     if (Error::notOK(pos->second->getVdcErr())) {
       vdcInitErr = pos->second->getVdcErr();
       LOG(LOG_ERR, "*** initial device collecting incomplete because of error: %s", vdcInitErr->text());
@@ -610,11 +610,11 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
   }
   aCompletedCB(vdcInitErr);
   LOG(LOG_NOTICE, "=== initialized all collected devices\n");
-  collecting = false;
+  mCollecting = false;
   // make sure at least one vdc can be announced to dS, even if all are empty and instructed to hide when empty
   bool someVisible = false;
   VdcPtr firstPublic;
-  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+  for (VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
     VdcPtr vdc = pos->second;
     if (vdc->isPublicDS()) {
       if (!firstPublic) firstPublic = vdc;
@@ -648,14 +648,14 @@ DevicePtr VdcHost::getDeviceByNameOrDsUid(const string &aName)
   DsDeviceMap::iterator pos;
   DsUid dsuid;
   if (dsuid.setAsString(aName)) {
-    pos = dSDevices.find(dsuid);
+    pos = mDSDevices.find(dsuid);
   }
   else {
-    for (pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+    for (pos = mDSDevices.begin(); pos!=mDSDevices.end(); ++pos) {
       if (pos->second->getName()==aName) break;
     }
   }
-  if (pos!=dSDevices.end()) {
+  if (pos!=mDSDevices.end()) {
     return pos->second;
   }
   return DevicePtr();
@@ -667,21 +667,21 @@ bool VdcHost::addDevice(DevicePtr aDevice)
   if (!aDevice)
     return false; // no device, nothing added
   // check if device with same dSUID already exists
-  DsDeviceMap::iterator pos = dSDevices.find(aDevice->getDsUid());
-  if (pos!=dSDevices.end()) {
+  DsDeviceMap::iterator pos = mDSDevices.find(aDevice->getDsUid());
+  if (pos!=mDSDevices.end()) {
     LOG(LOG_DEBUG, "- device %s already registered, not adding again",aDevice->shortDesc().c_str());
     // first unwind call chain that triggered deletion, keep aDevice living until then
     MainLoop::currentMainLoop().executeNow(boost::bind(&VdcHost::duplicateIgnored, this, aDevice));
     return false; // duplicate dSUID, not added
   }
   // set for given dSUID in the container-wide map of devices
-  dSDevices[aDevice->getDsUid()] = aDevice;
+  mDSDevices[aDevice->getDsUid()] = aDevice;
   LOG(LOG_NOTICE, "--- added device: %s (not yet initialized)",aDevice->shortDesc().c_str());
   // load the device's persistent params
   aDevice->load();
   // if not collecting, initialize device right away.
   // Otherwise, initialisation will be done when collecting is complete
-  if (!collecting) {
+  if (!mCollecting) {
     aDevice->initializeDevice(boost::bind(&VdcHost::separateDeviceInitialized, this, aDevice, _1), false);
   }
   return true;
@@ -712,7 +712,7 @@ void VdcHost::deviceInitialized(DevicePtr aDevice, ErrorPtr aError)
   else {
     LOG(LOG_NOTICE, "--- initialized device: %s",aDevice->description().c_str());
     #if ENABLE_LOCALCONTROLLER
-    if (localController) localController->deviceAdded(aDevice);
+    if (mLocalController) mLocalController->deviceAdded(aDevice);
     #endif
     aDevice->addedAndInitialized();
   }
@@ -733,10 +733,10 @@ void VdcHost::removeDevice(DevicePtr aDevice, bool aForget)
     aDevice->save();
   }
   // remove from container-wide map of devices
-  dSDevices.erase(aDevice->getDsUid());
+  mDSDevices.erase(aDevice->getDsUid());
   LOG(LOG_NOTICE, "--- removed device: %s", aDevice->shortDesc().c_str());
   #if ENABLE_LOCALCONTROLLER
-  if (localController) localController->deviceRemoved(aDevice);
+  if (mLocalController) mLocalController->deviceRemoved(aDevice);
   #endif
 }
 
@@ -745,10 +745,10 @@ void VdcHost::removeDevice(DevicePtr aDevice, bool aForget)
 void VdcHost::startLearning(LearnCB aLearnHandler, bool aDisableProximityCheck)
 {
   // enable learning in all class containers
-  learnHandler = aLearnHandler;
-  learningMode = true;
+  mLearnHandler = aLearnHandler;
+  mLearningMode = true;
   LOG(LOG_NOTICE, "=== start learning%s", aDisableProximityCheck ? " with proximity check disabled" : "");
-  for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
+  for (VdcMap::iterator pos = mVdcs.begin(); pos != mVdcs.end(); ++pos) {
     pos->second->setLearnMode(true, aDisableProximityCheck, undefined);
   }
 }
@@ -757,12 +757,12 @@ void VdcHost::startLearning(LearnCB aLearnHandler, bool aDisableProximityCheck)
 void VdcHost::stopLearning()
 {
   // disable learning in all class containers
-  for (VdcMap::iterator pos = vdcs.begin(); pos != vdcs.end(); ++pos) {
+  for (VdcMap::iterator pos = mVdcs.begin(); pos != mVdcs.end(); ++pos) {
     pos->second->setLearnMode(false, false, undefined);
   }
   LOG(LOG_NOTICE, "=== stopped learning");
-  learningMode = false;
-  learnHandler.clear();
+  mLearningMode = false;
+  mLearnHandler.clear();
 }
 
 
@@ -777,8 +777,8 @@ void VdcHost::reportLearnEvent(bool aLearnIn, ErrorPtr aError)
     }
   }
   // report status
-  if (learnHandler) {
-    learnHandler(aLearnIn, aError);
+  if (mLearnHandler) {
+    mLearnHandler(aLearnIn, aError);
   }
 }
 
@@ -789,7 +789,7 @@ void VdcHost::reportLearnEvent(bool aLearnIn, ErrorPtr aError)
 
 void VdcHost::signalActivity()
 {
-  lastActivity = MainLoop::now();
+  mLastActivity = MainLoop::now();
   postEvent(vdchost_activitysignal);
 }
 
@@ -797,15 +797,15 @@ void VdcHost::signalActivity()
 
 void VdcHost::setUserActionMonitor(DeviceUserActionCB aUserActionCB)
 {
-  deviceUserActionHandler = aUserActionCB;
+  mDeviceUserActionHandler = aUserActionCB;
 }
 
 
 bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
 {
   LOG(LOG_INFO, "vdSD %s: reports %s user action", aDevice.shortDesc().c_str(), aRegular ? "regular" : "identification");
-  if (deviceUserActionHandler) {
-    deviceUserActionHandler(DevicePtr(&aDevice), aRegular);
+  if (mDeviceUserActionHandler) {
+    mDeviceUserActionHandler(DevicePtr(&aDevice), aRegular);
     return true; // suppress normal action
   }
   if (!aRegular) {
@@ -835,14 +835,14 @@ bool VdcHost::signalDeviceUserAction(Device &aDevice, bool aRegular)
 void VdcHost::periodicTask(MLMicroSeconds aNow)
 {
   // cancel any pending executions
-  periodicTaskTicket.cancel();
+  mPeriodicTaskTicket.cancel();
   // prevent during activity as saving DB might affect performance
   if (
-    (aNow>lastActivity+ACTIVITY_PAUSE_INTERVAL) || // some time passed after last activity or...
-    (aNow>lastPeriodicRun+PERIODIC_TASK_FORCE_INTERVAL) // ...too much time passed since last run
+    (aNow>mLastActivity+ACTIVITY_PAUSE_INTERVAL) || // some time passed after last activity or...
+    (aNow>mLastPeriodicRun+PERIODIC_TASK_FORCE_INTERVAL) // ...too much time passed since last run
   ) {
-    lastPeriodicRun = aNow;
-    if (!collecting) {
+    mLastPeriodicRun = aNow;
+    if (!mCollecting) {
       // re-check network connection, might cause re-collection in some vdcs
       isNetworkConnected();
       // track time of day changes
@@ -853,19 +853,19 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
       save();
     }
   }
-  if (mainloopStatsInterval>0) {
+  if (mMainloopStatsInterval>0) {
     // show mainloop statistics
-    if (mainLoopStatsCounter<=0) {
+    if (mMainLoopStatsCounter<=0) {
       LOG(LOG_INFO, "%s", MainLoop::currentMainLoop().description().c_str());
       MainLoop::currentMainLoop().statistics_reset();
-      mainLoopStatsCounter = mainloopStatsInterval;
+      mMainLoopStatsCounter = mMainloopStatsInterval;
     }
     else {
-      --mainLoopStatsCounter;
+      --mMainLoopStatsCounter;
     }
   }
   // schedule next run
-  periodicTaskTicket.executeOnce(boost::bind(&VdcHost::periodicTask, this, _2), PERIODIC_TASK_INTERVAL);
+  mPeriodicTaskTicket.executeOnce(boost::bind(&VdcHost::periodicTask, this, _2), PERIODIC_TASK_INTERVAL);
 }
 
 
@@ -875,8 +875,8 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
 bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
   #if ENABLE_LOCALCONTROLLER
-  if (localController) {
-    if (localController->processButtonClick(aButtonBehaviour, aClickType)) {
+  if (mLocalController) {
+    if (mLocalController->processButtonClick(aButtonBehaviour, aClickType)) {
       LOG(aClickType!=ct_hold_repeat ? LOG_NOTICE : LOG_INFO, "localcontroller has handled clicktype %d from Button[%zu] '%s' in %s", aClickType, aButtonBehaviour.mIndex, aButtonBehaviour.getHardwareName().c_str(), aButtonBehaviour.mDevice.shortDesc().c_str());
       return true; // handled
     }
@@ -903,14 +903,14 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
   // if button has up/down, direction is derived from button
   int newDirection = aButtonBehaviour.localFunctionElement()==buttonElement_up ? 1 : (aButtonBehaviour.localFunctionElement()==buttonElement_down ? -1 : 0); // -1=down/off, 1=up/on, 0=toggle
   if (newDirection!=0)
-    localDimDirection = newDirection;
+    mLocalDimDirection = newDirection;
   switch (aClickType) {
     case ct_tip_1x:
     case ct_click_1x:
       scene = ROOM_ON;
       // toggle direction if click has none
       if (newDirection==0)
-        localDimDirection *= -1; // reverse if already determined
+        mLocalDimDirection *= -1; // reverse if already determined
       break;
     case ct_tip_2x:
     case ct_click_2x:
@@ -927,7 +927,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
       scene = INC_S; // just as a marker to start dimming (we'll use dimChannelForArea(), not legacy dimming!)
       // toggle direction if click has none
       if (newDirection==0)
-        localDimDirection *= -1; // reverse if already determined
+        mLocalDimDirection *= -1; // reverse if already determined
       break;
     case ct_hold_end:
       scene = STOP_S; // just as a marker to stop dimming (we'll use dimChannelForArea(), not legacy dimming!)
@@ -938,7 +938,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
   if (scene>=0) {
     signalActivity(); // local activity
     // some action to perform on every light device
-    for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+    for (DsDeviceMap::iterator pos = mDSDevices.begin(); pos!=mDSDevices.end(); ++pos) {
       DevicePtr dev = pos->second;
       LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(dev->getOutput());
       if (l) {
@@ -950,23 +950,23 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
         else {
           // call scene or start dimming
           // - figure out direction if not already known
-          if (localDimDirection==0 && l->brightness->getLastSync()!=Never) {
+          if (mLocalDimDirection==0 && l->brightness->getLastSync()!=Never) {
             // get initial direction from current value of first encountered light with synchronized brightness value
-            localDimDirection = l->brightness->getChannelValue() >= l->brightness->getMinDim() ? -1 : 1;
+            mLocalDimDirection = l->brightness->getChannelValue() >= l->brightness->getMinDim() ? -1 : 1;
           }
           if (scene==INC_S) {
             // Start dimming
             // - minimum scene if not already there
-            if (localDimDirection>0 && l->brightness->getChannelValue()==0) {
+            if (mLocalDimDirection>0 && l->brightness->getChannelValue()==0) {
               // starting dimming up from minimum
               l->brightness->setChannelValue(l->brightness->getMinDim(), 0, true);
             }
             // now dim (safety timeout after 10 seconds)
-            dev->dimChannelForArea(channel, localDimDirection>0 ? dimmode_up : dimmode_down, 0, 10*Second);
+            dev->dimChannelForArea(channel, mLocalDimDirection>0 ? dimmode_up : dimmode_down, 0, 10*Second);
           }
           else {
             // call a scene
-            if (localDimDirection<0)
+            if (mLocalDimDirection<0)
               scene = ROOM_OFF; // switching off a scene = call off scene
             dev->callScene(scene, true);
           }
@@ -982,10 +982,10 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
 
 
 NotificationGroup::NotificationGroup(VdcPtr aVdc, DsAddressablePtr aFirstMember) :
-  vdc(aVdc)
+  mVdc(aVdc)
 {
   if (aFirstMember) {
-    members.push_back(aFirstMember);
+    mMembers.push_back(aFirstMember);
   }
 }
 
@@ -1001,9 +1001,9 @@ void VdcHost::addTargetToAudience(NotificationAudience &aAudience, DsAddressable
   }
   // search for notification group for this vdc (for devices, vdc!=NULL) or none (for other addressables, vdc==NULL)
   for (NotificationAudience::iterator pos = aAudience.begin(); pos!=aAudience.end(); ++pos) {
-    if (pos->vdc==vdc) {
+    if (pos->mVdc==vdc) {
       // vdc group already exists, add device
-      pos->members.push_back(aTarget);
+      pos->mMembers.push_back(aTarget);
       return;
     }
   }
@@ -1047,7 +1047,7 @@ void VdcHost::addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZon
 {
   // Zone 0 = all zones
   // group_undefined (0) = all groups
-  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+  for (DsDeviceMap::iterator pos = mDSDevices.begin(); pos!=mDSDevices.end(); ++pos) {
     Device *devP = pos->second.get();
     if (
       (aZone==0 || devP->getZoneID()==aZone) &&
@@ -1063,15 +1063,15 @@ void VdcHost::addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZon
 void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   for (NotificationAudience::iterator gpos = aAudience.begin(); gpos!=aAudience.end(); ++gpos) {
-    if (gpos->vdc) {
-      OLOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s", aNotification.c_str(), gpos->members.size(), gpos->vdc->shortDesc().c_str());
+    if (gpos->mVdc) {
+      OLOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s", aNotification.c_str(), gpos->mMembers.size(), gpos->mVdc->shortDesc().c_str());
       // let vdc process this, might be able to optimize delivery using hardware's native mechanisms such as scenes or groups
-      gpos->vdc->deliverToAudience(gpos->members, aApiConnection, aNotification, aParams);
+      gpos->mVdc->deliverToAudience(gpos->mMembers, aApiConnection, aNotification, aParams);
     }
     else {
-      OLOG(LOG_INFO, "==== delivering notification '%s' to %lu non-devices now", aNotification.c_str(), gpos->members.size());
+      OLOG(LOG_INFO, "==== delivering notification '%s' to %lu non-devices now", aNotification.c_str(), gpos->mMembers.size());
       // just deliver to each member, no optimization for non-devices
-      for (DsAddressablesList::iterator apos = gpos->members.begin(); apos!=gpos->members.end(); ++apos) {
+      for (DsAddressablesList::iterator apos = gpos->mMembers.begin(); apos!=gpos->mMembers.end(); ++apos) {
         (*apos)->handleNotification(aApiConnection, aNotification, aParams);
       }
     }
@@ -1082,7 +1082,7 @@ void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectio
 void VdcHost::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState)
 {
   #if ENABLE_LOCALCONTROLLER
-  if (localController) localController->deviceWillApplyNotification(aDevice, aDeliveryState);
+  if (mLocalController) mLocalController->deviceWillApplyNotification(aDevice, aDeliveryState);
   #endif
 }
 
@@ -1181,7 +1181,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
   // check API version
   if (Error::isOK(respErr = checkParam(aParams, "api_version", v))) {
     int version = v->int32Value();
-    int maxversion = (maxApiVersion==0 || maxApiVersion>=VDC_API_VERSION_MAX) ? VDC_API_VERSION_MAX : maxApiVersion;
+    int maxversion = (mMaxApiVersion==0 || mMaxApiVersion>=VDC_API_VERSION_MAX) ? VDC_API_VERSION_MAX : mMaxApiVersion;
     if (version<VDC_API_VERSION_MIN || version>maxversion) {
       // incompatible version
       respErr = Error::err<VdcApiError>(505, "Incompatible vDC API version - found %d, expected %d..%d", version, VDC_API_VERSION_MIN, maxversion);
@@ -1194,14 +1194,14 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
       DsUid vdsmDsUid;
       if (Error::isOK(respErr = checkDsuidParam(aParams, "dSUID", vdsmDsUid))) {
         // same vdSM can restart session any time. Others will be rejected
-        if (!mVdsmSessionConnection || vdsmDsUid==connectedVdsm) {
+        if (!mVdsmSessionConnection || vdsmDsUid==mConnectedVdsm) {
           // ok to start new session
           if (mVdsmSessionConnection) {
             // session connection was already there, re-announce
             resetAnnouncing();
           }
           // - start session with this vdSM
-          connectedVdsm = vdsmDsUid;
+          mConnectedVdsm = vdsmDsUid;
           // - remember the session's connection
           mVdsmSessionConnection = aRequest->connection();
           // - log connection
@@ -1222,7 +1222,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         }
         else {
           // not ok to start new session, reject
-          respErr = Error::err<VdcApiError>(503, "this vDC already has an active session with %s %s", mVdsmSessionConnection->apiName() ,connectedVdsm.getString().c_str());
+          respErr = Error::err<VdcApiError>(503, "this vDC already has an active session with %s %s", mVdsmSessionConnection->apiName() ,mConnectedVdsm.getString().c_str());
           LOG(LOG_WARNING, "=== hello rejected: %s", respErr->text());
           aRequest->sendError(respErr);
           // close after send
@@ -1264,7 +1264,7 @@ DsAddressablePtr VdcHost::addressableForItemSpec(const string &aItemSpec)
       instanceNo = atoi(query.c_str()+i+1);
       query.erase(i); // cut off :iii part
     }
-    for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+    for (VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
       VdcPtr c = pos->second;
       if (
         strcmp(c->vdcClassIdentifier(), query.c_str())==0 &&
@@ -1290,14 +1290,14 @@ DsAddressablePtr VdcHost::addressableForDsUid(const DsUid &aDsUid)
   else {
     // Must be device or vdc level
     // - find device to handle it (more probable case)
-    DsDeviceMap::iterator pos = dSDevices.find(aDsUid);
-    if (pos!=dSDevices.end()) {
+    DsDeviceMap::iterator pos = mDSDevices.find(aDsUid);
+    if (pos!=mDSDevices.end()) {
       return pos->second;
     }
     else {
       // is not a device, try vdcs
-      VdcMap::iterator pos = vdcs.find(aDsUid);
-      if (pos!=vdcs.end()) {
+      VdcMap::iterator pos = mVdcs.find(aDsUid);
+      if (pos!=mVdcs.end()) {
         return pos->second;
       }
     }
@@ -1446,18 +1446,18 @@ void VdcHost::removeResultHandler(DevicePtr aDevice, VdcApiRequestPtr aRequest, 
 void VdcHost::resetAnnouncing()
 {
   // end pending announcement
-  announcementTicket.cancel();
+  mAnnouncementTicket.cancel();
   // end all device sessions
-  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+  for (DsDeviceMap::iterator pos = mDSDevices.begin(); pos!=mDSDevices.end(); ++pos) {
     DevicePtr dev = pos->second;
-    dev->announced = Never;
-    dev->announcing = Never;
+    dev->mAnnounced = Never;
+    dev->mAnnouncing = Never;
   }
   // end all vdc sessions
-  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+  for (VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
     VdcPtr vdc = pos->second;
-    vdc->announced = Never;
-    vdc->announcing = Never;
+    vdc->mAnnounced = Never;
+    vdc->mAnnouncing = Never;
   }
 }
 
@@ -1466,7 +1466,7 @@ void VdcHost::resetAnnouncing()
 /// start announcing all not-yet announced entities to the vdSM
 void VdcHost::startAnnouncing()
 {
-  if (!collecting && !announcementTicket && mVdsmSessionConnection) {
+  if (!mCollecting && !mAnnouncementTicket && mVdsmSessionConnection) {
     // start announcing
     announceNext();
   }
@@ -1475,48 +1475,48 @@ void VdcHost::startAnnouncing()
 
 void VdcHost::announceNext()
 {
-  if (collecting || !mVdsmSessionConnection) return; // prevent announcements during collect or without connection
+  if (mCollecting || !mVdsmSessionConnection) return; // prevent announcements during collect or without connection
   // cancel re-announcing
-  announcementTicket.cancel();
+  mAnnouncementTicket.cancel();
   // announce vdcs first
-  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+  for (VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
     VdcPtr vdc = pos->second;
     if (
       vdc->isPublicDS() && // only public ones
-      vdc->announced==Never &&
-      (vdc->announcing==Never || MainLoop::now()>vdc->announcing+ANNOUNCE_RETRY_TIMEOUT) &&
+      vdc->mAnnounced==Never &&
+      (vdc->mAnnouncing==Never || MainLoop::now()>vdc->mAnnouncing+ANNOUNCE_RETRY_TIMEOUT) &&
       (!vdc->getVdcFlag(vdcflag_hidewhenempty) || vdc->getNumberOfDevices()>0)
     ) {
       // mark device as being in process of getting announced
-      vdc->announcing = MainLoop::now();
+      vdc->mAnnouncing = MainLoop::now();
       // send announcevdc request
       ApiValuePtr params = getVdsmSessionConnection()->newApiValue();
       params->setType(apivalue_object);
       params->add("dSUID", params->newBinary(vdc->getDsUid().getBinary()));
       if (!vdc->sendRequest(mVdsmSessionConnection, "announcevdc", params, boost::bind(&VdcHost::announceResultHandler, this, vdc, _2, _3, _4))) {
         LOG(LOG_ERR, "Could not send vdc announcement message for %s %s", vdc->entityType(), vdc->shortDesc().c_str());
-        vdc->announcing = Never; // not registering
+        vdc->mAnnouncing = Never; // not registering
       }
       else {
         LOG(LOG_NOTICE, "Sent vdc announcement for %s %s", vdc->entityType(), vdc->shortDesc().c_str());
       }
       // schedule a retry
-      announcementTicket.executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_TIMEOUT);
+      mAnnouncementTicket.executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_TIMEOUT);
       // done for now, continues after ANNOUNCE_TIMEOUT or when registration acknowledged
       return;
     }
   }
   // check all devices for unnannounced ones and announce those
-  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+  for (DsDeviceMap::iterator pos = mDSDevices.begin(); pos!=mDSDevices.end(); ++pos) {
     DevicePtr dev = pos->second;
     if (
       dev->isPublicDS() && // only public ones
       (dev->mVdcP->isAnnounced()) && // class container must have already completed an announcement...
       !dev->isAnnounced() && // ...but not yet device...
-      (dev->announcing==Never || MainLoop::now()>dev->announcing+ANNOUNCE_RETRY_TIMEOUT) // ...and not too soon after last attempt to announce
+      (dev->mAnnouncing==Never || MainLoop::now()>dev->mAnnouncing+ANNOUNCE_RETRY_TIMEOUT) // ...and not too soon after last attempt to announce
     ) {
       // mark device as being in process of getting announced
-      dev->announcing = MainLoop::now();
+      dev->mAnnouncing = MainLoop::now();
       // send announcedevice request
       ApiValuePtr params = getVdcHost().getVdsmSessionConnection()->newApiValue();
       params->setType(apivalue_object);
@@ -1524,13 +1524,13 @@ void VdcHost::announceNext()
       params->add("vdc_dSUID", params->newBinary(dev->mVdcP->getDsUid().getBinary()));
       if (!dev->sendRequest(mVdsmSessionConnection, "announcedevice", params, boost::bind(&VdcHost::announceResultHandler, this, dev, _2, _3, _4))) {
         LOG(LOG_ERR, "Could not send device announcement message for %s %s", dev->entityType(), dev->shortDesc().c_str());
-        dev->announcing = Never; // not announcing
+        dev->mAnnouncing = Never; // not announcing
       }
       else {
         LOG(LOG_NOTICE, "Sent device announcement for %s %s", dev->entityType(), dev->shortDesc().c_str());
       }
       // schedule a retry
-      announcementTicket.executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_TIMEOUT);
+      mAnnouncementTicket.executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_TIMEOUT);
       // done for now, continues after ANNOUNCE_TIMEOUT or when announcement acknowledged
       return;
     }
@@ -1543,14 +1543,14 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
   if (Error::isOK(aError)) {
     // set device announced successfully
     LOG(LOG_NOTICE, "Announcement for %s %s acknowledged by vdSM", aAddressable->entityType(), aAddressable->shortDesc().c_str());
-    aAddressable->announced = MainLoop::now();
-    aAddressable->announcing = Never; // not announcing any more
+    aAddressable->mAnnounced = MainLoop::now();
+    aAddressable->mAnnouncing = Never; // not announcing any more
     aAddressable->vdSMAnnouncementAcknowledged(); // give instance opportunity to do things following an announcement
   }
   // cancel retry timer
-  announcementTicket.cancel();
+  mAnnouncementTicket.cancel();
   // try next announcement, after a pause
-  announcementTicket.executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_PAUSE);
+  mAnnouncementTicket.executeOnce(boost::bind(&VdcHost::announceNext, this), ANNOUNCE_PAUSE);
 }
 
 
@@ -1559,9 +1559,9 @@ void VdcHost::announceResultHandler(DsAddressablePtr aAddressable, VdcApiRequest
 ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
 {
   #if ENABLE_LOCALCONTROLLER
-  if (localController) {
+  if (mLocalController) {
     ErrorPtr lcErr;
-    if (localController->handleLocalControllerMethod(lcErr, aRequest, aMethod, aParams)) {
+    if (mLocalController->handleLocalControllerMethod(lcErr, aRequest, aMethod, aParams)) {
       // local controller did or will handle the method
       return lcErr;
     }
@@ -1574,7 +1574,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     if (o) {
       ScriptSource src(sourcecode+regular+keepvars+concurrently+ephemeralSource, "scriptExec/REPL", this);
       src.setSource(o->stringValue());
-      src.setSharedMainContext(vdcHostScriptContext);
+      src.setSharedMainContext(mVdcHostScriptContext);
       src.run(inherit, boost::bind(&VdcHost::scriptExecHandler, this, aRequest, _1));
     }
     else {
@@ -1585,18 +1585,18 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
   if (aMethod=="x-p44-restartMain") {
     // re-run the main script
     OLOG(LOG_NOTICE, "Re-starting global main script");
-    mainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mainScript.getOriginLabel()), ScriptObjPtr(), Infinite);
+    mMainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel()), ScriptObjPtr(), Infinite);
     return Error::ok();
   }
   if (aMethod=="x-p44-stopMain") {
     // stop the main script
     OLOG(LOG_NOTICE, "Stopping global main script");
-    vdcHostScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "main script stopped"));
+    mVdcHostScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "main script stopped"));
     return Error::ok();
   }
   if (aMethod=="x-p44-checkMain") {
     // check the main script for syntax errors (but do not re-start it)
-    ScriptObjPtr res = mainScript.syntaxcheck();
+    ScriptObjPtr res = mMainScript.syntaxcheck();
     ApiValuePtr checkResult = aRequest->newApiValue();
     checkResult->setType(apivalue_object);
     if (!res || !res->isErr()) {
@@ -1661,7 +1661,7 @@ enum {
 int VdcHost::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   if (aParentDescriptor->hasObjectKey(vdcs_obj)) {
-    return (int)vdcs.size();
+    return (int)mVdcs.size();
   }
   return inherited::numProps(aDomain, aParentDescriptor)+numVdcHostProperties;
 }
@@ -1719,13 +1719,13 @@ PropertyContainerPtr VdcHost::getContainer(const PropertyDescriptorPtr &aPropert
   }
   #if ENABLE_LOCALCONTROLLER
   else if (aPropertyDescriptor->hasObjectKey(localController_obj)) {
-    return localController; // can be NULL if local controller is not enabled
+    return mLocalController; // can be NULL if local controller is not enabled
   }
   #endif
   else if (aPropertyDescriptor->hasObjectKey(vdc_obj)) {
     // - just iterate into map, we'll never have more than a few logical vdcs!
     int i = 0;
-    for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+    for (VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
       if (i==aPropertyDescriptor->fieldKey()) {
         // found
         return pos->second;
@@ -1755,20 +1755,20 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           return true;
         #endif
         case persistentChannels_key:
-          aPropValue->setBoolValue(persistentChannels);
+          aPropValue->setBoolValue(mPersistentChannels);
           return true;
         case writeOperations_key:
-          aPropValue->setUint32Value(dsParamStore.writeOpsCount);
+          aPropValue->setUint32Value(mDSParamStore.writeOpsCount);
           return true;
         case latitude_key:
-          aPropValue->setDoubleValue(geolocation.latitude);
+          aPropValue->setDoubleValue(mGeolocation.latitude);
           return true;
         case longitude_key:
-          aPropValue->setDoubleValue(geolocation.longitude);
+          aPropValue->setDoubleValue(mGeolocation.longitude);
           return true;
         #if P44SCRIPT_FULL_SUPPORT
         case mainscript_key:
-          aPropValue->setStringValue(mainScript.getSource());
+          aPropValue->setStringValue(mMainScript.getSource());
           return true;
         #endif
         case nextVersion_key:
@@ -1780,17 +1780,17 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         case persistentChannels_key:
-          setPVar(persistentChannels, aPropValue->boolValue());
+          setPVar(mPersistentChannels, aPropValue->boolValue());
           return true;
         case latitude_key:
-          setPVar(geolocation.latitude, aPropValue->doubleValue());
+          setPVar(mGeolocation.latitude, aPropValue->doubleValue());
           return true;
         case longitude_key:
-          setPVar(geolocation.longitude, aPropValue->doubleValue());
+          setPVar(mGeolocation.longitude, aPropValue->doubleValue());
           return true;
         #if P44SCRIPT_FULL_SUPPORT
         case mainscript_key:
-          if (mainScript.setSource(aPropValue->stringValue())) markDirty();
+          if (mMainScript.setSource(aPropValue->stringValue())) markDirty();
           return true;
         #endif
       }
@@ -1804,7 +1804,7 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
 void VdcHost::createDeviceList(DeviceVector &aDeviceList)
 {
   aDeviceList.clear();
-  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+  for (DsDeviceMap::iterator pos = mDSDevices.begin(); pos!=mDSDevices.end(); ++pos) {
     aDeviceList.push_back(pos->second);
   }
 }
@@ -1816,7 +1816,7 @@ void VdcHost::createDeviceList(DeviceVector &aDeviceList)
 void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
 {
   // iterate through all devices and all of their sensors and inputs
-  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+  for (DsDeviceMap::iterator pos = mDSDevices.begin(); pos!=mDSDevices.end(); ++pos) {
     DevicePtr dev = pos->second;
     // Sensors
     for (BehaviourVector::iterator pos2 = dev->mSensors.begin(); pos2!=dev->mSensors.end(); ++pos2) {
@@ -1862,8 +1862,8 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
   size_t i = aValueSourceID.find("_");
   if (i!=string::npos) {
     DsUid dsuid(aValueSourceID.substr(0,i));
-    DsDeviceMap::iterator pos = dSDevices.find(dsuid);
-    if (pos!=dSDevices.end()) {
+    DsDeviceMap::iterator pos = mDSDevices.find(dsuid);
+    if (pos!=mDSDevices.end()) {
       // is a device
       DevicePtr dev = pos->second;
       const char *p = aValueSourceID.c_str()+i+1;
@@ -1902,16 +1902,16 @@ ErrorPtr VdcHost::loadAndFixDsUID()
 {
   ErrorPtr err;
   // generate a default dSUID if no external one is given
-  if (!externalDsuid) {
+  if (!mExternalDsuid) {
     // we don't have a fixed external dSUID to base everything on, so create a dSUID of our own:
     // single vDC per MAC-Adress scenario: generate UUIDv5 with name = macaddress
     // - calculate UUIDv5 based dSUID
     DsUid vdcNamespace(DSUID_VDC_NAMESPACE_UUID);
     string m = mac ? macAddressToString(mac,0) : "UnknownMACAddress";
-    if (vdcHostInstance>0) string_format_append(m, "_%d", vdcHostInstance); // add-in instance number
-    dSUID.setNameInSpace(m, vdcNamespace);
+    if (mVdcHostInstance>0) string_format_append(m, "_%d", mVdcHostInstance); // add-in instance number
+    mDSUID.setNameInSpace(m, vdcNamespace);
   }
-  DsUid originalDsUid = dSUID;
+  DsUid originalDsUid = mDSUID;
   // load the vdc host settings, which might override the default dSUID
   err = loadFromStore(entityType()); // is a singleton, identify by type
   if (Error::notOK(err)) LOG(LOG_ERR,"Error loading settings for vdc host: %s", err->text());
@@ -1920,10 +1920,10 @@ ErrorPtr VdcHost::loadAndFixDsUID()
   loadSettingsFromFiles();
   #endif
   // now check
-  if (!externalDsuid) {
-    if (storedDsuid) {
+  if (!mExternalDsuid) {
+    if (mStoredDsuid) {
       // a dSUID was loaded from DB -> check if different from default
-      if (!(originalDsUid==dSUID)) {
+      if (!(originalDsUid==mDSUID)) {
         // stored dSUID is not same as MAC derived -> we are running a migrated config
         LOG(LOG_WARNING,"Running a migrated configuration: dSUID collisions with original unit possible");
         LOG(LOG_WARNING,"- native vDC host dSUID of this instance would be %s", originalDsUid.getString().c_str());
@@ -1937,7 +1937,7 @@ ErrorPtr VdcHost::loadAndFixDsUID()
     }
   }
   #if ENABLE_LOCALCONTROLLER
-  if (localController) localController->load();
+  if (mLocalController) mLocalController->load();
   #endif
   return ErrorPtr();
 }
@@ -1955,14 +1955,14 @@ void VdcHost::save()
 {
   savePrivate();
   #if ENABLE_LOCALCONTROLLER
-  if (localController) localController->save();
+  if (mLocalController) mLocalController->save();
   #endif
   // - device containers
-  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+  for (VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
     pos->second->save();
   }
   // - devices
-  for (DsDeviceMap::iterator pos = dSDevices.begin(); pos!=dSDevices.end(); ++pos) {
+  for (DsDeviceMap::iterator pos = mDSDevices.begin(); pos!=mDSDevices.end(); ++pos) {
     pos->second->save();
   }
 }
@@ -2040,23 +2040,23 @@ void VdcHost::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   // get the name
   setName(nonNullCStr(aRow->get<const char *>(aIndex++)));
   // get the vdc host dSUID
-  if (!externalDsuid) {
+  if (!mExternalDsuid) {
     // only if dSUID is not set externally, we try to load it
     DsUid loadedDsUid;
     if (loadedDsUid.setAsString(nonNullCStr(aRow->get<const char *>(aIndex)))) {
       // dSUID string from DB is valid
-      dSUID = loadedDsUid; // activate it as the vdc host dSUID
-      storedDsuid = true; // we're using a stored dSUID now
+      mDSUID = loadedDsUid; // activate it as the vdc host dSUID
+      mStoredDsuid = true; // we're using a stored dSUID now
     }
   }
   aIndex++;
   // the persistentchannels flag
-  aRow->getIfNotNull(aIndex++, persistentChannels);
-  aRow->getIfNotNull(aIndex++, geolocation.latitude);
-  aRow->getIfNotNull(aIndex++, geolocation.longitude);
-  aRow->getIfNotNull(aIndex++, geolocation.heightAboveSea);
+  aRow->getIfNotNull(aIndex++, mPersistentChannels);
+  aRow->getIfNotNull(aIndex++, mGeolocation.latitude);
+  aRow->getIfNotNull(aIndex++, mGeolocation.longitude);
+  aRow->getIfNotNull(aIndex++, mGeolocation.heightAboveSea);
   #if P44SCRIPT_FULL_SUPPORT
-  mainScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)), sourcecode);
+  mMainScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)), sourcecode);
   #else
   aIndex++; // just ignore
   #endif
@@ -2069,18 +2069,18 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, getAssignedName().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  if (externalDsuid) {
+  if (mExternalDsuid) {
     aStatement.bind(aIndex++); // do not save externally defined dSUIDs
   }
   else {
-    aStatement.bind(aIndex++, dSUID.getString().c_str(), false); // not static, string is local obj
+    aStatement.bind(aIndex++, mDSUID.getString().c_str(), false); // not static, string is local obj
   }
-  aStatement.bind(aIndex++, persistentChannels);
-  aStatement.bind(aIndex++, geolocation.latitude);
-  aStatement.bind(aIndex++, geolocation.longitude);
-  aStatement.bind(aIndex++, geolocation.heightAboveSea);
+  aStatement.bind(aIndex++, mPersistentChannels);
+  aStatement.bind(aIndex++, mGeolocation.latitude);
+  aStatement.bind(aIndex++, mGeolocation.longitude);
+  aStatement.bind(aIndex++, mGeolocation.heightAboveSea);
   #if P44SCRIPT_FULL_SUPPORT
-  aStatement.bind(aIndex++, mainScript.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mMainScript.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #else
   aStatement.bind(aIndex++); // bind null
   #endif
@@ -2092,8 +2092,8 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 
 string VdcHost::description()
 {
-  string d = string_format("VdcHost with %lu vDCs:", vdcs.size());
-  for (VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+  string d = string_format("VdcHost with %lu vDCs:", mVdcs.size());
+  for (VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
     d.append("\n");
     d.append(pos->second->description());
   }
@@ -2315,15 +2315,15 @@ void VdcHost::runGlobalScripts()
     else {
       ScriptSource initScript(sourcecode+regular, "initscript", this);
       initScript.setSource(script, scriptbody|ephemeralSource);
-      initScript.setSharedMainContext(vdcHostScriptContext);
+      initScript.setSharedMainContext(mVdcHostScriptContext);
       OLOG(LOG_NOTICE, "Starting initscript specified on commandline '%s'", scriptFn.c_str());
       initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel()), ScriptObjPtr(), Infinite);
     }
   }
   // stored global script
-  if (!mainScript.getSource().empty()) {
+  if (!mMainScript.getSource().empty()) {
     OLOG(LOG_NOTICE, "Starting global main script");
-    mainScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, mainScript.getOriginLabel()), ScriptObjPtr(), Infinite);
+    mMainScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel()), ScriptObjPtr(), Infinite);
   }
 }
 

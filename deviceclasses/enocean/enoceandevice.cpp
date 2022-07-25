@@ -155,8 +155,8 @@ void EnoceanDevice::deriveDsUid()
   //   name = xxxxxxxx (x=8 digit enocean hex UPPERCASE address)
   DsUid enOceanNamespace(DSUID_ENOCEAN_NAMESPACE_UUID);
   string s = string_format("%08X", getAddress()); // hashed part of dSUID comes from unique EnOcean address
-  dSUID.setNameInSpace(s, enOceanNamespace);
-  dSUID.setSubdeviceIndex(getSubDevice()); // subdevice index is represented in the dSUID subdevice index byte
+  mDSUID.setNameInSpace(s, enOceanNamespace);
+  mDSUID.setSubdeviceIndex(getSubDevice()); // subdevice index is represented in the dSUID subdevice index byte
 }
 
 
@@ -586,7 +586,7 @@ void EnoceanDevice::switchProfiles(const ProfileVariantEntry &aFromVariant, cons
     }
     if (newDev->mDeviceSettings && getZoneID()!=0) {
       hasNameOrZone = true;
-      newDev->mDeviceSettings->zoneID = getZoneID();
+      newDev->mDeviceSettings->mZoneID = getZoneID();
     }
     // - add it to the container
     getEnoceanVdc().addAndRememberDevice(newDev);

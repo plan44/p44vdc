@@ -901,18 +901,18 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     return TextError::err("missing 'uniqueid'");
   }
   // - try it natively (can be a dSUID or a UUID)
-  if (!dSUID.setAsString(uniqueid)) {
+  if (!mDSUID.setAsString(uniqueid)) {
     // not suitable dSUID or UUID syntax, create hashed dSUID
     DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
     //   UUIDv5 with name = classcontainerinstanceid:uniqueid
     string s = mVdcP->vdcInstanceIdentifier();
     s += ':';
     s += uniqueid;
-    dSUID.setNameInSpace(s, vdcNamespace);
+    mDSUID.setNameInSpace(s, vdcNamespace);
   }
   // - subdevice index can be set separately
   if (aInitParams->get("subdeviceindex", o)) {
-    dSUID.setSubdeviceIndex(o->int32Value());
+    mDSUID.setSubdeviceIndex(o->int32Value());
   }
   // Output
   // - get group (overridden for some output types)

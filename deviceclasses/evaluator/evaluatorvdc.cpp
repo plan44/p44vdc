@@ -151,7 +151,7 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
           // confirm
           ApiValuePtr r = aRequest->newApiValue();
           r->setType(apivalue_object);
-          r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
+          r->add("dSUID", r->newBinary(dev->mDSUID.getBinary()));
           r->add("rowid", r->newUint64(dev->evaluatorDeviceRowID));
           r->add("name", r->newString(dev->getName()));
           aRequest->sendResult(r);

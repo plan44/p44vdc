@@ -253,7 +253,7 @@ void DigitalIODevice::deriveDsUid()
   if (indicatorOutput) { s += ":"; s += indicatorOutput->getName(); }
   if (digitalInput) { s += ":"; s += digitalInput->getName(); }
   if (blindsOutputUp && blindsOutputDown) { s += ":"; s += blindsName(); }
-  dSUID.setNameInSpace(s, vdcNamespace);
+  mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 

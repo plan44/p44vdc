@@ -126,8 +126,8 @@ namespace p44 {
 
     NotificationGroup(VdcPtr aVdc, DsAddressablePtr aFirstMember);
 
-    VdcPtr vdc; ///< the vDC that might be able to handle a notification for all (device)members together. NULL if members can also be vdcs or vdchost.
-    DsAddressablesList members; ///< list of addressables (devices only if vdc is not NULL
+    VdcPtr mVdc; ///< the vDC that might be able to handle a notification for all (device)members together. NULL if members can also be vdcs or vdchost.
+    DsAddressablesList mMembers; ///< list of addressables (devices only if vdc is not NULL
   };
   typedef list<NotificationGroup> NotificationAudience;
 
@@ -146,72 +146,72 @@ namespace p44 {
     friend class DsAddressable;
     friend class LocalController;
 
-    bool externalDsuid; ///< set when dSUID is set to a external value (usually UUIDv1 based)
-    int vdcHostInstance; ///< instance number of this vdc host (defaults to 0, can be set to >0 to have multiple vdchost on the same host/mac address)
-    bool storedDsuid; ///< set when using stored (DB persisted) dSUID that is not equal to default dSUID 
+    bool mExternalDsuid; ///< set when dSUID is set to a external value (usually UUIDv1 based)
+    int mVdcHostInstance; ///< instance number of this vdc host (defaults to 0, can be set to >0 to have multiple vdchost on the same host/mac address)
+    bool mStoredDsuid; ///< set when using stored (DB persisted) dSUID that is not equal to default dSUID 
     uint64_t mac; ///< MAC address as found at startup
 
-    string ifNameForConn; ///< the name of the network interface to use for getting IP and connectivity status
-    bool allowCloud; ///< if not set, vdcs are forbidden to use cloud-based services such as N-UPnP that are not actively/obviously configured by the user him/herself
+    string mIfNameForConn; ///< the name of the network interface to use for getting IP and connectivity status
+    bool mAllowCloud; ///< if not set, vdcs are forbidden to use cloud-based services such as N-UPnP that are not actively/obviously configured by the user him/herself
 
-    DsDeviceMap dSDevices; ///< available devices by API-exposed ID (dSUID or derived dsid)
-    DsParamStore dsParamStore; ///< the database for storing dS device parameters
+    DsDeviceMap mDSDevices; ///< available devices by API-exposed ID (dSUID or derived dsid)
+    DsParamStore mDSParamStore; ///< the database for storing dS device parameters
 
-    string iconDir; ///< the directory where to load icons from
-    string persistentDataDir; ///< the directory for the vdc host to store SQLite DBs and possibly other persistent data
-    string configDir; ///< the directory to load config files (scene definitions, machine configurations etc.) from
+    string mIconDir; ///< the directory where to load icons from
+    string mPersistentDataDir; ///< the directory for the vdc host to store SQLite DBs and possibly other persistent data
+    string mConfigDir; ///< the directory to load config files (scene definitions, machine configurations etc.) from
 
-    string productName; ///< the name of the vdc host product (model name) as a a whole
-    string productVersion; ///< the version string of the vdc host product as a a whole
+    string mProductName; ///< the name of the vdc host product (model name) as a a whole
+    string mProductVersion; ///< the version string of the vdc host product as a a whole
 
-    string deviceHardwareId; ///< the device hardware id (such as a serial number) of the vdc host product as a a whole
-    string descriptionTemplate; ///< how to describe the vdc host (e.g. in service announcements)
-    string vdcModelNameTemplate; ///< how to generate vdc model names (that's what shows up in HW-Info in dS)
+    string mDeviceHardwareId; ///< the device hardware id (such as a serial number) of the vdc host product as a a whole
+    string mDescriptionTemplate; ///< how to describe the vdc host (e.g. in service announcements)
+    string mVdcModelNameTemplate; ///< how to generate vdc model names (that's what shows up in HW-Info in dS)
 
-    bool collecting;
-    MLTicket announcementTicket;
-    MLTicket periodicTaskTicket;
-    MLMicroSeconds lastActivity;
-    MLMicroSeconds lastPeriodicRun;
+    bool mCollecting;
+    MLTicket mAnnouncementTicket;
+    MLTicket mPeriodicTaskTicket;
+    MLMicroSeconds mLastActivity;
+    MLMicroSeconds mLastPeriodicRun;
 
-    MLMicroSeconds timeOfDayDiff; ///< current difference of monotonic ML time and a pseudo local time to detect changes (TZ changes, NTP updates)
+    MLMicroSeconds mTimeOfDayDiff; ///< current difference of monotonic ML time and a pseudo local time to detect changes (TZ changes, NTP updates)
 
-    int8_t localDimDirection;
+    int8_t mLocalDimDirection;
 
     // learning
-    bool learningMode;
-    LearnCB learnHandler;
+    bool mLearningMode;
+    LearnCB mLearnHandler;
 
     // global status
-    bool networkConnected;
+    bool mNetworkConnected;
 
     // user action monitor (learn)buttons
-    DeviceUserActionCB deviceUserActionHandler;
+    DeviceUserActionCB mDeviceUserActionHandler;
 
     // global event monitor
-    VdchostEventCB eventMonitorHandler;
+    VdchostEventCB mEventMonitorHandler;
 
     // mainloop statistics
-    int mainloopStatsInterval; ///< 0=none, N=every PERIODIC_TASK_INTERVAL*N seconds
-    int mainLoopStatsCounter;
+    int mMainloopStatsInterval; ///< 0=none, N=every PERIODIC_TASK_INTERVAL*N seconds
+    int mMainLoopStatsCounter;
 
     // active vDC API session
-    int maxApiVersion; // limit for API version to support (for testing client's backwards compatibility), 0=no limit
-    DsUid connectedVdsm;
-    MLTicket sessionActivityTicket;
+    int mMaxApiVersion; // limit for API version to support (for testing client's backwards compatibility), 0=no limit
+    DsUid mConnectedVdsm;
+    MLTicket mSessionActivityTicket;
     VdcApiConnectionPtr mVdsmSessionConnection;
 
     // settings
-    bool persistentChannels;
+    bool mPersistentChannels;
 
     #if ENABLE_LOCALCONTROLLER
-    LocalControllerPtr localController;
+    LocalControllerPtr mLocalController;
     #endif
 
     #if P44SCRIPT_FULL_SUPPORT
-    ScriptSource mainScript; ///< global init/main script stored in settings
-    ScriptMainContextPtr vdcHostScriptContext; ///< context for global vdc scripts
-    bool globalScriptsStarted; ///< global scripts have been started
+    ScriptSource mMainScript; ///< global init/main script stored in settings
+    ScriptMainContextPtr mVdcHostScriptContext; ///< context for global vdc scripts
+    bool mGlobalScriptsStarted; ///< global scripts have been started
     #endif
 
   public:
@@ -229,13 +229,13 @@ namespace p44 {
     #endif
 
     /// geolocation of the installation
-    GeoLocation geolocation;
+    GeoLocation mGeolocation;
 
     /// the list of containers by API-exposed ID (dSUID or derived dsid)
-    VdcMap vdcs;
+    VdcMap mVdcs;
 
     /// API for vdSM
-    VdcApiServerPtr vdcApiServer;
+    VdcApiServerPtr mVdcApiServer;
 
     /// active vDSM session
     VdcApiConnectionPtr getVdsmSessionConnection() { return mVdsmSessionConnection; };
@@ -253,15 +253,15 @@ namespace p44 {
 
     /// set the human readable name of the vdc host product as a a whole
     /// @param aProductName product (model) name
-    void setProductName(const string &aProductName) { productName = aProductName; }
+    void setProductName(const string &aProductName) { mProductName = aProductName; }
 
     /// set the the human readable version string of the vdc host product as a a whole
     /// @param aProductVersion product version string
-    void setProductVersion(const string &aProductVersion) { productVersion = aProductVersion; }
+    void setProductVersion(const string &aProductVersion) { mProductVersion = aProductVersion; }
 
     /// set the the human readable hardware id (such as a serial number) of the vdc host product as a a whole
     /// @param aDeviceHardwareId device serial number or similar id
-    void setDeviceHardwareId(const string &aDeviceHardwareId) { deviceHardwareId = aDeviceHardwareId; }
+    void setDeviceHardwareId(const string &aDeviceHardwareId) { mDeviceHardwareId = aDeviceHardwareId; }
 
     /// set the template (or fixed string) for describing the vdc host product as a a whole (e.g. in network advertisements)
     /// @param aTemplate template how to create the description
@@ -270,7 +270,7 @@ namespace p44 {
     /// - %M : product model (name)
     /// - %N : user-assigned name, if any, preceeded by a space and in double quotes
     /// - %S : device hardware id (if set specifically, otherwise the dSUID is used)
-    void setDescriptionTemplate(const string &aTemplate) { descriptionTemplate = aTemplate; }
+    void setDescriptionTemplate(const string &aTemplate) { mDescriptionTemplate = aTemplate; }
 
     /// set the template (or fixed string) for describing a vdc within this vdchost in vdc's modelName property (which is used in dSS as HW-Info)
     /// @param aTemplate template how to create vdc modelName
@@ -279,7 +279,7 @@ namespace p44 {
     /// - %M : product model (name) of the vdchost
     /// - %m : vdcModelSuffix (short suffix describing vdc's functionality, such as "hue" or "DALI")
     /// - %S : device hardware id (if set specifically, otherwise the dSUID is used)
-    void setVdcModelNameTemplate(const string &aTemplate) { vdcModelNameTemplate = aTemplate; }
+    void setVdcModelNameTemplate(const string &aTemplate) { mVdcModelNameTemplate = aTemplate; }
 
     /// Set how dSUIDs are generated
     /// @param aExternalDsUid if specified, this is used directly as dSUID for the device container
@@ -291,18 +291,18 @@ namespace p44 {
 
     /// Set network interface to use for determining IP address and checking for being available for network connections
     /// @param aIfNameForConnections name of the network device, empty string to use default interface
-    void setNetworkIf(const string aIfNameForConnections) { ifNameForConn = aIfNameForConnections; };
+    void setNetworkIf(const string aIfNameForConnections) { mIfNameForConn = aIfNameForConnections; };
 
     /// Set maximum API version to support (to test backwards compatibility of connecting vdsms)
     /// @param aMaxApiVersion max API version to support, 0 = all implemented versions
-    void setMaxApiVersion(int aMaxApiVersion) { maxApiVersion = aMaxApiVersion; };
+    void setMaxApiVersion(int aMaxApiVersion) { mMaxApiVersion = aMaxApiVersion; };
 
     /// Enable or forbid use of cloud services not explicitly configured or obviously expected by user (such as N-UPnP)
     /// @param aAllow true to allow cloud services
-    void setAllowCloud(bool aAllow) { allowCloud = aAllow; };
+    void setAllowCloud(bool aAllow) { mAllowCloud = aAllow; };
 
     /// @return true if not explicitly configured cloud services are allowed, false otherwise
-    bool cloudAllowed() { return allowCloud; };
+    bool cloudAllowed() { return mAllowCloud; };
 
     /// Set directory for loading device icons
     /// @param aIconDir  full path to directory to load device icons from. Empty string or NULL means "no icons"
@@ -325,7 +325,7 @@ namespace p44 {
 
     /// Set how often mainloop statistics are printed out log (LOG_INFO)
     /// @param aInterval 0=none, N=every PERIODIC_TASK_INTERVAL*N seconds
-    void setMainloopStatsInterval(int aInterval) { mainloopStatsInterval = aInterval; };
+    void setMainloopStatsInterval(int aInterval) { mMainloopStatsInterval = aInterval; };
 
     /// prepare device container internals for creating and adding vDCs
     /// In particular, this triggers creating/loading the vdc host dSUID, which serves as a base ID
@@ -414,7 +414,7 @@ namespace p44 {
 
     /// global setting for persisting (and restoring after reboot) last output channel states
     /// @return true if output channel states should be saved/restored
-    bool doPersistChannels() { return persistentChannels; };
+    bool doPersistChannels() { return mPersistentChannels; };
 
     /// @}
 
@@ -448,7 +448,7 @@ namespace p44 {
     void stopLearning();
 
     /// @return true if currently in learn mode
-    bool isLearning() { return learningMode; };
+    bool isLearning() { return mLearningMode; };
 
     /// @}
 
@@ -465,7 +465,7 @@ namespace p44 {
 		const char *getPersistentDataDir();
 
     /// get the dsParamStore
-    DsParamStore &getDsParamStore() { return dsParamStore; }
+    DsParamStore &getDsParamStore() { return mDSParamStore; }
 
     /// @}
 
@@ -533,11 +533,11 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE { return productName.size()>0 ? productName : "vDC host"; }
+    virtual string modelName() P44_OVERRIDE { return mProductName.size()>0 ? mProductName : "vDC host"; }
 
     /// @return human readable product version string
     /// @note it is important to override this here in vdchost, because would loop otherwise when base class calls vdchost's implementation
-    virtual string modelVersion() const P44_OVERRIDE { return productVersion; }
+    virtual string modelVersion() const P44_OVERRIDE { return mProductVersion; }
 
     /// @return human readable product version string of next available (installable) product version, if any
     virtual string nextModelVersion() const { return ""; /* none by default */ }
@@ -562,7 +562,7 @@ namespace p44 {
     virtual string vendorName() P44_OVERRIDE { return "plan44.ch"; };
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
-    string getDeviceHardwareId() { return deviceHardwareId; };
+    string getDeviceHardwareId() { return mDeviceHardwareId; };
 
     /// @return text describing the vdc host device, suitable for publishing via Avahi etc.
     string publishedDescription();

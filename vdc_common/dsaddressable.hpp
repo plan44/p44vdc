@@ -63,20 +63,20 @@ namespace p44 {
     friend class VdcHost;
 
     /// the user-assignable name
-    string name;
+    string mName;
 
     /// announcement status
-    MLMicroSeconds announced; ///< set when last announced to the vdSM
-    MLMicroSeconds announcing; ///< set when announcement has been started (but not yet confirmed)
+    MLMicroSeconds mAnnounced; ///< set when last announced to the vdSM
+    MLMicroSeconds mAnnouncing; ///< set when announcement has been started (but not yet confirmed)
 
-    bool present; ///< current presence ("active" property) status
-    MLMicroSeconds lastPresenceUpdate; ///< when presence state was last updated
+    bool mPresent; ///< current presence ("active" property) status
+    MLMicroSeconds mLastPresenceUpdate; ///< when presence state was last updated
 
   protected:
-    VdcHost *vdcHostP;
+    VdcHost *mVdcHostP;
 
     /// the dSUID for accessing this addressable
-    DsUid dSUID;
+    DsUid mDSUID;
 
     #if ENABLE_JSONBRIDGEAPI
     bool mBridged; ///< this addressable is currently bridged, so should report relevant changes to bridge API
@@ -109,18 +109,18 @@ namespace p44 {
 
     /// check if this instance (device or vdc) has been announced
     /// @return true if device has been announced
-    bool isAnnounced() { return announced != Never; }
+    bool isAnnounced() { return mAnnounced != Never; }
 
     /// the real (always modern, 34 hex) dSUID
-    const DsUid &getDsUid() { return dSUID; };
+    const DsUid &getDsUid() { return mDSUID; };
 
     /// get reference to device container
-    VdcHost &getVdcHost() const { return *vdcHostP; };
+    VdcHost &getVdcHost() const { return *mVdcHostP; };
 
     /// get user assigned name of the addressable
     /// @return name string
     /// @note this is returned as a reference to make sure it represents stable data (needed e.g. for bind to SQL)
-    const string &getAssignedName() { return name; };
+    const string &getAssignedName() { return mName; };
 
     /// @return name string
     /// @note derived classes might provide a default name if no actual name is set

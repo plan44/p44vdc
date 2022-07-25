@@ -101,7 +101,7 @@ bool DsBehaviour::pushBehaviourState(bool aDS, bool aBridges)
 
 string DsBehaviour::getDbKey()
 {
-  return string_format("%s_%zu",mDevice.dSUID.getString().c_str(),mIndex);
+  return string_format("%s_%zu",mDevice.mDSUID.getString().c_str(),mIndex);
 }
 
 

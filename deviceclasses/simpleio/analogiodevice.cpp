@@ -299,7 +299,7 @@ void AnalogIODevice::deriveDsUid()
   if (analogIO2) { s += ":"; s += analogIO2->getName(); }
   if (analogIO3) { s += ":"; s += analogIO3->getName(); }
   if (analogIO4) { s += ":"; s += analogIO4->getName(); }
-  dSUID.setNameInSpace(s, vdcNamespace);
+  mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 

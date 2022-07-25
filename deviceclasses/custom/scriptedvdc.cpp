@@ -275,7 +275,7 @@ ErrorPtr ScriptedDevice::handleMethod(VdcApiRequestPtr aRequest, const string &a
 ErrorPtr ScriptedDevice::load()
 {
   ErrorPtr err = inherited::load();
-  err = mImplementation.loadFromStore(dSUID.getString().c_str());
+  err = mImplementation.loadFromStore(mDSUID.getString().c_str());
   if (Error::notOK(err)) OLOG(LOG_ERR,"Error loading implementation: %s", err->text());
   return err;
 }
@@ -283,7 +283,7 @@ ErrorPtr ScriptedDevice::load()
 
 ErrorPtr ScriptedDevice::save()
 {
-  ErrorPtr err = mImplementation.saveToStore(dSUID.getString().c_str(), false); // only one record per device
+  ErrorPtr err = mImplementation.saveToStore(mDSUID.getString().c_str(), false); // only one record per device
   if (Error::notOK(err)) OLOG(LOG_ERR,"Error saving implementation: %s", err->text());
   return inherited::save();
 }
@@ -621,7 +621,7 @@ ErrorPtr ScriptedVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
             // confirm
             ApiValuePtr r = aRequest->newApiValue();
             r->setType(apivalue_object);
-            r->add("dSUID", r->newBinary(dev->dSUID.getBinary()));
+            r->add("dSUID", r->newBinary(dev->mDSUID.getBinary()));
             r->add("rowid", r->newUint64(dev->mScriptedDeviceRowID));
             r->add("name", r->newString(dev->getName()));
             aRequest->sendResult(r);

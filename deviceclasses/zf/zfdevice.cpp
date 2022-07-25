@@ -82,8 +82,8 @@ void ZfDevice::deriveDsUid()
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcClassIdentifier();
   string_format_append(s, "%08X", getAddress()); // hashed part of dSUID comes from unique ZF address
-  dSUID.setNameInSpace(s, vdcNamespace);
-  dSUID.setSubdeviceIndex(getSubDevice()); // subdevice index is represented in the dSUID subdevice index byte
+  mDSUID.setNameInSpace(s, vdcNamespace);
+  mDSUID.setSubdeviceIndex(getSubDevice()); // subdevice index is represented in the dSUID subdevice index byte
 }
 
 
@@ -431,7 +431,7 @@ void ZfDevice::switchTypes(const ZfTypeVariantEntry &aFromVariant, const ZfTypeV
     }
     if (newDev->mDeviceSettings && getZoneID()!=0) {
       hasNameOrZone = true;
-      newDev->mDeviceSettings->zoneID = getZoneID();
+      newDev->mDeviceSettings->mZoneID = getZoneID();
     }
     // - add it to the container
     getZfVdc().addAndRememberDevice(newDev);

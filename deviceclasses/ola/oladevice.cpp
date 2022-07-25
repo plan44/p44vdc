@@ -332,7 +332,7 @@ void OlaDevice::deriveDsUid()
     string_format_append(s, ":%d:%d:%d", redChannel, greenChannel, blueChannel);
   if (amberChannel!=dmxNone)
     string_format_append(s, ":%d", amberChannel);
-  dSUID.setNameInSpace(s, vdcNamespace);
+  mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 

@@ -166,7 +166,7 @@ void Vdc::deriveDsUid()
 {
   // class containers have v5 UUIDs based on the device container's master UUID as namespace
   string name = string_format("%s.%d", vdcClassIdentifier(), getInstanceNumber()); // name is class identifier plus instance number: classID.instNo
-  dSUID.setNameInSpace(name, getVdcHost().dSUID); // domain is dSUID of device container
+  mDSUID.setNameInSpace(name, getVdcHost().mDSUID); // domain is dSUID of device container
 }
 
 
@@ -174,7 +174,7 @@ string Vdc::vdcInstanceIdentifier() const
 {
   string s(vdcClassIdentifier());
   string_format_append(s, ".%d@", getInstanceNumber());
-  s.append(getVdcHost().dSUID.getString());
+  s.append(getVdcHost().mDSUID.getString());
   return s;
 }
 
@@ -211,7 +211,7 @@ string Vdc::modelName()
 {
   // derive the descriptive name
   // "%M %m"
-  string n = getVdcHost().vdcModelNameTemplate;
+  string n = getVdcHost().mVdcModelNameTemplate;
   if (n.empty()) n = DEFAULT_MODELNAME_TEMPLATE;
   string s;
   size_t i;
@@ -846,7 +846,7 @@ void Vdc::performPair(VdcApiRequestPtr aRequest, Tristate aEstablish, bool aDisa
   // start new pairing
   OLOG(LOG_NOTICE, "Starting single vDC pairing");
   pairTicket.executeOnce(boost::bind(&Vdc::pairingTimeout, this, aRequest), aTimeout);
-  getVdcHost().learnHandler = boost::bind(&Vdc::pairingEvent, this, aRequest, _1, _2);
+  getVdcHost().mLearnHandler = boost::bind(&Vdc::pairingEvent, this, aRequest, _1, _2);
   setLearnMode(true, aDisableProximityCheck, aEstablish);
 }
 
@@ -1136,7 +1136,7 @@ ErrorPtr Vdc::loadOptimizerCache()
   // create a template
   OptimizerEntryPtr newEntry = OptimizerEntryPtr(new OptimizerEntry());
   // get the query
-  sqlite3pp::query *queryP = newEntry->newLoadAllQuery(dSUID.getString().c_str());
+  sqlite3pp::query *queryP = newEntry->newLoadAllQuery(mDSUID.getString().c_str());
   if (queryP==NULL) {
     // real error preparing query
     err = newEntry->paramStore.error();
@@ -1173,7 +1173,7 @@ ErrorPtr Vdc::saveOptimizerCache()
     for (OptimizerEntryList::iterator pos = optimizerCache.begin(); pos!=optimizerCache.end(); ++pos) {
       if (!(*pos)->nativeActionId.empty()) {
         (*pos)->markDirty();
-        err = (*pos)->saveToStore(dSUID.getString().c_str(), true); // multiple instances allowed, it's a *list*!
+        err = (*pos)->saveToStore(mDSUID.getString().c_str(), true); // multiple instances allowed, it's a *list*!
         if (Error::notOK(err)) LOG(LOG_ERR,"Error saving optimizer entry: %s", err->text());
       }
     }
@@ -1188,7 +1188,7 @@ ErrorPtr Vdc::load()
 {
   ErrorPtr err;
   // load the vdc settings (collecting phase is already over by now)
-  err = loadFromStore(dSUID.getString().c_str());
+  err = loadFromStore(mDSUID.getString().c_str());
   if (Error::notOK(err)) OLOG(LOG_ERR,"Error loading settings: %s", err->text());
   #if ENABLE_SETTINGS_FROM_FILES
   loadSettingsFromFiles();
@@ -1214,7 +1214,7 @@ ErrorPtr Vdc::save()
 {
   ErrorPtr err;
   // save the vdc settings
-  err = saveToStore(dSUID.getString().c_str(), false); // only one record per vdc
+  err = saveToStore(mDSUID.getString().c_str(), false); // only one record per vdc
   // load the optimizer cache
   err = saveOptimizerCache();
   return ErrorPtr();

@@ -1193,7 +1193,7 @@ DaliVdc &DaliOutputDevice::daliVdc()
 
 void DaliOutputDevice::daliDeviceContextSummary(ApiValuePtr aInfo) const
 {
-  aInfo->add("dSUID", aInfo->newString(dSUID.getString()));
+  aInfo->add("dSUID", aInfo->newString(mDSUID.getString()));
   aInfo->add("dSDeviceName", aInfo->newString(const_cast<DaliOutputDevice *>(this)->getName())); // TODO: remove once constness in getters is correct
   aInfo->add("dSDeviceModel", aInfo->newString(const_cast<DaliOutputDevice *>(this)->modelName())); // TODO: remove once constness in getters is correct
 }
@@ -1616,7 +1616,7 @@ bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStat
 void DaliSingleControllerDevice::deriveDsUid()
 {
   // single channel dimmer just uses dSUID derived from single DALI bus device
-  dSUID = daliController->dSUID;
+  mDSUID = daliController->dSUID;
 }
 
 
@@ -2095,7 +2095,7 @@ void DaliCompositeDevice::deriveDsUid()
     }
   }
   // use xored ID as base for creating UUIDv5 in vdcNamespace
-  dSUID.setNameInSpace("dalicombi:"+mixID, vdcNamespace);
+  mDSUID.setNameInSpace("dalicombi:"+mixID, vdcNamespace);
 }
 
 
@@ -2562,7 +2562,7 @@ void DaliInputDevice::deriveDsUid()
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcInstanceIdentifier();
   string_format_append(s, "::%u:%u", baseAddress, inputType);
-  dSUID.setNameInSpace(s, vdcNamespace);
+  mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 

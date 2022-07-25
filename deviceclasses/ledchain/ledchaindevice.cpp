@@ -230,14 +230,14 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   // set uniqueid as view label if view does not have a label
   if (lightView) lightView->setDefaultLabel(uniqueId);
   // if uniqueId is a valid dSUID/UUID, use it as-is
-  if (!dSUID.setAsString(uniqueId)) {
+  if (!mDSUID.setAsString(uniqueId)) {
     // generate vDC implementation specific UUID:
     //   UUIDv5 with name = <classcontainerinstanceid><uniqueid> (separator missing for backwards compatibility)
     //   Note: for backwards compatibility, when no uniqueid ist set, <ledchainType>:<firstLED>:<lastLED> is used
     DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
     string ii = mVdcP->vdcInstanceIdentifier();
     ii += uniqueId;
-    dSUID.setNameInSpace(ii, vdcNamespace);
+    mDSUID.setNameInSpace(ii, vdcNamespace);
   }
 }
 

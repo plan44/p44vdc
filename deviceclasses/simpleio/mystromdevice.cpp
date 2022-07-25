@@ -271,7 +271,7 @@ void MyStromDevice::deriveDsUid()
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcInstanceIdentifier();
   s += "::mystromhost_" + deviceHostName;
-  dSUID.setNameInSpace(s, vdcNamespace);
+  mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 

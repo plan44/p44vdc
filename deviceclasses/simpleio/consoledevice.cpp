@@ -327,7 +327,7 @@ void ConsoleDevice::deriveDsUid()
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcInstanceIdentifier();
   s += "::" + consoleName;
-  dSUID.setNameInSpace(s, vdcNamespace);
+  mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 

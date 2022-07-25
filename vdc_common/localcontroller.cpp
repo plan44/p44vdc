@@ -1926,7 +1926,7 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
 
 size_t LocalController::totalDevices() const
 {
-  return mVdcHost.dSDevices.size();
+  return mVdcHost.mDSDevices.size();
 }
 
 
@@ -2085,7 +2085,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
     }
     else {
       // globally
-      for (DsDeviceMap::iterator pos = mVdcHost.dSDevices.begin(); pos!=mVdcHost.dSDevices.end(); ++pos) {
+      for (DsDeviceMap::iterator pos = mVdcHost.mDSDevices.begin(); pos!=mVdcHost.mDSDevices.end(); ++pos) {
         OutputBehaviourPtr ob = pos->second->getOutput();
         if (ob) groups |= ob->groupMemberships();
       }

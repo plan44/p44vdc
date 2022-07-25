@@ -513,7 +513,7 @@ void EvaluatorDevice::deriveDsUid()
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcInstanceIdentifier();
   s += "::" + mEvaluatorID;
-  dSUID.setNameInSpace(s, vdcNamespace);
+  mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 

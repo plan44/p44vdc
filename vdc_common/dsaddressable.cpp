@@ -37,11 +37,11 @@ using namespace p44;
 
 
 DsAddressable::DsAddressable(VdcHost *aVdcHostP) :
-  vdcHostP(aVdcHostP),
-  announced(Never),
-  announcing(Never),
-  present(true), // by default, consider addressable present
-  lastPresenceUpdate(Never)
+  mVdcHostP(aVdcHostP),
+  mAnnounced(Never),
+  mAnnouncing(Never),
+  mPresent(true), // by default, consider addressable present
+  mLastPresenceUpdate(Never)
   #if ENABLE_JSONBRIDGEAPI
   , mBridged(false) // by default, addressable is not bridged
   #endif
@@ -75,8 +75,8 @@ void DsAddressable::setName(const string &aName)
 {
   // TODO: for now dsm API truncates names to 20 bytes. Therefore,
   //   we prevent replacing a long name with a truncated version
-  if (name!=aName && (name.length()<20 || name.substr(0,20)!=aName)) {
-    name = aName;
+  if (mName!=aName && (mName.length()<20 || mName.substr(0,20)!=aName)) {
+    mName = aName;
   }
 }
 
@@ -84,7 +84,7 @@ void DsAddressable::setName(const string &aName)
 void DsAddressable::initializeName(const string &aName)
 {
   // just assign
-  name = aName;
+  mName = aName;
 }
 
 
@@ -104,7 +104,7 @@ void DsAddressable::reportVanished()
 bool DsAddressable::isPublicDS()
 {
   // public dS when vdchost has API enabled at all (i.e. not localcontroller-only mode)
-  return vdcHostP && vdcHostP->vdcApiServer;
+  return mVdcHostP && mVdcHostP->mVdcApiServer;
 }
 
 
@@ -399,11 +399,11 @@ void DsAddressable::pingResultHandler(bool aIsPresent)
 
 void DsAddressable::updatePresenceState(bool aPresent)
 {
-  bool first = lastPresenceUpdate==Never;
-  lastPresenceUpdate = MainLoop::now();
-  if (aPresent!=present || first) {
+  bool first = mLastPresenceUpdate==Never;
+  mLastPresenceUpdate = MainLoop::now();
+  if (aPresent!=mPresent || first) {
     // change in presence
-    present = aPresent;
+    mPresent = aPresent;
     OLOG(LOG_NOTICE, "changes to %s", aPresent ? "PRESENT" : "OFFLINE");
     // push change in presence to vdSM
     VdcApiConnectionPtr api = getVdcHost().getVdsmSessionConnection();
@@ -436,7 +436,7 @@ void DsAddressable::updatePresenceState(bool aPresent)
 void DsAddressable::checkPresence(PresenceCB aPresenceResultHandler)
 {
   // base class just confirms current state
-  aPresenceResultHandler(present);
+  aPresenceResultHandler(mPresent);
 }
 
 
@@ -529,7 +529,7 @@ void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPt
 {
   if (aPropertyDescriptor->hasObjectKey(dsAddressable_key) && aPropertyDescriptor->fieldKey()==active_key) {
     // update status in case
-    if (lastPresenceUpdate+MIN_PRESENCE_SAMPLE_INTERVAL<MainLoop::now()) {
+    if (mLastPresenceUpdate+MIN_PRESENCE_SAMPLE_INTERVAL<MainLoop::now()) {
       // request update from device
       checkPresence(boost::bind(&DsAddressable::presenceSampleHandler, this, aPreparedCB, _1));
       return;
@@ -563,7 +563,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
     else {
       switch (aPropertyDescriptor->fieldKey()) {
         case type_key: aPropValue->setStringValue(entityType()); return true; // the entity type
-        case dSUID_key: aPropValue->setStringValue(dSUID.getString()); return true; // always the real dSUID
+        case dSUID_key: aPropValue->setStringValue(mDSUID.getString()); return true; // always the real dSUID
         case model_key: aPropValue->setStringValue(modelName()); return true; // human readable model identification
         case displayId_key: aPropValue->setStringValue(displayId()); return true; // human readable device instance identification
         case modelUID_key: aPropValue->setStringValue(modelUID()); return true; // unique model identification, same features = same model
@@ -585,7 +585,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case deviceIcon16_key: { string icon; if (getDeviceIcon(icon, true, "icon16")) { aPropValue->setBinaryValue(icon); return true; } else return false; }
         case iconName_key: { string iconName; if (getDeviceIcon(iconName, false, "icon16")) { aPropValue->setStringValue(iconName); return true; } else return false; }
         case name_key: aPropValue->setStringValue(getName()); return true;
-        case active_key: aPropValue->setBoolValue(present); return true;
+        case active_key: aPropValue->setBoolValue(mPresent); return true;
         #if ENABLE_JSONBRIDGEAPI
         case isBridged_key: aPropValue->setBoolValue(isBridged()); return true;
         case bridgeable_key: aPropValue->setBoolValue(bridgeable()); return true;
@@ -603,7 +603,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
 
 bool DsAddressable::getIcon(const char *aIconName, string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  DBGLOG(LOG_DEBUG, "Trying to load icon named '%s/%s' for dSUID %s", aResolutionPrefix, aIconName, dSUID.getString().c_str());
+  DBGLOG(LOG_DEBUG, "Trying to load icon named '%s/%s' for dSUID %s", aResolutionPrefix, aIconName, mDSUID.getString().c_str());
   const char *iconDir = getVdcHost().getIconDir();
   if (iconDir && *iconDir) {
     string iconPath = string_format("%s%s/%s.png", iconDir, aResolutionPrefix, aIconName);
@@ -768,7 +768,7 @@ string DsAddressable::logContextPrefix()
 string DsAddressable::shortDesc()
 {
   // short description is dSUID...
-  string s = dSUID.getString();
+  string s = mDSUID.getString();
   // ...and user-set name, if any
   if (!getName().empty())
     string_format_append(s, " (%s)", getName().c_str());
@@ -779,6 +779,6 @@ string DsAddressable::shortDesc()
 
 string DsAddressable::description()
 {
-  string s = string_format("%s %s - %sannounced", entityType(), shortDesc().c_str(), announced==Never ? "NOT YET " : "");
+  string s = string_format("%s %s - %sannounced", entityType(), shortDesc().c_str(), mAnnounced==Never ? "NOT YET " : "");
   return s;
 }
