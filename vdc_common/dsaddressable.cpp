@@ -587,7 +587,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case name_key: aPropValue->setStringValue(getName()); return true;
         case active_key: aPropValue->setBoolValue(present); return true;
         #if ENABLE_JSONBRIDGEAPI
-        case isBridged_key: aPropValue->setBoolValue(mBridged); return true;
+        case isBridged_key: aPropValue->setBoolValue(isBridged()); return true;
         case bridgeable_key: aPropValue->setBoolValue(bridgeable()); return true;
         #endif
       }

@@ -196,7 +196,7 @@ void Device::addToModelUIDHash(string &aHashedString)
 DsZoneID Device::getZoneID()
 {
   if (mDeviceSettings) {
-    return mDeviceSettings->zoneID;
+    return mDeviceSettings->mZoneID;
   }
   return 0; // not assigned to a zone
 }
@@ -208,7 +208,7 @@ void Device::setZoneID(DsZoneID aZoneId)
     #if ENABLE_LOCALCONTROLLER
     // must report changes of zone usage to local controller
     DsZoneID previousZone = getZoneID();
-    if (mDeviceSettings->setPVar(mDeviceSettings->zoneID, aZoneId)) {
+    if (mDeviceSettings->setPVar(mDeviceSettings->mZoneID, aZoneId)) {
       LocalControllerPtr lc = getVdcHost().getLocalController();
       if (lc) {
         lc->deviceChangesZone(DevicePtr(this), previousZone, aZoneId);
@@ -2146,6 +2146,9 @@ enum {
   // device class
   deviceClass_key,
   deviceClassVersion_key,
+  #if ENABLE_LOCALCONTROLLER
+  zoneName_key,
+  #endif
   numDeviceFieldKeys
 };
 
@@ -2247,6 +2250,9 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     // device class
     { "deviceClass", apivalue_string, deviceClass_key, OKEY(device_obj) },
     { "deviceClassVersion", apivalue_uint64, deviceClassVersion_key, OKEY(device_obj) },
+    #if ENABLE_LOCALCONTROLLER
+    { "x-p44-zonename", apivalue_string, zoneName_key, OKEY(device_obj) },
+    #endif
   };
   // C++ object manages different levels, check aParentDescriptor
   if (aParentDescriptor->isRootOfObject()) {
@@ -2446,6 +2452,20 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
         case configurationId_key:
           if (getDeviceConfigurationId().empty()) return false; // device does not have multiple configurations
           aPropValue->setStringValue(getDeviceConfigurationId()); return true; // current device configuration
+        #if ENABLE_LOCALCONTROLLER
+        case zoneName_key:
+          LocalControllerPtr lc = getVdcHost().getLocalController();
+          if (!lc) return false; // only available with localcontroller
+          ZoneDescriptorPtr z = LocalController::sharedLocalController()->mLocalZones.getZoneById(mDeviceSettings->zoneID, false);
+          string zn;
+          if (mDeviceSettings->zoneID!=0) {
+            // no name for devices without zone assignment (even if localcontroller does have a name for those)
+            if (z) zn = z->getName();
+            else zn = string_format("Zone_#%d", mDeviceSettings->zoneID);
+          }
+          aPropValue->setStringValue(zn);
+          return true;
+        #endif // ENABLE_LOCALCONTROLLER
       }
     }
     else {
