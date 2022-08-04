@@ -47,9 +47,9 @@ namespace p44 {
   protected:
 
     Device &mDevice;
-
-    /// generic device flag word, can be used by subclasses to map flags onto at loadFromRow() and bindToStatement()
-    int mDeviceFlags;
+    #if ENABLE_JSONBRIDGEAPI
+    bool mPreventBridging;
+    #endif
 
   public:
     DeviceSettings(Device &aDevice);

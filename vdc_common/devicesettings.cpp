@@ -29,7 +29,9 @@ using namespace p44;
 DeviceSettings::DeviceSettings(Device &aDevice) :
   inherited(aDevice.getVdcHost().getDsParamStore()),
   mDevice(aDevice),
-  mDeviceFlags(0),
+  #if ENABLE_JSONBRIDGEAPI
+  mPreventBridging(false),
+  #endif
   mZoneID(0)
 {
 }
@@ -53,6 +55,12 @@ size_t DeviceSettings::numFieldDefs()
 }
 
 
+// flags in mDeviceFlags
+enum {
+  // scene global
+  deviceflags_preventBridging = 0x0001, ///< prevent bridging this device
+};
+
 const FieldDefinition *DeviceSettings::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numFields] = {
@@ -74,9 +82,15 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field value
-  aRow->getIfNotNull<int>(aIndex++, mDeviceFlags);
+  uint64_t flags = aRow->getCastedWithDefault<uint64_t, long long int>(aIndex++, 0);
   mDevice.initializeName(nonNullCStr(aRow->get<const char *>(aIndex++))); // do not propagate to HW!
   aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, mZoneID);
+  // decode my own flags
+  #if ENABLE_JSONBRIDGEAPI
+  mPreventBridging = flags & deviceflags_preventBridging;
+  #endif
+  // pass the flags out to subclass which called this superclass to get the flags (and decode themselves)
+  if (aCommonFlagsP) *aCommonFlagsP = flags;
 }
 
 
@@ -84,8 +98,12 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
 void DeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  // encode the flags
+  #if ENABLE_JSONBRIDGEAPI
+  if (mPreventBridging) aCommonFlags |= deviceflags_preventBridging;
+  #endif
   // bind the fields
-  aStatement.bind(aIndex++, mDeviceFlags);
+  aStatement.bind(aIndex++, (long long int)aCommonFlags);
   aStatement.bind(aIndex++, mDevice.getAssignedName().c_str(), false);  // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (int)mZoneID);
 }

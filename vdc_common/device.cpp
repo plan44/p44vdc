@@ -221,6 +221,13 @@ void Device::setZoneID(DsZoneID aZoneId)
 }
 
 
+bool Device::bridgeable()
+{
+  if (!mDeviceSettings || mDeviceSettings->mPreventBridging) return false;
+  return true; // if not explicitly prevented by flag, allow bridging
+}
+
+
 
 
 string Device::vendorName()
@@ -2149,6 +2156,9 @@ enum {
   #if ENABLE_LOCALCONTROLLER
   zoneName_key,
   #endif
+  #if ENABLE_JSONBRIDGEAPI
+  preventBridging_key,
+  #endif
   numDeviceFieldKeys
 };
 
@@ -2252,6 +2262,9 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     { "deviceClassVersion", apivalue_uint64, deviceClassVersion_key, OKEY(device_obj) },
     #if ENABLE_LOCALCONTROLLER
     { "x-p44-zonename", apivalue_string, zoneName_key, OKEY(device_obj) },
+    #endif
+    #if ENABLE_JSONBRIDGEAPI
+    { "x-p44-preventBridging", apivalue_bool, preventBridging_key, OKEY(device_obj) },
     #endif
   };
   // C++ object manages different levels, check aParentDescriptor
@@ -2453,7 +2466,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           if (getDeviceConfigurationId().empty()) return false; // device does not have multiple configurations
           aPropValue->setStringValue(getDeviceConfigurationId()); return true; // current device configuration
         #if ENABLE_LOCALCONTROLLER
-        case zoneName_key:
+        case zoneName_key: {
           LocalControllerPtr lc = getVdcHost().getLocalController();
           if (!lc) return false; // only available with localcontroller
           ZoneDescriptorPtr z = LocalController::sharedLocalController()->mLocalZones.getZoneById(mDeviceSettings->mZoneID, false);
@@ -2465,7 +2478,12 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           }
           aPropValue->setStringValue(zn);
           return true;
+        }
         #endif // ENABLE_LOCALCONTROLLER
+        #if ENABLE_JSONBRIDGEAPI
+        case preventBridging_key:
+          aPropValue->setBoolValue(mDeviceSettings->mPreventBridging); return true;
+        #endif
       }
     }
     else {
@@ -2477,6 +2495,11 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
         case progMode_key:
           mProgMode = aPropValue->boolValue();
           return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case preventBridging_key:
+          mDeviceSettings->setPVar(mDeviceSettings->mPreventBridging, aPropValue->boolValue());
+          return true;
+        #endif
       }
     }
   }

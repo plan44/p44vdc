@@ -402,7 +402,7 @@ namespace p44 {
 
     #if ENABLE_JSONBRIDGEAPI
     /// @return true if addressable can be bridged
-    virtual bool bridgeable() P44_OVERRIDE { return true; } // by default, devices are bridgeable
+    virtual bool bridgeable() P44_OVERRIDE;
     #endif
 
     /// report that device has vanished (disconnected without being told so via vDC API)
