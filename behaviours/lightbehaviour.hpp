@@ -54,7 +54,7 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "brightness"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS brightness goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
-    virtual double getDimPerMS() P44_OVERRIDE { return 11.0/256*100/300; }; // dimming is 11 steps(1/256) per 300mS (as per ds-light.pdf specification) = 255/11*300 = 7 seconds full scale
+    virtual double getStdDimPerMS() P44_OVERRIDE { return 11.0/256*100/300; }; // dimming is 11 steps(1/256) per 300mS (as per ds-light.pdf specification) = 255/11*300 = 7 seconds full scale
     virtual double getMinDim() P44_OVERRIDE { return minDim; };
 
   };

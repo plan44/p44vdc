@@ -174,6 +174,10 @@ namespace p44 {
     /// destructor
     virtual ~Device();
 
+    /// get vdc
+    Vdc& getVdc();
+
+
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     /// @param aIdentifyCB must be called when the identification or setup is not instant, but can only be confirmed later. In this
     ///   case, identifyDevice() must return false, indicating the identification is not yet complete.
@@ -464,9 +468,10 @@ namespace p44 {
     /// @param aDimMode according to VdcDimMode: 1=start dimming up, -1=start dimming down, 0=stop dimming
     /// @param aArea the area (1..4, 0=room) to restrict dimming to. Can be -1 to override local priority
     /// @param aAutoStopAfter max dimming time, dimming will stop when this time has passed
+    /// @param aDimPerMSOverride if!=0, dimming rate per millisecond to use
     /// @note this method internally uses dimChannelForAreaPrepare/dimChannelForAreaExecute.
     ///    It is exposed as directly controlling dimming might be useful for special purposes (e.g. identify)
-    void dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
+    void dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride = 0);
 
     /// this can be called by optimizing scene call implementations in vdcs
     /// to get the scene transition time before the transition times are applied to the channels
@@ -805,7 +810,7 @@ namespace p44 {
     void callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
     void callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
     void callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);
-    void dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter);
+    void dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride);
     void dimRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState);
     void dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);
     void outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene);

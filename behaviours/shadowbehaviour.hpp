@@ -51,7 +51,7 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "shade position (outside)"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
-    virtual double getDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
+    virtual double getStdDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
 
   };
   typedef boost::intrusive_ptr<ShadowPositionChannel> ShadowPositionChannelPtr;
@@ -78,7 +78,7 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "shade angle (outside)"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
-    virtual double getDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
+    virtual double getStdDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
 
   };
   typedef boost::intrusive_ptr<ShadowAngleChannel> ShadowAngleChannelPtr;

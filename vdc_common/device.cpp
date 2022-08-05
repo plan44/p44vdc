@@ -114,6 +114,7 @@ Device::Device(Vdc *aVdcP) :
   mMissedApplyAttempts(0),
   mUpdateInProgress(false)
 {
+  assert(aVdcP);
 }
 
 
@@ -123,6 +124,12 @@ Device::~Device()
   mInputs.clear();
   mSensors.clear();
   mOutput.reset();
+}
+
+
+Vdc& Device::getVdc()
+{
+  return *mVdcP;
 }
 
 
@@ -882,37 +889,34 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     }
   }
   else if (aNotification=="setOutputChannelValue") {
-    // set output channel value (alias for setProperty outputStates)
+    // set output channel value
     ApiValuePtr o;
     ChannelBehaviourPtr channel;
     if (Error::isOK(err = checkChannel(aParams, channel))) {
       if (Error::isOK(err = checkParam(aParams, "value", o))) {
         double value = o->doubleValue();
+        // check optional relative flag (to increment/decrement a channel, with possible wraparound)
+        bool relative = false;
+        o = aParams->get("relative");
+        if (o) relative = o->boolValue();
         // check optional apply_now flag
-        bool apply_now = true; // non-buffered write by default
+        bool apply_now = true; // apply values by default
         o = aParams->get("apply_now");
-        if (o) {
-          apply_now = o->boolValue();
-        }
+        if (o) apply_now = o->boolValue();
+        // check
+        MLMicroSeconds transitionTime = getOutput()->mTransitionTime;
         o = aParams->get("transitionTime");
-        MLMicroSeconds oldTT = getOutput()->mTransitionTime;
-        if (o) {
-          getOutput()->mTransitionTime = o->doubleValue()*Second;
+        if (o) transitionTime = o->doubleValue()*Second;
+        if (relative) {
+          channel->dimChannelValue(value, transitionTime);
         }
-        // reverse build the correctly structured property value: { channelStates: { <channel>: { value:<value> } } }
-        // - value
-        o = aParams->newObject();
-        o->add("value", o->newDouble(value));
-        // - channel id
-        ApiValuePtr ch = o->newObject();
-        ch->add(channel->getId(), o);
-        // - channelStates
-        ApiValuePtr propValue = ch->newObject();
-        propValue->add("channelStates", ch);
-        // now access the property for write
-        accessProperty(apply_now ? access_write : access_write_preload, propValue, VDC_API_DOMAIN, 3, NoOP); // no callback
-        // restore the transition time
-        getOutput()->mTransitionTime = oldTT;
+        else {
+          channel->setChannelValue(value, transitionTime, true); // always apply precise value
+        }
+        if (apply_now) {
+          mVdcP->cancelNativeActionUpdate(); // still delayed native scene updates must be cancelled before changing channel values
+          requestApplyingChannels(NoOP, false);
+        }
       }
     }
     if (Error::notOK(err)) {
@@ -989,8 +993,8 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
     if (Error::isOK(err = checkParam(aDeliveryState->callParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
       bool force = false;
-      MLMicroSeconds transitionTimeOverride = Infinite; // none
       // check for custom transition time
+      MLMicroSeconds transitionTimeOverride = Infinite; // none
       o = aDeliveryState->callParams->get("transitionTime");
       if (o) {
         transitionTimeOverride = o->doubleValue()*Second;
@@ -1021,6 +1025,19 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         int area = 0;
         o = aDeliveryState->callParams->get("area");
         if (o) area = o->int32Value();
+        // check for custom dimming rate
+        double dimPerMSOverride = 0; // none
+        o = aDeliveryState->callParams->get("dimPerMS");
+        if (o) {
+          dimPerMSOverride = o->doubleValue();
+        }
+        o = aDeliveryState->callParams->get("fullRangeTime");
+        if (o) {
+          double v = o->doubleValue();
+          if (v>0) {
+            dimPerMSOverride = (channel->getMax()-channel->getMin())/(v*1000); // full range divided though # of mS
+          }
+        }
         // autostop of dimming (localcontroller may want to prevent that)
         bool autostop = true;
         o = aDeliveryState->callParams->get("autostop");
@@ -1033,7 +1050,8 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
           channel,
           mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up),
           area,
-          autostop ? MOC_DIM_STEP_TIMEOUT : EMERGENCY_DIM_STEP_TIMEOUT
+          autostop ? MOC_DIM_STEP_TIMEOUT : EMERGENCY_DIM_STEP_TIMEOUT,
+          dimPerMSOverride
         );
         return;
       }
@@ -1379,16 +1397,16 @@ void Device::updatingChannelsComplete()
 //  Rule 4 All devices which are turned on and not in local priority state take part in the dimming process.
 
 
-void Device::dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
+void Device::dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride)
 {
   // convenience helper
-  dimChannelForAreaPrepare(boost::bind(&Device::executePreparedOperation, this, SimpleCB(), _1), aChannel, aDimMode, aArea, aAutoStopAfter);
+  dimChannelForAreaPrepare(boost::bind(&Device::executePreparedOperation, this, SimpleCB(), _1), aChannel, aDimMode, aArea, aAutoStopAfter, aDimPerMSOverride);
 }
 
 
 // implementation of "dimChannel" vDC API command and legacy dimming
 // Note: ensures dimming only continues for at most aAutoStopAfter
-void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter)
+void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride)
 {
   if (!aChannel) { aPreparedCB(ntfy_none); return; } // no channel, no dimming
   LOG(LOG_DEBUG, "dimChannelForArea: aChannel=%s, aDimMode=%d, aArea=%d", aChannel->getName(), aDimMode, aArea);
@@ -1442,6 +1460,12 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
         // - stop previous dimming operation here
         dimChannel(mCurrentDimChannel, dimmode_stop, true);
       }
+      // apply custom dimming rate if any
+      aChannel->setCustomDimPerMS(aDimPerMSOverride);
+    }
+    else {
+      // stopping: reset any custom dimming rate
+      aChannel->setCustomDimPerMS();
     }
     // fully prepared now
     // - save parameters for executing dimming now
@@ -1611,7 +1635,7 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
       // area dimming continuation
       if (mAreaDimmed!=0 && mAreaDimMode!=dimmode_stop) {
         // continue or restart area dimming
-        dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), mAreaDimMode, mAreaDimmed, LEGACY_DIM_STEP_TIMEOUT);
+        dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), mAreaDimMode, mAreaDimmed, LEGACY_DIM_STEP_TIMEOUT, 0);
         return;
       }
       // - otherwise: NOP
@@ -1621,24 +1645,24 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
     // first check legacy (inc/dec scene) dimming
     if (cmd==scene_cmd_increment) {
       if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
-      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT);
+      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT, 0);
       return;
     }
     else if (cmd==scene_cmd_decrement) {
       if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
-      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT);
+      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT, 0);
       return;
     }
     else if (cmd==scene_cmd_stop) {
       if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
-      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_stop, area, 0);
+      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_stop, area, 0, 0);
       return;
     }
     // make sure dimming stops for any non-dimming scene call
     if (mCurrentDimMode!=dimmode_stop) {
       // any non-dimming scene call stops dimming
       OLOG(LOG_NOTICE, "CallScene(%d) interrupts dimming in progress", aSceneNo);
-      dimChannelForAreaPrepare(boost::bind(&Device::callSceneDimStop, this, aPreparedCB, scene, aForce), mCurrentDimChannel, dimmode_stop, area, 0);
+      dimChannelForAreaPrepare(boost::bind(&Device::callSceneDimStop, this, aPreparedCB, scene, aForce), mCurrentDimChannel, dimmode_stop, area, 0, 0);
       return;
     }
     else {

@@ -87,6 +87,7 @@ namespace p44 {
     MLMicroSeconds mTransitionStarted; ///< time of when current transition has started
     double mPreviousChannelValue; ///< the previous channel value, can be used for performing transitions
     double mProgress; ///< transition progress between 0..1, 1=finished
+    double mCustomDimPerMS; ///< non-standard dimming rate, 0=none
     /// @}
 
   public:
@@ -102,7 +103,9 @@ namespace p44 {
     virtual const char *getName() = 0; ///< descriptive channel name
     virtual double getMin() = 0; ///< min value
     virtual double getMax() = 0; ///< max value
-    virtual double getDimPerMS() { return (getMax()-getMin())/FULL_SCALE_DIM_TIME_MS; }; ///< value to step up or down per Millisecond when dimming, or 0 for non-dimmable channels (default = 7sec for full scale)
+    virtual double getStdDimPerMS() { return (getMax()-getMin())/FULL_SCALE_DIM_TIME_MS; }; ///< default value to step up or down per Millisecond for this channel, defaults to 7sec for full scale
+    double getDimPerMS() { return mCustomDimPerMS>0 ? mCustomDimPerMS : getStdDimPerMS(); }; ///< value to step up or down per Millisecond when dimming, or 0 for non-dimmable channels
+
     virtual double getMinDim() { return getMin(); }; ///< dimming min value defaults to same value as min
     virtual bool wrapsAround() { return false; }; ///< if true, channel is considered to wrap around, meaning max being the same value as min, and dimming never stopping but wrapping around. Off by default
     virtual bool enforceResolution() { return true; }; ///< if true, actual channel value will always be rounded to resolution of the channel
@@ -161,6 +164,9 @@ namespace p44 {
     /// @param aTransitionTime time in microseconds to be spent on transition from current to new channel value
     /// @return new channel value after increment/decrement
     double dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime);
+
+    /// set/reset custom dimming per millisecond rate (0 = standard dimming rate)
+    void setCustomDimPerMS(double aDimPerMS = 0) { mCustomDimPerMS = aDimPerMS; };
 
     /// get current value of channel.
     /// @param aTransitional if set and the channel is in transition, a calculated intermediate value
@@ -364,7 +370,7 @@ namespace p44 {
     virtual double getMin() P44_OVERRIDE { return 0; }; // 0..numIndices-1
     virtual double getMax() P44_OVERRIDE { return mNumIndices>0 ? mNumIndices-1 : 0; };
     int getIndex() { return getChannelValue(); }; // return as int for convenience
-    virtual double getDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
+    virtual double getStdDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
 
     void setNumIndices(uint32_t aNumIndices) { mNumIndices = aNumIndices; };
 
@@ -385,7 +391,7 @@ namespace p44 {
     virtual double getMin() P44_OVERRIDE { return 0; };
     virtual double getMax() P44_OVERRIDE { return 1; };
     bool getFlag() { return getChannelValue()!=0; }; // return as bool for convenience
-    virtual double getDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
+    virtual double getStdDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
 
   };
   typedef boost::intrusive_ptr<FlagChannel> FlagChannelPtr;
@@ -403,7 +409,7 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "switch"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // compatible with brightness: 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
-    virtual double getDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
+    virtual double getStdDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
 
   };
   typedef boost::intrusive_ptr<DigitalChannel> DigitalChannelPtr;
@@ -463,7 +469,7 @@ namespace p44 {
     AudioVolumeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "audioVolume")
     {
       mResolution = 0.1; // arbitrary, 1:1000 seems ok
-      mDimPerMS = (getMax()-getMin())/7000; // standard 7 seconds for full scale by default
+      mDimPerMS = 0; // standard rate
     };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_audio_volume; }; ///< the dS channel type
@@ -471,9 +477,9 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "volume"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS volume goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
-    virtual double getDimPerMS() P44_OVERRIDE { return mDimPerMS; }; ///< value to step up or down per Millisecond
+    virtual double getStdDimPerMS() P44_OVERRIDE { return mDimPerMS>0 ? mDimPerMS : inherited::getStdDimPerMS(); };
 
-    virtual void setDimPerMS(double aDimPerMS) { mDimPerMS = aDimPerMS; }; ///< set dimming per MS to make actual audio steps and dimming steps align better than with standard step
+    virtual void setDimPerMS(double aDimPerMS) { mDimPerMS = aDimPerMS; }; ///< set HW-specific dimming per MS to make actual audio steps and dimming steps align better than with standard step
 
   };
   typedef boost::intrusive_ptr<AudioVolumeChannel> AudioVolumeChannelPtr;
@@ -496,7 +502,7 @@ namespace p44 {
     virtual const char *getName() P44_OVERRIDE { return "stringChannel"; }
     virtual double getMin() P44_OVERRIDE { return 0; }
     virtual double getMax() P44_OVERRIDE { return 0; }
-    virtual double getDimPerMS() P44_OVERRIDE { return 0; } // not dimmable
+    virtual double getStdDimPerMS() P44_OVERRIDE { return 0; } // not dimmable
     virtual ApiValueType getChannelValueType() P44_OVERRIDE { return apivalue_string; }
 
     virtual bool setChannelValueIfNotDontCare(DsScenePtr aScene, const string& aNewValue, bool aAlwaysApply);

@@ -40,6 +40,7 @@ ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChann
   mChannelId(aChannelId),
   mChannelUpdatePending(false), // no output update pending
   mNextTransitionTime(0), // none
+  mCustomDimPerMS(0), // standard dimming rate
   mChannelLastSync(Never), // we don't known nor have we sent the output state
   mCachedChannelValue(0), // channel output value cache
   mIsVolatileValue(true), // not worth saving yet

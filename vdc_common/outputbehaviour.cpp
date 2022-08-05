@@ -876,6 +876,7 @@ static void applychannels_func(BuiltinFunctionContextPtr f)
     o->output()->setTransitionTimeOverride(f->arg(1)->doubleValue()*Second);
   }
   POLOG(o->output(), LOG_INFO, "applychannels() requests applying channels now");
+  o->output()->getDevice().getVdc().cancelNativeActionUpdate(); // still delayed native scene updates must be cancelled before changing channel values
   o->output()->getDevice().requestApplyingChannels(boost::bind(&outputOpComplete, f, o->output()), false);
 }
 
