@@ -1653,6 +1653,7 @@ enum {
   scenesList_key,
   #endif
   nextVersion_key,
+  deviceHardwareId_key,
   numVdcHostProperties
 };
 
@@ -1688,6 +1689,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "x-p44-scenesList", apivalue_null, scenesList_key, OKEY(vdchost_obj) },
     #endif
     { "x-p44-nextVersion", apivalue_string, nextVersion_key, OKEY(vdchost_obj) },
+    { "x-p44-deviceHardwareId", apivalue_string, nextVersion_key, OKEY(vdchost_obj) },
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -1773,6 +1775,9 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         #endif
         case nextVersion_key:
           aPropValue->setStringValue(nextModelVersion());
+          return true;
+        case deviceHardwareId_key:
+          aPropValue->setStringValue(getDeviceHardwareId());
           return true;
       }
     }
