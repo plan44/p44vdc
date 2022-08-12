@@ -128,6 +128,9 @@ typedef enum {
   AUDIO_RESUME_OFF = 54,  ///< audio: Resume Off
   AREA_4_STOP_S = 55,     ///< area 4 stop
   AUDIO_RESUME_ON = 55,   ///< audio: Resume On
+  SUN_PROTECTION = 56,    ///< Shades: sun protection
+  EXTENDER_PRELOAD = 57,  ///< Shades: extender preload
+  ZONE_UNDEFINED = 58,    ///< Shades: undefined zone
   ///< 56..63 - reserved
   START_APARTMENT_SCENES = 64,                    ///< 64 - first apartment scene
   AUTO_STANDBY = (START_APARTMENT_SCENES + 0),    ///< 64 - auto-standby scene
@@ -158,7 +161,8 @@ typedef enum {
   NO_RAIN = (START_APARTMENT_SCENES + 25),        ///< 89 - No Rain
   HAIL = (START_APARTMENT_SCENES + 26),           ///< 90 - Hail
   NO_HAIL = (START_APARTMENT_SCENES + 27),        ///< 91 - No Hail
-  POLLUTION = (START_APARTMENT_SCENES + 28),      ///< 92 - Pollution
+  POLLUTION = (START_APARTMENT_SCENES + 28),      ///< 92 - Pollution/Hazardous Air
+  BURGLARY = (START_APARTMENT_SCENES + 29),       ///< 93 - Burglary
   MAX_SCENE_NO,                                   ///< currently known number of scenes
   INVALID_SCENE_NO = MAX_SCENE_NO                 ///< marker for invalid scene
 } DsSceneNumber;

@@ -1689,7 +1689,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "x-p44-scenesList", apivalue_null, scenesList_key, OKEY(vdchost_obj) },
     #endif
     { "x-p44-nextVersion", apivalue_string, nextVersion_key, OKEY(vdchost_obj) },
-    { "x-p44-deviceHardwareId", apivalue_string, nextVersion_key, OKEY(vdchost_obj) },
+    { "x-p44-deviceHardwareId", apivalue_string, deviceHardwareId_key, OKEY(vdchost_obj) },
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -2150,6 +2150,9 @@ const SceneKindDescriptor p44::roomScenes[] = {
   { PRESET_42, scene_room|scene_preset|scene_extended, "preset 42" },
   { PRESET_43, scene_room|scene_preset|scene_extended, "preset 43" },
   { PRESET_44, scene_room|scene_preset|scene_extended, "preset 44" },
+  { SUN_PROTECTION, scene_room|scene_preset|scene_extended, "sun protection" },
+  { EXTENDER_PRELOAD, scene_room, "extender preload" },
+  { ZONE_UNDEFINED, scene_room, "zone undefined" },
   { T1234_CONT, 0, "T1234_CONT" },
   { DEC_S, 0, "dec" },
   { INC_S, 0, "inc" },
@@ -2211,6 +2214,7 @@ const SceneKindDescriptor p44::globalScenes[] = {
   { HAIL, scene_global, "hail" },
   { NO_HAIL, scene_global, "no hail" },
   { POLLUTION, scene_global, "pollution" },
+  { BURGLARY, scene_global, "burglary" },
   { ENERGY_OL, 0, "energy overload" },
   { INVALID_SCENE_NO, 0 } // terminator
 };
