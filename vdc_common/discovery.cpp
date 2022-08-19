@@ -118,10 +118,10 @@ bool ServiceAnnouncer::serviceCallback(ErrorPtr aStatus)
         svc->txtRecords.clear();
         aStatus = sg->addService(svc);
       }
-      if (Error::isOK(aStatus) && mVdcHost->vdcApiServer) {
+      if (Error::isOK(aStatus) && mVdcHost->mVdcApiServer) {
         // advertise the vdc API (for the vdsm to connect)
         int vdcPort = 0;
-        sscanf(mVdcHost->vdcApiServer->getPort(), "%d", &vdcPort);
+        sscanf(mVdcHost->mVdcApiServer->getPort(), "%d", &vdcPort);
         svc->type = VDC_SERVICE_TYPE;
         svc->port = vdcPort;
         svc->txtRecords.clear();
