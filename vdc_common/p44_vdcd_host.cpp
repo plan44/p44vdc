@@ -914,7 +914,7 @@ ApiRequestObj::ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest) :
 
 void ApiRequestObj::sendResponse(JsonObjectPtr aResponse, ErrorPtr aError)
 {
-  if (mConnection) P44VdcHost::sendJsonApiResponse(mConnection, aResponse, aError, 0 /* no reqno */);
+  if (mConnection) P44VdcHost::sendJsonApiResponse(mConnection, aResponse, aError, "" /* no reqid */);
   mConnection.reset(); // done now
 }
 
