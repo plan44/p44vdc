@@ -501,6 +501,16 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
         if (aUndefined) {
           // FIXME: buttons can get undefined, too
         }
+        else if (aValue<0) {
+          // direct click reporting
+          int click = (int)(-aValue);
+          switch (click) {
+            case 1 : bb->injectClick(ct_tip_1x); break;
+            case 2 : bb->injectClick(ct_tip_2x); break;
+            case 3 : bb->injectClick(ct_tip_3x); break;
+            case 4 : bb->injectClick(ct_tip_4x); break;
+          }
+        }
         else if (aValue>2) {
           // simulate a keypress of defined length in milliseconds
           bb->updateButtonState(true);
