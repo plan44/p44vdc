@@ -48,7 +48,7 @@ namespace p44 {
 
     Device &mDevice;
     #if ENABLE_JSONBRIDGEAPI
-    bool mPreventBridging;
+    bool mAllowBridging;
     #endif
 
   public:

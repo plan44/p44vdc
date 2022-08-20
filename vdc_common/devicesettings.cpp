@@ -30,7 +30,7 @@ DeviceSettings::DeviceSettings(Device &aDevice) :
   inherited(aDevice.getVdcHost().getDsParamStore()),
   mDevice(aDevice),
   #if ENABLE_JSONBRIDGEAPI
-  mPreventBridging(false),
+  mAllowBridging(false),
   #endif
   mZoneID(0)
 {
@@ -58,7 +58,7 @@ size_t DeviceSettings::numFieldDefs()
 // flags in mDeviceFlags
 enum {
   // scene global
-  deviceflags_preventBridging = 0x0001, ///< prevent bridging this device
+  deviceflags_allowBridging = 0x0001, ///< allow bridging this device
 };
 
 const FieldDefinition *DeviceSettings::getFieldDef(size_t aIndex)
@@ -87,7 +87,7 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
   aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, mZoneID);
   // decode my own flags
   #if ENABLE_JSONBRIDGEAPI
-  mPreventBridging = flags & deviceflags_preventBridging;
+  mAllowBridging = flags & deviceflags_allowBridging;
   #endif
   // pass the flags out to subclass which called this superclass to get the flags (and decode themselves)
   if (aCommonFlagsP) *aCommonFlagsP = flags;
@@ -100,7 +100,7 @@ void DeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // encode the flags
   #if ENABLE_JSONBRIDGEAPI
-  if (mPreventBridging) aCommonFlags |= deviceflags_preventBridging;
+  if (mAllowBridging) aCommonFlags |= deviceflags_allowBridging;
   #endif
   // bind the fields
   aStatement.bind(aIndex++, (long long int)aCommonFlags);
