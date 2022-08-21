@@ -142,12 +142,13 @@ namespace p44 {
     /// @{
 
     /// report current button state (can be repeated with same state)
+    /// Do NOT use this mixed with injectClick()!
     /// @param aPressed true if button is currently pressed, false if button is currently released
     void updateButtonState(bool aPressed);
 
     /// inject already detected clicks or hold/release operations
     /// @note this is for devices which do click/hold disambiguation themselves.
-    /// Do NOT used this mixed with updateButtonState()!
+    /// Do NOT use this mixed with updateButtonState()!
     /// @param aClickType the click or hold/release to inject
     void injectClick(DsClickType aClickType);
 

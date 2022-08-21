@@ -509,6 +509,8 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
             case 2 : bb->injectClick(ct_tip_2x); break;
             case 3 : bb->injectClick(ct_tip_3x); break;
             case 4 : bb->injectClick(ct_tip_4x); break;
+            case 10 : bb->injectClick(ct_hold_end); break;
+            case 11 : bb->injectClick(ct_hold_start); break;
           }
         }
         else if (aValue>2) {
