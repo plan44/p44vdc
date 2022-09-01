@@ -1351,6 +1351,7 @@ private:
         startReading();
         return;
       }
+      // report the error
     }
     else if (aNoOrTimeout) {
       // no response, means NO DATA
@@ -1363,11 +1364,19 @@ private:
       }
     }
     else {
-      // even ok result must be retry-free, otherwise we need to re-set the DTR
+      // even ok result must be retry-free, because retrying at bridge level might
+      // have incremented the read position.
+      // If we have a retry, we need to re-set the DTR to the correct byte position first
       if (aRetried) {
-        // restart reading explicitly at current offset
-        startReading();
-        return;
+        if (retries++<DALI_MAX_MEMREAD_RETRIES) {
+          // restart reading explicitly at current offset
+          startReading();
+          return;
+        }
+        // multiple retries because of frame errors in a row must count as frame error
+        // (even if bridge retry mechanism DID manage to get a error free answer in a retried read)
+        aError = Error::err<DaliCommError>(DaliCommError::DALIFrame, "repeated frame error (bridge retry) reading byte at offset %u", (unsigned int)currentOffset);
+        // report the error
       }
       // byte received, append to vector
       retries = 0;
