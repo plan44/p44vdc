@@ -51,6 +51,7 @@
 #include "i2c.hpp"
 #include "spi.hpp"
 #include "modbus.hpp"
+#include "dnssd.hpp"
 #endif
 
 
@@ -129,13 +130,13 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   // Add some extras
   #if ENABLE_HTTP_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::HttpLookup);
-  #endif // ENABLE_HTTP_SCRIPT_FUNCS
+  #endif
   #if ENABLE_SOCKET_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SocketLookup);
-  #endif // ENABLE_SOCKET_SCRIPT_FUNCS
+  #endif
   #if ENABLE_WEBSOCKET_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::WebSocketLookup);
-  #endif // ENABLE_WEBSOCKET_SCRIPT_FUNCS
+  #endif
   #if ENABLE_ANALOGIO_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::AnalogIoLookup);
   #endif
@@ -153,7 +154,10 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #endif
   #if ENABLE_MODBUS_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::ModbusLookup);
-  #endif // ENABLE_HTTP_SCRIPT_FUNCS
+  #endif
+  #if !DISABLE_DISCOVERY && ENABLE_DNSSD_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::DnsSdLookup);
+  #endif
   #endif // P44SCRIPT_FULL_SUPPORT
   #endif
   // remember singleton's address
