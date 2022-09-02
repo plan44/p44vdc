@@ -101,7 +101,7 @@ SocketCommPtr VdcApiServer::serverConnectionHandler(SocketCommPtr aServerSocketC
   VdcApiConnectionPtr apiConnection = newConnection();
   SocketCommPtr socketComm = apiConnection->socketConnection();
   socketComm->setClearHandlersAtClose(); // to make sure retain cycles are broken
-  socketComm->relatedObject = apiConnection; // bind object to connection
+  socketComm->mRelatedObject = apiConnection; // bind object to connection
   socketComm->setConnectionStatusHandler(boost::bind(&VdcApiServer::connectionStatusHandler, this, _1, _2));
   // return the socketComm object which handles this connection
   return socketComm;
@@ -112,14 +112,14 @@ void VdcApiServer::connectionStatusHandler(SocketCommPtr aSocketComm, ErrorPtr a
 {
   if (apiConnectionStatusHandler) {
     // get connection object
-    VdcApiConnectionPtr apiConnection = boost::dynamic_pointer_cast<VdcApiConnection>(aSocketComm->relatedObject);
+    VdcApiConnectionPtr apiConnection = boost::dynamic_pointer_cast<VdcApiConnection>(aSocketComm->mRelatedObject);
     if (apiConnection) {
       apiConnectionStatusHandler(apiConnection, aError);
     }
   }
   if (Error::notOK(aError)) {
     // connection failed/closed and we don't support reconnect yet
-    aSocketComm->relatedObject.reset(); // detach connection object
+    aSocketComm->mRelatedObject.reset(); // detach connection object
   }
 }
 

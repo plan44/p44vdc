@@ -93,7 +93,7 @@ ExternalDeviceConnector::ExternalDeviceConnector(ExternalVdc &aExternalVdc, Json
   mDeviceConnection(aDeviceConnection),
   mSimpletext(false)
 {
-  mDeviceConnection->relatedObject = this;
+  mDeviceConnection->mRelatedObject = this;
   // install handlers on device connection
   mDeviceConnection->setConnectionStatusHandler(boost::bind(&ExternalDeviceConnector::handleDeviceConnectionStatus, this, _2));
   mDeviceConnection->setMessageHandler(boost::bind(&ExternalDeviceConnector::handleDeviceApiJsonMessage, this, _1, _2));
