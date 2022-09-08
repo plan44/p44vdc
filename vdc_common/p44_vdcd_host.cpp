@@ -730,10 +730,22 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
 
 // MARK: - Bridge API
 
+BridgeInfoPtr P44VdcHost::getBridgeInfo(bool aInstantiate)
+{
+  if (!mBridgeInfo && aInstantiate) {
+    mBridgeInfo = new BridgeInfo(*this);
+  }
+  return mBridgeInfo;
+}
+
+
 void P44VdcHost::enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllowed)
 {
   if (!mBridgeApi) {
     // can be enabled only once
+    // - enabling bridge API also instantiates bridge info
+    getBridgeInfo(true);
+    // - enable API
     mBridgeApi = new BridgeApiConnection(new SocketComm(MainLoop::currentMainLoop()));
     mBridgeApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, AF_INET);
     mBridgeApi->mJsonApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
@@ -741,11 +753,20 @@ void P44VdcHost::enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllow
 }
 
 
+size_t P44VdcHost::numBridgeApiClients()
+{
+  if (!mBridgeApi) return 0;
+  return mBridgeApi->mJsonApiServer->numClients();
+}
+
+
+
 SocketCommPtr P44VdcHost::bridgeApiConnectionHandler(SocketCommPtr aServerSocketCommP)
 {
   JsonCommPtr conn = JsonCommPtr(new JsonComm(MainLoop::currentMainLoop()));
   conn->setMessageHandler(boost::bind(&P44VdcHost::bridgeApiRequestHandler, this, conn, _1, _2));
   conn->setClearHandlersAtClose(); // close must break retain cycles so this object won't cause a mem leak
+  getBridgeInfo()->resetInfo(); // reset bridge info
   return conn;
 }
 
@@ -794,8 +815,127 @@ void BridgeApiConnection::notifyBridgeClient(SocketCommPtr aSocketComm, const st
 }
 
 
+// MARK: - BridgeInfo
+
+BridgeInfo::BridgeInfo(P44VdcHost& aP44VdcHost) :
+  mP44VdcHost(aP44VdcHost)
+{
+  resetInfo();
+}
+
+
+void BridgeInfo::resetInfo()
+{
+  mQRCodeData.clear();
+  mCommissionable = false;
+}
+
+
+
+enum {
+  qrcodedata_key,
+  commissionable_key,
+  connected_key,
+  numBrigeInfoProperties
+};
+
+static char bridgeinfo_key;
+
+int BridgeInfo::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return numBrigeInfoProperties;
+}
+
+
+PropertyDescriptorPtr BridgeInfo::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  static const PropertyDescription properties[numBrigeInfoProperties] = {
+    { "qrcodedata", apivalue_string, qrcodedata_key, OKEY(bridgeinfo_key) },
+    { "commissionable", apivalue_bool, commissionable_key, OKEY(bridgeinfo_key) },
+    { "connected", apivalue_bool, connected_key, OKEY(bridgeinfo_key) },
+  };
+  if (aParentDescriptor->isRootOfObject()) {
+    // root level property of this object hierarchy
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+  }
+  return PropertyDescriptorPtr();
+}
+
+
+bool BridgeInfo::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(bridgeinfo_key)) {
+    if (aMode==access_read) {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case qrcodedata_key: aPropValue->setStringValue(mQRCodeData); return true;
+        case commissionable_key: aPropValue->setBoolValue(mCommissionable); return true;
+        case connected_key: aPropValue->setBoolValue(mP44VdcHost.numBridgeApiClients()>0); return true;
+      }
+    }
+    else {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case qrcodedata_key: mQRCodeData = aPropValue->stringValue(); return true;
+        case commissionable_key: mCommissionable = aPropValue->boolValue(); return true;
+      }
+    }
+  }
+  return false;
+}
 
 #endif // ENABLE_JSONBRIDGEAPI
+
+
+// MARK: - vdchost property access
+
+static char bridge_obj;
+
+enum {
+  #if ENABLE_JSONBRIDGEAPI
+  bridge_key,
+  #endif
+  numP44VdcHostProperties
+};
+
+
+
+int P44VdcHost::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  return inherited::numProps(aDomain, aParentDescriptor)+numP44VdcHostProperties;
+}
+
+
+// note: is only called when getDescriptorByName does not resolve the name
+PropertyDescriptorPtr P44VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  // TODO: remove outer if as soon as we have non-conditional other properties
+  // to avoid declaring an array of length 0 (which works in clang/gcc but is not allowed by ISO standard)
+  #if ENABLE_JSONBRIDGEAPI
+  static const PropertyDescription properties[numP44VdcHostProperties] = {
+    #if ENABLE_JSONBRIDGEAPI
+    { "x-p44-bridge", apivalue_object, bridge_key, OKEY(bridge_obj) },
+    #endif
+  };
+  int n = inherited::numProps(aDomain, aParentDescriptor);
+  if (aPropIndex<n)
+    return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor); // base class' property
+  aPropIndex -= n; // rebase to 0 for my own first property
+  return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+  #else
+  return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor); // base class' property
+  #endif
+}
+
+
+PropertyContainerPtr P44VdcHost::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  #if ENABLE_JSONBRIDGEAPI
+  if (aPropertyDescriptor->hasObjectKey(bridge_obj)) {
+    return mBridgeInfo; // can be NULL if bridge api is not enabled
+  }
+  #endif
+  // unknown here
+  return inherited::getContainer(aPropertyDescriptor, aDomain);
+}
 
 
 // MARK: - P44 specific vdchost level methods

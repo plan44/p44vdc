@@ -50,6 +50,7 @@ using namespace std;
 namespace p44 {
 
   class P44VdcHost;
+  class BridgeInfo;
 
   class P44VdcError : public Error
   {
@@ -178,6 +179,33 @@ namespace p44 {
 
   };
   typedef boost::intrusive_ptr<BridgeApiConnection> BridgeApiConnectionPtr;
+
+
+  /// access to current bridging global params, usually read/written by bridge and webui only
+  class BridgeInfo : public PropertyContainer
+  {
+    friend class VdcHost;
+
+    P44VdcHost& mP44VdcHost;
+
+    // properties
+    string mQRCodeData; ///< the QR code data string for onboarding
+    bool mCommissionable; ///< set when bridge is commissionable
+
+  public:
+
+    BridgeInfo(P44VdcHost& aP44VdcHost);
+    void resetInfo();
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<BridgeInfo> BridgeInfoPtr;
 
   #endif // ENABLE_JSONBRIDGEAPI
 
@@ -312,6 +340,7 @@ namespace p44 {
 
     #if ENABLE_JSONBRIDGEAPI
     BridgeApiConnectionPtr mBridgeApi; ///< JSON API for bridge access
+    BridgeInfoPtr mBridgeInfo; ///< bridge related properties, mostly passive (just for passing between bridge and webui)
     #endif
 
   public:
@@ -343,6 +372,7 @@ namespace p44 {
     #endif
 
     #if ENABLE_JSONBRIDGEAPI
+
     /// enable bridge API
     /// @param aServiceOrPort port number or service string
     /// @param aNonLocalAllowed if set, non-local clients are allowed to connect to the bridge API
@@ -351,7 +381,15 @@ namespace p44 {
 
     /// get the bridge API
     virtual VdcApiConnectionPtr getBridgeApi() P44_OVERRIDE { return mBridgeApi; }
-    #endif
+
+    /// number of connected bridge API clients
+    size_t numBridgeApiClients();
+
+    /// @return bridge info, might be NULL if no bridge info is available and aInstantiate not set
+    /// @param aInstantiate if set, a bridge info is instantiated when none exists
+    BridgeInfoPtr getBridgeInfo(bool aInstantiate = false);
+
+    #endif // ENABLE_JSONBRIDGEAPI
 
 		/// perform self testing
     /// @param aCompletedCB will be called when the entire self test is done
@@ -378,6 +416,11 @@ namespace p44 {
   protected:
 
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
 
   private:
 
