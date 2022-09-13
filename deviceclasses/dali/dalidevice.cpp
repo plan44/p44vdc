@@ -1332,8 +1332,14 @@ bool DaliSingleControllerDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 bool DaliSingleControllerDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   if (daliController->supportsDT8) {
-    if (getIcon("dali_color", aIcon, aWithData, aResolutionPrefix))
-      return true;
+    if (daliController->dt8Color) {
+      if (getIcon("dali_color", aIcon, aWithData, aResolutionPrefix))
+        return true;
+    }
+    else {
+      if (getIcon("dali_ct", aIcon, aWithData, aResolutionPrefix))
+        return true;
+    }
   }
   else {
     if (getIcon("dali_dimmer", aIcon, aWithData, aResolutionPrefix))
