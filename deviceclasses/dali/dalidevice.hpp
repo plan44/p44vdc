@@ -57,50 +57,50 @@ namespace p44 {
     friend class DaliSingleControllerDevice;
     friend class DaliVdc;
 
-    DaliDeviceInfoPtr deviceInfo; ///< the device info of the bus device (ballast)
+    DaliDeviceInfoPtr mDeviceInfo; ///< the device info of the bus device (ballast)
 
-    DsUid dSUID; ///< the dSUID of the bus device (if single device, this will become the dS device's dSUID)
+    DsUid mDSUID; ///< the dSUID of the bus device (if single device, this will become the dS device's dSUID)
 
-    DaliVdc &daliVdc;
+    DaliVdc &mDaliVdc;
 
-    MLTicket dimRepeaterTicket; ///< DALI dimming and repeater ticket
-    MLTicket outputSyncTicket; ///< output value sync-back ticket
-    VdcDimMode currentDimMode; ///< current dim mode
+    MLTicket mDimRepeaterTicket; ///< DALI dimming and repeater ticket
+    MLTicket mOutputSyncTicket; ///< output value sync-back ticket
+    VdcDimMode mCurrentDimMode; ///< current dim mode
 
     /// feature set
-    bool supportsLED; // supports device type 6/LED features
-    bool dt6LinearDim; // linear dimming curve enabled
-    bool supportsDT8; // supports device type 8 features
-    bool dt8Color; // supports DT 8 color features
-    bool dt8CT; // supports DT 8 color temperature features
-    uint8_t dt8PrimaryColors; // if>0, how many primary color channels are supported
-    uint8_t dt8RGBWAFchannels; // if>0, how many RGBWAF channels are supported
-    bool dt8autoactivation; // if set, changing DAPC (brightness) auto-activates colors set in TEMPROARY color registers
+    bool mSupportsLED; // supports device type 6/LED features
+    bool mDT6LinearDim; // linear dimming curve enabled
+    bool mSupportsDT8; // supports device type 8 features
+    bool mDT8Color; // supports DT 8 color features
+    bool mDT8CT; // supports DT 8 color temperature features
+    uint8_t mDT8PrimaryColors; // if>0, how many primary color channels are supported
+    uint8_t mDT8RGBWAFchannels; // if>0, how many RGBWAF channels are supported
+    bool mDT8AutoActivation; // if set, changing DAPC (brightness) auto-activates colors set in TEMPROARY color registers
 
     /// cached status (call updateStatus() to update these)
-    bool isDummy; ///< set if dummy (not found on bus, but known to be part of a composite device)
-    bool isPresent; ///< set if present
-    bool lampFailure; ///< set if lamp has failure
+    bool mIsDummy; ///< set if dummy (not found on bus, but known to be part of a composite device)
+    bool mIsPresent; ///< set if present
+    bool mLampFailure; ///< set if lamp has failure
 
     /// cached transition parameters (updated in setTransitionTime() and dimPrepare())
-    MLMicroSeconds currentTransitionTime; ///< currently set transition time
-    uint8_t currentFadeTime; ///< currently set DALI fade time
-    double currentDimPerMS; ///< current dim steps per second
-    uint8_t currentFadeRate; ///< currently set DALI fade rate
+    MLMicroSeconds mCurrentTransitionTime; ///< currently set transition time
+    uint8_t mCurrentFadeTime; ///< currently set DALI fade time
+    double mCurrentDimPerMS; ///< current dim steps per second
+    uint8_t mCurrentFadeRate; ///< currently set DALI fade rate
 
     /// cached parameters (call updateParams() to update these)
-    bool staleParams; ///< set if cached parameters might be stale and should not be used for deciding incremental changes to HW
-    Brightness currentBrightness; ///< current brightness
-    Brightness minBrightness; ///< currently set minimal brightness
+    bool mStaleParams; ///< set if cached parameters might be stale and should not be used for deciding incremental changes to HW
+    Brightness mCurrentBrightness; ///< current brightness
+    Brightness mMinBrightness; ///< currently set minimal brightness
     // - DT8 params
-    ColorLightMode currentColorMode; ///< current color mode
-    uint16_t currentXorCT; ///< current CIE X or CT
-    uint16_t currentY; ///< current CIE Y
-    uint8_t currentR; ///< current Red
-    uint8_t currentG; ///< current Green
-    uint8_t currentB; ///< current Blue
-    uint8_t currentW; ///< current White
-    uint8_t currentA; ///< current Amber
+    ColorLightMode mCurrentColorMode; ///< current color mode
+    uint16_t mCurrentXorCT; ///< current CIE X or CT
+    uint16_t mCurrentY; ///< current CIE Y
+    uint8_t mCurrentR; ///< current Red
+    uint8_t mCurrentG; ///< current Green
+    uint8_t mCurrentB; ///< current Blue
+    uint8_t mCurrentW; ///< current White
+    uint8_t mCurrentA; ///< current Amber
 
   public:
 
@@ -217,7 +217,7 @@ namespace p44 {
     /// DALI address to use for querying brightness etc.
     /// @return DALI address
     /// @note this will be overridden in DaliBusDeviceGroup to read info from single master dimmer, not group
-    virtual uint8_t addressForQuery() { return deviceInfo->shortAddress; };
+    virtual uint8_t addressForQuery() { return mDeviceInfo->mShortAddress; };
 
 
     typedef boost::function<void (uint16_t aGroupBitMask, ErrorPtr aError)> DaliGroupsCB;
@@ -275,9 +275,9 @@ namespace p44 {
     friend class DaliCompositeDevice;
     friend class DaliVdc;
 
-    string mixID; ///< dSUIDs of all members, XOR mixed
-    DaliAddress groupMaster; ///< the DALI short address of the master dimmer (i.e. the one that is read from)
-    DaliComm::ShortAddressList groupMembers; ///< short addresses of members of the group
+    string mMixID; ///< dSUIDs of all members, XOR + FNV mixed
+    DaliAddress mGroupMaster; ///< the DALI short address of the master dimmer (i.e. the one that is read from)
+    DaliComm::ShortAddressList mGroupMembers; ///< short addresses of members of the group
 
   public:
 
@@ -312,7 +312,7 @@ namespace p44 {
     /// DALI address to use for querying brightness etc.
     /// @return DALI address
     /// @note reading info from single master dimmer, not group
-    virtual uint8_t addressForQuery() P44_OVERRIDE { return groupMaster; };
+    virtual uint8_t addressForQuery() P44_OVERRIDE { return mGroupMaster; };
 
     /// check if this device belongs to a particular DALI address
     virtual bool belongsToShortAddr(DaliAddress aDaliAddres) const P44_OVERRIDE;
@@ -345,7 +345,7 @@ namespace p44 {
 
   protected:
 
-    MLTicket transitionTicket; ///< transition timing ticket
+    MLTicket mTransitionTicket; ///< transition timing ticket
 
   public:
 
@@ -408,7 +408,7 @@ namespace p44 {
 
   public:
 
-    DaliBusDevicePtr daliController; ///< the actual DALI bus device controlling the entire device
+    DaliBusDevicePtr mDaliController; ///< the actual DALI bus device controlling the entire device
 
     DaliSingleControllerDevice(DaliVdc *aVdcP);
 
@@ -416,7 +416,7 @@ namespace p44 {
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
     /// @return technical type of DALI device
-    virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return daliController && daliController->isGrouped() ? dalidevice_group : dalidevice_single; }
+    virtual DaliDeviceTypes daliTechnicalType() const P44_OVERRIDE { return mDaliController && mDaliController->isGrouped() ? dalidevice_group : dalidevice_single; }
 
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
@@ -564,7 +564,7 @@ namespace p44 {
     friend class DaliDeviceCollector;
     friend class DaliVdc;
 
-    uint32_t collectionID; ///< the ID of the collection that created this composite device
+    uint32_t mCollectionID; ///< the ID of the collection that created this composite device
     bool mBriCool; ///< if set, this is a tunable white where the W dimmer is brightness, and the A dimmer directly controls the "coolness"
 
   public:
@@ -580,7 +580,7 @@ namespace p44 {
     };
     typedef uint8_t DimmerIndex;
 
-    DaliBusDevicePtr dimmers[numDimmers];
+    DaliBusDevicePtr mDimmers[numDimmers];
 
     DaliCompositeDevice(DaliVdc *aVdcP);
 
@@ -724,10 +724,10 @@ namespace p44 {
     typedef Device inherited;
     friend class DaliVdc;
 
-    long long daliInputDeviceRowID; ///< the ROWID this device was created from (0=none)
+    long long mDaliInputDeviceRowID; ///< the ROWID this device was created from (0=none)
 
-    DaliAddress baseAddress;
-    int numAddresses;
+    DaliAddress mBaseAddress;
+    int mNumAddresses;
 
     typedef enum {
       input_button,
@@ -738,9 +738,9 @@ namespace p44 {
       input_pulse
     } DaliInputType;
 
-    DaliInputType inputType;
+    DaliInputType mInputType;
 
-    MLTicket releaseTicket;
+    MLTicket mReleaseTicket;
 
   public:
 

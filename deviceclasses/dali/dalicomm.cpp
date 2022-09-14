@@ -42,18 +42,18 @@ using namespace p44;
 
 
 DaliComm::DaliComm(MainLoop &aMainLoop) :
-  multiMaster(false),
+  mMultiMaster(false),
 	inherited(aMainLoop),
-  runningProcedures(0),
-  dali2ScanLock(false),
-  dali2LUNLock(false),
-  retriedReads(0),
-  retriedWrites(0),
-  closeAfterIdleTime(Never),
-  responsesInSequence(false),
-  expectedBridgeResponses(0),
-  sendEdgeAdj(DEFAULT_SENDING_EDGE_ADJUSTMENT),
-  samplePointAdj(DEFAULT_SAMPLING_POINT_ADJUSTMENT)
+  mRunningProcedures(0),
+  mDali2ScanLock(false),
+  mDali2LUNLock(false),
+  mRetriedReads(0),
+  mRetriedWrites(0),
+  mCloseAfterIdleTime(Never),
+  mResponsesInSequence(false),
+  mExpectedBridgeResponses(0),
+  mSendEdgeAdj(DEFAULT_SENDING_EDGE_ADJUSTMENT),
+  mSamplePointAdj(DEFAULT_SAMPLING_POINT_ADJUSTMENT)
 {
   // serialqueue needs a buffer as we use NOT_ENOUGH_BYTES mechanism
   setAcceptBuffer(21); // actually min 3 bytes for EVENT_CODE_FOREIGN_FRAME
@@ -86,19 +86,19 @@ const long long DALI_GTIN_blacklist[] = {
 
 void DaliComm::startProcedure()
 {
-  ++runningProcedures;
+  ++mRunningProcedures;
 }
 
 void DaliComm::endProcedure()
 {
-  if (runningProcedures>0)
-    --runningProcedures;
+  if (mRunningProcedures>0)
+    --mRunningProcedures;
 }
 
 
 bool DaliComm::isBusy()
 {
-  return runningProcedures>0;
+  return mRunningProcedures>0;
 }
 
 
@@ -140,7 +140,7 @@ static const char *bridgeAckText(uint8_t aResp1, uint8_t aResp2)
 
 void DaliComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, MLMicroSeconds aCloseAfterIdleTime)
 {
-  closeAfterIdleTime = aCloseAfterIdleTime;
+  mCloseAfterIdleTime = aCloseAfterIdleTime;
   serialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, DALIBRIDGE_COMMPARAMS);
 }
 
@@ -153,25 +153,25 @@ void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, Se
     OLOG(LOG_ERR, "operation timed out - indicates problem with bridge");
     return;
   }
-  if (expectedBridgeResponses>0) expectedBridgeResponses--;
-  if (expectedBridgeResponses<BUFFERED_BRIDGE_RESPONSES_LOW) {
-    responsesInSequence = false; // allow buffered sends without waiting for answers again
+  if (mExpectedBridgeResponses>0) mExpectedBridgeResponses--;
+  if (mExpectedBridgeResponses<BUFFERED_BRIDGE_RESPONSES_LOW) {
+    mResponsesInSequence = false; // allow buffered sends without waiting for answers again
   }
   // get received data
   if (Error::isOK(aError) && aOperation && aOperation->getDataSize()>=2) {
     uint8_t resp1 = aOperation->getDataP()[0];
     uint8_t resp2 = aOperation->getDataP()[1];
     if (resp1==RESP_CODE_DATA || resp1==RESP_CODE_DATA_RETRIED) {
-      FOCUSOLOG("bridge response: DATA            (%02X)      %02X    - %d pending responses%s", resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_DATA_RETRIED ? ", RETRIED" : "");
-      if (resp1==RESP_CODE_DATA_RETRIED) retriedReads++;
+      FOCUSOLOG("bridge response: DATA            (%02X)      %02X    - %d pending responses%s", resp1, resp2, mExpectedBridgeResponses, resp1==RESP_CODE_DATA_RETRIED ? ", RETRIED" : "");
+      if (resp1==RESP_CODE_DATA_RETRIED) mRetriedReads++;
     }
     else {
-      FOCUSOLOG("bridge response: %s (%02X %02X)         - %d pending responses%s", bridgeAckText(resp1, resp2), resp1, resp2, expectedBridgeResponses, resp1==RESP_CODE_ACK_RETRIED ? ", RETRIED" : "");
+      FOCUSOLOG("bridge response: %s (%02X %02X)         - %d pending responses%s", bridgeAckText(resp1, resp2), resp1, resp2, mExpectedBridgeResponses, resp1==RESP_CODE_ACK_RETRIED ? ", RETRIED" : "");
       if (resp1==RESP_CODE_ACK_RETRIED) {
         if (resp2==ACK_TIMEOUT || resp2==ACK_FRAME_ERR)
-          retriedReads++; // read ACKs
+          mRetriedReads++; // read ACKs
         else
-          retriedWrites++; // count others as write ACKs
+          mRetriedWrites++; // count others as write ACKs
       }
     }
     if (aBridgeResultHandler) {
@@ -192,9 +192,9 @@ void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, Se
 void DaliComm::sendBridgeCommand(uint8_t aCmd, uint8_t aDali1, uint8_t aDali2, DaliBridgeResultCB aResultCB, int aWithDelay)
 {
   // reset connection closing timeout
-  connectionTimeoutTicket.cancel();
-  if (closeAfterIdleTime!=Never) {
-    connectionTimeoutTicket.executeOnce(boost::bind(&DaliComm::connectionTimeout, this), closeAfterIdleTime);
+  mConnectionTimeoutTicket.cancel();
+  if (mCloseAfterIdleTime!=Never) {
+    mConnectionTimeoutTicket.executeOnce(boost::bind(&DaliComm::connectionTimeout, this), mCloseAfterIdleTime);
   }
   // create sending operation
   SerialOperationSendPtr sendOp = SerialOperationSendPtr(new SerialOperationSend);
@@ -213,19 +213,19 @@ void DaliComm::sendBridgeCommand(uint8_t aCmd, uint8_t aDali1, uint8_t aDali2, D
   // prepare response reading operation
   SerialOperationReceivePtr recOp = SerialOperationReceivePtr(new SerialOperationReceive);
   recOp->setExpectedBytes(2); // expected 2 response bytes
-  expectedBridgeResponses++;
+  mExpectedBridgeResponses++;
   if (aWithDelay>0) {
     // delayed sends must always be in sequence (always leave recOp->inSequence at its default, true)
     sendOp->setInitiationDelay(aWithDelay);
-    FOCUSOLOG("bridge command:  %s (%02X)      %02X %02X - %d pending responses - to be sent in %d µS after no response pending", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, expectedBridgeResponses, aWithDelay);
+    FOCUSOLOG("bridge command:  %s (%02X)      %02X %02X - %d pending responses - to be sent in %d µS after no response pending", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, mExpectedBridgeResponses, aWithDelay);
   }
   else {
     // non-delayed sends may be sent before answer of previous commands have arrived as long as Rx (9210) or Tx (p44dbr) buf in bridge does not overflow
-    if (expectedBridgeResponses>BUFFERED_BRIDGE_RESPONSES_HIGH) {
-      responsesInSequence = true; // prevent further sends without answers
+    if (mExpectedBridgeResponses>BUFFERED_BRIDGE_RESPONSES_HIGH) {
+      mResponsesInSequence = true; // prevent further sends without answers
     }
-    recOp->inSequence = responsesInSequence;
-    FOCUSOLOG("bridge command:  %s (%02X)      %02X %02X - %d pending responses - %s", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, expectedBridgeResponses, responsesInSequence ? "sent when no more responses pending" : "sent as soon as possible");
+    recOp->inSequence = mResponsesInSequence;
+    FOCUSOLOG("bridge command:  %s (%02X)      %02X %02X - %d pending responses - %s", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, mExpectedBridgeResponses, mResponsesInSequence ? "sent when no more responses pending" : "sent as soon as possible");
   }
   recOp->setTimeout(120*Second); // large timeout, because it can really take time until all expected answers are received, or DEH2 network/serial load might disturb timing for a longer while
   // set callback
@@ -323,8 +323,8 @@ ssize_t DaliComm::acceptExtraBytes(size_t aNumBytes, uint8_t *aBytes)
     // detected forward frame on the bus from another master
     OLOG(LOG_INFO, "bridge event: 0x%02X 0x%02X 0x%02X from other master on bus", aBytes[0], aBytes[1], aBytes[2]);
     // invoke handler
-    if (bridgeEventHandler) {
-      bridgeEventHandler(aBytes[0], aBytes[1], aBytes[2]);
+    if (mBridgeEventHandler) {
+      mBridgeEventHandler(aBytes[0], aBytes[1], aBytes[2]);
     }
     return 3; // 3 bytes of event message consumed, but no more
   }
@@ -357,10 +357,10 @@ void DaliComm::reset(DaliCommandStatusCB aStatusCB)
 {
   // this first reset command should also consume extra bytes left over from previous use
   // use delay to make sure commands are NOT buffered and extra bytes from unsynced bridge will be catched here
-  FOCUSOLOG("Before reset: retriedWrites=%ld, retriedReads=%ld, expectedBridgeResponses=%d (will be cleared to 0 now)", retriedWrites, retriedReads, expectedBridgeResponses);
-  retriedWrites = 0;
-  retriedReads = 0;
-  expectedBridgeResponses = 0;
+  FOCUSOLOG("Before reset: retriedWrites=%ld, retriedReads=%ld, expectedBridgeResponses=%d (will be cleared to 0 now)", mRetriedWrites, mRetriedReads, mExpectedBridgeResponses);
+  mRetriedWrites = 0;
+  mRetriedReads = 0;
+  mExpectedBridgeResponses = 0;
   sendBridgeCommand(CMD_CODE_RESET, 0, 0, boost::bind(&DaliComm::resetIssued, this, 0, aStatusCB, _1, _2, _3), 100*MilliSecond);
 }
 
@@ -378,7 +378,7 @@ void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aR
       return;
     }
     // issue another reset
-    expectedBridgeResponses = 0;
+    mExpectedBridgeResponses = 0;
     sendBridgeCommand(CMD_CODE_RESET, 0, 0, boost::bind(&DaliComm::resetIssued, this, aCount+1, aStatusCB, _1, _2, _3), 500*MilliSecond);
     return;
   }
@@ -390,13 +390,13 @@ void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aR
   // make sure bus overload protection is active, autoreset enabled, reset to operating
   sendBridgeCommand(CMD_CODE_OVLRESET, 0, 0, NoOP);
   // set DALI signal edge adjustments (available from fim_dali v3 onwards)
-  sendBridgeCommand(CMD_CODE_EDGEADJ, sendEdgeAdj, samplePointAdj, NoOP);
+  sendBridgeCommand(CMD_CODE_EDGEADJ, mSendEdgeAdj, mSamplePointAdj, NoOP);
   // terminate any special commands on the DALI bus
   daliSend(DALICMD_TERMINATE, 0, aStatusCB);
   // re-start PING if single master
-  pingTicket.cancel();
-  if (!multiMaster) {
-    pingTicket.executeOnce(boost::bind(&DaliComm::singleMasterPing, this, _1), DALI_SINGLE_MASTER_PING_INTERVAL);
+  mPingTicket.cancel();
+  if (!mMultiMaster) {
+    mPingTicket.executeOnce(boost::bind(&DaliComm::singleMasterPing, this, _1), DALI_SINGLE_MASTER_PING_INTERVAL);
   }
 }
 
@@ -684,7 +684,7 @@ private:
     numCycles(aNumCycles)
   {
     daliComm.startProcedure();
-    FOCUSSOLOG(daliComm, "Before R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
+    FOCUSSOLOG(daliComm, "Before R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.mRetriedWrites, daliComm.mRetriedReads);
     SOLOG(daliComm, LOG_DEBUG, "bus address %d - doing %d R/W tests to DTR...", busAddress, aNumCycles);
     // start with 0x55 pattern
     dtrValue = 0;
@@ -725,13 +725,13 @@ private:
     daliComm.endProcedure();
     if (numErrors>0) {
       SOLOG(daliComm, LOG_ERR, "Unreliable data access for bus address %d - %d of %d R/W tests have failed!", busAddress, numErrors, numCycles);
-      FOCUSSOLOG(daliComm, "After failed R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
+      FOCUSSOLOG(daliComm, "After failed R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.mRetriedWrites, daliComm.mRetriedReads);
       if (callback) callback(Error::err<DaliCommError>(numErrors>=numCycles ? DaliCommError::DataMissing : DaliCommError::DataUnreliable, "DALI R/W tests: %d of %d failed", numErrors, numCycles));
     }
     else {
       // everything is fine
       SOLOG(daliComm, LOG_DEBUG, "bus address %d - all %d test cycles OK", busAddress, numCycles);
-      FOCUSSOLOG(daliComm, "After succesful R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
+      FOCUSSOLOG(daliComm, "After succesful R/W test: retriedWrites=%ld, retriedReads=%ld", daliComm.mRetriedWrites, daliComm.mRetriedReads);
       if (callback) callback(ErrorPtr());
     }
     // done, delete myself
@@ -933,7 +933,7 @@ private:
         aError = Error::err<DaliCommError>(DaliCommError::AddressesMissing, "Devices with no short address -> need scan for those");
       }
     }
-    FOCUSSOLOG(daliComm, "After scanBus complete: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
+    FOCUSSOLOG(daliComm, "After scanBus complete: retriedWrites=%ld, retriedReads=%ld", daliComm.mRetriedWrites, daliComm.mRetriedReads);
     daliComm.endProcedure();
     // call back
     callback(activeDevicesPtr, unreliableDevicesPtr, aError);
@@ -1276,7 +1276,7 @@ private:
     // terminate
     daliComm.daliSend(DALICMD_TERMINATE, 0x00);
     daliComm.endProcedure();
-    FOCUSSOLOG(daliComm, "After scanBus complete: retriedWrites=%ld, retriedReads=%ld", daliComm.retriedWrites, daliComm.retriedReads);
+    FOCUSSOLOG(daliComm, "After scanBus complete: retriedWrites=%ld, retriedReads=%ld", daliComm.mRetriedWrites, daliComm.mRetriedReads);
     // callback
     callback(foundDevicesPtr, DaliComm::ShortAddressListPtr(), aError);
     // done, delete myself
@@ -1457,8 +1457,8 @@ private:
   {
     dali2 = false;
     deviceInfo.reset(new DaliDeviceInfo);
-    deviceInfo->shortAddress = busAddress;
-    deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // no info yet
+    deviceInfo->mShortAddress = busAddress;
+    deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // no info yet
     daliComm.daliSendQuery(busAddress, DALICMD_QUERY_VERSION_NUMBER, boost::bind(&DaliDeviceInfoReader::handleVersion, this, _1, _2, _3));
     return;
   }
@@ -1468,15 +1468,15 @@ private:
     if (Error::isOK(aError) && !aNoOrTimeout) {
       if (aResponse==1) {
         // IEC 62386-102:2009 says the response to QUERY_VERSION_NUMBER is 1 (meaning DALI 1.0)
-        deviceInfo->vers_102 = DALI_STD_VERS_BYTE(1, 0);
+        deviceInfo->mVers_102 = DALI_STD_VERS_BYTE(1, 0);
       }
       else {
         // IEC 62386-102:2014 says the response is content of bank0 offset 0x16 (6 bits major, 2 bits minor version)
-        deviceInfo->vers_102 = DALI_STD_VERS_NONEIS0(aResponse);
+        deviceInfo->mVers_102 = DALI_STD_VERS_NONEIS0(aResponse);
       }
-      SOLOG(daliComm, LOG_INFO,"device at shortaddress %d has DALI Version %d.%d", busAddress, DALI_STD_VERS_MAJOR(deviceInfo->vers_102), DALI_STD_VERS_MINOR(deviceInfo->vers_102));
-      dali2 = deviceInfo->vers_102>=DALI_STD_VERS_BYTE(2, 0);
-      if (dali2 && daliComm.dali2ScanLock) {
+      SOLOG(daliComm, LOG_INFO,"device at shortaddress %d has DALI Version %d.%d", busAddress, DALI_STD_VERS_MAJOR(deviceInfo->mVers_102), DALI_STD_VERS_MINOR(deviceInfo->mVers_102));
+      dali2 = deviceInfo->mVers_102>=DALI_STD_VERS_BYTE(2, 0);
+      if (dali2 && daliComm.mDali2ScanLock) {
         // this looks like a DALI 2 device, but scanning is locked to ensure backwards compatibility
         dali2 = false;
         SOLOG(daliComm, LOG_WARNING, "shortaddress %d is a DALI 2 device, but DALI 2 serialno scanning is disabled for backwards compatibility. Force-Rescan to enable DALI 2 scanning", busAddress);
@@ -1582,15 +1582,15 @@ private:
       }
     }
     // we have verified (re-read or checksummed) data
-    deviceInfo->devInfStatus = DaliDeviceInfo::devinf_solid; // assume solid info present
+    deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_solid; // assume solid info present
     // get standard version if available
     if (dali2 && aBank0Data->size()>=DALIMEM_BANK0_MINBYTES_v2_0) {
       // we have DALI2 with standard version numbers
       // Note: vers_102 decides about scanning for DALI2 infos at all and is retrieved with QUERY_VERSION_NUMBER above, not saved again here!
-      deviceInfo->vers_101 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x15].b);
-      deviceInfo->vers_103 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x17].b);
+      deviceInfo->mVers_101 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x15].b);
+      deviceInfo->mVers_103 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x17].b);
       // save logical unit index within single device
-      deviceInfo->lunIndex = (*aBank0Data)[0x1A].b;
+      deviceInfo->mLunIndex = (*aBank0Data)[0x1A].b;
     }
     // check plausibility of GTIN/Version/SN data
     // Know bad signatures we must catch:
@@ -1607,7 +1607,7 @@ private:
     for (int i=0x03; i<=idLastByte; i++) {
       if ((*aBank0Data)[i].no) {
         SOLOG(daliComm, LOG_ERR, "shortaddress %d Bank 0 has missing byte (timeout) at offset 0x%02X -> invalid GTIN/Serial data", busAddress, i);
-        deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+        deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
         break;
       }
       uint8_t b = (*aBank0Data)[i].b;
@@ -1629,68 +1629,68 @@ private:
     if (maxSame>=10 || (numFFs>=6 && maxSame>=3)) {
       // this is tuned heuristics: >=6 FFs total plus >=3 consecutive equal non-zeros are considered suspect (because linealight.com/i-LÈD/eral LED-FGI332 has that)
       SOLOG(daliComm, LOG_ERR, "shortaddress %d Bank 0 has %d consecutive bytes of 0x%02X and %d bytes of 0xFF  - indicates invalid GTIN/Serial data -> ignoring", busAddress, maxSame, sameByte, numFFs);
-      deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+      deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
     }
     // GTIN: bytes 0x03..0x08, MSB first
     // All 0xFF is official DALI for "no GTIN"
-    deviceInfo->gtin = 0;
+    deviceInfo->mGtin = 0;
     bool allFF = true;
     uint8_t b;
     for (int i=0x03; i<=0x08; i++) {
       b = (*aBank0Data)[i].b;
       if (b!=0xFF) allFF = false;
       if ((*aBank0Data)[i].no) b = 0; // consider missing bytes as zeroes
-      deviceInfo->gtin = (deviceInfo->gtin << 8) + b;
+      deviceInfo->mGtin = (deviceInfo->mGtin << 8) + b;
     }
-    if (allFF) deviceInfo->gtin = 0; // all FF means no GTIN
+    if (allFF) deviceInfo->mGtin = 0; // all FF means no GTIN
     // Firmware version
-    deviceInfo->fw_version_major = (*aBank0Data)[0x09].b;
-    deviceInfo->fw_version_minor = (*aBank0Data)[0x0A].b;
+    deviceInfo->mFwVersionMajor = (*aBank0Data)[0x09].b;
+    deviceInfo->mFwVersionMinor = (*aBank0Data)[0x0A].b;
     // Serial: bytes 0x0B..0x0E for <DALI 2.0
     //         bytes 0x0B..0x12 for >=DALI 2.0
-    deviceInfo->serialNo = 0;
+    deviceInfo->mSerialNo = 0;
     allFF = true;
     int serialLastByte = dali2 ? 0x12 : 0x0E; // 2.0 has longer ID field
     for (int i=0x0B; i<=serialLastByte; i++) {
       b = (*aBank0Data)[i].b;
       if (b!=0xFF) allFF = false;
       if ((*aBank0Data)[i].no) b = 0; // consider missing bytes as zeroes
-      deviceInfo->serialNo = (deviceInfo->serialNo << 8) + b;
+      deviceInfo->mSerialNo = (deviceInfo->mSerialNo << 8) + b;
     }
-    if (allFF) deviceInfo->serialNo = 0; // all FF means no serial number
+    if (allFF) deviceInfo->mSerialNo = 0; // all FF means no serial number
     // now some more plausibility checks at the GTIN/serial level
-    if (deviceInfo->gtin==0) {
-      deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // no usable GTIN, consider devinf invalid
+    if (deviceInfo->mGtin==0) {
+      deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // no usable GTIN, consider devinf invalid
     }
-    else if (gtinCheckDigit(deviceInfo->gtin)!=0) {
+    else if (gtinCheckDigit(deviceInfo->mGtin)!=0) {
       // invalid GTIN
-      SOLOG(daliComm, LOG_ERR, "shortaddress %d has invalid GTIN=%lld/0x%llX (wrong check digit) -> ignoring", busAddress, deviceInfo->gtin, deviceInfo->gtin);
-      deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+      SOLOG(daliComm, LOG_ERR, "shortaddress %d has invalid GTIN=%lld/0x%llX (wrong check digit) -> ignoring", busAddress, deviceInfo->mGtin, deviceInfo->mGtin);
+      deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
     }
     else {
       // GTIN by itself looks ok
-      if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
+      if (deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid) {
         // GTIN has not been ruled out before -> seems valid
         int i=0;
         while (DALI_GTIN_blacklist[i]!=0) {
-          if (deviceInfo->gtin==DALI_GTIN_blacklist[i]) {
+          if (deviceInfo->mGtin==DALI_GTIN_blacklist[i]) {
             // found in blacklist, invalidate serial
-            SOLOG(daliComm, LOG_ERR, "GTIN %lld of DALI shortaddress %d is blacklisted because it is known to have invalid serial -> invalidating serial", deviceInfo->gtin, busAddress);
-            deviceInfo->serialNo = 0; // reset, make invalid for check below
+            SOLOG(daliComm, LOG_ERR, "GTIN %lld of DALI shortaddress %d is blacklisted because it is known to have invalid serial -> invalidating serial", deviceInfo->mGtin, busAddress);
+            deviceInfo->mSerialNo = 0; // reset, make invalid for check below
             break;
           }
           i++;
         }
       }
-      if (deviceInfo->serialNo==0) {
-        if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
+      if (deviceInfo->mSerialNo==0) {
+        if (deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid) {
           // if everything else is ok, except for a missing serial number, consider GTIN valid
-          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_only_gtin;
+          deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_only_gtin;
           SOLOG(daliComm, LOG_WARNING, "shortaddress %d has no serial number but valid GTIN -> just using GTIN", busAddress);
         }
         else {
           // was not solid before, consider completely invalid
-          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_none;
+          deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none;
         }
       }
     }
@@ -1775,16 +1775,16 @@ private:
         }
       }
       // OEM GTIN: bytes 0x03..0x08, MSB first
-      deviceInfo->oem_gtin = 0;
+      deviceInfo->mOemGtin = 0;
       bool allFF = true;
       uint8_t b;
       for (int i=0x03; i<=0x08; i++) {
         b = (*aBank1Data)[i].b;
         if (b!=0xFF) allFF = false;
         if ((*aBank1Data)[i].no) b = 0; // consider missing bytes as zeroes
-        deviceInfo->oem_gtin = (deviceInfo->oem_gtin << 8) + b;
+        deviceInfo->mOemGtin = (deviceInfo->mOemGtin << 8) + b;
       }
-      if (allFF) deviceInfo->oem_gtin = 0; // all FF means no OEM GTIN
+      if (allFF) deviceInfo->mOemGtin = 0; // all FF means no OEM GTIN
       // OEM Serial: bytes 0x09..0x0C for <DALI 2.0
       //             bytes 0x09..0x10 for >=DALI 2.0
       allFF = true;
@@ -1793,9 +1793,9 @@ private:
         b = (*aBank1Data)[i].b;
         if (b!=0xFF) allFF = false;
         if ((*aBank1Data)[i].no) b = 0; // consider missing bytes as zeroes
-        deviceInfo->oem_serialNo = (deviceInfo->oem_serialNo << 8) + b;
+        deviceInfo->mOemSerialNo = (deviceInfo->mOemSerialNo << 8) + b;
       }
-      if (allFF) deviceInfo->oem_serialNo = 0; // all FF means no OEM GTIN
+      if (allFF) deviceInfo->mOemSerialNo = 0; // all FF means no OEM GTIN
       // done with bank1
       return complete(aError);
     }
@@ -1808,27 +1808,27 @@ private:
     if (Error::isOK(aError)) {
       SOLOG(daliComm, LOG_NOTICE,
         "Successfully read DALI%d device info %sfrom shortAddress %d - %s data: GTIN=%llu, Serial=%llu, LUN=%d",
-        deviceInfo->vers_102>=DALI_STD_VERS_BYTE(2, 0) ? 2 : 1,
+        deviceInfo->mVers_102>=DALI_STD_VERS_BYTE(2, 0) ? 2 : 1,
         dali2 ? "" : "in DALI1 mode ",
         busAddress,
-        deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid
+        deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid
         #if OLD_BUGGY_CHKSUM_COMPATIBLE
         || deviceInfo->devInfStatus==DaliDeviceInfo::devinf_maybe
         #endif
         ? "valid" : "UNRELIABLE",
-        deviceInfo->gtin,
-        deviceInfo->serialNo,
-        deviceInfo->lunIndex
+        deviceInfo->mGtin,
+        deviceInfo->mSerialNo,
+        deviceInfo->mLunIndex
       );
     }
     // clean device info in case it has been detected invalid by now
-    if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_none) {
+    if (deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_none) {
       deviceInfo->clear(); // clear everything except shortaddress
     }
-    else if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_only_gtin) {
+    else if (deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_only_gtin) {
       // consider serial numbers invalid, but GTIN and version ok
-      deviceInfo->serialNo = 0;
-      deviceInfo->oem_serialNo = 0;
+      deviceInfo->mSerialNo = 0;
+      deviceInfo->mOemSerialNo = 0;
     }
     // report
     callback(deviceInfo, aError);
@@ -1851,25 +1851,25 @@ void DaliComm::daliReadDeviceInfo(DaliDeviceInfoCB aResultCB, DaliAddress aAddre
 DaliDeviceInfo::DaliDeviceInfo()
 {
   clear();
-  vers_102 = 0; // clear() does not reset this, as it is not really part of devInf (but separately retrieved with QUERY_VERSION_NUMBER)
-  shortAddress = NoDaliAddress; // undefined short address
+  mVers_102 = 0; // clear() does not reset this, as it is not really part of devInf (but separately retrieved with QUERY_VERSION_NUMBER)
+  mShortAddress = NoDaliAddress; // undefined short address
 }
 
 
 void DaliDeviceInfo::clear()
 {
   // clear everything except short address
-  vers_101 = 0; // unknown
+  mVers_101 = 0; // unknown
   // do not clear vers_102, because this is retrieved with QUERY_VERSION_NUMBER, and should be ok even if devInf is not
-  vers_103 = 0; // unknown
-  gtin = 0;
-  fw_version_major = 0;
-  fw_version_minor = 0;
-  serialNo = 0;
-  lunIndex = 0;
-  oem_gtin = 0;
-  oem_serialNo = 0;
-  devInfStatus = devinf_none;
+  mVers_103 = 0; // unknown
+  mGtin = 0;
+  mFwVersionMajor = 0;
+  mFwVersionMinor = 0;
+  mSerialNo = 0;
+  mLunIndex = 0;
+  mOemGtin = 0;
+  mOemSerialNo = 0;
+  mDevInfStatus = devinf_none;
 }
 
 
@@ -1877,11 +1877,11 @@ void DaliDeviceInfo::invalidateSerial()
 {
   // reduce devinf to state that does not allow to base a dSUID on
   // - assume serials are garbage/not unique -> nobody should ever see them
-  serialNo = 0;
-  oem_serialNo = 0;
+  mSerialNo = 0;
+  mOemSerialNo = 0;
   // - make sure status gets downgraded (but keep other info such as GTIN which is likely valid)
-  if (devInfStatus>=devinf_only_gtin) {
-    devInfStatus = devinf_only_gtin;
+  if (mDevInfStatus>=devinf_only_gtin) {
+    mDevInfStatus = devinf_only_gtin;
   }
 }
 
@@ -1889,18 +1889,18 @@ void DaliDeviceInfo::invalidateSerial()
 
 string DaliDeviceInfo::description()
 {
-  string s = string_format("\n- DaliDeviceInfo for %s", DaliComm::formatDaliAddress(shortAddress).c_str());
-  string_format_append(s, "\n  - is %suniquely defining the device", devInfStatus==devinf_solid ? "" : "NOT ");
-  string_format_append(s, "\n  - GTIN       : %llu", gtin);
-  string_format_append(s, "\n  - Serial     : %llu", serialNo);
-  string_format_append(s, "\n  - LUN index  : %d", lunIndex);
-  string_format_append(s, "\n  - OEM GTIN   : %llu", oem_gtin);
-  string_format_append(s, "\n  - OEM Serial : %llu", oem_serialNo);
-  string_format_append(s, "\n  - Firmware   : %d.%d", fw_version_major, fw_version_minor);
+  string s = string_format("\n- DaliDeviceInfo for %s", DaliComm::formatDaliAddress(mShortAddress).c_str());
+  string_format_append(s, "\n  - is %suniquely defining the device", mDevInfStatus==devinf_solid ? "" : "NOT ");
+  string_format_append(s, "\n  - GTIN       : %llu", mGtin);
+  string_format_append(s, "\n  - Serial     : %llu", mSerialNo);
+  string_format_append(s, "\n  - LUN index  : %d", mLunIndex);
+  string_format_append(s, "\n  - OEM GTIN   : %llu", mOemGtin);
+  string_format_append(s, "\n  - OEM Serial : %llu", mOemSerialNo);
+  string_format_append(s, "\n  - Firmware   : %d.%d", mFwVersionMajor, mFwVersionMinor);
   string_format_append(s, "\n  - DALI vers  : 101:%d.%d, 102:%d.%d, 103:%d.%d",
-    DALI_STD_VERS_MAJOR(vers_101), DALI_STD_VERS_MINOR(vers_101),
-    DALI_STD_VERS_MAJOR(vers_102), DALI_STD_VERS_MINOR(vers_102),
-    DALI_STD_VERS_MAJOR(vers_103), DALI_STD_VERS_MINOR(vers_103)
+    DALI_STD_VERS_MAJOR(mVers_101), DALI_STD_VERS_MINOR(mVers_101),
+    DALI_STD_VERS_MAJOR(mVers_102), DALI_STD_VERS_MINOR(mVers_102),
+    DALI_STD_VERS_MAJOR(mVers_103), DALI_STD_VERS_MINOR(mVers_103)
   );
   return s;
 }

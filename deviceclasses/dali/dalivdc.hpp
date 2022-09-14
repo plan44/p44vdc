@@ -65,17 +65,17 @@ namespace p44 {
     friend class DaliInputDevice;
     friend class DaliBusDevice;
 
-		DaliPersistence db;
-    DaliDeviceInfoMap deviceInfoCache;
+		DaliPersistence mDb;
+    DaliDeviceInfoMap mDeviceInfoCache;
 
-    uint16_t usedDaliGroupsMask; ///< bitmask of DALI groups in use by optimizer or manually created composite devices
-    uint16_t usedDaliScenesMask; ///< bitmask of DALI scenes in use by optimizer or input devices
+    uint16_t mUsedDaliGroupsMask; ///< bitmask of DALI groups in use by optimizer or manually created composite devices
+    uint16_t mUsedDaliScenesMask; ///< bitmask of DALI scenes in use by optimizer or input devices
 
-    MLTicket groupDimTicket; ///< timer for group dimming
-    MLTicket recollectDelayTicket; ///< timer for delayed recollect
+    MLTicket mGroupDimTicket; ///< timer for group dimming
+    MLTicket mRecollectDelayTicket; ///< timer for delayed recollect
 
     #if ENABLE_DALI_INPUTS
-    DaliInputDeviceList inputDevices;
+    DaliInputDeviceList mInputDevices;
     #endif
 
   public:
@@ -89,7 +89,7 @@ namespace p44 {
 		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     // the DALI communication object
-    DaliComm daliComm;
+    DaliComm mDaliComm;
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 

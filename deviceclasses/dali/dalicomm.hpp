@@ -189,23 +189,23 @@ namespace p44 {
     /// invalidate info that claims to be a unique serial (usually because we found it's NOT unique)
     void invalidateSerial();
     /// short address
-    DaliAddress shortAddress;
+    DaliAddress mShortAddress;
     // DALI device information
-    uint8_t vers_101; ///< version of the IEC 62386-101 standard used, byte encoded, see DALI_STD_VERS_* macros
-    uint8_t vers_102; ///< version of the IEC 62386-102 standard used for all control gear in this bus unit, byte encoded, see DALI_STD_VERS_* macros
-    uint8_t vers_103; ///< version of the IEC 62386-103 standard used for all control devices in this bus unit, byte encoded, see DALI_STD_VERS_* macros
-    uint64_t gtin; /// < 48 bit global trade identification number (GTIN / EAN)
-    uint8_t fw_version_major; /// < major firmware version
-    uint8_t fw_version_minor; /// < minor firmware version
-    uint64_t serialNo; /// < unique serial number
-    uint8_t lunIndex; ///< index of logical unit within device with multiple indices
+    uint8_t mVers_101; ///< version of the IEC 62386-101 standard used, byte encoded, see DALI_STD_VERS_* macros
+    uint8_t mVers_102; ///< version of the IEC 62386-102 standard used for all control gear in this bus unit, byte encoded, see DALI_STD_VERS_* macros
+    uint8_t mVers_103; ///< version of the IEC 62386-103 standard used for all control devices in this bus unit, byte encoded, see DALI_STD_VERS_* macros
+    uint64_t mGtin; /// < 48 bit global trade identification number (GTIN / EAN)
+    uint8_t mFwVersionMajor; /// < major firmware version
+    uint8_t mFwVersionMinor; /// < minor firmware version
+    uint64_t mSerialNo; /// < unique serial number
+    uint8_t mLunIndex; ///< index of logical unit within device with multiple indices
     // OEM product information
-    uint64_t oem_gtin; /// < 48 bit global trade identification number of OEM product (GTIN / EAN)
-    uint64_t oem_serialNo; /// < unique serial number
+    uint64_t mOemGtin; /// < 48 bit global trade identification number of OEM product (GTIN / EAN)
+    uint64_t mOemSerialNo; /// < unique serial number
     /// text description
     string description();
     /// status of device info
-    DaliDevInfStatus devInfStatus;
+    DaliDevInfStatus mDevInfStatus;
   };
   typedef boost::intrusive_ptr<DaliDeviceInfo> DaliDeviceInfoPtr;
 
@@ -226,33 +226,33 @@ namespace p44 {
   {
     typedef SerialOperationQueue inherited;
 
-    int runningProcedures;
-    bool multiMaster;
+    int mRunningProcedures;
+    bool mMultiMaster;
 
     bool isBusy();
     static ErrorPtr busyError() { return ErrorPtr(new DaliCommError(DaliCommError::Busy)); };
 
-    MLMicroSeconds closeAfterIdleTime;
-    MLTicket connectionTimeoutTicket;
+    MLMicroSeconds mCloseAfterIdleTime;
+    MLTicket mConnectionTimeoutTicket;
 
-    MLTicket pingTicket; ///< timer for DALI single master PING
+    MLTicket mPingTicket; ///< timer for DALI single master PING
 
-    int expectedBridgeResponses; ///< not yet received bridge responses
-    bool responsesInSequence; ///< set when repsonses need to be in sequence with requests
+    int mExpectedBridgeResponses; ///< not yet received bridge responses
+    bool mResponsesInSequence; ///< set when repsonses need to be in sequence with requests
 
-    uint8_t sendEdgeAdj; ///< adjustment for sending rising edge - first param to CMD_CODE_EDGEADJ
-    uint8_t samplePointAdj; ///< adjustment for sampling point - second param to CMD_CODE_EDGEADJ
+    uint8_t mSendEdgeAdj; ///< adjustment for sending rising edge - first param to CMD_CODE_EDGEADJ
+    uint8_t mSamplePointAdj; ///< adjustment for sampling point - second param to CMD_CODE_EDGEADJ
 
-    DaliBridgeEventCB bridgeEventHandler; ///< will be called for bridge events
+    DaliBridgeEventCB mBridgeEventHandler; ///< will be called for bridge events
 
   public:
 
     // statistics
-    long retriedReads;
-    long retriedWrites;
+    long mRetriedReads;
+    long mRetriedWrites;
 
-    bool dali2ScanLock; ///< if set, scanner will interpret memory bank 0 as DALI 1.0 (because there is no real backwards compatibility between 1.0 and 2.0)
-    bool dali2LUNLock; ///< if set, logical unit index will not be used as dSUID subdeviceindex, and old dSUID mix algrorithm (w/o added FNV) will be used
+    bool mDali2ScanLock; ///< if set, scanner will interpret memory bank 0 as DALI 1.0 (because there is no real backwards compatibility between 1.0 and 2.0)
+    bool mDali2LUNLock; ///< if set, logical unit index will not be used as dSUID subdeviceindex, and old dSUID mix algrorithm (w/o added FNV) will be used
 
     DaliComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
     virtual ~DaliComm();
@@ -277,14 +277,14 @@ namespace p44 {
 
     /// set DALI edge adjustment
     /// @param how much (in 1/256th DALI bit time units) to delay the going inactive edge of the sending signal, to compensate for slow falling (going active) edge on the bus
-    void setDaliSendAdj(uint8_t aSendEdgeDelay) { sendEdgeAdj = aSendEdgeDelay; };
+    void setDaliSendAdj(uint8_t aSendEdgeDelay) { mSendEdgeAdj = aSendEdgeDelay; };
 
     /// @param how much (in 1/256th DALI bit time units) to delay or advance the sample point when receiving DALI data
-    void setDaliSampleAdj(int8_t aSamplePointDelay) { samplePointAdj = (uint8_t)aSamplePointDelay; };
+    void setDaliSampleAdj(int8_t aSamplePointDelay) { mSamplePointAdj = (uint8_t)aSamplePointDelay; };
 
     /// set event handler
     /// @param aEventHandler will be called when a dali bridge event is received
-    void setBridgeEventHandler(DaliBridgeEventCB aEventHandler) { bridgeEventHandler = aEventHandler; };
+    void setBridgeEventHandler(DaliBridgeEventCB aEventHandler) { mBridgeEventHandler = aEventHandler; };
 
     /// Send DALI command to bridge
     /// @param aCmd bridge command byte
