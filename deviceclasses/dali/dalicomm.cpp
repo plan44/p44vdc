@@ -1851,6 +1851,7 @@ void DaliComm::daliReadDeviceInfo(DaliDeviceInfoCB aResultCB, DaliAddress aAddre
 DaliDeviceInfo::DaliDeviceInfo()
 {
   clear();
+  vers_102 = 0; // clear() does not reset this, as it is not really part of devInf (but separately retrieved with QUERY_VERSION_NUMBER)
   shortAddress = NoDaliAddress; // undefined short address
 }
 
@@ -1859,7 +1860,7 @@ void DaliDeviceInfo::clear()
 {
   // clear everything except short address
   vers_101 = 0; // unknown
-  vers_102 = 0; // unknown
+  // do not clear vers_102, because this is retrieved with QUERY_VERSION_NUMBER, and should be ok even if devInf is not
   vers_103 = 0; // unknown
   gtin = 0;
   fw_version_major = 0;
