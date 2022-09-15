@@ -2520,7 +2520,16 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           return true;
         #if ENABLE_JSONBRIDGEAPI
         case allowBridging_key:
-          mDeviceSettings->setPVar(mDeviceSettings->mAllowBridging, aPropValue->boolValue());
+          if (mDeviceSettings->setPVar(mDeviceSettings->mAllowBridging, aPropValue->boolValue())) {
+            // bridgeability changed, push to bridge
+            VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
+            if (api) {
+              ApiValuePtr query = api->newApiValue();
+              query->setType(apivalue_object);
+              query->add("x-p44-bridgeable", query->newValue(apivalue_null));
+              pushNotification(api, query, ApiValuePtr());
+            }
+          }
           return true;
         #endif
       }
