@@ -143,6 +143,25 @@ ChannelBehaviourPtr OutputBehaviour::getChannelById(const string aChannelId, boo
 }
 
 
+DsClass OutputBehaviour::getColorClass()
+{
+  if (mColorClass!=class_undefined) return mColorClass;
+  // no specific color set on the behaviour level: try to derive from groups
+  DsClass colorclass = class_undefined;
+  for (int g = group_undefined; g<64; g++) {
+    if (isMember((DsGroup)g)) {
+      DsClass c = Device::colorClassFromGroup((DsGroup)g);
+      if (c!=class_undefined) {
+        colorclass = c;
+        break;
+      }
+    }
+  }
+  if (colorclass!=class_undefined) return colorclass;
+  // no color class obtainable on output level: use colorClass of device
+  return mDevice.getColorClass();
+}
+
 
 bool OutputBehaviour::isMember(DsGroup aGroup)
 {

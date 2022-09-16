@@ -177,6 +177,9 @@ namespace p44 {
     /// set group
     virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { sensorGroup = aGroup; };
 
+    /// get group
+    virtual DsGroup getGroup() P44_OVERRIDE { return sensorGroup; };
+
     /// creates a name of the form "<name>, <range><unit>"
     /// @param aName the name (function)
     void setSensorNameWithRange(const char *aName);

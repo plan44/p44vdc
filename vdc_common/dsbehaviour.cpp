@@ -35,6 +35,7 @@ DsBehaviour::DsBehaviour(Device &aDevice, const string aBehaviourId) :
   mIndex(0),
   mDevice(aDevice),
   mHardwareName(""), // empty, will show behaviour ID by default
+  mColorClass(class_undefined), // inherit color from device
   mHardwareError(hardwareError_none),
   mHardwareErrorUpdated(p44::Never)
 {
@@ -43,6 +44,17 @@ DsBehaviour::DsBehaviour(Device &aDevice, const string aBehaviourId) :
 
 DsBehaviour::~DsBehaviour()
 {
+}
+
+
+DsClass DsBehaviour::getColorClass()
+{
+  if (mColorClass!=class_undefined) return mColorClass;
+  // no specific color set on the behaviour level: try to derive from group
+  DsGroup group = getGroup();
+  if (group!=group_undefined) return Device::colorClassFromGroup(group);
+  // no group set on behaviour level: use colorClass of device
+  return mDevice.getColorClass();
 }
 
 
@@ -127,6 +139,49 @@ ErrorPtr DsBehaviour::forget()
 }
 
 
+// MARK: - persistence implementation
+
+/// Note: we do NOT define a `tableName()`, each specific behaviour has its own table
+
+static const size_t numFields = 1;
+
+size_t DsBehaviour::numFieldDefs()
+{
+  return inheritedParams::numFieldDefs()+numFields;
+}
+
+
+const FieldDefinition *DsBehaviour::getFieldDef(size_t aIndex)
+{
+  static const FieldDefinition dataDefs[numFields] = {
+    { "colorClass", SQLITE_INTEGER },
+  };
+  if (aIndex<inheritedParams::numFieldDefs())
+    return inheritedParams::getFieldDef(aIndex);
+  aIndex -= inheritedParams::numFieldDefs();
+  if (aIndex<numFields)
+    return &dataDefs[aIndex];
+  return NULL;
+}
+
+
+/// load values from passed row
+void DsBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
+{
+  inheritedParams::loadFromRow(aRow, aIndex, NULL); // no common flags in base class
+  // get the fields
+  aRow->getCastedIfNotNull<DsClass, int>(aIndex++, mColorClass); // if not present in DB, leave it untouched (class_undefined)
+}
+
+
+// bind values to passed statement
+void DsBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
+{
+  inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  aStatement.bind(aIndex++, mColorClass);
+}
+
+
 // MARK: - property access
 
 
@@ -140,9 +195,6 @@ string DsBehaviour::getApiId(int aApiVersion)
     return string_format("%zu", getIndex());
   }
 }
-
-
-
 
 
 const char *DsBehaviour::getTypeName()
@@ -168,6 +220,7 @@ enum {
 };
 
 enum {
+  colorClass_key,
   logLevelOffset_key,
   numDsBehaviourSettingsProperties
 };
@@ -216,6 +269,7 @@ PropertyDescriptorPtr DsBehaviour::getDescriptorByIndex(int aPropIndex, int aDom
   };
   static const PropertyDescription settingsProperties[numDsBehaviourSettingsProperties] = {
     { "x-p44-logLevelOffset", apivalue_int64, logLevelOffset_key+settings_key_offset, OKEY(dsBehaviour_Key) },
+    { "colorClass", apivalue_uint64, colorClass_key+settings_key_offset, OKEY(dsBehaviour_Key) },
   };
   static const PropertyDescription stateProperties[numDsBehaviourStateProperties] = {
     { "error", apivalue_uint64, error_key+states_key_offset, OKEY(dsBehaviour_Key) },
@@ -273,6 +327,7 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
         case behaviourType_key+descriptions_key_offset: aPropValue->setStringValue(behaviourTypeIdentifier()); return true;
         // settings
         case logLevelOffset_key+settings_key_offset: { int o=getLocalLogLevelOffset(); if (o==0) return false; else aPropValue->setInt32Value(o); return true; }
+        case colorClass_key+settings_key_offset: aPropValue->setUint16Value(getColorClass()); return true;
         // state
         case error_key+states_key_offset: aPropValue->setUint16Value(mHardwareError); return true;
       }
@@ -283,6 +338,9 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
         // Settings properties
         case logLevelOffset_key+settings_key_offset:
           setLogLevelOffset(aPropValue->int32Value());
+          return true;
+        case colorClass_key+settings_key_offset:
+          setPVar(mColorClass, (DsClass)aPropValue->uint16Value());
           return true;
       }
     }

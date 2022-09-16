@@ -103,6 +103,9 @@ namespace p44 {
     /// set group
     virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { binInputGroup = aGroup; };
 
+    /// get group
+    virtual DsGroup getGroup() P44_OVERRIDE { return binInputGroup; };
+
     /// @name interface towards actual device hardware (or simulation)
     /// @{
 

@@ -307,36 +307,33 @@ DsClass Device::colorClassFromGroup(DsGroup aGroup)
 
 DsClass Device::getDominantColorClass()
 {
-  // check if group determines apparent (icon color) class
-  DsGroup group = group_undefined;
+  // derive dominant color from colors of device's behaviours
+  DsClass colorClass = class_undefined;
   if (mOutput) {
-    // lowest group of output determines dominant color
-    for (int i = group_yellow_light; i<numColorClasses; i++) {
-      if (mOutput->isMember((DsGroup)i)) {
-        group = (DsGroup)i;
-        break;
-      }
-    }
+    // output is most important
+    colorClass = mOutput->getColorClass();
   }
   // if no or undefined output, check input colors
-  if (group==group_undefined) {
+  if (colorClass==class_undefined) {
     // second priority: color of first button
     ButtonBehaviourPtr btn = getButton(0);
-    if (btn) group = btn->buttonGroup;
+    if (btn) colorClass = btn->getColorClass();
   }
-  if (group==group_undefined) {
+  if (colorClass==class_undefined) {
     // third priority: color of first sensor
     SensorBehaviourPtr sns = getSensor(0);
-    if (sns) group = sns->sensorGroup;
+    if (sns) colorClass = sns->getColorClass();
   }
-  if (group==group_undefined) {
+  if (colorClass==class_undefined) {
     // fourth priority: color of first binary input
     BinaryInputBehaviourPtr bin = getInput(0);
-    if (bin) group = bin->binInputGroup;
+    if (bin) colorClass = bin->getColorClass();
   }
-  // Return color class the dominant group belongs to
-  DsClass cl = colorClassFromGroup(group);
-  return cl!=class_undefined ? cl : mColorClass;
+  if (colorClass==class_undefined) {
+    // final fallback: use colorClass of the device (housing plastic color)
+    colorClass = mColorClass;
+  }
+  return colorClass;
 }
 
 

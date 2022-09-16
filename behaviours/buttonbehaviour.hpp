@@ -128,6 +128,9 @@ namespace p44 {
     /// set group
     virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { setPVar(buttonGroup, aGroup); };
 
+    /// get group
+    virtual DsGroup getGroup() P44_OVERRIDE { return buttonGroup; };
+
     /// set function
     virtual void setFunction(DsButtonFunc aFunc) { setPVar(buttonFunc, aFunc); };
 

@@ -162,6 +162,12 @@ namespace p44 {
     /// @return true if device is member of this group
     bool isMember(DsGroup aGroup);
 
+    /// get color class
+    /// @note if no colorClass is explicitly set (`colorClass` property), this
+    ///   returns the color class derived from output's group members.
+    /// @return color class of this behaviour (useful for coloring UI elements)
+    virtual DsClass getColorClass() P44_OVERRIDE;
+
     /// get group membership bits
     /// @return mask of bits, set bit numbers corresponds to DsGroup numbers the output is member of
     DsGroupMask groupMemberships() const { return mOutputGroups; };

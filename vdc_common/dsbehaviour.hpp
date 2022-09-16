@@ -99,6 +99,7 @@ namespace p44 {
 
     /// @name persistent settings
     /// @{
+    DsClass mColorClass; 
     /// @}
 
     /// @name internal volatile state
@@ -133,6 +134,17 @@ namespace p44 {
 
     /// set group
     virtual void setGroup(DsGroup aGroup) { /* NOP in base class */ };
+
+    /// get group
+    virtual DsGroup getGroup() { return group_undefined; /* not defined in base class */ };
+
+    /// get color class
+    /// @note if no colorClass is explicitly set (`colorClass` property), this
+    ///   returns the color class derived from the behaviour's group, and if that does not
+    ///   exist or equals `group_undefined`, the device's colorClass
+    ///   (property named `primaryGroup` for historical reasons)
+    /// @return color class of this behaviour (useful for coloring UI elements)
+    virtual DsClass getColorClass();
 
     /// push state
     /// @param aDS push to dS (vDSM)
@@ -210,6 +222,14 @@ namespace p44 {
     /// @return returns a ID for the behaviour.
     /// @note this is only valid for a fully configured behaviour, as it is derived from configured parameters
     virtual string getAutoId() { return getTypeName(); } // base class just returns the behaviour type (sensor, button, binaryInput)
+
+
+    // persistence implementation
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
 
     /// @name property access implementation for descriptor/settings/states
     /// @{
