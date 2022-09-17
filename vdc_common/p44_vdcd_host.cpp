@@ -237,12 +237,7 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     StandardScriptingDomain::sharedDomain().registerMemberLookup(new FeatureApiLookup);
   }
   #endif
-  #if ENABLE_JSONBRIDGEAPI
-  // start bridge API, if we have one
-  if (mBridgeApi) {
-    mBridgeApi->mJsonApiServer->startServer(boost::bind(&P44VdcHost::bridgeApiConnectionHandler, this, _1), 3);
-  }
-  #endif
+  // Note: bridge API will be started when all devices are initialized for the first time
   // now init rest of vdc host
   inherited::initialize(aCompletedCB, aFactoryReset);
 }
@@ -730,6 +725,23 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
 
 // MARK: - Bridge API
 
+void P44VdcHost::handleGlobalEvent(VdchostEvent aEvent)
+{
+  if (aEvent==vdchost_devices_initialized) {
+    #if P44SCRIPT_FULL_SUPPORT
+    // after the first device initialisation run, start the bridge API if not already up
+    if (mBridgeApi && !mBridgeApi->mJsonApiServer->isServing()) {
+      // bridge API server is not yet up and running, start it now
+      mBridgeApi->mJsonApiServer->startServer(boost::bind(&P44VdcHost::bridgeApiConnectionHandler, this, _1), 3);
+    }
+    #endif // P44SCRIPT_FULL_SUPPORT
+  }
+  inherited::handleGlobalEvent(aEvent);
+}
+
+
+
+
 BridgeInfoPtr P44VdcHost::getBridgeInfo(bool aInstantiate)
 {
   if (!mBridgeInfo && aInstantiate) {
@@ -997,6 +1009,34 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
       learnIdentifyTicket.executeOnce(boost::bind(&P44VdcHost::identifyHandler, this, aRequest, DevicePtr()), seconds*Second);
     }
   }
+  #if ENABLE_JSONBRIDGEAPI
+  else if (aMethod=="x-p44-notifyBridge") {
+    // send a notification to the bridge(s)
+    if (!mBridgeApi) {
+      respErr = Error::err<P44VdcError>(404, "no bridge connected");
+    }
+    else {
+      ApiValuePtr o = aParams->get("bridgenotification");
+      if (!o) {
+        respErr = Error::err<P44VdcError>(415, "missing 'bridgenotification'");
+      }
+      else {
+        string n = o->stringValue();
+        aParams->del("bridgenotification");
+        aParams->del("method");
+        aParams->del("notification");
+        aParams->del("dSUID");
+        o = aParams->get("bridgeUID");
+        if (o) {
+          aParams->add("dSUID", o);
+          aParams->del("bridgeUID");
+        }
+        respErr = mBridgeApi->sendRequest(n, aParams);
+        if (Error::isOK(respErr)) respErr = Error::ok(); // return NULL response
+      }
+    }
+  }
+  #endif // ENABLE_JSONBRIDGEAPI
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }

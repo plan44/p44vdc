@@ -389,6 +389,10 @@ namespace p44 {
     /// @param aInstantiate if set, a bridge info is instantiated when none exists
     BridgeInfoPtr getBridgeInfo(bool aInstantiate = false);
 
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
+
     #endif // ENABLE_JSONBRIDGEAPI
 
 		/// perform self testing
