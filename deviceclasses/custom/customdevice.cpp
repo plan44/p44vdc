@@ -982,6 +982,12 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("configurl", o)) {
     mConfigUrl = o->stringValue();
   }
+  #if ENABLE_JSONBRIDGEAPI
+  // - get bridging hint
+  if (aInitParams->get("bridgeas", o)) {
+    mBridgeAs = o->stringValue();
+  }
+  #endif
   // - basic output behaviour
   VdcOutputFunction outputFunction = outputFunction_custom; // not defined yet
   if (aInitParams->get("dimmable", o)) {

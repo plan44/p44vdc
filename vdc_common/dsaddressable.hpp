@@ -92,8 +92,13 @@ namespace p44 {
     virtual bool isPublicDS();
 
     #if ENABLE_JSONBRIDGEAPI
-    /// @return true if addressable can be bridged
-    virtual bool bridgeable() { return false; } // by default, bridging an addressable is not possible
+    /// @return true if addressable can and should be bridged
+    virtual bool bridgeable() { return false; } // by default, bridging an addressable is not enabled
+
+    /// This string may help the bridge to determine how to bridge this device.
+    /// @return non-empty string if there is a bridging hint keyword that will be exposed as x-p44-bridgeAs.
+    virtual string bridgeAsHint() { return ""; } // by default, devices do not have a bridging hint
+
     #endif
 
     #if ENABLE_JSONBRIDGEAPI

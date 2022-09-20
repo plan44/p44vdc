@@ -107,7 +107,9 @@ namespace p44 {
     string mDevClass; ///< device class
     string mConfigUrl; ///< custom value for configURL if not empty
     uint32_t mDevClassVersion; ///< device class version
-
+    #if ENABLE_JSONBRIDGEAPI
+    string mBridgeAs; ///< custom bridging hint
+    #endif
 
     bool mConfigured; ///< set when device is configured (init message received and device added to vdc)
     bool mUseMovement; ///< if set, device communication uses MV/move command for dimming and shadow device operation
@@ -181,6 +183,12 @@ namespace p44 {
 
     /// @return URL for Web-UI (for access from local LAN)
     virtual string webuiURLString() P44_OVERRIDE;
+
+    #if ENABLE_JSONBRIDGEAPI
+    /// This string may help the bridge to determine how to bridge this device.
+    /// @return non-empty string if there is a bridging hint keyword that will be exposed as x-p44-bridgeAs.
+    virtual string bridgeAsHint() { return mBridgeAs; }
+    #endif
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

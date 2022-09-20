@@ -470,6 +470,7 @@ enum {
   #if ENABLE_JSONBRIDGEAPI
   isBridged_key,
   bridgeable_key,
+  bridgeaAs_key,
   #endif
   numDsAddressableProperties
 };
@@ -513,6 +514,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     #if ENABLE_JSONBRIDGEAPI
     { "x-p44-bridged", apivalue_bool, isBridged_key, OKEY(dsAddressable_key) },
     { "x-p44-bridgeable", apivalue_bool, bridgeable_key, OKEY(dsAddressable_key) },
+    { "x-p44-bridgeAs", apivalue_string, bridgeaAs_key, OKEY(dsAddressable_key) },
     #endif
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
@@ -589,6 +591,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         #if ENABLE_JSONBRIDGEAPI
         case isBridged_key: aPropValue->setBoolValue(isBridged()); return true;
         case bridgeable_key: aPropValue->setBoolValue(bridgeable()); return true;
+        case bridgeaAs_key: if (bridgeAsHint().size()>0) { aPropValue->setStringValue(bridgeAsHint()); return true; } else return false;
         #endif
       }
       return true;
