@@ -33,7 +33,11 @@ namespace p44 {
 
   /// Implements the behaviour of a digitalSTROM binary input
   /// This class should be used as-is in virtual devices representing binary inputs
-  class BinaryInputBehaviour : public DsBehaviour,  public ValueSource 
+  class BinaryInputBehaviour :
+    public DsBehaviour
+    #if ENABLE_P44SCRIPT
+    ,public ValueSource
+    #endif
   {
     typedef DsBehaviour inherited;
     friend class Device;
@@ -139,6 +143,7 @@ namespace p44 {
     virtual string getStatusText() P44_OVERRIDE;
 
 
+    #if ENABLE_P44SCRIPT
     /// @name ValueSource interface
     /// @{
 
@@ -158,7 +163,7 @@ namespace p44 {
     virtual int getSourceOpLevel() P44_OVERRIDE;
 
     /// @}
-
+    #endif
 
 
     /// description of object, mainly for debug and logging

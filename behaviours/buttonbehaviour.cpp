@@ -619,14 +619,9 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
 
 void ButtonBehaviour::keyOpComplete()
 {
-  #if ENABLE_LOCALCONTROLLER
-  #if ENABLE_P44SCRIPT
+  #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
   // send event
   sendValueEvent();
-  #else
-  // notify listeners
-  notifyListeners(valueevent_changed);
-  #endif
   #endif
 }
 

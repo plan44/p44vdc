@@ -1641,7 +1641,9 @@ static char localController_obj;
 
 enum {
   vdcs_key,
+  #if ENABLE_P44SCRIPT
   valueSources_key,
+  #endif
   persistentChannels_key,
   writeOperations_key,
   latitude_key,
@@ -1677,7 +1679,9 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
 {
   static const PropertyDescription properties[numVdcHostProperties] = {
     { "x-p44-vdcs", apivalue_object+propflag_container, vdcs_key, OKEY(vdcs_obj) },
+    #if ENABLE_P44SCRIPT
     { "x-p44-valueSources", apivalue_null, valueSources_key, OKEY(vdchost_obj) },
+    #endif
     { "x-p44-persistentChannels", apivalue_bool, persistentChannels_key, OKEY(vdchost_obj) },
     { "x-p44-writeOperations", apivalue_uint64, writeOperations_key, OKEY(vdchost_obj) },
     { "x-p44-latitude", apivalue_double, latitude_key, OKEY(vdchost_obj) },
@@ -1750,10 +1754,12 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
+        #if ENABLE_P44SCRIPT
         case valueSources_key:
           aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
           createValueSourcesList(aPropValue);
           return true;
+        #endif // ENABLE_P44SCRIPT
         #if !REDUCED_FOOTPRINT
         case scenesList_key:
           aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
@@ -1820,6 +1826,7 @@ void VdcHost::createDeviceList(DeviceVector &aDeviceList)
 
 
 
+#if ENABLE_P44SCRIPT
 // MARK: - value sources
 
 void VdcHost::createValueSourcesList(ApiValuePtr aApiObjectValue)
@@ -1902,6 +1909,8 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
   }
   return valueSource;
 }
+
+#endif // ENABLE_P44SCRIPT
 
 
 

@@ -92,7 +92,11 @@ namespace p44 {
   /// Implements the behaviour of a digitalSTROM Sensor. In particular it manages and throttles
   /// pushing updates to the dS upstream, to avoid jitter in hardware reported values to flood
   /// the system with unneded update messages
-  class SensorBehaviour : public DsBehaviour, public ValueSource
+  class SensorBehaviour :
+    public DsBehaviour
+    #if ENABLE_P44SCRIPT
+    ,public ValueSource
+    #endif
   {
     typedef DsBehaviour inherited;
     friend class Device;
@@ -269,6 +273,7 @@ namespace p44 {
     virtual string getStatusText() P44_OVERRIDE;
 
 
+    #if ENABLE_P44SCRIPT
     /// @name ValueSource interface
     /// @{
 
@@ -288,7 +293,7 @@ namespace p44 {
     virtual int getSourceOpLevel() P44_OVERRIDE;
 
     /// @}
-
+    #endif
 
 
     /// description of object, mainly for debug and logging

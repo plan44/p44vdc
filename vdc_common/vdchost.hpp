@@ -349,9 +349,11 @@ namespace p44 {
     /// @param aUserActionCB will be called when the user has performed an action (usually: button press) in a device
     void setUserActionMonitor(DeviceUserActionCB aUserActionCB);
 
+    #if ENABLE_P44SCRIPT
     /// find a value source
     /// @param aValueSourceID internal, persistent ID of the value source
     ValueSource *getValueSourceById(string aValueSourceID);
+    #endif // ENABLE_P44SCRIPT
 
     /// @name notification delivery
     /// @{
@@ -707,9 +709,12 @@ namespace p44 {
     // getting MAC
     void getMyMac(StatusCB aCompletedCB, bool aFactoryReset);
 
+    #if ENABLE_P44SCRIPT
     /// get all value sources in this vdc host
     /// @param aApiObjectValue must be an object typed API value, will receive available value sources as valueSourceID/description key/values
     void createValueSourcesList(ApiValuePtr aApiObjectValue);
+    #endif // ENABLE_P44SCRIPT
+
 
     #if !REDUCED_FOOTPRINT
     /// get a list of scene number/name associations

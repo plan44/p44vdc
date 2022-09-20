@@ -222,18 +222,18 @@ void Device::setZoneID(DsZoneID aZoneId)
       }
     }
     #else
-    mDeviceSettings->setPVar(mDeviceSettings->zoneID, aZoneId);
+    mDeviceSettings->setPVar(mDeviceSettings->mZoneID, aZoneId);
     #endif
   }
 }
 
 
+#if ENABLE_JSONBRIDGEAPI
 bool Device::bridgeable()
 {
   return mDeviceSettings && mDeviceSettings->mAllowBridging;
 }
-
-
+#endif
 
 
 string Device::vendorName()

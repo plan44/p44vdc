@@ -23,6 +23,9 @@
 #define __p44vdc__valuesource__
 
 #include "p44vdc_common.hpp"
+
+#if ENABLE_P44SCRIPT
+
 #include "vdcapi.hpp"
 #include "p44script.hpp"
 
@@ -150,5 +153,7 @@ namespace p44 {
   };
 
 } // namespace p44
+
+#endif // ENABLE_P44SCRIPT
 
 #endif /* defined(__p44vdc__valuesource__) */

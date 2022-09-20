@@ -166,9 +166,6 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
   #if ENABLE_P44SCRIPT
   // send event
   sendValueEvent();
-  #else
-  // notify listeners
-  notifyListeners(changedState ? valueevent_changed : valueevent_confirmed);
   #endif
 }
 
@@ -229,8 +226,6 @@ void BinaryInputBehaviour::invalidateInputState()
     // notify listeners
     #if ENABLE_P44SCRIPT
     sendValueEvent();
-    #else
-    notifyListeners(valueevent_changed);
     #endif
   }
 }
@@ -261,8 +256,8 @@ string BinaryInputBehaviour::getStatusText()
 
 
 
+#if ENABLE_P44SCRIPT
 // MARK: - value source implementation
-
 
 string BinaryInputBehaviour::getSourceId()
 {
@@ -301,6 +296,8 @@ int BinaryInputBehaviour::getSourceOpLevel()
 {
   return mDevice.opStateLevel();
 }
+
+#endif // ENABLE_P44SCRIPT 
 
 
 // MARK: - persistence implementation

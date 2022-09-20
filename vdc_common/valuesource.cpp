@@ -22,6 +22,13 @@
 #include "valuesource.hpp"
 #include "vdchost.hpp"
 
+// Note: valuesources have become a feature depending on p44script's event mechanims
+//  Eventually, the event mechanism and basic values should become separate from
+//  p44script itself, but at this time, it is not
+// TODO: separate basic values, events and p44script
+
+#if ENABLE_P44SCRIPT
+
 using namespace p44;
 
 // MARK: - ValueSource
@@ -213,3 +220,5 @@ string ValueSourceMapper::shortDesc() const
   }
   return s;
 }
+
+#endif // ENABLE_P44SCRIPT

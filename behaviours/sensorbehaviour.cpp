@@ -337,9 +337,6 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   }
   #if ENABLE_P44SCRIPT
   sendValueEvent();
-  #else
-  // notify listeners
-  notifyListeners(changedValue ? valueevent_changed : valueevent_confirmed);
   #endif
   // possibly log value
   #if ENABLE_RRDB
@@ -450,9 +447,6 @@ void SensorBehaviour::invalidateSensorValue(bool aPush)
     // notify listeners
     #if ENABLE_P44SCRIPT
     sendValueEvent();
-    #else
-    // notify listeners
-    notifyListeners(valueevent_changed);
     #endif
   }
 }
@@ -481,6 +475,7 @@ void SensorBehaviour::revalidateState()
 }
 
 
+#if ENABLE_P44SCRIPT
 // MARK: - value source implementation
 
 
@@ -522,8 +517,10 @@ int SensorBehaviour::getSourceOpLevel()
   return mDevice.opStateLevel();
 }
 
-#if ENABLE_RRDB
+#endif // ENABLE_P44SCRIPT
 
+
+#if ENABLE_RRDB
 // MARK: - RRD sensor value logging
 
 

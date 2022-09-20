@@ -37,7 +37,7 @@ namespace p44 {
   /// a user button or rocker switch.
   class ButtonBehaviour :
     public DsBehaviour
-    #if ENABLE_LOCALCONTROLLER
+    #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
     ,public ValueSource
     #endif
   {
@@ -176,7 +176,7 @@ namespace p44 {
     VdcButtonElement localFunctionElement();
 
 
-    #if ENABLE_LOCALCONTROLLER
+    #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
 
     /// @name ValueSource interface
     /// @{
