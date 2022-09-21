@@ -151,13 +151,12 @@ void DaliComm::bridgeResponseHandler(DaliBridgeResultCB aBridgeResultHandler, Se
   if (Error::isError(aError, OQError::domain(), OQError::TimedOut)) {
     // receive operation (answer from bridge, not from DALI!) has timed out
     aError = Error::err<DaliCommError>(DaliCommError::BridgeComm, "DALI bridge receive operation timed out - indicates problem with bridge");
-    OLOG(LOG_ERR, "%s", aError->text()); // make sure it is in the log, even if aBridgeResultHandler does not handle the error
+    OLOG(LOG_ERR, "While still expecting %d responses: %s", mExpectedBridgeResponses, aError->text()); // make sure it is in the log, even if aBridgeResultHandler does not handle the error
+    // otherwise, treat like having received an answer (count it, to avoid stalls)
   }
-  else {
-    if (mExpectedBridgeResponses>0) mExpectedBridgeResponses--;
-    if (mExpectedBridgeResponses<BUFFERED_BRIDGE_RESPONSES_LOW) {
-      mResponsesInSequence = false; // allow buffered sends without waiting for answers again
-    }
+  if (mExpectedBridgeResponses>0) mExpectedBridgeResponses--;
+  if (mExpectedBridgeResponses<BUFFERED_BRIDGE_RESPONSES_LOW) {
+    mResponsesInSequence = false; // allow buffered sends without waiting for answers again
   }
   // get received data
   if (Error::isOK(aError) && aOperation && aOperation->getDataSize()>=2) {
