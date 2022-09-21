@@ -73,7 +73,8 @@ namespace p44 {
 
     BridgeDeviceType mBridgeDeviceType;
 
-    bool mProcessingBridgeNotification;
+    bool mProcessingBridgeNotification; ///< set when processing state update sent by bridge
+    double mPreviousV; ///< value to compare to for deciding about issuing scene calls
 
   public:
 

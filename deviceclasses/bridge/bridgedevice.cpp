@@ -44,7 +44,8 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
   mBridgeDeviceRowID(0),
   mBridgeDeviceId(aBridgeDeviceId),
   mBridgeDeviceType(bridgedevice_unknown),
-  mProcessingBridgeNotification(false)
+  mProcessingBridgeNotification(false),
+  mPreviousV(0)
 {
   setColorClass(class_black_joker); // can be used to control any group
   // Config is:
@@ -162,6 +163,10 @@ void BridgeDevice::willExamineNotificationFromConnection(VdcApiConnectionPtr aAp
 {
   DBGOLOG(LOG_INFO, "willExamineNotificationFromConnection: domain=%d", aApiConnection->domain());
   mProcessingBridgeNotification = aApiConnection->domain()==BRIDGE_DOMAIN;
+  if (mProcessingBridgeNotification) {
+    // capture the current output value for comparison with new one the notification might set
+    mPreviousV = getChannelByType(channeltype_default)->getChannelValue();
+  }
 }
 
 
@@ -180,26 +185,31 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     mProcessingBridgeNotification = false; // just make sure (didExamineNotificationFromConnection should clear it anyway)
     ButtonBehaviourPtr b = getButton(0);
     if (b) {
-      int level;
+      int prevLevel=0;
+      int newLevel=0;
       if (mBridgeDeviceType==bridgedevice_fivelevel) {
-        level = (int)((v+12.5)/25); // 0..4
+        prevLevel = (int)((mPreviousV+12.5)/25); // 0..4
+        newLevel = (int)((v+12.5)/25); // 0..4
       }
       else if (mBridgeDeviceType==bridgedevice_onoff) {
-        level = v>=50 ? 4 : 0; // max==4 or off==0
+        prevLevel = mPreviousV>=50 ? 4 : 0; // max==4 or off==0
+        newLevel = v>=50 ? 4 : 0; // max==4 or off==0
       }
-      SceneNo actionID;
-      switch (level) {
-        case 4: actionID = ROOM_ON; break; // 100%
-        case 3: actionID = PRESET_2; break; // 75%
-        case 2: actionID = PRESET_3; break; // 50%
-        case 1: actionID = PRESET_4; break; // 25%
-        default: actionID = ROOM_OFF; break; // off
+      if (newLevel!=prevLevel) {
+        SceneNo actionID;
+        switch (newLevel) {
+          case 4: actionID = ROOM_ON; break; // 100%
+          case 3: actionID = PRESET_2; break; // 75%
+          case 2: actionID = PRESET_3; break; // 50%
+          case 1: actionID = PRESET_4; break; // 25%
+          default: actionID = ROOM_OFF; break; // off
+        }
+        OLOG(LOG_NOTICE,
+          "default channel change to %d originating from bridge -> inject callscene(%s)",
+          (int)v, VdcHost::sceneText(actionID, false).c_str()
+        );
+        b->sendAction(buttonActionMode_normal, actionID);
       }
-      OLOG(LOG_NOTICE,
-        "default channel change to %d originating from bridge -> inject callscene(%s)",
-        (int)v, VdcHost::sceneText(actionID, false).c_str()
-      );
-      b->sendAction(buttonActionMode_normal, actionID);
     }
   }
   else {
