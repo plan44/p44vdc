@@ -815,7 +815,7 @@ ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel
 
 
 
-bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+void Device::handleNotification(const string &aNotification, ApiValuePtr aParams, StatusCB aExaminedCB)
 {
   ErrorPtr err;
   if (aNotification=="saveScene") {
@@ -920,9 +920,10 @@ bool Device::handleNotification(VdcApiConnectionPtr aApiConnection, const string
     }
   }
   else {
-    return inherited::handleNotification(aApiConnection, aNotification, aParams);
+    inherited::handleNotification(aNotification, aParams, aExaminedCB);
   }
-  return true; // known notification name
+  // successfully examined (possibly also fully handled, but maybe some queued operations remain)
+  if (aExaminedCB) aExaminedCB(ErrorPtr());
 }
 
 

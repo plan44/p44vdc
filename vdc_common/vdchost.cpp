@@ -1070,13 +1070,13 @@ void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectio
     if (gpos->mVdc) {
       OLOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s", aNotification.c_str(), gpos->mMembers.size(), gpos->mVdc->shortDesc().c_str());
       // let vdc process this, might be able to optimize delivery using hardware's native mechanisms such as scenes or groups
-      gpos->mVdc->deliverToAudience(gpos->mMembers, aApiConnection, aNotification, aParams);
+      gpos->mVdc->deliverToDevicesAudience(gpos->mMembers, aApiConnection, aNotification, aParams);
     }
     else {
       OLOG(LOG_INFO, "==== delivering notification '%s' to %lu non-devices now", aNotification.c_str(), gpos->mMembers.size());
       // just deliver to each member, no optimization for non-devices
       for (DsAddressablesList::iterator apos = gpos->mMembers.begin(); apos!=gpos->mMembers.end(); ++apos) {
-        (*apos)->handleNotification(aApiConnection, aNotification, aParams);
+        (*apos)->handleNotificationFromConnection(aApiConnection, aNotification, aParams, NoOP);
       }
     }
   }
@@ -1623,13 +1623,6 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
   #endif // P44SCRIPT_FULL_SUPPORT
   return inherited::handleMethod(aRequest, aMethod, aParams);
 }
-
-
-bool VdcHost::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
-{
-  return inherited::handleNotification(aApiConnection, aNotification, aParams);
-}
-
 
 
 // MARK: - property access

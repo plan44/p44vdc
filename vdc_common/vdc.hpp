@@ -145,6 +145,7 @@ namespace p44 {
 
   public:
 
+    VdcApiConnectionPtr connection; ///< the connection the notification originates from
     DeviceList affectedDevices; ///< the list of devices that are included in the hash
     size_t pendingCount; ///< count used to count completed devices in some operations on affectedDevices
     ApiValuePtr callParams; ///< the notification parameters
@@ -654,7 +655,7 @@ namespace p44 {
     /// @param aApiConnection the API connection where the notification originates from
     /// @param aNotification the name of the notification
     /// @param aParams the parameters of the notification
-    void deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
+    void deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
 
     /// @}
 

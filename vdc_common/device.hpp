@@ -444,16 +444,16 @@ namespace p44 {
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// called to let device handle device-level notification
-    /// @param aApiConnection this is the API connection from which the notification originates
     /// @param aNotification the notification
     /// @param aParams the parameters object
+    /// @param aExaminedCB must be called when notification is examined (not necessarily fully executed)
     /// @return true if aNotification is known. Does not say anything about success or failure of the actions
     ///    it might trigger in the recipient
     /// @note callScene and dimChannel notifications are handled separately at the vDC level and dispatched
     ///    using special xxPrepare() and xxExecute() methods.
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this device.
-    virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
+    virtual void handleNotification(const string &aNotification, ApiValuePtr aParams, StatusCB aExaminedCB) P44_OVERRIDE;
 
     /// convenience method to call scene on this device
     /// @param aSceneNo the scene to call.

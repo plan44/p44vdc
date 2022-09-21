@@ -213,10 +213,9 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
         respErr = handleMethod(aRequest, methodName, params);
         if (Error::isError(respErr, VdcApiError::domain(), 405)) {
           // unknown method (or syntax error in params), but not actual failure of method operation: try as notification
-          if (handleNotification(aRequest->connection(), methodName, params)) {
-            // successful initiation of notification via genericRequest *method* call, confirm with simple OK
-            respErr = Error::ok();
-          }
+          handleNotificationFromConnection(aRequest->connection(), methodName, params, boost::bind(&DsAddressable::genericRequestNotificationExamined, this, aRequest, _1));
+          // genericRequestExamined will return error or ok
+          respErr.reset();
         }
         return respErr;
       }
@@ -251,6 +250,12 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
     respErr = Error::err<VdcApiError>(405, "unknown method '%s'", aMethod.c_str());
   }
   return respErr;
+}
+
+
+void DsAddressable::genericRequestNotificationExamined(VdcApiRequestPtr aRequest, ErrorPtr aError)
+{
+  aRequest->sendStatus(aError);
 }
 
 
@@ -334,9 +339,27 @@ void DsAddressable::pushPropertyReady(VdcApiConnectionPtr aApi, ApiValuePtr aEve
 
 
 
-
-bool DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+void DsAddressable::handleNotificationFromConnection(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams, StatusCB aStatusCB)
 {
+  willExamineNotificationFromConnection(aApiConnection);
+  handleNotification(aNotification, aParams, boost::bind(&DsAddressable::notificationExamined, this, aApiConnection, aStatusCB, _1));
+}
+
+void DsAddressable::notificationExamined(VdcApiConnectionPtr aApiConnection, StatusCB aStatusCB, ErrorPtr aError)
+{
+  didExamineNotificationFromConnection(aApiConnection);
+  if (Error::notOK(aError)) {
+    OLOG(LOG_WARNING, "error examining notification: %s", aError->text());
+  }
+  if (aStatusCB) {
+    aStatusCB(aError);
+  }
+}
+
+
+void DsAddressable::handleNotification(const string &aNotification, ApiValuePtr aParams, StatusCB aExaminedCB)
+{
+  ErrorPtr err;
   if (aNotification=="ping") {
     // issue device ping (which will issue a pong when device is reachable)
     OLOG(LOG_INFO, "ping -> checking presence...");
@@ -349,10 +372,11 @@ bool DsAddressable::handleNotification(VdcApiConnectionPtr aApiConnection, const
   }
   else {
     // unknown notification
-    OLOG(LOG_WARNING, "unknown notification '%s'", aNotification.c_str());
-    return false;
+    err = TextError::err("unknown notification '%s'", aNotification.c_str());
   }
-  return true;
+  if (aExaminedCB) {
+    aExaminedCB(err);
+  }
 }
 
 

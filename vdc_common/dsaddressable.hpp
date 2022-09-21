@@ -198,15 +198,28 @@ namespace p44 {
     ///   otherwise, a error response will be returned
     void methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError);
 
-    /// called by VdcHost to handle notifications directed to a dSUID
-    /// @param aApiConnection this is the API connection from which the notification originates
+    /// called to handle notification
     /// @param aNotification the notification
     /// @param aParams the parameters object
+    /// @param aExaminedCB must be called when notification is examined (not necessarily fully executed)
     /// @return true if aNotification is known. Does not say anything about success or failure of the actions
     ///    it might trigger in the recipient
     /// @note the parameters object always contains the dSUID parameter which has been
     ///   used already to route the notification to this DsAddressable.
-    virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
+    /// @note some notification handling might occur indirectly such as optimized scene calls and dimming requests
+    ///   and not through this method
+    virtual void handleNotification(const string &aNotification, ApiValuePtr aParams, StatusCB aExaminedCB);
+
+    /// called to handle notifications directed to this addressable
+    /// @param aApiConnection this is the API connection from which the notification originates
+    /// @param aNotification the notification
+    /// @param aParams the parameters object
+    /// @param aStatusCB will receive the status of the notification examination (not necessarily full execution)
+    /// @note the parameters object always contains the dSUID parameter which has been
+    ///   used already to route the notification to this DsAddressable.
+    /// @note some notification handling might occur indirectly such as optimized scene calls and dimming requests
+    ///   and not through this method
+    void handleNotificationFromConnection(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams, StatusCB aStatusCB);
 
     /// send a DsAddressable method or notification to specified API
     /// @param aApi the API
@@ -406,6 +419,11 @@ namespace p44 {
     /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
     virtual bool canIdentifyToUser() { return false; } // not by default
 
+    /// called before start examining (usually: handling) a notification
+    virtual void willExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection) { /* NOP */ }
+    /// called after notification is examined (and either done, or needed operations queued)
+    virtual void didExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection) { /* NOP */ }
+
     #if ENABLE_SETTINGS_FROM_FILES
     /// load settings from CSV file
     /// @param aCSVFilepath full file path to a CSV file to read. If file does not exist, the function does nothing. If
@@ -427,6 +445,8 @@ namespace p44 {
     void pushPropertyReady(VdcApiConnectionPtr aApi, ApiValuePtr aEvents, ApiValuePtr aResultObject, ErrorPtr aError);
     void pingResultHandler(bool aIsPresent);
     void presenceSampleHandler(StatusCB aPreparedCB, bool aIsPresent);
+    void notificationExamined(VdcApiConnectionPtr aApiConnection, StatusCB aStatusCB, ErrorPtr aError);
+    void genericRequestNotificationExamined(VdcApiRequestPtr aRequest, ErrorPtr aError);
 
   };
   typedef boost::intrusive_ptr<DsAddressable> DsAddressablePtr;

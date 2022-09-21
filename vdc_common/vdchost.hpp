@@ -476,7 +476,6 @@ namespace p44 {
     /// @{
 
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-    virtual bool handleNotification(VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @}
 
@@ -758,7 +757,8 @@ namespace p44 {
     /// @return new API value of suitable internal implementation to be used on this API connection
     virtual ApiValuePtr newApiValue() P44_OVERRIDE;
 
-    virtual int domain() P44_OVERRIDE { return VDC_CFG_DOMAIN; };
+    /// special domain for calls coming from internal scripts
+    virtual int domain() P44_OVERRIDE { return SCRIPTCALL_DOMAIN; };
 
   };
 

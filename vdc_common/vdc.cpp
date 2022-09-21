@@ -268,7 +268,7 @@ static const char *NotificationNames[numNotificationTypes] = {
 };
 
 
-void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+void Vdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   if (aNotification=="callScene") {
     // call scene
@@ -277,6 +277,7 @@ void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aA
     if (o) {
       nds->optimizeHint = o->boolValue() ? yes : no;
     }
+    nds->connection = aApiConnection; // keep that so processing can know which connection posted the request
     nds->audience = aAudience;
     nds->callType = ntfy_callscene;
     nds->callParams = aParams;
@@ -297,7 +298,7 @@ void Vdc::deliverToAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aA
   else {
     // not a specially handled/optimized notification: just let every device handle it individually
     for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
-      (*apos)->handleNotification(aApiConnection, aNotification, aParams);
+      (*apos)->handleNotificationFromConnection(aApiConnection, aNotification, aParams, NoOP);
     }
   }
 }
@@ -358,6 +359,7 @@ void Vdc::prepareNextNotification(NotificationDeliveryStatePtr aDeliveryState)
     // need to prepare next device
     DevicePtr dev = boost::dynamic_pointer_cast<Device>(aDeliveryState->audience.front());
     if (dev) {
+      dev->willExamineNotificationFromConnection(aDeliveryState->connection);
       dev->notificationPrepare(boost::bind(&Vdc::notificationPrepared, this, aDeliveryState, _1), aDeliveryState);
     }
   }
@@ -387,9 +389,10 @@ void Vdc::notificationPrepared(NotificationDeliveryStatePtr aDeliveryState, Noti
       // optimisation off, different notification type than others in set, or otherwise not optimizable -> just execute and apply right now
       dev->updateDeliveryState(aDeliveryState, false); // still: do basic updating of state such that processing has all the info
       getVdcHost().deviceWillApplyNotification(dev, *aDeliveryState); // let vdchost process for possibly updating global zone state
-      dev->executePreparedOperation(boost::bind(&Vdc::preparedOperationExecuted, this, dev), aNotificationToApply);
+      dev->executePreparedOperation(boost::bind(&Vdc::preparedOperationExecuted, this, dev), aNotificationToApply);      getVdcHost().deviceWillApplyNotification(dev, *aDeliveryState); // let vdchost process for possibly updating global zone state
     }
   }
+  dev->didExamineNotificationFromConnection(aDeliveryState->connection);
   // break caller chain by going via mainloop
   MainLoop::currentMainLoop().executeNow(boost::bind(&Vdc::prepareNextNotification, this, aDeliveryState));
 }

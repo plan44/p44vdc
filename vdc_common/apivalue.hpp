@@ -34,6 +34,7 @@ namespace p44 {
   #define VDC_API_DOMAIN 0x0042
   #define VDC_CFG_DOMAIN 0x1000
   #define BRIDGE_DOMAIN 0x2000
+  #define SCRIPTCALL_DOMAIN 0x4000
 
   /// API Value types
   typedef enum {
