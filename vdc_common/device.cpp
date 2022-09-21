@@ -2487,7 +2487,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           if (getDeviceConfigurationId().empty()) return false; // device does not have multiple configurations
           aPropValue->setStringValue(getDeviceConfigurationId()); return true; // current device configuration
         #if ENABLE_LOCALCONTROLLER
-        case zoneName_key: {
+        case zoneName_key: if (mDeviceSettings) {
           LocalControllerPtr lc = getVdcHost().getLocalController();
           if (!lc) return false; // only available with localcontroller
           ZoneDescriptorPtr z = LocalController::sharedLocalController()->mLocalZones.getZoneById(mDeviceSettings->mZoneID, false);
@@ -2499,12 +2499,12 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           }
           aPropValue->setStringValue(zn);
           return true;
-        }
+        } else return false;
         #endif // ENABLE_LOCALCONTROLLER
         #if ENABLE_JSONBRIDGEAPI
         case allowBridging_key:
-          aPropValue->setBoolValue(mDeviceSettings->mAllowBridging); return true;
-        #endif
+          aPropValue->setBoolValue(mDeviceSettings && mDeviceSettings->mAllowBridging); return true;
+        #endif // ENABLE_JSONBRIDGEAPI
       }
     }
     else {

@@ -47,9 +47,6 @@ namespace p44 {
   protected:
 
     Device &mDevice;
-    #if ENABLE_JSONBRIDGEAPI
-    bool mAllowBridging;
-    #endif
 
   public:
     DeviceSettings(Device &aDevice);
@@ -57,6 +54,11 @@ namespace p44 {
 
     /// global dS zone ID, zero if no zone assigned
     DsZoneID mZoneID;
+
+    #if ENABLE_JSONBRIDGEAPI
+    /// allow bridging via bridge API
+    bool mAllowBridging;
+    #endif
 
     // persistence implementation
     virtual const char *tableName();

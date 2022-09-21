@@ -43,8 +43,10 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
   inherited((Vdc *)aVdcP),
   mBridgeDeviceRowID(0),
   mBridgeDeviceId(aBridgeDeviceId),
-  mBridgeDeviceType(bridgedevice_unknown)
+  mBridgeDeviceType(bridgedevice_unknown),
+  mProcessingBridgeNotification(false)
 {
+  setColorClass(class_black_joker); // can be used to control any group
   // Config is:
   //  <type>
   if (aBridgeDeviceConfig=="onoff")
@@ -62,10 +64,15 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
     b->setHardwareName(mBridgeDeviceType==bridgedevice_fivelevel ? "5 scenes" : "on-off scenes");
     addBehaviour(b);
     // pseudo-output (to capture room scenes)
-    // - use light settings for the scene table
-    installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
+    // - standard scene device settings
+    DeviceSettingsPtr s = DeviceSettingsPtr(new SceneDeviceSettings(*this));
+    s->mAllowBridging = true; // bridging allowed from start (that's the purpose of these devices)
+    installSettings(s);
     // - but we do not need a light behaviour, simple output will do
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
+    // - add a default channel
+    o->addChannel(DialChannelPtr(new DialChannel(*o,"bridgedlevel")));
+    o->setGroupMembership(group_yellow_light, true); // default to light as well
     if (mBridgeDeviceType==bridgedevice_fivelevel) {
       // dimmable
       o->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, -1);
@@ -138,15 +145,69 @@ void BridgeDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 }
 
 
+/*
 ErrorPtr BridgeDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   if (false) {
-    /* maybe add methods later */
+    // maybe add methods later
   }
   else {
     return inherited::handleMethod(aRequest, aMethod, aParams);
   }
 }
+*/
+
+
+void BridgeDevice::willExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection)
+{
+  DBGOLOG(LOG_INFO, "willExamineNotificationFromConnection: domain=%d", aApiConnection->domain());
+  mProcessingBridgeNotification = aApiConnection->domain()==BRIDGE_DOMAIN;
+}
+
+
+void BridgeDevice::didExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection)
+{
+  DBGOLOG(LOG_INFO, "didExamineNotificationFromConnection: domain=%d", aApiConnection->domain());
+  mProcessingBridgeNotification = false;
+}
+
+
+void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
+{
+  double v = getChannelByType(channeltype_default)->getChannelValue();
+  if (mProcessingBridgeNotification) {
+    // this is an apply that originates from the bridge
+    mProcessingBridgeNotification = false; // just make sure (didExamineNotificationFromConnection should clear it anyway)
+    ButtonBehaviourPtr b = getButton(0);
+    if (b) {
+      int level;
+      if (mBridgeDeviceType==bridgedevice_fivelevel) {
+        level = (int)((v+12.5)/25); // 0..4
+      }
+      else if (mBridgeDeviceType==bridgedevice_onoff) {
+        level = v>=50 ? 4 : 0; // max==4 or off==0
+      }
+      SceneNo actionID;
+      switch (level) {
+        case 4: actionID = ROOM_ON; break; // 100%
+        case 3: actionID = PRESET_2; break; // 75%
+        case 2: actionID = PRESET_3; break; // 50%
+        case 1: actionID = PRESET_4; break; // 25%
+        default: actionID = ROOM_OFF; break; // off
+      }
+      OLOG(LOG_NOTICE,
+        "default channel change to %d originating from bridge -> inject callscene(%s)",
+        (int)v, VdcHost::sceneText(actionID, false).c_str()
+      );
+      b->sendAction(buttonActionMode_normal, actionID);
+    }
+  }
+  else {
+    OLOG(LOG_NOTICE, "changes default channel value to %d - NOT caused by bridged device", (int)v);
+  }
+  inherited::applyChannelValues(aDoneCB, aForDimming);
+}
+
 
 
 void BridgeDevice::deriveDsUid()
@@ -171,6 +232,17 @@ string BridgeDevice::description()
 }
 
 
+string BridgeDevice::bridgeAsHint()
+{
+  switch (mBridgeDeviceType) {
+    case bridgedevice_onoff: return "on-off";
+    case bridgedevice_fivelevel: return "level-control";
+    default: return inherited::bridgeAsHint();
+  }
+}
+
+
+/*
 string BridgeDevice::getBridgeDeviceType()
 {
   switch (mBridgeDeviceType) {
@@ -180,9 +252,11 @@ string BridgeDevice::getBridgeDeviceType()
       return "unknown";
   }
 }
-
+*/
 
 // MARK: - property access
+
+/*
 
 enum {
   bridgeDeviceType_key,
@@ -242,6 +316,7 @@ bool BridgeDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue,
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
 
+*/
 
 
 #endif // ENABLE_JSONBRIDGEAPI

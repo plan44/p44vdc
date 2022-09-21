@@ -73,6 +73,8 @@ namespace p44 {
 
     BridgeDeviceType mBridgeDeviceType;
 
+    bool mProcessingBridgeNotification;
+
   public:
 
     BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, const string &aBridgeDeviceConfig);
@@ -108,9 +110,9 @@ namespace p44 {
     /// @return textual description of object
     virtual string description() P44_OVERRIDE;
 
-    /// get the type of evaluator
-    /// @return string type name ("rocker", "input"...)
-    string getBridgeDeviceType();
+    /// This string may help the bridge to determine how to bridge this device.
+    /// @return non-empty string if there is a bridging hint keyword that will be exposed as x-p44-bridgeAs.
+    virtual string bridgeAsHint() P44_OVERRIDE;
 
     /// @name identification of the addressable entity
     /// @{
@@ -134,17 +136,41 @@ namespace p44 {
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
     virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
+    /*
     /// device level API methods (p44 specific, JSON only, for debugging evaluators)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+    */
 
   protected:
 
+    /// called before start examining (usually: handling) a notification
+    virtual void willExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection) P44_OVERRIDE;
+    /// called after notification is examined (and either done, or needed operations queued)
+    virtual void didExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection) P44_OVERRIDE;
+
+
+    /// apply all pending channel value updates to the device's hardware
+    /// @param aDoneCB will called when values are actually applied, or hardware reports an error/timeout
+    /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
+    ///   in a single channel (and not switching between color modes etc.)
+    /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
+    ///   ChannelBehaviours and check isChannelUpdatePending(), and send new values to the device hardware. After successfully
+    ///   updating the device hardware, channelValueApplied() must be called on the channels that had isChannelUpdatePending().
+    ///   In addition, if the device output hardware has distinct disabled/enabled states, output->isEnabled() must be checked and applied.
+    /// @note the implementation must capture the channel values to be applied before returning from this method call,
+    ///   because channel values might change again before a delayed apply mechanism calls aDoneCB.
+    /// @note this method will NOT be called again until aDoneCB is called, even if that takes a long time.
+    ///   Device::requestApplyingChannels() provides an implementation that serializes calls to applyChannelValues and syncChannelValues
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
+
     void deriveDsUid();
 
+    /*
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    */
 
   private:
 
