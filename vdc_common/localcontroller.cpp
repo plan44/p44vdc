@@ -1534,124 +1534,11 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       return true; // button inactive or unknown -> NOP, but handled
   }
   // evaluate function
-  int area = 0;
-  bool global = false;
-  SceneNo sceneOffclick = INVALID_SCENE_NO;
-  SceneNo scene1click = INVALID_SCENE_NO;
-  SceneNo scene2click = INVALID_SCENE_NO;
-  SceneNo scene3click = INVALID_SCENE_NO;
-  SceneNo scene4click = INVALID_SCENE_NO;
   if (aButtonBehaviour.mButtonFunc==buttonFunc_app) {
     return false; // we do not handle app buttons
   }
-  else if (group==group_black_variable) {
-    switch (aButtonBehaviour.mButtonFunc) {
-      case buttonFunc_alarm:
-        scene1click = ALARM1;
-        global = true;
-        break;
-      case buttonFunc_panic:
-        scene1click = PANIC;
-        global = true;
-        break;
-      case buttonFunc_leave:
-        scene1click = ABSENT;
-        global = true;
-        break;
-      case buttonFunc_doorbell:
-        scene1click = BELL1;
-        global = true;
-        break;
-      default:
-        break;
-    }
-  }
-  else {
-    switch (aButtonBehaviour.mButtonFunc) {
-      case buttonFunc_area1_preset0x:
-        area = 1;
-        scene1click = AREA_1_ON;
-        sceneOffclick = AREA_1_OFF;
-        goto preset0x;
-      case buttonFunc_area2_preset0x:
-        area = 2;
-        scene1click = AREA_2_ON;
-        sceneOffclick = AREA_2_OFF;
-        goto preset0x;
-      case buttonFunc_area3_preset0x:
-        area = 3;
-        scene1click = AREA_3_ON;
-        sceneOffclick = AREA_3_OFF;
-        goto preset0x;
-      case buttonFunc_area4_preset0x:
-        area = 4;
-        scene1click = AREA_4_ON;
-        sceneOffclick = AREA_4_OFF;
-        goto preset0x;
-      case buttonFunc_area1_preset1x:
-        area = 1;
-        scene1click = AREA_1_ON;
-        sceneOffclick = AREA_1_OFF;
-        goto preset1x;
-      case buttonFunc_area2_preset2x:
-        area = 2;
-        scene1click = AREA_2_ON;
-        sceneOffclick = AREA_2_OFF;
-        goto preset2x;
-      case buttonFunc_area3_preset3x:
-        area = 3;
-        scene1click = AREA_3_ON;
-        sceneOffclick = AREA_3_OFF;
-        goto preset3x;
-      case buttonFunc_area4_preset4x:
-        area = 4;
-        scene1click = AREA_4_ON;
-        sceneOffclick = AREA_4_OFF;
-        goto preset4x;
-      case buttonFunc_room_preset0x:
-        scene1click = ROOM_ON;
-        sceneOffclick = ROOM_OFF;
-      preset0x:
-        scene2click = PRESET_2;
-        scene3click = PRESET_3;
-        scene4click = PRESET_4;
-        break;
-      case buttonFunc_room_preset1x:
-        scene1click = PRESET_11;
-        sceneOffclick = ROOM_OFF;
-      preset1x:
-        scene2click = PRESET_12;
-        scene3click = PRESET_13;
-        scene4click = PRESET_14;
-        break;
-      case buttonFunc_room_preset2x:
-        scene1click = PRESET_21;
-        sceneOffclick = ROOM_OFF;
-      preset2x:
-        scene2click = PRESET_22;
-        scene3click = PRESET_23;
-        scene4click = PRESET_24;
-        break;
-      case buttonFunc_room_preset3x:
-        scene1click = PRESET_31;
-        sceneOffclick = ROOM_OFF;
-      preset3x:
-        scene2click = PRESET_32;
-        scene3click = PRESET_33;
-        scene4click = PRESET_34;
-        break;
-      case buttonFunc_room_preset4x:
-        scene1click = PRESET_41;
-        sceneOffclick = ROOM_OFF;
-      preset4x:
-        scene2click = PRESET_42;
-        scene3click = PRESET_43;
-        scene4click = PRESET_44;
-        break;
-      default:
-        break;
-    }
-  }
+  bool global = group==group_black_variable;
+  ButtonScenesMap map(aButtonBehaviour.mButtonFunc, global);
   if (global) {
     // global scene
     zoneID = zoneId_global;
@@ -1660,7 +1547,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     switch (aClickType) {
       case ct_tip_1x:
       case ct_click_1x:
-        sceneToCall = scene1click;
+        sceneToCall = map.mSceneClick[1];
         break;
       default:
         return true; // unknown click -> ignore, but handled
@@ -1676,7 +1563,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     // evaluate click
     if (aClickType==ct_hold_start) {
       // start dimming if not off (or if it is specifically the up-key of a rocker)
-      if (!zone->mZoneState.stateFor(group, area)) {
+      if (!zone->mZoneState.stateFor(group, map.mArea)) {
         // light is currently off
         if (direction==dimmode_up) {
           // holding specific up-key can start dimming even if light was off
@@ -1707,20 +1594,20 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       switch (aClickType) {
         case ct_tip_1x:
         case ct_click_1x:
-          sceneOnClick = scene1click;
+          sceneOnClick = map.mSceneClick[1];
           break;
         case ct_tip_2x:
         case ct_click_2x:
-          sceneOnClick = scene2click;
+          sceneOnClick = map.mSceneClick[2];
           direction = dimmode_up;
           break;
         case ct_tip_3x:
         case ct_click_3x:
-          sceneOnClick = scene3click;
+          sceneOnClick = map.mSceneClick[3];
           direction = dimmode_up;
           break;
         case ct_tip_4x:
-          sceneOnClick = scene4click;
+          sceneOnClick = map.mSceneClick[4];
           direction = dimmode_up;
           break;
         default:
@@ -1728,7 +1615,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       }
       if (direction==dimmode_stop) {
         // single button, no explicit direction
-        direction = zone->mZoneState.stateFor(group,area) ? dimmode_down : dimmode_up;
+        direction = zone->mZoneState.stateFor(group,map.mArea) ? dimmode_down : dimmode_up;
       }
       // local
       if (direction==dimmode_up) {
@@ -1737,7 +1624,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
       }
       else {
         // calling an off scene
-        sceneToCall = sceneOffclick;
+        sceneToCall = map.mSceneClick[0];
       }
     }
   }
@@ -1759,7 +1646,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     params->add("mode", params->newInt64(direction));
     params->add("autostop", params->newBool(false)); // prevent stop dimming event w/o repeating command
     params->add("channel", params->newUint64(channelType));
-    params->add("area", params->newUint64(area));
+    params->add("area", params->newUint64(map.mArea));
     // - deliver
     mVdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
     return true; // handled

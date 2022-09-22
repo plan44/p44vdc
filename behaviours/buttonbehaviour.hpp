@@ -29,7 +29,18 @@ using namespace std;
 namespace p44 {
 
   class LocalController;
-  
+
+
+  #if ENABLE_LOCALCONTROLLER || ENABLE_JSONBRIDGEAPI
+  class ButtonScenesMap
+  {
+  public:
+    int mArea; ///< which area the button affects
+    SceneNo mSceneClick[5]; ///< scene to call for off, 1..4 clicks
+    ButtonScenesMap(DsButtonFunc aButtonFunc, bool aGlobal);
+  };
+  #endif // ENABLE_LOCALCONTROLLER || ENABLE_JSONBRIDGEAPI
+
   /// Implements the behaviour of a digitalSTROM button, in particular the
   /// state machine which generates the different click types for the dS upstream
   /// from button press + button release events.
@@ -124,6 +135,9 @@ namespace p44 {
     /// @note this must be called once before the device gets added to the device container. Implementation might
     ///   also derive default values for settings from this information.
     void setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, int aNumCombinables);
+
+    /// get function
+    DsButtonFunc getButtonFunction() { return mButtonFunc; };
 
     /// set group
     virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { setPVar(mButtonGroup, aGroup); };

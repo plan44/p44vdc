@@ -32,7 +32,125 @@
 
 using namespace p44;
 
+#if ENABLE_LOCALCONTROLLER || ENABLE_JSONBRIDGEAPI
+// MARK: - ButtonScenesMap
 
+ButtonScenesMap::ButtonScenesMap(DsButtonFunc aButtonFunc, bool aGlobal)
+{
+  // defaults
+  mArea = 0;
+  for (int i=0; i<5; i++) mSceneClick[i] = INVALID_SCENE_NO;
+  // analyze
+  if (aGlobal) {
+    switch (aButtonFunc) {
+      case buttonFunc_alarm:
+        mSceneClick[1] = ALARM1;
+        break;
+      case buttonFunc_panic:
+        mSceneClick[1] = PANIC;
+        break;
+      case buttonFunc_leave:
+        mSceneClick[1] = ABSENT;
+        break;
+      case buttonFunc_doorbell:
+        mSceneClick[1] = BELL1;
+        break;
+      default:
+        break;
+    }
+  }
+  else {
+    switch (aButtonFunc) {
+      case buttonFunc_area1_preset0x:
+        mArea = 1;
+        mSceneClick[1] = AREA_1_ON;
+        mSceneClick[0] = AREA_1_OFF;
+        goto preset0x;
+      case buttonFunc_area2_preset0x:
+        mArea = 2;
+        mSceneClick[1] = AREA_2_ON;
+        mSceneClick[0] = AREA_2_OFF;
+        goto preset0x;
+      case buttonFunc_area3_preset0x:
+        mArea = 3;
+        mSceneClick[1] = AREA_3_ON;
+        mSceneClick[0] = AREA_3_OFF;
+        goto preset0x;
+      case buttonFunc_area4_preset0x:
+        mArea = 4;
+        mSceneClick[1] = AREA_4_ON;
+        mSceneClick[0] = AREA_4_OFF;
+        goto preset0x;
+      case buttonFunc_area1_preset1x:
+        mArea = 1;
+        mSceneClick[1] = AREA_1_ON;
+        mSceneClick[0] = AREA_1_OFF;
+        goto preset1x;
+      case buttonFunc_area2_preset2x:
+        mArea = 2;
+        mSceneClick[1] = AREA_2_ON;
+        mSceneClick[0] = AREA_2_OFF;
+        goto preset2x;
+      case buttonFunc_area3_preset3x:
+        mArea = 3;
+        mSceneClick[1] = AREA_3_ON;
+        mSceneClick[0] = AREA_3_OFF;
+        goto preset3x;
+      case buttonFunc_area4_preset4x:
+        mArea = 4;
+        mSceneClick[1] = AREA_4_ON;
+        mSceneClick[0] = AREA_4_OFF;
+        goto preset4x;
+      case buttonFunc_room_preset0x:
+        mSceneClick[1] = ROOM_ON;
+        mSceneClick[0] = ROOM_OFF;
+      preset0x:
+        mSceneClick[2] = PRESET_2;
+        mSceneClick[3] = PRESET_3;
+        mSceneClick[4] = PRESET_4;
+        break;
+      case buttonFunc_room_preset1x:
+        mSceneClick[1] = PRESET_11;
+        mSceneClick[0] = ROOM_OFF;
+      preset1x:
+        mSceneClick[2] = PRESET_12;
+        mSceneClick[3] = PRESET_13;
+        mSceneClick[4] = PRESET_14;
+        break;
+      case buttonFunc_room_preset2x:
+        mSceneClick[1] = PRESET_21;
+        mSceneClick[0] = ROOM_OFF;
+      preset2x:
+        mSceneClick[2] = PRESET_22;
+        mSceneClick[3] = PRESET_23;
+        mSceneClick[4] = PRESET_24;
+        break;
+      case buttonFunc_room_preset3x:
+        mSceneClick[1] = PRESET_31;
+        mSceneClick[0] = ROOM_OFF;
+      preset3x:
+        mSceneClick[2] = PRESET_32;
+        mSceneClick[3] = PRESET_33;
+        mSceneClick[4] = PRESET_34;
+        break;
+      case buttonFunc_room_preset4x:
+        mSceneClick[1] = PRESET_41;
+        mSceneClick[0] = ROOM_OFF;
+      preset4x:
+        mSceneClick[2] = PRESET_42;
+        mSceneClick[3] = PRESET_43;
+        mSceneClick[4] = PRESET_44;
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+#endif // ENABLE_LOCALCONTROLLER || ENABLE_JSONBRIDGEAPI
+
+
+// MARK: - ButtonBehaviour
 
 ButtonBehaviour::ButtonBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
