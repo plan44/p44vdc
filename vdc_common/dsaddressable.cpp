@@ -93,11 +93,11 @@ void DsAddressable::reportVanished()
   if (isAnnounced()) {
     // report to vDC API client that the device is now offline
     sendRequest(getVdcHost().getVdsmSessionConnection(), "vanish", ApiValuePtr());
-    #if ENABLE_JSONBRIDGEAPI
-    // also report to connected bridges
-    sendRequest(getVdcHost().getBridgeApi(), "vanish", ApiValuePtr());
-    #endif
   }
+  #if ENABLE_JSONBRIDGEAPI
+  // also report to connected bridges
+  sendRequest(getVdcHost().getBridgeApi(), "vanish", ApiValuePtr());
+  #endif
 }
 
 
@@ -623,6 +623,17 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
   }
   // not my field, let base class handle it
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor); // let base class handle it
+}
+
+
+void DsAddressable::pushBridgeable() {
+  VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
+  if (api) {
+    ApiValuePtr query = api->newApiValue();
+    query->setType(apivalue_object);
+    query->add("x-p44-bridgeable", query->newValue(apivalue_null));
+    pushNotification(api, query, ApiValuePtr());
+  }
 }
 
 

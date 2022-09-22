@@ -2459,7 +2459,6 @@ void Device::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPrope
 }
 
 
-
 bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
   if (aPropertyDescriptor->hasObjectKey(device_obj)) {
@@ -2520,13 +2519,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
         case allowBridging_key:
           if (mDeviceSettings->setPVar(mDeviceSettings->mAllowBridging, aPropValue->boolValue())) {
             // bridgeability changed, push to bridge
-            VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
-            if (api) {
-              ApiValuePtr query = api->newApiValue();
-              query->setType(apivalue_object);
-              query->add("x-p44-bridgeable", query->newValue(apivalue_null));
-              pushNotification(api, query, ApiValuePtr());
-            }
+            pushBridgeable();
           }
           return true;
         #endif

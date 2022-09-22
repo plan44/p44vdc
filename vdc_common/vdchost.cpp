@@ -719,6 +719,9 @@ void VdcHost::deviceInitialized(DevicePtr aDevice, ErrorPtr aError)
     if (mLocalController) mLocalController->deviceAdded(aDevice);
     #endif
     aDevice->addedAndInitialized();
+    #if ENABLE_JSONBRIDGEAPI
+    aDevice->pushBridgeable();
+    #endif
   }
 }
 
