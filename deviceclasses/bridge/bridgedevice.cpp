@@ -72,7 +72,7 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
     // - but we do not need a light behaviour, simple output will do
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
     // - add a default channel
-    o->addChannel(DialChannelPtr(new DialChannel(*o,"bridgedlevel")));
+    o->addChannel(PercentageLevelChannelPtr(new PercentageLevelChannel(*o,"bridgedlevel")));
     o->setGroupMembership(group_yellow_light, true); // default to light as well
     if (mBridgeDeviceType==bridgedevice_fivelevel) {
       // dimmable

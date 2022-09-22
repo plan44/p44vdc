@@ -35,9 +35,9 @@ namespace p44 {
 
   #define DS_BRIGHTNESS_STEP (100.0/255.0) ///< default step size for brightness (from historical 0..255 8bit dS brightness)
 
-  class BrightnessChannel : public ChannelBehaviour
+  class BrightnessChannel : public PercentageLevelChannel
   {
-    typedef ChannelBehaviour inherited;
+    typedef PercentageLevelChannel inherited;
     double minDim;
 
   public:
@@ -50,10 +50,7 @@ namespace p44 {
     void setDimMin(double aMinDim) { minDim = aMinDim; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_brightness; }; ///< the dS channel type
-    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "brightness"; };
-    virtual double getMin() P44_OVERRIDE { return 0; }; // dS brightness goes from 0 to 100%
-    virtual double getMax() P44_OVERRIDE { return 100; };
     virtual double getStdDimPerMS() P44_OVERRIDE { return 11.0/256*100/300; }; // dimming is 11 steps(1/256) per 300mS (as per ds-light.pdf specification) = 255/11*300 = 7 seconds full scale
     virtual double getMinDim() P44_OVERRIDE { return minDim; };
 

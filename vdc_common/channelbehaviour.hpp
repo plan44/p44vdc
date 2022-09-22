@@ -355,6 +355,23 @@ namespace p44 {
   // MARK: - generic channel implementations
 
 
+  class PercentageLevelChannel : public ChannelBehaviour
+  {
+    typedef ChannelBehaviour inherited;
+
+  public:
+    PercentageLevelChannel(OutputBehaviour &aOutput, const string aChannelId = "level") : inherited(aOutput, aChannelId) { mResolution = 1; };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
+
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
+    virtual const char *getName() P44_OVERRIDE { return "level"; };
+    virtual double getMin() P44_OVERRIDE { return 0; };
+    virtual double getMax() P44_OVERRIDE { return 100; };
+
+  };
+  typedef boost::intrusive_ptr<PercentageLevelChannel> PercentageLevelChannelPtr;
+
+
   /// index value channel
   class IndexChannel : public ChannelBehaviour
   {
