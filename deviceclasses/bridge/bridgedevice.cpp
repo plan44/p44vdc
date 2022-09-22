@@ -146,19 +146,6 @@ void BridgeDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 }
 
 
-/*
-ErrorPtr BridgeDevice::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
-{
-  if (false) {
-    // maybe add methods later
-  }
-  else {
-    return inherited::handleMethod(aRequest, aMethod, aParams);
-  }
-}
-*/
-
-
 void BridgeDevice::willExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection)
 {
   DBGOLOG(LOG_INFO, "willExamineNotificationFromConnection: domain=%d", aApiConnection->domain());
@@ -179,41 +166,51 @@ void BridgeDevice::didExamineNotificationFromConnection(VdcApiConnectionPtr aApi
 
 void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  double v = getChannelByType(channeltype_default)->getChannelValue();
+  double newV = getChannelByType(channeltype_default)->getChannelValue();
   if (mProcessingBridgeNotification) {
     // this is an apply that originates from the bridge
     mProcessingBridgeNotification = false; // just make sure (didExamineNotificationFromConnection should clear it anyway)
     ButtonBehaviourPtr b = getButton(0);
     if (b) {
-      int prevLevel=0;
-      int newLevel=0;
-      if (mBridgeDeviceType==bridgedevice_fivelevel) {
-        prevLevel = (int)((mPreviousV+12.5)/25); // 0..4
-        newLevel = (int)((v+12.5)/25); // 0..4
-      }
-      else if (mBridgeDeviceType==bridgedevice_onoff) {
-        prevLevel = mPreviousV>=50 ? 4 : 0; // max==4 or off==0
-        newLevel = v>=50 ? 4 : 0; // max==4 or off==0
-      }
-      if (newLevel!=prevLevel) {
-        SceneNo actionID;
-        switch (newLevel) {
-          case 4: actionID = ROOM_ON; break; // 100%
-          case 3: actionID = PRESET_2; break; // 75%
-          case 2: actionID = PRESET_3; break; // 50%
-          case 1: actionID = PRESET_4; break; // 25%
-          default: actionID = ROOM_OFF; break; // off
+      int prevPreset=-1;
+      int newPreset=-1;
+      double newSceneValue;
+      // get the reference levels from relevant scenes and determine nearest levels
+      ButtonScenesMap map(b->getButtonFunction(), false);
+      // figure out the scene that will produce a level as near as possible to the value provided from the bridge
+      double minPrevDiff;
+      double minNewDiff;
+      for (int i=0; i<5; i++) {
+        SceneNo sn = map.mSceneClick[i];
+        if (sn!=INVALID_SCENE_NO) {
+          SimpleScenePtr scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
+          if (scene) {
+            double prevDiff = fabs(scene->value-mPreviousV);
+            if (prevPreset<0 || prevDiff<minPrevDiff) { minPrevDiff = prevDiff; prevPreset = i; }
+            double newDiff =  fabs(scene->value-newV);
+            if (newPreset<0 || newDiff<minNewDiff) { newSceneValue = scene->value; minNewDiff = newDiff; newPreset = i; }
+          }
         }
+      }
+      OLOG(LOG_DEBUG, "area=%d, prevLevel=%d, newLevel=%d, newSceneValue=%d", map.mArea, prevPreset, newPreset, (int)newSceneValue);
+      OLOG(LOG_NOTICE, "default channel change to %d (adjusted to %d) originating from bridge", (int)newV, (int)newSceneValue);
+      if (newPreset!=prevPreset && newPreset>=0) {
+        SceneNo actionID = map.mSceneClick[newPreset];
+        // adjust the value to what it will be after the scene call returns to us from the room
+        getChannelByType(channeltype_default)->syncChannelValue(newSceneValue);
         OLOG(LOG_NOTICE,
-          "default channel change to %d originating from bridge -> inject callscene(%s)",
-          (int)v, VdcHost::sceneText(actionID, false).c_str()
+          "- preset changes from %d to %d -> inject button callscene(%s) action",
+          prevPreset, newPreset, VdcHost::sceneText(actionID, false).c_str()
         );
         b->sendAction(buttonActionMode_normal, actionID);
+      }
+      else {
+        OLOG(LOG_INFO, "- preset (%d) did not change -> no button action", prevPreset, (int)newV);
       }
     }
   }
   else {
-    OLOG(LOG_NOTICE, "changes default channel value to %d - NOT caused by bridged device", (int)v);
+    OLOG(LOG_INFO, "default channel change to %d - NOT caused by bridged device", (int)newV);
   }
   inherited::applyChannelValues(aDoneCB, aForDimming);
 }
@@ -251,82 +248,6 @@ string BridgeDevice::bridgeAsHint()
   }
 }
 
-
-/*
-string BridgeDevice::getBridgeDeviceType()
-{
-  switch (mBridgeDeviceType) {
-    case bridgedevice_onoff: return "onOff-scenes";
-    case bridgedevice_fivelevel: return "fivelevel-scenes";
-    default:
-      return "unknown";
-  }
-}
-*/
-
-// MARK: - property access
-
-/*
-
-enum {
-  bridgeDeviceType_key,
-  numProperties
-};
-
-static char bridgeDevice_key;
-
-
-int BridgeDevice::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  // Note: only add my own count when accessing root level properties!!
-  if (aParentDescriptor->isRootOfObject()) {
-    // Accessing properties at the Device (root) level, add mine
-    return inherited::numProps(aDomain, aParentDescriptor)+numProperties;
-  }
-  // just return base class' count
-  return inherited::numProps(aDomain, aParentDescriptor);
-}
-
-
-PropertyDescriptorPtr BridgeDevice::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
-{
-  static const PropertyDescription properties[numProperties] = {
-    { "x-p44-bridgeDeviceType", apivalue_string, bridgeDeviceType_key, OKEY(bridgeDevice_key) },
-  };
-  if (aParentDescriptor->isRootOfObject()) {
-    // root level - accessing properties on the Device level
-    int n = inherited::numProps(aDomain, aParentDescriptor);
-    if (aPropIndex<n)
-      return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor); // base class' property
-    aPropIndex -= n; // rebase to 0 for my own first property
-    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
-  }
-  else {
-    // other level
-    return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor); // base class' property
-  }
-}
-
-
-// access to all fields
-bool BridgeDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
-{
-  if (aPropertyDescriptor->hasObjectKey(bridgeDevice_key)) {
-    if (aMode==access_read) {
-      // read properties
-      switch (aPropertyDescriptor->fieldKey()) {
-        case bridgeDeviceType_key: aPropValue->setStringValue(getBridgeDeviceType()); return true;
-      }
-    }
-    else {
-      // write properties
-    }
-  }
-  // not my field, let base class handle it
-  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
-}
-
-*/
 
 
 #endif // ENABLE_JSONBRIDGEAPI

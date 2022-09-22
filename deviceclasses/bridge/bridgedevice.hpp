@@ -27,6 +27,8 @@
 #include "p44script.hpp"
 #include "httpcomm.hpp"
 
+#include <math.h>
+
 #if ENABLE_JSONBRIDGEAPI
 
 using namespace std;
@@ -137,11 +139,6 @@ namespace p44 {
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
     virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
-    /*
-    /// device level API methods (p44 specific, JSON only, for debugging evaluators)
-    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-    */
-
   protected:
 
     /// called before start examining (usually: handling) a notification
@@ -165,13 +162,6 @@ namespace p44 {
     virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
 
     void deriveDsUid();
-
-    /*
-    // property access implementation
-    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
-    */
 
   private:
 
