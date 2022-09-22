@@ -62,38 +62,38 @@ namespace p44 {
     ///   fixed constants or values set ONCE by device implementations when adding a ButtonBehaviour.
     ///   These need to remain constant after device initialisation is complete!
     /// @{
-    bool supportsLocalKeyMode; ///< set if this button can act as local button
-    int buttonID; ///< the ID grouping all inputs of a hardware button (which can have multiple elements)
-    VdcButtonType buttonType; ///< type of button
-    VdcButtonElement buttonElementID; ///< identifies element of a multi-input button hardware-button
-    DsButtonMode fixedButtonMode; ///< if not buttonMode_inactive, then this is the only mode that can be set
-    int combinables; ///< number of other device's submodules in total (including this device) that upstream might combine to form two-way buttons.
+    bool mSupportsLocalKeyMode; ///< set if this button can act as local button
+    int mButtonID; ///< the ID grouping all inputs of a hardware button (which can have multiple elements)
+    VdcButtonType mButtonType; ///< type of button
+    VdcButtonElement mButtonElementID; ///< identifies element of a multi-input button hardware-button
+    DsButtonMode mFixedButtonMode; ///< if not buttonMode_inactive, then this is the only mode that can be set
+    int mCombinables; ///< number of other device's submodules in total (including this device) that upstream might combine to form two-way buttons.
     /// @}
 
     /// @name persistent settings
     /// @{
-    DsGroup buttonGroup; ///< the group this button belongs to
-    DsButtonFunc buttonFunc; ///< the button function (LTNUM)
-    DsButtonMode buttonMode; ///< the button mode (LTMODE)
-    DsChannelType buttonChannel; ///< the channel the button is supposed to control
-    bool setsLocalPriority; ///< button should set local priority
-    bool callsPresent; ///< button should call "present" scene
-    VdcButtonActionMode buttonActionMode; ///< if set, button clicks directly issue action
-    uint8_t buttonActionId; ///< action Id (aka scene number) to trigger when button is clicked
-    ButtonStateMachineMode stateMachineMode; ///< state machine to use
-    MLMicroSeconds longFunctionDelay; ///< delay to be used to differentiate "long" press
+    DsGroup mButtonGroup; ///< the group this button belongs to
+    DsButtonFunc mButtonFunc; ///< the button function (LTNUM)
+    DsButtonMode mButtonMode; ///< the button mode (LTMODE)
+    DsChannelType mButtonChannel; ///< the channel the button is supposed to control
+    bool mSetsLocalPriority; ///< button should set local priority
+    bool mCallsPresent; ///< button should call "present" scene
+    VdcButtonActionMode mButtonActionMode; ///< if set, button clicks directly issue action
+    uint8_t mButtonActionId; ///< action Id (aka scene number) to trigger when button is clicked
+    ButtonStateMachineMode mStateMachineMode; ///< state machine to use
+    MLMicroSeconds mLongFunctionDelay; ///< delay to be used to differentiate "long" press
     /// @}
 
 
     /// @name internal volatile state
     /// @{
-    bool buttonPressed; ///< set if button is currently pressed
-    MLMicroSeconds lastAction; ///< time of last clickType or actionMode/actionScene update
+    bool mButtonPressed; ///< set if button is currently pressed
+    MLMicroSeconds mLastAction; ///< time of last clickType or actionMode/actionScene update
 
-    DsClickType clickType; ///< set to last click type of button
+    DsClickType mClickType; ///< set to last click type of button
 
-    VdcButtonActionMode actionMode; ///< last triggered action mode
-    uint8_t actionId; ///< last triggered action Id (aka scene number)
+    VdcButtonActionMode mActionMode; ///< last triggered action mode
+    uint8_t mActionId; ///< last triggered action Id (aka scene number)
     /// @}
 
   public:
@@ -126,19 +126,19 @@ namespace p44 {
     void setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, int aNumCombinables);
 
     /// set group
-    virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { setPVar(buttonGroup, aGroup); };
+    virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { setPVar(mButtonGroup, aGroup); };
 
     /// get group
-    virtual DsGroup getGroup() P44_OVERRIDE { return buttonGroup; };
+    virtual DsGroup getGroup() P44_OVERRIDE { return mButtonGroup; };
 
     /// set function
-    virtual void setFunction(DsButtonFunc aFunc) { setPVar(buttonFunc, aFunc); };
+    virtual void setFunction(DsButtonFunc aFunc) { setPVar(mButtonFunc, aFunc); };
 
     /// set state machine mode
-    void setStateMachineMode(ButtonStateMachineMode aStateMachineMode) { stateMachineMode = aStateMachineMode; }
+    void setStateMachineMode(ButtonStateMachineMode aStateMachineMode) { mStateMachineMode = aStateMachineMode; }
 
     /// set long function delay (how long button must be held to trigger "dimming" (press-and-hold) type operation
-    void setLongFunctionDelay(MLMicroSeconds aLongFunctionDelay) { longFunctionDelay = aLongFunctionDelay; }
+    void setLongFunctionDelay(MLMicroSeconds aLongFunctionDelay) { mLongFunctionDelay = aLongFunctionDelay; }
 
 
     /// @name interface towards actual device hardware (or simulation)

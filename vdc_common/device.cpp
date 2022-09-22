@@ -592,7 +592,7 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       // Check if any of the buttons has localbutton functionality available
       for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) {
         ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(*pos);
-        if (b && b->supportsLocalKeyMode) {
+        if (b && b->mSupportsLocalKeyMode) {
           return yes; // there is a button with local key mode support
         }
       }
@@ -603,7 +603,7 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       // devices with one button that has combinables>1 can possibly be combined and thus need this modelfeature to show the UI
       if (mButtons.size()!=1) return no; // none or multiple buttons in this device -> not combinable
       ButtonBehaviourPtr b = getButton(0);
-      return b->combinables>1 ? yes : no;
+      return b->mCombinables>1 ? yes : no;
     }
     case modelFeature_highlevel:
       // Assumption: only black joker devices can have a high-level (app) functionality

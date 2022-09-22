@@ -1504,7 +1504,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
   LocalController::sharedLocalController()->signalActivity(); // button clicks are activity
   FOCUSLOG("processButtonClick: clicktype=%d, device = %s", (int)aClickType, aButtonBehaviour.shortDesc().c_str());
   // defaults
-  DsGroup group = aButtonBehaviour.buttonGroup;
+  DsGroup group = aButtonBehaviour.mButtonGroup;
   DsChannelType channelType = channeltype_default;
   DsZoneID zoneID = zoneId_global;
   // possible actions
@@ -1512,7 +1512,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
   SceneNo sceneToCall = INVALID_SCENE_NO;
   // determine what to do
   VdcDimMode direction = dimmode_stop; // none known
-  switch (aButtonBehaviour.buttonMode) {
+  switch (aButtonBehaviour.mButtonMode) {
     case buttonMode_standard:
     case buttonMode_turbo:
       direction = dimmode_stop;
@@ -1541,11 +1541,11 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
   SceneNo scene2click = INVALID_SCENE_NO;
   SceneNo scene3click = INVALID_SCENE_NO;
   SceneNo scene4click = INVALID_SCENE_NO;
-  if (aButtonBehaviour.buttonFunc==buttonFunc_app) {
+  if (aButtonBehaviour.mButtonFunc==buttonFunc_app) {
     return false; // we do not handle app buttons
   }
   else if (group==group_black_variable) {
-    switch (aButtonBehaviour.buttonFunc) {
+    switch (aButtonBehaviour.mButtonFunc) {
       case buttonFunc_alarm:
         scene1click = ALARM1;
         global = true;
@@ -1567,7 +1567,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     }
   }
   else {
-    switch (aButtonBehaviour.buttonFunc) {
+    switch (aButtonBehaviour.mButtonFunc) {
       case buttonFunc_area1_preset0x:
         area = 1;
         scene1click = AREA_1_ON;
@@ -1669,7 +1669,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
   else {
     // room scene
     zoneID = aButtonBehaviour.mDevice.getZoneID();
-    channelType = aButtonBehaviour.buttonChannel;
+    channelType = aButtonBehaviour.mButtonChannel;
     ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
     if (!zone) return false; // button in a non-local zone, cannot handle
     if (group!=group_yellow_light && group!=group_grey_shadow) return true; // NOP because we don't support anything except light and shadow for now, but handled

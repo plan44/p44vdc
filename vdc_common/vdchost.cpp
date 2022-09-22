@@ -902,7 +902,7 @@ bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsCl
 void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
   #if ENABLE_LOCAL_BEHAVIOUR
-  if (aButtonBehaviour.buttonFunc==buttonFunc_app || aButtonBehaviour.buttonGroup!=group_yellow_light) {
+  if (aButtonBehaviour.mButtonFunc==buttonFunc_app || aButtonBehaviour.mButtonFunc!=group_yellow_light) {
     return; // do not try to handle non-light or app buttons
   }
   // TODO: Not really conforming to ds-light yet...
@@ -949,7 +949,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
       DevicePtr dev = pos->second;
       LightBehaviourPtr l = boost::dynamic_pointer_cast<LightBehaviour>(dev->getOutput());
       if (l) {
-        ChannelBehaviourPtr channel = dev->getChannelByType(aButtonBehaviour.buttonChannel);
+        ChannelBehaviourPtr channel = dev->getChannelByType(aButtonBehaviour.mButtonChannel);
         if (scene==STOP_S) {
           // stop dimming
           dev->dimChannelForArea(channel, dimmode_stop, 0, 0);

@@ -37,22 +37,22 @@ using namespace p44;
 ButtonBehaviour::ButtonBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
   // persistent settings
-  buttonGroup(group_yellow_light),
-  buttonMode(buttonMode_inactive), // none by default, hardware should set a default matching the actual HW capabilities
-  fixedButtonMode(buttonMode_inactive), // by default, mode can be set. Hardware may fix the possible mode
-  buttonChannel(channeltype_default), // by default, buttons act on default channel
-  buttonFunc(buttonFunc_room_preset0x), // act as room button by default
-  setsLocalPriority(false),
-  clickType(ct_none),
-  actionMode(buttonActionMode_none),
-  actionId(0),
-  buttonPressed(false),
-  lastAction(Never),
-  callsPresent(false),
-  buttonActionMode(buttonActionMode_none),
-  buttonActionId(0),
-  stateMachineMode(statemachine_standard),
-  longFunctionDelay(t_long_function_delay) // standard dS value, might need tuning for some special (slow) hardware
+  mButtonGroup(group_yellow_light),
+  mButtonMode(buttonMode_inactive), // none by default, hardware should set a default matching the actual HW capabilities
+  mFixedButtonMode(buttonMode_inactive), // by default, mode can be set. Hardware may fix the possible mode
+  mButtonChannel(channeltype_default), // by default, buttons act on default channel
+  mButtonFunc(buttonFunc_room_preset0x), // act as room button by default
+  mSetsLocalPriority(false),
+  mClickType(ct_none),
+  mActionMode(buttonActionMode_none),
+  mActionId(0),
+  mButtonPressed(false),
+  mLastAction(Never),
+  mCallsPresent(false),
+  mButtonActionMode(buttonActionMode_none),
+  mButtonActionId(0),
+  mStateMachineMode(statemachine_standard),
+  mLongFunctionDelay(t_long_function_delay) // standard dS value, might need tuning for some special (slow) hardware
 {
   // set default hardware configuration
   setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, 1); // not combinable, but button mode writable
@@ -63,35 +63,35 @@ ButtonBehaviour::ButtonBehaviour(Device &aDevice, const string aId) :
 
 void ButtonBehaviour::setHardwareButtonConfig(int aButtonID, VdcButtonType aType, VdcButtonElement aElement, bool aSupportsLocalKeyMode, int aCounterPartIndex, int aNumCombinables)
 {
-  buttonID = aButtonID;
-  buttonType = aType;
-  buttonElementID = aElement;
-  supportsLocalKeyMode = aSupportsLocalKeyMode;
-  combinables = aNumCombinables;
+  mButtonID = aButtonID;
+  mButtonType = aType;
+  mButtonElementID = aElement;
+  mSupportsLocalKeyMode = aSupportsLocalKeyMode;
+  mCombinables = aNumCombinables;
   // now derive default settings from hardware
   // - default to standard mode
-  buttonMode = buttonMode_standard;
+  mButtonMode = buttonMode_standard;
   // - modify for 2-way
-  if (buttonType==buttonType_2way) {
+  if (mButtonType==buttonType_2way) {
     // part of a 2-way button.
-    if (buttonElementID==buttonElement_up) {
-      buttonMode = (DsButtonMode)((int)buttonMode_rockerUp_pairWith0+aCounterPartIndex);
+    if (mButtonElementID==buttonElement_up) {
+      mButtonMode = (DsButtonMode)((int)buttonMode_rockerUp_pairWith0+aCounterPartIndex);
     }
-    else if (buttonElementID==buttonElement_down) {
-      buttonMode = (DsButtonMode)((int)buttonMode_rockerDown_pairWith0+aCounterPartIndex);
+    else if (mButtonElementID==buttonElement_down) {
+      mButtonMode = (DsButtonMode)((int)buttonMode_rockerDown_pairWith0+aCounterPartIndex);
     }
   }
-  if (combinables==0) {
+  if (mCombinables==0) {
     // not combinable and limited to only this mode
-    fixedButtonMode = buttonMode;
+    mFixedButtonMode = mButtonMode;
   }
 }
 
 
 string ButtonBehaviour::getAutoId()
 {
-  if (buttonType==buttonType_2way) {
-    return buttonElementID==buttonElement_up ? "up" : "down";
+  if (mButtonType==buttonType_2way) {
+    return mButtonElementID==buttonElement_up ? "up" : "down";
   }
   else {
     return "button";
@@ -103,10 +103,10 @@ string ButtonBehaviour::getAutoId()
 void ButtonBehaviour::updateButtonState(bool aPressed)
 {
   OLOG(LOG_NOTICE, "reports %s", aPressed ? "pressed" : "released");
-  bool stateChanged = aPressed!=buttonPressed;
-  buttonPressed = aPressed; // remember new state
+  bool stateChanged = aPressed!=mButtonPressed;
+  mButtonPressed = aPressed; // remember new state
   // check which statemachine to use
-  if (buttonMode==buttonMode_turbo || stateMachineMode!=statemachine_standard) {
+  if (mButtonMode==buttonMode_turbo || mStateMachineMode!=statemachine_standard) {
     // use custom state machine
     checkCustomStateMachine(stateChanged, MainLoop::now());
   }
@@ -151,7 +151,7 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
       }
       break;
     case ct_hold_start:
-      if (clickType==ct_hold_start) {
+      if (mClickType==ct_hold_start) {
         aClickType = ct_hold_repeat; // already started before -> treat as repeat
       }
       state = S8_awaitrelease; // must set a state, although regular state machine is not used, to make sure valueSource reports holds
@@ -159,7 +159,7 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
       buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
       break;
     case ct_hold_end:
-      if (clickType!=ct_hold_start && clickType!=ct_hold_repeat) break; // suppress hold end when not in hold start
+      if (mClickType!=ct_hold_start && mClickType!=ct_hold_repeat) break; // suppress hold end when not in hold start
       sendClick(aClickType);
       injectedOpComplete();
       break;
@@ -179,7 +179,7 @@ void ButtonBehaviour::injectedOpComplete()
 
 void ButtonBehaviour::resetStateMachine()
 {
-  buttonPressed = false;
+  mButtonPressed = false;
   state = S0_idle;
   clickCounter = 0;
   holdRepeats = 0;
@@ -233,7 +233,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
   MLMicroSeconds timeSinceRef = aNow-timerRef;
   timerRef = aNow;
 
-  if (buttonMode==buttonMode_turbo || stateMachineMode==statemachine_simple) {
+  if (mButtonMode==buttonMode_turbo || mStateMachineMode==statemachine_simple) {
     FOCUSOLOG("simple button state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
     // reset click counter if tip timeout has passed since last event
     if (timeSinceRef>t_tip_timeout) {
@@ -241,7 +241,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
     }
     // use Idle and Awaitrelease states only to remember previous button state detected
     bool isTip = false;
-    if (buttonPressed) {
+    if (mButtonPressed) {
       // the button was pressed right now
       // - always count button press as a tip
       isTip = true;
@@ -276,17 +276,17 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
       }
     }
   }
-  else if (stateMachineMode==statemachine_dimmer) {
+  else if (mStateMachineMode==statemachine_dimmer) {
     FOCUSOLOG("dimmer button state machine entered");
     // just issue hold and stop events (e.g. for volume)
     if (aStateChanged) {
       if (isLocalButtonEnabled() && isOutputOn()) {
         // local dimming start/stop
-        localDim(buttonPressed);
+        localDim(mButtonPressed);
       }
       else {
         // not local button mode
-        if (buttonPressed) {
+        if (mButtonPressed) {
           FOCUSOLOG("started dimming - sending ct_hold_start");
           // button just pressed
           sendClick(ct_hold_start);
@@ -320,7 +320,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
 
     case S0_idle :
       timerRef = Never; // no timer running
-      if (aStateChanged && buttonPressed) {
+      if (aStateChanged && mButtonPressed) {
         clickCounter = isLocalButtonEnabled() ? 0 : 1;
         timerRef = aNow;
         state = S1_initialpress;
@@ -328,7 +328,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S1_initialpress :
-      if (aStateChanged && !buttonPressed) {
+      if (aStateChanged && !mButtonPressed) {
         timerRef = aNow;
         state = S5_nextPauseWait;
       }
@@ -338,18 +338,18 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S2_holdOrTip:
-      if (aStateChanged && !buttonPressed && clickCounter==0) {
+      if (aStateChanged && !mButtonPressed && clickCounter==0) {
         localSwitchOutput();
         timerRef = aNow;
         clickCounter = 1;
         state = S4_nextTipWait;
       }
-      else if (aStateChanged && !buttonPressed && clickCounter>0) {
+      else if (aStateChanged && !mButtonPressed && clickCounter>0) {
         sendClick((DsClickType)(ct_tip_1x+clickCounter-1));
         timerRef = aNow;
         state = S4_nextTipWait;
       }
-      else if (timeSinceRef>=longFunctionDelay) {
+      else if (timeSinceRef>=mLongFunctionDelay) {
         // long function
         if (!isLocalButtonEnabled() || !isOutputOn()) {
           // hold
@@ -367,7 +367,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S3_hold:
-      if (aStateChanged && !buttonPressed) {
+      if (aStateChanged && !mButtonPressed) {
         // no packet send time, skip S15
         sendClick(ct_hold_end);
         state = S0_idle;
@@ -387,7 +387,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S4_nextTipWait:
-      if (aStateChanged && buttonPressed) {
+      if (aStateChanged && mButtonPressed) {
         timerRef = aNow;
         if (clickCounter>=4)
           clickCounter = 2;
@@ -402,7 +402,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S5_nextPauseWait:
-      if (aStateChanged && buttonPressed) {
+      if (aStateChanged && mButtonPressed) {
         timerRef = aNow;
         clickCounter = 2;
         state = S6_2ClickWait;
@@ -417,7 +417,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S6_2ClickWait:
-      if (aStateChanged && !buttonPressed) {
+      if (aStateChanged && !mButtonPressed) {
         timerRef = aNow;
         state = S9_2pauseWait;
       }
@@ -427,19 +427,19 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S7_progModeWait:
-      if (aStateChanged && !buttonPressed) {
+      if (aStateChanged && !mButtonPressed) {
         sendClick(ct_tip_2x);
         timerRef = aNow;
         state = S4_nextTipWait;
       }
-      else if (timeSinceRef>longFunctionDelay) {
+      else if (timeSinceRef>mLongFunctionDelay) {
         sendClick(ct_short_long);
         state = S8_awaitrelease;
       }
       break;
 
     case S9_2pauseWait:
-      if (aStateChanged && buttonPressed) {
+      if (aStateChanged && mButtonPressed) {
         timerRef = aNow;
         clickCounter = 3;
         state = S12_3clickWait;
@@ -451,7 +451,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S12_3clickWait:
-      if (aStateChanged && !buttonPressed) {
+      if (aStateChanged && !mButtonPressed) {
         timerRef = aNow;
         sendClick(ct_click_3x);
         state = S4_nextTipWait;
@@ -462,18 +462,18 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S13_3pauseWait:
-      if (aStateChanged && !buttonPressed) {
+      if (aStateChanged && !mButtonPressed) {
         timerRef = aNow;
         sendClick(ct_tip_3x);
       }
-      else if (timeSinceRef>=longFunctionDelay) {
+      else if (timeSinceRef>=mLongFunctionDelay) {
         sendClick(ct_short_short_long);
         state = S8_awaitrelease;
       }
       break;
 
     case S11_localdim:
-      if (aStateChanged && !buttonPressed) {
+      if (aStateChanged && !mButtonPressed) {
         state = S0_idle;
         localDim(dimmode_stop); // stop dimming
       }
@@ -481,14 +481,14 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
 
     case S8_awaitrelease:
       // normal wait for
-      if (aStateChanged && !buttonPressed) {
+      if (aStateChanged && !mButtonPressed) {
         state = S0_idle;
         keyOpComplete();
       }
       break;
     case S14_awaitrelease_timedout:
       // silently reset the state machine, hold_end was already sent before
-      if (aStateChanged && !buttonPressed) {
+      if (aStateChanged && !mButtonPressed) {
         state = S0_idle;
       }
       break;
@@ -503,9 +503,9 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
 
 VdcButtonElement ButtonBehaviour::localFunctionElement()
 {
-  if (buttonType!=buttonType_undefined) {
+  if (mButtonType!=buttonType_undefined) {
     // hardware defines the button
-    return buttonElementID;
+    return mButtonElementID;
   }
   // default to center
   return buttonElement_center;
@@ -514,7 +514,7 @@ VdcButtonElement ButtonBehaviour::localFunctionElement()
 
 bool ButtonBehaviour::isLocalButtonEnabled()
 {
-  return supportsLocalKeyMode && buttonFunc==buttonFunc_device;
+  return mSupportsLocalKeyMode && mButtonFunc==buttonFunc_device;
 }
 
 
@@ -532,8 +532,8 @@ bool ButtonBehaviour::isOutputOn()
 
 VdcDimMode ButtonBehaviour::twoWayDirection()
 {
-  if (buttonMode<buttonMode_rockerDown_pairWith0 || buttonMode>buttonMode_rockerUp_pairWith3) return dimmode_stop; // single button -> no direction
-  return buttonMode>=buttonMode_rockerDown_pairWith0 && buttonMode<=buttonMode_rockerDown_pairWith3 ? dimmode_down : dimmode_up; // down = -1, up = 1
+  if (mButtonMode<buttonMode_rockerDown_pairWith0 || mButtonMode>buttonMode_rockerUp_pairWith3) return dimmode_stop; // single button -> no direction
+  return mButtonMode>=buttonMode_rockerDown_pairWith0 && mButtonMode<=buttonMode_rockerDown_pairWith3 ? dimmode_down : dimmode_up; // down = -1, up = 1
 }
 
 
@@ -586,29 +586,24 @@ void ButtonBehaviour::localDim(bool aStart)
 void ButtonBehaviour::sendClick(DsClickType aClickType)
 {
   // check for p44-level scene buttons
-  if (buttonActionMode!=buttonActionMode_none && (aClickType==ct_tip_1x || aClickType==ct_click_1x)) {
+  if (mButtonActionMode!=buttonActionMode_none && (aClickType==ct_tip_1x || aClickType==ct_click_1x)) {
     // trigger direct scene action for single clicks
-    sendAction(buttonActionMode, buttonActionId);
+    sendAction(mButtonActionMode, mButtonActionId);
     return;
   }
   // update button state
-  lastAction = MainLoop::now();
-  clickType = aClickType;
-  actionMode = buttonActionMode_none;
+  mLastAction = MainLoop::now();
+  mClickType = aClickType;
+  mActionMode = buttonActionMode_none;
   // button press is considered a (regular!) user action, have it checked globally first
   if (!mDevice.getVdcHost().signalDeviceUserAction(mDevice, true)) {
     // button press not consumed on global level, forward to upstream dS (and bridges, if not just hold-repeat)
-    if (pushBehaviourState(true, clickType!=ct_hold_repeat)) {
-      OLOG(clickType==ct_hold_repeat ? LOG_INFO : LOG_NOTICE, "successfully pushed state = %d, clickType %d", buttonPressed, aClickType);
+    if (pushBehaviourState(true, mClickType!=ct_hold_repeat)) {
+      OLOG(mClickType==ct_hold_repeat ? LOG_INFO : LOG_NOTICE, "successfully pushed state = %d, clickType %d", mButtonPressed, aClickType);
     }
-    #if ENABLE_LOCALCONTROLLER
-    #if ENABLE_P44SCRIPT
+    #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
     // send event
-    if (clickType!=ct_hold_repeat) sendValueEvent();
-    #else
-    // notify listeners
-    notifyListeners(clickType!=ct_hold_repeat ? valueevent_changed : valueevent_confirmed);
-    #endif
+    if (mClickType!=ct_hold_repeat) sendValueEvent();
     #endif
     // also let vdchost know for local click handling
     // TODO: more elegant solution for this
@@ -634,10 +629,10 @@ bool ButtonBehaviour::hasDefinedState()
 
 void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActionId)
 {
-  lastAction = MainLoop::now();
-  actionMode = aActionMode;
-  actionId = aActionId;
-  OLOG(LOG_NOTICE, "pushes actionMode = %d, actionId %d", actionMode, actionId);
+  mLastAction = MainLoop::now();
+  mActionMode = aActionMode;
+  mActionId = aActionId;
+  OLOG(LOG_NOTICE, "pushes actionMode = %d, actionId %d", mActionMode, mActionId);
   // issue a state property push to dS (this is dS specific, no push to bridges)
   pushBehaviourState(true, false);
 }
@@ -651,7 +646,7 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
 bool ButtonBehaviour::isEnabled()
 {
   // only app buttons are available for use in local processing
-  return buttonFunc==buttonFunc_app;
+  return mButtonFunc==buttonFunc_app;
 }
 
 
@@ -682,7 +677,7 @@ double ButtonBehaviour::getSourceValue()
   // 1..4: number of clicks
   // >4 : held down
   if (state==S0_idle) return 0;
-  switch (clickType) {
+  switch (mClickType) {
     case ct_tip_1x:
     case ct_click_1x:
       return 1;
@@ -706,7 +701,7 @@ double ButtonBehaviour::getSourceValue()
 
 MLMicroSeconds ButtonBehaviour::getSourceLastUpdate()
 {
-  return lastAction;
+  return mLastAction;
 }
 
 
@@ -774,24 +769,24 @@ void ButtonBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
 {
   inherited::loadFromRow(aRow, aIndex, NULL); // no common flags in base class
   // get the fields
-  aRow->getCastedIfNotNull<DsGroup, int>(aIndex++, buttonGroup);
-  aRow->getCastedIfNotNull<DsButtonMode, int>(aIndex++, buttonMode);
-  if (buttonMode!=buttonMode_inactive && fixedButtonMode!=buttonMode_inactive && buttonMode!=fixedButtonMode) {
+  aRow->getCastedIfNotNull<DsGroup, int>(aIndex++, mButtonGroup);
+  aRow->getCastedIfNotNull<DsButtonMode, int>(aIndex++, mButtonMode);
+  if (mButtonMode!=buttonMode_inactive && mFixedButtonMode!=buttonMode_inactive && mButtonMode!=mFixedButtonMode) {
     // force mode according to fixedButtonMode, even if settings (from older versions) say something different
-    buttonMode = fixedButtonMode;
+    mButtonMode = mFixedButtonMode;
   }
-  aRow->getCastedIfNotNull<DsButtonFunc, int>(aIndex++, buttonFunc);
+  aRow->getCastedIfNotNull<DsButtonFunc, int>(aIndex++, mButtonFunc);
   uint64_t flags = aRow->getWithDefault<int>(aIndex++, 0);
-  aRow->getCastedIfNotNull<DsChannelType, int>(aIndex++, buttonChannel);
-  aRow->getCastedIfNotNull<VdcButtonActionMode, int>(aIndex++, buttonActionMode);
-  aRow->getCastedIfNotNull<uint8_t, int>(aIndex++, buttonActionId);
-  if (!aRow->getCastedIfNotNull<ButtonStateMachineMode, int>(aIndex++, stateMachineMode)) {
+  aRow->getCastedIfNotNull<DsChannelType, int>(aIndex++, mButtonChannel);
+  aRow->getCastedIfNotNull<VdcButtonActionMode, int>(aIndex++, mButtonActionMode);
+  aRow->getCastedIfNotNull<uint8_t, int>(aIndex++, mButtonActionId);
+  if (!aRow->getCastedIfNotNull<ButtonStateMachineMode, int>(aIndex++, mStateMachineMode)) {
     // no value yet for stateMachineMode -> old simpleStateMachine flag is still valid
-    if (flags & buttonflag_OBSOLETE_simpleStateMachine) stateMachineMode = statemachine_simple; // flag is set, use simple state machine mode
+    if (flags & buttonflag_OBSOLETE_simpleStateMachine) mStateMachineMode = statemachine_simple; // flag is set, use simple state machine mode
   }
   // decode the flags
-  setsLocalPriority = flags & buttonflag_setsLocalPriority;
-  callsPresent = flags & buttonflag_callsPresent;
+  mSetsLocalPriority = flags & buttonflag_setsLocalPriority;
+  mCallsPresent = flags & buttonflag_callsPresent;
   // pass the flags out to subclasses which call this superclass to get the flags (and decode themselves)
   if (aCommonFlagsP) *aCommonFlagsP = flags;
 }
@@ -803,17 +798,17 @@ void ButtonBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // encode the flags
   int flags = 0;
-  if (setsLocalPriority) flags |= buttonflag_setsLocalPriority;
-  if (callsPresent) flags |= buttonflag_callsPresent;
+  if (mSetsLocalPriority) flags |= buttonflag_setsLocalPriority;
+  if (mCallsPresent) flags |= buttonflag_callsPresent;
   // bind the fields
-  aStatement.bind(aIndex++, buttonGroup);
-  aStatement.bind(aIndex++, buttonMode);
-  aStatement.bind(aIndex++, buttonFunc);
+  aStatement.bind(aIndex++, mButtonGroup);
+  aStatement.bind(aIndex++, mButtonMode);
+  aStatement.bind(aIndex++, mButtonFunc);
   aStatement.bind(aIndex++, flags);
-  aStatement.bind(aIndex++, buttonChannel);
-  aStatement.bind(aIndex++, buttonActionMode);
-  aStatement.bind(aIndex++, buttonActionId);
-  aStatement.bind(aIndex++, stateMachineMode);
+  aStatement.bind(aIndex++, mButtonChannel);
+  aStatement.bind(aIndex++, mButtonActionMode);
+  aStatement.bind(aIndex++, mButtonActionId);
+  aStatement.bind(aIndex++, mStateMachineMode);
 }
 
 
@@ -919,79 +914,79 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       switch (aPropertyDescriptor->fieldKey()) {
         // Description properties
         case supportsLocalKeyMode_key+descriptions_key_offset:
-          aPropValue->setBoolValue(supportsLocalKeyMode);
+          aPropValue->setBoolValue(mSupportsLocalKeyMode);
           return true;
         case buttonID_key+descriptions_key_offset:
-          aPropValue->setUint64Value(buttonID);
+          aPropValue->setUint64Value(mButtonID);
           return true;
         case buttonType_key+descriptions_key_offset:
-          aPropValue->setUint64Value(buttonType);
+          aPropValue->setUint64Value(mButtonType);
           return true;
         case buttonElementID_key+descriptions_key_offset:
-          aPropValue->setUint64Value(buttonElementID);
+          aPropValue->setUint64Value(mButtonElementID);
           return true;
         case combinables_key+descriptions_key_offset:
-          aPropValue->setUint64Value(combinables); // 0 and 1 both mean non-combinable, but 1 means that buttonmode is still not fixed
+          aPropValue->setUint64Value(mCombinables); // 0 and 1 both mean non-combinable, but 1 means that buttonmode is still not fixed
           return true;
         // Settings properties
         case group_key+settings_key_offset:
-          aPropValue->setUint16Value(buttonGroup);
+          aPropValue->setUint16Value(mButtonGroup);
           return true;
         case mode_key+settings_key_offset:
-          aPropValue->setUint64Value(buttonMode);
+          aPropValue->setUint64Value(mButtonMode);
           return true;
         case function_key+settings_key_offset:
-          aPropValue->setUint64Value(buttonFunc);
+          aPropValue->setUint64Value(mButtonFunc);
           return true;
         case channel_key+settings_key_offset:
-          aPropValue->setUint64Value(buttonChannel);
+          aPropValue->setUint64Value(mButtonChannel);
           return true;
         case setsLocalPriority_key+settings_key_offset:
-          aPropValue->setBoolValue(setsLocalPriority);
+          aPropValue->setBoolValue(mSetsLocalPriority);
           return true;
         case callsPresent_key+settings_key_offset:
-          aPropValue->setBoolValue(callsPresent);
+          aPropValue->setBoolValue(mCallsPresent);
           return true;
         case buttonActionMode_key+settings_key_offset:
-          aPropValue->setUint8Value(buttonActionMode);
+          aPropValue->setUint8Value(mButtonActionMode);
           return true;
         case buttonActionId_key+settings_key_offset:
-          aPropValue->setUint8Value(buttonActionId);
+          aPropValue->setUint8Value(mButtonActionId);
           return true;
         case stateMachineMode_key+settings_key_offset:
-          aPropValue->setUint8Value(stateMachineMode);
+          aPropValue->setUint8Value(mStateMachineMode);
           return true;
         case longFunctionDelay_key+settings_key_offset:
-          aPropValue->setDoubleValue((double)longFunctionDelay/Second);
+          aPropValue->setDoubleValue((double)mLongFunctionDelay/Second);
           return true;
         // States properties
         case value_key+states_key_offset:
-          if (lastAction==Never)
+          if (mLastAction==Never)
             aPropValue->setNull();
           else
-            aPropValue->setBoolValue(buttonPressed);
+            aPropValue->setBoolValue(mButtonPressed);
           return true;
         case clickType_key+states_key_offset:
           // click type is available only if last actions was a regular click
-          if (actionMode!=buttonActionMode_none) return false;
-          aPropValue->setUint64Value(clickType);
+          if (mActionMode!=buttonActionMode_none) return false;
+          aPropValue->setUint64Value(mClickType);
           return true;
         case actionMode_key+states_key_offset:
           // actionMode is available only if last actions was direct action
-          if (actionMode==buttonActionMode_none) return false;
-          aPropValue->setUint64Value(actionMode);
+          if (mActionMode==buttonActionMode_none) return false;
+          aPropValue->setUint64Value(mActionMode);
           return true;
         case actionId_key+states_key_offset:
           // actionId is available only if last actions was direct action
-          if (actionMode==buttonActionMode_none) return false;
-          aPropValue->setUint64Value(actionId);
+          if (mActionMode==buttonActionMode_none) return false;
+          aPropValue->setUint64Value(mActionId);
           return true;
         case age_key+states_key_offset:
           // age
-          if (lastAction==Never)
+          if (mLastAction==Never)
             aPropValue->setNull();
           else
-            aPropValue->setDoubleValue((double)(MainLoop::now()-lastAction)/Second);
+            aPropValue->setDoubleValue((double)(MainLoop::now()-mLastAction)/Second);
           return true;
       }
     }
@@ -1002,12 +997,12 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case group_key+settings_key_offset:
           setGroup((DsGroup)aPropValue->int32Value());
           // for unchangeably paired (rocker) buttons, automatically change group on counterpart
-          if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
+          if (mFixedButtonMode==buttonMode_rockerDown_pairWith1 || mFixedButtonMode==buttonMode_rockerUp_pairWith1) {
             // also change group in button1
             OLOG(LOG_NOTICE,"paired button group changed in button0 -> also changed in button1");
             ButtonBehaviourPtr bb = mDevice.getButton(1); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
           }
-          else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
+          else if (mFixedButtonMode==buttonMode_rockerDown_pairWith0 || mFixedButtonMode==buttonMode_rockerUp_pairWith0) {
             // also change group in button0
             OLOG(LOG_NOTICE,"paired button group changed in button1 -> also changed in button0");
             ButtonBehaviourPtr bb = mDevice.getButton(0); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
@@ -1015,47 +1010,47 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case mode_key+settings_key_offset: {
           DsButtonMode m = (DsButtonMode)aPropValue->int32Value();
-          if (m!=buttonMode_inactive && fixedButtonMode!=buttonMode_inactive) {
+          if (m!=buttonMode_inactive && mFixedButtonMode!=buttonMode_inactive) {
             // only one particular mode (aside from inactive) is allowed.
-            m = fixedButtonMode;
+            m = mFixedButtonMode;
           }
-          setPVar(buttonMode, m);
+          setPVar(mButtonMode, m);
           return true;
         }
         case function_key+settings_key_offset:
           setFunction((DsButtonFunc)aPropValue->int32Value());
           // for unchangeably paired (rocker) buttons, automatically change function on counterpart
-          if (fixedButtonMode==buttonMode_rockerDown_pairWith1 || fixedButtonMode==buttonMode_rockerUp_pairWith1) {
+          if (mFixedButtonMode==buttonMode_rockerDown_pairWith1 || mFixedButtonMode==buttonMode_rockerUp_pairWith1) {
             // also change function in button1
             OLOG(LOG_NOTICE,"paired button function changed in button0 -> also changed in button1");
             ButtonBehaviourPtr bb = mDevice.getButton(1); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
           }
-          else if (fixedButtonMode==buttonMode_rockerDown_pairWith0 || fixedButtonMode==buttonMode_rockerUp_pairWith0) {
+          else if (mFixedButtonMode==buttonMode_rockerDown_pairWith0 || mFixedButtonMode==buttonMode_rockerUp_pairWith0) {
             // also change function in button0
             OLOG(LOG_NOTICE,"paired button function changed in button1 -> also changed in button0");
             ButtonBehaviourPtr bb = mDevice.getButton(0); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
           }
           return true;
         case channel_key+settings_key_offset:
-          setPVar(buttonChannel, (DsChannelType)aPropValue->int32Value());
+          setPVar(mButtonChannel, (DsChannelType)aPropValue->int32Value());
           return true;
         case setsLocalPriority_key+settings_key_offset:
-          setPVar(setsLocalPriority, aPropValue->boolValue());
+          setPVar(mSetsLocalPriority, aPropValue->boolValue());
           return true;
         case callsPresent_key+settings_key_offset:
-          setPVar(callsPresent, aPropValue->boolValue());
+          setPVar(mCallsPresent, aPropValue->boolValue());
           return true;
         case buttonActionMode_key+settings_key_offset:
-          setPVar(buttonActionMode, (VdcButtonActionMode)aPropValue->uint8Value());
+          setPVar(mButtonActionMode, (VdcButtonActionMode)aPropValue->uint8Value());
           return true;
         case buttonActionId_key+settings_key_offset:
-          setPVar(buttonActionId, aPropValue->uint8Value());
+          setPVar(mButtonActionId, aPropValue->uint8Value());
           return true;
         case stateMachineMode_key+settings_key_offset:
-          setPVar(stateMachineMode, (ButtonStateMachineMode)aPropValue->uint8Value());
+          setPVar(mStateMachineMode, (ButtonStateMachineMode)aPropValue->uint8Value());
           return true;
         case longFunctionDelay_key+settings_key_offset:
-          setPVar(longFunctionDelay, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
+          setPVar(mLongFunctionDelay, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
       }
     }
@@ -1071,8 +1066,8 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 string ButtonBehaviour::description()
 {
   string s = string_format("%s behaviour", shortDesc().c_str());
-  string_format_append(s, "\n- buttonID: %d, buttonType: %d, buttonElementID: %d", buttonID, buttonType, buttonElementID);
-  string_format_append(s, "\n- buttonChannel: %d, buttonFunc: %d, buttonmode/LTMODE: %d", buttonChannel, buttonFunc, buttonMode);
+  string_format_append(s, "\n- buttonID: %d, buttonType: %d, buttonElementID: %d", mButtonID, mButtonType, mButtonElementID);
+  string_format_append(s, "\n- buttonChannel: %d, buttonFunc: %d, buttonmode/LTMODE: %d", mButtonChannel, mButtonFunc, mButtonMode);
   s.append(inherited::description());
   return s;
 }
