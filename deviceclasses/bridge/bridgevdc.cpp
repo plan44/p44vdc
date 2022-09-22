@@ -84,7 +84,7 @@ const char *BridgeVdc::vdcClassIdentifier() const
 
 bool BridgeVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getIcon("brdg", aIcon, aWithData, aResolutionPrefix))
+  if (getIcon("vdc_brdg", aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);

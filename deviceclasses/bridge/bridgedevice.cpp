@@ -132,7 +132,7 @@ string BridgeDevice::modelName()
 
 bool BridgeDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getIcon("brdg", aIcon, aWithData, aResolutionPrefix))
+  if (getClassColoredIcon("brdg", getDominantColorClass(), aIcon, aWithData, aResolutionPrefix))
     return true;
   else
     return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
