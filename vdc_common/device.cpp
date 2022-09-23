@@ -1798,6 +1798,9 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatTo
           // just consider all channels already applied (e.g. by vdc-level native action)
           // - confirm having applied channels (normally, actual device-level apply would do that)
           allChannelsApplied();
+          // - push final channel values to bridges (but not dS)
+          //   (in non-optimized case above, this is done by applyingChannelsComplete() as consequence of requestApplyingChannels())
+          getOutput()->pushChannelStates(false, true);
           // - consider scene applied but indirectly
           sceneValuesApplied(aDoneCB, scene, true);
           return;
@@ -1837,7 +1840,7 @@ void Device::finishSceneActionWaiting()
 void Device::sceneValuesApplied(SimpleCB aDoneCB, DsScenePtr aScene, bool aIndirectly)
 {
   // now perform scene special actions such as blinking
-  // Note: scene actions might be ongoing, while apply should no go on forever.
+  // Note: scene actions might be ongoing, while apply should NOT go on forever.
   //   Therefore, we store the done callback device-globally to be able to continue before
   //   scene actions are complete
   // confirm previous pending one, if any
