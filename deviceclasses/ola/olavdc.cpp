@@ -81,7 +81,7 @@ void OlaVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   err = db.connectAndInitialize(databaseName.c_str(), OLADEVICES_SCHEMA_VERSION, OLADEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
   // launch OLA thread
   pthread_mutex_init(&olaBufferAccess, NULL);
-  olaThread = MainLoop::currentMainLoop().executeInThread(boost::bind(&OlaVdc::olaThreadRoutine, this, _1), NULL);
+  olaThread = MainLoop::currentMainLoop().executeInThread(boost::bind(&OlaVdc::olaThreadRoutine, this, _1), NoOP);
   // done
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(ErrorPtr());
