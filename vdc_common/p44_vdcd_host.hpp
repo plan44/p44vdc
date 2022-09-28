@@ -190,6 +190,7 @@ namespace p44 {
 
     // properties
     string mQRCodeData; ///< the QR code data string for onboarding
+    bool mStarted; ///< set when matter part of bridge has started
     bool mCommissionable; ///< set when bridge is commissionable
 
   public:
