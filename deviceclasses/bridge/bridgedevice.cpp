@@ -180,7 +180,8 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       // figure out the scene that will produce a level as near as possible to the value provided from the bridge
       double minPrevDiff;
       double minNewDiff;
-      for (int i=0; i<5; i++) {
+      // search off and preset1-4 (area on/off only for area buttons and on-off bridges)
+      for (int i=0; i < (map.mArea>0 || mBridgeDeviceType==bridgedevice_onoff ? 2 : 5); i++) {
         SceneNo sn = map.mSceneClick[i];
         if (sn!=INVALID_SCENE_NO) {
           SimpleScenePtr scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
@@ -205,7 +206,7 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         b->sendAction(buttonActionMode_normal, actionID);
       }
       else {
-        OLOG(LOG_INFO, "- preset (%d) did not change -> no button action", prevPreset, (int)newV);
+        OLOG(LOG_INFO, "- preset (%d) did not change -> no button action", prevPreset);
       }
     }
   }
