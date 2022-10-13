@@ -347,6 +347,7 @@ void EvaluatorDevice::parseVarDefs()
   }
   if (!foundall) {
     // schedule a re-parse later
+    OLOG(LOG_WARNING, "not all value mappings could be resolved now, retrying later...");
     mValueParseTicket.executeOnce(boost::bind(&EvaluatorDevice::parseVarDefs, this), REPARSE_DELAY);
   }
   else {
