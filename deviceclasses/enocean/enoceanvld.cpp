@@ -484,8 +484,8 @@ void EnoceanD201XXDevice::updateOutput(uint8_t aPercentOn, uint8_t aDimTimeSelec
   packet->setRadioDestination(getAddress());
   packet->radioUserData()[0] = 0x01; // CMD 0x1 - Actuator Set Output
   packet->radioUserData()[1] =
-  (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
-  ((aDimTimeSelector & 0x07)<<5);
+    (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
+    ((aDimTimeSelector & 0x07)<<5);
   packet->radioUserData()[2] = aPercentOn; // 0=off, 1..100 = 1..100% on
   sendCommand(packet, NoOP);
 }
