@@ -1604,11 +1604,11 @@ bool DaliSingleControllerDevice::prepareForOptimizedSet(NotificationDeliveryStat
     return false;
   }
   // check notification-specific conditions
-  if (aDeliveryState->optimizedType==ntfy_callscene) {
+  if (aDeliveryState->mOptimizedType==ntfy_callscene) {
     // scenes are generally optimizable unless transition time is really slow and must be executed in multiple steps
     return transitionTimeForPreparedScene(true)<=MAX_SINGLE_STEP_TRANSITION_TIME;
   }
-  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+  else if (aDeliveryState->mOptimizedType==ntfy_dimchannel) {
     // only brightness dimming optimizable for now
     // TODO: extend to also optimize DT8 channels dimming
     return mCurrentDimChannel && mCurrentDimChannel->getChannelType()==channeltype_brightness;

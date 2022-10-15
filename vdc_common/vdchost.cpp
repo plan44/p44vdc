@@ -629,7 +629,7 @@ void VdcHost::initializeNextDevice(StatusCB aCompletedCB, DsDeviceMap::iterator 
     }
   }
   if (!someVisible && firstPublic) {
-    firstPublic->vdcFlags &= ~vdcflag_hidewhenempty; // temporarily show this vdc to avoid webui getting unreachable from dS
+    firstPublic->mVdcFlags &= ~vdcflag_hidewhenempty; // temporarily show this vdc to avoid webui getting unreachable from dS
   }
 }
 

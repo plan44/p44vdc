@@ -117,43 +117,43 @@ namespace p44 {
     friend class LocalController;
 
     NotificationDeliveryState(Vdc &aVdc) :
-      vdc(aVdc),
-      delivering(false),
-      callType(ntfy_undefined),
-      optimizedType(ntfy_undefined),
-      contentId(0),
-      contentsHash(0),
-      actionParam(0),
-      actionVariant(0),
-      repeatAfter(Never),
-      repeatVariant(0),
-      pendingCount(0),
-      optimizeHint(undefined)
+      mVdc(aVdc),
+      mDelivering(false),
+      mCallType(ntfy_undefined),
+      mOptimizedType(ntfy_undefined),
+      mContentId(0),
+      mContentsHash(0),
+      mActionParam(0),
+      mActionVariant(0),
+      mRepeatAfter(Never),
+      mRepeatVariant(0),
+      mPendingCount(0),
+      mOptimizeHint(undefined)
     {};
 
     ~NotificationDeliveryState();
 
-    Vdc &vdc;
+    Vdc &mVdc;
 
-    bool delivering; ///< set when delivery is actually underway (and must report completion when deleted). Repeated actions are not "delivering"
-    DsAddressablesList audience; ///< remaining devices to be prepared
-    string affectedDevicesHash; ///< binary string hash, represents the set of affected devices, to be matched against known sets for optimisation
-    int contentId; ///< this represents the ID of the content, such a scene number
-    uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
-    NotificationType callType; ///< type of notification as originally called
-    Tristate optimizeHint; ///< if not undefined, this requests or prevents optimisation of the called scene (when possible)
+    bool mDelivering; ///< set when delivery is actually underway (and must report completion when deleted). Repeated actions are not "delivering"
+    DsAddressablesList mAudience; ///< remaining devices to be prepared
+    string mAffectedDevicesHash; ///< binary string hash, represents the set of affected devices, to be matched against known sets for optimisation
+    int mContentId; ///< this represents the ID of the content, such a scene number
+    uint64_t mContentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
+    NotificationType mCallType; ///< type of notification as originally called
+    Tristate mOptimizeHint; ///< if not undefined, this requests or prevents optimisation of the called scene (when possible)
 
   public:
 
-    VdcApiConnectionPtr connection; ///< the connection the notification originates from
-    DeviceList affectedDevices; ///< the list of devices that are included in the hash
-    size_t pendingCount; ///< count used to count completed devices in some operations on affectedDevices
-    ApiValuePtr callParams; ///< the notification parameters
-    int actionParam; ///< parameter for the action (such as dim channel)
-    int actionVariant; ///< variant of the action (such as dim up/down/stop)
-    MLMicroSeconds repeatAfter; ///< if>0: native action is repeated after this time with variant repeatVariant
-    int repeatVariant; ///< variant/parameter for the action when repeating it (such as dim stop)
-    NotificationType optimizedType; ///< the type that results (callScene might result in dimming...)
+    VdcApiConnectionPtr mConnection; ///< the connection the notification originates from
+    DeviceList mAffectedDevices; ///< the list of devices that are included in the hash
+    size_t mPendingCount; ///< count used to count completed devices in some operations on affectedDevices
+    ApiValuePtr mCallParams; ///< the notification parameters
+    int mActionParam; ///< parameter for the action (such as dim channel)
+    int mActionVariant; ///< variant of the action (such as dim up/down/stop)
+    MLMicroSeconds mRepeatAfter; ///< if>0: native action is repeated after this time with variant repeatVariant
+    int mRepeatVariant; ///< variant/parameter for the action when repeating it (such as dim stop)
+    NotificationType mOptimizedType; ///< the type that results (callScene might result in dimming...)
   };
   typedef boost::intrusive_ptr<NotificationDeliveryState> NotificationDeliveryStatePtr;
   typedef std::list<NotificationDeliveryStatePtr> NotificationDeliveryStateList;
@@ -170,19 +170,19 @@ namespace p44 {
   public:
 
     // identification
-    NotificationType type; ///< type of notification
-    int numberOfDevices; ///< number of affected devices (for evaluating importance of optimizing that)
-    string affectedDevicesHash; ///< binary string hash, represents the set of affected devices
-    int contentId; ///< this represents the ID of the content, such a scene number
-    uint64_t contentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
+    NotificationType mType; ///< type of notification
+    int mNumberOfDevices; ///< number of affected devices (for evaluating importance of optimizing that)
+    string mAffectedDevicesHash; ///< binary string hash, represents the set of affected devices
+    int mContentId; ///< this represents the ID of the content, such a scene number
+    uint64_t mContentsHash; ///< this FNV64 hash represents the contents of all affected device's scenes (for callScene)
 
     // native action
-    string nativeActionId; ///< the identifier for the native action (e.g. scene or group name)
-    MLMicroSeconds lastNativeChange; ///< last time when native action was updated (to prevent too many updates too quickly)
+    string mNativeActionId; ///< the identifier for the native action (e.g. scene or group name)
+    MLMicroSeconds mLastNativeChange; ///< last time when native action was updated (to prevent too many updates too quickly)
 
     // statistics
-    long numCalls; ///< overall number of calls for this entry (persistent for entries with assigned native action)
-    MLMicroSeconds lastUse; ///< time of last use (
+    long mNumCalls; ///< overall number of calls for this entry (persistent for entries with assigned native action)
+    MLMicroSeconds mLastUse; ///< time of last use (
 
     // @return number of previous calls, weighted down by time of last use
     long timeWeightedCallCount();
@@ -222,37 +222,37 @@ namespace p44 {
     friend class VdcHost;
     friend class NotificationDeliveryState;
 
-    int instanceNumber; ///< the instance number identifying this instance among other instances of this class
-    int tag; ///< tag used to in self test failures for showing on LEDs
-    MLTicket pairTicket; ///< used for pairing
+    int mInstanceNumber; ///< the instance number identifying this instance among other instances of this class
+    int mTag; ///< tag used to in self test failures for showing on LEDs
+    MLTicket mPairTicket; ///< used for pairing
 
     /// Settings
-    VdcFlags vdcFlags; ///< generic vdc flag word
-    DsZoneID defaultZoneID; ///< default dS zone ID
+    VdcFlags mVdcFlags; ///< generic vdc flag word
+    DsZoneID mDefaultZoneID; ///< default dS zone ID
 
     /// periodic rescan, collecting
-    MLMicroSeconds rescanInterval; ///< rescan interval, 0 if none
-    RescanMode rescanMode; ///< mode to use for periodic rescan
-    MLTicket rescanTicket; ///< rescan ticket
-    MLTicket identifyTicket; ///< identification ticket
-    bool collecting; ///< currently collecting
+    MLMicroSeconds mRescanInterval; ///< rescan interval, 0 if none
+    RescanMode mRescanMode; ///< mode to use for periodic rescan
+    MLTicket mRescanTicket; ///< rescan ticket
+    MLTicket mIdentifyTicket; ///< identification ticket
+    bool mCollecting; ///< currently collecting
 
     /// notification optimizing
-    NotificationDeliveryStateList pendingDeliveries; ///< pending deliveries
-    OptimizerEntryList optimizerCache; ///< the current optimizer cache
-    long totalOptimizableCalls; ///< total of optimizable calls
-    MLTicket optimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
-    bool delivering; ///< set while the delivery/optimization process is running
-    ErrorPtr vdcErr; ///< global error, set when something prevents or limits the vdc from working
+    NotificationDeliveryStateList mPendingDeliveries; ///< pending deliveries
+    OptimizerEntryList mOptimizerCache; ///< the current optimizer cache
+    long mTotalOptimizableCalls; ///< total of optimizable calls
+    MLTicket mOptimizedCallRepeaterTicket; ///< vdc-level ticket for auto-repeating a call (e.g. dim stop)
+    bool mDelivering; ///< set while the delivery/optimization process is running
+    ErrorPtr mVdcErr; ///< global error, set when something prevents or limits the vdc from working
 
   protected:
   
-    DeviceVector devices; ///< the devices of this class
-    OptimizerMode optimizerMode; ///< the optimizer mode
-    int minDevicesForOptimizing; ///< how many devices are needed for optimized scenes/dimming
-    int minCallsBeforeOptimizing; ///< how many calls before optimizer tries creating scene/group
-    int maxOptimizerScenes; ///< how many native scenes might be used for the optimizer (actual HW limit might be different)
-    int maxOptimizerGroups; ///< how many native groups might be used for the optimizer (actual HW limit might be different)
+    DeviceVector mDevices; ///< the devices of this class
+    OptimizerMode mOptimizerMode; ///< the optimizer mode
+    int mMinDevicesForOptimizing; ///< how many devices are needed for optimized scenes/dimming
+    int mMinCallsBeforeOptimizing; ///< how many calls before optimizer tries creating scene/group
+    int mMaxOptimizerScenes; ///< how many native scenes might be used for the optimizer (actual HW limit might be different)
+    int mMaxOptimizerGroups; ///< how many native groups might be used for the optimizer (actual HW limit might be different)
 
   public:
 
@@ -285,13 +285,13 @@ namespace p44 {
 		const char *getPersistentDataDir();
 
     /// get the tag
-    int getTag() const { return tag; };
+    int getTag() const { return mTag; };
 
     /// get number of devices
-    size_t getNumberOfDevices() const { return devices.size(); };
+    size_t getNumberOfDevices() const { return mDevices.size(); };
 
     /// get vDC status/error
-    ErrorPtr getVdcErr() { return vdcErr; }
+    ErrorPtr getVdcErr() { return mVdcErr; }
 
     /// @}
 		
@@ -352,7 +352,7 @@ namespace p44 {
     void scheduleRecollect(RescanMode aRescanMode, MLMicroSeconds aDelay);
 
     /// @return true if vdc is currently collecting (scanning for) devices
-    bool isCollecting() { return collecting; };
+    bool isCollecting() { return mCollecting; };
 
     /// handle global events
     /// @param aEvent the event to handle
@@ -360,7 +360,7 @@ namespace p44 {
 
     /// set vdc-global error
     /// @param aVdcError if NotOK, vdc cannot collect devices any more (or at all)
-    void setVdcError(ErrorPtr aVdcError) { vdcErr = aVdcError; };
+    void setVdcError(ErrorPtr aVdcError) { mVdcErr = aVdcError; };
 
     #if SELFTESTING_ENABLED
     /// perform self test
@@ -595,7 +595,7 @@ namespace p44 {
 
     /// @param aFlagMask mask for flag to check, see VdcFlag type and related enum
     /// @return state of a vdc flag
-    bool getVdcFlag(VdcFlags aFlagMask) { return (vdcFlags & aFlagMask)!=0; }
+    bool getVdcFlag(VdcFlags aFlagMask) { return (mVdcFlags & aFlagMask)!=0; }
 
   protected:
 
@@ -613,7 +613,7 @@ namespace p44 {
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
-    void setVdcFlag(VdcFlags aFlagMask, bool aNewValue) { setPVar(vdcFlags, (vdcFlags & ~aFlagMask) | (aNewValue ? aFlagMask : 0)); }
+    void setVdcFlag(VdcFlags aFlagMask, bool aNewValue) { setPVar(mVdcFlags, (mVdcFlags & ~aFlagMask) | (aNewValue ? aFlagMask : 0)); }
 
     // derive dSUID
     void deriveDsUid();

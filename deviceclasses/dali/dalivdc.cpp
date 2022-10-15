@@ -39,9 +39,9 @@ DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   mDaliComm.setBridgeEventHandler(boost::bind(&DaliVdc::daliEventHandler, this, _1, _2, _3));
   #endif
   // set default optimisation mode
-  optimizerMode = opt_disabled; // FIXME: once we are confident, make opt_auto the default
-  maxOptimizerScenes = 16; // dummy, not really checked as HW limits this
-  maxOptimizerGroups = 16; // dummy, not really checked as HW limits this
+  mOptimizerMode = opt_disabled; // FIXME: once we are confident, make opt_auto the default
+  mMaxOptimizerScenes = 16; // dummy, not really checked as HW limits this
+  mMaxOptimizerGroups = 16; // dummy, not really checked as HW limits this
 }
 
 
@@ -229,8 +229,8 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 
 void DaliVdc::removeLightDevices(bool aForget)
 {
-  DeviceVector::iterator pos = devices.begin();
-  while (pos!=devices.end()) {
+  DeviceVector::iterator pos = mDevices.begin();
+  while (pos!=mDevices.end()) {
     DaliOutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
     if (dev) {
       // inform upstream about these devices going offline now (if API connection is up at all at this time)
@@ -238,7 +238,7 @@ void DaliVdc::removeLightDevices(bool aForget)
       // now actually remove
       getVdcHost().removeDevice(dev, aForget);
       // erase from list
-      pos = devices.erase(pos);
+      pos = mDevices.erase(pos);
     }
     else {
       // skip non-outputs
@@ -840,7 +840,7 @@ bool DaliVdc::daliAddressSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo)
 
 bool DaliVdc::daliBusDeviceSummary(DaliAddress aDaliAddress, ApiValuePtr aInfo)
 {
-  for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+  for (DeviceVector::iterator pos = mDevices.begin(); pos!=mDevices.end(); ++pos) {
     DaliOutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
     if (dev) {
       if (dev->daliBusDeviceSummary(aDaliAddress, aInfo)) {
@@ -925,7 +925,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         memberUID.setAsBinary(o->binaryValue());
         bool deviceFound = false;
         // search for this device
-        for (DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+        for (DeviceVector::iterator pos = mDevices.begin(); pos!=mDevices.end(); ++pos) {
           // only non-composite DALI devices can be grouped at all
           DaliOutputDevicePtr dev = boost::dynamic_pointer_cast<DaliOutputDevice>(*pos);
           if (dev && dev->daliTechnicalType()!=dalidevice_composite && dev->getDsUid() == memberUID) {
@@ -1160,12 +1160,12 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
 {
   DaliAddress a = daliAddressFromActionId(aNativeActionId);
   if (a!=NoDaliAddress) {
-    if (aDeliveryState->optimizedType==ntfy_callscene) {
+    if (aDeliveryState->mOptimizedType==ntfy_callscene) {
       mGroupDimTicket.cancel(); // just safety, should be cancelled already
       // set fade time according to scene transition time (usually: already ok, so no time wasted)
       // note: dalicomm will make sure the fade time adjustments are sent before the scene call
       bool needDT8Activation = false;
-      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+      for (DeviceList::iterator pos = aDeliveryState->mAffectedDevices.begin(); pos!=aDeliveryState->mAffectedDevices.end(); ++pos) {
         DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
         if (dev && dev->mDaliController) {
           dev->mDaliController->setTransitionTime(dev->transitionTimeForPreparedScene(true)); // including override value
@@ -1187,18 +1187,18 @@ void DaliVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId,
       }
       return;
     }
-    else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    else if (aDeliveryState->mOptimizedType==ntfy_dimchannel) {
       // Dim group
       // - get mode
-      VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
+      VdcDimMode dm = (VdcDimMode)aDeliveryState->mActionVariant;
       OLOG(LOG_INFO,
         "optimized group dimming (DALI): 'brightness' %s",
         dm==dimmode_stop ? "STOPS dimming" : (dm==dimmode_up ? "starts dimming UP" : "starts dimming DOWN")
       );
       // - prepare dimming in all affected devices, i.e. check fade rate (usually: already ok, so no time wasted)
       // note: we let all devices do this in parallel, continue when last device reports done
-      aDeliveryState->pendingCount = aDeliveryState->affectedDevices.size(); // must be set before calling executePreparedOperation() the first time
-      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+      aDeliveryState->mPendingCount = aDeliveryState->mAffectedDevices.size(); // must be set before calling executePreparedOperation() the first time
+      for (DeviceList::iterator pos = aDeliveryState->mAffectedDevices.begin(); pos!=aDeliveryState->mAffectedDevices.end(); ++pos) {
         DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
         if (dev && dev->mDaliController) {
           // prepare
@@ -1217,12 +1217,12 @@ void DaliVdc::groupDimPrepared(StatusCB aStatusCB, DaliAddress aDaliAddress, Not
   if (Error::notOK(aError)) {
     OLOG(LOG_WARNING, "Error while preparing device for group dimming: %s", aError->text());
   }
-  if (--aDeliveryState->pendingCount>0) {
+  if (--aDeliveryState->mPendingCount>0) {
     FOCUSOLOG("waiting for all affected devices to confirm dim preparation: %d/%d remaining", aDeliveryState->pendingCount, aDeliveryState->affectedDevices.size());
     return; // not all confirmed yet
   }
   // now issue dimming command to group
-  VdcDimMode dm = (VdcDimMode)aDeliveryState->actionVariant;
+  VdcDimMode dm = (VdcDimMode)aDeliveryState->mActionVariant;
   if (dm==dimmode_stop) {
     // stop dimming
     // - cancel repeater ticket
@@ -1261,7 +1261,7 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
 {
   ErrorPtr err;
   DaliAddress a = NoDaliAddress;
-  if (aOptimizerEntry->type==ntfy_callscene) {
+  if (aOptimizerEntry->mType==ntfy_callscene) {
     // need a free scene
     for (int s=0; s<16; s++) {
       if ((mUsedDaliScenesMask & (1<<s))==0) {
@@ -1270,7 +1270,7 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
       }
     }
   }
-  else if (aOptimizerEntry->type==ntfy_dimchannel) {
+  else if (aOptimizerEntry->mType==ntfy_dimchannel) {
     // need a free group
     for (int g=0; g<16; g++) {
       if ((mUsedDaliGroupsMask & (1<<g))==0) {
@@ -1280,35 +1280,35 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
     }
   }
   else {
-    err = TextError::err("cannot create new DALI native action for type=%d", (int)aOptimizerEntry->type);
+    err = TextError::err("cannot create new DALI native action for type=%d", (int)aOptimizerEntry->mType);
   }
   if (a==NoDaliAddress) {
     err = Error::err<VdcError>(VdcError::NoMoreActions, "DALI: no free scene or group available");
   }
   else {
     markUsed(a, true);
-    aOptimizerEntry->nativeActionId = actionIdFromDaliAddress(a);
-    aOptimizerEntry->lastNativeChange = MainLoop::now();
-    OLOG(LOG_INFO,"creating action '%s' (DaliAddress=0x%02X)", aOptimizerEntry->nativeActionId.c_str(), a);
-    if (aDeliveryState->optimizedType==ntfy_callscene) {
+    aOptimizerEntry->mNativeActionId = actionIdFromDaliAddress(a);
+    aOptimizerEntry->mLastNativeChange = MainLoop::now();
+    OLOG(LOG_INFO,"creating action '%s' (DaliAddress=0x%02X)", aOptimizerEntry->mNativeActionId.c_str(), a);
+    if (aDeliveryState->mOptimizedType==ntfy_callscene) {
       // make sure no old scene settings remain in any device -> broadcast DALICMD_REMOVE_FROM_SCENE
       mDaliComm.daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_SCENE+(a&DaliSceneMask));
       // now update this scene's values
       updateNativeAction(aStatusCB, aOptimizerEntry, aDeliveryState);
       return;
     }
-    else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+    else if (aDeliveryState->mOptimizedType==ntfy_dimchannel) {
       // Make sure no old group settings remain -> broadcast DALICMD_REMOVE_FROM_GROUP
       mDaliComm.daliSendConfigCommand(DaliBroadcast, DALICMD_REMOVE_FROM_GROUP+(a&DaliGroupMask));
       // now create new group -> for each affected device sent DALICMD_ADD_TO_GROUP
-      for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+      for (DeviceList::iterator pos = aDeliveryState->mAffectedDevices.begin(); pos!=aDeliveryState->mAffectedDevices.end(); ++pos) {
         DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
         if (dev && dev->mDaliController) {
           mDaliComm.daliSendConfigCommand(dev->mDaliController->mDeviceInfo->mShortAddress, DALICMD_ADD_TO_GROUP+(a&DaliGroupMask));
         }
       }
     }
-    aOptimizerEntry->lastNativeChange = MainLoop::now();
+    aOptimizerEntry->mLastNativeChange = MainLoop::now();
   }
   aStatusCB(err);
 }
@@ -1316,11 +1316,11 @@ void DaliVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
 
 void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState)
 {
-  DaliAddress a = daliAddressFromActionId(aOptimizerEntry->nativeActionId);
-  if ((a&DaliScene) && aDeliveryState->optimizedType==ntfy_callscene) {
+  DaliAddress a = daliAddressFromActionId(aOptimizerEntry->mNativeActionId);
+  if ((a&DaliScene) && aDeliveryState->mOptimizedType==ntfy_callscene) {
     // now store scene values -> for each affected device send DALICMD_STORE_DTR_AS_SCENE
     // Note: we can do this immediately even if transitions might be running, because we store the locally known scene values
-    for (DeviceList::iterator pos = aDeliveryState->affectedDevices.begin(); pos!=aDeliveryState->affectedDevices.end(); ++pos) {
+    for (DeviceList::iterator pos = aDeliveryState->mAffectedDevices.begin(); pos!=aDeliveryState->mAffectedDevices.end(); ++pos) {
       DaliSingleControllerDevicePtr dev = boost::dynamic_pointer_cast<DaliSingleControllerDevice>(*pos);
       if (dev && dev->mDaliController) {
         LightBehaviourPtr l = dev->getOutput<LightBehaviour>();
@@ -1344,11 +1344,11 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
     }
     // done
     OLOG(LOG_INFO,"updated DALI scene #%d", a&DaliSceneMask);
-    aOptimizerEntry->lastNativeChange = MainLoop::now();
+    aOptimizerEntry->mLastNativeChange = MainLoop::now();
     aStatusCB(ErrorPtr());
     return;
   }
-  aStatusCB(TextError::err("cannot update DALI native action for type=%d", (int)aOptimizerEntry->type));
+  aStatusCB(TextError::err("cannot update DALI native action for type=%d", (int)aOptimizerEntry->mType));
 }
 
 
@@ -1534,7 +1534,7 @@ void DaliVdc::daliEventHandler(uint8_t aEvent, uint8_t aData1, uint8_t aData2)
   if (aEvent==EVENT_CODE_FOREIGN_FRAME && aData1==DALICMD_PING && aData2==0) {
     LOG(LOG_WARNING, "DALI: another bus master is using this bus -> NOT SUPPORTED!");
   }
-  for(DeviceVector::iterator pos = devices.begin(); pos!=devices.end(); ++pos) {
+  for(DeviceVector::iterator pos = mDevices.begin(); pos!=mDevices.end(); ++pos) {
     DaliInputDevicePtr inputDev = boost::dynamic_pointer_cast<DaliInputDevice>(*pos);
     if (inputDev) {
       if (inputDev->checkDaliEvent(aEvent, aData1, aData2))

@@ -984,23 +984,23 @@ static SceneNo offSceneForArea(int aArea)
 void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliveryStatePtr aDeliveryState)
 {
   ErrorPtr err;
-  if (aDeliveryState->callType==ntfy_callscene) {
+  if (aDeliveryState->mCallType==ntfy_callscene) {
     // call scene
     ApiValuePtr o;
-    if (Error::isOK(err = checkParam(aDeliveryState->callParams, "scene", o))) {
+    if (Error::isOK(err = checkParam(aDeliveryState->mCallParams, "scene", o))) {
       SceneNo sceneNo = (SceneNo)o->int32Value();
       bool force = false;
       // check for custom transition time
       MLMicroSeconds transitionTimeOverride = Infinite; // none
-      o = aDeliveryState->callParams->get("transitionTime");
+      o = aDeliveryState->mCallParams->get("transitionTime");
       if (o) {
         transitionTimeOverride = o->doubleValue()*Second;
       }
       // check for force flag
-      if (Error::isOK(err = checkParam(aDeliveryState->callParams, "force", o))) {
+      if (Error::isOK(err = checkParam(aDeliveryState->mCallParams, "force", o))) {
         force = o->boolValue();
         // set the channel type as actionParam
-        aDeliveryState->actionParam = channeltype_brightness; // legacy dimming (i.e. dimming via scene calls) is ALWAYS brightness
+        aDeliveryState->mActionParam = channeltype_brightness; // legacy dimming (i.e. dimming via scene calls) is ALWAYS brightness
         // prepare scene call
         callScenePrepare(aPreparedCB, sceneNo, force, transitionTimeOverride);
         return;
@@ -1010,25 +1010,25 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
       OLOG(LOG_WARNING, "callScene error: %s", err->text());
     }
   }
-  else if (aDeliveryState->callType==ntfy_dimchannel) {
+  else if (aDeliveryState->mCallType==ntfy_dimchannel) {
     // start or stop dimming a channel
     ApiValuePtr o;
     ChannelBehaviourPtr channel;
-    if (Error::isOK(err = checkChannel(aDeliveryState->callParams, channel))) {
-      if (Error::isOK(err = checkParam(aDeliveryState->callParams, "mode", o))) {
+    if (Error::isOK(err = checkChannel(aDeliveryState->mCallParams, channel))) {
+      if (Error::isOK(err = checkParam(aDeliveryState->mCallParams, "mode", o))) {
         // mode
         int mode = o->int32Value();
         // area
         int area = 0;
-        o = aDeliveryState->callParams->get("area");
+        o = aDeliveryState->mCallParams->get("area");
         if (o) area = o->int32Value();
         // check for custom dimming rate
         double dimPerMSOverride = 0; // none
-        o = aDeliveryState->callParams->get("dimPerMS");
+        o = aDeliveryState->mCallParams->get("dimPerMS");
         if (o) {
           dimPerMSOverride = o->doubleValue();
         }
-        o = aDeliveryState->callParams->get("fullRangeTime");
+        o = aDeliveryState->mCallParams->get("fullRangeTime");
         if (o) {
           double v = o->doubleValue();
           if (v>0) {
@@ -1037,10 +1037,10 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         }
         // autostop of dimming (localcontroller may want to prevent that)
         bool autostop = true;
-        o = aDeliveryState->callParams->get("autostop");
+        o = aDeliveryState->mCallParams->get("autostop");
         if (o) autostop = o->boolValue();
         // set the channel type as actionParam
-        aDeliveryState->actionParam = channel->getChannelType();
+        aDeliveryState->mActionParam = channel->getChannelType();
         // prepare starting or stopping dimming
         dimChannelForAreaPrepare(
           aPreparedCB,
@@ -1063,7 +1063,7 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
 
 void Device::optimizerRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState)
 {
-  if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+  if (aDeliveryState->mOptimizedType==ntfy_dimchannel) {
     dimRepeatPrepare(aDeliveryState);
   }
 }
@@ -1093,27 +1093,27 @@ void Device::releasePreparedOperation()
 
 bool Device::updateDeliveryState(NotificationDeliveryStatePtr aDeliveryState, bool aForOptimisation)
 {
-  if (aDeliveryState->optimizedType==ntfy_callscene) {
+  if (aDeliveryState->mOptimizedType==ntfy_callscene) {
     if (!mPreparedScene) return false; // no prepared scene -> not part of optimized set
-    aDeliveryState->contentId = mPreparedScene->mSceneNo; // to re-identify the scene (the contents might have changed...)
+    aDeliveryState->mContentId = mPreparedScene->mSceneNo; // to re-identify the scene (the contents might have changed...)
     if (aForOptimisation && prepareForOptimizedSet(aDeliveryState)) {
       // content hash must represent the contents of the called scenes in all affected devices
       Fnv64 sh(mPreparedScene->sceneHash());
       if (sh.getHash()==0) return false; // scene not hashable -> not part of optimized set
       sh.addString(mDSUID.getBinary()); // add device dSUID to make it "mixable" (i.e. combine into one hash via XOR in any order)
-      aDeliveryState->contentsHash ^= sh.getHash(); // mix
+      aDeliveryState->mContentsHash ^= sh.getHash(); // mix
       return true;
     }
   }
-  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+  else if (aDeliveryState->mOptimizedType==ntfy_dimchannel) {
     if (!mPreparedDim) return false; // no prepared scene -> not part of optimized set
-    aDeliveryState->contentId = 0; // no different content ids
-    aDeliveryState->actionVariant = mCurrentDimMode; // to actually apply the dim mode to the optimized group later
-    aDeliveryState->actionParam = mCurrentDimChannel ? mCurrentDimChannel->getChannelType() : channeltype_default;
+    aDeliveryState->mContentId = 0; // no different content ids
+    aDeliveryState->mActionVariant = mCurrentDimMode; // to actually apply the dim mode to the optimized group later
+    aDeliveryState->mActionParam = mCurrentDimChannel ? mCurrentDimChannel->getChannelType() : channeltype_default;
     if (aForOptimisation && prepareForOptimizedSet(aDeliveryState)) {
       if (mCurrentDimMode!=dimmode_stop) {
-        aDeliveryState->repeatVariant = dimmode_stop; // auto-stop
-        aDeliveryState->repeatAfter = mCurrentAutoStopTime; // after this time
+        aDeliveryState->mRepeatVariant = dimmode_stop; // auto-stop
+        aDeliveryState->mRepeatAfter = mCurrentAutoStopTime; // after this time
       }
       return true;
     }
@@ -1127,8 +1127,8 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
   bool include = updateDeliveryState(aDeliveryState, true);
   if (include) {
     // the device must be added to the device hash
-    mDSUID.xorDsUidIntoMix(aDeliveryState->affectedDevicesHash, true); // subdevice-safe mixing
-    aDeliveryState->affectedDevices.push_back(DevicePtr(this));
+    mDSUID.xorDsUidIntoMix(aDeliveryState->mAffectedDevicesHash, true); // subdevice-safe mixing
+    aDeliveryState->mAffectedDevices.push_back(DevicePtr(this));
     return true;
   }
   // by default: no optimisation

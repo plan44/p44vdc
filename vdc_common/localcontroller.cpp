@@ -1750,11 +1750,11 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
   ZoneDescriptorPtr zone = mLocalZones.getZoneById(aDevice->getZoneID(), false);
   if (zone && aDevice->getOutput()) {
     DsGroupMask affectedGroups = aDevice->getOutput()->groupMemberships();
-    if (aDeliveryState.optimizedType==ntfy_callscene) {
+    if (aDeliveryState.mOptimizedType==ntfy_callscene) {
       // scene call
       for (int g = group_undefined; affectedGroups; affectedGroups>>=1, ++g) {
         if (affectedGroups & 1) {
-          SceneIdentifier calledScene(aDeliveryState.contentId, zone->getZoneId(), (DsGroup)g);
+          SceneIdentifier calledScene(aDeliveryState.mContentId, zone->getZoneId(), (DsGroup)g);
           // general
           int area = SimpleScene::areaForScene(calledScene.mSceneNo);
           if (calledScene.getKindFlags()&scene_off) {
@@ -1787,11 +1787,11 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
         }
       }
     }
-    else if (aDeliveryState.optimizedType==ntfy_dimchannel) {
+    else if (aDeliveryState.mOptimizedType==ntfy_dimchannel) {
       // dimming
-      if (aDeliveryState.actionVariant!=dimmode_stop) {
-        zone->mZoneState.mLastDimChannel = (DsChannelType)aDeliveryState.actionParam;
-        zone->mZoneState.mLastDim = (VdcDimMode)aDeliveryState.actionVariant;
+      if (aDeliveryState.mActionVariant!=dimmode_stop) {
+        zone->mZoneState.mLastDimChannel = (DsChannelType)aDeliveryState.mActionParam;
+        zone->mZoneState.mLastDim = (VdcDimMode)aDeliveryState.mActionVariant;
       }
     }
     LOG(LOG_INFO,

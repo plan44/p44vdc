@@ -234,12 +234,12 @@ bool HueDevice::prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliverySta
 {
   // in general, we don't optimize for APIs before 1.11
   if (!hueVdc().mHas_1_11_api) return false;
-  if (aDeliveryState->optimizedType==ntfy_callscene) {
+  if (aDeliveryState->mOptimizedType==ntfy_callscene) {
     // scenes are generally optimizable, unless there is a transition time override
     // TODO: remove the condition once hue bridge allows overriding scene transition times
     return transitionTimeOverride()==Infinite;
   }
-  else if (aDeliveryState->optimizedType==ntfy_dimchannel) {
+  else if (aDeliveryState->mOptimizedType==ntfy_dimchannel) {
     // only brightness, saturation and hue dimming is optimizable for now
     return
       mCurrentDimChannel && // actually prepared for dimming
