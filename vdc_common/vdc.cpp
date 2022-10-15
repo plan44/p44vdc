@@ -297,9 +297,11 @@ void Vdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectio
   }
   else {
     // not a specially handled/optimized notification: just let every device handle it individually
+    OLOG(LOG_INFO, "===== '%s' one-by-one delivery to %lu devices starts now", aNotification.c_str(), aAudience.size());
     for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
       (*apos)->handleNotificationFromConnection(aApiConnection, aNotification, aParams, NoOP);
     }
+    OLOG(LOG_INFO, "===== '%s' one-by-one delivery complete", aNotification.c_str());
   }
 }
 
@@ -311,7 +313,7 @@ void Vdc::queueDelivery(NotificationDeliveryStatePtr aDeliveryState)
   if (mDelivering) {
     // queue for when current delivery is done
     mPendingDeliveries.push_back(aDeliveryState);
-    OLOG(LOG_INFO, "'%s' delivery queued (previous delivery still running) - now %lu queued deliveries", NotificationNames[aDeliveryState->mCallType], mPendingDeliveries.size());
+    OLOG(LOG_INFO, "'%s' grouped delivery queued (previous delivery still running) - now %lu queued deliveries", NotificationNames[aDeliveryState->mCallType], mPendingDeliveries.size());
     // now make sure delivery is not blocked by previous delivery waiting for long-running scene actions
     // Note: iterate only as long as still delivering 
     for (DeviceVector::iterator pos = mDevices.begin(); mDelivering && pos!=mDevices.end(); ++pos) {
@@ -320,7 +322,7 @@ void Vdc::queueDelivery(NotificationDeliveryStatePtr aDeliveryState)
   }
   else {
     // optimization - start right now
-    OLOG(LOG_INFO, "===== '%s' delivery to %lu devices starts now", NotificationNames[aDeliveryState->mCallType], aDeliveryState->mAudience.size());
+    OLOG(LOG_INFO, "===== '%s' grouped delivery to %lu devices starts now", NotificationNames[aDeliveryState->mCallType], aDeliveryState->mAudience.size());
     mDelivering = true;
     aDeliveryState->mDelivering = true;
     prepareNextNotification(aDeliveryState);
@@ -332,7 +334,7 @@ void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryState
 {
   // - done
   mDelivering = false;
-  OLOG(LOG_INFO, "===== '%s' delivery complete", NotificationNames[aDeliveryStateBeingDeleted.mCallType]);
+  OLOG(LOG_INFO, "===== '%s' grouped delivery complete", NotificationNames[aDeliveryStateBeingDeleted.mCallType]);
   // check for pending deliveries
   if (mPendingDeliveries.size()>0) {
     // get next from queue
@@ -341,7 +343,7 @@ void Vdc::notificationDeliveryComplete(NotificationDeliveryState &aDeliveryState
     //   because we rely on the NotificationDeliveryState's destructor to call us back here when done!
     mPendingDeliveries.pop_front();
     // - now start
-    OLOG(LOG_INFO, "===== '%s' queued delivery to %ld devices starts now", NotificationNames[nds->mCallType], nds->mAudience.size());
+    OLOG(LOG_INFO, "===== '%s' queued grouped delivery to %ld devices starts now", NotificationNames[nds->mCallType], nds->mAudience.size());
     mDelivering = true;
     nds->mDelivering = true;
     prepareNextNotification(nds);
