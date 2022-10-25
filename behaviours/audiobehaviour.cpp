@@ -558,7 +558,7 @@ void AudioBehaviour::stopSceneActions()
 
 
 
-void AudioBehaviour::identifyToUser()
+void AudioBehaviour::identifyToUser(MLMicroSeconds aDuration)
 {
   // blink effect?
   // TODO: %%% implement it, and change canIdentifyToUser() result when done

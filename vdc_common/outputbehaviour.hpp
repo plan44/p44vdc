@@ -239,9 +239,10 @@ namespace p44 {
     virtual bool processControlValue(const string &aName, double aValue) { return false; /* NOP in base class, no channels changed */ };
 
     /// identify the device to the user in a behaviour-specific way
+    /// @param aDuration if !=Never, this is how long the identification should be recognizable. If this is \<0, the identification should stop
     /// @note this is usually called by device's identifyToUser(), unless device has hardware (rather than behaviour)
     ///   specific implementation
-    virtual void identifyToUser() { /* NOP in base class */ };
+    virtual void identifyToUser(MLMicroSeconds aDuration) { /* NOP in base class */ };
 
     /// check if identifyToUser() has an actual implementation
     /// @return true if the addressable has a way to actually identify to the user (apart from a log message)

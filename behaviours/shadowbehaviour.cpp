@@ -852,18 +852,34 @@ void ShadowBehaviour::stopSceneActions()
 
 #define IDENTITY_MOVE_TIME (Second*1.5)
 
-void ShadowBehaviour::identifyToUser()
+void ShadowBehaviour::identifyToUser(MLMicroSeconds aDuration)
 {
-  VdcDimMode dimMode = position->getChannelValue()>50 ? dimmode_down : dimmode_up;
-  // move a little
-  mDevice.dimChannelForArea(mDevice.getChannelByIndex(0), dimMode, -1, IDENTITY_MOVE_TIME);
-  sequenceTicket.executeOnce(boost::bind(&ShadowBehaviour::reverseIdentify, this, dimMode==dimmode_up ? dimmode_down : dimmode_up), IDENTITY_MOVE_TIME*2);
+  sequenceTicket.cancel();
+  if (aDuration<0) {
+    // stop right now
+    mDevice.dimChannelForArea(mDevice.getChannelByIndex(0), dimmode_stop, -1, 0);
+  }
+  else {
+    // move a little (once or several times, depending on duration)
+    VdcDimMode dimMode = position->getChannelValue()>50 ? dimmode_down : dimmode_up;
+    int steps = (aDuration==Never ? 0 : aDuration/IDENTITY_MOVE_TIME/2)*2+1; // at least one repetition, forth and back
+    identifyStep(dimMode, steps);
+  }
 }
 
-
-void ShadowBehaviour::reverseIdentify(VdcDimMode aDimMode)
+void ShadowBehaviour::identifyStep(VdcDimMode aDimMode, int aRepetitions)
 {
   mDevice.dimChannelForArea(mDevice.getChannelByIndex(0), aDimMode, -1, IDENTITY_MOVE_TIME);
+  aRepetitions--;
+  if (aRepetitions<0) {
+    sequenceTicket.cancel();
+    return; // done
+  }
+  // again with reversed direction
+  sequenceTicket.executeOnce(
+    boost::bind(&ShadowBehaviour::identifyStep, this, aDimMode==dimmode_up ? dimmode_down : dimmode_up, aRepetitions),
+    IDENTITY_MOVE_TIME
+  );
 }
 
 

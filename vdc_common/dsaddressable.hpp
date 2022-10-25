@@ -414,9 +414,10 @@ namespace p44 {
     /// @}
 
     /// identify the addressable to the user in some way
+    /// @param aDuration if !=Never, this is how long the identification should be recognizable. If this is \<0, the identification should stop
     /// @note for lights, this would be blinking, for sound devices a beep, for moving devices (blinds) a short movement
     /// @note this base class just prints a log message
-    virtual void identifyToUser();
+    virtual void identifyToUser(MLMicroSeconds aDuration);
 
     /// check if identifyToUser() has an actual implementation
     /// @return true if the addressable has a way to actually identify to the user (apart from a log message)

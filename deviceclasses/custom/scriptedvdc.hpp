@@ -215,8 +215,9 @@ namespace p44 {
     virtual int getRescanModes() const P44_OVERRIDE { return rescanmode_exhaustive; }; // only exhaustive makes sense
 
     /// identify the vdc to the user in some way
+    /// @param aDuration if !=Never, this is how long the identification should be recognizable. If this is \<0, the identification should stop
     /// @note usually, this would be a LED or buzzer in the vdc device (bridge, gateway etc.)
-    virtual void identifyToUser() P44_OVERRIDE;
+    virtual void identifyToUser(MLMicroSeconds aDuration) P44_OVERRIDE;
 
     /// vdc level methods (p44 specific, JSON only, for configuring scripted devices)
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;

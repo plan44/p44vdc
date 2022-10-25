@@ -199,8 +199,9 @@ namespace p44 {
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// identify the external device to the user in some way
+    /// @param aDuration if !=Never, this is how long the identification should be recognizable. If this is \<0, the identification should stop
     /// @note for lights, this would be blinking, for sound devices a beep, for moving devices (blinds) a short movement
-    virtual void identifyToUser() P44_OVERRIDE;
+    virtual void identifyToUser(MLMicroSeconds aDuration) P44_OVERRIDE;
 
     /// check if identifyToUser() has an actual implementation
     virtual bool canIdentifyToUser() P44_OVERRIDE;

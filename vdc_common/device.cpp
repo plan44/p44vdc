@@ -1957,13 +1957,13 @@ void Device::callSceneMin(SceneNo aSceneNo)
 }
 
 
-void Device::identifyToUser()
+void Device::identifyToUser(MLMicroSeconds aDuration)
 {
   if (canIdentifyToUser()) {
-    mOutput->identifyToUser(); // pass on to behaviour by default
+    mOutput->identifyToUser(aDuration); // pass on to behaviour by default
   }
   else {
-    inherited::identifyToUser();
+    inherited::identifyToUser(aDuration);
   }
 }
 

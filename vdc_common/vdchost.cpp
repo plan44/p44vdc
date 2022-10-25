@@ -206,10 +206,10 @@ void VdcHost::setEventMonitor(VdchostEventCB aEventCB)
 }
 
 
-void VdcHost::identifyToUser()
+void VdcHost::identifyToUser(MLMicroSeconds aDuration)
 {
   postEvent(vdchost_identify); // send out signal anyway
-  if (!canIdentifyToUser()) inherited::identifyToUser(); // make sure it is at least logged
+  if (!canIdentifyToUser()) inherited::identifyToUser(aDuration); // make sure it is at least logged
 }
 
 

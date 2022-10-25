@@ -565,7 +565,7 @@ void VideoBehaviour::stopSceneActions()
 
 
 
-void VideoBehaviour::identifyToUser()
+void VideoBehaviour::identifyToUser(MLMicroSeconds aDuration)
 {
   // blink effect?
   // TODO: %%% implement it, and change canIdentifyToUser() result when done

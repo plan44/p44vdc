@@ -340,7 +340,8 @@ namespace p44 {
     virtual void stopSceneActions() P44_OVERRIDE;
 
     /// identify the device to the user by moving shade a little
-    virtual void identifyToUser() P44_OVERRIDE;
+    /// @param aDuration if !=Never, this is how long the identification should be recognizable. If this is \<0, the identification should stop
+    virtual void identifyToUser(MLMicroSeconds aDuration) P44_OVERRIDE;
 
     /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
     virtual bool canIdentifyToUser() P44_OVERRIDE { return true; }
@@ -406,7 +407,7 @@ namespace p44 {
     void endMove(MLMicroSeconds aRemainingMoveTime, SimpleCB aApplyDoneCB);
     void movePaused(MLMicroSeconds aRemainingMoveTime, SimpleCB aApplyDoneCB);
 
-    void reverseIdentify(VdcDimMode aDimMode);
+    void identifyStep(VdcDimMode aDimMode, int aRepetitions);
 
   };
 

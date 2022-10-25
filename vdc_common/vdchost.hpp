@@ -655,7 +655,8 @@ namespace p44 {
     void signalActivity();
 
     /// identify the vdchost to the user
-    virtual void identifyToUser() P44_OVERRIDE;
+    /// @param aDuration if !=Never, this is how long the identification should be recognizable. If this is \<0, the identification should stop
+    virtual void identifyToUser(MLMicroSeconds aDuration) P44_OVERRIDE;
 
     /// @return true if the vdchost has a way to actually identify to the user (apart from a log message)
     virtual bool canIdentifyToUser() P44_OVERRIDE;

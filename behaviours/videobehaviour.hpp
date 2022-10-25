@@ -219,7 +219,8 @@ namespace p44 {
     virtual bool canDim(ChannelBehaviourPtr aChannel) P44_OVERRIDE;
 
     /// identify the device to the user in a behaviour-specific way
-    virtual void identifyToUser() P44_OVERRIDE;
+    /// @param aDuration if !=Never, this is how long the identification should be recognizable. If this is \<0, the identification should stop. If this is \<0, the identification should stop
+    virtual void identifyToUser(MLMicroSeconds aDuration=Never) P44_OVERRIDE;
 
     /// @return true if the addressable has a way to actually identify to the user (apart from a log message)
     virtual bool canIdentifyToUser() P44_OVERRIDE { return false; } // TODO: implement identifyToUser() some way...

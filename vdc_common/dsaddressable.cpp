@@ -367,8 +367,13 @@ void DsAddressable::handleNotification(const string &aNotification, ApiValuePtr 
   }
   else if (aNotification=="identify") {
     // identify to user
-    OLOG(LOG_NOTICE, "Identify");
-    identifyToUser();
+    // optional duration
+    MLMicroSeconds duration = Never; // default
+    if (ApiValuePtr a = aParams->get("duration")) {
+      duration = a->doubleValue()*Second;
+    }
+    OLOG(LOG_NOTICE, "Identify, duration=%.2f (0=default)", (double)duration/Second);
+    identifyToUser(duration);
   }
   else {
     // unknown notification
@@ -380,7 +385,7 @@ void DsAddressable::handleNotification(const string &aNotification, ApiValuePtr 
 }
 
 
-void DsAddressable::identifyToUser()
+void DsAddressable::identifyToUser(MLMicroSeconds aDuration)
 {
   OLOG(LOG_WARNING, "***** 'identify' called (but addressable does not have a hardware implementation for it)");
 }

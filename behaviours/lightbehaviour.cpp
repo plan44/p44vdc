@@ -291,10 +291,17 @@ void LightBehaviour::stopSceneActions()
 
 
 
-void LightBehaviour::identifyToUser()
+void LightBehaviour::identifyToUser(MLMicroSeconds aDuration)
 {
-  // simple, non-parametrized blink, 6 seconds, 1.5 second period, 0.75 second on
-  blink(6*Second, LightScenePtr(), NoOP, 1.5*Second, 50);
+  if (aDuration<0) {
+    // stop identification
+    stopBlink();
+  }
+  else {
+    // simple, non-parametrized blink, 1.5 second period, 0.75 second on
+    if (aDuration==Never) aDuration=6*Second; // default is 6 seconds
+    blink(aDuration, LightScenePtr(), NoOP, 1.5*Second, 50);
+  }
 }
 
 

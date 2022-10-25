@@ -232,10 +232,10 @@ string Vdc::modelName()
 }
 
 
-void Vdc::identifyToUser()
+void Vdc::identifyToUser(MLMicroSeconds aDuration)
 {
   // by default, delegate to vdchost (as likely physical "location" of all vdcs)
-  return getVdcHost().identifyToUser();
+  return getVdcHost().identifyToUser(aDuration);
 }
 
 

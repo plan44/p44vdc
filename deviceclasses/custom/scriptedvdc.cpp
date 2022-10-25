@@ -502,7 +502,7 @@ void ScriptedVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 
-void ScriptedVdc::identifyToUser()
+void ScriptedVdc::identifyToUser(MLMicroSeconds aDuration)
 {
   if (mForwardIdentify) {
     // TODO: %%% send "VDCIDENTIFY" or maybe "vdc:IDENTIFY"
@@ -510,7 +510,7 @@ void ScriptedVdc::identifyToUser()
     OLOG(LOG_WARNING, "vdc level identify forwarding not yet implemented")
   }
   else {
-    inherited::identifyToUser();
+    inherited::identifyToUser(aDuration);
   }
 }
 

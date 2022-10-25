@@ -228,13 +228,13 @@ bool CustomDevice::canIdentifyToUser()
 }
 
 
-void CustomDevice::identifyToUser()
+void CustomDevice::identifyToUser(MLMicroSeconds aDuration)
 {
   if (mForwardIdentify) {
     sendDeviceApiFlagMessage("IDENTIFY");
   }
   else {
-    inherited::identifyToUser();
+    inherited::identifyToUser(aDuration);
   }
 }
 

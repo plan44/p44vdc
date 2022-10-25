@@ -455,7 +455,7 @@ const char *ExternalVdc::vdcClassIdentifier() const
 
 
 
-void ExternalVdc::identifyToUser()
+void ExternalVdc::identifyToUser(MLMicroSeconds aDuration)
 {
   if (mForwardIdentify) {
     // TODO: %%% send "VDCIDENTIFY" or maybe "vdc:IDENTIFY"
@@ -463,7 +463,7 @@ void ExternalVdc::identifyToUser()
     OLOG(LOG_WARNING, "vdc level identify forwarding not yet implemented")
   }
   else {
-    inherited::identifyToUser();
+    inherited::identifyToUser(aDuration);
   }
 }
 
