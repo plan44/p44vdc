@@ -80,7 +80,7 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
 
 string DaliBusDevice::logContextPrefix()
 {
-  return string_format("DaliBusDevice %02d", mDeviceInfo ? mDeviceInfo->mShortAddress : 99);
+  return string_format("DALI %s", DaliComm::formatDaliAddress(mDeviceInfo ? mDeviceInfo->mShortAddress : NoDaliAddress).c_str());
 }
 
 

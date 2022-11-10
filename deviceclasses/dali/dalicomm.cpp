@@ -641,7 +641,7 @@ DaliAddress DaliComm::addressFromDaliResponse(uint8_t aResponse)
 string DaliComm::formatDaliAddress(DaliAddress aAddress)
 {
   if (aAddress==NoDaliAddress) {
-    return "not a DALI address";
+    return "<NoDaliAddress>";
   }
   else if (aAddress==DaliBroadcast) {
     return "broadcast";
