@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2013-2019 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2022 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -1235,6 +1235,7 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   LightBehaviourPtr l = getOutput<LightBehaviour>();
   bool withColor = false;
+  bool withBrightness = false;
   MLMicroSeconds transitionTime = 0;
   if (l && needsToApplyChannels(&transitionTime)) {
     // abort previous multi-step transition
@@ -1251,6 +1252,7 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // prepare multi-step transition if needed
     if (l->brightnessNeedsApplying()) {
       l->updateBrightnessTransition(trinit); // init brightness transition
+      withBrightness = true;
     }
     // see if we also need a color transition
     ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
@@ -1260,7 +1262,7 @@ void DaliOutputDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       withColor = true;
     }
     // start transition
-    applyChannelValueSteps(aForDimming, withColor);
+    applyChannelValueSteps(aForDimming, withColor, withBrightness);
     // transition is initiated
     if (cl) {
       cl->appliedColorValues();
@@ -1491,24 +1493,23 @@ void DaliSingleControllerDevice::stopTransitions()
 }
 
 
-void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool aWithColor)
+void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool aWithColor, bool aWithBrightness)
 {
   MLMicroSeconds now = MainLoop::now();
   LightBehaviourPtr l = getOutput<LightBehaviour>();
   bool needactivation = false;
-  bool neednewbrightness = true; // assume brightness change, if color only, this will be cleared in color handling code below
   bool moreSteps = false;
   ColorLightBehaviourPtr cl;
   if (aWithColor) {
     cl = getOutput<ColorLightBehaviour>();
     moreSteps = cl->updateColorTransition(now);
-    neednewbrightness = l->brightness->inTransition(); // could be color transition only
     needactivation = mDaliController->setColorParamsFromChannels(cl, true, false, aForDimming); // activation needed when color has changed
   }
   // handle brightness
-  if (neednewbrightness || needactivation) {
+  if (aWithBrightness || needactivation) {
     // update actual dimmer value
-    if (l->updateBrightnessTransition(now)) moreSteps = true;
+    if (l->updateBrightnessTransition(now)) moreSteps = true; // brightness transition not yet complete
+    else aWithBrightness = false; // brightness is done now, if there are further steps, these are color only
     bool sentDAPC = mDaliController->setBrightness(l->brightnessForHardware());
     if (sentDAPC && mDaliController->mDT8AutoActivation) needactivation = false; // prevent activating twice!
   }
@@ -1520,7 +1521,7 @@ void DaliSingleControllerDevice::applyChannelValueSteps(bool aForDimming, bool a
   if (moreSteps) {
     // not yet complete, schedule next step
     mTransitionTicket.executeOnce(
-      boost::bind(&DaliSingleControllerDevice::applyChannelValueSteps, this, aForDimming, aWithColor),
+      boost::bind(&DaliSingleControllerDevice::applyChannelValueSteps, this, aForDimming, aWithColor, aWithBrightness),
       SLOW_TRANSITION_STEP_TIME
     );
     return; // will be called later again
@@ -1993,7 +1994,7 @@ void DaliCompositeDevice::stopTransitions()
 }
 
 
-void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithColor)
+void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithColor, bool aWithBrightness)
 {
   MLMicroSeconds now = MainLoop::now();
   RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
@@ -2053,7 +2054,7 @@ void DaliCompositeDevice::applyChannelValueSteps(bool aForDimming, bool aWithCol
   if (moreSteps) {
     // not yet complete, schedule next step
     mTransitionTicket.executeOnce(
-      boost::bind(&DaliCompositeDevice::applyChannelValueSteps, this, aForDimming, aWithColor),
+      boost::bind(&DaliCompositeDevice::applyChannelValueSteps, this, aForDimming, aWithColor, aWithBrightness),
       SLOW_TRANSITION_STEP_TIME
     );
     return; // will be called later again
