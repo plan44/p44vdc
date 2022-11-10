@@ -666,7 +666,7 @@ bool Device::needsToApplyChannels(MLMicroSeconds* aTransitionTimeP)
       if (!aTransitionTimeP) return true; // no need to check more channels
       needsApply = true;
       if (ch->transitionTimeToNewValue()>tt) {
-        LOG(LOG_DEBUG, "- channel increases transition time from %lld to %lld mS", tt/MilliSecond, ch->transitionTimeToNewValue());
+        LOG(LOG_DEBUG, "- channel increases transition time from %lld to %lld mS", tt/MilliSecond, ch->transitionTimeToNewValue()/MilliSecond);
         tt = ch->transitionTimeToNewValue();
       }
     }

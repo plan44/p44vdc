@@ -170,7 +170,7 @@ int ChannelBehaviour::getSourceOpLevel()
 
 // MARK: - transition management
 
-// Note: transition management is for rendering software transitions for ouputs that don't have native transitions.
+// Note: transition management is for rendering software transitions for outputs that don't have native transitions.
 //   Hardware implementations might choose not to use it, in favor of a hardware-specific transition mechanism.
 
 
@@ -361,7 +361,7 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
   // prevent propagating changes smaller than device resolution, but always apply when transition is in progress
   if (aAlwaysApply || inTransition() || fabs(aNewValue-mCachedChannelValue)>=getResolution()) {
     OLOG(LOG_INFO,
-      "is requested to change from %0.2f ->  %0.2f (transition time=%d mS)",
+      "is requested to change from %0.2f ->  %0.2f (transition time=%dmS)",
       mCachedChannelValue, aNewValue, (int)(aTransitionTime/MilliSecond)
     );
     // setting new value captures current (possibly transitional) value as previous and completes transition
@@ -400,7 +400,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
   // apply (silently), only if value has actually changed (but even if change is below resolution)
   if (newValue!=mCachedChannelValue) {
     FOCUSOLOG(
-      "is requested to dim by %f from %0.2f ->  %0.2f (transition time=%d mS)",
+      "is requested to dim by %f from %0.2f ->  %0.2f (transition time=%dmS)",
       aIncrement, mCachedChannelValue, newValue, (int)(aTransitionTime/MilliSecond)
     );
     // setting new value captures current (possibly transitional) value as previous and completes transition

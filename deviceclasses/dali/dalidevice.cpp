@@ -749,7 +749,7 @@ void DaliBusDevice::setTransitionTime(MLMicroSeconds aTransitionTime)
       h = h*h;
       h = ::log(h)/::log(2);
       tr = h>1 ? (uint8_t)h : 1;
-      OLOG(LOG_DEBUG, "new transition time = %.1f mS, calculated FADE_TIME setting = %f (rounded %d)", (double)aTransitionTime/MilliSecond, h, (int)tr);
+      OLOG(LOG_DEBUG, "new transition time = %.1f mS, ln2((T/0.5)^2) = %f -> FADE_TIME = %d", (double)aTransitionTime/MilliSecond, h, (int)tr);
     }
     if (tr!=mCurrentFadeTime || mCurrentTransitionTime==Infinite) {
       OLOG(LOG_INFO, "setting DALI FADE_TIME from %d to %d (for transition time %.1f mS)", mCurrentFadeTime, (int)tr, (double)aTransitionTime/MilliSecond);
