@@ -176,9 +176,13 @@ void ScriptedDevice::implementationEnds(ScriptObjPtr aResult)
     return;
   }
   OLOG(aResult && aResult->isErr() ? LOG_WARNING : LOG_NOTICE, "device implementation script finished running, result=%s", ScriptObj::describe(aResult).c_str());
-  if (aResult && Error::isError(aResult->errorValue(), ScriptError::domain(), ScriptError::Aborted)) {
+  if (
+    aResult &&
+    Error::isDomain(aResult->errorValue(), ScriptError::domain()) &&
+    aResult->errorValue()->getErrorCode()>=ScriptError::FatalErrors
+  ) {
     mImplementation.mContext->clearVars(); // clear vars and (especially) context local handlers
-    return; // aborted, no auto-restart
+    return; // fatal error, no auto-restart
   }
   if (aResult && aResult->errorValue()->isOK() && hasSinks()) return; // script ends w/o error, and monitors messages -> ok
   if (aResult && aResult->hasType(numeric) && aResult->boolValue()) return; // returning explicit trueish means no restart needed, as well
