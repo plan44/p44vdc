@@ -1699,13 +1699,13 @@ private:
     // only if the last byte was 0. We also passed the if checksum was 0xFF, because our reference devices always had 0x01 in
     // the last byte, and I assumed missing by 1 was the result of not precise enough specs or a bug in the device.
     #if OLD_BUGGY_CHKSUM_COMPATIBLE
-    if (!dali2 && bankChecksum==0 && deviceInfo->devInfStatus==DaliDeviceInfo::devinf_solid) {
+    if (!dali2 && bankChecksum==0 && deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid) {
       // by specs, this is a correct checksum, and a seemingly solid device info
       // - now check if the buggy checker would have passed it, too (which is when last byte is 0x01 or 0x00)
       uint8_t lastByte = (*aBank0Data)[aBank0Data->size()-1].b;
       if (lastByte!=0x00 && lastByte!=0x01) {
         // this bank 0 data would not have passed the buggy checker
-        deviceInfo->devInfStatus = DaliDeviceInfo::devinf_maybe; // might be usable to identify device, but needs backwards compatibility checking
+        deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_maybe; // might be usable to identify device, but needs backwards compatibility checking
       }
     }
     #endif
@@ -1814,7 +1814,7 @@ private:
         busAddress,
         deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid
         #if OLD_BUGGY_CHKSUM_COMPATIBLE
-        || deviceInfo->devInfStatus==DaliDeviceInfo::devinf_maybe
+        || deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_maybe
         #endif
         ? "valid" : "UNRELIABLE",
         deviceInfo->mGtin,

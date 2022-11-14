@@ -197,9 +197,9 @@ void DaliBusDevice::deriveDsUid()
   if (mIsDummy) return;
   // vDC implementation specific UUID:
   #if OLD_BUGGY_CHKSUM_COMPATIBLE
-  if (deviceInfo->devInfStatus==DaliDeviceInfo::devinf_maybe) {
+  if (mDeviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_maybe) {
     // assume we can use devInf to derive dSUID from
-    deviceInfo->devInfStatus = DaliDeviceInfo::devinf_solid;
+    mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_solid;
     // but only actually use it if there is no device entry for the shortaddress-based dSUID with a non-zero name
     // (as this means the device has been already actively used/configured with the shortaddr-dSUID)
     // - calculate the short address based dSUID
@@ -207,7 +207,7 @@ void DaliBusDevice::deriveDsUid()
     dsUidForDeviceInfoStatus(shortAddrBasedDsUid, DaliDeviceInfo::devinf_notForID);
     // - check for named device in database consisting of this dimmer with shortaddr based dSUID
     //   Note that only single dimmer device are checked for, composite devices will not have this compatibility mechanism
-    sqlite3pp::query qry(daliVdc.getVdcHost().getDsParamStore());
+    sqlite3pp::query qry(mDaliVdc.getVdcHost().getDsParamStore());
     // Note: this is a bit ugly, as it has the device settings table name hard coded
     string sql = string_format("SELECT deviceName FROM DeviceSettings WHERE parentID='%s'", shortAddrBasedDsUid.getString().c_str());
     if (qry.prepare(sql.c_str())==SQLITE_OK) {
@@ -217,7 +217,7 @@ void DaliBusDevice::deriveDsUid()
         string n = nonNullCStr(i->get<const char *>(0));
         if (n.length()>0) {
           // shortAddr based device has already been named. So keep that, and don't generate a devInf based dSUID
-          deviceInfo->devInfStatus = DaliDeviceInfo::devinf_notForID;
+          mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_notForID;
           OLOG(LOG_WARNING, "kept with shortaddr-based dSUID because it is already named: '%s'", n.c_str());
         }
       }

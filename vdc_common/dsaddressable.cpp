@@ -631,6 +631,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
 }
 
 
+#if ENABLE_JSONBRIDGEAPI
 void DsAddressable::pushBridgeable() {
   VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
   if (api) {
@@ -640,7 +641,7 @@ void DsAddressable::pushBridgeable() {
     pushNotification(api, query, ApiValuePtr());
   }
 }
-
+#endif // ENABLE_JSONBRIDGEAPI
 
 // MARK: - icon loading
 

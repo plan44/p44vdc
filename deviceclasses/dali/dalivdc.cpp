@@ -329,7 +329,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
       if ((*busdevpos)->mDeviceInfo->mDevInfStatus>=DaliDeviceInfo::devinf_solid) {
         DsUid thisDsuid;
         #if OLD_BUGGY_CHKSUM_COMPATIBLE
-        if ((*busdevpos)->deviceInfo->devInfStatus==DaliDeviceInfo::devinf_notForID) {
+        if ((*busdevpos)->mDeviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_notForID) {
           // check native dsuid, not shortaddress based fallback
           (*busdevpos)->dsUidForDeviceInfoStatus(thisDsuid, DaliDeviceInfo::devinf_solid);
         }
@@ -344,7 +344,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
         for (refpos++; refpos!=aBusDevices->end(); ++refpos) {
           DsUid otherDsuid;
           #if OLD_BUGGY_CHKSUM_COMPATIBLE
-          if ((*refpos)->deviceInfo->devInfStatus==DaliDeviceInfo::devinf_notForID) {
+          if ((*refpos)->mDeviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_notForID) {
             // check native dsuid, not shortaddress based fallback
             (*refpos)->dsUidForDeviceInfoStatus(otherDsuid, DaliDeviceInfo::devinf_solid);
           }
