@@ -450,7 +450,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
     // not yet complete, schedule next step
     transitionTicket.executeOnce(
       boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming),
-      getLedChainVdc().ledArrangement->mMinUpdateInterval
+      getLedChainVdc().ledArrangement->getMinUpdateInterval()
     );
     return; // will be called later again
   }
