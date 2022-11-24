@@ -792,7 +792,7 @@ JsonObjectPtr HueComm::getSuccessItem(JsonObjectPtr aResult, int aIndex)
   if (aResult && aIndex<aResult->arrayLength()) {
     JsonObjectPtr responseItem = aResult->arrayGet(aIndex);
     JsonObjectPtr successItem;
-    if (responseItem && responseItem->get("success", successItem)) {
+    if (responseItem && responseItem->get("success", successItem, false)) {
       return successItem;
     }
   }

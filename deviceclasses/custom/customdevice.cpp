@@ -323,7 +323,7 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
         if (aMessage->get("property", o)) {
           ValueDescriptorPtr prop = deviceProperties->getProperty(o->stringValue());
           if (prop) {
-            if (aMessage->get("value", o)) {
+            if (aMessage->get("value", o, false)) {
               ApiValuePtr v = ApiValuePtr(JsonApiValue::newValueFromJson(o));
               ErrorPtr err = prop->conforms(v, true); // check and make internal
               if (Error::notOK(err)) return err;

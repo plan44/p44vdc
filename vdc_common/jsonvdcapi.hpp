@@ -69,7 +69,7 @@ namespace p44 {
     virtual void operator=(ApiValue &aApiValue) P44_OVERRIDE;
 
     virtual void add(const string &aKey, ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->add(aKey.c_str(), o->jsonObject()); };
-    virtual ApiValuePtr get(const string &aKey) P44_OVERRIDE { JsonObjectPtr o; if (jsonObj && jsonObj->get(aKey.c_str(), o)) return newValueFromJson(o); else return ApiValuePtr(); };
+    virtual ApiValuePtr get(const string &aKey) P44_OVERRIDE { JsonObjectPtr o; if (jsonObj && jsonObj->get(aKey.c_str(), o, false)) return newValueFromJson(o); else return ApiValuePtr(); };
     virtual void del(const string &aKey) P44_OVERRIDE { if (jsonObj) jsonObj->del(aKey.c_str()); };
     virtual int arrayLength() P44_OVERRIDE { return jsonObj ? jsonObj->arrayLength() : 0; };
     virtual void arrayAppend(ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->arrayAppend(o->jsonObject()); };
