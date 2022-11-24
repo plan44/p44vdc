@@ -59,7 +59,7 @@ protected:
   ///   implementation must check this!
   virtual PixelColor contentColorAt(PixelPoint aPt)
   {
-    if (isInContentSize(aPt)) return foregroundColor;
+    if (isInContentSize(aPt)) return mForegroundColor;
     else return transparent;
   }
 
