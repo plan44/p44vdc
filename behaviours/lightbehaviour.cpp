@@ -211,7 +211,7 @@ static MLMicroSeconds transitionTimeFromDimTime(uint8_t aDimTime)
 
 MLMicroSeconds LightBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool aDimUp)
 {
-  uint8_t dimTimeIndex = 0;
+  uint8_t dimTimeIndex = 0; // default to smooth dimming
   SimpleScenePtr ssc = boost::dynamic_pointer_cast<SimpleScene>(aScene);
   if (ssc) {
     switch (ssc->mEffect) {
@@ -225,7 +225,7 @@ MLMicroSeconds LightBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool a
         return inherited::transitionTimeFromScene(aScene, aDimUp);
     }
   }
-  // dimTimeIndex found, look up actual time
+  // dimTimeIndex derived from effect or no scene at all, look up actual time
   return transitionTimeFromDimTime(aDimUp ? dimTimeUp[dimTimeIndex] : dimTimeDown[dimTimeIndex]);
 }
 

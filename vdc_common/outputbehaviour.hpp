@@ -251,10 +251,15 @@ namespace p44 {
     /// @}
 
     /// get transition time in microseconds from given scene effect
-    /// @param aScene the scene
+    /// @param aScene the scene, can be null to get a general (default/recommended) transition
+    ///   time for the behaviour rather than the scene specific one.
     /// @param aDimUp true when dimming up, false when dimming down
     /// @return 0 if no transition time is set for the scene
     virtual MLMicroSeconds transitionTimeFromScene(DsScenePtr aScene, bool aDimUp);
+
+    /// get recommended transition time in microseconds for this output
+    /// @param aDimUp true for getting time for dimming up, false for dimming down
+    MLMicroSeconds recommendedTransitionTime(bool aDimUp = true);
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs

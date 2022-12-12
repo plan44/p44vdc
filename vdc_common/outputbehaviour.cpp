@@ -477,6 +477,19 @@ MLMicroSeconds OutputBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool 
 }
 
 
+MLMicroSeconds OutputBehaviour::recommendedTransitionTime(bool aDimUp)
+{
+  // take preset1 (room on) scene's transition time as default
+  SceneDeviceSettingsPtr scenes = getDevice().getScenes();
+  DsScenePtr scene;
+  if (scenes) {
+    scene = scenes->getScene(ROOM_ON);
+  }
+  // safe to call with null scene
+  return transitionTimeFromScene(scene, aDimUp);
+}
+
+
 // MARK: - persistence implementation
 
 
@@ -636,6 +649,7 @@ enum {
   outputUsage_key,
   variableRamp_key,
   maxPower_key,
+  recommendedTransitionTime_key,
   numDescProperties
 };
 
@@ -648,6 +662,7 @@ const PropertyDescriptorPtr OutputBehaviour::getDescDescriptorByIndex(int aPropI
     { "outputUsage", apivalue_uint64, outputUsage_key+descriptions_key_offset, OKEY(output_key) },
     { "variableRamp", apivalue_bool, variableRamp_key+descriptions_key_offset, OKEY(output_key) },
     { "maxPower", apivalue_double, maxPower_key+descriptions_key_offset, OKEY(output_key) },
+    { "x-p44-recommendedTransitionTime", apivalue_double, recommendedTransitionTime_key+descriptions_key_offset, OKEY(output_key) },
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -731,6 +746,9 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case maxPower_key+descriptions_key_offset:
           aPropValue->setDoubleValue(mMaxPower);
+          return true;
+        case recommendedTransitionTime_key+descriptions_key_offset:
+          aPropValue->setDoubleValue((double)recommendedTransitionTime(true)/Second); // standard transition time for dimming up
           return true;
         // Settings properties
         case mode_key+settings_key_offset:
