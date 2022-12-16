@@ -477,7 +477,7 @@ void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     mProductVersion.c_str(),
     Application::sharedApplication()->version().c_str(),
     mDeviceHardwareId.c_str(),
-    mExternalDsuid ? "external" : "MAC-derived",
+    mExternalDsuid ? "external" : (mStoredDsuid ? "migrated" : "MAC-derived"),
     shortDesc().c_str(),
     macAddressToString(mac, ':').c_str(),
     ipv4ToString(getIpV4Address()).c_str()
@@ -1623,6 +1623,32 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     aRequest->sendResult(checkResult);
     return ErrorPtr();
   }
+  if (aMethod=="x-p44-setIdentity") {
+    ApiValuePtr o;
+    ErrorPtr err;
+    // current identity must be provided and must matches (safeguard)
+    if (Error::isOK(err=checkParam(aParams, "currentIdentity", o))) {
+      DsUid ci;
+      if (ci.setAsString(o->stringValue()) && ci==mDSUID) {
+        o = aParams->get("newIdentity");
+        if (!o || !mDSUID.setAsString(o->stringValue())) {
+          // no new identity given, reset to default
+          mDSUID.clear();
+        }
+        // save the changes
+        markDirty();
+        save();
+        // terminate
+        err = TextError::err("Identity changed, needs restart");
+        Application::sharedApplication()->terminateAppWith(err);
+        // still continue running, should be sufficient to return error before mainloop terminates
+      }
+      else {
+        err = Error::err<VdcApiError>(400, "current identity does not match");
+      }
+    }
+    return err;
+  }
   #endif // P44SCRIPT_FULL_SUPPORT
   return inherited::handleMethod(aRequest, aMethod, aParams);
 }
@@ -1941,7 +1967,11 @@ ErrorPtr VdcHost::loadAndFixDsUID()
         // stored dSUID is not same as MAC derived -> we are running a migrated config
         LOG(LOG_WARNING,"Running a migrated configuration: dSUID collisions with original unit possible");
         LOG(LOG_WARNING,"- native vDC host dSUID of this instance would be %s", originalDsUid.getString().c_str());
-        LOG(LOG_WARNING,"- if this is not a replacement unit -> factory reset recommended!");
+        LOG(LOG_WARNING,"- if this is not a replacement unit -> factory reset (or identity reset) recommended!");
+      }
+      else {
+        // it is the default dSUID that is stored, count as non-stored
+        mStoredDsuid = false;
       }
     }
     else {
@@ -2087,7 +2117,9 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
     aStatement.bind(aIndex++); // do not save externally defined dSUIDs
   }
   else {
-    aStatement.bind(aIndex++, mDSUID.getString().c_str(), false); // not static, string is local obj
+    if (mDSUID.empty()) aStatement.bind(aIndex); // bind null
+    else aStatement.bind(aIndex, mDSUID.getString().c_str(), false); // not static, string is local obj
+    aIndex++;
   }
   aStatement.bind(aIndex++, mPersistentChannels);
   aStatement.bind(aIndex++, mGeolocation.latitude);
@@ -2106,7 +2138,7 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
 
 string VdcHost::description()
 {
-  string d = string_format("VdcHost with %lu vDCs:", mVdcs.size());
+  string d = string_format("VdcHost%s with %lu vDCs:", mExternalDsuid ? " (external dSUID)" : (mStoredDsuid ? " (migrated dSUID)" : ""), mVdcs.size());
   for (VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
     d.append("\n");
     d.append(pos->second->description());

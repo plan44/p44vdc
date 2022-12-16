@@ -148,7 +148,7 @@ namespace p44 {
 
     bool mExternalDsuid; ///< set when dSUID is set to a external value (usually UUIDv1 based)
     int mVdcHostInstance; ///< instance number of this vdc host (defaults to 0, can be set to >0 to have multiple vdchost on the same host/mac address)
-    bool mStoredDsuid; ///< set when using stored (DB persisted) dSUID that is not equal to default dSUID 
+    bool mStoredDsuid; ///< set when using stored (DB persisted) dSUID that is NOT equal to default dSUID 
     uint64_t mac; ///< MAC address as found at startup
 
     string mIfNameForConn; ///< the name of the network interface to use for getting IP and connectivity status
