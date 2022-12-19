@@ -85,6 +85,7 @@ namespace p44 {
     MLMicroSeconds mChannelLastSync; ///< Never if the cachedChannelValue is not yet applied to the hardware or retrieved from hardware, otherwise when it was last synchronized
     MLMicroSeconds mNextTransitionTime; ///< the transition time to use for the next channel value change
     MLMicroSeconds mTransitionStarted; ///< time of when current transition has started
+    int mTransitionDirection; ///< in what direction we are transitioning: 0=direct/shortest way, 1=up, -1=down (for wraparound channels)
     double mPreviousChannelValue; ///< the previous channel value, can be used for performing transitions
     double mProgress; ///< transition progress between 0..1, 1=finished
     double mCustomDimPerMS; ///< non-standard dimming rate, 0=none

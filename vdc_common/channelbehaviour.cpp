@@ -46,6 +46,7 @@ ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChann
   mIsVolatileValue(true), // not worth saving yet
   mPreviousChannelValue(0), // previous output value
   mTransitionStarted(Never), // no transition in progress
+  mTransitionDirection(0), // shortest way by default
   mProgress(1), // no transition in progress
   mResolution(1) // dummy default resolution (derived classes must provide sensible defaults)
 {
@@ -179,7 +180,7 @@ bool ChannelBehaviour::updateTransition(MLMicroSeconds aNow)
   if (aNow<=0) {
     if (!inTransition() || mChannelUpdatePending) {
       // initialize transition
-      if (mNextTransitionTime<=0 || aNow<0 || mCachedChannelValue==mPreviousChannelValue) {
+      if (mNextTransitionTime<=0 || aNow<0 || (mCachedChannelValue==mPreviousChannelValue && !wrapsAround())) {
         // no transitiontime or explicitly no transition requested or no value change: set transition to completed
         OLOG(LOG_INFO, "no or immediate transition");
         return setTransitionProgress(1);
@@ -243,14 +244,21 @@ double ChannelBehaviour::getChannelValue(bool aTransitional)
   if (inTransition() && aTransitional) {
     double d = mCachedChannelValue-mPreviousChannelValue;
     if (wrapsAround()) {
-      // wraparound channels - use shorter distance
-      double r = getMax()-getMin();
-      // - find out shorter transition distance
-      double ad = fabs(d);
-      if (ad>r/2) {
-        // more than half the range -> other way around is shorter
-        ad = r-ad; // shorter way
-        d = ad * (d>=0 ? -1 : 1); // opposite sign of original
+      double r = getMax()-getMin(); // full range distance
+      if (mTransitionDirection!=0) {
+        // explicit direction, if sign is wrong or distance apparently zero -> make distance longer
+        if (d==0 || ((d>0) != (mTransitionDirection>0))) {
+          d += mTransitionDirection*r; // extend distance by range
+        }
+      }
+      else {
+        // automatically use shortest direction
+        double ad = fabs(d);
+        if (ad>r/2) {
+          // more than half the range -> other way around is shorter
+          ad = r-ad; // shorter way
+          d = ad * (d>=0 ? -1 : 1); // opposite sign of original
+        }
       }
       double res = mPreviousChannelValue+mProgress*d;
       // - wraparound
@@ -370,6 +378,7 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     // save target parameters for next transition
     setPVar(mCachedChannelValue, aNewValue); // might need to be persisted
     mNextTransitionTime = aTransitionTime;
+    mTransitionDirection = 0; // automatic, shortest way
     mChannelUpdatePending = true; // pending to be sent to the device
   }
   setPVar(mIsVolatileValue, false); // channel actively set, is not volatile
@@ -407,6 +416,7 @@ void ChannelBehaviour::moveChannelValue(int aDirection, MLMicroSeconds aTimePerU
 
 double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime)
 {
+  if (aIncrement==0) return mCachedChannelValue; // no change
   double newValue = mCachedChannelValue+aIncrement;
   if (wrapsAround()) {
     // In wrap-around mode, the max value is considered identical to the min value, so already REACHING it must wrap around
@@ -427,7 +437,11 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     }
   }
   // apply (silently), only if value has actually changed (but even if change is below resolution)
-  if (newValue!=mCachedChannelValue) {
+  // Note: when we get here, an actual increment has been requested.
+  // - non-wrapping channels might already be at the end of their range, then nothing needs to be done
+  // - dimming a wrapping channel with nonzero transition time *always* means transitioning, possibly one
+  //   full round to the same value
+  if (newValue!=mCachedChannelValue || (wrapsAround() && aTransitionTime!=0)) {
     FOCUSOLOG(
       "is requested to dim by %f from %0.2f ->  %0.2f (transition time=%dmS)",
       aIncrement, mCachedChannelValue, newValue, (int)(aTransitionTime/MilliSecond)
@@ -438,6 +452,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     // save target parameters for next transition
     setPVar(mCachedChannelValue, newValue); // might need to be persisted
     mNextTransitionTime = aTransitionTime;
+    mTransitionDirection = aIncrement>0 ? 1 : -1;
     mChannelUpdatePending = true; // pending to be sent to the device
   }
   setPVar(mIsVolatileValue, false); // channel actively dimmed, is not volatile
