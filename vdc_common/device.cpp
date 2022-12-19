@@ -889,26 +889,28 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
     ApiValuePtr o;
     ChannelBehaviourPtr channel;
     if (Error::isOK(err = checkChannel(aParams, channel))) {
-      if (Error::isOK(err = checkParam(aParams, "value", o))) {
+      if ((o = aParams->get("move"))) {
+        // start/stop moving
+        int dir = o->int32Value();
+        MLMicroSeconds timePerUnit = 0; // default rate
+        if ((o = aParams->get("rate"))) {
+          timePerUnit = o->doubleValue()*Second;
+        }
+        channel->moveChannelValue(dir, timePerUnit);
+      }
+      else if (Error::isOK(err = checkParam(aParams, "value", o))) {
+        // move to specific value
         double value = o->doubleValue();
-        // check optional relative flag (to increment/decrement a channel, with possible wraparound)
-        bool relative = false;
-        o = aParams->get("relative");
-        if (o) relative = o->boolValue();
+        MLMicroSeconds transitionTime = getOutput()->mTransitionTime;
+        o = aParams->get("transitionTime");
+        if (o) transitionTime = o->doubleValue()*Second;
+        channel->setChannelValue(value, transitionTime, true); // always apply precise value
+      }
+      if (Error::isOK(err)) {
         // check optional apply_now flag
         bool apply_now = true; // apply values by default
         o = aParams->get("apply_now");
         if (o) apply_now = o->boolValue();
-        // check
-        MLMicroSeconds transitionTime = getOutput()->mTransitionTime;
-        o = aParams->get("transitionTime");
-        if (o) transitionTime = o->doubleValue()*Second;
-        if (relative) {
-          channel->dimChannelValue(value, transitionTime);
-        }
-        else {
-          channel->setChannelValue(value, transitionTime, true); // always apply precise value
-        }
         if (apply_now) {
           mVdcP->cancelNativeActionUpdate(); // still delayed native scene updates must be cancelled before changing channel values
           requestApplyingChannels(NoOP, false);

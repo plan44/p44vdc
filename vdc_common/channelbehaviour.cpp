@@ -376,6 +376,35 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
 }
 
 
+void ChannelBehaviour::moveChannelValue(int aDirection, MLMicroSeconds aTimePerUnit)
+{
+  if (getDimPerMS()==0) return; // non-dimmable channel -> NOP
+  if (aDirection==0) {
+    // stop
+    stopTransition();
+  }
+  else {
+    if (aTimePerUnit==0) {
+      // use standard dimming rate
+      aTimePerUnit = (1.0/getDimPerMS())*MilliSecond;
+    }
+    double dist = 0;
+    if (wrapsAround()) {
+      // do one full round
+      dist = getMax()-getMin();
+      if (aDirection<0) dist = -dist;
+    }
+    else {
+      // towards end of scale (but not going below minDim)
+      double dist = (aDirection>0 ? getMax() : getMinDim()) - mCachedChannelValue;
+    }
+    MLMicroSeconds tt = aTimePerUnit*fabs(dist);
+    dimChannelValue(dist, tt);
+  }
+}
+
+
+
 double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime)
 {
   double newValue = mCachedChannelValue+aIncrement;
