@@ -839,6 +839,7 @@ BridgeInfo::BridgeInfo(P44VdcHost& aP44VdcHost) :
 void BridgeInfo::resetInfo()
 {
   mQRCodeData.clear();
+  mManualPairingCode.clear();
   mCommissionable = false;
   mStarted = false;
 }
@@ -847,6 +848,7 @@ void BridgeInfo::resetInfo()
 
 enum {
   qrcodedata_key,
+  manualpairingcode_key,
   started_key,
   commissionable_key,
   connected_key,
@@ -865,6 +867,7 @@ PropertyDescriptorPtr BridgeInfo::getDescriptorByIndex(int aPropIndex, int aDoma
 {
   static const PropertyDescription properties[numBrigeInfoProperties] = {
     { "qrcodedata", apivalue_string, qrcodedata_key, OKEY(bridgeinfo_key) },
+    { "manualpairingcode", apivalue_string, manualpairingcode_key, OKEY(bridgeinfo_key) },
     { "started", apivalue_bool, started_key, OKEY(bridgeinfo_key) },
     { "commissionable", apivalue_bool, commissionable_key, OKEY(bridgeinfo_key) },
     { "connected", apivalue_bool, connected_key, OKEY(bridgeinfo_key) },
@@ -883,6 +886,7 @@ bool BridgeInfo::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
         case qrcodedata_key: aPropValue->setStringValue(mQRCodeData); return true;
+        case manualpairingcode_key: aPropValue->setStringValue(mManualPairingCode); return true;
         case started_key: aPropValue->setBoolValue(mStarted); return true;
         case commissionable_key: aPropValue->setBoolValue(mCommissionable); return true;
         case connected_key: aPropValue->setBoolValue(mP44VdcHost.numBridgeApiClients()>0); return true;
@@ -891,6 +895,7 @@ bool BridgeInfo::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
     else {
       switch (aPropertyDescriptor->fieldKey()) {
         case qrcodedata_key: mQRCodeData = aPropValue->stringValue(); return true;
+        case manualpairingcode_key: mManualPairingCode = aPropValue->stringValue(); return true;
         case started_key: mStarted = aPropValue->boolValue(); return true;
         case commissionable_key: mCommissionable = aPropValue->boolValue(); return true;
       }
