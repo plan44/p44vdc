@@ -51,6 +51,8 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     analogIOType = analogio_dimmer;
   else if (mode=="rgbdimmer")
     analogIOType = analogio_rgbdimmer;
+  else if (mode=="cwwwdimmer")
+    analogIOType = analogio_cwwwdimmer;
   else if (mode=="valve")
     analogIOType = analogio_valve;
   else if (mode.find("sensor")==0) // sensor can have further specification in mode string
@@ -105,6 +107,27 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
         RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
         addBehaviour(l);
       }
+    }
+  }
+  else if (analogIOType==analogio_cwwwdimmer) {
+    // - is light
+    mColorClass = class_yellow_light;
+    // - need 2 IO names for CW and WW
+    size_t p;
+    p = ioname.find("|");
+    if (p!=string::npos) {
+      // 2 pins specified
+      // - create CW output
+      analogIO = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
+      ioname.erase(0,p+1);
+      // - create WW output
+      analogIO2 = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
+      // Complete set of outputs, now create CWWW light (with optional white channel)
+      // - use color light settings, which include a color scene table
+      installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
+      // - add CT only color light behaviour (which adds a number of auxiliary channels)
+      RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, true));
+      addBehaviour(l);
     }
   }
   else if (analogIOType==analogio_valve) {
@@ -188,8 +211,8 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // consider applied
     l->brightnessApplied();
   }
-  else if (analogIOType==analogio_rgbdimmer) {
-    // three channel RGB PWM dimmer
+  else if (analogIOType==analogio_rgbdimmer || analogIOType==analogio_cwwwdimmer) {
+    // three channel RGB PWM dimmer or two channel CWWW PWM dimmer
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     if (cl) {
       if (needsToApplyChannels(&transitionTime)) {
@@ -283,6 +306,30 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
     }
     if (!aForDimming) OLOG(LOG_INFO, "AnalogIO final RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
   }
+  else if (analogIOType==analogio_cwwwdimmer) {
+    // two channel RGB PWM dimmer
+    RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
+    bool moreSteps = cl->updateBrightnessTransition(now);
+    if (cl->updateColorTransition(now)) moreSteps = true;
+    // CWWW lamp, get components
+    double cw,ww, pwm;
+    cl->getCWWW(cw, ww, 100, true);
+    pwm = cl->brightnessToPWM(cw, 100);
+    analogIO->setValue(pwm);
+    pwm = cl->brightnessToPWM(ww, 100);
+    analogIO2->setValue(pwm);
+    // next step
+    if (moreSteps) {
+      OLOG(LOG_DEBUG, "AnalogIO transitional CWWW values: CW=%.2f WW=%.2f", cw, ww);
+      // not yet complete, schedule next step
+      timerTicket.executeOnce(
+        boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming),
+        TRANSITION_STEP_TIME
+      );
+      return; // will be called later again
+    }
+    if (!aForDimming) OLOG(LOG_INFO, "AnalogIO final CWWW values: CW=%.2f, WW=%.2f", cw, ww);
+  }
 }
 
 
@@ -307,9 +354,11 @@ string AnalogIODevice::modelName()
 {
   if (analogIOType==analogio_dimmer)
     return "Dimmer output";
+  if (analogIOType==analogio_cwwwdimmer)
+    return "CW/WW dimmer outputs";
   if (analogIOType==analogio_rgbdimmer)
     return "RGB(W) dimmer outputs";
-  else if (analogIOType==analogio_valve)
+  if (analogIOType==analogio_valve)
     return "Heating Valve output";
   return "Analog I/O";
 }
@@ -319,7 +368,9 @@ string AnalogIODevice::getExtraInfo()
 {
   if (analogIOType==analogio_rgbdimmer)
     return string_format("RGB Outputs:%s, %s, %s; White:%s", analogIO->getName().c_str(), analogIO2->getName().c_str(), analogIO3->getName().c_str(), analogIO4 ? analogIO4->getName().c_str() : "none");
-  else if (analogIOType==analogio_dimmer || analogIOType==analogio_valve)
+  if (analogIOType==analogio_cwwwdimmer)
+    return string_format("CW/WW Outputs:%s, %s", analogIO->getName().c_str(), analogIO2->getName().c_str());
+  if (analogIOType==analogio_dimmer || analogIOType==analogio_valve)
     return string_format("Output: %s", analogIO->getName().c_str());
   return "Analog I/O";
 }
@@ -331,11 +382,13 @@ string AnalogIODevice::description()
   string s = inherited::description();
   if (analogIOType==analogio_dimmer)
     string_format_append(s, "\n- Dimmer at Analog output '%s'", analogIO->getName().c_str());
-  if (analogIOType==analogio_rgbdimmer)
+  else if (analogIOType==analogio_cwwwdimmer)
+    string_format_append(s, "\n- Tunable White Dimmer with CW/WW outputs '%s'/'%s'", analogIO->getName().c_str(), analogIO2->getName().c_str());
+  else if (analogIOType==analogio_rgbdimmer)
     string_format_append(s, "\n- Color Dimmer with RGB outputs '%s', '%s', '%s'; White: '%s'", analogIO->getName().c_str(), analogIO2->getName().c_str(), analogIO3->getName().c_str(), analogIO4 ? analogIO4->getName().c_str() : "none");
-  if (analogIOType==analogio_valve)
+  else if (analogIOType==analogio_valve)
     string_format_append(s, "\nHeating Valve @ '%s'", analogIO->getName().c_str());
-  if (analogIOType==analogio_sensor)
+  else if (analogIOType==analogio_sensor)
     string_format_append(s, "\nSensor @ '%s'", analogIO->getName().c_str());
   return s;
 }

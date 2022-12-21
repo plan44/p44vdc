@@ -45,6 +45,7 @@ namespace p44 {
       analogio_unknown,
       analogio_dimmer,
       analogio_rgbdimmer,
+      analogio_cwwwdimmer,
       analogio_valve,
       analogio_sensor
     } AnalogIoType;
