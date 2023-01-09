@@ -890,8 +890,8 @@ bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsCl
   }
   #endif
   // not handled by local controller
-  if (!mVdsmSessionConnection) {
-    // not connected to a vdSM, handle clicks locally
+  if (mVdcApiServer && !mVdsmSessionConnection) {
+    // we do have a vdc API, but are not connected to a vdSM -> handle clicks locally (fallback mode)
     handleClickLocally(aButtonBehaviour, aClickType);
     return true; // handled
   }
