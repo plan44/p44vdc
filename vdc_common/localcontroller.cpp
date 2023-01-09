@@ -1645,6 +1645,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
     string method = "dimChannel";
     params->add("mode", params->newInt64(direction));
     params->add("autostop", params->newBool(false)); // prevent stop dimming event w/o repeating command
+    params->add("stopActions", params->newBool(false)); // prevent stopping runnig scene actions
     params->add("channel", params->newUint64(channelType));
     params->add("area", params->newUint64(map.mArea));
     // - deliver

@@ -1041,6 +1041,14 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         bool autostop = true;
         o = aDeliveryState->mCallParams->get("autostop");
         if (o) autostop = o->boolValue();
+        // stopping of actions when dimming (localcontroller may want to prevent that)
+        // - not specified: stop actions on dim stop, but not on dim start (old behaviour as before 2023-01-09)
+        // - true: always stop
+        // - false: never stop
+        bool stopactions;
+        o = aDeliveryState->mCallParams->get("stopActions");
+        if (o) stopactions = o->boolValue();
+        else stopactions = mode==0; // stop actions when stoping dimming
         // set the channel type as actionParam
         aDeliveryState->mActionParam = channel->getChannelType();
         // prepare starting or stopping dimming
@@ -1050,7 +1058,8 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
           mode==0 ? dimmode_stop : (mode<0 ? dimmode_down : dimmode_up),
           area,
           autostop ? MOC_DIM_STEP_TIMEOUT : EMERGENCY_DIM_STEP_TIMEOUT,
-          dimPerMSOverride
+          dimPerMSOverride,
+          stopactions
         );
         return;
       }
@@ -1399,13 +1408,13 @@ void Device::updatingChannelsComplete()
 void Device::dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride)
 {
   // convenience helper
-  dimChannelForAreaPrepare(boost::bind(&Device::executePreparedOperation, this, SimpleCB(), _1), aChannel, aDimMode, aArea, aAutoStopAfter, aDimPerMSOverride);
+  dimChannelForAreaPrepare(boost::bind(&Device::executePreparedOperation, this, SimpleCB(), _1), aChannel, aDimMode, aArea, aAutoStopAfter, aDimPerMSOverride, aDimMode==dimmode_stop);
 }
 
 
 // implementation of "dimChannel" vDC API command and legacy dimming
 // Note: ensures dimming only continues for at most aAutoStopAfter
-void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride)
+void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride, bool aStopActions)
 {
   if (!aChannel) { aPreparedCB(ntfy_none); return; } // no channel, no dimming
   LOG(LOG_DEBUG, "dimChannelForArea: aChannel=%s, aDimMode=%d, aArea=%d", aChannel->getName(), aDimMode, aArea);
@@ -1445,7 +1454,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     }
   }
   // always give device chance to stop, even if no dimming is in progress
-  if (aDimMode==dimmode_stop) {
+  if (aStopActions) {
     stopSceneActions();
   }
   finishSceneActionWaiting(); // finish things possibly still waiting for previous call's scene actions to complete
@@ -1634,7 +1643,7 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
       // area dimming continuation
       if (mAreaDimmed!=0 && mAreaDimMode!=dimmode_stop) {
         // continue or restart area dimming
-        dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), mAreaDimMode, mAreaDimmed, LEGACY_DIM_STEP_TIMEOUT, 0);
+        dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), mAreaDimMode, mAreaDimmed, LEGACY_DIM_STEP_TIMEOUT, 0, false); // continuing dimming must not stop actions
         return;
       }
       // - otherwise: NOP
@@ -1644,24 +1653,24 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
     // first check legacy (inc/dec scene) dimming
     if (cmd==scene_cmd_increment) {
       if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
-      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT, 0);
+      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT, 0, false); // starting dimming must not stop actions
       return;
     }
     else if (cmd==scene_cmd_decrement) {
       if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
-      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT, 0);
+      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT, 0, false); // starting dimming must not stop actions
       return;
     }
     else if (cmd==scene_cmd_stop) {
       if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
-      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_stop, area, 0, 0);
+      else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_stop, area, 0, 0, true); // stop dimming must stop actions
       return;
     }
     // make sure dimming stops for any non-dimming scene call
     if (mCurrentDimMode!=dimmode_stop) {
       // any non-dimming scene call stops dimming
       OLOG(LOG_NOTICE, "CallScene(%d) interrupts dimming in progress", aSceneNo);
-      dimChannelForAreaPrepare(boost::bind(&Device::callSceneDimStop, this, aPreparedCB, scene, aForce), mCurrentDimChannel, dimmode_stop, area, 0, 0);
+      dimChannelForAreaPrepare(boost::bind(&Device::callSceneDimStop, this, aPreparedCB, scene, aForce), mCurrentDimChannel, dimmode_stop, area, 0, 0, true); // scene call must stop actions as well
       return;
     }
     else {
