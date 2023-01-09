@@ -1039,7 +1039,7 @@ void Device::notificationPrepare(PreparedCB aPreparedCB, NotificationDeliverySta
         }
         // autostop of dimming (localcontroller may want to prevent that)
         bool autostop = true;
-        o = aDeliveryState->mCallParams->get("autostop");
+        o = aDeliveryState->mCallParams->get("autoStop");
         if (o) autostop = o->boolValue();
         // stopping of actions when dimming (localcontroller may want to prevent that)
         // - not specified: stop actions on dim stop, but not on dim start (old behaviour as before 2023-01-09)
