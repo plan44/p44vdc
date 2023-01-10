@@ -983,6 +983,30 @@ static void dimchannel_func(BuiltinFunctionContextPtr f)
   channel_funcImpl(true, f);
 }
 
+// movechannel(channelid, direction)   - start or stop moving the channel value in the specified direction
+// movechannel(channelid, direction, timePerUnit)
+static const BuiltInArgDesc movechannel_args[] = { { text }, { numeric }, { numeric|optionalarg } };
+static const size_t movechannel_numargs = sizeof(movechannel_args)/sizeof(BuiltInArgDesc);
+static void movechannel_func(BuiltinFunctionContextPtr f)
+{
+  OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
+  assert(o);
+  ChannelBehaviourPtr channel = o->output()->getChannelById(f->arg(0)->stringValue());
+  if (!channel) {
+    f->finish(new AnnotatedNullValue("unknown channel"));
+    return;
+  }
+  else {
+    MLMicroSeconds timePerUnit = 0; // default to standard dimming rate of the channel
+    if (f->numArgs()>2) {
+      timePerUnit = f->arg(2)->doubleValue()*Second;
+    }
+    channel->moveChannelValue(f->arg(1)->intValue(), timePerUnit);
+  }
+  f->finish();
+}
+
+
 static const BuiltinMemberDescriptor outputMembers[] = {
   { "loadscene", executable|null, loadscene_numargs, loadscene_args, &loadscene_func },
   { "runactions", executable|null, runactions_numargs, runactions_args, &runactions_func },
@@ -991,6 +1015,7 @@ static const BuiltinMemberDescriptor outputMembers[] = {
   { "syncchannels", executable|null, 0, NULL, &syncchannels_func },
   { "channel", executable|numeric, channel_numargs, channel_args, &channel_func },
   { "dimchannel", executable|numeric, channel_numargs, channel_args, &dimchannel_func },
+  { "movechannel", executable|numeric, movechannel_numargs, movechannel_args, &movechannel_func },
   { NULL } // terminator
 };
 
