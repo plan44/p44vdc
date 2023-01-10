@@ -180,7 +180,13 @@ bool ChannelBehaviour::updateTransition(MLMicroSeconds aNow)
   if (aNow<=0) {
     if (!inTransition() || mChannelUpdatePending) {
       // initialize transition
-      if (mNextTransitionTime<=0 || aNow<0 || (mCachedChannelValue==mPreviousChannelValue && !wrapsAround())) {
+      if (
+        mNextTransitionTime<=0 || // no transition time OR
+        aNow<0 || ( // explicit reset requested OR
+          mCachedChannelValue==mPreviousChannelValue && // value unchanged AND
+          !(wrapsAround() && mTransitionDirection!=0) // no explicitly directional wraparound transition
+        )
+      ) {
         // no transitiontime or explicitly no transition requested or no value change: set transition to completed
         OLOG(LOG_INFO, "no or immediate transition");
         return setTransitionProgress(1);
@@ -219,6 +225,7 @@ bool ChannelBehaviour::setTransitionProgress(double aProgress)
     mProgress=1;
     mTransitionStarted = Never;
     mPreviousChannelValue = mCachedChannelValue; // end of transition reached, old previous value is no longer needed
+    mTransitionDirection = 0; // reset direction to prevent re-running full wraparound transitions again
     return false; // no longer in transition
   }
   return true; // still in transition
