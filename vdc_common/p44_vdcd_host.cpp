@@ -1113,8 +1113,8 @@ string ApiRequestObj::getAnnotation() const
   return "API request";
 }
 
-// answer([answer value])        answer the request
-static const BuiltInArgDesc answer_args[] = { { any|optionalarg } };
+// answer([answer value|error])        answer the request
+static const BuiltInArgDesc answer_args[] = { { any|error|optionalarg } };
 static const size_t answer_numargs = sizeof(answer_args)/sizeof(BuiltInArgDesc);
 static void answer_func(BuiltinFunctionContextPtr f)
 {
