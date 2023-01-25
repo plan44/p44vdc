@@ -227,8 +227,8 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   #endif
   #if ENABLE_UBUS
   // start ubus API, if we have it
-  if (ubusApiServer) {
-    ubusApiServer->startServer();
+  if (mUbusApiServer) {
+    mUbusApiServer->startServer();
   }
   #endif
   #if ENABLE_P44FEATURES && ENABLE_P44SCRIPT
@@ -265,13 +265,13 @@ static const struct blobmsg_policy vdcapi_policy[] = {
 
 void P44VdcHost::enableUbusApi()
 {
-  if (!ubusApiServer) {
+  if (!mUbusApiServer) {
     // can be enabled only once
-    ubusApiServer = UbusServerPtr(new UbusServer());
+    mUbusApiServer = UbusServerPtr(new UbusServer());
     UbusObjectPtr u = new UbusObject("vdcd", boost::bind(&P44VdcHost::ubusApiRequestHandler, this, _1));
     u->addMethod("api", vdcapi_policy);
 //    u->addMethod("cfg", cfgapi_policy);
-    ubusApiServer->registerObject(u);
+    mUbusApiServer->registerObject(u);
   }
 }
 

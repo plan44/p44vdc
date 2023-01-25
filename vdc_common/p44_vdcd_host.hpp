@@ -337,7 +337,7 @@ namespace p44 {
     #endif
 
     #if ENABLE_UBUS
-    UbusServerPtr ubusApiServer; ///< ubus API for openwrt web interface
+    UbusServerPtr mUbusApiServer; ///< ubus API for openwrt web interface
     #endif
 
     #if ENABLE_JSONBRIDGEAPI
