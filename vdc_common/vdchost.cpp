@@ -2457,7 +2457,7 @@ void VdcHost::scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
 // MARK: - VdcHost global script members and functions
 
 // vdcapi(jsoncall)
-static const BuiltInArgDesc vdcapi_args[] = { { json|structured } };
+static const BuiltInArgDesc vdcapi_args[] = { { structured } };
 static const size_t vdcapi_numargs = sizeof(vdcapi_args)/sizeof(BuiltInArgDesc);
 static void vdcapi_func(BuiltinFunctionContextPtr f)
 {

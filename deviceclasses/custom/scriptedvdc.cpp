@@ -44,7 +44,7 @@ public:
 
 // message()
 // message(messagetosend)
-static const BuiltInArgDesc message_args[] = { { json|object|text|optionalarg } };
+static const BuiltInArgDesc message_args[] = { { object|text|optionalarg } };
 static const size_t message_numargs = sizeof(message_args)/sizeof(BuiltInArgDesc);
 static void message_func(BuiltinFunctionContextPtr f)
 {
