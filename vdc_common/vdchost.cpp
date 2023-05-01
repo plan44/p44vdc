@@ -1593,7 +1593,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
   if (aMethod=="x-p44-restartMain") {
     // re-run the main script
     OLOG(LOG_NOTICE, "Re-starting global main script");
-    mMainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel()), ScriptObjPtr(), Infinite);
+    mMainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel(), ""), ScriptObjPtr(), Infinite);
     return Error::ok();
   }
   if (aMethod=="x-p44-stopMain") {
@@ -1627,7 +1627,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
   if (aMethod=="x-p44-setIdentity") {
     ApiValuePtr o;
     ErrorPtr err;
-    // current identity must be provided and must matches (safeguard)
+    // current identity must be provided and must match (safeguard)
     if (Error::isOK(err=checkParam(aParams, "currentIdentity", o))) {
       DsUid ci;
       if (ci.setAsString(o->stringValue()) && ci==mDSUID) {
@@ -2357,30 +2357,66 @@ void VdcHost::runGlobalScripts()
   // command line provided script
   string scriptFn;
   string script;
-  if (CmdLineApp::sharedCmdLineApp()->getStringOption("initscript", scriptFn)) {
+  bool setupscript = false;
+  ErrorPtr err;
+  if (CmdLineApp::sharedCmdLineApp()->getStringOption("setupscript", scriptFn)) {
     scriptFn = Application::sharedApplication()->resourcePath(scriptFn);
-    ErrorPtr err = string_fromfile(scriptFn, script);
+    // does it exist (any more)?
+    err = string_fromfile(scriptFn, script);
+    if (Error::isOK(err)) {
+      // exists, run it (and delete afterwards), no initscript or mainscript can run now
+      setupscript = true;
+    }
+    else {
+      // setupscript not available, we can run mainscript
+      OLOG(LOG_DEBUG, "setupscript not found -> ignoring");
+      scriptFn.clear();
+    }
+  }
+  if (!setupscript && CmdLineApp::sharedCmdLineApp()->getStringOption("initscript", scriptFn)) {
+    scriptFn = Application::sharedApplication()->resourcePath(scriptFn);
+    err = string_fromfile(scriptFn, script);
+  }
+  if (!scriptFn.empty()) {
     if (Error::notOK(err)) {
       OLOG(LOG_ERR, "cannot open initscript: %s", err->text());
     }
     else {
-      ScriptSource initScript(sourcecode+regular, "initscript", this);
+      ScriptSource initScript(sourcecode+regular, setupscript ? "setupscript" : "initscript", this);
       initScript.setSource(script, scriptbody|ephemeralSource);
       initScript.setSharedMainContext(mVdcHostScriptContext);
-      OLOG(LOG_NOTICE, "Starting initscript specified on commandline '%s'", scriptFn.c_str());
-      initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel()), ScriptObjPtr(), Infinite);
+      OLOG(LOG_NOTICE, "Starting %s specified on commandline '%s'", initScript.getOriginLabel(), scriptFn.c_str());
+      initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel(), setupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
     }
   }
   // stored global script
   if (!mMainScript.getSource().empty()) {
     OLOG(LOG_NOTICE, "Starting global main script");
-    mMainScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel()), ScriptObjPtr(), Infinite);
+    mMainScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel(), ""), ScriptObjPtr(), Infinite);
   }
 }
 
-void VdcHost::globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel)
+void VdcHost::globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel, string aSetupScriptFn)
 {
   OLOG(aResult && aResult->isErr() ? LOG_WARNING : LOG_NOTICE, "Global %s script finished running, result=%s", aOriginLabel, ScriptObj::describe(aResult).c_str());
+  if (!aSetupScriptFn.empty()) {
+    // this was a setup script running
+    if (aResult && !aResult->isErr() && aResult->boolValue()) {
+      // successful execution of setupscript, return value is trueish
+      string ret = aResult->stringValue().c_str();
+      OLOG(LOG_WARNING, "setupscript successfully executed returning='%s', now deleting file '%s'", ret.c_str(), aSetupScriptFn.c_str());
+      unlink(aSetupScriptFn.c_str());
+      if (ret=="reboot" || ret=="restart") {
+        // also reboot/restart
+        OLOG(LOG_WARNING, "setupscript requests %s", ret.c_str());
+        save();
+        Application::sharedApplication()->terminateApp(ret=="reboot" ? P44_EXIT_REBOOT : EXIT_SUCCESS);
+      }
+    }
+    else {
+      OLOG(LOG_ERR, "setupscript failed to execute successfully, returns: %s", ScriptObj::describe(aResult).c_str());
+    }
+  }
 }
 
 
