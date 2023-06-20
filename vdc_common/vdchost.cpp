@@ -52,7 +52,9 @@
 #include "i2c.hpp"
 #include "spi.hpp"
 #include "modbus.hpp"
+#if !DISABLE_DISCOVERY
 #include "dnssd.hpp"
+#endif
 #endif
 
 
