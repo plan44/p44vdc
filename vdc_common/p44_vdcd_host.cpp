@@ -47,49 +47,51 @@ using namespace p44;
 
 class SelfTestRunner
 {
-  StatusCB completedCB;
-  VdcMap::iterator nextVdc;
-  VdcHost &vdcHost;
-  ButtonInputPtr button;
-  IndicatorOutputPtr redLED;
-  IndicatorOutputPtr greenLED;
-  MLTicket errorReportTicket;
-  ErrorPtr globalError;
-  int realTests;
+  StatusCB mCompletedCB;
+  VdcMap::iterator mNextVdc;
+  VdcHost &mVdcHost;
+  ButtonInputPtr mButton;
+  IndicatorOutputPtr mRedLED;
+  IndicatorOutputPtr mGreenLED;
+  MLTicket mErrorReportTicket;
+  ErrorPtr mGlobalError;
+  int mRealTests;
+  bool mNoTestableHw;
 public:
-  static void initialize(VdcHost &aVdcHost, StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED)
+  static void initialize(VdcHost &aVdcHost, StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED, bool aNoTestableHw)
   {
     // create new instance, deletes itself when finished
-    new SelfTestRunner(aVdcHost, aCompletedCB, aButton, aRedLED, aGreenLED);
+    new SelfTestRunner(aVdcHost, aCompletedCB, aButton, aRedLED, aGreenLED, aNoTestableHw);
   };
 private:
-  SelfTestRunner(VdcHost &aVdcHost, StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED) :
-    completedCB(aCompletedCB),
-    vdcHost(aVdcHost),
-    button(aButton),
-    redLED(aRedLED),
-    greenLED(aGreenLED),
-    realTests(0)
+  SelfTestRunner(VdcHost &aVdcHost, StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED, bool aNoTestableHw) :
+    mCompletedCB(aCompletedCB),
+    mVdcHost(aVdcHost),
+    mButton(aButton),
+    mRedLED(aRedLED),
+    mGreenLED(aGreenLED),
+    mNoTestableHw(aNoTestableHw),
+    mRealTests(0)
   {
     // start testing
-    nextVdc = vdcHost.mVdcs.begin();
+    mNextVdc = mVdcHost.mVdcs.begin();
     testNextVdc();
   }
 
 
   void testNextVdc()
   {
-    if (nextVdc!=vdcHost.mVdcs.end()) {
+    if (mNextVdc!=mVdcHost.mVdcs.end()) {
       // ok, test next
       // - start green/yellow blinking = test in progress
-      greenLED->steadyOn();
-      redLED->blinkFor(Infinite, 600*MilliSecond, 50);
+      mGreenLED->steadyOn();
+      mRedLED->blinkFor(Infinite, 600*MilliSecond, 50);
       // - check for init errors
-      ErrorPtr vdcErr = nextVdc->second->getVdcErr();
+      ErrorPtr vdcErr = mNextVdc->second->getVdcErr();
       if (Error::isOK(vdcErr)) {
         // - run the test
-        LOG(LOG_WARNING, "Starting Test of %s (Tag=%d, %s)", nextVdc->second->vdcClassIdentifier(), nextVdc->second->getTag(), nextVdc->second->shortDesc().c_str());
-        nextVdc->second->selfTest(boost::bind(&SelfTestRunner::vdcTested, this, _1));
+        LOG(LOG_WARNING, "Starting Test of %s (Tag=%d, %s)", mNextVdc->second->vdcClassIdentifier(), mNextVdc->second->getTag(), mNextVdc->second->shortDesc().c_str());
+        mNextVdc->second->selfTest(boost::bind(&SelfTestRunner::vdcTested, this, _1));
       }
       else {
         // - vdc is already in error -> can't run the test, report the initialisation error (vdc status)
@@ -97,9 +99,9 @@ private:
       }
     }
     else {
-      if (realTests==0) {
+      if (mRealTests==0) {
         // no real tests performed
-        globalError = Error::err<VdcError>(VdcError::NoHWTested, "self test had nothing to actually test (no HW tests performed)");
+        mGlobalError = Error::err<VdcError>(VdcError::NoHWTested, "self test had nothing to actually test (no HW tests performed)");
       }
       testCompleted(); // done
     }
@@ -109,30 +111,30 @@ private:
   void vdcTested(ErrorPtr aError)
   {
     if (Error::notOK(aError)) {
-      if (!aError->isError("Vdc", VdcError::NoHWTested)) {
+      if (!aError->isError(VdcError::domain(), VdcError::NoHWTested)) {
         // test failed
-        LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", nextVdc->second->vdcClassIdentifier(), aError->text());
+        LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", mNextVdc->second->vdcClassIdentifier(), aError->text());
         // remember
-        globalError = aError;
+        mGlobalError = aError;
         // morse out tag number of vDC failing self test until button is pressed
-        greenLED->steadyOff();
-        int numBlinks = nextVdc->second->getTag();
-        redLED->blinkFor(300*MilliSecond*numBlinks, 300*MilliSecond, 50);
+        mGreenLED->steadyOff();
+        int numBlinks = mNextVdc->second->getTag();
+        mRedLED->blinkFor(300*MilliSecond*numBlinks, 300*MilliSecond, 50);
         // call myself again later
-        errorReportTicket.executeOnce(boost::bind(&SelfTestRunner::vdcTested, this, aError), 300*MilliSecond*numBlinks+2*Second);
+        mErrorReportTicket.executeOnce(boost::bind(&SelfTestRunner::vdcTested, this, aError), 300*MilliSecond*numBlinks+2*Second);
         // also install button responder
-        button->setButtonHandler(boost::bind(&SelfTestRunner::errorAcknowledged, this), false); // report only release
+        mButton->setButtonHandler(boost::bind(&SelfTestRunner::errorAcknowledged, this), false); // report only release
         return; // done for now
       }
     }
     else {
       // real test ok
-      realTests++;
+      mRealTests++;
     }
     // test was ok
-    LOG(LOG_ERR, "------ Test of '%s' OK", nextVdc->second->vdcClassIdentifier());
+    LOG(LOG_ERR, "------ Test of '%s' OK", mNextVdc->second->vdcClassIdentifier());
     // check next
-    ++nextVdc;
+    ++mNextVdc;
     testNextVdc();
   }
 
@@ -140,29 +142,34 @@ private:
   void errorAcknowledged()
   {
     // stop error morse
-    redLED->steadyOff();
-    greenLED->steadyOff();
-    errorReportTicket.cancel();
+    mRedLED->steadyOff();
+    mGreenLED->steadyOff();
+    mErrorReportTicket.cancel();
     // test next (if any)
-    ++nextVdc;
+    ++mNextVdc;
     testNextVdc();
   }
 
 
   void testCompleted()
   {
-    if (Error::isOK(globalError)) {
+    if (Error::isError(mGlobalError, VdcError::domain(), VdcError::NoHWTested) && mNoTestableHw) {
+      LOG(LOG_ERR, "Self test OK - but without any actually tested hardware");
+      mRedLED->steadyOff();
+      mGreenLED->blinkFor(Infinite, 150, 80); // hectic green flickering = OK but no HW tested
+    }
+    if (Error::isOK(mGlobalError)) {
       LOG(LOG_ERR, "Self test OK");
-      redLED->steadyOff();
-      greenLED->blinkFor(Infinite, 500, 85); // slow green blinking = good
+      mRedLED->steadyOff();
+      mGreenLED->blinkFor(Infinite, 500, 85); // slow green blinking = good
     }
     else  {
-      LOG(LOG_ERR, "Self test has FAILED: %s", globalError->text());
-      greenLED->steadyOff();
-      redLED->blinkFor(Infinite, 250, 60); // faster red blinking = not good
+      LOG(LOG_ERR, "Self test has FAILED: %s", mGlobalError->text());
+      mGreenLED->steadyOff();
+      mRedLED->blinkFor(Infinite, 250, 60); // faster red blinking = not good
     }
     // callback, report last error seen
-    completedCB(globalError);
+    mCompletedCB(mGlobalError);
     // done, delete myself
     delete this;
   }
@@ -186,10 +193,10 @@ P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) 
 }
 
 
-void P44VdcHost::selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED)
+void P44VdcHost::selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED, bool aNoTestableHw)
 {
   #if SELFTESTING_ENABLED
-  SelfTestRunner::initialize(*this, aCompletedCB, aButton, aRedLED, aGreenLED);
+  SelfTestRunner::initialize(*this, aCompletedCB, aButton, aRedLED, aGreenLED, aNoTestableHw);
   #else
   aCompletedCB(TextError::err("Fatal: Testing is not included in this build"));
   #endif
