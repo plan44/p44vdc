@@ -35,24 +35,24 @@ namespace p44 {
   {
     typedef ChannelBehaviour inherited;
 
-    MLMicroSeconds fullRangeTime;
+    MLMicroSeconds mFullRangeTime;
 
   public:
     ShadowPositionChannel(OutputBehaviour &aOutput) : inherited(aOutput, "shadePositionOutside")
     {
       mResolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
-      fullRangeTime = 50*Second; // just an average blind full range time
+      mFullRangeTime = 50*Second; // just an average blind full range time
     };
 
     /// Set time it takes to run trough a full range (0..100%), approximately
-    void setFullRangeTime(MLMicroSeconds aFullRangeTime) { fullRangeTime = aFullRangeTime; };
+    void setFullRangeTime(MLMicroSeconds aFullRangeTime) { mFullRangeTime = aFullRangeTime; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_shade_position_outside; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "shade position (outside)"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
-    virtual double getStdDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
+    virtual double getStdDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/mFullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
 
   };
   typedef boost::intrusive_ptr<ShadowPositionChannel> ShadowPositionChannelPtr;
@@ -62,24 +62,24 @@ namespace p44 {
   {
     typedef ChannelBehaviour inherited;
 
-    MLMicroSeconds fullRangeTime;
+    MLMicroSeconds mFullRangeTime;
 
   public:
     ShadowAngleChannel(OutputBehaviour &aOutput) : inherited(aOutput, "shadeOpeningAngleOutside")
     {
       mResolution = 100.0/65536; // position defaults to historic dS 1/65536 of full scale resolution
-      fullRangeTime = 1.5*Second; // just an average blind angle turn time
+      mFullRangeTime = 1.5*Second; // just an average blind angle turn time
     };
 
     /// Set time it takes to run trough a full range (0..100%), approximately
-    void setFullRangeTime(MLMicroSeconds aFullRangeTime) { fullRangeTime = aFullRangeTime; };
+    void setFullRangeTime(MLMicroSeconds aFullRangeTime) { mFullRangeTime = aFullRangeTime; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_shade_angle_outside; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char *getName() P44_OVERRIDE { return "shade angle (outside)"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
-    virtual double getStdDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/fullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
+    virtual double getStdDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/mFullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
 
   };
   typedef boost::intrusive_ptr<ShadowAngleChannel> ShadowAngleChannelPtr;
@@ -96,7 +96,7 @@ namespace p44 {
     /// @name shadow scene specific values
     /// @{
 
-    double angle; ///< shadow device angle
+    double mAngle; ///< shadow device angle
 
     /// @}
 
@@ -224,22 +224,22 @@ namespace p44 {
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
-    ShadowDeviceKind shadowDeviceKind;
-    MLMicroSeconds minMoveTime;
-    MLMicroSeconds maxShortMoveTime;
-    MLMicroSeconds minLongMoveTime;
-    bool absoluteMovement;
-    bool hasEndContacts;
+    ShadowDeviceKind mShadowDeviceKind;
+    MLMicroSeconds mMinMoveTime;
+    MLMicroSeconds mMaxShortMoveTime;
+    MLMicroSeconds mMinLongMoveTime;
+    bool mAbsoluteMovement;
+    bool mHasEndContacts;
     /// @}
 
 
     /// @name persistent settings
     /// @{
-    double openTime; // in seconds!
-    double closeTime; // in seconds!
-    double angleOpenTime; // in seconds!
-    double angleCloseTime; // in seconds!
-    double stopDelayTime; // in seconds!
+    double mOpenTime; // in seconds!
+    double mCloseTime; // in seconds!
+    double mAngleOpenTime; // in seconds!
+    double mAngleCloseTime; // in seconds!
+    double mStopDelayTime; // in seconds!
     /// @}
 
 
@@ -254,20 +254,20 @@ namespace p44 {
       blind_stopping_before_turning, ///< stopping before adjusting angle
       blind_turning,
       blind_dimming, ///< free movement while dimming
-    } blindState; ///< current state
-    bool movingUp; ///< when in a moving state: set if moving up
+    } mBlindState; ///< current state
+    bool mMovingUp; ///< when in a moving state: set if moving up
 
-    double targetPosition;
-    double targetAngle;
-    double referencePosition; ///< reference (starting) position during moves
-    double referenceAngle; ///< reference (starting) angle during moves
-    MovementChangeCB movementCB; ///< routine to call to change movement
-    MLMicroSeconds referenceTime; ///< if not Never, time when last movement was started
-    MLTicket movingTicket;
-    MLTicket sequenceTicket;
-    bool runIntoEnd; ///< if set, move is expected to run into end contact, so no timer will be set up
-    bool updateMoveTimeAtEndReached; ///< if set (only makes sense with hasEndContacts), difference between reference time and now will update open or close time
-    SimpleCB endContactMoveAppliedCB; ///< callback to trigger when end contacts stop movement
+    double mTargetPosition;
+    double mTargetAngle;
+    double mReferencePosition; ///< reference (starting) position during moves
+    double mReferenceAngle; ///< reference (starting) angle during moves
+    MovementChangeCB mMovementCB; ///< routine to call to change movement
+    MLMicroSeconds mReferenceTime; ///< if not Never, time when last movement was started
+    MLTicket mMovingTicket;
+    MLTicket mSequenceTicket;
+    bool mRunIntoEnd; ///< if set, move is expected to run into end contact, so no timer will be set up
+    bool mUpdateMoveTimeAtEndReached; ///< if set (only makes sense with hasEndContacts), difference between reference time and now will update open or close time
+    SimpleCB mEndContactMoveAppliedCB; ///< callback to trigger when end contacts stop movement
 
     /// @}
 
@@ -280,8 +280,8 @@ namespace p44 {
     virtual const char *behaviourTypeIdentifier() P44_FINAL { return "shadow"; };
 
     /// the channels
-    ShadowPositionChannelPtr position;
-    ShadowAngleChannelPtr angle;
+    ShadowPositionChannelPtr mPosition;
+    ShadowAngleChannelPtr mAngle;
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{

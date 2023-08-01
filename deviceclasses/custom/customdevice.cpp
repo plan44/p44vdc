@@ -1147,8 +1147,8 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
       endContacts = o->boolValue();
     }
     sb->setDeviceParams(sk, endContacts, 0, 0, 0, !mUseMovement); // no restrictions for move times, when "move" is not specified, device can do absolute positioning
-    sb->position->syncChannelValue(100, false, true); // assume fully up at beginning
-    sb->angle->syncChannelValue(100, false, true); // assume fully open at beginning
+    sb->mPosition->syncChannelValue(100, false, true); // assume fully up at beginning
+    sb->mAngle->syncChannelValue(100, false, true); // assume fully open at beginning
     addBehaviour(sb);
   }
   else if (outputType=="basic") {
