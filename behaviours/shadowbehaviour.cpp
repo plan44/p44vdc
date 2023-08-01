@@ -594,7 +594,14 @@ void ShadowBehaviour::allDone(SimpleCB aApplyDoneCB)
   mMovementCB = NoOP;
   mBlindState = blind_idle;
   OLOG(LOG_INFO, "End of movement sequence, reached position=%.1f%%, angle=%.1f", mReferencePosition, mReferenceAngle);
-  if (aApplyDoneCB) aApplyDoneCB();
+  if (aApplyDoneCB) {
+    // apply not yet confirmed
+    aApplyDoneCB();
+  }
+  else {
+    // push final state to bridges (not to dS)
+    pushChannelStates(false, true);
+  }
 }
 
 
