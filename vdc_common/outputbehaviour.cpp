@@ -283,6 +283,7 @@ bool OutputBehaviour::pushChannelStates(bool aDS, bool aBridges)
       ApiValuePtr query = api->newApiValue();
       query->setType(apivalue_object);
       query->add("channelStates", query->newValue(apivalue_null));
+      query->add("outputState", query->newValue(apivalue_null));
       if (!mDevice.pushNotification(api, query, ApiValuePtr())) requestedPushDone = false;
     }
     else {
