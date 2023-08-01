@@ -983,6 +983,27 @@ const PropertyDescriptorPtr ShadowBehaviour::getSettingsDescriptorByIndex(int aP
 }
 
 
+// state properties
+enum {
+  movingState_key,
+  numStateProperties
+};
+
+
+int ShadowBehaviour::numStateProps() { return inherited::numStateProps()+numStateProperties; }
+const PropertyDescriptorPtr ShadowBehaviour::getStateDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
+{
+  static const PropertyDescription properties[numStateProperties] = {
+    { "movingState", apivalue_int64, movingState_key+states_key_offset, OKEY(shadow_key) },
+  };
+  int n = inherited::numStateProps();
+  if (aPropIndex<n)
+    return inherited::getStateDescriptorByIndex(aPropIndex, aParentDescriptor);
+  aPropIndex -= n;
+  return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+}
+
+
 // access to all fields
 
 bool ShadowBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
@@ -997,6 +1018,8 @@ bool ShadowBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case angleOpenTime_key+settings_key_offset: aPropValue->setDoubleValue(mAngleOpenTime); return true;
         case angleCloseTime_key+settings_key_offset: aPropValue->setDoubleValue(mAngleCloseTime); return true;
         case stopDelayTime_key+settings_key_offset: aPropValue->setDoubleValue(mStopDelayTime); return true;
+        // State properties
+        case movingState_key+states_key_offset: aPropValue->setInt8Value(mBlindState==blind_idle ? 0 : (mMovingUp ? 1 : -1)); return true;
       }
     }
     else {
