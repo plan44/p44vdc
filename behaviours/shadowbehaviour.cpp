@@ -25,7 +25,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL IFNOTREDUCEDFOOTPRINT(7)
+#define FOCUSLOGLEVEL IFNOTREDUCEDFOOTPRINT(6)
 
 #include "shadowbehaviour.hpp"
 
@@ -404,8 +404,10 @@ void ShadowBehaviour::moveTimerStart()
 
 void ShadowBehaviour::moveTimerStop()
 {
-  mReferencePosition = getPosition();
-  mReferenceAngle = getAngle();
+  if (mBlindState!=blind_stopping_after_turn) { // do not update position after turning
+    mReferencePosition = getPosition();
+  }
+  mReferenceAngle = getAngle(); // do update angle because it might always change when moving
   mReferenceTime = Never;
 }
 
@@ -431,7 +433,7 @@ void ShadowBehaviour::applyBlindChannels(MovementChangeCB aMovementCB, SimpleCB 
       return;
     }
     // normal operation: stop first
-    if (mBlindState==blind_stopping) {
+    if (mBlindState==blind_stopping || mBlindState==blind_stopping_after_turn) {
       // already stopping, just make sure we'll apply afterwards
       mBlindState = blind_stopping_before_apply;
     }
@@ -492,7 +494,7 @@ void ShadowBehaviour::stop(SimpleCB aApplyDoneCB)
     }
     else if (mBlindState!=blind_stopping_before_apply) {
       // normal stop, unless this is a stop caused by a request to apply new values afterwards
-      mBlindState = blind_stopping;
+      mBlindState = mBlindState==blind_turning ? blind_stopping_after_turn : blind_stopping;
     }
     OLOG(LOG_INFO, "Stopping all movement%s", mBlindState==blind_stopping_before_apply ? " before applying" : "");
     mMovingTicket.cancel();
@@ -576,9 +578,10 @@ void ShadowBehaviour::processStopped(SimpleCB aApplyDoneCB)
       break;
     default:
       // end of sequence
-      // - confirm apply and update actual values
+      // - confirm apply and update actual values (might have already happened at start for long moves)
       mPosition->channelValueApplied();
       mAngle->channelValueApplied();
+      // - actually set positions, ends estimating transitions
       mPosition->syncChannelValue(getPosition());
       mAngle->syncChannelValue(getAngle());
       // - done
@@ -600,7 +603,8 @@ void ShadowBehaviour::allDone(SimpleCB aApplyDoneCB)
   }
   else {
     // push final state to bridges (not to dS)
-    pushChannelStates(false, true);
+    OLOG(LOG_INFO, "- was a long movement, apply confirmed earlier -> re-push output state to bridges");
+    reportOutputState();
   }
 }
 
@@ -734,6 +738,10 @@ void ShadowBehaviour::startMoving(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
   }
   // actually start moving
   FOCUSLOG("- start moving into direction = %d", dir);
+  // - start a transition of the channel as an approximate model for live feedback
+  if (mBlindState==blind_positioning) mPosition->startExternallyTimedTransition(aStopIn);
+  if (mBlindState==blind_turning) mAngle->startExternallyTimedTransition(aStopIn);
+  // - start the movement
   mMovementCB(boost::bind(&ShadowBehaviour::moveStarted, this, aStopIn, aApplyDoneCB), dir);
 }
 
@@ -773,6 +781,11 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
       if (aApplyDoneCB) aApplyDoneCB();
       // - and prevent calling back again later
       aApplyDoneCB = NoOP;
+      // schedule progress updates
+      MLMicroSeconds r = outputReportInterval();
+      if (r!=Never) {
+        mProgressTicket.executeOnce(boost::bind(&ShadowBehaviour::progressReport, this, _2), r);
+      }
     }
     FOCUSLOG("- move started, scheduling stop in %.3f Seconds", (double)aStopIn/Second);
     mMovingTicket.executeOnce(boost::bind(&ShadowBehaviour::endMove, this, remaining, aApplyDoneCB), aStopIn);
@@ -780,8 +793,20 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
 }
 
 
+void ShadowBehaviour::progressReport(MLMicroSeconds aNow)
+{
+  // issue an intermediate output channel progress report
+  mPosition->updateTimedTransition(aNow, 0.9); // do not simulate progress beyond 90%
+  mAngle->updateTimedTransition(aNow, 0.9); // do not simulate progress beyond 90%
+  reportOutputState();
+  // - reschedule
+  mProgressTicket.executeOnce(boost::bind(&ShadowBehaviour::progressReport, this, _2), outputReportInterval());
+}
+
+
 void ShadowBehaviour::endMove(MLMicroSeconds aRemainingMoveTime, SimpleCB aApplyDoneCB)
 {
+  mProgressTicket.cancel();
   if (aRemainingMoveTime<=0) {
     // move is complete, regular stop
     stop(aApplyDoneCB);

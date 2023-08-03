@@ -253,6 +253,7 @@ namespace p44 {
       blind_positioning,
       blind_stopping_before_turning, ///< stopping before adjusting angle
       blind_turning,
+      blind_stopping_after_turn,
       blind_dimming, ///< free movement while dimming
     } mBlindState; ///< current state
     bool mMovingUp; ///< when in a moving state: set if moving up
@@ -264,6 +265,7 @@ namespace p44 {
     MovementChangeCB mMovementCB; ///< routine to call to change movement
     MLMicroSeconds mReferenceTime; ///< if not Never, time when last movement was started
     MLTicket mMovingTicket;
+    MLTicket mProgressTicket;
     MLTicket mSequenceTicket;
     bool mRunIntoEnd; ///< if set, move is expected to run into end contact, so no timer will be set up
     bool mUpdateMoveTimeAtEndReached; ///< if set (only makes sense with hasEndContacts), difference between reference time and now will update open or close time
@@ -398,6 +400,7 @@ namespace p44 {
     double getAngle();
     void moveTimerStart();
     void moveTimerStop();
+    void progressReport(MLMicroSeconds aNow);
     void stop(SimpleCB aApplyDoneCB);
     void stopped(SimpleCB aApplyDoneCB, bool delay=false);
     void processStopped(SimpleCB aApplyDoneCB);
