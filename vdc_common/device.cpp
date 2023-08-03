@@ -1319,8 +1319,8 @@ void Device::applyingChannelsComplete()
       cb();
     }
     FOCUSLOG("- confirmed apply (really) finalized (ticket #%ld)", ticketNo);
-    // report channel changes to bridges, but not to dS
-    getOutput()->pushChannelStates(false, true);
+    // report output changes according to output settings
+    getOutput()->reportOutputState();
   }
 }
 
@@ -1573,7 +1573,7 @@ void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool 
       mIsDimming = true;
       if (aDoApply) {
         // make sure the start point is calculated if needed
-        aChannel->getChannelValueCalculated();
+        aChannel->getChannelValueCalculated(false);
         aChannel->setNeedsApplying(0); // force re-applying start point, no transition time
         // calculate increment
         double increment = (aDimMode==dimmode_up ? DIM_STEP_INTERVAL_MS : -DIM_STEP_INTERVAL_MS) * aChannel->getDimPerMS();
@@ -1810,9 +1810,9 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatTo
           // just consider all channels already applied (e.g. by vdc-level native action)
           // - confirm having applied channels (normally, actual device-level apply would do that)
           allChannelsApplied();
-          // - push final channel values to bridges (but not dS)
+          // - report output changes according to output settings
           //   (in non-optimized case above, this is done by applyingChannelsComplete() as consequence of requestApplyingChannels())
-          getOutput()->pushChannelStates(false, true);
+          getOutput()->reportOutputState();
           // - consider scene applied but indirectly
           sceneValuesApplied(aDoneCB, scene, true);
           return;

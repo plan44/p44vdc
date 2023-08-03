@@ -171,7 +171,7 @@ namespace p44 {
     /// initialize a transition or update its progress over time
     /// @param aNow current time, used to calculate progress. Default is 0 and means starting a new transition NOW
     /// @return true if the transition must be updated again, false if end of transition already reached
-    bool updateBrightnessTransition(MLMicroSeconds aNow = 0) { return brightness->updateTransition(aNow); }
+    bool updateBrightnessTransition(MLMicroSeconds aNow = 0) { return brightness->updateTimedTransition(aNow); }
 
     /// wrapper to confirm having applied brightness
     void brightnessApplied() { brightness->channelValueApplied(); };

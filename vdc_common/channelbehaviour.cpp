@@ -152,7 +152,7 @@ string ChannelBehaviour::getSourceName()
 
 double ChannelBehaviour::getSourceValue()
 {
-  return getChannelValueCalculated();
+  return getChannelValueCalculated(false);
 }
 
 
@@ -176,7 +176,7 @@ int ChannelBehaviour::getSourceOpLevel()
 //   Hardware implementations might choose not to use it, in favor of a hardware-specific transition mechanism.
 
 
-bool ChannelBehaviour::updateTransition(MLMicroSeconds aNow)
+bool ChannelBehaviour::updateTimedTransition(MLMicroSeconds aNow, double aMaxProgress)
 {
   if (aNow<=0) {
     if (!inTransition() || mChannelUpdatePending) {
@@ -203,7 +203,9 @@ bool ChannelBehaviour::updateTransition(MLMicroSeconds aNow)
     OLOG(LOG_INFO, "no channel update pending: keep previous transition running");
   }
   // calculate new progress
-  return setTransitionProgress(mNextTransitionTime==0 ? 1 : (double)(aNow-mTransitionStarted)/mNextTransitionTime);
+  double progress = mNextTransitionTime==0 ? 1 : (double)(aNow-mTransitionStarted)/mNextTransitionTime;
+  if (aMaxProgress!=0 && progress>aMaxProgress) progress = aMaxProgress; // keep at provided "almost finished"
+  return setTransitionProgress(progress);
 }
 
 
@@ -237,6 +239,57 @@ bool ChannelBehaviour::inTransition()
 {
   return mProgress<1;
 }
+
+
+void ChannelBehaviour::startExternallyTimedTransition(MLMicroSeconds aEstimatedTransitionTime)
+{
+  if (aEstimatedTransitionTime!=Infinite) {
+    mNextTransitionTime = aEstimatedTransitionTime;
+    // start time-defined transition
+    updateTimedTransition();
+  }
+  else {
+    // start
+    OLOG(LOG_INFO, "initialized for externally defined transition of unknown time");
+    mNextTransitionTime = Infinite; // unknown
+    mTransitionStarted = MainLoop::now(); // still remember time started
+    setTransitionProgress(0);
+  }
+}
+
+
+bool ChannelBehaviour::reportChannelProgress(double aTransitionalChannelValue)
+{
+  double dist = mCachedChannelValue-mPreviousChannelValue;
+  double progress = 1; // assume done
+  if (dist!=0 && aTransitionalChannelValue!=mCachedChannelValue) {
+    progress = (aTransitionalChannelValue-mPreviousChannelValue) / dist;
+  }
+  if (progress<mProgress) {
+    OLOG(LOG_WARNING, "decreasing progress %.2f from value %.2f NOT APPLIED", mProgress, aTransitionalChannelValue);
+    return mProgress>=1; // done when already done before
+  }
+  bool done = setTransitionProgress(progress);
+  OLOG(LOG_INFO, "progress recalculated as %.2f from value %.2f", mProgress, aTransitionalChannelValue);
+  return done;
+}
+
+
+MLMicroSeconds ChannelBehaviour::remainingTransitionTime()
+{
+  if (!inTransition()) {
+    return 0; // nothing remaining
+  }
+  if (mNextTransitionTime>0) {
+    // timed transition, we know when it is finished
+    return mNextTransitionTime*(1-mProgress);
+  }
+  // estimate from progress and time already spent
+  MLMicroSeconds spent = MainLoop::now()-mTransitionStarted;
+  // below 10% progress, just assume 10% done
+  return spent / (mProgress>0.1 ? mProgress : 0.1);
+}
+
 
 
 // MARK: - channel value handling
@@ -607,6 +660,9 @@ enum {
 enum {
   value_key,
   age_key,
+  transitionalvalue_key,
+  transitiontimeleft_key,
+  progress_key,
   numChannelStateProperties
 };
 
@@ -649,8 +705,11 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
   //static const PropertyDescription channelSettingsProperties[numChannelSettingsProperties] = {
   //};
   static const PropertyDescription channelStateProperties[numChannelStateProperties] = {
-    { "value", apivalue_null, value_key+states_key_offset, OKEY(channel_Key) }, // note: so far, pbuf API requires uint here
+    { "value", apivalue_null, value_key+states_key_offset, OKEY(channel_Key) },
     { "age", apivalue_double, age_key+states_key_offset, OKEY(channel_Key) },
+    { "x-p44-transitional", apivalue_double, transitionalvalue_key+states_key_offset, OKEY(channel_Key) },
+    { "x-p44-transitiontimeleft", apivalue_double, transitiontimeleft_key+states_key_offset, OKEY(channel_Key) },
+    { "x-p44-progress", apivalue_double, progress_key+states_key_offset, OKEY(channel_Key) },
   };
   #if !REDUCED_FOOTPRINT
   if (aParentDescriptor->hasObjectKey(channel_enumvalues_key)) {
@@ -732,13 +791,26 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         case value_key+states_key_offset:
           // get value of channel, possibly calculating it if needed (color conversions)
           aPropValue->setType(apivalue_double);
-          aPropValue->setDoubleValue(getChannelValueCalculated());
+          aPropValue->setDoubleValue(getChannelValueCalculated(false));
           return true;
         case age_key+states_key_offset:
           if (mChannelLastSync==Never || mIsVolatileValue)
             aPropValue->setNull(); // no value known, or volatile
           else
             aPropValue->setDoubleValue((double)(MainLoop::now()-mChannelLastSync)/Second); // time of last sync (does not necessarily relate to currently visible "value", as this might be a to-be-applied new value already)
+          return true;
+        case transitionalvalue_key+states_key_offset:
+          if (!inTransition()) return false; // show only when transition is in progress
+          // get transitional value of channel
+          aPropValue->setDoubleValue(getChannelValueCalculated(true));
+          return true;
+        case transitiontimeleft_key+states_key_offset:
+          if (!inTransition()) return false; // show only when transition is in progress
+          aPropValue->setDoubleValue((double)remainingTransitionTime()/Second);
+          return true;
+        case progress_key+states_key_offset:
+          if (!inTransition()) return false; // show only when transition is in progress
+          aPropValue->setDoubleValue(transitionProgress());
           return true;
       }
     }

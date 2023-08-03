@@ -29,18 +29,18 @@ using namespace p44;
 
 // MARK: - ColorChannel
 
-double ColorChannel::getChannelValueCalculated()
+double ColorChannel::getChannelValueCalculated(bool aTransitional)
 {
   // check with behaviour first
   ColorLightBehaviour *cl = dynamic_cast<ColorLightBehaviour *>(&mOutput);
   if (cl) {
     if (cl->colorMode!=colorMode()) {
       // asking for a color channel that is not native -> have it calculated
-      cl->deriveMissingColorChannels();
+      cl->deriveMissingColorChannels(aTransitional);
     }
   }
   // now return it
-  return getChannelValue();
+  return getChannelValue(aTransitional);
 }
 
 
@@ -519,7 +519,7 @@ bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation, bo
 
 // Note: altough very similar to the getXXX() above, this one does not operate on transitional values and also
 //       can share some code when calculating two missing modes at once
-void ColorLightBehaviour::deriveMissingColorChannels()
+void ColorLightBehaviour::deriveMissingColorChannels(bool aTransitional)
 {
   if (!derivedValuesComplete) {
     Row3 HSV;
@@ -528,8 +528,8 @@ void ColorLightBehaviour::deriveMissingColorChannels()
     switch (colorMode) {
       case colorLightModeHueSaturation:
         // missing CIE and ct
-        HSV[0] = hue->getChannelValue(); // 0..360
-        HSV[1] = saturation->getChannelValue()/100; // 0..1
+        HSV[0] = hue->getChannelValue(aTransitional); // 0..360
+        HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
         HSV[2] = 1;
         HSVtoxyV(HSV, xyV);
         cieX->syncChannelValue(xyV[0], false, true); // derived values are always volatile
@@ -539,8 +539,8 @@ void ColorLightBehaviour::deriveMissingColorChannels()
         break;
       case colorLightModeXY:
         // missing HSV and ct
-        xyV[0] = cieX->getChannelValue();
-        xyV[1] = cieY->getChannelValue();
+        xyV[0] = cieX->getChannelValue(aTransitional);
+        xyV[1] = cieY->getChannelValue(aTransitional);
         xyV[2] = 1;
         xyVtoCT(xyV, mired);
         ct->syncChannelValue(mired, false, true);
@@ -552,7 +552,7 @@ void ColorLightBehaviour::deriveMissingColorChannels()
       case colorLightModeCt:
         // missing HSV and xy
         // - xy
-        CTtoxyV(ct->getChannelValue(), xyV);
+        CTtoxyV(ct->getChannelValue(aTransitional), xyV);
         cieX->syncChannelValue(xyV[0], false, true);
         cieY->syncChannelValue(xyV[1], false, true);
         // - also create HSV
@@ -564,9 +564,9 @@ void ColorLightBehaviour::deriveMissingColorChannels()
     if (DBGLOGENABLED(LOG_DEBUG)) {
       // show all values, plus RGB
       DBGLOG(LOG_DEBUG, "Color mode = %s, actual and derived channel settings:", colorMode==colorLightModeHueSaturation ? "HSV" : (colorMode==colorLightModeXY ? "CIExy" : (colorMode==colorLightModeCt ? "CT" : "none")));
-      DBGLOG(LOG_DEBUG, "- HSV : %6.1f, %6.1f, %6.1f [%%, %%, %%]", hue->getChannelValue(), saturation->getChannelValue(), brightness->getChannelValue());
-      DBGLOG(LOG_DEBUG, "- xyV : %6.4f, %6.4f, %6.4f [0..1, 0..1, %%]", cieX->getChannelValue(), cieY->getChannelValue(), brightness->getChannelValue());
-      DBGLOG(LOG_DEBUG, "- CT  : %6.0f, %6.0f [mired, K]", ct->getChannelValue(), 1E6/ct->getChannelValue());
+      DBGLOG(LOG_DEBUG, "- HSV : %6.1f, %6.1f, %6.1f [%%, %%, %%]", hue->getChannelValue(aTransitional), saturation->getChannelValue(aTransitional), brightness->getChannelValue(aTransitional));
+      DBGLOG(LOG_DEBUG, "- xyV : %6.4f, %6.4f, %6.4f [0..1, 0..1, %%]", cieX->getChannelValue(aTransitional), cieY->getChannelValue(aTransitional), brightness->getChannelValue(aTransitional));
+      DBGLOG(LOG_DEBUG, "- CT  : %6.0f, %6.0f [mired, K]", ct->getChannelValue(aTransitional), 1E6/ct->getChannelValue(aTransitional));
     }
   }
 }
@@ -612,15 +612,15 @@ bool ColorLightBehaviour::updateColorTransition(MLMicroSeconds aNow)
   bool moreSteps = false;
   switch (colorMode) {
     case colorLightModeHueSaturation:
-      if (hue->updateTransition(aNow)) moreSteps = true;
-      if (saturation->updateTransition(aNow)) moreSteps = true;
+      if (hue->updateTimedTransition(aNow)) moreSteps = true;
+      if (saturation->updateTimedTransition(aNow)) moreSteps = true;
       break;
     case colorLightModeCt:
-      if (ct->updateTransition(aNow)) moreSteps = true;
+      if (ct->updateTimedTransition(aNow)) moreSteps = true;
       break;
     case colorLightModeXY:
-      if (cieX->updateTransition(aNow)) moreSteps = true;
-      if (cieY->updateTransition(aNow)) moreSteps = true;
+      if (cieX->updateTimedTransition(aNow)) moreSteps = true;
+      if (cieY->updateTimedTransition(aNow)) moreSteps = true;
       break;
     default:
       // no color

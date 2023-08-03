@@ -58,10 +58,14 @@ namespace p44 {
     /// @name persistent settings
     /// @{
     VdcOutputMode mOutputMode; ///< the mode of the output. Can be outputmode_default to have device to use its preferred (or only possible) mode
-    bool mPushChanges; ///< if set, local changes to output will be pushed upstreams
+    bool mPushChangesToDS; ///< if set, local changes to output will be pushed upstreams
     DsGroupMask mOutputGroups; ///< mask for group memberships (0..63)
     /// @}
 
+    /// @name non-persistent operational settings
+    /// @{
+    MLMicroSeconds mBridgePushInterval; ///< Infinite: do not push. 0: push final values. Other: how often bridge would want updates (e.g. during transitions)
+    /// @}
 
     /// @name internal volatile state
     /// @{
@@ -109,8 +113,19 @@ namespace p44 {
     /// @return the actual output mode, never returns outputmode_default
     VdcOutputMode actualOutputMode();
 
-    /// push current channel states
-    bool pushChannelStates(bool aDS, bool aBridges);
+    /// push current output state (outputState and channelStates)
+    /// @param aDS push to digitalstrom (probably will never be used, because they do not bother to support it)
+    /// @param aBridges push to bridge API clients
+    /// @return true if requested pushes could be done (or none are requested at all)
+    bool pushOutputState(bool aDS, bool aBridges);
+
+    /// report current output state to interested consumers
+    /// @note mPushChangesToDS and mBridgePushInterval determine what to push.
+    bool reportOutputState();
+
+    /// get the report interval interested consumers would like to see
+    /// @return Never if no regular updates are needed, or interval after which clients would like another update
+    MLMicroSeconds outputReportInterval();
 
     /// @}
 

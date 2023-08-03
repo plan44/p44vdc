@@ -36,7 +36,8 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   // persistent settings
   mOutputMode(outputmode_default), // use the default
   mDefaultOutputMode(outputmode_disabled), // none by default, hardware should set a default matching the actual HW capabilities
-  mPushChanges(false), // do not push changes
+  mPushChangesToDS(false), // do not push changes
+  mBridgePushInterval(10*Second), // default to decent progress update for waiting user
   // volatile state
   mLocalPriority(false), // no local priority
   mTransitionTime(0) // immediate transitions by default
@@ -255,12 +256,27 @@ double OutputBehaviour::channelValueAccordingToMode(double aOutputValue, int aCh
 }
 
 
-bool OutputBehaviour::pushChannelStates(bool aDS, bool aBridges)
+bool OutputBehaviour::reportOutputState()
+{
+  return pushOutputState(mPushChangesToDS, mBridgePushInterval!=Infinite);
+}
+
+
+MLMicroSeconds OutputBehaviour::outputReportInterval()
+{
+  if (mBridgePushInterval==Infinite || mBridgePushInterval==Never) return Never; // no regular updates
+  return mBridgePushInterval; // bridges want regular updates
+}
+
+
+bool OutputBehaviour::pushOutputState(bool aDS, bool aBridges)
 {
   bool requestedPushDone = true;
 
   if (aDS) {
-    requestedPushDone = false; // TODO: remove and re-enable dead code below, should dS-vDC-API ever evolve to allow this
+    // TODO: remove and re-enable dead code below, should dS-vDC-API ever evolve to allow this
+    requestedPushDone = false;
+    OLOG(LOG_ERR, "pushing to dS is not yet implemented");
     /*
     // push to vDC API
     VdcApiConnectionPtr api = mDevice.getVdcHost().getVdsmSessionConnection();
@@ -268,6 +284,7 @@ bool OutputBehaviour::pushChannelStates(bool aDS, bool aBridges)
      ApiValuePtr query = api->newApiValue();
      query->setType(apivalue_object);
      query->add("channelStates", query->newValue(apivalue_null));
+     query->add("outputState", query->newValue(apivalue_null));
      if (!mDevice.pushNotification(api, query, ApiValuePtr())) requestedPushDone = false;
     }
     else {
@@ -537,7 +554,7 @@ void OutputBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
   uint64_t flags = aRow->getCastedWithDefault<uint64_t, long long int>(aIndex++, 0);
   aRow->getCastedIfNotNull<uint64_t, long long int>(aIndex++, mOutputGroups);
   // decode my own flags
-  mPushChanges = flags & outputflag_pushChanges;
+  mPushChangesToDS = flags & outputflag_pushChanges;
   // pass the flags out to subclass which called this superclass to get the flags (and decode themselves)
   if (aCommonFlagsP) *aCommonFlagsP = flags;
 }
@@ -548,7 +565,7 @@ void OutputBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // encode the flags
-  if (mPushChanges) aCommonFlags |= outputflag_pushChanges;
+  if (mPushChangesToDS) aCommonFlags |= outputflag_pushChanges;
   // bind the fields
   aStatement.bind(aIndex++, mOutputMode);
   aStatement.bind(aIndex++, (long long int)aCommonFlags);
@@ -674,7 +691,8 @@ const PropertyDescriptorPtr OutputBehaviour::getDescDescriptorByIndex(int aPropI
 
 enum {
   mode_key,
-  pushChanges_key,
+  pushChangesToDs_key,
+  bridgePushInterval_key,
   groups_key,
   numSettingsProperties
 };
@@ -685,7 +703,8 @@ const PropertyDescriptorPtr OutputBehaviour::getSettingsDescriptorByIndex(int aP
 {
   static const PropertyDescription properties[numSettingsProperties] = {
     { "mode", apivalue_uint64, mode_key+settings_key_offset, OKEY(output_key) },
-    { "pushChanges", apivalue_bool, pushChanges_key+settings_key_offset, OKEY(output_key) },
+    { "pushChanges", apivalue_bool, pushChangesToDs_key+settings_key_offset, OKEY(output_key) },
+    { "x-p44-bridgePushInterval", apivalue_double, bridgePushInterval_key+settings_key_offset, OKEY(output_key) },
     { "groups", apivalue_bool+propflag_container, groups_key+settings_key_offset, OKEY(output_groups_key) }
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
@@ -756,8 +775,13 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case mode_key+settings_key_offset:
           aPropValue->setUint8Value(actualOutputMode()); // return actual mode, never outputmode_default
           return true;
-        case pushChanges_key+settings_key_offset:
-          aPropValue->setBoolValue(mPushChanges);
+        case pushChangesToDs_key+settings_key_offset:
+          aPropValue->setBoolValue(mPushChangesToDS);
+          return true;
+        // Operational, non-persistent settings
+        case bridgePushInterval_key+settings_key_offset:
+          if (mBridgePushInterval==Infinite) aPropValue->setNull();
+          aPropValue->setDoubleValue((double)mBridgePushInterval/Second);
           return true;
         // State properties
         case localPriority_key+states_key_offset:
@@ -775,8 +799,12 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case mode_key+settings_key_offset:
           setOutputMode((VdcOutputMode)aPropValue->int32Value());
           return true;
-        case pushChanges_key+settings_key_offset:
-          setPVar(mPushChanges, aPropValue->boolValue());
+        case pushChangesToDs_key+settings_key_offset:
+          setPVar(mPushChangesToDS, aPropValue->boolValue());
+          return true;
+        // Operational, non-persistent settings
+        case bridgePushInterval_key+settings_key_offset:
+          mBridgePushInterval = aPropValue->isNull() ? Infinite : aPropValue->doubleValue()*Second;
           return true;
         // State properties
         case localPriority_key+states_key_offset:
@@ -930,11 +958,12 @@ static void syncchannels_func(BuiltinFunctionContextPtr f)
 
 
 // channel(channelid)               - return the value of the specified channel
+// channel_t(channelid)             - return the transitional value of the specified channel
 // [dim]channel(channelid, value)   - set the channel value to the specified value or dim it relatively
 // [dim]channel(channelid, value, transitiontime)
 static const BuiltInArgDesc channel_args[] = { { text }, { numeric|optionalarg }, { numeric|optionalarg } };
 static const size_t channel_numargs = sizeof(channel_args)/sizeof(BuiltInArgDesc);
-static void channel_funcImpl(bool aDim, BuiltinFunctionContextPtr f)
+static void channel_funcImpl(bool aDim, bool aTransitional, BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
   assert(o);
@@ -957,7 +986,7 @@ static void channel_funcImpl(bool aDim, BuiltinFunctionContextPtr f)
       #endif
       {
         // is not a value source, return numeric value only
-        f->finish(new NumericValue(channel->getChannelValueCalculated()));
+        f->finish(new NumericValue(channel->getChannelValueCalculated(aTransitional)));
       }
       return;
     }
@@ -978,11 +1007,15 @@ static void channel_funcImpl(bool aDim, BuiltinFunctionContextPtr f)
 
 static void channel_func(BuiltinFunctionContextPtr f)
 {
-  channel_funcImpl(false, f);
+  channel_funcImpl(false, false, f);
+}
+static void channel_t_func(BuiltinFunctionContextPtr f)
+{
+  channel_funcImpl(false, true, f);
 }
 static void dimchannel_func(BuiltinFunctionContextPtr f)
 {
-  channel_funcImpl(true, f);
+  channel_funcImpl(true, false, f);
 }
 
 // movechannel(channelid, direction)   - start or stop moving the channel value in the specified direction
@@ -1016,6 +1049,7 @@ static const BuiltinMemberDescriptor outputMembers[] = {
   { "applychannels", executable|null, applychannels_numargs, applychannels_args, &applychannels_func },
   { "syncchannels", executable|null, 0, NULL, &syncchannels_func },
   { "channel", executable|numeric, channel_numargs, channel_args, &channel_func },
+  { "channel_t", executable|numeric, channel_numargs, channel_args, &channel_t_func },
   { "dimchannel", executable|numeric, channel_numargs, channel_args, &dimchannel_func },
   { "movechannel", executable|numeric, movechannel_numargs, movechannel_args, &movechannel_func },
   { NULL } // terminator

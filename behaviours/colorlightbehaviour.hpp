@@ -54,7 +54,7 @@ namespace p44 {
     virtual ColorLightMode colorMode() = 0;
 
     /// get current value of this channel - and calculate it if it is not set in the device, but must be calculated from other channels
-    virtual double getChannelValueCalculated();
+    virtual double getChannelValueCalculated(bool aTransitional);
 
   };
 
@@ -238,7 +238,8 @@ namespace p44 {
 
     /// derives the values for the not-current color representations' channels
     /// by converting between representations
-    void deriveMissingColorChannels();
+    /// @param aTransitional if set and involved channels are in transition, the transitional values are used for calculating derived values
+    void deriveMissingColorChannels(bool aTransitional);
 
     /// mark Color Light values applied (flags channels applied depending on colormode)
     void appliedColorValues();

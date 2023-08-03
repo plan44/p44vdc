@@ -192,8 +192,26 @@ namespace p44 {
     /// initialize a transition or update its progress over time
     /// @param aNow current time, used to calculate progress. Default is 0 and means starting a new transition NOW,
     ///   negative means completing transition immediately.
+    /// @param aMaxProgress if set, keep progress below or at this value (for cases where in-channel transition is only a progress simulation)
     /// @return true if the transition must be updated again, false if end of transition already reached
-    bool updateTransition(MLMicroSeconds aNow = 0);
+    bool updateTimedTransition(MLMicroSeconds aNow = 0, double aMaxProgress = 0);
+
+    /// this is for updating the transition of channels, where the transition is determined by the
+    /// hardware's capabilities (such as a roller blind).
+    /// @param aChannelProgressValue the transitional value in this very moment
+    /// @note this sets the channel into transition mode, even if it was started without (no transition time),
+    ///    and calculates the transition progress as according to distance between last value and channel value set.
+    /// @return true if the transition is not yet complete
+    bool reportChannelProgress(double aChannelProgressValue);
+
+    /// this is for channels where the transition of channels, where the transition is determined by the
+    /// hardware's capabilities (such as a roller blind).
+    /// @param aEstimatedTransitionTime an estimate how long the transition will last
+    /// @note reportTransitionalChannelValue() can be used to update the progress from the value, even if
+    ///    transition time is not set
+    /// @note when aEstimatedTransitionTime is set, updateTransition() can also be used to update the
+    ///    transitional value based on that estimate
+    void startExternallyTimedTransition(MLMicroSeconds aEstimatedTransitionTime = Infinite);
 
     /// set transition progress
     /// @param aProgress progress between 0 (just started) to 1 (completed).
@@ -208,12 +226,24 @@ namespace p44 {
     /// @return true if transition not complete and getTransitionalValue() will return a intermediate value
     bool inTransition();
 
+    /// get the (estimated) remaining transition time
+    /// @return time until transition is supposedly complete, 0 if already complete
+    /// @note This value is intended for user progress feedback
+    ///   - If the transition is internally timed, this shows the actual time.
+    ///   - If the transition's timing is externally defined, a estimate is calculated based on start and
+    ///     current progress
+    MLMicroSeconds remainingTransitionTime();
+
+    /// @return current progress of transition, 0..1 (1=complete, no transition in progress)
+    double transitionProgress() { return mProgress; }
+
     /// get time of last sync with hardware (applied or synchronized back)
     /// @return time of last sync, p44::Never if value never synchronized
     MLMicroSeconds getLastSync() { return mChannelLastSync; };
 
     /// get current value of this channel - and calculate it if it is not set in the device, but must be calculated from other channels
-    virtual double getChannelValueCalculated() { return getChannelValue(); /* no calculated channels in base class */ };
+    /// @param aTransitional if set and the channel is in transition, the transitional value is returned
+    virtual double getChannelValueCalculated(bool aTransitional) { return getChannelValue(aTransitional); /* no calculated channels in base class */ };
 
     /// the transition time to use to change value in the hardware
     /// @return time to be used to transition to new value
