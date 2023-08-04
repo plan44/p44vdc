@@ -551,7 +551,6 @@ void ShadowBehaviour::stopped(SimpleCB aApplyDoneCB, bool delay)
   mUpdateMoveTimeAtEndReached = false; // stopping cancels full range timing update (if stop is due to end contact, measurement will be already done now)
   moveTimerStop();
   FOCUSOLOG("- calculated current blind position=%.1f%%, angle=%.1f", mReferencePosition, mReferenceAngle);
-
   if (delay) {
     mSequenceTicket.executeOnce(boost::bind(&ShadowBehaviour::processStopped, this, aApplyDoneCB), mStopDelayTime*Second);
   }
@@ -559,6 +558,7 @@ void ShadowBehaviour::stopped(SimpleCB aApplyDoneCB, bool delay)
     processStopped(aApplyDoneCB);
   }
 }
+
 
 void ShadowBehaviour::processStopped(SimpleCB aApplyDoneCB)
 {
@@ -604,6 +604,9 @@ void ShadowBehaviour::allDone(SimpleCB aApplyDoneCB)
   else {
     // push final state to bridges (not to dS)
     OLOG(LOG_INFO, "- was a long movement, apply confirmed earlier -> re-push output state to bridges");
+    // - end simulation transitions
+    mPosition->setTransitionProgress(1);
+    mAngle->setTransitionProgress(1);
     reportOutputState();
   }
 }
@@ -621,9 +624,12 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
     mTargetAngle = mAngle->getChannelValue();
     // new position requested, calculate next move
     double dist = 0;
+    double probableDist = 0;
     MLMicroSeconds stopIn = 0;
+    MLMicroSeconds probablyEndsIn = 0;
     mRunIntoEnd = false;
     // full up or down always schedule full way to synchronize
+    probableDist = mTargetPosition-mReferencePosition; // when our current status is correct
     if (mTargetPosition>=100) {
       // fully up, always do full cycle to synchronize position
       dist = 120; // 20% extra to fully run into end switch
@@ -638,7 +644,7 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
     }
     else {
       // somewhere in between, actually estimate distance
-      dist = mTargetPosition-mReferencePosition; // distance to move up
+      dist = probableDist; // distance to move up
     }
     // calculate moving time
     if (dist>0) {
@@ -646,6 +652,7 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
       FOCUSLOG("- currently saved open time: %.1f, angle open time: %.2f", mOpenTime, mAngleOpenTime);
       mMovingUp = true;
       stopIn = mOpenTime*Second/100.0*dist;
+      probablyEndsIn = mOpenTime*Second/100.0*probableDist;
       // we only want moves which result in a defined angle -> stretch when needed
       if (stopIn<mAngleOpenTime)
         stopIn = mAngleOpenTime;
@@ -655,17 +662,20 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
       FOCUSLOG("- currently saved close time: %.1f, angle close time: %.2f", mCloseTime, mAngleCloseTime);
       mMovingUp = false;
       stopIn = mCloseTime*Second/100.0*-dist;
+      probablyEndsIn = mCloseTime*Second/100.0*-probableDist;
       // we only want moves which result in a defined angle -> stretch when needed
       if (stopIn<mAngleCloseTime)
         stopIn = mAngleCloseTime;
     }
     OLOG(LOG_INFO,
-      "Blind position=%.1f%% requested, current=%.1f%% -> moving %s for %.3f Seconds",
-      mTargetPosition, mReferencePosition, dist>0 ? "up" : "down", (double)stopIn/Second
+      "Blind position=%.1f%% requested, current=%.1f%% -> moving %s for %.3f Seconds, probably already in %.3f Seconds",
+      mTargetPosition, mReferencePosition, dist>0 ? "up" : "down", (double)stopIn/Second, (double)probablyEndsIn/Second
     );
     // start moving position if not already moving (dimming case)
     if (mBlindState!=blind_positioning) {
       mBlindState = blind_positioning;
+      // - start a simulating transition of the position
+      mPosition->startExternallyTimedTransition(probablyEndsIn);
       startMoving(stopIn, aApplyDoneCB);
     }
   }
@@ -718,6 +728,8 @@ void ShadowBehaviour::applyAngle(SimpleCB aApplyDoneCB)
     );
     // start moving angle
     mBlindState = blind_turning;
+    // - start a simulating transition of the angle
+    mAngle->startExternallyTimedTransition(stopIn);
     startMoving(stopIn, aApplyDoneCB);
   }
 }
@@ -738,9 +750,6 @@ void ShadowBehaviour::startMoving(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
   }
   // actually start moving
   FOCUSLOG("- start moving into direction = %d", dir);
-  // - start a transition of the channel as an approximate model for live feedback
-  if (mBlindState==blind_positioning) mPosition->startExternallyTimedTransition(aStopIn);
-  if (mBlindState==blind_turning) mAngle->startExternallyTimedTransition(aStopIn);
   // - start the movement
   mMovementCB(boost::bind(&ShadowBehaviour::moveStarted, this, aStopIn, aApplyDoneCB), dir);
 }
