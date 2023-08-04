@@ -307,6 +307,9 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
       else if (aMessageType=="channel") {
         err = processInputJson('C', aMessage);
       }
+      else if (aMessageType=="channel_progress") {
+        err = processInputJson('P', aMessage);
+      }
       #if ENABLE_CUSTOM_SINGLEDEVICE
       else if (aMessageType=="confirmAction") {
         JsonObjectPtr o;
@@ -458,7 +461,7 @@ ErrorPtr CustomDevice::processInputJson(char aInputType, JsonObjectPtr aParams)
   if (o) {
     index = o->int32Value();
   }
-  else if (aInputType=='C' && aParams->get("type", o)) {
+  else if ((aInputType=='C' || aInputType=='P') && aParams->get("type", o)) {
     // channel specified by type, not index
     DsChannelType ty = (DsChannelType)o->int32Value();
     ChannelBehaviourPtr cb = getChannelByType(ty);
@@ -472,7 +475,9 @@ ErrorPtr CustomDevice::processInputJson(char aInputType, JsonObjectPtr aParams)
       case 'B': bhv = getButton(by_id, id); if (bhv) { index = (int)bhv->getIndex(); } break;
       case 'I': bhv = getInput(by_id, id); if (bhv) { index = (int)bhv->getIndex(); } break;
       case 'S': bhv = getSensor(by_id, id); if (bhv) { index = (int)bhv->getIndex(); } break;
-      case 'C': index = channelIndexById(getOutput(), id); break;
+      case 'C':
+      case 'P':
+        index = channelIndexById(getOutput(), id); break;
     }
   }
   if (index<0) {
@@ -558,7 +563,18 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
       }
       break;
     }
+    case 'P': {
+      // channel transition progress
+      ChannelBehaviourPtr cb = getChannelByIndex(aIndex);
+      if (cb) {
+        cb->reportChannelProgress(aValue);
+      }
+      else {
+        return TextError::err("no channel #%d", aIndex);
+      }
+    }
     case 'C': {
+      // final channel value
       ChannelBehaviourPtr cb = getChannelByIndex(aIndex);
       if (cb) {
         cb->syncChannelValue(aValue, true);

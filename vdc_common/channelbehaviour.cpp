@@ -260,6 +260,10 @@ void ChannelBehaviour::startExternallyTimedTransition(MLMicroSeconds aEstimatedT
 
 bool ChannelBehaviour::reportChannelProgress(double aTransitionalChannelValue)
 {
+  if (mTransitionStarted==Infinite) {
+    // no progress simulation started yet, start it now
+    startExternallyTimedTransition(Infinite);
+  }
   double dist = mCachedChannelValue-mPreviousChannelValue;
   double progress = 1; // assume done
   if (dist!=0 && aTransitionalChannelValue!=mCachedChannelValue) {
