@@ -247,6 +247,16 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       }
     }
   }
+  else if (aMethod=="logoptions") {
+    // via genericRequest
+    ApiValuePtr o;
+    if ((o = aParams->get("deltas"))) SETDELTATIME(o->boolValue());
+    #if ENABLE_LOG_COLORS
+    if ((o = aParams->get("symbols"))) SETLOGSYMBOLS(o->boolValue());
+    if ((o = aParams->get("colors"))) SETLOGCOLORING(o->boolValue());
+    #endif // ENABLE_LOG_COLORS
+    respErr = Error::ok(); // return OK as generic response
+  }
   else {
     respErr = Error::err<VdcApiError>(405, "unknown method '%s'", aMethod.c_str());
   }
