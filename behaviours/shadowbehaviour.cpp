@@ -427,9 +427,17 @@ void ShadowBehaviour::applyBlindChannels(MovementChangeCB aMovementCB, SimpleCB 
     // not idle
     if (aForDimming && mBlindState==blind_positioning) {
       // dimming requested while in progress of positioning
-      // -> don't stop, just re-calculate position and timing
+      // -> don't actually stop, just re-calculate position and timing
       mBlindState = blind_dimming;
       stopped(aApplyDoneCB);
+      return;
+    }
+    else if (mBlindState==blind_positioning && mAngle->needsApplying() && !mPosition->needsApplying()) {
+      // do not interrupt running positioning just because of angle change,
+      // the angle will be (re)applied after positioning anyway
+      // - just confirm applied
+      if (aApplyDoneCB) aApplyDoneCB();
+      // - let running state machine do the rest
       return;
     }
     // normal operation: stop first
