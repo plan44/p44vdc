@@ -241,28 +241,28 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
   switch (aClickType) {
     // add clicks and tips to counter (which will expire after t_tip_timeout)
     case ct_tip_4x:
-      clickCounter++;
+      mClickCounter++;
     case ct_tip_3x:
     case ct_click_3x:
-      clickCounter++;
+      mClickCounter++;
     case ct_tip_2x:
     case ct_click_2x:
-      clickCounter++;
+      mClickCounter++;
     case ct_tip_1x:
     case ct_click_1x:
-      clickCounter++;
+      mClickCounter++;
       // report current count as tips
-      state = S4_nextTipWait; // must set a state, although regular state machine is not used, to make sure valueSource reports clicks
-      if (isLocalButtonEnabled() && clickCounter==1) {
+      mState = S4_nextTipWait; // must set a state, although regular state machine is not used, to make sure valueSource reports clicks
+      if (isLocalButtonEnabled() && mClickCounter==1) {
         // first tip switches local output if local button is enabled
         localSwitchOutput();
       }
-      else if (clickCounter<=4) {
-        sendClick((DsClickType)(ct_tip_1x+clickCounter-1));
+      else if (mClickCounter<=4) {
+        sendClick((DsClickType)(ct_tip_1x+mClickCounter-1));
       }
-      if (clickCounter<4) {
+      if (mClickCounter<4) {
         // time out after we're sure all tips are accumulated
-        buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::injectedOpComplete, this), t_tip_timeout);
+        mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::injectedOpComplete, this), t_tip_timeout);
       }
       else {
         // counter overflow, reset right now
@@ -273,9 +273,9 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
       if (mClickType==ct_hold_start) {
         aClickType = ct_hold_repeat; // already started before -> treat as repeat
       }
-      state = S8_awaitrelease; // must set a state, although regular state machine is not used, to make sure valueSource reports holds
+      mState = S8_awaitrelease; // must set a state, although regular state machine is not used, to make sure valueSource reports holds
       sendClick(aClickType);
-      buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
+      mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
       break;
     case ct_hold_end:
       if (mClickType!=ct_hold_start && mClickType!=ct_hold_repeat) break; // suppress hold end when not in hold start
@@ -299,25 +299,25 @@ void ButtonBehaviour::injectedOpComplete()
 void ButtonBehaviour::resetStateMachine()
 {
   mButtonPressed = false;
-  state = S0_idle;
-  clickCounter = 0;
-  holdRepeats = 0;
-  dimmingUp = false;
-  timerRef = Never;
-  buttonStateMachineTicket.cancel();
+  mState = S0_idle;
+  mClickCounter = 0;
+  mHoldRepeats = 0;
+  mDimmingUp = false;
+  mTimerRef = Never;
+  mButtonStateMachineTicket.cancel();
 }
 
 
 void ButtonBehaviour::holdRepeat()
 {
-  buttonStateMachineTicket.cancel();
+  mButtonStateMachineTicket.cancel();
   // button still pressed
   FOCUSOLOG("dimming in progress - sending ct_hold_repeat (repeatcount = %d)", holdRepeats);
   sendClick(ct_hold_repeat);
-  holdRepeats++;
-  if (holdRepeats<max_hold_repeats) {
+  mHoldRepeats++;
+  if (mHoldRepeats<max_hold_repeats) {
     // schedule next repeat
-    buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
+    mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
   }
 }
 
@@ -349,14 +349,14 @@ static const char *stateNames[] = {
 // Note: only to be called when button state changes
 void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds aNow)
 {
-  MLMicroSeconds timeSinceRef = aNow-timerRef;
-  timerRef = aNow;
+  MLMicroSeconds timeSinceRef = aNow-mTimerRef;
+  mTimerRef = aNow;
 
   if (mButtonMode==buttonMode_turbo || mStateMachineMode==statemachine_simple) {
     FOCUSOLOG("simple button state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
     // reset click counter if tip timeout has passed since last event
     if (timeSinceRef>t_tip_timeout) {
-      clickCounter = 0;
+      mClickCounter = 0;
     }
     // use Idle and Awaitrelease states only to remember previous button state detected
     bool isTip = false;
@@ -365,33 +365,33 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
       // - always count button press as a tip
       isTip = true;
       // - state is now Awaitrelease
-      state = S8_awaitrelease;
+      mState = S8_awaitrelease;
     }
     else {
       // the button was released right now
       // - if we haven't seen a press before, assume the press got lost and act on the release
-      if (state==S0_idle) {
+      if (mState==S0_idle) {
         isTip = true;
         // as we'll send the click event NOW, but will get no physical release from the button, we must simulate keyOpComplete()
-        buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::keyOpComplete, this), t_tip_timeout);
-        state = S0_idle;
+        mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::keyOpComplete, this), t_tip_timeout);
+        mState = S0_idle;
       }
       else {
         // - state is now idle AGAIN after a previous click event
-        state = S0_idle;
+        mState = S0_idle;
         keyOpComplete();
       }
     }
     if (isTip) {
-      if (isLocalButtonEnabled() && clickCounter==0) {
+      if (isLocalButtonEnabled() && mClickCounter==0) {
         // first tip switches local output if local button is enabled
         localSwitchOutput();
       }
       else {
         // other tips are sent upstream
-        sendClick((DsClickType)(ct_tip_1x+clickCounter));
-        clickCounter++;
-        if (clickCounter>=4) clickCounter = 0; // wrap around
+        sendClick((DsClickType)(ct_tip_1x+mClickCounter));
+        mClickCounter++;
+        if (mClickCounter>=4) mClickCounter = 0; // wrap around
       }
     }
   }
@@ -410,14 +410,14 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
           // button just pressed
           sendClick(ct_hold_start);
           // schedule hold repeats
-          holdRepeats = 0;
-          buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
+          mHoldRepeats = 0;
+          mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
         }
         else {
           // button just released
           FOCUSOLOG("stopped dimming - sending ct_hold_end");
           sendClick(ct_hold_end);
-          buttonStateMachineTicket.cancel();
+          mButtonStateMachineTicket.cancel();
         }
       }
     }
@@ -431,56 +431,56 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
 // standard button state machine
 void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSeconds aNow)
 {
-  buttonStateMachineTicket.cancel();
-  MLMicroSeconds timeSinceRef = aNow-timerRef;
+  mButtonStateMachineTicket.cancel();
+  MLMicroSeconds timeSinceRef = aNow-mTimerRef;
 
   FOCUSOLOG("state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
-  switch (state) {
+  switch (mState) {
 
     case S0_idle :
-      timerRef = Never; // no timer running
+      mTimerRef = Never; // no timer running
       if (aStateChanged && mButtonPressed) {
-        clickCounter = isLocalButtonEnabled() ? 0 : 1;
-        timerRef = aNow;
-        state = S1_initialpress;
+        mClickCounter = isLocalButtonEnabled() ? 0 : 1;
+        mTimerRef = aNow;
+        mState = S1_initialpress;
       }
       break;
 
     case S1_initialpress :
       if (aStateChanged && !mButtonPressed) {
-        timerRef = aNow;
-        state = S5_nextPauseWait;
+        mTimerRef = aNow;
+        mState = S5_nextPauseWait;
       }
       else if (timeSinceRef>=t_click_length) {
-        state = S2_holdOrTip;
+        mState = S2_holdOrTip;
       }
       break;
 
     case S2_holdOrTip:
-      if (aStateChanged && !mButtonPressed && clickCounter==0) {
+      if (aStateChanged && !mButtonPressed && mClickCounter==0) {
         localSwitchOutput();
-        timerRef = aNow;
-        clickCounter = 1;
-        state = S4_nextTipWait;
+        mTimerRef = aNow;
+        mClickCounter = 1;
+        mState = S4_nextTipWait;
       }
-      else if (aStateChanged && !mButtonPressed && clickCounter>0) {
-        sendClick((DsClickType)(ct_tip_1x+clickCounter-1));
-        timerRef = aNow;
-        state = S4_nextTipWait;
+      else if (aStateChanged && !mButtonPressed && mClickCounter>0) {
+        sendClick((DsClickType)(ct_tip_1x+mClickCounter-1));
+        mTimerRef = aNow;
+        mState = S4_nextTipWait;
       }
       else if (timeSinceRef>=mLongFunctionDelay) {
         // long function
         if (!isLocalButtonEnabled() || !isOutputOn()) {
           // hold
-          holdRepeats = 0;
-          timerRef = aNow;
+          mHoldRepeats = 0;
+          mTimerRef = aNow;
           sendClick(ct_hold_start);
-          state = S3_hold;
+          mState = S3_hold;
         }
         else if (isLocalButtonEnabled() && isOutputOn()) {
           // local dimming
           localDim(true); // start dimming
-          state = S11_localdim;
+          mState = S11_localdim;
         }
       }
       break;
@@ -489,111 +489,111 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       if (aStateChanged && !mButtonPressed) {
         // no packet send time, skip S15
         sendClick(ct_hold_end);
-        state = S0_idle;
+        mState = S0_idle;
       }
       else if (timeSinceRef>=t_dim_repeat_time) {
-        if (holdRepeats<max_hold_repeats) {
-          timerRef = aNow;
+        if (mHoldRepeats<max_hold_repeats) {
+          mTimerRef = aNow;
           sendClick(ct_hold_repeat);
-          holdRepeats++;
+          mHoldRepeats++;
         }
         else {
           // early hold end reporting, still waiting for actual release of the button
           sendClick(ct_hold_end);
-          state = S14_awaitrelease_timedout;
+          mState = S14_awaitrelease_timedout;
         }
       }
       break;
 
     case S4_nextTipWait:
       if (aStateChanged && mButtonPressed) {
-        timerRef = aNow;
-        if (clickCounter>=4)
-          clickCounter = 2;
+        mTimerRef = aNow;
+        if (mClickCounter>=4)
+          mClickCounter = 2;
         else
-          clickCounter++;
-        state = S2_holdOrTip;
+          mClickCounter++;
+        mState = S2_holdOrTip;
       }
       else if (timeSinceRef>=t_tip_timeout) {
-        state = S0_idle;
+        mState = S0_idle;
         keyOpComplete();
       }
       break;
 
     case S5_nextPauseWait:
       if (aStateChanged && mButtonPressed) {
-        timerRef = aNow;
-        clickCounter = 2;
-        state = S6_2ClickWait;
+        mTimerRef = aNow;
+        mClickCounter = 2;
+        mState = S6_2ClickWait;
       }
       else if (timeSinceRef>=t_click_pause) {
         if (isLocalButtonEnabled())
           localSwitchOutput();
         else
           sendClick(ct_click_1x);
-        state = S4_nextTipWait;
+        mState = S4_nextTipWait;
       }
       break;
 
     case S6_2ClickWait:
       if (aStateChanged && !mButtonPressed) {
-        timerRef = aNow;
-        state = S9_2pauseWait;
+        mTimerRef = aNow;
+        mState = S9_2pauseWait;
       }
       else if (timeSinceRef>t_click_length) {
-        state = S7_progModeWait;
+        mState = S7_progModeWait;
       }
       break;
 
     case S7_progModeWait:
       if (aStateChanged && !mButtonPressed) {
         sendClick(ct_tip_2x);
-        timerRef = aNow;
-        state = S4_nextTipWait;
+        mTimerRef = aNow;
+        mState = S4_nextTipWait;
       }
       else if (timeSinceRef>mLongFunctionDelay) {
         sendClick(ct_short_long);
-        state = S8_awaitrelease;
+        mState = S8_awaitrelease;
       }
       break;
 
     case S9_2pauseWait:
       if (aStateChanged && mButtonPressed) {
-        timerRef = aNow;
-        clickCounter = 3;
-        state = S12_3clickWait;
+        mTimerRef = aNow;
+        mClickCounter = 3;
+        mState = S12_3clickWait;
       }
       else if (timeSinceRef>=t_click_pause) {
         sendClick(ct_click_2x);
-        state = S4_nextTipWait;
+        mState = S4_nextTipWait;
       }
       break;
 
     case S12_3clickWait:
       if (aStateChanged && !mButtonPressed) {
-        timerRef = aNow;
+        mTimerRef = aNow;
         sendClick(ct_click_3x);
-        state = S4_nextTipWait;
+        mState = S4_nextTipWait;
       }
       else if (timeSinceRef>=t_click_length) {
-        state = S13_3pauseWait;
+        mState = S13_3pauseWait;
       }
       break;
 
     case S13_3pauseWait:
       if (aStateChanged && !mButtonPressed) {
-        timerRef = aNow;
+        mTimerRef = aNow;
         sendClick(ct_tip_3x);
       }
       else if (timeSinceRef>=mLongFunctionDelay) {
         sendClick(ct_short_short_long);
-        state = S8_awaitrelease;
+        mState = S8_awaitrelease;
       }
       break;
 
     case S11_localdim:
       if (aStateChanged && !mButtonPressed) {
-        state = S0_idle;
+        mState = S0_idle;
         localDim(dimmode_stop); // stop dimming
       }
       break;
@@ -601,21 +601,21 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
     case S8_awaitrelease:
       // normal wait for
       if (aStateChanged && !mButtonPressed) {
-        state = S0_idle;
+        mState = S0_idle;
         keyOpComplete();
       }
       break;
     case S14_awaitrelease_timedout:
       // silently reset the state machine, hold_end was already sent before
       if (aStateChanged && !mButtonPressed) {
-        state = S0_idle;
+        mState = S0_idle;
       }
       break;
   }
-  FOCUSOLOG(" -->                       exit state %s with %sfurther timing needed", stateNames[state], timerRef!=Never ? "" : "NO ");
-  if (timerRef!=Never) {
+  FOCUSOLOG(" -->                       exit state %s with %sfurther timing needed", stateNames[mState], timerRef!=Never ? "" : "NO ");
+  if (mTimerRef!=Never) {
     // need timing, schedule calling again
-    buttonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::checkStandardStateMachine, this, false, _2), 10*MilliSecond);
+    mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::checkStandardStateMachine, this, false, _2), 10*MilliSecond);
   }
 }
 
@@ -688,8 +688,8 @@ void ButtonBehaviour::localDim(bool aStart)
       VdcDimMode dm = twoWayDirection();
       if (dm==dimmode_stop) {
         // not two-way, need to toggle direction
-        dimmingUp = !dimmingUp; // change direction
-        dm = dimmingUp ? dimmode_up : dimmode_down;
+        mDimmingUp = !mDimmingUp; // change direction
+        dm = mDimmingUp ? dimmode_up : dimmode_down;
       }
       mDevice.dimChannel(channel, dm, true);
     }
@@ -795,7 +795,7 @@ double ButtonBehaviour::getSourceValue()
   // 0: not pressed
   // 1..4: number of clicks
   // >4 : held down
-  if (state==S0_idle) return 0;
+  if (mState==S0_idle) return 0;
   switch (mClickType) {
     case ct_tip_1x:
     case ct_click_1x:

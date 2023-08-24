@@ -281,12 +281,12 @@ namespace p44 {
     } ButtonState;
 
     // state machine vars
-    ButtonState state;
-    int clickCounter;
-    int holdRepeats;
-    bool dimmingUp;
-    MLMicroSeconds timerRef;
-    MLTicket buttonStateMachineTicket;
+    ButtonState mState;
+    int mClickCounter;
+    int mHoldRepeats;
+    bool mDimmingUp;
+    MLMicroSeconds mTimerRef;
+    MLTicket mButtonStateMachineTicket;
 
     // state machine params
     static const int t_long_function_delay = 500*MilliSecond;
