@@ -304,11 +304,11 @@ namespace p44 {
     void resetStateMachine();
     void checkStandardStateMachine(bool aStateChanged, MLMicroSeconds aNow);
     void checkCustomStateMachine(bool aStateChanged, MLMicroSeconds aNow);
-    void keyOpComplete();
+    void clickSequenceComplete();
     void holdRepeat();
     void localSwitchOutput();
     void localDim(bool aStart);
-    void injectedOpComplete();
+    void injectedOpComplete(bool aSequence);
 
     /// @}
 

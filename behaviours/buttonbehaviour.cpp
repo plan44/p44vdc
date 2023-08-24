@@ -258,15 +258,19 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
         localSwitchOutput();
       }
       else if (mClickCounter<=4) {
+        // simulate complete press and release (altough of no duration)
+        mButtonPressed = true;
+        sendClick(ct_progress); // report extra progress of click starting
+        mButtonPressed = false;
         sendClick((DsClickType)(ct_tip_1x+mClickCounter-1));
       }
       if (mClickCounter<4) {
         // time out after we're sure all tips are accumulated
-        mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::injectedOpComplete, this), t_tip_timeout);
+        mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::injectedOpComplete, this, true), t_tip_timeout);
       }
       else {
         // counter overflow, reset right now
-        injectedOpComplete();
+        injectedOpComplete(true);
       }
       break;
     case ct_hold_start:
@@ -280,7 +284,7 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
     case ct_hold_end:
       if (mClickType!=ct_hold_start && mClickType!=ct_hold_repeat) break; // suppress hold end when not in hold start
       sendClick(aClickType);
-      injectedOpComplete();
+      injectedOpComplete(false);
       break;
     default:
       break;
@@ -289,10 +293,10 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
 }
 
 
-void ButtonBehaviour::injectedOpComplete()
+void ButtonBehaviour::injectedOpComplete(bool aSequence)
 {
   resetStateMachine();
-  keyOpComplete();
+  if (aSequence) clickSequenceComplete();
 }
 
 
@@ -345,13 +349,18 @@ static const char *stateNames[] = {
 
 
 
-// plan44 "turbo" state machine which can tolerate missing a "press" or a "release" event
-// Note: only to be called when button state changes
+// Custom state machines:
+// - plan44 "turbo" state machine which can tolerate missing a "press" or a "release" event
+//   but cannot detect multi-clicks, only multi-tips, and cannot dim
+// - dim-only state machine
+// Note: must only be changed on receiving a press or release event (which however does NOT
+//   necessarily mean aStateChanged, in case of lost press or releases!)
 void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds aNow)
 {
   MLMicroSeconds timeSinceRef = aNow-mTimerRef;
   mTimerRef = aNow;
 
+  mButtonStateMachineTicket.cancel();
   if (mButtonMode==buttonMode_turbo || mStateMachineMode==statemachine_simple) {
     FOCUSOLOG("simple button state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
     // reset click counter if tip timeout has passed since last event
@@ -366,21 +375,26 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
       isTip = true;
       // - state is now Awaitrelease
       mState = S8_awaitrelease;
+      sendClick(ct_progress); // report getting pressed to bridges (not dS)
     }
     else {
       // the button was released right now
-      // - if we haven't seen a press before, assume the press got lost and act on the release
       if (mState==S0_idle) {
+        // we haven't seen a press before, assume the press got lost and act (late) on the release
+        // - simulate the button pressing (for bridges)
+        mButtonPressed = true;
+        sendClick(ct_progress); // report getting released to bridges (not dS)
+        mButtonPressed = false;
+        // - process as tip
         isTip = true;
-        // as we'll send the click event NOW, but will get no physical release from the button, we must simulate keyOpComplete()
-        mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::keyOpComplete, this), t_tip_timeout);
-        mState = S0_idle;
       }
       else {
-        // - state is now idle AGAIN after a previous click event
-        mState = S0_idle;
-        keyOpComplete();
+        sendClick(ct_progress); // report getting released to bridges (not dS)
       }
+      // Note: we do not have other states but idle and awaitrelease
+      mState = S0_idle;
+      // complete the sequence if nothing happens within tip_timeout, anyway
+      mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::clickSequenceComplete, this), t_tip_timeout);
     }
     if (isTip) {
       if (isLocalButtonEnabled() && mClickCounter==0) {
@@ -443,6 +457,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
         mClickCounter = isLocalButtonEnabled() ? 0 : 1;
         mTimerRef = aNow;
         mState = S1_initialpress;
+        sendClick(ct_progress); // report getting pressed to bridges (not dS)
       }
       break;
 
@@ -450,6 +465,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       if (aStateChanged && !mButtonPressed) {
         mTimerRef = aNow;
         mState = S5_nextPauseWait;
+        sendClick(ct_progress); // report getting short-released to bridges (not dS)
       }
       else if (timeSinceRef>=t_click_length) {
         mState = S2_holdOrTip;
@@ -512,16 +528,18 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
           mClickCounter = 2;
         else
           mClickCounter++;
+        sendClick(ct_progress); // report getting pressed again to bridges (not dS)
         mState = S2_holdOrTip;
       }
       else if (timeSinceRef>=t_tip_timeout) {
         mState = S0_idle;
-        keyOpComplete();
+        clickSequenceComplete();
       }
       break;
 
     case S5_nextPauseWait:
       if (aStateChanged && mButtonPressed) {
+        sendClick(ct_progress); // report getting short-released to bridges (not dS)
         mTimerRef = aNow;
         mClickCounter = 2;
         mState = S6_2ClickWait;
@@ -537,6 +555,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
 
     case S6_2ClickWait:
       if (aStateChanged && !mButtonPressed) {
+        sendClick(ct_progress); // report getting short-released to bridges (not dS)
         mTimerRef = aNow;
         mState = S9_2pauseWait;
       }
@@ -559,6 +578,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
 
     case S9_2pauseWait:
       if (aStateChanged && mButtonPressed) {
+        sendClick(ct_progress); // report getting short-released to bridges (not dS)
         mTimerRef = aNow;
         mClickCounter = 3;
         mState = S12_3clickWait;
@@ -599,10 +619,10 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       break;
 
     case S8_awaitrelease:
-      // normal wait for
+      // normal wait for release
       if (aStateChanged && !mButtonPressed) {
         mState = S0_idle;
-        keyOpComplete();
+        clickSequenceComplete();
       }
       break;
     case S14_awaitrelease_timedout:
@@ -704,6 +724,7 @@ void ButtonBehaviour::localDim(bool aStart)
 
 void ButtonBehaviour::sendClick(DsClickType aClickType)
 {
+  OLOG(LOG_DEBUG, "sendClick: click=%d, state=%d, clickcounter=%d", aClickType, mButtonPressed, mClickCounter);
   // check for p44-level scene buttons
   if (mButtonActionMode!=buttonActionMode_none && (aClickType==ct_tip_1x || aClickType==ct_click_1x)) {
     // trigger direct scene action for single clicks
@@ -716,8 +737,10 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
   mActionMode = buttonActionMode_none;
   // button press is considered a (regular!) user action, have it checked globally first
   if (!mDevice.getVdcHost().signalDeviceUserAction(mDevice, true)) {
-    // button press not consumed on global level, forward to upstream dS (and bridges, if not just hold-repeat)
-    if (pushBehaviourState(true, mClickType!=ct_hold_repeat)) {
+    // button press not consumed on global level
+    // - forward to upstream dS (except for ct_progress, which is for bridges only)
+    // - forward to bridges (except for hold-repeat, which bridges don't need)
+    if (pushBehaviourState(mClickType!=ct_progress && mClickType!=ct_complete, mClickType!=ct_hold_repeat)) {
       OLOG(mClickType==ct_hold_repeat ? LOG_INFO : LOG_NOTICE, "successfully pushed state = %d, clickType %d", mButtonPressed, aClickType);
     }
     #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
@@ -731,12 +754,15 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
 }
 
 
-void ButtonBehaviour::keyOpComplete()
+void ButtonBehaviour::clickSequenceComplete()
 {
+  // click sequence complete
   #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
   // send event
   sendValueEvent();
   #endif
+  // report progress
+  sendClick(ct_complete); // always report state (not to dS)
 }
 
 
