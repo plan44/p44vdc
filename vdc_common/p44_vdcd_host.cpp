@@ -895,7 +895,7 @@ bool BridgeInfo::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
       switch (aPropertyDescriptor->fieldKey()) {
         case qrcodedata_key: aPropValue->setStringValue(mQRCodeData); return true;
         case manualpairingcode_key: aPropValue->setStringValue(mManualPairingCode); return true;
-        case started_key: aPropValue->setBoolValue(mStarted); return true;
+        case started_key: aPropValue->setBoolValue(mP44VdcHost.numBridgeApiClients()>0 && mStarted); return true;
         case commissionable_key: aPropValue->setBoolValue(mCommissionable); return true;
         case connected_key: aPropValue->setBoolValue(mP44VdcHost.numBridgeApiClients()>0); return true;
       }
