@@ -186,6 +186,10 @@ P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) 
   inherited(aWithLocalController, aWithPersistentChannels),
   webUiPort(0)
 {
+  #if P44SCRIPT_REGISTERED_SOURCE
+  mScriptManager = new P44ScriptManager(new ScriptingDomain);
+  StandardScriptingDomain::setStandardScriptingDomain(mScriptManager->domain());
+  #endif
   #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
   mScriptedApiLookup.isMemberVariable();
   StandardScriptingDomain::sharedDomain().registerMemberLookup(&mScriptedApiLookup);
@@ -918,10 +922,14 @@ bool BridgeInfo::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
 // MARK: - vdchost property access
 
 static char bridge_obj;
+static char scripts_obj;
 
 enum {
   #if ENABLE_JSONBRIDGEAPI
   bridge_key,
+  #endif
+  #if P44SCRIPT_REGISTERED_SOURCE
+  scripts_key,
   #endif
   numP44VdcHostProperties
 };
@@ -944,6 +952,9 @@ PropertyDescriptorPtr P44VdcHost::getDescriptorByIndex(int aPropIndex, int aDoma
     #if ENABLE_JSONBRIDGEAPI
     { "x-p44-bridge", apivalue_object, bridge_key, OKEY(bridge_obj) },
     #endif
+    #if P44SCRIPT_REGISTERED_SOURCE
+    { "x-p44-scripts", apivalue_object, scripts_key, OKEY(scripts_obj) },
+    #endif
   };
   int n = inherited::numProps(aDomain, aParentDescriptor);
   if (aPropIndex<n)
@@ -961,6 +972,11 @@ PropertyContainerPtr P44VdcHost::getContainer(const PropertyDescriptorPtr &aProp
   #if ENABLE_JSONBRIDGEAPI
   if (aPropertyDescriptor->hasObjectKey(bridge_obj)) {
     return mBridgeInfo; // can be NULL if bridge api is not enabled
+  }
+  #endif
+  #if P44SCRIPT_REGISTERED_SOURCE
+  if (aPropertyDescriptor->hasObjectKey(scripts_obj)) {
+    return mScriptManager; // can be NULL if no script manager is set
   }
   #endif
   // unknown here
@@ -1055,6 +1071,11 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
     }
   }
   #endif // ENABLE_JSONBRIDGEAPI
+  #if P44SCRIPT_REGISTERED_SOURCE
+  else if (mScriptManager && mScriptManager->handleScriptManagerMethod(respErr, aRequest, aMethod, aParams)) {
+    return respErr;
+  }
+  #endif // ENABLE_JSONBRIDGEAPI
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
@@ -1096,6 +1117,121 @@ void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
   learnIdentifyRequest.reset();
 }
 
+// MARK: - P44ScriptManager
+
+#if P44SCRIPT_REGISTERED_SOURCE
+
+/// script manager specific method handling
+bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
+{
+  // FIXME: implement %%%
+  return false;
+}
+
+
+static char sourceslist_key;
+
+enum {
+  // singledevice level properties
+  sources_key,
+  numScriptManagerProperties
+};
+
+static char source_key;
+
+enum {
+  // singledevice level properties
+  sourcetext_key,
+  numScriptSourceProperties
+};
+
+
+int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  if (aParentDescriptor->hasObjectKey(sourceslist_key)) {
+    // script sources container
+    return static_cast<int>(domain().numRegisteredSources());
+  }
+  else if (aParentDescriptor->hasObjectKey(source_key)) {
+    // source properties
+    return numScriptSourceProperties;
+  }
+  // Note: P44ScriptManager is final, so no subclass adding properties must be considered
+  // Always accessing properties at the scriptmanager (root) level
+  return inherited::numProps(aDomain, aParentDescriptor)+numScriptManagerProperties;
+}
+
+
+PropertyContainerPtr P44ScriptManager::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+{
+  // the only subcontainer are the sources, handled by myself
+  return PropertyContainerPtr(this);
+}
+
+
+PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
+{
+  // scriptmanager level properties
+  static const PropertyDescription managerProperties[numScriptManagerProperties] = {
+    // common device properties
+    { "sources", apivalue_object, sources_key, OKEY(sourceslist_key) },
+  };
+  // scriptsource level properties
+  static const PropertyDescription sourceProperties[numScriptManagerProperties] = {
+    // common device properties
+    { "sourcetext", apivalue_string, sourcetext_key, OKEY(source_key) },
+  };
+  // C++ object manages different levels, check objects
+  if (aParentDescriptor->hasObjectKey(sourceslist_key)) {
+    // script sources by their uid
+    ScriptSource* src = domain().getSourceByIndex(aPropIndex);
+    if (!src) return nullptr;
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = src->scriptSourceUid();
+    descP->propertyType = aParentDescriptor->type();
+    descP->propertyFieldKey = aPropIndex;
+    descP->propertyObjectKey = OKEY(source_key);
+    return descP;
+  }
+  else if (aParentDescriptor->hasObjectKey(source_key)) {
+    // source fields
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&sourceProperties[aPropIndex], aParentDescriptor));
+  }
+  // Note: P44ScriptManager is final, so no subclass adding properties must be considered
+  return PropertyDescriptorPtr(new StaticPropertyDescriptor(&managerProperties[aPropIndex], aParentDescriptor));
+}
+
+
+bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(source_key)) {
+    // scriptsource level property
+    // - get the source
+    ScriptSource* src = domain().getSourceByIndex(aPropertyDescriptor->parentDescriptor->fieldKey());
+    if (src) {
+      if (aMode==access_read) {
+        // read properties
+        switch (aPropertyDescriptor->fieldKey()) {
+          case sourcetext_key:
+            aPropValue->setStringValue(src->getSource());
+            return true;
+        }
+      }
+      else {
+        // write properties
+        switch (aPropertyDescriptor->fieldKey()) {
+          case sourcetext_key:
+            // FIXME: take care of persistence
+            src->setSource(aPropValue->stringValue());
+            return true;
+        }
+      }
+    }
+  }
+  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
+}
+
+#endif // P44SCRIPT_REGISTERED_SOURCE
 
 
 // MARK: - Scripted Custom API Support

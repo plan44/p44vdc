@@ -1626,6 +1626,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     aRequest->sendResult(checkResult);
     return ErrorPtr();
   }
+  #endif // P44SCRIPT_FULL_SUPPORT
   if (aMethod=="x-p44-setIdentity") {
     ApiValuePtr o;
     ErrorPtr err;
@@ -1652,7 +1653,6 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     }
     return err;
   }
-  #endif // P44SCRIPT_FULL_SUPPORT
   return inherited::handleMethod(aRequest, aMethod, aParams);
 }
 

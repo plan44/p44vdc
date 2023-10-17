@@ -62,7 +62,7 @@ protected:
       return scene.numSceneValues();
     }
     // actual fields of channel/output
-    // Note: SceneChannels is private an can't be derived, so no subclass adding properties must be considered
+    // Note: SceneChannels is final, so no subclass adding properties must be considered
     return numValueProperties;
   }
 
@@ -83,7 +83,7 @@ protected:
       descP->propertyObjectKey = OKEY(scenevalue_key);
       return descP;
     }
-    // Note: SceneChannels is private an can't be derived, so no subclass adding properties must be considered
+    // Note: SceneChannels is final, so no subclass adding properties must be considered
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&valueproperties[aPropIndex], aParentDescriptor));
   }
 

@@ -2050,9 +2050,8 @@ enum {
 
 int LocalController::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  // properties are only visible when single device is enabled (i.e. deviceActions exist)
   if (aParentDescriptor->isRootOfObject()) {
-    // Accessing properties at the Device (root) level
+    // Accessing properties at the localcontroller (root) level
     return inherited::numProps(aDomain, aParentDescriptor)+numLocalControllerProperties;
   }
   return inherited::numProps(aDomain, aParentDescriptor); // only the inherited ones
@@ -2061,7 +2060,7 @@ int LocalController::numProps(int aDomain, PropertyDescriptorPtr aParentDescript
 
 PropertyDescriptorPtr LocalController::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  // device level properties
+  // localcontroller level properties
   static const PropertyDescription properties[numLocalControllerProperties] = {
     // common device properties
     { "zones", apivalue_object, zones_key, OKEY(zonelist_key) },
@@ -2070,7 +2069,7 @@ PropertyDescriptorPtr LocalController::getDescriptorByIndex(int aPropIndex, int 
   };
   // C++ object manages different levels, check aParentDescriptor
   if (aParentDescriptor->isRootOfObject()) {
-    // root level - accessing properties on the Device level
+    // root level - accessing properties on the localcontroller level
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)
       return inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor); // base class' property

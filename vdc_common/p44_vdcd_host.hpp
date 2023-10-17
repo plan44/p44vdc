@@ -323,6 +323,37 @@ namespace p44 {
   #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
 
 
+  #if P44SCRIPT_REGISTERED_SOURCE
+  
+
+  class P44ScriptManager P44_FINAL : public PropertyContainer
+  {
+    typedef PropertyContainer inherited;
+
+    ScriptingDomainPtr mScriptingDomain;
+
+  public:
+
+    P44ScriptManager(ScriptingDomainPtr aScriptingDomain) : mScriptingDomain(aScriptingDomain) { assert(mScriptingDomain); }
+
+    /// @return scripting domain managed by this scriptmanager
+    ScriptingDomain& domain() { return *mScriptingDomain; };
+
+    /// script manager specific method handling
+    bool handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams);
+
+  protected:
+
+    // property access implementation
+    virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
+    virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+
+  };
+  typedef boost::intrusive_ptr<P44ScriptManager> P44ScriptManagerPtr;
+
+  #endif // P44SCRIPT_REGISTERED_SOURCE
 
 
   /// plan44 specific implementation of a vdc host, with a separate API used by WebUI components.
@@ -344,6 +375,10 @@ namespace p44 {
     #if ENABLE_JSONBRIDGEAPI
     BridgeApiConnectionPtr mBridgeApi; ///< JSON API for bridge access
     BridgeInfoPtr mBridgeInfo; ///< bridge related properties, mostly passive (just for passing between bridge and webui)
+    #endif
+
+    #if P44SCRIPT_REGISTERED_SOURCE
+    P44ScriptManagerPtr mScriptManager; ///< script manager
     #endif
 
   public:
