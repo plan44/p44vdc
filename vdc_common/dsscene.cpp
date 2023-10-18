@@ -150,7 +150,7 @@ DsScene::DsScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   #if P44SCRIPT_FULL_SUPPORT
   mSceneScript(scriptbody+regular, "scenescript", &aSceneDeviceSettings.mDevice),
   #endif
-  sceneDeviceSettings(aSceneDeviceSettings),
+  mSceneDeviceSettings(aSceneDeviceSettings),
   mSceneNo(aSceneNo),
   mSceneArea(0), // not area scene by default
   mSceneCmd(scene_cmd_invoke), // simple invoke command by default
@@ -162,13 +162,13 @@ DsScene::DsScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
 
 Device &DsScene::getDevice()
 {
-  return sceneDeviceSettings.mDevice;
+  return mSceneDeviceSettings.mDevice;
 }
 
 
 OutputBehaviourPtr DsScene::getOutputBehaviour()
 {
-  return sceneDeviceSettings.mDevice.getOutput();
+  return mSceneDeviceSettings.mDevice.getOutput();
 }
 
 

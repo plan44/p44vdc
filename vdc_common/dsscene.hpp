@@ -114,7 +114,7 @@ namespace p44 {
 
     friend class SceneDeviceSettings;
 
-    SceneDeviceSettings &sceneDeviceSettings;
+    SceneDeviceSettings &mSceneDeviceSettings;
 
   protected:
 
