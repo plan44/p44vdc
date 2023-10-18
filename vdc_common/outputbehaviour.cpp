@@ -349,7 +349,7 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 {
   #if ENABLE_SCENE_SCRIPT
   SimpleScenePtr simpleScene = boost::dynamic_pointer_cast<SimpleScene>(aScene);
-  if (simpleScene && simpleScene->mEffect==scene_effect_script) {
+  if (simpleScene && simpleScene->mEffect==scene_effect_script && simpleScene->mSceneScript.active()) {
     // run scene script
     OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->mSceneScript.getSource().c_str(), true, 80).c_str() );
     simpleScene->mSceneScript.setSharedMainContext(mDevice.getDeviceScriptContext());

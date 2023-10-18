@@ -188,7 +188,7 @@ P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) 
 {
   #if P44SCRIPT_REGISTERED_SOURCE
   mScriptManager = new P44ScriptManager(new ScriptingDomain);
-  StandardScriptingDomain::setStandardScriptingDomain(mScriptManager->domain());
+  StandardScriptingDomain::setStandardScriptingDomain(&(mScriptManager->domain()));
   #endif
   #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
   mScriptedApiLookup.isMemberVariable();

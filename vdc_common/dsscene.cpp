@@ -147,9 +147,6 @@ typedef boost::intrusive_ptr<SceneChannels> SceneChannelsPtr;
 
 DsScene::DsScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inheritedParams(aSceneDeviceSettings.paramStore),
-  #if P44SCRIPT_FULL_SUPPORT
-  mSceneScript(scriptbody+regular, "scenescript", &aSceneDeviceSettings.mDevice),
-  #endif
   mSceneDeviceSettings(aSceneDeviceSettings),
   mSceneNo(aSceneNo),
   mSceneArea(0), // not area scene by default
@@ -299,7 +296,7 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   // then proceed with loading other fields
   mGlobalSceneFlags = aRow->get<int>(aIndex++);
   #if ENABLE_SCENE_SCRIPT
-  mSceneScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  mSceneScript.loadAndActivate(string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(),mSceneNo), scriptbody+regular, "scenescript", &mSceneDeviceSettings.mDevice, aRow->get<const char *>(aIndex++));
   #endif
 }
 
@@ -311,7 +308,8 @@ void DsScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, (int)mSceneNo);
   aStatement.bind(aIndex++, (int)mGlobalSceneFlags);
   #if ENABLE_SCENE_SCRIPT
-  aStatement.bind(aIndex++, mSceneScript.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  mSceneScript.storeSource();
+  aStatement.bind(aIndex++, mSceneScript.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #endif
 }
 
