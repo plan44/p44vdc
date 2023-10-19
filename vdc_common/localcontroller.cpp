@@ -928,15 +928,15 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   mTriggerId(0),
-  triggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
-  triggerAction(sourcecode+regular, "action", this),
+  mTriggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
+  mTriggerAction(sourcecode+regular, "action", this),
   mConditionMet(undefined)
 {
   mValueMapper.isMemberVariable();
-  triggerContext = triggerCondition.domain()->newContext(); // common context for condition and action
-  triggerContext->registerMemberLookup(&mValueMapper); // allow context to access the mapped values
-  triggerCondition.setSharedMainContext(triggerContext);
-  triggerAction.setSharedMainContext(triggerContext);
+  mTriggerContext = mTriggerCondition.domain()->newContext(); // common context for condition and action
+  mTriggerContext->registerMemberLookup(&mValueMapper); // allow context to access the mapped values
+  mTriggerCondition.setSharedMainContext(mTriggerContext);
+  mTriggerAction.setSharedMainContext(mTriggerContext);
   // Note sourceCodeUid will be set when mTriggerId gets defined
 }
 
@@ -967,7 +967,7 @@ void Trigger::parseVarDefs()
   }
   else if (LocalController::sharedLocalController()->mDevicesReady) {
     // do not run checks (and fire triggers too early) before devices are reported initialized
-    triggerCondition.compileAndInit();
+    mTriggerCondition.compileAndInit();
   }
 }
 
@@ -983,7 +983,7 @@ void Trigger::processGlobalEvent(VdchostEvent aActivity)
     if (!mVarParseTicket) {
       // Note: if variable re-parsing is already scheduled, this will re-evaluate anyway
       //   Otherwise: have condition re-evaluated (because it possibly contains references to local time)
-      triggerCondition.nextEvaluationNotLaterThan(MainLoop::now()+REPARSE_DELAY);
+      mTriggerCondition.nextEvaluationNotLaterThan(MainLoop::now()+REPARSE_DELAY);
     }
   }
 }
@@ -1006,7 +1006,7 @@ void Trigger::executeTriggerAction()
 {
   // a trigger fire is an activity
   LocalController::sharedLocalController()->signalActivity();
-  triggerAction.run(stopall, boost::bind(&Trigger::triggerActionExecuted, this, _1), ScriptObjPtr(), Infinite);
+  mTriggerAction.run(stopall, boost::bind(&Trigger::triggerActionExecuted, this, _1), ScriptObjPtr(), Infinite);
 }
 
 
@@ -1034,12 +1034,12 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   }
   // Condition
   ApiValuePtr cond = checkResult->newObject();
-  ScriptObjPtr res = triggerCondition.run(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
-  cond->add("expression", checkResult->newString(triggerCondition.getSource().c_str()));
+  ScriptObjPtr res = mTriggerCondition.run(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
+  cond->add("expression", checkResult->newString(mTriggerCondition.getSource().c_str()));
   if (!res->isErr()) {
     cond->add("result", cond->newScriptValue(res));
     cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));
-    OLOG(LOG_INFO, "condition '%s' -> %s", triggerCondition.getSource().c_str(), res->stringValue().c_str());
+    OLOG(LOG_INFO, "condition '%s' -> %s", mTriggerCondition.getSource().c_str(), res->stringValue().c_str());
   }
   else {
     cond->add("error", cond->newString(res->errorValue()->getErrorMessage()));
@@ -1064,7 +1064,7 @@ ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest, ScriptObjPtr aTri
     threadLocals = new SimpleVarContainer();
     threadLocals->setMemberByName("triggerparam", aTriggerParam);
   }
-  triggerAction.run(stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), threadLocals, Infinite);
+  mTriggerAction.run(stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), threadLocals, Infinite);
   return ErrorPtr(); // will send result later
 }
 
@@ -1091,7 +1091,7 @@ void Trigger::testTriggerActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr 
 
 void Trigger::stopActions()
 {
-  triggerContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "trigger action stopped"));
+  mTriggerContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "trigger action stopped"));
 }
 
 
@@ -1102,8 +1102,8 @@ void Trigger::setTriggerId(int aTriggerId)
     mTriggerId = aTriggerId;
     // update dependent trigger script IDs
     string uidbase = string_format("trigger_%d.", mTriggerId);
-    triggerCondition.setScriptSourceUid(uidbase+"condition");
-    triggerAction.setScriptSourceUid(uidbase+"action");
+    mTriggerCondition.setScriptSourceUid(uidbase+"condition");
+    mTriggerAction.setScriptSourceUid(uidbase+"action");
   }
 }
 
@@ -1175,11 +1175,11 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   setTriggerId(aRow->getWithDefault<int>(aIndex++, 0));
   // the fields
   mName = nonNullCStr(aRow->get<const char *>(aIndex++));
-  triggerCondition.loadTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  triggerAction.loadSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  mTriggerCondition.loadTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  mTriggerAction.loadSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   mTriggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
-  triggerCondition.setTriggerMode(aRow->getCastedWithDefault<TriggerMode, int>(aIndex++, onGettingTrue), false); // do not initialize at load yet
-  triggerCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, 0), false); // do not initialize at load yet
+  mTriggerCondition.setTriggerMode(aRow->getCastedWithDefault<TriggerMode, int>(aIndex++, onGettingTrue), false); // do not initialize at load yet
+  mTriggerCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, 0), false); // do not initialize at load yet
   mUiParams = nonNullCStr(aRow->get<const char *>(aIndex++));
   // initiate evaluation, first vardefs and eventually trigger expression to get timers started
   parseVarDefs();
@@ -1193,11 +1193,11 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, mTriggerId);
   // the fields
   aStatement.bind(aIndex++, mName.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, triggerCondition.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, triggerAction.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mTriggerCondition.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mTriggerAction.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, mTriggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, (int)triggerCondition.getTriggerMode());
-  aStatement.bind(aIndex++, (long long int)triggerCondition.getTriggerHoldoff());
+  aStatement.bind(aIndex++, (int)mTriggerCondition.getTriggerMode());
+  aStatement.bind(aIndex++, (long long int)mTriggerCondition.getTriggerHoldoff());
   aStatement.bind(aIndex++, mUiParams.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
@@ -1254,10 +1254,10 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case triggerName_key: aPropValue->setStringValue(mName); return true;
         case uiParams_key: aPropValue->setStringValue(mUiParams); return true;
         case triggerVarDefs_key: aPropValue->setStringValue(mTriggerVarDefs); return true;
-        case triggerCondition_key: aPropValue->setStringValue(triggerCondition.getSource().c_str()); return true;
-        case triggerMode_key: aPropValue->setInt32Value(triggerCondition.getTriggerMode()); return true;
-        case triggerHoldOff_key: aPropValue->setDoubleValue((double)triggerCondition.getTriggerHoldoff()/Second); return true;
-        case triggerAction_key: aPropValue->setStringValue(triggerAction.getSource().c_str()); return true;
+        case triggerCondition_key: aPropValue->setStringValue(mTriggerCondition.getSource().c_str()); return true;
+        case triggerMode_key: aPropValue->setInt32Value(mTriggerCondition.getTriggerMode()); return true;
+        case triggerHoldOff_key: aPropValue->setDoubleValue((double)mTriggerCondition.getTriggerHoldoff()/Second); return true;
+        case triggerAction_key: aPropValue->setStringValue(mTriggerAction.getSource().c_str()); return true;
         case logLevelOffset_key: aPropValue->setInt32Value(getLocalLogLevelOffset()); return true;
       }
     }
@@ -1275,22 +1275,22 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           }
           return true;
         case triggerCondition_key:
-          if (triggerCondition.setAndStoreTriggerSource(aPropValue->stringValue(), true)) {
+          if (mTriggerCondition.setAndStoreTriggerSource(aPropValue->stringValue(), true)) {
             markDirty();
           }
           return true;
         case triggerMode_key:
-          if (triggerCondition.setTriggerMode(TriggerMode(aPropValue->int32Value()), true)) {
+          if (mTriggerCondition.setTriggerMode(TriggerMode(aPropValue->int32Value()), true)) {
             markDirty();
           }
           return true;
         case triggerHoldOff_key:
-          if (triggerCondition.setTriggerHoldoff((MLMicroSeconds)(aPropValue->doubleValue()*Second), true)) {
+          if (mTriggerCondition.setTriggerHoldoff((MLMicroSeconds)(aPropValue->doubleValue()*Second), true)) {
             markDirty();
           }
           return true;
         case triggerAction_key:
-          if (triggerAction.setAndStoreSource(aPropValue->stringValue())) {
+          if (mTriggerAction.setAndStoreSource(aPropValue->stringValue())) {
             markDirty();
           }
           return true;
@@ -2136,7 +2136,7 @@ static void trigger_func(BuiltinFunctionContextPtr f)
     f->finish(new ErrorValue(ScriptError::NotFound, "No trigger named '%s' found", f->arg(0)->stringValue().c_str()));
     return;
   }
-  targetTrigger->triggerAction.run(regular|stopall, boost::bind(&trigger_funcExecuted, f, _1), ScriptObjPtr(), Infinite);
+  targetTrigger->mTriggerAction.run(regular|stopall, boost::bind(&trigger_funcExecuted, f, _1), ScriptObjPtr(), Infinite);
 }
 
 

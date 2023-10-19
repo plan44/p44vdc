@@ -367,9 +367,9 @@ namespace p44 {
 
   public:
 
-    ScriptMainContextPtr triggerContext; ///< context shared for all scripts in this trigger
-    TriggerSource triggerCondition;
-    ScriptSource triggerAction;
+    ScriptMainContextPtr mTriggerContext; ///< context shared for all scripts in this trigger
+    TriggerSource mTriggerCondition;
+    ScriptSource mTriggerAction;
 
     Trigger();
     virtual ~Trigger();
