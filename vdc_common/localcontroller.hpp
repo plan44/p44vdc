@@ -357,7 +357,7 @@ namespace p44 {
     typedef PersistentParams inheritedParams;
     friend class TriggerList;
 
-    int mTriggerId; ///< the immutable ID of this trigger
+    int mTriggerId; ///< the immutable ID of this trigger, 0=not yet assigned
     string mName;
     string mTriggerVarDefs; ///< variable to valueSource mappings
     string mUiParams; ///< free-form (but usually JSON) string for rendering this trigger in the (custom) Web-UI
@@ -373,6 +373,11 @@ namespace p44 {
 
     Trigger();
     virtual ~Trigger();
+
+    /// set the (hereforth immutable) trigger id
+    /// @note setting this updates/sets script UIDs
+    /// @note is NOP when ID is already set
+    void setTriggerId(int aTriggerId);
 
     /// called when vdc host event occurs
     /// @param aActivity the activity that occurred at the vdc host level

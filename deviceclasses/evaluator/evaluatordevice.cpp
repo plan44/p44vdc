@@ -630,12 +630,12 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
             parseVarDefs(); // changed varDefs, re-parse them
           return true;
         case onCondition_key:
-          if (evaluatorSettings()->mOnCondition.setTriggerSource(aPropValue->stringValue(), true)) {
+          if (evaluatorSettings()->mOnCondition.setAndStoreTriggerSource(aPropValue->stringValue(), true)) {
             evaluatorSettings()->markDirty();
           }
           return true;
         case offCondition_key:
-          if (evaluatorSettings()->mOffCondition.setTriggerSource(aPropValue->stringValue(), true)) {
+          if (evaluatorSettings()->mOffCondition.setAndStoreTriggerSource(aPropValue->stringValue(), true)) {
             evaluatorSettings()->markDirty();
           }
           return true;
@@ -651,7 +651,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         #if P44SCRIPT_FULL_SUPPORT
         case action_key:
-          if (evaluatorSettings()->mAction.setSource(aPropValue->stringValue())) {
+          if (evaluatorSettings()->mAction.setAndStoreSource(aPropValue->stringValue())) {
             evaluatorSettings()->markDirty();
           }
           return true;
@@ -679,12 +679,15 @@ EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bo
   ,mAction(scriptbody|regular|keepvars|concurrently, "action", &mDevice)
   #endif
 {
+  string uidbase = string_format("eval_%s.", mDevice.getDsUid().getString().c_str());
   mEvaluatorContext = mOnCondition.domain()->newContext(); // common context for triggers and action
   mEvaluatorContext->registerMemberLookup(&aEvaluator.mValueMapper);
   mOnCondition.setSharedMainContext(mEvaluatorContext);
   mOffCondition.setSharedMainContext(mEvaluatorContext);
+  mOffCondition.setScriptSourceUid(uidbase+"offcondition");
   #if P44SCRIPT_FULL_SUPPORT
   mAction.setSharedMainContext(mEvaluatorContext);
+  mAction.setScriptSourceUid(uidbase+"action");
   #endif
 }
 
@@ -731,12 +734,12 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field values
   mVarDefs.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  mOnCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
-  mOffCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
+  mOnCondition.loadTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
+  mOffCondition.loadTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
   mOnCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
   mOffCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
   #if P44SCRIPT_FULL_SUPPORT
-  mAction.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  mAction.loadSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #else
   mOldAction = nonNullCStr(aRow->get<const char *>(aIndex++));
   #endif

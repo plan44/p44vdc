@@ -1221,8 +1221,7 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         // write properties
         switch (aPropertyDescriptor->fieldKey()) {
           case sourcetext_key:
-            // FIXME: take care of persistence
-            src->setSource(aPropValue->stringValue());
+            src->setAndStoreSource(aPropValue->stringValue());
             return true;
         }
       }

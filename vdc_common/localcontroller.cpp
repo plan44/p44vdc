@@ -937,6 +937,7 @@ Trigger::Trigger() :
   triggerContext->registerMemberLookup(&mValueMapper); // allow context to access the mapped values
   triggerCondition.setSharedMainContext(triggerContext);
   triggerAction.setSharedMainContext(triggerContext);
+  // Note sourceCodeUid will be set when mTriggerId gets defined
 }
 
 
@@ -1094,6 +1095,20 @@ void Trigger::stopActions()
 }
 
 
+void Trigger::setTriggerId(int aTriggerId)
+{
+  if (mTriggerId==0) {
+    // unset so far
+    mTriggerId = aTriggerId;
+    // update dependent trigger script IDs
+    string uidbase = string_format("trigger_%d.", mTriggerId);
+    triggerCondition.setScriptSourceUid(uidbase+"condition");
+    triggerAction.setScriptSourceUid(uidbase+"action");
+  }
+}
+
+
+
 // MARK: - Trigger persistence
 
 const char *Trigger::tableName()
@@ -1157,11 +1172,11 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
 {
   inheritedParams::loadFromRowWithoutParentId(aRow, aIndex, aCommonFlagsP);
   // get key fields
-  mTriggerId = aRow->getWithDefault<int>(aIndex++, 0);
+  setTriggerId(aRow->getWithDefault<int>(aIndex++, 0));
   // the fields
   mName = nonNullCStr(aRow->get<const char *>(aIndex++));
-  triggerCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  triggerAction.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  triggerCondition.loadTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  triggerAction.loadSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   mTriggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
   triggerCondition.setTriggerMode(aRow->getCastedWithDefault<TriggerMode, int>(aIndex++, onGettingTrue), false); // do not initialize at load yet
   triggerCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, 0), false); // do not initialize at load yet
@@ -1260,7 +1275,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           }
           return true;
         case triggerCondition_key:
-          if (triggerCondition.setTriggerSource(aPropValue->stringValue(), true)) {
+          if (triggerCondition.setAndStoreTriggerSource(aPropValue->stringValue(), true)) {
             markDirty();
           }
           return true;
@@ -1274,8 +1289,14 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
             markDirty();
           }
           return true;
-        case triggerAction_key: if (triggerAction.setSource(aPropValue->stringValue())) markDirty(); return true;
-        case logLevelOffset_key: setLogLevelOffset(aPropValue->int32Value()); return true;
+        case triggerAction_key:
+          if (triggerAction.setAndStoreSource(aPropValue->stringValue())) {
+            markDirty();
+          }
+          return true;
+        case logLevelOffset_key:
+          setLogLevelOffset(aPropValue->int32Value());
+          return true;
       }
     }
   }
@@ -1302,7 +1323,7 @@ TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting,
   }
   if (tidx>=mTriggers.size() && aCreateNewIfNotExisting) {
     TriggerPtr newTrigger = TriggerPtr(new Trigger);
-    newTrigger->mTriggerId = highestId+1;
+    newTrigger->setTriggerId(highestId+1);
     mTriggers.push_back(newTrigger);
   }
   if (tidx<mTriggers.size()) {

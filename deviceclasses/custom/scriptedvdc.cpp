@@ -377,7 +377,7 @@ bool ScriptedDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
       // write properties
       switch (aPropertyDescriptor->fieldKey()) {
         case implementation_key:
-          if (mImplementation.mScript.setSource(aPropValue->stringValue())) {
+          if (mImplementation.mScript.setAndStoreSource(aPropValue->stringValue())) {
             mImplementation.markDirty();
           }
           return true;
@@ -400,6 +400,8 @@ ScriptedDeviceImplementation::ScriptedDeviceImplementation(ScriptedDevice &aScri
 {
   mContext = StandardScriptingDomain::sharedDomain().newContext(mScriptedDevice.newDeviceObj());
   mScript.setSharedMainContext(mContext);
+  mScript.setScriptSourceUid(string_format("scripteddev_%s.implementation", mScriptedDevice.getDsUid().getString().c_str()));
+
 }
 
 
@@ -438,7 +440,7 @@ void ScriptedDeviceImplementation::loadFromRow(sqlite3pp::query::iterator &aRow,
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field values
-  mScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  mScript.loadSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
 }
 
 

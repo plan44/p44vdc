@@ -296,7 +296,12 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   // then proceed with loading other fields
   mGlobalSceneFlags = aRow->get<int>(aIndex++);
   #if ENABLE_SCENE_SCRIPT
-  mSceneScript.loadAndActivate(string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(),mSceneNo), scriptbody+regular, "scenescript", &mSceneDeviceSettings.mDevice, aRow->get<const char *>(aIndex++));
+  mSceneScript.loadAndActivate(
+    string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(),mSceneNo),
+    scriptbody+regular, "scenescript", &mSceneDeviceSettings.mDevice,
+    nullptr, // standard scripting domain
+    aRow->get<const char *>(aIndex++)
+  );
   #endif
 }
 
@@ -501,7 +506,13 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           return true;
         #if ENABLE_SCENE_SCRIPT
         case sceneScript_key:
-          if (mSceneScript.setSource(aPropValue->stringValue())) {
+          // lazy activation when setting a non-empty scene script
+          if (mSceneScript.setSourceAndActivate(
+            aPropValue->stringValue(),
+            string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(),mSceneNo),
+            scriptbody+regular, "scenescript", &mSceneDeviceSettings.mDevice,
+            nullptr // standard scripting domain
+          )) {
             markDirty();
           }
           return true;

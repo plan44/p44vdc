@@ -1830,7 +1830,7 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           return true;
         #if P44SCRIPT_FULL_SUPPORT
         case mainscript_key:
-          if (mMainScript.setSource(aPropValue->stringValue())) markDirty();
+          if (mMainScript.setAndStoreSource(aPropValue->stringValue())) markDirty();
           return true;
         #endif
       }
@@ -2103,7 +2103,7 @@ void VdcHost::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   aRow->getIfNotNull(aIndex++, mGeolocation.longitude);
   aRow->getIfNotNull(aIndex++, mGeolocation.heightAboveSea);
   #if P44SCRIPT_FULL_SUPPORT
-  mMainScript.setSource(nonNullCStr(aRow->get<const char *>(aIndex++)), sourcecode);
+  mMainScript.setAndStoreSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #else
   aIndex++; // just ignore
   #endif
