@@ -314,7 +314,7 @@ void DsScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, (int)mGlobalSceneFlags);
   #if ENABLE_SCENE_SCRIPT
   mSceneScript.storeSource();
-  aStatement.bind(aIndex++, mSceneScript.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mSceneScript.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #endif
 }
 

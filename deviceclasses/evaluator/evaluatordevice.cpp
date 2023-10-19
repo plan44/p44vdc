@@ -752,12 +752,12 @@ void EvaluatorDeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, 
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, mVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, mOnCondition.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, mOffCondition.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mOnCondition.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mOffCondition.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (long long int)mOnCondition.getTriggerHoldoff());
   aStatement.bind(aIndex++, (long long int)mOffCondition.getTriggerHoldoff());
   #if P44SCRIPT_FULL_SUPPORT
-  aStatement.bind(aIndex++, mAction.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mAction.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #else
   aStatement.bind(aIndex++, mOldAction.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #endif

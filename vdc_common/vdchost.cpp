@@ -2129,7 +2129,7 @@ void VdcHost::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, mGeolocation.longitude);
   aStatement.bind(aIndex++, mGeolocation.heightAboveSea);
   #if P44SCRIPT_FULL_SUPPORT
-  aStatement.bind(aIndex++, mMainScript.getDBStoreSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mMainScript.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #else
   aStatement.bind(aIndex++); // bind null
   #endif
