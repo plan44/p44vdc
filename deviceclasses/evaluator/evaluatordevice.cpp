@@ -128,11 +128,8 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
 void EvaluatorDevice::willBeAdded()
 {
   // set script ids based on dSUID now
-  string uidbase = string_format("eval_%s.", getDsUid().getString().c_str());
-  evaluatorSettings()->mOnCondition.setScriptSourceUid(uidbase+"oncondition");
-  evaluatorSettings()->mOffCondition.setScriptSourceUid(uidbase+"offcondition");
   #if P44SCRIPT_FULL_SUPPORT
-  evaluatorSettings()->mAction.setScriptSourceUid(uidbase+"action");
+  evaluatorSettings()->mAction.setScriptSourceUid(string_format("eval_%s.action", getDsUid().getString().c_str()));
   #endif
 }
 
@@ -642,12 +639,12 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
             parseVarDefs(); // changed varDefs, re-parse them
           return true;
         case onCondition_key:
-          if (evaluatorSettings()->mOnCondition.setAndStoreTriggerSource(aPropValue->stringValue(), true)) {
+          if (evaluatorSettings()->mOnCondition.setTriggerSource(aPropValue->stringValue(), true)) {
             evaluatorSettings()->markDirty();
           }
           return true;
         case offCondition_key:
-          if (evaluatorSettings()->mOffCondition.setAndStoreTriggerSource(aPropValue->stringValue(), true)) {
+          if (evaluatorSettings()->mOffCondition.setTriggerSource(aPropValue->stringValue(), true)) {
             evaluatorSettings()->markDirty();
           }
           return true;
@@ -742,8 +739,8 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field values
   mVarDefs.assign(nonNullCStr(aRow->get<const char *>(aIndex++)));
-  mOnCondition.loadTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
-  mOffCondition.loadTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
+  mOnCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
+  mOffCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)), false); // do not initialize at load yet
   mOnCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
   mOffCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
   #if P44SCRIPT_FULL_SUPPORT
@@ -760,8 +757,8 @@ void EvaluatorDeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, 
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, mVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, mOnCondition.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, mOffCondition.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mOnCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mOffCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (long long int)mOnCondition.getTriggerHoldoff());
   aStatement.bind(aIndex++, (long long int)mOffCondition.getTriggerHoldoff());
   #if P44SCRIPT_FULL_SUPPORT

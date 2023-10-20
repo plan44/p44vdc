@@ -937,7 +937,7 @@ Trigger::Trigger() :
   mTriggerContext->registerMemberLookup(&mValueMapper); // allow context to access the mapped values
   mTriggerCondition.setSharedMainContext(mTriggerContext);
   mTriggerAction.setSharedMainContext(mTriggerContext);
-  // Note sourceCodeUid will be set when mTriggerId gets defined
+  // Note: sourceCodeUid will be set when mTriggerId gets defined
 }
 
 
@@ -1175,7 +1175,7 @@ void Trigger::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   setTriggerId(aRow->getWithDefault<int>(aIndex++, 0));
   // the fields
   mName = nonNullCStr(aRow->get<const char *>(aIndex++));
-  mTriggerCondition.loadTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  mTriggerCondition.setTriggerSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   mTriggerAction.loadSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   mTriggerVarDefs = nonNullCStr(aRow->get<const char *>(aIndex++));
   mTriggerCondition.setTriggerMode(aRow->getCastedWithDefault<TriggerMode, int>(aIndex++, onGettingTrue), false); // do not initialize at load yet
@@ -1193,7 +1193,7 @@ void Trigger::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, con
   aStatement.bind(aIndex++, mTriggerId);
   // the fields
   aStatement.bind(aIndex++, mName.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, mTriggerCondition.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mTriggerCondition.getSource().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, mTriggerAction.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, mTriggerVarDefs.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, (int)mTriggerCondition.getTriggerMode());
@@ -1275,7 +1275,7 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           }
           return true;
         case triggerCondition_key:
-          if (mTriggerCondition.setAndStoreTriggerSource(aPropValue->stringValue(), true)) {
+          if (mTriggerCondition.setTriggerSource(aPropValue->stringValue(), true)) {
             markDirty();
           }
           return true;
