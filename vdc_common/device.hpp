@@ -179,7 +179,8 @@ namespace p44 {
     Vdc& getVdc();
 
 
-    /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
+    /// identify a device up to the point that it knows its dSUID and internal structure.
+    ///   Possibly swap device object for a more specialized subclass.
     /// @param aIdentifyCB must be called when the identification or setup is not instant, but can only be confirmed later. In this
     ///   case, identifyDevice() must return false, indicating the identification is not yet complete.
     ///   This is useful for devices that require API calls to determine device models, serial numbers etc.)
@@ -190,7 +191,7 @@ namespace p44 {
     /// @note identifyDevice() will only be called on a new Device object during the process of adding a device to a vDC.
     /// @note identifyDevice() MAY NOT perform any action on the (hardware) device that would modify its state. When re-scanning
     ///   for hardware devices, identifyDevice() will often target already known and registered devices. identifyDevice()'s only
-    ///   allowed interaction with the hardware device is to query enough information to derive a henceforth invariable dSUID and
+    ///   allowed interaction with the hardware device is to query enough information to derive a henceforth invariable dSUID
     ///   and to construct a suitable Device object, including all contained settings, scene and behaviour objects.
     ///   This object is then *possibly* used to operate the device later (in this case it will receive load() and initializeDevice() calls),
     //    but also might get discarded without further calls when it turns out there is already a Device with the same dSUID.
@@ -210,8 +211,14 @@ namespace p44 {
     /// called when vdsm acknowledges announcement of this device.
     virtual void vdSMAnnouncementAcknowledged() P44_OVERRIDE;
 
+    /// called when fully constructed (dSUID stable, ready to load), but NOT yet loaded
+    virtual void willBeAdded() { /* NOP */ };
+
     /// load parameters from persistent DB
-    /// @note this is usually called from the device container when device is added (detected), before initializeDevice() and after identifyDevice()
+    /// @note this is called before initializeDevice() and after identifyDevice(), so
+    ///   this is a point in time where structure and dSUID of the device is stable, and
+    ///   may be used (apart from loading data) to derive info that is based on that (but
+    ///   is not available at object construction), such as scriptSourceUIds.
     virtual ErrorPtr load();
 
     #if ENABLE_SETTINGS_FROM_FILES

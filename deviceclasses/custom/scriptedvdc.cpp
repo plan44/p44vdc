@@ -127,6 +127,13 @@ ScriptedDevice::~ScriptedDevice()
 }
 
 
+void ScriptedDevice::willBeAdded()
+{
+  mImplementation.mScript.setScriptSourceUid(string_format("scripteddev_%s.implementation", getDsUid().getString().c_str()));
+  inherited::willBeAdded();
+}
+
+
 void ScriptedDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
   restartImplementation();
@@ -400,8 +407,7 @@ ScriptedDeviceImplementation::ScriptedDeviceImplementation(ScriptedDevice &aScri
 {
   mContext = StandardScriptingDomain::sharedDomain().newContext(mScriptedDevice.newDeviceObj());
   mScript.setSharedMainContext(mContext);
-  mScript.setScriptSourceUid(string_format("scripteddev_%s.implementation", mScriptedDevice.getDsUid().getString().c_str()));
-
+  // script uid will be set at load
 }
 
 

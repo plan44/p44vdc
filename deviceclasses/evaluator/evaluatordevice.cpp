@@ -54,9 +54,9 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   #endif
   mReporting(false)
 {
-  #if ENABLE_P44SCRIPT
+#if ENABLE_P44SCRIPT
   mValueMapper.isMemberVariable();
-  #endif
+#endif
   // Config is:
   //  <behaviour mode>
   int st, su;
@@ -66,10 +66,10 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     mEvaluatorType = evaluator_input;
   else if (aEvaluatorConfig=="internal" || aEvaluatorConfig=="internalinput") // "internal" must be still recognized for backwards compatibility with existing settings!
     mEvaluatorType = evaluator_internalinput;
-  #if P44SCRIPT_FULL_SUPPORT
+#if P44SCRIPT_FULL_SUPPORT
   else if (aEvaluatorConfig=="internalaction")
     mEvaluatorType = evaluator_internalaction;
-  #endif
+#endif
   else if (sscanf(aEvaluatorConfig.c_str(), "sensor:%d:%d", &st, &su)==2) {
     mEvaluatorType = evaluator_sensor;
     mSensorType = (VdcSensorType)st;
@@ -122,6 +122,18 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     addBehaviour(s);
   }
   deriveDsUid();
+}
+
+
+void EvaluatorDevice::willBeAdded()
+{
+  // set script ids based on dSUID now
+  string uidbase = string_format("eval_%s.", getDsUid().getString().c_str());
+  evaluatorSettings()->mOnCondition.setScriptSourceUid(uidbase+"oncondition");
+  evaluatorSettings()->mOffCondition.setScriptSourceUid(uidbase+"offcondition");
+  #if P44SCRIPT_FULL_SUPPORT
+  evaluatorSettings()->mAction.setScriptSourceUid(uidbase+"action");
+  #endif
 }
 
 
@@ -679,18 +691,14 @@ EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bo
   ,mAction(scriptbody|regular|keepvars|concurrently, "action", &mDevice)
   #endif
 {
-  string uidbase = string_format("eval_%s.", mDevice.getDsUid().getString().c_str());
   mEvaluatorContext = mOnCondition.domain()->newContext(); // common context for triggers and action
   mEvaluatorContext->registerMemberLookup(&aEvaluator.mValueMapper);
   mOnCondition.setSharedMainContext(mEvaluatorContext);
   mOffCondition.setSharedMainContext(mEvaluatorContext);
-  mOffCondition.setScriptSourceUid(uidbase+"offcondition");
   #if P44SCRIPT_FULL_SUPPORT
   mAction.setSharedMainContext(mEvaluatorContext);
-  mAction.setScriptSourceUid(uidbase+"action");
   #endif
 }
-
 
 
 const char *EvaluatorDeviceSettings::tableName()

@@ -158,6 +158,9 @@ namespace p44 {
 
     /// @}
 
+    /// called when fully constructed (dSUID stable, ready to load), but NOT yet loaded
+    virtual void willBeAdded() P44_OVERRIDE;
+
     /// initializes the physical device for being used
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
     /// @note this is called before interaction with dS system starts

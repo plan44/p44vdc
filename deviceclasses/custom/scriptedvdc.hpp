@@ -105,6 +105,9 @@ namespace p44 {
     ScriptedDevice(Vdc *aVdcP, const string aDefaultUniqueId, bool aSimpleText);
     virtual ~ScriptedDevice();
 
+    /// called when fully constructed (dSUID stable, ready to load), but NOT yet loaded
+    virtual void willBeAdded() P44_OVERRIDE;
+
     ScriptedVdc &getScriptedVdc();
 
     /// @return a new script object representing this device. Derived device classes might return different types of device object.
