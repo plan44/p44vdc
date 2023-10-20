@@ -325,7 +325,6 @@ namespace p44 {
 
   #if P44SCRIPT_REGISTERED_SOURCE
   
-
   class P44ScriptManager P44_FINAL : public PropertyContainer
   {
     typedef PropertyContainer inherited;

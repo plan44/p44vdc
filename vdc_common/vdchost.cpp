@@ -130,6 +130,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mVdcHostScriptContext = StandardScriptingDomain::sharedDomain().newContext();
   // init main script source
   mMainScript.setSharedMainContext(mVdcHostScriptContext);
+  mMainScript.setScriptSourceUid("mainscript");
   // Add some extras
   #if ENABLE_HTTP_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::HttpLookup);
@@ -323,7 +324,7 @@ const char *VdcHost::getIconDir()
 void VdcHost::setPersistentDataDir(const char *aPersistentDataDir)
 {
 	mPersistentDataDir = nonNullCStr(aPersistentDataDir);
-  pathstring_format_append(mPersistentDataDir,""); // make sure filenames can be appended without adding a delimiter
+  pathstring_make_dir(mPersistentDataDir); // make sure filenames can be appended without adding a delimiter
 }
 
 
@@ -456,14 +457,15 @@ string DsParamStore::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 
 
 
-void VdcHost::prepareForVdcs(bool aFactoryReset)
+ErrorPtr VdcHost::prepareForVdcs(bool aFactoryReset)
 {
   // initialize dsParamsDB database
   string databaseName = getPersistentDataDir();
   string_format_append(databaseName, "DsParams.sqlite3");
-  ErrorPtr error = mDSParamStore.connectAndInitialize(databaseName.c_str(), DSPARAMS_SCHEMA_VERSION, DSPARAMS_SCHEMA_MIN_VERSION, aFactoryReset);
+  ErrorPtr err = mDSParamStore.connectAndInitialize(databaseName.c_str(), DSPARAMS_SCHEMA_VERSION, DSPARAMS_SCHEMA_MIN_VERSION, aFactoryReset);
   // load the vdc host settings and determine the dSUID (external > stored > mac-derived)
   loadAndFixDsUID();
+  return err;
 }
 
 
@@ -681,6 +683,8 @@ bool VdcHost::addDevice(DevicePtr aDevice)
     MainLoop::currentMainLoop().executeNow(boost::bind(&VdcHost::duplicateIgnored, this, aDevice));
     return false; // duplicate dSUID, not added
   }
+  // device construction and dSUID is stable and will be added this way
+  aDevice->willBeAdded();
   // set for given dSUID in the container-wide map of devices
   mDSDevices[aDevice->getDsUid()] = aDevice;
   LOG(LOG_NOTICE, "--- added device: %s (not yet initialized)",aDevice->shortDesc().c_str());
@@ -1585,6 +1589,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
       ScriptSource src(sourcecode+regular+keepvars+concurrently+ephemeralSource, "scriptExec/REPL", this);
       src.setSource(o->stringValue());
       src.setSharedMainContext(mVdcHostScriptContext);
+      src.registerUnstoredScript("scriptExec");
       src.run(inherit, boost::bind(&VdcHost::scriptExecHandler, this, aRequest, _1));
     }
     else {
@@ -2103,7 +2108,7 @@ void VdcHost::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   aRow->getIfNotNull(aIndex++, mGeolocation.longitude);
   aRow->getIfNotNull(aIndex++, mGeolocation.heightAboveSea);
   #if P44SCRIPT_FULL_SUPPORT
-  mMainScript.setAndStoreSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  mMainScript.loadSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #else
   aIndex++; // just ignore
   #endif
@@ -2387,6 +2392,7 @@ void VdcHost::runGlobalScripts()
       ScriptSource initScript(sourcecode+regular, setupscript ? "setupscript" : "initscript", this);
       initScript.setSource(script, scriptbody|ephemeralSource);
       initScript.setSharedMainContext(mVdcHostScriptContext);
+      initScript.registerUnstoredScript("initscript");
       OLOG(LOG_NOTICE, "Starting %s specified on commandline '%s'", initScript.getOriginLabel(), scriptFn.c_str());
       initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel(), setupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
     }

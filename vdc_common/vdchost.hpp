@@ -332,7 +332,7 @@ namespace p44 {
     /// In particular, this triggers creating/loading the vdc host dSUID, which serves as a base ID
     /// for most class containers and many devices.
     /// @param aFactoryReset if set, database will be reset
-    void prepareForVdcs(bool aFactoryReset);
+    ErrorPtr prepareForVdcs(bool aFactoryReset);
 
 		/// initialize
     /// @param aCompletedCB will be called when the entire container is initialized or has been aborted with a fatal error

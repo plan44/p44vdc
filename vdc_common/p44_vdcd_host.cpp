@@ -181,15 +181,14 @@ private:
 
 // MARK: - P44VdcHost
 
-
 P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   inherited(aWithLocalController, aWithPersistentChannels),
   webUiPort(0)
 {
   #if P44SCRIPT_REGISTERED_SOURCE
-  mScriptManager = new P44ScriptManager(new ScriptingDomain);
+  mScriptManager = new P44ScriptManager(&StandardScriptingDomain::sharedDomain());
   StandardScriptingDomain::setStandardScriptingDomain(&(mScriptManager->domain()));
-  #endif
+  #endif // P44SCRIPT_REGISTERED_SOURCE
   #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
   mScriptedApiLookup.isMemberVariable();
   StandardScriptingDomain::sharedDomain().registerMemberLookup(&mScriptedApiLookup);
