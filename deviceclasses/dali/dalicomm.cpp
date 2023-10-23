@@ -66,12 +66,6 @@ DaliComm::~DaliComm()
 }
 
 
-string DaliComm::logContextPrefix()
-{
-  return "DALI";
-}
-
-
 // MARK: - GTIN blacklist for ill-behaving devices
 
 

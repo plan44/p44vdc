@@ -47,7 +47,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_intensity; };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "airflow intensity"; };
+    virtual const char* getName() const P44_OVERRIDE { return "airflow intensity"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // intensity level is 0..100 in % of device's available range
     virtual double getMax() P44_OVERRIDE { return 100; };
   };
@@ -63,7 +63,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_direction; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "airflow direction"; };
+    virtual const char* getName() const P44_OVERRIDE { return "airflow direction"; };
   };
   typedef boost::intrusive_ptr<AirflowDirectionChannel> AirflowDirectionChannelPtr;
 
@@ -77,7 +77,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_louver_position; };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "louver position"; };
+    virtual const char* getName() const P44_OVERRIDE { return "louver position"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // intensity level is 0..100 in % of device's available range
     virtual double getMax() P44_OVERRIDE { return 100; };
   };
@@ -92,7 +92,7 @@ namespace p44 {
     AirflowAutoChannel(OutputBehaviour &aOutput) : inherited(aOutput, "airFlowAuto") { };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_intensity_auto; }; ///< the dS channel type
-    virtual const char *getName() P44_OVERRIDE { return "automatic airflow intensity"; };
+    virtual const char* getName() const P44_OVERRIDE { return "automatic airflow intensity"; };
   };
 
 
@@ -104,7 +104,7 @@ namespace p44 {
     LouverAutoChannel(OutputBehaviour &aOutput) : inherited(aOutput, "airLouverAuto") { };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_airflow_louver_auto; }; ///< the dS channel type
-    virtual const char *getName() P44_OVERRIDE { return "automatic louver position (swing mode)"; };
+    virtual const char* getName() const P44_OVERRIDE { return "automatic louver position (swing mode)"; };
   };
 
 

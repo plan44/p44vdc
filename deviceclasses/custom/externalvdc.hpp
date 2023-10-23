@@ -100,9 +100,14 @@ namespace p44 {
 
     /// @return the per-instance log level offset
     /// @note is virtual because some objects might want to use the log level offset of another object
-    virtual int getLogLevelOffset();
+    virtual int getLogLevelOffset() P44_OVERRIDE;
 
-    virtual string logContextPrefix();
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const P44_OVERRIDE;
+
+    /// @return id identifying the context object
+    virtual string contextId() const P44_OVERRIDE;
+
 
   private:
 

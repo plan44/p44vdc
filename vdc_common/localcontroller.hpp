@@ -390,8 +390,14 @@ namespace p44 {
     ErrorPtr handleCheckCondition(VdcApiRequestPtr aRequest);
     ErrorPtr handleTestActions(VdcApiRequestPtr aRequest, ScriptObjPtr aTriggerParam);
 
-    /// @return a prefix for log messages from this addressable
-    virtual string logContextPrefix() P44_OVERRIDE;
+    /// @return name (usually user-defined) of the context object
+    virtual string contextName() const P44_OVERRIDE { return mName; }
+
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const P44_OVERRIDE { return "Trigger"; }
+
+    /// @return id identifying the context object
+    virtual string contextId() const P44_OVERRIDE { return string_format("#%d", mTriggerId); }
 
   protected:
 

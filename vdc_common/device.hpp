@@ -298,7 +298,7 @@ namespace p44 {
 
 
     /// @return the entity type (one of dSD|vdSD|vDC|dSM|vdSM|dSS|*)
-    virtual const char *entityType() P44_OVERRIDE { return "vdSD"; }
+    virtual const char *entityType() const P44_OVERRIDE { return "vdSD"; }
 
     /// @return Vendor name for display purposes
     /// @note if not empty, value will be used by vendorId() default implementation to create vendorname:xxx URN schema id

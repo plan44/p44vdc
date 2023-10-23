@@ -49,7 +49,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_shade_position_outside; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "shade position (outside)"; };
+    virtual const char* getName() const P44_OVERRIDE { return "shade position (outside)"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
     virtual double getStdDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/mFullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime
@@ -76,7 +76,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_shade_angle_outside; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "shade angle (outside)"; };
+    virtual const char* getName() const P44_OVERRIDE { return "shade angle (outside)"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // dS position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
     virtual double getStdDimPerMS() P44_OVERRIDE { return (getMax()-getMin())*1000.0/mFullRangeTime; }; // dimming is such that it goes from min..max in fullRangeTime

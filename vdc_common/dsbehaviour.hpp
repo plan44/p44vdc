@@ -184,21 +184,21 @@ namespace p44 {
 
     /// get the index value
     /// @return index of this behaviour in one of the owning device's behaviour lists
-    size_t getIndex() { return mIndex; };
+    size_t getIndex() const { return mIndex; };
 
     /// get the identifier (unique within this device instance)
     /// @return behaviour id string
-    string getId() { return mBehaviourId; };
+    string getId() const { return mBehaviourId; };
 
     /// get the behaviour ID
     /// @param aApiVersion the API version to get the ID for. APIs before v3 always return the behaviour index as a numeric string
     /// @return the behaviour ID, which must be unique within the device and must always allow to re-find the same behaviour
-    string getApiId(int aApiVersion);
+    string getApiId(int aApiVersion) const;
 
     /// textual representation of getType()
     /// @return type string, which is the string used to prefix the xxxDescriptions, xxxSettings and xxxStates properties
     /// @note this only identifies the basic behaviour type. Subclassed behaviours can only be identified using behaviourTypeIdentifier()
-    const char *getTypeName();
+    const char *getTypeName() const;
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
@@ -214,10 +214,19 @@ namespace p44 {
     /// @return log level offset (overridden to use something other than the P44LoggingObj's)
     virtual int getLogLevelOffset() P44_OVERRIDE;
 
+    /// @return name (usually user-defined) of the context object
+    virtual string contextName() const P44_OVERRIDE;
+
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const P44_OVERRIDE;
+
+    /// @return id identifying the context object
+    virtual string contextId() const P44_OVERRIDE;
+
   protected:
 
     /// type of behaviour
-    virtual BehaviourType getType() = 0;
+    virtual BehaviourType getType() const = 0;
 
     /// automatic id for this behaviour
     /// @return returns a ID for the behaviour.

@@ -45,7 +45,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_heating_power; };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "power level"; };
+    virtual const char* getName() const P44_OVERRIDE { return "power level"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // 0..100 (cooling or heating)
     virtual double getMax() P44_OVERRIDE { return 100; };
 
@@ -74,7 +74,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_fcu_operation_mode; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "FCU operation mode"; };
+    virtual const char* getName() const P44_OVERRIDE { return "FCU operation mode"; };
   };
 
   #endif // ENABLE_FCU_SUPPORT

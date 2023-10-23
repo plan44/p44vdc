@@ -524,8 +524,8 @@ namespace p44 {
     EnOceanSecurity();
     virtual ~EnOceanSecurity();
 
-    /// @return the prefix to be used for logging from this object
-    virtual string logContextPrefix() P44_OVERRIDE;
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const P44_OVERRIDE { return "EnOceanSecurity"; }
 
     /// process a secure teach-in message
     /// @param aTeachInMsg a R-ORG TS (0x32) message to process (possibly only a segment)
@@ -640,8 +640,8 @@ namespace p44 {
 		EnoceanComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
 		virtual ~EnoceanComm();
 
-    /// @return the prefix to be used for logging from this object
-    virtual string logContextPrefix() P44_OVERRIDE;
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const P44_OVERRIDE { return "EnOcean"; }
 
     /// set the connection parameters to connect to the EnOcean TCM310 modem
     /// @param aConnectionSpec serial device path (/dev/...) or host name/address[:port] (1.2.3.4 or xxx.yy)

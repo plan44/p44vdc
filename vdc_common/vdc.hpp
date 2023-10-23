@@ -474,7 +474,7 @@ namespace p44 {
 
     /// get user assigned name of the vDC container, or if there is none, a synthesized default name
     /// @return name string
-    virtual string getName() P44_OVERRIDE;
+    virtual string getName() const P44_OVERRIDE;
 
     /// set user assignable name
     /// @param aName name of the addressable entity
@@ -503,7 +503,7 @@ namespace p44 {
     virtual string modelUID() P44_OVERRIDE;
 
     /// @return the entity type (one of dSD|vdSD|vDChost|vDC|dSM|vdSM|dSS|*)
-    virtual const char *entityType() P44_OVERRIDE { return "vDC"; }
+    virtual const char *entityType() const P44_OVERRIDE { return "vDC"; }
 
     /// @return hardware version string or NULL if none
     virtual string hardwareVersion() P44_OVERRIDE { return ""; }

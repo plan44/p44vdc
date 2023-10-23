@@ -160,8 +160,8 @@ namespace p44 {
     HueComm();
     virtual ~HueComm();
 
-    /// @return the prefix to be used for logging from this object
-    virtual string logContextPrefix() P44_OVERRIDE;
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const P44_OVERRIDE { return "hue"; }
 
     // HTTP communication object
     JsonWebClient mBridgeAPIComm;

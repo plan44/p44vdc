@@ -136,12 +136,6 @@ EldatComm::~EldatComm()
 }
 
 
-string EldatComm::logContextPrefix()
-{
-  return "Eldat";
-}
-
-
 void EldatComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort)
 {
   FOCUSOLOG("setConnectionSpecification: %s", aConnectionSpec);

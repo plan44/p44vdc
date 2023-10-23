@@ -42,7 +42,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_position_v; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "vertical position"; };
+    virtual const char* getName() const P44_OVERRIDE { return "vertical position"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
   };
@@ -57,7 +57,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_position_h; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "horizontal position"; };
+    virtual const char* getName() const P44_OVERRIDE { return "horizontal position"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // position goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
   };
@@ -187,7 +187,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_zoom_v; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "vertical size/zoom"; };
+    virtual const char* getName() const P44_OVERRIDE { return "vertical size/zoom"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // zoom goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
   };
@@ -202,7 +202,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_zoom_h; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "horizonal size/zoom"; };
+    virtual const char* getName() const P44_OVERRIDE { return "horizonal size/zoom"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; // zoom goes from 0 to 100%
     virtual double getMax() P44_OVERRIDE { return 100; };
   };
@@ -217,7 +217,7 @@ namespace p44 {
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_rotation; }; ///< the dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_degree, unitScaling_1); };
-    virtual const char *getName() P44_OVERRIDE { return "rotation"; };
+    virtual const char* getName() const P44_OVERRIDE { return "rotation"; };
     virtual double getMin() P44_OVERRIDE { return 0; }; ///< rotation goes from 0 to 360 degrees, with 0 and 360 meaning the same.
     virtual double getMax() P44_OVERRIDE { return 360; }; ///< Note the max value will never be actually reached, as it wraps around to min
     virtual bool wrapsAround() P44_OVERRIDE { return true; }; ///< rotation wraps around, meaning max is considered identical to min
@@ -242,7 +242,7 @@ namespace p44 {
 
   public:
     BrightnessGradientChannel(OutputBehaviour &aOutput) : inherited(aOutput, "brightnessGradient") { mCachedChannelValue = DEFAULT_BRIGHTNESS_GRADIENT; };
-    virtual const char *getName() P44_OVERRIDE { return "brightness gradient"; };
+    virtual const char* getName() const P44_OVERRIDE { return "brightness gradient"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_brightness_gradient; }; ///< the dS channel type
   };
 
@@ -252,7 +252,7 @@ namespace p44 {
 
   public:
     HueGradientChannel(OutputBehaviour &aOutput) : inherited(aOutput, "hueGradient") { mCachedChannelValue = DEFAULT_HUE_GRADIENT; };
-    virtual const char *getName() P44_OVERRIDE { return "hue gradient"; };
+    virtual const char* getName() const P44_OVERRIDE { return "hue gradient"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_hue_gradient; }; ///< the dS channel type
   };
 
@@ -262,7 +262,7 @@ namespace p44 {
 
   public:
     SaturationGradientChannel(OutputBehaviour &aOutput) : inherited(aOutput, "saturationGradient") { mCachedChannelValue = DEFAULT_SATURATION_GRADIENT; };
-    virtual const char *getName() P44_OVERRIDE { return "saturation gradient"; };
+    virtual const char* getName() const P44_OVERRIDE { return "saturation gradient"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_saturation_gradient; }; ///< the dS channel type
   };
 
@@ -273,7 +273,7 @@ namespace p44 {
 
   public:
     FeatureModeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "featureMode") { setMax(MAX_FEATURE_MODE); mCachedChannelValue = DEFAULT_FEATURE_MODE; };
-    virtual const char *getName() P44_OVERRIDE { return "feature mode"; };
+    virtual const char* getName() const P44_OVERRIDE { return "feature mode"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_feature_mode; }; ///< the dS channel type
   };
 

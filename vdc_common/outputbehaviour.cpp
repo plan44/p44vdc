@@ -830,6 +830,11 @@ string OutputBehaviour::logContextPrefix()
 }
 
 
+string OutputBehaviour::contextId() const
+{
+  return ""; // only one output per device
+}
+
 
 string OutputBehaviour::description()
 {

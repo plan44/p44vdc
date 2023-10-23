@@ -51,7 +51,7 @@ namespace p44 {
     void setDimMin(double aMinDim) { minDim = aMinDim; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_brightness; }; ///< the dS channel type
-    virtual const char *getName() P44_OVERRIDE { return "brightness"; };
+    virtual const char* getName() const P44_OVERRIDE { return "brightness"; };
     virtual double getStdDimPerMS() P44_OVERRIDE { return 11.0/256*100/300; }; // dimming is 11 steps(1/256) per 300mS (as per ds-light.pdf specification) = 255/11*300 = 7 seconds full scale
     virtual double getMinDim() P44_OVERRIDE { return minDim; };
 

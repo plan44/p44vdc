@@ -41,7 +41,7 @@ namespace p44 {
     VideoStationChannel(OutputBehaviour &aOutput) : inherited(aOutput, "videoStation") {};
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_video_station; }; ///< the dS channel type
-    virtual const char *getName() P44_OVERRIDE { return "video station"; };
+    virtual const char* getName() const P44_OVERRIDE { return "video station"; };
 
   };
   typedef boost::intrusive_ptr<VideoStationChannel> VideoStationChannelPtr;
@@ -57,7 +57,7 @@ namespace p44 {
     VideoInputSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "videoInputSource") {};
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_video_input_source; }; ///< the dS channel type
-    virtual const char *getName() P44_OVERRIDE { return "video input source"; };
+    virtual const char* getName() const P44_OVERRIDE { return "video input source"; };
 
   };
   typedef boost::intrusive_ptr<VideoInputSourceChannel> VideoInputSourceChannelPtr;

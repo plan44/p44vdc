@@ -129,11 +129,11 @@ namespace p44 {
     /// get user assigned name of the addressable
     /// @return name string
     /// @note this is returned as a reference to make sure it represents stable data (needed e.g. for bind to SQL)
-    const string &getAssignedName() { return mName; };
+    const string &getAssignedName() const { return mName; };
 
     /// @return name string
     /// @note derived classes might provide a default name if no actual name is set
-    virtual string getName() { return getAssignedName(); };
+    virtual string getName() const { return getAssignedName(); };
 
     /// set user assignable name
     /// @param aName name of the addressable entity
@@ -296,7 +296,7 @@ namespace p44 {
     virtual string modelUID() = 0;
 
     /// @return the entity type (one of dSD|vdSD|vDC|dSM|vdSM|dSS|*)
-    virtual const char *entityType() { return "*"; };
+    virtual const char* entityType() const { return "*"; };
 
     /// @return hardware version string or NULL if none
     virtual string hardwareVersion() { return ""; };
@@ -380,8 +380,15 @@ namespace p44 {
     /// @return textual description of object, may contain LFs
     virtual string description() = 0;
 
-    /// @return a prefix for log messages from this addressable
-    virtual string logContextPrefix();
+    /// @return name (usually user-defined) of the context object
+    virtual string contextName() const P44_OVERRIDE { return getName(); }
+
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const P44_OVERRIDE { return entityType(); }
+
+    /// @return id identifying the context object
+    virtual string contextId() const P44_OVERRIDE { return mDSUID.getString(); }
+
 
   protected:
 

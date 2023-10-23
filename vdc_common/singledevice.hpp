@@ -712,7 +712,7 @@ namespace p44 {
   protected:
 
     // the behaviour type
-    virtual BehaviourType getType() P44_OVERRIDE { return behaviour_actionOutput; };
+    virtual BehaviourType getType() const P44_OVERRIDE { return behaviour_actionOutput; };
 
     // suppress standard behaviour properties of outputBehaviour
     virtual int numDescProps() P44_OVERRIDE { return 0; };

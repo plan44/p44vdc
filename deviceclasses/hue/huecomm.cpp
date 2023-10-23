@@ -747,13 +747,6 @@ HueComm::~HueComm()
 }
 
 
-string HueComm::logContextPrefix()
-{
-  return "hue";
-}
-
-
-
 void HueComm::apiQuery(const char* aUrlSuffix, HueApiResultCB aResultHandler)
 {
   apiAction(httpMethodGET, aUrlSuffix, JsonObjectPtr(), aResultHandler);

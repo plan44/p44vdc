@@ -168,13 +168,6 @@ ZfComm::~ZfComm()
 }
 
 
-string ZfComm::logContextPrefix()
-{
-  return "ZF";
-}
-
-
-
 void ZfComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort)
 {
   FOCUSOLOG("setConnectionSpecification: %s", aConnectionSpec);

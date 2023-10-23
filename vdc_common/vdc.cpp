@@ -131,7 +131,7 @@ string Vdc::modelUID()
 }
 
 
-string Vdc::getName()
+string Vdc::getName() const
 {
   if (inherited::getName().empty()) {
     // no name set for this vdc

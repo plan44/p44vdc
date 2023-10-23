@@ -186,19 +186,19 @@ void DsBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex,
 // MARK: - property access
 
 
-string DsBehaviour::getApiId(int aApiVersion)
+string DsBehaviour::getApiId(int aApiVersion) const
 {
   if (aApiVersion>=3 && !mBehaviourId.empty()) {
     return mBehaviourId;
   }
   else {
-    // no channel ID set, default to decimal string representation of channel type
+    // no behaviour ID set, default to decimal string representation of behaviour index
     return string_format("%zu", getIndex());
   }
 }
 
 
-const char *DsBehaviour::getTypeName()
+const char *DsBehaviour::getTypeName() const
 {
   // Note: this must be the prefix for the xxxDescriptions, xxxSettings and xxxStates properties
   switch (getType()) {
@@ -381,6 +381,25 @@ int DsBehaviour::getLogLevelOffset()
 string DsBehaviour::logContextPrefix()
 {
   return string_format("%s: %s[%zu] %s '%s'", mDevice.logContextPrefix().c_str(), getTypeName(), getIndex(), getApiId(3).c_str(), getHardwareName().c_str());
+}
+
+
+
+string DsBehaviour::contextName() const
+{
+  return mDevice.contextName() + "/" + getApiId(3);
+}
+
+
+string DsBehaviour::contextType() const
+{
+  return mDevice.contextType() + "/" + getTypeName();
+}
+
+
+string DsBehaviour::contextId() const
+{
+  return string_format("#%d", getIndex());
 }
 
 

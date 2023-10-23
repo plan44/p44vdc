@@ -1140,12 +1140,6 @@ EnOceanSecurity::~EnOceanSecurity()
 }
 
 
-string EnOceanSecurity::logContextPrefix()
-{
-  return "EnOceanSecurity";
-}
-
-
 void EnOceanSecurity::deriveSubkeysFromPrivateKey()
 {
   deriveSubkeys(privateKey, subKey1, subKey2);
@@ -1667,13 +1661,6 @@ EnoceanComm::EnoceanComm(MainLoop &aMainLoop) :
 EnoceanComm::~EnoceanComm()
 {
 }
-
-
-string EnoceanComm::logContextPrefix()
-{
-  return "EnOcean";
-}
-
 
 
 void EnoceanComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, const char *aEnoceanResetPinName)

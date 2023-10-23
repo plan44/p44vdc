@@ -548,7 +548,7 @@ namespace p44 {
     virtual string modelUID() P44_OVERRIDE { return DSUID_P44VDC_MODELUID_UUID; /* using the p44 modelUID namespace UUID itself */ }
 
     /// @return the entity type (one of dSD|vdSD|vDChost|vDC|dSM|vdSM|dSS|*)
-    virtual const char *entityType() P44_OVERRIDE { return "vDChost"; }
+    virtual const char *entityType() const P44_OVERRIDE { return "vDChost"; }
 
     /// @return hardware version string or NULL if none
     virtual string hardwareVersion() P44_OVERRIDE { return ""; }

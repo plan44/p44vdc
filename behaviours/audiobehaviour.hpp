@@ -40,7 +40,7 @@ namespace p44 {
     AudioContentSourceChannel(OutputBehaviour &aOutput) : inherited(aOutput, "contentSource") {};
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_audio_content_source; }; ///< the dS channel type
-    virtual const char *getName() P44_OVERRIDE { return "contentsource"; };
+    virtual const char* getName() const P44_OVERRIDE { return "contentsource"; };
 
   };
   typedef boost::intrusive_ptr<AudioContentSourceChannel> AudioContentSourceChannelPtr;

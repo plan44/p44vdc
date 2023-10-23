@@ -812,13 +812,7 @@ bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExp
 #endif // ENABLE_SETTINGS_FROM_FILES
 
 
-// MARK: - description/shortDesc/logging
-
-string DsAddressable::logContextPrefix()
-{
-  return string_format("%s %s", entityType(), shortDesc().c_str());
-}
-
+// MARK: - description/shortDesc
 
 string DsAddressable::shortDesc()
 {

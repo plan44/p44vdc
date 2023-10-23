@@ -116,8 +116,8 @@ namespace p44 {
 		ZfComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
 		virtual ~ZfComm();
 		
-    /// @return the prefix to be used for logging from this object
-    virtual string logContextPrefix() P44_OVERRIDE;
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const P44_OVERRIDE { return "ZF"; }
 
     /// set the connection parameters to connect to the ZF modem
     /// @param aConnectionSpec serial device path (/dev/...) or host name/address[:port] (1.2.3.4 or xxx.yy)

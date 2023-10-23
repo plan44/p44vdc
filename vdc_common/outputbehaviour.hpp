@@ -284,6 +284,9 @@ namespace p44 {
     /// @return a prefix for log messages from this addressable
     virtual string logContextPrefix() P44_OVERRIDE;
 
+    /// @return id identifying the context object
+    virtual string contextId() const P44_OVERRIDE;
+
     /// Get short text for a "first glance" status of the behaviour
     /// @return string, really short, intended to be shown as a narrow column in a list
     virtual string getStatusText() P44_OVERRIDE;
@@ -328,7 +331,7 @@ namespace p44 {
     virtual bool reapplyRestoredChannels() { return true; }
 
     // the behaviour type
-    virtual BehaviourType getType() P44_OVERRIDE { return behaviour_output; };
+    virtual BehaviourType getType() const P44_OVERRIDE { return behaviour_output; };
 
     // for groups property
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;

@@ -174,7 +174,7 @@ namespace p44 {
   protected:
 
     /// the behaviour type
-    virtual BehaviourType getType() P44_OVERRIDE { return behaviour_binaryinput; };
+    virtual BehaviourType getType() const P44_OVERRIDE { return behaviour_binaryinput; };
 
     /// automatic id for this behaviour
     /// @return returns a ID for the behaviour.

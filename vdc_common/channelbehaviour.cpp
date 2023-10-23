@@ -101,6 +101,12 @@ string ChannelBehaviour::logContextPrefix()
 }
 
 
+string ChannelBehaviour::contextType() const
+{
+  return mOutput.contextType() + "/" + getName();
+}
+
+
 int ChannelBehaviour::getLogLevelOffset()
 {
   return mOutput.getLogLevelOffset();

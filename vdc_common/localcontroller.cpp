@@ -946,13 +946,6 @@ Trigger::~Trigger()
 }
 
 
-string Trigger::logContextPrefix()
-{
-  return string_format("Trigger '%s'", mName.c_str());
-}
-
-
-
 // MARK: - Trigger condition evaluation
 
 #define REPARSE_DELAY (30*Second)

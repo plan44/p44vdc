@@ -79,9 +79,9 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
 }
 
 
-string DaliBusDevice::logContextPrefix()
+string DaliBusDevice::contextId() const
 {
-  return string_format("DALI %s", DaliComm::formatDaliAddress(mDeviceInfo ? mDeviceInfo->mShortAddress : NoDaliAddress).c_str());
+  return DaliComm::formatDaliAddress(mDeviceInfo ? mDeviceInfo->mShortAddress : NoDaliAddress).c_str();
 }
 
 
