@@ -1141,6 +1141,11 @@ static char source_key;
 enum {
   // singledevice level properties
   sourcetext_key,
+  originlabel_key,
+  contexttype_key,
+  contextid_key,
+  contextname_key,
+  logprefix_key,
   numScriptSourceProperties
 };
 
@@ -1176,9 +1181,14 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     { "sources", apivalue_object, sources_key, OKEY(sourceslist_key) },
   };
   // scriptsource level properties
-  static const PropertyDescription sourceProperties[numScriptManagerProperties] = {
+  static const PropertyDescription sourceProperties[numScriptSourceProperties] = {
     // common device properties
     { "sourcetext", apivalue_string, sourcetext_key, OKEY(source_key) },
+    { "originlabel", apivalue_string, originlabel_key, OKEY(source_key) },
+    { "contexttype", apivalue_string, contexttype_key, OKEY(source_key) },
+    { "contextid", apivalue_string, contextid_key, OKEY(source_key) },
+    { "contextname", apivalue_string, contextname_key, OKEY(source_key) },
+    { "logprefix", apivalue_string, logprefix_key, OKEY(source_key) },
   };
   // C++ object manages different levels, check objects
   if (aParentDescriptor->hasObjectKey(sourceslist_key)) {
@@ -1210,9 +1220,33 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     if (src) {
       if (aMode==access_read) {
         // read properties
+        P44LoggingObj* cobj;
         switch (aPropertyDescriptor->fieldKey()) {
           case sourcetext_key:
             aPropValue->setStringValue(src->getSource());
+            return true;
+          case originlabel_key:
+            aPropValue->setStringValue(src->getOriginLabel());
+            return true;
+          case contexttype_key:
+            cobj = src->getLoggingContext();
+            if (!cobj) return false;
+            aPropValue->setStringValue(cobj->contextType());
+            return true;
+          case contextid_key:
+            cobj = src->getLoggingContext();
+            if (!cobj) return false;
+            aPropValue->setStringValue(cobj->contextId());
+            return true;
+          case contextname_key:
+            cobj = src->getLoggingContext();
+            if (!cobj) return false;
+            aPropValue->setStringValue(cobj->contextName());
+            return true;
+          case logprefix_key:
+            cobj = src->getLoggingContext();
+            if (!cobj) return false;
+            aPropValue->setStringValue(cobj->logContextPrefix());
             return true;
         }
       }

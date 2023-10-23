@@ -298,7 +298,9 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   #if ENABLE_SCENE_SCRIPT
   mSceneScript.loadAndActivate(
     string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(),mSceneNo),
-    scriptbody+regular, "scenescript", &mSceneDeviceSettings.mDevice,
+    scriptbody+regular,
+    string_format("scenescript[%s]", VdcHost::sceneText(mSceneNo).c_str()).c_str(),
+    &mSceneDeviceSettings.mDevice,
     nullptr, // standard scripting domain
     aRow->get<const char *>(aIndex++)
   );
@@ -510,7 +512,9 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           if (mSceneScript.setSourceAndActivate(
             aPropValue->stringValue(),
             string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(),mSceneNo),
-            scriptbody+regular, "scenescript", &mSceneDeviceSettings.mDevice,
+            scriptbody+regular,
+            string_format("scenescript[%s]", VdcHost::sceneText(mSceneNo).c_str()).c_str(),
+            &mSceneDeviceSettings.mDevice,
             nullptr // standard scripting domain
           )) {
             markDirty();
