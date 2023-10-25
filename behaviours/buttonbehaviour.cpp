@@ -51,6 +51,7 @@ ButtonScenesMap::ButtonScenesMap(DsButtonFunc aButtonFunc, bool aGlobal)
         mSceneClick[1] = PANIC;
         break;
       case buttonFunc_leave:
+        mSceneClick[0] = PRESENT;
         mSceneClick[1] = ABSENT;
         break;
       case buttonFunc_doorbell:

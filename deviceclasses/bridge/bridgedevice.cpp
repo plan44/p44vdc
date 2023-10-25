@@ -154,6 +154,7 @@ void BridgeDevice::willExamineNotificationFromConnection(VdcApiConnectionPtr aAp
   if (mProcessingBridgeNotification) {
     // capture the current output value for comparison with new one the notification might set
     mPreviousV = getChannelByType(channeltype_default)->getChannelValue();
+    OLOG(LOG_DEBUG, "before processing bridge notification: default channel value = %.1f", mPreviousV);
   }
 }
 
@@ -177,11 +178,12 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       int newPreset=-1;
       double newSceneValue;
       // get the reference levels from relevant scenes and determine nearest levels
-      ButtonScenesMap map(b->getButtonFunction(), false);
+      bool global = b->getGroup()==group_black_variable;
+      ButtonScenesMap map(b->getButtonFunction(), global);
       // figure out the scene that will produce a level as near as possible to the value provided from the bridge
       double minPrevDiff;
       double minNewDiff;
-      // search off and preset1-4 (area on/off only for area buttons and on-off bridges)
+      // - search off and preset1-4 (area on/off only for area buttons and on-off bridges)
       for (int i=0; i < (map.mArea>0 || mBridgeDeviceType==bridgedevice_onoff ? 2 : 5); i++) {
         SceneNo sn = map.mSceneClick[i];
         if (sn!=INVALID_SCENE_NO) {
@@ -194,20 +196,30 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
           }
         }
       }
-      OLOG(LOG_DEBUG, "area=%d, prevLevel=%d, newLevel=%d, newSceneValue=%d", map.mArea, prevPreset, newPreset, (int)newSceneValue);
+      OLOG(LOG_DEBUG, "global=%d, area=%d, prevLevel=%d, newLevel=%d, newSceneValue=%d", global, map.mArea, prevPreset, newPreset, (int)newSceneValue);
       OLOG(LOG_NOTICE, "default channel change to %d (adjusted to %d) originating from bridge", (int)newV, (int)newSceneValue);
       if (newPreset!=prevPreset && newPreset>=0) {
-        SceneNo actionID = map.mSceneClick[newPreset];
         // adjust the value to what it will be after the scene call returns to us from the room
         getChannelByType(channeltype_default)->syncChannelValue(newSceneValue);
+        // figure out the scene call to make
+        SceneNo actionID = map.mSceneClick[newPreset];
+        VdcButtonActionMode actionMode = buttonActionMode_normal;
+        if (global && actionID==INVALID_SCENE_NO && newPreset==0) {
+          // no specific reset scene -> undo the activation instead
+          actionMode = buttonActionMode_undo;
+          actionID = map.mSceneClick[1];
+        }
+        // emit the scene call
         OLOG(LOG_NOTICE,
-          "- preset changes from %d to %d -> inject button callscene(%s) action",
-          prevPreset, newPreset, VdcHost::sceneText(actionID, false).c_str()
+          "- preset changes from %d to %d -> inject button %sscene(%s) action",
+          prevPreset, newPreset,
+          actionMode==buttonActionMode_undo ? "undo" : "call",
+          VdcHost::sceneText(actionID, false).c_str()
         );
-        b->sendAction(buttonActionMode_normal, actionID);
+        b->sendAction(actionMode, actionID);
       }
       else {
-        OLOG(LOG_INFO, "- preset (%d) did not change -> no button action", prevPreset);
+        OLOG(LOG_INFO, "- preset (%d) did not change -> no button action sent", prevPreset);
       }
     }
   }
