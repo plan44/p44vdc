@@ -428,6 +428,7 @@ enum {
   #endif
   #if ENABLE_SCENE_SCRIPT
   sceneScript_key,
+  sceneScriptId_key,
   #endif
   numSceneProperties
 };
@@ -454,6 +455,7 @@ PropertyDescriptorPtr DsScene::getDescriptorByIndex(int aPropIndex, int aDomain,
     #endif
     #if ENABLE_SCENE_SCRIPT
     { "x-p44-sceneScript", apivalue_string, sceneScript_key, OKEY(dsscene_key) },
+    { "x-p44-sceneScriptId", apivalue_string, sceneScriptId_key, OKEY(dsscene_key) },
     #endif
   };
   int n = inheritedProps::numProps(aDomain, aParentDescriptor);
@@ -493,6 +495,10 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         #if ENABLE_SCENE_SCRIPT
         case sceneScript_key:
           aPropValue->setStringValue(mSceneScript.getSource());
+          return true;
+        case sceneScriptId_key:
+          if (!mSceneScript.active()) return false; // no ID yet
+          aPropValue->setStringValue(mSceneScript.scriptSourceUid());
           return true;
         #endif
       }

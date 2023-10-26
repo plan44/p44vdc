@@ -1681,6 +1681,7 @@ enum {
   heightabovesea_key,
   #if P44SCRIPT_FULL_SUPPORT
   mainscript_key,
+  mainscriptId_key,
   #endif
   #if ENABLE_LOCALCONTROLLER
   localController_key,
@@ -1719,6 +1720,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "x-p44-heightabovesea", apivalue_double, heightabovesea_key, OKEY(vdchost_obj) },
     #if P44SCRIPT_FULL_SUPPORT
     { "x-p44-mainscript", apivalue_string, mainscript_key, OKEY(vdchost_obj) },
+    { "x-p44-mainscriptId", apivalue_string, mainscriptId_key, OKEY(vdchost_obj) },
     #endif
     #if ENABLE_LOCALCONTROLLER
     { "x-p44-localController", apivalue_object, localController_key, OKEY(localController_obj) },
@@ -1811,6 +1813,9 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         #if P44SCRIPT_FULL_SUPPORT
         case mainscript_key:
           aPropValue->setStringValue(mMainScript.getSource());
+          return true;
+        case mainscriptId_key:
+          aPropValue->setStringValue(mMainScript.scriptSourceUid());
           return true;
         #endif
         case nextVersion_key:

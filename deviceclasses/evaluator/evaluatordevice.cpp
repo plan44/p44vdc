@@ -566,6 +566,7 @@ enum {
   minOffTime_key,
   #if P44SCRIPT_FULL_SUPPORT
   action_key,
+  actionId_key,
   #endif
   numProperties
 };
@@ -596,6 +597,7 @@ PropertyDescriptorPtr EvaluatorDevice::getDescriptorByIndex(int aPropIndex, int 
     { "x-p44-minOffTime", apivalue_double, minOffTime_key, OKEY(evaluatorDevice_key) },
     #if P44SCRIPT_FULL_SUPPORT
     { "x-p44-action", apivalue_string, action_key, OKEY(evaluatorDevice_key) },
+    { "x-p44-actionId", apivalue_string, actionId_key, OKEY(evaluatorDevice_key) },
     #endif
   };
   if (aParentDescriptor->isRootOfObject()) {
@@ -628,6 +630,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case minOffTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->mOffCondition.getTriggerHoldoff())/Second); return true;
         #if P44SCRIPT_FULL_SUPPORT
         case action_key: aPropValue->setStringValue(evaluatorSettings()->mAction.getSource()); return true;
+        case actionId_key: aPropValue->setStringValue(evaluatorSettings()->mAction.scriptSourceUid()); return true;
         #endif
       }
     }

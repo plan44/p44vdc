@@ -330,6 +330,7 @@ ErrorPtr ScriptedDevice::forget()
 enum {
   initmessage_key,
   implementation_key,
+  implementationId_key,
   numProperties
 };
 
@@ -353,6 +354,7 @@ PropertyDescriptorPtr ScriptedDevice::getDescriptorByIndex(int aPropIndex, int a
   static const PropertyDescription properties[numProperties] = {
     { "x-p44-initmessage", apivalue_string, initmessage_key, OKEY(scriptedDevice_key) },
     { "x-p44-implementation", apivalue_string, implementation_key, OKEY(scriptedDevice_key) },
+    { "x-p44-implementationId", apivalue_string, implementationId_key, OKEY(scriptedDevice_key) },
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level - accessing properties on the Device level
@@ -376,8 +378,9 @@ bool ScriptedDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
-        case implementation_key: aPropValue->setStringValue(mImplementation.mScript.getSource()); return true;
         case initmessage_key: aPropValue->setStringValue(mInitMessageText); return true;
+        case implementation_key: aPropValue->setStringValue(mImplementation.mScript.getSource()); return true;
+        case implementationId_key: aPropValue->setStringValue(mImplementation.mScript.scriptSourceUid()); return true;
       }
     }
     else {

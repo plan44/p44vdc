@@ -928,8 +928,8 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   mTriggerId(0),
-  mTriggerCondition("condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
-  mTriggerAction(sourcecode+regular, "action", this),
+  mTriggerCondition("trigger condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
+  mTriggerAction(sourcecode+regular, "trigger action", this),
   mConditionMet(undefined)
 {
   mValueMapper.isMemberVariable();
@@ -1205,6 +1205,7 @@ enum {
   triggerHoldOff_key,
   triggerVarDefs_key,
   triggerAction_key,
+  triggerActionId_key,
   logLevelOffset_key,
   numTriggerProperties
 };
@@ -1229,6 +1230,7 @@ PropertyDescriptorPtr Trigger::getDescriptorByIndex(int aPropIndex, int aDomain,
     { "holdofftime", apivalue_double, triggerHoldOff_key, OKEY(trigger_key) },
     { "varDefs", apivalue_string, triggerVarDefs_key, OKEY(trigger_key) },
     { "action", apivalue_string, triggerAction_key, OKEY(trigger_key) },
+    { "actionId", apivalue_string, triggerActionId_key, OKEY(trigger_key) },
     { "logLevelOffset", apivalue_int64, logLevelOffset_key, OKEY(trigger_key) },
   };
   if (aParentDescriptor->isRootOfObject()) {
@@ -1250,7 +1252,8 @@ bool Trigger::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case triggerCondition_key: aPropValue->setStringValue(mTriggerCondition.getSource().c_str()); return true;
         case triggerMode_key: aPropValue->setInt32Value(mTriggerCondition.getTriggerMode()); return true;
         case triggerHoldOff_key: aPropValue->setDoubleValue((double)mTriggerCondition.getTriggerHoldoff()/Second); return true;
-        case triggerAction_key: aPropValue->setStringValue(mTriggerAction.getSource().c_str()); return true;
+        case triggerAction_key: aPropValue->setStringValue(mTriggerAction.getSource()); return true;
+        case triggerActionId_key: aPropValue->setStringValue(mTriggerAction.scriptSourceUid()); return true;
         case logLevelOffset_key: aPropValue->setInt32Value(getLocalLogLevelOffset()); return true;
       }
     }
