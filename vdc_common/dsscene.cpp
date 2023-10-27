@@ -297,9 +297,10 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   mGlobalSceneFlags = aRow->get<int>(aIndex++);
   #if ENABLE_SCENE_SCRIPT
   mSceneScript.loadAndActivate(
-    string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(),mSceneNo),
+    string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(), mSceneNo),
     scriptbody+regular,
-    string_format("scenescript[%s]", VdcHost::sceneText(mSceneNo).c_str()).c_str(),
+    "scenescript",
+    string_format("%%C (%%O %s)", VdcHost::sceneText(mSceneNo).c_str()).c_str(), // title
     &mSceneDeviceSettings.mDevice,
     nullptr, // standard scripting domain
     aRow->get<const char *>(aIndex++)
@@ -519,7 +520,8 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
             aPropValue->stringValue(),
             string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(),mSceneNo),
             scriptbody+regular,
-            string_format("scenescript[%s]", VdcHost::sceneText(mSceneNo).c_str()).c_str(),
+            "scenescript",
+            string_format("%%C (%%O %s)", VdcHost::sceneText(mSceneNo).c_str()).c_str(), // title
             &mSceneDeviceSettings.mDevice,
             nullptr // standard scripting domain
           )) {

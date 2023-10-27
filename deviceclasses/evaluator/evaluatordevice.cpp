@@ -683,12 +683,12 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bool aIsSensor) :
   inherited(aEvaluator)
   // Note: conditions are synchronously evaluated, but action might be running when a condition wants evaluation, so we allow concurrent evaluation in that case
-  ,mOnCondition("onCondition", &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onChangingBoolRisingHoldoffOnly, Never, expression|synchronously|keepvars|concurrently)
-  ,mOffCondition("offCondition", &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onChangingBoolRisingHoldoffOnly, Never, expression|synchronously|keepvars|concurrently)
+  ,mOnCondition("onCondition", nullptr, &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onChangingBoolRisingHoldoffOnly, Never, expression|synchronously|keepvars|concurrently)
+  ,mOffCondition("offCondition", nullptr, &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onChangingBoolRisingHoldoffOnly, Never, expression|synchronously|keepvars|concurrently)
   #if P44SCRIPT_FULL_SUPPORT
   // Only thing that might run when action tries to run is an earlier invocation of the action.
   // However this might be a previous on-action, while the new action is a NOP off-action, so both must be allowed to run concurrently
-  ,mAction(scriptbody|regular|keepvars|concurrently, "action", &mDevice)
+  ,mAction(scriptbody|regular|keepvars|concurrently, "action", "%C (evaluator action)", &mDevice)
   #endif
 {
   mEvaluatorContext = mOnCondition.domain()->newContext(); // common context for triggers and action

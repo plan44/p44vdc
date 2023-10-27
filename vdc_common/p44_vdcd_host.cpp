@@ -1141,6 +1141,7 @@ static char source_key;
 enum {
   // singledevice level properties
   sourcetext_key,
+  title_key,
   originlabel_key,
   contexttype_key,
   contextid_key,
@@ -1184,6 +1185,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
   static const PropertyDescription sourceProperties[numScriptSourceProperties] = {
     // common device properties
     { "sourcetext", apivalue_string, sourcetext_key, OKEY(source_key) },
+    { "title", apivalue_string, title_key, OKEY(source_key) },
     { "originlabel", apivalue_string, originlabel_key, OKEY(source_key) },
     { "contexttype", apivalue_string, contexttype_key, OKEY(source_key) },
     { "contextid", apivalue_string, contextid_key, OKEY(source_key) },
@@ -1224,6 +1226,9 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         switch (aPropertyDescriptor->fieldKey()) {
           case sourcetext_key:
             aPropValue->setStringValue(src->getSource());
+            return true;
+          case title_key:
+            aPropValue->setStringValue(src->getScriptTitle());
             return true;
           case originlabel_key:
             aPropValue->setStringValue(src->getOriginLabel());

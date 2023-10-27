@@ -113,7 +113,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mMainLoopStatsCounter(0),
   mPersistentChannels(aWithPersistentChannels),
   #if P44SCRIPT_FULL_SUPPORT
-  mMainScript(sourcecode+regular, "mainscript", this),
+  mMainScript(sourcecode+regular, "mainscript", "%O", this),
   #endif
   #if P44SCRIPT_FULL_SUPPORT
   mGlobalScriptsStarted(false),
@@ -1586,7 +1586,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     // direct execution of a script command line in the common main/initscript context
     ApiValuePtr o = aParams->get("script");
     if (o) {
-      ScriptSource src(sourcecode+regular+keepvars+concurrently+ephemeralSource, "scriptExec/REPL", this);
+      ScriptSource src(sourcecode+regular+keepvars+concurrently+ephemeralSource, "scriptExec/REPL", nullptr , this);
       src.setSource(o->stringValue());
       src.setSharedMainContext(mVdcHostScriptContext);
       src.registerUnstoredScript("scriptExec");
@@ -2394,7 +2394,7 @@ void VdcHost::runGlobalScripts()
       OLOG(LOG_ERR, "cannot open initscript: %s", err->text());
     }
     else {
-      ScriptSource initScript(sourcecode+regular, setupscript ? "setupscript" : "initscript", this);
+      ScriptSource initScript(sourcecode+regular, setupscript ? "setupscript" : "initscript", "%O", this);
       initScript.setSource(script, scriptbody|ephemeralSource);
       initScript.setSharedMainContext(mVdcHostScriptContext);
       initScript.registerUnstoredScript("initscript");

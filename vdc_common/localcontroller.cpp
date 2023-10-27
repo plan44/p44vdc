@@ -928,8 +928,8 @@ PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPrope
 Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   mTriggerId(0),
-  mTriggerCondition("trigger condition", this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
-  mTriggerAction(sourcecode+regular, "trigger action", this),
+  mTriggerCondition("condition", nullptr, this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
+  mTriggerAction(sourcecode+regular, "action", "%C (trigger action)", this),
   mConditionMet(undefined)
 {
   mValueMapper.isMemberVariable();

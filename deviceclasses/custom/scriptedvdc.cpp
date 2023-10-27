@@ -406,7 +406,7 @@ bool ScriptedDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
 ScriptedDeviceImplementation::ScriptedDeviceImplementation(ScriptedDevice &aScriptedDevice) :
   inherited(aScriptedDevice.getVdcHost().getDsParamStore()),
   mScriptedDevice(aScriptedDevice),
-  mScript(sourcecode|regular, "implementation", &mScriptedDevice) // do not keep vars, only one main thread!
+  mScript(sourcecode|regular, "implementation", nullptr, &mScriptedDevice) // do not keep vars, only one main thread!
 {
   mContext = StandardScriptingDomain::sharedDomain().newContext(mScriptedDevice.newDeviceObj());
   mScript.setSharedMainContext(mContext);
