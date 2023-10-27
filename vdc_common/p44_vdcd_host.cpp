@@ -1268,6 +1268,184 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
 
+
+#ifdef _DUMMY
+
+// Evaluator Action
+
+// - x-p44-testEvaluatorAction
+
+else if (aMethod=="x-p44-testEvaluatorAction") {
+  ApiValuePtr vp = aParams->get("result");
+  Tristate state = mEvaluatorState;
+  if (vp) {
+    state = vp->boolValue() ? yes : no;
+  }
+  // now test
+  evaluatorSettings()->mEvaluatorContext->setMemberByName("result", new BoolValue(state==yes));
+  evaluatorSettings()->mAction.run(stopall, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1), ScriptObjPtr(), Infinite);
+  return ErrorPtr();
+}
+
+// - x-p44-stopEvaluatorAction
+
+else if (aMethod=="x-p44-stopEvaluatorAction") {
+  evaluatorSettings()->mEvaluatorContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "evaluator action stopped"));
+  return Error::ok();
+}
+
+
+void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
+{
+  ApiValuePtr testResult = aRequest->newApiValue();
+  testResult->setType(apivalue_object);
+  if (!aResult->isErr()) {
+    testResult->add("result", testResult->newScriptValue(aResult));
+  }
+  else {
+    testResult->add("error", testResult->newString(aResult->errorValue()->getErrorMessage()));
+    SourceCursor* cursor = aResult->cursor();
+    if (cursor) {
+      testResult->add("at", testResult->newUint64(cursor->textpos()));
+      testResult->add("line", testResult->newUint64(cursor->lineno()));
+      testResult->add("char", testResult->newUint64(cursor->charpos()));
+    }
+  }
+  aRequest->sendResult(testResult);
+}
+
+
+// Scripted Device Implementation
+
+// - x-p44-restartImpl
+
+if (aMethod=="x-p44-restartImpl") {
+  // re-run the device implementation script
+  restartImplementation();
+  return Error::ok();
+}
+
+
+
+
+// - x-p44-checkImpl
+
+if (aMethod=="x-p44-checkImpl") {
+  // check the implementation script for syntax errors (but do not re-start it)
+  ScriptObjPtr res = mImplementation.mScript.syntaxcheck();
+  ApiValuePtr checkResult = aRequest->newApiValue();
+  checkResult->setType(apivalue_object);
+  if (!res || !res->isErr()) {
+    OLOG(LOG_NOTICE, "Checked implementation script: syntax OK");
+    checkResult->add("result", checkResult->newNull());
+  }
+  else {
+    OLOG(LOG_NOTICE, "Error in implementation: %s", res->errorValue()->text());
+    checkResult->add("error", checkResult->newString(res->errorValue()->getErrorMessage()));
+    SourceCursor* cursor = res->cursor();
+    if (cursor) {
+      checkResult->add("at", checkResult->newUint64(cursor->textpos()));
+      checkResult->add("line", checkResult->newUint64(cursor->lineno()));
+      checkResult->add("char", checkResult->newUint64(cursor->charpos()));
+    }
+  }
+  aRequest->sendResult(checkResult);
+  return ErrorPtr();
+}
+
+// - x-p44-stopImpl
+
+if (aMethod=="x-p44-stopImpl") {
+  // stop the device implementation script
+  stopImplementation();
+  return Error::ok();
+}
+
+
+
+void ScriptedDevice::restartImplementation()
+{
+  OLOG(LOG_NOTICE, "(Re-)starting device implementation script");
+  mImplementation.mRestartTicket.cancel();
+  mImplementation.mContext->clearVars(); // clear vars and (especially) context local handlers
+  mImplementation.mScript.run(stopall, boost::bind(&ScriptedDevice::implementationEnds, this, _1), ScriptObjPtr(), Infinite);
+}
+
+
+void ScriptedDevice::stopImplementation()
+{
+  OLOG(LOG_NOTICE, "Stopping device implementation script");
+  mImplementation.mRestartTicket.cancel();
+  if (!mImplementation.mContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "device implementation script stopped"))) {
+    // nothing to abort, make sure handlers are gone (otherwise, they will get cleared in implementationEnds())
+    mImplementation.mContext->clearVars();
+  }
+}
+
+
+
+// Scene:
+
+// - start: just callScene()
+
+// - stop Scene
+
+void OutputBehaviour::stopSceneActions()
+{
+  #if ENABLE_SCENE_SCRIPT
+  mDevice.getDeviceScriptContext()->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
+  #endif // ENABLE_SCENE_SCRIPT
+}
+
+
+// Trigger:
+
+// - x-p44-testTriggerAction
+
+ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest, ScriptObjPtr aTriggerParam)
+{
+  ScriptObjPtr threadLocals;
+  if (aTriggerParam) {
+    threadLocals = new SimpleVarContainer();
+    threadLocals->setMemberByName("triggerparam", aTriggerParam);
+  }
+  mTriggerAction.run(stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), threadLocals, Infinite);
+  return ErrorPtr(); // will send result later
+}
+
+
+void Trigger::testTriggerActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
+{
+  ApiValuePtr testResult = aRequest->newApiValue();
+  testResult->setType(apivalue_object);
+  if (!aResult->isErr()) {
+    testResult->add("result", testResult->newScriptValue(aResult));
+  }
+  else {
+    testResult->add("error", testResult->newString(aResult->errorValue()->getErrorMessage()));
+    SourceCursor* cursor = aResult->cursor();
+    if (cursor) {
+      testResult->add("at", testResult->newUint64(cursor->textpos()));
+      testResult->add("line", testResult->newUint64(cursor->lineno()));
+      testResult->add("char", testResult->newUint64(cursor->charpos()));
+    }
+  }
+  aRequest->sendResult(testResult);
+}
+
+
+// - x-p44-stopTriggerAction
+
+void Trigger::stopActions()
+{
+  mTriggerContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "trigger action stopped"));
+}
+
+
+#endif // _DUMMY
+
+
+
 #endif // P44SCRIPT_REGISTERED_SOURCE
 
 
