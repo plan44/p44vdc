@@ -54,9 +54,9 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   #endif
   mReporting(false)
 {
-#if ENABLE_P44SCRIPT
+  #if ENABLE_P44SCRIPT
   mValueMapper.isMemberVariable();
-#endif
+  #endif
   // Config is:
   //  <behaviour mode>
   int st, su;
@@ -66,10 +66,10 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     mEvaluatorType = evaluator_input;
   else if (aEvaluatorConfig=="internal" || aEvaluatorConfig=="internalinput") // "internal" must be still recognized for backwards compatibility with existing settings!
     mEvaluatorType = evaluator_internalinput;
-#if P44SCRIPT_FULL_SUPPORT
+  #if P44SCRIPT_FULL_SUPPORT
   else if (aEvaluatorConfig=="internalaction")
     mEvaluatorType = evaluator_internalaction;
-#endif
+  #endif
   else if (sscanf(aEvaluatorConfig.c_str(), "sensor:%d:%d", &st, &su)==2) {
     mEvaluatorType = evaluator_sensor;
     mSensorType = (VdcSensorType)st;
@@ -440,7 +440,7 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
       // re-check opposite condition as "triggered" in case it is static (such as default fallbacks to true or false)
       MainLoop::currentMainLoop().executeNow(boost::bind(
         &TriggerSource::evaluate,
-        aOnCondition ? evaluatorSettings()->mOffCondition : evaluatorSettings()->mOnCondition,
+        aOnCondition ? &(evaluatorSettings()->mOffCondition) : &(evaluatorSettings()->mOnCondition),
         (EvaluationFlags)triggered
       ));
       // report new decision
