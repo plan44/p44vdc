@@ -184,15 +184,26 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       double minPrevDiff;
       double minNewDiff;
       // - search off and preset1-4 (area on/off only for area buttons and on-off bridges)
-      for (int i=0; i < (map.mArea>0 || mBridgeDeviceType==bridgedevice_onoff ? 2 : 5); i++) {
+      for (int i=0; i < (map.mArea>0 || mBridgeDeviceType==bridgedevice_onoff || global ? 2 : 5); i++) {
         SceneNo sn = map.mSceneClick[i];
+        double scenevalue = -1;
+        SimpleScenePtr scene = SimpleScenePtr();
         if (sn!=INVALID_SCENE_NO) {
+          scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
+        }
+        if (scene) {
+          scenevalue = scene->value;
+        }
+        else if (i==0 && global) {
+          scenevalue = 0; // assume a 0 value for the off scene, as reference for undo
+        }
+        if (scenevalue>=0) {
           SimpleScenePtr scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
           if (scene) {
-            double prevDiff = fabs(scene->value-mPreviousV);
+            double prevDiff = fabs(scenevalue-mPreviousV);
             if (prevPreset<0 || prevDiff<minPrevDiff) { minPrevDiff = prevDiff; prevPreset = i; }
-            double newDiff =  fabs(scene->value-newV);
-            if (newPreset<0 || newDiff<minNewDiff) { newSceneValue = scene->value; minNewDiff = newDiff; newPreset = i; }
+            double newDiff =  fabs(scenevalue-newV);
+            if (newPreset<0 || newDiff<minNewDiff) { newSceneValue = scenevalue; minNewDiff = newDiff; newPreset = i; }
           }
         }
       }
