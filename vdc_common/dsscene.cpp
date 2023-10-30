@@ -673,6 +673,9 @@ ErrorPtr SceneDeviceSettings::deleteChildren()
 {
   ErrorPtr err;
   for (DsSceneMap::iterator pos = mScenes.begin(); pos!=mScenes.end(); ++pos) {
+    #if P44SCRIPT_FULL_SUPPORT
+    pos->second->mSceneScript.deleteSource(); // make sure scene script is deleted, too
+    #endif
     err = pos->second->deleteFromStore();
   }
   return err;

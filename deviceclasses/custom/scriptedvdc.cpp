@@ -145,7 +145,10 @@ void ScriptedDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
 {
   stopImplementation();
   if (mScriptedDeviceRowID) {
-    if(getScriptedVdc().mDb.executef("DELETE FROM scriptedDevices WHERE rowid=%lld", mScriptedDeviceRowID)!=SQLITE_OK) {
+    if(getScriptedVdc().mDb.executef("DELETE FROM scriptedDevices WHERE rowid=%lld", mScriptedDeviceRowID)==SQLITE_OK) {
+      if (aForgetParams) mImplementation.mScript.deleteSource(); // make sure script gets deleted
+    }
+    else {
       OLOG(LOG_ERR, "Error deleting scripted device: %s", getScriptedVdc().mDb.error()->description().c_str());
     }
   }

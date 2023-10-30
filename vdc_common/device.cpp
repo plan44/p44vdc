@@ -936,8 +936,9 @@ void Device::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandle
   DevicePtr dev = DevicePtr(this);
   mVdcP->removeDevice(dev, aForgetParams);
   // that's all for the base class
-  if (aDisconnectResultHandler)
+  if (aDisconnectResultHandler) {
     aDisconnectResultHandler(true);
+  }
 }
 
 
