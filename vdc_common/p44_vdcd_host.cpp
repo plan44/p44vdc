@@ -1120,6 +1120,43 @@ void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
 
 #if P44SCRIPT_REGISTERED_SOURCE
 
+P44ScriptManager::P44ScriptManager(ScriptingDomainPtr aScriptingDomain) :
+  mScriptingDomain(aScriptingDomain)
+{
+  assert(mScriptingDomain);
+  mScriptingDomain->setPauseHandler(boost::bind(&P44ScriptManager::pausedHandler, this, _1));
+}
+
+
+void P44ScriptManager::pausedHandler(ScriptCodeThreadPtr aPausedThread)
+{
+  if (aPausedThread->pauseReason()==nopause) {
+    OLOG(LOG_ERR, "non-paused thread reported paused")
+    return;
+  }
+  // actually paused
+  P44PausedThread pausedThread;
+  pausedThread.mThread = aPausedThread;
+  pausedThread.mScriptHost = mScriptingDomain->getHostForThread(aPausedThread);
+  mPausedThreads.push_back(pausedThread);
+}
+
+
+bool P44ScriptManager::isDebugging() const
+{
+  return mScriptingDomain && mScriptingDomain->defaultPausingMode()>nopause;
+}
+
+
+void P44ScriptManager::setDebugging(bool aDebug)
+{
+  if (!mScriptingDomain) return;
+  mScriptingDomain->setDefaultPausingMode(aDebug ? breakpoint : nopause);
+}
+
+
+#warning before calling continueWithMode(), release the paused thread
+
 /// script manager specific method handling
 bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
 {
@@ -1128,18 +1165,37 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
 }
 
 
-static char sourceslist_key;
+void P44ScriptManager::setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjPtr aResult, const SourceCursor* aCursorP)
+{
+  aIntoApiValue->setType(apivalue_object);
+  if (!aResult->isErr()) {
+    aIntoApiValue->add("result", aIntoApiValue->newScriptValue(aResult));
+  }
+  else {
+    aIntoApiValue->add("error", aIntoApiValue->newString(aResult->errorValue()->getErrorMessage()));
+  }
+  if (!aCursorP) aCursorP = aResult->cursor();
+  if (aCursorP) {
+    aIntoApiValue->add("at", aIntoApiValue->newUint64(aCursorP->textpos()));
+    aIntoApiValue->add("line", aIntoApiValue->newUint64(aCursorP->lineno()));
+    aIntoApiValue->add("char", aIntoApiValue->newUint64(aCursorP->charpos()));
+  }
+}
+
 
 enum {
-  // singledevice level properties
+  // script manager level properties
   sources_key,
+  pausedthreads_key,
+  debugging_key,
   numScriptManagerProperties
 };
 
-static char source_key;
+static char scriptmanager_key;
+
 
 enum {
-  // singledevice level properties
+  // source level properties
   sourcetext_key,
   title_key,
   originlabel_key,
@@ -1147,19 +1203,46 @@ enum {
   contextid_key,
   contextname_key,
   logprefix_key,
-  numScriptSourceProperties
+  unstored_key,
+  numScriptHostProperties
 };
+
+static char scripthostslist_key;
+static char scripthost_key;
+
+
+enum {
+  // thread level properties
+  scripthostuid_key,
+  lineno_key,
+  charpos_key,
+  textpos_key,
+  result_key,
+  pausereason_key,
+  numPausedThreadProperties
+};
+
+static char pausedthreadslist_key;
+static char pausedthread_key;
 
 
 int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor->hasObjectKey(sourceslist_key)) {
-    // script sources container
-    return static_cast<int>(domain().numRegisteredSources());
+  if (aParentDescriptor->hasObjectKey(scripthostslist_key)) {
+    // script host container
+    return static_cast<int>(domain().numRegisteredHosts());
   }
-  else if (aParentDescriptor->hasObjectKey(source_key)) {
+  else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
+    // paused threads list
+    return static_cast<int>(mPausedThreads.size());
+  }
+  else if (aParentDescriptor->hasObjectKey(scripthost_key)) {
     // source properties
-    return numScriptSourceProperties;
+    return numScriptHostProperties;
+  }
+  else if (aParentDescriptor->hasObjectKey(pausedthreads_key)) {
+    // paused thread properties
+    return numPausedThreadProperties;
   }
   // Note: P44ScriptManager is final, so no subclass adding properties must be considered
   // Always accessing properties at the scriptmanager (root) level
@@ -1169,7 +1252,7 @@ int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
 
 PropertyContainerPtr P44ScriptManager::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
 {
-  // the only subcontainer are the sources, handled by myself
+  // all subcontainers are handled by myself
   return PropertyContainerPtr(this);
 }
 
@@ -1179,34 +1262,56 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
   // scriptmanager level properties
   static const PropertyDescription managerProperties[numScriptManagerProperties] = {
     // common device properties
-    { "sources", apivalue_object, sources_key, OKEY(sourceslist_key) },
+    { "sources", apivalue_object, sources_key, OKEY(scripthostslist_key) },
+    { "pausedthreads", apivalue_object, pausedthreads_key, OKEY(pausedthreadslist_key) },
+    { "debugging", apivalue_bool, debugging_key, OKEY(scriptmanager_key) },
   };
-  // scriptsource level properties
-  static const PropertyDescription sourceProperties[numScriptSourceProperties] = {
-    // common device properties
-    { "sourcetext", apivalue_string, sourcetext_key, OKEY(source_key) },
-    { "title", apivalue_string, title_key, OKEY(source_key) },
-    { "originlabel", apivalue_string, originlabel_key, OKEY(source_key) },
-    { "contexttype", apivalue_string, contexttype_key, OKEY(source_key) },
-    { "contextid", apivalue_string, contextid_key, OKEY(source_key) },
-    { "contextname", apivalue_string, contextname_key, OKEY(source_key) },
-    { "logprefix", apivalue_string, logprefix_key, OKEY(source_key) },
+  // scripthost level properties
+  static const PropertyDescription scripthostProperties[numScriptHostProperties] = {
+    { "sourcetext", apivalue_string, sourcetext_key, OKEY(scripthost_key) },
+    { "title", apivalue_string, title_key, OKEY(scripthost_key) },
+    { "originlabel", apivalue_string, originlabel_key, OKEY(scripthost_key) },
+    { "contexttype", apivalue_string, contexttype_key, OKEY(scripthost_key) },
+    { "contextid", apivalue_string, contextid_key, OKEY(scripthost_key) },
+    { "contextname", apivalue_string, contextname_key, OKEY(scripthost_key) },
+    { "logprefix", apivalue_string, logprefix_key, OKEY(scripthost_key) },
+    { "unstored", apivalue_bool, unstored_key, OKEY(scripthost_key) },
+  };
+  // pausedthread level properties
+  static const PropertyDescription pausedthreadProperties[numPausedThreadProperties] = {
+    { "scriptHostId", apivalue_string, scripthostuid_key, OKEY(pausedthread_key) },
+    { "result", apivalue_null, result_key, OKEY(pausedthread_key) },
+    { "pausereason", apivalue_string, pausereason_key, OKEY(pausedthread_key) },
   };
   // C++ object manages different levels, check objects
-  if (aParentDescriptor->hasObjectKey(sourceslist_key)) {
-    // script sources by their uid
-    ScriptSource* src = domain().getSourceByIndex(aPropIndex);
-    if (!src) return nullptr;
+  if (aParentDescriptor->hasObjectKey(scripthostslist_key)) {
+    // script hosts by their uid
+    ScriptHostPtr host = domain().getHostByIndex(aPropIndex);
+    if (!host) return nullptr;
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = src->scriptSourceUid();
+    descP->propertyName = host->scriptSourceUid();
     descP->propertyType = aParentDescriptor->type();
     descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(source_key);
+    descP->propertyObjectKey = OKEY(scripthost_key);
     return descP;
   }
-  else if (aParentDescriptor->hasObjectKey(source_key)) {
-    // source fields
-    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&sourceProperties[aPropIndex], aParentDescriptor));
+  else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
+    // paused threads by thread id
+    if (aPropIndex>=mPausedThreads.size()) return nullptr;
+    DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+    descP->propertyName = string_format("thread_%08d", mPausedThreads[aPropIndex].mThread->threadId());
+    descP->propertyType = aParentDescriptor->type();
+    descP->propertyFieldKey = aPropIndex;
+    descP->propertyObjectKey = OKEY(pausedthread_key);
+    return descP;
+  }
+  else if (aParentDescriptor->hasObjectKey(scripthost_key)) {
+    // script host fields
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&scripthostProperties[aPropIndex], aParentDescriptor));
+  }
+  else if (aParentDescriptor->hasObjectKey(pausedthread_key)) {
+    // paused threads fields
+    return PropertyDescriptorPtr(new StaticPropertyDescriptor(&pausedthreadProperties[aPropIndex], aParentDescriptor));
   }
   // Note: P44ScriptManager is final, so no subclass adding properties must be considered
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&managerProperties[aPropIndex], aParentDescriptor));
@@ -1215,43 +1320,59 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
 
 bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
-  if (aPropertyDescriptor->hasObjectKey(source_key)) {
-    // scriptsource level property
-    // - get the source
-    ScriptSource* src = domain().getSourceByIndex(aPropertyDescriptor->parentDescriptor->fieldKey());
-    if (src) {
+  if (aPropertyDescriptor->hasObjectKey(scriptmanager_key)) {
+    // script manager level property
+    if (aMode==access_read) {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case debugging_key: aPropValue->setBoolValue(isDebugging()); return true;
+      }
+    }
+    else {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case debugging_key: setDebugging(aPropValue->boolValue()); return true;
+      }
+    }
+  }
+  else if (aPropertyDescriptor->hasObjectKey(scripthost_key)) {
+    // script host level property
+    // - get the host
+    ScriptHostPtr host = domain().getHostByIndex(aPropertyDescriptor->parentDescriptor->fieldKey());
+    if (host) {
       if (aMode==access_read) {
         // read properties
         P44LoggingObj* cobj;
         switch (aPropertyDescriptor->fieldKey()) {
           case sourcetext_key:
-            aPropValue->setStringValue(src->getSource());
+            aPropValue->setStringValue(host->getSource());
             return true;
           case title_key:
-            aPropValue->setStringValue(src->getScriptTitle());
+            aPropValue->setStringValue(host->getScriptTitle());
             return true;
           case originlabel_key:
-            aPropValue->setStringValue(src->getOriginLabel());
+            aPropValue->setStringValue(host->getOriginLabel());
             return true;
           case contexttype_key:
-            cobj = src->getLoggingContext();
+            cobj = host->getLoggingContext();
             if (!cobj) return false;
             aPropValue->setStringValue(cobj->contextType());
             return true;
           case contextid_key:
-            cobj = src->getLoggingContext();
+            cobj = host->getLoggingContext();
             if (!cobj) return false;
             aPropValue->setStringValue(cobj->contextId());
             return true;
           case contextname_key:
-            cobj = src->getLoggingContext();
+            cobj = host->getLoggingContext();
             if (!cobj) return false;
             aPropValue->setStringValue(cobj->contextName());
             return true;
           case logprefix_key:
-            cobj = src->getLoggingContext();
+            cobj = host->getLoggingContext();
             if (!cobj) return false;
             aPropValue->setStringValue(cobj->logContextPrefix());
+            return true;
+          case unstored_key:
+            aPropValue->setBoolValue(host->isUnstored());
             return true;
         }
       }
@@ -1259,9 +1380,28 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         // write properties
         switch (aPropertyDescriptor->fieldKey()) {
           case sourcetext_key:
-            src->setAndStoreSource(aPropValue->stringValue());
+            host->setAndStoreSource(aPropValue->stringValue());
             return true;
         }
+      }
+    }
+  }
+  else if (aPropertyDescriptor->hasObjectKey(pausedthread_key)) {
+    // paused thread level property
+    // - get the paused thread
+    P44PausedThread& pausedthread = mPausedThreads[aPropertyDescriptor->parentDescriptor->fieldKey()];
+    if (aMode==access_read) {
+      // read properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        case scripthostuid_key:
+          aPropValue->setStringValue(pausedthread.mScriptHost->scriptSourceUid());
+          return true;
+        case result_key:
+          P44ScriptManager::setResultAndPosInfo(aPropValue, pausedthread.mThread->currentResult(), &pausedthread.mThread->cursor());
+          return true;
+        case pausereason_key:
+          aPropValue->setStringValue(ScriptCodeThread::pausingName(pausedthread.mThread->pauseReason()));
+          return true;
       }
     }
   }

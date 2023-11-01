@@ -325,21 +325,38 @@ namespace p44 {
 
   #if P44SCRIPT_REGISTERED_SOURCE
   
+  class P44PausedThread
+  {
+  public:
+    ScriptCodeThreadPtr mThread;
+    ScriptHostPtr mScriptHost;
+  };
+
+
   class P44ScriptManager P44_FINAL : public PropertyContainer
   {
     typedef PropertyContainer inherited;
 
     ScriptingDomainPtr mScriptingDomain;
 
+    typedef std::vector<P44PausedThread> PausedThreadsVector;
+    PausedThreadsVector mPausedThreads;
+
   public:
 
-    P44ScriptManager(ScriptingDomainPtr aScriptingDomain) : mScriptingDomain(aScriptingDomain) { assert(mScriptingDomain); }
+    P44ScriptManager(ScriptingDomainPtr aScriptingDomain);
 
     /// @return scripting domain managed by this scriptmanager
     ScriptingDomain& domain() { return *mScriptingDomain; };
 
     /// script manager specific method handling
     bool handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams);
+
+    /// set API value from result value and script position
+    /// @param aIntoApiValue API value to set the result info into
+    /// @param aResult script value, if it has a cursor attached, it will be used (if aCursorP is not set)
+    /// @param aCursor script cursor, if set overrides cursor associated with aResult
+    static void setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjPtr aResult, const SourceCursor* aCursorP = nullptr);
 
   protected:
 
@@ -348,6 +365,13 @@ namespace p44 {
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+
+  private:
+
+    void pausedHandler(ScriptCodeThreadPtr aPausedThread);
+
+    bool isDebugging() const;
+    void setDebugging(bool aDebug);
 
   };
   typedef boost::intrusive_ptr<P44ScriptManager> P44ScriptManagerPtr;
