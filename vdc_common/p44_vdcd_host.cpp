@@ -1151,7 +1151,18 @@ bool P44ScriptManager::isDebugging() const
 void P44ScriptManager::setDebugging(bool aDebug)
 {
   if (!mScriptingDomain) return;
-  mScriptingDomain->setDefaultPausingMode(aDebug ? breakpoint : nopause);
+  if (aDebug!=isDebugging()) {
+    mScriptingDomain->setDefaultPausingMode(aDebug ? breakpoint : nopause);
+    // restart all paused threads
+    if (!aDebug) {
+      OLOG(LOG_WARNING, "Debugging mode disabled: all paused threads are restarted now");
+      while (mPausedThreads.size()>0) {
+        PausedThreadsVector::iterator pos = mPausedThreads.begin();
+        pos->mThread->continueWithMode(nopause);
+        mPausedThreads.erase(pos);
+      }
+    }
+  }
 }
 
 
