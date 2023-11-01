@@ -136,7 +136,7 @@ namespace p44 {
     SceneCmd mSceneCmd; ///< scene command
     SceneArea mSceneArea; ///< scene area, 0 if none
     #if ENABLE_SCENE_SCRIPT
-    P44Script::ScriptSource mSceneScript; ///< scene script
+    P44Script::ScriptHost mSceneScript; ///< scene script
     #endif
 
     /// @}

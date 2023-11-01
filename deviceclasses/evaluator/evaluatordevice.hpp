@@ -46,7 +46,7 @@ namespace p44 {
     TriggerSource mOnCondition;
     TriggerSource mOffCondition;
     #if P44SCRIPT_FULL_SUPPORT
-    ScriptSource mAction;
+    ScriptHost mAction;
     #else
     string mOldAction; ///< just retain action string, but is NOP
     #endif

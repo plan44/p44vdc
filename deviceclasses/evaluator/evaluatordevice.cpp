@@ -129,7 +129,7 @@ void EvaluatorDevice::willBeAdded()
 {
   // set script ids based on dSUID now
   #if P44SCRIPT_FULL_SUPPORT
-  evaluatorSettings()->mAction.setScriptSourceUid(string_format("eval_%s.action", getDsUid().getString().c_str()));
+  evaluatorSettings()->mAction.setScriptHostUid(string_format("eval_%s.action", getDsUid().getString().c_str()));
   #endif
 }
 

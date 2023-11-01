@@ -929,7 +929,7 @@ Trigger::Trigger() :
   inheritedParams(VdcHost::sharedVdcHost()->getDsParamStore()),
   mTriggerId(0),
   mTriggerCondition("condition", nullptr, this, boost::bind(&Trigger::handleTrigger, this, _1), onGettingTrue, Never, expression+keepvars+synchronously+concurrently), // concurrently+keepvars: because action might still be running in this context
-  mTriggerAction(sourcecode+regular, "action", "%C (trigger action)", this),
+  mTriggerAction(sourcecode|regular, "action", "%C (trigger action)", this),
   mConditionMet(undefined)
 {
   mValueMapper.isMemberVariable();
@@ -1095,8 +1095,8 @@ void Trigger::setTriggerId(int aTriggerId)
     mTriggerId = aTriggerId;
     // update dependent trigger script IDs
     string uidbase = string_format("trigger_%d.", mTriggerId);
-    mTriggerCondition.setScriptSourceUid(uidbase+"condition");
-    mTriggerAction.setScriptSourceUid(uidbase+"action");
+    mTriggerCondition.setScriptHostUid(uidbase+"condition");
+    mTriggerAction.setScriptHostUid(uidbase+"action");
   }
 }
 

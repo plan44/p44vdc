@@ -369,7 +369,7 @@ namespace p44 {
 
     ScriptMainContextPtr mTriggerContext; ///< context shared for all scripts in this trigger
     TriggerSource mTriggerCondition;
-    ScriptSource mTriggerAction;
+    ScriptHost mTriggerAction;
 
     Trigger();
     virtual ~Trigger();

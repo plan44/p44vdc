@@ -210,7 +210,7 @@ namespace p44 {
     #endif
 
     #if P44SCRIPT_FULL_SUPPORT
-    ScriptSource mMainScript; ///< global init/main script stored in settings
+    ScriptHost mMainScript; ///< global init/main script stored in settings
     ScriptMainContextPtr mVdcHostScriptContext; ///< context for global vdc scripts
     bool mGlobalScriptsStarted; ///< global scripts have been started
     #endif

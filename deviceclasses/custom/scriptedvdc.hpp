@@ -48,7 +48,7 @@ namespace p44 {
     friend class ScriptedDevice;
 
     ScriptedDevice &mScriptedDevice; ///< the related scripted device
-    ScriptSource mScript; ///< the (p44script) device implementation
+    ScriptHost mScript; ///< the (p44script) device implementation
     ScriptMainContextPtr mContext; ///< context for implementation script
     MLTicket mRestartTicket; ///< the implementation
 

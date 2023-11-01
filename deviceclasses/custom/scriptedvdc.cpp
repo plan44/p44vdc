@@ -129,7 +129,7 @@ ScriptedDevice::~ScriptedDevice()
 
 void ScriptedDevice::willBeAdded()
 {
-  mImplementation.mScript.setScriptSourceUid(string_format("scripteddev_%s.implementation", getDsUid().getString().c_str()));
+  mImplementation.mScript.setScriptHostUid(string_format("scripteddev_%s.implementation", getDsUid().getString().c_str()));
   inherited::willBeAdded();
 }
 
