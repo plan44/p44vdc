@@ -330,6 +330,7 @@ namespace p44 {
   public:
     ScriptCodeThreadPtr mThread;
     ScriptHostPtr mScriptHost;
+    MLMicroSeconds mPausedAt;
   };
 
 
@@ -372,6 +373,8 @@ namespace p44 {
 
     bool isDebugging() const;
     void setDebugging(bool aDebug);
+    ScriptCodeThreadPtr pausedThreadById(int aThreadId);
+    void removePausedThread(ScriptCodeThreadPtr aThread);
 
   };
   typedef boost::intrusive_ptr<P44ScriptManager> P44ScriptManagerPtr;

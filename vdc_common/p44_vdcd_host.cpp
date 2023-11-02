@@ -1136,6 +1136,7 @@ void P44ScriptManager::pausedHandler(ScriptCodeThreadPtr aPausedThread)
   }
   // actually paused
   P44PausedThread pausedThread;
+  pausedThread.mPausedAt = MainLoop::now();
   pausedThread.mThread = aPausedThread;
   pausedThread.mScriptHost = mScriptingDomain->getHostForThread(aPausedThread);
   mPausedThreads.push_back(pausedThread);
@@ -1166,26 +1167,18 @@ void P44ScriptManager::setDebugging(bool aDebug)
 }
 
 
-#warning before calling continueWithMode(), release the paused thread
-
-/// script manager specific method handling
-bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
-{
-  // FIXME: implement %%%
-  return false;
-}
-
-
 void P44ScriptManager::setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjPtr aResult, const SourceCursor* aCursorP)
 {
   aIntoApiValue->setType(apivalue_object);
-  if (!aResult->isErr()) {
-    aIntoApiValue->add("result", aIntoApiValue->newScriptValue(aResult));
+  if (aResult) {
+    if (!aResult->isErr()) {
+      aIntoApiValue->add("result", aIntoApiValue->newScriptValue(aResult));
+    }
+    else {
+      aIntoApiValue->add("error", aIntoApiValue->newString(aResult->errorValue()->getErrorMessage()));
+    }
   }
-  else {
-    aIntoApiValue->add("error", aIntoApiValue->newString(aResult->errorValue()->getErrorMessage()));
-  }
-  if (!aCursorP) aCursorP = aResult->cursor();
+  if (!aCursorP && aResult) aCursorP = aResult->cursor();
   if (aCursorP) {
     aIntoApiValue->add("at", aIntoApiValue->newUint64(aCursorP->textpos()));
     aIntoApiValue->add("line", aIntoApiValue->newUint64(aCursorP->lineno()));
@@ -1208,7 +1201,7 @@ static char scriptmanager_key;
 enum {
   // source level properties
   sourcetext_key,
-  title_key,
+  sourcetitle_key,
   originlabel_key,
   contexttype_key,
   contextid_key,
@@ -1224,12 +1217,12 @@ static char scripthost_key;
 
 enum {
   // thread level properties
+  threadid_key,
+  threadtitle_key,
   scripthostuid_key,
-  lineno_key,
-  charpos_key,
-  textpos_key,
   result_key,
   pausereason_key,
+  pausedat_key,
   numPausedThreadProperties
 };
 
@@ -1251,7 +1244,7 @@ int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
     // source properties
     return numScriptHostProperties;
   }
-  else if (aParentDescriptor->hasObjectKey(pausedthreads_key)) {
+  else if (aParentDescriptor->hasObjectKey(pausedthread_key)) {
     // paused thread properties
     return numPausedThreadProperties;
   }
@@ -1280,7 +1273,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
   // scripthost level properties
   static const PropertyDescription scripthostProperties[numScriptHostProperties] = {
     { "sourcetext", apivalue_string, sourcetext_key, OKEY(scripthost_key) },
-    { "title", apivalue_string, title_key, OKEY(scripthost_key) },
+    { "title", apivalue_string, sourcetitle_key, OKEY(scripthost_key) },
     { "originlabel", apivalue_string, originlabel_key, OKEY(scripthost_key) },
     { "contexttype", apivalue_string, contexttype_key, OKEY(scripthost_key) },
     { "contextid", apivalue_string, contextid_key, OKEY(scripthost_key) },
@@ -1290,9 +1283,12 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
   };
   // pausedthread level properties
   static const PropertyDescription pausedthreadProperties[numPausedThreadProperties] = {
+    { "threadid", apivalue_uint64, threadid_key, OKEY(pausedthread_key) },
+    { "title", apivalue_string, threadtitle_key, OKEY(pausedthread_key) },
     { "scriptHostId", apivalue_string, scripthostuid_key, OKEY(pausedthread_key) },
     { "result", apivalue_null, result_key, OKEY(pausedthread_key) },
     { "pausereason", apivalue_string, pausereason_key, OKEY(pausedthread_key) },
+    { "pausedAt", apivalue_uint64, pausedat_key, OKEY(pausedthread_key) },
   };
   // C++ object manages different levels, check objects
   if (aParentDescriptor->hasObjectKey(scripthostslist_key)) {
@@ -1310,7 +1306,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     // paused threads by thread id
     if (aPropIndex>=mPausedThreads.size()) return nullptr;
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("thread_%08d", mPausedThreads[aPropIndex].mThread->threadId());
+    descP->propertyName = string_format("%d", aPropIndex);
     descP->propertyType = aParentDescriptor->type();
     descP->propertyFieldKey = aPropIndex;
     descP->propertyObjectKey = OKEY(pausedthread_key);
@@ -1356,7 +1352,7 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
           case sourcetext_key:
             aPropValue->setStringValue(host->getSource());
             return true;
-          case title_key:
+          case sourcetitle_key:
             aPropValue->setStringValue(host->getScriptTitle());
             return true;
           case originlabel_key:
@@ -1407,17 +1403,257 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         case scripthostuid_key:
           aPropValue->setStringValue(pausedthread.mScriptHost->scriptSourceUid());
           return true;
+        case threadid_key:
+          aPropValue->setUint32Value(pausedthread.mThread->threadId());
+          return true;
+        case threadtitle_key:
+          aPropValue->setStringValue(string_format("thread_%4d",pausedthread.mThread->threadId()));
+          return true;
         case result_key:
           P44ScriptManager::setResultAndPosInfo(aPropValue, pausedthread.mThread->currentResult(), &pausedthread.mThread->cursor());
           return true;
         case pausereason_key:
           aPropValue->setStringValue(ScriptCodeThread::pausingName(pausedthread.mThread->pauseReason()));
           return true;
+        case pausedat_key:
+          aPropValue->setUint64Value(pausedthread.mPausedAt);
+          return true;
       }
     }
   }
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
+
+
+ScriptCodeThreadPtr P44ScriptManager::pausedThreadById(int aThreadId)
+{
+  for (PausedThreadsVector::iterator pos = mPausedThreads.begin(); pos!=mPausedThreads.end(); ++pos) {
+    if (pos->mThread->threadId()==aThreadId) {
+      return pos->mThread;
+    }
+  }
+  return nullptr;
+}
+
+
+void P44ScriptManager::removePausedThread(ScriptCodeThreadPtr aThread)
+{
+  for (PausedThreadsVector::iterator pos = mPausedThreads.begin(); pos!=mPausedThreads.end(); ++pos) {
+    if (pos->mThread==aThread) {
+      mPausedThreads.erase(pos);
+      return;
+    }
+  }
+}
+
+
+/// script manager specific method handling
+bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
+{
+  if (aMethod=="x-p44-scriptContinue") {
+    ApiValuePtr o;
+    aError = DsAddressable::checkParam(aParams, "threadid", o);
+    if (Error::isOK(aError)) {
+      ScriptCodeThreadPtr thread = pausedThreadById(o->int32Value());
+      if (!thread) {
+        aError = Error::err<VdcApiError>(404, "no such thread");
+      }
+      else {
+        aError = DsAddressable::checkParam(aParams, "mode", o);
+        if (Error::isOK(aError)) {
+          PausingMode m = ScriptCodeThread::pausingModeNamed(o->stringValue());
+          // remove thread from list of paused threads
+          removePausedThread(thread);
+          // continue
+          thread->continueWithMode(m);
+          aError = Error::ok(); // ok answer right now
+        }
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+
+#ifdef _DUMMY2
+
+  /* from vdchost.cpp
+  if (aMethod=="x-p44-scriptExec") {
+    // direct execution of a script command line in the common main/initscript context
+    ApiValuePtr o = aParams->get("script");
+    if (o) {
+      ScriptHost src(sourcecode|regular|keepvars|concurrently|ephemeralSource, "scriptExec/REPL", nullptr , this);
+      src.setSource(o->stringValue());
+      src.setSharedMainContext(mVdcHostScriptContext);
+      src.registerUnstoredScript("scriptExec");
+      src.run(inherit, boost::bind(&VdcHost::scriptExecHandler, this, aRequest, _1));
+    }
+    else {
+      aRequest->sendStatus(NULL); // no script -> NOP
+    }
+    return ErrorPtr();
+  }
+  if (aMethod=="x-p44-restartMain") {
+    // re-run the main script
+    OLOG(LOG_NOTICE, "Re-starting global main script");
+    mMainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel(), ""), ScriptObjPtr(), Infinite);
+    return Error::ok();
+  }
+  if (aMethod=="x-p44-stopMain") {
+    // stop the main script
+    OLOG(LOG_NOTICE, "Stopping global main script");
+    mVdcHostScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "main script stopped"));
+    return Error::ok();
+  }
+  if (aMethod=="x-p44-checkMain") {
+    // check the main script for syntax errors (but do not re-start it)
+    ScriptObjPtr res = mMainScript.syntaxcheck();
+    ApiValuePtr checkResult = aRequest->newApiValue();
+    checkResult->setType(apivalue_object);
+    if (!res || !res->isErr()) {
+      OLOG(LOG_NOTICE, "Checked global main script: syntax OK");
+      checkResult->add("result", checkResult->newNull());
+    }
+    else {
+      OLOG(LOG_NOTICE, "Error in global main script: %s", res->errorValue()->text());
+      checkResult->add("error", checkResult->newString(res->errorValue()->getErrorMessage()));
+      SourceCursor* cursor = res->cursor();
+      if (cursor) {
+        checkResult->add("at", checkResult->newUint64(cursor->textpos()));
+        checkResult->add("line", checkResult->newUint64(cursor->lineno()));
+        checkResult->add("char", checkResult->newUint64(cursor->charpos()));
+      }
+    }
+    aRequest->sendResult(checkResult);
+    return ErrorPtr();
+  }
+
+
+  /* from localcontroller */
+
+  {
+  if (aMethod=="x-p44-queryScenes") {
+    // query scenes usable for a zone/group combination
+    ApiValuePtr o;
+    aError = DsAddressable::checkParam(aParams, "zoneID", o);
+    if (Error::isOK(aError)) {
+     DsZoneID zoneID = (DsZoneID)o->uint16Value();
+     // get zone
+     ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
+     if (!zone) {
+       aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
+     }
+     else {
+       aError = DsAddressable::checkParam(aParams, "group", o);
+       if (Error::isOK(aError) || zoneID==zoneId_global) {
+         DsGroup group = zoneID==zoneId_global ? group_undefined : (DsGroup)o->uint16Value();
+         // optional scene kind flags
+         SceneKind required = scene_preset;
+         SceneKind forbidden = scene_extended|scene_area;
+         o = aParams->get("required"); if (o) { forbidden = 0; required = o->uint32Value(); } // no auto-exclude when explicitly including
+         o = aParams->get("forbidden"); if (o) forbidden = o->uint32Value();
+         // query possible scenes for this zone/group
+         SceneIdsVector scenes = zone->getZoneScenes(group, required, forbidden);
+         // create answer object
+         ApiValuePtr result = aRequest->newApiValue();
+         result->setType(apivalue_object);
+         for (size_t i = 0; i<scenes.size(); ++i) {
+           ApiValuePtr s = result->newObject();
+           s->add("id", s->newString(scenes[i].stringId()));
+           s->add("no", s->newUint64(scenes[i].mSceneNo));
+           s->add("name", s->newString(scenes[i].getName()));
+           s->add("action", s->newString(scenes[i].getActionName()));
+           s->add("kind", s->newUint64(scenes[i].getKindFlags()));
+           result->add(string_format("%zu", i), s);
+         }
+         aRequest->sendResult(result);
+         aError.reset(); // make sure we don't send an extra ErrorOK
+       }
+     }
+    }
+    return true;
+  }
+  else if (aMethod=="x-p44-queryGroups") {
+   // query groups that are in use (in a zone or globally)
+   DsGroupMask groups = 0;
+   ApiValuePtr o = aParams->get("zoneID");
+   if (o) {
+     // specific zone
+     DsZoneID zoneID = (DsZoneID)o->uint16Value();
+     ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
+     if (!zone) {
+       aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
+       return true;
+     }
+     groups = zone->getZoneGroups();
+   }
+   else {
+     // globally
+     for (DsDeviceMap::iterator pos = mVdcHost.mDSDevices.begin(); pos!=mVdcHost.mDSDevices.end(); ++pos) {
+       OutputBehaviourPtr ob = pos->second->getOutput();
+       if (ob) groups |= ob->groupMemberships();
+     }
+   }
+   bool allGroups = false;
+   o = aParams->get("all"); if (o) allGroups = o->boolValue();
+   if (!allGroups) groups = standardRoomGroups(groups);
+   // create answer object
+   ApiValuePtr result = aRequest->newApiValue();
+   result->setType(apivalue_object);
+   for (int i = 0; i<64; ++i) {
+     if (groups & (1ll<<i)) {
+       const GroupDescriptor* gi = groupInfo((DsGroup)i);
+       ApiValuePtr g = result->newObject();
+       g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
+       g->add("kind", g->newUint64(gi ? gi->kind : 0));
+       g->add("color", g->newString(string_format("#%06X", gi ? gi->hexcolor : 0x999999)));
+       result->add(string_format("%d", i), g);
+     }
+   }
+   aRequest->sendResult(result);
+   aError.reset(); // make sure we don't send an extra ErrorOK
+   return true;
+  }
+  else if (aMethod=="x-p44-checkTriggerCondition" || aMethod=="x-p44-testTriggerAction" || aMethod=="x-p44-stopTriggerAction") {
+   // check the trigger condition of a trigger
+   ApiValuePtr o;
+   aError = DsAddressable::checkParam(aParams, "triggerID", o);
+   if (Error::isOK(aError)) {
+     int triggerId = o->int32Value();
+     TriggerPtr trig = mLocalTriggers.getTrigger(triggerId);
+     if (!trig) {
+       aError = WebError::webErr(400, "Trigger %d not found", triggerId);
+     }
+     else {
+       if (aMethod=="x-p44-testTriggerAction") {
+         ScriptObjPtr triggerParam;
+         ApiValuePtr o = aParams->get("triggerParam");
+         if (o) {
+           // has a trigger parameter
+           triggerParam = new StringValue(o->stringValue());
+         }
+         trig->handleTestActions(aRequest, triggerParam); // asynchronous!
+       }
+       else if (aMethod=="x-p44-stopTriggerAction") {
+         trig->stopActions();
+         aError = Error::ok();
+       }
+       else {
+         aError = trig->handleCheckCondition(aRequest);
+       }
+     }
+   }
+   return true;
+  }
+  else {
+   return false; // unknown at the localController level
+  }
+}
+
+
+#endif // _DUMMY2
+
 
 
 #ifdef _DUMMY
