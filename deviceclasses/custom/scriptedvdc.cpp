@@ -122,7 +122,7 @@ ScriptObjPtr ScriptedDevice::newDeviceObj()
 
 ScriptedDevice::~ScriptedDevice()
 {
-  stopImplementation();
+  mImplementation.mScript.runCommand(stop);
   OLOG(LOG_DEBUG, "destructed");
 }
 
@@ -136,14 +136,14 @@ void ScriptedDevice::willBeAdded()
 
 void ScriptedDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
-  restartImplementation();
+  mImplementation.mScript.runCommand(restart);
   inherited::initializeDevice(aCompletedCB, aFactoryReset);
 }
 
 
 void ScriptedDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
-  stopImplementation();
+  mImplementation.mScript.runCommand(stop);
   if (mScriptedDeviceRowID) {
     if(getScriptedVdc().mDb.executef("DELETE FROM scriptedDevices WHERE rowid=%lld", mScriptedDeviceRowID)==SQLITE_OK) {
       if (aForgetParams) mImplementation.mScript.deleteSource(); // make sure script gets deleted
@@ -157,50 +157,65 @@ void ScriptedDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
 }
 
 
-void ScriptedDevice::restartImplementation()
+ScriptObjPtr ScriptedDeviceImplementation::runScriptCommand(ScriptCommand aScriptCommand)
 {
-  OLOG(LOG_NOTICE, "(Re-)starting device implementation script");
-  mImplementation.mRestartTicket.cancel();
-  mImplementation.mContext->clearVars(); // clear vars and (especially) context local handlers
-  mImplementation.mScript.run(stopall, boost::bind(&ScriptedDevice::implementationEnds, this, _1), ScriptObjPtr(), Infinite);
-}
-
-
-void ScriptedDevice::stopImplementation()
-{
-  OLOG(LOG_NOTICE, "Stopping device implementation script");
-  mImplementation.mRestartTicket.cancel();
-  if (!mImplementation.mContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "device implementation script stopped"))) {
-    // nothing to abort, make sure handlers are gone (otherwise, they will get cleared in implementationEnds())
-    mImplementation.mContext->clearVars();
+  EvaluationFlags flags = stopall; // main script must always be running only once, so stopping all before start and restart
+  ScriptObjPtr ret;
+  switch(aScriptCommand) {
+    case P44Script::debug:
+      flags |= singlestep;
+    case P44Script::start:
+    case P44Script::restart:
+      SOLOG(mScriptedDevice, LOG_NOTICE, "(Re-)starting device implementation script");
+      mRestartTicket.cancel();
+      mContext->clearVars(); // clear vars and (especially) context local handlers
+      ret = mScript.runX(stopall, boost::bind(&ScriptedDeviceImplementation::implementationEnds, this, _1), ScriptObjPtr(), Infinite);
+      break;
+    case P44Script::stop:
+      SOLOG(mScriptedDevice, LOG_NOTICE, "Stopping device implementation script");
+      mRestartTicket.cancel();
+      if (!mContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "device implementation script stopped"))) {
+        // nothing to abort, make sure handlers are gone (otherwise, they will get cleared in implementationEnds())
+        mContext->clearVars();
+      }
+      break;
+    default:
+      ret = mScript.defaultCommandImplementation(aScriptCommand, NoOP, ScriptObjPtr());
   }
+  return ret;
 }
 
 
 #define IMPLEMENTATION_RESTART_DELAY (20*Second)
 
-void ScriptedDevice::implementationEnds(ScriptObjPtr aResult)
+void ScriptedDeviceImplementation::implementationEnds(ScriptObjPtr aResult)
 {
-  if (mImplementation.mScript.empty()) {
+  if (mScript.empty()) {
     // no restart if nothing programmed yet
-    OLOG(LOG_ERR, "Custom device has no implementation script (yet)");
+    SOLOG(mScriptedDevice, LOG_ERR, "Custom device has no implementation script (yet)");
     return;
   }
-  OLOG(aResult && aResult->isErr() ? LOG_WARNING : LOG_NOTICE, "device implementation script finished running, result=%s", ScriptObj::describe(aResult).c_str());
+  SOLOG(mScriptedDevice, aResult && aResult->isErr() ? LOG_WARNING : LOG_NOTICE, "device implementation script finished running, result=%s", ScriptObj::describe(aResult).c_str());
   if (
     aResult &&
     Error::isDomain(aResult->errorValue(), ScriptError::domain()) &&
     aResult->errorValue()->getErrorCode()>=ScriptError::FatalErrors
   ) {
-    mImplementation.mContext->clearVars(); // clear vars and (especially) context local handlers
+    mContext->clearVars(); // clear vars and (especially) context local handlers
     return; // fatal error, no auto-restart
   }
-  if (aResult && aResult->errorValue()->isOK() && hasSinks()) return; // script ends w/o error, and monitors messages -> ok
+  if (aResult && aResult->errorValue()->isOK() && mScriptedDevice.hasSinks()) return; // script ends w/o error, and monitors messages -> ok
   if (aResult && aResult->hasType(numeric) && aResult->boolValue()) return; // returning explicit trueish means no restart needed, as well
   // retry in a while
-  OLOG(LOG_NOTICE, "Will restart implementation in %lld seconds", IMPLEMENTATION_RESTART_DELAY/Second);
-  mImplementation.mRestartTicket.executeOnce(boost::bind(&ScriptedDevice::restartImplementation, this), IMPLEMENTATION_RESTART_DELAY);
+  SOLOG(mScriptedDevice, LOG_NOTICE, "Will restart implementation in %lld seconds", IMPLEMENTATION_RESTART_DELAY/Second);
+  mRestartTicket.executeOnce(boost::bind(&ScriptedDeviceImplementation::restartImplementation, this), IMPLEMENTATION_RESTART_DELAY);
 }
+
+void ScriptedDeviceImplementation::restartImplementation()
+{
+  mScript.runCommand(restart);
+}
+
 
 
 ErrorPtr ScriptedDevice::sendDeviceMesssage(JsonObjectPtr aMessage)
@@ -251,12 +266,12 @@ ErrorPtr ScriptedDevice::handleMethod(VdcApiRequestPtr aRequest, const string &a
 {
   if (aMethod=="x-p44-restartImpl") {
     // re-run the device implementation script
-    restartImplementation();
+    mImplementation.mScript.runCommand(restart);
     return Error::ok();
   }
   if (aMethod=="x-p44-stopImpl") {
     // stop the device implementation script
-    stopImplementation();
+    mImplementation.mScript.runCommand(stop);
     return Error::ok();
   }
   if (aMethod=="x-p44-checkImpl") {
@@ -413,6 +428,7 @@ ScriptedDeviceImplementation::ScriptedDeviceImplementation(ScriptedDevice &aScri
 {
   mContext = StandardScriptingDomain::sharedDomain().newContext(mScriptedDevice.newDeviceObj());
   mScript.setSharedMainContext(mContext);
+  mScript.setScriptCommandHandler(boost::bind(&ScriptedDeviceImplementation::runScriptCommand, this, _1));
   // script uid will be set at load
 }
 

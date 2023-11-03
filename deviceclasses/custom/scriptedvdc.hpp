@@ -63,6 +63,12 @@ namespace p44 {
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
+  private:
+
+    ScriptObjPtr runScriptCommand(ScriptCommand aScriptCommand);
+    void implementationEnds(ScriptObjPtr aResult);
+    void restartImplementation();
+
   };
 
 
@@ -121,12 +127,6 @@ namespace p44 {
 
   protected:
 
-    /// (re)start the device Implementation script
-    void restartImplementation();
-
-    /// stop implementation script
-    void stopImplementation();
-
     /// initializes the physical device for being used
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
     /// @note this is called before interaction with dS system starts
@@ -182,8 +182,6 @@ namespace p44 {
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   private:
-
-    void implementationEnds(ScriptObjPtr aResult);
 
     virtual void sendDeviceApiJsonMessage(JsonObjectPtr aMessage) P44_OVERRIDE;
     virtual void sendDeviceApiSimpleMessage(string aMessage) P44_OVERRIDE;

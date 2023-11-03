@@ -724,6 +724,7 @@ namespace p44 {
     #endif
     #if P44SCRIPT_FULL_SUPPORT
     void runGlobalScripts();
+    ScriptObjPtr mainScriptRun(ScriptCommand aScriptCommand);
     void globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel, string aSetupScriptFn);
     void scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
     #endif

@@ -255,6 +255,10 @@ namespace p44 {
 
     PropertyContainerPtr sceneChannels; // private container for implementing scene channels/outputs
 
+    #if ENABLE_SCENE_SCRIPT
+    P44Script::ScriptObjPtr runSceneScriptCommand(P44Script::ScriptCommand aScriptCommand);
+    #endif
+
   };
   typedef boost::intrusive_ptr<DsScene> DsScenePtr;
   typedef map<SceneNo, DsScenePtr> DsSceneMap;

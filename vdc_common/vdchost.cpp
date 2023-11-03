@@ -131,6 +131,8 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   // init main script source
   mMainScript.setSharedMainContext(mVdcHostScriptContext);
   mMainScript.setScriptHostUid("mainscript");
+  mMainScript.setScriptCommandHandler(boost::bind(&VdcHost::mainScriptRun, this, _1));
+  mMainScript.setScriptResultHandler(boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel(), ""));
   // Add some extras
   #if ENABLE_HTTP_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::HttpLookup);
@@ -1590,7 +1592,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
       src.setSource(o->stringValue());
       src.setSharedMainContext(mVdcHostScriptContext);
       src.registerUnstoredScript("scriptExec");
-      src.run(inherit, boost::bind(&VdcHost::scriptExecHandler, this, aRequest, _1));
+      src.runX(inherit, boost::bind(&VdcHost::scriptExecHandler, this, aRequest, _1));
     }
     else {
       aRequest->sendStatus(NULL); // no script -> NOP
@@ -1600,18 +1602,18 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
   if (aMethod=="x-p44-restartMain") {
     // re-run the main script
     OLOG(LOG_NOTICE, "Re-starting global main script");
-    mMainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel(), ""), ScriptObjPtr(), Infinite);
+    mMainScript.runCommand(restart);
     return Error::ok();
   }
   if (aMethod=="x-p44-stopMain") {
     // stop the main script
     OLOG(LOG_NOTICE, "Stopping global main script");
-    mVdcHostScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "main script stopped"));
+    mMainScript.runCommand(stop);
     return Error::ok();
   }
   if (aMethod=="x-p44-checkMain") {
     // check the main script for syntax errors (but do not re-start it)
-    ScriptObjPtr res = mMainScript.syntaxcheck();
+    ScriptObjPtr res = mMainScript.runCommand(check);
     ApiValuePtr checkResult = aRequest->newApiValue();
     checkResult->setType(apivalue_object);
     if (!res || !res->isErr()) {
@@ -2364,6 +2366,7 @@ ApiValuePtr ScriptCallConnection::newApiValue()
 
 // MARK: - global vdc host scripts
 
+
 void VdcHost::runGlobalScripts()
 {
   // command line provided script
@@ -2399,13 +2402,13 @@ void VdcHost::runGlobalScripts()
       initScript.setSharedMainContext(mVdcHostScriptContext);
       initScript.registerUnstoredScript("initscript");
       OLOG(LOG_NOTICE, "Starting %s specified on commandline '%s'", initScript.getOriginLabel(), scriptFn.c_str());
-      initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel(), setupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
+      initScript.runX(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel(), setupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
     }
   }
   // stored global script
   if (!mMainScript.getSource().empty()) {
     OLOG(LOG_NOTICE, "Starting global main script");
-    mMainScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel(), ""), ScriptObjPtr(), Infinite);
+    mMainScript.runX(regular|concurrently|keepvars, NoOP, ScriptObjPtr(), Infinite);
   }
 }
 
@@ -2430,6 +2433,27 @@ void VdcHost::globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel, s
       OLOG(LOG_ERR, "setupscript failed to execute successfully, returns: %s", ScriptObj::describe(aResult).c_str());
     }
   }
+}
+
+
+ScriptObjPtr VdcHost::mainScriptRun(ScriptCommand aScriptCommand)
+{
+  EvaluationFlags flags = stopall; // main script must always be running only once, so stopping all before start and restart
+  ScriptObjPtr ret;
+  switch(aScriptCommand) {
+    case P44Script::debug:
+      flags |= singlestep;
+    case P44Script::start:
+    case P44Script::restart:
+      ret = mMainScript.runX(flags, NoOP, ScriptObjPtr(), Infinite);
+      break;
+    case P44Script::stop:
+      mVdcHostScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "main script stopped"));
+      break;
+    default:
+      ret = mMainScript.defaultCommandImplementation(aScriptCommand, NoOP, ScriptObjPtr());
+  }
+  return ret;
 }
 
 

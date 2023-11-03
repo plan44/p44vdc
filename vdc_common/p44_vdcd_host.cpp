@@ -1472,6 +1472,44 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
     }
     return true;
   }
+  else if (aMethod=="x-p44-scriptCommand") {
+    ApiValuePtr o;
+    aError = DsAddressable::checkParam(aParams, "scriptsourceuid", o);
+    if (Error::isOK(aError)) {
+      ScriptHostPtr script = domain().getHostByUid(o->stringValue());
+      if (!script) {
+        aError = Error::err<VdcApiError>(404, "no such script");
+      }
+      else {
+        aError = DsAddressable::checkParam(aParams, "command", o);
+        if (Error::isOK(aError)) {
+          string cmd = o->stringValue();
+          ScriptCommand c;
+          if (cmd=="check") c = check;
+          else if (cmd=="debug") c = debug;
+          else if (cmd=="restart") c = restart;
+          else if (cmd=="start") c = start;
+          else if (cmd=="stop") c = stop;
+          else {
+            aError = Error::err<VdcApiError>(400, "unknown script command");
+          }
+          // always return as result, error or not
+          ScriptObjPtr result;
+          if (Error::notOK(aError)) {
+            result = new ErrorValue(aError);
+          }
+          else {
+            ScriptObjPtr result = script->runCommand(c);
+            o = aParams->newObject();
+            P44ScriptManager::setResultAndPosInfo(o, result, nullptr);
+          }
+          aRequest->sendResult(o);
+          aError.reset(); // result already sent
+        }
+      }
+    }
+    return true;
+  }
   return false;
 }
 

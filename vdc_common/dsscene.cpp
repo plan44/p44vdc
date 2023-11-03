@@ -296,7 +296,7 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
   // then proceed with loading other fields
   mGlobalSceneFlags = aRow->get<int>(aIndex++);
   #if ENABLE_SCENE_SCRIPT
-  mSceneScript.loadAndActivate(
+  if (mSceneScript.loadAndActivate(
     string_format("dev_%s.scene_%d", getDevice().getDsUid().getString().c_str(), mSceneNo),
     scriptbody+regular,
     "scenescript",
@@ -304,9 +304,41 @@ void DsScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_
     &mSceneDeviceSettings.mDevice,
     nullptr, // standard scripting domain
     aRow->get<const char *>(aIndex++)
-  );
+  )) {
+    // set up script command handler
+    mSceneScript.setScriptCommandHandler(boost::bind(&DsScene::runSceneScriptCommand, this, _1));
+  }
   #endif
 }
+
+
+#if ENABLE_SCENE_SCRIPT
+
+ScriptObjPtr DsScene::runSceneScriptCommand(ScriptCommand aScriptCommand)
+{
+  ScriptObjPtr ret;
+  // start and stop are implicit with scene call
+  switch(aScriptCommand) {
+    case P44Script::debug:
+      ret = new ErrorValue(ScriptError::Internal, "cannot step into scene scripts, use breakpoint");
+      break;
+    case P44Script::start:
+    case P44Script::restart:
+      // just call the scene
+      mSceneDeviceSettings.mDevice.callScene(mSceneNo, true);
+      break;
+    case P44Script::stop:
+      // just stop all scene actions
+      mSceneDeviceSettings.mDevice.stopSceneActions();
+      break;
+    default:
+      ret = mSceneScript.defaultCommandImplementation(aScriptCommand, NoOP, nullptr);
+      break;
+  }
+  return ret;
+}
+
+#endif // ENABLE_SCENE_SCRIPT
 
 
 void DsScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
@@ -526,6 +558,8 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
             nullptr // standard scripting domain
           )) {
             markDirty();
+            // set up script command handler
+            mSceneScript.setScriptCommandHandler(boost::bind(&DsScene::runSceneScriptCommand, this, _1));
           }
           return true;
         #endif
