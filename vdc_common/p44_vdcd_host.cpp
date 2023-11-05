@@ -1175,8 +1175,9 @@ void P44ScriptManager::setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjP
       aIntoApiValue->add("result", aIntoApiValue->newScriptValue(aResult));
     }
     else {
-      aIntoApiValue->add("error", aIntoApiValue->newString(aResult->errorValue()->getErrorMessage()));
+      aIntoApiValue->add("error", aIntoApiValue->newString(aResult->errorValue()->text()));
     }
+    aIntoApiValue->add("annotation", aIntoApiValue->newString(aResult->getAnnotation()));
   }
   if (!aCursorP && aResult) aCursorP = aResult->cursor();
   if (aCursorP) {
@@ -1220,6 +1221,7 @@ enum {
   threadid_key,
   threadtitle_key,
   scripthostuid_key,
+  scripthosttitle_key,
   result_key,
   pausereason_key,
   pausedat_key,
@@ -1286,6 +1288,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     { "threadid", apivalue_uint64, threadid_key, OKEY(pausedthread_key) },
     { "title", apivalue_string, threadtitle_key, OKEY(pausedthread_key) },
     { "scriptHostId", apivalue_string, scripthostuid_key, OKEY(pausedthread_key) },
+    { "scripttitle", apivalue_string, scripthosttitle_key, OKEY(pausedthread_key) },
     { "result", apivalue_null, result_key, OKEY(pausedthread_key) },
     { "pausereason", apivalue_string, pausereason_key, OKEY(pausedthread_key) },
     { "pausedAt", apivalue_uint64, pausedat_key, OKEY(pausedthread_key) },
@@ -1403,11 +1406,14 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         case scripthostuid_key:
           aPropValue->setStringValue(pausedthread.mScriptHost->scriptSourceUid());
           return true;
+        case scripthosttitle_key:
+          aPropValue->setStringValue(pausedthread.mScriptHost->getScriptTitle());
+          return true;
         case threadid_key:
           aPropValue->setUint32Value(pausedthread.mThread->threadId());
           return true;
         case threadtitle_key:
-          aPropValue->setStringValue(string_format("thread_%4d",pausedthread.mThread->threadId()));
+          aPropValue->setStringValue(string_format("thread_%04d",pausedthread.mThread->threadId()));
           return true;
         case result_key:
           P44ScriptManager::setResultAndPosInfo(aPropValue, pausedthread.mThread->currentResult(), &pausedthread.mThread->cursor());
