@@ -1454,7 +1454,7 @@ void P44ScriptManager::removePausedThread(ScriptCodeThreadPtr aThread)
 
 
 /// script manager specific method handling
-bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
+bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
   if (aMethod=="x-p44-scriptContinue") {
     ApiValuePtr o;
@@ -1516,8 +1516,65 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
     }
     return true;
   }
+  else if (aMethod=="x-p44-scriptExec") {
+    // Note: replaces x-p44-scriptExec in vdchost, not backwards compatible
+    // direct execution of script code, optionally in a thread's or scripthost's context
+    ApiValuePtr o;
+    aError = DsAddressable::checkParam(aParams, "scriptcode", o);
+    if (Error::isOK(aError)) {
+      string code = o->stringValue();
+      ScriptCodeThreadPtr thread;
+      ScriptMainContextPtr ctx;
+      // need thread or script context
+      o = aParams->get("threadid");
+      if (o) {
+        // in a paused thread's context
+        thread = pausedThreadById(o->int32Value());
+        if (thread) {
+          ctx = thread->owner()->scriptmain();
+        }
+        else {
+          aError = Error::err<VdcApiError>(404, "no such thread");
+        }
+      }
+      else {
+        o = aParams->get("scriptsourceuid");
+        if (o) {
+          // in a scripthost's shared main context
+          ScriptHostPtr script = domain().getHostByUid(o->stringValue());
+          if (script) {
+            ctx = script->sharedMainContext();
+          }
+          if (!script || !ctx) {
+            aError = Error::err<VdcApiError>(404, "no context found for this scriptsourceuid");
+          }
+        }
+      }
+      MLMicroSeconds maxRunTime = 5*Second;
+      o = aParams->get("maxruntime");
+      if (o) maxRunTime = o->doubleValue()<0 ? Infinite : o->doubleValue()*Second;
+      if (Error::isOK(aError)) {
+        ScriptHost src(sourcecode|regular|keepvars|concurrently|ephemeralSource, "REPL", "%O" , this);
+        src.setSource(code);
+        // if ctx is null here, this is ok (executing script in ephemeral context)
+        src.setSharedMainContext(ctx);
+        src.run(inherit, boost::bind(&P44ScriptManager::scriptExecHandler, this, aRequest, _1), thread ? thread->threadLocals() : nullptr, maxRunTime);
+        aError.reset(); // result will be sent by scriptExecHandler
+      }
+    }
+    return true;
+  }
   return false;
 }
+
+
+void P44ScriptManager::scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
+{
+  ApiValuePtr ans = aRequest->newApiValue();
+  setResultAndPosInfo(ans, aResult);
+  aRequest->sendResult(ans);
+}
+
 
 
 #ifdef _DUMMY2

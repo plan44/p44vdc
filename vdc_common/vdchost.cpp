@@ -1583,8 +1583,11 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     }
   }
   #endif
-  #if P44SCRIPT_FULL_SUPPORT
+  #if P44SCRIPT_FULL_SUPPORT && !P44SCRIPT_REGISTERED_SOURCE
+  // Note: functionality for controlling script executions (not only) of mainscript
+  //   is now in P44ScriptHost, but is not backwards compatible
   if (aMethod=="x-p44-scriptExec") {
+    // Note: replaced by x-p44-scriptExec in P44ScriptHost, but not backwards compatible
     // direct execution of a script command line in the common main/initscript context
     ApiValuePtr o = aParams->get("script");
     if (o) {
@@ -1633,7 +1636,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
     aRequest->sendResult(checkResult);
     return ErrorPtr();
   }
-  #endif // P44SCRIPT_FULL_SUPPORT
+  #endif // P44SCRIPT_FULL_SUPPORT && !P44SCRIPT_REGISTERED_SOURCE
   if (aMethod=="x-p44-setIdentity") {
     ApiValuePtr o;
     ErrorPtr err;
@@ -2402,13 +2405,13 @@ void VdcHost::runGlobalScripts()
       initScript.setSharedMainContext(mVdcHostScriptContext);
       initScript.registerUnstoredScript("initscript");
       OLOG(LOG_NOTICE, "Starting %s specified on commandline '%s'", initScript.getOriginLabel(), scriptFn.c_str());
-      initScript.runX(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel(), setupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
+      initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel(), setupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
     }
   }
   // stored global script
   if (!mMainScript.getSource().empty()) {
     OLOG(LOG_NOTICE, "Starting global main script");
-    mMainScript.runX(regular|concurrently|keepvars, NoOP, ScriptObjPtr(), Infinite);
+    mMainScript.run(regular|concurrently|keepvars, NoOP, ScriptObjPtr(), Infinite);
   }
 }
 
@@ -2445,7 +2448,7 @@ ScriptObjPtr VdcHost::mainScriptRun(ScriptCommand aScriptCommand)
       flags |= singlestep;
     case P44Script::start:
     case P44Script::restart:
-      ret = mMainScript.runX(flags, NoOP, ScriptObjPtr(), Infinite);
+      ret = mMainScript.run(flags, NoOP, ScriptObjPtr(), Infinite);
       break;
     case P44Script::stop:
       mVdcHostScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "main script stopped"));

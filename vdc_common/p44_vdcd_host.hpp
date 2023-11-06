@@ -351,7 +351,7 @@ namespace p44 {
     ScriptingDomain& domain() { return *mScriptingDomain; };
 
     /// script manager specific method handling
-    bool handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams);
+    bool handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams);
 
     /// set API value from result value and script position
     /// @param aIntoApiValue API value to set the result info into
@@ -375,6 +375,8 @@ namespace p44 {
     void setDebugging(bool aDebug);
     ScriptCodeThreadPtr pausedThreadById(int aThreadId);
     void removePausedThread(ScriptCodeThreadPtr aThread);
+    void scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
+
 
   };
   typedef boost::intrusive_ptr<P44ScriptManager> P44ScriptManagerPtr;
