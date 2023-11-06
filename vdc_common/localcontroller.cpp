@@ -1027,7 +1027,7 @@ ErrorPtr Trigger::handleCheckCondition(VdcApiRequestPtr aRequest)
   }
   // Condition
   ApiValuePtr cond = checkResult->newObject();
-  ScriptObjPtr res = mTriggerCondition.runX(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
+  ScriptObjPtr res = mTriggerCondition.run(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
   cond->add("expression", checkResult->newString(mTriggerCondition.getSource().c_str()));
   if (!res->isErr()) {
     cond->add("result", cond->newScriptValue(res));

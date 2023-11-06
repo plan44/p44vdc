@@ -169,7 +169,7 @@ ScriptObjPtr ScriptedDeviceImplementation::runScriptCommand(ScriptCommand aScrip
       SOLOG(mScriptedDevice, LOG_NOTICE, "(Re-)starting device implementation script");
       mRestartTicket.cancel();
       mContext->clearVars(); // clear vars and (especially) context local handlers
-      ret = mScript.runX(stopall, boost::bind(&ScriptedDeviceImplementation::implementationEnds, this, _1), ScriptObjPtr(), Infinite);
+      ret = mScript.run(stopall, boost::bind(&ScriptedDeviceImplementation::implementationEnds, this, _1), ScriptObjPtr(), Infinite);
       break;
     case P44Script::stop:
       SOLOG(mScriptedDevice, LOG_NOTICE, "Stopping device implementation script");

@@ -232,7 +232,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     ScriptObjPtr res;
     // - on condition (or calculation for sensors)
     cond = checkResult->newObject();
-    res = evaluatorSettings()->mOnCondition.runX(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
+    res = evaluatorSettings()->mOnCondition.run(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
     cond->add("expression", checkResult->newString(evaluatorSettings()->mOnCondition.getSource()));
     if (!res->isErr()) {
       cond->add("result", cond->newScriptValue(res));
@@ -258,7 +258,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
         LOG(LOG_INFO, "- offCondition is empty -> disabled");
       }
       else {
-        res = evaluatorSettings()->mOffCondition.runX(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
+        res = evaluatorSettings()->mOffCondition.run(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
         if (!res->isErr()) {
           cond->add("result", cond->newScriptValue(res));
           cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));
@@ -502,7 +502,7 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
 void EvaluatorDevice::executeActions()
 {
   evaluatorSettings()->mEvaluatorContext->setMemberByName("result", new BoolValue(mEvaluatorState==yes));
-  evaluatorSettings()->mAction.runX(inherit, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), ScriptObjPtr(), Infinite);
+  evaluatorSettings()->mAction.run(inherit, boost::bind(&EvaluatorDevice::actionExecuted, this, _1), ScriptObjPtr(), Infinite);
 }
 
 
@@ -718,7 +718,7 @@ ScriptObjPtr EvaluatorDeviceSettings::actionRun(ScriptCommand aScriptCommand, Ev
       flags |= singlestep;
     case P44Script::start:
     case P44Script::restart:
-      ret = mAction.runX(flags, aScriptResultCB, ScriptObjPtr(), Infinite);
+      ret = mAction.run(flags, aScriptResultCB, ScriptObjPtr(), Infinite);
       break;
     case P44Script::stop:
       mEvaluatorContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "evaluator action stopped"));
