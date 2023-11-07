@@ -1522,16 +1522,16 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
     ApiValuePtr o;
     aError = DsAddressable::checkParam(aParams, "scriptcode", o);
     if (Error::isOK(aError)) {
-      string code = o->stringValue();
+      string code = trimWhiteSpace(o->stringValue());
       ScriptCodeThreadPtr thread;
-      ScriptMainContextPtr ctx;
+      ScriptCodeContextPtr ctx;
       // need thread or script context
       o = aParams->get("threadid");
       if (o) {
         // in a paused thread's context
         thread = pausedThreadById(o->int32Value());
         if (thread) {
-          ctx = thread->owner()->scriptmain();
+          ctx = thread->owner();
         }
         else {
           aError = Error::err<VdcApiError>(404, "no such thread");
@@ -1554,12 +1554,36 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
       o = aParams->get("maxruntime");
       if (o) maxRunTime = o->doubleValue()<0 ? Infinite : o->doubleValue()*Second;
       if (Error::isOK(aError)) {
-        ScriptHost src(sourcecode|regular|keepvars|concurrently|ephemeralSource, "REPL", "%O" , this);
-        src.setSource(code);
-        // if ctx is null here, this is ok (executing script in ephemeral context)
-        src.setSharedMainContext(ctx);
-        src.run(inherit, boost::bind(&P44ScriptManager::scriptExecHandler, this, aRequest, _1), thread ? thread->threadLocals() : nullptr, maxRunTime);
-        aError.reset(); // result will be sent by scriptExecHandler
+        if (code.empty()) {
+          scriptExecHandler(aRequest, new AnnotatedNullValue("nothing to execute"));
+        }
+        else {
+          // non-debuggable source container (text not available to IDE editor)
+          SourceContainerPtr source = new SourceContainer("scriptExec", this, code);
+          // get the main context
+          ScriptMainContextPtr mctx = ctx->scriptmain();
+          assert(mctx.get());
+          // compile
+          EvaluationFlags flags = sourcecode|regular|keepvars|concurrently|ephemeralSource|neverpause;
+          ScriptCompiler compiler(ctx->domain());
+          CompiledCodePtr compiledcode = new CompiledCode("interactive");
+          ScriptObjPtr res = compiler.compile(source, compiledcode, flags, mctx);
+          if (res->isErr()) {
+            // compiler error
+            scriptExecHandler(aRequest, res);
+          }
+          else {
+            // now execute the code in the very context
+            ctx->execute(
+              compiledcode, flags,
+              boost::bind(&P44ScriptManager::scriptExecHandler, this, aRequest, _1),
+              nullptr, // not chained
+              thread ? thread->threadLocals() : nullptr, // also see into the current thread's threadvars
+              maxRunTime // run time limit
+            );
+          }
+        }
+        aError.reset(); // result is or will be sent by scriptExecHandler
       }
     }
     return true;
