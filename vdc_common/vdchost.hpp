@@ -209,6 +209,8 @@ namespace p44 {
     LocalControllerPtr mLocalController;
     #endif
 
+  protected:
+
     #if P44SCRIPT_FULL_SUPPORT
     ScriptHost mMainScript; ///< global init/main script stored in settings
     ScriptMainContextPtr mVdcHostScriptContext; ///< context for global vdc scripts

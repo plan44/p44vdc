@@ -343,9 +343,14 @@ namespace p44 {
     typedef std::vector<P44PausedThread> PausedThreadsVector;
     PausedThreadsVector mPausedThreads;
 
+    MLMicroSeconds mDebuggerTimeout; ///< how long the debugger remains active without getting any of the script manager calls
+    MLTicket mDebuggerTimer; ///< timer that will stop the debugger when no longer connected
+
   public:
 
     P44ScriptManager(ScriptingDomainPtr aScriptingDomain);
+
+    virtual string logContextPrefix() P44_OVERRIDE { return "p44script manager"; }
 
     /// @return scripting domain managed by this scriptmanager
     ScriptingDomain& domain() { return *mScriptingDomain; };
@@ -373,9 +378,11 @@ namespace p44 {
 
     bool isDebugging() const;
     void setDebugging(bool aDebug);
+    void debuggerWatchdog();
+    void debuggerTimedOut();
     ScriptCodeThreadPtr pausedThreadById(int aThreadId);
     void removePausedThread(ScriptCodeThreadPtr aThread);
-    void scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
+    void scriptResultReport(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
 
 
   };
@@ -407,6 +414,7 @@ namespace p44 {
 
     #if P44SCRIPT_REGISTERED_SOURCE
     P44ScriptManagerPtr mScriptManager; ///< script manager
+    ScriptHost mPlayground; ///< playground/REPL script in main script context
     #endif
 
   public:

@@ -183,11 +183,16 @@ private:
 
 P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   inherited(aWithLocalController, aWithPersistentChannels),
-  webUiPort(0)
+  webUiPort(0),
+  mPlayground(sourcecode|regular, "playground", "p44script playground", this)
 {
   #if P44SCRIPT_REGISTERED_SOURCE
   mScriptManager = new P44ScriptManager(&StandardScriptingDomain::sharedDomain());
   StandardScriptingDomain::setStandardScriptingDomain(&(mScriptManager->domain()));
+  // playground script in vdc host script (mainscript) context
+  mPlayground.setScriptHostUid("p44script_playground");
+  mPlayground.setSharedMainContext(mVdcHostScriptContext);
+  mPlayground.loadSource();
   #endif // P44SCRIPT_REGISTERED_SOURCE
   #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
   mScriptedApiLookup.isMemberVariable();
@@ -1121,7 +1126,8 @@ void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
 #if P44SCRIPT_REGISTERED_SOURCE
 
 P44ScriptManager::P44ScriptManager(ScriptingDomainPtr aScriptingDomain) :
-  mScriptingDomain(aScriptingDomain)
+  mScriptingDomain(aScriptingDomain),
+  mDebuggerTimeout(Never)
 {
   assert(mScriptingDomain);
   mScriptingDomain->setPauseHandler(boost::bind(&P44ScriptManager::pausedHandler, this, _1));
@@ -1240,6 +1246,7 @@ int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
   }
   else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
     // paused threads list
+    debuggerWatchdog(); ///< querying paused threads also triggers debugger watchdog
     return static_cast<int>(mPausedThreads.size());
   }
   else if (aParentDescriptor->hasObjectKey(scripthost_key)) {
@@ -1453,13 +1460,40 @@ void P44ScriptManager::removePausedThread(ScriptCodeThreadPtr aThread)
 }
 
 
+void P44ScriptManager::debuggerWatchdog()
+{
+  // re-arm watchdog
+  if (mDebuggerTimeout>0) {
+    mDebuggerTimer.executeOnce(boost::bind(&P44ScriptManager::debuggerTimedOut, this), mDebuggerTimeout);
+  }
+}
+
+
+void P44ScriptManager::debuggerTimedOut()
+{
+  OLOG(LOG_ERR, "Debugger API timeout -> shutting down debugger");
+  setDebugging(false);
+}
+
+
 /// script manager specific method handling
 bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
-  if (aMethod=="x-p44-scriptContinue") {
+  if (aMethod=="x-p44-debuggerActivate") {
+    ApiValuePtr o;
+    aError = DsAddressable::checkParam(aParams, "timeout", o);
+    if (Error::isOK(aError)) {
+      mDebuggerTimeout = o->doubleValue()*Second;
+      setDebugging(true);
+      debuggerWatchdog();
+    }
+    return true;
+  }
+  else if (aMethod=="x-p44-scriptContinue") {
     ApiValuePtr o;
     aError = DsAddressable::checkParam(aParams, "threadid", o);
     if (Error::isOK(aError)) {
+      debuggerWatchdog();
       ScriptCodeThreadPtr thread = pausedThreadById(o->int32Value());
       if (!thread) {
         aError = Error::err<VdcApiError>(404, "no such thread");
@@ -1482,6 +1516,7 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
     ApiValuePtr o;
     aError = DsAddressable::checkParam(aParams, "scriptsourceuid", o);
     if (Error::isOK(aError)) {
+      debuggerWatchdog();
       ScriptHostPtr script = domain().getHostByUid(o->stringValue());
       if (!script) {
         aError = Error::err<VdcApiError>(404, "no such script");
@@ -1505,12 +1540,20 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
             result = new ErrorValue(aError);
           }
           else {
-            ScriptObjPtr result = script->runCommand(c);
-            o = aParams->newObject();
-            P44ScriptManager::setResultAndPosInfo(o, result, nullptr);
+            o = aParams->get("evalresult");
+            ScriptObjPtr result;
+            if (o && o->boolValue()) {
+              // run the script and capture the final evaluation result
+              script->runCommand(c, boost::bind(&P44ScriptManager::scriptResultReport, this, aRequest, _1), nullptr);
+            }
+            else {
+              // run the script and have its content see the result via default result handler set in scripthost
+              ScriptObjPtr result = script->runCommand(c);
+              ApiValuePtr ans = aParams->newObject();
+              scriptResultReport(aRequest, result);
+            }
           }
-          aRequest->sendResult(o);
-          aError.reset(); // result already sent
+          aError.reset(); // result already sent or will be sent later
         }
       }
     }
@@ -1522,6 +1565,7 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
     ApiValuePtr o;
     aError = DsAddressable::checkParam(aParams, "scriptcode", o);
     if (Error::isOK(aError)) {
+      debuggerWatchdog();
       string code = trimWhiteSpace(o->stringValue());
       ScriptCodeThreadPtr thread;
       ScriptCodeContextPtr ctx;
@@ -1555,9 +1599,11 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
       if (o) maxRunTime = o->doubleValue()<0 ? Infinite : o->doubleValue()*Second;
       if (Error::isOK(aError)) {
         if (code.empty()) {
-          scriptExecHandler(aRequest, new AnnotatedNullValue("nothing to execute"));
+          scriptResultReport(aRequest, new AnnotatedNullValue("nothing to execute"));
         }
         else {
+          // use domain's default context if none set
+          if (!ctx) ctx = domain().newContext(); // independent context
           // non-debuggable source container (text not available to IDE editor)
           SourceContainerPtr source = new SourceContainer("scriptExec", this, code);
           // get the main context
@@ -1570,13 +1616,13 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
           ScriptObjPtr res = compiler.compile(source, compiledcode, flags, mctx);
           if (res->isErr()) {
             // compiler error
-            scriptExecHandler(aRequest, res);
+            scriptResultReport(aRequest, res);
           }
           else {
             // now execute the code in the very context
             ctx->execute(
               compiledcode, flags,
-              boost::bind(&P44ScriptManager::scriptExecHandler, this, aRequest, _1),
+              boost::bind(&P44ScriptManager::scriptResultReport, this, aRequest, _1),
               nullptr, // not chained
               thread ? thread->threadLocals() : nullptr, // also see into the current thread's threadvars
               maxRunTime // run time limit
@@ -1592,370 +1638,12 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
 }
 
 
-void P44ScriptManager::scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
+void P44ScriptManager::scriptResultReport(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
 {
   ApiValuePtr ans = aRequest->newApiValue();
   setResultAndPosInfo(ans, aResult);
   aRequest->sendResult(ans);
 }
-
-
-
-#ifdef _DUMMY2
-
-  /* from vdchost.cpp
-  if (aMethod=="x-p44-scriptExec") {
-    // direct execution of a script command line in the common main/initscript context
-    ApiValuePtr o = aParams->get("script");
-    if (o) {
-      ScriptHost src(sourcecode|regular|keepvars|concurrently|ephemeralSource, "scriptExec/REPL", nullptr , this);
-      src.setSource(o->stringValue());
-      src.setSharedMainContext(mVdcHostScriptContext);
-      src.registerUnstoredScript("scriptExec");
-      src.run(inherit, boost::bind(&VdcHost::scriptExecHandler, this, aRequest, _1));
-    }
-    else {
-      aRequest->sendStatus(NULL); // no script -> NOP
-    }
-    return ErrorPtr();
-  }
-  if (aMethod=="x-p44-restartMain") {
-    // re-run the main script
-    OLOG(LOG_NOTICE, "Re-starting global main script");
-    mMainScript.run(stopall, boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel(), ""), ScriptObjPtr(), Infinite);
-    return Error::ok();
-  }
-  if (aMethod=="x-p44-stopMain") {
-    // stop the main script
-    OLOG(LOG_NOTICE, "Stopping global main script");
-    mVdcHostScriptContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "main script stopped"));
-    return Error::ok();
-  }
-  if (aMethod=="x-p44-checkMain") {
-    // check the main script for syntax errors (but do not re-start it)
-    ScriptObjPtr res = mMainScript.syntaxcheck();
-    ApiValuePtr checkResult = aRequest->newApiValue();
-    checkResult->setType(apivalue_object);
-    if (!res || !res->isErr()) {
-      OLOG(LOG_NOTICE, "Checked global main script: syntax OK");
-      checkResult->add("result", checkResult->newNull());
-    }
-    else {
-      OLOG(LOG_NOTICE, "Error in global main script: %s", res->errorValue()->text());
-      checkResult->add("error", checkResult->newString(res->errorValue()->getErrorMessage()));
-      SourceCursor* cursor = res->cursor();
-      if (cursor) {
-        checkResult->add("at", checkResult->newUint64(cursor->textpos()));
-        checkResult->add("line", checkResult->newUint64(cursor->lineno()));
-        checkResult->add("char", checkResult->newUint64(cursor->charpos()));
-      }
-    }
-    aRequest->sendResult(checkResult);
-    return ErrorPtr();
-  }
-
-
-  /* from localcontroller */
-
-  {
-  if (aMethod=="x-p44-queryScenes") {
-    // query scenes usable for a zone/group combination
-    ApiValuePtr o;
-    aError = DsAddressable::checkParam(aParams, "zoneID", o);
-    if (Error::isOK(aError)) {
-     DsZoneID zoneID = (DsZoneID)o->uint16Value();
-     // get zone
-     ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
-     if (!zone) {
-       aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
-     }
-     else {
-       aError = DsAddressable::checkParam(aParams, "group", o);
-       if (Error::isOK(aError) || zoneID==zoneId_global) {
-         DsGroup group = zoneID==zoneId_global ? group_undefined : (DsGroup)o->uint16Value();
-         // optional scene kind flags
-         SceneKind required = scene_preset;
-         SceneKind forbidden = scene_extended|scene_area;
-         o = aParams->get("required"); if (o) { forbidden = 0; required = o->uint32Value(); } // no auto-exclude when explicitly including
-         o = aParams->get("forbidden"); if (o) forbidden = o->uint32Value();
-         // query possible scenes for this zone/group
-         SceneIdsVector scenes = zone->getZoneScenes(group, required, forbidden);
-         // create answer object
-         ApiValuePtr result = aRequest->newApiValue();
-         result->setType(apivalue_object);
-         for (size_t i = 0; i<scenes.size(); ++i) {
-           ApiValuePtr s = result->newObject();
-           s->add("id", s->newString(scenes[i].stringId()));
-           s->add("no", s->newUint64(scenes[i].mSceneNo));
-           s->add("name", s->newString(scenes[i].getName()));
-           s->add("action", s->newString(scenes[i].getActionName()));
-           s->add("kind", s->newUint64(scenes[i].getKindFlags()));
-           result->add(string_format("%zu", i), s);
-         }
-         aRequest->sendResult(result);
-         aError.reset(); // make sure we don't send an extra ErrorOK
-       }
-     }
-    }
-    return true;
-  }
-  else if (aMethod=="x-p44-queryGroups") {
-   // query groups that are in use (in a zone or globally)
-   DsGroupMask groups = 0;
-   ApiValuePtr o = aParams->get("zoneID");
-   if (o) {
-     // specific zone
-     DsZoneID zoneID = (DsZoneID)o->uint16Value();
-     ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
-     if (!zone) {
-       aError = WebError::webErr(400, "Zone %d not found (never used, no devices)", (int)zoneID);
-       return true;
-     }
-     groups = zone->getZoneGroups();
-   }
-   else {
-     // globally
-     for (DsDeviceMap::iterator pos = mVdcHost.mDSDevices.begin(); pos!=mVdcHost.mDSDevices.end(); ++pos) {
-       OutputBehaviourPtr ob = pos->second->getOutput();
-       if (ob) groups |= ob->groupMemberships();
-     }
-   }
-   bool allGroups = false;
-   o = aParams->get("all"); if (o) allGroups = o->boolValue();
-   if (!allGroups) groups = standardRoomGroups(groups);
-   // create answer object
-   ApiValuePtr result = aRequest->newApiValue();
-   result->setType(apivalue_object);
-   for (int i = 0; i<64; ++i) {
-     if (groups & (1ll<<i)) {
-       const GroupDescriptor* gi = groupInfo((DsGroup)i);
-       ApiValuePtr g = result->newObject();
-       g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
-       g->add("kind", g->newUint64(gi ? gi->kind : 0));
-       g->add("color", g->newString(string_format("#%06X", gi ? gi->hexcolor : 0x999999)));
-       result->add(string_format("%d", i), g);
-     }
-   }
-   aRequest->sendResult(result);
-   aError.reset(); // make sure we don't send an extra ErrorOK
-   return true;
-  }
-  else if (aMethod=="x-p44-checkTriggerCondition" || aMethod=="x-p44-testTriggerAction" || aMethod=="x-p44-stopTriggerAction") {
-   // check the trigger condition of a trigger
-   ApiValuePtr o;
-   aError = DsAddressable::checkParam(aParams, "triggerID", o);
-   if (Error::isOK(aError)) {
-     int triggerId = o->int32Value();
-     TriggerPtr trig = mLocalTriggers.getTrigger(triggerId);
-     if (!trig) {
-       aError = WebError::webErr(400, "Trigger %d not found", triggerId);
-     }
-     else {
-       if (aMethod=="x-p44-testTriggerAction") {
-         ScriptObjPtr triggerParam;
-         ApiValuePtr o = aParams->get("triggerParam");
-         if (o) {
-           // has a trigger parameter
-           triggerParam = new StringValue(o->stringValue());
-         }
-         trig->handleTestActions(aRequest, triggerParam); // asynchronous!
-       }
-       else if (aMethod=="x-p44-stopTriggerAction") {
-         trig->stopActions();
-         aError = Error::ok();
-       }
-       else {
-         aError = trig->handleCheckCondition(aRequest);
-       }
-     }
-   }
-   return true;
-  }
-  else {
-   return false; // unknown at the localController level
-  }
-}
-
-
-#endif // _DUMMY2
-
-
-
-#ifdef _DUMMY
-
-// Evaluator Action
-
-// - x-p44-testEvaluatorAction
-
-else if (aMethod=="x-p44-testEvaluatorAction") {
-  ApiValuePtr vp = aParams->get("result");
-  Tristate state = mEvaluatorState;
-  if (vp) {
-    state = vp->boolValue() ? yes : no;
-  }
-  // now test
-  evaluatorSettings()->mEvaluatorContext->setMemberByName("result", new BoolValue(state==yes));
-  evaluatorSettings()->mAction.run(stopall, boost::bind(&EvaluatorDevice::testActionExecuted, this, aRequest, _1), ScriptObjPtr(), Infinite);
-  return ErrorPtr();
-}
-
-// - x-p44-stopEvaluatorAction
-
-else if (aMethod=="x-p44-stopEvaluatorAction") {
-  evaluatorSettings()->mEvaluatorContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "evaluator action stopped"));
-  return Error::ok();
-}
-
-
-void EvaluatorDevice::testActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
-{
-  ApiValuePtr testResult = aRequest->newApiValue();
-  testResult->setType(apivalue_object);
-  if (!aResult->isErr()) {
-    testResult->add("result", testResult->newScriptValue(aResult));
-  }
-  else {
-    testResult->add("error", testResult->newString(aResult->errorValue()->getErrorMessage()));
-    SourceCursor* cursor = aResult->cursor();
-    if (cursor) {
-      testResult->add("at", testResult->newUint64(cursor->textpos()));
-      testResult->add("line", testResult->newUint64(cursor->lineno()));
-      testResult->add("char", testResult->newUint64(cursor->charpos()));
-    }
-  }
-  aRequest->sendResult(testResult);
-}
-
-
-// Scripted Device Implementation
-
-// - x-p44-restartImpl
-
-if (aMethod=="x-p44-restartImpl") {
-  // re-run the device implementation script
-  restartImplementation();
-  return Error::ok();
-}
-
-
-
-
-// - x-p44-checkImpl
-
-if (aMethod=="x-p44-checkImpl") {
-  // check the implementation script for syntax errors (but do not re-start it)
-  ScriptObjPtr res = mImplementation.mScript.syntaxcheck();
-  ApiValuePtr checkResult = aRequest->newApiValue();
-  checkResult->setType(apivalue_object);
-  if (!res || !res->isErr()) {
-    OLOG(LOG_NOTICE, "Checked implementation script: syntax OK");
-    checkResult->add("result", checkResult->newNull());
-  }
-  else {
-    OLOG(LOG_NOTICE, "Error in implementation: %s", res->errorValue()->text());
-    checkResult->add("error", checkResult->newString(res->errorValue()->getErrorMessage()));
-    SourceCursor* cursor = res->cursor();
-    if (cursor) {
-      checkResult->add("at", checkResult->newUint64(cursor->textpos()));
-      checkResult->add("line", checkResult->newUint64(cursor->lineno()));
-      checkResult->add("char", checkResult->newUint64(cursor->charpos()));
-    }
-  }
-  aRequest->sendResult(checkResult);
-  return ErrorPtr();
-}
-
-// - x-p44-stopImpl
-
-if (aMethod=="x-p44-stopImpl") {
-  // stop the device implementation script
-  stopImplementation();
-  return Error::ok();
-}
-
-
-
-void ScriptedDevice::restartImplementation()
-{
-  OLOG(LOG_NOTICE, "(Re-)starting device implementation script");
-  mImplementation.mRestartTicket.cancel();
-  mImplementation.mContext->clearVars(); // clear vars and (especially) context local handlers
-  mImplementation.mScript.run(stopall, boost::bind(&ScriptedDevice::implementationEnds, this, _1), ScriptObjPtr(), Infinite);
-}
-
-
-void ScriptedDevice::stopImplementation()
-{
-  OLOG(LOG_NOTICE, "Stopping device implementation script");
-  mImplementation.mRestartTicket.cancel();
-  if (!mImplementation.mContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "device implementation script stopped"))) {
-    // nothing to abort, make sure handlers are gone (otherwise, they will get cleared in implementationEnds())
-    mImplementation.mContext->clearVars();
-  }
-}
-
-
-
-// Scene:
-
-// - start: just callScene()
-
-// - stop Scene
-
-void OutputBehaviour::stopSceneActions()
-{
-  #if ENABLE_SCENE_SCRIPT
-  mDevice.getDeviceScriptContext()->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
-  #endif // ENABLE_SCENE_SCRIPT
-}
-
-
-// Trigger:
-
-// - x-p44-testTriggerAction
-
-ErrorPtr Trigger::handleTestActions(VdcApiRequestPtr aRequest, ScriptObjPtr aTriggerParam)
-{
-  ScriptObjPtr threadLocals;
-  if (aTriggerParam) {
-    threadLocals = new SimpleVarContainer();
-    threadLocals->setMemberByName("triggerparam", aTriggerParam);
-  }
-  mTriggerAction.run(stopall, boost::bind(&Trigger::testTriggerActionExecuted, this, aRequest, _1), threadLocals, Infinite);
-  return ErrorPtr(); // will send result later
-}
-
-
-void Trigger::testTriggerActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
-{
-  ApiValuePtr testResult = aRequest->newApiValue();
-  testResult->setType(apivalue_object);
-  if (!aResult->isErr()) {
-    testResult->add("result", testResult->newScriptValue(aResult));
-  }
-  else {
-    testResult->add("error", testResult->newString(aResult->errorValue()->getErrorMessage()));
-    SourceCursor* cursor = aResult->cursor();
-    if (cursor) {
-      testResult->add("at", testResult->newUint64(cursor->textpos()));
-      testResult->add("line", testResult->newUint64(cursor->lineno()));
-      testResult->add("char", testResult->newUint64(cursor->charpos()));
-    }
-  }
-  aRequest->sendResult(testResult);
-}
-
-
-// - x-p44-stopTriggerAction
-
-void Trigger::stopActions()
-{
-  mTriggerContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "trigger action stopped"));
-}
-
-
-#endif // _DUMMY
-
 
 
 #endif // P44SCRIPT_REGISTERED_SOURCE
