@@ -142,7 +142,7 @@ namespace p44 {
   };
 
 
-  /// Implements the behaviour of a digitalSTROM video device
+  /// Implements the behaviour of a Digital Strom video device
   class VideoBehaviour : public OutputBehaviour
   {
     typedef OutputBehaviour inherited;
@@ -188,7 +188,7 @@ namespace p44 {
     bool knownPaused; ///< paused
 
 
-    /// @name interaction with digitalSTROM system
+    /// @name interaction with Digital Strom system
     /// @{
 
     /// check for presence of model feature (flag in dSS visibility matrix)

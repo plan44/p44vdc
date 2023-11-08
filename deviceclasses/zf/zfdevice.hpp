@@ -61,7 +61,7 @@ namespace p44 {
 
 
 
-  /// digitalstrom device representing one or multiple ZF device channels
+  /// Digital Strom device representing one or multiple ZF device channels
   class ZfDevice : public Device
   {
     typedef Device inherited;

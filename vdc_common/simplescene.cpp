@@ -199,20 +199,20 @@ typedef struct {
 
 // General rules
 
-//  Rule 1 A digitalSTROM Ready Device has to be preconfigured in the right functional group. This is essential to ensure that all electrical devices in one functional group can be orchestrated together.
-//  Rule 2 A digitalSTROM Ready Device must be configured for exactly one digitalSTROM functional group. The assigned functional group must be non- ambiguous and is part of the static device configuration (see Function-ID 9.4).
+//  Rule 1 A Digital Strom Ready Device has to be preconfigured in the right functional group. This is essential to ensure that all electrical devices in one functional group can be orchestrated together.
+//  Rule 2 A Digital Strom Ready Device must be configured for exactly one Digital Strom functional group. The assigned functional group must be non- ambiguous and is part of the static device configuration (see Function-ID 9.4).
 //  Rule 3 The function of a devices output is the basis of its group member- ship. For devices without actuator the target function of the switch button decides about the group membership.
-//  Rule 4 digitalSTROM Devices have to implement a default behavior for all 128 scene commands. The system behavior and default values are defined in the particular documents for each functional group.
-//  Rule 5 When applications send a scene command to a set of digitalSTROM Devices with more than one target device they have to use scene calls di- rected to a group, splitting into multiple calls to single devices has to be avoided due to latency and statemachine consistency issues.
+//  Rule 4 Digital Strom Devices have to implement a default behavior for all 128 scene commands. The system behavior and default values are defined in the particular documents for each functional group.
+//  Rule 5 When applications send a scene command to a set of Digital Strom Devices with more than one target device they have to use scene calls di- rected to a group, splitting into multiple calls to single devices has to be avoided due to latency and statemachine consistency issues.
 
-//  Rule 6 digitalSTROM Ready Devices must ignore stepping commands if their output value is zero.
+//  Rule 6 Digital Strom Ready Devices must ignore stepping commands if their output value is zero.
 
-//  Rule 7 digitalSTROM Device have to complete the identification action on the command Programming Mode Start within 4 seconds.
+//  Rule 7 Digital Strom Device have to complete the identification action on the command Programming Mode Start within 4 seconds.
 //  Rule 8 Application processes that do automatic cyclic reads or writes of device parameters are subject to a request limit: at maximum one request per minute and circuit is allowed.
 //  Rule 9 Application processes that do automatic cyclic reads of measured values are subject to a request limit: at maximum one request per minute and circuit is allowed.
 //  Rule 10 The action command "SetOutputValue" must not be used for other than device configuration purposes.
-//  Rule 11 digitalSTROM Ready Devices must not send upstream events continously and must stop sending Low-Level-Event data even if the event is still or repeatedly valid. Transmission of pushbutton events must be abondoned after a maximum time of 2.5 minutes. Automatically genereated events must not exceed a rate limit of 5 events per 5 minutes.
-//  Rule 12 Applications shall use the digitalSTROM Server webservice inter- face for communication with the digitalSTROM system. Directly interfacing the dSM-API shall be avoided because it is an internal interface and its API may change in the future.
+//  Rule 11 Digital Strom Ready Devices must not send upstream events continously and must stop sending Low-Level-Event data even if the event is still or repeatedly valid. Transmission of pushbutton events must be abondoned after a maximum time of 2.5 minutes. Automatically genereated events must not exceed a rate limit of 5 events per 5 minutes.
+//  Rule 12 Applications shall use the Digital Strom Server webservice inter- face for communication with the Digital Strom system. Directly interfacing the dSM-API shall be avoided because it is an internal interface and its API may change in the future.
 
 //  Rule 13 Applications that automatically generate Call Scene action commands (see 5.1.1) must not execute the action commands at a rate faster than one request per second.
 

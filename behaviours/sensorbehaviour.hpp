@@ -90,7 +90,7 @@ namespace p44 {
 
 
 
-  /// Implements the behaviour of a digitalSTROM Sensor. In particular it manages and throttles
+  /// Implements the behaviour of a Digital Strom Sensor. In particular it manages and throttles
   /// pushing updates to the dS upstream, to avoid jitter in hardware reported values to flood
   /// the system with unneded update messages
   class SensorBehaviour :

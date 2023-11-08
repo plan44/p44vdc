@@ -42,7 +42,7 @@ namespace p44 {
   };
   #endif // ENABLE_LOCALCONTROLLER || ENABLE_JSONBRIDGEAPI
 
-  /// Implements the behaviour of a digitalSTROM button, in particular the
+  /// Implements the behaviour of a Digital Strom button, in particular the
   /// state machine which generates the different click types for the dS upstream
   /// from button press + button release events.
   /// This class should be used as-is for any virtual device which represents
@@ -62,7 +62,7 @@ namespace p44 {
   public:
 
     typedef enum {
-      statemachine_standard, ///< digitalSTROM standard button state machine
+      statemachine_standard, ///< Digital Strom standard button state machine
       statemachine_simple, ///< no dimming, only tips, tolerant to missing a pressed/released event sometimes
       statemachine_dimmer ///< primarily dimming, does not generate single clicks (e.g. audio volume button)
     } ButtonStateMachineMode;

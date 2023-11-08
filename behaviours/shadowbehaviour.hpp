@@ -215,7 +215,7 @@ namespace p44 {
   typedef boost::function<void (SimpleCB aDoneCB, int aNewDirection)> MovementChangeCB;
 
 
-  /// Implements the behaviour of a digitalSTROM Light device, such as maintaining the logical brightness,
+  /// Implements the behaviour of a Digital Strom Light device, such as maintaining the logical brightness,
   /// dimming and alert (blinking) functions.
   class ShadowBehaviour : public OutputBehaviour
   {
@@ -324,7 +324,7 @@ namespace p44 {
     /// @}
 
 
-    /// @name interaction with digitalSTROM system
+    /// @name interaction with Digital Strom system
     /// @{
 
     /// check for presence of model feature (flag in dSS visibility matrix)

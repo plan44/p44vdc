@@ -180,7 +180,7 @@ typedef enum {
   num_areas = 4 ///< number of areas (excluding global)
 } DsArea;
 
-typedef uint16_t DsZoneID; ///< digitalSTROM Zone ID (= room ID)
+typedef uint16_t DsZoneID; ///< Digital Strom Zone ID (= room ID)
 typedef enum {
   zoneId_global = 0 ///< global (appartment, all rooms) zone
 } DsZones;

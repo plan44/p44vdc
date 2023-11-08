@@ -73,7 +73,7 @@ namespace p44 {
 
 
 
-  /// digitalstrom device representing one or multiple Eldat device channels
+  /// Digital Strom device representing one or multiple Eldat device channels
   class EldatDevice : public Device
   {
     typedef Device inherited;

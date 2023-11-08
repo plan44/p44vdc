@@ -848,7 +848,7 @@ void ShadowBehaviour::movePaused(MLMicroSeconds aRemainingMoveTime, SimpleCB aAp
 }
 
 
-// MARK: - behaviour interaction with digitalSTROM system
+// MARK: - behaviour interaction with Digital Strom system
 
 
 void ShadowBehaviour::loadChannelsFromScene(DsScenePtr aScene)

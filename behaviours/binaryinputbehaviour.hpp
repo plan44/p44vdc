@@ -32,7 +32,7 @@ namespace p44 {
   typedef uint8_t InputState;
 
 
-  /// Implements the behaviour of a digitalSTROM binary input
+  /// Implements the behaviour of a Digital Strom binary input
   /// This class should be used as-is in virtual devices representing binary inputs
   class BinaryInputBehaviour :
     public DsBehaviour

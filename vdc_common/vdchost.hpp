@@ -74,7 +74,7 @@ namespace p44 {
   typedef uint8_t RescanMode;
 
 
-  /// persistence for digitalSTROM paramters
+  /// persistence for Digital Strom paramters
   class DsParamStore : public ParamStore
   {
     typedef ParamStore inherited;

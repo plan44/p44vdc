@@ -280,7 +280,7 @@ namespace p44 {
     /// @}
 
 
-    /// @name interaction with digitalSTROM system
+    /// @name interaction with Digital Strom system
     /// @{
 
     /// get the identifier (unique within this device instance)

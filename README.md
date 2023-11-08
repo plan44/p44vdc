@@ -4,7 +4,7 @@ p44vdc
 
 *[[if you want to support p44vdc development, please consider to sponsor plan44]](https://github.com/sponsors/plan44)* 
 
-"p44vdc" is a a free (opensource, GPLv3) framework of C++ source files, which is used to build virtual device connectors (vdcs) for digitalSTROM systems.
+"p44vdc" is a a free (opensource, GPLv3) framework of C++ source files, which is used to build virtual device connectors (vdcs) for Digital Strom systems.
 
 "p44vdc" was extracted as a submodule from the ["vdcd" (virtual device connector daemon) project](https://github.com/plan44/vdcd), of which it is an essential part.
 
@@ -25,7 +25,7 @@ If that's a problem for your particular application, I am open to provide a comm
 Features
 --------
 
-- Implements the complete digitalSTROM vDC API including behaviours for buttons, binary inputs, lights, color lights, sensors, heating valves and shadow blinds.
+- Implements the complete Digital Strom vDC API including behaviours for buttons, binary inputs, lights, color lights, sensors, heating valves and shadow blinds.
 - Provides the *plan44 vdcd external device API* for easily building custom devices as external scripts or programs, or implemented in the built-in [p44script](https://plan44.ch/p44-techdocs/en/script_ref/) language.
 - Supports EnOcean TCM310 based gateway modules, connected via serial port or network
 - Supports Philips hue lights via the hue bridge and its JSON API

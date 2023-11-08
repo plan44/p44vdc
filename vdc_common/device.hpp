@@ -87,7 +87,7 @@ namespace p44 {
   typedef boost::function<void (NotificationType aNotificationToApply)> PreparedCB;
 
 
-  /// base class representing a virtual digitalSTROM device.
+  /// base class representing a virtual Digital Strom device.
   /// For each type of subsystem (EnOcean, DALI, ...) this class is subclassed to implement
   /// the vDC' specifics, in particular the interface with the hardware.
   class Device : public DsAddressable

@@ -447,7 +447,7 @@ Tristate VideoBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 
 
 
-// MARK: - behaviour interaction with digitalSTROM system
+// MARK: - behaviour interaction with Digital Strom system
 
 
 #define AUTO_OFF_FADE_TIME (1800*Second)

@@ -282,7 +282,7 @@ namespace p44 {
     /// @}
 
 
-    /// @name interaction with digitalSTROM system
+    /// @name interaction with Digital Strom system
     /// @{
 
     /// check for presence of model feature (flag in dSS visibility matrix)

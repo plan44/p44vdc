@@ -130,7 +130,7 @@ namespace p44 {
   };
 
 
-  /// Implements the behaviour of a digitalSTROM Audio device
+  /// Implements the behaviour of a Digital Strom Audio device
   class AudioBehaviour : public OutputBehaviour
   {
     typedef OutputBehaviour inherited;
@@ -174,7 +174,7 @@ namespace p44 {
     bool knownPaused; ///< paused
 
 
-    /// @name interaction with digitalSTROM system
+    /// @name interaction with Digital Strom system
     /// @{
 
     /// check for presence of model feature (flag in dSS visibility matrix)

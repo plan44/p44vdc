@@ -126,7 +126,7 @@ namespace p44 {
 
   typedef boost::intrusive_ptr<EnoceanDevice> EnoceanDevicePtr;
 
-  /// digitalstrom device representing one or multiple EnOcean device channels
+  /// Digital Strom device representing one or multiple EnOcean device channels
   class EnoceanDevice : public Device
   {
     typedef Device inherited;

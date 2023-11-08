@@ -114,7 +114,7 @@ namespace p44 {
     VdcOutputMode actualOutputMode();
 
     /// push current output state (outputState and channelStates)
-    /// @param aDS push to digitalstrom (probably will never be used, because they do not bother to support it)
+    /// @param aDS push to Digital Strom (probably will never be used, because they do not bother to support it)
     /// @param aBridges push to bridge API clients
     /// @return true if requested pushes could be done (or none are requested at all)
     bool pushOutputState(bool aDS, bool aBridges);
@@ -170,7 +170,7 @@ namespace p44 {
     /// @}
 
 
-    /// @name interaction with digitalSTROM system
+    /// @name interaction with Digital Strom system
     /// @{
 
     /// check group membership

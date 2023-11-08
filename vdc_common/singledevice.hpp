@@ -725,7 +725,7 @@ namespace p44 {
 
 
 
-  /// class representing a digitalSTROM "single" device.
+  /// class representing a Digital Strom "single" device.
   /// This is a device which is normally not used in zone/group context and thus
   /// usually not (very much) using scenes. It provides "actions" and "states"
   /// to provide access to its features.
