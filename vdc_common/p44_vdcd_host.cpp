@@ -1162,7 +1162,7 @@ void P44ScriptManager::setDebugging(bool aDebug)
     mScriptingDomain->setDefaultPausingMode(aDebug ? breakpoint : nopause);
     // restart all paused threads
     if (!aDebug) {
-      OLOG(LOG_WARNING, "Debugging mode disabled: all paused threads are restarted now");
+      OLOG(LOG_WARNING, "Debugging mode disabled: all paused threads continue running now");
       while (mPausedThreads.size()>0) {
         PausedThreadsVector::iterator pos = mPausedThreads.begin();
         pos->mThread->continueWithMode(nopause);
@@ -1215,12 +1215,14 @@ enum {
   contextname_key,
   logprefix_key,
   unstored_key,
+  breakpoints_key,
   numScriptHostProperties
 };
 
 static char scripthostslist_key;
 static char scripthost_key;
 
+static char breakpoints_list_key;
 
 enum {
   // thread level properties
@@ -1243,6 +1245,11 @@ int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
   if (aParentDescriptor->hasObjectKey(scripthostslist_key)) {
     // script host container
     return static_cast<int>(domain().numRegisteredHosts());
+  }
+  else if (aParentDescriptor->hasObjectKey(breakpoints_list_key)) {
+    // breakpoints
+    ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->parentDescriptor->fieldKey());
+    return static_cast<int>(host->breakpoints().size());
   }
   else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
     // paused threads list
@@ -1270,6 +1277,50 @@ PropertyContainerPtr P44ScriptManager::getContainer(const PropertyDescriptorPtr 
 }
 
 
+PropertyDescriptorPtr P44ScriptManager::getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor)
+{
+  if (aParentDescriptor->hasObjectKey(breakpoints_list_key)) {
+    // array-like container
+    PropertyDescriptorPtr propDesc;
+    bool lineNoSpecified = getNextPropIndex(aPropMatch, aStartIndex);
+    int n = numProps(aDomain, aParentDescriptor);
+    if (lineNoSpecified || (aStartIndex!=PROPINDEX_NONE && aStartIndex<n)) {
+      int lineNo;
+      if (lineNoSpecified) {
+        // what we scanned as startindex is the lineNo
+        lineNo = aStartIndex;
+        aStartIndex = 0;
+      }
+      else {
+        ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->parentDescriptor->fieldKey());
+        DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+        // Note: we need to enumerate the set, so we must convert it to a vector here, which is
+        //   acceptable when assuming a small number of breakpoints (which IS realistic)
+        vector<int> bpVec(host->breakpoints().begin(), host->breakpoints().end());
+        lineNo = bpVec[aStartIndex];
+      }
+      DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
+      descP->propertyName = string_format("%d", lineNo); // name of the breakpoint is the line
+      descP->propertyType = aParentDescriptor->type();
+      descP->propertyFieldKey = lineNo; // key is the line number (by which we can easily obtain true or false value)
+      descP->propertyObjectKey = aParentDescriptor->objectKey();
+      propDesc = PropertyDescriptorPtr(descP);
+      // advance index
+      aStartIndex++;
+    }
+    if (aStartIndex>=n || lineNoSpecified) {
+      // no more descriptors OR specific descriptor accessed -> no "next" descriptor
+      aStartIndex = PROPINDEX_NONE;
+    }
+    return propDesc;
+  }
+  // None of the containers within Device - let base class handle Device-Level properties
+  return inherited::getDescriptorByName(aPropMatch, aStartIndex, aDomain, aMode, aParentDescriptor);
+}
+
+
+
+
 PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   // scriptmanager level properties
@@ -1289,6 +1340,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     { "contextname", apivalue_string, contextname_key, OKEY(scripthost_key) },
     { "logprefix", apivalue_string, logprefix_key, OKEY(scripthost_key) },
     { "unstored", apivalue_bool, unstored_key, OKEY(scripthost_key) },
+    { "breakpoints", apivalue_bool+propflag_container, breakpoints_key, OKEY(breakpoints_list_key) },
   };
   // pausedthread level properties
   static const PropertyDescription pausedthreadProperties[numPausedThreadProperties] = {
@@ -1403,6 +1455,24 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
       }
     }
   }
+  else if (aPropertyDescriptor->hasObjectKey(breakpoints_list_key)) {
+    ScriptHostPtr host = domain().getHostByIndex(aPropertyDescriptor->parentDescriptor->parentDescriptor->  fieldKey());
+    size_t line = aPropertyDescriptor->fieldKey();
+    if (aMode==access_read) {
+      // breakpoint
+      if (host->breakpoints().find(line)!=host->breakpoints().end()) {
+        aPropValue->setBoolValue(true);
+        return true;
+      }
+      return false;
+    }
+    else {
+      // write breakpoint flag on line
+      if (aPropValue->boolValue()) host->breakpoints().insert(line);
+      else host->breakpoints().erase(line);
+      return true;
+    }
+  }
   else if (aPropertyDescriptor->hasObjectKey(pausedthread_key)) {
     // paused thread level property
     // - get the paused thread
@@ -1486,6 +1556,7 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
       mDebuggerTimeout = o->doubleValue()*Second;
       setDebugging(true);
       debuggerWatchdog();
+      aError = Error::ok(); // ok answer right now
     }
     return true;
   }
