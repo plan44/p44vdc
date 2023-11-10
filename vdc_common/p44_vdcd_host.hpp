@@ -345,6 +345,8 @@ namespace p44 {
 
     MLMicroSeconds mDebuggerTimeout; ///< how long the debugger remains active without getting any of the script manager calls
     MLTicket mDebuggerTimer; ///< timer that will stop the debugger when no longer connected
+    
+    string mCollectedLogText; ///< log line collector for debugger
 
   public:
 
@@ -384,7 +386,7 @@ namespace p44 {
     ScriptCodeThreadPtr pausedThreadById(int aThreadId);
     void removePausedThread(ScriptCodeThreadPtr aThread);
     void scriptResultReport(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
-
+    void logCollectHandler(int aLevel, const char *aLinePrefix, const char *aLogMessage);
 
   };
   typedef boost::intrusive_ptr<P44ScriptManager> P44ScriptManagerPtr;

@@ -190,7 +190,7 @@ P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) 
   mScriptManager = new P44ScriptManager(&StandardScriptingDomain::sharedDomain());
   StandardScriptingDomain::setStandardScriptingDomain(&(mScriptManager->domain()));
   // playground script in vdc host script (mainscript) context
-  mPlayground.setScriptHostUid("p44script_playground");
+  mPlayground.setScriptHostUid("p44script_playground", true); // unstored
   mPlayground.setSharedMainContext(mVdcHostScriptContext);
   mPlayground.loadSource();
   #endif // P44SCRIPT_REGISTERED_SOURCE
@@ -1160,8 +1160,15 @@ void P44ScriptManager::setDebugging(bool aDebug)
   if (!mScriptingDomain) return;
   if (aDebug!=isDebugging()) {
     mScriptingDomain->setDefaultPausingMode(aDebug ? breakpoint : nopause);
-    // restart all paused threads
-    if (!aDebug) {
+    if (aDebug) {
+      // enable log collector
+      SETLOGHANDLER(boost::bind(&P44ScriptManager::logCollectHandler, this, _1, _2, _3), true);
+    }
+    else {
+      // disable log collector
+      SETLOGHANDLER(NoOP, true);
+      mCollectedLogText.clear(); // free the storage
+      // restart all paused threads
       OLOG(LOG_WARNING, "Debugging mode disabled: all paused threads continue running now");
       while (mPausedThreads.size()>0) {
         PausedThreadsVector::iterator pos = mPausedThreads.begin();
@@ -1171,6 +1178,22 @@ void P44ScriptManager::setDebugging(bool aDebug)
     }
   }
 }
+
+
+#define MAX_COLLECTED_LOG_SIZE 30000
+#define OVERFLOW_CUT_SIZE 5000
+
+void P44ScriptManager::logCollectHandler(int aLevel, const char *aLinePrefix, const char *aLogMessage)
+{
+  mCollectedLogText += aLinePrefix;
+  mCollectedLogText += aLogMessage;
+  mCollectedLogText += "\n";
+  if (mCollectedLogText.size()>MAX_COLLECTED_LOG_SIZE) {
+    mCollectedLogText.erase(0,OVERFLOW_CUT_SIZE);
+    mCollectedLogText.insert(0, "\n...overflow - some lines lost...\n");
+  }
+}
+
 
 
 void P44ScriptManager::setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjPtr aResult, const SourceCursor* aCursorP)
@@ -1199,6 +1222,8 @@ enum {
   sources_key,
   pausedthreads_key,
   debugging_key,
+  logtext_key,
+  loglevel_key,
   numScriptManagerProperties
 };
 
@@ -1249,7 +1274,7 @@ int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
   else if (aParentDescriptor->hasObjectKey(breakpoints_list_key)) {
     // breakpoints
     ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->parentDescriptor->fieldKey());
-    return static_cast<int>(host->breakpoints().size());
+    return static_cast<int>(host->numBreakPoints());
   }
   else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
     // paused threads list
@@ -1296,7 +1321,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByName(string aPropMatch, i
         DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
         // Note: we need to enumerate the set, so we must convert it to a vector here, which is
         //   acceptable when assuming a small number of breakpoints (which IS realistic)
-        vector<int> bpVec(host->breakpoints().begin(), host->breakpoints().end());
+        vector<int> bpVec(host->breakpoints()->begin(), host->breakpoints()->end());
         lineNo = bpVec[aStartIndex];
       }
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
@@ -1329,6 +1354,8 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     { "sources", apivalue_object, sources_key, OKEY(scripthostslist_key) },
     { "pausedthreads", apivalue_object, pausedthreads_key, OKEY(pausedthreadslist_key) },
     { "debugging", apivalue_bool, debugging_key, OKEY(scriptmanager_key) },
+    { "logtext", apivalue_string, logtext_key, OKEY(scriptmanager_key) },
+    { "loglevel", apivalue_int64, loglevel_key, OKEY(scriptmanager_key) },
   };
   // scripthost level properties
   static const PropertyDescription scripthostProperties[numScriptHostProperties] = {
@@ -1393,12 +1420,23 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     // script manager level property
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
-        case debugging_key: aPropValue->setBoolValue(isDebugging()); return true;
+        case debugging_key:
+          aPropValue->setBoolValue(isDebugging());
+          return true;
+        case logtext_key:
+          aPropValue->setStringValue(mCollectedLogText);
+          mCollectedLogText.clear();
+          return true;
+        case loglevel_key:
+          aPropValue->setInt32Value(LOGLEVEL);
+          return true;
       }
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
-        case debugging_key: setDebugging(aPropValue->boolValue()); return true;
+        case debugging_key:
+          setDebugging(aPropValue->boolValue());
+          return true;
       }
     }
   }
@@ -1460,7 +1498,7 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     size_t line = aPropertyDescriptor->fieldKey();
     if (aMode==access_read) {
       // breakpoint
-      if (host->breakpoints().find(line)!=host->breakpoints().end()) {
+      if (host->breakpoints()->find(line)!=host->breakpoints()->end()) {
         aPropValue->setBoolValue(true);
         return true;
       }
@@ -1468,8 +1506,8 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     }
     else {
       // write breakpoint flag on line
-      if (aPropValue->boolValue()) host->breakpoints().insert(line);
-      else host->breakpoints().erase(line);
+      if (aPropValue->boolValue()) host->breakpoints()->insert(line);
+      else host->breakpoints()->erase(line);
       return true;
     }
   }
