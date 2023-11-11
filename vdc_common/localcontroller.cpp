@@ -2204,7 +2204,7 @@ static void sceneno_func(BuiltinFunctionContextPtr f)
     sceneNo = VdcHost::getSceneIdByKind(f->arg(0)->stringValue());
   }
   if (sceneNo!=INVALID_SCENE_NO) {
-    f->finish(new NumericValue(sceneNo));
+    f->finish(new IntegerValue(sceneNo));
   }
   else {
     f->finish(new AnnotatedNullValue("no such scene"));
