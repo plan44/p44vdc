@@ -526,6 +526,66 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         }
       }
       #endif
+      #if ENABLE_LEDCHAIN
+      else if (apiselector=="leddata") {
+        // raw LED data for a LED chain
+        JsonObjectPtr o;
+        if (mLedChainArrangement) {
+          // which view to look at
+          P44ViewPtr view;
+          if (request->get("view", o)) {
+            view = mLedChainArrangement->getRootView()->getView(o->stringValue());
+          }
+          if (!view) {
+            view = mLedChainArrangement->getRootView();
+          }
+          if (request->get("dx", o)) {
+            // specific area from view
+            PixelRect area;
+            area.dx = o->int32Value();
+            area.dy = 1;
+            if (area.dx>0 && area.dy>0) {
+              if (request->get("dy", o)) area.dy = o->int32Value();
+              area.x = 0;
+              if (request->get("x", o)) area.x = o->int32Value();
+              area.y = 0;
+              if (request->get("y", o)) area.y = o->int32Value();
+              string rawrgb;
+              view->ledRGBdata(rawrgb, area);
+              rawrgb += "\n"; // message terminator
+              aJsonComm->sendRaw(rawrgb);
+              return;
+            }
+          }
+          else if (request->get("status", o) && o->boolValue()) {
+            // get view status
+            sendJsonApiResponse(aJsonComm, view->viewStatus(), ErrorPtr(), reqid);
+            return;
+          }
+          else if (request->get("configure", o)) {
+            // configure view
+            aError = Error::ok(view->configureView(o));
+          }
+          else if (request->get("cover", o) && o->boolValue()) {
+            // return the covered area
+            JsonObjectPtr res = JsonObject::newObj();
+            PixelRect cover = mLedChainArrangement->totalCover();
+            res->add("x", JsonObject::newInt32(cover.x));
+            res->add("y", JsonObject::newInt32(cover.y));
+            res->add("dx", JsonObject::newInt32(cover.dx));
+            res->add("dy", JsonObject::newInt32(cover.dy));
+            sendJsonApiResponse(aJsonComm, res, ErrorPtr(), reqid);
+            return;
+          }
+          else {
+            aError = Error::err<P44VdcError>(400, "invalid leddata parameters");
+          }
+        }
+        else {
+          aError = Error::err<P44VdcError>(400, "LED subsystem not initialized");
+        }
+      }
+      #endif
       #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
       else if (apiselector=="scriptapi") {
         // scripted parts of the (web) API

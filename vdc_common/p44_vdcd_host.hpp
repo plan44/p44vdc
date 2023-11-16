@@ -44,6 +44,9 @@
   #define P44SCRIPT_IMPLEMENTED_CUSTOM_API 1
 #endif
 
+#if ENABLE_LEDCHAIN
+  #include "ledchaincomm.hpp"
+#endif
 
 
 using namespace std;
@@ -425,6 +428,10 @@ namespace p44 {
     #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
     ScriptApiLookup mScriptedApiLookup; ///< custom API implemented via p44script, is also the event source for requests
     #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
+
+    #if ENABLE_LEDCHAIN
+    LEDChainArrangementPtr mLedChainArrangement; ///< access to LED chains for LED simulator API
+    #endif
 
     int webUiPort; ///< port number of the web-UI (on the same host). 0 if no Web-UI present
     string webUiPath; ///< path to be used in the webuiURLString
