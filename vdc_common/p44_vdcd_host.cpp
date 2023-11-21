@@ -1378,7 +1378,6 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByName(string aPropMatch, i
       }
       else {
         ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->parentDescriptor->fieldKey());
-        DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
         // Note: we need to enumerate the set, so we must convert it to a vector here, which is
         //   acceptable when assuming a small number of breakpoints (which IS realistic)
         vector<int> bpVec(host->breakpoints()->begin(), host->breakpoints()->end());
