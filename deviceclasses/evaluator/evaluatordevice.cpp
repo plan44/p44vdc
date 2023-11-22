@@ -60,15 +60,20 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   // Config is:
   //  <behaviour mode>
   int st, su;
-  if (aEvaluatorConfig=="rocker")
+  if (aEvaluatorConfig=="rocker") {
     mEvaluatorType = evaluator_rocker;
-  else if (aEvaluatorConfig=="input")
+  }
+  else if (aEvaluatorConfig=="input") {
     mEvaluatorType = evaluator_input;
-  else if (aEvaluatorConfig=="internal" || aEvaluatorConfig=="internalinput") // "internal" must be still recognized for backwards compatibility with existing settings!
+  }
+  else if (aEvaluatorConfig=="internal" || aEvaluatorConfig=="internalinput") {
+    // "internal" must be still recognized for backwards compatibility with existing settings!
     mEvaluatorType = evaluator_internalinput;
+  }
   #if P44SCRIPT_FULL_SUPPORT
-  else if (aEvaluatorConfig=="internalaction")
+  else if (aEvaluatorConfig=="internalaction") {
     mEvaluatorType = evaluator_internalaction;
+  }
   #endif
   else if (sscanf(aEvaluatorConfig.c_str(), "sensor:%d:%d", &st, &su)==2) {
     mEvaluatorType = evaluator_sensor;
@@ -121,6 +126,14 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     s->setHardwareName("calculated sensor result");
     addBehaviour(s);
   }
+  #if P44SCRIPT_FULL_SUPPORT
+  else if (mEvaluatorType==evaluator_internalaction) {
+    // only now that we are actually an action evaluator, activate the script
+    evaluatorSettings()->mAction.activate(scriptbody|regular|keepvars|concurrently, "action", "%C (evaluator action)", this);
+    evaluatorSettings()->mAction.setSharedMainContext(evaluatorSettings()->mEvaluatorContext);
+    evaluatorSettings()->mAction.setScriptCommandHandler(boost::bind(&EvaluatorDevice::actionRun, this, _1, _2));
+  }
+  #endif
   deriveDsUid();
 }
 
@@ -129,7 +142,9 @@ void EvaluatorDevice::willBeAdded()
 {
   // set script ids based on dSUID now
   #if P44SCRIPT_FULL_SUPPORT
-  evaluatorSettings()->mAction.setScriptHostUid(string_format("eval_%s.action", getDsUid().getString().c_str()));
+  if (evaluatorSettings()->mAction.active()) {
+    evaluatorSettings()->mAction.setScriptHostUid(string_format("eval_%s.action", getDsUid().getString().c_str()));
+  }
   #endif
 }
 
@@ -499,6 +514,27 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
 
 #if P44SCRIPT_FULL_SUPPORT
 
+ScriptObjPtr EvaluatorDevice::actionRun(ScriptCommand aScriptCommand, EvaluationCB aScriptResultCB)
+{
+  EvaluationFlags flags = stopall; // main script must always be running only once, so stopping all before start and restart
+  ScriptObjPtr ret;
+  switch(aScriptCommand) {
+    case P44Script::debug:
+      flags |= singlestep;
+    case P44Script::start:
+    case P44Script::restart:
+      ret = evaluatorSettings()->mAction.run(flags, aScriptResultCB, ScriptObjPtr(), Infinite);
+      break;
+    case P44Script::stop:
+      evaluatorSettings()->mEvaluatorContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "evaluator action stopped"));
+      break;
+    default:
+      ret = evaluatorSettings()->mAction.defaultCommandImplementation(aScriptCommand, aScriptResultCB, nullptr);
+  }
+  return ret;
+}
+
+
 void EvaluatorDevice::executeActions()
 {
   evaluatorSettings()->mEvaluatorContext->setMemberByName("result", new BoolValue(mEvaluatorState==yes));
@@ -691,46 +727,13 @@ EvaluatorDeviceSettings::EvaluatorDeviceSettings(EvaluatorDevice &aEvaluator, bo
   // Note: conditions are synchronously evaluated, but action might be running when a condition wants evaluation, so we allow concurrent evaluation in that case
   ,mOnCondition("onCondition", nullptr, &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, true, _1), aIsSensor ? onChange : onChangingBoolRisingHoldoffOnly, Never, expression|synchronously|keepvars|concurrently)
   ,mOffCondition("offCondition", nullptr, &mDevice, boost::bind(&EvaluatorDevice::handleTrigger, &aEvaluator, false, _1), aIsSensor ? inactive : onChangingBoolRisingHoldoffOnly, Never, expression|synchronously|keepvars|concurrently)
-  #if P44SCRIPT_FULL_SUPPORT
-  // Only thing that might run when action tries to run is an earlier invocation of the action.
-  // However this might be a previous on-action, while the new action is a NOP off-action, so both must be allowed to run concurrently
-  ,mAction(scriptbody|regular|keepvars|concurrently, "action", "%C (evaluator action)", &mDevice)
-  #endif
+  // note: action will be activated only later when we know that we are an action evaluator
 {
   mEvaluatorContext = mOnCondition.domain()->newContext(); // common context for triggers and action
   mEvaluatorContext->registerMemberLookup(&aEvaluator.mValueMapper);
   mOnCondition.setSharedMainContext(mEvaluatorContext);
   mOffCondition.setSharedMainContext(mEvaluatorContext);
-  #if P44SCRIPT_FULL_SUPPORT
-  mAction.setSharedMainContext(mEvaluatorContext);
-  mAction.setScriptCommandHandler(boost::bind(&EvaluatorDeviceSettings::actionRun, this, _1, _2));
-  #endif
 }
-
-#if P44SCRIPT_FULL_SUPPORT
-
-ScriptObjPtr EvaluatorDeviceSettings::actionRun(ScriptCommand aScriptCommand, EvaluationCB aScriptResultCB)
-{
-  EvaluationFlags flags = stopall; // main script must always be running only once, so stopping all before start and restart
-  ScriptObjPtr ret;
-  switch(aScriptCommand) {
-    case P44Script::debug:
-      flags |= singlestep;
-    case P44Script::start:
-    case P44Script::restart:
-      ret = mAction.run(flags, aScriptResultCB, ScriptObjPtr(), Infinite);
-      break;
-    case P44Script::stop:
-      mEvaluatorContext->abort(stopall, new ErrorValue(ScriptError::Aborted, "evaluator action stopped"));
-      break;
-    default:
-      ret = mAction.defaultCommandImplementation(aScriptCommand, aScriptResultCB, nullptr);
-  }
-  return ret;
-}
-
-#endif
-
 
 const char *EvaluatorDeviceSettings::tableName()
 {
@@ -778,7 +781,7 @@ void EvaluatorDeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   mOnCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
   mOffCondition.setTriggerHoldoff(aRow->getCastedWithDefault<MLMicroSeconds, long long int>(aIndex++, Never), false); // do not initialize at load yet
   #if P44SCRIPT_FULL_SUPPORT
-  mAction.loadSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
+  if (mAction.active()) mAction.loadSource(nonNullCStr(aRow->get<const char *>(aIndex++)));
   #else
   mOldAction = nonNullCStr(aRow->get<const char *>(aIndex++));
   #endif

@@ -62,10 +62,6 @@ namespace p44 {
     virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
     virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
 
-  private:
-
-    ScriptObjPtr actionRun(ScriptCommand aScriptCommand, EvaluationCB aScriptResultCB);
-
   };
   typedef boost::intrusive_ptr<EvaluatorDeviceSettings> EvaluatorDeviceSettingsPtr;
 
@@ -204,6 +200,7 @@ namespace p44 {
     void executeActions();
     void actionExecuted(ScriptObjPtr aResult);
     void testActionExecuted(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
+    ScriptObjPtr actionRun(ScriptCommand aScriptCommand, EvaluationCB aScriptResultCB);
     #endif // P44SCRIPT_FULL_SUPPORT
 
   };
