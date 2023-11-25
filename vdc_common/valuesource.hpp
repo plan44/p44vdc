@@ -149,7 +149,7 @@ namespace p44 {
     /// @return a souce of events for this object
     virtual EventSource *eventSource() const P44_OVERRIDE;
 
-    virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) P44_OVERRIDE;
+    virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) const P44_OVERRIDE;
 
   };
 

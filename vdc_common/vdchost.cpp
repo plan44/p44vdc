@@ -2473,7 +2473,7 @@ ErrorPtr ScriptApiRequest::sendResult(ApiValuePtr aResult)
   LOG(LOG_DEBUG, "script <- vdcd (JSON) result: %s", aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   #if ENABLE_P44SCRIPT
-  mBuiltinFunctionContext->finish(result ? ScriptObjPtr(new JsonValue(result->jsonObject())) : ScriptObjPtr(new AnnotatedNullValue("no vdcapi result")));
+  mBuiltinFunctionContext->finish(result ? ScriptObj::valueFromJSON(result->jsonObject()) : ScriptObjPtr(new AnnotatedNullValue("no vdcapi result")));
   #else
   ExpressionValue res;
   if (result) {
@@ -2624,7 +2624,7 @@ static void nextversion_func(BuiltinFunctionContextPtr f)
 }
 
 static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
-  { "vdcapi", executable|json, vdcapi_numargs, vdcapi_args, &vdcapi_func },
+  { "vdcapi", executable|structured, vdcapi_numargs, vdcapi_args, &vdcapi_func },
   { "device", executable|any, device_numargs, device_args, &device_func },
   { "valuesource", executable|any, valuesource_numargs, valuesource_args, &valuesource_func },
   { "productversion", executable|text, 0, NULL, &productversion_func },

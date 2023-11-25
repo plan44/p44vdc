@@ -1858,11 +1858,11 @@ static const BuiltinMemberDescriptor answer_desc =
   { "answer", executable|any, answer_numargs, answer_args, &answer_func };
 
 
-const ScriptObjPtr ApiRequestObj::memberByName(const string aName, TypeInfo aMemberAccessFlags)
+const ScriptObjPtr ApiRequestObj::memberByName(const string aName, TypeInfo aMemberAccessFlags) const
 {
   ScriptObjPtr val;
   if (uequals(aName, "answer")) {
-    val = new BuiltinFunctionObj(&answer_desc, this, NULL);
+    val = new BuiltinFunctionObj(&answer_desc, const_cast<ApiRequestObj*>(this), NULL);
   }
   else {
     val = inherited::memberByName(aName, aMemberAccessFlags);
@@ -1880,7 +1880,7 @@ static void webrequest_func(BuiltinFunctionContextPtr f)
 }
 
 static const BuiltinMemberDescriptor scriptApiGlobals[] = {
-  { "webrequest", executable|json|null, 0, NULL, &webrequest_func },
+  { "webrequest", executable|structured|null, 0, NULL, &webrequest_func },
   { NULL } // terminator
 };
 

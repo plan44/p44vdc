@@ -151,7 +151,7 @@ EventSource *ValueSourceObj::eventSource() const
   return mEventSource;
 }
 
-const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMemberAccessFlags)
+const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMemberAccessFlags) const
 {
   ScriptObjPtr val;
   if (uequals(aName, "age")) {

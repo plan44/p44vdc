@@ -249,7 +249,7 @@ void ScriptedDevice::sendDeviceApiJsonMessage(JsonObjectPtr aMessage)
 {
   // now show and send
   OLOG(LOG_INFO, "device <- ScriptedVdc (JSON) message sent: %s", aMessage->c_strValue());
-  sendEvent(new JsonValue(aMessage));
+  sendEvent(ScriptObj::valueFromJSON(aMessage));
 }
 
 

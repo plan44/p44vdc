@@ -299,9 +299,9 @@ namespace p44 {
   namespace P44Script {
 
     /// represents an API request
-    class ApiRequestObj : public JsonValue
+    class ApiRequestObj : public ObjectValue
     {
-      typedef JsonValue inherited;
+      typedef ObjectValue inherited;
 
       JsonCommPtr mConnection;
 
@@ -309,7 +309,7 @@ namespace p44 {
       ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest);
       void sendResponse(JsonObjectPtr aResponse, ErrorPtr aError);
       virtual string getAnnotation() const P44_OVERRIDE;
-      virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) P44_OVERRIDE;
+      virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) const P44_OVERRIDE;
     };
 
     /// represents the global objects related to the script API
