@@ -169,6 +169,14 @@ const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMe
 }
 
 
+void ValueSourceMapper::appendMemberNames(FieldNameList& aList, TypeInfo aInterestedInTypes)
+{
+  aList.push_back("age");
+  aList.push_back("valid");
+  aList.push_back("oplevel");
+}
+
+
 ScriptObjPtr ValueSourceMapper::memberByNameFrom(ScriptObjPtr aThisObj, const string aName, TypeInfo aTypeRequirements) const
 {
   ScriptObjPtr vsMember;

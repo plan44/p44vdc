@@ -124,6 +124,11 @@ namespace p44 {
     /// @return ScriptObj representing the member, or NULL if none
     virtual ScriptObjPtr memberByNameFrom(ScriptObjPtr aThisObj, const string aName, TypeInfo aTypeRequirements) const P44_OVERRIDE;
 
+    /// add all member field names to aList
+    /// @param aList member names will be added to this list
+    /// @param aInterestedInTypes what types of fields we are interested in at all (not included ones MIGHT be omitted if callee supports filtering)
+    virtual void appendMemberNames(FieldNameList& aList, TypeInfo aInterestedInTypes) P44_OVERRIDE;
+
     /// get info about all mapped sources (everything needed for editing mappingdefs)
     /// @param the api object to add info for mappings to
     /// @return true if information could be added
