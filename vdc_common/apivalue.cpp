@@ -350,7 +350,16 @@ ApiValuePtr ApiValue::newScriptValue(P44Script::ScriptObjPtr aValue)
     return j;
   }
   #endif
-  else return newDouble(aValue->doubleValue());
+  else {
+    // numeric, check subtypes
+    if (dynamic_cast<P44Script::BoolValue*>(aValue.get())) {
+      return newBool(aValue->boolValue());
+    }
+    else if (dynamic_cast<P44Script::IntegerValue*>(aValue.get())) {
+      return newInt64(aValue->int64Value());
+    }
+    return newDouble(aValue->doubleValue());
+  }
 }
 
 #endif
