@@ -254,7 +254,7 @@ public:
 };
 
 
-static ScriptObjPtr view_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite)
+static ScriptObjPtr view_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
 {
   LedChainDeviceObj* d = dynamic_cast<LedChainDeviceObj*>(aParentObj.get());
   return d->getLightView()->newViewObj();

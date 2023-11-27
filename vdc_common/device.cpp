@@ -2635,7 +2635,7 @@ ScriptMainContextPtr Device::getDeviceScriptContext()
 
 
 
-static ScriptObjPtr output_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite)
+static ScriptObjPtr output_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
 {
   DeviceObj* d = dynamic_cast<DeviceObj*>(aParentObj.get());
   assert(d);
@@ -2646,7 +2646,7 @@ static ScriptObjPtr output_accessor(BuiltInMemberLookup& aMemberLookup, ScriptOb
   return new AnnotatedNullValue("device has no output");
 }
 
-static ScriptObjPtr name_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite)
+static ScriptObjPtr name_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
 {
   DeviceObj* d = dynamic_cast<DeviceObj*>(aParentObj.get());
   assert(d);
