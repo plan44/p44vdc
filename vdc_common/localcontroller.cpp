@@ -2349,12 +2349,12 @@ static void set_func(BuiltinFunctionContextPtr f)
 
 
 static const BuiltinMemberDescriptor localControllerFuncs[] = {
-  { "trigger", executable|any, trigger_numargs, trigger_args, &trigger_func },
-  { "scene", executable|any, scene_numargs, scene_args, &scene_func },
+  { "trigger", executable|anyvalid, trigger_numargs, trigger_args, &trigger_func },
+  { "scene", executable|anyvalid, scene_numargs, scene_args, &scene_func },
   { "sceneid", executable|text, sceneid_no_numargs, sceneid_no_args, &sceneid_func },
   { "sceneno", executable|numeric, sceneid_no_numargs, sceneid_no_args, &sceneno_func },
-  { "savescene", executable|any, savescene_numargs, savescene_args, &savescene_func },
-  { "set", executable|any, set_numargs, set_args, &set_func },
+  { "savescene", executable|anyvalid, savescene_numargs, savescene_args, &savescene_func },
+  { "set", executable|anyvalid, set_numargs, set_args, &set_func },
   { NULL } // terminator
 };
 

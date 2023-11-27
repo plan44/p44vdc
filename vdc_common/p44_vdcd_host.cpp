@@ -1841,7 +1841,7 @@ string ApiRequestObj::getAnnotation() const
 }
 
 // answer([answer value|error])        answer the request
-static const BuiltInArgDesc answer_args[] = { { any|error|optionalarg } };
+static const BuiltInArgDesc answer_args[] = { { anyvalid|error|optionalarg } };
 static const size_t answer_numargs = sizeof(answer_args)/sizeof(BuiltInArgDesc);
 static void answer_func(BuiltinFunctionContextPtr f)
 {
@@ -1855,7 +1855,7 @@ static void answer_func(BuiltinFunctionContextPtr f)
   f->finish();
 }
 static const BuiltinMemberDescriptor answer_desc =
-  { "answer", executable|any, answer_numargs, answer_args, &answer_func };
+  { "answer", executable|anyvalid, answer_numargs, answer_args, &answer_func };
 
 
 const ScriptObjPtr ApiRequestObj::memberByName(const string aName, TypeInfo aMemberAccessFlags) const

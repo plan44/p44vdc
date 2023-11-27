@@ -2680,9 +2680,9 @@ static void inputValueSource_func(BuiltinFunctionContextPtr f)
 static const BuiltinMemberDescriptor deviceMembers[] = {
   { "output", builtinmember, 0, NULL, (BuiltinFunctionImplementation)&output_accessor }, // Note: correct '.accessor=&lrg_accessor' form does not work with OpenWrt g++, so need ugly cast here
   { "name", builtinmember, 0, NULL, (BuiltinFunctionImplementation)&name_accessor }, // Note: correct '.accessor=&lrg_accessor' form does not work with OpenWrt g++, so need ugly cast here
-  { "button", executable|any, behaviour_numargs, behaviour_args, &inputValueSource_func },
-  { "sensor", executable|any, behaviour_numargs, behaviour_args, &inputValueSource_func },
-  { "input", executable|any, behaviour_numargs, behaviour_args, &inputValueSource_func },
+  { "button", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
+  { "sensor", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
+  { "input", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
   { NULL } // terminator
 };
 

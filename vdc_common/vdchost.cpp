@@ -2625,8 +2625,8 @@ static void nextversion_func(BuiltinFunctionContextPtr f)
 
 static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   { "vdcapi", executable|structured, vdcapi_numargs, vdcapi_args, &vdcapi_func },
-  { "device", executable|any, device_numargs, device_args, &device_func },
-  { "valuesource", executable|any, valuesource_numargs, valuesource_args, &valuesource_func },
+  { "device", executable|anyvalid, device_numargs, device_args, &device_func },
+  { "valuesource", executable|anyvalid, valuesource_numargs, valuesource_args, &valuesource_func },
   { "productversion", executable|text, 0, NULL, &productversion_func },
   { "nextversion", executable|text, 0, NULL, &nextversion_func },
   { "macaddress", executable|text, 0, NULL, &macaddress_func },
