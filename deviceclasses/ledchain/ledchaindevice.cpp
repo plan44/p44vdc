@@ -196,7 +196,7 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
         fl->featureMode->syncChannelValue(
           DEFAULT_FEATURE_MODE | // basic default features
           (origincentered ? 0 : 0x04000000) | // from pseudo-property "origincentered", or true for lightspot, false for all others
-          (lv && (lv->getWrapMode() & P44View::clipMask)==P44View::clipXY ? 0 : 0x02000000), // depending on actual view's clipping bits
+          (lv && (lv->getFramingMode() & P44View::clipMask)==P44View::clipXY ? 0 : 0x02000000), // depending on actual view's clipping bits
           true, true // always + volatile
         );
       }
@@ -410,7 +410,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
       centered
     );
     // - has clip/noclip
-    targetView->setWrapMode((targetView->getWrapMode()&~P44View::clipMask) | ((mode & 0x02000000)==0 ? P44View::clipXY : 0));
+    targetView->setFramingMode((targetView->getFramingMode()&~P44View::clipMask) | ((mode & 0x02000000)==0 ? P44View::clipXY : 0));
     if (fl) {
       // feature light with extra channels
       // - rotation is common to all views
@@ -428,9 +428,9 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
         });
         cev->setColoringParameters(
           pix,
-          fl->brightnessGradient->getChannelValue(true)/100, mode & 0xFF,
-          fl->hueGradient->getChannelValue(true)/100, (mode>>8) & 0xFF,
-          fl->saturationGradient->getChannelValue(true)/100, (mode>>16) & 0xFF,
+          fl->brightnessGradient->getChannelValue(true)/100, (GradientMode)(mode & 0xFF),
+          fl->hueGradient->getChannelValue(true)/100, (GradientMode)((mode>>8) & 0xFF),
+          fl->saturationGradient->getChannelValue(true)/100, (GradientMode)((mode>>16) & 0xFF),
           (mode & 0x01000000)==0 // not radial
         );
       }
