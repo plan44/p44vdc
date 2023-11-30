@@ -1329,7 +1329,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     while (o->nextKeyValue(hn, hv)) {
       // find feature
       for (int idx=0; idx<numModelFeatures; idx++) {
-        if (strucmp(modelFeatureNames[idx], hn.c_str())==0) {
+        if (uequals(modelFeatureNames[idx], hn.c_str())) {
           if (hv && hv->boolValue()) {
             // explicitly set feature
             mExtraModelFeatures |= (1ll<<idx);

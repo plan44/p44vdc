@@ -2305,7 +2305,7 @@ SceneNo VdcHost::getSceneIdByKind(string aSceneKindName)
   const SceneKindDescriptor* skP = roomScenes;
   for (int i=0; i<2; i++) {
     while (skP->no!=INVALID_SCENE_NO) {
-      if (strucmp(aSceneKindName.c_str(), skP->actionName)==0) {
+      if (uequals(aSceneKindName.c_str(), skP->actionName)) {
         return skP->no;
       }
       skP++;
@@ -2315,7 +2315,7 @@ SceneNo VdcHost::getSceneIdByKind(string aSceneKindName)
   }
   // try just using integer
   int sceneNo;
-  if (strucmp(aSceneKindName.c_str(),"scene ",6)==0) aSceneKindName.erase(0,6); // allow "scene " prefix, as possibly generated for unnamed scene kinds
+  if (uequals(aSceneKindName.c_str(),"scene ",6)) aSceneKindName.erase(0,6); // allow "scene " prefix, as possibly generated for unnamed scene kinds
   if (sscanf(aSceneKindName.c_str(), "%d", &sceneNo)==1) {
     if (sceneNo>=0 && sceneNo<MAX_SCENE_NO) return sceneNo;
   }

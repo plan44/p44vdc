@@ -388,7 +388,7 @@ ZoneDescriptorPtr ZoneList::getZoneByName(const string aZoneName)
   int numName = -1;
   sscanf(aZoneName.c_str(), "%d", &numName);
   for (ZonesVector::iterator pos = mZones.begin(); pos!=mZones.end(); ++pos) {
-    if (strucmp((*pos)->getName().c_str(),aZoneName.c_str())==0) {
+    if (uequals((*pos)->getName().c_str(),aZoneName.c_str())) {
       return *pos;
     }
     else if (numName>=0 && numName==(*pos)->getZoneId()) {
@@ -772,7 +772,7 @@ SceneDescriptorPtr SceneList::getSceneByName(const string aSceneName)
   SceneDescriptorPtr scene;
   for (int i = 0; i<mScenes.size(); ++i) {
     SceneDescriptorPtr sc = mScenes[i];
-    if (strucmp(sc->mSceneIdentifier.mName.c_str(), aSceneName.c_str())==0) {
+    if (uequals(sc->mSceneIdentifier.mName.c_str(), aSceneName.c_str())) {
       scene = sc;
       break;
     }
@@ -1333,7 +1333,7 @@ TriggerPtr TriggerList::getTrigger(int aTriggerId, bool aCreateNewIfNotExisting,
 TriggerPtr TriggerList::getTriggerByName(const string aTriggerName)
 {
   for (TriggersVector::iterator pos = mTriggers.begin(); pos!=mTriggers.end(); ++pos) {
-    if (strucmp((*pos)->mName.c_str(),aTriggerName.c_str())==0) {
+    if (uequals((*pos)->mName.c_str(),aTriggerName.c_str())) {
       return *pos;
     }
   }
@@ -1909,7 +1909,7 @@ const GroupDescriptor* LocalController::groupInfoByName(const string aGroupName)
 {
   const GroupDescriptor *giP = groupInfos;
   while (giP && giP->kind!=0) {
-    if (strucmp(aGroupName.c_str(), giP->name)==0) {
+    if (uequals(aGroupName.c_str(), giP->name)) {
       return giP;
     }
     giP++;
