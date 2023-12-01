@@ -188,7 +188,7 @@ namespace p44 {
     #if ENABLE_JSONBRIDGEAPI
     /// This string may help the bridge to determine how to bridge this device.
     /// @return non-empty string if there is a bridging hint keyword that will be exposed as x-p44-bridgeAs.
-    virtual string bridgeAsHint() { return mBridgeAs; }
+    virtual string bridgeAsHint() P44_OVERRIDE { return mBridgeAs; }
     #endif
 
     /// Get icon data or name

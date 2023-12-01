@@ -399,7 +399,7 @@ string DsBehaviour::contextType() const
 
 string DsBehaviour::contextId() const
 {
-  return string_format("#%d", getIndex());
+  return string_format("#%zu", getIndex());
 }
 
 

@@ -476,7 +476,7 @@ void ChannelBehaviour::moveChannelValue(int aDirection, MLMicroSeconds aTimePerU
     }
     else {
       // towards end of scale (but not going below minDim)
-      double dist = (aDirection>0 ? getMax() : getMinDim()) - mCachedChannelValue;
+      dist = (aDirection>0 ? getMax() : getMinDim()) - mCachedChannelValue;
     }
     MLMicroSeconds tt = aTimePerUnit*fabs(dist);
     dimChannelValue(dist, tt);
