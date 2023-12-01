@@ -191,7 +191,7 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
       }
       // set feature channel default
       if (fl && lightView) {
-        P44ViewPtr lv = lightView->getView("LIGHT"); // actual light view might be nested
+        P44ViewPtr lv = lightView->findView("LIGHT"); // actual light view might be nested
         if (!lv) lv = lightView;
         fl->featureMode->syncChannelValue(
           DEFAULT_FEATURE_MODE | // basic default features
@@ -389,7 +389,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
   pix.b = b;
   pix.a = 255;
   lightView->setAlpha(cl->brightnessForHardware()*255/100); // alpha is brightness, scaled down to 0..255
-  P44ViewPtr targetView = lightView->getView("LIGHT"); // where to direct extras to
+  P44ViewPtr targetView = lightView->findView("LIGHT"); // where to direct extras to
   if (!targetView) targetView = lightView;
   if (ml) {
     bool centered;

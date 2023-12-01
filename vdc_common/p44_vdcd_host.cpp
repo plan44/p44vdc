@@ -534,7 +534,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
           // which view to look at
           P44ViewPtr view;
           if (request->get("view", o)) {
-            view = mLedChainArrangement->getRootView()->getView(o->stringValue());
+            view = mLedChainArrangement->getRootView()->findView(o->stringValue());
           }
           if (!view) {
             view = mLedChainArrangement->getRootView();
