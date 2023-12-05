@@ -597,7 +597,8 @@ void VdcHost::vdcCollected(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMa
   LOG(LOG_NOTICE, "=== done collecting from %s\n", aNextVdc->second->shortDesc().c_str());
   // next
   aNextVdc++;
-  collectFromNextVdc(aCompletedCB, aRescanFlags, aNextVdc);
+  // unwind call chain
+  MainLoop::currentMainLoop().executeNow(boost::bind(&VdcHost::collectFromNextVdc, this, aCompletedCB, aRescanFlags, aNextVdc));
 }
 
 
