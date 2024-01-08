@@ -1370,7 +1370,7 @@ string DaliSingleControllerDevice::getExtraInfo()
 int DaliSingleControllerDevice::opStateLevel()
 {
   if (mDaliController->mLampFailure || !mDaliController->mIsPresent) return 0;
-  if (mDaliController->mDeviceInfo->mDevInfStatus!=DaliDeviceInfo::devinf_solid) return 50; // is not a recommended device, does not have unique ID
+  if (mDaliController->mDeviceInfo->mDevInfStatus!=DaliDeviceInfo::devinf_solid && !mDaliController->isGrouped()) return 50; // is not a recommended device (but is not a group), does not have unique ID
   return 100; // everything's fine
 }
 
@@ -1383,7 +1383,7 @@ string DaliSingleControllerDevice::getOpStateText()
     t += "lamp failure";
     sep = ", ";
   }
-  if (mDaliController->mDeviceInfo->mDevInfStatus!=DaliDeviceInfo::devinf_solid) {
+  if (mDaliController->mDeviceInfo->mDevInfStatus!=DaliDeviceInfo::devinf_solid && !mDaliController->isGrouped()) {
     t += sep + "Missing S/N";
     sep = ", ";
   }
