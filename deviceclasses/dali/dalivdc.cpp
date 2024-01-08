@@ -873,18 +873,18 @@ bool DaliVdc::daliInfoSummary(DaliDeviceInfoPtr aDeviceInfo, ApiValuePtr aInfo)
     case DaliDeviceInfo::devinf_solid:
       devInfStatus = "stable serial";
       // serial
-      aInfo->add("serialNo", aInfo->newUint64(aDeviceInfo->mSerialNo));
+      aInfo->add("serialNo", aInfo->newString(string_format("%llu",aDeviceInfo->mSerialNo)));
       if (aDeviceInfo->mOemSerialNo!=0) {
-        aInfo->add("OEM_serialNo", aInfo->newUint64(aDeviceInfo->mOemSerialNo));
+        aInfo->add("OEM_serialNo", aInfo->newString(string_format("%llu",aDeviceInfo->mOemSerialNo)));
       }
       goto gtin;
     case DaliDeviceInfo::devinf_only_gtin:
       devInfStatus = "GTIN, but no serial";
     gtin:
       // GTIN
-      aInfo->add("GTIN", aInfo->newUint64(aDeviceInfo->mGtin));
+      aInfo->add("GTIN", aInfo->newString(string_format("%llu",aDeviceInfo->mGtin)));
       if (aDeviceInfo->mOemGtin!=0) {
-        aInfo->add("OEM_GTIN", aInfo->newUint64(aDeviceInfo->mOemGtin));
+        aInfo->add("OEM_GTIN", aInfo->newString(string_format("%llu",aDeviceInfo->mOemGtin)));
       }
       // firmware versions
       aInfo->add("versionMajor", aInfo->newUint64(aDeviceInfo->mFwVersionMajor));
