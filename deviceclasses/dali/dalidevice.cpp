@@ -254,6 +254,7 @@ void DaliBusDevice::dsUidForDeviceInfoStatus(DsUid &aDsUid, DaliDeviceInfo::Dali
     // DALI2 devices might have multiple logical units -> set subdevice index
     aDsUid.setSubdeviceIndex(mDeviceInfo->mLunIndex);
   }
+  OLOG(LOG_INFO, "derives UID %s from %s", aDsUid.getString().c_str(), aDevInfStatus==DaliDeviceInfo::devinf_solid ? "devInf" : "shortAddr")
 }
 
 
@@ -1046,17 +1047,17 @@ DaliBusDeviceGroup::DaliBusDeviceGroup(DaliVdc &aDaliVdc, uint8_t aGroupNo) :
 
 void DaliBusDeviceGroup::addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice)
 {
-  // add the ID to the mix
-  LOG(LOG_NOTICE, "- DALI bus device %s is grouped in DALI group %d", DaliComm::formatDaliAddress(aDaliBusDevice->mDeviceInfo->mShortAddress).c_str(), mDeviceInfo->mShortAddress & DaliGroupMask);
   // - when completely unlocked (no backward compatibility needed), use the improved mix which adds a FNV hash
   //   including the subdevice index, so mixing multiple dSUIDs only differing in subdevice byte
-  //   don't cancel each other out completely (even #) or match the original dSUID {odd # of mixed dSUIDs)
+  //   don't cancel each other out completely (even #) or match the original dSUID (odd # of mixed dSUIDs)
   bool lunSafeMix = !mDaliVdc.mDaliComm.mDali2ScanLock && !mDaliVdc.mDaliComm.mDali2LUNLock;
+  // add the ID to the mix
+  LOG(LOG_NOTICE, "- DALI bus device %s (UID=%s) gets grouped in DALI group %d (%s UID mix)", DaliComm::formatDaliAddress(aDaliBusDevice->mDeviceInfo->mShortAddress).c_str(), aDaliBusDevice->mDSUID.getString().c_str(), mDeviceInfo->mShortAddress & DaliGroupMask, lunSafeMix ? "LUN safe" : "legacy");
   aDaliBusDevice->mDSUID.xorDsUidIntoMix(mMixID, lunSafeMix);
   // if this is the first valid device, use it as master
   if (mGroupMaster==NoDaliAddress && !aDaliBusDevice->mIsDummy) {
     // this is the master device
-    LOG(LOG_INFO, "- DALI bus device with shortaddr %d is master of the group (queried for brightness, mindim)", aDaliBusDevice->mDeviceInfo->mShortAddress);
+    LOG(LOG_INFO, "- DALI bus device %s is master of the group (queried for brightness, mindim)", DaliComm::formatDaliAddress(aDaliBusDevice->mDeviceInfo->mShortAddress).c_str());
     mGroupMaster = aDaliBusDevice->mDeviceInfo->mShortAddress;
   }
   // reduce features to common denominator for all group members

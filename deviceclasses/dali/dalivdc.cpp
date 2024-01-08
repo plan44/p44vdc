@@ -408,7 +408,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
               // process dimmer
               if (!dimmer) {
                 // dimmer not found
-                LOG(LOG_WARNING, "Missing DALI dimmer %s for DALI group %d", dimmerUID.getString().c_str(), groupNo);
+                LOG(LOG_WARNING, "Missing DALI dimmer UID %s for DALI group %d", dimmerUID.getString().c_str(), groupNo);
                 // insert dummy instead
                 dimmer = DaliBusDevicePtr(new DaliBusDevice(*this));
                 dimmer->mIsDummy = true; // disable bus access
