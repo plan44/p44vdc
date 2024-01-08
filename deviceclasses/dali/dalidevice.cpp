@@ -1106,6 +1106,13 @@ void DaliBusDeviceGroup::daliBusDeviceSummary(ApiValuePtr aInfo) const
   inherited::daliBusDeviceSummary(aInfo);
   // group specifics
   aInfo->add("groupMasterAddr", aInfo->newUint64(mGroupMaster));
+  // override devInf status, as group does not have a devInf
+  // - the ID is not real, but a mix of IDs as captured at group creation
+  aInfo->add("devInfStatus", aInfo->newString("group id (virtual)"));
+  // - the ID is stable as long as the group exists
+  //   (when members change their address, they will be reported missing in the group, but the
+  //   original ID will still be included in the mix, so the mix remains stable)
+  aInfo->add("reliableId", aInfo->newBool(true));
 }
 
 
