@@ -171,11 +171,12 @@ namespace p44 {
   // MARK: - Feature spotlight with size, rotation, gradients
 
   #define DEFAULT_ZOOM 50 // half size = fits into area
-  #define DEFAULT_BRIGHTNESS_GRADIENT -30  // dimming down a bit towards the edges
+  #define DEFAULT_BRIGHTNESS_GRADIENT -32  // dimming down a bit towards the edges
   #define DEFAULT_HUE_GRADIENT 0
   #define DEFAULT_SATURATION_GRADIENT 0
   #define MAX_FEATURE_MODE 0x07FFFFFF
   #define DEFAULT_FEATURE_MODE 0x00222222  // linear, oscillating, radial, clipped, centered
+  #define DEFAULT_EFFECT_CYCLES 3 // allow 4 cycles (also scales gradient channels)
 
 
   class VZoomChannel : public ChannelBehaviour
