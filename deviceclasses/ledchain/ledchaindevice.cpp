@@ -409,8 +409,9 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
       (fl->verticalPosition->getChannelValue(true)-50)/50,
       centered
     );
-    // - has clip/noclip
-    targetView->setFramingMode((targetView->getFramingMode()&~P44View::clipMask) | ((mode & 0x02000000)==0 ? P44View::clipXY : 0));
+    // clip light to its frame size?
+    bool clipLight = (mode & 0x02000000)==0;
+    targetView->setFramingMode((targetView->getFramingMode()&~P44View::clipMask) | (clipLight ? P44View::clipXY : 0));
     if (fl) {
       // feature light with extra channels
       // - rotation is common to all views
@@ -418,6 +419,20 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
       ColorEffectViewPtr cev = boost::dynamic_pointer_cast<ColorEffectView>(targetView);
       if (cev) {
         // features available only in ColorEffectView
+        #if NEW_COLORING
+        cev->setEffectZoom(clipLight ? 1 : Infinite);
+        cev->setRelativeContentSize(
+          fl->horizontalZoom->getChannelValue(true)*0.01,
+          fl->verticalZoom->getChannelValue(true)*0.01
+        );
+        cev->setColoringParameters(
+          pix,
+          fl->brightnessGradient->getChannelValue(true)/100, (GradientMode)(mode & 0xFF),
+          fl->hueGradient->getChannelValue(true)/100, (GradientMode)((mode>>8) & 0xFF),
+          fl->saturationGradient->getChannelValue(true)/100, (GradientMode)((mode>>16) & 0xFF),
+          (mode & 0x01000000)==0 // not radial
+        );
+        #else
         // - zoom area is (like position) twice the size of the larger dimension of the frame
         //   This means the light fully fits the frame in the larger direction at zoom==50
         PixelPoint sz = cev->getFrameSize();
@@ -433,6 +448,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
           fl->saturationGradient->getChannelValue(true)/100, (GradientMode)((mode>>16) & 0xFF),
           (mode & 0x01000000)==0 // not radial
         );
+        #endif
       }
       else {
         // not a ColorEffectView, just set foreground color
