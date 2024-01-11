@@ -422,10 +422,9 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
         // features available only in ColorEffectView
         #if NEW_COLORING
         cev->setEffectZoom(clipLight ? 1 : Infinite);
-        cev->setRelativeContentSize(
-          fl->horizontalZoom->getChannelValue(true)*0.01,
-          fl->verticalZoom->getChannelValue(true)*0.01,
-          true // relative to larger frame dimension
+        cev->setContentAppearanceSize(
+          fl->horizontalZoom->getChannelValue(true)*0.02, // default of channel==50 -> 100% -> 1.0 rel size
+          fl->verticalZoom->getChannelValue(true)*0.02 // default of channel==50 -> 100% -> 1.0 rel size
         );
         cev->setColoringParameters(
           pix,
