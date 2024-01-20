@@ -146,10 +146,17 @@ TypeInfo ValueSourceObj::getTypeInfo() const
 }
 
 
-EventSource *ValueSourceObj::eventSource() const
+bool ValueSourceObj::isEventSource() const
 {
-  return mEventSource;
+  return mEventSource; // yes if it exists
 }
+
+
+void ValueSourceObj::registerForFilteredEvents(EventSink* aEventSink, intptr_t aRegId)
+{
+  if (mEventSource) mEventSource->registerForEvents(aEventSink, aRegId); // no filtering
+}
+
 
 const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMemberAccessFlags) const
 {

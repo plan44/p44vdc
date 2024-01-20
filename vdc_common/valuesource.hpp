@@ -151,8 +151,8 @@ namespace p44 {
     virtual string getAnnotation() const P44_OVERRIDE;
     virtual TypeInfo getTypeInfo() const P44_OVERRIDE;
 
-    /// @return a souce of events for this object
-    virtual EventSource *eventSource() const P44_OVERRIDE;
+    virtual bool isEventSource() const P44_OVERRIDE;
+    virtual void registerForFilteredEvents(EventSink* aEventSink, intptr_t aRegId = 0) P44_OVERRIDE;
 
     virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) const P44_OVERRIDE;
 
