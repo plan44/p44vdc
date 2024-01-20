@@ -587,7 +587,8 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
       }
       #endif
       #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
-      else if (apiselector=="scriptapi") {
+      #define SCRIPTAPI_NAME "scriptapi"
+      else if (uequals(apiselector.c_str(), SCRIPTAPI_NAME, strlen(SCRIPTAPI_NAME))) {
         // scripted parts of the (web) API
         if (!mScriptedApiLookup.hasSinks()) {
           // no script API active
@@ -595,7 +596,14 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         }
         else {
           // API active, send request object to event sinks
-          mScriptedApiLookup.sendEvent(new ApiRequestObj(aJsonComm, request));
+          // - extract endpoint (part of url beyond SCRIPTAPI_NAME)
+          if (apiselector.size()>strlen(SCRIPTAPI_NAME)+1 && apiselector[strlen(SCRIPTAPI_NAME)]=='/') {
+            request->add("endpoint", request->newString(apiselector.substr(strlen(SCRIPTAPI_NAME)+1)));
+          }
+          if (!mScriptedApiLookup.sendEvent(new ApiRequestObj(aJsonComm, request))) {
+            // no sink reached - probably means no matching endpoint
+            aError = WebError::webErr(404, "unknown script API endpoint");
+          }
         }
       }
       #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
@@ -1871,16 +1879,54 @@ const ScriptObjPtr ApiRequestObj::memberByName(const string aName, TypeInfo aMem
 }
 
 
-// webrequest()        event source for (script API) web request
+class WebRequestUriFilter : public EventFilter
+{
+  string mEndPoint;
+public:
+  WebRequestUriFilter(const string aEndPoint) : mEndPoint(aEndPoint) {};
+
+  virtual bool filteredEventObj(ScriptObjPtr &aEventObj) P44_OVERRIDE
+  {
+    if (!aEventObj) return false;
+    if (mEndPoint.empty()) return true; // no filter
+    ScriptObjPtr ep = aEventObj->memberByName("endpoint");
+    return ep && ep->stringValue()==mEndPoint; // ok if matches endpoint
+  }
+};
+
+
+class WebRequestPlaceholder : public OneShotEventNullValue
+{
+  typedef OneShotEventNullValue inherited;
+  EventFilterPtr mFilter;
+public:
+  WebRequestPlaceholder(EventSource *aEventSource, const string aEndPoint) :
+    inherited(aEventSource, "web request")
+  {
+    mFilter = new WebRequestUriFilter(aEndPoint);
+  }
+
+protected:
+  virtual EventFilterPtr eventFilter() { return mFilter; }
+};
+
+
+
+// webrequest()                event source for (script API) web request
+// webrequest(endpoint)        filtered event source for specific sub-endpoint of the script API
+static const BuiltInArgDesc webrequest_args[] = { { text|optionalarg } };
+static const size_t webrequest_numargs = sizeof(webrequest_args)/sizeof(BuiltInArgDesc);
 static void webrequest_func(BuiltinFunctionContextPtr f)
 {
   // return API request event source place holder, actual value will be delivered via event
   P44VdcHost* h = dynamic_cast<P44VdcHost*>(VdcHost::sharedVdcHost().get());
-  f->finish(new OneShotEventNullValue(&h->mScriptedApiLookup, "web request"));
+  string ep;
+  if (f->numArgs()>0) ep = f->arg(0)->stringValue();
+  f->finish(new WebRequestPlaceholder(&h->mScriptedApiLookup, ep));
 }
 
 static const BuiltinMemberDescriptor scriptApiGlobals[] = {
-  { "webrequest", executable|structured|null, 0, NULL, &webrequest_func },
+  { "webrequest", executable|structured|null, webrequest_numargs, webrequest_args, &webrequest_func },
   { NULL } // terminator
 };
 
