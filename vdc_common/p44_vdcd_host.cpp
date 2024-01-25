@@ -184,7 +184,7 @@ private:
 P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   inherited(aWithLocalController, aWithPersistentChannels),
   webUiPort(0),
-  mPlayground(sourcecode|regular, "playground", "p44script playground", this)
+  mPlayground(sourcecode|regular|keepvars, "playground", "p44script playground", this)
 {
   #if P44SCRIPT_REGISTERED_SOURCE
   mScriptManager = new P44ScriptManager(&StandardScriptingDomain::sharedDomain());
