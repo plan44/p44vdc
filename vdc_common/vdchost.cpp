@@ -52,6 +52,7 @@
 #include "i2c.hpp"
 #include "spi.hpp"
 #include "modbus.hpp"
+#include "midi.hpp"
 #if !DISABLE_DISCOVERY
 #include "dnssd.hpp"
 #endif
@@ -157,6 +158,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #endif
   #if ENABLE_SPI_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SPILookup());
+  #endif
+  #if ENABLE_MIDI_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::MidiLookup());
   #endif
   #if ENABLE_MODBUS_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::ModbusLookup);
