@@ -1895,23 +1895,6 @@ public:
 };
 
 
-class WebRequestPlaceholder : public OneShotEventNullValue
-{
-  typedef OneShotEventNullValue inherited;
-  EventFilterPtr mFilter;
-public:
-  WebRequestPlaceholder(EventSource *aEventSource, const string aEndPoint) :
-    inherited(aEventSource, "web request")
-  {
-    mFilter = new WebRequestUriFilter(aEndPoint);
-  }
-
-protected:
-  virtual EventFilterPtr eventFilter() { return mFilter; }
-};
-
-
-
 // webrequest()                event source for (script API) web request
 // webrequest(endpoint)        filtered event source for specific sub-endpoint of the script API
 static const BuiltInArgDesc webrequest_args[] = { { text|optionalarg } };
@@ -1922,7 +1905,7 @@ static void webrequest_func(BuiltinFunctionContextPtr f)
   P44VdcHost* h = dynamic_cast<P44VdcHost*>(VdcHost::sharedVdcHost().get());
   string ep;
   if (f->numArgs()>0) ep = f->arg(0)->stringValue();
-  f->finish(new WebRequestPlaceholder(&h->mScriptedApiLookup, ep));
+  f->finish(new OneShotEventNullValue(&h->mScriptedApiLookup, "web request", new WebRequestUriFilter(ep)));
 }
 
 static const BuiltinMemberDescriptor scriptApiGlobals[] = {
