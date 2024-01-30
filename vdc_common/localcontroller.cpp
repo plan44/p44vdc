@@ -2119,8 +2119,7 @@ using namespace P44Script;
 // MARK: - Local controller specific functions
 
 // trigger('triggername')    execute a trigger's action script
-static const BuiltInArgDesc trigger_args[] = { { text } };
-static const size_t trigger_numargs = sizeof(trigger_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(trigger, { text } );
 static void trigger_funcExecuted(BuiltinFunctionContextPtr f, ScriptObjPtr aResult)
 {
   f->finish(aResult);
@@ -2182,8 +2181,7 @@ static bool findSceneAndTarget(int &ai, BuiltinFunctionContextPtr f, SceneNo &sc
 
 // sceneid(name)
 // sceneno(name_or_id)
-static const BuiltInArgDesc sceneid_no_args[] = { { text } };
-static const size_t sceneid_no_numargs = sizeof(sceneid_no_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(sceneid_no, { text } );
 static void sceneid_func(BuiltinFunctionContextPtr f)
 {
   SceneDescriptorPtr scene = LocalController::sharedLocalController()->mLocalScenes.getSceneByName(f->arg(0)->stringValue());
@@ -2217,8 +2215,7 @@ static void sceneno_func(BuiltinFunctionContextPtr f)
 // scene(id, zone_or_device)
 // scene(id, zone_or_device, transition_time)
 // scene(id, zone_or_device, transition_time, group)
-static const BuiltInArgDesc scene_args[] = { { text|numeric }, { text|numeric|optionalarg }, { numeric|optionalarg }, { text|numeric|optionalarg } };
-static const size_t scene_numargs = sizeof(scene_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(scene, { text|numeric }, { text|numeric|optionalarg }, { numeric|optionalarg }, { text|numeric|optionalarg } );
 static void scene_func(BuiltinFunctionContextPtr f)
 {
   int ai = 1;
@@ -2257,8 +2254,7 @@ static void scene_func(BuiltinFunctionContextPtr f)
 
 // savescene(name [, group]])
 // savescene(id, zone_or_device [, group]])
-static const BuiltInArgDesc savescene_args[] = { { text|numeric }, { text|numeric|optionalarg }, { text|numeric|optionalarg } };
-static const size_t savescene_numargs = sizeof(savescene_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(savescene, { text|numeric }, { text|numeric|optionalarg }, { text|numeric|optionalarg } );
 static void savescene_func(BuiltinFunctionContextPtr f)
 {
   int ai = 1;
@@ -2300,8 +2296,7 @@ static void savescene_func(BuiltinFunctionContextPtr f)
 // set(zone_or_device, value, transitiontime)
 // set(zone_or_device, value, transitiontime, channelid)
 // set(zone, value, transitiontime, channelid, group)
-static const BuiltInArgDesc set_args[] = { { text|numeric }, { numeric }, { numeric|optionalarg }, { text|optionalarg }, { text|numeric|optionalarg } };
-static const size_t set_numargs = sizeof(set_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(set, { text|numeric }, { numeric }, { numeric|optionalarg }, { text|optionalarg }, { text|numeric|optionalarg } );
 static void set_func(BuiltinFunctionContextPtr f)
 {
   double value = f->arg(1)->doubleValue();
@@ -2349,12 +2344,12 @@ static void set_func(BuiltinFunctionContextPtr f)
 
 
 static const BuiltinMemberDescriptor localControllerFuncs[] = {
-  { "trigger", executable|anyvalid, trigger_numargs, trigger_args, &trigger_func },
-  { "scene", executable|anyvalid, scene_numargs, scene_args, &scene_func },
+  FUNC_DEF_W_ARG(trigger, executable|anyvalid),
+  FUNC_DEF_W_ARG(scene, executable|anyvalid),
   { "sceneid", executable|text, sceneid_no_numargs, sceneid_no_args, &sceneid_func },
-  { "sceneno", executable|numeric, sceneid_no_numargs, sceneid_no_args, &sceneno_func },
-  { "savescene", executable|anyvalid, savescene_numargs, savescene_args, &savescene_func },
-  { "set", executable|anyvalid, set_numargs, set_args, &set_func },
+  FUNC_DEF_C_ARG(sceneno, executable|numeric, sceneid_no),
+  FUNC_DEF_W_ARG(savescene, executable|anyvalid),
+  FUNC_DEF_W_ARG(set, executable|anyvalid),
   { NULL } // terminator
 };
 

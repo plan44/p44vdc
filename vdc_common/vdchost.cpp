@@ -2538,8 +2538,7 @@ void VdcHost::scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
 // MARK: - VdcHost global script members and functions
 
 // vdcapi(jsoncall)
-static const BuiltInArgDesc vdcapi_args[] = { { structured } };
-static const size_t vdcapi_numargs = sizeof(vdcapi_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(vdcapi, { structured } );
 static void vdcapi_func(BuiltinFunctionContextPtr f)
 {
   // get method/notification and params
@@ -2586,8 +2585,7 @@ static void vdcapi_func(BuiltinFunctionContextPtr f)
 
 
 // device(device_name_or_dSUID)
-static const BuiltInArgDesc device_args[] = { { text } };
-static const size_t device_numargs = sizeof(device_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(device, { text } );
 static void device_func(BuiltinFunctionContextPtr f)
 {
   DevicePtr device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(f->arg(0)->stringValue());
@@ -2598,8 +2596,7 @@ static void device_func(BuiltinFunctionContextPtr f)
   f->finish(device->newDeviceObj());
 }
 
-static const BuiltInArgDesc valuesource_args[] = { { text } };
-static const size_t valuesource_numargs = sizeof(valuesource_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(valuesource, { text } );
 static void valuesource_func(BuiltinFunctionContextPtr f)
 {
   ValueSource* valueSource = VdcHost::sharedVdcHost()->getValueSourceById(f->arg(0)->stringValue());
@@ -2629,12 +2626,12 @@ static void nextversion_func(BuiltinFunctionContextPtr f)
 }
 
 static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
-  { "vdcapi", executable|structured, vdcapi_numargs, vdcapi_args, &vdcapi_func },
-  { "device", executable|anyvalid, device_numargs, device_args, &device_func },
-  { "valuesource", executable|anyvalid, valuesource_numargs, valuesource_args, &valuesource_func },
-  { "productversion", executable|text, 0, NULL, &productversion_func },
-  { "nextversion", executable|text, 0, NULL, &nextversion_func },
-  { "macaddress", executable|text, 0, NULL, &macaddress_func },
+  FUNC_DEF_W_ARG(vdcapi, executable|structured),
+  FUNC_DEF_W_ARG(device, executable|anyvalid),
+  FUNC_DEF_W_ARG(valuesource, executable|anyvalid),
+  FUNC_DEF_NOARG(productversion, executable|text),
+  FUNC_DEF_NOARG(nextversion, executable|text),
+  FUNC_DEF_NOARG(macaddress, executable|text),
   { NULL } // terminator
 };
 

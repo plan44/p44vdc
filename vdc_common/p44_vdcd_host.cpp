@@ -1849,8 +1849,7 @@ string ApiRequestObj::getAnnotation() const
 }
 
 // answer([answer value|error])        answer the request
-static const BuiltInArgDesc answer_args[] = { { anyvalid|error|optionalarg } };
-static const size_t answer_numargs = sizeof(answer_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(answer, { anyvalid|error|optionalarg } );
 static void answer_func(BuiltinFunctionContextPtr f)
 {
   ApiRequestObj* reqObj = dynamic_cast<ApiRequestObj *>(f->thisObj().get());
@@ -1863,7 +1862,7 @@ static void answer_func(BuiltinFunctionContextPtr f)
   f->finish();
 }
 static const BuiltinMemberDescriptor answer_desc =
-  { "answer", executable|anyvalid, answer_numargs, answer_args, &answer_func };
+  FUNC_DEF_W_ARG(answer, executable|anyvalid);
 
 
 const ScriptObjPtr ApiRequestObj::memberByName(const string aName, TypeInfo aMemberAccessFlags) const
@@ -1897,8 +1896,7 @@ public:
 
 // webrequest()                event source for (script API) web request
 // webrequest(endpoint)        filtered event source for specific sub-endpoint of the script API
-static const BuiltInArgDesc webrequest_args[] = { { text|optionalarg } };
-static const size_t webrequest_numargs = sizeof(webrequest_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(webrequest, { text|optionalarg } );
 static void webrequest_func(BuiltinFunctionContextPtr f)
 {
   // return API request event source place holder, actual value will be delivered via event
@@ -1909,7 +1907,7 @@ static void webrequest_func(BuiltinFunctionContextPtr f)
 }
 
 static const BuiltinMemberDescriptor scriptApiGlobals[] = {
-  { "webrequest", executable|structured|null, webrequest_numargs, webrequest_args, &webrequest_func },
+  FUNC_DEF_W_ARG(webrequest, executable|structured|null),
   { NULL } // terminator
 };
 

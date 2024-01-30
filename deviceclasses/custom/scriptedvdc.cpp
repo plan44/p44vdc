@@ -44,8 +44,7 @@ public:
 
 // message()
 // message(messagetosend)
-static const BuiltInArgDesc message_args[] = { { objectvalue|text|optionalarg } };
-static const size_t message_numargs = sizeof(message_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(message, { objectvalue|text|optionalarg } );
 static void message_func(BuiltinFunctionContextPtr f)
 {
   ScriptedDeviceObj* d = dynamic_cast<ScriptedDeviceObj*>(f->thisObj().get());
@@ -68,7 +67,7 @@ static void message_func(BuiltinFunctionContextPtr f)
 
 
 static const BuiltinMemberDescriptor scriptedDeviceMembers[] = {
-  { "message", executable|text|null, message_numargs, message_args, &message_func },
+  FUNC_DEF_W_ARG(message, executable|text|null),
   { NULL } // terminator
 };
 

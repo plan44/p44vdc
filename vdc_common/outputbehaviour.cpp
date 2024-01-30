@@ -884,8 +884,7 @@ static DsScenePtr findScene(OutputObj* o, const string aSceneId)
 }
 
 // loadscene(sceneNoOrName [, transitionTimeOverride])
-static const BuiltInArgDesc loadscene_args[] = { { numeric|text }, { numeric|optionalarg} };
-static const size_t loadscene_numargs = sizeof(loadscene_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(loadscene, { numeric|text }, { numeric|optionalarg} );
 static void loadscene_func(BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
@@ -902,8 +901,7 @@ static void loadscene_func(BuiltinFunctionContextPtr f)
 
 
 // runactions(sceneNoOrName)
-static const BuiltInArgDesc runactions_args[] = { { numeric|optionalarg } };
-static const size_t runactions_numargs = sizeof(runactions_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(runactions, { numeric|optionalarg } );
 static void runactions_func(BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
@@ -934,8 +932,7 @@ static void stopactions_func(BuiltinFunctionContextPtr f)
 
 // applychannels()
 // applychannels(forced [, transitionTimeOverride])
-static const BuiltInArgDesc applychannels_args[] = { { numeric|optionalarg }, { numeric|optionalarg } };
-static const size_t applychannels_numargs = sizeof(applychannels_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(applychannels, { numeric|optionalarg }, { numeric|optionalarg } );
 static void applychannels_func(BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
@@ -966,8 +963,7 @@ static void syncchannels_func(BuiltinFunctionContextPtr f)
 // channel_t(channelid)             - return the transitional value of the specified channel
 // [dim]channel(channelid, value)   - set the channel value to the specified value or dim it relatively
 // [dim]channel(channelid, value, transitiontime)
-static const BuiltInArgDesc channel_args[] = { { text }, { numeric|optionalarg }, { numeric|optionalarg } };
-static const size_t channel_numargs = sizeof(channel_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(channel, { text }, { numeric|optionalarg }, { numeric|optionalarg } );
 static void channel_funcImpl(bool aDim, bool aTransitional, BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
@@ -1025,8 +1021,7 @@ static void dimchannel_func(BuiltinFunctionContextPtr f)
 
 // movechannel(channelid, direction)   - start or stop moving the channel value in the specified direction
 // movechannel(channelid, direction, timePerUnit)
-static const BuiltInArgDesc movechannel_args[] = { { text }, { numeric }, { numeric|optionalarg } };
-static const size_t movechannel_numargs = sizeof(movechannel_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(movechannel, { text }, { numeric }, { numeric|optionalarg } );
 static void movechannel_func(BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
@@ -1048,15 +1043,15 @@ static void movechannel_func(BuiltinFunctionContextPtr f)
 
 
 static const BuiltinMemberDescriptor outputMembers[] = {
-  { "loadscene", executable|null, loadscene_numargs, loadscene_args, &loadscene_func },
-  { "runactions", executable|null, runactions_numargs, runactions_args, &runactions_func },
-  { "stopactions", executable|null, 0, NULL, &stopactions_func },
-  { "applychannels", executable|null, applychannels_numargs, applychannels_args, &applychannels_func },
-  { "syncchannels", executable|null, 0, NULL, &syncchannels_func },
-  { "channel", executable|numeric, channel_numargs, channel_args, &channel_func },
-  { "channel_t", executable|numeric, channel_numargs, channel_args, &channel_t_func },
-  { "dimchannel", executable|numeric, channel_numargs, channel_args, &dimchannel_func },
-  { "movechannel", executable|numeric, movechannel_numargs, movechannel_args, &movechannel_func },
+  FUNC_DEF_W_ARG(loadscene, executable|null),
+  FUNC_DEF_W_ARG(runactions, executable|null),
+  FUNC_DEF_NOARG(stopactions, executable|null),
+  FUNC_DEF_W_ARG(applychannels, executable|null),
+  FUNC_DEF_NOARG(syncchannels, executable|null),
+  FUNC_DEF_W_ARG(channel, executable|numeric),
+  FUNC_DEF_C_ARG(channel_t, executable|numeric, channel),
+  FUNC_DEF_C_ARG(dimchannel, executable|numeric, channel),
+  FUNC_DEF_W_ARG(movechannel, executable|numeric),
   { NULL } // terminator
 };
 

@@ -2657,8 +2657,7 @@ static ScriptObjPtr name_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjP
 // button(id_or_index)
 // sensor(id_or_index)
 // input(id_or_index)
-static const BuiltInArgDesc behaviour_args[] = { { text } };
-static const size_t behaviour_numargs = sizeof(behaviour_args)/sizeof(BuiltInArgDesc);
+FUNC_ARG_DEFS(behaviour, { text } );
 static void inputValueSource_func(BuiltinFunctionContextPtr f)
 {
   string fn = f->funcObj()->getIdentifier(); // function name determines behaviour type to get
@@ -2678,8 +2677,8 @@ static void inputValueSource_func(BuiltinFunctionContextPtr f)
 }
 
 static const BuiltinMemberDescriptor deviceMembers[] = {
-  { "output", builtinmember, 0, NULL, (BuiltinFunctionImplementation)&output_accessor }, // Note: correct '.accessor=&lrg_accessor' form does not work with OpenWrt g++, so need ugly cast here
-  { "name", builtinmember, 0, NULL, (BuiltinFunctionImplementation)&name_accessor }, // Note: correct '.accessor=&lrg_accessor' form does not work with OpenWrt g++, so need ugly cast here
+  MEMBER_DEF(output, builtinmember),
+  MEMBER_DEF(name, builtinmember),
   { "button", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
   { "sensor", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
   { "input", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },

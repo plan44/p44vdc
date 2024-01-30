@@ -263,7 +263,7 @@ static ScriptObjPtr view_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjP
 
 
 static const BuiltinMemberDescriptor ledChainMembers[] = {
-  { "view", builtinmember, 0, NULL, (BuiltinFunctionImplementation)&view_accessor }, // Note: correct '.accessor=&lrg_accessor' form does not work with OpenWrt g++, so need ugly cast here
+  MEMBER_DEF(view, builtinmember),
   { NULL } // terminator
 };
 
