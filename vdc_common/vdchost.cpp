@@ -159,6 +159,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if ENABLE_SPI_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SPILookup());
   #endif
+  #if ENABLE_SERIAL_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SerialLookup());
+  #endif
   #if ENABLE_MIDI_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::MidiLookup());
   #endif
