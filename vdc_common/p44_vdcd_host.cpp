@@ -1204,7 +1204,7 @@ P44ScriptManager::P44ScriptManager(ScriptingDomainPtr aScriptingDomain) :
 
 void P44ScriptManager::pausedHandler(ScriptCodeThreadPtr aPausedThread)
 {
-  if (aPausedThread->pauseReason()==nopause) {
+  if (aPausedThread->pauseReason()==running) {
     OLOG(LOG_ERR, "non-paused thread reported paused")
     return;
   }
@@ -1219,7 +1219,7 @@ void P44ScriptManager::pausedHandler(ScriptCodeThreadPtr aPausedThread)
 
 bool P44ScriptManager::isDebugging() const
 {
-  return mScriptingDomain && mScriptingDomain->defaultPausingMode()>nopause;
+  return mScriptingDomain && mScriptingDomain->defaultPausingMode()>running;
 }
 
 
@@ -1227,7 +1227,7 @@ void P44ScriptManager::setDebugging(bool aDebug)
 {
   if (!mScriptingDomain) return;
   if (aDebug!=isDebugging()) {
-    mScriptingDomain->setDefaultPausingMode(aDebug ? breakpoint : nopause);
+    mScriptingDomain->setDefaultPausingMode(aDebug ? breakpoint : running);
     if (aDebug) {
       // enable log collector
       SETLOGHANDLER(boost::bind(&P44ScriptManager::logCollectHandler, this, _1, _2, _3), true);
@@ -1240,7 +1240,7 @@ void P44ScriptManager::setDebugging(bool aDebug)
       OLOG(LOG_WARNING, "Debugging mode disabled: all paused threads continue running now");
       while (mPausedThreads.size()>0) {
         PausedThreadsVector::iterator pos = mPausedThreads.begin();
-        pos->mThread->continueWithMode(nopause);
+        pos->mThread->continueWithMode(running);
         mPausedThreads.erase(pos);
       }
     }
