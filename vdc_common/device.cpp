@@ -2677,8 +2677,8 @@ static void inputValueSource_func(BuiltinFunctionContextPtr f)
 }
 
 static const BuiltinMemberDescriptor deviceMembers[] = {
-  MEMBER_DEF(output, builtinmember),
-  MEMBER_DEF(name, builtinmember),
+  MEMBER_DEF(output, builtinvalue),
+  MEMBER_DEF(name, builtinvalue),
   { "button", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
   { "sensor", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
   { "input", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },

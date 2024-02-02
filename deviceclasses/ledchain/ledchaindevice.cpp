@@ -263,7 +263,7 @@ static ScriptObjPtr view_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjP
 
 
 static const BuiltinMemberDescriptor ledChainMembers[] = {
-  MEMBER_DEF(view, builtinmember),
+  MEMBER_DEF(view, builtinvalue),
   { NULL } // terminator
 };
 

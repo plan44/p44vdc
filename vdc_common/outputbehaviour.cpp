@@ -1044,10 +1044,10 @@ static void movechannel_func(BuiltinFunctionContextPtr f)
 
 static const BuiltinMemberDescriptor outputMembers[] = {
   FUNC_DEF_W_ARG(loadscene, executable|null),
-  FUNC_DEF_W_ARG(runactions, executable|null),
+  FUNC_DEF_W_ARG(runactions, executable|async|null),
   FUNC_DEF_NOARG(stopactions, executable|null),
-  FUNC_DEF_W_ARG(applychannels, executable|null),
-  FUNC_DEF_NOARG(syncchannels, executable|null),
+  FUNC_DEF_W_ARG(applychannels, executable|async|null),
+  FUNC_DEF_NOARG(syncchannels, executable|async|null),
   FUNC_DEF_W_ARG(channel, executable|numeric),
   FUNC_DEF_C_ARG(channel_t, executable|numeric, channel),
   FUNC_DEF_C_ARG(dimchannel, executable|numeric, channel),
