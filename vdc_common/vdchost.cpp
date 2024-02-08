@@ -2523,6 +2523,7 @@ void VdcHost::scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult)
       ans->add("error", ans->newString(aResult->errorValue()->text()));
     }
     else {
+      aResult = aResult->calculationValue(); // make sure we have the calculation value
       ans->add("result", ans->newScriptValue(aResult));
     }
     ans->add("annotation", ans->newString(aResult->getAnnotation()));

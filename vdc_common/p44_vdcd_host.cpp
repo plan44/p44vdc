@@ -1268,6 +1268,7 @@ void P44ScriptManager::setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjP
 {
   aIntoApiValue->setType(apivalue_object);
   if (aResult) {
+    aResult = aResult->calculationValue(); // make sure we have the calculation value
     if (!aResult->isErr()) {
       aIntoApiValue->add("result", aIntoApiValue->newScriptValue(aResult));
     }
@@ -1720,6 +1721,7 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
             ScriptObjPtr result;
             if (o && o->boolValue()) {
               // run the script and capture the final evaluation result
+              c = static_cast<ScriptCommand>(c|evaluate);
               script->runCommand(c, boost::bind(&P44ScriptManager::scriptResultReport, this, aRequest, _1), nullptr);
             }
             else {
@@ -1786,7 +1788,7 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
           ScriptMainContextPtr mctx = ctx->scriptmain();
           assert(mctx.get());
           // compile
-          EvaluationFlags flags = sourcecode|regular|keepvars|concurrently|ephemeralSource|neverpause;
+          EvaluationFlags flags = sourcecode|regular|keepvars|concurrently|ephemeralSource|neverpause|implicitreturn;
           ScriptCompiler compiler(ctx->domain());
           CompiledCodePtr compiledcode = new CompiledCode("interactive");
           ScriptObjPtr res = compiler.compile(source, compiledcode, flags, mctx);
