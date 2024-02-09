@@ -277,11 +277,7 @@ static BuiltInMemberLookup* sharedLedChainDeviceMemberLookupP = NULL;
 
 LedChainDeviceObj::LedChainDeviceObj(DevicePtr aDevice) : inherited(aDevice)
 {
-  if (sharedLedChainDeviceMemberLookupP==NULL) {
-    sharedLedChainDeviceMemberLookupP = new BuiltInMemberLookup(ledChainMembers);
-    sharedLedChainDeviceMemberLookupP->isMemberVariable(); // disable refcounting
-  }
-  registerMemberLookup(sharedLedChainDeviceMemberLookupP);
+  registerSharedLookup(sharedLedChainDeviceMemberLookupP, ledChainMembers);
 };
 
 ScriptObjPtr LedChainDevice::newDeviceObj()

@@ -81,11 +81,7 @@ static BuiltInMemberLookup* sharedScriptedDeviceMemberLookupP = NULL;
 
 ScriptedDeviceObj::ScriptedDeviceObj(DevicePtr aDevice) : inherited(aDevice)
 {
-  if (sharedScriptedDeviceMemberLookupP==NULL) {
-    sharedScriptedDeviceMemberLookupP = new BuiltInMemberLookup(scriptedDeviceMembers);
-    sharedScriptedDeviceMemberLookupP->isMemberVariable(); // disable refcounting
-  }
-  registerMemberLookup(sharedScriptedDeviceMemberLookupP);
+  registerSharedLookup(sharedScriptedDeviceMemberLookupP, scriptedDeviceMembers);
 };
 
 

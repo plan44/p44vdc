@@ -1061,11 +1061,7 @@ static BuiltInMemberLookup* sharedOutputMemberLookupP = NULL;
 OutputObj::OutputObj(OutputBehaviourPtr aOutput) :
   mOutput(aOutput)
 {
-  if (sharedOutputMemberLookupP==NULL) {
-    sharedOutputMemberLookupP = new BuiltInMemberLookup(outputMembers);
-    sharedOutputMemberLookupP->isMemberVariable(); // disable refcounting
-  }
-  registerMemberLookup(sharedOutputMemberLookupP);
+  registerSharedLookup(sharedOutputMemberLookupP, outputMembers);
 }
 
 

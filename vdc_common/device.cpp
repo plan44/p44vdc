@@ -2691,11 +2691,7 @@ static BuiltInMemberLookup* sharedDeviceMemberLookupP = NULL;
 DeviceObj::DeviceObj(DevicePtr aDevice) :
   mDevice(aDevice)
 {
-  if (sharedDeviceMemberLookupP==NULL) {
-    sharedDeviceMemberLookupP = new BuiltInMemberLookup(deviceMembers);
-    sharedDeviceMemberLookupP->isMemberVariable(); // disable refcounting
-  }
-  registerMemberLookup(sharedDeviceMemberLookupP);
+  registerSharedLookup(sharedDeviceMemberLookupP, deviceMembers);
 }
 
 
