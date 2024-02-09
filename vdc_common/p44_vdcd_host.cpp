@@ -1564,6 +1564,7 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
   else if (aPropertyDescriptor->hasObjectKey(breakpoints_list_key)) {
     ScriptHostPtr host = domain().getHostByIndex(aPropertyDescriptor->parentDescriptor->parentDescriptor->  fieldKey());
     size_t line = aPropertyDescriptor->fieldKey();
+    if (!host->breakpoints()) return false;
     if (aMode==access_read) {
       // breakpoint
       if (host->breakpoints()->find(line)!=host->breakpoints()->end()) {
