@@ -176,7 +176,6 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
         cfg->add("dx", cfg->newInt32(aDx));
         cfg->add("dy", cfg->newInt32(aDy));
         // - set some defaults if not defined in cfg
-        if (!cfg->get("effect_cycles")) cfg->add("effect_cycles", cfg->newInt32(DEFAULT_EFFECT_CYCLES));
         if (!cfg->get("fullframe")) cfg->add("fullframe", cfg->newBool(true));
         if (!cfg->get("type")) cfg->add("type", cfg->newString("stack"));
         // - origin handling
