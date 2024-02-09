@@ -416,7 +416,6 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
       ColorEffectViewPtr cev = boost::dynamic_pointer_cast<ColorEffectView>(targetView);
       if (cev) {
         // features available only in ColorEffectView
-        #if NEW_COLORING
         cev->setEffectZoom(clipLight ? 1 : Infinite);
         cev->setContentAppearanceSize(
           fl->horizontalZoom->getChannelValue(true)*0.02, // default of channel==50 -> 100% -> 1.0 rel size
@@ -429,23 +428,6 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
           fl->saturationGradient->getChannelValue(true)/100, (GradientMode)((mode>>16) & 0xFF),
           (mode & 0x01000000)==0 // not radial
         );
-        #else
-        // - zoom area is (like position) twice the size of the larger dimension of the frame
-        //   This means the light fully fits the frame in the larger direction at zoom==50
-        PixelPoint sz = cev->getFrameSize();
-        int maxD = max(sz.x, sz.y);
-        cev->setExtent({
-          (int)(maxD*fl->horizontalZoom->getChannelValue(true)*0.01),
-          (int)(maxD*fl->verticalZoom->getChannelValue(true)*0.01)
-        });
-        cev->setColoringParameters(
-          pix,
-          fl->brightnessGradient->getChannelValue(true)/100, (GradientMode)(mode & 0xFF),
-          fl->hueGradient->getChannelValue(true)/100, (GradientMode)((mode>>8) & 0xFF),
-          fl->saturationGradient->getChannelValue(true)/100, (GradientMode)((mode>>16) & 0xFF),
-          (mode & 0x01000000)==0 // not radial
-        );
-        #endif
       }
       else {
         // not a ColorEffectView, just set foreground color
