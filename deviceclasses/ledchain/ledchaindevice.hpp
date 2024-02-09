@@ -58,10 +58,10 @@ namespace p44 {
     #if ENABLE_P44SCRIPT
     friend class LedChainDeviceLookup;
 
-    LedChainDeviceLookup ledChainDeviceLookup;
+    LedChainDeviceLookup mLedChainDeviceLookup;
     #endif
 
-    P44ViewPtr lightView; ///< the view representing the light
+    P44ViewPtr mLightView; ///< the view representing the light
 
     typedef enum {
       lighttype_unknown,
@@ -69,12 +69,12 @@ namespace p44 {
       lighttype_feature
     } LightType;
 
-    LightType lightType; ///< type of light
-    string uniqueId; ///< unique ID, if set it is used to determine the dsUID
+    LightType mLightType; ///< type of light
+    string mUniqueId; ///< unique ID, if set it is used to determine the dsUID
 
-    long long ledChainDeviceRowID; ///< the ROWID this device was created from (0=none)
+    long long mLedChainDeviceRowID; ///< the ROWID this device was created from (0=none)
 
-    MLTicket transitionTicket;
+    MLTicket mTransitionTicket;
 
   public:
 
@@ -115,7 +115,7 @@ namespace p44 {
 
     LedChainVdc &getLedChainVdc();
 
-    P44ViewPtr getLightView() { return lightView; }
+    P44ViewPtr getLightView() { return mLightView; }
 
     #if P44SCRIPT_FULL_SUPPORT
     /// @return a new script object representing this device. Derived device classes might return different types of device object.

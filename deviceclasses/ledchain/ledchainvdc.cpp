@@ -83,14 +83,14 @@ string LedChainDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToV
 
 LedChainVdc::LedChainVdc(int aInstanceNumber, LEDChainArrangementPtr aLedArrangement, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  ledArrangement(aLedArrangement)
+  mLedArrangement(aLedArrangement)
 {
 }
 
 
 void LedChainVdc::setLogLevelOffset(int aLogLevelOffset)
 {
-  if (ledArrangement) ledArrangement->setLogLevelOffset(aLogLevelOffset);
+  if (mLedArrangement) mLedArrangement->setLogLevelOffset(aLogLevelOffset);
   inherited::setLogLevelOffset(aLogLevelOffset);
 }
 
@@ -99,18 +99,18 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   ErrorPtr err;
   // initialize root view
-  if (ledArrangement) {
-    PixelRect r = ledArrangement->totalCover();
-    rootView = ViewStackPtr(new ViewStack);
-    rootView->setFrame(r);
-    rootView->setBackgroundColor(black); // stack with black background is more efficient (and there's nothing below, anyway)
-    ledArrangement->setRootView(rootView);
+  if (mLedArrangement) {
+    PixelRect r = mLedArrangement->totalCover();
+    mRootView = ViewStackPtr(new ViewStack);
+    mRootView->setFrame(r);
+    mRootView->setBackgroundColor(black); // stack with black background is more efficient (and there's nothing below, anyway)
+    mLedArrangement->setRootView(mRootView);
     // initialize database
     string databaseName = getPersistentDataDir();
     string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-    err = db.connectAndInitialize(databaseName.c_str(), LEDCHAINDEVICES_SCHEMA_VERSION, LEDCHAINDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
+    err = mDb.connectAndInitialize(databaseName.c_str(), LEDCHAINDEVICES_SCHEMA_VERSION, LEDCHAINDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
     // Initialize chain driver
-    ledArrangement->begin(true);
+    mLedArrangement->begin(true);
   }
   // done
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
@@ -121,7 +121,7 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 Brightness LedChainVdc::getMinBrightness()
 {
   // scale up according to scaled down maximum, and make it 0..100
-  return ledArrangement ? ledArrangement->getMinVisibleColorIntensity()*100.0/255.0 : 0;
+  return mLedArrangement ? mLedArrangement->getMinVisibleColorIntensity()*100.0/255.0 : 0;
 }
 
 
@@ -150,11 +150,11 @@ LedChainDevicePtr LedChainVdc::addLedChainDevice(int aX, int aDx, int aY, int aD
     // add to container
     simpleIdentifyAndAddDevice(newDev);
     // add to view
-    if (newDev->lightView->getZOrder()==0) newDev->lightView->setZOrder(aZOrder);
-    rootView->setPositioningMode(P44View::noAdjust);
-    rootView->pushView(newDev->lightView);
+    if (newDev->mLightView->getZOrder()==0) newDev->mLightView->setZOrder(aZOrder);
+    mRootView->setPositioningMode(P44View::noAdjust);
+    mRootView->pushView(newDev->mLightView);
     // - re-render
-    if (ledArrangement) ledArrangement->render();
+    if (mLedArrangement) mLedArrangement->render();
     return boost::dynamic_pointer_cast<LedChainDevice>(newDev);
   }
   // none added
@@ -169,9 +169,9 @@ void LedChainVdc::removeDevice(DevicePtr aDevice, bool aForget)
     // - remove single device from superclass
     inherited::removeDevice(aDevice, aForget);
     // - remove device's view
-    rootView->removeView(dev->lightView);
+    mRootView->removeView(dev->mLightView);
     // - re-render
-    if (ledArrangement) ledArrangement->render();
+    if (mLedArrangement) mLedArrangement->render();
   }
 }
 
@@ -183,7 +183,7 @@ void LedChainVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // then add those from the DB
-    sqlite3pp::query qry(db);
+    sqlite3pp::query qry(mDb);
     if (qry.prepare("SELECT rowid, firstLED, numLEDs, y, dy, zorder, deviceconfig FROM devConfigs ORDER BY zorder,rowid")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         int zorder;
@@ -192,7 +192,7 @@ void LedChainVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
           zorder = (int)rowid;
         }
         LedChainDevicePtr dev = addLedChainDevice(i->get<int>(1), i->get<int>(2), i->get<int>(3), i->get<int>(4), zorder, i->get<string>(6));
-        dev->ledChainDeviceRowID = rowid;
+        dev->mLedChainDeviceRowID = rowid;
       }
     }
   }
@@ -205,62 +205,70 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
 {
   ErrorPtr respErr;
   if (aMethod=="x-p44-addDevice") {
-    // add a new LED chain segment device
-    ApiValuePtr o;
-    int x, dx;
+    // add a new LED chain device
+    int x = 0;
     int y = 0;
-    int dy = 1;
-    respErr = checkParam(aParams, "x", o);
-    if (Error::isOK(respErr)) {
-      x = o->int32Value();
-      respErr = checkParam(aParams, "dx", o);
+    int dx = 0;
+    int dy = 0;
+    ApiValuePtr o;
+    o = aParams->get("autosize");
+    if (!o || !o->boolValue()) {
+      // fixed size
+      dy = 1;
+      respErr = checkParam(aParams, "x", o);
       if (Error::isOK(respErr)) {
-        dx = o->int32Value();
-        string uid;
-        respErr = checkStringParam(aParams, "uniqueId", uid);
+        x = o->int32Value();
+        respErr = checkParam(aParams, "dx", o);
         if (Error::isOK(respErr)) {
-          string cfg;
-          respErr = checkStringParam(aParams, "deviceConfig", cfg);
-          if (Error::isOK(respErr)) {
-            string deviceConfig = "#"+uid+':'+cfg;
-            // optional y position and size
-            o = aParams->get("y");
-            if (o) y = o->int32Value();
-            o = aParams->get("dy");
-            if (o) dy = o->int32Value();
-            // optional name
-            string name;
-            checkStringParam(aParams, "name", name);
-            // optional z-order
-            int zorder = 0;
-            o = aParams->get("z_order");
-            if (o) zorder = o->int32Value();
-            // try to create device
-            LedChainDevicePtr dev = addLedChainDevice(x, dx, y, dy, zorder, deviceConfig);
-            if (!dev) {
-              respErr = WebError::webErr(500, "invalid configuration for LedChain device -> none created");
+          dx = o->int32Value();
+          // optional y position and size
+          o = aParams->get("y");
+          if (o) y = o->int32Value();
+          o = aParams->get("dy");
+          if (o) dy = o->int32Value();
+        }
+      }
+    }
+    if (Error::isOK(respErr)) {
+      string uid;
+      respErr = checkStringParam(aParams, "uniqueId", uid);
+      if (Error::isOK(respErr)) {
+        string cfg;
+        respErr = checkStringParam(aParams, "deviceConfig", cfg);
+        if (Error::isOK(respErr)) {
+          string deviceConfig = "#"+uid+':'+cfg;
+          // optional name
+          string name;
+          checkStringParam(aParams, "name", name);
+          // optional z-order
+          int zorder = 0;
+          o = aParams->get("z_order");
+          if (o) zorder = o->int32Value();
+          // try to create device
+          LedChainDevicePtr dev = addLedChainDevice(x, dx, y, dy, zorder, deviceConfig);
+          if (!dev) {
+            respErr = WebError::webErr(500, "invalid configuration for LedChain device -> none created");
+          }
+          else {
+            // set name
+            if (name.size()>0) dev->setName(name);
+            // insert into database
+            if(mDb.executef(
+              "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, y, dy, zorder, deviceconfig) VALUES (%d, %d, %d, %d, %d, '%q')",
+              x, dx, y, dy, zorder, deviceConfig.c_str()
+            )!=SQLITE_OK) {
+              respErr = mDb.error("saving LED chain segment params");
             }
             else {
-              // set name
-              if (name.size()>0) dev->setName(name);
-              // insert into database
-              if(db.executef(
-                "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, y, dy, zorder, deviceconfig) VALUES (%d, %d, %d, %d, %d, '%q')",
-                x, dx, y, dy, zorder, deviceConfig.c_str()
-              )!=SQLITE_OK) {
-                respErr = db.error("saving LED chain segment params");
-              }
-              else {
-                dev->ledChainDeviceRowID = db.last_insert_rowid();
-                // confirm
-                ApiValuePtr r = aRequest->newApiValue();
-                r->setType(apivalue_object);
-                r->add("dSUID", r->newBinary(dev->mDSUID.getBinary()));
-                r->add("rowid", r->newUint64(dev->ledChainDeviceRowID));
-                r->add("name", r->newString(dev->getName()));
-                aRequest->sendResult(r);
-                respErr.reset(); // make sure we don't send an extra ErrorOK
-              }
+              dev->mLedChainDeviceRowID = mDb.last_insert_rowid();
+              // confirm
+              ApiValuePtr r = aRequest->newApiValue();
+              r->setType(apivalue_object);
+              r->add("dSUID", r->newBinary(dev->mDSUID.getBinary()));
+              r->add("rowid", r->newUint64(dev->mLedChainDeviceRowID));
+              r->add("name", r->newString(dev->getName()));
+              aRequest->sendResult(r);
+              respErr.reset(); // make sure we don't send an extra ErrorOK
             }
           }
         }

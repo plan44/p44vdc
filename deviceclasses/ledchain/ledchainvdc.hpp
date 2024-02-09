@@ -60,9 +60,9 @@ namespace p44 {
     typedef Vdc inherited;
     friend class LedChainDevice;
 
-    LedChainDevicePersistence db;
-    LEDChainArrangementPtr ledArrangement;
-    ViewStackPtr rootView;
+    LedChainDevicePersistence mDb;
+    LEDChainArrangementPtr mLedArrangement;
+    ViewStackPtr mRootView;
 
     typedef std::list<LedChainDevicePtr> LedChainDeviceList;
 

@@ -85,11 +85,11 @@ public:
 LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int aDy, const string &aDeviceConfig) :
   inherited(aVdcP)
   #if P44SCRIPT_FULL_SUPPORT
-  ,ledChainDeviceLookup(*this)
+  ,mLedChainDeviceLookup(*this)
   #endif
 {
   #if P44SCRIPT_FULL_SUPPORT
-  ledChainDeviceLookup.isMemberVariable();
+  mLedChainDeviceLookup.isMemberVariable();
   #endif
   RGBColorLightBehaviourPtr behaviour;
   // aDeviceConfig syntax:
@@ -117,17 +117,17 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   if (nextPart(p2, s, ':')) {
     if (s[0]=='#') {
       // this is the unique ID
-      uniqueId = s.substr(1); // save it
+      mUniqueId = s.substr(1); // save it
       p = p2; // skip it
     }
   }
   if (nextPart(p, lt, ':')) {
     // found light type
-    lightType = lighttype_unknown;
+    mLightType = lighttype_unknown;
     if (lt=="segment" || lt=="area") {
       if (lt=="segment" && aDy==0) aDy = 1; // backwards compatibility, old DB entries have null Y/dY and return 0 for it
       // simple segment (area) of the matrix/chain
-      lightType = lighttype_simplearea;
+      mLightType = lighttype_simplearea;
       int startSoftEdge = 0;
       int endSoftEdge = 0;
       if (nextPart(p, s, ':')) {
@@ -138,12 +138,12 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
         }
       }
       // install the view
-      lightView = P44ViewPtr(new LightSegment(aX, aDx, aY, aDy, startSoftEdge, endSoftEdge));
+      mLightView = P44ViewPtr(new LightSegment(aX, aDx, aY, aDy, startSoftEdge, endSoftEdge));
     }
     #if ENABLE_VIEWCONFIG
     else if (lt=="feature") {
       // light spot
-      lightType = lighttype_feature;
+      mLightType = lighttype_feature;
       installSettings(DeviceSettingsPtr(new FeatureLightDeviceSettings(*this)));
       FeatureLightBehaviour* fl = new FeatureLightBehaviour(*this, false);
       behaviour = FeatureLightBehaviourPtr(fl);
@@ -185,15 +185,15 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
           origincentered = o->boolValue();
         }
         // - create
-        err = createViewFromConfig(cfg, lightView, P44ViewPtr());
+        err = createViewFromConfig(cfg, mLightView, P44ViewPtr());
       }
       if (Error::notOK(err)) {
         OLOG(LOG_WARNING, "Invalid feature light config: %s", err->text());
       }
       // set feature channel default
-      if (fl && lightView) {
-        P44ViewPtr lv = lightView->findView("LIGHT"); // actual light view might be nested
-        if (!lv) lv = lightView;
+      if (fl && mLightView) {
+        P44ViewPtr lv = mLightView->findView("LIGHT"); // actual light view might be nested
+        if (!lv) lv = mLightView;
         fl->featureMode->syncChannelValue(
           DEFAULT_FEATURE_MODE | // basic default features
           (origincentered ? 0 : 0x04000000) | // from pseudo-property "origincentered", or true for lightspot, false for all others
@@ -204,8 +204,8 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     }
     #endif
   }
-  if (!lightView) {
-    lightView = P44ViewPtr(new P44View()); // dummy to avoid crashes
+  if (!mLightView) {
+    mLightView = P44ViewPtr(new P44View()); // dummy to avoid crashes
     OLOG(LOG_WARNING, "No light view found");
   }
   if (!behaviour) {
@@ -214,9 +214,9 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
     behaviour = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
   }
-  if (lightView) {
+  if (mLightView) {
     // make sure it is invisible at the beginning
-    lightView->hide();
+    mLightView->hide();
   }
   // - is RGB
   mColorClass = class_yellow_light;
@@ -224,21 +224,21 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   behaviour->initMinBrightness(getLedChainVdc().getMinBrightness());
   addBehaviour(behaviour);
   // - create dSUID
-  if (uniqueId.empty()) {
+  if (mUniqueId.empty()) {
     // no unique id, use type and position to form dSUID (backwards compatibility)
     OLOG(LOG_WARNING, "Legacy LED chain device, should specify unique ID to get stable dSUID");
-    uniqueId = string_format("%d:%d:%d", lightType, aX, aDx);
+    mUniqueId = string_format("%d:%d:%d", mLightType, aX, aDx);
   }
   // set uniqueid as view label if view does not have a label
-  if (lightView) lightView->setDefaultLabel(uniqueId);
+  if (mLightView) mLightView->setDefaultLabel(mUniqueId);
   // if uniqueId is a valid dSUID/UUID, use it as-is
-  if (!mDSUID.setAsString(uniqueId)) {
+  if (!mDSUID.setAsString(mUniqueId)) {
     // generate vDC implementation specific UUID:
     //   UUIDv5 with name = <classcontainerinstanceid><uniqueid> (separator missing for backwards compatibility)
     //   Note: for backwards compatibility, when no uniqueid ist set, <ledchainType>:<firstLED>:<lastLED> is used
     DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
     string ii = mVdcP->vdcInstanceIdentifier();
-    ii += uniqueId;
+    ii += mUniqueId;
     mDSUID.setNameInSpace(ii, vdcNamespace);
   }
 }
@@ -309,9 +309,9 @@ LedChainVdc &LedChainDevice::getLedChainVdc()
 void LedChainDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
   // clear learn-in data from DB
-  if (ledChainDeviceRowID) {
-    if(getLedChainVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", ledChainDeviceRowID)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error deleting led chain device: %s", getLedChainVdc().db.error()->description().c_str());
+  if (mLedChainDeviceRowID) {
+    if(getLedChainVdc().mDb.executef("DELETE FROM devConfigs WHERE rowid=%lld", mLedChainDeviceRowID)!=SQLITE_OK) {
+      OLOG(LOG_ERR, "Error deleting led chain device: %s", getLedChainVdc().mDb.error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -323,14 +323,14 @@ void LedChainDevice::stopTransitions()
 {
   inherited::stopTransitions();
   // stop any ongoing transition
-  transitionTicket.cancel();
+  mTransitionTicket.cancel();
 }
 
 
 void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // abort previous transition
-  transitionTicket.cancel();
+  mTransitionTicket.cancel();
   // full color device
   RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
   FeatureLightBehaviourPtr fl = getOutput<FeatureLightBehaviour>();
@@ -385,9 +385,9 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
   pix.g = g;
   pix.b = b;
   pix.a = 255;
-  lightView->setAlpha(cl->brightnessForHardware()*255/100); // alpha is brightness, scaled down to 0..255
-  P44ViewPtr targetView = lightView->findView("LIGHT"); // where to direct extras to
-  if (!targetView) targetView = lightView;
+  mLightView->setAlpha(cl->brightnessForHardware()*255/100); // alpha is brightness, scaled down to 0..255
+  P44ViewPtr targetView = mLightView->findView("LIGHT"); // where to direct extras to
+  if (!targetView) targetView = mLightView;
   if (ml) {
     bool centered;
     uint32_t mode;
@@ -455,21 +455,21 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
   }
   else {
     // simple area, just set foreground color
-    lightView->setForegroundColor(pix);
+    mLightView->setForegroundColor(pix);
   }
-  getLedChainVdc().ledArrangement->render(); // update
+  getLedChainVdc().mLedArrangement->render(); // update
   // next step
   if (moreSteps) {
-    OLOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
+    OLOG(LOG_DEBUG, "LED chain transitional values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, mLightView->getAlpha());
     // not yet complete, schedule next step
-    transitionTicket.executeOnce(
+    mTransitionTicket.executeOnce(
       boost::bind(&LedChainDevice::applyChannelValueSteps, this, aForDimming),
-      getLedChainVdc().ledArrangement->getMinUpdateInterval()
+      getLedChainVdc().mLedArrangement->getMinUpdateInterval()
     );
     return; // will be called later again
   }
   if (!aForDimming) {
-    OLOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, lightView->getAlpha());
+    OLOG(LOG_INFO, "LED chain final values R=%d, G=%d, B=%d, dim=%d", (int)r, (int)g, (int)b, mLightView->getAlpha());
   }
 }
 
@@ -477,9 +477,9 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
 
 string LedChainDevice::modelName()
 {
-  if (lightType==lighttype_simplearea)
+  if (mLightType==lighttype_simplearea)
     return "Static LED Matrix Area";
-  else if (lightType==lighttype_feature)
+  else if (mLightType==lighttype_feature)
     return "Moving Feature Light on LED Matrix";
   return "LedChain device";
 }
@@ -499,8 +499,8 @@ bool LedChainDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aR
 string LedChainDevice::getExtraInfo()
 {
   string s;
-  PixelRect r = lightView->getFrame();
-  s = string_format("LED matrix light in rectangle (%d,%d,%d,%d), id='%s'", r.x, r.y, r.dx, r.dy, uniqueId.c_str());
+  PixelRect r = mLightView->getFrame();
+  s = string_format("LED matrix light in rectangle (%d,%d,%d,%d), id='%s', viewId='%s'", r.x, r.y, r.dx, r.dy, mUniqueId.c_str(), mLightView->getId().c_str());
   return s;
 }
 
@@ -509,8 +509,8 @@ string LedChainDevice::getExtraInfo()
 string LedChainDevice::description()
 {
   string s = inherited::description();
-  PixelRect r = lightView->getFrame();
-  string_format_append(s, "\n- LED matrix light in rectangle (%d,%d,%d,%d)\n  unique ID='%s'", r.x, r.y, r.dx, r.dy, uniqueId.c_str());
+  PixelRect r = mLightView->getFrame();
+  string_format_append(s, "\n- LED matrix light in rectangle (%d,%d,%d,%d)\n  unique ID='%s'\n  viewId='%s'", r.x, r.y, r.dx, r.dy, mUniqueId.c_str(), mLightView->getId().c_str());
   return s;
 }
 
