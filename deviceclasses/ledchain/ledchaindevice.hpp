@@ -146,6 +146,9 @@ namespace p44 {
     ///   by vDC API "remove" method.
     virtual bool isSoftwareDisconnectable() P44_OVERRIDE;
 
+    /// this is called after a device was successfully added, loaded with settings and initialized for operation
+    virtual void addedAndInitialized() P44_OVERRIDE;
+
     /// disconnect device. For static device, this means removing the config from the container's DB. Note that command line
     /// static devices cannot be disconnected.
     /// @param aForgetParams if set, not only the connection to the device is removed, but also all parameters related to it

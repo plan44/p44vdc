@@ -228,8 +228,6 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     OLOG(LOG_WARNING, "Legacy LED chain device, should specify unique ID to get stable dSUID");
     mUniqueId = string_format("%d:%d:%d", mLightType, aX, aDx);
   }
-  // set uniqueid as view label if view does not have a label
-  if (mLightView) mLightView->setDefaultLabel(mUniqueId);
   // if uniqueId is a valid dSUID/UUID, use it as-is
   if (!mDSUID.setAsString(mUniqueId)) {
     // generate vDC implementation specific UUID:
@@ -241,6 +239,15 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
     mDSUID.setNameInSpace(ii, vdcNamespace);
   }
 }
+
+
+void LedChainDevice::addedAndInitialized()
+{
+  // set device name / uniqueid as view label if view does not have a label
+  if (mLightView) mLightView->setDefaultLabel(getName()+"/"+mUniqueId);
+  inherited::addedAndInitialized();
+}
+
 
 
 #if P44SCRIPT_FULL_SUPPORT
