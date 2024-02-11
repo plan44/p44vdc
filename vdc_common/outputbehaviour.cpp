@@ -352,7 +352,7 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
   if (simpleScene && simpleScene->mEffect==scene_effect_script && simpleScene->mSceneScript.active()) {
     // run scene script
     OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->mSceneScript.getSource().c_str(), true, 80).c_str() );
-    simpleScene->mSceneScript.setSharedMainContext(mDevice.getDeviceScriptContext());
+    simpleScene->mSceneScript.setSharedMainContext(mDevice.getDeviceScriptContext(true));
     simpleScene->mSceneScript.run(regular|stopall, boost::bind(&OutputBehaviour::sceneScriptDone, this, aDoneCB, _1), ScriptObjPtr(), Infinite);
     return;
   }
@@ -375,7 +375,10 @@ void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ScriptObjPtr aResult)
 void OutputBehaviour::stopSceneActions()
 {
   #if ENABLE_SCENE_SCRIPT
-  mDevice.getDeviceScriptContext()->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
+  ScriptMainContextPtr dsc = mDevice.getDeviceScriptContext(false);
+  if (dsc) {
+    dsc->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
+  }
   #endif // ENABLE_SCENE_SCRIPT
 }
 

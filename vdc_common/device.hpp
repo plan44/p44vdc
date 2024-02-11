@@ -627,7 +627,7 @@ namespace p44 {
     virtual ScriptObjPtr newDeviceObj();
 
     /// @return on-demand common script context for device scripts
-    ScriptMainContextPtr getDeviceScriptContext();
+    ScriptMainContextPtr getDeviceScriptContext(bool aCreateIfMissing);
 
     #endif // P44SCRIPT_FULL_SUPPORT
 

@@ -2624,9 +2624,9 @@ ScriptObjPtr Device::newDeviceObj()
   return new DeviceObj(this);
 }
 
-ScriptMainContextPtr Device::getDeviceScriptContext()
+ScriptMainContextPtr Device::getDeviceScriptContext(bool aCreateIfMissing)
 {
-  if (!mDeviceScriptContext) {
+  if (!mDeviceScriptContext && aCreateIfMissing) {
     // create on demand, such that only devices actually using scripts get a context
     mDeviceScriptContext = StandardScriptingDomain::sharedDomain().newContext(newDeviceObj());
   }
