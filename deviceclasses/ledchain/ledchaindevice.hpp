@@ -93,6 +93,9 @@ namespace p44 {
     /// stop running transitions
     virtual void stopTransitions() P44_OVERRIDE;
 
+    /// abort any currently ongoing scene action
+    virtual void stopSceneActions() P44_OVERRIDE;
+
     /// apply all pending channel value updates to the device's hardware
     /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
     ///   ChannelBehaviours and check isChannelUpdatePending(), and send new values to the device hardware. After successfully

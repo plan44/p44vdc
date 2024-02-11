@@ -768,8 +768,8 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
   }
   else if (aMethod=="x-p44-stopSceneActions") {
     // we want everything to stop
-    stopTransitions();
-    stopSceneActions();
+    stopTransitions(); // channel transitions
+    stopSceneActions(); // actions such as blinking, scene scripts, animations on views
     respErr = Error::ok();
   }
   else if (aMethod=="x-p44-syncChannels") {

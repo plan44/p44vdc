@@ -340,6 +340,13 @@ void LedChainDevice::stopTransitions()
 }
 
 
+void LedChainDevice::stopSceneActions()
+{
+  if (mLightView) mLightView->stopAnimations();
+  inherited::stopSceneActions();
+}
+
+
 void LedChainDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // abort previous transition
