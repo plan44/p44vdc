@@ -49,8 +49,10 @@ using namespace p44;
 
 class LightSegment : public P44View
 {
-  int startSoftEdge;
-  int endSoftEdge;
+  // softedge is not implemented, but we keep the params from old installations
+  // in case we do implement it some time again
+  int mStartSoftEdge;
+  int mEndSoftEdge;
 
 protected:
 
@@ -67,8 +69,8 @@ protected:
 public:
 
   LightSegment(int aX, int aDx, int aY, int aDy, int aStartSoftEdge, int aEndSoftEdge) :
-    startSoftEdge(aStartSoftEdge),
-    endSoftEdge(aEndSoftEdge)
+    mStartSoftEdge(aStartSoftEdge),
+    mEndSoftEdge(aEndSoftEdge)
   {
     setForegroundColor(black);
     setBackgroundColor(transparent);
@@ -99,8 +101,8 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
   // - with lighttype=segment
   //   - aX,aDx,aY,aDY determine the position and size (=frame) of the segment (view)
   //   - config=b:e
-  //     - b:0..n size of softedge at beginning
-  //     - e:0..n size of softedge at end
+  //     - b:0..n size of softedge at beginning (no longer implemented)
+  //     - e:0..n size of softedge at end (no longer implemented)
   // - with lighttype=featurelight
   //   - aX,aDx,aY,aDY determine the position and size (=frame) of the light spot
   //   - config:string|filepath|JSON
@@ -147,7 +149,7 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
       installSettings(DeviceSettingsPtr(new FeatureLightDeviceSettings(*this)));
       FeatureLightBehaviour* fl = new FeatureLightBehaviour(*this, false);
       behaviour = FeatureLightBehaviourPtr(fl);
-      // create the root view (not necessarily a ColorEffectView, but likely so
+      // create the light's view (not necessarily a ColorEffectView, but likely so
       bool origincentered = true;
       JsonObjectPtr cfg;
       ErrorPtr err;
@@ -160,13 +162,18 @@ LedChainDevice::LedChainDevice(LedChainVdc *aVdcP, int aX, int aDx, int aY, int 
         cfg = JsonObject::objFromFile(Application::sharedApplication()->resourcePath(p).c_str(), &err);
       }
       else {
-        string vty = "lightspot"; // default to lightspot
+        cfg = JsonObject::newObj();
+        string vty = "lightspot"; // default to lightspot...
         if (*p) {
-          // but can override it with a custom type
+          // ...but can override it with a custom type
           vty = p;
           origincentered = false; // custom view type does not use centered positioning by default
         }
-        cfg = JsonObject::newObj();
+        else {
+          // strictly default lightspot behaviour needs 3x effect size for
+          // approximate visual backwards compatibility
+          cfg->add("effect_cycles", cfg->newInt32(3));
+        }
         cfg->add("type", cfg->newString(vty));
       }
       if (Error::isOK(err)) {
@@ -488,7 +495,11 @@ string LedChainDevice::getExtraInfo()
 {
   string s;
   PixelRect r = mLightView->getFrame();
-  s = string_format("LED matrix light in rectangle (%d,%d,%d,%d), id='%s', viewId='%s'", r.x, r.y, r.dx, r.dy, mUniqueId.c_str(), mLightView->getId().c_str());
+  s = string_format(
+    "SmartLED light in rectangle (%d,%d,%d,%d), type='%s'",
+    r.x, r.y, r.dx, r.dy,
+    mLightView->getTypeName()
+  );
   return s;
 }
 
@@ -498,7 +509,15 @@ string LedChainDevice::description()
 {
   string s = inherited::description();
   PixelRect r = mLightView->getFrame();
-  string_format_append(s, "\n- LED matrix light in rectangle (%d,%d,%d,%d)\n  unique ID='%s'\n  viewId='%s'", r.x, r.y, r.dx, r.dy, mUniqueId.c_str(), mLightView->getId().c_str());
+  string_format_append(s,
+    "\n- SmartLED light in rectangle (%d,%d,%d,%d)%s\n  type='%s'\n  unique ID='%s'\n  view label='%s'\n  viewId='%s'",
+    r.x, r.y, r.dx, r.dy,
+    mLightView->getAutoAdjust() & P44View::fillXY ? ", autoadjusting" : "",
+    mLightView->getTypeName(),
+    mUniqueId.c_str(),
+    mLightView->getLabel().c_str(),
+    mLightView->getId().c_str()
+  );
   return s;
 }
 
