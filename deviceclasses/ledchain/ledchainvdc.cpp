@@ -144,6 +144,9 @@ const char *LedChainVdc::vdcClassIdentifier() const
 LedChainDevicePtr LedChainVdc::addLedChainDevice(int aX, int aDx, int aY, int aDy, int aZOrder, string aDeviceConfig)
 {
   LedChainDevicePtr newDev;
+  P44View::FramingMode autoadjust = P44View::noFraming; // not noAdjust, we DO want content resizing with frame
+  if (aDx==0) autoadjust |= P44View::fillX;
+  if (aDy==0) autoadjust |= P44View::fillY;
   newDev = LedChainDevicePtr(new LedChainDevice(this, aX, aDx, aY, aDy, aDeviceConfig));
   // add to container if device was created
   if (newDev) {
@@ -151,6 +154,7 @@ LedChainDevicePtr LedChainVdc::addLedChainDevice(int aX, int aDx, int aY, int aD
     simpleIdentifyAndAddDevice(newDev);
     // add to view
     if (newDev->mLightView->getZOrder()==0) newDev->mLightView->setZOrder(aZOrder);
+    newDev->mLightView->setAutoAdjust(autoadjust);
     mRootView->setPositioningMode(P44View::noAdjust);
     mRootView->pushView(newDev->mLightView);
     // - re-render
