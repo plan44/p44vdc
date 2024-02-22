@@ -157,6 +157,7 @@ private:
       LOG(LOG_ERR, "Self test OK - but without any actually tested hardware");
       mRedLED->steadyOff();
       mGreenLED->blinkFor(Infinite, 150, 80); // hectic green flickering = OK but no HW tested
+      mGlobalError.reset(); // report as OK
     }
     if (Error::isOK(mGlobalError)) {
       LOG(LOG_ERR, "Self test OK");
