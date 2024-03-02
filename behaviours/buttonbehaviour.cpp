@@ -746,7 +746,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     }
     #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
     // send event
-    if (mClickType!=ct_hold_repeat) sendValueEvent();
+    if (mClickType!=ct_hold_repeat && mClickType!=ct_progress && mClickType!=ct_complete) sendValueEvent();
     #endif
     // also let vdchost know for local click handling
     // TODO: more elegant solution for this
@@ -758,11 +758,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
 void ButtonBehaviour::clickSequenceComplete()
 {
   // click sequence complete
-  #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
-  // send event
-  sendValueEvent();
-  #endif
-  // report progress
+  // - report progress
   sendClick(ct_complete); // always report state (not to dS)
 }
 
