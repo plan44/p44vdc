@@ -1153,8 +1153,8 @@ private:
       if (searchAddr>0xFFFFFF) {
         SOLOG(daliComm, LOG_WARNING, "- failed search");
         if (restarts<MAX_RESTARTS) {
-          SOLOG(daliComm, LOG_NOTICE, "- restarting search at address of last found device + 1");
           restarts++;
+          SOLOG(daliComm, LOG_NOTICE, "- restarting search at address of last found device + 1 (%d/%d)", restarts, MAX_RESTARTS);
           newSearchUpFrom(lastSearchMin);
           return;
         }
@@ -1183,8 +1183,8 @@ private:
       // should definitely not happen, probably bus error led to false device detection -> restart search after a while
       SOLOG(daliComm, LOG_WARNING, "- Device at 0x%06X did not respond to %d attempts of DALICMD_QUERY_SHORT_ADDRESS", searchAddr, MAX_SHORTADDR_READ_REPEATS+1);
       if (restarts<MAX_RESTARTS) {
-        SOLOG(daliComm, LOG_NOTICE, "- restarting complete scan after a delay");
         restarts++;
+        SOLOG(daliComm, LOG_NOTICE, "- restarting complete scan after a delay (%d/%d)", restarts, MAX_RESTARTS);
         delayTicket.executeOnce(boost::bind(&DaliFullBusScanner::startScan, this), RESCAN_RETRY_DELAY);
         return;
       }
