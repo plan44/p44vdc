@@ -73,7 +73,46 @@ static void D2030AButtonHandler(const struct EnoceanInputDescriptor &aInputDescr
 }
 
 
+/// sensor bitfield extractor for sensors with last value reserved for error condition
+static void errSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
+{
+  uint64_t value = EnoceanInputs::bitsExtractor(aInputDescriptor, aDataP, aDataSize);
+  // now pass to behaviour
+  if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
+    uint64_t maxval = EnoceanInputs::maxVal(aInputDescriptor);
+    if (value==maxval) {
+      // maxval in the bitfield is reserved for error
+      sb->setHardwareError(hardwareError_deviceError); // unspecified error
+      sb->invalidateSensorValue(); // not a valid measurement, out of range
+    }
+    else {
+      sb->updateEngineeringValue(value); // update the value
+    }
+  }
+}
 
+
+/// sensor bitfield extractor for sensors with last 3 values reserved for +/- out of range and error
+static void rngErrSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
+{
+  uint64_t value = EnoceanInputs::bitsExtractor(aInputDescriptor, aDataP, aDataSize);
+  // now pass to behaviour
+  if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
+    uint64_t maxval = EnoceanInputs::maxVal(aInputDescriptor);
+    if (value==maxval) {
+      // maxval in the bitfield is reserved for error
+      sb->setHardwareError(hardwareError_deviceError); // unspecified error
+      sb->invalidateSensorValue(); // not a valid measurement, out of range
+    }
+    else if (value==maxval-1 || value==maxval-2) {
+      // maxval-1 = overrange, maxval-2 = underrange
+      sb->invalidateSensorValue(); // not a valid measurement, out of range
+    }
+    else {
+      sb->updateEngineeringValue(value); // update the value
+    }
+  }
+}
 
 
 // MARK: - mapping table for generic EnoceanInputHandler
@@ -94,6 +133,10 @@ const p44::EnoceanInputDescriptor enoceanVLDdescriptors[] = {
   { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(2,0), DB(1,1),    100,      40*60, &stdSensorHandler,   humText },
   { 0, 0x14, 0x30, 0, class_blue_climate, group_red_security,            behaviour_binaryinput, binInpType_smoke,       usage_room,         0,      1, DB(5,7), DB(5,7),    100,      40*60, &stdInputHandler,    "Smoke Alarm" },
   { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,         0,      1, DB(4,2), DB(4,2),    100,      40*60, &lowBatInputHandler, lowBatText }, // MSB of 2-bit battery status -> low+Critical report low bat
+  // D2-14-40 Multi-Function Temperature, Rel. Humidity, Illumination (and acceleration, but we don't use that yet)
+  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -40,   62.4, DB(8,7), DB(7,6),    100,      40*60, &rngErrSensorHandler, tempText },
+  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(7,5), DB(6,6),    100,      40*60, &rngErrSensorHandler, humText },
+  { 0, 0x14, 0x40, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,         0, 131071, DB(6,5), DB(4,5),    100,      40*60, &errSensorHandler,    illumText },
   // D2-32 AC current clamps
   // D2-32-00: single phase current clamp
   { 0, 0x32, 0x00, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler, "Current" },
@@ -525,8 +568,7 @@ static void D20601SensorHandler(const struct EnoceanInputDescriptor &aInputDescr
   // now pass to behaviour
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
     // D20601 values all have the last two values in the bitrange reserved for invalid/notsupported value
-    int fieldsize = aInputDescriptor.msBit-aInputDescriptor.lsBit+1;
-    uint64_t maxval = (1<<fieldsize)-1;
+    uint64_t maxval = maxVal(aInputDescriptor);
     if (value==maxval || value==maxval-1)
       sb->invalidateSensorValue(); // not a valid value
     else

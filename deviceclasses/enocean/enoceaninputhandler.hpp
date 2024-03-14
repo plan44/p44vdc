@@ -82,6 +82,7 @@ namespace p44 {
 
     void handleBitField(const EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
     uint64_t bitsExtractor(const struct EnoceanInputDescriptor &aInputDescriptor, uint8_t *aDataP, int aDataSize);
+    uint64_t maxVal(const struct EnoceanInputDescriptor &aInputDescriptor);
 
     void stdSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);
     void invSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP);

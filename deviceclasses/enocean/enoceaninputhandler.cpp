@@ -64,6 +64,14 @@ uint64_t p44::EnoceanInputs::bitsExtractor(const struct EnoceanInputDescriptor &
 }
 
 
+/// maximum value of the defined bitfield
+uint64_t p44::EnoceanInputs::maxVal(const struct EnoceanInputDescriptor &aInputDescriptor)
+{
+  int fieldsize = aInputDescriptor.msBit-aInputDescriptor.lsBit+1;
+  return (1<<fieldsize)-1;
+}
+
+
 /// standard bitfield extractor function for sensor behaviours
 void p44::EnoceanInputs::stdSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
