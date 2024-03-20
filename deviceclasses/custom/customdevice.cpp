@@ -595,14 +595,14 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
           switch (ct) {
             case channeltype_hue:
             case channeltype_saturation:
-              cl->colorMode = colorLightModeHueSaturation;
+              cl->mColorMode = colorLightModeHueSaturation;
               break;
             case channeltype_cie_x:
             case channeltype_cie_y:
-              cl->colorMode = colorLightModeXY;
+              cl->mColorMode = colorLightModeXY;
               break;
             case channeltype_colortemp:
-              cl->colorMode = colorLightModeCt;
+              cl->mColorMode = colorLightModeCt;
               break;
           }
         }

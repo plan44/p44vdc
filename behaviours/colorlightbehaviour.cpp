@@ -34,7 +34,7 @@ double ColorChannel::getChannelValueCalculated(bool aTransitional)
   // check with behaviour first
   ColorLightBehaviour *cl = dynamic_cast<ColorLightBehaviour *>(&mOutput);
   if (cl) {
-    if (cl->colorMode!=colorMode()) {
+    if (cl->mColorMode!=colorMode()) {
       // asking for a color channel that is not native -> have it calculated
       cl->deriveMissingColorChannels(aTransitional);
     }
@@ -49,9 +49,9 @@ double ColorChannel::getChannelValueCalculated(bool aTransitional)
 
 ColorLightScene::ColorLightScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
   inherited(aSceneDeviceSettings, aSceneNo),
-  colorMode(colorLightModeNone),
-  XOrHueOrCt(0),
-  YOrSat(0)
+  mColorMode(colorLightModeNone),
+  mXOrHueOrCt(0),
+  mYOrSat(0)
 {
 }
 
@@ -63,11 +63,11 @@ double ColorLightScene::sceneValue(int aChannelIndex)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
-    case channeltype_hue: return colorMode==colorLightModeHueSaturation ? XOrHueOrCt : 0;
-    case channeltype_saturation: return colorMode==colorLightModeHueSaturation ? YOrSat : 0;
-    case channeltype_colortemp: return colorMode==colorLightModeCt ? XOrHueOrCt : 0;
-    case channeltype_cie_x: return colorMode==colorLightModeXY ? XOrHueOrCt : 0;
-    case channeltype_cie_y: return colorMode==colorLightModeXY ? YOrSat : 0;
+    case channeltype_hue: return mColorMode==colorLightModeHueSaturation ? mXOrHueOrCt : 0;
+    case channeltype_saturation: return mColorMode==colorLightModeHueSaturation ? mYOrSat : 0;
+    case channeltype_colortemp: return mColorMode==colorLightModeCt ? mXOrHueOrCt : 0;
+    case channeltype_cie_x: return mColorMode==colorLightModeXY ? mXOrHueOrCt : 0;
+    case channeltype_cie_y: return mColorMode==colorLightModeXY ? mYOrSat : 0;
     default: return inherited::sceneValue(aChannelIndex);
   }
   return 0;
@@ -78,11 +78,11 @@ void ColorLightScene::setSceneValue(int aChannelIndex, double aValue)
 {
   ChannelBehaviourPtr cb = getDevice().getChannelByIndex(aChannelIndex);
   switch (cb->getChannelType()) {
-    case channeltype_hue: setPVar(XOrHueOrCt, aValue); setPVar(colorMode, colorLightModeHueSaturation); break;
-    case channeltype_saturation: setPVar(YOrSat, aValue); setPVar(colorMode, colorLightModeHueSaturation); break;
-    case channeltype_colortemp: setPVar(XOrHueOrCt, aValue); setPVar(colorMode, colorLightModeCt); break;
-    case channeltype_cie_x: setPVar(XOrHueOrCt, aValue); setPVar(colorMode, colorLightModeXY); break;
-    case channeltype_cie_y: setPVar(YOrSat, aValue); setPVar(colorMode, colorLightModeXY); break;
+    case channeltype_hue: setPVar(mXOrHueOrCt, aValue); setPVar(mColorMode, colorLightModeHueSaturation); break;
+    case channeltype_saturation: setPVar(mYOrSat, aValue); setPVar(mColorMode, colorLightModeHueSaturation); break;
+    case channeltype_colortemp: setPVar(mXOrHueOrCt, aValue); setPVar(mColorMode, colorLightModeCt); break;
+    case channeltype_cie_x: setPVar(mXOrHueOrCt, aValue); setPVar(mColorMode, colorLightModeXY); break;
+    case channeltype_cie_y: setPVar(mYOrSat, aValue); setPVar(mColorMode, colorLightModeXY); break;
     default: inherited::setSceneValue(aChannelIndex, aValue); break;
   }
 }
@@ -126,9 +126,9 @@ void ColorLightScene::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
-  colorMode = (ColorLightMode)aRow->get<int>(aIndex++);
-  XOrHueOrCt = aRow->get<double>(aIndex++);
-  YOrSat = aRow->get<double>(aIndex++);
+  mColorMode = (ColorLightMode)aRow->get<int>(aIndex++);
+  mXOrHueOrCt = aRow->get<double>(aIndex++);
+  mYOrSat = aRow->get<double>(aIndex++);
 }
 
 
@@ -137,9 +137,9 @@ void ColorLightScene::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, (int)colorMode);
-  aStatement.bind(aIndex++, XOrHueOrCt);
-  aStatement.bind(aIndex++, YOrSat);
+  aStatement.bind(aIndex++, (int)mColorMode);
+  aStatement.bind(aIndex++, mXOrHueOrCt);
+  aStatement.bind(aIndex++, mYOrSat);
 }
 
 
@@ -165,20 +165,20 @@ void ColorLightScene::setDefaultSceneValues(SceneNo aSceneNo)
     case LOCAL_OFF:
     case DEEP_OFF:
       // no color for off
-      colorMode = colorLightModeNone;
+      mColorMode = colorLightModeNone;
       break;
     case PANIC:
     case FIRE:
       // Alert - use cold white
-      colorMode = colorLightModeCt;
-      XOrHueOrCt = 153; // = 1E6/153 = 6535K = cold white
-      YOrSat = 0;
+      mColorMode = colorLightModeCt;
+      mXOrHueOrCt = 153; // = 1E6/153 = 6535K = cold white
+      mYOrSat = 0;
       break;
     default:
       // default color is warm white
-      colorMode = colorLightModeCt;
-      XOrHueOrCt = 370; // = 1E6/370 = 2700k = warm white
-      YOrSat = 0;
+      mColorMode = colorLightModeCt;
+      mXOrHueOrCt = 370; // = 1E6/370 = 2700k = warm white
+      mYOrSat = 0;
   }
   ColorLightBehaviourPtr cb = boost::dynamic_pointer_cast<ColorLightBehaviour>(getOutputBehaviour());
   if (cb) {
@@ -212,28 +212,28 @@ DsScenePtr ColorLightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 ColorLightBehaviour::ColorLightBehaviour(Device &aDevice, bool aCtOnly) :
   inherited(aDevice),
-  ctOnly(aCtOnly),
-  colorMode(colorLightModeNone),
-  derivedValuesComplete(false)
+  mCtOnly(aCtOnly),
+  mColorMode(colorLightModeNone),
+  mDerivedValuesComplete(false)
 {
   // primary channel of a color light is always a dimmer controlling the brightness
-  setHardwareOutputConfig(ctOnly ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, -1);
+  setHardwareOutputConfig(mCtOnly ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, -1);
   // Create and add auxiliary channels to the device for Hue, Saturation, Color Temperature and CIE x,y
   // Note: all channels always exists, but for CT only lights, only CT is exposed in the API
   // - hue
-  hue = ChannelBehaviourPtr(new HueChannel(*this));
-  if (!aCtOnly) addChannel(hue);
+  mHue = ChannelBehaviourPtr(new HueChannel(*this));
+  if (!aCtOnly) addChannel(mHue);
   // - saturation
-  saturation = ChannelBehaviourPtr(new SaturationChannel(*this));
-  if (!aCtOnly) addChannel(saturation);
+  mSaturation = ChannelBehaviourPtr(new SaturationChannel(*this));
+  if (!aCtOnly) addChannel(mSaturation);
   // - color temperature
-  ct = ChannelBehaviourPtr(new ColorTempChannel(*this));
-  addChannel(ct);
+  mCt = ChannelBehaviourPtr(new ColorTempChannel(*this));
+  addChannel(mCt);
   // - CIE x and y
-  cieX = ChannelBehaviourPtr(new CieXChannel(*this));
-  if (!aCtOnly) addChannel(cieX);
-  cieY = ChannelBehaviourPtr(new CieYChannel(*this));
-  if (!aCtOnly) addChannel(cieY);
+  mCIEx = ChannelBehaviourPtr(new CieXChannel(*this));
+  if (!aCtOnly) addChannel(mCIEx);
+  mCIEy = ChannelBehaviourPtr(new CieYChannel(*this));
+  if (!aCtOnly) addChannel(mCIEy);
 }
 
 
@@ -263,20 +263,20 @@ void ColorLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     MLMicroSeconds ttDown = transitionTimeFromScene(colorLightScene, false);
     // prepare next color values in channels
     bool colorInfoSet = false;
-    ColorLightMode loadedMode = colorLightScene->colorMode;
+    ColorLightMode loadedMode = colorLightScene->mColorMode;
     switch (loadedMode) {
       case colorLightModeHueSaturation: {
-        if (hue->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
-        if (saturation->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true)) colorInfoSet = true;
+        if (mHue->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->mXOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
+        if (mSaturation->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->mYOrSat, ttUp, ttDown, true)) colorInfoSet = true;
         break;
       }
       case colorLightModeXY: {
-        if (cieX->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
-        if (cieY->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->YOrSat, ttUp, ttDown, true)) colorInfoSet = true;
+        if (mCIEx->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->mXOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
+        if (mCIEy->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->mYOrSat, ttUp, ttDown, true)) colorInfoSet = true;
         break;
       }
       case colorLightModeCt: {
-        if (ct->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->XOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
+        if (mCt->setChannelValueIfNotDontCare(colorLightScene, colorLightScene->mXOrHueOrCt, ttUp, ttDown, true)) colorInfoSet = true;
         break;
       }
       default:
@@ -284,14 +284,14 @@ void ColorLightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
     }
     if (brightnessForHardware(true)>0 && colorInfoSet) {
       // change current color mode only if final brightness is not zero and any color channels have actually changed
-      colorMode = loadedMode;
+      mColorMode = loadedMode;
       // Don't cares should be correct at this point, but scenes saved long ago might have values that should NOT be
       // applied but don't have a dontCare. The following call will repair these incorrect scenes:
       adjustChannelDontCareToColorMode(colorLightScene, true); // only SET dontCares, but do not remove any
     }
   }
   // need recalculation of values
-  derivedValuesComplete = false;
+  mDerivedValuesComplete = false;
 }
 
 
@@ -302,21 +302,21 @@ void ColorLightBehaviour::saveChannelsToScene(DsScenePtr aScene)
   // now save color specific scene information
   ColorLightScenePtr colorLightScene = boost::dynamic_pointer_cast<ColorLightScene>(aScene);
   if (colorLightScene) {
-    colorLightScene->colorMode = colorMode;
+    colorLightScene->mColorMode = mColorMode;
     // save the values and adjust don't cares according to color mode
-    switch (colorMode) {
+    switch (mColorMode) {
       case colorLightModeHueSaturation: {
-        colorLightScene->setPVar(colorLightScene->XOrHueOrCt, hue->getChannelValue());
-        colorLightScene->setPVar(colorLightScene->YOrSat, saturation->getChannelValue());
+        colorLightScene->setPVar(colorLightScene->mXOrHueOrCt, mHue->getChannelValue());
+        colorLightScene->setPVar(colorLightScene->mYOrSat, mSaturation->getChannelValue());
         break;
       }
       case colorLightModeXY: {
-        colorLightScene->setPVar(colorLightScene->XOrHueOrCt, cieX->getChannelValue());
-        colorLightScene->setPVar(colorLightScene->YOrSat, cieY->getChannelValue());
+        colorLightScene->setPVar(colorLightScene->mXOrHueOrCt, mCIEx->getChannelValue());
+        colorLightScene->setPVar(colorLightScene->mYOrSat, mCIEy->getChannelValue());
         break;
       }
       case colorLightModeCt: {
-        colorLightScene->setPVar(colorLightScene->XOrHueOrCt, ct->getChannelValue());
+        colorLightScene->setPVar(colorLightScene->mXOrHueOrCt, mCt->getChannelValue());
         break;
       }
       default: {
@@ -332,50 +332,50 @@ void ColorLightBehaviour::saveChannelsToScene(DsScenePtr aScene)
 void ColorLightBehaviour::adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene, bool aSetOnly)
 {
   // save the values and adjust don't cares according to color mode
-  switch (aColorLightScene->colorMode) {
+  switch (aColorLightScene->mColorMode) {
     case colorLightModeHueSaturation: {
       // don't care unused ones
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mCIEx->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mCIEy->getChannelIndex(), valueflags_dontCare, true);
+      aColorLightScene->setSceneValueFlags(mCt->getChannelIndex(), valueflags_dontCare, true);
       if (!aSetOnly) {
         // enable the used values
-        if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, false);
-        if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, false);
+        if (!mCtOnly) aColorLightScene->setSceneValueFlags(mHue->getChannelIndex(), valueflags_dontCare, false);
+        if (!mCtOnly) aColorLightScene->setSceneValueFlags(mSaturation->getChannelIndex(), valueflags_dontCare, false);
       }
       break;
     }
     case colorLightModeXY: {
       // don't care unused ones
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mHue->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mSaturation->getChannelIndex(), valueflags_dontCare, true);
+      aColorLightScene->setSceneValueFlags(mCt->getChannelIndex(), valueflags_dontCare, true);
       if (!aSetOnly) {
         // enable the used values
-        if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, false);
-        if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, false);
+        if (!mCtOnly) aColorLightScene->setSceneValueFlags(mCIEx->getChannelIndex(), valueflags_dontCare, false);
+        if (!mCtOnly) aColorLightScene->setSceneValueFlags(mCIEy->getChannelIndex(), valueflags_dontCare, false);
       }
       break;
     }
     case colorLightModeCt: {
       // don't care unused ones
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mCIEx->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mCIEy->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mHue->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mSaturation->getChannelIndex(), valueflags_dontCare, true);
       if (!aSetOnly) {
         // enable the used values
-        aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, false);
+        aColorLightScene->setSceneValueFlags(mCt->getChannelIndex(), valueflags_dontCare, false);
       }
       break;
     }
     default: {
       // all color related information is dontCare
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(hue->getChannelIndex(), valueflags_dontCare, true);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(saturation->getChannelIndex(), valueflags_dontCare, true);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieX->getChannelIndex(), valueflags_dontCare, true);
-      if (!ctOnly) aColorLightScene->setSceneValueFlags(cieY->getChannelIndex(), valueflags_dontCare, true);
-      aColorLightScene->setSceneValueFlags(ct->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mHue->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mSaturation->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mCIEx->getChannelIndex(), valueflags_dontCare, true);
+      if (!mCtOnly) aColorLightScene->setSceneValueFlags(mCIEy->getChannelIndex(), valueflags_dontCare, true);
+      aColorLightScene->setSceneValueFlags(mCt->getChannelIndex(), valueflags_dontCare, true);
       break;
     }
   }
@@ -391,38 +391,38 @@ bool ColorLightBehaviour::deriveColorMode()
 {
   // the need to derive the color modes only arises when
   // colors (may) have changed, so this invalidates the derived channel values
-  derivedValuesComplete = false;
+  mDerivedValuesComplete = false;
   // Note: actual calculation of derived values might not be carried out at all if none of the
   //   derived channel values is queried. However, we must mark the derived channel values
   //   volatile here to make sure these don't get persisted
   // check changed channels
-  if (!ctOnly) {
-    if (hue->needsApplying() || saturation->needsApplying()) {
-      colorMode = colorLightModeHueSaturation;
-      hue->setVolatile(false);
-      saturation->setVolatile(false);
-      cieX->setVolatile(true);
-      cieY->setVolatile(true);
-      ct->setVolatile(true);
+  if (!mCtOnly) {
+    if (mHue->needsApplying() || mSaturation->needsApplying()) {
+      mColorMode = colorLightModeHueSaturation;
+      mHue->setVolatile(false);
+      mSaturation->setVolatile(false);
+      mCIEx->setVolatile(true);
+      mCIEy->setVolatile(true);
+      mCt->setVolatile(true);
       return true;
     }
-    else if (cieX->needsApplying() || cieY->needsApplying()) {
-      colorMode = colorLightModeXY;
-      cieX->setVolatile(false);
-      cieY->setVolatile(false);
-      hue->setVolatile(true);
-      saturation->setVolatile(true);
-      ct->setVolatile(true);
+    else if (mCIEx->needsApplying() || mCIEy->needsApplying()) {
+      mColorMode = colorLightModeXY;
+      mCIEx->setVolatile(false);
+      mCIEy->setVolatile(false);
+      mHue->setVolatile(true);
+      mSaturation->setVolatile(true);
+      mCt->setVolatile(true);
       return true;
     }
   }
-  if (ct->needsApplying()) {
-    colorMode = colorLightModeCt;
-    ct->setVolatile(false);
-    cieX->setVolatile(true);
-    cieY->setVolatile(true);
-    hue->setVolatile(true);
-    saturation->setVolatile(true);
+  if (mCt->needsApplying()) {
+    mColorMode = colorLightModeCt;
+    mCt->setVolatile(false);
+    mCIEx->setVolatile(true);
+    mCIEy->setVolatile(true);
+    mHue->setVolatile(true);
+    mSaturation->setVolatile(true);
     return true;
   }
   // could not determine new color mode (assuming old is still ok)
@@ -434,21 +434,21 @@ bool ColorLightBehaviour::getCIExy(double &aCieX, double &aCieY, bool aTransitio
 {
   Row3 HSV;
   Row3 xyV;
-  switch (colorMode) {
+  switch (mColorMode) {
     case colorLightModeHueSaturation:
-      HSV[0] = hue->getChannelValue(aTransitional); // 0..360
-      HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
+      HSV[0] = mHue->getChannelValue(aTransitional); // 0..360
+      HSV[1] = mSaturation->getChannelValue(aTransitional)/100; // 0..1
       HSV[2] = 1;
       HSVtoxyV(HSV, xyV);
       aCieX = xyV[0];
       aCieY = xyV[1];
       break;
     case colorLightModeXY:
-      aCieX = cieX->getChannelValue(aTransitional);
-      aCieY = cieY->getChannelValue(aTransitional);
+      aCieX = mCIEx->getChannelValue(aTransitional);
+      aCieY = mCIEy->getChannelValue(aTransitional);
       break;
     case colorLightModeCt:
-      CTtoxyV(ct->getChannelValue(aTransitional), xyV);
+      CTtoxyV(mCt->getChannelValue(aTransitional), xyV);
       aCieX = xyV[0];
       aCieY = xyV[1];
       break;
@@ -463,23 +463,23 @@ bool ColorLightBehaviour::getCT(double &aCT, bool aTransitional)
 {
   Row3 HSV;
   Row3 xyV;
-  switch (colorMode) {
+  switch (mColorMode) {
     case colorLightModeHueSaturation:
-      HSV[0] = hue->getChannelValue(aTransitional); // 0..360
-      HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
+      HSV[0] = mHue->getChannelValue(aTransitional); // 0..360
+      HSV[1] = mSaturation->getChannelValue(aTransitional)/100; // 0..1
       HSV[2] = 1;
       HSVtoxyV(HSV, xyV);
       xyVtoCT(xyV, aCT);
       break;
     case colorLightModeXY:
       // missing HSV and ct
-      xyV[0] = cieX->getChannelValue(aTransitional);
-      xyV[1] = cieY->getChannelValue(aTransitional);
+      xyV[0] = mCIEx->getChannelValue(aTransitional);
+      xyV[1] = mCIEy->getChannelValue(aTransitional);
       xyV[2] = 1;
       xyVtoCT(xyV, aCT);
       break;
     case colorLightModeCt:
-      aCT = ct->getChannelValue(aTransitional);
+      aCT = mCt->getChannelValue(aTransitional);
       break;
     default:
       return false; // unknown color mode
@@ -492,14 +492,14 @@ bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation, bo
 {
   Row3 HSV;
   Row3 xyV;
-  switch (colorMode) {
+  switch (mColorMode) {
     case colorLightModeHueSaturation:
-      aHue = hue->getChannelValue(aTransitional); // 0..360
-      aSaturation = saturation->getChannelValue(aTransitional);
+      aHue = mHue->getChannelValue(aTransitional); // 0..360
+      aSaturation = mSaturation->getChannelValue(aTransitional);
       break;
     case colorLightModeXY:
-      xyV[0] = cieX->getChannelValue(aTransitional);
-      xyV[1] = cieY->getChannelValue(aTransitional);
+      xyV[0] = mCIEx->getChannelValue(aTransitional);
+      xyV[1] = mCIEy->getChannelValue(aTransitional);
       xyV[2] = 1;
     xyVtoHSV:
       xyVtoHSV(xyV, HSV);
@@ -507,7 +507,7 @@ bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation, bo
       aSaturation = HSV[1]*100; // 0..100%
       break;
     case colorLightModeCt:
-      CTtoxyV(ct->getChannelValue(aTransitional), xyV);
+      CTtoxyV(mCt->getChannelValue(aTransitional), xyV);
       goto xyVtoHSV;
     default:
       return false; // unknown color mode
@@ -521,52 +521,52 @@ bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation, bo
 //       can share some code when calculating two missing modes at once
 void ColorLightBehaviour::deriveMissingColorChannels(bool aTransitional)
 {
-  if (!derivedValuesComplete) {
+  if (!mDerivedValuesComplete) {
     Row3 HSV;
     Row3 xyV;
     double mired;
-    switch (colorMode) {
+    switch (mColorMode) {
       case colorLightModeHueSaturation:
         // missing CIE and ct
-        HSV[0] = hue->getChannelValue(aTransitional); // 0..360
-        HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
+        HSV[0] = mHue->getChannelValue(aTransitional); // 0..360
+        HSV[1] = mSaturation->getChannelValue(aTransitional)/100; // 0..1
         HSV[2] = 1;
         HSVtoxyV(HSV, xyV);
-        cieX->syncChannelValue(xyV[0], false, true); // derived values are always volatile
-        cieY->syncChannelValue(xyV[1], false, true);
+        mCIEx->syncChannelValue(xyV[0], false, true); // derived values are always volatile
+        mCIEy->syncChannelValue(xyV[1], false, true);
         xyVtoCT(xyV, mired);
-        ct->syncChannelValue(mired, false, true);
+        mCt->syncChannelValue(mired, false, true);
         break;
       case colorLightModeXY:
         // missing HSV and ct
-        xyV[0] = cieX->getChannelValue(aTransitional);
-        xyV[1] = cieY->getChannelValue(aTransitional);
+        xyV[0] = mCIEx->getChannelValue(aTransitional);
+        xyV[1] = mCIEy->getChannelValue(aTransitional);
         xyV[2] = 1;
         xyVtoCT(xyV, mired);
-        ct->syncChannelValue(mired, false, true);
+        mCt->syncChannelValue(mired, false, true);
       xyVtoHSV:
         xyVtoHSV(xyV, HSV);
-        hue->syncChannelValue(HSV[0], false, true);
-        saturation->syncChannelValue(HSV[1]*100, false, true); // 0..100%
+        mHue->syncChannelValue(HSV[0], false, true);
+        mSaturation->syncChannelValue(HSV[1]*100, false, true); // 0..100%
         break;
       case colorLightModeCt:
         // missing HSV and xy
         // - xy
-        CTtoxyV(ct->getChannelValue(aTransitional), xyV);
-        cieX->syncChannelValue(xyV[0], false, true);
-        cieY->syncChannelValue(xyV[1], false, true);
+        CTtoxyV(mCt->getChannelValue(aTransitional), xyV);
+        mCIEx->syncChannelValue(xyV[0], false, true);
+        mCIEy->syncChannelValue(xyV[1], false, true);
         // - also create HSV
         goto xyVtoHSV;
       default:
         break;
     }
-    derivedValuesComplete = true;
+    mDerivedValuesComplete = true;
     if (DBGLOGENABLED(LOG_DEBUG)) {
       // show all values, plus RGB
-      DBGLOG(LOG_DEBUG, "Color mode = %s, actual and derived channel settings:", colorMode==colorLightModeHueSaturation ? "HSV" : (colorMode==colorLightModeXY ? "CIExy" : (colorMode==colorLightModeCt ? "CT" : "none")));
-      DBGLOG(LOG_DEBUG, "- HSV : %6.1f, %6.1f, %6.1f [%%, %%, %%]", hue->getChannelValue(aTransitional), saturation->getChannelValue(aTransitional), brightness->getChannelValue(aTransitional));
-      DBGLOG(LOG_DEBUG, "- xyV : %6.4f, %6.4f, %6.4f [0..1, 0..1, %%]", cieX->getChannelValue(aTransitional), cieY->getChannelValue(aTransitional), brightness->getChannelValue(aTransitional));
-      DBGLOG(LOG_DEBUG, "- CT  : %6.0f, %6.0f [mired, K]", ct->getChannelValue(aTransitional), 1E6/ct->getChannelValue(aTransitional));
+      DBGLOG(LOG_DEBUG, "Color mode = %s, actual and derived channel settings:", mColorMode==colorLightModeHueSaturation ? "HSV" : (mColorMode==colorLightModeXY ? "CIExy" : (mColorMode==colorLightModeCt ? "CT" : "none")));
+      DBGLOG(LOG_DEBUG, "- HSV : %6.1f, %6.1f, %6.1f [%%, %%, %%]", mHue->getChannelValue(aTransitional), mSaturation->getChannelValue(aTransitional), mBrightness->getChannelValue(aTransitional));
+      DBGLOG(LOG_DEBUG, "- xyV : %6.4f, %6.4f, %6.4f [0..1, 0..1, %%]", mCIEx->getChannelValue(aTransitional), mCIEy->getChannelValue(aTransitional), mBrightness->getChannelValue(aTransitional));
+      DBGLOG(LOG_DEBUG, "- CT  : %6.0f, %6.0f [mired, K]", mCt->getChannelValue(aTransitional), 1E6/mCt->getChannelValue(aTransitional));
     }
   }
 }
@@ -574,31 +574,31 @@ void ColorLightBehaviour::deriveMissingColorChannels(bool aTransitional)
 
 void ColorLightBehaviour::appliedColorValues()
 {
-  brightness->channelValueApplied(true);
-  switch (colorMode) {
+  mBrightness->channelValueApplied(true);
+  switch (mColorMode) {
     case colorLightModeHueSaturation:
-      hue->channelValueApplied(true);
-      saturation->channelValueApplied(true);
+      mHue->channelValueApplied(true);
+      mSaturation->channelValueApplied(true);
       // reset others in case these were falsely triggered for update
-      ct->makeApplyPending(false);
-      cieX->makeApplyPending(false);
-      cieY->makeApplyPending(false);
+      mCt->makeApplyPending(false);
+      mCIEx->makeApplyPending(false);
+      mCIEy->makeApplyPending(false);
       break;
     case colorLightModeCt:
-      ct->channelValueApplied(true);
+      mCt->channelValueApplied(true);
       // reset others in case these were falsely triggered for update
-      hue->makeApplyPending(false);
-      saturation->makeApplyPending(false);
-      cieX->makeApplyPending(false);
-      cieY->makeApplyPending(false);
+      mHue->makeApplyPending(false);
+      mSaturation->makeApplyPending(false);
+      mCIEx->makeApplyPending(false);
+      mCIEy->makeApplyPending(false);
       break;
     case colorLightModeXY:
-      cieX->channelValueApplied(true);
-      cieY->channelValueApplied(true);
+      mCIEx->channelValueApplied(true);
+      mCIEy->channelValueApplied(true);
       // reset others in case these were falsely triggered for update
-      hue->makeApplyPending(false);
-      saturation->makeApplyPending(false);
-      ct->makeApplyPending(false);
+      mHue->makeApplyPending(false);
+      mSaturation->makeApplyPending(false);
+      mCt->makeApplyPending(false);
       break;
     default:
       // no color
@@ -610,17 +610,17 @@ void ColorLightBehaviour::appliedColorValues()
 bool ColorLightBehaviour::updateColorTransition(MLMicroSeconds aNow)
 {
   bool moreSteps = false;
-  switch (colorMode) {
+  switch (mColorMode) {
     case colorLightModeHueSaturation:
-      if (hue->updateTimedTransition(aNow)) moreSteps = true;
-      if (saturation->updateTimedTransition(aNow)) moreSteps = true;
+      if (mHue->updateTimedTransition(aNow)) moreSteps = true;
+      if (mSaturation->updateTimedTransition(aNow)) moreSteps = true;
       break;
     case colorLightModeCt:
-      if (ct->updateTimedTransition(aNow)) moreSteps = true;
+      if (mCt->updateTimedTransition(aNow)) moreSteps = true;
       break;
     case colorLightModeXY:
-      if (cieX->updateTimedTransition(aNow)) moreSteps = true;
-      if (cieY->updateTimedTransition(aNow)) moreSteps = true;
+      if (mCIEx->updateTimedTransition(aNow)) moreSteps = true;
+      if (mCIEy->updateTimedTransition(aNow)) moreSteps = true;
       break;
     default:
       // no color
@@ -643,7 +643,7 @@ string ColorLightBehaviour::shortDesc()
 string ColorLightBehaviour::description()
 {
   string s = string_format("%s behaviour", shortDesc().c_str());
-  string_format_append(s, "\n- color mode = %s", colorMode==colorLightModeHueSaturation ? "HSB" : (colorMode==colorLightModeXY ? "CIExy" : (colorMode==colorLightModeCt ? "CT" : "none")));
+  string_format_append(s, "\n- color mode = %s", mColorMode==colorLightModeHueSaturation ? "HSB" : (mColorMode==colorLightModeXY ? "CIExy" : (mColorMode==colorLightModeCt ? "CT" : "none")));
   // TODO: add color specific info here
   s.append(inherited::description());
   return s;
@@ -659,11 +659,11 @@ RGBColorLightBehaviour::RGBColorLightBehaviour(Device &aDevice, bool aCtOnly) :
   inherited(aDevice, aCtOnly)
 {
   // default to sRGB with D65 white point
-  matrix3x3_copy(sRGB_d65_calibration, calibration);
+  matrix3x3_copy(sRGB_d65_calibration, mCalibration);
   // default white assumed to contribute equally to R,G,B with 35% each
-  whiteRGB[0] = 0.35; whiteRGB[1] = 0.35; whiteRGB[2] = 0.35;
+  mWhiteRGB[0] = 0.35; mWhiteRGB[1] = 0.35; mWhiteRGB[2] = 0.35;
   // default amber assumed to be AMBER web color #FFBE00 = 100%, 75%, 0% contributing 50% intensity
-  amberRGB[0] = 0.5; amberRGB[1] = 0.375; amberRGB[2] = 0;
+  mAmberRGB[0] = 0.5; mAmberRGB[1] = 0.375; mAmberRGB[2] = 0;
 
   #if DUMP_CONVERSION_TABLE
   // dump a conversion table for HSV -> RGBWA and then back -> HSV, with deltas (dH,dS,dV)
@@ -721,44 +721,44 @@ void RGBColorLightBehaviour::getRGB(double &aRed, double &aGreen, double &aBlue,
   Row3 XYZ;
   Row3 HSV;
   double scale = 1;
-  switch (colorMode) {
+  switch (mColorMode) {
     case colorLightModeHueSaturation: {
-      HSV[0] = hue->getChannelValue(aTransitional); // 0..360
-      HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
-      HSV[2] = aNoBrightness ? 1 : brightness->getChannelValue(aTransitional)/100; // 0..1
+      HSV[0] = mHue->getChannelValue(aTransitional); // 0..360
+      HSV[1] = mSaturation->getChannelValue(aTransitional)/100; // 0..1
+      HSV[2] = aNoBrightness ? 1 : mBrightness->getChannelValue(aTransitional)/100; // 0..1
       HSVtoRGB(HSV, RGB);
       break;
     }
     case colorLightModeCt: {
       // Note: for some reason, passing brightness to V gives bad results,
       // so for now we always assume 1 and scale resulting RGB
-      CTtoxyV(ct->getChannelValue(aTransitional), xyV);
+      CTtoxyV(mCt->getChannelValue(aTransitional), xyV);
       xyVtoXYZ(xyV, XYZ);
-      XYZtoRGB(calibration, XYZ, RGB);
+      XYZtoRGB(mCalibration, XYZ, RGB);
       // get maximum component brightness -> gives 100% brightness point, will be scaled down according to actual brightness
       double m = 0;
       if (RGB[0]>m) m = RGB[0];
       if (RGB[1]>m) m = RGB[1];
       if (RGB[2]>m) m = RGB[2];
       // include actual brightness into scale calculation
-      if (!aNoBrightness) scale = brightness->getChannelValue(aTransitional)/100/m;
+      if (!aNoBrightness) scale = mBrightness->getChannelValue(aTransitional)/100/m;
       break;
     }
     case colorLightModeXY: {
       // Note: for some reason, passing brightness to V gives bad results,
       // so for now we always assume 1 and scale resulting RGB
-      xyV[0] = cieX->getChannelValue(aTransitional);
-      xyV[1] = cieY->getChannelValue(aTransitional);
+      xyV[0] = mCIEx->getChannelValue(aTransitional);
+      xyV[1] = mCIEy->getChannelValue(aTransitional);
       xyV[2] = 1;
       xyVtoXYZ(xyV, XYZ);
       // convert using calibration for this lamp
-      XYZtoRGB(calibration, XYZ, RGB);
-      if (!aNoBrightness) scale = brightness->getChannelValue(aTransitional)/100; // 0..1
+      XYZtoRGB(mCalibration, XYZ, RGB);
+      if (!aNoBrightness) scale = mBrightness->getChannelValue(aTransitional)/100; // 0..1
       break;
     }
     default: {
       // no color, just set R=G=B=brightness
-      RGB[0] = aNoBrightness ? 1 : brightness->getChannelValue(aTransitional)/100;
+      RGB[0] = aNoBrightness ? 1 : mBrightness->getChannelValue(aTransitional)/100;
       RGB[1] = RGB[0];
       RGB[2] = RGB[0];
       break;
@@ -780,14 +780,14 @@ void RGBColorLightBehaviour::setRGB(double aRed, double aGreen, double aBlue, do
   Row3 HSV;
   RGBtoHSV(RGB, HSV);
   // set the channels
-  hue->syncChannelValue(HSV[0]);
-  saturation->syncChannelValue(HSV[1]*100);
-  if (!aNoBrightness) brightness->syncChannelValue(HSV[2]*100);
+  mHue->syncChannelValue(HSV[0]);
+  mSaturation->syncChannelValue(HSV[1]*100);
+  if (!aNoBrightness) mBrightness->syncChannelValue(HSV[2]*100);
   // change the mode if needed
-  if (colorMode!=colorLightModeHueSaturation) {
-    colorMode = colorLightModeHueSaturation;
+  if (mColorMode!=colorLightModeHueSaturation) {
+    mColorMode = colorLightModeHueSaturation;
     // force recalculation of derived color value
-    derivedValuesComplete = false;
+    mDerivedValuesComplete = false;
   }
 }
 
@@ -798,7 +798,7 @@ void RGBColorLightBehaviour::getRGBW(double &aRed, double &aGreen, double &aBlue
   double r,g,b;
   getRGB(r, g, b, 1, aNoBrightness, aTransitional);
   // transfer as much as possible to the white channel
-  double w = transferToColor(whiteRGB, r, g, b);
+  double w = transferToColor(mWhiteRGB, r, g, b);
   // Finally scale as requested
   aWhite = colorCompScaled(w, aMax);
   aRed = colorCompScaled(r, aMax);
@@ -813,9 +813,9 @@ void RGBColorLightBehaviour::getRGBWA(double &aRed, double &aGreen, double &aBlu
   double r,g,b;
   getRGB(r, g, b, 1, aNoBrightness, aTransitional);
   // transfer as much as possible to the white channel
-  double w = transferToColor(whiteRGB, r, g, b);
+  double w = transferToColor(mWhiteRGB, r, g, b);
   // then transfer as much as possible to the amber channel
-  double a = transferToColor(amberRGB, r, g, b);
+  double a = transferToColor(mAmberRGB, r, g, b);
   // Finally scale as requested
   aAmber = colorCompScaled(a, aMax);
   aWhite = colorCompScaled(w, aMax);
@@ -831,19 +831,19 @@ void RGBColorLightBehaviour::setRGBW(double aRed, double aGreen, double aBlue, d
   RGB[0] = aRed/aMax;
   RGB[1] = aGreen/aMax;
   RGB[2] = aBlue/aMax;
-  transferFromColor(whiteRGB, aWhite/aMax, RGB[0], RGB[1], RGB[2]);
+  transferFromColor(mWhiteRGB, aWhite/aMax, RGB[0], RGB[1], RGB[2]);
   // always convert to HSV, as this can actually represent the values seen on the light
   Row3 HSV;
   RGBtoHSV(RGB, HSV);
   // set the channels
-  hue->syncChannelValue(HSV[0]);
-  saturation->syncChannelValue(HSV[1]*100);
-  if (!aNoBrightness) brightness->syncChannelValue(HSV[2]*100);
+  mHue->syncChannelValue(HSV[0]);
+  mSaturation->syncChannelValue(HSV[1]*100);
+  if (!aNoBrightness) mBrightness->syncChannelValue(HSV[2]*100);
   // change the mode if needed
-  if (colorMode!=colorLightModeHueSaturation) {
-    colorMode = colorLightModeHueSaturation;
+  if (mColorMode!=colorLightModeHueSaturation) {
+    mColorMode = colorLightModeHueSaturation;
     // force recalculation of derived color value
-    derivedValuesComplete = false;
+    mDerivedValuesComplete = false;
   }
 }
 
@@ -855,21 +855,21 @@ void RGBColorLightBehaviour::setRGBWA(double aRed, double aGreen, double aBlue, 
   RGB[1] = aGreen/aMax;
   RGB[2] = aBlue/aMax;
   // transfer the amber amount into RGB
-  transferFromColor(amberRGB, aAmber/aMax, RGB[0], RGB[1], RGB[2]);
+  transferFromColor(mAmberRGB, aAmber/aMax, RGB[0], RGB[1], RGB[2]);
   // transfer the white amount into RGB
-  transferFromColor(whiteRGB, aWhite/aMax, RGB[0], RGB[1], RGB[2]);
+  transferFromColor(mWhiteRGB, aWhite/aMax, RGB[0], RGB[1], RGB[2]);
   // always convert to HSV, as this can actually represent the values seen on the light
   Row3 HSV;
   RGBtoHSV(RGB, HSV);
   // set the channels
-  hue->syncChannelValue(HSV[0]);
-  saturation->syncChannelValue(HSV[1]*100);
-  if (!aNoBrightness) brightness->syncChannelValue(HSV[2]*100);
+  mHue->syncChannelValue(HSV[0]);
+  mSaturation->syncChannelValue(HSV[1]*100);
+  if (!aNoBrightness) mBrightness->syncChannelValue(HSV[2]*100);
   // change the mode if needed
-  if (colorMode!=colorLightModeHueSaturation) {
-    colorMode = colorLightModeHueSaturation;
+  if (mColorMode!=colorLightModeHueSaturation) {
+    mColorMode = colorLightModeHueSaturation;
     // force recalculation of derived color value
-    derivedValuesComplete = false;
+    mDerivedValuesComplete = false;
   }
 }
 
@@ -888,24 +888,24 @@ void RGBColorLightBehaviour::getCWWW(double &aCW, double &aWW, double aMax, bool
   Row3 xyV;
   Row3 HSV;
   double mired;
-  switch (colorMode) {
+  switch (mColorMode) {
     case colorLightModeCt: {
       // we have mired, use it
-      mired = ct->getChannelValue(aTransitional);
+      mired = mCt->getChannelValue(aTransitional);
       break;
     }
     case colorLightModeXY: {
       // get mired from x,y
-      xyV[0] = cieX->getChannelValue(aTransitional);
-      xyV[1] = cieY->getChannelValue(aTransitional);
+      xyV[0] = mCIEx->getChannelValue(aTransitional);
+      xyV[1] = mCIEy->getChannelValue(aTransitional);
       xyV[2] = 1;
       xyVtoCT(xyV, mired);
       break;
     }
     case colorLightModeHueSaturation: {
       // get mired from HS
-      HSV[0] = hue->getChannelValue(aTransitional); // 0..360
-      HSV[1] = saturation->getChannelValue(aTransitional)/100; // 0..1
+      HSV[0] = mHue->getChannelValue(aTransitional); // 0..360
+      HSV[1] = mSaturation->getChannelValue(aTransitional)/100; // 0..1
       HSV[2] = 1;
       HSVtoxyV(HSV,xyV);
       xyVtoCT(xyV, mired);
@@ -916,8 +916,8 @@ void RGBColorLightBehaviour::getCWWW(double &aCW, double &aWW, double aMax, bool
     }
   }
   // mired to CW/WW
-  double b = brightness->getChannelValue(aTransitional)/100; // 0..1
-  double t = (mired-ct->getMin()) / (ct->getMax()-ct->getMin()); // 0..1 scale of possible mireds, 0=coldest, 1=warmest
+  double b = mBrightness->getChannelValue(aTransitional)/100; // 0..1
+  double t = (mired-mCt->getMin()) / (mCt->getMax()-mCt->getMin()); // 0..1 scale of possible mireds, 0=coldest, 1=warmest
   // Equations:
   aWW = t * b;
   aCW = ((1-t)*(1-CW_MIN)+CW_MIN) * b;
@@ -949,19 +949,19 @@ void RGBColorLightBehaviour::setCWWW(double aCW, double aWW, double aMax)
     }
   }
   // back to mired and brightness
-  ct->syncChannelValue(t*(ct->getMax()-ct->getMin())+ct->getMin());
-  brightness->syncChannelValue(b*100);
+  mCt->syncChannelValue(t*(mCt->getMax()-mCt->getMin())+mCt->getMin());
+  mBrightness->syncChannelValue(b*100);
 }
 
 
 void RGBColorLightBehaviour::getBriCool(double &aBri, double &aCool, double aMax, bool aTransitional)
 {
-  double b = brightness->getChannelValue(aTransitional)/100; // 0..1
+  double b = mBrightness->getChannelValue(aTransitional)/100; // 0..1
   aBri = b*aMax;
   double ctval;
   getCT(ctval, aTransitional);
   // assume cool 1..0 goes over min..max of CT channel
-  double cool = 1-(ctval-ct->getMin())/(ct->getMax()-ct->getMin());
+  double cool = 1-(ctval-mCt->getMin())/(mCt->getMax()-mCt->getMin());
   if (cool<0) cool = 0;
   else if (cool>1) cool = 1;
   aBri = aMax*b;
@@ -972,8 +972,8 @@ void RGBColorLightBehaviour::getBriCool(double &aBri, double &aCool, double aMax
 void RGBColorLightBehaviour::setBriCool(double aBri, double aCool, double aMax)
 {
   // assume cool 1..0 goes over min..max of CT channel
-  brightness->syncChannelValue(aBri/aMax*100);
-  ct->syncChannelValue((1-aCool/aMax)*(ct->getMax()-ct->getMin())+ct->getMin());
+  mBrightness->syncChannelValue(aBri/aMax*100);
+  mCt->syncChannelValue((1-aCool/aMax)*(mCt->getMax()-mCt->getMin())+mCt->getMin());
 }
 
 
@@ -1027,7 +1027,7 @@ void RGBColorLightBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &
   //  [[Xr,Xg,Xb],[Yr,Yg,Yb],[Zr,Zg,Zb]]
   for (int i=0; i<3; i++) {
     for (int j=0; j<3; j++) {
-      calibration[j][i] = aRow->get<double>(aIndex++);
+      mCalibration[j][i] = aRow->get<double>(aIndex++);
     }
   }
 }
@@ -1041,7 +1041,7 @@ void RGBColorLightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, i
   //  [[Xr,Xg,Xb],[Yr,Yg,Yb],[Zr,Zg,Zb]]
   for (int i=0; i<3; i++) {
     for (int j=0; j<3; j++) {
-      aStatement.bind(aIndex++, calibration[j][i]);
+      aStatement.bind(aIndex++, mCalibration[j][i]);
     }
   }
 }
@@ -1100,11 +1100,11 @@ bool RGBColorLightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr a
     if (ix>=Xr_key && ix<=Zb_key) {
       if (aMode==access_read) {
         // read properties
-        aPropValue->setDoubleValue(calibration[ix/3][ix%3]);
+        aPropValue->setDoubleValue(mCalibration[ix/3][ix%3]);
       }
       else {
         // write properties
-        setPVar(calibration[ix/3][ix%3], aPropValue->doubleValue());
+        setPVar(mCalibration[ix/3][ix%3], aPropValue->doubleValue());
       }
       return true;
     }

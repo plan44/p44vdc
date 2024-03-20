@@ -403,7 +403,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
     JsonObjectPtr newState = JsonObject::newObj();
     // brightness is always re-applied unless it's dimming
     bool lightIsOn = mCurrentlyOn!=no; // assume on even if unknown
-    if (aReapply || !aForDimming || l->brightness->needsApplying()) {
+    if (aReapply || !aForDimming || l->mBrightness->needsApplying()) {
       Brightness b = l->brightnessForHardware();
       lightIsOn = b>=DS_BRIGHTNESS_STEP;
       if (l->getOutputFunction()==outputFunction_switch) {
@@ -466,30 +466,30 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       cl->deriveColorMode();
       if (lightIsOn) {
         // light is on - add color in case it was set (by scene call)
-        switch (cl->colorMode) {
+        switch (cl->mColorMode) {
           case colorLightModeHueSaturation: {
             // for dimming, only actually changed component (hue or saturation)
-            if (aReapply || !aForDimming || cl->hue->needsApplying()) {
-              newState->add("hue", JsonObject::newInt32(cl->hue->getChannelValue()*HUEAPI_FACTOR_HUE+0.5));
+            if (aReapply || !aForDimming || cl->mHue->needsApplying()) {
+              newState->add("hue", JsonObject::newInt32(cl->mHue->getChannelValue()*HUEAPI_FACTOR_HUE+0.5));
             }
-            if (aReapply || !aForDimming || cl->saturation->needsApplying()) {
-              newState->add("sat", JsonObject::newInt32(cl->saturation->getChannelValue()*HUEAPI_FACTOR_SATURATION+0.5));
+            if (aReapply || !aForDimming || cl->mSaturation->needsApplying()) {
+              newState->add("sat", JsonObject::newInt32(cl->mSaturation->getChannelValue()*HUEAPI_FACTOR_SATURATION+0.5));
             }
             break;
           }
           case colorLightModeXY: {
             // x,y are always applied together
-            if (aReapply || cl->cieX->needsApplying() || cl->cieY->needsApplying()) {
+            if (aReapply || cl->mCIEx->needsApplying() || cl->mCIEy->needsApplying()) {
               JsonObjectPtr xyArr = JsonObject::newArray();
-              xyArr->arrayAppend(JsonObject::newDouble(cl->cieX->getChannelValue()));
-              xyArr->arrayAppend(JsonObject::newDouble(cl->cieY->getChannelValue()));
+              xyArr->arrayAppend(JsonObject::newDouble(cl->mCIEx->getChannelValue()));
+              xyArr->arrayAppend(JsonObject::newDouble(cl->mCIEy->getChannelValue()));
               newState->add("xy", xyArr);
             }
             break;
           }
           case colorLightModeCt: {
-            if (aReapply || cl->ct->needsApplying()) {
-              newState->add("ct", JsonObject::newInt32(cl->ct->getChannelValue()));
+            if (aReapply || cl->mCt->needsApplying()) {
+              newState->add("ct", JsonObject::newInt32(cl->mCt->getChannelValue()));
             }
             break;
           }
@@ -504,21 +504,21 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
     else {
       // non-color light
       // - confirm brightness applied
-      l->brightness->channelValueApplied(true); // confirm early, as subsequent request might set new value again
+      l->mBrightness->channelValueApplied(true); // confirm early, as subsequent request might set new value again
     }
     // show what we are doing
     if (OLOGENABLED(LOG_INFO) && (!aForDimming || OLOGENABLED(LOG_DEBUG))) {
-      OLOG(LOG_INFO, "sending new light state: light is %s, brightness=%0.0f, transition %d mS", lightIsOn ? "ON" : "OFF", l->brightness->getChannelValue(), (int)(aTransitionTime/MilliSecond));
+      OLOG(LOG_INFO, "sending new light state: light is %s, brightness=%0.0f, transition %d mS", lightIsOn ? "ON" : "OFF", l->mBrightness->getChannelValue(), (int)(aTransitionTime/MilliSecond));
       if (cl) {
-        switch (cl->colorMode) {
+        switch (cl->mColorMode) {
           case colorLightModeHueSaturation:
-            LOG(LOG_INFO, "- color mode HSV: hue=%0.0f, saturation=%0.0f", cl->hue->getChannelValue(), cl->saturation->getChannelValue());
+            LOG(LOG_INFO, "- color mode HSV: hue=%0.0f, saturation=%0.0f", cl->mHue->getChannelValue(), cl->mSaturation->getChannelValue());
             break;
           case colorLightModeXY:
-            LOG(LOG_INFO, "- color mode xyV: x=%0.3f, y=%0.3f", cl->cieX->getChannelValue(), cl->cieY->getChannelValue());
+            LOG(LOG_INFO, "- color mode xyV: x=%0.3f, y=%0.3f", cl->mCIEx->getChannelValue(), cl->mCIEy->getChannelValue());
             break;
           case colorLightModeCt:
-            LOG(LOG_INFO, "- color mode color temperature: mired=%0.0f", cl->ct->getChannelValue());
+            LOG(LOG_INFO, "- color mode color temperature: mired=%0.0f", cl->mCt->getChannelValue());
             break;
           default:
             LOG(LOG_INFO, "- NO color");
@@ -557,19 +557,19 @@ void HueDevice::channelValuesSent(LightBehaviourPtr aLightBehaviour, SimpleCB aD
             // match path
             string param = key.substr(key.find_last_of('/')+1);
             if (cl && param=="hue") {
-              cl->hue->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_HUE, false); // only sync if no new value pending already
+              cl->mHue->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_HUE, false); // only sync if no new value pending already
             }
             else if (cl && param=="sat") {
-              cl->saturation->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_SATURATION, false); // only sync if no new value pending already
+              cl->mSaturation->syncChannelValue(val->int32Value()/HUEAPI_FACTOR_SATURATION, false); // only sync if no new value pending already
             }
             else if (cl && param=="xy") {
               JsonObjectPtr e = val->arrayGet(0);
-              if (e) cl->cieX->syncChannelValue(e->doubleValue(), false); // only sync if no new value pending already, volatile
+              if (e) cl->mCIEx->syncChannelValue(e->doubleValue(), false); // only sync if no new value pending already, volatile
               e = val->arrayGet(1);
-              if (e) cl->cieY->syncChannelValue(e->doubleValue(), false); // only sync if no new value pending already, volatile
+              if (e) cl->mCIEy->syncChannelValue(e->doubleValue(), false); // only sync if no new value pending already, volatile
             }
             else if (cl && param=="ct") {
-              cl->ct->syncChannelValue(val->int32Value(), false); // only sync if no new value pending already, volatile
+              cl->mCt->syncChannelValue(val->int32Value(), false); // only sync if no new value pending already, volatile
             }
             else if (param=="on") {
               mCurrentlyOn = val->boolValue() ? yes : no;
@@ -629,29 +629,29 @@ void HueDevice::parseLightState(JsonObjectPtr aDeviceInfo)
         if (o) {
           string mode = o->stringValue();
           if (mode=="hs") {
-            cl->colorMode = colorLightModeHueSaturation;
+            cl->mColorMode = colorLightModeHueSaturation;
             o = state->get("hue");
-            if (o) cl->hue->syncChannelValue((o->int32Value())/HUEAPI_FACTOR_HUE);
+            if (o) cl->mHue->syncChannelValue((o->int32Value())/HUEAPI_FACTOR_HUE);
             o = state->get("sat");
-            if (o) cl->saturation->syncChannelValue((o->int32Value())/HUEAPI_FACTOR_SATURATION);
+            if (o) cl->mSaturation->syncChannelValue((o->int32Value())/HUEAPI_FACTOR_SATURATION);
           }
           else if (mode=="xy") {
-            cl->colorMode = colorLightModeXY;
+            cl->mColorMode = colorLightModeXY;
             o = state->get("xy");
             if (o) {
               JsonObjectPtr e = o->arrayGet(0);
-              if (e) cl->cieX->syncChannelValue(e->doubleValue());
+              if (e) cl->mCIEx->syncChannelValue(e->doubleValue());
               e = o->arrayGet(1);
-              if (e) cl->cieY->syncChannelValue(e->doubleValue());
+              if (e) cl->mCIEy->syncChannelValue(e->doubleValue());
             }
           }
           else if (mode=="ct") {
-            cl->colorMode = colorLightModeCt;
+            cl->mColorMode = colorLightModeCt;
             o = state->get("ct");
-            if (o) cl->ct->syncChannelValue(o->int32Value());
+            if (o) cl->mCt->syncChannelValue(o->int32Value());
           }
           else {
-            cl->colorMode = colorLightModeNone;
+            cl->mColorMode = colorLightModeNone;
           }
         }
       } // color

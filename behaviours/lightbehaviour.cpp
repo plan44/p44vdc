@@ -58,25 +58,25 @@ LightBehaviour::LightBehaviour(Device &aDevice) :
   inherited(aDevice),
   // hardware derived parameters
   // persistent settings
-  onThreshold(50.0),
-  dimCurveExp(STANDARD_DIM_CURVE_EXPONENT),
+  mOnThreshold(50.0),
+  mDimCurveExp(STANDARD_DIM_CURVE_EXPONENT),
   // volatile state
-  hardwareHasSetMinDim(false)
+  mHardwareHasSetMinDim(false)
 {
   // make it member of the light group
   setGroupMembership(group_yellow_light, true);
   // primary output controls brightness
   setHardwareName("brightness");
   // persistent settings
-  dimTimeUp[0] = 0x0F; // 100mS // smooth
-  dimTimeUp[1] = 0xA2; // 1min (60800mS) // slow
-  dimTimeUp[2] = 0x68; // 5sec // custom
-  dimTimeDown[0] = 0x0F; // 100mS // smooth
-  dimTimeDown[1] = 0xA2; // 1min (60800mS) // slow
-  dimTimeDown[2] = 0x68; // 5sec // custom
+  mDimTimeUp[0] = 0x0F; // 100mS // smooth
+  mDimTimeUp[1] = 0xA2; // 1min (60800mS) // slow
+  mDimTimeUp[2] = 0x68; // 5sec // custom
+  mDimTimeDown[0] = 0x0F; // 100mS // smooth
+  mDimTimeDown[1] = 0xA2; // 1min (60800mS) // slow
+  mDimTimeDown[2] = 0x68; // 5sec // custom
   // add the brightness channel (every light has brightness)
-  brightness = BrightnessChannelPtr(new BrightnessChannel(*this));
-  addChannel(brightness);
+  mBrightness = BrightnessChannelPtr(new BrightnessChannel(*this));
+  addChannel(mBrightness);
   #if DUMP_CONVERSION_TABLE
   // dump a conversion table for HSV -> RGBWA and then back -> HSV, with deltas (dH,dS,dV)
   printf("B-in;PWM100-out;PWM-4096;B-back\n");
@@ -121,14 +121,14 @@ Tristate LightBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
 void LightBehaviour::initMinBrightness(Brightness aMin)
 {
   // save min
-  brightness->setDimMin(aMin);
-  hardwareHasSetMinDim = true;
+  mBrightness->setDimMin(aMin);
+  mHardwareHasSetMinDim = true;
 }
 
 
 Brightness LightBehaviour::brightnessForHardware(bool aFinal)
 {
-  return outputValueAccordingToMode(brightness->getChannelValue(!aFinal), brightness->getChannelIndex());
+  return outputValueAccordingToMode(mBrightness->getChannelValue(!aFinal), mBrightness->getChannelIndex());
 }
 
 
@@ -137,9 +137,9 @@ void LightBehaviour::syncBrightnessFromHardware(Brightness aBrightness, bool aAl
 {
   if (
     isDimmable() || // for dimmable lights: always update value
-    ((aBrightness>=onThreshold) != (brightness->getChannelValue()>=onThreshold)) // for switched outputs: keep value if onThreshold condition is already met
+    ((aBrightness>=mOnThreshold) != (mBrightness->getChannelValue()>=mOnThreshold)) // for switched outputs: keep value if onThreshold condition is already met
   ) {
-    brightness->syncChannelValue(aBrightness, aAlwaysSync, aVolatile);
+    mBrightness->syncChannelValue(aBrightness, aAlwaysSync, aVolatile);
   }
 }
 
@@ -151,7 +151,7 @@ double LightBehaviour::outputValueAccordingToMode(double aChannelValue, int aCha
     return inherited::outputValueAccordingToMode(aChannelValue, aChannelIndex);
   }
   // switched light, check threshold
-  return brightness->getChannelValue() >= onThreshold ? brightness->getMax() : brightness->getMin();
+  return mBrightness->getChannelValue() >= mOnThreshold ? mBrightness->getMax() : mBrightness->getMin();
 }
 
 
@@ -167,7 +167,7 @@ void LightBehaviour::loadChannelsFromScene(DsScenePtr aScene)
   if (lightScene) {
     // load brightness channel from scene
     Brightness b = lightScene->value;
-    brightness->setChannelValueIfNotDontCare(lightScene, b, transitionTimeFromScene(lightScene, true), transitionTimeFromScene(lightScene, false), true);
+    mBrightness->setChannelValueIfNotDontCare(lightScene, b, transitionTimeFromScene(lightScene, true), transitionTimeFromScene(lightScene, false), true);
   }
   else {
     // only if not light scene, use default loader
@@ -181,8 +181,8 @@ void LightBehaviour::saveChannelsToScene(DsScenePtr aScene)
   LightScenePtr lightScene = boost::dynamic_pointer_cast<LightScene>(aScene);
   if (lightScene) {
     // save brightness channel from scene
-    lightScene->setPVar(lightScene->value, brightness->getChannelValue());
-    lightScene->setSceneValueFlags(brightness->getChannelIndex(), valueflags_dontCare, false);
+    lightScene->setPVar(lightScene->value, mBrightness->getChannelValue());
+    lightScene->setSceneValueFlags(mBrightness->getChannelIndex(), valueflags_dontCare, false);
   }
 }
 
@@ -227,7 +227,7 @@ MLMicroSeconds LightBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool a
     }
   }
   // dimTimeIndex derived from effect or no scene at all, look up actual time
-  return transitionTimeFromDimTime(aDimUp ? dimTimeUp[dimTimeIndex] : dimTimeDown[dimTimeIndex]);
+  return transitionTimeFromDimTime(aDimUp ? mDimTimeUp[dimTimeIndex] : mDimTimeDown[dimTimeIndex]);
 }
 
 
@@ -237,21 +237,21 @@ MLMicroSeconds LightBehaviour::transitionTimeFromScene(DsScenePtr aScene, bool a
 bool LightBehaviour::canDim(ChannelBehaviourPtr aChannel)
 {
   // to dim anything (not only brightness), brightness value must be >0
-  return brightness->getChannelValue()>0;
+  return mBrightness->getChannelValue()>0;
 }
 
 
 void LightBehaviour::onAtMinBrightness(DsScenePtr aScene)
 {
-  if (brightness->getChannelValue()<=0) {
+  if (mBrightness->getChannelValue()<=0) {
     // device is off and must be set to minimal logical brightness
     // but only if the brightness stored in the scene is not zero
     LightScenePtr lightScene = boost::dynamic_pointer_cast<LightScene>(aScene);
-    if (lightScene && lightScene->sceneValue(brightness->getChannelIndex())>0) {
+    if (lightScene && lightScene->sceneValue(mBrightness->getChannelIndex())>0) {
       // - load scene values for channels
       loadChannelsFromScene(lightScene); // Note: causes log message because channel is set to new value
       // - override brightness with minDim
-      brightness->setChannelValue(brightness->getMinDim(), transitionTimeFromScene(lightScene, true));
+      mBrightness->setChannelValue(mBrightness->getMinDim(), transitionTimeFromScene(lightScene, true));
     }
   }
 }
@@ -285,7 +285,7 @@ void LightBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 void LightBehaviour::stopSceneActions()
 {
   // stop blink
-  if (blinkTicket) stopBlink();
+  if (mBlinkTicket) stopBlink();
   // let inherited stop as well
   inherited::stopSceneActions();
 }
@@ -330,13 +330,13 @@ void LightBehaviour::identifyToUser(MLMicroSeconds aDuration)
 
 double LightBehaviour::brightnessToPWM(Brightness aBrightness, double aMaxPWM)
 {
-  return aMaxPWM*((exp(aBrightness*dimCurveExp/100)-1)/(exp(dimCurveExp)-1));
+  return aMaxPWM*((exp(aBrightness*mDimCurveExp/100)-1)/(exp(mDimCurveExp)-1));
 }
 
 
 Brightness LightBehaviour::PWMToBrightness(double aPWM, double aMaxPWM)
 {
-  return 100/dimCurveExp*::log(aPWM*(exp(dimCurveExp)-1)/aMaxPWM + 1);
+  return 100/mDimCurveExp*::log(aPWM*(exp(mDimCurveExp)-1)/aMaxPWM + 1);
 }
 
 
@@ -348,21 +348,21 @@ Brightness LightBehaviour::PWMToBrightness(double aPWM, double aMaxPWM)
 void LightBehaviour::blink(MLMicroSeconds aDuration, LightScenePtr aParamScene, SimpleCB aDoneCB, MLMicroSeconds aBlinkPeriod, int aOnRatioPercent)
 {
   // prevent current blink from going on further (but do not restore previous state)
-  blinkTicket.cancel();
+  mBlinkTicket.cancel();
   // confirm end of previous blink if any handler was set for that
-  if (blinkDoneHandler) {
-    SimpleCB h = blinkDoneHandler;
-    blinkDoneHandler = NoOP;
+  if (mBlinkDoneHandler) {
+    SimpleCB h = mBlinkDoneHandler;
+    mBlinkDoneHandler = NoOP;
     h();
   }
   // save new handler now
-  blinkDoneHandler = aDoneCB;
+  mBlinkDoneHandler = aDoneCB;
   // check for saving current before-blink state
   SceneDeviceSettingsPtr scenes = mDevice.getScenes();
-  if (scenes && !blinkRestoreScene) {
+  if (scenes && !mBlinkRestoreScene) {
     // device has scenes, and blink not in progress already -> capture current state
-    blinkRestoreScene = boost::dynamic_pointer_cast<LightScene>(mDevice.getScenes()->newDefaultScene(ROOM_OFF)); // main off as template to store state
-    captureScene(blinkRestoreScene, false, boost::bind(&LightBehaviour::beforeBlinkStateSavedHandler, this, aDuration, aParamScene, aBlinkPeriod, aOnRatioPercent));
+    mBlinkRestoreScene = boost::dynamic_pointer_cast<LightScene>(mDevice.getScenes()->newDefaultScene(ROOM_OFF)); // main off as template to store state
+    captureScene(mBlinkRestoreScene, false, boost::bind(&LightBehaviour::beforeBlinkStateSavedHandler, this, aDuration, aParamScene, aBlinkPeriod, aOnRatioPercent));
   }
   else {
     // device has no scenes (some switch outputs don't have scenes), or blink already in progress -> just start blinking
@@ -395,36 +395,36 @@ void LightBehaviour::blinkHandler(MLMicroSeconds aEndTime, bool aState, MLMicroS
 {
   if (MainLoop::now()>=aEndTime) {
     // kill scheduled execution, if any
-    blinkTicket.cancel();
+    mBlinkTicket.cancel();
     // restore previous values if any
-    if (blinkRestoreScene) {
-      loadChannelsFromScene(blinkRestoreScene);
-      blinkRestoreScene.reset();
+    if (mBlinkRestoreScene) {
+      loadChannelsFromScene(mBlinkRestoreScene);
+      mBlinkRestoreScene.reset();
       mDevice.requestApplyingChannels(NoOP, false); // apply to hardware, not dimming
     }
     // done, call end handler if any
-    if (blinkDoneHandler) {
-      SimpleCB h = blinkDoneHandler;
-      blinkDoneHandler = NoOP;
+    if (mBlinkDoneHandler) {
+      SimpleCB h = mBlinkDoneHandler;
+      mBlinkDoneHandler = NoOP;
       h();
     }
     return;
   }
   else if (!aState) {
     // turn on
-    brightness->setChannelValue(brightness->getMax(), 0);
-    brightness->markClean(); // do not save blink states
+    mBrightness->setChannelValue(mBrightness->getMax(), 0);
+    mBrightness->markClean(); // do not save blink states
   }
   else {
     // turn off
-    brightness->setChannelValue(brightness->getMinDim(), 0);
-    brightness->markClean(); // do not save blink states
+    mBrightness->setChannelValue(mBrightness->getMinDim(), 0);
+    mBrightness->markClean(); // do not save blink states
   }
   // apply to hardware
   mDevice.requestApplyingChannels(NoOP, false); // not dimming
   aState = !aState; // toggle
   // schedule next event
-  blinkTicket.executeOnce(
+  mBlinkTicket.executeOnce(
     boost::bind(&LightBehaviour::blinkHandler, this, aEndTime, aState, aOnTime, aOffTime),
     aState ? aOnTime : aOffTime
   );
@@ -473,28 +473,28 @@ void LightBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // read onThreshold only if not NULL
-  aRow->getCastedIfNotNull<Brightness, double>(aIndex++, onThreshold);
+  aRow->getCastedIfNotNull<Brightness, double>(aIndex++, mOnThreshold);
   // get the other fields
   Brightness md;
   if (aRow->getCastedIfNotNull<Brightness, double>(aIndex++, md)) {
-    if (!hardwareHasSetMinDim) brightness->setDimMin(md); // only apply if not set by hardware
+    if (!mHardwareHasSetMinDim) mBrightness->setDimMin(md); // only apply if not set by hardware
   }
   uint32_t du;
   if (aRow->getCastedIfNotNull<uint32_t, int>(aIndex++, du)) {
     // dissect dimming times
-    dimTimeUp[0] = du & 0xFF;
-    dimTimeUp[1] = (du>>8) & 0xFF;
-    dimTimeUp[2] = (du>>16) & 0xFF;
+    mDimTimeUp[0] = du & 0xFF;
+    mDimTimeUp[1] = (du>>8) & 0xFF;
+    mDimTimeUp[2] = (du>>16) & 0xFF;
   }
   uint32_t dd;
   if (aRow->getCastedIfNotNull<uint32_t, int>(aIndex++, dd)) {
     // dissect dimming times
-    dimTimeDown[0] = dd & 0xFF;
-    dimTimeDown[1] = (dd>>8) & 0xFF;
-    dimTimeDown[2] = (dd>>16) & 0xFF;
+    mDimTimeDown[0] = dd & 0xFF;
+    mDimTimeDown[1] = (dd>>8) & 0xFF;
+    mDimTimeDown[2] = (dd>>16) & 0xFF;
   }
   // read dim curve exponent only if not NULL
-  aRow->getIfNotNull<double>(aIndex++, dimCurveExp);
+  aRow->getIfNotNull<double>(aIndex++, mDimCurveExp);
 }
 
 
@@ -504,19 +504,19 @@ void LightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // create dimming time fields
   uint32_t du =
-    dimTimeUp[0] |
-    (dimTimeUp[1]<<8) |
-    (dimTimeUp[2]<<16);
+    mDimTimeUp[0] |
+    (mDimTimeUp[1]<<8) |
+    (mDimTimeUp[2]<<16);
   uint32_t dd =
-    dimTimeDown[0] |
-    (dimTimeDown[1]<<8) |
-    (dimTimeDown[2]<<16);
+    mDimTimeDown[0] |
+    (mDimTimeDown[1]<<8) |
+    (mDimTimeDown[2]<<16);
   // bind the fields
-  aStatement.bind(aIndex++, onThreshold);
-  aStatement.bind(aIndex++, brightness->getMinDim());
+  aStatement.bind(aIndex++, mOnThreshold);
+  aStatement.bind(aIndex++, mBrightness->getMinDim());
   aStatement.bind(aIndex++, (int)du);
   aStatement.bind(aIndex++, (int)dd);
-  aStatement.bind(aIndex++, dimCurveExp);
+  aStatement.bind(aIndex++, mDimCurveExp);
 }
 
 
@@ -574,23 +574,23 @@ bool LightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case onThreshold_key+settings_key_offset:
-          aPropValue->setDoubleValue(onThreshold);
+          aPropValue->setDoubleValue(mOnThreshold);
           return true;
         case minBrightness_key+settings_key_offset:
-          aPropValue->setDoubleValue(brightness->getMinDim());
+          aPropValue->setDoubleValue(mBrightness->getMinDim());
           return true;
         case dimTimeUp_key+settings_key_offset:
         case dimTimeUpAlt1_key+settings_key_offset:
         case dimTimeUpAlt2_key+settings_key_offset:
-          aPropValue->setUint8Value(dimTimeUp[aPropertyDescriptor->fieldKey()-(dimTimeUp_key+settings_key_offset)]);
+          aPropValue->setUint8Value(mDimTimeUp[aPropertyDescriptor->fieldKey()-(dimTimeUp_key+settings_key_offset)]);
           return true;
         case dimTimeDown_key+settings_key_offset:
         case dimTimeDownAlt1_key+settings_key_offset:
         case dimTimeDownAlt2_key+settings_key_offset:
-          aPropValue->setUint8Value(dimTimeDown[aPropertyDescriptor->fieldKey()-(dimTimeDown_key+settings_key_offset)]);
+          aPropValue->setUint8Value(mDimTimeDown[aPropertyDescriptor->fieldKey()-(dimTimeDown_key+settings_key_offset)]);
           return true;
         case dimCurveExp_key+settings_key_offset:
-          aPropValue->setDoubleValue(dimCurveExp);
+          aPropValue->setDoubleValue(mDimCurveExp);
           return true;
       }
     }
@@ -599,24 +599,24 @@ bool LightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case onThreshold_key+settings_key_offset:
-          setPVar(onThreshold, aPropValue->doubleValue());
+          setPVar(mOnThreshold, aPropValue->doubleValue());
           return true;
         case minBrightness_key+settings_key_offset:
-          brightness->setDimMin(aPropValue->doubleValue());
-          if (!hardwareHasSetMinDim) markDirty();
+          mBrightness->setDimMin(aPropValue->doubleValue());
+          if (!mHardwareHasSetMinDim) markDirty();
           return true;
         case dimTimeUp_key+settings_key_offset:
         case dimTimeUpAlt1_key+settings_key_offset:
         case dimTimeUpAlt2_key+settings_key_offset:
-          setPVar(dimTimeUp[aPropertyDescriptor->fieldKey()-(dimTimeUp_key+settings_key_offset)], (DimmingTime)aPropValue->int32Value());
+          setPVar(mDimTimeUp[aPropertyDescriptor->fieldKey()-(dimTimeUp_key+settings_key_offset)], (DimmingTime)aPropValue->int32Value());
           return true;
         case dimTimeDown_key+settings_key_offset:
         case dimTimeDownAlt1_key+settings_key_offset:
         case dimTimeDownAlt2_key+settings_key_offset:
-          setPVar(dimTimeDown[aPropertyDescriptor->fieldKey()-(dimTimeDown_key+settings_key_offset)], (DimmingTime)aPropValue->int32Value());
+          setPVar(mDimTimeDown[aPropertyDescriptor->fieldKey()-(dimTimeDown_key+settings_key_offset)], (DimmingTime)aPropValue->int32Value());
           return true;
         case dimCurveExp_key+settings_key_offset:
-          setPVar(dimCurveExp, aPropValue->doubleValue());
+          setPVar(mDimCurveExp, aPropValue->doubleValue());
           return true;
       }
     }
@@ -638,8 +638,8 @@ string LightBehaviour::shortDesc()
 string LightBehaviour::description()
 {
   string s = string_format("%s behaviour", shortDesc().c_str());
-  string_format_append(s, "\n- brightness = %.1f, localPriority = %d", brightness->getChannelValue(), hasLocalPriority());
-  string_format_append(s, "\n- dimmable: %d, minBrightness=%.1f, onThreshold=%.1f", isDimmable(), brightness->getMinDim(), onThreshold);
+  string_format_append(s, "\n- brightness = %.1f, localPriority = %d", mBrightness->getChannelValue(), hasLocalPriority());
+  string_format_append(s, "\n- dimmable: %d, minBrightness=%.1f, onThreshold=%.1f", isDimmable(), mBrightness->getMinDim(), mOnThreshold);
   s.append(inherited::description());
   return s;
 }

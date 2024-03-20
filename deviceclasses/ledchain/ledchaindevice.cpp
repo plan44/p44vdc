@@ -396,7 +396,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
     }
   }
   // RGB light, get basic color
-  FOCUSLOG("Ledchain: brightness = %f, hue=%f, saturation=%f", cl->brightness->getChannelValue(true), cl->hue->getChannelValue(true), cl->saturation->getChannelValue(true));
+  FOCUSLOG("Ledchain: brightness = %f, hue=%f, saturation=%f", cl->mBrightness->getChannelValue(true), cl->mHue->getChannelValue(true), cl->mSaturation->getChannelValue(true));
   double r, g, b;
   cl->getRGB(r, g, b, 255, true, true); // get R,G,B at full brightness
   // the view's foreground color is the color

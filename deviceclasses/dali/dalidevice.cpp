@@ -900,7 +900,7 @@ bool DaliBusDevice::setColorParamsFromChannels(ColorLightBehaviourPtr aColorLigh
   }
   else {
     // DALI controller understands Cie and/or Ct directly
-    if (mDT8Color && (aColorLight->colorMode!=colorLightModeCt || !mDT8CT)) {
+    if (mDT8Color && (aColorLight->mColorMode!=colorLightModeCt || !mDT8CT)) {
       // color is requested or CT is requested but controller cannot do CT natively -> send CieX/Y
       double cieX, cieY;
       aColorLight->getCIExy(cieX, cieY, aTransitional);
@@ -1439,15 +1439,15 @@ void DaliSingleControllerDevice::processUpdatedParams(ErrorPtr aError)
       ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
       if (cl) {
         // also synchronize color information
-        cl->colorMode = mDaliController->mCurrentColorMode;
+        cl->mColorMode = mDaliController->mCurrentColorMode;
         if (mDaliController->mCurrentColorMode==colorLightModeCt) {
           // - tunable white mode
-          cl->ct->syncChannelValue(mDaliController->mCurrentXorCT);
+          cl->mCt->syncChannelValue(mDaliController->mCurrentXorCT);
         }
         else if (mDaliController->mCurrentColorMode==colorLightModeXY) {
           // - X/Y color mode
-          cl->cieX->syncChannelValue((double)mDaliController->mCurrentXorCT/65536);
-          cl->cieY->syncChannelValue((double)mDaliController->mCurrentY/65536);
+          cl->mCIEx->syncChannelValue((double)mDaliController->mCurrentXorCT/65536);
+          cl->mCIEy->syncChannelValue((double)mDaliController->mCurrentY/65536);
         }
       }
     }

@@ -39,21 +39,21 @@ namespace p44 {
   class BrightnessChannel : public PercentageLevelChannel
   {
     typedef PercentageLevelChannel inherited;
-    double minDim;
+    double mMinDim;
 
   public:
     BrightnessChannel(OutputBehaviour &aOutput) : inherited(aOutput, "brightness")
     {
       mResolution = DS_BRIGHTNESS_STEP; // light defaults to historic dS scale resolution
-      minDim = getMin()+mResolution; // min dimming level defaults to one resolution step above zero
+      mMinDim = getMin()+mResolution; // min dimming level defaults to one resolution step above zero
     };
 
-    void setDimMin(double aMinDim) { minDim = aMinDim; };
+    void setDimMin(double aMinDim) { mMinDim = aMinDim; };
 
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_brightness; }; ///< the dS channel type
     virtual const char* getName() const P44_OVERRIDE { return "brightness"; };
     virtual double getStdDimPerMS() P44_OVERRIDE { return 11.0/256*100/300; }; // dimming is 11 steps(1/256) per 300mS (as per ds-light.pdf specification) = 255/11*300 = 7 seconds full scale
-    virtual double getMinDim() P44_OVERRIDE { return minDim; };
+    virtual double getMinDim() P44_OVERRIDE { return mMinDim; };
 
   };
   typedef boost::intrusive_ptr<BrightnessChannel> BrightnessChannelPtr;
@@ -105,19 +105,19 @@ namespace p44 {
 
     /// @name persistent settings
     /// @{
-    Brightness onThreshold; ///< if !isDimmable, output will be on when output value is >= the threshold
-    DimmingTime dimTimeUp[3]; ///< dimming up time
-    DimmingTime dimTimeDown[3]; ///< dimming down time
-    double dimCurveExp; ///< exponent for logarithmic curve (1=linear, 2=quadratic, 3=cubic, ...)
+    Brightness mOnThreshold; ///< if !isDimmable, output will be on when output value is >= the threshold
+    DimmingTime mDimTimeUp[3]; ///< dimming up time
+    DimmingTime mDimTimeDown[3]; ///< dimming down time
+    double mDimCurveExp; ///< exponent for logarithmic curve (1=linear, 2=quadratic, 3=cubic, ...)
     /// @}
 
 
     /// @name internal volatile state
     /// @{
-    MLTicket blinkTicket; ///< when blinking
-    SimpleCB blinkDoneHandler; ///< called when blinking done
-    LightScenePtr blinkRestoreScene; ///< scene to restore
-    bool hardwareHasSetMinDim; ///< if set, hardware has set minDim (prevents loading from DB)
+    MLTicket mBlinkTicket; ///< when blinking
+    SimpleCB mBlinkDoneHandler; ///< called when blinking done
+    LightScenePtr mBlinkRestoreScene; ///< scene to restore
+    bool mHardwareHasSetMinDim; ///< if set, hardware has set minDim (prevents loading from DB)
     /// @}
 
 
@@ -129,7 +129,7 @@ namespace p44 {
     virtual const char *behaviourTypeIdentifier() P44_OVERRIDE P44_FINAL { return "light"; };
 
     /// the brightness channel
-    BrightnessChannelPtr brightness;
+    BrightnessChannelPtr mBrightness;
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{
@@ -166,18 +166,18 @@ namespace p44 {
 
     /// Check if brightness change needs to be applied to hardware
     /// @return true if brightness has pending change
-    bool brightnessNeedsApplying() { return brightness->needsApplying(); };
+    bool brightnessNeedsApplying() { return mBrightness->needsApplying(); };
 
     /// initialize a transition or update its progress over time
     /// @param aNow current time, used to calculate progress. Default is 0 and means starting a new transition NOW
     /// @return true if the transition must be updated again, false if end of transition already reached
-    bool updateBrightnessTransition(MLMicroSeconds aNow = 0) { return brightness->updateTimedTransition(aNow); }
+    bool updateBrightnessTransition(MLMicroSeconds aNow = 0) { return mBrightness->updateTimedTransition(aNow); }
 
     /// wrapper to confirm having applied brightness
-    void brightnessApplied() { brightness->channelValueApplied(); };
+    void brightnessApplied() { mBrightness->channelValueApplied(); };
 
     /// wrapper to get brightness' transition time
-    MLMicroSeconds transitionTimeToNewBrightness() { return brightness->transitionTimeToNewValue(); };
+    MLMicroSeconds transitionTimeToNewBrightness() { return mBrightness->transitionTimeToNewValue(); };
 
     /// @}
 

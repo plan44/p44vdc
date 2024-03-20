@@ -152,9 +152,9 @@ namespace p44 {
     /// @name color light scene specific values
     /// @{
 
-    ColorLightMode colorMode; ///< color mode (hue+Saturation or CIE xy or color temperature)
-    double XOrHueOrCt; ///< X or hue or ct, depending on colorMode
-    double YOrSat; ///< Y or saturation, depending on colorMode
+    ColorLightMode mColorMode; ///< color mode (hue+Saturation or CIE xy or color temperature)
+    double mXOrHueOrCt; ///< X or hue or ct, depending on colorMode
+    double mYOrSat; ///< Y or saturation, depending on colorMode
 
     /// @}
 
@@ -201,24 +201,24 @@ namespace p44 {
     typedef LightBehaviour inherited;
     friend class ColorLightScene;
 
-    bool ctOnly; // if set, behaviour only exposes brightness and colortemperature channels
+    bool mCtOnly; // if set, behaviour only exposes brightness and colortemperature channels
 
   public:
 
     /// @name internal volatile state
     /// @{
-    ColorLightMode colorMode;
-    bool derivedValuesComplete;
+    ColorLightMode mColorMode;
+    bool mDerivedValuesComplete;
     /// @}
 
 
     /// @name channels
     /// @{
-    ChannelBehaviourPtr hue;
-    ChannelBehaviourPtr saturation;
-    ChannelBehaviourPtr ct;
-    ChannelBehaviourPtr cieX;
-    ChannelBehaviourPtr cieY;
+    ChannelBehaviourPtr mHue;
+    ChannelBehaviourPtr mSaturation;
+    ChannelBehaviourPtr mCt;
+    ChannelBehaviourPtr mCIEx;
+    ChannelBehaviourPtr mCIEy;
     /// @}
 
 
@@ -230,7 +230,7 @@ namespace p44 {
     /// @{
 
     /// @return true if light is not full color, but color temperature only
-    bool isCtOnly() { return ctOnly; }
+    bool isCtOnly() { return mCtOnly; }
 
     /// derives the color mode from channel values that need to be applied to hardware
     /// @return true if new mode could be found (which also means that color needs to be applied to HW)
@@ -321,9 +321,9 @@ namespace p44 {
 
     /// @name settings (color calibration)
     /// @{
-    Matrix3x3 calibration; ///< calibration matrix: [[Xr,Xg,Xb],[Yr,Yg,Yb],[Zr,Zg,Zb]]
-    Row3 whiteRGB; ///< R,G,B relative intensities that can be replaced by a extra (cold)white channel
-    Row3 amberRGB; ///< R,G,B relative intensities that can be replaced by a extra amber (warm white) channel
+    Matrix3x3 mCalibration; ///< calibration matrix: [[Xr,Xg,Xb],[Yr,Yg,Yb],[Zr,Zg,Zb]]
+    Row3 mWhiteRGB; ///< R,G,B relative intensities that can be replaced by a extra (cold)white channel
+    Row3 mAmberRGB; ///< R,G,B relative intensities that can be replaced by a extra amber (warm white) channel
     /// @}
 
     RGBColorLightBehaviour(Device &aDevice, bool aCtOnly);

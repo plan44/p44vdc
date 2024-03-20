@@ -974,16 +974,16 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
         else {
           // call scene or start dimming
           // - figure out direction if not already known
-          if (mLocalDimDirection==0 && l->brightness->getLastSync()!=Never) {
+          if (mLocalDimDirection==0 && l->mBrightness->getLastSync()!=Never) {
             // get initial direction from current value of first encountered light with synchronized brightness value
-            mLocalDimDirection = l->brightness->getChannelValue() >= l->brightness->getMinDim() ? -1 : 1;
+            mLocalDimDirection = l->mBrightness->getChannelValue() >= l->mBrightness->getMinDim() ? -1 : 1;
           }
           if (scene==INC_S) {
             // Start dimming
             // - minimum scene if not already there
-            if (mLocalDimDirection>0 && l->brightness->getChannelValue()==0) {
+            if (mLocalDimDirection>0 && l->mBrightness->getChannelValue()==0) {
               // starting dimming up from minimum
-              l->brightness->setChannelValue(l->brightness->getMinDim(), 0, true);
+              l->mBrightness->setChannelValue(l->mBrightness->getMinDim(), 0, true);
             }
             // now dim (safety timeout after 10 seconds)
             dev->dimChannelForArea(channel, mLocalDimDirection>0 ? dimmode_up : dimmode_down, 0, 10*Second);
