@@ -430,6 +430,18 @@ bool ColorLightBehaviour::deriveColorMode()
 }
 
 
+bool ColorLightBehaviour::setColorMode(ColorLightMode aColorMode)
+{
+  if (aColorMode!=mColorMode) {
+    deriveMissingColorChannels(false);
+    mColorMode = aColorMode;
+    return true;
+  }
+  return false;
+}
+
+
+
 bool ColorLightBehaviour::getCIExy(double &aCieX, double &aCieY, bool aTransitional)
 {
   Row3 HSV;
@@ -517,8 +529,6 @@ bool ColorLightBehaviour::getHueSaturation(double &aHue, double &aSaturation, bo
 
 
 
-// Note: altough very similar to the getXXX() above, this one does not operate on transitional values and also
-//       can share some code when calculating two missing modes at once
 void ColorLightBehaviour::deriveMissingColorChannels(bool aTransitional)
 {
   if (!mDerivedValuesComplete) {

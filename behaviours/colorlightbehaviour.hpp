@@ -236,6 +236,11 @@ namespace p44 {
     /// @return true if new mode could be found (which also means that color needs to be applied to HW)
     bool deriveColorMode();
 
+    /// set a specific color mode, if different from current mode missing channel values will be derived
+    /// @param aColorMode new color mode requested
+    /// @return true if mode actually changed, false if requested mode was already set
+    bool setColorMode(ColorLightMode aColorMode);
+
     /// derives the values for the not-current color representations' channels
     /// by converting between representations
     /// @param aTransitional if set and involved channels are in transition, the transitional values are used for calculating derived values

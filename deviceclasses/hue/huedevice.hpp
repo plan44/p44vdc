@@ -60,6 +60,8 @@ namespace p44 {
     MLMicroSeconds mReapplyAfter;
     MLTicket mReapplyTicket;
     bool mSeparateOnAndChannels;
+    ColorLightMode mPreferredFullColorMode; ///< if not colorLightModeNone, designates the preferred color mode for sending full color changes to the light
+    ColorLightMode mPreferredCtMode; ///< if not colorLightModeNone, designates the preferred color mode for sending ct changes to the light
 
     // internal state
     Tristate mCurrentlyOn; ///< current "on" status

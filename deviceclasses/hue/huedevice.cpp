@@ -68,7 +68,9 @@ HueDevice::HueDevice(HueVdc *aVdcP, const string &aLightID, HueType aHueType, co
   mReapplyAfter(DEFAULT_REAPPLY_DELAY),
   mCurrentlyOn(undefined),
   mLastSentBri(0), // undefined (bri starts at 1)
-  mSeparateOnAndChannels(false)
+  mSeparateOnAndChannels(false),
+  mPreferredFullColorMode(colorLightModeNone),
+  mPreferredCtMode(colorLightModeNone)
 {
   // hue devices are lights
   setColorClass(class_yellow_light);
@@ -155,8 +157,16 @@ void HueDevice::checkBrokenDevices(JsonObjectPtr aDeviceInfo)
     aDeviceInfo->get("modelid", o) && o->stringValue()=="VOLARE ZB3" &&
     aDeviceInfo->get("swversion", o) && o->stringValue()=="v.1.2"
   ) {
-    OLOG(LOG_WARNING, "Model %s is known broken, enabling tweaks. device info:\n%s", mHueModel.c_str(), aDeviceInfo->c_strValue());
+    OLOG(LOG_WARNING, "Model %s is known broken, enabling tweaks. Device info:\n%s", mHueModel.c_str(), aDeviceInfo->c_strValue());
     mSeparateOnAndChannels = true;
+  }
+  else if (
+    !mHueCertified &&
+    aDeviceInfo->get("modelid", o) && o->stringValue()=="TS0505B"
+  ) {
+    // this Zigbee controller is known to not understand HSV, so we prefer CIExy even when user changes HSV
+    OLOG(LOG_WARNING, "Model %s only understands CIExy, prevent HSV changes. Device info:\n%s", mHueModel.c_str(), aDeviceInfo->c_strValue());
+    mPreferredFullColorMode = colorLightModeXY;
   }
 }
 
@@ -466,6 +476,26 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       cl->deriveColorMode();
       if (lightIsOn) {
         // light is on - add color in case it was set (by scene call)
+        // - some broken lights might need a specific mode for control
+        ColorLightMode cm = cl->mColorMode;
+        switch (cm) {
+          case colorLightModeHueSaturation:
+          case colorLightModeXY:
+            // full color control
+            if (mPreferredFullColorMode!=colorLightModeNone) cm = mPreferredFullColorMode;
+            break;
+          case colorLightModeCt:
+            // color temperature control
+            if (mPreferredCtMode!=colorLightModeNone) cm = mPreferredCtMode;
+            break;
+          default:
+            break;
+        }
+        if (cl->setColorMode(cm)) {
+          OLOG(LOG_INFO, "using light-specific preferred override mode for controlling color/ct");
+          aReapply = true; // make sure channels get fully applied anyway
+        }
+        // - apply
         switch (cl->mColorMode) {
           case colorLightModeHueSaturation: {
             // for dimming, only actually changed component (hue or saturation)
