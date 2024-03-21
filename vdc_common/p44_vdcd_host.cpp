@@ -1885,29 +1885,40 @@ const ScriptObjPtr ApiRequestObj::memberByName(const string aName, TypeInfo aMem
 class WebRequestUriFilter : public EventFilter
 {
   string mEndPoint;
+  string mPeer;
 public:
-  WebRequestUriFilter(const string aEndPoint) : mEndPoint(aEndPoint) {};
+  WebRequestUriFilter(const string aEndPoint, const string aPeer) : mEndPoint(aEndPoint), mPeer(aPeer) {};
 
   virtual bool filteredEventObj(ScriptObjPtr &aEventObj) P44_OVERRIDE
   {
     if (!aEventObj) return false;
-    if (mEndPoint.empty()) return true; // no filter
-    ScriptObjPtr ep = aEventObj->memberByName("endpoint");
-    return ep && ep->stringValue()==mEndPoint; // ok if matches endpoint
+    if (!mEndPoint.empty()) {
+      // we have an endpoint filter to check
+      ScriptObjPtr ep = aEventObj->memberByName("endpoint");
+      if (!(ep && ep->stringValue()==mEndPoint)) return false; // no endpoint match
+    }
+    if (!mPeer.empty()) {
+      // we have a peer filter to check
+      ScriptObjPtr peer = aEventObj->memberByName("peer");
+      if (!(peer && peer->stringValue()==mPeer)) return false; // no peer match
+    }
+    return true;
   }
 };
 
 
 // webrequest()                event source for (script API) web request
 // webrequest(endpoint)        filtered event source for specific sub-endpoint of the script API
-FUNC_ARG_DEFS(webrequest, { text|optionalarg } );
+// webrequest(endpoint, peer)  filtered event source for specific sub-endpoint of the script API and coming from a specific peer
+FUNC_ARG_DEFS(webrequest, { text|optionalarg }, { text|optionalarg } );
 static void webrequest_func(BuiltinFunctionContextPtr f)
 {
   // return API request event source place holder, actual value will be delivered via event
   P44VdcHost* h = dynamic_cast<P44VdcHost*>(VdcHost::sharedVdcHost().get());
-  string ep;
-  if (f->numArgs()>0) ep = f->arg(0)->stringValue();
-  f->finish(new OneShotEventNullValue(&h->mScriptedApiLookup, "web request", new WebRequestUriFilter(ep)));
+  string ep, peer;
+  if (f->arg(0)->defined()) ep = f->arg(0)->stringValue();
+  if (f->arg(1)->defined()) peer = f->arg(1)->stringValue();
+  f->finish(new OneShotEventNullValue(&h->mScriptedApiLookup, "web request", new WebRequestUriFilter(ep, peer)));
 }
 
 static const BuiltinMemberDescriptor scriptApiGlobals[] = {
