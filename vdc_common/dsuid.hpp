@@ -149,6 +149,9 @@ namespace p44 {
     // clear, make empty()==true
     void clear();
 
+    /// get the function/subdevice index of the dSUID
+    uint8_t getSubdeviceIndex() const;
+
     /// set the function/subdevice index of the dSUID
     /// @param aSubDeviceIndex a subdevice index. Devices containing multiple, logically independent subdevices
     ///   or functionality (like 2 or 4 buttons in one EnOcean device) must use this index to differentiate

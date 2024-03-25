@@ -106,6 +106,15 @@ void DsUid::setSubdeviceIndex(uint8_t aSubDeviceIndex)
 }
 
 
+uint8_t DsUid::getSubdeviceIndex() const
+{
+  if (mIdBytes==dsuidBytes) {
+    // is a dSUID, can set subdevice index
+    return mRaw[16];
+  }
+  return 0; // no subdeviceindex available
+}
+
 
 // MARK: - set SGTIN based dSUID from parameters
 
