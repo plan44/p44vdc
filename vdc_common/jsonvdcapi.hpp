@@ -125,17 +125,17 @@ namespace p44 {
   {
     typedef VdcApiRequest inherited;
 
-    string jsonRpcId;
+    JsonObjectPtr jsonRpcId;
     VdcJsonApiConnectionPtr jsonConnection;
 
   public:
 
     /// constructor
-    VdcJsonApiRequest(VdcJsonApiConnectionPtr aConnection, const char *aJsonRpcId);
+    VdcJsonApiRequest(VdcJsonApiConnectionPtr aConnection, const JsonObjectPtr aJsonRpcId);
 
-    /// return the request ID as a string
-    /// @return request ID as string
-    virtual string requestId() P44_OVERRIDE { return jsonRpcId; }
+    /// return the request ID as a JSON object
+    /// @return request ID as JSON object (usually string or integer)
+    virtual JsonObjectPtr requestId() P44_OVERRIDE { return jsonRpcId; }
 
     /// get the API connection this request originates from
     /// @return API connection
@@ -193,7 +193,7 @@ namespace p44 {
 
   private:
 
-    void jsonRequestHandler(const char *aMethod, const char *aJsonRpcId, JsonObjectPtr aParams);
+    void jsonRequestHandler(const char *aMethod, const JsonObjectPtr aJsonRpcId, JsonObjectPtr aParams);
     void jsonResponseHandler(VdcApiResponseCB aResponseHandler, int32_t aResponseId, ErrorPtr &aError, JsonObjectPtr aResultOrErrorData);
 
   };

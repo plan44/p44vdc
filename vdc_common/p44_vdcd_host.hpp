@@ -115,7 +115,7 @@ namespace p44 {
 
     /// return the request ID as a string
     /// @return request ID as string
-    virtual string requestId()  P44_OVERRIDE { return mRequestId; }
+    virtual JsonObjectPtr requestId()  P44_OVERRIDE { return JsonObject::newString(mRequestId); }
 
     /// get the API connection this request originates from
     /// @return API connection
