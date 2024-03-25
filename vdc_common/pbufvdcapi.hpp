@@ -59,7 +59,7 @@ namespace p44 {
     friend class VdcPbufApiConnection;
 
     // the actual storage
-    ApiValueType allocatedType;
+    ApiValueType mAllocatedType;
     union {
       bool boolVal;
       uint64_t uint64Val;
@@ -68,9 +68,9 @@ namespace p44 {
       string *stringP; // for strings and binary values
       ApiValueFieldMap *objectMapP;
       ApiValueArray *arrayVectorP;
-    } objectValue;
+    } mObjectValue;
 
-    ApiValueFieldMap::iterator keyIterator;
+    ApiValueFieldMap::iterator mKeyIterator;
 
   public:
 
@@ -185,9 +185,9 @@ namespace p44 {
 
     friend class VdcPbufApiConnection;
 
-    uint32_t reqId;
-    VdcPbufApiConnectionPtr pbufConnection;
-    Vdcapi__Type responseType; ///< which response message to send back
+    uint32_t mReqId;
+    VdcPbufApiConnectionPtr mPbufConnection;
+    Vdcapi__Type mResponseType; ///< which response message to send back
 
   public:
 
@@ -196,7 +196,7 @@ namespace p44 {
 
     /// return the request ID as a string
     /// @return request ID as string
-    virtual JsonObjectPtr requestId() P44_OVERRIDE { return JsonObject::newInt32(reqId); }
+    virtual JsonObjectPtr requestId() P44_OVERRIDE { return JsonObject::newInt32(mReqId); }
 
     /// get the API connection this request originates from
     /// @return API connection
@@ -227,20 +227,20 @@ namespace p44 {
 
     friend class VdcPbufApiRequest;
 
-    SocketCommPtr socketComm;
+    SocketCommPtr mSocketComm;
 
     // receiving
-    uint32_t expectedMsgBytes; ///< number of bytes expected of next message
-    string receivedMessage; ///< accumulated message bytes, including 4-byte length header
+    uint32_t mExpectedMsgBytes; ///< number of bytes expected of next message
+    string mReceivedMessage; ///< accumulated message bytes, including 4-byte length header
 
     // sending
-    string transmitBuffer; ///< binary buffer for data to be sent
-    bool closeWhenSent;
+    string mTransmitBuffer; ///< binary buffer for data to be sent
+    bool mCloseWhenSent;
 
     // pending requests
-    int32_t requestIdCounter;
+    int32_t mRequestIdCounter;
     typedef map<int32_t, VdcApiResponseCB> PendingAnswerMap;
-    PendingAnswerMap pendingAnswers;
+    PendingAnswerMap mPendingAnswers;
 
   public:
 
@@ -248,7 +248,7 @@ namespace p44 {
 
     /// The underlying socket connection
     /// @return socket connection
-    virtual SocketCommPtr socketConnection() P44_OVERRIDE { return socketComm; };
+    virtual SocketCommPtr socketConnection() P44_OVERRIDE { return mSocketComm; };
 
     /// request closing connection after last message has been sent
     virtual void closeAfterSend() P44_OVERRIDE;

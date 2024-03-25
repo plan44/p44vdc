@@ -31,13 +31,13 @@ using namespace p44;
 void VdcApiError::setFormattedUserFacingMessage(const char *aFmt, va_list aArgs)
 {
   // now make the string
-  string_format_v(userFacingMessage, true, aFmt, aArgs);
+  string_format_v(mUserFacingMessage, true, aFmt, aArgs);
 }
 
 
 void VdcApiError::setUserFacingInfo(uint8_t aErrorType, const char *aFmt, ...)
 {
-  errorType = aErrorType;
+  mErrorType = aErrorType;
   va_list args;
   va_start(args, aFmt);
   setFormattedUserFacingMessage(aFmt, args);
@@ -48,7 +48,7 @@ void VdcApiError::setUserFacingInfo(uint8_t aErrorType, const char *aFmt, ...)
 VdcApiErrorPtr VdcApiError::userFacingErr(ErrorCode aErrorCode, uint8_t aErrorType, const char *aFmt, ...)
 {
   VdcApiError *errP = new VdcApiError(aErrorCode);
-  errP->errorType = aErrorType;
+  errP->mErrorType = aErrorType;
   va_list args;
   va_start(args, aFmt);
   errP->setFormattedUserFacingMessage(aFmt, args);
@@ -61,8 +61,8 @@ string VdcApiError::description() const
 {
   string errorText = Error::description();
   // Append type and user facing message if any
-  if (errorType!=0 || !userFacingMessage.empty()) {
-    string_format_append(errorText, " - type %d - '%s'", errorType, userFacingMessage.c_str());
+  if (mErrorType!=0 || !mUserFacingMessage.empty()) {
+    string_format_append(errorText, " - type %d - '%s'", mErrorType, mUserFacingMessage.c_str());
   }
   return errorText;
 }
@@ -130,7 +130,7 @@ void VdcApiServer::connectionStatusHandler(SocketCommPtr aSocketComm, ErrorPtr a
 
 void VdcApiConnection::setRequestHandler(VdcApiRequestCB aApiRequestHandler)
 {
-  apiRequestHandler = aApiRequestHandler;
+  mApiRequestHandler = aApiRequestHandler;
 }
 
 

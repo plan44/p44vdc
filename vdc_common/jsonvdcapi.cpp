@@ -47,14 +47,14 @@ void JsonApiValue::clear()
   switch (getType()) {
     case apivalue_object:
       // just assign new object and forget old one
-      jsonObj = JsonObject::newObj();
+      mJsonObj = JsonObject::newObj();
       break;
     case apivalue_array:
-      jsonObj = JsonObject::newArray();
+      mJsonObj = JsonObject::newArray();
       break;
     // for unstuctured values, the json obj will be created on assign, so clear it now
     default:
-      jsonObj.reset();
+      mJsonObj.reset();
       break;
   }
 }
@@ -63,7 +63,7 @@ void JsonApiValue::clear()
 bool JsonApiValue::setStringValue(const string &aString)
 {
   if (getType()==apivalue_string || getType()==apivalue_binary) {
-    jsonObj = JsonObject::newString(aString, false);
+    mJsonObj = JsonObject::newString(aString, false);
     return true;
   }
   else
@@ -90,13 +90,13 @@ string JsonApiValue::binaryValue()
 
 void JsonApiValue::setJsonObject(JsonObjectPtr aJsonObject)
 {
-  jsonObj = aJsonObject;
+  mJsonObj = aJsonObject;
   // derive type
-  if (!jsonObj) {
+  if (!mJsonObj) {
     setType(apivalue_null);
   }
   else {
-    switch (jsonObj->type()) {
+    switch (mJsonObj->type()) {
       case json_type_boolean: mObjectType = apivalue_bool; break;
       case json_type_double: mObjectType = apivalue_double; break;
       case json_type_int: mObjectType = apivalue_int64; break;
@@ -116,7 +116,7 @@ void JsonApiValue::operator=(ApiValue &aApiValue)
 {
   JsonApiValue *javP = dynamic_cast<JsonApiValue *>(&aApiValue);
   if (javP)
-    setJsonObject(javP->jsonObj);
+    setJsonObject(javP->mJsonObj);
   else
     inherited::operator=(aApiValue); // cross-type assignment, needs more expensive generic assignment
 }
@@ -154,15 +154,15 @@ ApiValuePtr VdcJsonApiServer::newApiValue()
 
 
 VdcJsonApiRequest::VdcJsonApiRequest(VdcJsonApiConnectionPtr aConnection, const JsonObjectPtr aJsonRpcId) :
-  jsonConnection(aConnection),
-  jsonRpcId(aJsonRpcId)
+  mJsonConnection(aConnection),
+  mJsonRpcId(aJsonRpcId)
 {
 }
 
 
 VdcApiConnectionPtr VdcJsonApiRequest::connection()
 {
-  return jsonConnection;
+  return mJsonConnection;
 }
 
 
@@ -171,7 +171,7 @@ ErrorPtr VdcJsonApiRequest::sendResult(ApiValuePtr aResult)
 {
   LOG(LOG_INFO, "%s <- vDC, id=%s: result=%s", JsonObject::text(requestId()), apiName(), aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
-  return jsonConnection->jsonRpcComm->sendResult(requestId(), result ? result->jsonObject() : NULL);
+  return mJsonConnection->mJsonRpcComm->sendResult(requestId(), result ? result->jsonObject() : NULL);
 }
 
 
@@ -192,7 +192,7 @@ ErrorPtr VdcJsonApiRequest::sendError(ErrorPtr aError)
       errorData->add("userFacingMessage", errorData->newString(vdcApiErr->getUserFacingMessage()));
     }
   }
-  return jsonConnection->jsonRpcComm->sendError(requestId(), (uint32_t)aError->getErrorCode(), *aError->getErrorMessage() ? aError->getErrorMessage() : NULL, errorData ? errorData->jsonObject() : JsonObjectPtr());
+  return mJsonConnection->mJsonRpcComm->sendError(requestId(), (uint32_t)aError->getErrorCode(), *aError->getErrorMessage() ? aError->getErrorMessage() : NULL, errorData ? errorData->jsonObject() : JsonObjectPtr());
 }
 
 
@@ -202,9 +202,9 @@ ErrorPtr VdcJsonApiRequest::sendError(ErrorPtr aError)
 
 VdcJsonApiConnection::VdcJsonApiConnection()
 {
-  jsonRpcComm = JsonRpcCommPtr(new JsonRpcComm(MainLoop::currentMainLoop()));
+  mJsonRpcComm = JsonRpcCommPtr(new JsonRpcComm(MainLoop::currentMainLoop()));
   // install JSON request handler locally
-  jsonRpcComm->setRequestHandler(boost::bind(&VdcJsonApiConnection::jsonRequestHandler, this, _1, _2, _3));
+  mJsonRpcComm->setRequestHandler(boost::bind(&VdcJsonApiConnection::jsonRequestHandler, this, _1, _2, _3));
 }
 
 
@@ -212,7 +212,7 @@ VdcJsonApiConnection::VdcJsonApiConnection()
 void VdcJsonApiConnection::jsonRequestHandler(const char *aMethod, const JsonObjectPtr aJsonRpcId, JsonObjectPtr aParams)
 {
   ErrorPtr respErr;
-  if (apiRequestHandler) {
+  if (mApiRequestHandler) {
     // create params API value
     ApiValuePtr params = JsonApiValue::newValueFromJson(aParams);
     VdcApiRequestPtr request;
@@ -227,14 +227,14 @@ void VdcJsonApiConnection::jsonRequestHandler(const char *aMethod, const JsonObj
       LOG(LOG_INFO, "%s -> vDC: sent notification '%s', params=%s", apiName(), aMethod, params ? params->description().c_str() : "<none>");
     }
     // call handler
-    apiRequestHandler(VdcJsonApiConnectionPtr(this), request, aMethod, params);
+    mApiRequestHandler(VdcJsonApiConnectionPtr(this), request, aMethod, params);
   }
 }
 
 
 void VdcJsonApiConnection::closeAfterSend()
 {
-  jsonRpcComm->closeAfterSend();
+  mJsonRpcComm->closeAfterSend();
 }
 
 
@@ -244,13 +244,13 @@ ErrorPtr VdcJsonApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
   ErrorPtr err;
   if (aResponseHandler) {
     // method call expecting response
-    LOG(LOG_INFO, "%s <- vDC, id=%d: calling method '%s', params=%s", apiName(), jsonRpcComm->lastRequestId(), aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
-    err = jsonRpcComm->sendRequest(aMethod.c_str(), params->jsonObject(), boost::bind(&VdcJsonApiConnection::jsonResponseHandler, this, aResponseHandler, _1, _2, _3));
+    LOG(LOG_INFO, "%s <- vDC, id=%d: calling method '%s', params=%s", apiName(), mJsonRpcComm->lastRequestId(), aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
+    err = mJsonRpcComm->sendRequest(aMethod.c_str(), params->jsonObject(), boost::bind(&VdcJsonApiConnection::jsonResponseHandler, this, aResponseHandler, _1, _2, _3));
   }
   else {
     // notification
     LOG(LOG_INFO, "%s <- vDC: sending notification '%s', params=%s", apiName(), aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
-    err = jsonRpcComm->sendRequest(aMethod.c_str(), params->jsonObject(), NoOP);
+    err = mJsonRpcComm->sendRequest(aMethod.c_str(), params->jsonObject(), NoOP);
   }
   return err;
 }

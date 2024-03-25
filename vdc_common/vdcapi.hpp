@@ -40,20 +40,20 @@ namespace p44 {
 
   class VdcApiError : public Error
   {
-    VdcErrorType errorType; ///< the error type (see Vdcapi__ErrorType protobuf enum) as a hint for user faced error processing
-    string userFacingMessage; ///< a user facing message, which might also be the key into a translation database
+    VdcErrorType mErrorType; ///< the error type (see Vdcapi__ErrorType protobuf enum) as a hint for user faced error processing
+    string mUserFacingMessage; ///< a user facing message, which might also be the key into a translation database
 
   public:
     typedef ErrorCode ErrorCodes;
 
     static const char *domain() { return "VdcApi"; }
     virtual const char *getErrorDomain() const P44_OVERRIDE { return VdcApiError::domain(); };
-    VdcApiError(ErrorCode aError) : Error(aError), errorType(0) {};
+    VdcApiError(ErrorCode aError) : Error(aError), mErrorType(0) {};
     VdcApiError(ErrorCode aError, const string &aMsg, VdcErrorType aErrorType, const string &aUsrMsg) :
-      Error(aError, aMsg), errorType(aErrorType), userFacingMessage(aUsrMsg) {};
+      Error(aError, aMsg), mErrorType(aErrorType), mUserFacingMessage(aUsrMsg) {};
 
-    VdcErrorType getErrorType() const { return errorType; };
-    string getUserFacingMessage() const { return userFacingMessage; };
+    VdcErrorType getErrorType() const { return mErrorType; };
+    string getUserFacingMessage() const { return mUserFacingMessage; };
 
     /// set userFacingMessage
     /// @param aFmt error message format string
@@ -120,12 +120,12 @@ namespace p44 {
 
   protected:
 
-    VdcApiRequestCB apiRequestHandler;
-    int apiVersion;
+    VdcApiRequestCB mApiRequestHandler;
+    int mApiVersion;
 
   public:
 
-    VdcApiConnection() : apiVersion(0) {};
+    VdcApiConnection() : mApiVersion(0) {};
 
     /// install callback for received API requests
     /// @param aApiRequestHandler will be called when a API request has been received
@@ -166,12 +166,12 @@ namespace p44 {
     /// get API version
     /// @return API version for this connection
     /// @note 0 is returned as long as API version is not yet determined
-    int getApiVersion() { return apiVersion; }
+    int getApiVersion() { return mApiVersion; }
 
     /// set API version for this connection
     /// @param aApiVersion numeric API version to set
     /// @note is effective only when current API version is not defined (==0)
-    void setApiVersion(int aApiVersion) { if (apiVersion==0) apiVersion = aApiVersion; };
+    void setApiVersion(int aApiVersion) { if (mApiVersion==0) mApiVersion = aApiVersion; };
 
   };
 

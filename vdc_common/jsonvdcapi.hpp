@@ -53,7 +53,7 @@ namespace p44 {
     typedef ApiValue inherited;
 
     // using an embedded Json Object
-    JsonObjectPtr jsonObj;
+    JsonObjectPtr mJsonObj;
 
     // set value from a JsonObject
     void setJsonObject(JsonObjectPtr aJsonObject);
@@ -69,31 +69,31 @@ namespace p44 {
     virtual void clear() P44_OVERRIDE;
     virtual void operator=(ApiValue &aApiValue) P44_OVERRIDE;
 
-    virtual void add(const string &aKey, ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->add(aKey.c_str(), o->jsonObject()); };
-    virtual ApiValuePtr get(const string &aKey) P44_OVERRIDE { JsonObjectPtr o; if (jsonObj && jsonObj->get(aKey.c_str(), o, false)) return newValueFromJson(o); else return ApiValuePtr(); };
-    virtual void del(const string &aKey) P44_OVERRIDE { if (jsonObj) jsonObj->del(aKey.c_str()); };
-    virtual int arrayLength() P44_OVERRIDE { return jsonObj ? jsonObj->arrayLength() : 0; };
-    virtual void arrayAppend(ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->arrayAppend(o->jsonObject()); };
-    virtual ApiValuePtr arrayGet(int aAtIndex) P44_OVERRIDE { if (jsonObj) { JsonObjectPtr o = jsonObj->arrayGet(aAtIndex); return newValueFromJson(o); } else return ApiValuePtr(); };
-    virtual void arrayPut(int aAtIndex, ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (jsonObj && o) jsonObj->arrayPut(aAtIndex, o->jsonObject()); };
-    virtual bool resetKeyIteration() P44_OVERRIDE { if (jsonObj) return jsonObj->resetKeyIteration(); else return false; };
-    virtual bool nextKeyValue(string &aKey, ApiValuePtr &aValue) P44_OVERRIDE { if (jsonObj) { JsonObjectPtr o; bool gotone = jsonObj->nextKeyValue(aKey, o); aValue = newValueFromJson(o); return gotone; } else return false; };
+    virtual void add(const string &aKey, ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (mJsonObj && o) mJsonObj->add(aKey.c_str(), o->jsonObject()); };
+    virtual ApiValuePtr get(const string &aKey) P44_OVERRIDE { JsonObjectPtr o; if (mJsonObj && mJsonObj->get(aKey.c_str(), o, false)) return newValueFromJson(o); else return ApiValuePtr(); };
+    virtual void del(const string &aKey) P44_OVERRIDE { if (mJsonObj) mJsonObj->del(aKey.c_str()); };
+    virtual int arrayLength() P44_OVERRIDE { return mJsonObj ? mJsonObj->arrayLength() : 0; };
+    virtual void arrayAppend(ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (mJsonObj && o) mJsonObj->arrayAppend(o->jsonObject()); };
+    virtual ApiValuePtr arrayGet(int aAtIndex) P44_OVERRIDE { if (mJsonObj) { JsonObjectPtr o = mJsonObj->arrayGet(aAtIndex); return newValueFromJson(o); } else return ApiValuePtr(); };
+    virtual void arrayPut(int aAtIndex, ApiValuePtr aObj) P44_OVERRIDE { JsonApiValuePtr o = boost::dynamic_pointer_cast<JsonApiValue>(aObj); if (mJsonObj && o) mJsonObj->arrayPut(aAtIndex, o->jsonObject()); };
+    virtual bool resetKeyIteration() P44_OVERRIDE { if (mJsonObj) return mJsonObj->resetKeyIteration(); else return false; };
+    virtual bool nextKeyValue(string &aKey, ApiValuePtr &aValue) P44_OVERRIDE { if (mJsonObj) { JsonObjectPtr o; bool gotone = mJsonObj->nextKeyValue(aKey, o); aValue = newValueFromJson(o); return gotone; } else return false; };
 
-    virtual uint64_t uint64Value() P44_OVERRIDE { return jsonObj ? (uint64_t)jsonObj->int64Value() : 0; };
-    virtual int64_t int64Value() P44_OVERRIDE { return jsonObj ? jsonObj->int64Value() : 0; };
-    virtual double doubleValue() P44_OVERRIDE { return jsonObj ? jsonObj->doubleValue() : 0; };
-    virtual bool boolValue() P44_OVERRIDE { return jsonObj ? jsonObj->boolValue() : false; };
+    virtual uint64_t uint64Value() P44_OVERRIDE { return mJsonObj ? (uint64_t)mJsonObj->int64Value() : 0; };
+    virtual int64_t int64Value() P44_OVERRIDE { return mJsonObj ? mJsonObj->int64Value() : 0; };
+    virtual double doubleValue() P44_OVERRIDE { return mJsonObj ? mJsonObj->doubleValue() : 0; };
+    virtual bool boolValue() P44_OVERRIDE { return mJsonObj ? mJsonObj->boolValue() : false; };
     virtual string binaryValue() P44_OVERRIDE;
-    virtual string stringValue() P44_OVERRIDE { if (getType()==apivalue_string) { return jsonObj ? jsonObj->stringValue() : ""; } else return inherited::stringValue(); };
+    virtual string stringValue() P44_OVERRIDE { if (getType()==apivalue_string) { return mJsonObj ? mJsonObj->stringValue() : ""; } else return inherited::stringValue(); };
 
-    virtual void setUint64Value(uint64_t aUint64) P44_OVERRIDE { jsonObj = JsonObject::newInt64(aUint64); }
-    virtual void setInt64Value(int64_t aInt64) P44_OVERRIDE { jsonObj = JsonObject::newInt64(aInt64); };
-    virtual void setDoubleValue(double aDouble) P44_OVERRIDE { jsonObj = JsonObject::newDouble(aDouble); };
-    virtual void setBoolValue(bool aBool) P44_OVERRIDE { jsonObj = JsonObject::newBool(aBool); };
+    virtual void setUint64Value(uint64_t aUint64) P44_OVERRIDE { mJsonObj = JsonObject::newInt64(aUint64); }
+    virtual void setInt64Value(int64_t aInt64) P44_OVERRIDE { mJsonObj = JsonObject::newInt64(aInt64); };
+    virtual void setDoubleValue(double aDouble) P44_OVERRIDE { mJsonObj = JsonObject::newDouble(aDouble); };
+    virtual void setBoolValue(bool aBool) P44_OVERRIDE { mJsonObj = JsonObject::newBool(aBool); };
     virtual void setBinaryValue(const string &aBinary) P44_OVERRIDE;
     virtual bool setStringValue(const string &aString) P44_OVERRIDE;
 
-    JsonObjectPtr jsonObject() { return jsonObj; };
+    JsonObjectPtr jsonObject() { return mJsonObj; };
 
   protected:
     
@@ -125,8 +125,8 @@ namespace p44 {
   {
     typedef VdcApiRequest inherited;
 
-    JsonObjectPtr jsonRpcId;
-    VdcJsonApiConnectionPtr jsonConnection;
+    JsonObjectPtr mJsonRpcId;
+    VdcJsonApiConnectionPtr mJsonConnection;
 
   public:
 
@@ -135,7 +135,7 @@ namespace p44 {
 
     /// return the request ID as a JSON object
     /// @return request ID as JSON object (usually string or integer)
-    virtual JsonObjectPtr requestId() P44_OVERRIDE { return jsonRpcId; }
+    virtual JsonObjectPtr requestId() P44_OVERRIDE { return mJsonRpcId; }
 
     /// get the API connection this request originates from
     /// @return API connection
@@ -166,7 +166,7 @@ namespace p44 {
 
     friend class VdcJsonApiRequest;
 
-    JsonRpcCommPtr jsonRpcComm;
+    JsonRpcCommPtr mJsonRpcComm;
 
   public:
 
@@ -174,7 +174,7 @@ namespace p44 {
 
     /// The underlying socket connection
     /// @return socket connection
-    virtual SocketCommPtr socketConnection() P44_OVERRIDE { return jsonRpcComm; };
+    virtual SocketCommPtr socketConnection() P44_OVERRIDE { return mJsonRpcComm; };
 
     /// request closing connection after last message has been sent
     virtual void closeAfterSend() P44_OVERRIDE;

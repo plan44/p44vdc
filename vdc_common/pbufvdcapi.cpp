@@ -41,7 +41,7 @@ void protobufMessagePrint(FILE *aOutFile, const ProtobufCMessage *aMessageP, int
 // MARK: - PbufApiValue
 
 PbufApiValue::PbufApiValue() :
-  allocatedType(apivalue_null)
+  mAllocatedType(apivalue_null)
 {
 }
 
@@ -67,19 +67,19 @@ void PbufApiValue::operator=(ApiValue &aApiValue)
   if (pavP) {
     setType(aApiValue.getType());
     allocate();
-    switch (allocatedType) {
+    switch (mAllocatedType) {
       case apivalue_string:
       case apivalue_binary:
-        objectValue.stringP = new string(*(pavP->objectValue.stringP));
+        mObjectValue.stringP = new string(*(pavP->mObjectValue.stringP));
         break;
       case apivalue_object:
-        objectValue.objectMapP = new ApiValueFieldMap(*(pavP->objectValue.objectMapP));
+        mObjectValue.objectMapP = new ApiValueFieldMap(*(pavP->mObjectValue.objectMapP));
         break;
       case apivalue_array:
-        objectValue.arrayVectorP = new ApiValueArray(*(pavP->objectValue.arrayVectorP));
+        mObjectValue.arrayVectorP = new ApiValueArray(*(pavP->mObjectValue.arrayVectorP));
         break;
       default:
-        objectValue = pavP->objectValue; // copy union containing a scalar value
+        mObjectValue = pavP->mObjectValue; // copy union containing a scalar value
         break;
     }
   }
@@ -93,43 +93,43 @@ void PbufApiValue::operator=(ApiValue &aApiValue)
 void PbufApiValue::clear()
 {
   // forget allocated type
-  if (allocatedType!=apivalue_null) {
-    switch (allocatedType) {
+  if (mAllocatedType!=apivalue_null) {
+    switch (mAllocatedType) {
       case apivalue_string:
       case apivalue_binary:
-        if (objectValue.stringP) delete objectValue.stringP;
+        if (mObjectValue.stringP) delete mObjectValue.stringP;
         break;
       case apivalue_object:
-        if (objectValue.objectMapP) delete objectValue.objectMapP;
+        if (mObjectValue.objectMapP) delete mObjectValue.objectMapP;
         break;
       case apivalue_array:
-        if (objectValue.arrayVectorP) delete objectValue.arrayVectorP;
+        if (mObjectValue.arrayVectorP) delete mObjectValue.arrayVectorP;
         break;
       default:
         break;
     }
     // zero out union
-    memset(&objectValue, 0, sizeof(objectValue));
+    memset(&mObjectValue, 0, sizeof(mObjectValue));
     // is now a NULL object
-    allocatedType = apivalue_null;
+    mAllocatedType = apivalue_null;
   }
 }
 
 
 void PbufApiValue::allocate()
 {
-  if (allocatedType!=getType() && allocatedType==apivalue_null) {
-    allocatedType = getType();
-    switch (allocatedType) {
+  if (mAllocatedType!=getType() && mAllocatedType==apivalue_null) {
+    mAllocatedType = getType();
+    switch (mAllocatedType) {
       case apivalue_string:
       case apivalue_binary:
-        objectValue.stringP = new string;
+        mObjectValue.stringP = new string;
         break;
       case apivalue_object:
-        objectValue.objectMapP = new ApiValueFieldMap;
+        mObjectValue.objectMapP = new ApiValueFieldMap;
         break;
       case apivalue_array:
-        objectValue.arrayVectorP = new ApiValueArray;
+        mObjectValue.arrayVectorP = new ApiValueArray;
         break;
       default:
         break;
@@ -153,16 +153,16 @@ void PbufApiValue::add(const string &aKey, ApiValuePtr aObj)
 {
   PbufApiValuePtr val = boost::dynamic_pointer_cast<PbufApiValue>(aObj);
   if (val && allocateIf(apivalue_object)) {
-    (*(objectValue.objectMapP))[aKey] = val;
+    (*(mObjectValue.objectMapP))[aKey] = val;
   }
 }
 
 
 ApiValuePtr PbufApiValue::get(const string &aKey)
 {
-  if (allocatedType==apivalue_object) {
-    ApiValueFieldMap::iterator pos = objectValue.objectMapP->find(aKey);
-    if (pos!=objectValue.objectMapP->end())
+  if (mAllocatedType==apivalue_object) {
+    ApiValueFieldMap::iterator pos = mObjectValue.objectMapP->find(aKey);
+    if (pos!=mObjectValue.objectMapP->end())
       return pos->second;
   }
   return ApiValuePtr();
@@ -171,16 +171,16 @@ ApiValuePtr PbufApiValue::get(const string &aKey)
 
 void PbufApiValue::del(const string &aKey)
 {
-  if (allocatedType==apivalue_object) {
-    objectValue.objectMapP->erase(aKey);
+  if (mAllocatedType==apivalue_object) {
+    mObjectValue.objectMapP->erase(aKey);
   }
 }
 
 
 int PbufApiValue::arrayLength()
 {
-  if (allocatedType==apivalue_array) {
-    return (int)objectValue.arrayVectorP->size();
+  if (mAllocatedType==apivalue_array) {
+    return (int)mObjectValue.arrayVectorP->size();
   }
   return 0;
 }
@@ -190,16 +190,16 @@ void PbufApiValue::arrayAppend(ApiValuePtr aObj)
 {
   PbufApiValuePtr val = boost::dynamic_pointer_cast<PbufApiValue>(aObj);
   if (val && allocateIf(apivalue_array)) {
-    objectValue.arrayVectorP->push_back(val);
+    mObjectValue.arrayVectorP->push_back(val);
   }
 }
 
 
 ApiValuePtr PbufApiValue::arrayGet(int aAtIndex)
 {
-  if (allocatedType==apivalue_array) {
-    if (aAtIndex<objectValue.arrayVectorP->size()) {
-      return objectValue.arrayVectorP->at(aAtIndex);
+  if (mAllocatedType==apivalue_array) {
+    if (aAtIndex<mObjectValue.arrayVectorP->size()) {
+      return mObjectValue.arrayVectorP->at(aAtIndex);
     }
   }
   return ApiValuePtr();
@@ -210,10 +210,10 @@ void PbufApiValue::arrayPut(int aAtIndex, ApiValuePtr aObj)
 {
   PbufApiValuePtr val = boost::dynamic_pointer_cast<PbufApiValue>(aObj);
   if (val && allocateIf(apivalue_array)) {
-    if (aAtIndex<objectValue.arrayVectorP->size()) {
-      ApiValueArray::iterator i = objectValue.arrayVectorP->begin() + aAtIndex;
-      objectValue.arrayVectorP->erase(i);
-      objectValue.arrayVectorP->insert(i, val);
+    if (aAtIndex<mObjectValue.arrayVectorP->size()) {
+      ApiValueArray::iterator i = mObjectValue.arrayVectorP->begin() + aAtIndex;
+      mObjectValue.arrayVectorP->erase(i);
+      mObjectValue.arrayVectorP->insert(i, val);
     }
   }
 }
@@ -222,8 +222,8 @@ void PbufApiValue::arrayPut(int aAtIndex, ApiValuePtr aObj)
 
 size_t PbufApiValue::numObjectFields()
 {
-  if (allocatedType==apivalue_object) {
-    return objectValue.objectMapP->size();
+  if (mAllocatedType==apivalue_object) {
+    return mObjectValue.objectMapP->size();
   }
   return 0;
 }
@@ -231,8 +231,8 @@ size_t PbufApiValue::numObjectFields()
 
 bool PbufApiValue::resetKeyIteration()
 {
-  if (allocatedType==apivalue_object) {
-    keyIterator = objectValue.objectMapP->begin();
+  if (mAllocatedType==apivalue_object) {
+    mKeyIterator = mObjectValue.objectMapP->begin();
   }
   return false; // cannot be iterated
 }
@@ -240,11 +240,11 @@ bool PbufApiValue::resetKeyIteration()
 
 bool PbufApiValue::nextKeyValue(string &aKey, ApiValuePtr &aValue)
 {
-  if (allocatedType==apivalue_object) {
-    if (keyIterator!=objectValue.objectMapP->end()) {
-      aKey = keyIterator->first;
-      aValue = keyIterator->second;
-      keyIterator++;
+  if (mAllocatedType==apivalue_object) {
+    if (mKeyIterator!=mObjectValue.objectMapP->end()) {
+      aKey = mKeyIterator->first;
+      aValue = mKeyIterator->second;
+      mKeyIterator++;
       return true;
     }
   }
@@ -255,15 +255,15 @@ bool PbufApiValue::nextKeyValue(string &aKey, ApiValuePtr &aValue)
 
 uint64_t PbufApiValue::uint64Value()
 {
-  if (allocatedType==apivalue_uint64) {
-    return objectValue.uint64Val;
+  if (mAllocatedType==apivalue_uint64) {
+    return mObjectValue.uint64Val;
   }
-  else if (allocatedType==apivalue_int64 && objectValue.int64Val>=0) {
-    return objectValue.int64Val; // only return positive values
+  else if (mAllocatedType==apivalue_int64 && mObjectValue.int64Val>=0) {
+    return mObjectValue.int64Val; // only return positive values
   }
-  else if (allocatedType==apivalue_double) {
+  else if (mAllocatedType==apivalue_double) {
     // we can get a double as uint (for JSON compatibility needed in upper dSS levels (VDCE, August 2016)
-    return objectValue.doubleVal;
+    return mObjectValue.doubleVal;
   }
   return 0;
 }
@@ -272,15 +272,15 @@ uint64_t PbufApiValue::uint64Value()
 
 int64_t PbufApiValue::int64Value()
 {
-  if (allocatedType==apivalue_int64) {
-    return objectValue.int64Val;
+  if (mAllocatedType==apivalue_int64) {
+    return mObjectValue.int64Val;
   }
-  else if (allocatedType==apivalue_uint64) {
-    return objectValue.uint64Val & 0x7FFFFFFFFFFFFFFFll; // prevent returning sign
+  else if (mAllocatedType==apivalue_uint64) {
+    return mObjectValue.uint64Val & 0x7FFFFFFFFFFFFFFFll; // prevent returning sign
   }
-  else if (allocatedType==apivalue_double) {
+  else if (mAllocatedType==apivalue_double) {
     // we can get a double as int (for JSON compatibility needed in upper dSS levels (VDCE, August 2016)
-    return objectValue.doubleVal;
+    return mObjectValue.doubleVal;
   }
   return 0;
 }
@@ -288,8 +288,8 @@ int64_t PbufApiValue::int64Value()
 
 double PbufApiValue::doubleValue()
 {
-  if (allocatedType==apivalue_double) {
-    return objectValue.doubleVal;
+  if (mAllocatedType==apivalue_double) {
+    return mObjectValue.doubleVal;
   }
   else {
     return int64Value(); // int (or int derived from uint) can also be read as double
@@ -299,8 +299,8 @@ double PbufApiValue::doubleValue()
 
 bool PbufApiValue::boolValue()
 {
-  if (allocatedType==apivalue_bool) {
-    return objectValue.boolVal;
+  if (mAllocatedType==apivalue_bool) {
+    return mObjectValue.boolVal;
   }
   else {
     return int64Value()!=0; // non-zero int is also true
@@ -310,11 +310,11 @@ bool PbufApiValue::boolValue()
 
 string PbufApiValue::binaryValue()
 {
-  if (allocatedType==apivalue_binary) {
-    return *(objectValue.stringP);
+  if (mAllocatedType==apivalue_binary) {
+    return *(mObjectValue.stringP);
   }
-  else if (allocatedType==apivalue_string) {
-    return hexToBinaryString(objectValue.stringP->c_str());
+  else if (mAllocatedType==apivalue_string) {
+    return hexToBinaryString(mObjectValue.stringP->c_str());
   }
   else {
     return ""; // not binary
@@ -324,12 +324,12 @@ string PbufApiValue::binaryValue()
 
 string PbufApiValue::stringValue()
 {
-  if (allocatedType==apivalue_string) {
-    return *(objectValue.stringP);
+  if (mAllocatedType==apivalue_string) {
+    return *(mObjectValue.stringP);
   }
-  else if (allocatedType==apivalue_binary) {
+  else if (mAllocatedType==apivalue_binary) {
     // render as hex string
-    return binaryToHexString(*(objectValue.stringP));
+    return binaryToHexString(*(mObjectValue.stringP));
   }
   // let base class render the contents as string
   return inherited::stringValue();
@@ -339,7 +339,7 @@ string PbufApiValue::stringValue()
 void PbufApiValue::setUint64Value(uint64_t aUint64)
 {
   if (allocateIf(apivalue_uint64)) {
-    objectValue.uint64Val = aUint64;
+    mObjectValue.uint64Val = aUint64;
   }
 }
 
@@ -347,7 +347,7 @@ void PbufApiValue::setUint64Value(uint64_t aUint64)
 void PbufApiValue::setInt64Value(int64_t aInt64)
 {
   if (allocateIf(apivalue_int64)) {
-    objectValue.int64Val = aInt64;
+    mObjectValue.int64Val = aInt64;
   }
 }
 
@@ -355,7 +355,7 @@ void PbufApiValue::setInt64Value(int64_t aInt64)
 void PbufApiValue::setDoubleValue(double aDouble)
 {
   if (allocateIf(apivalue_double)) {
-    objectValue.doubleVal = aDouble;
+    mObjectValue.doubleVal = aDouble;
   }
 }
 
@@ -363,7 +363,7 @@ void PbufApiValue::setDoubleValue(double aDouble)
 void PbufApiValue::setBoolValue(bool aBool)
 {
   if (allocateIf(apivalue_bool)) {
-    objectValue.boolVal = aBool;
+    mObjectValue.boolVal = aBool;
   }
 }
 
@@ -371,7 +371,7 @@ void PbufApiValue::setBoolValue(bool aBool)
 void PbufApiValue::setBinaryValue(const string &aBinary)
 {
   if (allocateIf(apivalue_binary)) {
-    objectValue.stringP->assign(aBinary);
+    mObjectValue.stringP->assign(aBinary);
   }
 }
 
@@ -379,12 +379,12 @@ void PbufApiValue::setBinaryValue(const string &aBinary)
 bool PbufApiValue::setStringValue(const string &aString)
 {
   if (allocateIf(apivalue_string)) {
-    objectValue.stringP->assign(aString);
+    mObjectValue.stringP->assign(aString);
     return true;
   }
   else if (allocateIf(apivalue_binary)) {
     // parse string as hex
-    objectValue.stringP->assign(hexToBinaryString(aString.c_str()));
+    mObjectValue.stringP->assign(hexToBinaryString(aString.c_str()));
     return true;
   }
   else {
@@ -564,7 +564,7 @@ void PbufApiValue::getObjectFromMessageFields(const ProtobufCMessage &aMessage)
 void PbufApiValue::putObjectIntoMessageFields(ProtobufCMessage &aMessage)
 {
   // only if we actually have any object data
-  if (allocatedType==apivalue_object) {
+  if (mAllocatedType==apivalue_object) {
     // iterate over fields
     const ProtobufCFieldDescriptor *fieldDescP = aMessage.descriptor->fields;
     for (unsigned f = 0; f<aMessage.descriptor->n_fields; f++) {
@@ -703,7 +703,7 @@ void PbufApiValue::putValueIntoField(const ProtobufCFieldDescriptor &aFieldDescr
   }
   switch (aFieldDescriptor.type) {
     case PROTOBUF_C_TYPE_BOOL:
-      if (allocatedType==apivalue_bool) {
+      if (mAllocatedType==apivalue_bool) {
         if (allocArray) dataP = new protobuf_c_boolean[aArraySize];
         *((protobuf_c_boolean *)dataP+aIndex) = boolValue();
       }
@@ -711,7 +711,7 @@ void PbufApiValue::putValueIntoField(const ProtobufCFieldDescriptor &aFieldDescr
     case PROTOBUF_C_TYPE_INT32:
     case PROTOBUF_C_TYPE_SINT32:
     case PROTOBUF_C_TYPE_SFIXED32:
-      if (allocatedType==apivalue_int64 || allocatedType==apivalue_uint64) {
+      if (mAllocatedType==apivalue_int64 || mAllocatedType==apivalue_uint64) {
         if (allocArray) dataP = new int32_t[aArraySize];
         *((int32_t *)dataP+aIndex) = int32Value();
       }
@@ -719,45 +719,45 @@ void PbufApiValue::putValueIntoField(const ProtobufCFieldDescriptor &aFieldDescr
     case PROTOBUF_C_TYPE_INT64:
     case PROTOBUF_C_TYPE_SINT64:
     case PROTOBUF_C_TYPE_SFIXED64:
-      if (allocatedType==apivalue_int64 || allocatedType==apivalue_uint64) {
+      if (mAllocatedType==apivalue_int64 || mAllocatedType==apivalue_uint64) {
         if (allocArray) dataP = new int64_t[aArraySize];
         *((int64_t *)dataP+aIndex) = int64Value();
       }
       break;
     case PROTOBUF_C_TYPE_UINT32:
     case PROTOBUF_C_TYPE_FIXED32:
-      if (allocatedType==apivalue_uint64 || allocatedType==apivalue_int64) {
+      if (mAllocatedType==apivalue_uint64 || mAllocatedType==apivalue_int64) {
         if (allocArray) dataP = new uint32_t[aArraySize];
         *((uint32_t *)dataP+aIndex) = uint32Value();
       }
       break;
     case PROTOBUF_C_TYPE_UINT64:
     case PROTOBUF_C_TYPE_FIXED64:
-      if (allocatedType==apivalue_uint64 || allocatedType==apivalue_int64) {
+      if (mAllocatedType==apivalue_uint64 || mAllocatedType==apivalue_int64) {
         if (allocArray) dataP = new uint64_t[aArraySize];
         *((uint64_t *)dataP+aIndex) = uint64Value();
       }
       break;
     case PROTOBUF_C_TYPE_FLOAT:
-      if (allocatedType==apivalue_double) {
+      if (mAllocatedType==apivalue_double) {
         if (allocArray) dataP = new float[aArraySize];
         *((float *)dataP+aIndex) = doubleValue();
       }
       break;
     case PROTOBUF_C_TYPE_DOUBLE:
-      if (allocatedType==apivalue_double) {
+      if (mAllocatedType==apivalue_double) {
         if (allocArray) dataP = new double[aArraySize];
         *((double *)dataP+aIndex) = doubleValue();
       }
       break;
     case PROTOBUF_C_TYPE_ENUM:
-      if (allocatedType==apivalue_uint64) {
+      if (mAllocatedType==apivalue_uint64) {
         if (allocArray) dataP = new int[aArraySize];
         *((int *)dataP+aIndex) = int32Value();
       }
       break;
     case PROTOBUF_C_TYPE_STRING:
-      if (allocatedType==apivalue_string || allocatedType==apivalue_binary) {
+      if (mAllocatedType==apivalue_string || mAllocatedType==apivalue_binary) {
         if (allocArray) {
           dataP = new char*[aArraySize];
           memset(dataP, 0, aArraySize*sizeof(char *)); // null the array
@@ -769,7 +769,7 @@ void PbufApiValue::putValueIntoField(const ProtobufCFieldDescriptor &aFieldDescr
       }
       break;
     case PROTOBUF_C_TYPE_BYTES:
-      if (allocatedType==apivalue_binary) {
+      if (mAllocatedType==apivalue_binary) {
         if (allocArray) {
           dataP = new ProtobufCBinaryData[aArraySize];
           memset(dataP, 0, aArraySize*sizeof(ProtobufCBinaryData)); // null the array
@@ -788,7 +788,7 @@ void PbufApiValue::putValueIntoField(const ProtobufCFieldDescriptor &aFieldDescr
         dataP = new void *[aArraySize];
         memset(dataP, 0, aArraySize*sizeof(void *)); // null the array
       }
-      if (allocatedType==apivalue_object && !allocArray) {
+      if (mAllocatedType==apivalue_object && !allocArray) {
         ProtobufCMessage *aSubMessageP = *((ProtobufCMessage **)dataP+aIndex);
         if (aSubMessageP) {
           // submessage exists, have it filled in
@@ -907,7 +907,7 @@ void PbufApiValue::getValueFromPropVal(Vdcapi__PropertyValue &aPropVal)
 
 void PbufApiValue::putValueIntoPropVal(Vdcapi__PropertyValue &aPropVal)
 {
-  switch (allocatedType) {
+  switch (mAllocatedType) {
     case apivalue_bool:
       aPropVal.has_v_bool = true;
       aPropVal.v_bool = boolValue();
@@ -970,15 +970,15 @@ ApiValuePtr VdcPbufApiServer::newApiValue()
 
 VdcPbufApiRequest::VdcPbufApiRequest(VdcPbufApiConnectionPtr aConnection, uint32_t aRequestId)
 {
-  pbufConnection = aConnection;
-  reqId = aRequestId;
-  responseType = VDCAPI__TYPE__GENERIC_RESPONSE;
+  mPbufConnection = aConnection;
+  mReqId = aRequestId;
+  mResponseType = VDCAPI__TYPE__GENERIC_RESPONSE;
 }
 
 
 VdcApiConnectionPtr VdcPbufApiRequest::connection()
 {
-  return pbufConnection;
+  return mPbufConnection;
 }
 
 
@@ -989,13 +989,13 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
   if (!aResult || aResult->isNull()) {
     // empty result is like sending no error
     err = sendError(0);
-    LOG(LOG_INFO, "%s <- vDC, id=%d: generic OK", apiName(), reqId);
+    LOG(LOG_INFO, "%s <- vDC, id=%d: generic OK", apiName(), mReqId);
   }
-  else if (responseType==VDCAPI__TYPE__GENERIC_RESPONSE) {
+  else if (mResponseType==VDCAPI__TYPE__GENERIC_RESPONSE) {
     // non-empty result, but pbuf API does not have a response message to deliver it -> just acknowledge OK
     // Note: this can be the case for setProperty creating new object, where result is the created object's id
     err = sendError(0);
-    LOG(LOG_INFO, "%s <- vDC, id=%d, generic OK sent: UNSENT result=%s", apiName(), reqId, aResult->description().c_str());
+    LOG(LOG_INFO, "%s <- vDC, id=%d, generic OK sent: UNSENT result=%s", apiName(), mReqId, aResult->description().c_str());
   }
   else {
     // we might have a specific result
@@ -1004,10 +1004,10 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
     // create a message
     Vdcapi__Message msg = VDCAPI__MESSAGE__INIT;
     msg.has_message_id = true; // is response to a previous method call message
-    msg.message_id = reqId; // use same message id as in method call
+    msg.message_id = mReqId; // use same message id as in method call
     // set correct type and generate appropriate submessage
-    msg.type = responseType;
-    switch (responseType) {
+    msg.type = mResponseType;
+    switch (mResponseType) {
       case VDCAPI__TYPE__VDC_RESPONSE_HELLO:
         msg.vdc_response_hello = new Vdcapi__VdcResponseHello;
         vdcapi__vdc__response_hello__init(msg.vdc_response_hello);
@@ -1031,11 +1031,11 @@ ErrorPtr VdcPbufApiRequest::sendResult(ApiValuePtr aResult)
         return Error::err<VdcApiError>(500,"Error: Method is not implemented in the pbuf API");
     }
     // send
-    err = pbufConnection->sendMessage(&msg);
+    err = mPbufConnection->sendMessage(&msg);
     // dispose allocated submessage
     protobuf_c_message_free_unpacked(subMessageP, NULL);
     // log
-    LOG(LOG_INFO, "%s <- vDC, id=%d: result=%s", apiName(), reqId, aResult->description().c_str());
+    LOG(LOG_INFO, "%s <- vDC, id=%d: result=%s", apiName(), mReqId, aResult->description().c_str());
   }
   return err;
 }
@@ -1054,20 +1054,20 @@ ErrorPtr VdcPbufApiRequest::sendError(ErrorPtr aError)
   // error response is a generic message
   msg.generic_response = &resp;
   msg.has_message_id = true; // is response to a previous method call message
-  msg.message_id = reqId; // use same message id as in method call
+  msg.message_id = mReqId; // use same message id as in method call
   resp.code = VdcPbufApiConnection::internalToPbufError(aError->getErrorCode());
   resp.description = (char *)(*aError->getErrorMessage() ? aError->getErrorMessage() : NULL);
   resp.has_errortype = true;
   resp.errortype = vdcApiErr ? (Vdcapi__ErrorType)vdcApiErr->getErrorType() : VDCAPI__ERROR_TYPE__FAILED;
   resp.usermessagetobetranslated = (char *)(vdcApiErr && vdcApiErr->getUserFacingMessage().size()>0 ? vdcApiErr->getUserFacingMessage().c_str() : NULL);
-  err = pbufConnection->sendMessage(&msg);
+  err = mPbufConnection->sendMessage(&msg);
   // log (if not just OK)
   if (Error::notOK(aError)) {
     if (vdcApiErr) {
-      LOG(LOG_INFO, "%s <- vDC id=%d: error=%ld (%s) - type=%d (%s)", apiName(), reqId, vdcApiErr->getErrorCode(), vdcApiErr->getErrorMessage(), vdcApiErr->getErrorType(), vdcApiErr->getUserFacingMessage().c_str());
+      LOG(LOG_INFO, "%s <- vDC id=%d: error=%ld (%s) - type=%d (%s)", apiName(), mReqId, vdcApiErr->getErrorCode(), vdcApiErr->getErrorMessage(), vdcApiErr->getErrorType(), vdcApiErr->getUserFacingMessage().c_str());
     }
     else {
-      LOG(LOG_INFO, "%s <- vDC id=%d: error=%ld (%s)", apiName(), reqId, aError->getErrorCode(), aError->getErrorMessage());
+      LOG(LOG_INFO, "%s <- vDC id=%d: error=%ld (%s)", apiName(), mReqId, aError->getErrorCode(), aError->getErrorMessage());
     }
   }
   // done
@@ -1080,13 +1080,13 @@ ErrorPtr VdcPbufApiRequest::sendError(ErrorPtr aError)
 
 
 VdcPbufApiConnection::VdcPbufApiConnection() :
-  closeWhenSent(false),
-  expectedMsgBytes(0),
-  requestIdCounter(0)
+  mCloseWhenSent(false),
+  mExpectedMsgBytes(0),
+  mRequestIdCounter(0)
 {
-  socketComm = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
+  mSocketComm = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
   // install data handler
-  socketComm->setReceiveHandler(boost::bind(&VdcPbufApiConnection::gotData, this, _1));
+  mSocketComm->setReceiveHandler(boost::bind(&VdcPbufApiConnection::gotData, this, _1));
 }
 
 
@@ -1099,45 +1099,45 @@ void VdcPbufApiConnection::gotData(ErrorPtr aError)
   // got data
   if (Error::isOK(aError)) {
     // no error
-    size_t dataSz = socketComm->numBytesReady();
+    size_t dataSz = mSocketComm->numBytesReady();
     DBGFOCUSLOG("gotData: numBytesReady()=%d", dataSz);
     // read data we've got so far
     if (dataSz>0) {
       // temporary buffer
       uint8_t *buf = new uint8_t[dataSz];
-      size_t receivedBytes = socketComm->receiveBytes(dataSz, buf, aError);
+      size_t receivedBytes = mSocketComm->receiveBytes(dataSz, buf, aError);
       DBGFOCUSLOG("gotData: receiveBytes(%d)=%d", dataSz, receivedBytes);
       DBGFOCUSLOG("gotData: before appending: receivedMessage.size()=%d", receivedMessage.size());
       if (Error::isOK(aError)) {
         // append to receive buffer
-        receivedMessage.append((const char *)buf, receivedBytes);
+        mReceivedMessage.append((const char *)buf, receivedBytes);
         DBGFOCUSLOG("gotData: after appending: receivedMessage.size()=%d", receivedMessage.size());
         // single message extraction
         while(true) {
           DBGFOCUSLOG("gotData: processing loop beginning, expectedMsgBytes=%d", expectedMsgBytes);
-          if(expectedMsgBytes==0 && receivedMessage.size()>=2) {
+          if(mExpectedMsgBytes==0 && mReceivedMessage.size()>=2) {
             // got 2-byte length header, decode it
-            const uint8_t *sz = (const uint8_t *)receivedMessage.c_str();
-            expectedMsgBytes =
+            const uint8_t *sz = (const uint8_t *)mReceivedMessage.c_str();
+            mExpectedMsgBytes =
               (sz[0]<<8) +
               sz[1];
-            receivedMessage.erase(0,2);
+            mReceivedMessage.erase(0,2);
             FOCUSLOG("gotData: parsed new header, now expectedMsgBytes=%d", expectedMsgBytes);
             DBGFOCUSLOG("gotData: after removing header: receivedMessage.size()=%d", receivedMessage.size());
-            if (expectedMsgBytes>MAX_DATA_SIZE) {
+            if (mExpectedMsgBytes>MAX_DATA_SIZE) {
               aError = Error::err<VdcApiError>(413, "message exceeds maximum length of 16kB");
               break;
             }
           }
           // check for complete message
-          if (expectedMsgBytes && (receivedMessage.size()>=expectedMsgBytes)) {
+          if (mExpectedMsgBytes && (mReceivedMessage.size()>=mExpectedMsgBytes)) {
             FOCUSLOG("gotData: receivedMessage.size()=%d >= expectedMsgBytes=%d -> process", receivedMessage.size(), expectedMsgBytes);
             // process message
-            aError = processMessage((uint8_t *)receivedMessage.c_str(),expectedMsgBytes);
+            aError = processMessage((uint8_t *)mReceivedMessage.c_str(),mExpectedMsgBytes);
             // erase processed message
-            receivedMessage.erase(0,expectedMsgBytes);
+            mReceivedMessage.erase(0,mExpectedMsgBytes);
             DBGFOCUSLOG("gotData: after removing message: receivedMessage.size()=%d", receivedMessage.size());
-            expectedMsgBytes = 0; // reset to unknown
+            mExpectedMsgBytes = 0; // reset to unknown
             // repeat evaluation with remaining bytes (could be another message)
           }
           else {
@@ -1179,26 +1179,26 @@ ErrorPtr VdcPbufApiConnection::sendMessage(const Vdcapi__Message *aVdcApiMessage
   // - adjust the total message length
   packedSize += 2;
   // send the message
-  if (transmitBuffer.size()>0) {
+  if (mTransmitBuffer.size()>0) {
     // other messages are already waiting, append entire message
-    transmitBuffer.append((const char *)packedMsg, packedSize);
+    mTransmitBuffer.append((const char *)packedMsg, packedSize);
   }
   else {
     // nothing in buffer yet, start new send
-    size_t sentBytes = socketComm->transmitBytes(packedSize, packedMsg, err);
+    size_t sentBytes = mSocketComm->transmitBytes(packedSize, packedMsg, err);
     if (Error::isOK(err)) {
       // check if all could be sent
       if (sentBytes<packedSize) {
         // Not everything (or maybe nothing, transmitBytes() can return 0) was sent
         // - enable callback for ready-for-send
-        socketComm->setTransmitHandler(boost::bind(&VdcPbufApiConnection::canSendData, this, _1));
+        mSocketComm->setTransmitHandler(boost::bind(&VdcPbufApiConnection::canSendData, this, _1));
         // buffer the rest, canSendData handler will take care of writing it out
-        transmitBuffer.assign((char *)packedMsg+sentBytes, packedSize-sentBytes);
+        mTransmitBuffer.assign((char *)packedMsg+sentBytes, packedSize-sentBytes);
       }
 			else {
 				// all sent
 				// - disable transmit handler
-        socketComm->setTransmitHandler(NoOP);
+        mSocketComm->setTransmitHandler(NoOP);
 			}
     }
   }
@@ -1211,24 +1211,24 @@ ErrorPtr VdcPbufApiConnection::sendMessage(const Vdcapi__Message *aVdcApiMessage
 
 void VdcPbufApiConnection::canSendData(ErrorPtr aError)
 {
-  size_t bytesToSend = transmitBuffer.size();
+  size_t bytesToSend = mTransmitBuffer.size();
   if (bytesToSend>0 && Error::isOK(aError)) {
     // send data from transmit buffer
-    size_t sentBytes = socketComm->transmitBytes(bytesToSend, (const uint8_t *)transmitBuffer.c_str(), aError);
+    size_t sentBytes = mSocketComm->transmitBytes(bytesToSend, (const uint8_t *)mTransmitBuffer.c_str(), aError);
     if (Error::isOK(aError)) {
       if (sentBytes==bytesToSend) {
         // all sent
-        transmitBuffer.erase();
+        mTransmitBuffer.erase();
 				// - disable transmit handler
-        socketComm->setTransmitHandler(NoOP);
+        mSocketComm->setTransmitHandler(NoOP);
       }
       else {
         // partially sent, remove sent bytes
-        transmitBuffer.erase(0, sentBytes);
+        mTransmitBuffer.erase(0, sentBytes);
       }
       // check for closing connection when no data pending to be sent any more
-      if (closeWhenSent && transmitBuffer.size()==0) {
-        closeWhenSent = false; // done
+      if (mCloseWhenSent && mTransmitBuffer.size()==0) {
+        mCloseWhenSent = false; // done
         LOG(LOG_NOTICE, "vDC API request demands ending connection now");
         closeConnection();
       }
@@ -1453,15 +1453,15 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         msgFieldsObj->getObjectFromMessageFields(decodedMsg->base);
       }
       // find the originating request
-      PendingAnswerMap::iterator pos = pendingAnswers.find(responseForId);
-      if (pos==pendingAnswers.end()) {
+      PendingAnswerMap::iterator pos = mPendingAnswers.find(responseForId);
+      if (pos==mPendingAnswers.end()) {
         // errors without ID cannot be associated with calls made earlier, so just log the error
         LOG(LOG_WARNING, "%s -> vDC error: Received response with unknown 'id'=%d, error=%s", apiName(), responseForId, Error::isOK(err) ? "<none>" : err->text());
       }
       else {
         // found callback
         VdcApiResponseCB cb = pos->second;
-        pendingAnswers.erase(pos); // erase
+        mPendingAnswers.erase(pos); // erase
         // create request object just to hold the response ID
         VdcPbufApiRequestPtr request = VdcPbufApiRequestPtr(new VdcPbufApiRequest(VdcPbufApiConnectionPtr(this), responseForId));
         if (Error::isOK(err)) {
@@ -1485,8 +1485,8 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
       if (decodedMsg->has_message_id) {
         // method call, we need a request reference object
         request = VdcPbufApiRequestPtr(new VdcPbufApiRequest(VdcPbufApiConnectionPtr(this), decodedMsg->message_id));
-        request->responseType = (Vdcapi__Type)responseType; // save the response type for sending answers later
-        LOG(LOG_INFO, "%s -> vDC method call received: requestid='%d', method='%s', params=%s", apiName(), request->reqId, method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+        request->mResponseType = (Vdcapi__Type)responseType; // save the response type for sending answers later
+        LOG(LOG_INFO, "%s -> vDC method call received: requestid='%d', method='%s', params=%s", apiName(), request->mReqId, method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
       }
       else {
         LOG(LOG_INFO, "%s -> vDC notification received: method='%s', params=%s", apiName(), method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
@@ -1505,7 +1505,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
       }
       else {
         // call handler
-        apiRequestHandler(VdcPbufApiConnectionPtr(this), request, method, msgFieldsObj);
+        mApiRequestHandler(VdcPbufApiConnectionPtr(this), request, method, msgFieldsObj);
       }
     }
     // free the unpacked message
@@ -1518,7 +1518,7 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
 
 void VdcPbufApiConnection::closeAfterSend()
 {
-  closeWhenSent = true;
+  mCloseWhenSent = true;
 }
 
 
@@ -1578,9 +1578,9 @@ ErrorPtr VdcPbufApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
     if (aResponseHandler) {
       // method call expecting response
       msg.has_message_id = true; // has a messageID
-      msg.message_id = ++requestIdCounter; // use new ID
+      msg.message_id = ++mRequestIdCounter; // use new ID
       // save response handler into our map so that it can be called later when answer arrives
-      pendingAnswers[requestIdCounter] = aResponseHandler;
+      mPendingAnswers[mRequestIdCounter] = aResponseHandler;
     }
     // now generically fill parameters into submessage (if any, and if not handled above explicitly)
     if (params) {
@@ -1592,7 +1592,7 @@ ErrorPtr VdcPbufApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
     protobuf_c_message_free_unpacked(subMessageP, NULL);
     // log
     if (aResponseHandler) {
-      LOG(LOG_INFO, "%s <- vDC id=%d: method='%s', params=%s", apiName(), requestIdCounter, aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s <- vDC id=%d: method='%s', params=%s", apiName(), mRequestIdCounter, aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
     }
     else {
       LOG(LOG_INFO, "%s <- vDC: notification='%s', params=%s", apiName(), aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
