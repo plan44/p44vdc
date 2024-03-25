@@ -925,6 +925,17 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   }
   else {
     uniqueid = o->stringValue();
+    // check if uniqueid has a schema
+    for (size_t i=0; i<uniqueid.size(); i++) {
+      if (!isalnum(uniqueid[i])) {
+        if (uniqueid[i]==':' && i>3) {
+          // has three char or longer alphanumeric URN schema prefix: use it as hardware UID
+          // Note: dSS does display the part after the URN prefix as shortId
+          mHardwareGUID = uniqueid;
+        }
+        break;
+      }
+    }
   }
   if (uniqueid.empty()) {
     return TextError::err("missing 'uniqueid'");

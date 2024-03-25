@@ -102,6 +102,7 @@ namespace p44 {
     friend class CustomVdc;
     friend class CustomDeviceConnector;
 
+    string mHardwareGUID; ///< the string to be returned as hardware UID, always having schema:uid form
     string mModelVersionString; ///< the string to be returned by modelVersion()
     string mVendorNameString; ///< the vendor name
     string mOemModelGUIDString; ///< the OEM model GUID, which is used to match devices with dS database
@@ -170,6 +171,12 @@ namespace p44 {
 
     /// @return OEM model GUID in URN format to identify the OEM product MODEL hardware as uniquely as possible
     virtual string oemModelGUID() P44_OVERRIDE;
+
+    /// @return hardware GUID in URN format to identify the hardware INSTANCE as uniquely as possible
+    /// @note this gets populated if the initmessage contains a uniqueid in URN format
+    ///   (that is, starts with an alphanum string of 3 or more chars immediately followed by a colon as a schema prefix).
+    ///   Current dSS uses the string following the schema prefix as "shortID" for display purposes.
+    virtual string hardwareGUID() P44_OVERRIDE { return mHardwareGUID; };
 
     /// device class (for grouping functionally equivalent single devices)
     /// @note usually, only single devices do have a deviceClass
