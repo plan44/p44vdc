@@ -228,9 +228,9 @@ namespace p44 {
 
   public:
 
-    /// return the request ID as a JSON object
-    /// @return request ID as JSON object (usually string or integer)
-    virtual JsonObjectPtr requestId() = 0;
+    /// return the request ID as a string
+    /// @return request ID as string
+    virtual string requestId() = 0;
 
     /// get the API connection this request originates from
     /// @return API connection

@@ -782,7 +782,7 @@ namespace p44 {
 
     /// return the request ID as a string
     /// @return request ID as string
-    virtual JsonObjectPtr requestId() P44_OVERRIDE { return nullptr; }
+    virtual string requestId()  P44_OVERRIDE { return ""; }
 
     /// get the API connection this request originates from
     /// @return API connection

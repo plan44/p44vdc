@@ -1465,10 +1465,10 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         // create request object just to hold the response ID
         VdcPbufApiRequestPtr request = VdcPbufApiRequestPtr(new VdcPbufApiRequest(VdcPbufApiConnectionPtr(this), responseForId));
         if (Error::isOK(err)) {
-          LOG(LOG_INFO, "%s -> vDC result received: id='%s', result=%s", apiName(), JsonObject::text(request->requestId()), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+          LOG(LOG_INFO, "%s -> vDC result received: id='%s', result=%s", apiName(), request->requestId().c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
         }
         else {
-          LOG(LOG_INFO, "%s -> vDC error received: id='%s', error=%s, errordata=%s", apiName(), JsonObject::text(request->requestId()), err->text(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+          LOG(LOG_INFO, "%s -> vDC error received: id='%s', error=%s, errordata=%s", apiName(), request->requestId().c_str(), err->text(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
         }
         cb(this, request, err, msgFieldsObj); // call handler
       }

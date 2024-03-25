@@ -26,7 +26,6 @@
 #include "p44utils_common.hpp"
 
 #include "vdcapi.hpp"
-#include "jsonobject.hpp" // required for requestId()
 
 #include "vdcapi.pb-c.h"
 #include "messages.pb-c.h"
@@ -196,7 +195,7 @@ namespace p44 {
 
     /// return the request ID as a string
     /// @return request ID as string
-    virtual JsonObjectPtr requestId() P44_OVERRIDE { return JsonObject::newInt32(mReqId); }
+    virtual string requestId() P44_OVERRIDE { return string_format("%d", mReqId); }
 
     /// get the API connection this request originates from
     /// @return API connection

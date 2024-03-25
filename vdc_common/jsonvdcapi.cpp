@@ -153,7 +153,7 @@ ApiValuePtr VdcJsonApiServer::newApiValue()
 // MARK: - VdcJsonApiRequest
 
 
-VdcJsonApiRequest::VdcJsonApiRequest(VdcJsonApiConnectionPtr aConnection, const JsonObjectPtr aJsonRpcId) :
+VdcJsonApiRequest::VdcJsonApiRequest(VdcJsonApiConnectionPtr aConnection, const string aJsonRpcId) :
   mJsonConnection(aConnection),
   mJsonRpcId(aJsonRpcId)
 {
@@ -169,15 +169,15 @@ VdcApiConnectionPtr VdcJsonApiRequest::connection()
 
 ErrorPtr VdcJsonApiRequest::sendResult(ApiValuePtr aResult)
 {
-  LOG(LOG_INFO, "%s <- vDC, id=%s: result=%s", JsonObject::text(requestId()), apiName(), aResult ? aResult->description().c_str() : "<none>");
+  LOG(LOG_INFO, "%s <- vDC, id=%s: result=%s", requestId().c_str(), apiName(), aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
-  return mJsonConnection->mJsonRpcComm->sendResult(requestId(), result ? result->jsonObject() : NULL);
+  return mJsonConnection->mJsonRpcComm->sendResult(JsonObject::newString(requestId()), result ? result->jsonObject() : NULL);
 }
 
 
 ErrorPtr VdcJsonApiRequest::sendError(ErrorPtr aError)
 {
-  LOG(LOG_INFO, "%s <- vDC, id=%s: error='%s'", apiName(), JsonObject::text(requestId()), Error::text(aError));
+  LOG(LOG_INFO, "%s <- vDC, id=%s: error='%s'", apiName(), requestId().c_str(), Error::text(aError));
   if (!aError) {
     aError = Error::ok();
   }
@@ -192,7 +192,7 @@ ErrorPtr VdcJsonApiRequest::sendError(ErrorPtr aError)
       errorData->add("userFacingMessage", errorData->newString(vdcApiErr->getUserFacingMessage()));
     }
   }
-  return mJsonConnection->mJsonRpcComm->sendError(requestId(), (uint32_t)aError->getErrorCode(), *aError->getErrorMessage() ? aError->getErrorMessage() : NULL, errorData ? errorData->jsonObject() : JsonObjectPtr());
+  return mJsonConnection->mJsonRpcComm->sendError(JsonObject::newString(requestId()), (uint32_t)aError->getErrorCode(), *aError->getErrorMessage() ? aError->getErrorMessage() : NULL, errorData ? errorData->jsonObject() : JsonObjectPtr());
 }
 
 
@@ -219,8 +219,8 @@ void VdcJsonApiConnection::jsonRequestHandler(const char *aMethod, const JsonObj
     // create request object in case this request expects an answer
     if (aJsonRpcId) {
       // Method
-      request = VdcJsonApiRequestPtr(new VdcJsonApiRequest(VdcJsonApiConnectionPtr(this), aJsonRpcId));
-      LOG(LOG_INFO, "%s -> vDC, id=%s: called method '%s', params=%s", apiName(), JsonObject::text(request->requestId()), aMethod, params ? params->description().c_str() : "<none>");
+      request = VdcJsonApiRequestPtr(new VdcJsonApiRequest(VdcJsonApiConnectionPtr(this), aJsonRpcId->stringValue()));
+      LOG(LOG_INFO, "%s -> vDC, id=%s: called method '%s', params=%s", apiName(), request->requestId().c_str(), aMethod, params ? params->description().c_str() : "<none>");
     }
     else {
       // Notification
@@ -260,14 +260,14 @@ void VdcJsonApiConnection::jsonResponseHandler(VdcApiResponseCB aResponseHandler
 {
   if (aResponseHandler) {
     // create request object just to hold the response ID
-    JsonObjectPtr respId = JsonObject::newInt32(aResponseId);
+    string respId = string_format("%d", aResponseId);
     ApiValuePtr resultOrErrorData = JsonApiValue::newValueFromJson(aResultOrErrorData);
     VdcApiRequestPtr request = VdcJsonApiRequestPtr(new VdcJsonApiRequest(VdcJsonApiConnectionPtr(this), respId));
     if (Error::isOK(aError)) {
-      LOG(LOG_INFO, "%s -> vDC, id='%s', result=%s", apiName(), JsonObject::text(request->requestId()), resultOrErrorData ? resultOrErrorData->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s -> vDC, id='%s', result=%s", apiName(), request->requestId().c_str(), resultOrErrorData ? resultOrErrorData->description().c_str() : "<none>");
     }
     else {
-      LOG(LOG_INFO, "%s -> vDC, id='%s', error=%s, errordata=%s", apiName(), JsonObject::text(request->requestId()), aError->text(), resultOrErrorData ? resultOrErrorData->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s -> vDC, id='%s', error=%s, errordata=%s", apiName(), request->requestId().c_str(), aError->text(), resultOrErrorData ? resultOrErrorData->description().c_str() : "<none>");
     }
     aResponseHandler(VdcApiConnectionPtr(this), request, aError, resultOrErrorData);
   }
