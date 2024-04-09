@@ -654,7 +654,8 @@ void VdcHost::nextDeviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator
   deviceInitialized(aNextDevice->second, aError);
   // check next
   ++aNextDevice;
-  initializeNextDevice(aCompletedCB, aNextDevice);
+  // unwind stack before starting next device
+  MainLoop::currentMainLoop().executeNow(boost::bind(&VdcHost::initializeNextDevice, this, aCompletedCB, aNextDevice));
 }
 
 
