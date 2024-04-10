@@ -109,6 +109,8 @@ namespace p44 {
     string mDevClass; ///< device class
     string mConfigUrl; ///< custom value for configURL if not empty
     uint32_t mDevClassVersion; ///< device class version
+    int mOpStateLevel; ///< operation state level
+    string mOpStateText; ///< operation state text
     #if ENABLE_JSONBRIDGEAPI
     string mBridgeAs; ///< custom bridging hint
     #endif
@@ -182,6 +184,14 @@ namespace p44 {
     /// @note usually, only single devices do have a deviceClass
     /// @return name of the device class, such as "washingmachine" or "kettle" or "oven". Empty string if no device class exists.
     virtual string deviceClass() P44_OVERRIDE { return mDevClass; }
+
+    /// Get an indication how good/critical the operation state of the device is (such as radio strenght, battery level)
+    /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
+    virtual int opStateLevel() P44_OVERRIDE { return mOpStateLevel; }
+
+    /// Get short text to describe the operation state (such as radio RSSI, critical battery level, etc.)
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getOpStateText() { return mOpStateText; };
 
     /// device class version number.
     /// @note This allows different versions of the functional representation of the device class

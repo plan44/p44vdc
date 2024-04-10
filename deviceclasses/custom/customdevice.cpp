@@ -147,7 +147,8 @@ CustomDevice::CustomDevice(Vdc *aVdcP, bool aSimpleText) :
   mIconBaseName("cust"), // default icon name
   mModelNameString("custom device"),
   mVendorNameString("plan44.ch"),
-  mDevClassVersion(0)
+  mDevClassVersion(0),
+  mOpStateLevel(-1) // unknown operating state by default
   #if ENABLE_CUSTOM_EXOTIC
   ,mExtraModelFeatures(0)
   ,mMutedModelFeatures(0)
@@ -292,6 +293,16 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
         JsonObjectPtr o;
         if (aMessage->get("value", o)) {
           updatePresenceState(o->boolValue());
+        }
+        return ErrorPtr(); // no answer
+      }
+      else if (aMessageType=="opstate") {
+        JsonObjectPtr o;
+        if (aMessage->get("level", o)) {
+          mOpStateLevel = o->int32Value();
+        }
+        if (aMessage->get("text", o)) {
+          mOpStateText = o->stringValue();
         }
         return ErrorPtr(); // no answer
       }
