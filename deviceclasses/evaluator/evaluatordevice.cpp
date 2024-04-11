@@ -46,16 +46,8 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   mEvaluatorID(aEvaluatorID),
   mEvaluatorType(evaluator_unknown),
   mEvaluatorState(undefined)
-  #if !ENABLE_P44SCRIPT
-  , currentOn(undefined),
-  , currentOff(undefined),
-  , conditionMetSince(Never),
-  , onConditionMet(false)
-  #endif
 {
-  #if ENABLE_P44SCRIPT
   mValueMapper.isMemberVariable();
-  #endif
   // Config is:
   //  <behaviour mode>
   int st, su;
