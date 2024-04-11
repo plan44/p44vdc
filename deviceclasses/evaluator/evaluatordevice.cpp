@@ -45,14 +45,13 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
   evaluatorDeviceRowID(0),
   mEvaluatorID(aEvaluatorID),
   mEvaluatorType(evaluator_unknown),
-  mEvaluatorState(undefined),
+  mEvaluatorState(undefined)
   #if !ENABLE_P44SCRIPT
-  currentOn(undefined),
-  currentOff(undefined),
-  conditionMetSince(Never),
-  onConditionMet(false),
+  , currentOn(undefined),
+  , currentOff(undefined),
+  , conditionMetSince(Never),
+  , onConditionMet(false)
   #endif
-  mReporting(false)
 {
   #if ENABLE_P44SCRIPT
   mValueMapper.isMemberVariable();
@@ -408,8 +407,6 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
     // sensor evaluator was re-evaluated
     SensorBehaviourPtr s = getSensor(0);
     if (s) {
-      // protect against state updates triggering evaluation again via cyclic references
-      mReporting = true;
       if (aResult->defined()) {
         FOCUSOLOG("===== sensor expression result: '%s' = '%s' = %f", evaluatorSettings()->mOnCondition.getSource().c_str(), aResult->stringValue().c_str(), aResult->doubleValue());
         s->updateSensorValue(aResult->doubleValue());
@@ -418,8 +415,6 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
         OLOG(LOG_INFO,"Sensor expression '%s' evaluation status: %s", evaluatorSettings()->mOnCondition.getSource().c_str(), aResult->stringValue().c_str());
         s->invalidateSensorValue();
       }
-      // done reporting, critical phase is over
-      mReporting = false;
     }
   }
   else {
@@ -466,8 +461,6 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
       ));
       // report new decision
       if (decisionMade) {
-        // protect against state updates triggering evaluation again via cyclic references
-        mReporting = true;
         // give some context info
         OLOG(LOG_NOTICE, "new evaluation: %s based on %s values: %s",
           mEvaluatorState==yes ? "TRUE" : "FALSE",
@@ -504,8 +497,6 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
           #endif // P44SCRIPT_FULL_SUPPORT
           default: break;
         }
-        // done reporting, critical phase is over
-        mReporting = false;
       }
     }
   }
