@@ -444,51 +444,48 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
         }
       }
     }
-    if (mEvaluatorState!=undefined) {
-      // re-check opposite condition as "triggered" in case it is static (such as default fallbacks to true or false)
+    if (mEvaluatorState!=undefined && decisionMade) {
+      // have opposite condition re-checked as "triggered" in case it is static (such as default fallbacks to true or false)
       MainLoop::currentMainLoop().executeNow(boost::bind(
         &TriggerSource::evaluate,
         aOnCondition ? &(evaluatorSettings()->mOffCondition) : &(evaluatorSettings()->mOnCondition),
         (EvaluationFlags)triggered
       ));
-      // report new decision
-      if (decisionMade) {
-        // give some context info
-        OLOG(LOG_NOTICE, "new evaluation: %s based on %s values: %s",
-          mEvaluatorState==yes ? "TRUE" : "FALSE",
-          prevState==undefined ? "new" : "timing and",
-          mValueMapper.shortDesc().c_str()
-        );
-        // report it
-        switch (mEvaluatorType) {
-          case evaluator_input :
-          case evaluator_internalinput :
-          {
-            BinaryInputBehaviourPtr b = getInput(0);
-            if (b) {
-              b->updateInputState(mEvaluatorState==yes);
-            }
-            break;
+      // give some context info
+      OLOG(LOG_NOTICE, "new evaluation: %s based on %s values: %s",
+        mEvaluatorState==yes ? "TRUE" : "FALSE",
+        prevState==undefined ? "new" : "timing and",
+        mValueMapper.shortDesc().c_str()
+      );
+      // report it
+      switch (mEvaluatorType) {
+        case evaluator_input :
+        case evaluator_internalinput :
+        {
+          BinaryInputBehaviourPtr b = getInput(0);
+          if (b) {
+            b->updateInputState(mEvaluatorState==yes);
           }
-          case evaluator_rocker : {
-            if (mEvaluatorState!=prevState) {
-              // virtually click up or down button
-              ButtonBehaviourPtr b = getButton(mEvaluatorState==no ? 0 : 1);
-              if (b) {
-                b->sendClick(ct_tip_1x);
-              }
-            }
-            break;
-          }
-          #if P44SCRIPT_FULL_SUPPORT
-          case evaluator_internalaction: {
-            // execute actions (but let trigger evaluation IN SAME CONTEXT actually finish first)
-            MainLoop::currentMainLoop().executeNow(boost::bind(&EvaluatorDevice::executeActions, this));
-            break;
-          }
-          #endif // P44SCRIPT_FULL_SUPPORT
-          default: break;
+          break;
         }
+        case evaluator_rocker : {
+          if (mEvaluatorState!=prevState) {
+            // virtually click up or down button
+            ButtonBehaviourPtr b = getButton(mEvaluatorState==no ? 0 : 1);
+            if (b) {
+              b->sendClick(ct_tip_1x);
+            }
+          }
+          break;
+        }
+        #if P44SCRIPT_FULL_SUPPORT
+        case evaluator_internalaction: {
+          // execute actions (but let trigger evaluation IN SAME CONTEXT actually finish first)
+          MainLoop::currentMainLoop().executeNow(boost::bind(&EvaluatorDevice::executeActions, this));
+          break;
+        }
+        #endif // P44SCRIPT_FULL_SUPPORT
+        default: break;
       }
     }
   }
