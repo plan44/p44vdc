@@ -312,7 +312,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
       if (pos!=mDeviceInfoCache.end() && pos->second->mDevInfStatus!=DaliDeviceInfo::devinf_needsquery) {
         // we already have real device info for this device, or know the device does not have any
         // -> have it processed (but via mainloop to avoid stacking up recursions here)
-        LOG(LOG_INFO, "Using cached device info for device at shortAddress %d", addr);
+        LOG(LOG_INFO, "Using cached device info for device at short address %d", addr);
         MainLoop::currentMainLoop().executeNow(boost::bind(&DaliVdc::deviceInfoValid, this, aBusDevices, aNextDev, aCompletedCB, pos->second));
         return;
       }
@@ -545,8 +545,8 @@ void DaliVdc::deviceInfoReceived(DaliBusDeviceListPtr aBusDevices, DaliBusDevice
     return aCompletedCB(aError);
   }
   // no error, or error but due to missing or bad data -> device exists and possibly still has ok device info
-  if (missingData) { LOG(LOG_INFO, "Device at shortAddress %d is missing all or some device info data in at least one info bank",aDaliDeviceInfoPtr->mShortAddress); }
-  if (badData) { LOG(LOG_INFO, "Device at shortAddress %d has bad data in at least in one info bank",aDaliDeviceInfoPtr->mShortAddress); }
+  if (missingData) { LOG(LOG_INFO, "Device at short address %d is missing all or some device info data in at least one info bank",aDaliDeviceInfoPtr->mShortAddress); }
+  if (badData) { LOG(LOG_INFO, "Device at short address %d has bad data in at least in one info bank",aDaliDeviceInfoPtr->mShortAddress); }
   // update entry in the cache
   // Note: callback always gets a deviceInfo back, possibly with devinf_none if device does not have devInf at all (or garbage)
   //   So, assigning this here will make sure no entries with devinf_needsquery will remain.

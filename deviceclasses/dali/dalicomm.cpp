@@ -1201,7 +1201,7 @@ private:
         // device has no short address yet, assign one
         needsNewAddress = true;
         newAddress = newShortAddress();
-        SOLOG(daliComm, LOG_NOTICE, "- Device at 0x%06X has NO short address -> assigning new address", searchAddr);
+        SOLOG(daliComm, LOG_NOTICE, "- Device at 0x%06X has NO short address -> assigning new short address", searchAddr);
       }
       else {
         shortAddress = DaliComm::addressFromDaliResponse(aResponse);
@@ -1210,7 +1210,7 @@ private:
         if (isShortAddressInList(shortAddress, foundDevicesPtr)) {
           newAddress = newShortAddress();
           needsNewAddress = true;
-          SOLOG(daliComm, LOG_NOTICE, "- Collision on short address %d -> assigning new address", shortAddress);
+          SOLOG(daliComm, LOG_NOTICE, "- Collision on short address %d -> assigning new short address", shortAddress);
         }
       }
       // check if we need to re-assign the short address
@@ -1222,10 +1222,10 @@ private:
           addrProg = 0xFF; // programming 0xFF means NO address
         }
         else {
-          SOLOG(daliComm, LOG_NOTICE, "- assigning new free address %d to device", newAddress);
+          SOLOG(daliComm, LOG_NOTICE, "- assigning new free short address %d to device", newAddress);
           addrProg = DaliComm::dali1FromAddress(newAddress)+1;
         }
-        // new address (or explicit no-address==DaliBroadcast) must be assigned
+        // new short address (or explicit no-address==DaliBroadcast) must be assigned
         daliComm.daliSend(DALICMD_PROGRAM_SHORT_ADDRESS, addrProg);
         daliComm.daliSendAndReceive(
           DALICMD_VERIFY_SHORT_ADDRESS, addrProg,
@@ -1470,16 +1470,16 @@ private:
         // IEC 62386-102:2014 says the response is content of bank0 offset 0x16 (6 bits major, 2 bits minor version)
         deviceInfo->mVers_102 = DALI_STD_VERS_NONEIS0(aResponse);
       }
-      SOLOG(daliComm, LOG_INFO,"device at shortaddress %d has DALI Version %d.%d", busAddress, DALI_STD_VERS_MAJOR(deviceInfo->mVers_102), DALI_STD_VERS_MINOR(deviceInfo->mVers_102));
+      SOLOG(daliComm, LOG_INFO,"device at short address %d has DALI Version %d.%d", busAddress, DALI_STD_VERS_MAJOR(deviceInfo->mVers_102), DALI_STD_VERS_MINOR(deviceInfo->mVers_102));
       dali2 = deviceInfo->mVers_102>=DALI_STD_VERS_BYTE(2, 0);
       if (dali2 && daliComm.mDali2ScanLock) {
         // this looks like a DALI 2 device, but scanning is locked to ensure backwards compatibility
         dali2 = false;
-        SOLOG(daliComm, LOG_WARNING, "shortaddress %d is a DALI 2 device, but DALI 2 serialno scanning is disabled for backwards compatibility. Force-Rescan to enable DALI 2 scanning", busAddress);
+        SOLOG(daliComm, LOG_WARNING, "short address %d is a DALI 2 device, but DALI 2 serialno scanning is disabled for backwards compatibility. Force-Rescan to enable DALI 2 scanning", busAddress);
       }
     }
     else {
-      SOLOG(daliComm, LOG_WARNING, "shortaddress %d did not respond to QUERY_VERSION_NUMBER -> probably bad", busAddress);
+      SOLOG(daliComm, LOG_WARNING, "short address %d did not respond to QUERY_VERSION_NUMBER -> probably bad", busAddress);
     }
     readBank0();
   }
@@ -1505,12 +1505,12 @@ private:
       SOLOG(daliComm, LOG_INFO, "- highest available DALI memory bank = %d", maxBank);
     }
     if ((*aBank0Data)[0].no) {
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at shortAddress %d does not exist", busAddress));
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at short address %d does not exist", busAddress));
     }
     uint16_t n = (*aBank0Data)[0].b+1; // last available location + 1 = number of bytes in bank 0
     SOLOG(daliComm, LOG_INFO, "- number of bytes available in bank0 = %d/0x%x", n, n);
     if (n<DALIMEM_BANK0_MINBYTES || (dali2 && n<DALIMEM_BANK0_MINBYTES_v2_0)) {
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at shortAddress %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK0_MINBYTES));
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at short address %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK0_MINBYTES));
     }
     // no need to read more than what we need for dali2, because there's no checksum, anyway
     if (dali2 && n>DALIMEM_BANK0_MINBYTES_v2_0) n = DALIMEM_BANK0_MINBYTES_v2_0;
@@ -1532,8 +1532,8 @@ private:
             return;
           }
           // to many retries
-          SOLOG(daliComm, LOG_ERR, "shortaddress %d Bank 0 cannot be read reliably", busAddress);
-          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "DALI memory bank 0 cannot be reliably read at shortAddress %d", busAddress));
+          SOLOG(daliComm, LOG_ERR, "short address %d Bank 0 cannot be read reliably", busAddress);
+          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "DALI memory bank 0 cannot be reliably read at short address %d", busAddress));
         }
       }
       // verified, make sure we don't re-read
@@ -1568,13 +1568,13 @@ private:
         // - check retries
         if (retries++<DALI_MAX_BANKREAD_RETRIES) {
           // retry reading bank 0 info
-          SOLOG(daliComm, LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank0 info from shortAddress %d -> retrying", bankChecksum, retries, busAddress);
+          SOLOG(daliComm, LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank0 info from short address %d -> retrying", bankChecksum, retries, busAddress);
           readBank0();
           return;
         }
         // - report error
-        SOLOG(daliComm, LOG_ERR, "shortaddress %d Bank 0 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
-        return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 0 checksum at shortAddress %d", busAddress));
+        SOLOG(daliComm, LOG_ERR, "short address %d Bank 0 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
+        return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 0 checksum at short address %d", busAddress));
       }
     }
     // we have verified (re-read or checksummed) data
@@ -1602,7 +1602,7 @@ private:
     int idLastByte = dali2 ? 0x12 : 0x0E; // >=2.0 has longer ID field
     for (int i=0x03; i<=idLastByte; i++) {
       if ((*aBank0Data)[i].no) {
-        SOLOG(daliComm, LOG_ERR, "shortaddress %d Bank 0 has missing byte (timeout) at offset 0x%02X -> invalid GTIN/Serial data", busAddress, i);
+        SOLOG(daliComm, LOG_ERR, "short address %d Bank 0 has missing byte (timeout) at offset 0x%02X -> invalid GTIN/Serial data", busAddress, i);
         deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
         break;
       }
@@ -1624,7 +1624,7 @@ private:
     }
     if (maxSame>=10 || (numFFs>=6 && maxSame>=3)) {
       // this is tuned heuristics: >=6 FFs total plus >=3 consecutive equal non-zeros are considered suspect (because linealight.com/i-LÈD/eral LED-FGI332 has that)
-      SOLOG(daliComm, LOG_ERR, "shortaddress %d Bank 0 has %d consecutive bytes of 0x%02X and %d bytes of 0xFF  - indicates invalid GTIN/Serial data -> ignoring", busAddress, maxSame, sameByte, numFFs);
+      SOLOG(daliComm, LOG_ERR, "short address %d Bank 0 has %d consecutive bytes of 0x%02X and %d bytes of 0xFF  - indicates invalid GTIN/Serial data -> ignoring", busAddress, maxSame, sameByte, numFFs);
       deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
     }
     // GTIN: bytes 0x03..0x08, MSB first
@@ -1660,7 +1660,7 @@ private:
     }
     else if (gtinCheckDigit(deviceInfo->mGtin)!=0) {
       // invalid GTIN
-      SOLOG(daliComm, LOG_ERR, "shortaddress %d has invalid GTIN=%lld/0x%llX (wrong check digit) -> ignoring", busAddress, deviceInfo->mGtin, deviceInfo->mGtin);
+      SOLOG(daliComm, LOG_ERR, "short address %d has invalid GTIN=%lld/0x%llX (wrong check digit) -> ignoring", busAddress, deviceInfo->mGtin, deviceInfo->mGtin);
       deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
     }
     else {
@@ -1671,7 +1671,7 @@ private:
         while (DALI_GTIN_blacklist[i]!=0) {
           if (deviceInfo->mGtin==DALI_GTIN_blacklist[i]) {
             // found in blacklist, invalidate serial
-            SOLOG(daliComm, LOG_ERR, "GTIN %lld of DALI shortaddress %d is blacklisted because it is known to have invalid serial -> invalidating serial", deviceInfo->mGtin, busAddress);
+            SOLOG(daliComm, LOG_ERR, "GTIN %lld of DALI short address %d is blacklisted because it is known to have invalid serial -> invalidating serial", deviceInfo->mGtin, busAddress);
             deviceInfo->mSerialNo = 0; // reset, make invalid for check below
             break;
           }
@@ -1682,7 +1682,7 @@ private:
         if (deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid) {
           // if everything else is ok, except for a missing serial number, consider GTIN valid
           deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_only_gtin;
-          SOLOG(daliComm, LOG_WARNING, "shortaddress %d has no serial number but valid GTIN -> just using GTIN", busAddress);
+          SOLOG(daliComm, LOG_WARNING, "short address %d has no serial number but valid GTIN -> just using GTIN", busAddress);
         }
         else {
           // was not solid before, consider completely invalid
@@ -1731,13 +1731,13 @@ private:
       return complete(aError);
     }
     if ((*aBank1Data)[0].no) {
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at shortAddress %d has not enough header bytes", busAddress));
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at short address %d has not enough header bytes", busAddress));
     }
     // valid byte count
     uint16_t n = (*aBank1Data)[0].b+1; // last available location + 1 = number of bytes in bank 1
     SOLOG(daliComm, LOG_INFO, "- number of bytes available in bank1 = %d/0x%X", n, n);
     if (n<DALIMEM_BANK1_MINBYTES) {
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at shortAddress %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK1_MINBYTES));
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at short address %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK1_MINBYTES));
     }
     // append actual bank contents
     DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Data, this, _1, _2), busAddress, 1, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank1Data);
@@ -1761,13 +1761,13 @@ private:
           // - check retries
           if (retries++<DALI_MAX_BANKREAD_RETRIES) {
             // retry reading bank 1 info
-            SOLOG(daliComm, LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank1 info from shortAddress %d -> retrying", bankChecksum, retries, busAddress);
+            SOLOG(daliComm, LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank1 info from short address %d -> retrying", bankChecksum, retries, busAddress);
             readBank1();
             return;
           }
           // - report error
-          SOLOG(daliComm, LOG_ERR, "shortaddress %d Bank 1 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
-          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 1 checksum at shortAddress %d", busAddress));
+          SOLOG(daliComm, LOG_ERR, "short address %d Bank 1 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
+          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 1 checksum at short address %d", busAddress));
         }
       }
       // OEM GTIN: bytes 0x03..0x08, MSB first
@@ -1803,7 +1803,7 @@ private:
     daliComm.endProcedure();
     if (Error::isOK(aError)) {
       SOLOG(daliComm, LOG_NOTICE,
-        "Successfully read DALI%d device info %sfrom shortAddress %d - %s data: GTIN=%llu, Serial=%llu, LUN=%d",
+        "Successfully read DALI%d device info %sfrom short address %d - %s data: GTIN=%llu, Serial=%llu, LUN=%d",
         deviceInfo->mVers_102>=DALI_STD_VERS_BYTE(2, 0) ? 2 : 1,
         dali2 ? "" : "in DALI1 mode ",
         busAddress,
