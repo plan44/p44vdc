@@ -748,6 +748,7 @@ void DaliVdc::bridgeCmdSent(VdcApiRequestPtr aRequest, uint8_t aResp1, uint8_t a
 
 ErrorPtr DaliVdc::daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 {
+  OLOG(LOG_NOTICE, "Scanning DALI bus for summary...");
   ApiValuePtr p = aParams->get("addr");
   if (p) {
     // quick info about a single bus address
@@ -766,6 +767,7 @@ ErrorPtr DaliVdc::daliSummary(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 
 void DaliVdc::daliSummaryScanDone(VdcApiRequestPtr aRequest, DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError)
 {
+  OLOG(LOG_NOTICE, "DALI summary scan complete");
   ApiValuePtr res = aRequest->newApiValue();
   res->setType(apivalue_object);
   if (Error::notOK(aError)) {
