@@ -307,7 +307,7 @@ namespace p44 {
     /// - gs1:(01)ggggg = GS1 formatted GTIN
     /// - uuid:UUUUUUU = UUID
     /// - macaddress:MM:MM:MM:MM:MM:MM = MAC Address in hex
-    /// - sparkcoreid:ssssss = spark core ID
+    /// - p44serial:ssssss = P44 device serial number
     virtual string hardwareGUID() { return ""; };
 
     /// @return model GUID in URN format to identify MODEL of the connected hardware device as uniquely as possible
