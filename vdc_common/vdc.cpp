@@ -808,6 +808,7 @@ ErrorPtr Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, Api
     if (clear) mode |= rescanmode_clearsettings;
     if (reenumerate) mode |= rescanmode_reenumerate;
     mode |= rescanmode_force; // when explicitly triggered via method, even try scanning when there is a global vdc error present
+    OLOG(LOG_NOTICE, "scanDevices API call requests rescan with mode=0x%x", mode);
     collectDevices(boost::bind(&DsAddressable::methodCompleted, this, aRequest, _1), mode);
   }
   else if (aMethod=="pair") {
