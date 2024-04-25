@@ -103,7 +103,7 @@ namespace p44 {
 
     HueComm mHueComm;
 
-		void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+		virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 

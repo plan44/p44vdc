@@ -369,8 +369,6 @@ namespace p44 {
 
     CustomVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
 
-    void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
-
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE = 0;
 
     /// scan for (collect) devices and add them to the vdc

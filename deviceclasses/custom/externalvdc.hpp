@@ -140,7 +140,7 @@ namespace p44 {
   public:
     ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
 
-    void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 

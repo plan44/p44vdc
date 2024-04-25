@@ -1427,13 +1427,6 @@ CustomVdc::CustomVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 }
 
 
-void CustomVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
-{
-  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
-  aCompletedCB(ErrorPtr()); // ok by default
-}
-
-
 string CustomVdc::modelName()
 {
   if (!mModelNameString.empty())
