@@ -98,6 +98,8 @@ void LedChainVdc::setLogLevelOffset(int aLogLevelOffset)
 void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   ErrorPtr err;
+  // load persistent params for dSUID
+  load();
   // initialize root view
   if (mLedArrangement) {
     PixelRect r = mLedArrangement->totalCover();

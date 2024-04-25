@@ -76,7 +76,9 @@ OlaVdc::OlaVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 void OlaVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   ErrorPtr err;
-  // initialize database
+  // load persistent params for dSUID
+  load();
+  // load private data
   string databaseName = getPersistentDataDir();
   string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   err = db.connectAndInitialize(databaseName.c_str(), OLADEVICES_SCHEMA_VERSION, OLADEVICES_SCHEMA_MIN_VERSION, aFactoryReset);

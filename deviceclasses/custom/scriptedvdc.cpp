@@ -523,6 +523,9 @@ const char *ScriptedVdc::vdcClassIdentifier() const
 
 void ScriptedVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  // load persistent params for dSUID
+  load();
+  // load private data
   string databaseName = getPersistentDataDir();
   string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), SCRIPTEDDEVICES_SCHEMA_VERSION, SCRIPTEDDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);

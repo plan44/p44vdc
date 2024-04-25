@@ -66,6 +66,9 @@ EvaluatorVdc::EvaluatorVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 
 void EvaluatorVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  // load persistent params for dSUID
+  load();
+  // load private data
   string databaseName = getPersistentDataDir();
   string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), EVALUATORDEVICES_SCHEMA_VERSION, EVALUATORDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);

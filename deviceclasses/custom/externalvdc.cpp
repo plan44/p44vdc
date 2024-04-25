@@ -439,6 +439,8 @@ ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, b
 
 void ExternalVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  // load persistent params for dSUID
+  load();
   // start device API server
   ErrorPtr err = mExternalDeviceApiServer->startServer(boost::bind(&ExternalVdc::deviceApiConnectionHandler, this, _1), 10);
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default

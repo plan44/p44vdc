@@ -274,7 +274,10 @@ namespace p44 {
 		/// @param aCompletedCB will be called when initialisation is complete
 		///   callback will return an error if initialisation has failed and the vDC is not functional
 		/// @param aFactoryReset if set, also perform factory reset for data persisted for this vDC
-    /// @note this is called after persistent settings have been loaded
+    /// @note this USED to be called after persistent settings have been loaded, BUT NO LONGER!
+    ///   This means the implementations **must call load() before calling aCompletedCB**.
+    ///   The default implementation **does** call load() immediately, derived classes might decide when in the
+    ///   possibly async initialisation process load gets called.
     /// @note this is called before collection of devices, and before any interaction with dS system starts
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset);
 		

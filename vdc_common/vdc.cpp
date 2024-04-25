@@ -82,7 +82,10 @@ void Vdc::addVdcToVdcHost()
 
 void Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
-  // done
+  // Default implementation only
+  // - load persistent params
+  load();
+  // - done
   aCompletedCB(ErrorPtr()); // default to error-free initialisation
 }
 

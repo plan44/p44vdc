@@ -511,9 +511,10 @@ void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMa
 {
   // initialize all vDCs, even when some have errors
   if (aNextVdc!=mVdcs.end()) {
-    // load persistent params for vdc (dSUID is already stable at this point, cannot depend on initialize()!)
-    aNextVdc->second->load();
-    // initialize with parameters already loaded
+    // note: before 2024-04-25, we did call load() here, but to allow vdcs to obtain their dSUID late in
+    //   the possibly async initilasiation process, we NO LONGER DO THAT - meaning that
+    //   initialize() implementations MUST CALL load() SOMEWHERE IN THEIR PROCESS before calling back!
+    // initialize with parameters NOT YET loaded
     aNextVdc->second->initialize(boost::bind(&VdcHost::vdcInitialized, this, aCompletedCB, aFactoryReset, aNextVdc, _1), aFactoryReset);
     return;
   }

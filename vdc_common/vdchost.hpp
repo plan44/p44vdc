@@ -128,7 +128,7 @@ namespace p44 {
     NotificationGroup(VdcPtr aVdc, DsAddressablePtr aFirstMember);
 
     VdcPtr mVdc; ///< the vDC that might be able to handle a notification for all (device)members together. NULL if members can also be vdcs or vdchost.
-    DsAddressablesList mMembers; ///< list of addressables (devices only if vdc is not NULL
+    DsAddressablesList mMembers; ///< list of addressables (devices only if vdc is not NULL)
   };
   typedef list<NotificationGroup> NotificationAudience;
 

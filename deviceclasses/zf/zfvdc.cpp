@@ -91,6 +91,9 @@ string ZfPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 
 void ZfVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  // load persistent params for dSUID
+  load();
+  // load private data
 	string databaseName = getPersistentDataDir();
 	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), ZF_SCHEMA_VERSION, ZF_SCHEMA_MIN_VERSION, aFactoryReset);

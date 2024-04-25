@@ -92,6 +92,9 @@ string EldatPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 
 void EldatVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  // load persistent params for dSUID
+  load();
+  // load private data
 	string databaseName = getPersistentDataDir();
 	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
   ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), ELDAT_SCHEMA_VERSION, ELDAT_SCHEMA_MIN_VERSION, aFactoryReset);
