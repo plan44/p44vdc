@@ -1006,6 +1006,11 @@ private:
   void shortAddrListReceived(DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError)
   {
     bool missingAddrs = Error::isError(aError, DaliCommError::domain(), DaliCommError::AddressesMissing);
+    SOLOG(daliComm, LOG_NOTICE, "found %zu responding short addresses, %zu unreliable, %s missing",
+      aShortAddressListPtr ? aShortAddressListPtr->size() : 0,
+      aUnreliableShortAddressListPtr ? aUnreliableShortAddressListPtr->size() : 0,
+      missingAddrs ? "SOME" : "none"
+    );
     // Strategy:
     // - when short scan reports devices with no short address, trigger a random binary serach FOR THOSE ONLY (case: new devices)
     // - when short scan reports another error: just report back, UNLESS unconditional full scan is requested
@@ -1047,6 +1052,7 @@ private:
     }
     return false;
   }
+
 
   // get new unused short address
   DaliAddress newShortAddress()
@@ -1104,6 +1110,7 @@ private:
     // - issue the compare command
     daliComm.daliSendAndReceive(DALICMD_COMPARE, 0x00, boost::bind(&DaliFullBusScanner::handleCompareResult, this, _1, _2, _3));
   }
+
 
   void handleCompareResult(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
   {
@@ -1167,6 +1174,7 @@ private:
       compareNext();
     }
   }
+
 
   void handleShortAddressQuery(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
   {
@@ -1240,6 +1248,7 @@ private:
     }
   }
 
+
   void handleNewShortAddressVerify(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
   {
     if (newAddress==NoDaliAddress || DaliComm::isYes(aNoOrTimeout, aResponse, aError, false)) {
@@ -1254,18 +1263,26 @@ private:
     }
   }
 
+
   void deviceFound(DaliAddress aShortAddress)
   {
     // store short address if real address
     // (if broadcast, means that this device is w/o short address because >64 devices are on the bus, or short address could not be programmed)
     if (aShortAddress!=NoDaliAddress) {
-      foundDevicesPtr->push_back(aShortAddress);
+      if (isShortAddressInList(aShortAddress, foundDevicesPtr)) {
+        // this should not happen, but maybe it can (we had a weird support case where logs indicated that)
+        SOLOG(daliComm, LOG_ERR, "internal inconsistency: short address #%d found again in list", aShortAddress);
+      }
+      else {
+        foundDevicesPtr->push_back(aShortAddress);
+      }
     }
     // withdraw this device from further searches
     daliComm.daliSend(DALICMD_WITHDRAW, 0x00);
     // continue searching devices
     newSearchUpFrom(searchAddr+1);
   }
+
 
   void completed(ErrorPtr aError)
   {

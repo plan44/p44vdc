@@ -355,13 +355,19 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
             otherDsuid = (*refpos)->mDSUID;
           }
           if (thisDsuid==otherDsuid) {
-            // duplicate dSUID, indicates DALI devices with invalid device info that slipped all heuristics
-            LOG(LOG_ERR, "Bus devices #%d and #%d have same devinf-based dSUID -> assuming invalid device info, forcing both to short address based dSUID", (*busdevpos)->mDeviceInfo->mShortAddress, (*refpos)->mDeviceInfo->mShortAddress);
-            LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%llu and Serial=%llu", (*busdevpos)->mDeviceInfo->mShortAddress, (*busdevpos)->mDeviceInfo->mGtin, (*busdevpos)->mDeviceInfo->mSerialNo);
-            LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%llu and Serial=%llu", (*refpos)->mDeviceInfo->mShortAddress, (*refpos)->mDeviceInfo->mGtin, (*refpos)->mDeviceInfo->mSerialNo);
-            // - invalidate device info (but keep GTIN) and revert to short address derived dSUID
-            (*refpos)->invalidateDeviceInfoSerial();
-            anyDuplicates = true; // at least one found
+            if ((*busdevpos)->mDeviceInfo->mShortAddress==(*refpos)->mDeviceInfo->mShortAddress) {
+              // should not happen, but apparently can for some not-yet-known reason, so log it here but prevent invalidating serial
+              LOG(LOG_ERR, "internal inconsistentcy: same dSUID, same shortaddress %d: iterators %s", (*busdevpos)->mDeviceInfo->mShortAddress, refpos==busdevpos ? "same" : "DIFFERENT!");
+            }
+            else {
+              // duplicate dSUID for DIFFERENT bus addresses, indicates DALI devices with invalid device info that slipped all heuristics
+              LOG(LOG_ERR, "Bus devices #%d and #%d have same devinf-based dSUID -> assuming invalid device info, forcing both to short address based dSUID", (*busdevpos)->mDeviceInfo->mShortAddress, (*refpos)->mDeviceInfo->mShortAddress);
+              LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%llu and Serial=%llu", (*busdevpos)->mDeviceInfo->mShortAddress, (*busdevpos)->mDeviceInfo->mGtin, (*busdevpos)->mDeviceInfo->mSerialNo);
+              LOG(LOG_NOTICE, "- device #%d claims to have GTIN=%llu and Serial=%llu", (*refpos)->mDeviceInfo->mShortAddress, (*refpos)->mDeviceInfo->mGtin, (*refpos)->mDeviceInfo->mSerialNo);
+              // - invalidate device info (but keep GTIN) and revert to short address derived dSUID
+              (*refpos)->invalidateDeviceInfoSerial();
+              anyDuplicates = true; // at least one found
+            }
           }
         }
         if (anyDuplicates) {
