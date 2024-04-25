@@ -518,6 +518,17 @@ void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMa
     aNextVdc->second->initialize(boost::bind(&VdcHost::vdcInitialized, this, aCompletedCB, aFactoryReset, aNextVdc, _1), aFactoryReset);
     return;
   }
+  // all vdcs initialized
+  // - re-map in case initialisation has changed dSUID
+  VdcMap vdcs = mVdcs;
+  mVdcs.clear();
+  for(VdcMap::iterator pos = vdcs.begin(); pos!=vdcs.end(); ++pos) {
+    if (!(pos->first==pos->second->getDsUid())) {
+      POLOG(pos->second, LOG_NOTICE, "has changed dSUID during initialisation (from %s)", pos->first.getString().c_str());
+    }
+    // map with new dSUID
+    mVdcs[pos->second->getDsUid()] = pos->second;
+  }
   // successfully done
   postEvent(vdchost_vdcs_initialized);
   aCompletedCB(ErrorPtr());

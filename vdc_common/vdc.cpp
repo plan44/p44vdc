@@ -72,10 +72,13 @@ Vdc::~Vdc()
 
 void Vdc::addVdcToVdcHost()
 {
-  // derive dSUID first, as it will be mapped by dSUID in the device container
+  // derive a dSUID first, as it will be mapped by dSUID in the device container
+  // Note: dSUID derived here (early) might be non-final (but must be unique!).
+  //   Final dSUID must be stable after initialize(), latest.
   deriveDsUid();
-  // add to container
+  // add to container mapped to the current dSUID
   getVdcHost().addVdc(VdcPtr(this));
+  // Note: vdchost will re-map all vdcs to their final (possibly differing) dSUID later
 }
 
 
@@ -168,9 +171,10 @@ int Vdc::getInstanceNumber() const
 
 void Vdc::deriveDsUid()
 {
-  // class containers have v5 UUIDs based on the device container's master UUID as namespace
+  // most vDCs have v5 UUIDs based on the vDChost's master UUID as namespace
+  // Note: some might have their own schema, and will override this method
   string name = string_format("%s.%d", vdcClassIdentifier(), getInstanceNumber()); // name is class identifier plus instance number: classID.instNo
-  mDSUID.setNameInSpace(name, getVdcHost().mDSUID); // domain is dSUID of device container
+  mDSUID.setNameInSpace(name, getVdcHost().mDSUID); // domain is dSUID of the vDC host
 }
 
 

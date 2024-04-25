@@ -462,10 +462,10 @@ namespace p44 {
     /// @return instance index number
     int getInstanceNumber() const;
 
-    /// get a sufficiently unique identifier for this class container
+    /// get a sufficiently unique identifier for this vdc
     /// @return ID that identifies this container running on a specific hardware
     ///   the ID should not be dependent on the software version
-    ///   the ID must differ for each of multiple vDC containers run on the same hardware
+    ///   the ID MUST differ for each of multiple vDCs running on the same hardware
     ///   the ID MUST change when same software runs on different hardware
     /// @note Current implementation derives this from the devicecontainer's dSUID,
     ///   the deviceClassIdentitfier and the instance number in the form "class:instanceIndex@devicecontainerDsUid"
@@ -621,7 +621,11 @@ namespace p44 {
     void setVdcFlag(VdcFlags aFlagMask, bool aNewValue) { setPVar(mVdcFlags, (mVdcFlags & ~aFlagMask) | (aNewValue ? aFlagMask : 0)); }
 
     // derive dSUID
-    void deriveDsUid();
+    // Note: base class implementation derives dSUID from vdcInstanceIdentifier()
+    //   This is what all vDCs initially use after instantiation, and most vDCs will keep this initial dSUID.
+    //   However, some vDCs might want/need to derived their ID from hardware data obtained at initialize()
+    //   and thus might override this method to generate a updated dSUID and call it again during initialize()
+    virtual void deriveDsUid();
 
     /// actual implementation of scanning for devices from this vDC
     /// @param aRescanFlags selects mode of rescan:
