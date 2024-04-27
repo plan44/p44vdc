@@ -238,9 +238,10 @@ namespace p44 {
     /// @param aApi the API for which to access properties (different APIs might have different properties and API versions for the same PropertyContainer)
     /// @param aPropertyQuery description of what property change should be pushed (same syntax as in getProperty API), can be NULL
     /// @param aEvents list of events to be pushed, can be NULL
-    /// @param aDeletedProperty if set, the aPropertyQuery describes a property that has been deleted
+    /// @param aForwardQuery if set, the aPropertyQuery itself describes the property change (such as deletion, or from a proxy)
+    ///   so aPropertyQuery should be forwarded as-is, without looking up values from local properties.
     /// @return true if push could be sent, false otherwise (e.g. no vdSM connection, or device not yet announced)
-    bool pushNotification(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aDeletedProperty = false);
+    bool pushNotification(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aForwardQuery = false);
 
     /// @}
 

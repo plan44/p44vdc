@@ -237,6 +237,13 @@ void ButtonBehaviour::updateButtonState(bool aPressed)
 }
 
 
+void ButtonBehaviour::injectState(bool aButtonPressed)
+{
+  mButtonPressed = aButtonPressed;
+  mLastAction = MainLoop::now();
+}
+
+
 void ButtonBehaviour::injectClick(DsClickType aClickType)
 {
   switch (aClickType) {

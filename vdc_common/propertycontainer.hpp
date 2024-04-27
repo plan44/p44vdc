@@ -228,7 +228,8 @@ namespace p44 {
     ///   (but will internally be repaced by a RootPropertyDescriptor)
     /// @param aAccessCompleteCB will be called when property access is complete. Callback's aError
     ///   returns Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
-    void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB);
+    /// @note normally not overridden, but can be for special cases like ProxyDevice
+    virtual void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB);
 
     /// @}
 

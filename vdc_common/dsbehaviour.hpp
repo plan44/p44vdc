@@ -147,6 +147,9 @@ namespace p44 {
     /// @return color class of this behaviour (useful for coloring UI elements)
     virtual DsClass getColorClass();
 
+    /// set behaviour's initial color class property, does not flag dirty
+    void initColorClass(DsClass aColorClass) { mColorClass = aColorClass; }
+
     /// push state
     /// @param aDS push to dS (vDSM)
     /// @param aDS push to bridges

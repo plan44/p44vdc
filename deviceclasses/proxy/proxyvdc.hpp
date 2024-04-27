@@ -40,7 +40,7 @@ namespace p44 {
   class ProxyDevice;
 
   typedef boost::intrusive_ptr<ProxyVdc> ProxyVdcPtr;
-  class ProxyVdc : public Vdc
+  class ProxyVdc final : public Vdc
   {
     typedef Vdc inherited;
     friend class ProxyDevice;
@@ -115,12 +115,20 @@ namespace p44 {
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
+    /// deliver (forward) notifications to devices in one call instead of forwarding on device level
+    virtual void deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
+
   private:
 
     void bridgeApiConnectedHandler(StatusCB aCompletedCB, ErrorPtr aStatus);
     void bridgeApiIDQueryHandler(StatusCB aCompletedCB, ErrorPtr aError, JsonObjectPtr aJsonMsg);
+    void bridgeApiCollectQueryHandler(StatusCB aCompletedCB, ErrorPtr aError, JsonObjectPtr aJsonMsg);
 
     void bridgeApiNotificationHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg);
+
+    ProxyDevicePtr addProxyDevice(JsonObjectPtr aDeviceJSON);
+
+    bool handleBridgeLevelNotification(const string aNotification, JsonObjectPtr aParams);
 
   };
 

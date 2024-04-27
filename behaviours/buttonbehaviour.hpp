@@ -58,6 +58,7 @@ namespace p44 {
     friend class Device;
     friend class VdcHost; // for simple local mode
     friend class LocalController; // for full standalone mode
+    friend class ProxyDevice; // for proxy behaviour setup
 
   public:
 
@@ -164,12 +165,6 @@ namespace p44 {
     /// @param aPressed true if button is currently pressed, false if button is currently released
     void updateButtonState(bool aPressed);
 
-    /// inject already detected clicks or hold/release operations
-    /// @note this is for devices which do click/hold disambiguation themselves.
-    /// Do NOT use this mixed with updateButtonState()!
-    /// @param aClickType the click or hold/release to inject
-    void injectClick(DsClickType aClickType);
-
     /// send direct action
     /// @param aActionMode the mode how to send the action
     /// @param aActionId the scene number to send
@@ -179,6 +174,18 @@ namespace p44 {
     /// @param aClickType the click to send
     /// @note Normally this is not directly used, but automatically called by the button state machine
     void sendClick(DsClickType aClickType);
+
+    /// inject already detected clicks or hold/release operations
+    /// @note this is for devices which do click/hold disambiguation themselves.
+    /// Do NOT use this mixed with updateButtonState()!
+    /// @param aClickType the click or hold/release to inject
+    void injectClick(DsClickType aClickType);
+
+    /// inject (set) current button state without causing evaluation
+    /// @note this is for devices which do click/hold disambiguation themselves.
+    /// Do NOT use this mixed with updateButtonState()!
+    /// @param aButtonPressed current pressed/released state of the button
+    void injectState(bool aButtonPressed);
 
     /// @}
 

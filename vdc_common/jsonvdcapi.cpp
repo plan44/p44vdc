@@ -131,6 +131,40 @@ ApiValuePtr JsonApiValue::newValueFromJson(JsonObjectPtr aJsonObject)
 }
 
 
+JsonObjectPtr JsonApiValue::getAsJson(ApiValuePtr aApiValue)
+{
+  JsonObjectPtr json;
+  if (aApiValue) {
+    JsonApiValuePtr jav = boost::dynamic_pointer_cast<JsonApiValue>(aApiValue);
+    if (!jav) {
+      // different API type, need to convert
+      jav = JsonApiValuePtr(new JsonApiValue());
+      *jav = *aApiValue;
+    }
+    // now get the json object
+    json = jav->jsonObject();
+  }
+  return json;
+}
+
+
+void JsonApiValue::setAsJson(ApiValuePtr aApiValue, JsonObjectPtr aJson)
+{
+  if (!aApiValue) return;
+  JsonApiValuePtr jav = boost::dynamic_pointer_cast<JsonApiValue>(aApiValue);
+  if (!jav) {
+    // need to wrap the json into a JsonApiValue first for cross-type assinment
+    jav = JsonApiValuePtr(new JsonApiValue());
+    jav->setJsonObject(aJson); // set into wrapper
+    *aApiValue = *jav; // cross-type assign
+  }
+  else {
+    // target api value is json already, we can set it directly
+    jav->setJsonObject(aJson);
+  }
+}
+
+
 
 // MARK: - VdcJsonApiServer
 

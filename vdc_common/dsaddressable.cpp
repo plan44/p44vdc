@@ -294,14 +294,15 @@ void DsAddressable::methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError)
 
 
 
-bool DsAddressable::pushNotification(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aDeletedProperty)
+bool DsAddressable::pushNotification(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aForwardQuery)
 {
   if (!aApi) return false; // safety
   if (aApi->domain()!=VDC_API_DOMAIN || isAnnounced()) {
     // device is announced: push can take place
     if (aPropertyQuery) {
-      if (aDeletedProperty) {
-        // a property deletion is to be notified -> the query itself is what needs to be pushed
+      if (aForwardQuery) {
+        // the query should be forwarded as-is
+        // (for example for reporting property deletion, or forwarding proxied property changes)
         pushPropertyReady(aApi, aEvents, aPropertyQuery, ErrorPtr());
       }
       else {

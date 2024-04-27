@@ -83,10 +83,9 @@ void CustomDeviceAction::performCall(ApiValuePtr aParams, StatusCB aCompletedCB)
   message->add("message", JsonObject::newString("invokeAction"));
   message->add("action", JsonObject::newString(actionId));
   // convert params
-  if (aParams) {
-    JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue()); // must be JSON so we can pass it as part of the message
-    *params = *aParams; // copy to convert to JSON in all cases
-    message->add("params", params->jsonObject());
+  JsonObjectPtr params = JsonApiValue::getAsJson(aParams);
+  if (params) {
+    message->add("params", params);
   }
   // send it
   getCustomDevice().sendDeviceApiJsonMessage(message);

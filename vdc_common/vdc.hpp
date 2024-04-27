@@ -664,7 +664,7 @@ namespace p44 {
     /// @param aApiConnection the API connection where the notification originates from
     /// @param aNotification the name of the notification
     /// @param aParams the parameters of the notification
-    void deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
+    virtual void deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
 
     /// @}
 

@@ -32,6 +32,8 @@
 
 #if ENABLE_PROXYDEVICES
 
+#include "jsonvdcapi.hpp"
+
 using namespace p44;
 
 // MARK: - Factory
@@ -189,13 +191,66 @@ bool ProxyVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolut
 }
 
 
-
 void ProxyVdc::bridgeApiNotificationHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg)
 {
-  // TODO: process relevant notifications
-  // - output channel changes? maybe not needed, who would want to know? WebUI polls...
-  // - input changes! Buttons, sensors, binaryinputs
-  OLOG(LOG_INFO, "received bridge notification: %s", JsonObject::text(aJsonMsg));
+  if (Error::isOK(aError)) {
+    OLOG(LOG_DEBUG, "bridge API message received: %s", JsonObject::text(aJsonMsg));
+    // handle push notifications
+    JsonObjectPtr o;
+    string targetDSUID;
+    if (aJsonMsg && aJsonMsg->get("dSUID", o, true)) {
+      // request targets a device
+      DsUid targetDSUID(o->stringValue());
+      for (DeviceVector::iterator devpos = mDevices.begin(); devpos!=mDevices.end(); ++devpos) {
+        ProxyDevicePtr dev = boost::static_pointer_cast<ProxyDevice>(*devpos);
+        if (dev->getDsUid()==targetDSUID) {
+          // device exists, dispatch
+          if (aJsonMsg->get("notification", o, true)) {
+            string notification = o->stringValue();
+            POLOG(dev, LOG_INFO, "Notification '%s' received: %s", notification.c_str(), JsonObject::text(aJsonMsg));
+            bool handled = dev->handleBridgedDeviceNotification(notification, aJsonMsg);
+            if (handled) {
+              POLOG(dev, LOG_INFO, "processed notification");
+            }
+            else {
+              POLOG(dev, LOG_ERR, "could not handle notification '%s'", notification.c_str());
+            }
+          }
+          else {
+            POLOG(dev, LOG_ERR, "unknown request for device");
+          }
+          // done with this notification
+          return;
+        }
+      }
+      // unknown DSUID
+      // note: we do not check for changes in bridgeability
+      //   (must issue a rescan to get newly bridged devices).
+      //   So just warn getting notified for an unknown dSUID
+      OLOG(LOG_WARNING, "request targeting unknown device %s - maybe need to scan for devices?", targetDSUID.getString().c_str());
+    }
+    else {
+      // bridge level request
+      if (aJsonMsg->get("notification", o, true)) {
+        string notification = o->stringValue();
+        OLOG(LOG_NOTICE, "bridge level notification '%s' received: %s", notification.c_str(), JsonObject::text(aJsonMsg));
+        handleBridgeLevelNotification(notification, aJsonMsg);
+      }
+      else {
+        OLOG(LOG_ERR, "unknown global request: %s", JsonObject::text(aJsonMsg));
+      }
+    }
+  }
+  else {
+    OLOG(LOG_ERR, "bridge API Error %s", aError->text());
+  }
+}
+
+
+bool ProxyVdc::handleBridgeLevelNotification(const string aNotification, JsonObjectPtr aParams)
+{
+  // none known so far
+  return false;
 }
 
 
@@ -206,30 +261,126 @@ int ProxyVdc::getRescanModes() const
 }
 
 
+#define NEEDED_DEVICE_PROPERTIES \
+  "{\"dSUID\":null, \"name\":null, \"zoneID\": null, \"x-p44-zonename\": null, " \
+  "\"outputDescription\":null, \"outputSettings\": null, \"modelFeatures\":null, " \
+  "\"scenes\": { \"0\":null, \"5\":null }, " \
+  "\"vendorName\":null, \"model\":null, \"configURL\":null, " \
+  "\"channelStates\":null, \"channelDescriptions\":null, " \
+  "\"sensorDescriptions\":null, \"sensorStates\":null, " \
+  "\"binaryInputDescriptions\":null, \"binaryInputStates\":null, " \
+  "\"buttonInputDescriptions\":null, \"buttonInputStates\":null, " \
+  "\"active\":null, " \
+  "\"x-p44-bridgeable\":null, \"x-p44-bridged\":null, \"x-p44-bridgeAs\":null }"
+
 
 /// collect devices from this vDC
 /// @param aCompletedCB will be called when device scan for this vDC has been completed
 void ProxyVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
-  // incrementally collecting configured devices makes no sense. The devices are "static"!
-//  if (!(aRescanFlags & rescanmode_incremental)) {
-//    // non-incremental, re-collect all devices
-//    removeDevices(aRescanFlags & rescanmode_clearsettings);
-//    // add from the DB
-//    sqlite3pp::query qry(mDb);
-//    if (qry.prepare("SELECT bridgeDeviceId, config, rowid FROM bridgedevices")==SQLITE_OK) {
-//      for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
-//        BridgeDevicePtr dev = BridgeDevicePtr(new BridgeDevice(this, i->get<string>(0), i->get<string>(1)));
-//        if (dev) {
-//          dev->mBridgeDeviceRowID = i->get<int>(2);
-//          simpleIdentifyAndAddDevice(dev);
-//        }
-//      }
-//    }
-//  }
-  // assume ok
-  aCompletedCB(ErrorPtr());
+  if (!(aRescanFlags & rescanmode_incremental)) {
+    // full collect, remove all devices
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
+  }
+  // query devices
+  JsonObjectPtr params = JsonObject::objFromText(
+    "{ \"method\":\"getProperty\", \"dSUID\":\"root\", \"query\":{ "
+    "\"x-p44-vdcs\": { \"*\":{ \"x-p44-devices\": { \"*\": "
+    NEEDED_DEVICE_PROPERTIES
+    "} }} }}"
+  );
+  api().call("getProperty", params, boost::bind(&ProxyVdc::bridgeApiCollectQueryHandler, this, aCompletedCB, _1, _2));
 }
+
+
+void ProxyVdc::bridgeApiCollectQueryHandler(StatusCB aCompletedCB, ErrorPtr aError, JsonObjectPtr aJsonMsg)
+{
+  JsonObjectPtr result;
+  JsonObjectPtr o;
+  FOCUSOLOG("bridgeapi devices query: status=%s, answer:\n%s", Error::text(aError), JsonObject::text(aJsonMsg));
+  if (aJsonMsg && aJsonMsg->get("result", result)) {
+    // process device list
+    JsonObjectPtr vdcs;
+    // devices
+    if (result->get("x-p44-vdcs", vdcs)) {
+      vdcs->resetKeyIteration();
+      string vn;
+      JsonObjectPtr vdc;
+      while(vdcs->nextKeyValue(vn, vdc)) {
+        JsonObjectPtr devices;
+        if (vdc->get("x-p44-devices", devices)) {
+          devices->resetKeyIteration();
+          string dn;
+          JsonObjectPtr device;
+          while(devices->nextKeyValue(dn, device)) {
+            // examine device
+            if (device->get("x-p44-bridgeable", o) && o->boolValue()) {
+              // bridgeable device
+              ProxyDevicePtr dev = addProxyDevice(device);
+            }
+          }
+        }
+      }
+    }
+  }
+  // done collecting
+  aCompletedCB(aError);
+}
+
+
+ProxyDevicePtr ProxyVdc::addProxyDevice(JsonObjectPtr aDeviceJSON)
+{
+  ProxyDevicePtr newDev;
+  newDev = ProxyDevicePtr(new ProxyDevice(this, aDeviceJSON));
+  // add to container if device was created
+  if (newDev) {
+    // add to container
+    simpleIdentifyAndAddDevice(newDev);
+  }
+  return newDev;
+}
+
+
+void ProxyVdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+{
+  // instead of having each proxied device issue its own call,
+  // send as one notification with multiple target dSUIDs
+  // Note: this keeps target vdc's ability to optimize calls
+  JsonObjectPtr params = JsonApiValue::getAsJson(aParams);
+  JsonObjectPtr targetDSUIDs = JsonObject::newArray();
+  for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
+    targetDSUIDs->arrayAppend(JsonObject::newString((*apos)->getDsUid().getString()));
+  }
+  params->add("dSUID", targetDSUIDs);
+  api().notify(aNotification, params);
+}
+
+
+
+
+  // TODO: query bridge API for devices
+  // - query immutable structure
+  // - rebuild as much as needed for internal operation (but not all properties, property access will be just forwarded)
+  // - dSUID
+  // - colorclass, group memberships and zone is needed for notification delivery routing
+  // - set "bridged" so remote knows it must forward events
+  //   - can we bridge devices that are not set bridgeable?
+  // - implement some dummies for properties that are used in logging, but as most activity actually happens remotely, not many!
+
+
+  // TODO: implement handleNotification/Method
+  // - proxy almost EVERYTHING
+  // - augment/replace only some properties:
+  //   - icon, we can use the remote name, but not the remote URL/data
+  //   - maybe status text to show when original device is inactive?
+
+  // TODO: possible problems
+  // - scenescripts, as these are generic but NOT hosted locally, so scripthost will not work correctly
+  //   -> maybe block editing these non-locally, or provide remote link
+
+// TODO: divs not to forget
+// - prevent saving persistent settings locally, not event zone or group assignments!
+// - track zone and group changes, maybe need to improve bridge API reporting so we get notified about these changes
 
 
 #endif // ENABLE_PROXYDEVICES

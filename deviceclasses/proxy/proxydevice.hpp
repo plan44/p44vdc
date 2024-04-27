@@ -27,6 +27,8 @@
 
 #if ENABLE_PROXYDEVICES
 
+#include "jsoncomm.hpp"
+
 using namespace std;
 
 namespace p44 {
@@ -34,7 +36,7 @@ namespace p44 {
   class ProxyVdc;
   class ProxyDevice;
 
-  class ProxyDevice : public Device
+  class ProxyDevice final : public Device
   {
     typedef Device inherited;
     friend class ProxyVdc;
@@ -43,7 +45,7 @@ namespace p44 {
 
   public:
 
-    ProxyDevice(ProxyVdc *aVdcP, JsonObjectPtr aProxyDeviceInfo);
+    ProxyDevice(ProxyVdc *aVdcP, JsonObjectPtr aDeviceJSON);
 
     virtual ~ProxyDevice();
 
@@ -55,6 +57,9 @@ namespace p44 {
     virtual string deviceTypeIdentifier() const P44_OVERRIDE;
 
     ProxyVdc &getProxyVdc();
+
+    /// override because we do not want to save any properties locally
+    virtual ErrorPtr save() P44_OVERRIDE { return ErrorPtr(); /* NOP */ };
 
     /// check if device can be disconnected by software (i.e. Web-UI)
     /// @return true if device might be disconnectable (deletable) by the user via software (i.e. web UI)
@@ -77,15 +82,18 @@ namespace p44 {
     /// @return URL for Web-UI (for access from local LAN)
     virtual string webuiURLString() P44_OVERRIDE;
 
-    /// Get icon data or name
-    /// @param aIcon string to put result into (when method returns true)
-    /// - if aWithData is set, binary PNG icon data for given resolution prefix is returned
-    /// - if aWithData is not set, only the icon name (without file extension) is returned
-    /// @param aWithData if set, PNG data is returned, otherwise only name
-    /// @return true if there is an icon, false if not
-    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
-
     /// @}
+
+
+    /// overridden to handle or proxy method calls, depending on what it is
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+
+    /// overridden to handle (i.e. forward) notifications TO the device
+    virtual void handleNotification(const string &aNotification, ApiValuePtr aParams, StatusCB aExaminedCB) P44_OVERRIDE;
+
+    /// read or write property
+    /// @note overridden here to avoid internal property access, but forward query instead
+    virtual void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB) P44_OVERRIDE;
 
     /// initializes the physical device for being used
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
@@ -93,11 +101,22 @@ namespace p44 {
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
     virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
-  protected:
-
-    void deriveDsUid();
+    /// called to handle notifications from bridge
+    bool handleBridgedDeviceNotification(const string aNotification, JsonObjectPtr aParams);
 
   private:
+
+    ErrorPtr notify(const string aNotification, JsonObjectPtr aParams);
+    void call(const string aMethod, JsonObjectPtr aParams, JSonMessageCB aResponseCB);
+
+    void configureStructure(JsonObjectPtr aDeviceJSON);
+    void updateCachedProperties(JsonObjectPtr aProps);
+
+    void bridgingEnabled(StatusCB aCompletedCB, bool aFactoryReset);
+
+    void handleProxyMethodCallResponse(VdcApiRequestPtr aRequest, ErrorPtr aError, JsonObjectPtr aJsonObject);
+    void handleProxyPropertyAccessResponse(PropertyAccessCB aAccessCompleteCB, ApiValuePtr aEmptyResult, ErrorPtr aError, JsonObjectPtr aJsonObject);
+
 
   };
   typedef boost::intrusive_ptr<ProxyDevice> ProxyDevicePtr;

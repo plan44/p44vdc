@@ -66,6 +66,11 @@ namespace p44 {
 
     static ApiValuePtr newValueFromJson(JsonObjectPtr aJsonObject);
 
+    /// utility to get a JSON version from a untyped API value (which might or might not be JSON already)
+    static JsonObjectPtr getAsJson(ApiValuePtr aApiValue);
+    /// utility to set an API value directly from a Json Object
+    static void setAsJson(ApiValuePtr aApiValue, JsonObjectPtr aJson);
+
     virtual void clear() P44_OVERRIDE;
     virtual void operator=(ApiValue &aApiValue) P44_OVERRIDE;
 

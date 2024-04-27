@@ -120,7 +120,6 @@ namespace p44 {
     DeviceSettingsPtr mDeviceSettings;
 
     // volatile r/w properties
-    bool mProgMode; ///< if set, device is in programming mode
     DsScenePtr mPreviousState; ///< a pseudo scene which holds the device state before the last performApplySceneToChannels() call, used to do undoScene()
 
     // variables set by concrete devices (=hardware dependent)

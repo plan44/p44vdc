@@ -102,7 +102,6 @@ namespace p44 { namespace DeviceConfigurations {
 
 
 Device::Device(Vdc *aVdcP) :
-  mProgMode(false),
   mIsDimming(false),
   mCurrentDimMode(dimmode_stop),
   mAreaDimmed(0),
@@ -2171,7 +2170,6 @@ enum {
   // device level simple parameters
   colorClass_key,
   zoneID_key,
-  progMode_key,
   implementationId_key,
   softwareRemovable_key,
   teachinSignals_key,
@@ -2263,7 +2261,6 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     // common device properties
     { "primaryGroup", apivalue_uint64, colorClass_key, OKEY(device_obj) },
     { "zoneID", apivalue_uint64, zoneID_key, OKEY(device_obj) },
-    { "progMode", apivalue_bool, progMode_key, OKEY(device_obj) },
     { "implementationId", apivalue_string, implementationId_key, OKEY(device_obj) },
     { "x-p44-softwareRemovable", apivalue_bool, softwareRemovable_key, OKEY(device_obj) },
     { "x-p44-teachInSignals", apivalue_int64, teachinSignals_key, OKEY(device_obj) },
@@ -2486,8 +2483,6 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           aPropValue->setUint16Value(getColorClass()); return true;
         case zoneID_key:
           aPropValue->setUint16Value(getZoneID()); return true;
-        case progMode_key:
-          aPropValue->setBoolValue(mProgMode); return true;
         case implementationId_key:
           aPropValue->setStringValue(deviceTypeIdentifier()); return true;
         case deviceClass_key:
@@ -2527,9 +2522,6 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
       switch (aPropertyDescriptor->fieldKey()) {
         case zoneID_key:
           setZoneID(aPropValue->int32Value());
-          return true;
-        case progMode_key:
-          mProgMode = aPropValue->boolValue();
           return true;
         #if ENABLE_JSONBRIDGEAPI
         case allowBridging_key:

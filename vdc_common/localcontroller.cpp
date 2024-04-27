@@ -1520,7 +1520,7 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
 bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
 {
   LocalController::sharedLocalController()->signalActivity(); // button clicks are activity
-  FOCUSLOG("processButtonClick: clicktype=%d, device = %s", (int)aClickType, aButtonBehaviour.shortDesc().c_str());
+  FOCUSLOG("processButtonClick: clicktype=%d, button = %s", (int)aClickType, aButtonBehaviour.shortDesc().c_str());
   // defaults
   DsGroup group = aButtonBehaviour.mButtonGroup;
   DsChannelType channelType = channeltype_default;
