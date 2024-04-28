@@ -32,7 +32,7 @@
 using namespace p44;
 
 
-// MARK: - OlaDevice
+// MARK: - DmxDevice
 
 
 static bool nextChannelSpec(string &aConfig, size_t &aStartPos, char &aChannelType, DmxChannel &aChannelNo, DmxValue &aDefaultValue)
@@ -66,14 +66,14 @@ static bool nextChannelSpec(string &aConfig, size_t &aStartPos, char &aChannelTy
 }
 
 
-OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
+DmxDevice::DmxDevice(DmxVdc *aVdcP, const string &aDeviceConfig) :
   inherited(aVdcP),
-  olaType(ola_unknown),
-  whiteChannel(dmxNone),
-  redChannel(dmxNone),
-  greenChannel(dmxNone),
-  blueChannel(dmxNone),
-  amberChannel(dmxNone)
+  mDmxType(dmx_unknown),
+  mWhiteChannel(dmxNone),
+  mRedChannel(dmxNone),
+  mGreenChannel(dmxNone),
+  mBlueChannel(dmxNone),
+  mAmberChannel(dmxNone)
 {
   // evaluate config
   string config = aDeviceConfig;
@@ -84,13 +84,13 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
     config = aDeviceConfig.substr(i+1,string::npos);
   }
   if (mode=="dimmer")
-    olaType = ola_dimmer;
+    mDmxType = dmx_dimmer;
   else if (mode=="tunablewhite")
-    olaType = ola_tunablewhitedimmer;
+    mDmxType = dmx_tunablewhitedimmer;
   else if (mode=="color")
-    olaType = ola_fullcolordimmer;
+    mDmxType = dmx_fullcolordimmer;
   else {
-    LOG(LOG_ERR, "unknown OLA device type: %s", mode.c_str());
+    LOG(LOG_ERR, "unknown DMX device type: %s", mode.c_str());
   }
   // by default, act as black device so we can configure colors
   setColorClass(class_black_joker);
@@ -101,20 +101,20 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
   size_t p = 0;
   while (nextChannelSpec(config, p, channelType, channelNo, defaultValue)) {
     switch (channelType) {
-      case 'W' : whiteChannel = channelNo; break;
-      case 'R' : redChannel = channelNo; break;
-      case 'G' : greenChannel = channelNo; break;
-      case 'B' : blueChannel = channelNo; break;
-      case 'A' : amberChannel = channelNo; break;
-      case 'H' : hPosChannel = channelNo; break;
-      case 'V' : vPosChannel = channelNo; break;
+      case 'W' : mWhiteChannel = channelNo; break;
+      case 'R' : mRedChannel = channelNo; break;
+      case 'G' : mGreenChannel = channelNo; break;
+      case 'B' : mBlueChannel = channelNo; break;
+      case 'A' : mAmberChannel = channelNo; break;
+      case 'H' : mHPosChannel = channelNo; break;
+      case 'V' : mVPosChannel = channelNo; break;
       default : break; // static channel, just set default once
     }
     // set initial default value (will stay in the buffer)
     setDMXChannel(channelNo, defaultValue);
   }
   // now create device according to type
-  if (olaType==ola_dimmer) {
+  if (mDmxType==dmx_dimmer) {
     // Single channel DMX512 dimmer, only use white channel
     // - is light
     setColorClass(class_yellow_light);
@@ -125,12 +125,12 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
     l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, -1);
     addBehaviour(l);
   }
-  else if (olaType==ola_fullcolordimmer) {
+  else if (mDmxType==dmx_fullcolordimmer) {
     // - is RGB
     setColorClass(class_yellow_light);
-    if (redChannel!=dmxNone && greenChannel!=dmxNone && blueChannel!=dmxNone) {
+    if (mRedChannel!=dmxNone && mGreenChannel!=dmxNone && mBlueChannel!=dmxNone) {
       // Complete set of outputs to create RGB light
-      if (hPosChannel!=dmxNone || vPosChannel!=dmxNone) {
+      if (mHPosChannel!=dmxNone || mVPosChannel!=dmxNone) {
         // also has position, use moving light behaviour
         installSettings(DeviceSettingsPtr(new MovingLightDeviceSettings(*this)));
         // - add moving color light behaviour
@@ -150,7 +150,7 @@ OlaDevice::OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig) :
 }
 
 
-bool OlaDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
+bool DmxDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Nothing to do to identify for now
   return true; // simple identification, callback will not be called
@@ -158,23 +158,23 @@ bool OlaDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 
 
-bool OlaDevice::isSoftwareDisconnectable()
+bool DmxDevice::isSoftwareDisconnectable()
 {
-  return olaDeviceRowID>0; // disconnectable by software if it was created from DB entry (and not on the command line)
+  return mDmxDeviceRowID>0; // disconnectable by software if it was created from DB entry (and not on the command line)
 }
 
-OlaVdc &OlaDevice::getOlaVdc()
+DmxVdc &DmxDevice::getDmxVdc()
 {
-  return *(static_cast<OlaVdc *>(mVdcP));
+  return *(static_cast<DmxVdc *>(mVdcP));
 }
 
 
-void OlaDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
+void DmxDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
   // clear learn-in data from DB
-  if (olaDeviceRowID) {
-    if(getOlaVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", olaDeviceRowID)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error deleting device: %s", getOlaVdc().db.error()->description().c_str());
+  if (mDmxDeviceRowID) {
+    if(getDmxVdc().mDb.executef("DELETE FROM devConfigs WHERE rowid=%lld", mDmxDeviceRowID)!=SQLITE_OK) {
+      OLOG(LOG_ERR, "Error deleting device: %s", getDmxVdc().mDb.error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -182,20 +182,20 @@ void OlaDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHan
 }
 
 
-void OlaDevice::setDMXChannel(DmxChannel aChannel, DmxValue aChannelValue)
+void DmxDevice::setDMXChannel(DmxChannel aChannel, DmxValue aChannelValue)
 {
-  getOlaVdc().setDMXChannel(aChannel, aChannelValue);
+  getDmxVdc().setDMXChannel(aChannel, aChannelValue);
 }
 
 
 #define TRANSITION_STEP_TIME (10*MilliSecond)
 
-void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
+void DmxDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   // abort previous transition
-  transitionTicket.cancel();
+  mTransitionTicket.cancel();
   // generic device, show changed channels
-  if (olaType==ola_dimmer) {
+  if (mDmxType==dmx_dimmer) {
     // single channel dimmer
     LightBehaviourPtr l = getOutput<LightBehaviour>();
     if (l && l->brightnessNeedsApplying()) {
@@ -205,7 +205,7 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // consider applied
     l->brightnessApplied();
   }
-  else if (olaType==ola_fullcolordimmer) {
+  else if (mDmxType==dmx_fullcolordimmer) {
     // RGB, RGBW or RGBWA dimmer
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     if (cl) {
@@ -229,32 +229,32 @@ void OlaDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 }
 
 
-void OlaDevice::applyChannelValueSteps(bool aForDimming)
+void DmxDevice::applyChannelValueSteps(bool aForDimming)
 {
   MLMicroSeconds now = MainLoop::now();
   // generic device, show changed channels
-  if (olaType==ola_dimmer) {
+  if (mDmxType==dmx_dimmer) {
     // single channel dimmer
     LightBehaviourPtr l = getOutput<LightBehaviour>();
     bool moreSteps = l->updateBrightnessTransition(now);
     double w = l->brightnessForHardware()*255/100;
-    setDMXChannel(whiteChannel,(DmxValue)w);
+    setDMXChannel(mWhiteChannel,(DmxValue)w);
     // next step
     if (moreSteps) {
-      OLOG(LOG_DEBUG, "transitional DMX512 value %d=%d", whiteChannel, (int)w);
+      OLOG(LOG_DEBUG, "transitional DMX512 value %d=%d", mWhiteChannel, (int)w);
       // not yet complete, schedule next step
-      transitionTicket.executeOnce(
-        boost::bind(&OlaDevice::applyChannelValueSteps, this, aForDimming),
+      mTransitionTicket.executeOnce(
+        boost::bind(&DmxDevice::applyChannelValueSteps, this, aForDimming),
         TRANSITION_STEP_TIME
       );
       return; // will be called later again
     }
     if (!aForDimming) {
-      OLOG(LOG_INFO, "final DMX512 channel %d=%d", whiteChannel, (int)w);
+      OLOG(LOG_INFO, "final DMX512 channel %d=%d", mWhiteChannel, (int)w);
     }
     l->brightnessApplied(); // confirm having applied the new brightness
   }
-  else if (olaType==ola_fullcolordimmer) {
+  else if (mDmxType==dmx_fullcolordimmer) {
     // RGB, RGBW or RGBWA dimmer
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     MovingLightBehaviourPtr ml = getOutput<MovingLightBehaviour>();
@@ -265,46 +265,46 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming)
     double r,g,b;
     double w = 0;
     double a = 0;
-    if (whiteChannel!=dmxNone) {
-      if (amberChannel!=dmxNone) {
+    if (mWhiteChannel!=dmxNone) {
+      if (mAmberChannel!=dmxNone) {
         // RGBW
         cl->getRGBWA(r, g, b, w, a, 255, false, true);
-        setDMXChannel(amberChannel,(DmxValue)a);
+        setDMXChannel(mAmberChannel,(DmxValue)a);
       }
       else {
         // RGBW
         cl->getRGBW(r, g, b, w, 255, false, true);
       }
-      setDMXChannel(whiteChannel,(DmxValue)w);
+      setDMXChannel(mWhiteChannel,(DmxValue)w);
     }
     else {
       // RGB
       cl->getRGB(r, g, b, 255, false, true); // get brightness per R,G,B channel
     }
     // There's always RGB
-    setDMXChannel(redChannel,(DmxValue)r);
-    setDMXChannel(greenChannel,(DmxValue)g);
-    setDMXChannel(blueChannel,(DmxValue)b);
+    setDMXChannel(mRedChannel,(DmxValue)r);
+    setDMXChannel(mGreenChannel,(DmxValue)g);
+    setDMXChannel(mBlueChannel,(DmxValue)b);
     // there might be position as well
     double h = 0;
     double v = 0;
     if (ml) {
       h = ml->horizontalPosition->getChannelValue(true)/100*255;
-      setDMXChannel(hPosChannel,(DmxValue)h);
+      setDMXChannel(mHPosChannel,(DmxValue)h);
       v = ml->verticalPosition->getChannelValue(true)/100*255;
-      setDMXChannel(vPosChannel,(DmxValue)v);
+      setDMXChannel(mVPosChannel,(DmxValue)v);
     }
     // next step
     if (moreSteps) {
       OLOG(LOG_DEBUG,
         "transitional DMX512 values R(%hd)=%d, G(%hd)=%d, B(%hd)=%d, W(%hd)=%d, A(%hd)=%d, H(%hd)=%d, V(%hd)=%d",
-        redChannel, (int)r, greenChannel, (int)g, blueChannel, (int)b,
-        whiteChannel, (int)w, amberChannel, (int)a,
-        hPosChannel, (int)h, vPosChannel, (int)v
+        mRedChannel, (int)r, mGreenChannel, (int)g, mBlueChannel, (int)b,
+        mWhiteChannel, (int)w, mAmberChannel, (int)a,
+        mHPosChannel, (int)h, mVPosChannel, (int)v
       );
       // not yet complete, schedule next step
-      transitionTicket.executeOnce(
-        boost::bind(&OlaDevice::applyChannelValueSteps, this, aForDimming),
+      mTransitionTicket.executeOnce(
+        boost::bind(&DmxDevice::applyChannelValueSteps, this, aForDimming),
         TRANSITION_STEP_TIME
       );
       return; // will be called later again
@@ -312,9 +312,9 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming)
     if (!aForDimming) {
       OLOG(LOG_INFO,
         "final DMX512 values R(%hd)=%d, G(%hd)=%d, B(%hd)=%d, W(%hd)=%d, A(%hd)=%d, H(%hd)=%d, V(%hd)=%d",
-        redChannel, (int)r, greenChannel, (int)g, blueChannel, (int)b,
-        whiteChannel, (int)w, amberChannel, (int)a,
-        hPosChannel, (int)h, vPosChannel, (int)v
+        mRedChannel, (int)r, mGreenChannel, (int)g, mBlueChannel, (int)b,
+        mWhiteChannel, (int)w, mAmberChannel, (int)a,
+        mHPosChannel, (int)h, mVPosChannel, (int)v
       );
     }
   }
@@ -322,41 +322,41 @@ void OlaDevice::applyChannelValueSteps(bool aForDimming)
 
 
 
-void OlaDevice::deriveDsUid()
+void DmxDevice::deriveDsUid()
 {
   // vDC implementation specific UUID:
-  //   UUIDv5 with name = classcontainerinstanceid::olaType:white[:red:green:blue][:amber]
+  //   UUIDv5 with name = classcontainerinstanceid::dmxType:white[:red:green:blue][:amber]
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcInstanceIdentifier();
-  string_format_append(s, ":%d:%d", (int)olaType, whiteChannel);
-  if (olaType==ola_fullcolordimmer)
-    string_format_append(s, ":%d:%d:%d", redChannel, greenChannel, blueChannel);
-  if (amberChannel!=dmxNone)
-    string_format_append(s, ":%d", amberChannel);
+  string_format_append(s, ":%d:%d", (int)mDmxType, mWhiteChannel);
+  if (mDmxType==dmx_fullcolordimmer)
+    string_format_append(s, ":%d:%d:%d", mRedChannel, mGreenChannel, mBlueChannel);
+  if (mAmberChannel!=dmxNone)
+    string_format_append(s, ":%d", mAmberChannel);
   mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 
-string OlaDevice::modelName()
+string DmxDevice::modelName()
 {
-  if (olaType==ola_dimmer)
+  if (mDmxType==dmx_dimmer)
     return "DMX512 Dimmer";
-  else if (olaType==ola_tunablewhitedimmer)
+  else if (mDmxType==dmx_tunablewhitedimmer)
     return "DMX512 Tunable white";
-  else if (olaType==ola_fullcolordimmer)
+  else if (mDmxType==dmx_fullcolordimmer)
     return "DMX512 Full color";
   return "DMX512 device";
 }
 
 
 
-bool OlaDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
+bool DmxDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   const char *iconName = NULL;
-  switch (olaType) {
-    case ola_dimmer: iconName = "ola_dimmer"; break;
-    case ola_tunablewhitedimmer: iconName = "ola_ct"; break;
-    case ola_fullcolordimmer: iconName = "ola_color"; break;
+  switch (mDmxType) {
+    case dmx_dimmer: iconName = "dmx_dimmer"; break;
+    case dmx_tunablewhitedimmer: iconName = "dmx_ct"; break;
+    case dmx_fullcolordimmer: iconName = "dmx_color"; break;
     default: break;
   }
   if (iconName && getIcon(iconName, aIcon, aWithData, aResolutionPrefix))
@@ -366,35 +366,35 @@ bool OlaDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolu
 }
 
 
-string OlaDevice::getExtraInfo()
+string DmxDevice::getExtraInfo()
 {
   string s;
-  if (olaType==ola_dimmer)
-    s = string_format("DMX512 Dimmer: brightness=%d", whiteChannel);
-  else if (olaType==ola_tunablewhitedimmer)
-    s = string_format("DMX512 Tunable white dimmer: white=%d, amber=%d", whiteChannel, amberChannel);
-  else if (olaType==ola_fullcolordimmer)
-    s = string_format("DMX512 Full color dimmer: RGB=%d,%d,%d, white=%d, amber=%d", redChannel, greenChannel, blueChannel, whiteChannel, amberChannel);
+  if (mDmxType==dmx_dimmer)
+    s = string_format("DMX512 Dimmer: brightness=%d", mWhiteChannel);
+  else if (mDmxType==dmx_tunablewhitedimmer)
+    s = string_format("DMX512 Tunable white dimmer: white=%d, amber=%d", mWhiteChannel, mAmberChannel);
+  else if (mDmxType==dmx_fullcolordimmer)
+    s = string_format("DMX512 Full color dimmer: RGB=%d,%d,%d, white=%d, amber=%d", mRedChannel, mGreenChannel, mBlueChannel, mWhiteChannel, mAmberChannel);
   else
     s = "DMX512 device";
-  if (hPosChannel!=dmxNone || vPosChannel!=dmxNone)
-    string_format_append(s, " with position: h=%d, v=%d", hPosChannel, vPosChannel);
+  if (mHPosChannel!=dmxNone || mVPosChannel!=dmxNone)
+    string_format_append(s, " with position: h=%d, v=%d", mHPosChannel, mVPosChannel);
   return s;
 }
 
 
 
-string OlaDevice::description()
+string DmxDevice::description()
 {
   string s = inherited::description();
-  if (olaType==ola_dimmer)
-    string_format_append(s, "\n- DMX512 Dimmer: brightness=%d", whiteChannel);
-  else if (olaType==ola_tunablewhitedimmer)
-    string_format_append(s, "\n- DMX512 Tunable white dimmer: white=%d, amber=%d", whiteChannel, amberChannel);
-  else if (olaType==ola_fullcolordimmer)
-    string_format_append(s, "\n- DMX512 Full color dimmer: RGB=%d,%d,%d, white=%d, amber=%d", redChannel, greenChannel, blueChannel, whiteChannel, amberChannel);
-  if (hPosChannel!=dmxNone || vPosChannel!=dmxNone)
-    string_format_append(s, "\n- With position: horizontal=%d, vertical=%d", hPosChannel, vPosChannel);
+  if (mDmxType==dmx_dimmer)
+    string_format_append(s, "\n- DMX512 Dimmer: brightness=%d", mWhiteChannel);
+  else if (mDmxType==dmx_tunablewhitedimmer)
+    string_format_append(s, "\n- DMX512 Tunable white dimmer: white=%d, amber=%d", mWhiteChannel, mAmberChannel);
+  else if (mDmxType==dmx_fullcolordimmer)
+    string_format_append(s, "\n- DMX512 Full color dimmer: RGB=%d,%d,%d, white=%d, amber=%d", mRedChannel, mGreenChannel, mBlueChannel, mWhiteChannel, mAmberChannel);
+  if (mHPosChannel!=dmxNone || mVPosChannel!=dmxNone)
+    string_format_append(s, "\n- With position: horizontal=%d, vertical=%d", mHPosChannel, mVPosChannel);
   return s;
 }
 

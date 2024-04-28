@@ -33,45 +33,45 @@ using namespace std;
 
 namespace p44 {
 
-  class OlaVdc;
+  class DmxVdc;
 
-  class OlaDevice : public Device
+  class DmxDevice : public Device
   {
     typedef Device inherited;
-    friend class OlaVdc;
+    friend class DmxVdc;
 
     typedef enum {
-      ola_unknown,
-      ola_dimmer,
-      ola_tunablewhitedimmer,
-      ola_fullcolordimmer,
-    } OlaType;
+      dmx_unknown,
+      dmx_dimmer,
+      dmx_tunablewhitedimmer,
+      dmx_fullcolordimmer,
+    } DmxType;
 
-    OlaType olaType;
+    DmxType mDmxType;
 
-    long long olaDeviceRowID; ///< the ROWID this device was created from (0=none)
+    long long mDmxDeviceRowID; ///< the ROWID this device was created from (0=none)
 
-    DmxChannel whiteChannel;
-    DmxChannel redChannel;
-    DmxChannel greenChannel;
-    DmxChannel blueChannel;
-    DmxChannel amberChannel;
+    DmxChannel mWhiteChannel;
+    DmxChannel mRedChannel;
+    DmxChannel mGreenChannel;
+    DmxChannel mBlueChannel;
+    DmxChannel mAmberChannel;
 
-    DmxChannel hPosChannel;
-    DmxChannel vPosChannel;
+    DmxChannel mHPosChannel;
+    DmxChannel mVPosChannel;
 
-    MLTicket transitionTicket;
+    MLTicket mTransitionTicket;
 
   public:
 
-    OlaDevice(OlaVdc *aVdcP, const string &aDeviceConfig);
+    DmxDevice(DmxVdc *aVdcP, const string &aDeviceConfig);
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)
-    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "ola"; };
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "dmx"; };
 
     /// @name interaction with subclasses, actually representing physical I/O
     /// @{
@@ -87,7 +87,7 @@ namespace p44 {
 
     /// @}
 
-    OlaVdc &getOlaVdc();
+    DmxVdc &getDmxVdc();
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
@@ -146,7 +146,7 @@ namespace p44 {
     virtual void applyChannelValueSteps(bool aForDimming);
 
   };
-  typedef boost::intrusive_ptr<OlaDevice> OlaDevicePtr;
+  typedef boost::intrusive_ptr<DmxDevice> DmxDevicePtr;
 
 
 } // namespace p44

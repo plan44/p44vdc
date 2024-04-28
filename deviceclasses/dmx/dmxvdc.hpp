@@ -35,6 +35,10 @@
   #include <ola/Logging.h>
   #include <ola/client/StreamingClient.h>
 #endif
+#if ENABLE_DMX
+  #include "serialcomm.hpp"
+#endif
+
 
 using namespace std;
 
@@ -44,13 +48,13 @@ namespace p44 {
   typedef uint8_t DmxValue;
   const DmxChannel dmxNone = 0; // no channel
 
-  class OlaVdc;
-  class OlaDevice;
-  typedef boost::intrusive_ptr<OlaDevice> OlaDevicePtr;
+  class DmxVdc;
+  class DmxDevice;
+  typedef boost::intrusive_ptr<DmxDevice> DmxDevicePtr;
 
 
   /// persistence for ola device container
-  class OlaDevicePersistence : public SQLite3Persistence  {
+  class DmxDevicePersistence : public SQLite3Persistence  {
     typedef SQLite3Persistence inherited;
   protected:
     /// Get DB Schema creation/upgrade SQL statements
@@ -60,23 +64,38 @@ namespace p44 {
 
 	typedef std::multimap<string, string> DeviceConfigMap;
 	
-  typedef boost::intrusive_ptr<OlaVdc> OlaVdcPtr;
-  class OlaVdc : public Vdc
+  typedef boost::intrusive_ptr<DmxVdc> DmxVdcPtr;
+  class DmxVdc : public Vdc
   {
     typedef Vdc inherited;
-    friend class OlaDevice;
+    friend class DmxDevice;
 
-    OlaDevicePersistence db;
+    DmxDevicePersistence mDb;
 
-    // OLA Thread
-    ChildThreadWrapperPtr olaThread;
-    pthread_mutex_t olaBufferAccess;
-    ola::DmxBuffer *dmxBufferP;
-    ola::client::StreamingClient *olaClientP;
+    bool mUseOLA;
+
+    // DMX sender thread
+    ChildThreadWrapperPtr mDMXSenderThread;
+    pthread_mutex_t mDmxBufferAccess;
+
+    #if ENABLE_OLA
+    ola::DmxBuffer *mOlaDmxBufferP;
+    ola::client::StreamingClient *mOlaClientP;
+    uint8_t mDMXUniverse;
+    #endif
+    #if ENABLE_DMX
+    uint8_t* mSerialDmxBufferP;
+    SerialCommPtr mDmxSender;
+    #endif
 
 
   public:
-    OlaVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
+    DmxVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
+
+    /// set connection to use for DMX
+    /// @param aDmxOutputSpec can be serial interface spec or "ola[:universe]" to use OLA
+    /// @param aDefaultPort the default port to use when aDmxOutputSpec is a TCP connection
+    void setDmxOutput(const string aDmxOutputSpec, uint16_t aDefaultPort);
 
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
@@ -102,9 +121,15 @@ namespace p44 {
 
   private:
 
-    OlaDevicePtr addOlaDevice(string aDeviceType, string aDeviceConfig);
+    DmxDevicePtr addDmxDevice(string aDeviceType, string aDeviceConfig);
 
+    #if ENABLE_OLA
     void olaThreadRoutine(ChildThreadWrapper &aThread);
+    #endif
+    #if ENABLE_DMX
+    void dmxThreadRoutine(ChildThreadWrapper &aThread);
+    #endif
+
     void setDMXChannel(DmxChannel aChannel, DmxValue aChannelValue);
 
   };
