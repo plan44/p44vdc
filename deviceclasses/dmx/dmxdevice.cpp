@@ -20,9 +20,9 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "oladevice.hpp"
+#include "dmxdevice.hpp"
 
-#if ENABLE_OLA
+#if ENABLE_OLA || ENABLE_DMX
 
 #include "lightbehaviour.hpp"
 #include "colorlightbehaviour.hpp"
@@ -398,7 +398,7 @@ string OlaDevice::description()
   return s;
 }
 
-#endif // ENABLE_OLA
+#endif // ENABLE_OLA || ENABLE_DMX
 
 
 

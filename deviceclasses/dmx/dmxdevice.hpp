@@ -20,14 +20,14 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __p44vdc__oladevice__
-#define __p44vdc__oladevice__
+#ifndef __p44vdc__dmxdevice__
+#define __p44vdc__dmxdevice__
 
 #include "device.hpp"
 
-#if ENABLE_OLA
+#if ENABLE_OLA || ENABLE_DMX
 
-#include "olavdc.hpp"
+#include "dmxvdc.hpp"
 
 using namespace std;
 
@@ -151,5 +151,5 @@ namespace p44 {
 
 } // namespace p44
 
-#endif // ENABLE_OLA
-#endif // __p44vdc__oladevice__
+#endif // ENABLE_OLA || ENABLE_DMX
+#endif // __p44vdc__dmxdevice__

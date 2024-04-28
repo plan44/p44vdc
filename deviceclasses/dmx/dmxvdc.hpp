@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2013-2023 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -20,19 +20,21 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#ifndef __p44vdc__olavdc__
-#define __p44vdc__olavdc__
+#ifndef __p44vdc__dmxvdc__
+#define __p44vdc__dmxvdc__
 
 #include "p44vdc_common.hpp"
 
-#if ENABLE_OLA
+#if ENABLE_OLA || ENABLE_DMX
 
 #include "vdc.hpp"
 #include "device.hpp"
 
-#include <ola/DmxBuffer.h>
-#include <ola/Logging.h>
-#include <ola/client/StreamingClient.h>
+#if ENABLE_OLA
+  #include <ola/DmxBuffer.h>
+  #include <ola/Logging.h>
+  #include <ola/client/StreamingClient.h>
+#endif
 
 using namespace std;
 
@@ -96,7 +98,7 @@ namespace p44 {
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() const P44_OVERRIDE { return "OLA/DMX512"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "DMX512"; }
 
   private:
 
@@ -109,5 +111,5 @@ namespace p44 {
 
 } // namespace p44
 
-#endif // ENABLE_OLA
-#endif // __p44vdc__olavdc__
+#endif // ENABLE_OLA || ENABLE_DMX
+#endif // __p44vdc__dmxvdc__

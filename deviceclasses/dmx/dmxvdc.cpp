@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2013-2023 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -20,13 +20,15 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "olavdc.hpp"
+#include "dmxvdc.hpp"
+
+#if ENABLE_OLA || ENABLE_DMX
+
+#include "dmxdevice.hpp"
 
 #if ENABLE_OLA
-
-#include "oladevice.hpp"
-
-#include <ola/DmxBuffer.h>
+  #include <ola/DmxBuffer.h>
+#endif
 
 using namespace p44;
 
@@ -243,6 +245,6 @@ ErrorPtr OlaVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
   return respErr;
 }
 
-#endif // ENABLE_OLA
+#endif // ENABLE_OLA || ENABLE_DMX
 
 
