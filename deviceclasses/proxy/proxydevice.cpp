@@ -204,11 +204,32 @@ bool ProxyDevice::handleBridgedDeviceNotification(const string aNotification, Js
 
 // MARK: - property access forwarding
 
-void ProxyDevice::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB)
+ErrorPtr ProxyDevice::accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList)
 {
-  // TODO: implement, forward to proxied device
+  if (aParentDescriptor->isRootOfObject()) {
+    if (aPreparationList) {
+      // accessing this object's properties needs async preparation
+      aPreparationList->push_back(PropertyPrep(this, aParentDescriptor, aQueryObject));
+      FOCUSOLOG("- proxy device needs preparation -> added to preparation list (%zu items now)", aPreparationList->size());
+    }
+    else {
+      // repeated access gets cached result
+      JsonApiValue::setAsJson(aResultObject, mCachedPropAccessResult);
+      // cache no longer needed
+      mCachedPropAccessResult.reset();
+    }
+    return ErrorPtr();
+  }
+  // should not happen, there is not other access than object root
+  return Error::err<VdcApiError>(500, "invalid proxy device access");
+}
+
+
+void ProxyDevice::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
+{
+  // proxy the subquery
   JsonObjectPtr params = JsonObject::newObj();
-  JsonObjectPtr props = JsonApiValue::getAsJson(aQueryObject);
+  JsonObjectPtr props = JsonApiValue::getAsJson(aPrepInfo.subquery);
   string method;
   if (aMode==access_read) {
     // read
@@ -223,20 +244,39 @@ void ProxyDevice::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObj
       params->add("preload", JsonObject::newBool(true));
     }
   }
-  call(method, params, boost::bind(&ProxyDevice::handleProxyPropertyAccessResponse, this, aAccessCompleteCB, aQueryObject->newObject(), _1, _2));
+  call(method, params, boost::bind(&ProxyDevice::handleProxyPropertyAccessResponse, this, aPreparedCB, aPrepInfo.subquery->newNull(), _1, _2));
 }
 
 
-void ProxyDevice::handleProxyPropertyAccessResponse(PropertyAccessCB aAccessCompleteCB, ApiValuePtr aEmptyResult, ErrorPtr aError, JsonObjectPtr aJsonObject)
+void ProxyDevice::handleProxyPropertyAccessResponse(StatusCB aPreparedCB, ApiValuePtr aResult, ErrorPtr aError, JsonObjectPtr aJsonObject)
 {
   if (aError) {
-    OLOG(LOG_WARNING, "remote -> proxy: property access call returns error: %s", Error::text(aError));
+    OLOG(LOG_WARNING, "remote -> proxy: property access call failed on transport level: %s", Error::text(aError));
+    // error propagates immediately
   }
   else {
     OLOG(LOG_INFO, "remote -> proxy: property access response: %s", JsonObject::text(aJsonObject));
-    JsonApiValue::setAsJson(aEmptyResult, aJsonObject);
+    JsonObjectPtr o;
+    if (aJsonObject->get("error", o)) {
+      // error
+      ErrorCode e = o->int32Value();
+      string msg;
+      if (aJsonObject->get("errormessage", o)) msg = o->stringValue();
+      aError = Error::err<VdcApiError>(e, "%s", msg.c_str());
+    }
+    else {
+      // result will be accessed later by accessPropertyInternal()
+      mCachedPropAccessResult = aJsonObject->get("result");
+    }
   }
-  if (aAccessCompleteCB) aAccessCompleteCB(aEmptyResult, aError);
+  if (aPreparedCB) aPreparedCB(aError);
+}
+
+
+void ProxyDevice::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  mCachedPropAccessResult.reset();
+  inherited::finishAccess(aMode, aPropertyDescriptor);
 }
 
 
@@ -258,6 +298,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
   }
   // input states we actually need to propagate
   if (aProps->get("buttonInputStates", elements)) {
+    elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
         // update plain button state first
@@ -278,6 +319,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     }
   }
   if (aProps->get("binaryInputStates", elements)) {
+    elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
         if (props->get("value", o)) {
@@ -288,6 +330,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     }
   }
   if (aProps->get("sensorStates", elements)) {
+    elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
         if (props->get("value", o)) {
@@ -339,6 +382,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     if (props->get("groups", groups)) {
       string groupstr;
       getOutput()->resetGroupMembership();
+      groups->resetKeyIteration();
       while(groups->nextKeyValue(groupstr, o)) {
         int groupno;
         if (sscanf(groupstr.c_str(), "%d", &groupno)==1) {
@@ -349,6 +393,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
   }
   // - button settings needed for localcontroller
   if (aProps->get("buttonInputSettings", elements)) {
+    elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
         // we need group, mode, function and channel for LocalController::processButtonClick
@@ -369,6 +414,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
   }
   // - input settings needed for local event monitoring in evaluators/p44script
   if (aProps->get("binaryInputSettings", elements)) {
+    elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
         // we may need group
@@ -380,6 +426,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
   }
   // - sensor settings needed for local event monitoring in evaluators/p44script
   if (aProps->get("sensorSettings", elements)) {
+    elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
         // we may need group
@@ -425,6 +472,10 @@ void ProxyDevice::configureStructure(JsonObjectPtr aDeviceJSON)
       // - completely generic description is sufficient here
       bb->setHardwareName("proxy button");
       addBehaviour(bb);
+      // make button bridge exclusive
+      JsonObjectPtr p = JsonObject::newBool(true);
+      p = p->wrapAs("x-p44-bridgeExclusive")->wrapAs(id)->wrapAs("buttonInputSettings")->wrapAs("properties");
+      call("setProperty", p, NoOP);
     }
   }
   // - binary inputs
@@ -456,11 +507,9 @@ void ProxyDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // make bridgable
   // enable it for bridging on the other side
-  JsonObjectPtr params = JsonObject::newObj();
-  JsonObjectPtr props = JsonObject::newObj();
-  props->add("x-p44-bridged", JsonObject::newBool(true));
-  params->add("properties", props);
-  call("setProperty", params, boost::bind(&ProxyDevice::bridgingEnabled, this, aCompletedCB, aFactoryReset));
+  JsonObjectPtr p = JsonObject::newBool(true);
+  p = p->wrapAs("x-p44-bridged")->wrapAs("properties");
+  call("setProperty", p, boost::bind(&ProxyDevice::bridgingEnabled, this, aCompletedCB, aFactoryReset));
 }
 
 

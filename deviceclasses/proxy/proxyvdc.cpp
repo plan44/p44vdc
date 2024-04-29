@@ -345,6 +345,9 @@ ProxyDevicePtr ProxyVdc::addProxyDevice(JsonObjectPtr aDeviceJSON)
 }
 
 
+// MARK: - operation
+
+
 void ProxyVdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   // instead of having each proxied device issue its own call,
@@ -356,35 +359,9 @@ void ProxyVdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConn
     targetDSUIDs->arrayAppend(JsonObject::newString((*apos)->getDsUid().getString()));
   }
   params->add("dSUID", targetDSUIDs);
+  OLOG(LOG_INFO, "===== '%s' delivery to %d proxy devices starts now", aNotification.c_str(), targetDSUIDs->arrayLength());
   api().notify(aNotification, params);
 }
-
-
-
-
-  // TODO: query bridge API for devices
-  // - query immutable structure
-  // - rebuild as much as needed for internal operation (but not all properties, property access will be just forwarded)
-  // - dSUID
-  // - colorclass, group memberships and zone is needed for notification delivery routing
-  // - set "bridged" so remote knows it must forward events
-  //   - can we bridge devices that are not set bridgeable?
-  // - implement some dummies for properties that are used in logging, but as most activity actually happens remotely, not many!
-
-
-  // TODO: implement handleNotification/Method
-  // - proxy almost EVERYTHING
-  // - augment/replace only some properties:
-  //   - icon, we can use the remote name, but not the remote URL/data
-  //   - maybe status text to show when original device is inactive?
-
-  // TODO: possible problems
-  // - scenescripts, as these are generic but NOT hosted locally, so scripthost will not work correctly
-  //   -> maybe block editing these non-locally, or provide remote link
-
-// TODO: divs not to forget
-// - prevent saving persistent settings locally, not event zone or group assignments!
-// - track zone and group changes, maybe need to improve bridge API reporting so we get notified about these changes
 
 
 #endif // ENABLE_PROXYDEVICES
