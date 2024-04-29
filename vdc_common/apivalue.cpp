@@ -476,4 +476,16 @@ string ApiValue::lowercaseStringValue()
 }
 
 
+ApiValuePtr ApiValue::wrapAs(const string aFieldName)
+{
+  ApiValuePtr wrapper = newObject();
+  wrapper->add(aFieldName, this);
+  return wrapper;
+}
 
+
+ApiValuePtr ApiValue::wrapNull(const string aFieldName)
+{
+  setNull();
+  return wrapAs(aFieldName);
+}

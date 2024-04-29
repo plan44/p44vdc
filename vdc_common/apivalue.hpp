@@ -187,6 +187,12 @@ namespace p44 {
     /// @return true if assignment was successful, false otherwise
     virtual bool setStringValue(const string &aString);
 
+    /// wrap a value in an object as the value of the named field
+    /// @param the name of the field the current object should have in the wrapper object
+    ApiValuePtr wrapAs(const string aFieldName);
+
+    /// null this value and add it using wrapAs()
+    ApiValuePtr wrapNull(const string aFieldName);
 
     /// get in different int types
     uint8_t uint8Value();
@@ -203,7 +209,6 @@ namespace p44 {
     void setInt8Value(int8_t aInt8);
     void setInt16Value(int16_t aInt16);
     void setInt32Value(int32_t aInt32);
-
 
     /// utilities
     virtual size_t stringLength();

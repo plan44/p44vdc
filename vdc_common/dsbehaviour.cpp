@@ -79,12 +79,9 @@ bool DsBehaviour::pushBehaviourState(bool aDS, bool aBridges)
     // push to vDC API
     VdcApiConnectionPtr api = mDevice.getVdcHost().getVdsmSessionConnection();
     if (api) {
-      ApiValuePtr query = api->newApiValue();
-      query->setType(apivalue_object);
-      ApiValuePtr subQuery = query->newValue(apivalue_object);
-      subQuery->add(getApiId(api->getApiVersion()), subQuery->newValue(apivalue_null));
-      query->add(string(getTypeName()).append("States"), subQuery);
-      if (!mDevice.pushNotification(api, query, ApiValuePtr())) requestedPushDone = false;
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull(getApiId(api->getApiVersion()))->wrapAs(string(getTypeName()).append("States"));
+      if (!mDevice.pushNotification(api, q, ApiValuePtr())) requestedPushDone = false;
     }
     else {
       requestedPushDone = false;
@@ -95,12 +92,9 @@ bool DsBehaviour::pushBehaviourState(bool aDS, bool aBridges)
     // push to bridges
     VdcApiConnectionPtr api = mDevice.getVdcHost().getBridgeApi();
     if (api) {
-      ApiValuePtr query = api->newApiValue();
-      query->setType(apivalue_object);
-      ApiValuePtr subQuery = query->newValue(apivalue_object);
-      subQuery->add(getApiId(api->getApiVersion()), subQuery->newValue(apivalue_null));
-      query->add(string(getTypeName()).append("States"), subQuery);
-      if (!mDevice.pushNotification(api, query, ApiValuePtr())) requestedPushDone = false;
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull(getApiId(api->getApiVersion()))->wrapAs(string(getTypeName()).append("States"));
+      if (!mDevice.pushNotification(api, q, ApiValuePtr())) requestedPushDone = false;
     }
     else {
       requestedPushDone = false;

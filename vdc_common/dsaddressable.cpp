@@ -449,20 +449,18 @@ void DsAddressable::updatePresenceState(bool aPresent)
     // push change in presence to vdSM
     VdcApiConnectionPtr api = getVdcHost().getVdsmSessionConnection();
     if (api) {
-      ApiValuePtr query = api->newApiValue();
-      query->setType(apivalue_object);
-      query->add("active", query->newValue(apivalue_null));
-      pushNotification(api, query, ApiValuePtr(), VDC_API_DOMAIN);
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull("active");
+      pushNotification(api, q, ApiValuePtr(), VDC_API_DOMAIN);
     }
     // also push change in presence to bridgeAPI
     #if ENABLE_JSONBRIDGEAPI
     if (isBridged()) {
       VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
       if (api) {
-        ApiValuePtr query = api->newApiValue();
-        query->setType(apivalue_object);
-        query->add("active", query->newValue(apivalue_null));
-        pushNotification(api, query, ApiValuePtr());
+        ApiValuePtr q = api->newApiValue();
+        q = q->wrapNull("active");
+        pushNotification(api, q, ApiValuePtr());
       }
     }
     #endif
@@ -650,10 +648,9 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
 void DsAddressable::pushBridgeable() {
   VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
   if (api) {
-    ApiValuePtr query = api->newApiValue();
-    query->setType(apivalue_object);
-    query->add("x-p44-bridgeable", query->newValue(apivalue_null));
-    pushNotification(api, query, ApiValuePtr());
+    ApiValuePtr q = api->newApiValue();
+    q = q->wrapNull("x-p44-bridgeable");
+    pushNotification(api, q, ApiValuePtr());
   }
 }
 #endif // ENABLE_JSONBRIDGEAPI

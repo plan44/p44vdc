@@ -356,13 +356,10 @@ bool DynamicDeviceActions::pushActionChange(DeviceActionPtr aAction, bool aRemov
   // try to push to connected vDC API client
   if (api) {
     // create query for description property to get pushed
-    ApiValuePtr query = api->newApiValue();
-    query->setType(apivalue_object);
-    ApiValuePtr subQuery = query->newValue(apivalue_object);
-    subQuery->add(aAction->getId(), subQuery->newValue(apivalue_null));
-    query->add(string("dynamicActionDescriptions"), subQuery);
+    ApiValuePtr q = api->newApiValue();
+    q = q->wrapNull(aAction->getId())->wrapAs("dynamicActionDescriptions");
     // let pushNotification execute the query and
-    return sd.pushNotification(api, query, ApiValuePtr(), aRemoved);
+    return sd.pushNotification(api, q, ApiValuePtr(), aRemoved);
   }
   // no API, cannot not push
   return false;
@@ -1458,12 +1455,9 @@ bool DeviceProperties::pushProperty(ValueDescriptorPtr aPropertyDesc)
   VdcApiConnectionPtr api = singleDeviceP->getVdcHost().getVdsmSessionConnection();
   if (api) {
     // create query for device property to get pushed
-    ApiValuePtr query = api->newApiValue();
-    query->setType(apivalue_object);
-    ApiValuePtr subQuery = query->newValue(apivalue_object);
-    subQuery->add(aPropertyDesc->getName(), subQuery->newValue(apivalue_null));
-    query->add(string("deviceProperties"), subQuery);
-    return singleDeviceP->pushNotification(api, query, ApiValuePtr());
+    ApiValuePtr q = api->newApiValue();
+    q = q->wrapNull(aPropertyDesc->getName())->wrapAs("deviceProperties");
+    return singleDeviceP->pushNotification(api, q, ApiValuePtr());
   }
   return false; // cannot push
 }
