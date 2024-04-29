@@ -193,6 +193,9 @@ namespace p44 {
     P44VdcHost& mP44VdcHost;
 
     // properties
+    string mBridgeType; ///< the type of bridge (matter, proxy, …)
+    string mConfigURL; ///< the config URL of the bridge, if it has any (e.g. proxy: link to the P44-xx hosting the proxy vdc)
+    // - matter related
     string mQRCodeData; ///< the QR code data string for onboarding
     string mManualPairingCode; ///< the manual pairing code (in case QR code does not work or commissioner has no camera)
     bool mStarted; ///< set when matter part of bridge has started

@@ -932,6 +932,8 @@ void BridgeInfo::resetInfo()
 
 
 enum {
+  bridgetype_key,
+  config_url_key,
   qrcodedata_key,
   manualpairingcode_key,
   started_key,
@@ -951,6 +953,8 @@ int BridgeInfo::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 PropertyDescriptorPtr BridgeInfo::getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   static const PropertyDescription properties[numBrigeInfoProperties] = {
+    { "bridgetype", apivalue_string, bridgetype_key, OKEY(bridgeinfo_key) },
+    { "configURL", apivalue_string, config_url_key, OKEY(bridgeinfo_key) },
     { "qrcodedata", apivalue_string, qrcodedata_key, OKEY(bridgeinfo_key) },
     { "manualpairingcode", apivalue_string, manualpairingcode_key, OKEY(bridgeinfo_key) },
     { "started", apivalue_bool, started_key, OKEY(bridgeinfo_key) },
@@ -970,6 +974,8 @@ bool BridgeInfo::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
   if (aPropertyDescriptor->hasObjectKey(bridgeinfo_key)) {
     if (aMode==access_read) {
       switch (aPropertyDescriptor->fieldKey()) {
+        case bridgetype_key: aPropValue->setStringValue(mBridgeType); return true;
+        case config_url_key: aPropValue->setStringValue(mConfigURL); return true;
         case qrcodedata_key: aPropValue->setStringValue(mQRCodeData); return true;
         case manualpairingcode_key: aPropValue->setStringValue(mManualPairingCode); return true;
         case started_key: aPropValue->setBoolValue(mP44VdcHost.numBridgeApiClients()>0 && mStarted); return true;
@@ -979,6 +985,8 @@ bool BridgeInfo::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, P
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
+        case bridgetype_key: mBridgeType = aPropValue->stringValue(); return true;
+        case config_url_key: mConfigURL = aPropValue->stringValue(); return true;
         case qrcodedata_key: mQRCodeData = aPropValue->stringValue(); return true;
         case manualpairingcode_key: mManualPairingCode = aPropValue->stringValue(); return true;
         case started_key: mStarted = aPropValue->boolValue(); return true;
