@@ -184,8 +184,22 @@ void OutputBehaviour::setGroupMembership(DsGroup aGroup, bool aIsMember)
     // not explicitly member
     newGroups &= ~(0x1ll<<aGroup);
   }
-  setPVar(mOutputGroups, newGroups);
+  if (setPVar(mOutputGroups, newGroups)) {
+    // changed
+    #if ENABLE_JSONBRIDGEAPI
+    if (mDevice.isBridged()) {
+      // inform bridges
+      VdcApiConnectionPtr api = mDevice.getVdcHost().getBridgeApi();
+      if (api) {
+        ApiValuePtr q = api->newApiValue();
+        q = q->wrapNull("groups")->wrapAs("outputSettings.groups");
+        mDevice.pushNotification(api, q, ApiValuePtr());
+      }
+    }
+    #endif
+  }
 }
+
 
 
 void OutputBehaviour::resetGroupMembership()

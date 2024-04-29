@@ -212,17 +212,30 @@ DsZoneID Device::getZoneID()
 void Device::setZoneID(DsZoneID aZoneId)
 {
   if (mDeviceSettings) {
+    bool changed;
     #if ENABLE_LOCALCONTROLLER
     // must report changes of zone usage to local controller
     DsZoneID previousZone = getZoneID();
-    if (mDeviceSettings->setPVar(mDeviceSettings->mZoneID, aZoneId)) {
+    changed = mDeviceSettings->setPVar(mDeviceSettings->mZoneID, aZoneId);
+    if (changed) {
       LocalControllerPtr lc = getVdcHost().getLocalController();
       if (lc) {
         lc->deviceChangesZone(DevicePtr(this), previousZone, aZoneId);
       }
     }
     #else
-    mDeviceSettings->setPVar(mDeviceSettings->mZoneID, aZoneId);
+    changed = mDeviceSettings->setPVar(mDeviceSettings->mZoneID, aZoneId);
+    #endif
+    #if ENABLE_JSONBRIDGEAPI
+    if (changed && isBridged()) {
+      // inform bridges
+      VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
+      if (api) {
+        ApiValuePtr q = api->newApiValue();
+        q = q->wrapNull("zoneID");
+        pushNotification(api, q, ApiValuePtr());
+      }
+    }
     #endif
   }
 }
@@ -257,10 +270,9 @@ void Device::setName(const string &aName)
     if (isBridged()) {
       VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
       if (api) {
-        ApiValuePtr query = api->newApiValue();
-        query->setType(apivalue_object);
-        query->add("name", query->newNull());
-        pushNotification(api, query, ApiValuePtr());
+        ApiValuePtr q = api->newApiValue();
+        q = q->wrapNull("name");
+        pushNotification(api, q, ApiValuePtr());
       }
     }
     #endif
