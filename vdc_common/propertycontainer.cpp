@@ -35,7 +35,6 @@
 using namespace p44;
 
 
-
 void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB)
 {
   // create a list for possibly needed preparations
@@ -61,6 +60,13 @@ void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQu
 void PropertyContainer::prepareNext(PropertyPrepListPtr aPrepList, PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB, ErrorPtr aError)
 {
   if (Error::notOK(aError)) {
+    if (aError->isDomain(VdcApiError::domain())) {
+      // this error is meant to get forwarded directly
+      aPrepList->clear();
+      // done
+      if (aAccessCompleteCB) aAccessCompleteCB(nullptr, aError);
+      return;
+    }
     LOG(LOG_WARNING, "- prepraration of property failed with error: %s", aError->text());
   }
   if (aPrepList->empty()) {
@@ -69,22 +75,21 @@ void PropertyContainer::prepareNext(PropertyPrepListPtr aPrepList, PropertyAcces
     ApiValuePtr result;
     if (aMode==access_read) result = aQueryObject->newObject();
     ErrorPtr err = accessPropertyInternal(aMode, aQueryObject, result, aDomain, aParentDescriptor, PropertyPrepListPtr());
-    // call back
-    if (aAccessCompleteCB) aAccessCompleteCB(result, err);
     // done
+    if (aAccessCompleteCB) aAccessCompleteCB(result, err);
     return;
   }
   // prepare next item on the list
   PropertyPrep prep = aPrepList->front();
   aPrepList->pop_front();
-  prep.target->prepareAccess(aMode, prep.propertyDescriptor,
+  prep.target->prepareAccess(aMode, prep,
     boost::bind(&PropertyContainer::prepareNext, this, aPrepList, aMode, aQueryObject, aDomain, aParentDescriptor, aAccessCompleteCB, _1)
   );
 }
 
 
 
-void PropertyContainer::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+void PropertyContainer::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
   // nothing to prepare in base class
   if (aPreparedCB) aPreparedCB(ErrorPtr());
@@ -151,8 +156,8 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
           // check if property needs preparation before being accessed
           if (aPreparationList && propDesc->needsPreparation(aMode)) {
             // collecting list of to-be-prepared properties, and this one needs prep -> add it
-            aPreparationList->push_back(PropertyPrep(this, propDesc));
-            FOCUSLOG("- property '%s' needs preparation -> added to preparation list (%d items now)", propDesc->name(), aPreparationList->size());
+            aPreparationList->push_back(PropertyPrep(this, propDesc, queryValue));
+            FOCUSLOG("- property '%s' needs preparation -> added to preparation list (%zu items now)", propDesc->name(), aPreparationList->size());
             if (aMode==access_read) {
               // read access: return NULL for to-be-prepared properties
               aResultObject->add(propDesc->name(), queryValue->newNull());
@@ -191,7 +196,7 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
                 PropertyContainerPtr container = getContainer(containerPropDesc, containerDomain);
                 if (container) {
                   FOCUSLOG("  - container for '%s' is 0x%p", propDesc->name(), container.get());
-                  FOCUSLOG("    >>>> RECURSING into accessProperty()");
+                  FOCUSLOG("    >>>> RECURSING into accessPropertyInternal()");
                   if (container!=this) {
                     // switching to another C++ object -> starting at root level in that object
                     containerPropDesc->rootOfObject = true;
@@ -210,7 +215,7 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
                   else {
                     // for write, just pass the query value and the (non-hierarchic) result object
                     err = container->accessPropertyInternal(aMode, subQuery, aResultObject, containerDomain, containerPropDesc, aPreparationList);
-                    FOCUSLOG("    <<<< RETURNED from accessProperty() recursion", propDesc->name(), container.get());
+                    FOCUSLOG("    <<<< RETURNED from accessPropertyInternal() recursion");
                   }
                   if ((aMode!=access_read) && Error::isOK(err)) {
                     // give this container a chance to post-process write access

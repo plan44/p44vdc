@@ -2451,15 +2451,15 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aProperty
 
 
 
-void Device::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+void Device::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
-  if (aPropertyDescriptor->hasObjectKey(device_configurations_key)) {
+  if (aPrepInfo.propertyDescriptor->hasObjectKey(device_configurations_key)) {
     // have device create these
     getDeviceConfigurations(mCachedConfigurations, aPreparedCB);
     return;
   }
   // nothing to do here, let inherited handle it
-  inherited::prepareAccess(aMode, aPropertyDescriptor, aPreparedCB);
+  inherited::prepareAccess(aMode, aPrepInfo, aPreparedCB);
 }
 
 

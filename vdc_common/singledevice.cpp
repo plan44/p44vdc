@@ -1484,17 +1484,17 @@ PropertyDescriptorPtr DeviceProperties::getDescriptorByIndex(int aPropIndex, int
 }
 
 
-void DeviceProperties::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+void DeviceProperties::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
   if (aMode==access_read) {
-    ValueDescriptorPtr val = values[aPropertyDescriptor->fieldKey()];
+    ValueDescriptorPtr val = values[aPrepInfo.propertyDescriptor->fieldKey()];
     if (propertyFetchHandler) {
       propertyFetchHandler(val, aPreparedCB);
       return;
     }
   }
   // nothing to do here, let inherited handle it
-  inherited::prepareAccess(aMode, aPropertyDescriptor, aPreparedCB);
+  inherited::prepareAccess(aMode, aPrepInfo, aPreparedCB);
 }
 
 

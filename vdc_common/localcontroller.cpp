@@ -319,14 +319,14 @@ PropertyDescriptorPtr ZoneDescriptor::getDescriptorByIndex(int aPropIndex, int a
 
 
 
-void ZoneDescriptor::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+void ZoneDescriptor::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
-  if (aPropertyDescriptor->hasObjectKey(zonedevices_container_key) && mZoneID==zoneId_global) {
+  if (aPrepInfo.propertyDescriptor->hasObjectKey(zonedevices_container_key) && mZoneID==zoneId_global) {
     // for global zone: create temporary list of all devices
     LocalController::sharedLocalController()->mVdcHost.createDeviceList(mDevices);
   }
   // in any case: let inherited handle the callback
-  inherited::prepareAccess(aMode, aPropertyDescriptor, aPreparedCB);
+  inherited::prepareAccess(aMode, aPrepInfo, aPreparedCB);
 }
 
 

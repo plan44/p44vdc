@@ -193,12 +193,13 @@ namespace p44 {
 
   class PropertyPrep
   {
-    friend class PropertyContainer;
-
+  public:
     PropertyContainerPtr target;
     PropertyDescriptorPtr propertyDescriptor;
+    ApiValuePtr subquery;
 
-    PropertyPrep(PropertyContainerPtr aTarget, PropertyDescriptorPtr aDescriptor) : target(aTarget), propertyDescriptor(aDescriptor) {};
+    PropertyPrep(PropertyContainerPtr aTarget, PropertyDescriptorPtr aDescriptor, ApiValuePtr aSubQuery) :
+      target(aTarget), propertyDescriptor(aDescriptor), subquery(aSubQuery) {};
   };
 
   typedef list<PropertyPrep> PropertyPrepList;
@@ -225,11 +226,9 @@ namespace p44 {
     /// @param aQueryObject the object defining the read or write query
     /// @param aDomain the access domain
     /// @param aApiVersion the API version relevant for this property access
-    ///   (but will internally be repaced by a RootPropertyDescriptor)
     /// @param aAccessCompleteCB will be called when property access is complete. Callback's aError
     ///   returns Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
-    /// @note normally not overridden, but can be for special cases like ProxyDevice
-    virtual void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB);
+    void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB);
 
     /// @}
 
@@ -290,10 +289,10 @@ namespace p44 {
 
     /// prepare access to a property (for example if the property needs I/O to update its value before being read).
     /// @param aMode access mode (see PropertyAccessMode: read, write, write preload or delete)
-    /// @param aPropertyDescriptor decriptor that signalled a need for preparation
+    /// @param aPrepInfo info possibly needed for preparation, like descriptor that signalled a need for preparation, target, subquery
     /// @param aPreparedCB will be called when property is ready to be accessed with aMode
     /// @note this base class implementation just calls aPreparedCB with success status.
-    virtual void prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB);
+    virtual void prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB);
 
     /// This is called when access to a property that needed preparation (see prepareAccess()) has been accessed.
     /// This can be used e.g. to free properties generated on the fly at prepareAccess(), or to perform
@@ -334,7 +333,11 @@ namespace p44 {
     /// @param aPreparationList if not NULL, this list will be filled with property descriptors that need preparation before accessing.
     ///   Otherwise, properties are assumed to be prepared already and will be accessed directly
     /// @return Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
-    ErrorPtr accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList);
+    /// @note normally not overridden, but can be for special cases like ProxyDevice
+    /// @note base class implementation adds those sub-properties to aPreparationList which are flagged accordingly in the descriptor.
+    ///   Subclass implementations might (ProxyDevice does) choose to require preparation at the base level and might add the object's root descriptor
+    ///   to aPreparationList.
+    virtual ErrorPtr accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList);
 
     /// parse aPropmatch for numeric index (both plain number and #n are allowed, plus empty and "*" wildcards)
     /// @param aPropMatch property name to match

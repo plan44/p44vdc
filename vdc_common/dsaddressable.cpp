@@ -568,9 +568,9 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
 
 #define MIN_PRESENCE_SAMPLE_INTERVAL (120*Second)
 
-void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor, StatusCB aPreparedCB)
+void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
-  if (aPropertyDescriptor->hasObjectKey(dsAddressable_key) && aPropertyDescriptor->fieldKey()==active_key) {
+  if (aPrepInfo.propertyDescriptor->hasObjectKey(dsAddressable_key) && aPrepInfo.propertyDescriptor->fieldKey()==active_key) {
     // update status in case
     if (mLastPresenceUpdate+MIN_PRESENCE_SAMPLE_INTERVAL<MainLoop::now()) {
       // request update from device
@@ -579,7 +579,7 @@ void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyDescriptorPt
     }
   }
   // nothing to do here, let inherited handle it
-  inherited::prepareAccess(aMode, aPropertyDescriptor, aPreparedCB);
+  inherited::prepareAccess(aMode, aPrepInfo, aPreparedCB);
 }
 
 
