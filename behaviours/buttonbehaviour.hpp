@@ -107,6 +107,11 @@ namespace p44 {
 
     VdcButtonActionMode mActionMode; ///< last triggered action mode
     uint8_t mActionId; ///< last triggered action Id (aka scene number)
+
+    #if ENABLE_JSONBRIDGEAPI
+    bool mBridgeExclusive; ///< if set, button actions are only forwarded to bridges (if any is connected)
+    #endif
+
     /// @}
 
   public:
@@ -142,10 +147,13 @@ namespace p44 {
     DsButtonFunc getButtonFunction() { return mButtonFunc; };
 
     /// set group
-    virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { setPVar(mButtonGroup, aGroup); };
+    virtual void setGroup(DsGroup aGroup) P44_OVERRIDE;
 
     /// get group
     virtual DsGroup getGroup() P44_OVERRIDE { return mButtonGroup; };
+
+    /// set channel
+    virtual void setChannel(DsChannelType aChannel);
 
     /// set function
     virtual void setFunction(DsButtonFunc aFunc) { setPVar(mButtonFunc, aFunc); };
@@ -155,6 +163,9 @@ namespace p44 {
 
     /// set long function delay (how long button must be held to trigger "dimming" (press-and-hold) type operation
     void setLongFunctionDelay(MLMicroSeconds aLongFunctionDelay) { mLongFunctionDelay = aLongFunctionDelay; }
+
+    /// @return true when button actions should be forwarded to bridge clients only, and NOT get processed locally
+    bool isBridgeExclusive();
 
 
     /// @name interface towards actual device hardware (or simulation)

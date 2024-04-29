@@ -171,6 +171,9 @@ ButtonBehaviour::ButtonBehaviour(Device &aDevice, const string aId) :
   mCallsPresent(false),
   mButtonActionMode(buttonActionMode_none),
   mButtonActionId(0),
+  #if ENABLE_JSONBRIDGEAPI
+  mBridgeExclusive(false),
+  #endif
   mStateMachineMode(statemachine_standard),
   mLongFunctionDelay(t_long_function_delay) // standard dS value, might need tuning for some special (slow) hardware
 {
@@ -217,6 +220,53 @@ string ButtonBehaviour::getAutoId()
     return "button";
   }
 }
+
+
+void ButtonBehaviour::setGroup(DsGroup aGroup)
+{
+  if (setPVar(mButtonGroup, aGroup)) {
+    #if ENABLE_JSONBRIDGEAPI
+    if (mDevice.isBridged()) {
+      // inform bridges
+      VdcApiConnectionPtr api = mDevice.getVdcHost().getBridgeApi();
+      if (api) {
+        ApiValuePtr q = api->newApiValue();
+        q = q->wrapNull("group")->wrapAs(getApiId(api->getApiVersion()))->wrapAs("buttonSettings");
+        mDevice.pushNotification(api, q, ApiValuePtr());
+      }
+    }
+    #endif
+  }
+}
+
+
+void ButtonBehaviour::setChannel(DsChannelType aChannel)
+{
+  if (setPVar(mButtonChannel, aChannel)) {
+    #if ENABLE_JSONBRIDGEAPI
+    if (mDevice.isBridged()) {
+      // inform bridges
+      VdcApiConnectionPtr api = mDevice.getVdcHost().getBridgeApi();
+      if (api) {
+        ApiValuePtr q = api->newApiValue();
+        q = q->wrapNull("channel")->wrapAs(getApiId(api->getApiVersion()))->wrapAs("buttonSettings");
+        mDevice.pushNotification(api, q, ApiValuePtr());
+      }
+    }
+    #endif
+  }
+}
+
+
+bool ButtonBehaviour::isBridgeExclusive()
+{
+  #if ENABLE_JSONBRIDGEAPI
+  return mDevice.isBridged() && mBridgeExclusive;
+  #else
+  return false;
+  #endif
+}
+
 
 
 
@@ -746,9 +796,9 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
   // button press is considered a (regular!) user action, have it checked globally first
   if (!mDevice.getVdcHost().signalDeviceUserAction(mDevice, true)) {
     // button press not consumed on global level
-    // - forward to upstream dS (except for ct_progress, which is for bridges only)
+    // - forward to upstream dS if not bridgeExclusive (except for ct_progress/ct_complete, which are for bridges only)
     // - forward to bridges (except for hold-repeat, which bridges don't need)
-    if (pushBehaviourState(mClickType!=ct_progress && mClickType!=ct_complete, mClickType!=ct_hold_repeat)) {
+    if (pushBehaviourState(!isBridgeExclusive() && mClickType!=ct_progress && mClickType!=ct_complete, mClickType!=ct_hold_repeat)) {
       OLOG(mClickType==ct_hold_repeat ? LOG_INFO : LOG_NOTICE, "successfully pushed state = %d, clickType %d", mButtonPressed, aClickType);
     }
     #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
@@ -757,7 +807,9 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     #endif
     // also let vdchost know for local click handling
     // TODO: more elegant solution for this
-    mDevice.getVdcHost().checkForLocalClickHandling(*this, aClickType);
+    if (!isBridgeExclusive()) {
+      mDevice.getVdcHost().checkForLocalClickHandling(*this, aClickType);
+    }
   }
 }
 
@@ -782,8 +834,8 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
   mActionMode = aActionMode;
   mActionId = aActionId;
   OLOG(LOG_NOTICE, "pushes actionMode = %d, actionId %d", mActionMode, mActionId);
-  // issue a state property push to dS (this is dS specific, no push to bridges)
-  pushBehaviourState(true, false);
+  // issue a state property push. This is dS/P44 specific, but will not harm bridges that are not interested
+  pushBehaviourState(!isBridgeExclusive(), true);
 }
 
 
@@ -1005,6 +1057,9 @@ enum {
   buttonActionId_key,
   stateMachineMode_key,
   longFunctionDelay_key,
+  #if ENABLE_JSONBRIDGEAPI
+  bridgeExclusive_key,
+  #endif
   numSettingsProperties
 };
 
@@ -1023,6 +1078,9 @@ const PropertyDescriptorPtr ButtonBehaviour::getSettingsDescriptorByIndex(int aP
     { "x-p44-buttonActionId", apivalue_uint64, buttonActionId_key+settings_key_offset, OKEY(button_key) },
     { "x-p44-stateMachineMode", apivalue_uint64, stateMachineMode_key+settings_key_offset, OKEY(button_key) },
     { "x-p44-longFunctionDelay", apivalue_uint64, longFunctionDelay_key+settings_key_offset, OKEY(button_key) },
+    #if ENABLE_JSONBRIDGEAPI
+    { "x-p44-bridgeExclusive", apivalue_bool, bridgeExclusive_key+settings_key_offset, OKEY(button_key) },
+    #endif
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -1108,6 +1166,12 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case longFunctionDelay_key+settings_key_offset:
           aPropValue->setDoubleValue((double)mLongFunctionDelay/Second);
           return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case bridgeExclusive_key+settings_key_offset:
+          if (!mDevice.isBridged()) return false; // hide when not bridged
+          aPropValue->setBoolValue(mBridgeExclusive);
+          return true;
+        #endif
         // States properties
         case value_key+states_key_offset:
           if (mLastAction==Never)
@@ -1181,7 +1245,7 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           }
           return true;
         case channel_key+settings_key_offset:
-          setPVar(mButtonChannel, (DsChannelType)aPropValue->int32Value());
+          setChannel((DsChannelType)aPropValue->int32Value());
           return true;
         case setsLocalPriority_key+settings_key_offset:
           setPVar(mSetsLocalPriority, aPropValue->boolValue());
@@ -1201,6 +1265,12 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case longFunctionDelay_key+settings_key_offset:
           setPVar(mLongFunctionDelay, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case bridgeExclusive_key+settings_key_offset:
+          // volatile, does not make settings dirty
+          mBridgeExclusive = aPropValue->boolValue();
+          return true;
+        #endif
       }
     }
   }
