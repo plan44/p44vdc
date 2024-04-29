@@ -106,6 +106,10 @@ void ProxyVdc::bridgeApiConnectedHandler(StatusCB aCompletedCB, ErrorPtr aStatus
     aCompletedCB(aStatus); // init failed
   }
   else {
+    // reset the bridge info in the remote device
+    api().setProperty("root", "x-p44-bridge.bridgetype", JsonObject::newString("proxy"));
+    api().setProperty("root", "x-p44-bridge.configURL", JsonObject::newString(getVdcHost().webuiURLString()));
+    api().setProperty("root", "x-p44-bridge.started", JsonObject::newBool(true));
     // query for basic vdc identification
     JsonObjectPtr params = JsonObject::objFromText(
       "{ \"method\":\"getProperty\", \"dSUID\":\"root\", \"query\":{ "
