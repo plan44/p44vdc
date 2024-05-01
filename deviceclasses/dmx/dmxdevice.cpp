@@ -73,7 +73,9 @@ DmxDevice::DmxDevice(DmxVdc *aVdcP, const string &aDeviceConfig) :
   mRedChannel(dmxNone),
   mGreenChannel(dmxNone),
   mBlueChannel(dmxNone),
-  mAmberChannel(dmxNone)
+  mAmberChannel(dmxNone),
+  mHPosChannel(dmxNone),
+  mVPosChannel(dmxNone)
 {
   // evaluate config
   string config = aDeviceConfig;
