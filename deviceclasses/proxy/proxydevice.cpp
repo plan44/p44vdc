@@ -50,6 +50,7 @@ ProxyDevice::ProxyDevice(ProxyVdc *aVdcP, JsonObjectPtr aDeviceJSON) :
   if (aDeviceJSON->get("dSUID", o)) {
     // set dSUID
     mDSUID.setAsString(o->stringValue());
+    installSettings(); // Standard device settings without scene table, but hosting zoneID
     configureStructure(aDeviceJSON);
   }
   else {
