@@ -92,10 +92,12 @@ namespace p44 {
     /// overridden to handle (i.e. forward) notifications TO the device
     virtual void handleNotification(const string &aNotification, ApiValuePtr aParams, StatusCB aExaminedCB) P44_OVERRIDE;
 
-    /// access to properties via proxy
-    virtual void prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB) P44_OVERRIDE;
-    virtual ErrorPtr accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList) P44_OVERRIDE;
-    virtual void finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+    /// get this container's root descriptor.
+    virtual PropertyDescriptorPtr getContainerRootDescriptor(int aApiVersion) P44_OVERRIDE;
+
+    /// read or write property
+    /// @note overridden here to avoid internal property access, but forward query instead
+    virtual void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB) P44_OVERRIDE;
 
     /// initializes the physical device for being used
     /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
@@ -117,7 +119,7 @@ namespace p44 {
     void bridgingEnabled(StatusCB aCompletedCB, bool aFactoryReset);
 
     void handleProxyMethodCallResponse(VdcApiRequestPtr aRequest, ErrorPtr aError, JsonObjectPtr aJsonObject);
-    void handleProxyPropertyAccessResponse(StatusCB aPreparedCB, ApiValuePtr aResult, ErrorPtr aError, JsonObjectPtr aJsonObject);
+    void handleProxyPropertyAccessResponse(PropertyAccessCB aAccessCompleteCB, ApiValuePtr aResultObj, ErrorPtr aError, JsonObjectPtr aJsonObject);
 
 
   };

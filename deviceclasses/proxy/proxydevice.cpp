@@ -103,7 +103,6 @@ string ProxyDevice::webuiURLString()
 
 string ProxyDevice::description()
 {
-  // TODO: possibly forward original device's description
   string s = inherited::description();
   string_format_append(s, "\n- proxy has no description of its own");
   return s;
@@ -183,7 +182,6 @@ void ProxyDevice::handleNotification(const string &aNotification, ApiValuePtr aP
 
 // MARK: - bridge notification handling
 
-
 bool ProxyDevice::handleBridgedDeviceNotification(const string aNotification, JsonObjectPtr aParams)
 {
   if (aNotification=="pushNotification") {
@@ -205,32 +203,26 @@ bool ProxyDevice::handleBridgedDeviceNotification(const string aNotification, Js
 
 // MARK: - property access forwarding
 
-ErrorPtr ProxyDevice::accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList)
+class ProxyDeviceRootDescriptor : public RootPropertyDescriptor
 {
-  if (aParentDescriptor->isRootOfObject()) {
-    if (aPreparationList) {
-      // accessing this object's properties needs async preparation
-      aPreparationList->push_back(PropertyPrep(this, aParentDescriptor, aQueryObject));
-      FOCUSOLOG("- proxy device needs preparation -> added to preparation list (%zu items now)", aPreparationList->size());
-    }
-    else {
-      // repeated access gets cached result
-      JsonApiValue::setAsJson(aResultObject, mCachedPropAccessResult);
-      // cache no longer needed
-      mCachedPropAccessResult.reset();
-    }
-    return ErrorPtr();
-  }
-  // should not happen, there is not other access than object root
-  return Error::err<VdcApiError>(500, "invalid proxy device access");
+  typedef RootPropertyDescriptor inherited;
+public:
+  ProxyDeviceRootDescriptor(int aApiVersion) : inherited(aApiVersion) {};
+  virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return true; };
+};
+
+
+PropertyDescriptorPtr ProxyDevice::getContainerRootDescriptor(int aApiVersion)
+{
+  // default to standard root descriptor
+  return PropertyDescriptorPtr(new ProxyDeviceRootDescriptor(aApiVersion));
 }
 
 
-void ProxyDevice::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
+void ProxyDevice::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB)
 {
-  // proxy the subquery
   JsonObjectPtr params = JsonObject::newObj();
-  JsonObjectPtr props = JsonApiValue::getAsJson(aPrepInfo.subquery);
+  JsonObjectPtr props = JsonApiValue::getAsJson(aQueryObject);
   string method;
   if (aMode==access_read) {
     // read
@@ -245,11 +237,11 @@ void ProxyDevice::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInf
       params->add("preload", JsonObject::newBool(true));
     }
   }
-  call(method, params, boost::bind(&ProxyDevice::handleProxyPropertyAccessResponse, this, aPreparedCB, aPrepInfo.subquery->newNull(), _1, _2));
+  call(method, params, boost::bind(&ProxyDevice::handleProxyPropertyAccessResponse, this, aAccessCompleteCB, aQueryObject->newObject(), _1, _2));
 }
 
 
-void ProxyDevice::handleProxyPropertyAccessResponse(StatusCB aPreparedCB, ApiValuePtr aResult, ErrorPtr aError, JsonObjectPtr aJsonObject)
+void ProxyDevice::handleProxyPropertyAccessResponse(PropertyAccessCB aAccessCompleteCB, ApiValuePtr aResultObj, ErrorPtr aError, JsonObjectPtr aJsonObject)
 {
   if (aError) {
     OLOG(LOG_WARNING, "remote -> proxy: property access call failed on transport level: %s", Error::text(aError));
@@ -267,18 +259,12 @@ void ProxyDevice::handleProxyPropertyAccessResponse(StatusCB aPreparedCB, ApiVal
     }
     else {
       // result will be accessed later by accessPropertyInternal()
-      mCachedPropAccessResult = aJsonObject->get("result");
+      JsonApiValue::setAsJson(aResultObj, aJsonObject->get("result"));
     }
   }
-  if (aPreparedCB) aPreparedCB(aError);
+  if (aAccessCompleteCB) aAccessCompleteCB(aResultObj, aError);
 }
 
-
-void ProxyDevice::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPtr aPropertyDescriptor)
-{
-  mCachedPropAccessResult.reset();
-  inherited::finishAccess(aMode, aPropertyDescriptor);
-}
 
 
 // MARK: - cached properties

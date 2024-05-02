@@ -71,10 +71,8 @@ namespace p44 {
   class PropertyDescriptor : public P44Obj
   {
   public:
-    bool rootOfObject;
-
     /// constructor
-    PropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) : parentDescriptor(aParentDescriptor), rootOfObject(false) {};
+    PropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) : parentDescriptor(aParentDescriptor) {};
     /// the parent descriptor (NULL at root level of DsAdressables)
     PropertyDescriptorPtr parentDescriptor;
     /// API version
@@ -102,7 +100,7 @@ namespace p44 {
     /// was created by the current write action
     virtual bool wasCreatedNew() const { return false; };
     /// acts as root of a C++ class hierarchy
-    bool isRootOfObject() const { return rootOfObject; };
+    virtual bool isRootOfObject() const { return false; };
     /// checks
     bool hasObjectKey(char &aMemAddrObjectKey) { return (objectKey()==(intptr_t)&aMemAddrObjectKey); };
     bool hasObjectKey(intptr_t aIntObjectKey) { return (objectKey()==aIntObjectKey); };
@@ -114,15 +112,16 @@ namespace p44 {
   class RootPropertyDescriptor : public PropertyDescriptor
   {
     typedef PropertyDescriptor inherited;
-    int apiVersion;
+    int mApiVersion;
   public:
-    RootPropertyDescriptor(int aApiVersion) : inherited(PropertyDescriptorPtr()) { rootOfObject = true; apiVersion = aApiVersion; };
+    RootPropertyDescriptor(int aApiVersion) : inherited(PropertyDescriptorPtr()), mApiVersion(aApiVersion) {};
+    virtual bool isRootOfObject() const P44_OVERRIDE { return true; };
     virtual const char *name() const P44_OVERRIDE { return "<root>"; };
     virtual ApiValueType type() const P44_OVERRIDE { return apivalue_object; };
     virtual size_t fieldKey() const P44_OVERRIDE { return 0; };
     virtual intptr_t objectKey() const P44_OVERRIDE { return 0; };
     virtual bool isArrayContainer() const P44_OVERRIDE { return false; };
-    virtual int getApiVersion() const P44_OVERRIDE { return apiVersion; };
+    virtual int getApiVersion() const P44_OVERRIDE { return mApiVersion; };
   };
 
 
@@ -130,23 +129,23 @@ namespace p44 {
   class StaticPropertyDescriptor : public PropertyDescriptor
   {
     typedef PropertyDescriptor inherited;
-    const PropertyDescription *descP;
+    const PropertyDescription *mDescP;
 
   public:
 
     /// create from const table entry
     StaticPropertyDescriptor(const PropertyDescription *aDescP, PropertyDescriptorPtr aParentDescriptor) :
       inherited(aParentDescriptor),
-      descP(aDescP)
+      mDescP(aDescP)
     {};
 
-    virtual const char *name() const P44_OVERRIDE { return descP->propertyName; }
-    virtual ApiValueType type() const P44_OVERRIDE { return (ApiValueType)((descP->propertyType) & proptype_mask); }
-    virtual size_t fieldKey() const P44_OVERRIDE { return descP->fieldKey; }
-    virtual intptr_t objectKey() const P44_OVERRIDE { return descP->objectKey; }
-    virtual bool isArrayContainer() const P44_OVERRIDE { return descP->propertyType & propflag_container; };
-    virtual bool isWildcardAddressable() const P44_OVERRIDE { return (descP->propertyType & propflag_nowildcard)==0; };
-    virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return (descP->propertyType & (aMode==access_read ? propflag_needsreadprep : propflag_needswriteprep))!=0; };
+    virtual const char *name() const P44_OVERRIDE { return mDescP->propertyName; }
+    virtual ApiValueType type() const P44_OVERRIDE { return (ApiValueType)((mDescP->propertyType) & proptype_mask); }
+    virtual size_t fieldKey() const P44_OVERRIDE { return mDescP->fieldKey; }
+    virtual intptr_t objectKey() const P44_OVERRIDE { return mDescP->objectKey; }
+    virtual bool isArrayContainer() const P44_OVERRIDE { return mDescP->propertyType & propflag_container; };
+    virtual bool isWildcardAddressable() const P44_OVERRIDE { return (mDescP->propertyType & propflag_nowildcard)==0; };
+    virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return (mDescP->propertyType & (aMode==access_read ? propflag_needsreadprep : propflag_needswriteprep))!=0; };
   };
 
 
@@ -194,12 +193,14 @@ namespace p44 {
   class PropertyPrep
   {
   public:
-    PropertyContainerPtr target;
-    PropertyDescriptorPtr propertyDescriptor;
-    ApiValuePtr subquery;
+    PropertyDescriptorPtr descriptor; ///< the descriptor of the property that needs async re-access
+    PropertyContainerPtr target; ///< object to re-run subquery on
+    ApiValuePtr subquery; ///< subquery to run
+    ApiValuePtr insertIn; ///< parent object to insert result of subquery
+    string insertAs; ///< field name to insert subquery result as
 
-    PropertyPrep(PropertyContainerPtr aTarget, PropertyDescriptorPtr aDescriptor, ApiValuePtr aSubQuery) :
-      target(aTarget), propertyDescriptor(aDescriptor), subquery(aSubQuery) {};
+    PropertyPrep(PropertyContainerPtr aTarget, PropertyDescriptorPtr aPropDesc, ApiValuePtr aSubQuery, ApiValuePtr aInsertIn, const string aInsertAs) :
+      target(aTarget), descriptor(aPropDesc), subquery(aSubQuery), insertIn(aInsertIn), insertAs(aInsertAs) {};
   };
 
   typedef list<PropertyPrep> PropertyPrepList;
@@ -228,7 +229,7 @@ namespace p44 {
     /// @param aApiVersion the API version relevant for this property access
     /// @param aAccessCompleteCB will be called when property access is complete. Callback's aError
     ///   returns Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
-    void accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB);
+    void virtual accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB);
 
     /// @}
 
@@ -254,6 +255,11 @@ namespace p44 {
     ///   Allows single C++ class to handle multiple levels of nested property tree objects
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) { return 0; }
 
+    /// get this container's root descriptor.
+    /// @note base class just returns a standard object root descriptor suitable for normal
+    ///   object containers, but special subclasses might produce their own (e.g. a proxy)
+    virtual PropertyDescriptorPtr getContainerRootDescriptor(int aApiVersion);
+
     /// get property descriptor by index.
     /// @param aPropIndex property index, 0..numProps()-1
     /// @param aDomain the domain for which to access properties (different APIs might have different properties for the same PropertyContainer)
@@ -277,15 +283,15 @@ namespace p44 {
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor);
 
     /// get subcontainer for a apivalue_object property
-    /// @param aPropertyDescriptor descriptor for a structured (object) property. Call might modify this pointer such as setting it to
-    ///   NULL when new container is the root of another DsAdressable. The resulting pointer will be passed to the container's access
-    ///   methods as aParentDescriptor.
+    /// @param aPropertyDescriptor descriptor for finding structured (object) property. Once this call returns,
+    ///   and the container is a new C++ object instance, getContainerRootDescriptor() will be invoked to get
+    ///   the descriptor to be actually used for further accessing the object.
     /// @param aDomain the domain for which to access properties. Call might modify the domain such that it fits
     ///   to the accessed container. For example, one container might support different sets of properties
     ///   (like description/settings/states for DsBehaviours)
     /// @return PropertyContainer representing the property or property array element
     /// @note base class always returns NULL, which means no structured or proxy properties
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) { return NULL; };
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain) { return NULL; };
 
     /// prepare access to a property (for example if the property needs I/O to update its value before being read).
     /// @param aMode access mode (see PropertyAccessMode: read, write, write preload or delete)
@@ -330,14 +336,17 @@ namespace p44 {
     /// @param aResultObject for read, must be an object
     /// @param aDomain the access domain
     /// @param aParentDescriptor the descriptor of the parent property, must not be NULL
-    /// @param aPreparationList if not NULL, this list will be filled with property descriptors that need preparation before accessing.
-    ///   Otherwise, properties are assumed to be prepared already and will be accessed directly
+    /// @param aPreparationList if not NULL, and aPrepared is fales, properties that need prepareAccess() calls will be prepended to this list,
+    ///   PropertyContainer root property containers will be appended to this list (aPrepared is irrelevant for those)
+    /// @param aPrepared if set, properties that have requested preparation were already prepared, so must not be added to the aPreparationList.
+    ///   However, PropertyContainer objects that need to be accessed asynchronously via a separate accessProperty() call, can still add
+    ///   preparation objects with root descriptors to the list when aPrepared is set.
     /// @return Error 501 if property is unknown, 403 if property exists but cannot be accessed, 415 if value type is incompatible with the property
     /// @note normally not overridden, but can be for special cases like ProxyDevice
     /// @note base class implementation adds those sub-properties to aPreparationList which are flagged accordingly in the descriptor.
     ///   Subclass implementations might (ProxyDevice does) choose to require preparation at the base level and might add the object's root descriptor
     ///   to aPreparationList.
-    virtual ErrorPtr accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList);
+    virtual ErrorPtr accessPropertyInternal(PropertyAccessMode aMode, ApiValuePtr aQueryObject, ApiValuePtr aResultObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyPrepListPtr aPreparationList, bool aPrepared);
 
     /// parse aPropmatch for numeric index (both plain number and #n are allowed, plus empty and "*" wildcards)
     /// @param aPropMatch property name to match
@@ -374,7 +383,9 @@ namespace p44 {
 
   private:
 
-    void prepareNext(PropertyPrepListPtr aPrepList, PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyDescriptorPtr aParentDescriptor, PropertyAccessCB aAccessCompleteCB, ErrorPtr aError);
+    void prepareNext(PropertyPrepListPtr aPrepList, PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyAccessCB aAccessCompleteCB, ApiValuePtr aFinalResult);
+    void subqueryDone(PropertyPrepListPtr aPrepList, PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyAccessCB aAccessCompleteCB, ApiValuePtr aFinalResult, ApiValuePtr aResult, ErrorPtr aError);
+    void prepareDone(PropertyPrepListPtr aPrepList, PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, PropertyAccessCB aAccessCompleteCB, ApiValuePtr aFinalResult, ErrorPtr aError);
 
 
 
