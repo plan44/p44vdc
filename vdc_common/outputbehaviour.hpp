@@ -336,7 +336,7 @@ namespace p44 {
     // for groups property
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
-    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
+    virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain) P44_OVERRIDE;
 
     // property access implementation for descriptor/settings/states
     virtual int numDescProps() P44_OVERRIDE;

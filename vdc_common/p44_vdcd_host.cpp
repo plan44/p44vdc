@@ -1048,7 +1048,7 @@ PropertyDescriptorPtr P44VdcHost::getDescriptorByIndex(int aPropIndex, int aDoma
 }
 
 
-PropertyContainerPtr P44VdcHost::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr P44VdcHost::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   #if ENABLE_JSONBRIDGEAPI
   if (aPropertyDescriptor->hasObjectKey(bridge_obj)) {
@@ -1373,7 +1373,7 @@ int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
 }
 
 
-PropertyContainerPtr P44ScriptManager::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr P44ScriptManager::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   // all subcontainers are handled by myself
   return PropertyContainerPtr(this);

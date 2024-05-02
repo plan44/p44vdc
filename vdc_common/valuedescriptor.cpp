@@ -654,7 +654,7 @@ bool EnumValueDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPro
 }
 
 
-PropertyContainerPtr EnumValueDescriptor::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr EnumValueDescriptor::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(value_enumvalues_key)) {
     return PropertyContainerPtr(this); // handle enum values array myself
@@ -730,7 +730,7 @@ PropertyDescriptorPtr ValueList::getDescriptorByIndex(int aPropIndex, int aDomai
 }
 
 
-PropertyContainerPtr ValueList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr ValueList::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(valueDescriptor_key)) {
     return values[aPropertyDescriptor->fieldKey()];

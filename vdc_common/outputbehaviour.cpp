@@ -637,7 +637,7 @@ int OutputBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescript
 }
 
 
-PropertyContainerPtr OutputBehaviour::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr OutputBehaviour::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(output_groups_key)) {
     return PropertyContainerPtr(this); // handle groups array myself

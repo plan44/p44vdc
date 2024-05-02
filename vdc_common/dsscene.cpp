@@ -88,7 +88,7 @@ protected:
   }
 
 
-  PropertyContainerPtr getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+  PropertyContainerPtr getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
   {
     // the only subcontainer are the fields, handled by myself
     return PropertyContainerPtr(this);
@@ -499,7 +499,7 @@ PropertyDescriptorPtr DsScene::getDescriptorByIndex(int aPropIndex, int aDomain,
 }
 
 
-PropertyContainerPtr DsScene::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DsScene::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   // the only container is sceneChannels
   return sceneChannels;

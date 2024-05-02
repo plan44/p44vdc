@@ -742,7 +742,7 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
 
 
 #if !REDUCED_FOOTPRINT
-PropertyContainerPtr ChannelBehaviour::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr ChannelBehaviour::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->isArrayContainer() && aPropertyDescriptor->hasObjectKey(channel_enumvalues_key)) {
     return mEnumList ? PropertyContainerPtr(this) : PropertyContainerPtr(); // handle enum values array myself

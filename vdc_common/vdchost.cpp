@@ -1779,7 +1779,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByName(string aPropMatch, int &aStar
 }
 
 
-PropertyContainerPtr VdcHost::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr VdcHost::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->isArrayContainer()) {
     // local container

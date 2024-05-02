@@ -2415,7 +2415,7 @@ PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStart
 
 
 
-PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   // might be virtual container
   if (aPropertyDescriptor->isArrayContainer()) {
@@ -2465,7 +2465,7 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr &aProperty
 
 void Device::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
-  if (aPrepInfo.propertyDescriptor->hasObjectKey(device_configurations_key)) {
+  if (aPrepInfo.descriptor->hasObjectKey(device_configurations_key)) {
     // have device create these
     getDeviceConfigurations(mCachedConfigurations, aPreparedCB);
     return;

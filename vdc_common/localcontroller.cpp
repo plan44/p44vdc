@@ -286,7 +286,7 @@ PropertyDescriptorPtr ZoneDescriptor::getDescriptorByName(string aPropMatch, int
 }
 
 
-PropertyContainerPtr ZoneDescriptor::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr ZoneDescriptor::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->isArrayContainer()) {
     // local container (e.g. all devices of this zone)
@@ -321,7 +321,7 @@ PropertyDescriptorPtr ZoneDescriptor::getDescriptorByIndex(int aPropIndex, int a
 
 void ZoneDescriptor::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
-  if (aPrepInfo.propertyDescriptor->hasObjectKey(zonedevices_container_key) && mZoneID==zoneId_global) {
+  if (aPrepInfo.descriptor->hasObjectKey(zonedevices_container_key) && mZoneID==zoneId_global) {
     // for global zone: create temporary list of all devices
     LocalController::sharedLocalController()->mVdcHost.createDeviceList(mDevices);
   }
@@ -522,7 +522,7 @@ bool ZoneList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pro
 }
 
 
-PropertyContainerPtr ZoneList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr ZoneList::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(zonelist_key)) {
     return mZones[aPropertyDescriptor->fieldKey()];
@@ -913,7 +913,7 @@ bool SceneList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pr
 }
 
 
-PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr SceneList::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(scenelist_key)) {
     return mScenes[aPropertyDescriptor->fieldKey()];
@@ -1452,7 +1452,7 @@ bool TriggerList::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 }
 
 
-PropertyContainerPtr TriggerList::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr TriggerList::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(triggerlist_key)) {
     return mTriggers[aPropertyDescriptor->fieldKey()];
@@ -2097,7 +2097,7 @@ PropertyDescriptorPtr LocalController::getDescriptorByIndex(int aPropIndex, int 
 }
 
 
-PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->parentDescriptor->isRootOfObject()) {
     switch (aPropertyDescriptor->fieldKey()) {

@@ -156,7 +156,7 @@ PropertyDescriptorPtr DeviceAction::getDescriptorByIndex(int aPropIndex, int aDo
 }
 
 
-PropertyContainerPtr DeviceAction::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DeviceAction::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(deviceaction_key)) {
     if (aPropertyDescriptor->fieldKey()==actionparams_key) {
@@ -228,7 +228,7 @@ PropertyDescriptorPtr DeviceActions::getDescriptorByIndex(int aPropIndex, int aD
 }
 
 
-PropertyContainerPtr DeviceActions::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DeviceActions::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(actions_key)) {
     return deviceActions[aPropertyDescriptor->fieldKey()];
@@ -780,7 +780,7 @@ bool CustomActions::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
 
 
 
-PropertyContainerPtr CustomActions::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr CustomActions::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(customactions_key)) {
     return customActions[aPropertyDescriptor->fieldKey()];
@@ -934,7 +934,7 @@ PropertyDescriptorPtr StandardActions::getDescriptorByIndex(int aPropIndex, int 
 }
 
 
-PropertyContainerPtr StandardActions::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr StandardActions::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(standardactions_key)) {
     return standardActions[aPropertyDescriptor->fieldKey()];
@@ -1114,7 +1114,7 @@ PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDom
 }
 
 
-PropertyContainerPtr DeviceState::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DeviceState::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(devicestatedesc_key)) {
     if (aPropertyDescriptor->fieldKey()==statetype_key) {
@@ -1205,7 +1205,7 @@ PropertyDescriptorPtr DeviceStates::getDescriptorByIndex(int aPropIndex, int aDo
 }
 
 
-PropertyContainerPtr DeviceStates::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DeviceStates::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(states_key)) {
     return deviceStates[aPropertyDescriptor->fieldKey()];
@@ -1278,7 +1278,7 @@ PropertyDescriptorPtr DeviceEvent::getDescriptorByIndex(int aPropIndex, int aDom
 }
 
 
-PropertyContainerPtr DeviceEvent::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DeviceEvent::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(deviceeventdesc_key)) {
     // TODO: here we would add descriptions of event params once we introduce them
@@ -1339,7 +1339,7 @@ PropertyDescriptorPtr DeviceEvents::getDescriptorByIndex(int aPropIndex, int aDo
 }
 
 
-PropertyContainerPtr DeviceEvents::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr DeviceEvents::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->hasObjectKey(events_key)) {
     return deviceEvents[aPropertyDescriptor->fieldKey()];
@@ -1487,7 +1487,7 @@ PropertyDescriptorPtr DeviceProperties::getDescriptorByIndex(int aPropIndex, int
 void DeviceProperties::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
   if (aMode==access_read) {
-    ValueDescriptorPtr val = values[aPrepInfo.propertyDescriptor->fieldKey()];
+    ValueDescriptorPtr val = values[aPrepInfo.descriptor->fieldKey()];
     if (propertyFetchHandler) {
       propertyFetchHandler(val, aPreparedCB);
       return;
@@ -1849,7 +1849,7 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
 }
 
 
-PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr &aPropertyDescriptor, int &aDomain)
+PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->parentDescriptor->isRootOfObject()) {
     switch (aPropertyDescriptor->fieldKey()) {
