@@ -259,6 +259,12 @@ string ApiValue::description()
 }
 
 
+string ApiValue::text(ApiValuePtr aApiValue)
+{
+  if (aApiValue) return aApiValue->description();
+  else return "<none>";
+}
+
 
 // MARK: - factory methods
 

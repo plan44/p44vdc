@@ -221,6 +221,10 @@ namespace p44 {
     /// human readable content of the value
     string description();
 
+    /// Convenience method: return string representation of passed object, which may be NULL
+    /// @return description representation of aApiValue, or "<none>" if aApiValue is NULL
+    static string text(ApiValuePtr aApiValue);
+
   };
 
 
