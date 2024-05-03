@@ -657,10 +657,10 @@ PropertyDescriptorPtr OutputBehaviour::getDescriptorByName(string aPropMatch, in
     if (aStartIndex!=PROPINDEX_NONE && aStartIndex<n) {
       // within range, create descriptor
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-      descP->propertyName = string_format("%d", aStartIndex);
-      descP->propertyType = aParentDescriptor->type();
-      descP->propertyFieldKey = aStartIndex;
-      descP->propertyObjectKey = aParentDescriptor->objectKey();
+      descP->mPropertyName = string_format("%d", aStartIndex);
+      descP->mPropertyType = aParentDescriptor->type();
+      descP->mPropertyFieldKey = aStartIndex;
+      descP->mPropertyObjectKey = aParentDescriptor->objectKey();
       propDesc = PropertyDescriptorPtr(descP);
       // advance index
       aStartIndex++;

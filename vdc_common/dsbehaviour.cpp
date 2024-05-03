@@ -233,7 +233,7 @@ int DsBehaviour::numLocalProps(PropertyDescriptorPtr aParentDescriptor)
 {
   // Note: output does not have an intermediate level as there is only one
   // we need to get the fieldkey of the device level behaviour property of which this behaviour is a child or grandchild
-  PropertyDescriptorPtr pdP = aParentDescriptor->parentDescriptor; // check parent of parent
+  PropertyDescriptorPtr pdP = aParentDescriptor->mParentDescriptor; // check parent of parent
   if (!pdP || pdP->objectKey()!=aParentDescriptor->objectKey()) {
     // if parent's parent is another object, there is no intermediate enumeration level (for buttons, binaryInputs, sensors), but field directly
     pdP = aParentDescriptor;
@@ -276,7 +276,7 @@ PropertyDescriptorPtr DsBehaviour::getDescriptorByIndex(int aPropIndex, int aDom
   if (aPropIndex>=numLocalProps(aParentDescriptor))
     return NULL;
   // we need to get the fieldkey of the device level behaviour property of which this behaviour is a child or grandchild
-  PropertyDescriptorPtr pdP = aParentDescriptor->parentDescriptor; // check parent of parent
+  PropertyDescriptorPtr pdP = aParentDescriptor->mParentDescriptor; // check parent of parent
   if (!pdP || pdP->objectKey()!=aParentDescriptor->objectKey()) {
     // if parent's parent is another object, there is no intermediate enumeration level (for buttons, binaryInputs, sensors), but field directly
     pdP = aParentDescriptor;

@@ -75,16 +75,16 @@ void PropertyContainer::prepareNext(PropertyPrepListPtr aPrepList, PropertyAcces
   }
   // process next item in list
   PropertyPrep prep = aPrepList->front();
-  if (prep.descriptor->isRootOfObject()) {
+  if (prep.mDescriptor->isRootOfObject()) {
     // root objects are "prepared" by calling their (likely overridden) accessProperty recursively
     FOCUSLOG("- recursive accessProperty() with preliminary overall result = %s", aFinalResult->description().c_str());
-    prep.target->accessProperty(aMode, prep.subquery, aDomain, prep.descriptor->getApiVersion(),
+    prep.mTarget->accessProperty(aMode, prep.mSubquery, aDomain, prep.mDescriptor->getApiVersion(),
       boost::bind(&PropertyContainer::subqueryDone, this, aPrepList, aMode, aQueryObject, aDomain, aAccessCompleteCB, aFinalResult, _1, _2)
     );
   }
   else {
     // non-root, prepare
-    prep.target->prepareAccess(aMode, prep,
+    prep.mTarget->prepareAccess(aMode, prep,
       boost::bind(&PropertyContainer::prepareDone, this, aPrepList, aMode, aQueryObject, aDomain, aAccessCompleteCB, aFinalResult, _1)
     );
   }
@@ -104,8 +104,8 @@ void PropertyContainer::subqueryDone(PropertyPrepListPtr aPrepList, PropertyAcce
   // save subquery result if any
   if (aResult) {
     FOCUSLOG("- subquery result = %s", aResult->description().c_str());
-    FOCUSLOG("- inserting as '%s' in object: %s", prepped.insertAs.c_str(), prepped.insertIn->description().c_str());
-    prepped.insertIn->add(prepped.insertAs.c_str(), aResult);
+    FOCUSLOG("- inserting as '%s' in object: %s", prepped.mInsertAs.c_str(), prepped.mInsertIn->description().c_str());
+    prepped.mInsertIn->add(prepped.mInsertAs.c_str(), aResult);
     FOCUSLOG("- preliminary overall result is now = %s", aFinalResult->description().c_str());
   }
   // done with the prep entry
@@ -124,11 +124,11 @@ void PropertyContainer::prepareDone(PropertyPrepListPtr aPrepList, PropertyAcces
     aAccessCompleteCB(nullptr, aError);
     return;
   }
-  int apiVersion = aPrepList->front().descriptor->getApiVersion();
+  int apiVersion = aPrepList->front().mDescriptor->getApiVersion();
   // done with the prep entry
   aPrepList->pop_front();
   // check if this is was last preparation
-  if (aPrepList->empty() || aPrepList->front().descriptor->isRootOfObject()) {
+  if (aPrepList->empty() || aPrepList->front().mDescriptor->isRootOfObject()) {
     // no more items or next is a async root subquery:
     FOCUSLOG("- all non-root properties prepared, re-running query now, remaining preparations (root re-runs) = %zu", aPrepList->size());
     // - reset final result
@@ -325,7 +325,7 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
               if (propDesc->wasCreatedNew()) {
                 aResultObject->setType(apivalue_array);
                 ApiValuePtr inserted = aResultObject->newObject();
-                if (propDesc->parentDescriptor) inserted->add("insertedin", inserted->newString(propDesc->parentDescriptor->name()));
+                if (propDesc->mParentDescriptor) inserted->add("insertedin", inserted->newString(propDesc->mParentDescriptor->name()));
                 inserted->add("element", inserted->newString(propDesc->name()));
                 aResultObject->arrayAppend(inserted);
               }
@@ -482,10 +482,10 @@ PropertyDescriptorPtr PropertyContainer::getDescriptorByNumericName(
   if (aStartIndex!=PROPINDEX_NONE && aStartIndex<n) {
     // within range, create descriptor
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("%d", aStartIndex);
-    descP->propertyType = aParentDescriptor->type();
-    descP->propertyFieldKey = aStartIndex;
-    descP->propertyObjectKey = aObjectKey;
+    descP->mPropertyName = string_format("%d", aStartIndex);
+    descP->mPropertyType = aParentDescriptor->type();
+    descP->mPropertyFieldKey = aStartIndex;
+    descP->mPropertyObjectKey = aObjectKey;
     propDesc = PropertyDescriptorPtr(descP);
     // advance index
     aStartIndex++;

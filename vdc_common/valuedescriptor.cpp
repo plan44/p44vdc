@@ -491,10 +491,10 @@ PropertyDescriptorPtr EnumList::getDescriptorByIndex(int aPropIndex, int aDomain
   DynamicPropertyDescriptor *descP = NULL;
   if (aPropIndex<numProps()) {
     descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = enumDescs[aPropIndex].first;
-    descP->propertyType = valuesInDescription ? apivalue_uint64 : apivalue_null;
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = INSTANCE_OKEY(this); 
+    descP->mPropertyName = enumDescs[aPropIndex].first;
+    descP->mPropertyType = valuesInDescription ? apivalue_uint64 : apivalue_null;
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = INSTANCE_OKEY(this); 
   }
   return descP;
 }
@@ -720,10 +720,10 @@ PropertyDescriptorPtr ValueList::getDescriptorByIndex(int aPropIndex, int aDomai
 {
   if (aPropIndex<values.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = values[aPropIndex]->valueName;
-    descP->propertyType = apivalue_object;
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(valueDescriptor_key);
+    descP->mPropertyName = values[aPropIndex]->valueName;
+    descP->mPropertyType = apivalue_object;
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(valueDescriptor_key);
     return descP;
   }
   return PropertyDescriptorPtr();

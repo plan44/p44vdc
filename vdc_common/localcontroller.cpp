@@ -321,7 +321,7 @@ PropertyDescriptorPtr ZoneDescriptor::getDescriptorByIndex(int aPropIndex, int a
 
 void ZoneDescriptor::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
-  if (aPrepInfo.descriptor->hasObjectKey(zonedevices_container_key) && mZoneID==zoneId_global) {
+  if (aPrepInfo.mDescriptor->hasObjectKey(zonedevices_container_key) && mZoneID==zoneId_global) {
     // for global zone: create temporary list of all devices
     LocalController::sharedLocalController()->mVdcHost.createDeviceList(mDevices);
   }
@@ -470,11 +470,11 @@ PropertyDescriptorPtr ZoneList::getDescriptorByIndex(int aPropIndex, int aDomain
 {
   if (aPropIndex<mZones.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("%hu", mZones[aPropIndex]->mZoneID);
-    descP->propertyType = apivalue_object;
-    descP->deletable = mZones[aPropIndex]->mDevices.size()==0; // zone is deletable when no device uses it
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(zonelist_key);
+    descP->mPropertyName = string_format("%hu", mZones[aPropIndex]->mZoneID);
+    descP->mPropertyType = apivalue_object;
+    descP->mDeletable = mZones[aPropIndex]->mDevices.size()==0; // zone is deletable when no device uses it
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(zonelist_key);
     return descP;
   }
   return PropertyDescriptorPtr();
@@ -487,10 +487,10 @@ PropertyDescriptorPtr ZoneList::getDescriptorByName(string aPropMatch, int &aSta
   if (!p && aMode==access_write && isNamedPropSpec(aPropMatch)) {
     // writing to non-existing zone -> insert new zone
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyType = apivalue_object;
-    descP->deletable = true; // new zones are deletable
-    descP->propertyFieldKey = mZones.size(); // new zone will be appended, so index is current size
-    descP->propertyObjectKey = OKEY(zonelist_key);
+    descP->mPropertyType = apivalue_object;
+    descP->mDeletable = true; // new zones are deletable
+    descP->mPropertyFieldKey = mZones.size(); // new zone will be appended, so index is current size
+    descP->mPropertyObjectKey = OKEY(zonelist_key);
     DsZoneID newId = 0;
     if (sscanf(aPropMatch.c_str(), "%hu", &newId)!=1) {
       // not a valid zone ID, generate one
@@ -501,8 +501,8 @@ PropertyDescriptorPtr ZoneList::getDescriptorByName(string aPropMatch, int &aSta
       }
     }
     getZoneById(newId, true); // creates the zone on the fly
-    descP->propertyName = string_format("%hu", newId);
-    descP->createdNew = true;
+    descP->mPropertyName = string_format("%hu", newId);
+    descP->mCreatedNew = true;
     p = descP;
   }
   return p;
@@ -864,11 +864,11 @@ PropertyDescriptorPtr SceneList::getDescriptorByIndex(int aPropIndex, int aDomai
 {
   if (aPropIndex<mScenes.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = mScenes[aPropIndex]->getStringID();
-    descP->propertyType = apivalue_object;
-    descP->deletable = true; // scene is deletable
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(scenelist_key);
+    descP->mPropertyName = mScenes[aPropIndex]->getStringID();
+    descP->mPropertyType = apivalue_object;
+    descP->mDeletable = true; // scene is deletable
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(scenelist_key);
     return descP;
   }
   return PropertyDescriptorPtr();
@@ -881,15 +881,15 @@ PropertyDescriptorPtr SceneList::getDescriptorByName(string aPropMatch, int &aSt
   if (!p && aMode==access_write && isNamedPropSpec(aPropMatch)) {
     // writing to non-existing scene -> try to insert new scene
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = aPropMatch;
-    descP->createdNew = true;
-    descP->propertyType = apivalue_object;
-    descP->deletable = true; // new scenes are deletable
-    descP->propertyObjectKey = OKEY(scenelist_key);
+    descP->mPropertyName = aPropMatch;
+    descP->mCreatedNew = true;
+    descP->mPropertyType = apivalue_object;
+    descP->mDeletable = true; // new scenes are deletable
+    descP->mPropertyObjectKey = OKEY(scenelist_key);
     size_t si;
     if (getScene(SceneIdentifier(aPropMatch), true, &si)) {
       // valid new scene
-      descP->propertyFieldKey = si; // the scene's index
+      descP->mPropertyFieldKey = si; // the scene's index
       p = descP;
     }
     else {
@@ -1400,11 +1400,11 @@ PropertyDescriptorPtr TriggerList::getDescriptorByIndex(int aPropIndex, int aDom
 {
   if (aPropIndex<mTriggers.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("%d",mTriggers[aPropIndex]->mTriggerId);
-    descP->propertyType = apivalue_object;
-    descP->deletable = true; // trigger is deletable
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(triggerlist_key);
+    descP->mPropertyName = string_format("%d",mTriggers[aPropIndex]->mTriggerId);
+    descP->mPropertyType = apivalue_object;
+    descP->mDeletable = true; // trigger is deletable
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(triggerlist_key);
     return descP;
   }
   return PropertyDescriptorPtr();
@@ -1417,18 +1417,18 @@ PropertyDescriptorPtr TriggerList::getDescriptorByName(string aPropMatch, int &a
   if (!p && aMode==access_write) {
     // writing to non-existing trigger id (usually 0) -> insert new trigger
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyType = apivalue_object;
-    descP->deletable = true; // new scenes are deletable
-    descP->propertyObjectKey = OKEY(triggerlist_key);
+    descP->mPropertyType = apivalue_object;
+    descP->mDeletable = true; // new scenes are deletable
+    descP->mPropertyObjectKey = OKEY(triggerlist_key);
     size_t ti;
     int newId = 0;
     sscanf(aPropMatch.c_str(), "%d", &newId); // use specified new id, otherwise use 0
     TriggerPtr trg = getTrigger(newId, true, &ti);
     if (trg) {
       // valid new trigger
-      descP->propertyFieldKey = ti; // the scene's index
-      descP->propertyName = string_format("%d", trg->mTriggerId);
-      descP->createdNew = true;
+      descP->mPropertyFieldKey = ti; // the scene's index
+      descP->mPropertyName = string_format("%d", trg->mTriggerId);
+      descP->mCreatedNew = true;
       p = descP;
     }
     else {
@@ -2099,7 +2099,7 @@ PropertyDescriptorPtr LocalController::getDescriptorByIndex(int aPropIndex, int 
 
 PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
-  if (aPropertyDescriptor->parentDescriptor->isRootOfObject()) {
+  if (aPropertyDescriptor->mParentDescriptor->isRootOfObject()) {
     switch (aPropertyDescriptor->fieldKey()) {
       case zones_key:
         return ZoneListPtr(&mLocalZones);

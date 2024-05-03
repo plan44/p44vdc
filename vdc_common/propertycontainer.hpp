@@ -71,12 +71,14 @@ namespace p44 {
   class PropertyDescriptor : public P44Obj
   {
   public:
+    bool mRootOfObject;
+
     /// constructor
-    PropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) : parentDescriptor(aParentDescriptor) {};
+    PropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) : mParentDescriptor(aParentDescriptor) {};
     /// the parent descriptor (NULL at root level of DsAdressables)
-    PropertyDescriptorPtr parentDescriptor;
+    PropertyDescriptorPtr mParentDescriptor;
     /// API version
-    virtual int getApiVersion() const { return (parentDescriptor ? parentDescriptor->getApiVersion() : 0); };
+    virtual int getApiVersion() const { return (mParentDescriptor ? mParentDescriptor->getApiVersion() : 0); };
     /// name of the property
     virtual const char *name() const = 0;
     /// type of the property
@@ -157,30 +159,30 @@ namespace p44 {
   public:
     DynamicPropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) :
       inherited(aParentDescriptor),
-      arrayContainer(false),
-      deletable(false),
-      needsReadPrep(false),
-      needsWritePrep(false),
-      createdNew(false)
+      mArrayContainer(false),
+      mDeletable(false),
+      mNeedsReadPrep(false),
+      mNeedsWritePrep(false),
+      mCreatedNew(false)
     {};
-    string propertyName; ///< name of the property
-    ApiValueType propertyType; ///< type of the property value
-    size_t propertyFieldKey; ///< key for accessing the property within its container
-    intptr_t propertyObjectKey; ///< identifier for container
-    bool arrayContainer;
-    bool deletable;
-    bool needsReadPrep;
-    bool needsWritePrep;
-    bool createdNew; ///< set for properties that were created new
+    string mPropertyName; ///< name of the property
+    ApiValueType mPropertyType; ///< type of the property value
+    size_t mPropertyFieldKey; ///< key for accessing the property within its container
+    intptr_t mPropertyObjectKey; ///< identifier for container
+    bool mArrayContainer;
+    bool mDeletable;
+    bool mNeedsReadPrep;
+    bool mNeedsWritePrep;
+    bool mCreatedNew; ///< set for properties that were created new
 
-    virtual const char *name() const P44_OVERRIDE { return propertyName.c_str(); }
-    virtual ApiValueType type() const P44_OVERRIDE { return propertyType; }
-    virtual size_t fieldKey() const P44_OVERRIDE { return propertyFieldKey; }
-    virtual intptr_t objectKey() const P44_OVERRIDE { return propertyObjectKey; }
-    virtual bool isArrayContainer() const P44_OVERRIDE { return arrayContainer; };
-    virtual bool isDeletable() const P44_OVERRIDE { return deletable; };
-    virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return aMode==access_read ? needsReadPrep : needsWritePrep; };
-    virtual bool wasCreatedNew() const P44_OVERRIDE { return createdNew; };
+    virtual const char *name() const P44_OVERRIDE { return mPropertyName.c_str(); }
+    virtual ApiValueType type() const P44_OVERRIDE { return mPropertyType; }
+    virtual size_t fieldKey() const P44_OVERRIDE { return mPropertyFieldKey; }
+    virtual intptr_t objectKey() const P44_OVERRIDE { return mPropertyObjectKey; }
+    virtual bool isArrayContainer() const P44_OVERRIDE { return mArrayContainer; };
+    virtual bool isDeletable() const P44_OVERRIDE { return mDeletable; };
+    virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return aMode==access_read ? mNeedsReadPrep : mNeedsWritePrep; };
+    virtual bool wasCreatedNew() const P44_OVERRIDE { return mCreatedNew; };
   };
 
 
@@ -193,14 +195,14 @@ namespace p44 {
   class PropertyPrep
   {
   public:
-    PropertyDescriptorPtr descriptor; ///< the descriptor of the property that needs async re-access
-    PropertyContainerPtr target; ///< object to re-run subquery on
-    ApiValuePtr subquery; ///< subquery to run
-    ApiValuePtr insertIn; ///< parent object to insert result of subquery
-    string insertAs; ///< field name to insert subquery result as
+    PropertyDescriptorPtr mDescriptor; ///< the descriptor of the property that needs async re-access
+    PropertyContainerPtr mTarget; ///< object to re-run subquery on
+    ApiValuePtr mSubquery; ///< subquery to run
+    ApiValuePtr mInsertIn; ///< parent object to insert result of subquery
+    string mInsertAs; ///< field name to insert subquery result as
 
     PropertyPrep(PropertyContainerPtr aTarget, PropertyDescriptorPtr aPropDesc, ApiValuePtr aSubQuery, ApiValuePtr aInsertIn, const string aInsertAs) :
-      target(aTarget), descriptor(aPropDesc), subquery(aSubQuery), insertIn(aInsertIn), insertAs(aInsertAs) {};
+      mTarget(aTarget), mDescriptor(aPropDesc), mSubquery(aSubQuery), mInsertIn(aInsertIn), mInsertAs(aInsertAs) {};
   };
 
   typedef list<PropertyPrep> PropertyPrepList;

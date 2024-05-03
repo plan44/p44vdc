@@ -570,7 +570,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
 
 void DsAddressable::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
-  if (aPrepInfo.descriptor->hasObjectKey(dsAddressable_key) && aPrepInfo.descriptor->fieldKey()==active_key) {
+  if (aPrepInfo.mDescriptor->hasObjectKey(dsAddressable_key) && aPrepInfo.mDescriptor->fieldKey()==active_key) {
     // update status in case
     if (mLastPresenceUpdate+MIN_PRESENCE_SAMPLE_INTERVAL<MainLoop::now()) {
       // request update from device

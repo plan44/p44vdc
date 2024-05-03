@@ -688,7 +688,7 @@ int ChannelBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
     return mEnumList ? mEnumList->numProps() : 0;
   }
   #endif
-  switch (aParentDescriptor->parentDescriptor->fieldKey()) {
+  switch (aParentDescriptor->mParentDescriptor->fieldKey()) {
     case descriptions_key_offset: return numChannelDescProperties;
     case settings_key_offset: return numChannelSettingsProperties;
     case states_key_offset: return numChannelStateProperties;
@@ -728,7 +728,7 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
   #endif
   if (aPropIndex>=numProps(aDomain, aParentDescriptor))
     return NULL;
-  switch (aParentDescriptor->parentDescriptor->fieldKey()) {
+  switch (aParentDescriptor->mParentDescriptor->fieldKey()) {
     case descriptions_key_offset:
       return PropertyDescriptorPtr(new StaticPropertyDescriptor(&channelDescProperties[aPropIndex], aParentDescriptor));
       //case settings_key_offset:

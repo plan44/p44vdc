@@ -2326,10 +2326,10 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     // model features - distinct set of boolean flags
     if (aPropIndex<numModelFeatures) {
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-      descP->propertyName = modelFeatureNames[aPropIndex];
-      descP->propertyType = apivalue_bool;
-      descP->propertyFieldKey = aPropIndex;
-      descP->propertyObjectKey = OKEY(device_modelFeatures_key);
+      descP->mPropertyName = modelFeatureNames[aPropIndex];
+      descP->mPropertyType = apivalue_bool;
+      descP->mPropertyFieldKey = aPropIndex;
+      descP->mPropertyObjectKey = OKEY(device_modelFeatures_key);
       return descP;
     }
   }
@@ -2356,10 +2356,10 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
       id = mCachedConfigurations[aPropIndex]->getId();
     }
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = id;
-    descP->propertyType = apivalue_object;
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = aParentDescriptor->objectKey();
+    descP->mPropertyName = id;
+    descP->mPropertyType = apivalue_object;
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = aParentDescriptor->objectKey();
     return descP;
   }
   return PropertyDescriptorPtr();
@@ -2378,10 +2378,10 @@ PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStart
     if (aStartIndex!=PROPINDEX_NONE && aStartIndex<n) {
       // within range, create descriptor
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-      descP->propertyName = string_format("%d", aStartIndex);
-      descP->propertyType = aParentDescriptor->type();
-      descP->propertyFieldKey = aStartIndex;
-      descP->propertyObjectKey = aParentDescriptor->objectKey();
+      descP->mPropertyName = string_format("%d", aStartIndex);
+      descP->mPropertyType = aParentDescriptor->type();
+      descP->mPropertyFieldKey = aStartIndex;
+      descP->mPropertyObjectKey = aParentDescriptor->objectKey();
       propDesc = PropertyDescriptorPtr(descP);
       // advance index
       aStartIndex++;
@@ -2401,10 +2401,10 @@ PropertyDescriptorPtr Device::getDescriptorByName(string aPropMatch, int &aStart
   ) {
     // special case for backwards compatibility: channel with id "0" is the default (first) channel
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = "0";
-    descP->propertyType = aParentDescriptor->type();
-    descP->propertyFieldKey = aStartIndex;
-    descP->propertyObjectKey = aParentDescriptor->objectKey();
+    descP->mPropertyName = "0";
+    descP->mPropertyType = aParentDescriptor->type();
+    descP->mPropertyFieldKey = aStartIndex;
+    descP->mPropertyObjectKey = aParentDescriptor->objectKey();
     // advance index
     aStartIndex++;
     return descP;
@@ -2465,7 +2465,7 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr aPropertyD
 
 void Device::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
-  if (aPrepInfo.descriptor->hasObjectKey(device_configurations_key)) {
+  if (aPrepInfo.mDescriptor->hasObjectKey(device_configurations_key)) {
     // have device create these
     getDeviceConfigurations(mCachedConfigurations, aPreparedCB);
     return;

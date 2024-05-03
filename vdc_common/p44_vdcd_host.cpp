@@ -1351,7 +1351,7 @@ int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
   }
   else if (aParentDescriptor->hasObjectKey(breakpoints_list_key)) {
     // breakpoints
-    ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->parentDescriptor->fieldKey());
+    ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey());
     return static_cast<int>(host->numBreakPoints());
   }
   else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
@@ -1395,17 +1395,17 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByName(string aPropMatch, i
         aStartIndex = 0;
       }
       else {
-        ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->parentDescriptor->fieldKey());
+        ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey());
         // Note: we need to enumerate the set, so we must convert it to a vector here, which is
         //   acceptable when assuming a small number of breakpoints (which IS realistic)
         vector<int> bpVec(host->breakpoints()->begin(), host->breakpoints()->end());
         lineNo = bpVec[aStartIndex];
       }
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-      descP->propertyName = string_format("%d", lineNo); // name of the breakpoint is the line
-      descP->propertyType = aParentDescriptor->type();
-      descP->propertyFieldKey = lineNo; // key is the line number (by which we can easily obtain true or false value)
-      descP->propertyObjectKey = aParentDescriptor->objectKey();
+      descP->mPropertyName = string_format("%d", lineNo); // name of the breakpoint is the line
+      descP->mPropertyType = aParentDescriptor->type();
+      descP->mPropertyFieldKey = lineNo; // key is the line number (by which we can easily obtain true or false value)
+      descP->mPropertyObjectKey = aParentDescriptor->objectKey();
       propDesc = PropertyDescriptorPtr(descP);
       // advance index
       aStartIndex++;
@@ -1462,20 +1462,20 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     ScriptHostPtr host = domain().getHostByIndex(aPropIndex);
     if (!host) return nullptr;
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = host->scriptSourceUid();
-    descP->propertyType = aParentDescriptor->type();
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(scripthost_key);
+    descP->mPropertyName = host->scriptSourceUid();
+    descP->mPropertyType = aParentDescriptor->type();
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(scripthost_key);
     return descP;
   }
   else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
     // paused threads by thread id
     if (aPropIndex>=mPausedThreads.size()) return nullptr;
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = string_format("%d", aPropIndex);
-    descP->propertyType = aParentDescriptor->type();
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(pausedthread_key);
+    descP->mPropertyName = string_format("%d", aPropIndex);
+    descP->mPropertyType = aParentDescriptor->type();
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(pausedthread_key);
     return descP;
   }
   else if (aParentDescriptor->hasObjectKey(scripthost_key)) {
@@ -1520,7 +1520,7 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
   else if (aPropertyDescriptor->hasObjectKey(scripthost_key)) {
     // script host level property
     // - get the host
-    ScriptHostPtr host = domain().getHostByIndex(aPropertyDescriptor->parentDescriptor->fieldKey());
+    ScriptHostPtr host = domain().getHostByIndex(aPropertyDescriptor->mParentDescriptor->fieldKey());
     if (host) {
       if (aMode==access_read) {
         // read properties
@@ -1571,7 +1571,7 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     }
   }
   else if (aPropertyDescriptor->hasObjectKey(breakpoints_list_key)) {
-    ScriptHostPtr host = domain().getHostByIndex(aPropertyDescriptor->parentDescriptor->parentDescriptor->  fieldKey());
+    ScriptHostPtr host = domain().getHostByIndex(aPropertyDescriptor->mParentDescriptor->mParentDescriptor->  fieldKey());
     size_t line = aPropertyDescriptor->fieldKey();
     if (!host->breakpoints()) return false;
     if (aMode==access_read) {
@@ -1592,7 +1592,7 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
   else if (aPropertyDescriptor->hasObjectKey(pausedthread_key)) {
     // paused thread level property
     // - get the paused thread
-    P44PausedThread& pausedthread = mPausedThreads[aPropertyDescriptor->parentDescriptor->fieldKey()];
+    P44PausedThread& pausedthread = mPausedThreads[aPropertyDescriptor->mParentDescriptor->fieldKey()];
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {

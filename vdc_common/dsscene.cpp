@@ -77,10 +77,10 @@ protected:
     if (aParentDescriptor->hasObjectKey(dsscene_channels_key)) {
       // scene channels by their channel ID
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-      descP->propertyName = scene.getDevice().getChannelByIndex(aPropIndex)->getApiId(aParentDescriptor->getApiVersion());
-      descP->propertyType = aParentDescriptor->type();
-      descP->propertyFieldKey = aPropIndex;
-      descP->propertyObjectKey = OKEY(scenevalue_key);
+      descP->mPropertyName = scene.getDevice().getChannelByIndex(aPropIndex)->getApiId(aParentDescriptor->getApiVersion());
+      descP->mPropertyType = aParentDescriptor->type();
+      descP->mPropertyFieldKey = aPropIndex;
+      descP->mPropertyObjectKey = OKEY(scenevalue_key);
       return descP;
     }
     // Note: SceneChannels is final, so no subclass adding properties must be considered
@@ -100,7 +100,7 @@ protected:
     if (aPropertyDescriptor->hasObjectKey(scenevalue_key)) {
       // Scene value level
       // - get the output index
-      int outputIndex = (int)aPropertyDescriptor->parentDescriptor->fieldKey();
+      int outputIndex = (int)aPropertyDescriptor->mParentDescriptor->fieldKey();
       if (aMode==access_read) {
         // read properties
         switch (aPropertyDescriptor->fieldKey()) {

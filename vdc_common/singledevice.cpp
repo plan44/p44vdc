@@ -218,10 +218,10 @@ PropertyDescriptorPtr DeviceActions::getDescriptorByIndex(int aPropIndex, int aD
 {
   if (aPropIndex<deviceActions.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = deviceActions[aPropIndex]->actionId;
-    descP->propertyType = apivalue_object;
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(actions_key);
+    descP->mPropertyName = deviceActions[aPropIndex]->actionId;
+    descP->mPropertyType = apivalue_object;
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(actions_key);
     return descP;
   }
   return PropertyDescriptorPtr();
@@ -733,11 +733,11 @@ PropertyDescriptorPtr CustomActions::getDescriptorByIndex(int aPropIndex, int aD
 {
   if (aPropIndex<customActions.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = customActions[aPropIndex]->actionId;
-    descP->propertyType = apivalue_object;
-    descP->deletable = true; // custom actions are deletable
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(customactions_key);
+    descP->mPropertyName = customActions[aPropIndex]->actionId;
+    descP->mPropertyType = apivalue_object;
+    descP->mDeletable = true; // custom actions are deletable
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(customactions_key);
     return descP;
   }
   return PropertyDescriptorPtr();
@@ -750,12 +750,12 @@ PropertyDescriptorPtr CustomActions::getDescriptorByName(string aPropMatch, int 
   if (!p && aMode==access_write && isNamedPropSpec(aPropMatch)) {
     // writing to non-existing custom action -> insert new action
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = aPropMatch;
-    descP->createdNew = true;
-    descP->propertyType = apivalue_object;
-    descP->deletable = true; // custom actions are deletable
-    descP->propertyFieldKey = customActions.size();
-    descP->propertyObjectKey = OKEY(customactions_key);
+    descP->mPropertyName = aPropMatch;
+    descP->mCreatedNew = true;
+    descP->mPropertyType = apivalue_object;
+    descP->mDeletable = true; // custom actions are deletable
+    descP->mPropertyFieldKey = customActions.size();
+    descP->mPropertyObjectKey = OKEY(customactions_key);
     CustomActionPtr a = CustomActionPtr(new CustomAction(singleDevice));
     a->actionId = aPropMatch;
     customActions.push_back(a);
@@ -924,10 +924,10 @@ PropertyDescriptorPtr StandardActions::getDescriptorByIndex(int aPropIndex, int 
 {
   if (aPropIndex<standardActions.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = standardActions[aPropIndex]->actionId;
-    descP->propertyType = apivalue_object;
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(standardactions_key);
+    descP->mPropertyName = standardActions[aPropIndex]->actionId;
+    descP->mPropertyType = apivalue_object;
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(standardactions_key);
     return descP;
   }
   return PropertyDescriptorPtr();
@@ -968,7 +968,7 @@ PropertyDescriptorPtr DeviceStateParams::getDescriptorByIndex(int aPropIndex, in
   PropertyDescriptorPtr p = inherited::getDescriptorByIndex(aPropIndex, aDomain, aParentDescriptor);
   if (aParentDescriptor->hasObjectKey(devicestate_key)) {
     // access via deviceStates, we directly want to see the values
-    static_cast<DynamicPropertyDescriptor *>(p.get())->propertyType = apivalue_null; // switch to leaf (of variable type)
+    static_cast<DynamicPropertyDescriptor *>(p.get())->mPropertyType = apivalue_null; // switch to leaf (of variable type)
   }
   return p;
 }
@@ -976,7 +976,7 @@ PropertyDescriptorPtr DeviceStateParams::getDescriptorByIndex(int aPropIndex, in
 
 bool DeviceStateParams::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
-  if (aPropertyDescriptor->parentDescriptor->hasObjectKey(devicestate_key) && aMode==access_read) {
+  if (aPropertyDescriptor->mParentDescriptor->hasObjectKey(devicestate_key) && aMode==access_read) {
     // fieldkey is the param index, just get that param's value
     if (!values[aPropertyDescriptor->fieldKey()]->getValue(aPropValue))
       aPropValue->setNull(); // unset param will just report NULL
@@ -1083,9 +1083,9 @@ enum {
 int DeviceState::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   // check access path, depends on how we access the state (description or actual state)
-  if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestatedesc_key))
+  if (aParentDescriptor->mParentDescriptor->hasObjectKey(devicestatedesc_key))
     return numStatesDescProperties;
-  else if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestate_key))
+  else if (aParentDescriptor->mParentDescriptor->hasObjectKey(devicestate_key))
     return numStatesProperties;
   return 0;
 }
@@ -1104,10 +1104,10 @@ PropertyDescriptorPtr DeviceState::getDescriptorByIndex(int aPropIndex, int aDom
     { "changed", apivalue_double, changed_key, OKEY(devicestate_key) },
   };
   // check access path, depends on how we access the state (description or actual state)
-  if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestatedesc_key)) {
+  if (aParentDescriptor->mParentDescriptor->hasObjectKey(devicestatedesc_key)) {
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&descproperties[aPropIndex], aParentDescriptor));
   }
-  else if (aParentDescriptor->parentDescriptor->hasObjectKey(devicestate_key)) {
+  else if (aParentDescriptor->mParentDescriptor->hasObjectKey(devicestate_key)) {
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
   }
   return PropertyDescriptorPtr();
@@ -1195,10 +1195,10 @@ PropertyDescriptorPtr DeviceStates::getDescriptorByIndex(int aPropIndex, int aDo
 {
   if (aPropIndex<deviceStates.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = deviceStates[aPropIndex]->stateId;
-    descP->propertyType = apivalue_object;
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(states_key);
+    descP->mPropertyName = deviceStates[aPropIndex]->stateId;
+    descP->mPropertyType = apivalue_object;
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(states_key);
     return descP;
   }
   return PropertyDescriptorPtr();
@@ -1259,7 +1259,7 @@ static char deviceeventdesc_key;
 int DeviceEvent::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
   // check access path, depends on how we access the state (description or actual state)
-  if (aParentDescriptor->parentDescriptor->hasObjectKey(deviceeventdesc_key))
+  if (aParentDescriptor->mParentDescriptor->hasObjectKey(deviceeventdesc_key))
     return numEventDescProperties;
   return 0;
 }
@@ -1271,7 +1271,7 @@ PropertyDescriptorPtr DeviceEvent::getDescriptorByIndex(int aPropIndex, int aDom
     { "description", apivalue_string, eventdescription_key, OKEY(deviceeventdesc_key) },
   };
   // check access path, depends on how we access the event (Note: for now we only have description, so it's not strictly needed yet here)
-  if (aParentDescriptor->parentDescriptor->hasObjectKey(deviceeventdesc_key)) {
+  if (aParentDescriptor->mParentDescriptor->hasObjectKey(deviceeventdesc_key)) {
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&descproperties[aPropIndex], aParentDescriptor));
   }
   return PropertyDescriptorPtr();
@@ -1329,10 +1329,10 @@ PropertyDescriptorPtr DeviceEvents::getDescriptorByIndex(int aPropIndex, int aDo
 {
   if (aPropIndex<deviceEvents.size()) {
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->propertyName = deviceEvents[aPropIndex]->eventId;
-    descP->propertyType = apivalue_object;
-    descP->propertyFieldKey = aPropIndex;
-    descP->propertyObjectKey = OKEY(events_key);
+    descP->mPropertyName = deviceEvents[aPropIndex]->eventId;
+    descP->mPropertyType = apivalue_object;
+    descP->mPropertyFieldKey = aPropIndex;
+    descP->mPropertyObjectKey = OKEY(events_key);
     return descP;
   }
   return PropertyDescriptorPtr();
@@ -1476,9 +1476,9 @@ PropertyDescriptorPtr DeviceProperties::getDescriptorByIndex(int aPropIndex, int
   if (aParentDescriptor->hasObjectKey(deviceproperty_key)) {
     DynamicPropertyDescriptor *dp = static_cast<DynamicPropertyDescriptor *>(p.get());
     // access via deviceProperties, we directly want to see the values
-    dp->propertyType = apivalue_null; // switch to leaf (of variable type)
-    dp->deletable = true; // some properties might be assigned NULL to "delete", "invalidate" or "reset" them in some way (properties that do not allow null will complain at conforms())
-    dp->needsReadPrep = values[aPropIndex]->doesNeedFetch(); // for values, we might need a fetch
+    dp->mPropertyType = apivalue_null; // switch to leaf (of variable type)
+    dp->mDeletable = true; // some properties might be assigned NULL to "delete", "invalidate" or "reset" them in some way (properties that do not allow null will complain at conforms())
+    dp->mNeedsReadPrep = values[aPropIndex]->doesNeedFetch(); // for values, we might need a fetch
   }
   return p;
 }
@@ -1487,7 +1487,7 @@ PropertyDescriptorPtr DeviceProperties::getDescriptorByIndex(int aPropIndex, int
 void DeviceProperties::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPrepInfo, StatusCB aPreparedCB)
 {
   if (aMode==access_read) {
-    ValueDescriptorPtr val = values[aPrepInfo.descriptor->fieldKey()];
+    ValueDescriptorPtr val = values[aPrepInfo.mDescriptor->fieldKey()];
     if (propertyFetchHandler) {
       propertyFetchHandler(val, aPreparedCB);
       return;
@@ -1500,7 +1500,7 @@ void DeviceProperties::prepareAccess(PropertyAccessMode aMode, PropertyPrep& aPr
 
 bool DeviceProperties::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
-  if (aPropertyDescriptor->parentDescriptor->hasObjectKey(deviceproperty_key)) {
+  if (aPropertyDescriptor->mParentDescriptor->hasObjectKey(deviceproperty_key)) {
     // fieldkey is the property index, just get that property's value
     ValueDescriptorPtr val = values[aPropertyDescriptor->fieldKey()];
     if (aMode==access_read) {
@@ -1851,7 +1851,7 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
 
 PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
-  if (aPropertyDescriptor->parentDescriptor->isRootOfObject()) {
+  if (aPropertyDescriptor->mParentDescriptor->isRootOfObject()) {
     switch (aPropertyDescriptor->fieldKey()) {
       case deviceActionDescriptions_key:
         return deviceActions;
