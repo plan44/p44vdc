@@ -35,26 +35,26 @@ using namespace p44;
 
 SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
-  profileP(NULL), // the profile
+  mProfileP(NULL), // the profile
   // persistent settings
-  sensorGroup(group_black_variable), // default to joker
-  minPushInterval(30*Second), // default unless sensor type profile sets another value
-  maxPushInterval(0),
-  changesOnlyInterval(30*Minute), // report unchanged values only rarely by default (note: before 2021-09-16 we did not have a default limit here)
+  mSensorGroup(group_black_variable), // default to joker
+  mMinPushInterval(30*Second), // default unless sensor type profile sets another value
+  mMaxPushInterval(0),
+  mChangesOnlyInterval(30*Minute), // report unchanged values only rarely by default (note: before 2021-09-16 we did not have a default limit here)
   #if !REDUCED_FOOTPRINT
   mSensorFunc(sensorFunc_standard),
   mSensorChannel(channeltype_default),
   #endif
   // state
   #if ENABLE_RRDB
-  loggingReady(false),
-  lastRrdUpdate(Never),
+  mLoggingReady(false),
+  mLastRRDBupdate(Never),
   #endif
-  lastUpdate(Never),
-  lastPush(Never),
-  currentValue(0),
-  lastPushedValue(0),
-  contextId(-1)
+  mLastUpdate(Never),
+  mLastPush(Never),
+  mCurrentValue(0),
+  mLastPushedValue(0),
+  mContextId(-1)
 {
   // set dummy default hardware default configuration (no known alive sign interval!)
   setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 100, 1, 15*Second, 0);
@@ -185,31 +185,31 @@ static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
 
 void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval)
 {
-  sensorType = aType;
-  sensorUsage = aUsage;
-  min = aMin;
-  max = aMax;
-  resolution = aResolution;
-  updateInterval = aUpdateInterval;
-  aliveSignInterval = aAliveSignInterval;
-  maxPushInterval = aliveSignInterval==Never ? Never : DSS_SENSOR_MAX_PUSH_INTERVAL; // sensors without any update guarantee do not need to fake regular pushes
+  mSensorType = aType;
+  mSensorUsage = aUsage;
+  mMin = aMin;
+  mMax = aMax;
+  mResolution = aResolution;
+  mUpdateInterval = aUpdateInterval;
+  mAliveSignInterval = aAliveSignInterval;
+  mMaxPushInterval = mAliveSignInterval==Never ? Never : DSS_SENSOR_MAX_PUSH_INTERVAL; // sensors without any update guarantee do not need to fake regular pushes
   armInvalidator();
-  profileP = NULL;
+  mProfileP = NULL;
   // default only, devices once created will have this as a persistent setting
-  changesOnlyInterval = aDefaultChangesOnlyInterval; // default in case sensor profile does not override this
+  mChangesOnlyInterval = aDefaultChangesOnlyInterval; // default in case sensor profile does not override this
   // look for sensor behaviour profile
   const SensorBehaviourProfile *sbpP = sensorBehaviourProfiles;
   while (sbpP->type!=sensorType_none) {
-    if (sensorType==sbpP->type && sensorUsage==sbpP->usage) {
+    if (mSensorType==sbpP->type && mSensorUsage==sbpP->usage) {
       // sensor type/usage has a behaviour profile, use it
-      LOG(LOG_INFO, "Activated sensor processing/filtering profile for '%s' (usage %d)", sensorTypeIds[sensorType], sensorUsage);
-      profileP = sbpP;
+      LOG(LOG_INFO, "Activated sensor processing/filtering profile for '%s' (usage %d)", sensorTypeIds[mSensorType], mSensorUsage);
+      mProfileP = sbpP;
       // get settings defaults
-      if (profileP->pushIntvl>0) {
-        minPushInterval = profileP->pushIntvl;
+      if (mProfileP->pushIntvl>0) {
+        mMinPushInterval = mProfileP->pushIntvl;
       }
-      if (profileP->chgOnlyIntvl>0) {
-        changesOnlyInterval = profileP->chgOnlyIntvl; // also report updates with no change after this time
+      if (mProfileP->chgOnlyIntvl>0) {
+        mChangesOnlyInterval = mProfileP->chgOnlyIntvl; // also report updates with no change after this time
       }
     }
     ++sbpP; // next
@@ -219,15 +219,15 @@ void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint 
 
 string SensorBehaviour::getAutoId()
 {
-  return sensorTypeIds[sensorType];
+  return sensorTypeIds[mSensorType];
 }
 
 
 
 ValueUnit SensorBehaviour::getSensorUnit()
 {
-  if (sensorType>=numVdcSensorTypes) return VALUE_UNIT(valueUnit_none, unitScaling_1);
-  return sensorTypeUnits[sensorType];
+  if (mSensorType>=numVdcSensorTypes) return VALUE_UNIT(valueUnit_none, unitScaling_1);
+  return sensorTypeUnits[mSensorType];
 }
 
 
@@ -239,15 +239,15 @@ string SensorBehaviour::getSensorUnitText()
 
 string SensorBehaviour::getSensorRange()
 {
-  if (min==max) {
+  if (mMin==mMax) {
     return ""; // undefined range
   }
   int fracDigits = 2; // default if no resolution defined
-  if (resolution!=0) {
-    fracDigits = (int)(-::log(resolution)/::log(10)+0.99);
+  if (mResolution!=0) {
+    fracDigits = (int)(-::log(mResolution)/::log(10)+0.99);
   }
   if (fracDigits<0) fracDigits=0;
-  return string_format("%0.*f..%0.*f", fracDigits, min, fracDigits, max);
+  return string_format("%0.*f..%0.*f", fracDigits, mMin, fracDigits, mMax);
 }
 
 
@@ -255,11 +255,11 @@ string SensorBehaviour::getStatusText()
 {
   if (hasDefinedState()) {
     int fracDigits = 2; // default if no resolution defined
-    if (resolution!=0) {
-      fracDigits = (int)(-::log(resolution)/::log(10)+0.99);
+    if (mResolution!=0) {
+      fracDigits = (int)(-::log(mResolution)/::log(10)+0.99);
     }
     if (fracDigits<0) fracDigits=0;
-    return string_format("%0.*f %s", fracDigits, currentValue, getSensorUnitText().c_str());
+    return string_format("%0.*f %s", fracDigits, mCurrentValue, getSensorUnitText().c_str());
   }
   return inherited::getStatusText();
 }
@@ -274,27 +274,27 @@ void SensorBehaviour::setSensorNameWithRange(const char *aName)
 void SensorBehaviour::setFilter(WinEvalMode aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime)
 {
   if (aEvalType==eval_none) {
-    filter.reset(); // remove, standard filter (if any) will be re-installed at next datapoint
+    mFilter.reset(); // remove, standard filter (if any) will be re-installed at next datapoint
   }
   else {
-    filter = WindowEvaluatorPtr(new WindowEvaluator(aWindowTime, aDataPointCollTime, aEvalType));
+    mFilter = WindowEvaluatorPtr(new WindowEvaluator(aWindowTime, aDataPointCollTime, aEvalType));
   }
 }
 
 
 void SensorBehaviour::updateEngineeringValue(long aEngineeringValue, bool aPush, int32_t aContextId, const char *aContextMsg)
 {
-  double newCurrentValue = min+(aEngineeringValue*resolution);
+  double newCurrentValue = mMin+(aEngineeringValue*mResolution);
   updateSensorValue(newCurrentValue, -1, aPush, aContextId, aContextMsg);
 }
 
 
 void SensorBehaviour::armInvalidator()
 {
-  invalidatorTicket.cancel();
-  if (aliveSignInterval!=Never) {
+  mInvalidatorTicket.cancel();
+  if (mAliveSignInterval!=Never) {
     // this sensor can time out, schedule invalidation
-    invalidatorTicket.executeOnce(boost::bind(&SensorBehaviour::invalidateSensorValue, this, true), aliveSignInterval);
+    mInvalidatorTicket.executeOnce(boost::bind(&SensorBehaviour::invalidateSensorValue, this, true), mAliveSignInterval);
   }
 }
 
@@ -304,42 +304,42 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   MLMicroSeconds now = MainLoop::now();
   bool changedValue = false;
   // always update age, even if value itself may not have changed
-  lastUpdate = now;
+  mLastUpdate = now;
   armInvalidator();
   // update context
-  if (contextId!=aContextId) {
-    contextId = aContextId;
+  if (mContextId!=aContextId) {
+    mContextId = aContextId;
     changedValue = true;
   };
-  if (contextMsg!=nonNullCStr(aContextMsg)) {
-    contextMsg = nonNullCStr(aContextMsg);
+  if (mContextMsg!=nonNullCStr(aContextMsg)) {
+    mContextMsg = nonNullCStr(aContextMsg);
     changedValue = true;
   };
   // update value
-  if (aMinChange<0) aMinChange = resolution/2;
-  if (fabs(aValue - currentValue) > aMinChange) changedValue = true;
+  if (aMinChange<0) aMinChange = mResolution/2;
+  if (fabs(aValue - mCurrentValue) > aMinChange) changedValue = true;
   OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "reports %s value = %0.3f %s", changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
-  if (contextId>=0 || !contextMsg.empty()) {
-    LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", contextId, contextMsg.c_str());
+  if (mContextId>=0 || !mContextMsg.empty()) {
+    LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", mContextId, mContextMsg.c_str());
   }
   if (changedValue) {
     // check for filtering
-    if (filter || (profileP && profileP->evalType!=eval_none)) {
+    if (mFilter || (mProfileP && mProfileP->evalType!=eval_none)) {
       // process values through filter
-      if (!filter) {
+      if (!mFilter) {
         // no filter exists yet, but profile needs a filter, create it now
-        filter = WindowEvaluatorPtr(new WindowEvaluator(profileP->evalWin, profileP->collWin, profileP->evalType));
+        mFilter = WindowEvaluatorPtr(new WindowEvaluator(mProfileP->evalWin, mProfileP->collWin, mProfileP->evalType));
       }
-      filter->addValue(aValue, now);
-      double v = filter->evaluate();
+      mFilter->addValue(aValue, now);
+      double v = mFilter->evaluate();
       // re-evaluate changed flag after filtering
-      if (fabs(v - currentValue) > resolution/2) changedValue = true;
+      if (fabs(v - mCurrentValue) > mResolution/2) changedValue = true;
       OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "calculates %s filtered value = %0.3f %s", changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
-      currentValue = v;
+      mCurrentValue = v;
     }
     else {
       // just assign new current value
-      currentValue = aValue;
+      mCurrentValue = aValue;
     }
   }
   // possibly push
@@ -351,7 +351,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   #endif
   // possibly log value
   #if ENABLE_RRDB
-  logSensorValue(now, aValue, currentValue, lastPushedValue);
+  logSensorValue(now, aValue, mCurrentValue, mLastPushedValue);
   #endif
 }
 
@@ -360,11 +360,11 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
 bool SensorBehaviour::pushSensor(bool aAlways)
 {
   MLMicroSeconds now = MainLoop::now();
-  bool doPush = aAlways || lastPush==Never; // always push if asked for or when there's no previous value
+  bool doPush = aAlways || mLastPush==Never; // always push if asked for or when there's no previous value
   if (!doPush) {
     // Note: when we get here, lastPush and lastPushedValue are always valid
-    bool changed = currentValue!=lastPushedValue;
-    if (now>lastPush+minPushInterval) {
+    bool changed = mCurrentValue!=mLastPushedValue;
+    if (now>mLastPush+mMinPushInterval) {
       // Minimal push interval is over -> push...
       // - if value has changed or
       // - if maxPushInterval has passed or
@@ -372,28 +372,28 @@ bool SensorBehaviour::pushSensor(bool aAlways)
       // - if aliveSignInterval is defined and has been exceeded
       doPush =
         changed || // when changed
-        (maxPushInterval!=Never && now>lastPush+maxPushInterval) || // when interval for max push interval has passed (similar, but not quite the same as changesOnlyInterval)
-        now>lastPush+changesOnlyInterval || // or when interval for not reporting unchanged values has passed
-        (aliveSignInterval!=Never && now>lastUpdate+aliveSignInterval); // or in case sensor declares a heartbeat interval
+        (mMaxPushInterval!=Never && now>mLastPush+mMaxPushInterval) || // when interval for max push interval has passed (similar, but not quite the same as changesOnlyInterval)
+        now>mLastPush+mChangesOnlyInterval || // or when interval for not reporting unchanged values has passed
+        (mAliveSignInterval!=Never && now>mLastUpdate+mAliveSignInterval); // or in case sensor declares a heartbeat interval
     }
-    else if (profileP) {
+    else if (mProfileP) {
       // Minimal push interval is NOT over, check extra trigger conditions
-      if (profileP->trigDelta!=0 && now>lastPush+profileP->trigIntvl) {
+      if (mProfileP->trigDelta!=0 && now>mLastPush+mProfileP->trigIntvl) {
         // Trigger interval is over -> push if conditions are met
-        double nowDelta = currentValue-lastPushedValue;
+        double nowDelta = mCurrentValue-mLastPushedValue;
         double minDelta;
-        if (profileP->trigMode&tr_relative) {
+        if (mProfileP->trigMode&tr_relative) {
           // relative mode: delta is relative to last pushed value, trigMin indicates minimal absolute DELTA value
-          minDelta = lastPushedValue*profileP->trigDelta;
-          doPush = fabs(nowDelta) > profileP->trigMin;
+          minDelta = mLastPushedValue*mProfileP->trigDelta;
+          doPush = fabs(nowDelta) > mProfileP->trigMin;
         }
         else {
           // absolute mode: delta is absolute, trigMin indicates minimal CURRENT value
-          minDelta = profileP->trigDelta;
-          doPush = currentValue > profileP->trigMin;
+          minDelta = mProfileP->trigDelta;
+          doPush = mCurrentValue > mProfileP->trigMin;
         }
         if (doPush) {
-          if (profileP->trigMode&tr_unipolar) {
+          if (mProfileP->trigMode&tr_unipolar) {
             // unipolar check: deltas must have same sign
             doPush = (minDelta<0)==(nowDelta<0);
           }
@@ -402,25 +402,25 @@ bool SensorBehaviour::pushSensor(bool aAlways)
           }
         }
         if (doPush) {
-          OLOG(LOG_INFO, "meets SOD conditions (%0.3f -> %0.3f %s) to push now", lastPushedValue, currentValue, getSensorUnitText().c_str());
+          OLOG(LOG_INFO, "meets SOD conditions (%0.3f -> %0.3f %s) to push now", mLastPushedValue, mCurrentValue, getSensorUnitText().c_str());
         }
       }
     }
     if (!doPush && changed) {
       // we have a pending change, but rules don't allow to push now. Make sure final state gets pushed later
       OLOG(LOG_INFO, "- changes too quickly, cannot push update now, but final state will be pushed after minPushInterval");
-      updateTicket.executeOnceAt(boost::bind(&SensorBehaviour::reportFinalValue, this), lastPush+minPushInterval);
+      mUpdateTicket.executeOnceAt(boost::bind(&SensorBehaviour::reportFinalValue, this), mLastPush+mMinPushInterval);
     }
   }
   if (doPush) {
     // push the new value
     if (pushBehaviourState(true, true)) {
-      lastPush = now;
-      lastPushedValue = currentValue;
-      OLOG(LOG_NOTICE, "successfully pushed value = %0.3f %s", lastPushedValue, getSensorUnitText().c_str());
-      if (hasDefinedState() && maxPushInterval>0) {
+      mLastPush = now;
+      mLastPushedValue = mCurrentValue;
+      OLOG(LOG_NOTICE, "successfully pushed value = %0.3f %s", mLastPushedValue, getSensorUnitText().c_str());
+      if (hasDefinedState() && mMaxPushInterval>0) {
         // schedule re-push of defined value
-        updateTicket.executeOnce(boost::bind(&SensorBehaviour::pushSensor, this, true), maxPushInterval);
+        mUpdateTicket.executeOnce(boost::bind(&SensorBehaviour::pushSensor, this, true), mMaxPushInterval);
       }
       return true;
     }
@@ -436,20 +436,20 @@ void SensorBehaviour::reportFinalValue()
 {
   // push the current value (after awaiting minPushInterval)
   if (pushBehaviourState(true, true)) {
-    OLOG(LOG_NOTICE, "now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", currentValue, getSensorUnitText().c_str());
-    lastPush = MainLoop::currentMainLoop().now();
-    lastPushedValue = currentValue;
+    OLOG(LOG_NOTICE, "now pushed finally settled value (%0.3f %s) after awaiting minPushInterval", mCurrentValue, getSensorUnitText().c_str());
+    mLastPush = MainLoop::currentMainLoop().now();
+    mLastPushedValue = mCurrentValue;
   }
 }
 
 
 void SensorBehaviour::invalidateSensorValue(bool aPush)
 {
-  if (lastUpdate!=Never) {
+  if (mLastUpdate!=Never) {
     // currently valid -> invalidate
-    lastUpdate = Never;
-    currentValue = 0;
-    updateTicket.cancel();
+    mLastUpdate = Never;
+    mCurrentValue = 0;
+    mUpdateTicket.cancel();
     OLOG(LOG_NOTICE, "reports value no longer available");
     if (aPush) {
       // push invalidation (primitive clients not capable of NULL will at least see value==0)
@@ -465,15 +465,15 @@ void SensorBehaviour::invalidateSensorValue(bool aPush)
 
 bool SensorBehaviour::hasCurrentValue(MLMicroSeconds aMaxAge)
 {
-  if (lastUpdate==Never) return false; // no value at all
+  if (mLastUpdate==Never) return false; // no value at all
   MLMicroSeconds now = MainLoop::now();
-  return now < lastUpdate+aMaxAge;
+  return now < mLastUpdate+aMaxAge;
 }
 
 
 bool SensorBehaviour::hasDefinedState()
 {
-  return lastUpdate!=Never;
+  return mLastUpdate!=Never;
 }
 
 
@@ -576,12 +576,12 @@ static string rrdminmax(double aMin, double aMax)
 
 void SensorBehaviour::prepareLogging()
 {
-  if (!loggingReady && !rrdbconfig.empty() && rrdbfile.empty()) {
+  if (!mLoggingReady && !mRRDBconfig.empty() && mRRDBfile.empty()) {
     // configured but not yet prepared to log
     // Note: not ready and rrdbfile NOT empty means that we could not start logging due to a problem (-> no op)
     // always need to parse config first to get update statement, maybe to (re-)create file
     ArgsVector cfgArgs;
-    const char *p = rrdbconfig.c_str();
+    const char *p = mRRDBconfig.c_str();
     string arg;
     bool autoRaw = false;
     bool autoFiltered = false;
@@ -636,7 +636,7 @@ void SensorBehaviour::prepareLogging()
         // update statement in case no autods is in use (any autods use will create a update string automatically)
         // Syntax update:<rrdb update string with %R, %F and %P placeholders>
         autoUpdate = false;
-        rrdbupdate = arg.substr(7); // rest of string is considered update string
+        mRRDBupdate = arg.substr(7); // rest of string is considered update string
       }
       else {
         // is regular RRD create argument, use as-is
@@ -644,61 +644,61 @@ void SensorBehaviour::prepareLogging()
       }
     }
     // in any case, we need the update statement
-    loggingReady = true; // assume true
+    mLoggingReady = true; // assume true
     if (autoUpdate) {
-      rrdbupdate = "N";
-      if (autoRaw) rrdbupdate += ":%R";
-      if (autoFiltered) rrdbupdate += ":%F";
-      if (autoPushed) rrdbupdate += ":%P";
-      if (rrdbupdate.size()<4) {
+      mRRDBupdate = "N";
+      if (autoRaw) mRRDBupdate += ":%R";
+      if (autoFiltered) mRRDBupdate += ":%F";
+      if (autoPushed) mRRDBupdate += ":%P";
+      if (mRRDBupdate.size()<4) {
         OLOG(LOG_WARNING, "Cannot create RRD update string, missing 'auto..' or 'update' config");
-        rrdbupdate = "";
-        loggingReady = false; // no point in trying
+        mRRDBupdate = "";
+        mLoggingReady = false; // no point in trying
       }
     }
     // use or create rrd file
-    rrdbfile = Application::sharedApplication()->tempPath(rrdbpath);
-    if (rrdbpath.empty() || rrdbfile[rrdbfile.size()-1]=='/') {
+    mRRDBfile = Application::sharedApplication()->tempPath(mRRDBpath);
+    if (mRRDBpath.empty() || mRRDBfile[mRRDBfile.size()-1]=='/') {
       // auto-generate filename
-      pathstring_format_append(rrdbfile, "Log_%s.rrd", getSourceId().c_str());
+      pathstring_format_append(mRRDBfile, "Log_%s.rrd", getSourceId().c_str());
     }
     struct stat st;
-    if (loggingReady && stat(rrdbfile.c_str(), &st)<0 && errno==ENOENT) {
+    if (mLoggingReady && stat(mRRDBfile.c_str(), &st)<0 && errno==ENOENT) {
       // does not exist yet, create new
-      loggingReady = false; // not any more, only if we succeed in creating new file it'll get set again
-      string dsname = string_format("%.17s", sensorTypeIds[sensorType]); // 19 chars max for RRD data sources, we need 2 for suffix
+      mLoggingReady = false; // not any more, only if we succeed in creating new file it'll get set again
+      string dsname = string_format("%.17s", sensorTypeIds[mSensorType]); // 19 chars max for RRD data sources, we need 2 for suffix
       // at this spoint, cfgArgs vector contains explicitly specified RRD args from config
       // - now create the actual
       ArgsVector args;
       // command and filename
       args.push_back("rrdcreate");
-      args.push_back(rrdbfile);
+      args.push_back(mRRDBfile);
       // always start from now
       args.push_back("--start"); args.push_back("now"); // start now
       // possibly automatic --step option
       if (autoStep) {
-        step = updateInterval>15*Second ? updateInterval/Second : 15;
+        step = mUpdateInterval>15*Second ? mUpdateInterval/Second : 15;
         // use step from sensor's update interval (but not faster than once in 15 seconds)
         args.push_back("--step"); args.push_back(string_format("%ld", step)); // use sensor's native interval if known, 15sec otherwise
       }
       // possibly automatic datasources
-      long heartbeat = aliveSignInterval ? aliveSignInterval/Second : 60*60*24; // without aliveSignInterval, allow a day of no updates
+      long heartbeat = mAliveSignInterval ? mAliveSignInterval/Second : 60*60*24; // without aliveSignInterval, allow a day of no updates
       if (autoRaw) {
-        args.push_back(string_format("DS:%s_R:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
+        args.push_back(string_format("DS:%s_R:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(mMin, mMax).c_str()));
       }
       if (autoFiltered) {
-        args.push_back(string_format("DS:%s_F:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
+        args.push_back(string_format("DS:%s_F:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(mMin, mMax).c_str()));
       }
       if (autoPushed) {
-        args.push_back(string_format("DS:%s_P:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(min, max).c_str()));
+        args.push_back(string_format("DS:%s_P:GAUGE:%ld:%s", dsname.c_str(), heartbeat, rrdminmax(mMin, mMax).c_str()));
       }
       if (autoRRA) {
         // choose correct consolidation function
         if (consolidationFunc.empty()) {
           consolidationFunc = "AVERAGE";
-          if (profileP) {
-            if (profileP->evalType==eval_max) consolidationFunc = "MAX";
-            else if (profileP->evalType==eval_min) consolidationFunc = "MIN";
+          if (mProfileP) {
+            if (mProfileP->evalType==eval_max) consolidationFunc = "MAX";
+            else if (mProfileP->evalType==eval_min) consolidationFunc = "MIN";
           }
         }
         // now RRAs: RRA:consolidationFunc:xff:steps:rows
@@ -716,18 +716,18 @@ void SensorBehaviour::prepareLogging()
       }
       int ret = rrd_call(rrd_create, args);
       if (ret==0) {
-        OLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", rrdbfile.c_str());
-        loggingReady = true;
-        lastRrdUpdate = MainLoop::currentMainLoop().now(); // creation counts as update, make sure we don't immediately try to send first update afterwards
+        OLOG(LOG_INFO, "rrd: successfully created new rrd file '%s'", mRRDBfile.c_str());
+        mLoggingReady = true;
+        mLastRRDBupdate = MainLoop::currentMainLoop().now(); // creation counts as update, make sure we don't immediately try to send first update afterwards
       }
       else {
-        OLOG(LOG_ERR, "rrd: cannot create rrd file '%s': %s", rrdbfile.c_str(), rrd_get_error());
+        OLOG(LOG_ERR, "rrd: cannot create rrd file '%s': %s", mRRDBfile.c_str(), rrd_get_error());
       }
     }
     else {
       // file apparently already exists
-      OLOG(LOG_INFO, "rrd: using existing file '%s'", rrdbfile.c_str());
-      loggingReady = true;
+      OLOG(LOG_INFO, "rrd: using existing file '%s'", mRRDBfile.c_str());
+      mLoggingReady = true;
     }
   }
 }
@@ -738,30 +738,30 @@ void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue
   // make sure logging is prepared
   prepareLogging();
   // now actually log into file
-  if (loggingReady && lastRrdUpdate<aTimeStamp-10*Second) {
-    lastRrdUpdate = aTimeStamp;
+  if (mLoggingReady && mLastRRDBupdate<aTimeStamp-10*Second) {
+    mLastRRDBupdate = aTimeStamp;
     ArgsVector args;
     args.push_back("rrdupdate");
-    args.push_back(rrdbfile);
-    string ud = rrdbupdate;
+    args.push_back(mRRDBfile);
+    string ud = mRRDBupdate;
     // substitute values for placeholders
     size_t i;
     i = ud.find("%T");
     if (i!=string::npos) ud.replace(i, 2, string_format("%lld", aTimeStamp/Second).c_str());
     // - raw (considered unknown when sensor is invalid)
     i = ud.find("%R");
-    if (i!=string::npos) ud.replace(i, 2, rrdval(aRawValue, lastUpdate!=Never).c_str());
+    if (i!=string::npos) ud.replace(i, 2, rrdval(aRawValue, mLastUpdate!=Never).c_str());
     // - filtered (considered unknown when sensor is invalid)
     i = ud.find("%F");
-    if (i!=string::npos) ud.replace(i, 2, rrdval(aProcessedValue, lastUpdate!=Never).c_str());
+    if (i!=string::npos) ud.replace(i, 2, rrdval(aProcessedValue, mLastUpdate!=Never).c_str());
     // - pushed (considered unknown when never pushed, or last state pushed must have been NULL because of invalidation)
     i = ud.find("%P");
-    if (i!=string::npos) ud.replace(i, 2, rrdval(aPushedValue, lastPush!=Never && lastUpdate!=Never).c_str());
+    if (i!=string::npos) ud.replace(i, 2, rrdval(aPushedValue, mLastPush!=Never && mLastUpdate!=Never).c_str());
     args.push_back(ud);
     int ret = rrd_call(rrd_update, args);
     if (ret!=0) {
-      OLOG(LOG_WARNING, "rrd: could not update rrd data for file '%s': %s", rrdbfile.c_str(), rrd_get_error());
-      loggingReady = false; // back to not initialized, might work again after recreating file
+      OLOG(LOG_WARNING, "rrd: could not update rrd data for file '%s': %s", mRRDBfile.c_str(), rrd_get_error());
+      mLoggingReady = false; // back to not initialized, might work again after recreating file
     }
   }
 }
@@ -831,12 +831,12 @@ void SensorBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
-  aRow->getCastedIfNotNull<DsGroup, int>(aIndex++, sensorGroup);
-  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minPushInterval);
-  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, changesOnlyInterval);
+  aRow->getCastedIfNotNull<DsGroup, int>(aIndex++, mSensorGroup);
+  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, mMinPushInterval);
+  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, mChangesOnlyInterval);
   #if ENABLE_RRDB
-  aRow->getIfNotNull(aIndex++, rrdbconfig);
-  aRow->getIfNotNull(aIndex++, rrdbpath);
+  aRow->getIfNotNull(aIndex++, mRRDBconfig);
+  aRow->getIfNotNull(aIndex++, mRRDBpath);
   // make sure logging is ready (if enabled at all)
   prepareLogging();
   #endif
@@ -852,12 +852,12 @@ void SensorBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, sensorGroup);
-  aStatement.bind(aIndex++, (long long int)minPushInterval);
-  aStatement.bind(aIndex++, (long long int)changesOnlyInterval);
+  aStatement.bind(aIndex++, mSensorGroup);
+  aStatement.bind(aIndex++, (long long int)mMinPushInterval);
+  aStatement.bind(aIndex++, (long long int)mChangesOnlyInterval);
   #if ENABLE_RRDB
-  aStatement.bind(aIndex++, rrdbconfig.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
-  aStatement.bind(aIndex++, rrdbpath.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mRRDBconfig.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, mRRDBpath.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   #endif
   #if !REDUCED_FOOTPRINT
   aStatement.bind(aIndex++, mSensorFunc);
@@ -984,10 +984,10 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       switch (aPropertyDescriptor->fieldKey()) {
         // Description properties
         case sensorType_key+descriptions_key_offset:
-          aPropValue->setUint16Value(sensorType);
+          aPropValue->setUint16Value(mSensorType);
           return true;
         case sensorUsage_key+descriptions_key_offset:
-          aPropValue->setUint16Value(sensorUsage);
+          aPropValue->setUint16Value(mSensorUsage);
           return true;
         case siunit_key+descriptions_key_offset:
           aPropValue->setStringValue(valueUnitName(getSensorUnit(), false));
@@ -996,35 +996,35 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           aPropValue->setStringValue(valueUnitName(getSensorUnit(), true));
           return true;
         case min_key+descriptions_key_offset:
-          if (min==max) return false;
-          aPropValue->setDoubleValue(min);
+          if (mMin==mMax) return false;
+          aPropValue->setDoubleValue(mMin);
           return true;
         case max_key+descriptions_key_offset:
-          if (min==max) return false;
-          aPropValue->setDoubleValue(max);
+          if (mMin==mMax) return false;
+          aPropValue->setDoubleValue(mMax);
           return true;
         case resolution_key+descriptions_key_offset:
-          if (resolution==0) return false;
-          aPropValue->setDoubleValue(resolution);
+          if (mResolution==0) return false;
+          aPropValue->setDoubleValue(mResolution);
           return true;
         case updateInterval_key+descriptions_key_offset:
-          aPropValue->setDoubleValue((double)updateInterval/Second);
+          aPropValue->setDoubleValue((double)mUpdateInterval/Second);
           return true;
         case aliveSignInterval_key+descriptions_key_offset:
-          aPropValue->setDoubleValue((double)aliveSignInterval/Second);
+          aPropValue->setDoubleValue((double)mAliveSignInterval/Second);
           return true;
         case maxPushInterval_key+descriptions_key_offset:
-          aPropValue->setDoubleValue((double)maxPushInterval/Second);
+          aPropValue->setDoubleValue((double)mMaxPushInterval/Second);
           return true;
         #if ENABLE_RRDB
         case rrdbFile_key+descriptions_key_offset:
-          if (rrdbfile.empty()) return false; // only visible if there actually IS a file
-          aPropValue->setStringValue(rrdbfile);
+          if (mRRDBfile.empty()) return false; // only visible if there actually IS a file
+          aPropValue->setStringValue(mRRDBfile);
           return true;
         #endif
         // Settings properties
         case group_key+settings_key_offset:
-          aPropValue->setUint16Value(sensorGroup);
+          aPropValue->setUint16Value(mSensorGroup);
           return true;
         #if !REDUCED_FOOTPRINT
         case function_key+settings_key_offset:
@@ -1035,17 +1035,17 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         #endif
         case minPushInterval_key+settings_key_offset:
-          aPropValue->setDoubleValue((double)minPushInterval/Second);
+          aPropValue->setDoubleValue((double)mMinPushInterval/Second);
           return true;
         case changesOnlyInterval_key+settings_key_offset:
-          aPropValue->setDoubleValue((double)changesOnlyInterval/Second);
+          aPropValue->setDoubleValue((double)mChangesOnlyInterval/Second);
           return true;
         #if ENABLE_RRDB
         case rrdbPath_key+settings_key_offset:
-          aPropValue->setStringValue(rrdbpath);
+          aPropValue->setStringValue(mRRDBpath);
           return true;
         case rrdbConfig_key+settings_key_offset:
-          aPropValue->setStringValue(rrdbconfig);
+          aPropValue->setStringValue(mRRDBconfig);
           return true;
         #endif
         // States properties
@@ -1054,24 +1054,24 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (!hasDefinedState())
             aPropValue->setNull();
           else
-            aPropValue->setDoubleValue(currentValue);
+            aPropValue->setDoubleValue(mCurrentValue);
           return true;
         case age_key+states_key_offset:
           // age
           if (!hasDefinedState())
             aPropValue->setNull();
           else
-            aPropValue->setDoubleValue((double)(MainLoop::now()-lastUpdate)/Second);
+            aPropValue->setDoubleValue((double)(MainLoop::now()-mLastUpdate)/Second);
           return true;
         case contextid_key+states_key_offset:
           // context ID
-          if (!hasDefinedState() || contextId<0) return false; // not available
-          aPropValue->setUint32Value((int32_t)contextId);
+          if (!hasDefinedState() || mContextId<0) return false; // not available
+          aPropValue->setUint32Value((int32_t)mContextId);
           return true;
         case contextmsg_key+states_key_offset:
           // context message
-          if (!hasDefinedState() || contextMsg.empty()) return false; // not available
-          aPropValue->setStringValue(contextMsg);
+          if (!hasDefinedState() || mContextMsg.empty()) return false; // not available
+          aPropValue->setStringValue(mContextMsg);
           return true;
       }
     }
@@ -1080,7 +1080,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case group_key+settings_key_offset:
-          setPVar(sensorGroup, (DsGroup)aPropValue->int32Value());
+          setPVar(mSensorGroup, (DsGroup)aPropValue->int32Value());
           return true;
         #if !REDUCED_FOOTPRINT
         case function_key+settings_key_offset:
@@ -1091,21 +1091,21 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         #endif
         case minPushInterval_key+settings_key_offset:
-          setPVar(minPushInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
+          setPVar(mMinPushInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
         case changesOnlyInterval_key+settings_key_offset:
-          setPVar(changesOnlyInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
+          setPVar(mChangesOnlyInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
         #if ENABLE_RRDB
         case rrdbPath_key+settings_key_offset:
-          if (setPVar(rrdbpath, aPropValue->stringValue())) {
-            rrdbfile.clear(); // force re-setup of rrdb logging
+          if (setPVar(mRRDBpath, aPropValue->stringValue())) {
+            mRRDBfile.clear(); // force re-setup of rrdb logging
             prepareLogging();
           }
           return true;
         case rrdbConfig_key+settings_key_offset:
-          if (setPVar(rrdbconfig, aPropValue->stringValue())) {
-            rrdbfile.clear(); // force re-setup of rrdb logging
+          if (setPVar(mRRDBconfig, aPropValue->stringValue())) {
+            mRRDBfile.clear(); // force re-setup of rrdb logging
             prepareLogging();
           }
           return true;
@@ -1125,8 +1125,8 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
 string SensorBehaviour::description()
 {
   string s = string_format("%s behaviour", shortDesc().c_str());
-  string_format_append(s, "\n- sensor type: %d, min: %0.1f, max: %0.1f, resolution: %0.3f, interval: %lld mS", sensorType, min, max, resolution, updateInterval/MilliSecond);
-  string_format_append(s, "\n- minimal interval between pushes: %lld mS, aliveSignInterval: %lld mS", minPushInterval/MilliSecond, aliveSignInterval/MilliSecond);
+  string_format_append(s, "\n- sensor type: %d, min: %0.1f, max: %0.1f, resolution: %0.3f, interval: %lld mS", mSensorType, mMin, mMax, mResolution, mUpdateInterval/MilliSecond);
+  string_format_append(s, "\n- minimal interval between pushes: %lld mS, aliveSignInterval: %lld mS", mMinPushInterval/MilliSecond, mAliveSignInterval/MilliSecond);
   s.append(inherited::description());
   return s;
 }
