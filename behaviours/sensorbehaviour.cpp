@@ -45,6 +45,9 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   mSensorFunc(sensorFunc_standard),
   mSensorChannel(channeltype_default),
   #endif
+  #if ENABLE_JSONBRIDGEAPI
+  mBridgeExclusive(false),
+  #endif
   // state
   #if ENABLE_RRDB
   mLoggingReady(false),
@@ -222,6 +225,15 @@ string SensorBehaviour::getAutoId()
   return sensorTypeIds[mSensorType];
 }
 
+
+bool SensorBehaviour::isBridgeExclusive()
+{
+  #if ENABLE_JSONBRIDGEAPI
+  return mDevice.isBridged() && mBridgeExclusive;
+  #else
+  return false;
+  #endif
+}
 
 
 ValueUnit SensorBehaviour::getSensorUnit()
@@ -427,6 +439,13 @@ bool SensorBehaviour::pushSensor(bool aAlways)
     else if (mDevice.isPublicDS() || mDevice.isBridged()) {
       OLOG(LOG_NOTICE, "could not be pushed");
     }
+    #if ENABLE_LOCALCONTROLLER
+    // also let vdchost know for local dimmer dial handling etc.
+    // TODO: maybe more elegant solution for this
+    if (!isBridgeExclusive()) {
+      mDevice.getVdcHost().checkForLocalSensorHandling(*this, mCurrentValue);
+    }
+    #endif
   }
   return false;
 }
@@ -923,6 +942,9 @@ enum {
   #endif
   minPushInterval_key,
   changesOnlyInterval_key,
+  #if ENABLE_JSONBRIDGEAPI
+  bridgeExclusive_key,
+  #endif
   #if ENABLE_RRDB
   rrdbPath_key,
   rrdbConfig_key,
@@ -942,6 +964,9 @@ const PropertyDescriptorPtr SensorBehaviour::getSettingsDescriptorByIndex(int aP
     #endif
     { "minPushInterval", apivalue_double, minPushInterval_key+settings_key_offset, OKEY(sensor_key) },
     { "changesOnlyInterval", apivalue_double, changesOnlyInterval_key+settings_key_offset, OKEY(sensor_key) },
+    #if ENABLE_JSONBRIDGEAPI
+    { "x-p44-bridgeExclusive", apivalue_bool, bridgeExclusive_key+settings_key_offset, OKEY(sensor_key) },
+    #endif
     #if ENABLE_RRDB
     { "x-p44-rrdFilePath", apivalue_string, rrdbPath_key+settings_key_offset, OKEY(sensor_key) },
     { "x-p44-rrdConfig", apivalue_string, rrdbConfig_key+settings_key_offset, OKEY(sensor_key) },
@@ -1040,6 +1065,12 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case changesOnlyInterval_key+settings_key_offset:
           aPropValue->setDoubleValue((double)mChangesOnlyInterval/Second);
           return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case bridgeExclusive_key+settings_key_offset:
+          if (!mDevice.isBridged()) return false; // hide when not bridged
+          aPropValue->setBoolValue(mBridgeExclusive);
+          return true;
+        #endif
         #if ENABLE_RRDB
         case rrdbPath_key+settings_key_offset:
           aPropValue->setStringValue(mRRDBpath);
@@ -1096,6 +1127,12 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case changesOnlyInterval_key+settings_key_offset:
           setPVar(mChangesOnlyInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case bridgeExclusive_key+settings_key_offset:
+          // volatile, does not make settings dirty
+          mBridgeExclusive = aPropValue->boolValue();
+          return true;
+        #endif
         #if ENABLE_RRDB
         case rrdbPath_key+settings_key_offset:
           if (setPVar(mRRDBpath, aPropValue->stringValue())) {

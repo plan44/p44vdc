@@ -42,6 +42,7 @@ namespace p44 {
   class Vdc;
   class Device;
   class ButtonBehaviour;
+  class SensorBehaviour;
   class DsUid;
   class LocalController;
   class NotificationDeliveryState;
@@ -487,6 +488,14 @@ namespace p44 {
     /// @param aClickType the type of click
     /// @return true if locally handled
     bool checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
+
+    #if ENABLE_LOCALCONTROLLER
+    /// have sensor changes checked for local handling
+    /// @param aSensorBehaviour the sensor behaviour that has pushed a change
+    /// @param aCurrentValue the current sensor value
+    /// @return true if acted on the change locally
+    bool checkForLocalSensorHandling(SensorBehaviour &aSensorBehaviour, double aCurrentValue);
+    #endif
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object

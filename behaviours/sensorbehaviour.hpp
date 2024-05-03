@@ -101,6 +101,9 @@ namespace p44 {
   {
     typedef DsBehaviour inherited;
     friend class Device;
+    friend class VdcHost;
+    friend class LocalController; // for full standalone mode
+    friend class ProxyDevice; // for proxy behaviour setup
 
     MLTicket mInvalidatorTicket;
     MLTicket mUpdateTicket;
@@ -146,6 +149,9 @@ namespace p44 {
     int32_t mContextId; ///< context ID for the value - <0 = none
     string mContextMsg; ///< context message for the value - empty=none
     WindowEvaluatorPtr mFilter; ///< filter
+    #if ENABLE_JSONBRIDGEAPI
+    bool mBridgeExclusive; ///< if set, non-default sensor functions are only forwarded to bridges (if any is connected)
+    #endif
     #if ENABLE_RRDB
     bool mLoggingReady; ///< if set, logging is ready
     MLMicroSeconds mLastRRDBupdate; ///< set when rrd was last updated
@@ -229,6 +235,9 @@ namespace p44 {
     ///   (setting eval_none restores sensor-type specific filtering, if any)
     void setFilter(WinEvalMode aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime);
 
+    /// @return true when sensor changes should be forwarded to bridge clients only, and NOT get processed locally
+    bool isBridgeExclusive();
+
     /// @name interface towards actual device hardware (or simulation)
     /// @{
 
@@ -239,10 +248,10 @@ namespace p44 {
     /// update sensor value (when new value received from hardware)
     /// @param aValue the new value from the sensor, in physical units according to sensorType (VdcSensorType)
     /// @param aMinChange what minimum change the new value must have compared to last reported value
+    ///   to be treated as a change. Default is -1, which means half the declared resolution.
     /// @param aPush set when change should be pushed. Can be set to false to use manual pushSensor() later
     /// @param aContextId -1 for none, or positive integer identifying a context
     /// @param aContextMsg empty for none, or string describing a context
-    ///   to be treated as a change. Default is -1, which means half the declared resolution.
     void updateSensorValue(double aValue, double aMinChange = -1, bool aPush = true, int32_t aContextId = -1, const char *aContextMsg = NULL);
 
     /// sensor value change occurred

@@ -1015,6 +1015,21 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
 }
 
 
+#if ENABLE_LOCALCONTROLLER
+bool VdcHost::checkForLocalSensorHandling(SensorBehaviour &aSensorBehaviour, double aCurrentValue)
+{
+  if (mLocalController) {
+    if (mLocalController->processSensorChange(aSensorBehaviour, aCurrentValue)) {
+      LOG(LOG_INFO, "localcontroller has acted on change of Sensor[%zu] '%s' in %s", aSensorBehaviour.mIndex, aSensorBehaviour.getHardwareName().c_str(), aSensorBehaviour.mDevice.shortDesc().c_str());
+      return true; // acted on the change
+    }
+  }
+  return false; // nothing happened due to sensor change
+}
+#endif
+
+
+
 // MARK: - notification delivery
 
 

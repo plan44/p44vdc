@@ -435,13 +435,12 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
         }
         // we may need the channel (for dimmer "sensors")
         if (props->get("channel", o)) {
-          // TODO: enable when ready
-          //sb->mSensorChannel = static_cast<DsChannelType>(o->int32Value());
+          sb->mSensorChannel = static_cast<DsChannelType>(o->int32Value());
         }
         // we may need the function (for dimmer "sensors")
         if (props->get("function", o)) {
           // TODO: enable when ready
-          //sb->mSensorFunction = static_cast<VdcSensorFunc>(o->int32Value());
+          sb->mSensorFunc = static_cast<VdcSensorFunc>(o->int32Value());
         }
       }
     }
@@ -507,6 +506,10 @@ void ProxyDevice::configureStructure(JsonObjectPtr aDeviceJSON)
       // - completely generic description is sufficient here
       sb->setHardwareName("proxy sensor");
       addBehaviour(sb);
+      // make sensor bridge exclusive
+      JsonObjectPtr p = JsonObject::newBool(true);
+      p = p->wrapAs("x-p44-bridgeExclusive")->wrapAs(id)->wrapAs("sensorSettings")->wrapAs("properties");
+      call("setProperty", p, NoOP);
     }
   }
   // get the properties we cache locally for addressing and information

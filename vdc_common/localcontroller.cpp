@@ -33,6 +33,7 @@
 
 #include "outputbehaviour.hpp"
 #include "buttonbehaviour.hpp"
+#include "sensorbehaviour.hpp"
 #include "simplescene.hpp"
 
 #include "timeutils.hpp"
@@ -1515,6 +1516,60 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
     LOG(LOG_INFO, ">>> localcontroller done processing event %d", (int)aActivity);
   }
 }
+
+
+bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue)
+{
+  DsZoneID zoneID = aSensorBehaviour.mDevice.getZoneID();
+  int area = 0;
+  switch (aSensorBehaviour.mSensorFunc) {
+    default:
+    case sensorFunc_standard:
+    case sensorFunc_app:
+      return false;
+    case sensorFunc_dimmer_area1: area = 1; break;
+    case sensorFunc_dimmer_area2: area = 2; break;
+    case sensorFunc_dimmer_area3: area = 3; break;
+    case sensorFunc_dimmer_area4: area = 4; break;
+    case sensorFunc_dimmer_global: zoneID = zoneId_global;
+    case sensorFunc_dimmer_room: break;
+  }
+  DsGroup group = aSensorBehaviour.mSensorGroup;
+  DsChannelType channelType = aSensorBehaviour.mSensorChannel;
+  // deliver the channel change
+  NotificationAudience audience;
+  mVdcHost.addToAudienceByZoneAndGroup(audience, zoneID, group);
+  JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
+  params->setType(apivalue_object);
+  // - define audience
+  params->add("zone_id", params->newUint64(zoneID));
+  params->add("group", params->newUint64(group));
+  string method = "setOutputChannelValue";
+  if (aSensorBehaviour.mSensorType==sensorType_percent_speed) {
+    // set dimming speed
+    int dir = 0;
+    if (aCurrentValue>0) dir = 1;
+    else if (aCurrentValue<0) dir = -1;
+    params->add("move", params->newInt64(dir));
+    params->add("rate", params->newDouble(fabs(aCurrentValue)));
+  }
+  else {
+    // limit value range to percentage
+    if (aCurrentValue>100) aCurrentValue = 100;
+    else if (aCurrentValue<0) aCurrentValue = 0;
+    params->add("value", params->newDouble(aCurrentValue));
+    double tt = (double)aSensorBehaviour.mMinPushInterval/Second;
+    if (tt>0.5) tt = 0.5; // not too slow
+    params->add("transitionTime", params->newDouble(tt));
+  }
+  params->add("channel", params->newUint64(channelType));
+  params->add("area", params->newUint64(area));
+  // - deliver
+  mVdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
+  LocalController::sharedLocalController()->signalActivity(); // local dimming is activity
+  return true; // acted upon sensor change
+}
+
 
 
 bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)

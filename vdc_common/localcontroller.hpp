@@ -513,6 +513,13 @@ namespace p44 {
     /// @return true if click could be handled
     bool processButtonClick(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
 
+    /// called when sensor value is pushed
+    /// @param aSensorBehaviour the sensor behaviour that has pushed a change
+    /// @param aCurrentValue the current sensor value
+    /// @return true if acted on the change locally
+    bool processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue);
+
+
     /// device was added
     /// @param aDevice device being added
     void deviceAdded(DevicePtr aDevice);
