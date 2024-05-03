@@ -211,17 +211,17 @@ void ProxyVdc::bridgeApiNotificationHandler(ErrorPtr aError, JsonObjectPtr aJson
           // device exists, dispatch
           if (aJsonMsg->get("notification", o, true)) {
             string notification = o->stringValue();
-            POLOG(dev, LOG_INFO, "Notification '%s' received: %s", notification.c_str(), JsonObject::text(aJsonMsg));
+            POLOG(dev, LOG_INFO, "bridge notification '%s' received: %s", notification.c_str(), JsonObject::text(aJsonMsg));
             bool handled = dev->handleBridgedDeviceNotification(notification, aJsonMsg);
             if (handled) {
-              POLOG(dev, LOG_INFO, "processed notification");
+              POLOG(dev, LOG_INFO, "processed bridge notification");
             }
             else {
-              POLOG(dev, LOG_ERR, "could not handle notification '%s'", notification.c_str());
+              POLOG(dev, LOG_ERR, "could not handle bridge notification '%s'", notification.c_str());
             }
           }
           else {
-            POLOG(dev, LOG_ERR, "unknown request for device");
+            POLOG(dev, LOG_ERR, "unknown bridge request for device");
           }
           // done with this notification
           return;
