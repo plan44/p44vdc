@@ -666,6 +666,12 @@ namespace p44 {
     /// @param aParams the parameters of the notification
     virtual void deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams);
 
+    /// utility for deliverToDevicesAudience implementations: create a delivery state
+    /// @param aNotification the name of the notification
+    /// @param aParams the parameters of the notification
+    /// @param aPrepared do basic preparation (for using the delivery state in non-optimized cases)
+    NotificationDeliveryStatePtr createDeliveryState(const string &aNotification, ApiValuePtr aParams, bool aPrepared);
+
     /// @}
 
 

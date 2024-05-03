@@ -276,30 +276,54 @@ static const char *NotificationNames[numNotificationTypes] = {
 };
 
 
-void Vdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+NotificationDeliveryStatePtr Vdc::createDeliveryState(const string &aNotification, ApiValuePtr aParams, bool aPrepared)
 {
+  NotificationDeliveryStatePtr nds;
+  ApiValuePtr o;
   if (aNotification=="callScene") {
     // call scene
-    NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState(*this));
-    ApiValuePtr o = aParams->get("optimize");
+    nds = NotificationDeliveryStatePtr(new NotificationDeliveryState(*this));
+    o = aParams->get("optimize");
     if (o) {
       nds->mOptimizeHint = o->boolValue() ? yes : no;
     }
-    nds->mConnection = aApiConnection; // keep that so processing can know which connection posted the request
-    nds->mAudience = aAudience;
     nds->mCallType = ntfy_callscene;
     nds->mCallParams = aParams;
-    nds->mOptimizedType = ntfy_undefined; // first device will decide (callScene might become dimChannel)
-    queueDelivery(nds);
-    return;
+    nds->mOptimizedType = aPrepared ? ntfy_callscene : ntfy_undefined; // when optimized: first device will decide (callScene might become dimChannel)
+    if (aPrepared) {
+      if ((o = aParams->get("scene"))) {
+        nds->mContentId = o->int32Value();
+      }
+    }
   }
   else if (aNotification=="dimChannel") {
     // start or stop dimming a channel
-    NotificationDeliveryStatePtr nds = NotificationDeliveryStatePtr(new NotificationDeliveryState(*this));
-    nds->mAudience = aAudience;
+    nds = NotificationDeliveryStatePtr(new NotificationDeliveryState(*this));
     nds->mCallType = ntfy_dimchannel;
     nds->mCallParams = aParams;
     nds->mOptimizedType = ntfy_dimchannel; // dimchannel will always remain dimchannel
+    if (aPrepared) {
+      if ((o = aParams->get("mode"))) {
+        nds->mActionVariant = o->int32Value();
+      }
+      nds->mActionParam = channeltype_default; // assume default
+      // FIXME: we cannot support channelID here because device might not actually have the channels (proxy case)
+      if ((o = aParams->get("channel"))) {
+        nds->mActionParam = o->int32Value();
+      }
+    }
+  }
+  return nds;
+}
+
+
+
+void Vdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
+{
+  NotificationDeliveryStatePtr nds = createDeliveryState(aNotification, aParams, false);
+  if (nds) {
+    nds->mConnection = aApiConnection; // keep that so processing can know which connection posted the request
+    nds->mAudience = aAudience;
     queueDelivery(nds);
     return;
   }

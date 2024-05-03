@@ -25,7 +25,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 6
+#define FOCUSLOGLEVEL 7
 
 #include "proxyvdc.hpp"
 #include "proxydevice.hpp"
@@ -356,7 +356,15 @@ void ProxyVdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConn
   JsonObjectPtr params = JsonApiValue::getAsJson(aParams);
   JsonObjectPtr targetDSUIDs = JsonObject::newArray();
   for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
-    targetDSUIDs->arrayAppend(JsonObject::newString((*apos)->getDsUid().getString()));
+    DevicePtr dev = boost::dynamic_pointer_cast<Device>(*apos);
+    if (dev) {
+      targetDSUIDs->arrayAppend(JsonObject::newString(dev->getDsUid().getString()));
+      // also need to announce delivery for local zone tracking
+      NotificationDeliveryStatePtr nds = createDeliveryState(aNotification, aParams, true);
+      if (nds) {
+        getVdcHost().deviceWillApplyNotification(dev, *nds); // let vdchost process for possibly updating global zone state
+      }
+    }
   }
   params->add("dSUID", targetDSUIDs);
   OLOG(LOG_INFO, "===== '%s' delivery to %d proxy devices starts now", aNotification.c_str(), targetDSUIDs->arrayLength());

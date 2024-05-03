@@ -51,7 +51,7 @@ BinaryInputBehaviour::~BinaryInputBehaviour()
 
 
 
-const char *inputTypeIds[numVdcSensorTypes] = {
+const char *inputTypeIds[numBinaryInputTypes] = {
   "generic", ///< no system function
   "presence", ///< Presence
   "light", ///< Light
