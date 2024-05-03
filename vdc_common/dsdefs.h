@@ -401,6 +401,7 @@ typedef enum {
   binInpType_initStatus = 21, ///< can indicate when not all functions are ready yet
   binInpType_malfunction = 22, ///< malfunction, device needs maintainance, cannot operate
   binInpType_service = 23, ///< device needs service, but can still operate normally at the moment
+  numBinaryInputTypes
 } DsBinaryInputType;
 
 
@@ -498,8 +499,22 @@ typedef enum {
   sensorType_length = 29, ///< Length in meters
   sensorType_mass = 30, ///< mass in grams
   sensorType_duration = 31, ///< time in seconds
+  sensorType_percent = 32, ///< absolute percentage 0..100% (for user dimmers)
+  sensorType_percent_speed = 33, ///< change speed in % of full range per second (for user dimmers)
   numVdcSensorTypes
 } VdcSensorType;
+
+
+/// P44-only sensor function extension - aliased to DS button functions
+typedef enum {
+  sensorFunc_standard = buttonFunc_device, ///< standard sensor
+  sensorFunc_dimmer_area1 = buttonFunc_area1_preset0x, ///< area1 dimmer
+  sensorFunc_dimmer_area2 = buttonFunc_area2_preset0x, ///< area2 dimmer
+  sensorFunc_dimmer_area3 = buttonFunc_area3_preset0x, ///< area3 dimmer
+  sensorFunc_dimmer_area4 = buttonFunc_area4_preset0x, ///< area4 dimmer
+  sensorFunc_dimmer_room  = buttonFunc_room_preset0x, ///< room dimmer
+  sensorFunc_app = buttonFunc_app, ///< application specific button
+} VdcSensorFunc;
 
 
 /// technical value types

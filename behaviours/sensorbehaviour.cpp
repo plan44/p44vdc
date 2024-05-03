@@ -41,6 +41,10 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   minPushInterval(30*Second), // default unless sensor type profile sets another value
   maxPushInterval(0),
   changesOnlyInterval(30*Minute), // report unchanged values only rarely by default (note: before 2021-09-16 we did not have a default limit here)
+  #if !REDUCED_FOOTPRINT
+  mSensorFunc(sensorFunc_standard),
+  mSensorChannel(channeltype_default),
+  #endif
   // state
   #if ENABLE_RRDB
   loggingReady(false),
@@ -97,6 +101,8 @@ const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
   VALUE_UNIT(valueUnit_meter, unitScaling_1), ///< Length in meters
   VALUE_UNIT(valueUnit_gram, unitScaling_1), ///< mass in grams
   VALUE_UNIT(valueUnit_second, unitScaling_1), ///< time in seconds
+  VALUE_UNIT(valueUnit_percent, unitScaling_1), ///< absolute percentage 0..100% (for user dimmers)
+  VALUE_UNIT(valueUnit_percent, unitScaling_1), ///< change speed in % of full range per second (for user dimmers)
 };
 
 
@@ -133,6 +139,8 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
   "length", ///< Length in meters
   "mass", ///< mass in grams
   "time", ///< duration in seconds
+  "percent", ///< absolute percent value
+  "percent_speed", ///< relative speed in % of full range per second
 };
 
 
@@ -142,6 +150,8 @@ static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
   // user dials
   { sensorType_set_point,      usage_user,     0,         0,               eval_none,                 3*Second,  60*Minute,    0,         tr_absolute,                0,      0 },
   { sensorType_temperature,    usage_user,     0,         0,               eval_none,                 3*Second,  60*Minute,    0,         tr_absolute,                0,      0 },
+  { sensorType_percent,        usage_user,     0,         0,               eval_none,                 Second/5,  60*Minute,    0,         tr_absolute,                0,      0 },
+  { sensorType_percent_speed,  usage_user,     0,         0,               eval_none,                 Second/5,  60*Minute,    0,         tr_absolute,                0,      0 },
   // indoor context
   { sensorType_temperature,    usage_room,     0,         0,               eval_none,                 5*Minute,  60*Minute,    0.5,       tr_absolute,                -100,   1*Second /* = "immediate" */ },
   { sensorType_humidity,       usage_room,     0,         0,               eval_none,                 30*Minute, 60*Minute,    2,         tr_absolute,                -1,     1*Second /* = "immediate" */ },
@@ -773,11 +783,18 @@ const char *SensorBehaviour::tableName()
 // data field definitions
 
 
+#define RRDB_FIELDS 0
+#define NON_RED_FP_FIELDS 0
 #if ENABLE_RRDB
-static const size_t numFields = 5;
-#else
-static const size_t numFields = 3;
+  #undef RRDB_FIELDS
+  #define RRDB_FIELDS 2
 #endif
+#if !REDUCED_FOOTPRINT
+  #undef NON_RED_FP_FIELDS
+  #define NON_RED_FP_FIELDS 2
+#endif
+
+static const size_t numFields = 3+RRDB_FIELDS+NON_RED_FP_FIELDS;
 
 size_t SensorBehaviour::numFieldDefs()
 {
@@ -794,6 +811,10 @@ const FieldDefinition *SensorBehaviour::getFieldDef(size_t aIndex)
     #if ENABLE_RRDB
     { "rrdbConfig", SQLITE_TEXT },
     { "rrdbPath", SQLITE_TEXT },
+    #endif
+    #if !REDUCED_FOOTPRINT
+    { "sensorFunc", SQLITE_INTEGER },
+    { "sensorChannel", SQLITE_INTEGER },
     #endif
   };
   if (aIndex<inherited::numFieldDefs())
@@ -819,6 +840,10 @@ void SensorBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
   // make sure logging is ready (if enabled at all)
   prepareLogging();
   #endif
+  #if !REDUCED_FOOTPRINT
+  aRow->getCastedIfNotNull<VdcSensorFunc, int>(aIndex++, mSensorFunc);
+  aRow->getCastedIfNotNull<DsChannelType, int>(aIndex++, mSensorChannel);
+  #endif
 }
 
 
@@ -833,6 +858,10 @@ void SensorBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
   #if ENABLE_RRDB
   aStatement.bind(aIndex++, rrdbconfig.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
   aStatement.bind(aIndex++, rrdbpath.c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  #endif
+  #if !REDUCED_FOOTPRINT
+  aStatement.bind(aIndex++, mSensorFunc);
+  aStatement.bind(aIndex++, mSensorChannel);
   #endif
 }
 
@@ -888,6 +917,10 @@ const PropertyDescriptorPtr SensorBehaviour::getDescDescriptorByIndex(int aPropI
 
 enum {
   group_key,
+  #if !REDUCED_FOOTPRINT
+  function_key,
+  channel_key,
+  #endif
   minPushInterval_key,
   changesOnlyInterval_key,
   #if ENABLE_RRDB
@@ -903,6 +936,10 @@ const PropertyDescriptorPtr SensorBehaviour::getSettingsDescriptorByIndex(int aP
 {
   static const PropertyDescription properties[numSettingsProperties] = {
     { "group", apivalue_uint64, group_key+settings_key_offset, OKEY(sensor_key) },
+    #if !REDUCED_FOOTPRINT
+    { "function", apivalue_uint64, function_key+settings_key_offset, OKEY(sensor_key) },
+    { "channel", apivalue_uint64, channel_key+settings_key_offset, OKEY(sensor_key) },
+    #endif
     { "minPushInterval", apivalue_double, minPushInterval_key+settings_key_offset, OKEY(sensor_key) },
     { "changesOnlyInterval", apivalue_double, changesOnlyInterval_key+settings_key_offset, OKEY(sensor_key) },
     #if ENABLE_RRDB
@@ -989,6 +1026,14 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case group_key+settings_key_offset:
           aPropValue->setUint16Value(sensorGroup);
           return true;
+        #if !REDUCED_FOOTPRINT
+        case function_key+settings_key_offset:
+          aPropValue->setUint16Value(mSensorFunc);
+          return true;
+        case channel_key+settings_key_offset:
+          aPropValue->setUint16Value(mSensorChannel);
+          return true;
+        #endif
         case minPushInterval_key+settings_key_offset:
           aPropValue->setDoubleValue((double)minPushInterval/Second);
           return true;
@@ -1037,6 +1082,14 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case group_key+settings_key_offset:
           setPVar(sensorGroup, (DsGroup)aPropValue->int32Value());
           return true;
+        #if !REDUCED_FOOTPRINT
+        case function_key+settings_key_offset:
+          setPVar(mSensorFunc, (VdcSensorFunc)aPropValue->int32Value());
+          return true;
+        case channel_key+settings_key_offset:
+          setPVar(mSensorChannel, (DsChannelType)aPropValue->int32Value());
+          return true;
+        #endif
         case minPushInterval_key+settings_key_offset:
           setPVar(minPushInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
