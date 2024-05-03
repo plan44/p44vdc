@@ -281,6 +281,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
   }
   if (aProps->get("x-p44-bridgeable", o)) {
     // note: bridgeable status just treated like presence
+    FOCUSOLOG("update bridgeable state to %d", o->boolValue());
     updatePresenceState(o->boolValue());
   }
   // input states we actually need to propagate
@@ -289,6 +290,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     while(elements->nextKeyValue(id, props)) {
       if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
         // update plain button state first
+        FOCUSOLOG("process button '%s' state push: %s", id.c_str(), JsonObject::text(props));
         if (props->get("value", o)) {
           bb->injectState(o->boolValue());
         }
@@ -309,6 +311,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
+        FOCUSOLOG("process input '%s' state push: %s", id.c_str(), JsonObject::text(props));
         if (props->get("value", o)) {
           if (o->isType(json_type_null)) ib->invalidateInputState();
           else ib->updateInputState(o->int32Value());
@@ -320,6 +323,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
+        FOCUSOLOG("process sensor '%s' state push: %s", id.c_str(), JsonObject::text(props));
         if (props->get("value", o)) {
           if (o->isType(json_type_null)) sb->invalidateSensorValue();
           else sb->updateSensorValue(o->doubleValue());
@@ -339,6 +343,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
       // forward push to upstream bridges
       VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
       if (api) {
+        FOCUSOLOG("forward push channelStates to upstream bridges: %s", JsonObject::text(elements));
         ApiValuePtr pushedprops = api->newApiValue();
         pushedprops->setType(apivalue_object);
         ApiValuePtr data = pushedprops->newNull();
@@ -352,21 +357,26 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
   // properties we need for multicast addressing
   // - zone ID
   if (aProps->get("zoneID", o)) {
+    FOCUSOLOG("update cached zoneid to %d", o->int32Value());
     setZoneID(o->int32Value());
   }
   // - device level color class
   if (aProps->get("primaryGroup", o)) {
+    FOCUSOLOG("update cached primaryGroup to %d", o->int32Value());
     setColorClass(static_cast<DsClass>(o->int32Value()));
   }
   // - output group settings
   if (getOutput() && aProps->get("outputSettings", props)) {
+    FOCUSOLOG("updating cached output settings from: %s", JsonObject::text(props));
     // - output level color class
     if (props->get("colorClass", o)) {
+      FOCUSOLOG("- update cached colorClass to %d", o->int32Value());
       getOutput()->initColorClass(static_cast<DsClass>(o->int32Value()));
     }
     // - group memberships
     JsonObjectPtr groups;
     if (props->get("groups", groups)) {
+      FOCUSOLOG("- update cached groups to %s", JsonObject::text(groups));
       string groupstr;
       getOutput()->resetGroupMembership();
       groups->resetKeyIteration();
@@ -383,6 +393,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
+        FOCUSOLOG("update cached button '%s' settings from: %s", id.c_str(), JsonObject::text(props));
         // we need group, mode, function and channel for LocalController::processButtonClick
         if (props->get("group", o)) {
           bb->setGroup(static_cast<DsGroup>(o->int32Value()));
@@ -404,6 +415,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
+        FOCUSOLOG("update cached input '%s' settings from: %s", id.c_str(), JsonObject::text(props));
         // we may need group
         if (props->get("group", o)) {
           ib->setGroup(static_cast<DsGroup>(o->int32Value()));
@@ -416,9 +428,20 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
+        FOCUSOLOG("update cached sensor '%s' settings from: %s", id.c_str(), JsonObject::text(props));
         // we may need group
         if (props->get("group", o)) {
           sb->setGroup(static_cast<DsGroup>(o->int32Value()));
+        }
+        // we may need the channel (for dimmer "sensors")
+        if (props->get("channel", o)) {
+          // TODO: enable when ready
+          //sb->mSensorChannel = static_cast<DsChannelType>(o->int32Value());
+        }
+        // we may need the function (for dimmer "sensors")
+        if (props->get("function", o)) {
+          // TODO: enable when ready
+          //sb->mSensorFunction = static_cast<VdcSensorFunc>(o->int32Value());
         }
       }
     }
@@ -426,6 +449,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
   // other cached properties for internal purposes such as logging
   // - name
   if (aProps->get("name", o)) {
+    FOCUSOLOG("update cached name to '%s'", o->stringValue().c_str());
     initializeName(o->stringValue());
   }
   // nothing of all this must be made persistent!
