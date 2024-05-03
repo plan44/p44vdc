@@ -207,15 +207,15 @@ class ProxyDeviceRootDescriptor : public RootPropertyDescriptor
 {
   typedef RootPropertyDescriptor inherited;
 public:
-  ProxyDeviceRootDescriptor(int aApiVersion) : inherited(aApiVersion) {};
+  ProxyDeviceRootDescriptor(int aApiVersion, PropertyDescriptorPtr aParentDescriptor) : inherited(aApiVersion, aParentDescriptor) {};
   virtual bool needsPreparation(PropertyAccessMode aMode) const P44_OVERRIDE { return true; };
 };
 
 
-PropertyDescriptorPtr ProxyDevice::getContainerRootDescriptor(int aApiVersion)
+void ProxyDevice::adaptRootDescriptor(PropertyDescriptorPtr& aContainerDescriptor)
 {
-  // default to standard root descriptor
-  return PropertyDescriptorPtr(new ProxyDeviceRootDescriptor(aApiVersion));
+  // replace by modified descriptor which forces preparation
+  aContainerDescriptor = PropertyDescriptorPtr(new ProxyDeviceRootDescriptor(aContainerDescriptor->getApiVersion(), aContainerDescriptor->mParentDescriptor));
 }
 
 

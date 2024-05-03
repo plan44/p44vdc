@@ -367,7 +367,7 @@ void ProxyVdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConn
     }
   }
   params->add("dSUID", targetDSUIDs);
-  OLOG(LOG_INFO, "===== '%s' delivery to %d proxy devices starts now", aNotification.c_str(), targetDSUIDs->arrayLength());
+  OLOG(LOG_INFO, "===== '%s' forwarding to %d proxy devices starts now: %s", aNotification.c_str(), targetDSUIDs->arrayLength(), JsonObject::text(params));
   api().notify(aNotification, params);
 }
 

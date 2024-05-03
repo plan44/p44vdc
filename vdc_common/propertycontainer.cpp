@@ -35,20 +35,14 @@
 using namespace p44;
 
 
-PropertyDescriptorPtr PropertyContainer::getContainerRootDescriptor(int aApiVersion)
-{
-  // default to standard root descriptor
-  return PropertyDescriptorPtr(new RootPropertyDescriptor(aApiVersion));
-}
-
-
 void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB)
 {
   assert(aAccessCompleteCB);
   // create a list for possibly needed preparations
   PropertyPrepListPtr prepList = PropertyPrepListPtr(new PropertyPrepList);
-  // create root descriptor
-  PropertyDescriptorPtr parentDescriptor = getContainerRootDescriptor(aApiVersion);
+  // create root descriptor (with no parent, accessProperty() should be independent from who is calling it)
+  PropertyDescriptorPtr parentDescriptor = PropertyDescriptorPtr(new RootPropertyDescriptor(aApiVersion, PropertyDescriptorPtr()));
+  adaptRootDescriptor(parentDescriptor);
   // first attempt to access
   // - create result object of same API type as query
   ApiValuePtr result = aQueryObject->newNull(); // write might return a object containing ids of inserted container elements
@@ -56,6 +50,7 @@ void PropertyContainer::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQu
   ErrorPtr err = accessPropertyInternal(aMode, aQueryObject, result, aDomain, parentDescriptor, prepList, false);
   if (Error::notOK(err) || prepList->empty()) {
     // error or no need for preparation, immediately call back
+    FOCUSLOG("- accessProperty ends without need of preparations: result = %s", result->description().c_str());
     aAccessCompleteCB(result, err);
     // done
     return;
@@ -125,6 +120,7 @@ void PropertyContainer::prepareDone(PropertyPrepListPtr aPrepList, PropertyAcces
     return;
   }
   int apiVersion = aPrepList->front().mDescriptor->getApiVersion();
+  PropertyDescriptorPtr parentDescriptor = aPrepList->front().mDescriptor->mParentDescriptor;
   // done with the prep entry
   aPrepList->pop_front();
   // check if this is was last preparation
@@ -134,7 +130,9 @@ void PropertyContainer::prepareDone(PropertyPrepListPtr aPrepList, PropertyAcces
     // - reset final result
     if (aMode==access_read) aFinalResult = aQueryObject->newObject();
     // re-access with all preparation requests fulfilled (but not yet possible async recursions into accessProperty()
-    ErrorPtr err = accessPropertyInternal(aMode, aQueryObject, aFinalResult, aDomain, getContainerRootDescriptor(apiVersion), aPrepList, true);
+    PropertyDescriptorPtr propDesc = PropertyDescriptorPtr(new RootPropertyDescriptor(apiVersion, parentDescriptor));
+    adaptRootDescriptor(propDesc);
+    ErrorPtr err = accessPropertyInternal(aMode, aQueryObject, aFinalResult, aDomain, propDesc, aPrepList, true);
   }
   // check next
   prepareNext(aPrepList, aMode, aQueryObject, aDomain, aAccessCompleteCB, aFinalResult);
@@ -158,7 +156,7 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
 {
   ErrorPtr err;
   assert(aParentDescriptor);
-  FOCUSLOG("\naccessProperty: entered %swith query = %s", aPrepared ? "PREPARED " : "", aQueryObject->description().c_str());
+  FOCUSLOG("\naccessPropertyInternal: entered %swith query = %s", aPrepared ? "PREPARED " : "", aQueryObject->description().c_str());
   FOCUSLOG("- parentDescriptor '%s' (%s, %s), fieldKey=%zu, objectKey=%ld",
     aParentDescriptor->name(),
     aParentDescriptor->isStructured() ? "structured" : "scalar",
@@ -249,9 +247,11 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
                   FOCUSLOG("  - container for '%s' is 0x%p", propDesc->name(), container.get());
                   if (container!=this) {
                     // switching to another C++ object -> starting at root level in that object
-                    // - let the object itself produce its root descriptor
-                    containerPropDesc = container->getContainerRootDescriptor(propDesc->getApiVersion());
                     FOCUSLOG("  - container is not the same object");
+                    // - mark descriptor as such
+                    containerPropDesc->mRootOfObject = true;
+                    // - let the object itself possibly modify/replace its descriptor
+                    container->adaptRootDescriptor(containerPropDesc);
                   }
                   // - check new root descriptor for preparation and async re-access (e.g. for proxy)
                   if (aPreparationList && containerPropDesc->isRootOfObject() && containerPropDesc->needsPreparation(aMode)) {
@@ -267,8 +267,8 @@ ErrorPtr PropertyContainer::accessPropertyInternal(PropertyAccessMode aMode, Api
                     err = container->accessPropertyInternal(aMode, subQuery, resultValue, containerDomain, containerPropDesc, aPreparationList, aPrepared);
                     if (Error::isOK(err)) {
                       // add to result with actual name (from descriptor)
-                      FOCUSLOG("\n  <<<< RETURNED from accessProperty() recursion");
-                      FOCUSLOG("  - accessProperty of container for '%s' returns %s", propDesc->name(), resultValue->description().c_str());
+                      FOCUSLOG("\n  <<<< RETURNED from accessPropertyInternal() recursion");
+                      FOCUSLOG("  - accessPropertyInternal of container for '%s' returns %s", propDesc->name(), resultValue->description().c_str());
                       aResultObject->add(propDesc->name(), resultValue);
                     }
                   }

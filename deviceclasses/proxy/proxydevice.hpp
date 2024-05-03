@@ -92,8 +92,8 @@ namespace p44 {
     /// overridden to handle (i.e. forward) notifications TO the device
     virtual void handleNotification(const string &aNotification, ApiValuePtr aParams, StatusCB aExaminedCB) P44_OVERRIDE;
 
-    /// get this container's root descriptor.
-    virtual PropertyDescriptorPtr getContainerRootDescriptor(int aApiVersion) P44_OVERRIDE;
+    /// adapt container descriptor
+    virtual void adaptRootDescriptor(PropertyDescriptorPtr& aContainerDescriptor) P44_OVERRIDE;
 
     /// read or write property
     /// @note overridden here to avoid internal property access, but forward query instead

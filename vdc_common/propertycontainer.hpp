@@ -74,7 +74,7 @@ namespace p44 {
     bool mRootOfObject;
 
     /// constructor
-    PropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) : mParentDescriptor(aParentDescriptor) {};
+    PropertyDescriptor(PropertyDescriptorPtr aParentDescriptor) : mParentDescriptor(aParentDescriptor), mRootOfObject(false) {};
     /// the parent descriptor (NULL at root level of DsAdressables)
     PropertyDescriptorPtr mParentDescriptor;
     /// API version
@@ -102,7 +102,7 @@ namespace p44 {
     /// was created by the current write action
     virtual bool wasCreatedNew() const { return false; };
     /// acts as root of a C++ class hierarchy
-    virtual bool isRootOfObject() const { return false; };
+    bool isRootOfObject() const { return mRootOfObject; };
     /// checks
     bool hasObjectKey(char &aMemAddrObjectKey) { return (objectKey()==(intptr_t)&aMemAddrObjectKey); };
     bool hasObjectKey(intptr_t aIntObjectKey) { return (objectKey()==aIntObjectKey); };
@@ -110,14 +110,13 @@ namespace p44 {
   };
 
 
-  /// description of the root of any property access
+  /// description of the object root of any property access
   class RootPropertyDescriptor : public PropertyDescriptor
   {
     typedef PropertyDescriptor inherited;
     int mApiVersion;
   public:
-    RootPropertyDescriptor(int aApiVersion) : inherited(PropertyDescriptorPtr()), mApiVersion(aApiVersion) {};
-    virtual bool isRootOfObject() const P44_OVERRIDE { return true; };
+    RootPropertyDescriptor(int aApiVersion, PropertyDescriptorPtr aParentDescriptor) : inherited(aParentDescriptor), mApiVersion(aApiVersion) { mRootOfObject = true; };
     virtual const char *name() const P44_OVERRIDE { return "<root>"; };
     virtual ApiValueType type() const P44_OVERRIDE { return apivalue_object; };
     virtual size_t fieldKey() const P44_OVERRIDE { return 0; };
@@ -257,10 +256,11 @@ namespace p44 {
     ///   Allows single C++ class to handle multiple levels of nested property tree objects
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) { return 0; }
 
-    /// get this container's root descriptor.
-    /// @note base class just returns a standard object root descriptor suitable for normal
-    ///   object containers, but special subclasses might produce their own (e.g. a proxy)
-    virtual PropertyDescriptorPtr getContainerRootDescriptor(int aApiVersion);
+    /// adapt container descriptor
+    /// @param aContainerDescriptor the descriptor that led to accessing this container
+    /// @note base class is NOP as the descriptor used to access the container is usually ok
+    ///   but special subclasses might need to adapt it (e.g. a proxy)
+    virtual void adaptRootDescriptor(PropertyDescriptorPtr& aContainerDescriptor) { /* NOP */ }
 
     /// get property descriptor by index.
     /// @param aPropIndex property index, 0..numProps()-1
@@ -286,7 +286,7 @@ namespace p44 {
 
     /// get subcontainer for a apivalue_object property
     /// @param aPropertyDescriptor descriptor for finding structured (object) property. Once this call returns,
-    ///   and the container is a new C++ object instance, getContainerRootDescriptor() will be invoked to get
+    ///   and the container is a new C++ object instance, adaptRootDescriptor() will be invoked to get
     ///   the descriptor to be actually used for further accessing the object.
     /// @param aDomain the domain for which to access properties. Call might modify the domain such that it fits
     ///   to the accessed container. For example, one container might support different sets of properties
@@ -392,7 +392,7 @@ namespace p44 {
 
 
   };
-  
+
 } // namespace p44
 
 #endif /* defined(__p44vdc__propertycontainer__) */
