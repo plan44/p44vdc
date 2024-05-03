@@ -1101,12 +1101,12 @@ void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectio
 {
   for (NotificationAudience::iterator gpos = aAudience.begin(); gpos!=aAudience.end(); ++gpos) {
     if (gpos->mVdc) {
-      OLOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s", aNotification.c_str(), gpos->mMembers.size(), gpos->mVdc->shortDesc().c_str());
+      OLOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s\n- params:%s", aNotification.c_str(), gpos->mMembers.size(), gpos->mVdc->shortDesc().c_str(), ApiValue::text(aParams).c_str());
       // let vdc process this, might be able to optimize delivery using hardware's native mechanisms such as scenes or groups
       gpos->mVdc->deliverToDevicesAudience(gpos->mMembers, aApiConnection, aNotification, aParams);
     }
     else {
-      OLOG(LOG_INFO, "==== delivering notification '%s' to %lu non-devices now", aNotification.c_str(), gpos->mMembers.size());
+      OLOG(LOG_INFO, "==== delivering notification '%s' to %lu non-devices now\n- params:%s", aNotification.c_str(), gpos->mMembers.size(), ApiValue::text(aParams).c_str());
       // just deliver to each member, no optimization for non-devices
       for (DsAddressablesList::iterator apos = gpos->mMembers.begin(); apos!=gpos->mMembers.end(); ++apos) {
         (*apos)->handleNotificationFromConnection(aApiConnection, aNotification, aParams, NoOP);
