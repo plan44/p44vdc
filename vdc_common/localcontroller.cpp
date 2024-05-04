@@ -1557,6 +1557,9 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
     // limit value range to percentage
     if (aCurrentValue>100) aCurrentValue = 100;
     else if (aCurrentValue<0) aCurrentValue = 0;
+    if (channelType==channeltype_hue || channelType==channeltype_p44_rotation) {
+      aCurrentValue *= 3.6; // expande it to 0..360
+    }
     params->add("value", params->newDouble(aCurrentValue));
     double tt = (double)aSensorBehaviour.mMinPushInterval/Second;
     if (tt>0.5) tt = 0.5; // not too slow
