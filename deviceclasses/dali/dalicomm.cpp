@@ -33,9 +33,11 @@
 
 using namespace p44;
 
-
-// pseudo baudrate for dali bridge must be 9600bd
-#define DALIBRIDGE_COMMPARAMS "9600,8,N,1"
+#if P44_BUILD_DIGI
+#define DALIBRIDGE_COMMPARAMS "9600,8,N,1" // pseudo baudrate for old Digi ESP dali bridge must be 9600bd
+#else
+#define DALIBRIDGE_COMMPARAMS "none" // modern DALI bridge kernel module does not want termios settings (and will return error if tried)
+#endif
 
 // default sending and sampling adjustment values
 #define DEFAULT_SENDING_EDGE_ADJUSTMENT 16 // one step (1/16th = 16/256th DALI bit time) delay of rising edge by default is probably better
