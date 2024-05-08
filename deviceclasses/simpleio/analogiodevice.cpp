@@ -154,7 +154,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     int pollIntervalS = 30;
     scale = 1;
     offset = 0;
-    // optionally, sensor can specify type, usage, sensor;tt;uu;mi;ma;res
+    // optionally, sensor can specify details, sensor;<type>;<usage>;<interval>;<scale>;<offset>
     sscanf(mode.c_str(), "sensor;%d;%d;%d;%lf;%lf", &sensorType, &sensorUsage, &pollIntervalS, &scale, &offset);
     // Analog input as sensor
     analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), false, 0));

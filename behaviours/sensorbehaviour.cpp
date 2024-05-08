@@ -354,9 +354,17 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
       mCurrentValue = aValue;
     }
   }
+  // possibly let localcontroller process it
+  #if ENABLE_LOCALCONTROLLER
+  // also let vdchost know for local dimmer dial handling etc., but only changes!
+  // TODO: maybe more elegant solution for this
+  if (!isBridgeExclusive() && changedValue) {
+    mDevice.getVdcHost().checkForLocalSensorHandling(*this, mCurrentValue);
+  }
+  #endif
   // possibly push
   if (aPush) {
-    pushSensor();
+    pushSensor(false);
   }
   #if ENABLE_P44SCRIPT
   sendValueEvent();
@@ -374,7 +382,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
   MLMicroSeconds now = MainLoop::now();
   bool doPush = aAlways || mLastPush==Never; // always push if asked for or when there's no previous value
   if (!doPush) {
-    // Note: when we get here, lastPush and lastPushedValue are always valid
+    // Note: when we get here, mLastPush and mLastPushedValue are always valid
     bool changed = mCurrentValue!=mLastPushedValue;
     if (now>mLastPush+mMinPushInterval) {
       // Minimal push interval is over -> push...
@@ -383,7 +391,7 @@ bool SensorBehaviour::pushSensor(bool aAlways)
       // - if changesOnlyInterval has been exceeded
       // - if aliveSignInterval is defined and has been exceeded
       doPush =
-        changed || // when changed
+        changed || // when changed (compared to last push)
         (mMaxPushInterval!=Never && now>mLastPush+mMaxPushInterval) || // when interval for max push interval has passed (similar, but not quite the same as changesOnlyInterval)
         now>mLastPush+mChangesOnlyInterval || // or when interval for not reporting unchanged values has passed
         (mAliveSignInterval!=Never && now>mLastUpdate+mAliveSignInterval); // or in case sensor declares a heartbeat interval
@@ -439,13 +447,6 @@ bool SensorBehaviour::pushSensor(bool aAlways)
     else if (mDevice.isPublicDS() || mDevice.isBridged()) {
       OLOG(LOG_NOTICE, "could not be pushed");
     }
-    #if ENABLE_LOCALCONTROLLER
-    // also let vdchost know for local dimmer dial handling etc.
-    // TODO: maybe more elegant solution for this
-    if (!isBridgeExclusive()) {
-      mDevice.getVdcHost().checkForLocalSensorHandling(*this, mCurrentValue);
-    }
-    #endif
   }
   return false;
 }
