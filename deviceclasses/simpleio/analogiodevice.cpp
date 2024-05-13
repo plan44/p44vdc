@@ -151,11 +151,12 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     double min = 0;
     double max = 100;
     double resolution = 1;
-    int pollIntervalS = 30;
+    double customresolution = 0;
+    double pollIntervalS = 30;
     scale = 1;
     offset = 0;
     // optionally, sensor can specify details, sensor;<type>;<usage>;<interval>;<scale>;<offset>
-    sscanf(mode.c_str(), "sensor;%d;%d;%d;%lf;%lf", &sensorType, &sensorUsage, &pollIntervalS, &scale, &offset);
+    sscanf(mode.c_str(), "sensor;%d;%d;%lf;%lf;%lf;%lf", &sensorType, &sensorUsage, &pollIntervalS, &scale, &offset, &customresolution);
     // Analog input as sensor
     analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), false, 0));
     // - query native range
