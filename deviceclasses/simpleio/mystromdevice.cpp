@@ -40,16 +40,16 @@ using namespace p44;
 
 MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
-  myStromComm(MainLoop::currentMainLoop())
+  mMyStromComm(MainLoop::currentMainLoop())
 {
-  myStromComm.isMemberVariable();
+  mMyStromComm.isMemberVariable();
   // config must be: mystromdevicehost[:token]:(light|relay)[+temp]
   size_t i = aDeviceConfig.rfind(":");
   bool isLight = false;
   bool hasTemp = false;
   if (i!=string::npos) {
     string mode = aDeviceConfig.substr(i+1,string::npos);
-    deviceHostName = aDeviceConfig.substr(0,i);
+    mDeviceHostName = aDeviceConfig.substr(0,i);
     // check for +temp option
     i = mode.find("+temp");
     if (i!=string::npos) {
@@ -60,14 +60,14 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     isLight = (mode=="light");
   }
   else {
-    deviceHostName = aDeviceConfig;
+    mDeviceHostName = aDeviceConfig;
   }
   // now see if hostname includes token
-  i = deviceHostName.find(":");
+  i = mDeviceHostName.find(":");
   if (i!=string::npos) {
     // split
-    deviceToken = deviceHostName.substr(i+1,string::npos);
-    deviceHostName.erase(i,string::npos);
+    mDeviceToken = mDeviceHostName.substr(i+1,string::npos);
+    mDeviceHostName.erase(i,string::npos);
   }
   // configure device now
   if (isLight) {
@@ -91,16 +91,16 @@ MyStromDevice::MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     addBehaviour(o);
   }
   // Power sensor
-  powerSensor = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
-  powerSensor->setHardwareSensorConfig(sensorType_power, usage_undefined, 0, 2300, 0.01, STATE_POLL_INTERVAL, 10*STATE_POLL_INTERVAL, 5*STATE_POLL_INTERVAL);
-  powerSensor->setSensorNameWithRange("Power");
-  addBehaviour(powerSensor);
+  mPowerSensor = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
+  mPowerSensor->setHardwareSensorConfig(sensorType_power, usage_undefined, 0, 2300, 0.01, STATE_POLL_INTERVAL, 10*STATE_POLL_INTERVAL, 5*STATE_POLL_INTERVAL);
+  mPowerSensor->setSensorNameWithRange("Power");
+  addBehaviour(mPowerSensor);
   if (hasTemp) {
     // Temperature sensor (V2 devices have it)
-    temperatureSensor = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
-    temperatureSensor->setHardwareSensorConfig(sensorType_temperature, usage_room, -40, 60, 0.1, STATE_POLL_INTERVAL, 10*STATE_POLL_INTERVAL, 5*STATE_POLL_INTERVAL);
-    temperatureSensor->setSensorNameWithRange("Temperature");
-    addBehaviour(temperatureSensor);
+    mTemperatureSensor = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
+    mTemperatureSensor->setHardwareSensorConfig(sensorType_temperature, usage_room, -40, 60, 0.1, STATE_POLL_INTERVAL, 10*STATE_POLL_INTERVAL, 5*STATE_POLL_INTERVAL);
+    mTemperatureSensor->setSensorNameWithRange("Temperature");
+    addBehaviour(mTemperatureSensor);
   }
   // dsuid
 	deriveDsUid();
@@ -114,17 +114,17 @@ MyStromDevice::~MyStromDevice()
 
 bool MyStromDevice::myStromApiQuery(JsonWebClientCB aResponseCB, string aPathAndArgs)
 {
-  string url = string_format("http://%s/%s", deviceHostName.c_str(), aPathAndArgs.c_str());
+  string url = string_format("http://%s/%s", mDeviceHostName.c_str(), aPathAndArgs.c_str());
   FOCUSLOG("myStromApiQuery: %s", url.c_str());
-  return myStromComm.jsonReturningRequest(url.c_str(), aResponseCB, "GET");
+  return mMyStromComm.jsonReturningRequest(url.c_str(), aResponseCB, "GET");
 }
 
 
 bool MyStromDevice::myStromApiAction(HttpCommCB aResponseCB, string aPathAndArgs)
 {
-  string url = string_format("http://%s/%s", deviceHostName.c_str(), aPathAndArgs.c_str());
+  string url = string_format("http://%s/%s", mDeviceHostName.c_str(), aPathAndArgs.c_str());
   FOCUSLOG("myStromApiAction: %s", url.c_str());
-  return myStromComm.httpRequest(url.c_str(), aResponseCB, "GET");
+  return mMyStromComm.httpRequest(url.c_str(), aResponseCB, "GET");
 }
 
 
@@ -149,7 +149,7 @@ void MyStromDevice::initialStateReceived(StatusCB aCompletedCB, bool aFactoryRes
     }
   }
   // set up regular polling
-  sensorPollTicket.executeOnce(boost::bind(&MyStromDevice::sampleState, this), 1*Second);
+  mSensorPollTicket.executeOnce(boost::bind(&MyStromDevice::sampleState, this), 1*Second);
   // anyway, consider initialized
   inherited::initializeDevice(aCompletedCB, aFactoryReset);
 }
@@ -157,10 +157,10 @@ void MyStromDevice::initialStateReceived(StatusCB aCompletedCB, bool aFactoryRes
 
 void MyStromDevice::sampleState()
 {
-  sensorPollTicket.cancel();
+  mSensorPollTicket.cancel();
   if (!myStromApiQuery(boost::bind(&MyStromDevice::stateReceived, this, _1, _2), "report")) {
     // error, try again later (after pausing 10 normal poll periods)
-    sensorPollTicket.executeOnce(boost::bind(&MyStromDevice::sampleState, this), 10*STATE_POLL_INTERVAL);
+    mSensorPollTicket.executeOnce(boost::bind(&MyStromDevice::sampleState, this), 10*STATE_POLL_INTERVAL);
   }
 }
 
@@ -169,12 +169,12 @@ void MyStromDevice::stateReceived(JsonObjectPtr aJsonResponse, ErrorPtr aError)
 {
   if (Error::isOK(aError) && aJsonResponse) {
     JsonObjectPtr o = aJsonResponse->get("power");
-    if (o && powerSensor) {
-      powerSensor->updateSensorValue(o->doubleValue());
+    if (o && mPowerSensor) {
+      mPowerSensor->updateSensorValue(o->doubleValue());
     }
     o = aJsonResponse->get("temperature");
-    if (o && temperatureSensor) {
-      temperatureSensor->updateSensorValue(o->doubleValue());
+    if (o && mTemperatureSensor) {
+      mTemperatureSensor->updateSensorValue(o->doubleValue());
     }
     o = aJsonResponse->get("relay");
     if (o) {
@@ -182,7 +182,7 @@ void MyStromDevice::stateReceived(JsonObjectPtr aJsonResponse, ErrorPtr aError)
     }
   }
   // schedule next poll
-  sensorPollTicket.executeOnce(boost::bind(&MyStromDevice::sampleState, this), STATE_POLL_INTERVAL);
+  mSensorPollTicket.executeOnce(boost::bind(&MyStromDevice::sampleState, this), STATE_POLL_INTERVAL);
 }
 
 
@@ -191,7 +191,7 @@ void MyStromDevice::stateReceived(JsonObjectPtr aJsonResponse, ErrorPtr aError)
 void MyStromDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
   // assume present if we had a recent succesful poll
-  aPresenceResultHandler(powerSensor && powerSensor->hasCurrentValue(STATE_POLL_INTERVAL*1.2));
+  aPresenceResultHandler(mPowerSensor && mPowerSensor->hasCurrentValue(STATE_POLL_INTERVAL*1.2));
 }
 
 
@@ -271,7 +271,7 @@ void MyStromDevice::deriveDsUid()
   //   UUIDv5 with name = classcontainerinstanceid::mystromhost_xxxx where xxxx=IP address or host name
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcInstanceIdentifier();
-  s += "::mystromhost_" + deviceHostName;
+  s += "::mystromhost_" + mDeviceHostName;
   mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
@@ -280,7 +280,7 @@ void MyStromDevice::deriveDsUid()
 string MyStromDevice::description()
 {
   string s = inherited::description();
-  string_format_append(s, "\n- myStrom Switch @ %s", deviceHostName.c_str());
+  string_format_append(s, "\n- myStrom Switch @ %s", mDeviceHostName.c_str());
   return s;
 }
 

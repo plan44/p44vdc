@@ -36,7 +36,7 @@ using namespace p44;
 
 ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
-  consoleIoType(consoleio_unknown)
+  mConsoleIoType(consoleio_unknown)
 {
   // Config is:
   //  <name>:<behaviour type>
@@ -47,19 +47,19 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     name = aDeviceConfig.substr(0,i);
     string mode = aDeviceConfig.substr(i+1,string::npos);
     if (mode=="button")
-      consoleIoType = consoleio_button;
+      mConsoleIoType = consoleio_button;
     else if (mode=="rocker")
-      consoleIoType = consoleio_rocker;
+      mConsoleIoType = consoleio_rocker;
     else if (mode=="input")
-      consoleIoType = consoleio_input;
+      mConsoleIoType = consoleio_input;
     else if (mode=="sensor")
-      consoleIoType = consoleio_sensor;
+      mConsoleIoType = consoleio_sensor;
     else if (mode=="dimmer")
-      consoleIoType = consoleio_dimmer;
+      mConsoleIoType = consoleio_dimmer;
     else if (mode=="colordimmer")
-      consoleIoType = consoleio_colordimmer;
+      mConsoleIoType = consoleio_colordimmer;
     else if (mode=="valve")
-      consoleIoType = consoleio_valve;
+      mConsoleIoType = consoleio_valve;
     else {
       LOG(LOG_ERR, "unknown console IO type: %s", mode.c_str());
     }
@@ -68,17 +68,17 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     LOG(LOG_ERR, "missing console IO type");
   }
   // assign name for showing on console and for creating dSUID from
-  consoleName = name;
+  mConsoleName = name;
   // create I/O
-  if (consoleIoType==consoleio_button) {
+  if (mConsoleIoType==consoleio_button) {
     // Simulate Button device
     // - defaults to black (generic button)
     mColorClass = class_black_joker;
     // - standard device settings without scene table
     installSettings();
     // - console key input as button
-    consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
-    consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 0, _1, _2));
+    mConsoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
+    mConsoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 0, _1, _2));
     // - create one button input
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
     b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, 1); // not combinable, but mode not fixed
@@ -86,50 +86,50 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     b->setHardwareName(string_format("console key '%c'",name[0]));
     addBehaviour(b);
   }
-  if (consoleIoType==consoleio_rocker) {
+  if (mConsoleIoType==consoleio_rocker) {
     // Simulate Two-way Rocker Button device
     // - defaults to black (generic button)
     mColorClass = class_black_joker;
     // - standard device settings without scene table
     installSettings();
     // - create down button (index 0)
-    consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
-    consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 0, _1, _2));
+    mConsoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
+    mConsoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 0, _1, _2));
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
     b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, 0); // counterpart up-button has buttonIndex 1, fixed mode
     b->setGroup(group_yellow_light); // pre-configure for light
-    b->setHardwareName(string_format("console key '%c'",consoleKey1->getKeyCode()));
+    b->setHardwareName(string_format("console key '%c'",mConsoleKey1->getKeyCode()));
     addBehaviour(b);
     // - create up button (index 1)
-    consoleKey2 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0]+1, name.c_str());
-    consoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 1, _1, _2));
+    mConsoleKey2 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0]+1, name.c_str());
+    mConsoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::buttonHandler, this, 1, _1, _2));
     b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
     b->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, 0); // counterpart down-button has buttonIndex 0, fixed mode
     b->setGroup(group_yellow_light); // pre-configure for light
-    b->setHardwareName(string_format("console key '%c'",consoleKey2->getKeyCode()));
+    b->setHardwareName(string_format("console key '%c'",mConsoleKey2->getKeyCode()));
     addBehaviour(b);
   }
-  else if (consoleIoType==consoleio_input) {
+  else if (mConsoleIoType==consoleio_input) {
     // Standard device settings without scene table
     mColorClass = class_black_joker;
     installSettings();
     // Digital input as binary input (AKM, automation block type)
-    consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
-    consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::binaryInputHandler, this, _1, _2));
+    mConsoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
+    mConsoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::binaryInputHandler, this, _1, _2));
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"siminput"));
     b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     addBehaviour(b);
   }
-  else if (consoleIoType==consoleio_sensor) {
+  else if (mConsoleIoType==consoleio_sensor) {
     // Standard device settings without scene table
     mColorClass = class_black_joker;
     installSettings();
     // Analog sensor value, which can be changed up and down with two keys
-    consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
-    consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorHandler, this, 0, _1, _2)); // down
-    consoleKey2 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0]+1, name.c_str());
-    consoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorHandler, this, 1, _1, _2)); // up
+    mConsoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
+    mConsoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorHandler, this, 0, _1, _2)); // down
+    mConsoleKey2 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0]+1, name.c_str());
+    mConsoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorHandler, this, 1, _1, _2)); // up
     // - create one sensor input
     SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
     //s->setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 50, 1, 30*Second, 300*Second);
@@ -137,7 +137,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     s->setHardwareName("Console simulated Sensor 0..50");
     addBehaviour(s);
   }
-  else if (consoleIoType==consoleio_valve) {
+  else if (mConsoleIoType==consoleio_valve) {
     // simulate heating valve with lo bat (like thermokon SAB02,SAB05 or Kieback+Peter MD15-FTL)
     // - is heating
     mColorClass = class_blue_climate;
@@ -164,13 +164,13 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     addBehaviour(bb);
     // Simulation
     // - add console key for low battery
-    consoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
-    consoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::binaryInputHandler, this, _1, _2));
+    mConsoleKey1 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey(name[0], name.c_str());
+    mConsoleKey1->setConsoleKeyHandler(boost::bind(&ConsoleDevice::binaryInputHandler, this, _1, _2));
     // - add console keys for changing sensor
-    consoleKey2 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey('$', "random sensor simulation change");
-    consoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorJitter, this, _1, _2));
+    mConsoleKey2 = ConsoleKeyManager::sharedKeyManager()->newConsoleKey('$', "random sensor simulation change");
+    mConsoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorJitter, this, _1, _2));
   }
-  else if (consoleIoType==consoleio_dimmer) {
+  else if (mConsoleIoType==consoleio_dimmer) {
     // Simple single-channel light
     // - defaults to yellow (light)
     mColorClass = class_yellow_light;
@@ -181,7 +181,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, -1);
     addBehaviour(l);
   }
-  else if (consoleIoType==consoleio_colordimmer) {
+  else if (mConsoleIoType==consoleio_colordimmer) {
     // Color light
     // - defaults to yellow (light)
     mColorClass = class_yellow_light;
@@ -198,11 +198,11 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
 string ConsoleDevice::modelName()
 {
   string m = "Console ";
-  switch (consoleIoType) {
-    case consoleio_button: string_format_append(m, "button key:'%c'", consoleKey1->getKeyCode()); break;
-    case consoleio_rocker: string_format_append(m, "rocker keys:'%c'/'%c'", consoleKey1->getKeyCode(), consoleKey2->getKeyCode()); break;
-    case consoleio_input: string_format_append(m, "binary input key:'%c'", consoleKey1->getKeyCode()); break;
-    case consoleio_sensor: string_format_append(m, "sensor tunable with keys:'%c'/'%c'", consoleKey1->getKeyCode(), consoleKey2->getKeyCode()); break;
+  switch (mConsoleIoType) {
+    case consoleio_button: string_format_append(m, "button key:'%c'", mConsoleKey1->getKeyCode()); break;
+    case consoleio_rocker: string_format_append(m, "rocker keys:'%c'/'%c'", mConsoleKey1->getKeyCode(), mConsoleKey2->getKeyCode()); break;
+    case consoleio_input: string_format_append(m, "binary input key:'%c'", mConsoleKey1->getKeyCode()); break;
+    case consoleio_sensor: string_format_append(m, "sensor tunable with keys:'%c'/'%c'", mConsoleKey1->getKeyCode(), mConsoleKey2->getKeyCode()); break;
     case consoleio_valve: m += "valve"; break;
     case consoleio_dimmer: m += "dimmer"; break;
     case consoleio_colordimmer: m += "color dimmer"; break;
@@ -327,7 +327,7 @@ void ConsoleDevice::deriveDsUid()
   //   UUIDv5 with name = classcontainerinstanceid::consoledevicename
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcInstanceIdentifier();
-  s += "::" + consoleName;
+  s += "::" + mConsoleName;
   mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
@@ -335,17 +335,17 @@ void ConsoleDevice::deriveDsUid()
 string ConsoleDevice::description()
 {
   string s = inherited::description();
-  if (consoleIoType==consoleio_dimmer || consoleIoType==consoleio_colordimmer)
+  if (mConsoleIoType==consoleio_dimmer || mConsoleIoType==consoleio_colordimmer)
     string_format_append(s, "\n- has output printing channel value(s) to console");
-  if (consoleIoType==consoleio_button)
+  if (mConsoleIoType==consoleio_button)
     string_format_append(s, "\n- has button which can be switched via console keypresses");
-  if (consoleIoType==consoleio_rocker)
+  if (mConsoleIoType==consoleio_rocker)
     string_format_append(s, "\n- has 2-way-rocker which can be switched via console keypresses");
-  if (consoleIoType==consoleio_input)
+  if (mConsoleIoType==consoleio_input)
     string_format_append(s, "\n- has binary input can be switched via console keypresses");
-  if (consoleIoType==consoleio_sensor)
+  if (mConsoleIoType==consoleio_sensor)
     string_format_append(s, "\n- has sensor input that can be tuned up/down via console keypresses");
-  if (consoleIoType==consoleio_valve)
+  if (mConsoleIoType==consoleio_valve)
     string_format_append(s, "\n- has valve actuator shown on console, pseudo temperature, battery low via console keypress");
   return s;
 }

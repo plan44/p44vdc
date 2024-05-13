@@ -45,13 +45,13 @@ namespace p44 {
   {
     typedef StaticDevice inherited;
 
-    string deviceHostName;
-    string deviceToken;
-    JsonWebClient myStromComm;
+    string mDeviceHostName;
+    string mDeviceToken;
+    JsonWebClient mMyStromComm;
 
-    SensorBehaviourPtr powerSensor;
-    SensorBehaviourPtr temperatureSensor;
-    MLTicket sensorPollTicket;
+    SensorBehaviourPtr mPowerSensor;
+    SensorBehaviourPtr mTemperatureSensor;
+    MLTicket mSensorPollTicket;
 
   public:
     MyStromDevice(StaticVdc *aVdcP, const string &aDeviceConfig);

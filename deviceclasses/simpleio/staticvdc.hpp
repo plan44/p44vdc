@@ -50,7 +50,7 @@ namespace p44 {
     typedef Device inherited;
     friend class StaticVdc;
 
-    long long staticDeviceRowID; ///< the ROWID this device was created from (0=none)
+    long long mStaticDeviceRowID; ///< the ROWID this device was created from (0=none)
 
   public:
 
@@ -93,9 +93,9 @@ namespace p44 {
     typedef Vdc inherited;
     friend class StaticDevice;
 
-		DeviceConfigMap deviceConfigs;
+		DeviceConfigMap mDeviceConfigs;
 
-    StaticDevicePersistence db;
+    StaticDevicePersistence mDb;
 
   public:
     StaticVdc(int aInstanceNumber, DeviceConfigMap aDeviceConfigs, VdcHost *aVdcHostP, int aTag);

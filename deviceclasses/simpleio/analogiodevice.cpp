@@ -33,9 +33,9 @@ using namespace p44;
 
 AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
-  analogIOType(analogio_unknown),
-  scale(1),
-  offset(0)
+  mAnalogIOType(analogio_unknown),
+  mScale(1),
+  mOffset(0)
 {
   // Config is:
   //  <pin(s) specification>:[<behaviour mode>]
@@ -49,23 +49,23 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     mode = aDeviceConfig.substr(i+1,string::npos);
   }
   if (mode=="dimmer")
-    analogIOType = analogio_dimmer;
+    mAnalogIOType = analogio_dimmer;
   else if (mode=="rgbdimmer")
-    analogIOType = analogio_rgbdimmer;
+    mAnalogIOType = analogio_rgbdimmer;
   else if (mode=="cwwwdimmer")
-    analogIOType = analogio_cwwwdimmer;
+    mAnalogIOType = analogio_cwwwdimmer;
   else if (mode=="valve")
-    analogIOType = analogio_valve;
+    mAnalogIOType = analogio_valve;
   else if (mode.find("sensor")==0) // sensor can have further specification in mode string
-    analogIOType = analogio_sensor;
+    mAnalogIOType = analogio_sensor;
   else {
     LOG(LOG_ERR, "unknown analog IO type: %s", mode.c_str());
   }
   // by default, act as black device so we can configure colors
   mColorClass = class_black_joker;
-  if (analogIOType==analogio_dimmer) {
+  if (mAnalogIOType==analogio_dimmer) {
     // Analog output as dimmer
-    analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
+    mAnalogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
     // - is light
     mColorClass = class_yellow_light;
     // - use light settings, which include a scene table
@@ -75,7 +75,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, -1);
     addBehaviour(l);
   }
-  else if (analogIOType==analogio_rgbdimmer) {
+  else if (mAnalogIOType==analogio_rgbdimmer) {
     // - is light
     mColorClass = class_yellow_light;
     // - need 3 IO names for R,G,B, optional fourth for W
@@ -84,23 +84,23 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     if (p!=string::npos) {
       // at least 2 pins specified
       // - create red output
-      analogIO = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
+      mAnalogIO = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
       ioname.erase(0,p+1);
       p = ioname.find("|");
       if (p!=string::npos) {
         // 3 pins specified
         // - create green output
-        analogIO2 = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
+        mAnalogIO2 = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
         ioname.erase(0,p+1);
         p = ioname.find("|");
         if (p!=string::npos) {
           // extra 4th pin for white specified
           // - create white output from rest
-          analogIO4 = AnalogIoPtr(new AnalogIo(ioname.substr(p+1).c_str(), true, 0));
+          mAnalogIO4 = AnalogIoPtr(new AnalogIo(ioname.substr(p+1).c_str(), true, 0));
           ioname.erase(p); // remove specification of white channel
         }
         // - create blue output from rest
-        analogIO3 = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
+        mAnalogIO3 = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
         // Complete set of outputs, now create RGB light (with optional white channel)
         // - use color light settings, which include a color scene table
         installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
@@ -110,7 +110,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
       }
     }
   }
-  else if (analogIOType==analogio_cwwwdimmer) {
+  else if (mAnalogIOType==analogio_cwwwdimmer) {
     // - is light
     mColorClass = class_yellow_light;
     // - need 2 IO names for CW and WW
@@ -119,10 +119,10 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     if (p!=string::npos) {
       // 2 pins specified
       // - create CW output
-      analogIO = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
+      mAnalogIO = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
       ioname.erase(0,p+1);
       // - create WW output
-      analogIO2 = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
+      mAnalogIO2 = AnalogIoPtr(new AnalogIo(ioname.substr(0,p).c_str(), true, 0));
       // Complete set of outputs, now create CWWW light (with optional white channel)
       // - use color light settings, which include a color scene table
       installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
@@ -131,9 +131,9 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
       addBehaviour(l);
     }
   }
-  else if (analogIOType==analogio_valve) {
+  else if (mAnalogIOType==analogio_valve) {
     // Analog output as valve controlling output
-    analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
+    mAnalogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), true, 0));
     // - is heating
     mColorClass = class_blue_climate;
     // - valve needs climate control scene table (ClimateControlScene)
@@ -145,7 +145,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     ob->setHardwareName("Valve, 0..100");
     addBehaviour(ob);
   }
-  else if (analogIOType==analogio_sensor) {
+  else if (mAnalogIOType==analogio_sensor) {
     int sensorType = sensorType_none;
     int sensorUsage = usage_undefined;
     double min = 0;
@@ -153,17 +153,18 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     double resolution = 1;
     double customresolution = 0;
     double pollIntervalS = 30;
-    scale = 1;
-    offset = 0;
+    mScale = 1;
+    mOffset = 0;
     // optionally, sensor can specify details, sensor;<type>;<usage>;<interval>;<scale>;<offset>
-    sscanf(mode.c_str(), "sensor;%d;%d;%lf;%lf;%lf;%lf", &sensorType, &sensorUsage, &pollIntervalS, &scale, &offset, &customresolution);
+    sscanf(mode.c_str(), "sensor;%d;%d;%lf;%lf;%lf;%lf", &sensorType, &sensorUsage, &pollIntervalS, &mScale, &mOffset, &customresolution);
     // Analog input as sensor
-    analogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), false, 0));
+    mAnalogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), false, 0));
     // - query native range
-    analogIO->getRange(min, max, resolution);
-    min = min*scale+offset;
-    max = max*scale+offset;
-    resolution = resolution*scale;
+    mAnalogIO->getRange(min, max, resolution);
+    min = min*mScale+mOffset;
+    max = max*mScale+mOffset;
+    if (customresolution!=0) resolution = customresolution; // custom resolution
+    else resolution = resolution*mScale; // native resolution, scaled
     // sensor only, standard settings without scene table
     installSettings();
     // single sensor behaviour
@@ -171,7 +172,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     sb->setHardwareSensorConfig((VdcSensorType)sensorType, (VdcUsageHint)sensorUsage, min, max, resolution, pollIntervalS*Second, pollIntervalS*Second);
     addBehaviour(sb);
     // install polling for it
-    timerTicket.executeOnce(boost::bind(&AnalogIODevice::analogInputPoll, this, _1, _2));
+    mTimerTicket.executeOnce(boost::bind(&AnalogIODevice::analogInputPoll, this, _1, _2));
   }
 	deriveDsUid();
 }
@@ -187,7 +188,7 @@ void AnalogIODevice::analogInputPoll(MLTimer &aTimer, MLMicroSeconds aNow)
   SensorBehaviourPtr sb = getSensor(0);
   if (sb) {
     // return value with scaling (default==1) and offset (default==0)
-    sb->updateSensorValue(analogIO->value()*scale+offset);
+    sb->updateSensorValue(mAnalogIO->value()*mScale+mOffset);
     MainLoop::currentMainLoop().retriggerTimer(aTimer, sb->getUpdateInterval());
   }
 }
@@ -201,9 +202,9 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   MLMicroSeconds transitionTime = 0;
   // abort previous transition
-  timerTicket.cancel();
+  mTimerTicket.cancel();
   // generic device, show changed channels
-  if (analogIOType==analogio_dimmer) {
+  if (mAnalogIOType==analogio_dimmer) {
     // single channel PWM dimmer
     LightBehaviourPtr l = getOutput<LightBehaviour>();
     if (l && l->brightnessNeedsApplying()) {
@@ -213,7 +214,7 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // consider applied
     l->brightnessApplied();
   }
-  else if (analogIOType==analogio_rgbdimmer || analogIOType==analogio_cwwwdimmer) {
+  else if (mAnalogIOType==analogio_rgbdimmer || mAnalogIOType==analogio_cwwwdimmer) {
     // three channel RGB PWM dimmer or two channel CWWW PWM dimmer
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     if (cl) {
@@ -236,7 +237,7 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     if (ch && ch->needsApplying()) {
       double chVal = ch->getChannelValue(true)-ch->getMin();
       double chSpan = ch->getMax()-ch->getMin();
-      analogIO->setValue(chVal/chSpan*100); // 0..100%
+      mAnalogIO->setValue(chVal/chSpan*100); // 0..100%
       ch->channelValueApplied(); // confirm having applied the value
     }
   }
@@ -250,18 +251,18 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
 {
   MLMicroSeconds now = MainLoop::now();
   // generic device, show changed channels
-  if (analogIOType==analogio_dimmer) {
+  if (mAnalogIOType==analogio_dimmer) {
     // single channel PWM dimmer
     LightBehaviourPtr l = getOutput<LightBehaviour>();
     bool moreSteps = l->updateBrightnessTransition(now);
     double w = l->brightnessForHardware();
     double pwm = l->brightnessToPWM(w, 100);
-    analogIO->setValue(pwm);
+    mAnalogIO->setValue(pwm);
     // next step
     if (moreSteps) {
       OLOG(LOG_DEBUG, "AnalogIO transitional brightness value: %.2f", w);
       // not yet complete, schedule next step
-      timerTicket.executeOnce(
+      mTimerTicket.executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming),
         TRANSITION_STEP_TIME
       );
@@ -269,7 +270,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
     }
     if (!aForDimming) OLOG(LOG_INFO, "AnalogIO final PWM value: %.2f", w);
   }
-  else if (analogIOType==analogio_rgbdimmer) {
+  else if (mAnalogIOType==analogio_rgbdimmer) {
     // three channel RGB PWM dimmer
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     bool moreSteps = cl->updateBrightnessTransition(now);
@@ -277,11 +278,11 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
     // RGB lamp, get components
     double r, g, b, pwm;
     double w = 0;
-    if (analogIO4) {
+    if (mAnalogIO4) {
       // RGBW lamp
       cl->getRGBW(r, g, b, w, 100, false, true); // get brightness for R,G,B,W channels
       pwm = cl->brightnessToPWM(w, 100);
-      analogIO4->setValue(pwm);
+      mAnalogIO4->setValue(pwm);
     }
     else {
       // RGB only
@@ -289,18 +290,18 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
     }
     // - red
     pwm = cl->brightnessToPWM(r, 100);
-    analogIO->setValue(pwm);
+    mAnalogIO->setValue(pwm);
     // - green
     pwm = cl->brightnessToPWM(g, 100);
-    analogIO2->setValue(pwm);
+    mAnalogIO2->setValue(pwm);
     // - blue
     pwm = cl->brightnessToPWM(b, 100);
-    analogIO3->setValue(pwm);
+    mAnalogIO3->setValue(pwm);
     // next step
     if (moreSteps) {
       OLOG(LOG_DEBUG, "AnalogIO transitional RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
       // not yet complete, schedule next step
-      timerTicket.executeOnce(
+      mTimerTicket.executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming),
         TRANSITION_STEP_TIME
       );
@@ -308,7 +309,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
     }
     if (!aForDimming) OLOG(LOG_INFO, "AnalogIO final RGBW values: R=%.2f G=%.2f, B=%.2f, W=%.2f", r, g, b, w);
   }
-  else if (analogIOType==analogio_cwwwdimmer) {
+  else if (mAnalogIOType==analogio_cwwwdimmer) {
     // two channel RGB PWM dimmer
     RGBColorLightBehaviourPtr cl = getOutput<RGBColorLightBehaviour>();
     bool moreSteps = cl->updateBrightnessTransition(now);
@@ -317,14 +318,14 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
     double cw,ww, pwm;
     cl->getCWWW(cw, ww, 100, true);
     pwm = cl->brightnessToPWM(cw, 100);
-    analogIO->setValue(pwm);
+    mAnalogIO->setValue(pwm);
     pwm = cl->brightnessToPWM(ww, 100);
-    analogIO2->setValue(pwm);
+    mAnalogIO2->setValue(pwm);
     // next step
     if (moreSteps) {
       OLOG(LOG_DEBUG, "AnalogIO transitional CWWW values: CW=%.2f WW=%.2f", cw, ww);
       // not yet complete, schedule next step
-      timerTicket.executeOnce(
+      mTimerTicket.executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming),
         TRANSITION_STEP_TIME
       );
@@ -343,24 +344,24 @@ void AnalogIODevice::deriveDsUid()
   //   UUIDv5 with name = classcontainerinstanceid::ioname[:ioname ...]
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcInstanceIdentifier();
-  string_format_append(s, ":%d:", (int)analogIOType);
-  if (analogIO) { s += ":"; s += analogIO->getName(); }
-  if (analogIO2) { s += ":"; s += analogIO2->getName(); }
-  if (analogIO3) { s += ":"; s += analogIO3->getName(); }
-  if (analogIO4) { s += ":"; s += analogIO4->getName(); }
+  string_format_append(s, ":%d:", (int)mAnalogIOType);
+  if (mAnalogIO) { s += ":"; s += mAnalogIO->getName(); }
+  if (mAnalogIO2) { s += ":"; s += mAnalogIO2->getName(); }
+  if (mAnalogIO3) { s += ":"; s += mAnalogIO3->getName(); }
+  if (mAnalogIO4) { s += ":"; s += mAnalogIO4->getName(); }
   mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 
 string AnalogIODevice::modelName()
 {
-  if (analogIOType==analogio_dimmer)
+  if (mAnalogIOType==analogio_dimmer)
     return "Dimmer output";
-  if (analogIOType==analogio_cwwwdimmer)
+  if (mAnalogIOType==analogio_cwwwdimmer)
     return "CW/WW dimmer outputs";
-  if (analogIOType==analogio_rgbdimmer)
+  if (mAnalogIOType==analogio_rgbdimmer)
     return "RGB(W) dimmer outputs";
-  if (analogIOType==analogio_valve)
+  if (mAnalogIOType==analogio_valve)
     return "Heating Valve output";
   return "Analog I/O";
 }
@@ -368,12 +369,12 @@ string AnalogIODevice::modelName()
 
 string AnalogIODevice::getExtraInfo()
 {
-  if (analogIOType==analogio_rgbdimmer)
-    return string_format("RGB Outputs:%s, %s, %s; White:%s", analogIO->getName().c_str(), analogIO2->getName().c_str(), analogIO3->getName().c_str(), analogIO4 ? analogIO4->getName().c_str() : "none");
-  if (analogIOType==analogio_cwwwdimmer)
-    return string_format("CW/WW Outputs:%s, %s", analogIO->getName().c_str(), analogIO2->getName().c_str());
-  if (analogIOType==analogio_dimmer || analogIOType==analogio_valve)
-    return string_format("Output: %s", analogIO->getName().c_str());
+  if (mAnalogIOType==analogio_rgbdimmer)
+    return string_format("RGB Outputs:%s, %s, %s; White:%s", mAnalogIO->getName().c_str(), mAnalogIO2->getName().c_str(), mAnalogIO3->getName().c_str(), mAnalogIO4 ? mAnalogIO4->getName().c_str() : "none");
+  if (mAnalogIOType==analogio_cwwwdimmer)
+    return string_format("CW/WW Outputs:%s, %s", mAnalogIO->getName().c_str(), mAnalogIO2->getName().c_str());
+  if (mAnalogIOType==analogio_dimmer || mAnalogIOType==analogio_valve)
+    return string_format("Output: %s", mAnalogIO->getName().c_str());
   return "Analog I/O";
 }
 
@@ -382,16 +383,16 @@ string AnalogIODevice::getExtraInfo()
 string AnalogIODevice::description()
 {
   string s = inherited::description();
-  if (analogIOType==analogio_dimmer)
-    string_format_append(s, "\n- Dimmer at Analog output '%s'", analogIO->getName().c_str());
-  else if (analogIOType==analogio_cwwwdimmer)
-    string_format_append(s, "\n- Tunable White Dimmer with CW/WW outputs '%s'/'%s'", analogIO->getName().c_str(), analogIO2->getName().c_str());
-  else if (analogIOType==analogio_rgbdimmer)
-    string_format_append(s, "\n- Color Dimmer with RGB outputs '%s', '%s', '%s'; White: '%s'", analogIO->getName().c_str(), analogIO2->getName().c_str(), analogIO3->getName().c_str(), analogIO4 ? analogIO4->getName().c_str() : "none");
-  else if (analogIOType==analogio_valve)
-    string_format_append(s, "\nHeating Valve @ '%s'", analogIO->getName().c_str());
-  else if (analogIOType==analogio_sensor)
-    string_format_append(s, "\nSensor @ '%s'", analogIO->getName().c_str());
+  if (mAnalogIOType==analogio_dimmer)
+    string_format_append(s, "\n- Dimmer at Analog output '%s'", mAnalogIO->getName().c_str());
+  else if (mAnalogIOType==analogio_cwwwdimmer)
+    string_format_append(s, "\n- Tunable White Dimmer with CW/WW outputs '%s'/'%s'", mAnalogIO->getName().c_str(), mAnalogIO2->getName().c_str());
+  else if (mAnalogIOType==analogio_rgbdimmer)
+    string_format_append(s, "\n- Color Dimmer with RGB outputs '%s', '%s', '%s'; White: '%s'", mAnalogIO->getName().c_str(), mAnalogIO2->getName().c_str(), mAnalogIO3->getName().c_str(), mAnalogIO4 ? mAnalogIO4->getName().c_str() : "none");
+  else if (mAnalogIOType==analogio_valve)
+    string_format_append(s, "\nHeating Valve @ '%s'", mAnalogIO->getName().c_str());
+  else if (mAnalogIOType==analogio_sensor)
+    string_format_append(s, "\nSensor @ '%s'", mAnalogIO->getName().c_str());
   return s;
 }
 

@@ -51,13 +51,13 @@ namespace p44 {
     } DigitalIoType;
 
 
-		ButtonInputPtr buttonInput;
-    DigitalIoPtr digitalInput;
-    IndicatorOutputPtr indicatorOutput;
-    DigitalIoPtr blindsOutputUp;
-    DigitalIoPtr blindsOutputDown;
+		ButtonInputPtr mButtonInput;
+    DigitalIoPtr mDigitalInput;
+    IndicatorOutputPtr mIndicatorOutput;
+    DigitalIoPtr mBlindsOutputUp;
+    DigitalIoPtr mBlindsOutputDown;
 
-    DigitalIoType digitalIoType;
+    DigitalIoType mDigitalIoType;
 
   public:
 

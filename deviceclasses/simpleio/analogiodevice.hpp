@@ -51,16 +51,16 @@ namespace p44 {
       analogio_sensor
     } AnalogIoType;
 
-    AnalogIoPtr analogIO; // brighness for single channel, red for RGB
-    AnalogIoPtr analogIO2; // green for RGB
-    AnalogIoPtr analogIO3; // blue for RGB
-    AnalogIoPtr analogIO4; // white for RGBW
+    AnalogIoPtr mAnalogIO; // brighness for single channel, red for RGB
+    AnalogIoPtr mAnalogIO2; // green for RGB
+    AnalogIoPtr mAnalogIO3; // blue for RGB
+    AnalogIoPtr mAnalogIO4; // white for RGBW
 
-    AnalogIoType analogIOType;
+    AnalogIoType mAnalogIOType;
 
-    MLTicket timerTicket; // for output transitions and input poll
-    double scale; ///< scaling factor for analog sensors (native value will be multiplied by this)
-    double offset; ///< offset for analog sensors (reported value = native*scale+offset)
+    MLTicket mTimerTicket; // for output transitions and input poll
+    double mScale; ///< scaling factor for analog sensors (native value will be multiplied by this)
+    double mOffset; ///< offset for analog sensors (reported value = native*scale+offset)
 
   public:
     AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig);

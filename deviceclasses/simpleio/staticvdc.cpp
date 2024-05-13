@@ -39,7 +39,7 @@ using namespace p44;
 
 StaticDevice::StaticDevice(Vdc *aVdcP) :
   Device(aVdcP),
-  staticDeviceRowID(0)
+  mStaticDeviceRowID(0)
 {
 }
 
@@ -53,7 +53,7 @@ bool StaticDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 bool StaticDevice::isSoftwareDisconnectable()
 {
-  return staticDeviceRowID>0; // disconnectable by software if it was created from DB entry (and not on the command line)
+  return mStaticDeviceRowID>0; // disconnectable by software if it was created from DB entry (and not on the command line)
 }
 
 StaticVdc &StaticDevice::getStaticVdc()
@@ -64,11 +64,11 @@ StaticVdc &StaticDevice::getStaticVdc()
 
 void StaticDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
-  OLOG(LOG_DEBUG, "disconnecting static device with rowid=%lld", staticDeviceRowID);
+  OLOG(LOG_DEBUG, "disconnecting static device with rowid=%lld", mStaticDeviceRowID);
   // clear learn-in data from DB
-  if (staticDeviceRowID) {
-    if(getStaticVdc().db.executef("DELETE FROM devConfigs WHERE rowid=%lld", staticDeviceRowID)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Edeleting static device: %s", getStaticVdc().db.error()->description().c_str());
+  if (mStaticDeviceRowID) {
+    if(getStaticVdc().mDb.executef("DELETE FROM devConfigs WHERE rowid=%lld", mStaticDeviceRowID)!=SQLITE_OK) {
+      OLOG(LOG_ERR, "Edeleting static device: %s", getStaticVdc().mDb.error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -108,7 +108,7 @@ string StaticDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVer
 
 StaticVdc::StaticVdc(int aInstanceNumber, DeviceConfigMap aDeviceConfigs, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-	deviceConfigs(aDeviceConfigs)
+	mDeviceConfigs(aDeviceConfigs)
 {
 }
 
@@ -120,7 +120,7 @@ void StaticVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load private data
   string databaseName = getPersistentDataDir();
   string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), STATICDEVICES_SCHEMA_VERSION, STATICDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
+  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), STATICDEVICES_SCHEMA_VERSION, STATICDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
   aCompletedCB(error); // return status of DB init
 }
@@ -173,7 +173,7 @@ void StaticVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // create devices from command line config
-    for (DeviceConfigMap::iterator pos = deviceConfigs.begin(); pos!=deviceConfigs.end(); ++pos) {
+    for (DeviceConfigMap::iterator pos = mDeviceConfigs.begin(); pos!=mDeviceConfigs.end(); ++pos) {
       // create device of appropriate class
       StaticDevicePtr dev = addStaticDevice(pos->first, pos->second);
       if (dev) {
@@ -181,12 +181,12 @@ void StaticVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
       }
     }
     // then add those from the DB
-    sqlite3pp::query qry(db);
+    sqlite3pp::query qry(mDb);
     if (qry.prepare("SELECT devicetype, deviceconfig, rowid FROM devConfigs")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         StaticDevicePtr dev = addStaticDevice(i->get<string>(0), i->get<string>(1));
         if (dev) {
-          dev->staticDeviceRowID = i->get<int>(2);
+          dev->mStaticDeviceRowID = i->get<int>(2);
         }
       }
     }
@@ -219,19 +219,19 @@ ErrorPtr StaticVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
           // set name
           if (name.size()>0) dev->setName(name);
           // insert into database
-          if(db.executef(
+          if(mDb.executef(
             "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
             deviceType.c_str(), deviceConfig.c_str()
           )!=SQLITE_OK) {
-            respErr = db.error("saving static device params");
+            respErr = mDb.error("saving static device params");
           }
           else {
-            dev->staticDeviceRowID = db.last_insert_rowid();
+            dev->mStaticDeviceRowID = mDb.last_insert_rowid();
             // confirm
             ApiValuePtr r = aRequest->newApiValue();
             r->setType(apivalue_object);
             r->add("dSUID", r->newBinary(dev->mDSUID.getBinary()));
-            r->add("rowid", r->newUint64(dev->staticDeviceRowID));
+            r->add("rowid", r->newUint64(dev->mStaticDeviceRowID));
             r->add("name", r->newString(dev->getName()));
             aRequest->sendResult(r);
             respErr.reset(); // make sure we don't send an extra ErrorOK

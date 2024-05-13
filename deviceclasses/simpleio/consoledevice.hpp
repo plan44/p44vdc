@@ -52,10 +52,10 @@ namespace p44 {
       consoleio_valve,
     } ConsoleIoType;
 
-    ConsoleIoType consoleIoType;
-    ConsoleKeyPtr consoleKey1;
-    ConsoleKeyPtr consoleKey2;
-    string consoleName;
+    ConsoleIoType mConsoleIoType;
+    ConsoleKeyPtr mConsoleKey1;
+    ConsoleKeyPtr mConsoleKey2;
+    string mConsoleName;
 
   public:
     ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig);

@@ -35,7 +35,7 @@ using namespace p44;
 
 DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
-  digitalIoType(digitalio_unknown)
+  mDigitalIoType(digitalio_unknown)
 {
   // Config is:
   //  <pin(s) specification>:<behaviour mode>
@@ -54,18 +54,18 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
       mode.erase(0,1);
     }
     if (mode=="button")
-      digitalIoType = digitalio_button;
+      mDigitalIoType = digitalio_button;
     else if (mode=="input")
-      digitalIoType = digitalio_input;
+      mDigitalIoType = digitalio_input;
     else if (mode=="light")
-      digitalIoType = digitalio_light;
+      mDigitalIoType = digitalio_light;
     else if (mode=="relay") {
-      digitalIoType = digitalio_relay;
+      mDigitalIoType = digitalio_relay;
     } else if (mode=="blind") {
       // ioname = "<upPinSpec>:<downPinSpec>"
       size_t t = ioname.find(":");
       if (t != string::npos) {
-        digitalIoType = digitalio_blind;
+        mDigitalIoType = digitalio_blind;
         upName = ioname.substr(0, t);
         downName = ioname.substr(t+1, string::npos);
       } else {
@@ -77,13 +77,13 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     }
   }
   // basically act as black device so we can configure colors
-  if (digitalIoType==digitalio_button) {
+  if (mDigitalIoType==digitalio_button) {
     mColorClass = class_black_joker;
     // Standard device settings without scene table
     installSettings();
     // Digital input as button
-    buttonInput = ButtonInputPtr(new ButtonInput(ioname.c_str()));
-    buttonInput->setButtonHandler(boost::bind(&DigitalIODevice::buttonHandler, this, _1, _2), true);
+    mButtonInput = ButtonInputPtr(new ButtonInput(ioname.c_str()));
+    mButtonInput->setButtonHandler(boost::bind(&DigitalIODevice::buttonHandler, this, _1, _2), true);
     // - create one button input
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
     b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, 1); // not combinable, but mode not restricted
@@ -91,23 +91,23 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     b->setGroup(group_yellow_light); // pre-configure for light
     addBehaviour(b);
   }
-  else if (digitalIoType==digitalio_input) {
+  else if (mDigitalIoType==digitalio_input) {
     mColorClass = class_black_joker;
     // Standard device settings without scene table
     installSettings();
     // Digital input as binary input (AKM, automation block type)
-    digitalInput = DigitalIoPtr(new DigitalIo(ioname.c_str(), false));
-    digitalInput->setInputChangedHandler(boost::bind(&DigitalIODevice::inputHandler, this, _1), INPUT_DEBOUNCE_TIME, 0); // edge detection if possible, mainloop idle poll otherwise
+    mDigitalInput = DigitalIoPtr(new DigitalIo(ioname.c_str(), false));
+    mDigitalInput->setInputChangedHandler(boost::bind(&DigitalIODevice::inputHandler, this, _1), INPUT_DEBOUNCE_TIME, 0); // edge detection if possible, mainloop idle poll otherwise
     // - create one binary input
     BinaryInputBehaviourPtr b = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
     b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     b->setHardwareName("digitalin");
     addBehaviour(b);
   }
-  else if (digitalIoType==digitalio_light) {
+  else if (mDigitalIoType==digitalio_light) {
     // Digital output as light on/off switch
     mColorClass = class_yellow_light;
-    indicatorOutput = IndicatorOutputPtr(new IndicatorOutput(ioname.c_str(), false));
+    mIndicatorOutput = IndicatorOutputPtr(new IndicatorOutput(ioname.c_str(), false));
     // - use light settings, which include a scene table
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
     // - add simple single-channel light behaviour
@@ -116,12 +116,12 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     l->setHardwareName("digitalout");
     addBehaviour(l);
   }
-  else if (digitalIoType==digitalio_relay) {
+  else if (mDigitalIoType==digitalio_relay) {
     mColorClass = class_black_joker;
     // - standard device settings with scene table
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // Digital output
-    indicatorOutput = IndicatorOutputPtr(new IndicatorOutput(ioname.c_str(), false));
+    mIndicatorOutput = IndicatorOutputPtr(new IndicatorOutput(ioname.c_str(), false));
     // - add generic output behaviour
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
     o->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
@@ -130,11 +130,11 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "relay")));
     addBehaviour(o);
   }
-  else if (digitalIoType==digitalio_blind) {
+  else if (mDigitalIoType==digitalio_blind) {
     mColorClass = class_grey_shadow;
     installSettings(DeviceSettingsPtr(new ShadowDeviceSettings(*this)));
-    blindsOutputUp = DigitalIoPtr(new DigitalIo(upName.c_str(), true, false));
-    blindsOutputDown = DigitalIoPtr(new DigitalIo(downName.c_str(), true, false));
+    mBlindsOutputUp = DigitalIoPtr(new DigitalIo(upName.c_str(), true, false));
+    mBlindsOutputDown = DigitalIoPtr(new DigitalIo(downName.c_str(), true, false));
     ShadowBehaviourPtr s = ShadowBehaviourPtr(new ShadowBehaviour(*this));
     s->setHardwareName("dual_digitalout");
     s->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, -1);
@@ -172,7 +172,7 @@ void DigitalIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   if (lightBehaviour) {
     // light
     if (lightBehaviour->brightnessNeedsApplying()) {
-      indicatorOutput->set(lightBehaviour->brightnessForHardware());
+      mIndicatorOutput->set(lightBehaviour->brightnessForHardware());
       lightBehaviour->brightnessApplied(); // confirm having applied the value
     }
   }
@@ -185,7 +185,7 @@ void DigitalIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // simple switch output, activates at 50% of possible output range
     ChannelBehaviourPtr ch = getOutput()->getChannelByIndex(0);
     if (ch->needsApplying()) {
-      indicatorOutput->set(ch->getChannelValueBool());
+      mIndicatorOutput->set(ch->getChannelValueBool());
       ch->channelValueApplied();
     }
   }
@@ -220,14 +220,14 @@ void DigitalIODevice::changeMovement(SimpleCB aDoneCB, int aNewDirection)
 {
   if (aNewDirection == 0) {
     // stop
-    blindsOutputUp->set(false);
-    blindsOutputDown->set(false);
+    mBlindsOutputUp->set(false);
+    mBlindsOutputDown->set(false);
   } else if (aNewDirection > 0) {
-    blindsOutputDown->set(false);
-    blindsOutputUp->set(true);
+    mBlindsOutputDown->set(false);
+    mBlindsOutputUp->set(true);
   } else {
-    blindsOutputUp->set(false);
-    blindsOutputDown->set(true);
+    mBlindsOutputUp->set(false);
+    mBlindsOutputDown->set(true);
   }
   if (aDoneCB) {
     aDoneCB();
@@ -236,8 +236,8 @@ void DigitalIODevice::changeMovement(SimpleCB aDoneCB, int aNewDirection)
 
 string DigitalIODevice::blindsName() const
 {
-  if (blindsOutputUp && blindsOutputDown) {
-    return string_format("%s+%s", blindsOutputUp->getName().c_str(), blindsOutputDown->getName().c_str());
+  if (mBlindsOutputUp && mBlindsOutputDown) {
+    return string_format("%s+%s", mBlindsOutputUp->getName().c_str(), mBlindsOutputDown->getName().c_str());
   }
   return "";
 }
@@ -250,17 +250,17 @@ void DigitalIODevice::deriveDsUid()
   DsUid vdcNamespace(DSUID_P44VDC_NAMESPACE_UUID);
   string s = mVdcP->vdcInstanceIdentifier();
   s += ':';
-  if (buttonInput) { s += ":"; s += buttonInput->getName(); }
-  if (indicatorOutput) { s += ":"; s += indicatorOutput->getName(); }
-  if (digitalInput) { s += ":"; s += digitalInput->getName(); }
-  if (blindsOutputUp && blindsOutputDown) { s += ":"; s += blindsName(); }
+  if (mButtonInput) { s += ":"; s += mButtonInput->getName(); }
+  if (mIndicatorOutput) { s += ":"; s += mIndicatorOutput->getName(); }
+  if (mDigitalInput) { s += ":"; s += mDigitalInput->getName(); }
+  if (mBlindsOutputUp && mBlindsOutputDown) { s += ":"; s += blindsName(); }
   mDSUID.setNameInSpace(s, vdcNamespace);
 }
 
 
 string DigitalIODevice::modelName()
 {
-  switch (digitalIoType) {
+  switch (mDigitalIoType) {
     case digitalio_button: return "Button digital input";
     case digitalio_input: return "Binary digital input";
     case digitalio_light: return "Light controlling output";
@@ -273,13 +273,13 @@ string DigitalIODevice::modelName()
 
 string DigitalIODevice::getExtraInfo()
 {
-  if (buttonInput)
-    return string_format("Button: %s\n", buttonInput->getName().c_str());
-  else if (digitalInput)
-    return string_format("Input: %s\n", digitalInput->getName().c_str());
-  else if (indicatorOutput)
-    return string_format("Output: %s\n", indicatorOutput->getName().c_str());
-  else if (blindsOutputUp && blindsOutputDown)
+  if (mButtonInput)
+    return string_format("Button: %s\n", mButtonInput->getName().c_str());
+  else if (mDigitalInput)
+    return string_format("Input: %s\n", mDigitalInput->getName().c_str());
+  else if (mIndicatorOutput)
+    return string_format("Output: %s\n", mIndicatorOutput->getName().c_str());
+  else if (mBlindsOutputUp && mBlindsOutputDown)
     return string_format("Outputs: %s\n", blindsName().c_str());
   else
     return "?";
@@ -290,13 +290,13 @@ string DigitalIODevice::getExtraInfo()
 string DigitalIODevice::description()
 {
   string s = inherited::description();
-  if (buttonInput)
-    string_format_append(s, "\n- Button at Digital IO '%s'", buttonInput->getName().c_str());
-  if (digitalInput)
-    string_format_append(s, "\n- Input at Digital IO '%s'", digitalInput->getName().c_str());
-  if (indicatorOutput)
-    string_format_append(s, "\n- Switch output at Digital IO '%s'", indicatorOutput->getName().c_str());
-  if (blindsOutputUp && blindsOutputDown)
+  if (mButtonInput)
+    string_format_append(s, "\n- Button at Digital IO '%s'", mButtonInput->getName().c_str());
+  if (mDigitalInput)
+    string_format_append(s, "\n- Input at Digital IO '%s'", mDigitalInput->getName().c_str());
+  if (mIndicatorOutput)
+    string_format_append(s, "\n- Switch output at Digital IO '%s'", mIndicatorOutput->getName().c_str());
+  if (mBlindsOutputUp && mBlindsOutputDown)
     string_format_append(s, "\n Blinds output at Digital IO %s", blindsName().c_str());
   return s;
 }
