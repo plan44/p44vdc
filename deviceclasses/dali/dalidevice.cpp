@@ -878,14 +878,14 @@ bool DaliBusDevice::setColorParamsFromChannels(ColorLightBehaviourPtr aColorLigh
         // RGBWA
         rgbl->getRGBWA(r, g, b, w, a, 254, true, aTransitional);
         if (!aSilent) {
-          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGBWA: R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
+          SOLOG(aColorLight->getDevice(), LOG_INFO, "DALI DT8 RGBWA: setting R=%d, G=%d, B=%d, W=%d, A=%d", (int)r, (int)g, (int)b, (int)w, (int)a);
         }
       }
       else {
         // RGBW
         rgbl->getRGBW(r, g, b, w, 254, true, aTransitional);
         if (!aSilent) {
-          SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGBW: R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
+          SOLOG(aColorLight->getDevice(), LOG_INFO, "DALI DT8 RGBW: setting R=%d, G=%d, B=%d, W=%d", (int)r, (int)g, (int)b, (int)w);
         }
       }
     }
@@ -893,7 +893,7 @@ bool DaliBusDevice::setColorParamsFromChannels(ColorLightBehaviourPtr aColorLigh
       // RGB
       rgbl->getRGB(r, g, b, 254, true, aTransitional);
       if (!aSilent) {
-        SOLOG(rgbl->getDevice(), LOG_INFO, "DALI DT8 RGB: R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
+        SOLOG(aColorLight->getDevice(), LOG_INFO, "DALI DT8 RGB: setting R=%d, G=%d, B=%d", (int)r, (int)g, (int)b);
       }
     }
     hasNewColors = setRGBWAParams(r, g, b, w, a, aAlways);
@@ -904,12 +904,18 @@ bool DaliBusDevice::setColorParamsFromChannels(ColorLightBehaviourPtr aColorLigh
       // color is requested or CT is requested but controller cannot do CT natively -> send CieX/Y
       double cieX, cieY;
       aColorLight->getCIExy(cieX, cieY, aTransitional);
+      if (!aSilent) {
+        SOLOG(aColorLight->getDevice(), LOG_INFO, "DALI DT8 CIE: setting x=%.3f, y=%.3f", cieX, cieY);
+      }
       hasNewColors = setColorParams(colorLightModeXY, cieX, cieY, aAlways);
     }
     else {
       // CT is requested and controller can do CT natively, or color is requested but controller can ONLY do CT
       double mired;
       aColorLight->getCT(mired, aTransitional);
+      if (!aSilent) {
+        SOLOG(aColorLight->getDevice(), LOG_INFO, "DALI DT8 CT: setting mired=%d", (int)mired);
+      }
       hasNewColors = setColorParams(colorLightModeCt, mired, 0, aAlways);
     }
   }
