@@ -70,6 +70,7 @@ namespace p44 {
     /// @{
     int mChannelIndex; ///< the index of the channel within the device
     double mResolution; ///< actual resolution within the device
+    bool mEnforceResolution; ///< if true, actual channel value will always be rounded to resolution of the channel
     string mChannelId; ///< string identifier for this channel. If string is empty, getApiId() will return decimal string representation of channelType()
     /// @}
 
@@ -110,7 +111,7 @@ namespace p44 {
 
     virtual double getMinDim() { return getMin(); }; ///< dimming min value defaults to same value as min
     virtual bool wrapsAround() { return false; }; ///< if true, channel is considered to wrap around, meaning max being the same value as min, and dimming never stopping but wrapping around. Off by default
-    virtual bool enforceResolution() { return true; }; ///< if true, actual channel value will always be rounded to resolution of the channel
+    bool enforceResolution() { return mEnforceResolution; }; ///< if true, actual channel value will always be rounded to resolution of the channel
     virtual ApiValueType getChannelValueType() { return apivalue_double; }
     /// @}
 
@@ -408,7 +409,6 @@ namespace p44 {
     virtual const char* getName() const P44_OVERRIDE { return "level"; };
     virtual double getMin() P44_OVERRIDE { return 0; };
     virtual double getMax() P44_OVERRIDE { return 100; };
-
   };
   typedef boost::intrusive_ptr<PercentageLevelChannel> PercentageLevelChannelPtr;
 
@@ -421,7 +421,7 @@ namespace p44 {
     uint32_t mNumIndices; ///< number of valid indices (indices are 0..numIndices-1)
 
   public:
-    IndexChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 1; mNumIndices = 0; };
+    IndexChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 1; mEnforceResolution = true, mNumIndices = 0; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char* getName() const P44_OVERRIDE { return "index"; };
@@ -431,7 +431,6 @@ namespace p44 {
     virtual double getStdDimPerMS() P44_OVERRIDE { return 0; }; // not dimmable
 
     void setNumIndices(uint32_t aNumIndices) { mNumIndices = aNumIndices; };
-
   };
   typedef boost::intrusive_ptr<IndexChannel> IndexChannelPtr;
 
@@ -442,7 +441,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    FlagChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 1; };
+    FlagChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 1; mEnforceResolution = true; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char* getName() const P44_OVERRIDE { return "flag"; };
@@ -461,7 +460,7 @@ namespace p44 {
     typedef ChannelBehaviour inherited;
 
   public:
-    DigitalChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 100; /* on or off */ };
+    DigitalChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 100; mEnforceResolution = true; /* on or off */ };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_percent, unitScaling_1); };
     virtual const char* getName() const P44_OVERRIDE { return "switch"; };

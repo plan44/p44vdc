@@ -49,7 +49,8 @@ ChannelBehaviour::ChannelBehaviour(OutputBehaviour &aOutput, const string aChann
   mTransitionStarted(Never), // no transition in progress
   mTransitionDirection(0), // shortest way by default
   mProgress(1), // no transition in progress
-  mResolution(1) // dummy default resolution (derived classes must provide sensible defaults)
+  mResolution(1), // dummy default resolution (derived classes must provide sensible defaults)
+  mEnforceResolution(false) // do NOT enforce resolution by default.
 {
 }
 

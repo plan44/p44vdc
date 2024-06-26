@@ -272,7 +272,7 @@ namespace p44 {
     typedef DialChannel inherited;
 
   public:
-    FeatureModeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "featureMode") { setMax(MAX_FEATURE_MODE); mCachedChannelValue = DEFAULT_FEATURE_MODE; };
+    FeatureModeChannel(OutputBehaviour &aOutput) : inherited(aOutput, "featureMode") { setMax(MAX_FEATURE_MODE); mEnforceResolution = true; mCachedChannelValue = DEFAULT_FEATURE_MODE; };
     virtual const char* getName() const P44_OVERRIDE { return "feature mode"; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_p44_feature_mode; }; ///< the dS channel type
   };
