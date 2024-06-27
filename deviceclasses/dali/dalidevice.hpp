@@ -70,6 +70,7 @@ namespace p44 {
 
     /// feature set
     bool mSupportsLED; // supports device type 6/LED features
+    bool mFullySupportsDimcurve; // IEC 62386-218 / DT17 indicates that dimming curve switching should actually work
     bool mDT6LinearDim; // linear dimming curve enabled
     bool mSupportsDT8; // supports device type 8 features
     bool mDT8Color; // supports DT 8 color features
@@ -242,10 +243,10 @@ namespace p44 {
 
   private:
 
-    void registerDeviceType(uint8_t aDeviceType);
+    void registerDeviceType(uint8_t aDeviceType, uint8_t aExtendedVersion);
     void deviceTypeResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
-    void probeDeviceType(StatusCB aCompletedCB, uint8_t aNextDT);
-    void probeDeviceTypeResponse(StatusCB aCompletedCB, uint8_t aNextDT, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
+    void probeDeviceType(StatusCB aCompletedCB, uint8_t aDType, const uint8_t* aNextDtP);
+    void probeDeviceTypeResponse(StatusCB aCompletedCB, uint8_t aDType, const uint8_t* aNextDtP, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
     void queryDTFeatures(StatusCB aCompletedCB);
     void dt8FeaturesResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);
     void dt8GearStatusResponse(StatusCB aCompletedCB, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError);

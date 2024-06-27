@@ -28,7 +28,6 @@
 #define DALI_MAXGROUPS 16
 #define DALI_MAXSCENES 16
 
-
 // DALI commands with standard address in first byte
 // - normal commands, send once
 #define DALICMD_OFF 0x00 // 0000 0000
@@ -90,11 +89,13 @@
 #define DALICMD_QUERY_EXTENDED_VERSION 0xFF // 1111 1111
 
 // - DT6 extended (device type specific) commands and queries
+#define DT6_TYPE_LED 6
 #define DALICMD_DT6_SELECT_DIMMING_CURVE 0x06E3 // 1110 0011 (from DTR)
 #define DALICMD_DT6_QUERY_DIMMING_CURVE 0x06EE // 1110 1110
 #define DALICMD_DT6_QUERY_POSSIBLE_OPERATING_MODES 0x06EF // 1110 1111
 
 // - DT8 extended (device type specific) commands and queries
+#define DT8_TYPE_COLOR 8
 #define DALICMD_DT8_SET_TEMP_XCOORD 0x08E0 // 1110 0000 (from DTR1/DTR)
 #define DALICMD_DT8_SET_TEMP_YCOORD 0x08E1 // 1110 0001 (from DTR1/DTR)
 #define DALICMD_DT8_SET_TEMP_CT 0x08E7 // 1110 0111 (from DTR1/DTR)
@@ -108,6 +109,9 @@
 #define DALICMD_DT8_QUERY_COLOR_FEATURES 0x08F9 // 1111 1001
 #define DALICMD_DT8_QUERY_COLOR_VALUE 0x08FA // 1111 1010
 #define DALICMD_DT8_QUERY_COLORSTATE_WORD 0x08FA // 1111 1010 (selector DTR, result into DTR2/DTR1)
+
+// - DT17
+#define DT17_TYPE_DIMCURVE 17
 
 
 // DALI 2-byte special commands, command in first byte

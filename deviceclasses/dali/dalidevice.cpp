@@ -61,6 +61,7 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   mCurrentFadeRate(0xFF), mCurrentFadeTime(0xFF), // unlikely values
   mCurrentDimMode(dimmode_stop),
   mSupportsLED(false),
+  mFullySupportsDimcurve(false),
   mDT6LinearDim(false),
   mSupportsDT8(false),
   mDT8Color(false),
@@ -259,16 +260,26 @@ void DaliBusDevice::dsUidForDeviceInfoStatus(DsUid &aDsUid, DaliDeviceInfo::Dali
 
 
 
+static const uint8_t devTypesOfInterest[] = {
+  DT6_TYPE_LED,
+  DT8_TYPE_COLOR,
+  DT17_TYPE_DIMCURVE,
+  0xFF // terminator
+};
 
-void DaliBusDevice::registerDeviceType(uint8_t aDeviceType)
+void DaliBusDevice::registerDeviceType(uint8_t aDeviceType, uint8_t aExtendedVersion)
 {
-  OLOG(LOG_INFO, "supports device type %d", aDeviceType);
+  // note: getting aExtendedVersion==0 means device with only one additional type, extended version not queried
+  OLOG(LOG_INFO, "supports device type %d, extended version %d.%d", aDeviceType, DALI_STD_VERS_MAJOR(aExtendedVersion), DALI_STD_VERS_MINOR(aExtendedVersion));
   switch (aDeviceType) {
-    case 6: // DALI DT6 is LED support
+    case DT6_TYPE_LED:
       mSupportsLED = true;
       break;
-    case 8: // DALI DT8 is color support
+    case DT8_TYPE_COLOR:
       mSupportsDT8 = true;
+      break;
+    case DT17_TYPE_DIMCURVE:
+      mFullySupportsDimcurve = true;
       break;
   }
 }
@@ -293,46 +304,47 @@ void DaliBusDevice::deviceTypeResponse(StatusCB aCompletedCB, bool aNoOrTimeout,
     // special case is 0xFF, which means device supports multiple types
     if (aResponse==0xFF) {
       // need to query all possible types
-      probeDeviceType(aCompletedCB, 0); // start with 0
+      probeDeviceType(aCompletedCB, *devTypesOfInterest, devTypesOfInterest+1);
       return;
     }
-    // check device type
-    registerDeviceType(aResponse);
+    // single device type, query extended version
+    probeDeviceType(aCompletedCB, aResponse, nullptr);
+    return;
   }
   // done with device type, check groups now
   queryDTFeatures(aCompletedCB);
 }
 
 
-void DaliBusDevice::probeDeviceType(StatusCB aCompletedCB, uint8_t aNextDT)
+void DaliBusDevice::probeDeviceType(StatusCB aCompletedCB, uint8_t aDType, const uint8_t* aNextDtP)
 {
-  if (aNextDT>10) {
-    // all device types checked
-    // done with device type, check DT features now
-    queryDTFeatures(aCompletedCB);
-    return;
-  }
   // query next device type
-  mDaliVdc.mDaliComm.daliSend(DALICMD_ENABLE_DEVICE_TYPE, aNextDT);
+  mDaliVdc.mDaliComm.daliSend(DALICMD_ENABLE_DEVICE_TYPE, aDType);
   mDaliVdc.mDaliComm.daliSendQuery(
     mDeviceInfo->mShortAddress,
     DALICMD_QUERY_EXTENDED_VERSION,
-    boost::bind(&DaliBusDevice::probeDeviceTypeResponse, this, aCompletedCB, aNextDT, _1, _2, _3)
+    boost::bind(&DaliBusDevice::probeDeviceTypeResponse, this, aCompletedCB, aDType, aNextDtP, _1, _2, _3)
   );
 }
 
 
-void DaliBusDevice::probeDeviceTypeResponse(StatusCB aCompletedCB, uint8_t aNextDT, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
+void DaliBusDevice::probeDeviceTypeResponse(StatusCB aCompletedCB, uint8_t aDType, const uint8_t* aNextDtP, bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
 {
   // extended version type query response.
   if (Error::isOK(aError) && !aNoOrTimeout) {
     // extended version response
     // check device type
-    registerDeviceType(aNextDT);
+    registerDeviceType(aDType, aResponse);
   }
   // query next device type
-  aNextDT++;
-  probeDeviceType(aCompletedCB, aNextDT);
+  if (aNextDtP && *aNextDtP!=0xFF) {
+    uint8_t dt = *aNextDtP++;
+    probeDeviceType(aCompletedCB, dt, aNextDtP);
+    return;
+  }
+  // all device types checked
+  // done with device type, check DT features now
+  queryDTFeatures(aCompletedCB);
 }
 
 
@@ -1043,6 +1055,7 @@ DaliBusDeviceGroup::DaliBusDeviceGroup(DaliVdc &aDaliVdc, uint8_t aGroupNo) :
   mMixID.erase(); // no members yet
   // assume max features, will be reduced to what all group members are capable in addDaliBusDevice()
   mSupportsLED = true;
+  mFullySupportsDimcurve = true;
   mSupportsDT8 = true;
   mDT8Color = true;
   mDT8CT = true;
@@ -1068,6 +1081,7 @@ void DaliBusDeviceGroup::addDaliBusDevice(DaliBusDevicePtr aDaliBusDevice)
   }
   // reduce features to common denominator for all group members
   if (!aDaliBusDevice->mSupportsLED) mSupportsLED = false;
+  if (!aDaliBusDevice->mFullySupportsDimcurve) mFullySupportsDimcurve = false;
   if (!aDaliBusDevice->mSupportsDT8) mSupportsDT8 = false;
   if (!aDaliBusDevice->mDT8Color) mSupportsDT8 = false;
   if (!aDaliBusDevice->mDT8CT) mDT8CT = false;
