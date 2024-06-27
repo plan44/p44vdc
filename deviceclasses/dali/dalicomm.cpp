@@ -1239,7 +1239,7 @@ private:
         mDaliComm.daliSendAndReceive(
           DALICMD_VERIFY_SHORT_ADDRESS, addrProg,
           boost::bind(&DaliFullBusScanner::handleNewShortAddressVerify, this, _1, _2, _3),
-          1000 // delay one second before querying for new short address
+          1*Second // delay one second before querying for new short address
         );
       }
       else {
