@@ -1666,14 +1666,14 @@ EnoceanComm::~EnoceanComm()
 void EnoceanComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, const char *aEnoceanResetPinName)
 {
   OLOG(LOG_DEBUG, "setConnectionSpecification: %s", aConnectionSpec);
-  serialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, ENOCEAN_ESP3_COMMAPARMS);
+  mSerialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, ENOCEAN_ESP3_COMMAPARMS);
   // create the EnOcean reset IO pin
   if (aEnoceanResetPinName) {
     // init, initially inactive = not reset
     enoceanResetPin = DigitalIoPtr(new DigitalIo(aEnoceanResetPinName, true, false));
   }
 	// open connection so we can receive
-	serialComm->requestConnection();
+	mSerialComm->requestConnection();
 }
 
 
@@ -1687,7 +1687,7 @@ void EnoceanComm::initialize(StatusCB aCompletedCB)
 void EnoceanComm::initializeInternal(StatusCB aCompletedCB, int aRetriesLeft)
 {
   // get version
-  serialComm->requestConnection();
+  mSerialComm->requestConnection();
   sendCommand(Esp3Packet::newEsp3Message(pt_common_cmd, CO_RD_VERSION), boost::bind(&EnoceanComm::versionReceived, this, aCompletedCB, aRetriesLeft, _1, _2));
 }
 
@@ -1702,7 +1702,7 @@ void EnoceanComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aE
     if (aRetriesLeft>ENOCEAN_INIT_RETRIES/2) {
       flushLine();
     }
-    serialComm->closeConnection();
+    mSerialComm->closeConnection();
     // retry initializing later
     aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::initializeInternal, this, aCompletedCB, aRetriesLeft), ENOCEAN_INIT_RETRY_INTERVAL);
   }
@@ -1833,7 +1833,7 @@ void EnoceanComm::aliveCheckResponse(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aErr
     // alive check failed, try to recover EnOcean interface
     OLOG(LOG_ERR, "alive check of EnOcean module failed -> restarting module");
     // - close the connection
-    serialComm->closeConnection();
+    mSerialComm->closeConnection();
     // - do a hardware reset of the module if possible
     if (enoceanResetPin) enoceanResetPin->set(true); // reset
     // - using alive check ticket for reset sequence
@@ -1863,7 +1863,7 @@ void EnoceanComm::resetDone()
 void EnoceanComm::reopenConnection()
 {
   OLOG(LOG_NOTICE, "re-opening connection");
-	serialComm->requestConnection(); // re-open connection
+	mSerialComm->requestConnection(); // re-open connection
   // restart alive checks, not too soon after reset
   aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), 10*Second);
 }
@@ -1969,7 +1969,7 @@ void EnoceanComm::flushLine()
   ErrorPtr err;
   uint8_t zeroes[42];
   memset(zeroes, 0, sizeof(zeroes));
-  serialComm->transmitBytes(sizeof(zeroes), zeroes, err);
+  mSerialComm->transmitBytes(sizeof(zeroes), zeroes, err);
   if (Error::notOK(err)) {
     OLOG(LOG_ERR, "flushLine: error sending flush bytes");
   }
@@ -1984,10 +1984,10 @@ void EnoceanComm::sendPacket(Esp3PacketPtr aPacket)
   // transmit
   // - fixed header
   ErrorPtr err;
-  serialComm->transmitBytes(ESP3_HEADERBYTES, aPacket->header, err);
+  mSerialComm->transmitBytes(ESP3_HEADERBYTES, aPacket->header, err);
   if (Error::isOK(err)) {
     // - payload
-    serialComm->transmitBytes(aPacket->payloadSize, aPacket->payloadP, err);
+    mSerialComm->transmitBytes(aPacket->payloadSize, aPacket->payloadP, err);
   }
   if (Error::notOK(err)) {
     OLOG(LOG_ERR, "sendPacket: error sending packet over serial: %s", err->text());

@@ -171,9 +171,9 @@ ZfComm::~ZfComm()
 void ZfComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort)
 {
   FOCUSOLOG("setConnectionSpecification: %s", aConnectionSpec);
-  serialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, ZF_COMMAPARMS);
+  mSerialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, ZF_COMMAPARMS);
 	// open connection so we can receive
-	serialComm->requestConnection();
+	mSerialComm->requestConnection();
 }
 
 

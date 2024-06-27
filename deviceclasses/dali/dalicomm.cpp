@@ -138,7 +138,7 @@ static const char *bridgeAckText(uint8_t aResp1, uint8_t aResp2)
 void DaliComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, MLMicroSeconds aCloseAfterIdleTime)
 {
   mCloseAfterIdleTime = aCloseAfterIdleTime;
-  serialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, DALIBRIDGE_COMMPARAMS);
+  mSerialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, DALIBRIDGE_COMMPARAMS);
 }
 
 
@@ -222,7 +222,7 @@ void DaliComm::sendBridgeCommand(uint8_t aCmd, uint8_t aDali1, uint8_t aDali2, D
     if (mExpectedBridgeResponses>BUFFERED_BRIDGE_RESPONSES_HIGH) {
       mResponsesInSequence = true; // prevent further sends without answers
     }
-    recOp->inSequence = mResponsesInSequence;
+    recOp->mInSequence = mResponsesInSequence;
     FOCUSOLOG("bridge command:  %s (%02X)      %02X %02X - %d pending responses - %s", bridgeCmdName(aCmd), aCmd, aDali1, aDali2, mExpectedBridgeResponses, mResponsesInSequence ? "sent when no more responses pending" : "sent as soon as possible");
   }
   recOp->setTimeout(120*Second); // large timeout, because it can really take time until all expected answers are received, or DEH2 network/serial load might disturb timing for a longer while
@@ -240,7 +240,7 @@ void DaliComm::sendBridgeCommand(uint8_t aCmd, uint8_t aDali1, uint8_t aDali2, D
 
 void DaliComm::connectionTimeout()
 {
-  serialComm->closeConnection();
+  mSerialComm->closeConnection();
 }
 
 // MARK: - DALI bus communication basics
@@ -759,13 +759,13 @@ void DaliComm::daliBusTestData(StatusCB aResultCB, DaliAddress aAddress, uint8_t
 
 class DaliBusScanner : public P44Obj
 {
-  DaliComm &daliComm;
-  DaliComm::DaliBusScanCB callback;
-  DaliAddress shortAddress;
-  DaliComm::ShortAddressListPtr activeDevicesPtr;
-  DaliComm::ShortAddressListPtr unreliableDevicesPtr;
-  bool probablyCollision;
-  bool unconfiguredDevices;
+  DaliComm &mDaliComm;
+  DaliComm::DaliBusScanCB mCallback;
+  DaliAddress mShortAddress;
+  DaliComm::ShortAddressListPtr mActiveDevicesPtr;
+  DaliComm::ShortAddressListPtr mUnreliableDevicesPtr;
+  bool mProbablyCollision;
+  bool mUnconfiguredDevices;
 public:
   static void scanBus(DaliComm &aDaliComm, DaliComm::DaliBusScanCB aResultCB)
   {
@@ -774,30 +774,30 @@ public:
   };
 private:
   DaliBusScanner(DaliComm &aDaliComm, DaliComm::DaliBusScanCB aResultCB) :
-    callback(aResultCB),
-    daliComm(aDaliComm),
-    probablyCollision(false),
-    unconfiguredDevices(false),
-    activeDevicesPtr(new DaliComm::ShortAddressList),
-    unreliableDevicesPtr(new DaliComm::ShortAddressList)
+    mCallback(aResultCB),
+    mDaliComm(aDaliComm),
+    mProbablyCollision(false),
+    mUnconfiguredDevices(false),
+    mActiveDevicesPtr(new DaliComm::ShortAddressList),
+    mUnreliableDevicesPtr(new DaliComm::ShortAddressList)
   {
-    daliComm.startProcedure();
-    SOLOG(daliComm, LOG_INFO, "starting quick bus scan (short address poll)");
+    mDaliComm.startProcedure();
+    SOLOG(mDaliComm, LOG_INFO, "starting quick bus scan (short address poll)");
     // reset the bus first
-    daliComm.reset(boost::bind(&DaliBusScanner::resetComplete, this, _1));
+    mDaliComm.reset(boost::bind(&DaliBusScanner::resetComplete, this, _1));
   }
 
   void resetComplete(ErrorPtr aError)
   {
     // check for overload condition
     if (Error::isError(aError, DaliCommError::domain(), DaliCommError::BusOverload)) {
-      SOLOG(daliComm, LOG_ERR, "bus has overload - possibly due to short circuit, defective ballasts or more than 64 devices connected");
-      SOLOG(daliComm, LOG_ERR, "-> Please power down installation, check bus and try again");
+      SOLOG(mDaliComm, LOG_ERR, "bus has overload - possibly due to short circuit, defective ballasts or more than 64 devices connected");
+      SOLOG(mDaliComm, LOG_ERR, "-> Please power down installation, check bus and try again");
     }
     if (aError)
       return completed(aError);
     // check if there are devices without short address
-    daliComm.daliSendQuery(DaliBroadcast, DALICMD_QUERY_MISSING_SHORT_ADDRESS, boost::bind(&DaliBusScanner::handleMissingShortAddressResponse, this, _1, _2, _3));
+    mDaliComm.daliSendQuery(DaliBroadcast, DALICMD_QUERY_MISSING_SHORT_ADDRESS, boost::bind(&DaliBusScanner::handleMissingShortAddressResponse, this, _1, _2, _3));
   }
 
 
@@ -813,11 +813,11 @@ private:
   {
     if (DaliComm::isYes(aNoOrTimeout, aResponse, aError, true)) {
       // we have devices without short addresses
-      SOLOG(daliComm, LOG_NOTICE, "Detected devices without short address on the bus (-> will trigger full scan later)");
-      unconfiguredDevices = true;
+      SOLOG(mDaliComm, LOG_NOTICE, "Detected devices without short address on the bus (-> will trigger full scan later)");
+      mUnconfiguredDevices = true;
     }
     // start the scan
-    shortAddress = 0;
+    mShortAddress = 0;
     nextQuery(dqs_controlgear);
   };
 
@@ -828,20 +828,20 @@ private:
     bool isYes = false;
     if (Error::isError(aError, DaliCommError::domain(), DaliCommError::DALIFrame)) {
       // framing error, indicates that we might have duplicates
-      SOLOG(daliComm, LOG_NOTICE, "Detected framing error for %d-th response from short address %d - probably short address collision", (int)aQueryState, shortAddress);
-      probablyCollision = true;
+      SOLOG(mDaliComm, LOG_NOTICE, "Detected framing error for %d-th response from short address %d - probably short address collision", (int)aQueryState, mShortAddress);
+      mProbablyCollision = true;
       isYes = true; // still count as YES
       aError.reset(); // do not count as error aborting the search
       aQueryState=dqs_random_l; // one error is enough, no need to check other bytes
     }
     else if (Error::isOK(aError) && !aNoOrTimeout) {
       // no error, no timeout
-      SOLOG(daliComm, LOG_DEBUG, "Short address %d returns 0x%02X for queryState %d (0=controlgear, 1..3=random address H/M/L)", shortAddress, aResponse, (int)aQueryState);
+      SOLOG(mDaliComm, LOG_DEBUG, "Short address %d returns 0x%02X for queryState %d (0=controlgear, 1..3=random address H/M/L)", mShortAddress, aResponse, (int)aQueryState);
       isYes = true;
       if (aQueryState==dqs_controlgear && aResponse!=DALIANSWER_YES) {
         // not entirely correct answer, also indicates collision
-        SOLOG(daliComm, LOG_NOTICE, "Detected incorrect YES answer 0x%02X from short address %d - probably short address collision", aResponse, shortAddress);
-        probablyCollision = true;
+        SOLOG(mDaliComm, LOG_NOTICE, "Detected incorrect YES answer 0x%02X from short address %d - probably short address collision", aResponse, mShortAddress);
+        mProbablyCollision = true;
       }
     }
     if (aQueryState==dqs_random_l || aNoOrTimeout) {
@@ -862,9 +862,9 @@ private:
       //     nonconforming device might only be detected when the bus is free of collisions.
       // - otherwise:
       //   - no device at this short address (or a severely broken one)
-      if (aQueryState!=dqs_controlgear && (isYes || !probablyCollision)) {
+      if (aQueryState!=dqs_controlgear && (isYes || !mProbablyCollision)) {
         // Device at this shortaddress: do a data reliability test now (quick 3 byte 0,0x55,0xAA only, unless loglevel>=6)
-        DaliBusDataTester::daliBusTestData(daliComm, boost::bind(&DaliBusScanner::nextDevice ,this, true, _1), shortAddress, LOGLEVEL>=LOG_INFO ? 9 : 3);
+        DaliBusDataTester::daliBusTestData(mDaliComm, boost::bind(&DaliBusScanner::nextDevice ,this, true, _1), mShortAddress, LOGLEVEL>=LOG_INFO ? 9 : 3);
         return;
       }
       // No device found at this shortaddress -> just test next address
@@ -882,17 +882,17 @@ private:
     if (aDeviceAtThisAddress) {
       if (Error::isOK(aError)) {
         // this short address has a device which has passed the test
-        activeDevicesPtr->push_back(shortAddress);
-        SOLOG(daliComm, LOG_INFO, "- detected reliably communicating DALI device at short address %d", shortAddress);
+        mActiveDevicesPtr->push_back(mShortAddress);
+        SOLOG(mDaliComm, LOG_INFO, "- detected reliably communicating DALI device at short address %d", mShortAddress);
       }
       else {
-        unreliableDevicesPtr->push_back(shortAddress);
-        SOLOG(daliComm, LOG_ERR, "Detected device at short address %d, but it FAILED R/W TEST: %s -> ignoring", shortAddress, aError->text());
+        mUnreliableDevicesPtr->push_back(mShortAddress);
+        SOLOG(mDaliComm, LOG_ERR, "Detected device at short address %d, but it FAILED R/W TEST: %s -> ignoring", mShortAddress, aError->text());
       }
     }
     // check if more short addresses to test
-    shortAddress++;
-    if (shortAddress<DALI_MAXDEVICES) {
+    mShortAddress++;
+    if (mShortAddress<DALI_MAXDEVICES) {
       // more devices to scan
       nextQuery(dqs_controlgear);
     }
@@ -912,7 +912,7 @@ private:
       case dqs_random_m: q = DALICMD_QUERY_RANDOM_ADDRESS_M; break;
       case dqs_random_l: q = DALICMD_QUERY_RANDOM_ADDRESS_L; break;
     }
-    daliComm.daliSendQuery(shortAddress, q, boost::bind(&DaliBusScanner::handleScanResponse, this, aQueryState, _1, _2, _3));
+    mDaliComm.daliSendQuery(mShortAddress, q, boost::bind(&DaliBusScanner::handleScanResponse, this, aQueryState, _1, _2, _3));
   }
 
 
@@ -920,21 +920,21 @@ private:
   void completed(ErrorPtr aError)
   {
     // scan done or error, return list to callback
-    if (probablyCollision || unconfiguredDevices) {
+    if (mProbablyCollision || mUnconfiguredDevices) {
       if (Error::notOK(aError)) {
-        SOLOG(daliComm, LOG_WARNING, "Error (%s) in quick scan ignored because we need to do a full scan anyway", aError->text());
+        SOLOG(mDaliComm, LOG_WARNING, "Error (%s) in quick scan ignored because we need to do a full scan anyway", aError->text());
       }
-      if (probablyCollision) {
+      if (mProbablyCollision) {
         aError = Error::err<DaliCommError>(DaliCommError::AddressCollisions, "Address collision -> need full bus scan");
       }
       else {
         aError = Error::err<DaliCommError>(DaliCommError::AddressesMissing, "Devices with no short address -> need scan for those");
       }
     }
-    FOCUSSOLOG(daliComm, "After scanBus complete: retriedWrites=%ld, retriedReads=%ld", daliComm.mRetriedWrites, daliComm.mRetriedReads);
-    daliComm.endProcedure();
+    FOCUSSOLOG(mDaliComm, "After scanBus complete: retriedWrites=%ld, retriedReads=%ld", mDaliComm.mRetriedWrites, mDaliComm.mRetriedReads);
+    mDaliComm.endProcedure();
     // call back
-    callback(activeDevicesPtr, unreliableDevicesPtr, aError);
+    mCallback(mActiveDevicesPtr, mUnreliableDevicesPtr, aError);
     // done, delete myself
     delete this;
   }
@@ -961,23 +961,23 @@ void DaliComm::daliBusScan(DaliBusScanCB aResultCB)
 
 class DaliFullBusScanner : public P44Obj
 {
-  DaliComm &daliComm;
-  DaliComm::DaliBusScanCB callback;
-  bool fullScanOnlyIfNeeded;
-  uint32_t searchMax;
-  uint32_t searchMin;
-  uint32_t searchAddr;
-  uint8_t searchL, searchM, searchH;
-  uint32_t lastSearchMin; // for re-starting
-  int restarts;
-  int compareRepeat;
-  int readShortAddrRepeat;
-  bool setLMH;
-  DaliComm::ShortAddressListPtr foundDevicesPtr;
-  DaliComm::ShortAddressListPtr usedShortAddrsPtr;
-  DaliComm::ShortAddressListPtr conflictedShortAddrsPtr;
-  DaliAddress newAddress;
-  MLTicket delayTicket;
+  DaliComm &mDaliComm;
+  DaliComm::DaliBusScanCB mCallback;
+  bool mFullScanOnlyIfNeeded;
+  uint32_t mSearchMax;
+  uint32_t mSearchMin;
+  uint32_t mSearchAddr;
+  uint8_t mSearchL, mSearchM, mSearchH;
+  uint32_t mLastSearchMin; // for re-starting
+  int mRestarts;
+  int mCompareRepeat;
+  int mReadShortAddrRepeat;
+  bool mSetLMH;
+  DaliComm::ShortAddressListPtr mFoundDevicesPtr;
+  DaliComm::ShortAddressListPtr mUsedShortAddrsPtr;
+  DaliComm::ShortAddressListPtr mConflictedShortAddrsPtr;
+  DaliAddress mNewAddress;
+  MLTicket mDelayTicket;
 public:
   static void fullBusScan(DaliComm &aDaliComm, DaliComm::DaliBusScanCB aResultCB, bool aFullScanOnlyIfNeeded)
   {
@@ -986,12 +986,12 @@ public:
   };
 private:
   DaliFullBusScanner(DaliComm &aDaliComm, DaliComm::DaliBusScanCB aResultCB, bool aFullScanOnlyIfNeeded) :
-    daliComm(aDaliComm),
-    callback(aResultCB),
-    fullScanOnlyIfNeeded(aFullScanOnlyIfNeeded),
-    foundDevicesPtr(new DaliComm::ShortAddressList)
+    mDaliComm(aDaliComm),
+    mCallback(aResultCB),
+    mFullScanOnlyIfNeeded(aFullScanOnlyIfNeeded),
+    mFoundDevicesPtr(new DaliComm::ShortAddressList)
   {
-    daliComm.startProcedure();
+    mDaliComm.startProcedure();
     // start a scan
     startScan();
   }
@@ -1000,15 +1000,15 @@ private:
   void startScan()
   {
     // first scan for used short addresses
-    foundDevicesPtr->clear(); // must be empty in case we do a restart
-    DaliBusScanner::scanBus(daliComm,boost::bind(&DaliFullBusScanner::shortAddrListReceived, this, _1, _2, _3));
+    mFoundDevicesPtr->clear(); // must be empty in case we do a restart
+    DaliBusScanner::scanBus(mDaliComm,boost::bind(&DaliFullBusScanner::shortAddrListReceived, this, _1, _2, _3));
   }
 
 
   void shortAddrListReceived(DaliComm::ShortAddressListPtr aShortAddressListPtr, DaliComm::ShortAddressListPtr aUnreliableShortAddressListPtr, ErrorPtr aError)
   {
     bool missingAddrs = Error::isError(aError, DaliCommError::domain(), DaliCommError::AddressesMissing);
-    SOLOG(daliComm, LOG_NOTICE, "found %zu responding short addresses, %zu unreliable, %s missing",
+    SOLOG(mDaliComm, LOG_NOTICE, "found %zu responding short addresses, %zu unreliable, %s missing",
       aShortAddressListPtr ? aShortAddressListPtr->size() : 0,
       aUnreliableShortAddressListPtr ? aUnreliableShortAddressListPtr->size() : 0,
       missingAddrs ? "SOME" : "none"
@@ -1016,31 +1016,31 @@ private:
     // Strategy:
     // - when short scan reports devices with no short address, trigger a random binary serach FOR THOSE ONLY (case: new devices)
     // - when short scan reports another error: just report back, UNLESS unconditional full scan is requested
-    if (!missingAddrs && fullScanOnlyIfNeeded) {
+    if (!missingAddrs && mFullScanOnlyIfNeeded) {
       // not enough reason for triggering a random search, with or without error
-      foundDevicesPtr = aShortAddressListPtr; // but return those that are reliable
+      mFoundDevicesPtr = aShortAddressListPtr; // but return those that are reliable
       completed(aError);
       return;
     }
     // save the short address list
-    usedShortAddrsPtr = aShortAddressListPtr;
-    conflictedShortAddrsPtr = aUnreliableShortAddressListPtr;
-    if (!fullScanOnlyIfNeeded) {
-      SOLOG(daliComm, LOG_WARNING, "unconditional full bus scan (random address binary search) for ALL devices requested, will reassign conflicting short addresses.");
+    mUsedShortAddrsPtr = aShortAddressListPtr;
+    mConflictedShortAddrsPtr = aUnreliableShortAddressListPtr;
+    if (!mFullScanOnlyIfNeeded) {
+      SOLOG(mDaliComm, LOG_WARNING, "unconditional full bus scan (random address binary search) for ALL devices requested, will reassign conflicting short addresses.");
     }
     else {
-      foundDevicesPtr = aShortAddressListPtr; // use the already addressed devices
-      SOLOG(daliComm, LOG_WARNING, "bus scan (random address binary search) for devices without shortaddr - NO existing addresses will be reassigned.");
+      mFoundDevicesPtr = aShortAddressListPtr; // use the already addressed devices
+      SOLOG(mDaliComm, LOG_WARNING, "bus scan (random address binary search) for devices without shortaddr - NO existing addresses will be reassigned.");
     }
     // Terminate any special modes first
-    daliComm.daliSend(DALICMD_TERMINATE, 0x00);
+    mDaliComm.daliSend(DALICMD_TERMINATE, 0x00);
     // initialize entire system for random address selection process. Unless full scan explicitly requested, only unaddressed devices will be included
-    daliComm.daliSendTwice(DALICMD_INITIALISE, fullScanOnlyIfNeeded ? 0xFF : 0x00, NoOP, 100*MilliSecond); // 0xFF = only those w/o short address
-    daliComm.daliSendTwice(DALICMD_RANDOMISE, 0x00, NoOP, 100*MilliSecond);
+    mDaliComm.daliSendTwice(DALICMD_INITIALISE, mFullScanOnlyIfNeeded ? 0xFF : 0x00, NoOP, 100*MilliSecond); // 0xFF = only those w/o short address
+    mDaliComm.daliSendTwice(DALICMD_RANDOMISE, 0x00, NoOP, 100*MilliSecond);
     // start search at lowest address
-    restarts = 0;
+    mRestarts = 0;
     // - as specs say DALICMD_RANDOMISE might need 100mS until new random addresses are ready, wait a little before actually starting
-    delayTicket.executeOnce(boost::bind(&DaliFullBusScanner::newSearchUpFrom, this, 0), 150*MilliSecond);
+    mDelayTicket.executeOnce(boost::bind(&DaliFullBusScanner::newSearchUpFrom, this, 0), 150*MilliSecond);
   };
 
 
@@ -1062,7 +1062,7 @@ private:
     DaliAddress newAddr = DALI_MAXDEVICES;
     while (newAddr>0) {
       newAddr--;
-      if (!isShortAddressInList(newAddr,usedShortAddrsPtr) && !isShortAddressInList(newAddr, conflictedShortAddrsPtr)) {
+      if (!isShortAddressInList(newAddr,mUsedShortAddrsPtr) && !isShortAddressInList(newAddr, mConflictedShortAddrsPtr)) {
         // this one is free, use it
         return newAddr;
       }
@@ -1075,13 +1075,13 @@ private:
   void newSearchUpFrom(uint32_t aMinSearch)
   {
     // init search range
-    searchMax = 0xFFFFFF;
-    searchMin = aMinSearch;
-    lastSearchMin = aMinSearch;
-    searchAddr = (searchMax-aMinSearch)/2+aMinSearch; // start in the middle
+    mSearchMax = 0xFFFFFF;
+    mSearchMin = aMinSearch;
+    mLastSearchMin = aMinSearch;
+    mSearchAddr = (mSearchMax-aMinSearch)/2+aMinSearch; // start in the middle
     // no search address currently set
-    setLMH = true;
-    compareRepeat = 0;
+    mSetLMH = true;
+    mCompareRepeat = 0;
     compareNext();
   }
 
@@ -1090,26 +1090,26 @@ private:
   {
     // issue next compare command
     // - update address bytes as needed (only those that have changed)
-    uint8_t by = (searchAddr>>16) & 0xFF;
-    if (by!=searchH || setLMH) {
-      searchH = by;
-      daliComm.daliSend(DALICMD_SEARCHADDRH, searchH);
+    uint8_t by = (mSearchAddr>>16) & 0xFF;
+    if (by!=mSearchH || mSetLMH) {
+      mSearchH = by;
+      mDaliComm.daliSend(DALICMD_SEARCHADDRH, mSearchH);
     }
     // - searchM
-    by = (searchAddr>>8) & 0xFF;
-    if (by!=searchM || setLMH) {
-      searchM = by;
-      daliComm.daliSend(DALICMD_SEARCHADDRM, searchM);
+    by = (mSearchAddr>>8) & 0xFF;
+    if (by!=mSearchM || mSetLMH) {
+      mSearchM = by;
+      mDaliComm.daliSend(DALICMD_SEARCHADDRM, mSearchM);
     }
     // - searchL
-    by = (searchAddr) & 0xFF;
-    if (by!=searchL || setLMH) {
-      searchL = by;
-      daliComm.daliSend(DALICMD_SEARCHADDRL, searchL);
+    by = (mSearchAddr) & 0xFF;
+    if (by!=mSearchL || mSetLMH) {
+      mSearchL = by;
+      mDaliComm.daliSend(DALICMD_SEARCHADDRL, mSearchL);
     }
-    setLMH = false; // incremental from now on until flag is set again
+    mSetLMH = false; // incremental from now on until flag is set again
     // - issue the compare command
-    daliComm.daliSendAndReceive(DALICMD_COMPARE, 0x00, boost::bind(&DaliFullBusScanner::handleCompareResult, this, _1, _2, _3));
+    mDaliComm.daliSendAndReceive(DALICMD_COMPARE, 0x00, boost::bind(&DaliFullBusScanner::handleCompareResult, this, _1, _2, _3));
   }
 
 
@@ -1118,52 +1118,52 @@ private:
     // Anything received but timeout is considered a yes
     bool isYes = DaliComm::isYes(aNoOrTimeout, aResponse, aError, true);
     if (aError) {
-      SOLOG(daliComm, LOG_ERR, "compare result error: %s -> aborted scan", aError->text());
+      SOLOG(mDaliComm, LOG_ERR, "compare result error: %s -> aborted scan", aError->text());
       completed(aError); // other error, abort
       return;
     }
-    compareRepeat++;
-    SOLOG(daliComm, LOG_DEBUG, "DALICMD_COMPARE result #%d = %s, search=0x%06X, searchMin=0x%06X, searchMax=0x%06X", compareRepeat, isYes ? "Yes" : "No ", searchAddr, searchMin, searchMax);
+    mCompareRepeat++;
+    SOLOG(mDaliComm, LOG_DEBUG, "DALICMD_COMPARE result #%d = %s, search=0x%06X, searchMin=0x%06X, searchMax=0x%06X", mCompareRepeat, isYes ? "Yes" : "No ", mSearchAddr, mSearchMin, mSearchMax);
     // repeat to make sure
-    if (!isYes && compareRepeat<=MAX_COMPARE_REPEATS) {
-      SOLOG(daliComm, LOG_DEBUG, "- not trusting compare NO result yet, retrying...");
+    if (!isYes && mCompareRepeat<=MAX_COMPARE_REPEATS) {
+      SOLOG(mDaliComm, LOG_DEBUG, "- not trusting compare NO result yet, retrying...");
       compareNext();
       return;
     }
     // any ballast has smaller or equal random address?
     if (isYes) {
-      if (compareRepeat>1) {
-        SOLOG(daliComm, LOG_DEBUG, "- got a NO in first attempt but now a YES in %d attempt! -> unreliable answers", compareRepeat);
+      if (mCompareRepeat>1) {
+        SOLOG(mDaliComm, LOG_DEBUG, "- got a NO in first attempt but now a YES in %d attempt! -> unreliable answers", mCompareRepeat);
       }
       // yes, there is at least one, max address is what we searched so far
-      searchMax = searchAddr;
+      mSearchMax = mSearchAddr;
     }
     else {
       // none at or below current search
-      if (searchMin==0xFFFFFF) {
+      if (mSearchMin==0xFFFFFF) {
         // already at max possible -> no more devices found
-        SOLOG(daliComm, LOG_INFO, "No more devices");
+        SOLOG(mDaliComm, LOG_INFO, "No more devices");
         completed(ErrorPtr()); return;
       }
-      searchMin = searchAddr+1; // new min
+      mSearchMin = mSearchAddr+1; // new min
     }
-    if (searchMin==searchMax && searchAddr==searchMin) {
+    if (mSearchMin==mSearchMax && mSearchAddr==mSearchMin) {
       // found!
-      SOLOG(daliComm, LOG_NOTICE, "- Found device at 0x%06X", searchAddr);
+      SOLOG(mDaliComm, LOG_NOTICE, "- Found device at 0x%06X", mSearchAddr);
       // read current short address
-      readShortAddrRepeat = 0;
-      daliComm.daliSendAndReceive(DALICMD_QUERY_SHORT_ADDRESS, 0x00, boost::bind(&DaliFullBusScanner::handleShortAddressQuery, this, _1, _2, _3), READ_SHORT_ADDR_SEND_DELAY);
+      mReadShortAddrRepeat = 0;
+      mDaliComm.daliSendAndReceive(DALICMD_QUERY_SHORT_ADDRESS, 0x00, boost::bind(&DaliFullBusScanner::handleShortAddressQuery, this, _1, _2, _3), READ_SHORT_ADDR_SEND_DELAY);
     }
     else {
       // not yet - continue
-      searchAddr = searchMin + (searchMax-searchMin)/2;
-      SOLOG(daliComm, LOG_DEBUG, "                            Next search=0x%06X, searchMin=0x%06X, searchMax=0x%06X", searchAddr, searchMin, searchMax);
-      if (searchAddr>0xFFFFFF) {
-        SOLOG(daliComm, LOG_WARNING, "- failed search");
-        if (restarts<MAX_RESTARTS) {
-          restarts++;
-          SOLOG(daliComm, LOG_NOTICE, "- restarting search at address of last found device + 1 (%d/%d)", restarts, MAX_RESTARTS);
-          newSearchUpFrom(lastSearchMin);
+      mSearchAddr = mSearchMin + (mSearchMax-mSearchMin)/2;
+      SOLOG(mDaliComm, LOG_DEBUG, "                            Next search=0x%06X, searchMin=0x%06X, searchMax=0x%06X", mSearchAddr, mSearchMin, mSearchMax);
+      if (mSearchAddr>0xFFFFFF) {
+        SOLOG(mDaliComm, LOG_WARNING, "- failed search");
+        if (mRestarts<MAX_RESTARTS) {
+          mRestarts++;
+          SOLOG(mDaliComm, LOG_NOTICE, "- restarting search at address of last found device + 1 (%d/%d)", mRestarts, MAX_RESTARTS);
+          newSearchUpFrom(mLastSearchMin);
           return;
         }
         else {
@@ -1171,7 +1171,7 @@ private:
         }
       }
       // issue next address' compare
-      compareRepeat = 0;
+      mCompareRepeat = 0;
       compareNext();
     }
   }
@@ -1183,18 +1183,18 @@ private:
       return completed(aError);
     if (aNoOrTimeout) {
       // should not happen, but just retry
-      SOLOG(daliComm, LOG_WARNING, "- Device at 0x%06X does not respond to DALICMD_QUERY_SHORT_ADDRESS", searchAddr);
-      readShortAddrRepeat++;
-      if (readShortAddrRepeat<=MAX_SHORTADDR_READ_REPEATS) {
-        daliComm.daliSendAndReceive(DALICMD_QUERY_SHORT_ADDRESS, 0x00, boost::bind(&DaliFullBusScanner::handleShortAddressQuery, this, _1, _2, _3), READ_SHORT_ADDR_SEND_DELAY);
+      SOLOG(mDaliComm, LOG_WARNING, "- Device at 0x%06X does not respond to DALICMD_QUERY_SHORT_ADDRESS", mSearchAddr);
+      mReadShortAddrRepeat++;
+      if (mReadShortAddrRepeat<=MAX_SHORTADDR_READ_REPEATS) {
+        mDaliComm.daliSendAndReceive(DALICMD_QUERY_SHORT_ADDRESS, 0x00, boost::bind(&DaliFullBusScanner::handleShortAddressQuery, this, _1, _2, _3), READ_SHORT_ADDR_SEND_DELAY);
         return;
       }
       // should definitely not happen, probably bus error led to false device detection -> restart search after a while
-      SOLOG(daliComm, LOG_WARNING, "- Device at 0x%06X did not respond to %d attempts of DALICMD_QUERY_SHORT_ADDRESS", searchAddr, MAX_SHORTADDR_READ_REPEATS+1);
-      if (restarts<MAX_RESTARTS) {
-        restarts++;
-        SOLOG(daliComm, LOG_NOTICE, "- restarting complete scan after a delay (%d/%d)", restarts, MAX_RESTARTS);
-        delayTicket.executeOnce(boost::bind(&DaliFullBusScanner::startScan, this), RESCAN_RETRY_DELAY);
+      SOLOG(mDaliComm, LOG_WARNING, "- Device at 0x%06X did not respond to %d attempts of DALICMD_QUERY_SHORT_ADDRESS", mSearchAddr, MAX_SHORTADDR_READ_REPEATS+1);
+      if (mRestarts<MAX_RESTARTS) {
+        mRestarts++;
+        SOLOG(mDaliComm, LOG_NOTICE, "- restarting complete scan after a delay (%d/%d)", mRestarts, MAX_RESTARTS);
+        mDelayTicket.executeOnce(boost::bind(&DaliFullBusScanner::startScan, this), RESCAN_RETRY_DELAY);
         return;
       }
       else {
@@ -1203,40 +1203,40 @@ private:
     }
     else {
       // response is short address in 0AAAAAA1 format or DALIVALUE_MASK (no adress)
-      newAddress = NoDaliAddress; // none
-      DaliAddress shortAddress = newAddress; // none
+      mNewAddress = NoDaliAddress; // none
+      DaliAddress shortAddress = mNewAddress; // none
       bool needsNewAddress = false;
       if (aResponse==DALIVALUE_MASK) {
         // device has no short address yet, assign one
         needsNewAddress = true;
-        newAddress = newShortAddress();
-        SOLOG(daliComm, LOG_NOTICE, "- Device at 0x%06X has NO short address -> assigning new short address", searchAddr);
+        mNewAddress = newShortAddress();
+        SOLOG(mDaliComm, LOG_NOTICE, "- Device at 0x%06X has NO short address -> assigning new short address", mSearchAddr);
       }
       else {
         shortAddress = DaliComm::addressFromDaliResponse(aResponse);
-        SOLOG(daliComm, LOG_INFO, "- Device at 0x%06X has short address: %d", searchAddr, shortAddress);
+        SOLOG(mDaliComm, LOG_INFO, "- Device at 0x%06X has short address: %d", mSearchAddr, shortAddress);
         // check for collisions
-        if (isShortAddressInList(shortAddress, foundDevicesPtr)) {
-          newAddress = newShortAddress();
+        if (isShortAddressInList(shortAddress, mFoundDevicesPtr)) {
+          mNewAddress = newShortAddress();
           needsNewAddress = true;
-          SOLOG(daliComm, LOG_NOTICE, "- Collision on short address %d -> assigning new short address", shortAddress);
+          SOLOG(mDaliComm, LOG_NOTICE, "- Collision on short address %d -> assigning new short address", shortAddress);
         }
       }
       // check if we need to re-assign the short address
       if (needsNewAddress) {
         uint8_t addrProg;
-        if (newAddress==NoDaliAddress) {
+        if (mNewAddress==NoDaliAddress) {
           // no more short addresses available
-          SOLOG(daliComm, LOG_ERR, "Bus has too many devices, device 0x%06X cannot be assigned a new short address and will not be usable", searchAddr);
+          SOLOG(mDaliComm, LOG_ERR, "Bus has too many devices, device 0x%06X cannot be assigned a new short address and will not be usable", mSearchAddr);
           addrProg = 0xFF; // programming 0xFF means NO address
         }
         else {
-          SOLOG(daliComm, LOG_NOTICE, "- assigning new free short address %d to device", newAddress);
-          addrProg = DaliComm::dali1FromAddress(newAddress)+1;
+          SOLOG(mDaliComm, LOG_NOTICE, "- assigning new free short address %d to device", mNewAddress);
+          addrProg = DaliComm::dali1FromAddress(mNewAddress)+1;
         }
         // new short address (or explicit no-address==DaliBroadcast) must be assigned
-        daliComm.daliSend(DALICMD_PROGRAM_SHORT_ADDRESS, addrProg);
-        daliComm.daliSendAndReceive(
+        mDaliComm.daliSend(DALICMD_PROGRAM_SHORT_ADDRESS, addrProg);
+        mDaliComm.daliSendAndReceive(
           DALICMD_VERIFY_SHORT_ADDRESS, addrProg,
           boost::bind(&DaliFullBusScanner::handleNewShortAddressVerify, this, _1, _2, _3),
           1000 // delay one second before querying for new short address
@@ -1252,14 +1252,14 @@ private:
 
   void handleNewShortAddressVerify(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
   {
-    if (newAddress==NoDaliAddress || DaliComm::isYes(aNoOrTimeout, aResponse, aError, false)) {
+    if (mNewAddress==NoDaliAddress || DaliComm::isYes(aNoOrTimeout, aResponse, aError, false)) {
       // address was deleted, not added in the first place (more than 64 devices)
       // OR real clean YES - new short address verified
-      deviceFound(newAddress);
+      deviceFound(mNewAddress);
     }
     else {
       // short address verification failed
-      SOLOG(daliComm, LOG_ERR, "Error - could not assign new short address %d", newAddress);
+      SOLOG(mDaliComm, LOG_ERR, "Error - could not assign new short address %d", mNewAddress);
       deviceFound(NoDaliAddress); // not really a usable device, but withdraw it and continue searching
     }
   }
@@ -1270,27 +1270,27 @@ private:
     // store short address if real address
     // (if broadcast, means that this device is w/o short address because >64 devices are on the bus, or short address could not be programmed)
     if (aShortAddress!=NoDaliAddress) {
-      if (!isShortAddressInList(aShortAddress, foundDevicesPtr)) {
+      if (!isShortAddressInList(aShortAddress, mFoundDevicesPtr)) {
         // prevent registering the same address twice (did happen before fixing bug with newShortAddress() 2024-06-27)
-        SOLOG(daliComm, LOG_NOTICE, "- new short address %d programming verified", aShortAddress);
-        foundDevicesPtr->push_back(aShortAddress);
+        SOLOG(mDaliComm, LOG_NOTICE, "- new short address %d programming verified", aShortAddress);
+        mFoundDevicesPtr->push_back(aShortAddress);
       }
     }
     // withdraw this device from further searches
-    daliComm.daliSend(DALICMD_WITHDRAW, 0x00);
+    mDaliComm.daliSend(DALICMD_WITHDRAW, 0x00);
     // continue searching devices
-    newSearchUpFrom(searchAddr+1);
+    newSearchUpFrom(mSearchAddr+1);
   }
 
 
   void completed(ErrorPtr aError)
   {
     // terminate
-    daliComm.daliSend(DALICMD_TERMINATE, 0x00);
-    daliComm.endProcedure();
-    FOCUSSOLOG(daliComm, "After scanBus complete: retriedWrites=%ld, retriedReads=%ld", daliComm.mRetriedWrites, daliComm.mRetriedReads);
+    mDaliComm.daliSend(DALICMD_TERMINATE, 0x00);
+    mDaliComm.endProcedure();
+    FOCUSSOLOG(mDaliComm, "After scanBus complete: retriedWrites=%ld, retriedReads=%ld", mDaliComm.mRetriedWrites, mDaliComm.mRetriedReads);
     // callback
-    callback(foundDevicesPtr, DaliComm::ShortAddressListPtr(), aError);
+    mCallback(mFoundDevicesPtr, DaliComm::ShortAddressListPtr(), aError);
     // done, delete myself
     delete this;
   }
@@ -1311,13 +1311,13 @@ void DaliComm::daliFullBusScan(DaliBusScanCB aResultCB, bool aFullScanOnlyIfNeed
 
 class DaliMemoryReader : public P44Obj
 {
-  DaliComm &daliComm;
-  DaliComm::DaliReadMemoryCB callback;
-  DaliAddress busAddress;
-  DaliComm::MemoryVectorPtr memory;
-  int bytesToRead;
-  int retries;
-  uint8_t currentOffset;
+  DaliComm &mDaliComm;
+  DaliComm::DaliReadMemoryCB mCallback;
+  DaliAddress mBusAddress;
+  DaliComm::MemoryVectorPtr mMemory;
+  int mBytesToRead;
+  int mRetries;
+  uint8_t mCurrentOffset;
 public:
   static void readMemory(DaliComm &aDaliComm, DaliComm::DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint16_t aNumBytes, DaliComm::MemoryVectorPtr aMemory)
   {
@@ -1326,20 +1326,20 @@ public:
   };
 private:
   DaliMemoryReader(DaliComm &aDaliComm, DaliComm::DaliReadMemoryCB aResultCB, DaliAddress aAddress, uint8_t aBank, uint8_t aOffset, uint16_t aNumBytes, DaliComm::MemoryVectorPtr aMemory) :
-    daliComm(aDaliComm),
-    callback(aResultCB),
-    busAddress(aAddress),
-    memory(aMemory)
+    mDaliComm(aDaliComm),
+    mCallback(aResultCB),
+    mBusAddress(aAddress),
+    mMemory(aMemory)
   {
-    if (!memory) memory = DaliComm::MemoryVectorPtr(new DaliComm::MemoryVector);
-    daliComm.startProcedure();
-    SOLOG(daliComm, LOG_INFO, "bus address %d - reading %d bytes from bank %d at offset %d:", busAddress, aNumBytes, aBank, aOffset);
+    if (!mMemory) mMemory = DaliComm::MemoryVectorPtr(new DaliComm::MemoryVector);
+    mDaliComm.startProcedure();
+    SOLOG(mDaliComm, LOG_INFO, "bus address %d - reading %d bytes from bank %d at offset %d:", mBusAddress, aNumBytes, aBank, aOffset);
     // set DTR1 = bank
-    daliComm.daliSend(DALICMD_SET_DTR1, aBank);
+    mDaliComm.daliSend(DALICMD_SET_DTR1, aBank);
     // set initial offset and bytes
-    currentOffset = aOffset;
-    bytesToRead = aNumBytes;
-    retries = 0;
+    mCurrentOffset = aOffset;
+    mBytesToRead = aNumBytes;
+    mRetries = 0;
     startReading();
   }
 
@@ -1347,7 +1347,7 @@ private:
   void startReading()
   {
     // set DTR = offset within bank
-    daliComm.daliSend(DALICMD_SET_DTR, currentOffset);
+    mDaliComm.daliSend(DALICMD_SET_DTR, mCurrentOffset);
     // start reading
     readNextByte();
   };
@@ -1358,7 +1358,7 @@ private:
   {
     if (Error::notOK(aError)) {
       // error
-      if (retries++<DALI_MAX_MEMREAD_RETRIES) {
+      if (mRetries++<DALI_MAX_MEMREAD_RETRIES) {
         // restart reading explicitly at current offset
         startReading();
         return;
@@ -1367,10 +1367,10 @@ private:
     }
     else if (aNoOrTimeout) {
       // no response, means NO DATA
-      memory->push_back(DaliComm::MemoryCell(0xFF, true));
+      mMemory->push_back(DaliComm::MemoryCell(0xFF, true));
       // restart at next location
-      currentOffset++;
-      if (--bytesToRead>0) {
+      mCurrentOffset++;
+      if (--mBytesToRead>0) {
         startReading();
         return;
       }
@@ -1380,48 +1380,48 @@ private:
       // have incremented the read position.
       // If we have a retry, we need to re-set the DTR to the correct byte position first
       if (aRetried) {
-        if (retries++<DALI_MAX_MEMREAD_RETRIES) {
+        if (mRetries++<DALI_MAX_MEMREAD_RETRIES) {
           // restart reading explicitly at current offset
           startReading();
           return;
         }
         // multiple retries because of frame errors in a row must count as frame error
         // (even if bridge retry mechanism DID manage to get a error free answer in a retried read)
-        aError = Error::err<DaliCommError>(DaliCommError::DALIFrame, "repeated frame error (bridge retry) reading byte at offset %u", (unsigned int)currentOffset);
+        aError = Error::err<DaliCommError>(DaliCommError::DALIFrame, "repeated frame error (bridge retry) reading byte at offset %u", (unsigned int)mCurrentOffset);
         // report the error
       }
       // byte received, append to vector
-      retries = 0;
-      memory->push_back(DaliComm::MemoryCell(aResponse));
-      currentOffset++;
-      if (--bytesToRead>0) {
+      mRetries = 0;
+      mMemory->push_back(DaliComm::MemoryCell(aResponse));
+      mCurrentOffset++;
+      if (--mBytesToRead>0) {
         // more bytes to read
         readNextByte();
         return;
       }
     }
     // read done or error, return memory to callback
-    daliComm.endProcedure();
+    mDaliComm.endProcedure();
     if (LOGENABLED(LOG_INFO)) {
       // dump data
       int o=0;
-      for (DaliComm::MemoryVector::iterator pos = memory->begin(); pos!=memory->end(); ++pos, ++o) {
+      for (DaliComm::MemoryVector::iterator pos = mMemory->begin(); pos!=mMemory->end(); ++pos, ++o) {
         if (pos->no) {
-          SOLOG(daliComm, LOG_INFO, "- %03d/0x%02X : NO (timeout)", o, o);
+          SOLOG(mDaliComm, LOG_INFO, "- %03d/0x%02X : NO (timeout)", o, o);
         }
         else {
-          SOLOG(daliComm, LOG_INFO, "- %03d/0x%02X : 0x%02X/%03d", o, o, pos->b, pos->b);
+          SOLOG(mDaliComm, LOG_INFO, "- %03d/0x%02X : 0x%02X/%03d", o, o, pos->b, pos->b);
         }
       }
     }
-    callback(memory, aError);
+    mCallback(mMemory, aError);
     // done, delete myself
     delete this;
   };
 
   void readNextByte()
   {
-    daliComm.daliSendQuery(busAddress, DALICMD_READ_MEMORY_LOCATION, boost::bind(&DaliMemoryReader::handleResponse, this, _1, _2, _3, _4));
+    mDaliComm.daliSendQuery(mBusAddress, DALICMD_READ_MEMORY_LOCATION, boost::bind(&DaliMemoryReader::handleResponse, this, _1, _2, _3, _4));
   }
 };
 
@@ -1440,14 +1440,14 @@ void DaliComm::daliReadMemory(DaliReadMemoryCB aResultCB, DaliAddress aAddress, 
 
 class DaliDeviceInfoReader : public P44Obj
 {
-  DaliComm &daliComm;
-  DaliComm::DaliDeviceInfoCB callback;
-  DaliAddress busAddress;
-  DaliDeviceInfoPtr deviceInfo;
-  uint8_t bankChecksum;
-  uint8_t maxBank;
-  bool dali2;
-  int retries;
+  DaliComm &mDaliComm;
+  DaliComm::DaliDeviceInfoCB mCallback;
+  DaliAddress mBusAddress;
+  DaliDeviceInfoPtr mDeviceInfo;
+  uint8_t mBankChecksum;
+  uint8_t mMaxBank;
+  bool mDali2;
+  int mRetries;
 public:
   static void readDeviceInfo(DaliComm &aDaliComm, DaliComm::DaliDeviceInfoCB aResultCB, DaliAddress aAddress)
   {
@@ -1456,22 +1456,22 @@ public:
   };
 private:
   DaliDeviceInfoReader(DaliComm &aDaliComm, DaliComm::DaliDeviceInfoCB aResultCB, DaliAddress aAddress) :
-    daliComm(aDaliComm),
-    callback(aResultCB),
-    busAddress(aAddress)
+    mDaliComm(aDaliComm),
+    mCallback(aResultCB),
+    mBusAddress(aAddress)
   {
-    daliComm.startProcedure();
-    retries = 0;
+    mDaliComm.startProcedure();
+    mRetries = 0;
     readVersion();
   }
 
   void readVersion()
   {
-    dali2 = false;
-    deviceInfo.reset(new DaliDeviceInfo);
-    deviceInfo->mShortAddress = busAddress;
-    deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // no info yet
-    daliComm.daliSendQuery(busAddress, DALICMD_QUERY_VERSION_NUMBER, boost::bind(&DaliDeviceInfoReader::handleVersion, this, _1, _2, _3));
+    mDali2 = false;
+    mDeviceInfo.reset(new DaliDeviceInfo);
+    mDeviceInfo->mShortAddress = mBusAddress;
+    mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // no info yet
+    mDaliComm.daliSendQuery(mBusAddress, DALICMD_QUERY_VERSION_NUMBER, boost::bind(&DaliDeviceInfoReader::handleVersion, this, _1, _2, _3));
     return;
   }
 
@@ -1480,22 +1480,22 @@ private:
     if (Error::isOK(aError) && !aNoOrTimeout) {
       if (aResponse==1) {
         // IEC 62386-102:2009 says the response to QUERY_VERSION_NUMBER is 1 (meaning DALI 1.0)
-        deviceInfo->mVers_102 = DALI_STD_VERS_BYTE(1, 0);
+        mDeviceInfo->mVers_102 = DALI_STD_VERS_BYTE(1, 0);
       }
       else {
         // IEC 62386-102:2014 says the response is content of bank0 offset 0x16 (6 bits major, 2 bits minor version)
-        deviceInfo->mVers_102 = DALI_STD_VERS_NONEIS0(aResponse);
+        mDeviceInfo->mVers_102 = DALI_STD_VERS_NONEIS0(aResponse);
       }
-      SOLOG(daliComm, LOG_INFO,"device at short address %d has DALI Version %d.%d", busAddress, DALI_STD_VERS_MAJOR(deviceInfo->mVers_102), DALI_STD_VERS_MINOR(deviceInfo->mVers_102));
-      dali2 = deviceInfo->mVers_102>=DALI_STD_VERS_BYTE(2, 0);
-      if (dali2 && daliComm.mDali2ScanLock) {
+      SOLOG(mDaliComm, LOG_INFO,"device at short address %d has DALI Version %d.%d", mBusAddress, DALI_STD_VERS_MAJOR(mDeviceInfo->mVers_102), DALI_STD_VERS_MINOR(mDeviceInfo->mVers_102));
+      mDali2 = mDeviceInfo->mVers_102>=DALI_STD_VERS_BYTE(2, 0);
+      if (mDali2 && mDaliComm.mDali2ScanLock) {
         // this looks like a DALI 2 device, but scanning is locked to ensure backwards compatibility
-        dali2 = false;
-        SOLOG(daliComm, LOG_WARNING, "short address %d is a DALI 2 device, but DALI 2 serialno scanning is disabled for backwards compatibility. Force-Rescan to enable DALI 2 scanning", busAddress);
+        mDali2 = false;
+        SOLOG(mDaliComm, LOG_WARNING, "short address %d is a DALI 2 device, but DALI 2 serialno scanning is disabled for backwards compatibility. Force-Rescan to enable DALI 2 scanning", mBusAddress);
       }
     }
     else {
-      SOLOG(daliComm, LOG_WARNING, "short address %d did not respond to QUERY_VERSION_NUMBER -> probably bad", busAddress);
+      SOLOG(mDaliComm, LOG_WARNING, "short address %d did not respond to QUERY_VERSION_NUMBER -> probably bad", mBusAddress);
     }
     readBank0();
   }
@@ -1504,10 +1504,10 @@ private:
   void readBank0()
   {
     // read the memory
-    maxBank = 0; // all devices must have a bank 0, rest is optional
+    mMaxBank = 0; // all devices must have a bank 0, rest is optional
     // Note: official checksum algorithm is: 0-byte2-byte3...byteLast, check with checksum+byte2+byte3...byteLast==0
-    bankChecksum = 0;
-    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Header, this, _1, _2), busAddress, 0, 0, DALIMEM_BANK_HDRBYTES, DaliComm::MemoryVectorPtr());
+    mBankChecksum = 0;
+    DaliMemoryReader::readMemory(mDaliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Header, this, _1, _2), mBusAddress, 0, 0, DALIMEM_BANK_HDRBYTES, DaliComm::MemoryVectorPtr());
   };
 
 
@@ -1517,21 +1517,21 @@ private:
       return complete(aError);
     }
     if (!(*aBank0Data)[2].no) {
-      maxBank = (*aBank0Data)[2].b; // this is the highest bank number implemented in this device
-      SOLOG(daliComm, LOG_INFO, "- highest available DALI memory bank = %d", maxBank);
+      mMaxBank = (*aBank0Data)[2].b; // this is the highest bank number implemented in this device
+      SOLOG(mDaliComm, LOG_INFO, "- highest available DALI memory bank = %d", mMaxBank);
     }
     if ((*aBank0Data)[0].no) {
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at short address %d does not exist", busAddress));
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at short address %d does not exist", mBusAddress));
     }
     uint16_t n = (*aBank0Data)[0].b+1; // last available location + 1 = number of bytes in bank 0
-    SOLOG(daliComm, LOG_INFO, "- number of bytes available in bank0 = %d/0x%x", n, n);
-    if (n<DALIMEM_BANK0_MINBYTES || (dali2 && n<DALIMEM_BANK0_MINBYTES_v2_0)) {
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at short address %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK0_MINBYTES));
+    SOLOG(mDaliComm, LOG_INFO, "- number of bytes available in bank0 = %d/0x%x", n, n);
+    if (n<DALIMEM_BANK0_MINBYTES || (mDali2 && n<DALIMEM_BANK0_MINBYTES_v2_0)) {
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank0 at short address %d has not enough bytes (%d, min=%d)", mBusAddress, n, DALIMEM_BANK0_MINBYTES));
     }
     // no need to read more than what we need for dali2, because there's no checksum, anyway
-    if (dali2 && n>DALIMEM_BANK0_MINBYTES_v2_0) n = DALIMEM_BANK0_MINBYTES_v2_0;
+    if (mDali2 && n>DALIMEM_BANK0_MINBYTES_v2_0) n = DALIMEM_BANK0_MINBYTES_v2_0;
     // append actual bank contents
-    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Data, this, _1, _2), busAddress, 0, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank0Data);
+    DaliMemoryReader::readMemory(mDaliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Data, this, _1, _2), mBusAddress, 0, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank0Data);
     return;
   }
 
@@ -1541,19 +1541,19 @@ private:
     if (Error::isOK(aError)) {
       for (int i=DALIMEM_BANK_HDRBYTES; i<=0x12; i++) {
         if ((*aOriginalBank0Data)[i].b!=(*aGTINSerialAgain)[i-DALIMEM_BANK_HDRBYTES].b) {
-          if (retries++<DALI2_MAX_BANK0_REREADS) {
+          if (mRetries++<DALI2_MAX_BANK0_REREADS) {
             // try again
-            SOLOG(daliComm, LOG_WARNING, "DALI2 bank 0 GTIN/Serial bytes differ when re-read at offset 0x%02x at bus address %d -> retrying", i, busAddress);
+            SOLOG(mDaliComm, LOG_WARNING, "DALI2 bank 0 GTIN/Serial bytes differ when re-read at offset 0x%02x at bus address %d -> retrying", i, mBusAddress);
             readBank0();
             return;
           }
           // to many retries
-          SOLOG(daliComm, LOG_ERR, "short address %d Bank 0 cannot be read reliably", busAddress);
-          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "DALI memory bank 0 cannot be reliably read at short address %d", busAddress));
+          SOLOG(mDaliComm, LOG_ERR, "short address %d Bank 0 cannot be read reliably", mBusAddress);
+          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "DALI memory bank 0 cannot be reliably read at short address %d", mBusAddress));
         }
       }
       // verified, make sure we don't re-read
-      retries = DALI2_MAX_BANK0_REREADS; // no more retries
+      mRetries = DALI2_MAX_BANK0_REREADS; // no more retries
     }
     handleBank0Data(aOriginalBank0Data, aError);
   }
@@ -1564,45 +1564,45 @@ private:
     if (aError) {
       return complete(aError);
     }
-    if (dali2) {
-      if (retries<DALI2_MAX_BANK0_REREADS) {
+    if (mDali2) {
+      if (mRetries<DALI2_MAX_BANK0_REREADS) {
         // DALI2: no checksum, so read crucial bytes (GTIN, serial) again to make sure
-        DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Verify, this, aBank0Data, _1, _2), busAddress, 0, DALIMEM_BANK_HDRBYTES, 0x12+1-DALIMEM_BANK_HDRBYTES, DaliComm::MemoryVectorPtr());
+        DaliMemoryReader::readMemory(mDaliComm, boost::bind(&DaliDeviceInfoReader::handleBank0Verify, this, aBank0Data, _1, _2), mBusAddress, 0, DALIMEM_BANK_HDRBYTES, 0x12+1-DALIMEM_BANK_HDRBYTES, DaliComm::MemoryVectorPtr());
         return;
       }
       // offset 1 should be NO
       if (!(*aBank0Data)[1].no) {
-        SOLOG(daliComm, LOG_WARNING, "DALI2 bank 0 should return NO for offset 1, but returned 0x%x at bus address %d", (*aBank0Data)[1].b, busAddress);
+        SOLOG(mDaliComm, LOG_WARNING, "DALI2 bank 0 should return NO for offset 1, but returned 0x%x at bus address %d", (*aBank0Data)[1].b, mBusAddress);
       }
     }
     else {
       // DALI 1: sum up starting with checksum (offset 0x01) itself, result must be 0x00 in the end
       for (int i=0x01; i<aBank0Data->size(); i++) {
-        bankChecksum += (*aBank0Data)[i].b;
+        mBankChecksum += (*aBank0Data)[i].b;
       }
-      if (bankChecksum!=0x00) {
+      if (mBankChecksum!=0x00) {
         // - check retries
-        if (retries++<DALI_MAX_BANKREAD_RETRIES) {
+        if (mRetries++<DALI_MAX_BANKREAD_RETRIES) {
           // retry reading bank 0 info
-          SOLOG(daliComm, LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank0 info from short address %d -> retrying", bankChecksum, retries, busAddress);
+          SOLOG(mDaliComm, LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank0 info from short address %d -> retrying", mBankChecksum, mRetries, mBusAddress);
           readBank0();
           return;
         }
         // - report error
-        SOLOG(daliComm, LOG_ERR, "short address %d Bank 0 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
-        return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 0 checksum at short address %d", busAddress));
+        SOLOG(mDaliComm, LOG_ERR, "short address %d Bank 0 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", mBusAddress, mBankChecksum);
+        return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 0 checksum at short address %d", mBusAddress));
       }
     }
     // we have verified (re-read or checksummed) data
-    deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_solid; // assume solid info present
+    mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_solid; // assume solid info present
     // get standard version if available
-    if (dali2 && aBank0Data->size()>=DALIMEM_BANK0_MINBYTES_v2_0) {
+    if (mDali2 && aBank0Data->size()>=DALIMEM_BANK0_MINBYTES_v2_0) {
       // we have DALI2 with standard version numbers
       // Note: vers_102 decides about scanning for DALI2 infos at all and is retrieved with QUERY_VERSION_NUMBER above, not saved again here!
-      deviceInfo->mVers_101 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x15].b);
-      deviceInfo->mVers_103 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x17].b);
+      mDeviceInfo->mVers_101 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x15].b);
+      mDeviceInfo->mVers_103 = DALI_STD_VERS_NONEIS0((*aBank0Data)[0x17].b);
       // save logical unit index within single device
-      deviceInfo->mLunIndex = (*aBank0Data)[0x1A].b;
+      mDeviceInfo->mLunIndex = (*aBank0Data)[0x1A].b;
     }
     // check plausibility of GTIN/Version/SN data
     // Know bad signatures we must catch:
@@ -1615,11 +1615,11 @@ private:
     uint8_t numFFs = 0;
     uint8_t maxSame = 0;
     uint8_t sameByte = 0;
-    int idLastByte = dali2 ? 0x12 : 0x0E; // >=2.0 has longer ID field
+    int idLastByte = mDali2 ? 0x12 : 0x0E; // >=2.0 has longer ID field
     for (int i=0x03; i<=idLastByte; i++) {
       if ((*aBank0Data)[i].no) {
-        SOLOG(daliComm, LOG_ERR, "short address %d Bank 0 has missing byte (timeout) at offset 0x%02X -> invalid GTIN/Serial data", busAddress, i);
-        deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+        SOLOG(mDaliComm, LOG_ERR, "short address %d Bank 0 has missing byte (timeout) at offset 0x%02X -> invalid GTIN/Serial data", mBusAddress, i);
+        mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
         break;
       }
       uint8_t b = (*aBank0Data)[i].b;
@@ -1640,69 +1640,69 @@ private:
     }
     if (maxSame>=10 || (numFFs>=6 && maxSame>=3)) {
       // this is tuned heuristics: >=6 FFs total plus >=3 consecutive equal non-zeros are considered suspect (because linealight.com/i-LÈD/eral LED-FGI332 has that)
-      SOLOG(daliComm, LOG_ERR, "short address %d Bank 0 has %d consecutive bytes of 0x%02X and %d bytes of 0xFF  - indicates invalid GTIN/Serial data -> ignoring", busAddress, maxSame, sameByte, numFFs);
-      deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+      SOLOG(mDaliComm, LOG_ERR, "short address %d Bank 0 has %d consecutive bytes of 0x%02X and %d bytes of 0xFF  - indicates invalid GTIN/Serial data -> ignoring", mBusAddress, maxSame, sameByte, numFFs);
+      mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
     }
     // GTIN: bytes 0x03..0x08, MSB first
     // All 0xFF is official DALI for "no GTIN"
-    deviceInfo->mGtin = 0;
+    mDeviceInfo->mGtin = 0;
     bool allFF = true;
     uint8_t b;
     for (int i=0x03; i<=0x08; i++) {
       b = (*aBank0Data)[i].b;
       if (b!=0xFF) allFF = false;
       if ((*aBank0Data)[i].no) b = 0; // consider missing bytes as zeroes
-      deviceInfo->mGtin = (deviceInfo->mGtin << 8) + b;
+      mDeviceInfo->mGtin = (mDeviceInfo->mGtin << 8) + b;
     }
-    if (allFF) deviceInfo->mGtin = 0; // all FF means no GTIN
+    if (allFF) mDeviceInfo->mGtin = 0; // all FF means no GTIN
     // Firmware version
-    deviceInfo->mFwVersionMajor = (*aBank0Data)[0x09].b;
-    deviceInfo->mFwVersionMinor = (*aBank0Data)[0x0A].b;
+    mDeviceInfo->mFwVersionMajor = (*aBank0Data)[0x09].b;
+    mDeviceInfo->mFwVersionMinor = (*aBank0Data)[0x0A].b;
     // Serial: bytes 0x0B..0x0E for <DALI 2.0
     //         bytes 0x0B..0x12 for >=DALI 2.0
-    deviceInfo->mSerialNo = 0;
+    mDeviceInfo->mSerialNo = 0;
     allFF = true;
-    int serialLastByte = dali2 ? 0x12 : 0x0E; // 2.0 has longer ID field
+    int serialLastByte = mDali2 ? 0x12 : 0x0E; // 2.0 has longer ID field
     for (int i=0x0B; i<=serialLastByte; i++) {
       b = (*aBank0Data)[i].b;
       if (b!=0xFF) allFF = false;
       if ((*aBank0Data)[i].no) b = 0; // consider missing bytes as zeroes
-      deviceInfo->mSerialNo = (deviceInfo->mSerialNo << 8) + b;
+      mDeviceInfo->mSerialNo = (mDeviceInfo->mSerialNo << 8) + b;
     }
-    if (allFF) deviceInfo->mSerialNo = 0; // all FF means no serial number
+    if (allFF) mDeviceInfo->mSerialNo = 0; // all FF means no serial number
     // now some more plausibility checks at the GTIN/serial level
-    if (deviceInfo->mGtin==0) {
-      deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // no usable GTIN, consider devinf invalid
+    if (mDeviceInfo->mGtin==0) {
+      mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // no usable GTIN, consider devinf invalid
     }
-    else if (gtinCheckDigit(deviceInfo->mGtin)!=0) {
+    else if (gtinCheckDigit(mDeviceInfo->mGtin)!=0) {
       // invalid GTIN
-      SOLOG(daliComm, LOG_ERR, "short address %d has invalid GTIN=%lld/0x%llX (wrong check digit) -> ignoring", busAddress, deviceInfo->mGtin, deviceInfo->mGtin);
-      deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
+      SOLOG(mDaliComm, LOG_ERR, "short address %d has invalid GTIN=%lld/0x%llX (wrong check digit) -> ignoring", mBusAddress, mDeviceInfo->mGtin, mDeviceInfo->mGtin);
+      mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none; // consider invalid
     }
     else {
       // GTIN by itself looks ok
-      if (deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid) {
+      if (mDeviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid) {
         // GTIN has not been ruled out before -> seems valid
         int i=0;
         while (DALI_GTIN_blacklist[i]!=0) {
-          if (deviceInfo->mGtin==DALI_GTIN_blacklist[i]) {
+          if (mDeviceInfo->mGtin==DALI_GTIN_blacklist[i]) {
             // found in blacklist, invalidate serial
-            SOLOG(daliComm, LOG_ERR, "GTIN %lld of DALI short address %d is blacklisted because it is known to have invalid serial -> invalidating serial", deviceInfo->mGtin, busAddress);
-            deviceInfo->mSerialNo = 0; // reset, make invalid for check below
+            SOLOG(mDaliComm, LOG_ERR, "GTIN %lld of DALI short address %d is blacklisted because it is known to have invalid serial -> invalidating serial", mDeviceInfo->mGtin, mBusAddress);
+            mDeviceInfo->mSerialNo = 0; // reset, make invalid for check below
             break;
           }
           i++;
         }
       }
-      if (deviceInfo->mSerialNo==0) {
-        if (deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid) {
+      if (mDeviceInfo->mSerialNo==0) {
+        if (mDeviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid) {
           // if everything else is ok, except for a missing serial number, consider GTIN valid
-          deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_only_gtin;
-          SOLOG(daliComm, LOG_WARNING, "short address %d has no serial number but valid GTIN -> just using GTIN", busAddress);
+          mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_only_gtin;
+          SOLOG(mDaliComm, LOG_WARNING, "short address %d has no serial number but valid GTIN -> just using GTIN", mBusAddress);
         }
         else {
           // was not solid before, consider completely invalid
-          deviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none;
+          mDeviceInfo->mDevInfStatus = DaliDeviceInfo::devinf_none;
         }
       }
     }
@@ -1721,9 +1721,9 @@ private:
     }
     #endif
     // done with bank0
-    if (maxBank>0) {
+    if (mMaxBank>0) {
       // now read OEM info from bank1
-      retries = 0;
+      mRetries = 0;
       readBank1();
     }
     else {
@@ -1736,8 +1736,8 @@ private:
 
   void readBank1()
   {
-    bankChecksum = 0;
-    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Header, this, _1, _2), busAddress, 1, 0, DALIMEM_BANK_HDRBYTES, DaliComm::MemoryVectorPtr());
+    mBankChecksum = 0;
+    DaliMemoryReader::readMemory(mDaliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Header, this, _1, _2), mBusAddress, 1, 0, DALIMEM_BANK_HDRBYTES, DaliComm::MemoryVectorPtr());
   }
 
 
@@ -1747,16 +1747,16 @@ private:
       return complete(aError);
     }
     if ((*aBank1Data)[0].no) {
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at short address %d has not enough header bytes", busAddress));
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at short address %d has not enough header bytes", mBusAddress));
     }
     // valid byte count
     uint16_t n = (*aBank1Data)[0].b+1; // last available location + 1 = number of bytes in bank 1
-    SOLOG(daliComm, LOG_INFO, "- number of bytes available in bank1 = %d/0x%X", n, n);
+    SOLOG(mDaliComm, LOG_INFO, "- number of bytes available in bank1 = %d/0x%X", n, n);
     if (n<DALIMEM_BANK1_MINBYTES) {
-      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at short address %d has not enough bytes (%d, min=%d)", busAddress, n, DALIMEM_BANK1_MINBYTES));
+      return complete(Error::err<DaliCommError>(DaliCommError::MissingData, "bank1 at short address %d has not enough bytes (%d, min=%d)", mBusAddress, n, DALIMEM_BANK1_MINBYTES));
     }
     // append actual bank contents
-    DaliMemoryReader::readMemory(daliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Data, this, _1, _2), busAddress, 1, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank1Data);
+    DaliMemoryReader::readMemory(mDaliComm, boost::bind(&DaliDeviceInfoReader::handleBank1Data, this, _1, _2), mBusAddress, 1, DALIMEM_BANK_HDRBYTES, n-DALIMEM_BANK_HDRBYTES, aBank1Data);
     return;
   }
 
@@ -1768,46 +1768,46 @@ private:
     }
     if (aBank1Data->size()>=DALIMEM_BANK1_MINBYTES) {
       // sum up starting with checksum itself, result must be 0x00 in the end
-      if (!dali2) {
+      if (!mDali2) {
         // only DALI 1 does have checksums
         for (int i=0x01; i<aBank1Data->size(); i++) {
-          bankChecksum += (*aBank1Data)[i].b;
+          mBankChecksum += (*aBank1Data)[i].b;
         }
-        if (bankChecksum!=0x00) {
+        if (mBankChecksum!=0x00) {
           // - check retries
-          if (retries++<DALI_MAX_BANKREAD_RETRIES) {
+          if (mRetries++<DALI_MAX_BANKREAD_RETRIES) {
             // retry reading bank 1 info
-            SOLOG(daliComm, LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank1 info from short address %d -> retrying", bankChecksum, retries, busAddress);
+            SOLOG(mDaliComm, LOG_INFO, "Checksum wrong (0x%02X!=0x00) in %d. attempt to read bank1 info from short address %d -> retrying", mBankChecksum, mRetries, mBusAddress);
             readBank1();
             return;
           }
           // - report error
-          SOLOG(daliComm, LOG_ERR, "short address %d Bank 1 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", busAddress, bankChecksum);
-          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 1 checksum at short address %d", busAddress));
+          SOLOG(mDaliComm, LOG_ERR, "short address %d Bank 1 checksum is wrong - should sum up to 0x00, actual sum is 0x%02X", mBusAddress, mBankChecksum);
+          return complete(Error::err<DaliCommError>(DaliCommError::BadData, "bad DALI memory bank 1 checksum at short address %d", mBusAddress));
         }
       }
       // OEM GTIN: bytes 0x03..0x08, MSB first
-      deviceInfo->mOemGtin = 0;
+      mDeviceInfo->mOemGtin = 0;
       bool allFF = true;
       uint8_t b;
       for (int i=0x03; i<=0x08; i++) {
         b = (*aBank1Data)[i].b;
         if (b!=0xFF) allFF = false;
         if ((*aBank1Data)[i].no) b = 0; // consider missing bytes as zeroes
-        deviceInfo->mOemGtin = (deviceInfo->mOemGtin << 8) + b;
+        mDeviceInfo->mOemGtin = (mDeviceInfo->mOemGtin << 8) + b;
       }
-      if (allFF) deviceInfo->mOemGtin = 0; // all FF means no OEM GTIN
+      if (allFF) mDeviceInfo->mOemGtin = 0; // all FF means no OEM GTIN
       // OEM Serial: bytes 0x09..0x0C for <DALI 2.0
       //             bytes 0x09..0x10 for >=DALI 2.0
       allFF = true;
-      int serialLastByte = dali2 ? 0x10 : 0x0C; // >=2.0 has longer ID field
+      int serialLastByte = mDali2 ? 0x10 : 0x0C; // >=2.0 has longer ID field
       for (int i=0x0B; i<=serialLastByte; i++) {
         b = (*aBank1Data)[i].b;
         if (b!=0xFF) allFF = false;
         if ((*aBank1Data)[i].no) b = 0; // consider missing bytes as zeroes
-        deviceInfo->mOemSerialNo = (deviceInfo->mOemSerialNo << 8) + b;
+        mDeviceInfo->mOemSerialNo = (mDeviceInfo->mOemSerialNo << 8) + b;
       }
-      if (allFF) deviceInfo->mOemSerialNo = 0; // all FF means no OEM GTIN
+      if (allFF) mDeviceInfo->mOemSerialNo = 0; // all FF means no OEM GTIN
       // done with bank1
       return complete(aError);
     }
@@ -1816,34 +1816,34 @@ private:
 
   void complete(ErrorPtr aError)
   {
-    daliComm.endProcedure();
+    mDaliComm.endProcedure();
     if (Error::isOK(aError)) {
-      SOLOG(daliComm, LOG_NOTICE,
+      SOLOG(mDaliComm, LOG_NOTICE,
         "Successfully read DALI%d device info %sfrom short address %d - %s data: GTIN=%llu, Serial=%llu, LUN=%d",
-        deviceInfo->mVers_102>=DALI_STD_VERS_BYTE(2, 0) ? 2 : 1,
-        dali2 ? "" : "in DALI1 mode ",
-        busAddress,
-        deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid
+        mDeviceInfo->mVers_102>=DALI_STD_VERS_BYTE(2, 0) ? 2 : 1,
+        mDali2 ? "" : "in DALI1 mode ",
+        mBusAddress,
+        mDeviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_solid
         #if OLD_BUGGY_CHKSUM_COMPATIBLE
         || deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_maybe
         #endif
         ? "valid" : "UNRELIABLE",
-        deviceInfo->mGtin,
-        deviceInfo->mSerialNo,
-        deviceInfo->mLunIndex
+        mDeviceInfo->mGtin,
+        mDeviceInfo->mSerialNo,
+        mDeviceInfo->mLunIndex
       );
     }
     // clean device info in case it has been detected invalid by now
-    if (deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_none) {
-      deviceInfo->clear(); // clear everything except shortaddress
+    if (mDeviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_none) {
+      mDeviceInfo->clear(); // clear everything except shortaddress
     }
-    else if (deviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_only_gtin) {
+    else if (mDeviceInfo->mDevInfStatus==DaliDeviceInfo::devinf_only_gtin) {
       // consider serial numbers invalid, but GTIN and version ok
-      deviceInfo->mSerialNo = 0;
-      deviceInfo->mOemSerialNo = 0;
+      mDeviceInfo->mSerialNo = 0;
+      mDeviceInfo->mOemSerialNo = 0;
     }
     // report
-    callback(deviceInfo, aError);
+    mCallback(mDeviceInfo, aError);
     // done, delete myself
     delete this;
   }

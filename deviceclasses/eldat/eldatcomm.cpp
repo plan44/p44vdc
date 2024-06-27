@@ -139,9 +139,9 @@ EldatComm::~EldatComm()
 void EldatComm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort)
 {
   FOCUSOLOG("setConnectionSpecification: %s", aConnectionSpec);
-  serialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, ELDAT_COMMAPARMS);
+  mSerialComm->setConnectionSpecification(aConnectionSpec, aDefaultPort, ELDAT_COMMAPARMS);
 	// open connection so we can receive
-	serialComm->requestConnection();
+	mSerialComm->requestConnection();
 }
 
 
@@ -155,8 +155,8 @@ void EldatComm::initialize(StatusCB aCompletedCB)
 void EldatComm::initializeInternal(StatusCB aCompletedCB, int aRetriesLeft)
 {
   // get version
-  serialComm->requestConnection();
-  serialComm->setDTR(true);
+  mSerialComm->requestConnection();
+  mSerialComm->setDTR(true);
   sendCommand("ID?", boost::bind(&EldatComm::versionReceived, this, aCompletedCB, aRetriesLeft, _1, _2));
 }
 
@@ -167,8 +167,8 @@ void EldatComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aErr
   aRetriesLeft--;
   if (aRetriesLeft>=0) {
     OLOG(LOG_WARNING, "Initialisation: command failed: %s -> retrying again", aError->text());
-    serialComm->setDTR(false); // should cause reset
-    serialComm->closeConnection(); // also close and re-open later
+    mSerialComm->setDTR(false); // should cause reset
+    mSerialComm->closeConnection(); // also close and re-open later
     // retry initializing later
     aliveCheckTicket.executeOnce(boost::bind(&EldatComm::initializeInternal, this, aCompletedCB, aRetriesLeft), ELDAT_INIT_RETRY_INTERVAL);
   }
@@ -224,7 +224,7 @@ void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
   if (Error::notOK(aError)) {
     // alive check failed, try to recover ELDAT interface
     OLOG(LOG_ERR, "alive check of ELDAT module failed -> restarting module");
-    serialComm->setDTR(false); // release DTR, this should reset the ELDAT interface
+    mSerialComm->setDTR(false); // release DTR, this should reset the ELDAT interface
     // - using alive check ticket for reset sequence
     aliveCheckTicket.executeOnce(boost::bind(&EldatComm::resetDone, this), 2*Second);
   }
@@ -242,7 +242,7 @@ void EldatComm::aliveCheckResponse(string aAnswer, ErrorPtr aError)
 void EldatComm::resetDone()
 {
   OLOG(LOG_NOTICE, "re-asserting DTR");
-  serialComm->setDTR(true); // should restart the ELDAT interface
+  mSerialComm->setDTR(true); // should restart the ELDAT interface
   // wait a little, then re-open connection
   aliveCheckTicket.executeOnce(boost::bind(&EldatComm::reopenConnection, this), 2*Second);
 }
@@ -251,7 +251,7 @@ void EldatComm::resetDone()
 void EldatComm::reopenConnection()
 {
   OLOG(LOG_NOTICE, "re-opening connection");
-	serialComm->requestConnection(); // re-open connection
+	mSerialComm->requestConnection(); // re-open connection
   // restart alive checks, not too soon after reset
   aliveCheckTicket.executeOnce(boost::bind(&EldatComm::aliveCheck, this), 10*Second);
 }

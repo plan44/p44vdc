@@ -188,7 +188,7 @@ OperationPtr HueApiOperation::finalize()
 
 void HueApiOperation::abortOperation(ErrorPtr aError)
 {
-  if (!aborted) {
+  if (!mAborted) {
     if (!mCompleted) {
       mHueComm.mBridgeAPIComm.cancelRequest();
     }
