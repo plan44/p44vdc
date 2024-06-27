@@ -1056,7 +1056,7 @@ private:
   }
 
 
-  // get new unused short address
+  // get new unused short address (but does NOT yet add it to usedShortAddr!
   DaliAddress newShortAddress()
   {
     DaliAddress newAddr = DALI_MAXDEVICES;
@@ -1064,7 +1064,6 @@ private:
       newAddr--;
       if (!isShortAddressInList(newAddr,usedShortAddrsPtr) && !isShortAddressInList(newAddr, conflictedShortAddrsPtr)) {
         // this one is free, use it
-        usedShortAddrsPtr->push_back(newAddr);
         return newAddr;
       }
     }
@@ -1271,11 +1270,9 @@ private:
     // store short address if real address
     // (if broadcast, means that this device is w/o short address because >64 devices are on the bus, or short address could not be programmed)
     if (aShortAddress!=NoDaliAddress) {
-      if (isShortAddressInList(aShortAddress, foundDevicesPtr)) {
-        // this should not happen, but maybe it can (we had a weird support case where logs indicated that)
-        SOLOG(daliComm, LOG_ERR, "internal inconsistency: short address #%d found again in list", aShortAddress);
-      }
-      else {
+      if (!isShortAddressInList(aShortAddress, foundDevicesPtr)) {
+        // prevent registering the same address twice (did happen before fixing bug with newShortAddress() 2024-06-27)
+        SOLOG(daliComm, LOG_NOTICE, "- new short address %d programming verified", aShortAddress);
         foundDevicesPtr->push_back(aShortAddress);
       }
     }

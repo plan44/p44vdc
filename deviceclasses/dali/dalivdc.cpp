@@ -359,7 +359,7 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
           }
           if (thisDsuid==otherDsuid) {
             if ((*busdevpos)->mDeviceInfo->mShortAddress==(*refpos)->mDeviceInfo->mShortAddress) {
-              // should not happen, but apparently can for some not-yet-known reason, so log it here but prevent invalidating serial
+              // should not happen (and should not any more since we found the origin 2024-06-27), but keep safeguard anyway, as false invalidating is REALLY bad
               LOG(LOG_ERR, "internal inconsistentcy: same dSUID, same shortaddress %d: iterators %s", (*busdevpos)->mDeviceInfo->mShortAddress, refpos==busdevpos ? "same" : "DIFFERENT!");
             }
             else {
