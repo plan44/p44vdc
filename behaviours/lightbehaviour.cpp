@@ -49,9 +49,7 @@ DsScenePtr LightDeviceSettings::newDefaultScene(SceneNo aSceneNo)
 
 // MARK: - LightBehaviour
 
-#define STANDARD_DIM_CURVE_EXPONENT 4 // standard exponent, usually ok for PWM for LEDs
-
-#define DUMP_CONVERSION_TABLE 0 // set to get a brightness to PWM conversion table on stdout
+#define DUMP_CONVERSION_TABLE_FOR_GAMMA 0 // set to a gamma > 0 to get a brightness to Output conversion table on stdout
 
 
 LightBehaviour::LightBehaviour(Device &aDevice) :
@@ -59,7 +57,7 @@ LightBehaviour::LightBehaviour(Device &aDevice) :
   // hardware derived parameters
   // persistent settings
   mOnThreshold(50.0),
-  mDimCurveExp(STANDARD_DIM_CURVE_EXPONENT),
+  mGamma(1), // linear by default
   // volatile state
   mHardwareHasSetMinDim(false)
 {
@@ -77,19 +75,25 @@ LightBehaviour::LightBehaviour(Device &aDevice) :
   // add the brightness channel (every light has brightness)
   mBrightness = BrightnessChannelPtr(new BrightnessChannel(*this));
   addChannel(mBrightness);
-  #if DUMP_CONVERSION_TABLE
-  // dump a conversion table for HSV -> RGBWA and then back -> HSV, with deltas (dH,dS,dV)
-  printf("B-in;PWM100-out;PWM-4096;B-back\n");
+  #if DUMP_CONVERSION_TABLE_FOR_GAMMA>0
+  #ifndef DEBUG
+  #error "DUMP_CONVERSION_TABLE_FOR_GAMMA enabled in non-debug build"
+  #endif
+  // dump a conversion table for brightness -> output and then back, with gamma = DUMP_CONVERSION_TABLE_FOR_GAMMA
+  double origGamma = mGamma;
+  mGamma = DUMP_CONVERSION_TABLE_FOR_GAMMA;
+  printf("B-in;PWM100-out;PWM-4096;B-back;gamma\n");
   for (double b = 0; b<=100; b += 0.05) {
-    double pwm = brightnessToPWM(b, 100);
+    double pwm = brightnessToOutput(b, 100);
     uint16_t pwm4096 = (uint16_t)(pwm*40.96+0.5);
-    double bb = PWMToBrightness(pwm, 100);
+    double bb = OutputToBrightness(pwm, 100);
     // dump
     printf(
-      "%.2f;%.4f;%d;%.2f\n",
-      b, pwm, pwm4096, bb
+      "%.2f;%.4f;%d;%.2f;%.3f\n",
+      b, pwm, pwm4096, bb, mGamma
     );
   }
+  mGamma = origGamma; // restore
   #endif // DUMP_CONVERSION_TABLE
 }
 
@@ -139,7 +143,7 @@ void LightBehaviour::syncBrightnessFromHardware(Brightness aBrightness, bool aAl
     isDimmable() || // for dimmable lights: always update value
     ((aBrightness>=mOnThreshold) != (mBrightness->getChannelValue()>=mOnThreshold)) // for switched outputs: keep value if onThreshold condition is already met
   ) {
-    mBrightness->syncChannelValue(aBrightness, aAlwaysSync, aVolatile);
+    mBrightness->syncChannelValue(outputToBrightness(aBrightness, 100), aAlwaysSync, aVolatile);
   }
 }
 
@@ -148,7 +152,8 @@ double LightBehaviour::outputValueAccordingToMode(double aChannelValue, int aCha
 {
   // non-default channels and dimmable brightness are passed directly
   if (aChannelIndex!=0 || isDimmable()) {
-    return inherited::outputValueAccordingToMode(aChannelValue, aChannelIndex);
+    // apply behaviour-level dimming curve here
+    return inherited::outputValueAccordingToMode(brightnessToOutput(aChannelValue, 100), aChannelIndex);
   }
   // switched light, check threshold
   return mBrightness->getChannelValue() >= mOnThreshold ? mBrightness->getMax() : mBrightness->getMin();
@@ -306,37 +311,34 @@ void LightBehaviour::identifyToUser(MLMicroSeconds aDuration)
 }
 
 
-// MARK: - PWM dim curve
+// MARK: - Dimming curve (Brightness -> hardware output relation)
 
-// TODO: implement multi point adjustable curves, logarithmic curve with adjustable exponent for now
 
-// PWM    = PWM value
-// maxPWM = max PWM value
-// B      = brightness
-// maxB   = max brightness value
-// S      = dim Curve Exponent (1=linear, 2=quadratic, ...)
-//
-//                   (B*S/maxB)
-//                 e            - 1
-// PWM =  maxPWM * ----------------
-//                      S
-//                    e   - 1
-//
-//                           S
-//        maxB        P * (e   - 1)
-// B   =  ---- * ln ( ------------- + 1)
-//          S             maxP
-//
-
-double LightBehaviour::brightnessToPWM(Brightness aBrightness, double aMaxPWM)
+double LightBehaviour::brightnessToOutput(Brightness aBrightness, double aMaxOutput)
 {
-  return aMaxPWM*((exp(aBrightness*mDimCurveExp/100)-1)/(exp(mDimCurveExp)-1));
+  if (aBrightness<=0) return 0;
+  if (mGamma==1 || mGamma<=0) {
+    // gamma==1 -> linear, only scale for output
+    return aBrightness/100*aMaxOutput;
+  }
+  else {
+    // gamma(x, g) = x^g  (in 0..1 ranges for both input and output)
+    return ::pow(aBrightness/100, mGamma)*aMaxOutput;
+  }
 }
 
 
-Brightness LightBehaviour::PWMToBrightness(double aPWM, double aMaxPWM)
+Brightness LightBehaviour::outputToBrightness(double aOutValue, double aMaxOutput)
 {
-  return 100/mDimCurveExp*::log(aPWM*(exp(mDimCurveExp)-1)/aMaxPWM + 1);
+  if (aMaxOutput<=0) return 0;
+  if (mGamma==1 || mGamma<=0) {
+    // gamma==1 -> linear, only scale output down to brightness
+    return aOutValue/aMaxOutput*100;
+  }
+  else {
+    // gamma(x, g) = x^g  (in 0..1 ranges for both input and output)
+    return ::pow(aOutValue/aMaxOutput, 1/mGamma)*100;
+  }
 }
 
 
@@ -457,7 +459,7 @@ const FieldDefinition *LightBehaviour::getFieldDef(size_t aIndex)
     { "minBrightness", SQLITE_FLOAT }, // formerly minBrightness, renamed because type changed
     { "dimUpTimes", SQLITE_INTEGER },
     { "dimDownTimes", SQLITE_INTEGER },
-    { "dimCurveExp", SQLITE_FLOAT },
+    { "dimCurveExp", SQLITE_FLOAT }, // actually, since 2024-06-27: gamma
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
@@ -494,7 +496,7 @@ void LightBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
     mDimTimeDown[2] = (dd>>16) & 0xFF;
   }
   // read dim curve exponent only if not NULL
-  aRow->getIfNotNull<double>(aIndex++, mDimCurveExp);
+  aRow->getIfNotNull<double>(aIndex++, mGamma);
 }
 
 
@@ -516,7 +518,7 @@ void LightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
   aStatement.bind(aIndex++, mBrightness->getMinDim());
   aStatement.bind(aIndex++, (int)du);
   aStatement.bind(aIndex++, (int)dd);
-  aStatement.bind(aIndex++, mDimCurveExp);
+  aStatement.bind(aIndex++, mGamma);
 }
 
 
@@ -537,7 +539,7 @@ enum {
   dimTimeDown_key, // downAlt1/2 must immediately follow (array index calculation in accessField below!)
   dimTimeDownAlt1_key,
   dimTimeDownAlt2_key,
-  dimCurveExp_key,
+  gamma_key, // formerly "dimCurveExp"
   numSettingsProperties
 };
 
@@ -554,7 +556,7 @@ const PropertyDescriptorPtr LightBehaviour::getSettingsDescriptorByIndex(int aPr
     { "dimTimeDown", apivalue_uint64, dimTimeDown_key+settings_key_offset, OKEY(light_key) },
     { "dimTimeDownAlt1", apivalue_uint64, dimTimeDownAlt1_key+settings_key_offset, OKEY(light_key) },
     { "dimTimeDownAlt2", apivalue_uint64, dimTimeDownAlt2_key+settings_key_offset, OKEY(light_key) },
-    { "x-p44-dimCurveExp", apivalue_double, dimCurveExp_key+settings_key_offset, OKEY(light_key) },
+    { "x-p44-gamma", apivalue_double, gamma_key+settings_key_offset, OKEY(light_key) },  // formerly "x-p44-dimCurveExp"
   };
   int n = inherited::numSettingsProps();
   if (aPropIndex<n)
@@ -589,8 +591,8 @@ bool LightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
         case dimTimeDownAlt2_key+settings_key_offset:
           aPropValue->setUint8Value(mDimTimeDown[aPropertyDescriptor->fieldKey()-(dimTimeDown_key+settings_key_offset)]);
           return true;
-        case dimCurveExp_key+settings_key_offset:
-          aPropValue->setDoubleValue(mDimCurveExp);
+        case gamma_key+settings_key_offset:
+          aPropValue->setDoubleValue(mGamma);
           return true;
       }
     }
@@ -615,8 +617,8 @@ bool LightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
         case dimTimeDownAlt2_key+settings_key_offset:
           setPVar(mDimTimeDown[aPropertyDescriptor->fieldKey()-(dimTimeDown_key+settings_key_offset)], (DimmingTime)aPropValue->int32Value());
           return true;
-        case dimCurveExp_key+settings_key_offset:
-          setPVar(mDimCurveExp, aPropValue->doubleValue());
+        case gamma_key+settings_key_offset:
+          setPVar(mGamma, aPropValue->doubleValue());
           return true;
       }
     }

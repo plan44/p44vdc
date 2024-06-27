@@ -31,6 +31,8 @@
 
 using namespace p44;
 
+#define STANDARD_PWM_GAMMA 4 // standard gamma that works ok for PWM for LEDs (roughly same as the old exp/log curve of before 2024-06-27)
+
 AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
   mAnalogIOType(analogio_unknown),
@@ -73,6 +75,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     // - add simple single-channel light behaviour
     LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
     l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, -1);
+    l->setGamma(STANDARD_PWM_GAMMA); // default gamma, assuming analog output is a PWM
     addBehaviour(l);
   }
   else if (mAnalogIOType==analogio_rgbdimmer) {
@@ -106,6 +109,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
         installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
         // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
         RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
+        l->setGamma(STANDARD_PWM_GAMMA); // default gamma, assuming analog output are PWMs
         addBehaviour(l);
       }
     }
@@ -128,6 +132,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
       installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
       // - add CT only color light behaviour (which adds a number of auxiliary channels)
       RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, true));
+      l->setGamma(STANDARD_PWM_GAMMA); // default gamma, assuming analog outputs are PWMs
       addBehaviour(l);
     }
   }
@@ -255,12 +260,11 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
     // single channel PWM dimmer
     LightBehaviourPtr l = getOutput<LightBehaviour>();
     bool moreSteps = l->updateBrightnessTransition(now);
-    double w = l->brightnessForHardware();
-    double pwm = l->brightnessToPWM(w, 100);
+    double pwm = l->brightnessForHardware(); // includes gamma, which is set to STANDARD_PWM_GAMMA by default
     mAnalogIO->setValue(pwm);
     // next step
     if (moreSteps) {
-      OLOG(LOG_DEBUG, "AnalogIO transitional brightness value: %.2f", w);
+      OLOG(LOG_DEBUG, "AnalogIO transitional PWM value: %.2f", pwm);
       // not yet complete, schedule next step
       mTimerTicket.executeOnce(
         boost::bind(&AnalogIODevice::applyChannelValueSteps, this, aForDimming),
@@ -268,7 +272,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
       );
       return; // will be called later again
     }
-    if (!aForDimming) OLOG(LOG_INFO, "AnalogIO final PWM value: %.2f", w);
+    if (!aForDimming) OLOG(LOG_INFO, "AnalogIO final PWM value: %.2f", pwm);
   }
   else if (mAnalogIOType==analogio_rgbdimmer) {
     // three channel RGB PWM dimmer
@@ -281,7 +285,7 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
     if (mAnalogIO4) {
       // RGBW lamp
       cl->getRGBW(r, g, b, w, 100, false, true); // get brightness for R,G,B,W channels
-      pwm = cl->brightnessToPWM(w, 100);
+      pwm = cl->brightnessToOutput(w, 100);
       mAnalogIO4->setValue(pwm);
     }
     else {
@@ -289,13 +293,13 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
       cl->getRGB(r, g, b, 100, false, true); // get brightness for R,G,B channels
     }
     // - red
-    pwm = cl->brightnessToPWM(r, 100);
+    pwm = cl->brightnessToOutput(r, 100);
     mAnalogIO->setValue(pwm);
     // - green
-    pwm = cl->brightnessToPWM(g, 100);
+    pwm = cl->brightnessToOutput(g, 100);
     mAnalogIO2->setValue(pwm);
     // - blue
-    pwm = cl->brightnessToPWM(b, 100);
+    pwm = cl->brightnessToOutput(b, 100);
     mAnalogIO3->setValue(pwm);
     // next step
     if (moreSteps) {
@@ -317,9 +321,9 @@ void AnalogIODevice::applyChannelValueSteps(bool aForDimming)
     // CWWW lamp, get components
     double cw,ww, pwm;
     cl->getCWWW(cw, ww, 100, true);
-    pwm = cl->brightnessToPWM(cw, 100);
+    pwm = cl->brightnessToOutput(cw, 100);
     mAnalogIO->setValue(pwm);
-    pwm = cl->brightnessToPWM(ww, 100);
+    pwm = cl->brightnessToOutput(ww, 100);
     mAnalogIO2->setValue(pwm);
     // next step
     if (moreSteps) {

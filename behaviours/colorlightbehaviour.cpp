@@ -792,7 +792,7 @@ void RGBColorLightBehaviour::setRGB(double aRed, double aGreen, double aBlue, do
   // set the channels
   mHue->syncChannelValue(HSV[0]);
   mSaturation->syncChannelValue(HSV[1]*100);
-  if (!aNoBrightness) mBrightness->syncChannelValue(HSV[2]*100);
+  if (!aNoBrightness) syncBrightnessFromHardware(HSV[2]*100);
   // change the mode if needed
   if (mColorMode!=colorLightModeHueSaturation) {
     mColorMode = colorLightModeHueSaturation;
@@ -848,7 +848,7 @@ void RGBColorLightBehaviour::setRGBW(double aRed, double aGreen, double aBlue, d
   // set the channels
   mHue->syncChannelValue(HSV[0]);
   mSaturation->syncChannelValue(HSV[1]*100);
-  if (!aNoBrightness) mBrightness->syncChannelValue(HSV[2]*100);
+  if (!aNoBrightness) syncBrightnessFromHardware(HSV[2]*100);
   // change the mode if needed
   if (mColorMode!=colorLightModeHueSaturation) {
     mColorMode = colorLightModeHueSaturation;
@@ -874,7 +874,7 @@ void RGBColorLightBehaviour::setRGBWA(double aRed, double aGreen, double aBlue, 
   // set the channels
   mHue->syncChannelValue(HSV[0]);
   mSaturation->syncChannelValue(HSV[1]*100);
-  if (!aNoBrightness) mBrightness->syncChannelValue(HSV[2]*100);
+  if (!aNoBrightness) syncBrightnessFromHardware(HSV[2]*100);
   // change the mode if needed
   if (mColorMode!=colorLightModeHueSaturation) {
     mColorMode = colorLightModeHueSaturation;
@@ -960,7 +960,7 @@ void RGBColorLightBehaviour::setCWWW(double aCW, double aWW, double aMax)
   }
   // back to mired and brightness
   mCt->syncChannelValue(t*(mCt->getMax()-mCt->getMin())+mCt->getMin());
-  mBrightness->syncChannelValue(b*100);
+  syncBrightnessFromHardware(b*100);
 }
 
 
@@ -982,7 +982,7 @@ void RGBColorLightBehaviour::getBriCool(double &aBri, double &aCool, double aMax
 void RGBColorLightBehaviour::setBriCool(double aBri, double aCool, double aMax)
 {
   // assume cool 1..0 goes over min..max of CT channel
-  mBrightness->syncChannelValue(aBri/aMax*100);
+  syncBrightnessFromHardware(aBri/aMax*100);
   mCt->syncChannelValue((1-aCool/aMax)*(mCt->getMax()-mCt->getMin())+mCt->getMin());
 }
 

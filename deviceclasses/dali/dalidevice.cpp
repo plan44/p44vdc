@@ -1438,14 +1438,14 @@ void DaliSingleControllerDevice::processUpdatedParams(ErrorPtr aError)
         rgbl->setRGB(mDaliController->mCurrentR, mDaliController->mCurrentG, mDaliController->mCurrentB, 255, true);
       }
       // color tone is set, now sync back current brightness, as RGBWA values are not absolute, but relative to brightness
-      getOutput()->getChannelByIndex(0)->syncChannelValue(mDaliController->mCurrentBrightness);
+      rgbl->syncBrightnessFromHardware(mDaliController->mCurrentBrightness);
     }
     else {
       // save brightness now
-      getOutput()->getChannelByIndex(0)->syncChannelValue(mDaliController->mCurrentBrightness);
       // initialize the light behaviour with the minimal dimming level
       LightBehaviourPtr l = getOutput<LightBehaviour>();
-      l->initMinBrightness(mDaliController->mMinBrightness);
+      l->syncBrightnessFromHardware(mDaliController->mCurrentBrightness);  // already includes gamma correction
+      l->initMinBrightness(l->outputToBrightness(mDaliController->mMinBrightness, 100)); // include gamma correction explicitly
       ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
       if (cl) {
         // also synchronize color information

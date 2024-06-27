@@ -401,8 +401,6 @@ DsScenePtr VideoDeviceSettings::newUndoStateScene()
 
 // MARK: - VideoBehaviour
 
-#define STANDARD_DIM_CURVE_EXPONENT 4 // standard exponent, usually ok for PWM for LEDs
-
 VideoBehaviour::VideoBehaviour(Device &aDevice) :
   inherited(aDevice),
   // hardware derived parameters

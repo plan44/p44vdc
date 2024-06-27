@@ -108,7 +108,7 @@ namespace p44 {
     Brightness mOnThreshold; ///< if !isDimmable, output will be on when output value is >= the threshold
     DimmingTime mDimTimeUp[3]; ///< dimming up time
     DimmingTime mDimTimeDown[3]; ///< dimming down time
-    double mDimCurveExp; ///< exponent for logarithmic curve (1=linear, 2=quadratic, 3=cubic, ...)
+    double mGamma; ///< gamma for adjusting dimming curve, defaults to 1==linear
     /// @}
 
 
@@ -136,6 +136,10 @@ namespace p44 {
 
     /// @return true if device is dimmable
     bool isDimmable() { return mOutputFunction!=outputFunction_switch && actualOutputMode()!=outputmode_binary; };
+
+    /// Set gamma exponent for the gamma curve to apply between brightness and actually applied output value
+    /// @param aGamma the gamma value to set. Values <= 0 are treated like 1 -> linear
+    void setGamma(double aGamma) { mGamma = aGamma; };
 
     /// initialize behaviour with actual device's brightness parameters
     /// @param aMin minimal brightness that can be set
@@ -232,17 +236,17 @@ namespace p44 {
     /// stop blinking immediately
     virtual void stopBlink();
 
-    /// get PWM value for brightness (from brightness channel) according to dim curve
+    /// get output value for brightness (from brightness channel) according to dim curve (gamma)
     /// @param aBrightness brightness to convert to PWM value
-    /// @param aMaxPWM max PWM duty cycle value
+    /// @param aMaxOutput max output value, corresponding to aBrightness==100
     /// @return the PWM value (from 0..aMaxPWM) corresponding to aBrightness
-    double brightnessToPWM(Brightness aBrightness, double aMaxPWM);
+    double brightnessToOutput(Brightness aBrightness, double aMaxOutput);
 
-    /// set PWM value from lamp (to update brightness channel) according to dim curve
-    /// @param aPWM PWM value to be converted back to brightness
-    /// @param aMaxPWM max PWM duty cycle value
-    /// @return the brightness value corresponding to aPWM (which must be 0..aMaxPWM)
-    Brightness PWMToBrightness(double aPWM, double aMaxPWM);
+    /// get brightness value from current output value according to dim curve (gamma)
+    /// @param aOutValue PWM value to be converted back to brightness
+    /// @param aMaxOutput max output value, corresponding to aBrightness==100
+    /// @return the brightness value corresponding to aOutValue (which must be 0..aMaxOutput)
+    Brightness outputToBrightness(double aOutValue, double aMaxOutput);
 
     /// get transition time in microseconds from given scene effect
     /// @param aScene the scene

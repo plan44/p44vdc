@@ -401,8 +401,6 @@ DsScenePtr AudioDeviceSettings::newUndoStateScene()
 
 // MARK: - AudioBehaviour
 
-#define STANDARD_DIM_CURVE_EXPONENT 4 // standard exponent, usually ok for PWM for LEDs
-
 AudioBehaviour::AudioBehaviour(Device &aDevice) :
   inherited(aDevice),
   // hardware derived parameters
