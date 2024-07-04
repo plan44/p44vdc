@@ -108,7 +108,7 @@ void DeviceAction::call(ApiValuePtr aParams, StatusCB aCompletedCB)
     return; // done
   }
   // parameters are ok, now invoking action implementation
-  LOG(LOG_INFO, "- calling with expanded params: %s:%s", actionId.c_str(), aParams->description().c_str());
+  POLOG(singleDeviceP, LOG_INFO, "- calling with expanded params: %s:%s", actionId.c_str(), aParams->description().c_str());
   performCall(aParams, aCompletedCB);
 }
 

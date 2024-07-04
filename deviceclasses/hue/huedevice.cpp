@@ -542,16 +542,16 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       if (cl) {
         switch (cl->mColorMode) {
           case colorLightModeHueSaturation:
-            LOG(LOG_INFO, "- color mode HSV: hue=%0.0f, saturation=%0.0f", cl->mHue->getChannelValue(), cl->mSaturation->getChannelValue());
+            OLOG(LOG_INFO, "- color mode HSV: hue=%0.0f, saturation=%0.0f", cl->mHue->getChannelValue(), cl->mSaturation->getChannelValue());
             break;
           case colorLightModeXY:
-            LOG(LOG_INFO, "- color mode xyV: x=%0.3f, y=%0.3f", cl->mCIEx->getChannelValue(), cl->mCIEy->getChannelValue());
+            OLOG(LOG_INFO, "- color mode xyV: x=%0.3f, y=%0.3f", cl->mCIEx->getChannelValue(), cl->mCIEy->getChannelValue());
             break;
           case colorLightModeCt:
-            LOG(LOG_INFO, "- color mode color temperature: mired=%0.0f", cl->mCt->getChannelValue());
+            OLOG(LOG_INFO, "- color mode color temperature: mired=%0.0f", cl->mCt->getChannelValue());
             break;
           default:
-            LOG(LOG_INFO, "- NO color");
+            OLOG(LOG_INFO, "- NO color");
             break;
         }
       }

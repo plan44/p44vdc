@@ -450,12 +450,12 @@ bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aS
   ) {
     // apply stored scene value(s) to channels
     loadChannelsFromScene(aScene);
-    LOG(LOG_INFO, "- Scene(%s): new channel value(s) loaded from scene, ready to apply",  VdcHost::sceneText(aScene->mSceneNo).c_str());
+    OLOG(LOG_INFO, "- Scene(%s): new channel value(s) loaded from scene, ready to apply",  VdcHost::sceneText(aScene->mSceneNo).c_str());
     return true;
   }
   else {
     // no channel changes
-    LOG(LOG_INFO, "- Scene(%s): no invoke/off/min/max (but cmd=%d) -> no channels loaded", VdcHost::sceneText(aScene->mSceneNo).c_str(), aSceneCmd);
+    OLOG(LOG_INFO, "- Scene(%s): no invoke/off/min/max (but cmd=%d) -> no channels loaded", VdcHost::sceneText(aScene->mSceneNo).c_str(), aSceneCmd);
     return false;
   }
 }

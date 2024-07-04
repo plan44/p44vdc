@@ -414,7 +414,7 @@ bool DsAddressable::sendRequest(VdcApiConnectionPtr aApi, const char *aMethod, A
     aParams->add("dSUID", aParams->newBinary(getDsUid().getBinary()));
     ErrorPtr err = aApi->sendRequest(aMethod, aParams, aResponseHandler);
     if (Error::isOK(err)) return true;
-    LOG(LOG_ERR, "Failed to send request to %s-API (domain 0x%x)", aApi->apiName(), aApi->domain());
+    OLOG(LOG_ERR, "Failed to send request to %s-API (domain 0x%x)", aApi->apiName(), aApi->domain());
   }
   return false; // no API/connection
 }
@@ -790,7 +790,7 @@ bool DsAddressable::loadSettingsFromFile(const char *aCSVFilepath, bool aOnlyExp
     int syserr = errno;
     if (syserr!=ENOENT) {
       // file not existing is ok, all other errors must be reported
-      LOG(LOG_ERR, "failed opening file %s - %s", aCSVFilepath, strerror(syserr));
+      OLOG(LOG_ERR, "failed opening file %s - %s", aCSVFilepath, strerror(syserr));
     }
     // NOP
   }

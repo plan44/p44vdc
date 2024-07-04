@@ -205,7 +205,7 @@ void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint 
   while (sbpP->type!=sensorType_none) {
     if (mSensorType==sbpP->type && mSensorUsage==sbpP->usage) {
       // sensor type/usage has a behaviour profile, use it
-      LOG(LOG_INFO, "Activated sensor processing/filtering profile for '%s' (usage %d)", sensorTypeIds[mSensorType], mSensorUsage);
+      OLOG(LOG_INFO, "Activated sensor processing/filtering profile for '%s' (usage %d)", sensorTypeIds[mSensorType], mSensorUsage);
       mProfileP = sbpP;
       // get settings defaults
       if (mProfileP->pushIntvl>0) {
@@ -332,7 +332,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   if (fabs(aValue - mCurrentValue) > aMinChange) changedValue = true;
   OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "reports %s value = %0.3f %s", changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
   if (mContextId>=0 || !mContextMsg.empty()) {
-    LOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", mContextId, mContextMsg.c_str());
+    OLOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", mContextId, mContextMsg.c_str());
   }
   if (changedValue) {
     // check for filtering

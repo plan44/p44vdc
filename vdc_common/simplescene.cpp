@@ -412,7 +412,7 @@ int SimpleCmdScene::substitutePlaceholders(string &aCommandStr)
     size_t e = aCommandStr.find("}",p+2);
     if (e==string::npos) {
       // syntactically incorrect, no closing "}"
-      LOG(LOG_WARNING,"- unterminated replacement placeholder: %s", aCommandStr.c_str()+p);
+      OLOG(LOG_WARNING,"- unterminated replacement placeholder: %s", aCommandStr.c_str()+p);
       break;
     }
     string v = aCommandStr.substr(p+2,e-2-p);
@@ -460,7 +460,7 @@ int SimpleCmdScene::substitutePlaceholders(string &aCommandStr)
       }
     }
     else {
-      LOG(LOG_WARNING,"- unknown replacement placeholder @{%s}", v.c_str());
+      OLOG(LOG_WARNING,"- unknown replacement placeholder @{%s}", v.c_str());
     }
     // replace, even if rep is empty
     aCommandStr.replace(p, e-p+1, rep);

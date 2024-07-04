@@ -528,7 +528,7 @@ void ShadowBehaviour::endReached(bool aTop)
     if (mUpdateMoveTimeAtEndReached) {
       // ran full range, update time
       MLMicroSeconds fullRangeTime = MainLoop::now()-mReferenceTime;
-      LOG(LOG_INFO, "- is end of a full range movement : measured move time %.1f -> updating settings", (double)fullRangeTime/Second);
+      OLOG(LOG_INFO, "- is end of a full range movement : measured move time %.1f -> updating settings", (double)fullRangeTime/Second);
       if (aTop) {
         mOpenTime = (double)fullRangeTime/Second; // update opening time
       }

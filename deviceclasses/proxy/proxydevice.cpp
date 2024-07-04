@@ -193,7 +193,7 @@ bool ProxyDevice::handleBridgedDeviceNotification(const string aNotification, Js
   }
   else if (aNotification=="vanish") {
     // device got removed
-    LOG(LOG_WARNING, "original device has vanished -> vanish proxy as well");
+    OLOG(LOG_WARNING, "original device has vanished -> vanish proxy as well");
     hasVanished(false);
     return true;
   }

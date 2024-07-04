@@ -446,11 +446,11 @@ void Device::addBehaviour(DsBehaviourPtr aBehaviour)
         break;
       }
       default:
-        LOG(LOG_ERR, "Device::addBehaviour: unknown behaviour type");
+        OLOG(LOG_ERR, "Device::addBehaviour: unknown behaviour type");
     }
   }
   else {
-    LOG(LOG_ERR, "Device::addBehaviour: NULL behaviour passed");
+    OLOG(LOG_ERR, "Device::addBehaviour: NULL behaviour passed");
   }
 }
 
@@ -674,11 +674,11 @@ bool Device::needsToApplyChannels(MLMicroSeconds* aTransitionTimeP)
     ChannelBehaviourPtr ch = getChannelByIndex(i, true);
     if (ch) {
       // at least this channel needs update
-      LOG(LOG_DEBUG, "needsToApplyChannels() will return true because of %s", ch->description().c_str());
+      OLOG(LOG_DEBUG, "needsToApplyChannels() will return true because of %s", ch->description().c_str());
       if (!aTransitionTimeP) return true; // no need to check more channels
       needsApply = true;
       if (ch->transitionTimeToNewValue()>tt) {
-        LOG(LOG_DEBUG, "- channel increases transition time from %lld to %lld mS", tt/MilliSecond, ch->transitionTimeToNewValue()/MilliSecond);
+        OLOG(LOG_DEBUG, "- channel increases transition time from %lld to %lld mS", tt/MilliSecond, ch->transitionTimeToNewValue()/MilliSecond);
         tt = ch->transitionTimeToNewValue();
       }
     }
@@ -1430,10 +1430,10 @@ void Device::dimChannelForArea(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode
 void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride, bool aStopActions)
 {
   if (!aChannel) { aPreparedCB(ntfy_none); return; } // no channel, no dimming
-  LOG(LOG_DEBUG, "dimChannelForArea: aChannel=%s, aDimMode=%d, aArea=%d", aChannel->getName(), aDimMode, aArea);
+  OLOG(LOG_DEBUG, "dimChannelForArea: aChannel=%s, aDimMode=%d, aArea=%d", aChannel->getName(), aDimMode, aArea);
   // check basic dimmability (e.g. avoid dimming brightness for lights that are off)
   if (aDimMode!=dimmode_stop && !(mOutput->canDim(aChannel))) {
-    LOG(LOG_DEBUG, "- behaviour does not allow dimming channel '%s' now (e.g. because light is off)", aChannel->getName());
+    OLOG(LOG_DEBUG, "- behaviour does not allow dimming channel '%s' now (e.g. because light is off)", aChannel->getName());
     aPreparedCB(ntfy_none); // cannot dim
     return;
   }
@@ -1449,7 +1449,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
       SceneNo areaScene = mainSceneForArea(aArea);
       DsScenePtr scene = scenes->getScene(areaScene);
       if (scene->isDontCare()) {
-        LOG(LOG_DEBUG, "- area main scene(%d) is dontCare -> suppress dimChannel for Area %d", areaScene, aArea);
+        OLOG(LOG_DEBUG, "- area main scene(%d) is dontCare -> suppress dimChannel for Area %d", areaScene, aArea);
         aPreparedCB(ntfy_none); // not in this area, suppress dimming
         return;
       }
@@ -1461,7 +1461,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     // non-area dimming: suppress if device is in local priority
     // Note: aArea can be set -1 to override local priority checking, for example when using method for identify purposes
     if (aArea==0 && mOutput->hasLocalPriority()) {
-      LOG(LOG_DEBUG, "- Non-area dimming, localPriority set -> suppressed");
+      OLOG(LOG_DEBUG, "- Non-area dimming, localPriority set -> suppressed");
       aPreparedCB(ntfy_none); // local priority active, suppress dimming
       return;
     }
@@ -1617,7 +1617,7 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
   MLMicroSeconds now = MainLoop::now();
   while (aNextDimAt<now) {
     // missed this step - simply increment channel and target time, but do not cause re-apply
-    LOG(LOG_DEBUG, "dimChannel: applyChannelValues() was too slow while dimming channel=%d -> skipping next dim step", aChannel->getChannelType());
+    OLOG(LOG_DEBUG, "dimChannel: applyChannelValues() was too slow while dimming channel=%d -> skipping next dim step", aChannel->getChannelType());
     aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL);
     aNextDimAt += DIM_STEP_INTERVAL;
   }
@@ -1710,18 +1710,18 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
   OLOG(LOG_INFO, "Evaluating CallScene(%s)", VdcHost::sceneText(sceneNo).c_str());
   // filter area scene calls via area main scene's (area x on, Tx_S1) dontCare flag
   if (area) {
-    LOG(LOG_INFO, "- callScene(%d): is area #%d scene", sceneNo, area);
+    OLOG(LOG_INFO, "- callScene(%d): is area #%d scene", sceneNo, area);
     // check if device is in area (criteria used is dontCare flag OF THE AREA ON SCENE (other don't care flags are irrelevant!)
     DsScenePtr areamainscene = getScenes()->getScene(mainSceneForArea(area));
     if (areamainscene->isDontCare()) {
-      LOG(LOG_INFO, "- area main scene(%s) is dontCare -> suppress", VdcHost::sceneText(areamainscene->mSceneNo).c_str());
+      OLOG(LOG_INFO, "- area main scene(%s) is dontCare -> suppress", VdcHost::sceneText(areamainscene->mSceneNo).c_str());
       aPreparedCB(ntfy_none); // not in this area, suppress callScene entirely
       return;
     }
     // call applies, if it is a off scene, it resets localPriority
     if (aScene->mSceneCmd==scene_cmd_off) {
       // area is switched off -> end local priority
-      LOG(LOG_INFO, "- is area off scene -> ends localPriority now");
+      OLOG(LOG_INFO, "- is area off scene -> ends localPriority now");
       mOutput->setLocalPriority(false);
     }
   }
@@ -1732,7 +1732,7 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
       // non-area scene call, but device is in local priority
       if (!aForce && !aScene->ignoresLocalPriority()) {
         // not forced nor localpriority ignored, localpriority prevents applying non-area scene
-        LOG(LOG_DEBUG, "- Non-area scene, localPriority set, scene does not ignore local prio and not forced -> suppressed");
+        OLOG(LOG_DEBUG, "- Non-area scene, localPriority set, scene does not ignore local prio and not forced -> suppressed");
         aPreparedCB(ntfy_none); // suppress scene call entirely
         return;
       }
@@ -1954,7 +1954,7 @@ void Device::setLocalPriority(SceneNo aSceneNo)
     // we have a device-wide scene table, get the scene object
     DsScenePtr scene = scenes->getScene(aSceneNo);
     if (scene && !scene->isDontCare()) {
-      LOG(LOG_DEBUG, "- setLocalPriority(%d): localPriority set", aSceneNo);
+      OLOG(LOG_DEBUG, "- setLocalPriority(%d): localPriority set", aSceneNo);
       mOutput->setLocalPriority(true);
     }
   }
