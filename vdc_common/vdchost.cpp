@@ -2607,7 +2607,7 @@ static void vdcapi_func(BuiltinFunctionContextPtr f)
     }
     if (err) {
       // no API result will arrive later, so finish here
-      request->sendError(err);
+      request->sendStatus(err);
       f->finish();
       return;
     }
