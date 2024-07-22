@@ -2657,6 +2657,29 @@ static ScriptObjPtr name_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjP
   return new StringValue(d->device()->getName());
 }
 
+static ScriptObjPtr uid_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
+{
+  DeviceObj* d = dynamic_cast<DeviceObj*>(aParentObj.get());
+  assert(d);
+  return new StringValue(d->device()->getDsUid().getString());
+}
+
+
+// logleveloffset()
+// logleveloffset(newoffset)
+FUNC_ARG_DEFS(logleveloffset, { numeric|optionalarg } );
+static void logleveloffset_func(BuiltinFunctionContextPtr f)
+{
+  P44LoggingObj* l = dynamic_cast<P44LoggingObj *>(f->thisObj().get());
+  assert(l);
+  int oldOffset = l->getLogLevelOffset();
+  if (f->numArgs()>0) {
+    int newOffset = f->arg(0)->intValue();
+    l->setLogLevelOffset(newOffset);
+  }
+  f->finish(new IntegerValue(oldOffset));
+}
+
 
 // button(id_or_index)
 // sensor(id_or_index)
@@ -2683,9 +2706,11 @@ static void inputValueSource_func(BuiltinFunctionContextPtr f)
 static const BuiltinMemberDescriptor deviceMembers[] = {
   MEMBER_DEF(output, builtinvalue),
   MEMBER_DEF(name, builtinvalue),
+  MEMBER_DEF(uid, builtinvalue),
   { "button", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
   { "sensor", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
   { "input", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
+  FUNC_DEF_W_ARG(logleveloffset, executable|numeric),
   { NULL } // terminator
 };
 
