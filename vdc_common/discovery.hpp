@@ -49,6 +49,7 @@ namespace p44 {
     int mPublishWebPort;
     string mPublishWebPath;
     int mPublishSshPort;
+    int mPublishBridgePort;
 
     // private constructor, use sharedServiceAnnouncer() to obtain singleton
     ServiceAnnouncer();
@@ -68,12 +69,14 @@ namespace p44 {
     /// @param aWebPort if set, a _http._tcp service will be published as well
     /// @param aWebPath the web path to publish (when aWebPort is set)
     /// @param aSshPort if set, a _ssh._tcp service will be published as well
+    /// @param aBridgePort if set, a _p44-br._tcp service will be published as well
     void advertiseVdcHostDevice(
       const char *aHostname,
       VdcHostPtr aVdcHost,
       bool aNoAuto,
       int aWebPort, const string aWebPath,
-      int aSshPort
+      int aSshPort,
+      int aBridgePort
     );
 
     /// Refresh advertising the device

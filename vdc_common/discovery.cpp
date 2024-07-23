@@ -36,6 +36,7 @@ using namespace p44;
 
 
 #define VDC_SERVICE_TYPE "_ds-vdc._tcp"
+#define BRIDGE_SERVICE_TYPE "_p44-br._tcp"
 #define HTTP_SERVICE_TYPE "_http._tcp"
 #define SSH_SERVICE_TYPE "_ssh._tcp"
 
@@ -58,7 +59,8 @@ ServiceAnnouncer &ServiceAnnouncer::sharedServiceAnnouncer()
 ServiceAnnouncer::ServiceAnnouncer() :
   mNoAuto(false),
   mPublishWebPort(0),
-  mPublishSshPort(0)
+  mPublishSshPort(0),
+  mPublishBridgePort(0)
 {
 }
 
@@ -72,7 +74,9 @@ void ServiceAnnouncer::advertiseVdcHostDevice(
   const char *aHostname,
   VdcHostPtr aVdcHost,
   bool aNoAuto,
-  int aWebPort, const string aWebPath, int aSshPort
+  int aWebPort, const string aWebPath,
+  int aSshPort,
+  int aBridgePort
 ) {
   ErrorPtr err = DnsSdManager::sharedDnsSdManager().initialize(aHostname, true);
   if (Error::notOK(err)) {
@@ -86,6 +90,7 @@ void ServiceAnnouncer::advertiseVdcHostDevice(
   mPublishWebPort = aWebPort;
   mPublishWebPath = aWebPath;
   mPublishSshPort = aSshPort;
+  mPublishBridgePort = aBridgePort;
   // - request service now
   DnsSdManager::sharedDnsSdManager().requestService(boost::bind(&ServiceAnnouncer::serviceCallback, this, _1), INITIAL_STARTUP_DELAY);
 }
@@ -128,6 +133,13 @@ bool ServiceAnnouncer::serviceCallback(ErrorPtr aStatus)
         svc->txtRecords.clear();
         svc->txtRecords["dSUID"] = mVdcHost->getDsUid().getString().c_str();
         if (mNoAuto) svc->txtRecords["noauto"] = "";
+        aStatus = sg->addService(svc);
+      }
+      if (Error::isOK(aStatus) && mPublishBridgePort) {
+        // advertise the bridge API (to allow main device to proxy our devices)
+        svc->type = BRIDGE_SERVICE_TYPE;
+        svc->port = mPublishBridgePort;
+        svc->txtRecords.clear();
         aStatus = sg->addService(svc);
       }
     }
