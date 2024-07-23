@@ -72,13 +72,18 @@ ServiceAnnouncer::~ServiceAnnouncer()
 
 void ServiceAnnouncer::advertiseVdcHostDevice(
   const char *aHostname,
+  int aProtocolFamily,
   VdcHostPtr aVdcHost,
   bool aNoAuto,
   int aWebPort, const string aWebPath,
   int aSshPort,
   int aBridgePort
 ) {
-  ErrorPtr err = DnsSdManager::sharedDnsSdManager().initialize(aHostname, true);
+  ErrorPtr err = DnsSdManager::sharedDnsSdManager().initialize(
+    aHostname,
+    aProtocolFamily==PF_INET6 || aProtocolFamily==PF_INET4_AND_6,
+    aProtocolFamily==PF_INET || aProtocolFamily==PF_INET4_AND_6
+  );
   if (Error::notOK(err)) {
     LOG(LOG_ERR, "cannot initialize dns-sd.");
     return;
