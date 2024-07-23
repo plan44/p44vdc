@@ -445,8 +445,9 @@ namespace p44 {
     /// enable config API
     /// @param aServiceOrPort port number or service string
     /// @param aNonLocalAllowed if set, non-local clients are allowed to connect to the config API
+    /// @param aProtocolFamily PF_INET, PF_INET6 or pseudo-family PF_INET4_AND_6 for both
     /// @note API server will be started only at initialize()
-    void enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed);
+    void enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed, int aProtocolFamily);
 
     /// get the config API
     VdcApiConnectionPtr getConfigApi() { return mConfigApi; }
@@ -463,8 +464,9 @@ namespace p44 {
     /// enable bridge API
     /// @param aServiceOrPort port number or service string
     /// @param aNonLocalAllowed if set, non-local clients are allowed to connect to the bridge API
+    /// @param aProtocolFamily PF_INET, PF_INET6 or pseudo-family PF_INET4_AND_6 for both
     /// @note API server will be started only at initialize()
-    void enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllowed);
+    void enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllowed, int aProtocolFamily);
 
     /// get the bridge API
     virtual VdcApiConnectionPtr getBridgeApi() P44_OVERRIDE { return mBridgeApi; }

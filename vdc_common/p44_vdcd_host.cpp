@@ -438,12 +438,12 @@ void UbusApiRequest::sendResponse(JsonObjectPtr aResult, ErrorPtr aError)
 
 // MARK: - JSON config API
 
-void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed)
+void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllowed, int aProtocolFamily)
 {
   if (!mConfigApi) {
     // can be enabled only once
     mConfigApi = new P44CfgApiConnection(new SocketComm(MainLoop::currentMainLoop()));
-    mConfigApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, AF_INET);
+    mConfigApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, aProtocolFamily);
     mConfigApi->mJsonApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
   }
 }
@@ -836,7 +836,7 @@ BridgeInfoPtr P44VdcHost::getBridgeInfo(bool aInstantiate)
 }
 
 
-void P44VdcHost::enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllowed)
+void P44VdcHost::enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllowed, int aProtocolFamily)
 {
   if (!mBridgeApi) {
     // can be enabled only once
@@ -844,7 +844,7 @@ void P44VdcHost::enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllow
     getBridgeInfo(true);
     // - enable API
     mBridgeApi = new BridgeApiConnection(new SocketComm(MainLoop::currentMainLoop()));
-    mBridgeApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, AF_INET);
+    mBridgeApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, aProtocolFamily);
     mBridgeApi->mJsonApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
   }
 }
