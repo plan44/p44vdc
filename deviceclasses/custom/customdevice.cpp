@@ -578,6 +578,7 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
       ChannelBehaviourPtr cb = getChannelByIndex(aIndex);
       if (cb) {
         cb->reportChannelProgress(aValue);
+        getOutput()->reportOutputState();
       }
       else {
         return TextError::err("no channel #%d", aIndex);
@@ -587,7 +588,7 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
       // final channel value
       ChannelBehaviourPtr cb = getChannelByIndex(aIndex);
       if (cb) {
-        cb->syncChannelValue(aValue, true);
+        bool changed = cb->syncChannelValue(aValue, true);
         // check for shadow end contact reporting
         if (aIndex==0) {
           ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
@@ -615,6 +616,10 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
               cl->mColorMode = colorLightModeCt;
               break;
           }
+        }
+        if (changed && !mSyncedCB) {
+          // channel report is not part of active syncChannelValues, report changed output state
+          getOutput()->reportOutputState();
         }
       }
       else {

@@ -64,13 +64,20 @@ namespace p44 {
 
     /// @name non-persistent operational settings
     /// @{
+    #if ENABLE_JSONBRIDGEAPI
     MLMicroSeconds mBridgePushInterval; ///< Infinite: do not push. 0: push final values. Other: how often bridge would want updates (e.g. during transitions)
+    MLMicroSeconds mMinReportInterval; ///< minimal time between output state reports
+    #endif
     /// @}
 
     /// @name internal volatile state
     /// @{
     bool mLocalPriority; ///< if set device is in local priority mode
     MLMicroSeconds mTransitionTime; ///< default transition time when changing this output
+    #if ENABLE_JSONBRIDGEAPI
+    MLMicroSeconds mLastOutputStateReport; ///< minimal time between output state reports
+    MLTicket mDelayedReportTicket; ///< timer for delayed final report
+    #endif
     /// @}
 
   public:
@@ -120,7 +127,10 @@ namespace p44 {
     bool pushOutputState(bool aDS, bool aBridges);
 
     /// report current output state to interested consumers
-    /// @note mPushChangesToDS and mBridgePushInterval determine what to push.
+    /// @note mPushChangesToDS and mBridgePushInterval determine what to push. Does not actually report more
+    ///   often than mMinOutputReportInterval
+    /// @return true when output state could be reported right now. false when reporting is not possible, has failed
+    ///   or will happen later because report was requested earlier than mMinOutputReportInterval from last report.
     bool reportOutputState();
 
     /// get the report interval interested consumers would like to see

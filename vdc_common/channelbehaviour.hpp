@@ -130,14 +130,16 @@ namespace p44 {
     /// @param aVolatile if set, the resulting value will not be persisted
     /// @note only used to get the actual value FROM the hardware.
     ///   NOT to be used to change the hardware output value!
-    void syncChannelValue(double aActualChannelValue, bool aAlwaysSync=false, bool aVolatile=false);
+    /// @return true if channel value was actually updated
+    bool syncChannelValue(double aActualChannelValue, bool aAlwaysSync=false, bool aVolatile=false);
 
     /// sync from boolean value
     /// @param aValue value to sync back to channel value
     /// @param aAlwaysSync if set, value is synchronized even if current value is still pending to be applied
     /// @note standard behaviour is not changing channel value when getChannelValueBool() already matches,
     ///   otherwise setting max() for aValue true, min() for false.
-    virtual void syncChannelValueBool(bool aValue, bool aAlwaysSync=false);
+    /// @return true if channel value was actually updated
+    virtual bool syncChannelValueBool(bool aValue, bool aAlwaysSync=false);
 
     /// set new channel value and transition time to be applied with next device-level applyChannelValues()
     /// @param aNewValue the new output value
@@ -208,7 +210,7 @@ namespace p44 {
     /// this is for channels where the transition of channels, where the transition is determined by the
     /// hardware's capabilities (such as a roller blind).
     /// @param aEstimatedTransitionTime an estimate how long the transition will last
-    /// @note reportTransitionalChannelValue() can be used to update the progress from the value, even if
+    /// @note reportChannelProgress() can be used to update the progress from the value, even if
     ///    transition time is not set
     /// @note when aEstimatedTransitionTime is set, updateTransition() can also be used to update the
     ///    transitional value based on that estimate

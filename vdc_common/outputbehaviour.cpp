@@ -37,10 +37,17 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   mOutputMode(outputmode_default), // use the default
   mDefaultOutputMode(outputmode_disabled), // none by default, hardware should set a default matching the actual HW capabilities
   mPushChangesToDS(false), // do not push changes
+  // volatile settings
+  #if ENABLE_JSONBRIDGEAPI
   mBridgePushInterval(10*Second), // default to decent progress update for waiting user
+  mMinReportInterval(2*Second), // min push interval
+  #endif
   // volatile state
   mLocalPriority(false), // no local priority
   mTransitionTime(0) // immediate transitions by default
+  #if ENABLE_JSONBRIDGEAPI
+  , mLastOutputStateReport(Never)
+  #endif
 {
   // set default group membership (which is group_undefined)
   resetGroupMembership();
@@ -272,14 +279,34 @@ double OutputBehaviour::channelValueAccordingToMode(double aOutputValue, int aCh
 
 bool OutputBehaviour::reportOutputState()
 {
-  return pushOutputState(mPushChangesToDS, mBridgePushInterval!=Infinite);
+  #if ENABLE_JSONBRIDGEAPI
+  mDelayedReportTicket.cancel();
+  if (!mPushChangesToDS && mBridgePushInterval==Infinite) return false; // cannot report anything
+  MLMicroSeconds now = MainLoop::now();
+  MLMicroSeconds timeToNextReport = mLastOutputStateReport+mMinReportInterval-now;
+  if (mLastOutputStateReport==Never || timeToNextReport<=0) {
+    if (pushOutputState(mPushChangesToDS, mBridgePushInterval!=Infinite)) {
+      mLastOutputStateReport = now;
+      return true; // pushed
+    }
+  }
+  else {
+    // too soon, report after minimal interval
+    mDelayedReportTicket.executeOnce(boost::bind(&OutputBehaviour::reportOutputState, this), timeToNextReport);
+    return false; // could not be reported RIGHT NOW
+  }
+  return false; // could not be reported
+  #else
+  // simplified DS-only (and probably never to be used) direct push
+  return pushOutputState(mPushChangesToDS, false);
+  #endif
 }
 
 
 MLMicroSeconds OutputBehaviour::outputReportInterval()
 {
   if (mBridgePushInterval==Infinite || mBridgePushInterval==Never) return Never; // no regular updates
-  return mBridgePushInterval; // bridges want regular updates
+  return mBridgePushInterval; // bridges want regular updates in about this intervals when e.g. a transition is going on
 }
 
 
@@ -710,6 +737,7 @@ enum {
   mode_key,
   pushChangesToDs_key,
   bridgePushInterval_key,
+  minReportInterval_key,
   groups_key,
   numSettingsProperties
 };
@@ -722,6 +750,7 @@ const PropertyDescriptorPtr OutputBehaviour::getSettingsDescriptorByIndex(int aP
     { "mode", apivalue_uint64, mode_key+settings_key_offset, OKEY(output_key) },
     { "pushChanges", apivalue_bool, pushChangesToDs_key+settings_key_offset, OKEY(output_key) },
     { "x-p44-bridgePushInterval", apivalue_double, bridgePushInterval_key+settings_key_offset, OKEY(output_key) },
+    { "x-p44-minReportInterval", apivalue_double, minReportInterval_key+settings_key_offset, OKEY(output_key) },
     { "groups", apivalue_bool+propflag_container, groups_key+settings_key_offset, OKEY(output_groups_key) }
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
@@ -800,6 +829,9 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (mBridgePushInterval==Infinite) aPropValue->setNull();
           aPropValue->setDoubleValue((double)mBridgePushInterval/Second);
           return true;
+        case minReportInterval_key+settings_key_offset:
+          aPropValue->setDoubleValue((double)mMinReportInterval/Second);
+          return true;
         // State properties
         case localPriority_key+states_key_offset:
           aPropValue->setBoolValue(mLocalPriority);
@@ -822,6 +854,9 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         // Operational, non-persistent settings
         case bridgePushInterval_key+settings_key_offset:
           mBridgePushInterval = aPropValue->isNull() ? Infinite : aPropValue->doubleValue()*Second;
+          return true;
+        case minReportInterval_key+settings_key_offset:
+          mMinReportInterval = aPropValue->doubleValue()*Second;
           return true;
         // State properties
         case localPriority_key+states_key_offset:

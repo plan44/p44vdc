@@ -178,7 +178,9 @@ void MyStromDevice::stateReceived(JsonObjectPtr aJsonResponse, ErrorPtr aError)
     }
     o = aJsonResponse->get("relay");
     if (o) {
-      getOutput()->getChannelByIndex(0)->syncChannelValueBool(o->boolValue());
+      if (getOutput()->getChannelByIndex(0)->syncChannelValueBool(o->boolValue())) {
+        getOutput()->reportOutputState();
+      }
     }
   }
   // schedule next poll

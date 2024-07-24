@@ -352,10 +352,12 @@ double ChannelBehaviour::getChannelValue(bool aTransitional)
 
 // used at startup and before saving scenes to get the current value FROM the hardware
 // NOT to be used to change the hardware channel value!
-void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlwaysSync, bool aVolatile)
+bool ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlwaysSync, bool aVolatile)
 {
+  bool changed = false;
   if (!mChannelUpdatePending || aAlwaysSync) {
-    if (mCachedChannelValue!=aActualChannelValue || OLOGENABLED(LOG_DEBUG)) {
+    changed = mCachedChannelValue!=aActualChannelValue;
+    if (changed || OLOGENABLED(LOG_DEBUG)) {
       // show only changes except if debugging
       OLOG(LOG_INFO,
         "cached value synchronized from %0.2f -> %0.2f%s",
@@ -385,14 +387,16 @@ void ChannelBehaviour::syncChannelValue(double aActualChannelValue, bool aAlways
     mChannelUpdatePending = false; // we are in sync
     mChannelLastSync = MainLoop::now(); // value is current
   }
+  return changed;
 }
 
 
-void ChannelBehaviour::syncChannelValueBool(bool aValue, bool aAlwaysSync)
+bool ChannelBehaviour::syncChannelValueBool(bool aValue, bool aAlwaysSync)
 {
   if (aValue!=getChannelValueBool()) {
-    syncChannelValue(aValue ? getMax() : getMin(), aAlwaysSync);
+    return syncChannelValue(aValue ? getMax() : getMin(), aAlwaysSync);
   }
+  return false;
 }
 
 
