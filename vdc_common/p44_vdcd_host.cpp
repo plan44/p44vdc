@@ -1318,12 +1318,13 @@ enum {
   contextname_key,
   logprefix_key,
   unstored_key,
+  isScript_key,
   breakpoints_key,
   numScriptHostProperties
 };
 
-static char scripthostslist_key;
-static char scripthost_key;
+static char sourcehostslist_key;
+static char sourcehost_key;
 
 static char breakpoints_list_key;
 
@@ -1345,21 +1346,22 @@ static char pausedthread_key;
 
 int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
-  if (aParentDescriptor->hasObjectKey(scripthostslist_key)) {
+  if (aParentDescriptor->hasObjectKey(sourcehostslist_key)) {
     // script host container
     return static_cast<int>(domain().numRegisteredHosts());
   }
   else if (aParentDescriptor->hasObjectKey(breakpoints_list_key)) {
     // breakpoints
-    ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey());
-    return static_cast<int>(host->numBreakPoints());
+    ScriptHostPtr scripthost = boost::dynamic_pointer_cast<ScriptHost>(domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey()));
+    if (!scripthost) return 0;
+    return static_cast<int>(scripthost->numBreakPoints());
   }
   else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
     // paused threads list
     debuggerWatchdog(); ///< querying paused threads also triggers debugger watchdog
     return static_cast<int>(mPausedThreads.size());
   }
-  else if (aParentDescriptor->hasObjectKey(scripthost_key)) {
+  else if (aParentDescriptor->hasObjectKey(sourcehost_key)) {
     // source properties
     return numScriptHostProperties;
   }
@@ -1395,10 +1397,11 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByName(string aPropMatch, i
         aStartIndex = 0;
       }
       else {
-        ScriptHostPtr host = domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey());
+        ScriptHostPtr scripthost = boost::dynamic_pointer_cast<ScriptHost>(domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey()));
+        if (!scripthost) { aStartIndex = PROPINDEX_NONE; return propDesc; } // safety only, because numProps should prevent us being called for non-scripts
         // Note: we need to enumerate the set, so we must convert it to a vector here, which is
         //   acceptable when assuming a small number of breakpoints (which IS realistic)
-        vector<int> bpVec(host->breakpoints()->begin(), host->breakpoints()->end());
+        vector<int> bpVec(scripthost->breakpoints()->begin(), scripthost->breakpoints()->end());
         lineNo = bpVec[aStartIndex];
       }
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
@@ -1428,7 +1431,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
   // scriptmanager level properties
   static const PropertyDescription managerProperties[numScriptManagerProperties] = {
     // common device properties
-    { "sources", apivalue_object, sources_key, OKEY(scripthostslist_key) },
+    { "sources", apivalue_object, sources_key, OKEY(sourcehostslist_key) },
     { "pausedthreads", apivalue_object, pausedthreads_key, OKEY(pausedthreadslist_key) },
     { "debugging", apivalue_bool, debugging_key, OKEY(scriptmanager_key) },
     { "logtext", apivalue_string, logtext_key, OKEY(scriptmanager_key) },
@@ -1436,14 +1439,15 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
   };
   // scripthost level properties
   static const PropertyDescription scripthostProperties[numScriptHostProperties] = {
-    { "sourcetext", apivalue_string, sourcetext_key, OKEY(scripthost_key) },
-    { "title", apivalue_string, sourcetitle_key, OKEY(scripthost_key) },
-    { "originlabel", apivalue_string, originlabel_key, OKEY(scripthost_key) },
-    { "contexttype", apivalue_string, contexttype_key, OKEY(scripthost_key) },
-    { "contextid", apivalue_string, contextid_key, OKEY(scripthost_key) },
-    { "contextname", apivalue_string, contextname_key, OKEY(scripthost_key) },
-    { "logprefix", apivalue_string, logprefix_key, OKEY(scripthost_key) },
-    { "unstored", apivalue_bool, unstored_key, OKEY(scripthost_key) },
+    { "sourcetext", apivalue_string, sourcetext_key, OKEY(sourcehost_key) },
+    { "title", apivalue_string, sourcetitle_key, OKEY(sourcehost_key) },
+    { "originlabel", apivalue_string, originlabel_key, OKEY(sourcehost_key) },
+    { "contexttype", apivalue_string, contexttype_key, OKEY(sourcehost_key) },
+    { "contextid", apivalue_string, contextid_key, OKEY(sourcehost_key) },
+    { "contextname", apivalue_string, contextname_key, OKEY(sourcehost_key) },
+    { "logprefix", apivalue_string, logprefix_key, OKEY(sourcehost_key) },
+    { "unstored", apivalue_bool, unstored_key, OKEY(sourcehost_key) },
+    { "script", apivalue_bool, isScript_key, OKEY(sourcehost_key) },
     { "breakpoints", apivalue_bool+propflag_container, breakpoints_key, OKEY(breakpoints_list_key) },
   };
   // pausedthread level properties
@@ -1457,15 +1461,15 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     { "pausedAt", apivalue_uint64, pausedat_key, OKEY(pausedthread_key) },
   };
   // C++ object manages different levels, check objects
-  if (aParentDescriptor->hasObjectKey(scripthostslist_key)) {
+  if (aParentDescriptor->hasObjectKey(sourcehostslist_key)) {
     // script hosts by their uid
-    ScriptHostPtr host = domain().getHostByIndex(aPropIndex);
+    SourceHostPtr host = domain().getHostByIndex(aPropIndex);
     if (!host) return nullptr;
     DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
-    descP->mPropertyName = host->scriptSourceUid();
+    descP->mPropertyName = host->getSourceUid();
     descP->mPropertyType = aParentDescriptor->type();
     descP->mPropertyFieldKey = aPropIndex;
-    descP->mPropertyObjectKey = OKEY(scripthost_key);
+    descP->mPropertyObjectKey = OKEY(sourcehost_key);
     return descP;
   }
   else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
@@ -1478,7 +1482,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     descP->mPropertyObjectKey = OKEY(pausedthread_key);
     return descP;
   }
-  else if (aParentDescriptor->hasObjectKey(scripthost_key)) {
+  else if (aParentDescriptor->hasObjectKey(sourcehost_key)) {
     // script host fields
     return PropertyDescriptorPtr(new StaticPropertyDescriptor(&scripthostProperties[aPropIndex], aParentDescriptor));
   }
@@ -1517,10 +1521,10 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
       }
     }
   }
-  else if (aPropertyDescriptor->hasObjectKey(scripthost_key)) {
+  else if (aPropertyDescriptor->hasObjectKey(sourcehost_key)) {
     // script host level property
     // - get the host
-    ScriptHostPtr host = domain().getHostByIndex(aPropertyDescriptor->mParentDescriptor->fieldKey());
+    SourceHostPtr host = domain().getHostByIndex(aPropertyDescriptor->mParentDescriptor->fieldKey());
     if (host) {
       if (aMode==access_read) {
         // read properties
@@ -1530,15 +1534,13 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
             aPropValue->setStringValue(host->getSource());
             return true;
           case sourcetitle_key:
-            aPropValue->setStringValue(host->getScriptTitle());
+            aPropValue->setStringValue(host->getSourceTitle());
             return true;
           case originlabel_key:
             aPropValue->setStringValue(host->getOriginLabel());
             return true;
           case contexttype_key:
-            cobj = host->getLoggingContext();
-            if (!cobj) return false;
-            aPropValue->setStringValue(cobj->contextType());
+            aPropValue->setStringValue(host->getContextType());
             return true;
           case contextid_key:
             cobj = host->getLoggingContext();
@@ -1558,6 +1560,9 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
           case unstored_key:
             aPropValue->setBoolValue(host->isUnstored());
             return true;
+          case isScript_key:
+            aPropValue->setBoolValue(host->isScript());
+            return true;
         }
       }
       else {
@@ -1571,7 +1576,8 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     }
   }
   else if (aPropertyDescriptor->hasObjectKey(breakpoints_list_key)) {
-    ScriptHostPtr host = domain().getHostByIndex(aPropertyDescriptor->mParentDescriptor->mParentDescriptor->  fieldKey());
+    ScriptHostPtr host = boost::dynamic_pointer_cast<ScriptHost>(domain().getHostByIndex(aPropertyDescriptor->mParentDescriptor->mParentDescriptor->fieldKey()));
+    if (!host) return false; // is not a script, cannot have breakpoints
     size_t line = aPropertyDescriptor->fieldKey();
     if (!host->breakpoints()) return false;
     if (aMode==access_read) {
@@ -1597,10 +1603,10 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case scripthostuid_key:
-          aPropValue->setStringValue(pausedthread.mScriptHost->scriptSourceUid());
+          aPropValue->setStringValue(pausedthread.mScriptHost->getSourceUid());
           return true;
         case scripthosttitle_key:
-          aPropValue->setStringValue(pausedthread.mScriptHost->getScriptTitle());
+          aPropValue->setStringValue(pausedthread.mScriptHost->getSourceTitle());
           return true;
         case threadid_key:
           aPropValue->setUint32Value(pausedthread.mThread->threadId());
