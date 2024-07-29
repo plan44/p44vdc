@@ -126,8 +126,8 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
   ErrorPtr respErr;
   if (aMethod=="x-p44-addDevice") {
     // add a new bridge device
-    string bridgeType;
-    respErr = checkStringParam(aParams, "bridgeType", bridgeType);
+    string bridgeConfig;
+    respErr = checkStringParam(aParams, "bridgeType", bridgeConfig);
     if (Error::isOK(respErr)) {
       // optional name
       string name;
@@ -135,7 +135,7 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
       // use current time as ID for new bridgeDevices
       string bridgeDeviceId = string_format("bridgedevice_%lld", MainLoop::now());
       // try to create device
-      BridgeDevicePtr dev = BridgeDevicePtr(new BridgeDevice(this, bridgeDeviceId, bridgeType));
+      BridgeDevicePtr dev = BridgeDevicePtr(new BridgeDevice(this, bridgeDeviceId, bridgeConfig));
       if (!dev) {
         respErr = WebError::webErr(500, "invalid configuration for bridge device -> none created");
       }
@@ -145,7 +145,7 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
         // insert into database
         if (mDb.executef(
           "INSERT OR REPLACE INTO bridgedevices (bridgeDeviceId, config) VALUES ('%q','%q')",
-          bridgeDeviceId.c_str(), bridgeType.c_str()
+          bridgeDeviceId.c_str(), bridgeConfig.c_str()
         )!=SQLITE_OK) {
           respErr = mDb.error("saving bridge device");
         }

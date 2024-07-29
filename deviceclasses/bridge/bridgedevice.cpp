@@ -44,27 +44,55 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
   mBridgeDeviceRowID(0),
   mBridgeDeviceId(aBridgeDeviceId),
   mBridgeDeviceType(bridgedevice_unknown),
+  mScene(INVALID_SCENE_NO),
   mProcessingBridgeNotification(false),
   mPreviousV(0)
 {
   setColorClass(class_black_joker); // can be used to control any group
   // Config is:
-  //  <type>
-  if (aBridgeDeviceConfig=="onoff")
+  //  <type>[:<sceneno>[:undo]]
+  const char *p = aBridgeDeviceConfig.c_str();
+  string s;
+  nextPart(p, s, ':');
+  if (s=="onoff")
     mBridgeDeviceType = bridgedevice_onoff;
-  if (aBridgeDeviceConfig=="fivelevel")
+  else if (s=="fivelevel")
     mBridgeDeviceType = bridgedevice_fivelevel;
+  else if (s=="sceneresponder")
+    mBridgeDeviceType = bridgedevice_sceneresponder;
+  else if (s=="scenecaller")
+    mBridgeDeviceType = bridgedevice_scenecaller;
   else {
-    LOG(LOG_ERR, "unknown bridge device type: %s", aBridgeDeviceConfig.c_str());
+    LOG(LOG_ERR, "unknown bridge device type: %s", s.c_str());
   }
-  if (mBridgeDeviceType==bridgedevice_onoff || mBridgeDeviceType==bridgedevice_fivelevel) {
-    // scene emitting button
+  if (mBridgeDeviceType!=bridgedevice_unknown) {
+    if (mBridgeDeviceType==bridgedevice_sceneresponder || mBridgeDeviceType==bridgedevice_scenecaller) {
+      mScene = ROOM_OFF; // a valid scene by default
+      if (nextPart(p, s, ':')) {
+        mScene = (SceneNo)atoi(s.c_str());
+        if (nextPart(p, s, ':')) {
+          mHandleUndo = s=="undo";
+        }
+      }
+    }
+    // pseudo button for emitting clicks or scene calls
     ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
     b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, 1); // mode not restricted
     b->setGroup(group_yellow_light); // pre-configure for light
-    b->setHardwareName(mBridgeDeviceType==bridgedevice_fivelevel ? "5 scenes" : "on-off scenes");
+    if (mScene!=INVALID_SCENE_NO) {
+      // responder/caller
+      b->setHardwareName(string_format("scene %s", VdcHost::sceneText(mScene).c_str()));
+      if (mBridgeDeviceType==bridgedevice_sceneresponder) {
+        // responder must only issue button clicks to bridges, no local processing!
+        b->setBridgeExclusive();
+      }
+    }
+    else {
+      // level bridges
+      b->setHardwareName(mBridgeDeviceType==bridgedevice_fivelevel ? "5 scenes" : "on-off scenes");
+    }
     addBehaviour(b);
-    // pseudo-output (to capture room scenes)
+    // pseudo-output (to capture scenes)
     // - standard scene device settings
     DeviceSettingsPtr s = DeviceSettingsPtr(new SceneDeviceSettings(*this));
     s->mAllowBridging = true; // bridging allowed from start (that's the purpose of these devices)
@@ -123,6 +151,8 @@ string BridgeDevice::modelName()
   switch (mBridgeDeviceType) {
     case bridgedevice_onoff: return "on-off bridge";
     case bridgedevice_fivelevel: return "5-level bridge";
+    case bridgedevice_scenecaller: return "scene calling bridge";
+    case bridgedevice_sceneresponder: return "scene responding bridge";
     default: break;
   }
   return "";
@@ -165,6 +195,38 @@ void BridgeDevice::didExamineNotificationFromConnection(VdcApiConnectionPtr aApi
 }
 
 
+bool BridgeDevice::prepareSceneCall(DsScenePtr aScene)
+{
+  DBGOLOG(LOG_INFO, "prepareSceneCall: scene=%s", VdcHost::sceneText(aScene->mSceneNo).c_str());
+  if (mBridgeDeviceType==bridgedevice_sceneresponder && !mProcessingBridgeNotification) {
+    if (aScene->mSceneNo==mScene) {
+      // this is our trigger scene
+      ButtonBehaviourPtr b = getButton(0);
+      bool undo = aScene->mSceneCmd==scene_cmd_undo;
+      OLOG(LOG_NOTICE, "detected scene %s %s", undo ? "undo" : "call", VdcHost::sceneText(mScene, b->getGroup()==group_black_variable).c_str());
+      if (b) {
+        // Note: button behaviour is always bridge exclusive, so DS side will not see a click
+        if (undo) {
+          // undo call
+          if (mHandleUndo) {
+            // issue a double click
+            OLOG(LOG_NOTICE, "- send double click to bridge");
+            b->sendClick(ct_click_2x);
+          }
+        }
+        else {
+          // call, issue a click
+          b->sendClick(ct_click_1x);
+          OLOG(LOG_NOTICE, "- send single click to bridge");
+        }
+      }
+    }
+  }
+  return inherited::prepareSceneCall(aScene);
+}
+
+
+
 void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
   double newV = getChannelByType(channeltype_default)->getChannelValue();
@@ -172,64 +234,86 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // this is an apply that originates from the bridge
     mProcessingBridgeNotification = false; // just make sure (didExamineNotificationFromConnection should clear it anyway)
     ButtonBehaviourPtr b = getButton(0);
-    if (b) {
-      int prevPreset=-1;
-      int newPreset=-1;
-      double newSceneValue;
-      // get the reference levels from relevant scenes and determine nearest levels
+    if (b && mBridgeDeviceType!=bridgedevice_sceneresponder) {
       bool global = b->getGroup()==group_black_variable;
-      ButtonScenesMap map(b->getButtonFunction(), global);
-      // figure out the scene that will produce a level as near as possible to the value provided from the bridge
-      double minPrevDiff;
-      double minNewDiff;
-      // - search off and preset1-4 (area on/off only for area buttons and on-off bridges)
-      for (int i=0; i < (map.mArea>0 || mBridgeDeviceType==bridgedevice_onoff || global ? 2 : 5); i++) {
-        SceneNo sn = map.mSceneClick[i];
-        double scenevalue = -1;
-        SimpleScenePtr scene = SimpleScenePtr();
-        if (sn!=INVALID_SCENE_NO) {
-          scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
-        }
-        if (scene) {
-          scenevalue = scene->value;
-        }
-        else if (i==0 && global) {
-          scenevalue = 0; // assume a 0 value for the off scene, as reference for undo
-        }
-        if (scenevalue>=0) {
-          SimpleScenePtr scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
-          if (scene) {
-            double prevDiff = fabs(scenevalue-mPreviousV);
-            if (prevPreset<0 || prevDiff<minPrevDiff) { minPrevDiff = prevDiff; prevPreset = i; }
-            double newDiff =  fabs(scenevalue-newV);
-            if (newPreset<0 || newDiff<minNewDiff) { newSceneValue = scenevalue; minNewDiff = newDiff; newPreset = i; }
+      // only for output value following bridges
+      if (mBridgeDeviceType==bridgedevice_scenecaller) {
+        // local scene called is predefined
+        bool newOn = newV>=50;
+        if (newOn!=(mPreviousV>=50)) {
+          OLOG(LOG_NOTICE, "default channel change to %d -> on=%d", (int)newV, (int)newOn);
+          // on/off has changed from bridge side
+          if (newOn) {
+            // switched on: issue forced scene call
+            OLOG(LOG_NOTICE, "- inject button callscene(%s) action", VdcHost::sceneText(mScene, global).c_str());
+            b->sendAction(buttonActionMode_force, mScene);
+          }
+          else if (mHandleUndo) {
+            // switched off: issue undo
+            OLOG(LOG_NOTICE, "- inject button undoscene(%s) action", VdcHost::sceneText(mScene, global).c_str());
+            b->sendAction(buttonActionMode_undo, mScene);
           }
         }
       }
-      OLOG(LOG_DEBUG, "global=%d, area=%d, prevLevel=%d, newLevel=%d, newSceneValue=%d", global, map.mArea, prevPreset, newPreset, (int)newSceneValue);
-      OLOG(LOG_NOTICE, "default channel change to %d (adjusted to %d) originating from bridge", (int)newV, (int)newSceneValue);
-      if (newPreset!=prevPreset && newPreset>=0) {
-        // adjust the value to what it will be after the scene call returns to us from the room
-        getChannelByType(channeltype_default)->syncChannelValue(newSceneValue);
-        // figure out the scene call to make
-        SceneNo actionID = map.mSceneClick[newPreset];
-        VdcButtonActionMode actionMode = buttonActionMode_normal;
-        if (global && actionID==INVALID_SCENE_NO && newPreset==0) {
-          // no specific reset scene -> undo the activation instead
-          actionMode = buttonActionMode_undo;
-          actionID = map.mSceneClick[1];
-        }
-        // emit the scene call
-        OLOG(LOG_NOTICE,
-          "- preset changes from %d to %d -> inject button %sscene(%s) action",
-          prevPreset, newPreset,
-          actionMode==buttonActionMode_undo ? "undo" : "call",
-          VdcHost::sceneText(actionID, false).c_str()
-        );
-        b->sendAction(actionMode, actionID);
-      }
       else {
-        OLOG(LOG_INFO, "- preset (%d) did not change -> no button action sent", prevPreset);
+        // local scene call depends on value match
+        int prevPreset=-1;
+        int newPreset=-1;
+        double newSceneValue;
+        // get the reference levels from relevant scenes and determine nearest levels
+        ButtonScenesMap map(b->getButtonFunction(), global);
+        // figure out the scene that will produce a level as near as possible to the value provided from the bridge
+        double minPrevDiff;
+        double minNewDiff;
+        // - search off and preset1-4 (area on/off only for area buttons and on-off bridges)
+        for (int i=0; i < (map.mArea>0 || mBridgeDeviceType==bridgedevice_onoff || global ? 2 : 5); i++) {
+          SceneNo sn = map.mSceneClick[i];
+          double scenevalue = -1;
+          SimpleScenePtr scene = SimpleScenePtr();
+          if (sn!=INVALID_SCENE_NO) {
+            scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
+          }
+          if (scene) {
+            scenevalue = scene->value;
+          }
+          else if (i==0 && global) {
+            scenevalue = 0; // assume a 0 value for the off scene, as reference for undo
+          }
+          if (scenevalue>=0) {
+            SimpleScenePtr scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
+            if (scene) {
+              double prevDiff = fabs(scenevalue-mPreviousV);
+              if (prevPreset<0 || prevDiff<minPrevDiff) { minPrevDiff = prevDiff; prevPreset = i; }
+              double newDiff =  fabs(scenevalue-newV);
+              if (newPreset<0 || newDiff<minNewDiff) { newSceneValue = scenevalue; minNewDiff = newDiff; newPreset = i; }
+            }
+          }
+        }
+        OLOG(LOG_DEBUG, "global=%d, area=%d, prevLevel=%d, newLevel=%d, newSceneValue=%d", global, map.mArea, prevPreset, newPreset, (int)newSceneValue);
+        OLOG(LOG_NOTICE, "default channel change to %d (adjusted to %d) originating from bridge", (int)newV, (int)newSceneValue);
+        if (newPreset!=prevPreset && newPreset>=0) {
+          // adjust the value to what it will be after the scene call returns to us from the room
+          getChannelByType(channeltype_default)->syncChannelValue(newSceneValue);
+          // figure out the scene call to make
+          SceneNo actionID = map.mSceneClick[newPreset];
+          VdcButtonActionMode actionMode = buttonActionMode_normal;
+          if (global && actionID==INVALID_SCENE_NO && newPreset==0) {
+            // no specific reset scene -> undo the activation instead
+            actionMode = buttonActionMode_undo;
+            actionID = map.mSceneClick[1];
+          }
+          // emit the scene call
+          OLOG(LOG_NOTICE,
+            "- preset changes from %d to %d -> inject button %sscene(%s) action",
+            prevPreset, newPreset,
+            actionMode==buttonActionMode_undo ? "undo" : "call",
+            VdcHost::sceneText(actionID, global).c_str()
+          );
+          b->sendAction(actionMode, actionID);
+        }
+        else {
+          OLOG(LOG_INFO, "- preset (%d) did not change -> no button action sent", prevPreset);
+        }
       }
     }
   }
@@ -255,10 +339,17 @@ void BridgeDevice::deriveDsUid()
 string BridgeDevice::description()
 {
   string s = inherited::description();
-  if (mBridgeDeviceType==bridgedevice_onoff)
-    string_format_append(s, "\n- bridging onoff room state");
-  if (mBridgeDeviceType==bridgedevice_fivelevel)
-    string_format_append(s, "\n- bridging off,25,50,75,100%% level room state");
+  switch (mBridgeDeviceType) {
+    case bridgedevice_onoff:
+      string_format_append(s, "\n- bridging onoff room state"); break;
+    case bridgedevice_fivelevel:
+      string_format_append(s, "\n- bridging off,25,50,75,100%% level room state"); break;
+    case bridgedevice_scenecaller:
+      string_format_append(s, "\n- call scene '%s' when bridged onoff goes on%s", VdcHost::sceneText(mScene).c_str(), mHandleUndo ? ", undo when off" : ""); break;
+    case bridgedevice_sceneresponder:
+      string_format_append(s, "\n- click bridged button when detecting scene '%s'%s", VdcHost::sceneText(mScene).c_str(), mHandleUndo ? ", doubleclick at undo" : ""); break;
+    default: break;
+  }
   return s;
 }
 
@@ -266,9 +357,15 @@ string BridgeDevice::description()
 string BridgeDevice::bridgeAsHint()
 {
   switch (mBridgeDeviceType) {
-    case bridgedevice_onoff: return "on-off";
-    case bridgedevice_fivelevel: return "level-control";
-    default: return inherited::bridgeAsHint();
+    case bridgedevice_onoff:
+    case bridgedevice_scenecaller:
+      return "on-off";
+    case bridgedevice_fivelevel: 
+      return "level-control";
+    case bridgedevice_sceneresponder:
+      return "no-output";
+    default:
+      return inherited::bridgeAsHint();
   }
 }
 

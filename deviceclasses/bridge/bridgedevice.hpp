@@ -69,11 +69,15 @@ namespace p44 {
 
     typedef enum {
       bridgedevice_unknown,
-      bridgedevice_onoff, ///< output is a button emitting preset1 and off scenes for bridged pseudo-onoff device
-      bridgedevice_fivelevel, ///< output is a button emitting the standard scenes for bridged levelcontrol device (100,75,50,25% and off)
+      bridgedevice_onoff, ///< mirrors preset1/off scenes to bridged pseudo-onoff device
+      bridgedevice_fivelevel, ///< mirrors standard scenes for bridged pseudo-levelcontrol device (according to scene values)
+      bridgedevice_sceneresponder, ///<  forwards specific scene call as a button click to bridge
+      bridgedevice_scenecaller, ///< emits a specific scene when bridged on-off device is turned on
     } BridgeDeviceType;
 
     BridgeDeviceType mBridgeDeviceType;
+    SceneNo mScene; ///< scene No for scene-specific bridges (detected or called)
+    bool mHandleUndo; ///< forward/issue undo-scenes for responder and caller
 
     bool mProcessingBridgeNotification; ///< set when processing state update sent by bridge
     double mPreviousV; ///< value to compare to for deciding about issuing scene calls
@@ -146,6 +150,8 @@ namespace p44 {
     /// called after notification is examined (and either done, or needed operations queued)
     virtual void didExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection) P44_OVERRIDE;
 
+    /// prepare for calling a scene on the device level
+    virtual bool prepareSceneCall(DsScenePtr aScene) P44_OVERRIDE;
 
     /// apply all pending channel value updates to the device's hardware
     /// @param aDoneCB will called when values are actually applied, or hardware reports an error/timeout
