@@ -273,6 +273,14 @@ void CustomDevice::sendDeviceApiFlagMessage(string aFlagWord)
 }
 
 
+void CustomDevice::deviceInitiatedSyncComplete()
+{
+  mSyncedCB = NoOP;
+  // when device initiates multiple channel sync, report output when done
+  getOutput()->reportOutputState();
+}
+
+
 ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMessage)
 {
   ErrorPtr err;
@@ -286,6 +294,11 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
         // device confirms having reported all channel states (in response to "sync" command)
         if (mSyncedCB) mSyncedCB();
         mSyncedCB = NoOP;
+        return ErrorPtr(); // no answer
+      }
+      else if (aMessageType=="sync") {
+        // device informs it intends to sync multiple channel states. NOP if already in vdcd-initiated sync state
+        if (!mSyncedCB) mSyncedCB = boost::bind(&CustomDevice::deviceInitiatedSyncComplete, this);
         return ErrorPtr(); // no answer
       }
       else if (aMessageType=="active") {

@@ -348,6 +348,7 @@ namespace p44 {
 
     void changeChannelMovement(int aChannelIndex, SimpleCB aDoneCB, int aNewDirection);
     void releaseButton(ButtonBehaviourPtr aButtonBehaviour);
+    void deviceInitiatedSyncComplete();
 
   };
 
