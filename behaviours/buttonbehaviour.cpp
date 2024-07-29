@@ -779,7 +779,6 @@ void ButtonBehaviour::localDim(bool aStart)
 }
 
 
-
 void ButtonBehaviour::sendClick(DsClickType aClickType)
 {
   OLOG(LOG_DEBUG, "sendClick: click=%d, state=%d, clickcounter=%d", aClickType, mButtonPressed, mClickCounter);

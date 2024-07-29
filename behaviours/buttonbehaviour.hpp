@@ -167,6 +167,8 @@ namespace p44 {
     /// @return true when button actions should be forwarded to bridge clients only, and NOT get processed locally
     bool isBridgeExclusive();
 
+    /// make button bridge exclusive, i.e. not causing any local or DS actions
+    void setBridgeExclusive() { mBridgeExclusive = true; };
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{
