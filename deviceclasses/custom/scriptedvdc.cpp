@@ -393,7 +393,7 @@ bool ScriptedDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
       switch (aPropertyDescriptor->fieldKey()) {
         case initmessage_key: aPropValue->setStringValue(mInitMessageText); return true;
         case implementation_key: aPropValue->setStringValue(mImplementation.mScript.getSource()); return true;
-        case implementationId_key: aPropValue->setStringValue(mImplementation.mScript.scriptSourceUid()); return true;
+        case implementationId_key: aPropValue->setStringValue(mImplementation.mScript.getSourceUid()); return true;
       }
     }
     else {

@@ -1856,7 +1856,7 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           aPropValue->setStringValue(mMainScript.getSource());
           return true;
         case mainscriptId_key:
-          aPropValue->setStringValue(mMainScript.scriptSourceUid());
+          aPropValue->setStringValue(mMainScript.getSourceUid());
           return true;
         #endif
         case nextVersion_key:

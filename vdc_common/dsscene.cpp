@@ -531,7 +531,7 @@ bool DsScene::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           return true;
         case sceneScriptId_key:
           if (!mSceneScript.active()) return false; // no ID yet
-          aPropValue->setStringValue(mSceneScript.scriptSourceUid());
+          aPropValue->setStringValue(mSceneScript.getSourceUid());
           return true;
         #endif
       }

@@ -652,7 +652,7 @@ bool EvaluatorDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case minOffTime_key: aPropValue->setDoubleValue((double)(evaluatorSettings()->mOffCondition.getTriggerHoldoff())/Second); return true;
         #if P44SCRIPT_FULL_SUPPORT
         case action_key: aPropValue->setStringValue(evaluatorSettings()->mAction.getSource()); return true;
-        case actionId_key: aPropValue->setStringValue(evaluatorSettings()->mAction.scriptSourceUid()); return true;
+        case actionId_key: aPropValue->setStringValue(evaluatorSettings()->mAction.getSourceUid()); return true;
         #endif
       }
     }
