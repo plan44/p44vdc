@@ -43,37 +43,37 @@ namespace p44 {
     typedef DsBehaviour inherited;
     friend class Device;
 
-    MLTicket timeoutTicket;
-    MLTicket updateTicket;
+    MLTicket mTimeoutTicket;
+    MLTicket mUpdateTicket;
 
   protected:
 
     /// @name behaviour description, constants or variables
     ///   set by device implementations when adding a Behaviour.
     /// @{
-    DsBinaryInputType hardwareInputType; ///< the input type when device has hardwired functions
-    VdcUsageHint inputUsage; ///< the input type when device has hardwired functions
-    bool reportsChanges; ///< set if the input detects changes without polling
-    MLMicroSeconds updateInterval; ///< how fast the input is expected to update its value maximally (can be much less often, up to never, depending on actual signals)
-    MLMicroSeconds aliveSignInterval; ///< how often the input reports its state minimally (if it does not report for longer than that, it can be considered out of order). Can be 0 for inputs from which no regular update can be expected at all
-    MLMicroSeconds maxPushInterval; ///< max push interval (after that, value gets re-pushed even if no input update has occurred)
-    int autoResetTo; ///< input value to reset to after updateInterval has passed, <0 means no auto reset
+    DsBinaryInputType mHardwareInputType; ///< the input type when device has hardwired functions
+    VdcUsageHint mInputUsage; ///< the input type when device has hardwired functions
+    bool mReportsChanges; ///< set if the input detects changes without polling
+    MLMicroSeconds mUpdateInterval; ///< how fast the input is expected to update its value maximally (can be much less often, up to never, depending on actual signals)
+    MLMicroSeconds mAliveSignInterval; ///< how often the input reports its state minimally (if it does not report for longer than that, it can be considered out of order). Can be 0 for inputs from which no regular update can be expected at all
+    MLMicroSeconds mMaxPushInterval; ///< max push interval (after that, value gets re-pushed even if no input update has occurred)
+    int mAutoResetTo; ///< input value to reset to after updateInterval has passed, <0 means no auto reset
     /// @}
 
     /// @name persistent settings
     /// @{
-    DsGroup binInputGroup; ///< group this binary input belongs to
-    DsBinaryInputType configuredInputType; ///< the configurable input type (aka Sensor Function)
-    MLMicroSeconds minPushInterval; ///< minimum time between two state pushes
-    MLMicroSeconds changesOnlyInterval; ///< time span during which only actual value changes are reported. After this interval, next hardware sensor update, even without value change, will cause a push)
+    DsGroup mBinInputGroup; ///< group this binary input belongs to
+    DsBinaryInputType mConfiguredInputType; ///< the configurable input type (aka Sensor Function)
+    MLMicroSeconds mMinPushInterval; ///< minimum time between two state pushes
+    MLMicroSeconds mChangesOnlyInterval; ///< time span during which only actual value changes are reported. After this interval, next hardware sensor update, even without value change, will cause a push)
     /// @}
 
 
     /// @name internal volatile state
     /// @{
-    InputState currentState; ///< current input value
-    MLMicroSeconds lastUpdate; ///< time of last update from hardware
-    MLMicroSeconds lastPush; ///< time of last push
+    InputState mCurrentState; ///< current input value
+    MLMicroSeconds mLastUpdate; ///< time of last update from hardware
+    MLMicroSeconds mLastPush; ///< time of last push
     /// @}
 
 
@@ -103,13 +103,13 @@ namespace p44 {
 
     /// get the hardware input type
     /// @return the type of the input
-    DsBinaryInputType getHardwareInputType() { return hardwareInputType; };
+    DsBinaryInputType getHardwareInputType() { return mHardwareInputType; };
 
     /// set group
-    virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { binInputGroup = aGroup; };
+    virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { mBinInputGroup = aGroup; };
 
     /// get group
-    virtual DsGroup getGroup() P44_OVERRIDE { return binInputGroup; };
+    virtual DsGroup getGroup() P44_OVERRIDE { return mBinInputGroup; };
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{
@@ -137,7 +137,7 @@ namespace p44 {
     /// get currently known state
     /// @return current state.
     /// @note The return value only has a meaning if hasDefinedState() returns true
-    InputState getCurrentState() { return currentState; }
+    InputState getCurrentState() { return mCurrentState; }
 
     /// Get short text for a "first glance" status of the behaviour
     /// @return string, really short, intended to be shown as a narrow column in a list

@@ -29,16 +29,16 @@ using namespace p44;
 BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
   // persistent settings
-  binInputGroup(group_black_variable),
-  configuredInputType(binInpType_none),
-  minPushInterval(2*Second), // don't push more often than every 2 seconds
-  maxPushInterval(0),
-  changesOnlyInterval(30*Minute), // report unchanged state updates max once every 30 minutes
-  autoResetTo(-1), // no auto reset
+  mBinInputGroup(group_black_variable),
+  mConfiguredInputType(binInpType_none),
+  mMinPushInterval(2*Second), // don't push more often than every 2 seconds
+  mMaxPushInterval(0),
+  mChangesOnlyInterval(30*Minute), // report unchanged state updates max once every 30 minutes
+  mAutoResetTo(-1), // no auto reset
   // state
-  lastUpdate(Never),
-  lastPush(Never),
-  currentState(0)
+  mLastUpdate(Never),
+  mLastPush(Never),
+  mCurrentState(0)
 {
   // set dummy default hardware default configuration (no known alive sign interval!)
   setHardwareInputConfig(binInpType_none, usage_undefined, true, 15*Second, 0);
@@ -83,40 +83,40 @@ const char *inputTypeIds[numBinaryInputTypes] = {
 
 void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, VdcUsageHint aUsage, bool aReportsChanges, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, int aAutoResetTo)
 {
-  hardwareInputType = aInputType;
-  inputUsage = aUsage;
-  reportsChanges = aReportsChanges;
-  updateInterval = aUpdateInterval;
-  autoResetTo = aAutoResetTo;
-  aliveSignInterval = aAliveSignInterval;
-  maxPushInterval = aliveSignInterval==Never ? Never : DSS_INPUT_MAX_PUSH_INTERVAL; // sensors without any update guarantee do not need to fake regular pushes
+  mHardwareInputType = aInputType;
+  mInputUsage = aUsage;
+  mReportsChanges = aReportsChanges;
+  mUpdateInterval = aUpdateInterval;
+  mAutoResetTo = aAutoResetTo;
+  mAliveSignInterval = aAliveSignInterval;
+  mMaxPushInterval = mAliveSignInterval==Never ? Never : DSS_INPUT_MAX_PUSH_INTERVAL; // sensors without any update guarantee do not need to fake regular pushes
   // setup standard timeout to undefined state
-  startInputTimeout(aliveSignInterval, undefined);
+  startInputTimeout(mAliveSignInterval, undefined);
   // set default input mode to hardware type
-  configuredInputType = hardwareInputType;
+  mConfiguredInputType = mHardwareInputType;
 }
 
 
 string BinaryInputBehaviour::getAutoId()
 {
-  return inputTypeIds[hardwareInputType];
+  return inputTypeIds[mHardwareInputType];
 }
 
 
 
 InputState BinaryInputBehaviour::maxExtendedValue()
 {
-  if (configuredInputType==binInpType_windowHandle) return 2; // Window handle is tri-state
+  if (mConfiguredInputType==binInpType_windowHandle) return 2; // Window handle is tri-state
   return 1; // all others are binary so far
 }
 
 
 void BinaryInputBehaviour::startInputTimeout(MLMicroSeconds aTimeout, int aAfterTimeOutState)
 {
-  timeoutTicket.cancel();
+  mTimeoutTicket.cancel();
   if (aTimeout!=Never) {
     // schedule invalidation or auto-reset
-    timeoutTicket.executeOnce(boost::bind(&BinaryInputBehaviour::inputTimeout, this, aAfterTimeOutState), aTimeout);
+    mTimeoutTicket.executeOnce(boost::bind(&BinaryInputBehaviour::inputTimeout, this, aAfterTimeOutState), aTimeout);
   }
 }
 
@@ -140,16 +140,16 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
   if (aNewState>maxExtendedValue()) aNewState = maxExtendedValue(); // make sure state does not exceed expectation
   // always update age, even if value itself may not have changed
   MLMicroSeconds now = MainLoop::now();
-  lastUpdate = now;
-  if (autoResetTo>=0 && aNewState!=autoResetTo) {
+  mLastUpdate = now;
+  if (mAutoResetTo>=0 && aNewState!=mAutoResetTo) {
     // this update sets the output to a non-reset state -> set up auto reset
-    startInputTimeout(updateInterval, autoResetTo);
+    startInputTimeout(mUpdateInterval, mAutoResetTo);
   }
   else {
     // just start the invalidation timeout
-    startInputTimeout(aliveSignInterval, -1);
+    startInputTimeout(mAliveSignInterval, -1);
   }
-  bool changedState = aNewState!=currentState;
+  bool changedState = aNewState!=mCurrentState;
   if (changedState) {
     // input state change is considered a (regular!) user action, have it checked globally first
     mDevice.getVdcHost().signalDeviceUserAction(mDevice, true);
@@ -158,9 +158,9 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
   OLOG(changedState ? LOG_NOTICE : LOG_INFO, "reports %s state = %d", changedState ? "NEW" : "same", aNewState);
   // in all cases, binary input state changes must be forwarded long term
   // (but minPushInterval must "debounce" rapid intermediate changes)
-  if (changedState || now>lastPush+changesOnlyInterval) {
+  if (changedState || now>mLastPush+mChangesOnlyInterval) {
     // changed state or no update sent for more than changesOnlyInterval
-    currentState = aNewState;
+    mCurrentState = aNewState;
     pushInput(changedState);
   }
   // notify listeners
@@ -174,14 +174,14 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
 bool BinaryInputBehaviour::pushInput(bool aChanged)
 {
   MLMicroSeconds now = MainLoop::now();
-  if (lastPush==Never || now>lastPush+minPushInterval) {
+  if (mLastPush==Never || now>mLastPush+mMinPushInterval) {
     // push the new value right now
     if (pushBehaviourState(true, true)) {
-      lastPush = now;
-      OLOG(LOG_NOTICE, "successfully pushed state = %d", currentState);
-      if (hasDefinedState() && maxPushInterval!=Never) {
+      mLastPush = now;
+      OLOG(LOG_NOTICE, "successfully pushed state = %d", mCurrentState);
+      if (hasDefinedState() && mMaxPushInterval!=Never) {
         // schedule re-push of defined state
-        updateTicket.executeOnce(boost::bind(&BinaryInputBehaviour::pushInput, this, false), maxPushInterval);
+        mUpdateTicket.executeOnce(boost::bind(&BinaryInputBehaviour::pushInput, this, false), mMaxPushInterval);
       }
       return true;
     }
@@ -192,7 +192,7 @@ bool BinaryInputBehaviour::pushInput(bool aChanged)
   else if (aChanged) {
     // cannot be pushed now, but final state of the input must be reported later
     OLOG(LOG_INFO, "input changes too quickly, push of final state will be pushed after minPushInterval");
-    updateTicket.executeOnceAt(boost::bind(&BinaryInputBehaviour::reportFinalState, this), lastPush+minPushInterval);
+    mUpdateTicket.executeOnceAt(boost::bind(&BinaryInputBehaviour::reportFinalState, this), mLastPush+mMinPushInterval);
   }
   return false;
 }
@@ -202,10 +202,10 @@ bool BinaryInputBehaviour::pushInput(bool aChanged)
 void BinaryInputBehaviour::reportFinalState()
 {
   // push the current value (after awaiting minPushInterval or after maxPushInterval has passed)
-  updateTicket.cancel();
+  mUpdateTicket.cancel();
   if (pushBehaviourState(true, true)) {
-    OLOG(LOG_NOTICE, "now pushes current state (%d) after awaiting minPushInterval", currentState);
-    lastPush = MainLoop::currentMainLoop().now();
+    OLOG(LOG_NOTICE, "now pushes current state (%d) after awaiting minPushInterval", mCurrentState);
+    mLastPush = MainLoop::currentMainLoop().now();
   }
 }
 
@@ -214,15 +214,15 @@ void BinaryInputBehaviour::invalidateInputState()
 {
   if (hasDefinedState()) {
     // currently valid -> invalidate
-    lastUpdate = Never;
+    mLastUpdate = Never;
     //currentState = 0; // do NOT reset the state, it is better to use the last known state (for the valuesource value in p44scripts)
-    updateTicket.cancel();
+    mUpdateTicket.cancel();
     OLOG(LOG_NOTICE, "reports input state no longer available");
     // push invalidation (primitive clients not capable of NULL will at least see state==false)
     MLMicroSeconds now = MainLoop::now();
     // push the invalid state
     if (pushBehaviourState(true, true)) {
-      lastPush = now;
+      mLastPush = now;
     }
     // notify listeners
     #if ENABLE_P44SCRIPT
@@ -234,15 +234,15 @@ void BinaryInputBehaviour::invalidateInputState()
 
 bool BinaryInputBehaviour::hasDefinedState()
 {
-  return lastUpdate!=Never;
+  return mLastUpdate!=Never;
 }
 
 
 void BinaryInputBehaviour::revalidateState()
 {
-  if (hasDefinedState() && (autoResetTo<0 || updateInterval==Never || currentState==autoResetTo)) {
+  if (hasDefinedState() && (mAutoResetTo<0 || mUpdateInterval==Never || mCurrentState==mAutoResetTo)) {
     // re-arm invalidator (unless autoreset is pending)
-    startInputTimeout(aliveSignInterval, undefined);
+    startInputTimeout(mAliveSignInterval, undefined);
   }
 }
 
@@ -250,7 +250,7 @@ void BinaryInputBehaviour::revalidateState()
 string BinaryInputBehaviour::getStatusText()
 {
   if (hasDefinedState()) {
-    return string_format("%d", currentState);
+    return string_format("%d", mCurrentState);
   }
   return inherited::getStatusText();
 }
@@ -283,13 +283,13 @@ string BinaryInputBehaviour::getSourceName()
 
 double BinaryInputBehaviour::getSourceValue()
 {
-  return currentState;
+  return mCurrentState;
 }
 
 
 MLMicroSeconds BinaryInputBehaviour::getSourceLastUpdate()
 {
-  return lastUpdate;
+  return mLastUpdate;
 }
 
 
@@ -343,10 +343,10 @@ void BinaryInputBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aI
 {
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the fields
-  aRow->getCastedIfNotNull<DsGroup, int>(aIndex++, binInputGroup);
-  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, minPushInterval);
-  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, changesOnlyInterval);
-  aRow->getCastedIfNotNull<DsBinaryInputType, int>(aIndex++, configuredInputType);
+  aRow->getCastedIfNotNull<DsGroup, int>(aIndex++, mBinInputGroup);
+  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, mMinPushInterval);
+  aRow->getCastedIfNotNull<MLMicroSeconds, long long int>(aIndex++, mChangesOnlyInterval);
+  aRow->getCastedIfNotNull<DsBinaryInputType, int>(aIndex++, mConfiguredInputType);
 }
 
 
@@ -355,10 +355,10 @@ void BinaryInputBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
-  aStatement.bind(aIndex++, binInputGroup);
-  aStatement.bind(aIndex++, (long long int)minPushInterval);
-  aStatement.bind(aIndex++, (long long int)changesOnlyInterval);
-  aStatement.bind(aIndex++, (long long int)configuredInputType);
+  aStatement.bind(aIndex++, mBinInputGroup);
+  aStatement.bind(aIndex++, (long long int)mMinPushInterval);
+  aStatement.bind(aIndex++, (long long int)mChangesOnlyInterval);
+  aStatement.bind(aIndex++, (long long int)mConfiguredInputType);
 }
 
 
@@ -386,7 +386,7 @@ const PropertyDescriptorPtr BinaryInputBehaviour::getDescDescriptorByIndex(int a
   static const PropertyDescription properties[numDescProperties] = {
     { "sensorFunction", apivalue_uint64, hardwareInputType_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "inputUsage", apivalue_uint64, inputUsage_key+descriptions_key_offset, OKEY(binaryInput_key) },
-    { "inputType", apivalue_bool, reportsChanges_key+descriptions_key_offset, OKEY(binaryInput_key) },
+    { "inputType", apivalue_bool, reportsChanges_key+descriptions_key_offset, OKEY(binaryInput_key) }, // reports changes or not
     { "updateInterval", apivalue_double, updateInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "aliveSignInterval", apivalue_double, aliveSignInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "maxPushInterval", apivalue_double, maxPushInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
@@ -449,35 +449,35 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
       switch (aPropertyDescriptor->fieldKey()) {
         // Description properties
         case hardwareInputType_key+descriptions_key_offset: // aka "hardwareSensorFunction"
-          aPropValue->setUint8Value(hardwareInputType);
+          aPropValue->setUint8Value(mHardwareInputType);
           return true;
         case inputUsage_key+descriptions_key_offset:
-          aPropValue->setUint8Value(inputUsage);
+          aPropValue->setUint8Value(mInputUsage);
           return true;
-        case reportsChanges_key+descriptions_key_offset: // aka "inputType"
-          aPropValue->setUint8Value(reportsChanges ? 1 : 0);
+        case reportsChanges_key+descriptions_key_offset: // aka "inputType", 1=reporting, 0=needs polling
+          aPropValue->setUint8Value(mReportsChanges ? 1 : 0);
           return true;
         case updateInterval_key+descriptions_key_offset:
-          aPropValue->setDoubleValue((double)updateInterval/Second);
+          aPropValue->setDoubleValue((double)mUpdateInterval/Second);
           return true;
         case aliveSignInterval_key+descriptions_key_offset:
-          aPropValue->setDoubleValue((double)aliveSignInterval/Second);
+          aPropValue->setDoubleValue((double)mAliveSignInterval/Second);
           return true;
         case maxPushInterval_key+descriptions_key_offset:
-          aPropValue->setDoubleValue((double)maxPushInterval/Second);
+          aPropValue->setDoubleValue((double)mMaxPushInterval/Second);
           return true;
         // Settings properties
         case group_key+settings_key_offset:
-          aPropValue->setUint16Value(binInputGroup);
+          aPropValue->setUint16Value(mBinInputGroup);
           return true;
         case minPushInterval_key+settings_key_offset:
-          aPropValue->setDoubleValue((double)minPushInterval/Second);
+          aPropValue->setDoubleValue((double)mMinPushInterval/Second);
           return true;
         case changesOnlyInterval_key+settings_key_offset:
-          aPropValue->setDoubleValue((double)changesOnlyInterval/Second);
+          aPropValue->setDoubleValue((double)mChangesOnlyInterval/Second);
           return true;
         case configuredInputType_key+settings_key_offset: // aka "sensorFunction"
-          aPropValue->setUint8Value(configuredInputType);
+          aPropValue->setUint8Value(mConfiguredInputType);
           return true;
         // States properties
         case value_key+states_key_offset:
@@ -485,7 +485,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
           if (!hasDefinedState())
             aPropValue->setNull();
           else
-            aPropValue->setBoolValue(currentState>=1); // all states > 0 are considered "true" for the basic state
+            aPropValue->setBoolValue(mCurrentState>=1); // all states > 0 are considered "true" for the basic state
           return true;
         case extendedValue_key+states_key_offset:
           // extended value
@@ -494,7 +494,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
             if (!hasDefinedState())
               aPropValue->setNull();
             else
-              aPropValue->setUint8Value(currentState);
+              aPropValue->setUint8Value(mCurrentState);
           }
           else {
             // simple binary input, do not show the extended state
@@ -506,7 +506,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
           if (!hasDefinedState())
             aPropValue->setNull();
           else
-            aPropValue->setDoubleValue((double)(MainLoop::now()-lastUpdate)/Second);
+            aPropValue->setDoubleValue((double)(MainLoop::now()-mLastUpdate)/Second);
           return true;
       }
     }
@@ -515,16 +515,16 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case group_key+settings_key_offset:
-          setPVar(binInputGroup, (DsGroup)aPropValue->int32Value());
+          setPVar(mBinInputGroup, (DsGroup)aPropValue->int32Value());
           return true;
         case minPushInterval_key+settings_key_offset:
-          setPVar(minPushInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
+          setPVar(mMinPushInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
         case changesOnlyInterval_key+settings_key_offset:
-          setPVar(changesOnlyInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
+          setPVar(mChangesOnlyInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
         case configuredInputType_key+settings_key_offset: // aka "sensorFunction"
-          setPVar(configuredInputType, (DsBinaryInputType)aPropValue->int32Value());
+          setPVar(mConfiguredInputType, (DsBinaryInputType)aPropValue->int32Value());
           return true;
       }
     }
@@ -541,8 +541,8 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
 string BinaryInputBehaviour::description()
 {
   string s = string_format("%s behaviour", shortDesc().c_str());
-  string_format_append(s, "\n- binary input type: %d, reportsChanges=%d, interval: %lld mS", hardwareInputType, reportsChanges, updateInterval/MilliSecond);
-  string_format_append(s, "\n- minimal interval between pushes: %lld mS, aliveSignInterval: %lld mS", minPushInterval/MilliSecond, aliveSignInterval/MilliSecond);
+  string_format_append(s, "\n- binary input type: %d, reportsChanges=%d, interval: %lld mS", mHardwareInputType, mReportsChanges, mUpdateInterval/MilliSecond);
+  string_format_append(s, "\n- minimal interval between pushes: %lld mS, aliveSignInterval: %lld mS", mMinPushInterval/MilliSecond, mAliveSignInterval/MilliSecond);
   s.append(inherited::description());
   return s;
 }
