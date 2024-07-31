@@ -65,6 +65,16 @@ namespace p44 {
     /// @note only the hard coded default scene table is consulted!
     static int areaForScene(SceneNo aSceneNo);
 
+    /// get main scene for area number or room
+    /// @param aArea the area number or 0 for room
+    /// @return the on scene for the area (preset 1  for room)
+    static SceneNo mainSceneForArea(int aArea);
+
+    /// get off scene for area number or room
+    /// @param aArea the area number or 0 for room
+    /// @return the off scene for the area or room
+    static SceneNo offSceneForArea(int aArea);
+
   protected:
 
     // persistence implementation

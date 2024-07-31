@@ -31,6 +31,7 @@
 #include "fnv.hpp"
 
 #include "device.hpp"
+#include "simplescene.hpp"
 
 #if ENABLE_LOCALCONTROLLER
   #include "localcontroller.hpp"
@@ -969,30 +970,6 @@ void Device::scheduleVanish(bool aForgetParams, MLMicroSeconds aDelay)
 }
 
 
-static SceneNo mainSceneForArea(int aArea)
-{
-  switch (aArea) {
-    case 1: return AREA_1_ON;
-    case 2: return AREA_2_ON;
-    case 3: return AREA_3_ON;
-    case 4: return AREA_4_ON;
-  }
-  return ROOM_ON; // no area, main scene for room
-}
-
-
-static SceneNo offSceneForArea(int aArea)
-{
-  switch (aArea) {
-    case 1: return AREA_1_OFF;
-    case 2: return AREA_2_OFF;
-    case 3: return AREA_3_OFF;
-    case 4: return AREA_4_OFF;
-  }
-  return ROOM_OFF; // no area, off scene for room
-}
-
-
 // MARK: - optimized notification delivery
 
 
@@ -1446,7 +1423,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
     SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
     if (scenes) {
       // check area first
-      SceneNo areaScene = mainSceneForArea(aArea);
+      SceneNo areaScene = SimpleScene::mainSceneForArea(aArea);
       DsScenePtr scene = scenes->getScene(areaScene);
       if (scene->isDontCare()) {
         OLOG(LOG_DEBUG, "- area main scene(%d) is dontCare -> suppress dimChannel for Area %d", areaScene, aArea);
@@ -1712,7 +1689,7 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
   if (area) {
     OLOG(LOG_INFO, "- callScene(%d): is area #%d scene", sceneNo, area);
     // check if device is in area (criteria used is dontCare flag OF THE AREA ON SCENE (other don't care flags are irrelevant!)
-    DsScenePtr areamainscene = getScenes()->getScene(mainSceneForArea(area));
+    DsScenePtr areamainscene = getScenes()->getScene(SimpleScene::mainSceneForArea(area));
     if (areamainscene->isDontCare()) {
       OLOG(LOG_INFO, "- area main scene(%s) is dontCare -> suppress", VdcHost::sceneText(areamainscene->mSceneNo).c_str());
       aPreparedCB(ntfy_none); // not in this area, suppress callScene entirely
@@ -2024,7 +2001,7 @@ void Device::outputSceneValueSaved(DsScenePtr aScene)
   int area = aScene->mSceneArea;
   if (area) {
     // detail check - set don't care when saving Area On-Scene
-    if (sceneNo==mainSceneForArea(area)) {
+    if (sceneNo==SimpleScene::mainSceneForArea(area)) {
       // saving Main ON scene - set dontCare flag when main/default channel is zero, otherwise clear dontCare
       ChannelBehaviourPtr ch = mOutput->getChannelByType(channeltype_default);
       if (ch) {
@@ -2033,7 +2010,7 @@ void Device::outputSceneValueSaved(DsScenePtr aScene)
         aScene->setDontCare(mustBeDontCare);
         // also update the off scene's dontCare
         SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
-        DsScenePtr offScene = scenes->getScene(offSceneForArea(area));
+        DsScenePtr offScene = scenes->getScene(SimpleScene::offSceneForArea(area));
         if (offScene) {
           offScene->setDontCare(mustBeDontCare);
           // update scene in scene table and DB if dirty

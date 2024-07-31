@@ -233,7 +233,6 @@ namespace p44 {
     /// @note is allowed to return different values for same scene contents on different platforms
     virtual uint64_t sceneHash();
 
-
   protected:
 
     // property access implementation

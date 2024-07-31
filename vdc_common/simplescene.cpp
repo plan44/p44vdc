@@ -315,6 +315,30 @@ int SimpleScene::areaForScene(SceneNo aSceneNo)
 }
 
 
+SceneNo SimpleScene::mainSceneForArea(int aArea)
+{
+  switch (aArea) {
+    case 1: return AREA_1_ON;
+    case 2: return AREA_2_ON;
+    case 3: return AREA_3_ON;
+    case 4: return AREA_4_ON;
+  }
+  return ROOM_ON; // no area, main scene for room
+}
+
+
+SceneNo SimpleScene::offSceneForArea(int aArea)
+{
+  switch (aArea) {
+    case 1: return AREA_1_OFF;
+    case 2: return AREA_2_OFF;
+    case 3: return AREA_3_OFF;
+    case 4: return AREA_4_OFF;
+  }
+  return ROOM_OFF; // no area, off scene for room
+}
+
+
 void SimpleScene::setDefaultSceneValues(SceneNo aSceneNo)
 {
   // basic initialisation
