@@ -496,6 +496,10 @@ void ProxyDevice::configureStructure(JsonObjectPtr aDeviceJSON)
       // - completely generic description is sufficient here
       ib->setHardwareName("proxy input");
       addBehaviour(ib);
+      // make input bridge exclusive
+      JsonObjectPtr p = JsonObject::newBool(true);
+      p = p->wrapAs("x-p44-bridgeExclusive")->wrapAs(id)->wrapAs("binaryInputSettings")->wrapAs("properties");
+      call("setProperty", p, NoOP);
     }
   }
   // - proxy sensor

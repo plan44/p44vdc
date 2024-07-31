@@ -74,6 +74,10 @@ namespace p44 {
     InputState mCurrentState; ///< current input value
     MLMicroSeconds mLastUpdate; ///< time of last update from hardware
     MLMicroSeconds mLastPush; ///< time of last push
+
+    #if ENABLE_JSONBRIDGEAPI
+    bool mBridgeExclusive; ///< if set, button actions are only forwarded to bridges (if any is connected)
+    #endif
     /// @}
 
 
@@ -110,6 +114,12 @@ namespace p44 {
 
     /// get group
     virtual DsGroup getGroup() P44_OVERRIDE { return mBinInputGroup; };
+
+    /// @return true when input events should be forwarded to bridge clients only, and NOT get processed locally
+    bool isBridgeExclusive();
+
+    /// make button bridge exclusive, i.e. not causing any local or DS actions
+    void setBridgeExclusive() { mBridgeExclusive = true; };
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{

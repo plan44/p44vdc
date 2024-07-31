@@ -100,6 +100,10 @@ namespace p44 {
 
     /// @name internal volatile state
     /// @{
+    #if ENABLE_JSONBRIDGEAPI
+    bool mBridgeExclusive; ///< if set, button actions are only forwarded to bridges (if any is connected)
+    #endif
+
     bool mButtonPressed; ///< set if button is currently pressed
     MLMicroSeconds mLastAction; ///< time of last clickType or actionMode/actionScene update
 
@@ -107,10 +111,6 @@ namespace p44 {
 
     VdcButtonActionMode mActionMode; ///< last triggered action mode
     uint8_t mActionId; ///< last triggered action Id (aka scene number)
-
-    #if ENABLE_JSONBRIDGEAPI
-    bool mBridgeExclusive; ///< if set, button actions are only forwarded to bridges (if any is connected)
-    #endif
 
     /// @}
 

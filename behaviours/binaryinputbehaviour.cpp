@@ -36,6 +36,9 @@ BinaryInputBehaviour::BinaryInputBehaviour(Device &aDevice, const string aId) :
   mChangesOnlyInterval(30*Minute), // report unchanged state updates max once every 30 minutes
   mAutoResetTo(-1), // no auto reset
   // state
+  #if ENABLE_JSONBRIDGEAPI
+  mBridgeExclusive(false),
+  #endif
   mLastUpdate(Never),
   mLastPush(Never),
   mCurrentState(0)
@@ -102,6 +105,15 @@ string BinaryInputBehaviour::getAutoId()
   return inputTypeIds[mHardwareInputType];
 }
 
+
+bool BinaryInputBehaviour::isBridgeExclusive()
+{
+  #if ENABLE_JSONBRIDGEAPI
+  return mDevice.isBridged() && mBridgeExclusive;
+  #else
+  return false;
+  #endif
+}
 
 
 InputState BinaryInputBehaviour::maxExtendedValue()
@@ -176,7 +188,7 @@ bool BinaryInputBehaviour::pushInput(bool aChanged)
   MLMicroSeconds now = MainLoop::now();
   if (mLastPush==Never || now>mLastPush+mMinPushInterval) {
     // push the new value right now
-    if (pushBehaviourState(true, true)) {
+    if (pushBehaviourState(!isBridgeExclusive(), true)) {
       mLastPush = now;
       OLOG(LOG_NOTICE, "successfully pushed state = %d", mCurrentState);
       if (hasDefinedState() && mMaxPushInterval!=Never) {
@@ -203,7 +215,7 @@ void BinaryInputBehaviour::reportFinalState()
 {
   // push the current value (after awaiting minPushInterval or after maxPushInterval has passed)
   mUpdateTicket.cancel();
-  if (pushBehaviourState(true, true)) {
+  if (pushBehaviourState(!isBridgeExclusive(), true)) {
     OLOG(LOG_NOTICE, "now pushes current state (%d) after awaiting minPushInterval", mCurrentState);
     mLastPush = MainLoop::currentMainLoop().now();
   }
@@ -402,6 +414,9 @@ enum {
   minPushInterval_key,
   changesOnlyInterval_key,
   configuredInputType_key,
+  #if ENABLE_JSONBRIDGEAPI
+  bridgeExclusive_key,
+  #endif
   numSettingsProperties
 };
 
@@ -414,6 +429,9 @@ const PropertyDescriptorPtr BinaryInputBehaviour::getSettingsDescriptorByIndex(i
     { "minPushInterval", apivalue_double, minPushInterval_key+settings_key_offset, OKEY(binaryInput_key) },
     { "changesOnlyInterval", apivalue_double, changesOnlyInterval_key+settings_key_offset, OKEY(binaryInput_key) },
     { "sensorFunction", apivalue_uint64, configuredInputType_key+settings_key_offset, OKEY(binaryInput_key) },
+    #if ENABLE_JSONBRIDGEAPI
+    { "x-p44-bridgeExclusive", apivalue_bool, bridgeExclusive_key+settings_key_offset, OKEY(binaryInput_key) },
+    #endif
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -479,6 +497,12 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
         case configuredInputType_key+settings_key_offset: // aka "sensorFunction"
           aPropValue->setUint8Value(mConfiguredInputType);
           return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case bridgeExclusive_key+settings_key_offset:
+          if (!mDevice.isBridged()) return false; // hide when not bridged
+          aPropValue->setBoolValue(mBridgeExclusive);
+          return true;
+        #endif
         // States properties
         case value_key+states_key_offset:
           // value
@@ -526,6 +550,12 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
         case configuredInputType_key+settings_key_offset: // aka "sensorFunction"
           setPVar(mConfiguredInputType, (DsBinaryInputType)aPropValue->int32Value());
           return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case bridgeExclusive_key+settings_key_offset:
+          // volatile, does not make settings dirty
+          mBridgeExclusive = aPropValue->boolValue();
+          return true;
+        #endif
       }
     }
   }
