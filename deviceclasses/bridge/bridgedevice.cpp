@@ -39,19 +39,21 @@
 
 using namespace p44;
 
+#define AUTORESET_DELAY (5*Second)
 
 BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, const string &aBridgeDeviceConfig) :
   inherited((Vdc *)aVdcP),
   mBridgeDeviceRowID(0),
   mBridgeDeviceId(aBridgeDeviceId),
   mBridgeDeviceType(bridgedevice_unknown),
-  mScene(INVALID_SCENE_NO),
+  mActivateScene(INVALID_SCENE_NO),
+  mResetScene(RESERVED_WILDCARD), // default to autoreset
   mProcessingBridgeNotification(false),
   mPreviousV(0)
 {
   setColorClass(class_black_joker); // can be used to control any group
   // Config is:
-  //  <type>[:<sceneno>[:undo]]
+  //  <type>[:<on sceneno>[:<off sceneno>]
   const char *p = aBridgeDeviceConfig.c_str();
   string s;
   nextPart(p, s, ':');
@@ -68,24 +70,30 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
   }
   if (mBridgeDeviceType!=bridgedevice_unknown) {
     if (mBridgeDeviceType==bridgedevice_sceneresponder || mBridgeDeviceType==bridgedevice_scenecaller) {
-      mScene = ROOM_OFF; // a valid scene by default
+      mActivateScene = ROOM_ON; // a valid scene by default
+      mResetScene = ROOM_OFF; // a valid scene by default
       if (nextPart(p, s, ':')) {
-        mScene = (SceneNo)atoi(s.c_str());
+        mActivateScene = (SceneNo)atoi(s.c_str());
+        if (mResetScene>INVALID_SCENE_NO) mActivateScene=INVALID_SCENE_NO;
         if (nextPart(p, s, ':')) {
-          mHandleUndo = s=="undo";
+          if (s=="other") mResetScene = INVALID_SCENE_NO;
+          else if (s=="autoreset") mResetScene = RESERVED_WILDCARD;
+          else if (s=="undo") mResetScene = mActivateScene;
+          else mResetScene = (SceneNo)atoi(s.c_str());
+          if (mResetScene>INVALID_SCENE_NO) mResetScene=INVALID_SCENE_NO;
         }
       }
     }
     if (mBridgeDeviceType==bridgedevice_sceneresponder) {
       // scene responder needs a pseudo-input to inform bridge when scene call is detected
       BinaryInputBehaviourPtr i = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
-      if (mHandleUndo) {
-        // signal remains set until undo call or other scene call
-        i->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
+      if (mResetScene==RESERVED_WILDCARD) {
+        // signal just pulses (autoresets)
+        i->setHardwareInputConfig(binInpType_none, usage_undefined, true, AUTORESET_DELAY, Never, 0); // autoreset
       }
       else {
-        // signal just pulses
-        i->setHardwareInputConfig(binInpType_none, usage_undefined, true, 5*Second, Never, 0); // autoreset to 0 after 5 seconds
+        // signal remains set until reset according to mResetMode
+        i->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
       }
       i->setGroup(group_black_variable);
       i->setHardwareName("scene responder");
@@ -208,33 +216,44 @@ bool BridgeDevice::prepareSceneCall(DsScenePtr aScene)
 {
   DBGOLOG(LOG_INFO, "prepareSceneCall: scene=%s", VdcHost::sceneText(aScene->mSceneNo).c_str());
   if (mBridgeDeviceType==bridgedevice_sceneresponder && !mProcessingBridgeNotification) {
+    bool undo = aScene->mSceneCmd==scene_cmd_undo;
     BinaryInputBehaviourPtr i = getInput(0);
-    if (aScene->mSceneNo==mScene) {
-      // this is our trigger scene
-      bool undo = aScene->mSceneCmd==scene_cmd_undo;
-      OLOG(LOG_NOTICE, "detected scene %s %s", undo ? "undo" : "call", VdcHost::sceneText(mScene, false).c_str());
-      if (i) {
+    if (i) {
+      if (aScene->mSceneNo==mActivateScene) {
+        // this is our trigger scene
         // Note: input behaviour is always set to bridge exclusive, so DS side will not see an event
-        if (undo) {
-          // undo call resets signal anyway
-          OLOG(LOG_NOTICE, "- reset signal");
+        if (undo && mActivateScene==mResetScene) {
+          OLOG(LOG_NOTICE, "- undo scene resets signal");
           i->updateInputState(0);
         }
         else {
           // call, raise input signal
-          OLOG(LOG_NOTICE, "- raise signal (will be %s or other scene call)", mHandleUndo ? "cleared by undo" : "auto-reset in 5 secs");
+          OLOG(LOG_NOTICE, "- scene call raises signal");
           i->updateInputState(1);
         }
       }
-    }
-    else if (i->getCurrentState()>0 && mHandleUndo) {
-      OLOG(LOG_NOTICE, "other scene called before undo -> reset signal");
-      i->updateInputState(0);
+      else if (aScene->mSceneNo==mResetScene && !undo) {
+        // our reset scene
+        OLOG(LOG_NOTICE, "reset scene called -> reset signal");
+        i->updateInputState(0);
+      }
+      else if (mResetScene!=RESERVED_WILDCARD) {
+        // any another scene call will reset
+        OLOG(LOG_NOTICE, "another scene called (%s) -> reset signal", VdcHost::sceneText(aScene->mSceneNo).c_str());
+        i->updateInputState(0);
+      }
     }
   }
   return inherited::prepareSceneCall(aScene);
 }
 
+
+void BridgeDevice::resetSignalChannel()
+{
+  OLOG(LOG_NOTICE, "auto-resetting scene caller's controlling output");
+  getChannelByType(channeltype_default)->syncChannelValue(0);
+  getOutput()->reportOutputState();
+}
 
 
 void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
@@ -251,17 +270,27 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         // local scene called is predefined
         bool newOn = newV>=50;
         if (newOn!=(mPreviousV>=50)) {
+          mResetSignalTicket.cancel();
           OLOG(LOG_NOTICE, "default channel change to %d -> on=%d", (int)newV, (int)newOn);
           // on/off has changed from bridge side
           if (newOn) {
             // switched on: issue forced scene call
-            OLOG(LOG_NOTICE, "- inject button callscene(%s) action", VdcHost::sceneText(mScene, global).c_str());
-            b->sendAction(buttonActionMode_force, mScene);
+            OLOG(LOG_NOTICE, "- activate: inject callscene(%s)", VdcHost::sceneText(mActivateScene, global).c_str());
+            b->sendAction(buttonActionMode_force, mActivateScene);
+            if (mResetScene==RESERVED_WILDCARD) {
+              // auto-reset bridge side
+              mResetSignalTicket.executeOnce(boost::bind(&BridgeDevice::resetSignalChannel, this), AUTORESET_DELAY);
+            }
           }
-          else if (mHandleUndo) {
-            // switched off: issue undo
-            OLOG(LOG_NOTICE, "- inject button undoscene(%s) action", VdcHost::sceneText(mScene, global).c_str());
-            b->sendAction(buttonActionMode_undo, mScene);
+          else {
+            if (mActivateScene==mResetScene) {
+              OLOG(LOG_NOTICE, "- deactivate: inject undoscene(%s)", VdcHost::sceneText(mActivateScene, global).c_str());
+              b->sendAction(buttonActionMode_undo, mActivateScene);
+            }
+            else if (mResetScene!=INVALID_SCENE_NO && mResetScene!=RESERVED_WILDCARD) {
+              OLOG(LOG_NOTICE, "- deactivate: inject callscene(%s)", VdcHost::sceneText(mResetScene, global).c_str());
+              b->sendAction(buttonActionMode_force, mResetScene);
+            }
           }
         }
       }
@@ -351,14 +380,27 @@ string BridgeDevice::description()
   string s = inherited::description();
   switch (mBridgeDeviceType) {
     case bridgedevice_onoff:
-      string_format_append(s, "\n- bridging onoff room state"); break;
+      string_format_append(s, "\n- bridging onoff room state");
+      break;
     case bridgedevice_fivelevel:
-      string_format_append(s, "\n- bridging off,25,50,75,100%% level room state"); break;
+      string_format_append(s, "\n- bridging off,25,50,75,100%% level room state");
+      break;
     case bridgedevice_scenecaller:
-      string_format_append(s, "\n- call scene '%s' when bridged onoff goes on%s", VdcHost::sceneText(mScene).c_str(), mHandleUndo ? ", undo when off" : ""); break;
+      string_format_append(s,
+        "\n- call scene '%s' when bridged onoff goes on, '%s' when off",
+        VdcHost::sceneText(mActivateScene).c_str(),
+        mActivateScene==mResetScene ? "undo" : VdcHost::sceneText(mResetScene).c_str()
+      );
+      break;
     case bridgedevice_sceneresponder:
-      string_format_append(s, "\n- activate contact when detecting scene '%s'%s", VdcHost::sceneText(mScene).c_str(), mHandleUndo ? ", deactivate at undo" : ""); break;
-    default: break;
+      string_format_append(s,
+        "\n- activate contact when detecting scene '%s', deactivate on '%s'",
+        VdcHost::sceneText(mActivateScene).c_str(),
+        mActivateScene==mResetScene ? "undo" : (mResetScene==RESERVED_WILDCARD ? "timeout" : VdcHost::sceneText(mResetScene).c_str())
+      );
+      break;
+    default:
+      break;
   }
   return s;
 }

@@ -2362,6 +2362,7 @@ SceneNo VdcHost::getSceneIdByKind(string aSceneKindName)
 
 string VdcHost::sceneText(SceneNo aSceneNo, bool aIsGlobal)
 {
+  if (aSceneNo==INVALID_SCENE_NO) return "none";
   #if !REDUCED_FOOTPRINT
   // look up info from scene description tables
   const SceneKindDescriptor* skP = aIsGlobal ? globalScenes : roomScenes;

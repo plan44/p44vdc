@@ -76,11 +76,12 @@ namespace p44 {
     } BridgeDeviceType;
 
     BridgeDeviceType mBridgeDeviceType;
-    SceneNo mScene; ///< scene No for scene-specific bridges (detected or called)
-    bool mHandleUndo; ///< forward/issue undo-scenes for responder and caller
+    SceneNo mActivateScene; ///< scene No for scene-specific bridges (detected or called)
+    SceneNo mResetScene; ///< scene No for scene-specific bridges (detected or called)
 
     bool mProcessingBridgeNotification; ///< set when processing state update sent by bridge
     double mPreviousV; ///< value to compare to for deciding about issuing scene calls
+    MLTicket mResetSignalTicket; ///< delayed reset signal timer
 
   public:
 
@@ -170,6 +171,8 @@ namespace p44 {
     void deriveDsUid();
 
   private:
+
+    void resetSignalChannel();
 
   };
   typedef boost::intrusive_ptr<BridgeDevice> BridgeDevicePtr;
