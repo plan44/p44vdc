@@ -34,6 +34,7 @@
 #include "bridgevdc.hpp"
 
 #include "buttonbehaviour.hpp"
+#include "binaryinputbehaviour.hpp"
 #include "lightbehaviour.hpp"
 
 using namespace p44;
@@ -75,23 +76,31 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
         }
       }
     }
-    // pseudo button for emitting clicks or scene calls
-    ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
-    b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, 1); // mode not restricted
-    b->setGroup(group_yellow_light); // pre-configure for light
-    if (mScene!=INVALID_SCENE_NO) {
-      // responder/caller
-      b->setHardwareName(string_format("scene %s", VdcHost::sceneText(mScene).c_str()));
-      if (mBridgeDeviceType==bridgedevice_sceneresponder) {
-        // responder must only issue button clicks to bridges, no local processing!
-        b->setBridgeExclusive();
+    if (mBridgeDeviceType==bridgedevice_sceneresponder) {
+      // scene responder needs a pseudo-input to inform bridge when scene call is detected
+      BinaryInputBehaviourPtr i = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this,"")); // automatic id
+      if (mHandleUndo) {
+        // signal remains set until undo call or other scene call
+        i->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
       }
+      else {
+        // signal just pulses
+        i->setHardwareInputConfig(binInpType_none, usage_undefined, true, 5*Second, Never, 0); // autoreset to 0 after 5 seconds
+      }
+      i->setGroup(group_black_variable);
+      i->setHardwareName("scene responder");
+      // responder must send input changes to bridges, no local processing!
+      i->setBridgeExclusive();
+      addBehaviour(i);
     }
     else {
-      // level bridges
+      // level bridges and scene caller need a pseudo-button to emit scene calls to DS
+      ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
+      b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, 1); // mode not restricted
+      b->setGroup(group_yellow_light); // pre-configure for light
       b->setHardwareName(mBridgeDeviceType==bridgedevice_fivelevel ? "5 scenes" : "on-off scenes");
+      addBehaviour(b);
     }
-    addBehaviour(b);
     // pseudo-output (to capture scenes)
     // - standard scene device settings
     DeviceSettingsPtr s = DeviceSettingsPtr(new SceneDeviceSettings(*this));
@@ -199,27 +208,28 @@ bool BridgeDevice::prepareSceneCall(DsScenePtr aScene)
 {
   DBGOLOG(LOG_INFO, "prepareSceneCall: scene=%s", VdcHost::sceneText(aScene->mSceneNo).c_str());
   if (mBridgeDeviceType==bridgedevice_sceneresponder && !mProcessingBridgeNotification) {
+    BinaryInputBehaviourPtr i = getInput(0);
     if (aScene->mSceneNo==mScene) {
       // this is our trigger scene
-      ButtonBehaviourPtr b = getButton(0);
       bool undo = aScene->mSceneCmd==scene_cmd_undo;
-      OLOG(LOG_NOTICE, "detected scene %s %s", undo ? "undo" : "call", VdcHost::sceneText(mScene, b->getGroup()==group_black_variable).c_str());
-      if (b) {
-        // Note: button behaviour is always bridge exclusive, so DS side will not see a click
+      OLOG(LOG_NOTICE, "detected scene %s %s", undo ? "undo" : "call", VdcHost::sceneText(mScene, false).c_str());
+      if (i) {
+        // Note: input behaviour is always set to bridge exclusive, so DS side will not see an event
         if (undo) {
-          // undo call
-          if (mHandleUndo) {
-            // issue a double click
-            OLOG(LOG_NOTICE, "- send double click to bridge");
-            b->sendClick(ct_click_2x);
-          }
+          // undo call resets signal anyway
+          OLOG(LOG_NOTICE, "- reset signal");
+          i->updateInputState(0);
         }
         else {
-          // call, issue a click
-          b->sendClick(ct_click_1x);
-          OLOG(LOG_NOTICE, "- send single click to bridge");
+          // call, raise input signal
+          OLOG(LOG_NOTICE, "- raise signal (will be %s or other scene call)", mHandleUndo ? "cleared by undo" : "auto-reset in 5 secs");
+          i->updateInputState(1);
         }
       }
+    }
+    else if (i->getCurrentState()>0 && mHandleUndo) {
+      OLOG(LOG_NOTICE, "other scene called before undo -> reset signal");
+      i->updateInputState(0);
     }
   }
   return inherited::prepareSceneCall(aScene);
@@ -347,7 +357,7 @@ string BridgeDevice::description()
     case bridgedevice_scenecaller:
       string_format_append(s, "\n- call scene '%s' when bridged onoff goes on%s", VdcHost::sceneText(mScene).c_str(), mHandleUndo ? ", undo when off" : ""); break;
     case bridgedevice_sceneresponder:
-      string_format_append(s, "\n- click bridged button when detecting scene '%s'%s", VdcHost::sceneText(mScene).c_str(), mHandleUndo ? ", doubleclick at undo" : ""); break;
+      string_format_append(s, "\n- activate contact when detecting scene '%s'%s", VdcHost::sceneText(mScene).c_str(), mHandleUndo ? ", deactivate at undo" : ""); break;
     default: break;
   }
   return s;
