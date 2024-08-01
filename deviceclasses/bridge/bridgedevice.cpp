@@ -251,113 +251,117 @@ bool BridgeDevice::prepareSceneCall(DsScenePtr aScene)
 void BridgeDevice::resetSignalChannel()
 {
   OLOG(LOG_NOTICE, "auto-resetting scene caller's controlling output");
-  getChannelByType(channeltype_default)->syncChannelValue(0);
+  getChannelByType(channeltype_default)->syncChannelValue(0, true);
   getOutput()->reportOutputState();
 }
 
 
 void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 {
-  double newV = getChannelByType(channeltype_default)->getChannelValue();
-  if (mProcessingBridgeNotification) {
-    // this is an apply that originates from the bridge
-    mProcessingBridgeNotification = false; // just make sure (didExamineNotificationFromConnection should clear it anyway)
-    ButtonBehaviourPtr b = getButton(0);
-    if (b && mBridgeDeviceType!=bridgedevice_sceneresponder) {
-      bool global = b->getGroup()==group_black_variable;
-      // only for output value following bridges
-      if (mBridgeDeviceType==bridgedevice_scenecaller) {
-        // local scene called is predefined
-        bool newOn = newV>=50;
-        if (newOn!=(mPreviousV>=50)) {
-          mResetSignalTicket.cancel();
-          OLOG(LOG_NOTICE, "default channel change to %d -> on=%d", (int)newV, (int)newOn);
-          // on/off has changed from bridge side
-          if (newOn) {
-            // switched on: issue forced scene call
-            OLOG(LOG_NOTICE, "- activate: inject callscene(%s)", VdcHost::sceneText(mActivateScene, global).c_str());
-            b->sendAction(buttonActionMode_force, mActivateScene);
-            if (mResetScene==RESERVED_WILDCARD) {
-              // auto-reset bridge side
-              mResetSignalTicket.executeOnce(boost::bind(&BridgeDevice::resetSignalChannel, this), AUTORESET_DELAY);
+  ChannelBehaviourPtr ch = getChannelByType(channeltype_default);
+  if (ch && ch->needsApplying()) {
+    double newV = ch->getChannelValue();
+    if (mProcessingBridgeNotification) {
+      // this is an apply that originates from the bridge
+      mProcessingBridgeNotification = false; // just make sure (didExamineNotificationFromConnection should clear it anyway)
+      ButtonBehaviourPtr b = getButton(0);
+      if (b && mBridgeDeviceType!=bridgedevice_sceneresponder) {
+        bool global = b->getGroup()==group_black_variable;
+        // only for output value following bridges
+        if (mBridgeDeviceType==bridgedevice_scenecaller) {
+          // local scene called is predefined
+          bool newOn = newV>=50;
+          if (newOn!=(mPreviousV>=50)) {
+            mResetSignalTicket.cancel();
+            OLOG(LOG_NOTICE, "default channel change to %d -> on=%d", (int)newV, (int)newOn);
+            // on/off has changed from bridge side
+            if (newOn) {
+              // switched on: issue forced scene call
+              OLOG(LOG_NOTICE, "- activate: inject callscene(%s)", VdcHost::sceneText(mActivateScene, global).c_str());
+              b->sendAction(buttonActionMode_force, mActivateScene);
+              if (mResetScene==RESERVED_WILDCARD) {
+                // auto-reset bridge side
+                mResetSignalTicket.executeOnce(boost::bind(&BridgeDevice::resetSignalChannel, this), AUTORESET_DELAY);
+              }
+            }
+            else {
+              if (mActivateScene==mResetScene) {
+                OLOG(LOG_NOTICE, "- deactivate: inject undoscene(%s)", VdcHost::sceneText(mActivateScene, global).c_str());
+                b->sendAction(buttonActionMode_undo, mActivateScene);
+              }
+              else if (mResetScene!=INVALID_SCENE_NO && mResetScene!=RESERVED_WILDCARD) {
+                OLOG(LOG_NOTICE, "- deactivate: inject callscene(%s)", VdcHost::sceneText(mResetScene, global).c_str());
+                b->sendAction(buttonActionMode_force, mResetScene);
+              }
             }
           }
-          else {
-            if (mActivateScene==mResetScene) {
-              OLOG(LOG_NOTICE, "- deactivate: inject undoscene(%s)", VdcHost::sceneText(mActivateScene, global).c_str());
-              b->sendAction(buttonActionMode_undo, mActivateScene);
-            }
-            else if (mResetScene!=INVALID_SCENE_NO && mResetScene!=RESERVED_WILDCARD) {
-              OLOG(LOG_NOTICE, "- deactivate: inject callscene(%s)", VdcHost::sceneText(mResetScene, global).c_str());
-              b->sendAction(buttonActionMode_force, mResetScene);
-            }
-          }
-        }
-      }
-      else {
-        // local scene call depends on value match
-        int prevPreset=-1;
-        int newPreset=-1;
-        double newSceneValue;
-        // get the reference levels from relevant scenes and determine nearest levels
-        ButtonScenesMap map(b->getButtonFunction(), global);
-        // figure out the scene that will produce a level as near as possible to the value provided from the bridge
-        double minPrevDiff;
-        double minNewDiff;
-        // - search off and preset1-4 (area on/off only for area buttons and on-off bridges)
-        for (int i=0; i < (map.mArea>0 || mBridgeDeviceType==bridgedevice_onoff || global ? 2 : 5); i++) {
-          SceneNo sn = map.mSceneClick[i];
-          double scenevalue = -1;
-          SimpleScenePtr scene = SimpleScenePtr();
-          if (sn!=INVALID_SCENE_NO) {
-            scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
-          }
-          if (scene) {
-            scenevalue = scene->value;
-          }
-          else if (i==0 && global) {
-            scenevalue = 0; // assume a 0 value for the off scene, as reference for undo
-          }
-          if (scenevalue>=0) {
-            SimpleScenePtr scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
-            if (scene) {
-              double prevDiff = fabs(scenevalue-mPreviousV);
-              if (prevPreset<0 || prevDiff<minPrevDiff) { minPrevDiff = prevDiff; prevPreset = i; }
-              double newDiff =  fabs(scenevalue-newV);
-              if (newPreset<0 || newDiff<minNewDiff) { newSceneValue = scenevalue; minNewDiff = newDiff; newPreset = i; }
-            }
-          }
-        }
-        OLOG(LOG_DEBUG, "global=%d, area=%d, prevLevel=%d, newLevel=%d, newSceneValue=%d", global, map.mArea, prevPreset, newPreset, (int)newSceneValue);
-        OLOG(LOG_NOTICE, "default channel change to %d (adjusted to %d) originating from bridge", (int)newV, (int)newSceneValue);
-        if (newPreset!=prevPreset && newPreset>=0) {
-          // adjust the value to what it will be after the scene call returns to us from the room
-          getChannelByType(channeltype_default)->syncChannelValue(newSceneValue);
-          // figure out the scene call to make
-          SceneNo actionID = map.mSceneClick[newPreset];
-          VdcButtonActionMode actionMode = buttonActionMode_normal;
-          if (global && actionID==INVALID_SCENE_NO && newPreset==0) {
-            // no specific reset scene -> undo the activation instead
-            actionMode = buttonActionMode_undo;
-            actionID = map.mSceneClick[1];
-          }
-          // emit the scene call
-          OLOG(LOG_NOTICE,
-            "- preset changes from %d to %d -> inject button %sscene(%s) action",
-            prevPreset, newPreset,
-            actionMode==buttonActionMode_undo ? "undo" : "call",
-            VdcHost::sceneText(actionID, global).c_str()
-          );
-          b->sendAction(actionMode, actionID);
         }
         else {
-          OLOG(LOG_INFO, "- preset (%d) did not change -> no button action sent", prevPreset);
+          // local scene call depends on value match
+          int prevPreset=-1;
+          int newPreset=-1;
+          double newSceneValue;
+          // get the reference levels from relevant scenes and determine nearest levels
+          ButtonScenesMap map(b->getButtonFunction(), global);
+          // figure out the scene that will produce a level as near as possible to the value provided from the bridge
+          double minPrevDiff;
+          double minNewDiff;
+          // - search off and preset1-4 (area on/off only for area buttons and on-off bridges)
+          for (int i=0; i < (map.mArea>0 || mBridgeDeviceType==bridgedevice_onoff || global ? 2 : 5); i++) {
+            SceneNo sn = map.mSceneClick[i];
+            double scenevalue = -1;
+            SimpleScenePtr scene = SimpleScenePtr();
+            if (sn!=INVALID_SCENE_NO) {
+              scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
+            }
+            if (scene) {
+              scenevalue = scene->value;
+            }
+            else if (i==0 && global) {
+              scenevalue = 0; // assume a 0 value for the off scene, as reference for undo
+            }
+            if (scenevalue>=0) {
+              SimpleScenePtr scene = boost::dynamic_pointer_cast<SimpleScene>(getScenes()->getScene(sn));
+              if (scene) {
+                double prevDiff = fabs(scenevalue-mPreviousV);
+                if (prevPreset<0 || prevDiff<minPrevDiff) { minPrevDiff = prevDiff; prevPreset = i; }
+                double newDiff =  fabs(scenevalue-newV);
+                if (newPreset<0 || newDiff<minNewDiff) { newSceneValue = scenevalue; minNewDiff = newDiff; newPreset = i; }
+              }
+            }
+          }
+          OLOG(LOG_DEBUG, "global=%d, area=%d, prevLevel=%d, newLevel=%d, newSceneValue=%d", global, map.mArea, prevPreset, newPreset, (int)newSceneValue);
+          OLOG(LOG_NOTICE, "default channel change to %d (adjusted to %d) originating from bridge", (int)newV, (int)newSceneValue);
+          if (newPreset!=prevPreset && newPreset>=0) {
+            // adjust the value to what it will be after the scene call returns to us from the room
+            getChannelByType(channeltype_default)->syncChannelValue(newSceneValue);
+            // figure out the scene call to make
+            SceneNo actionID = map.mSceneClick[newPreset];
+            VdcButtonActionMode actionMode = buttonActionMode_normal;
+            if (global && actionID==INVALID_SCENE_NO && newPreset==0) {
+              // no specific reset scene -> undo the activation instead
+              actionMode = buttonActionMode_undo;
+              actionID = map.mSceneClick[1];
+            }
+            // emit the scene call
+            OLOG(LOG_NOTICE,
+              "- preset changes from %d to %d -> inject button %sscene(%s) action",
+              prevPreset, newPreset,
+              actionMode==buttonActionMode_undo ? "undo" : "call",
+              VdcHost::sceneText(actionID, global).c_str()
+            );
+            b->sendAction(actionMode, actionID);
+          }
+          else {
+            OLOG(LOG_INFO, "- preset (%d) did not change -> no button action sent", prevPreset);
+          }
         }
       }
     }
-  }
-  else {
-    OLOG(LOG_INFO, "default channel change to %d - NOT caused by bridged device", (int)newV);
+    else {
+      OLOG(LOG_INFO, "default channel change to %d - NOT caused by bridged device", (int)newV);
+    }
+    ch->channelValueApplied();
   }
   inherited::applyChannelValues(aDoneCB, aForDimming);
 }
