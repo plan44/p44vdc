@@ -596,6 +596,7 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
       else {
         return TextError::err("no channel #%d", aIndex);
       }
+      break;
     }
     case 'C': {
       // final channel value
