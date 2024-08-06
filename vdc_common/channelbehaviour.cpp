@@ -257,7 +257,7 @@ void ChannelBehaviour::startExternallyTimedTransition(MLMicroSeconds aEstimatedT
   }
   else {
     // start
-    OLOG(LOG_INFO, "initialized for externally defined transition of unknown time");
+    OLOG(LOG_INFO, "initialized for externally defined transition of unknown duration");
     mNextTransitionTime = Infinite; // unknown
     mTransitionStarted = MainLoop::now(); // still remember time started
     setTransitionProgress(0);
@@ -267,7 +267,7 @@ void ChannelBehaviour::startExternallyTimedTransition(MLMicroSeconds aEstimatedT
 
 bool ChannelBehaviour::reportChannelProgress(double aTransitionalChannelValue)
 {
-  if (mTransitionStarted==Infinite) {
+  if (mTransitionStarted==Never) {
     // no progress simulation started yet, start it now
     startExternallyTimedTransition(Infinite);
   }
