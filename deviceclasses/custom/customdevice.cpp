@@ -1212,15 +1212,31 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     // - use simple scene settings
     installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*this)));
     // - add generic output behaviour
-    OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
-    o->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_undefined, false, -1);
-    o->setHardwareName(hardwareName);
-    o->setGroupMembership(defaultGroup, true); // put into default group
-    if (outputFunction==outputFunction_switch)
-      o->addChannel(ChannelBehaviourPtr(new DigitalChannel(*o, "basic_switch")));
-    else
-      o->addChannel(ChannelBehaviourPtr(new DialChannel(*o, "basic_dial")));
-    addBehaviour(o);
+    OutputBehaviourPtr out = OutputBehaviourPtr(new OutputBehaviour(*this));
+    out->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_undefined, false, -1);
+    out->setHardwareName(hardwareName);
+    out->setGroupMembership(defaultGroup, true); // put into default group
+    // - add channel
+    string channelid;
+    if (aInitParams->get("channelid", o)) {
+      channelid = o->stringValue();
+    }
+    if (outputFunction==outputFunction_switch) {
+      // on/off switch type, no further customisation
+      out->addChannel(ChannelBehaviourPtr(new DigitalChannel(*out, channelid.empty() ? "basic_switch" : channelid)));
+      channelid = "basic_switch";
+    }
+    else {
+      // configurable
+      CustomChannelPtr cc = new CustomChannel(*out, channelid.empty() ? "basic_dial" : channelid);
+      if (aInitParams->get("min", o)) cc->setMin(o->doubleValue());
+      if (aInitParams->get("max", o)) cc->setMax(o->doubleValue());
+      if (aInitParams->get("resolution", o)) cc->setResolution(o->doubleValue());
+      if (aInitParams->get("unit", o)) cc->setChannelUnit(stringToValueUnit(o->stringValue()));
+      if (aInitParams->get("channelname", o)) cc->setName(o->stringValue());
+      out->addChannel(cc);
+    }
+    addBehaviour(out);
   }
   else {
     // no output, just install minimal settings without scenes
