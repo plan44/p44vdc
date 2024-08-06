@@ -479,19 +479,44 @@ namespace p44 {
   {
     typedef ChannelBehaviour inherited;
 
+    double mMin; ///< minimum value
     double mMax; ///< maximum value
 
   public:
-    DialChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mMax=100; /* standard dimmer range */ mResolution = 1; /* integer by default */ };
+    DialChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mMin=0; mMax=100; /* standard dimmer range */ mResolution = 1; /* integer by default */ };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char* getName() const P44_OVERRIDE { return "dial"; };
-    virtual double getMin() P44_OVERRIDE { return 0; };
+    virtual double getMin() P44_OVERRIDE { return mMin; };
     virtual double getMax() P44_OVERRIDE { return mMax; };
 
+    void setResolution(double aResolution) { mResolution = aResolution; };
+    void setMin(double aMin) { mMin = aMin; };
     void setMax(double aMax) { mMax = aMax; };
   };
   typedef boost::intrusive_ptr<DialChannel> DialChannelPtr;
+
+
+  /// custom channel
+  class CustomChannel : public DialChannel
+  {
+    typedef DialChannel inherited;
+
+    string mName; ///< custom name, defaults to channelID
+    ValueUnit mValueUnit; ///< custom value unit, defaults to none
+
+  public:
+    CustomChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mName = aChannelId; mValueUnit = VALUE_UNIT(valueUnit_none, unitScaling_1); };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
+    virtual ValueUnit getChannelUnit() P44_OVERRIDE { return mValueUnit; };
+    virtual const char* getName() const P44_OVERRIDE { return mName.c_str(); };
+
+    void setName(const string aName) { mName = aName; };
+    void setChannelUnit(ValueUnit aValueUnit) { mValueUnit = aValueUnit; };
+
+  };
+  typedef boost::intrusive_ptr<CustomChannel> CustomChannelPtr;
+
 
 
   // MARK: - specific purpose channel implementations
