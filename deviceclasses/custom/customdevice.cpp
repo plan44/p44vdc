@@ -333,6 +333,9 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
       else if (aMessageType=="channel_progress") {
         err = processInputJson('P', aMessage);
       }
+      else if (aMessageType=="channel_config") {
+        err = processInputJson('c', aMessage);
+      }
       #if ENABLE_CUSTOM_SINGLEDEVICE
       else if (aMessageType=="confirmAction") {
         JsonObjectPtr o;
@@ -484,7 +487,7 @@ ErrorPtr CustomDevice::processInputJson(char aInputType, JsonObjectPtr aParams)
   if (o) {
     index = o->int32Value();
   }
-  else if ((aInputType=='C' || aInputType=='P') && aParams->get("type", o)) {
+  else if ((aInputType=='C' || aInputType=='P' || aInputType=='c') && aParams->get("type", o)) {
     // channel specified by type, not index
     DsChannelType ty = (DsChannelType)o->int32Value();
     ChannelBehaviourPtr cb = getChannelByType(ty);
@@ -499,6 +502,7 @@ ErrorPtr CustomDevice::processInputJson(char aInputType, JsonObjectPtr aParams)
       case 'I': bhv = getInput(by_id, id); if (bhv) { index = (int)bhv->getIndex(); } break;
       case 'S': bhv = getSensor(by_id, id); if (bhv) { index = (int)bhv->getIndex(); } break;
       case 'C':
+      case 'c':
       case 'P':
         index = channelIndexById(getOutput(), id); break;
     }
@@ -506,7 +510,14 @@ ErrorPtr CustomDevice::processInputJson(char aInputType, JsonObjectPtr aParams)
   if (index<0) {
     return TextError::err("missing 'id', 'index' or 'type'");
   }
-  if (aParams->get("value", o, false)) {
+  if (aInputType=='c') {
+    // custom channel config
+    CustomChannelPtr cc = boost::dynamic_pointer_cast<CustomChannel>(getChannelByIndex(index));
+    if (!cc) return TextError::err("channel is not configurable");
+    if (aParams->get("min", o)) cc->setMin(o->doubleValue());
+    if (aParams->get("max", o)) cc->setMax(o->doubleValue());
+  }
+  else if (aParams->get("value", o, false)) {
     // explicit NULL is allowed to set input to "undefined"
     double value = 0;
     if (o) {
