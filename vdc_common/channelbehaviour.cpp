@@ -277,7 +277,7 @@ bool ChannelBehaviour::reportChannelProgress(double aTransitionalChannelValue)
     progress = (aTransitionalChannelValue-mPreviousChannelValue) / dist;
   }
   if (progress<mProgress) {
-    OLOG(LOG_WARNING, "decreasing progress %.2f from value %.2f NOT APPLIED", mProgress, aTransitionalChannelValue);
+    OLOG(LOG_WARNING, "decreasing progress %.2f from value %.2f NOT APPLIED", progress, aTransitionalChannelValue);
     return mProgress>=1; // done when already done before
   }
   bool done = setTransitionProgress(progress);
@@ -451,6 +451,7 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     // setting new value captures current (possibly transitional) value as previous and completes transition
     mPreviousChannelValue = mChannelLastSync!=Never ? getChannelValue(true) : aNewValue; // If there is no valid previous value, set current as previous.
     mProgress = 1; // consider done
+    mTransitionStarted = Never; //  not running any more
     // save target parameters for next transition
     setPVar(mCachedChannelValue, aNewValue); // might need to be persisted
     mNextTransitionTime = aTransitionTime;
