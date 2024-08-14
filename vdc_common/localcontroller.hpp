@@ -67,6 +67,7 @@ namespace p44 {
     DsGroup no;
     GroupKind kind;
     const char *name;
+    const char *symbol;
     uint32_t hexcolor;
   } GroupDescriptor;
 

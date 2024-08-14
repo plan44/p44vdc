@@ -1931,21 +1931,21 @@ ErrorPtr LocalController::save()
 
 
 static const GroupDescriptor groupInfos[] = {
-  { group_undefined,               group_global,      "undefined",      0x000000 },
-  { group_yellow_light,            group_standard,    "light",          0xFFFF00 },
-  { group_grey_shadow,             group_standard,    "shadow",         0x999999 },
-  { group_blue_heating,            group_standard,    "heating",        0x0000FF },
-  { group_cyan_audio,              group_standard,    "audio",          0x00FFFF },
-  { group_magenta_video,           group_standard,    "video",          0xFF00FF },
-  { group_red_security,            group_global,      "security",       0xFF0000 },
-  { group_green_access,            group_global,      "access",         0x00FF00 },
-  { group_black_variable,          group_application, "joker",          0x000000 },
-  { group_blue_cooling,            group_standard,    "cooling",        0x0000FF },
-  { group_blue_ventilation,        group_standard,    "ventilation",    0x0000FF },
-  { group_blue_windows,            group_standard,    "windows",        0x0000FF },
-  { group_blue_air_recirculation,  group_controller,  "air recirculation", 0x0000FF },
-  { group_roomtemperature_control, group_controller,  "room temperature control", 0x0000FF },
-  { group_ventilation_control,     group_controller,  "ventilation control", 0x0000FF },
+  { group_undefined,               group_global,      "undefined",                "", 0x000000 },
+  { group_yellow_light,            group_standard,    "light",                    "🟡", 0xFFFF00 },
+  { group_grey_shadow,             group_standard,    "shadow",                   "⚪️", 0x999999 },
+  { group_blue_heating,            group_standard,    "heating",                  "🔵", 0x0000FF },
+  { group_cyan_audio,              group_standard,    "audio",                    "🟣", 0x00FFFF },
+  { group_magenta_video,           group_standard,    "video",                    "🟣", 0xFF00FF },
+  { group_red_security,            group_global,      "security",                 "🔴", 0xFF0000 },
+  { group_green_access,            group_global,      "access",                   "🟢", 0x00FF00 },
+  { group_black_variable,          group_application, "joker",                    "⚫️", 0x000000 },
+  { group_blue_cooling,            group_standard,    "cooling",                  "🔵", 0x0000FF },
+  { group_blue_ventilation,        group_standard,    "ventilation",              "🔵", 0x0000FF },
+  { group_blue_windows,            group_standard,    "windows",                  "🔵", 0x0000FF },
+  { group_blue_air_recirculation,  group_controller,  "air recirculation",        "🔵", 0x0000FF },
+  { group_roomtemperature_control, group_controller,  "room temperature control", "🔵", 0x0000FF },
+  { group_ventilation_control,     group_controller,  "ventilation control",      "🔵", 0x0000FF },
   { group_undefined,               0 /* terminator */,"" }
 };
 
@@ -2067,6 +2067,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
         g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
         g->add("kind", g->newUint64(gi ? gi->kind : 0));
         g->add("color", g->newString(string_format("#%06X", gi ? gi->hexcolor : 0x999999)));
+        g->add("symbol", g->newString(gi->symbol));
         result->add(string_format("%d", i), g);
       }
     }
