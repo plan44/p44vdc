@@ -130,6 +130,7 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
     string bridgeConfig;
     respErr = checkStringParam(aParams, "bridgeType", bridgeConfig);
     if (Error::isOK(respErr)) {
+      bool customized = false;
       // optional name
       string name;
       checkStringParam(aParams, "name", name);
@@ -138,10 +139,15 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
       ApiValuePtr p = aParams->get("group");
       if (p) {
         group = static_cast<DsGroup>(p->int8Value());
+        customized = true;
       }
-      // optional
+      // optional bridging activation status
       bool allowbridging = true; // start active by default
-      checkBoolParam(aParams, "allowBridging", allowbridging);
+      p = aParams->get("allowBridging");
+      if (p) {
+        allowbridging = p->boolValue();
+        customized = true;
+      }
       // use current time as ID for new bridgeDevices
       string bridgeDeviceId = string_format("bridgedevice_%lld", MainLoop::now());
       // try to create device
@@ -151,7 +157,10 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
       }
       else {
         // set name
-        if (name.size()>0) dev->setName(name);
+        if (name.size()>0) {
+          dev->setName(name);
+          customized = true;
+        }
         // insert into database
         if (mDb.executef(
           "INSERT OR REPLACE INTO bridgedevices (bridgeDeviceId, config) VALUES ('%q','%q')",
@@ -161,7 +170,10 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
         }
         else {
           dev->mBridgeDeviceRowID = mDb.last_insert_rowid();
-          simpleIdentifyAndAddDevice(dev);
+          simpleIdentifyAndAddDevice(dev);  // includes load() which clears dirty status
+          if (customized) {
+            dev->setDirty(true); // make sure customized name/color/allowbridging state gets persisted
+          }
           // confirm
           ApiValuePtr r = aRequest->newApiValue();
           r->setType(apivalue_object);

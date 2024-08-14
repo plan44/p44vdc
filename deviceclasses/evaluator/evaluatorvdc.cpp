@@ -129,6 +129,7 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
     string evaluatorType;
     respErr = checkStringParam(aParams, "evaluatorType", evaluatorType);
     if (Error::isOK(respErr)) {
+      bool customized = false;
       // optional name
       string name;
       checkStringParam(aParams, "name", name);
@@ -141,7 +142,10 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
       }
       else {
         // set name
-        if (name.size()>0) dev->setName(name);
+        if (name.size()>0) {
+          customized = true;
+          dev->setName(name);
+        }
         // insert into database
         if (mDb.executef(
           "INSERT OR REPLACE INTO evaluators (evaluatorId, config) VALUES ('%q','%q')",
@@ -151,7 +155,8 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
         }
         else {
           dev->evaluatorDeviceRowID = mDb.last_insert_rowid();
-          simpleIdentifyAndAddDevice(dev);
+          simpleIdentifyAndAddDevice(dev); // includes load() which clears dirty status
+          if (customized) dev->mDeviceSettings->markDirty(); // make sure customized name gets persisted
           // confirm
           ApiValuePtr r = aRequest->newApiValue();
           r->setType(apivalue_object);

@@ -134,33 +134,26 @@ const char *StaticVdc::vdcClassIdentifier() const
 }
 
 
-StaticDevicePtr StaticVdc::addStaticDevice(string aDeviceType, string aDeviceConfig)
+StaticDevicePtr StaticVdc::createStaticDevice(string aDeviceType, string aDeviceConfig)
 {
-  DevicePtr newDev;
+  StaticDevicePtr newDev;
   if (aDeviceType=="digitalio") {
     // Digital IO based device
-    newDev = DevicePtr(new DigitalIODevice(this, aDeviceConfig));
+    newDev = StaticDevicePtr(new DigitalIODevice(this, aDeviceConfig));
   }
   else if (aDeviceType=="analogio") {
     // Analog IO based device
-    newDev = DevicePtr(new AnalogIODevice(this, aDeviceConfig));
+    newDev = StaticDevicePtr(new AnalogIODevice(this, aDeviceConfig));
   }
   else if (aDeviceType=="console") {
     // console based simulated device
-    newDev = DevicePtr(new ConsoleDevice(this, aDeviceConfig));
+    newDev = StaticDevicePtr(new ConsoleDevice(this, aDeviceConfig));
   }
   else if (aDeviceType=="mystrom") {
     // mystrom WiFi switch
-    newDev = DevicePtr(new MyStromDevice(this, aDeviceConfig));
+    newDev = StaticDevicePtr(new MyStromDevice(this, aDeviceConfig));
   }
-  // add to container if device was created
-  if (newDev) {
-    // add to container
-    simpleIdentifyAndAddDevice(newDev);
-    return boost::dynamic_pointer_cast<StaticDevice>(newDev);
-  }
-  // none added
-  return StaticDevicePtr();
+  return newDev;
 }
 
 
@@ -175,18 +168,20 @@ void StaticVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // create devices from command line config
     for (DeviceConfigMap::iterator pos = mDeviceConfigs.begin(); pos!=mDeviceConfigs.end(); ++pos) {
       // create device of appropriate class
-      StaticDevicePtr dev = addStaticDevice(pos->first, pos->second);
+      StaticDevicePtr dev = createStaticDevice(pos->first, pos->second);
       if (dev) {
         dev->initializeName(pos->second); // for command line devices, use config as name
+        simpleIdentifyAndAddDevice(dev);
       }
     }
     // then add those from the DB
     sqlite3pp::query qry(mDb);
     if (qry.prepare("SELECT devicetype, deviceconfig, rowid FROM devConfigs")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
-        StaticDevicePtr dev = addStaticDevice(i->get<string>(0), i->get<string>(1));
+        StaticDevicePtr dev = createStaticDevice(i->get<string>(0), i->get<string>(1));
         if (dev) {
           dev->mStaticDeviceRowID = i->get<int>(2);
+          simpleIdentifyAndAddDevice(dev);
         }
       }
     }
@@ -207,17 +202,21 @@ ErrorPtr StaticVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
     if (Error::isOK(respErr)) {
       respErr = checkStringParam(aParams, "deviceConfig", deviceConfig);
       if (Error::isOK(respErr)) {
+        bool customized = false;
         // optional name
         string name; // default to config
         checkStringParam(aParams, "name", name);
         // try to create device
-        StaticDevicePtr dev = addStaticDevice(deviceType, deviceConfig);
+        StaticDevicePtr dev = createStaticDevice(deviceType, deviceConfig);
         if (!dev) {
           respErr = WebError::webErr(500, "invalid configuration for static device -> none created");
         }
         else {
           // set name
-          if (name.size()>0) dev->setName(name);
+          if (name.size()>0) {
+            dev->setName(name);
+            customized = true;
+          }
           // insert into database
           if(mDb.executef(
             "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
@@ -227,6 +226,8 @@ ErrorPtr StaticVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
           }
           else {
             dev->mStaticDeviceRowID = mDb.last_insert_rowid();
+            simpleIdentifyAndAddDevice(dev); // includes load() which clears dirty status
+            if (customized) dev->mDeviceSettings->markDirty(); // make sure customized name gets persisted
             // confirm
             ApiValuePtr r = aRequest->newApiValue();
             r->setType(apivalue_object);

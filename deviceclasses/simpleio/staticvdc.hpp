@@ -116,7 +116,7 @@ namespace p44 {
 
   private:
 
-    StaticDevicePtr addStaticDevice(string aDeviceType, string aDeviceConfig);
+    StaticDevicePtr createStaticDevice(string aDeviceType, string aDeviceConfig);
 
   };
 
