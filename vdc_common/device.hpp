@@ -246,7 +246,10 @@ namespace p44 {
     virtual bool isDirty();
 
     // make all settings clean (not to be saved to DB)
-    virtual void markClean();
+    void markClean() { setDirty(false); };
+
+    // set or clear dirty flag in all settings
+    virtual void setDirty(bool aDirty);
 
     /// callback for disconnect()
     /// @param aDisconnected returns true if device could be disconnected, false if disconnection by software is not possible

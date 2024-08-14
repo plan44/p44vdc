@@ -170,8 +170,8 @@ namespace p44 {
     // check if any settings are dirty
     virtual bool isDirty() P44_OVERRIDE;
 
-    // make all settings clean (not to be saved to DB)
-    virtual void markClean() P44_OVERRIDE;
+    // set or clear dirty flag in all settings
+    virtual void setDirty(bool aDirty) P44_OVERRIDE;
 
     /// return a default unique id for the device
     virtual string defaultUniqueId() P44_OVERRIDE { return mDefaultUniqueId; };

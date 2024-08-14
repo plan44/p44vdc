@@ -322,11 +322,11 @@ bool ScriptedDevice::isDirty()
 }
 
 
-void ScriptedDevice::markClean()
+void ScriptedDevice::setDirty(bool aDirty)
 {
   // check the device settings
-  mImplementation.markClean();
-  inherited::markClean();
+  mImplementation.setDirty(aDirty);
+  inherited::setDirty(aDirty);
 }
 
 

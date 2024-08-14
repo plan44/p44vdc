@@ -869,10 +869,10 @@ bool CustomActions::isDirty()
 }
 
 
-void CustomActions::markClean()
+void CustomActions::setDirty(bool aDirty)
 {
   for (CustomActionsVector::iterator pos = customActions.begin(); pos!=customActions.end(); ++pos) {
-    (*pos)->markClean();
+    (*pos)->setDirty(aDirty);
   }
 }
 
@@ -1657,10 +1657,10 @@ bool SingleDevice::isDirty()
 }
 
 
-void SingleDevice::markClean()
+void SingleDevice::setDirty(bool aDirty)
 {
-  inherited::markClean();
-  if (customActions) customActions->markClean();
+  inherited::setDirty(aDirty);
+  if (customActions) customActions->setDirty(aDirty);
 }
 
 

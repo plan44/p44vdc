@@ -2101,14 +2101,14 @@ bool Device::isDirty()
 }
 
 
-void Device::markClean()
+void Device::setDirty(bool aDirty)
 {
   // check the device settings
-  if (mDeviceSettings) mDeviceSettings->markClean();
-  for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) (*pos)->markClean();
-  for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) (*pos)->markClean();
-  for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) (*pos)->markClean();
-  if (mOutput) mOutput->markClean();
+  if (mDeviceSettings) mDeviceSettings->setDirty(aDirty);
+  for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) (*pos)->setDirty(aDirty);
+  for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) (*pos)->setDirty(aDirty);
+  for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) (*pos)->setDirty(aDirty);
+  if (mOutput) mOutput->setDirty(aDirty);
 }
 
 

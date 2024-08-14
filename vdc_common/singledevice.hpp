@@ -332,8 +332,8 @@ namespace p44 {
     ErrorPtr forget();
     /// check if any settings are dirty
     bool isDirty();
-    /// make all settings clean (not to be saved to DB)
-    void markClean();
+    /// set or clear dirty flag in all settings
+    virtual void setDirty(bool aDirty);
 
   protected:
 
@@ -794,8 +794,8 @@ namespace p44 {
     /// check if any settings are dirty
     virtual bool isDirty() P44_OVERRIDE;
 
-    /// make all settings clean (not to be saved to DB)
-    virtual void markClean() P44_OVERRIDE;
+    // set or clear dirty flag in all settings
+    virtual void setDirty(bool aDirty) P44_OVERRIDE;
 
     /// @}
 
