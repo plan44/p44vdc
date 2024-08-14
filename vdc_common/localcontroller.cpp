@@ -423,7 +423,7 @@ ErrorPtr ZoneList::load()
   sqlite3pp::query *queryP = newZone->newLoadAllQuery(NULL);
   if (queryP==NULL) {
     // real error preparing query
-    err = newZone->paramStore.error();
+    err = newZone->mParamStore.error();
   }
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
@@ -819,7 +819,7 @@ ErrorPtr SceneList::load()
   sqlite3pp::query *queryP = newScene->newLoadAllQuery(NULL);
   if (queryP==NULL) {
     // real error preparing query
-    err = newScene->paramStore.error();
+    err = newScene->mParamStore.error();
   }
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
@@ -1355,7 +1355,7 @@ ErrorPtr TriggerList::load()
   sqlite3pp::query *queryP = newTrigger->newLoadAllQuery(NULL);
   if (queryP==NULL) {
     // real error preparing query
-    err = newTrigger->paramStore.error();
+    err = newTrigger->mParamStore.error();
   }
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {

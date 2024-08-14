@@ -1177,7 +1177,7 @@ ErrorPtr Vdc::loadOptimizerCache()
   sqlite3pp::query *queryP = newEntry->newLoadAllQuery(mDSUID.getString().c_str());
   if (queryP==NULL) {
     // real error preparing query
-    err = newEntry->paramStore.error();
+    err = newEntry->mParamStore.error();
   }
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
@@ -1285,7 +1285,7 @@ void Vdc::loadSettingsFromFiles()
     // try to open config file
     string fn = dir+"vdcsettings_"+levelids[i]+".csv";
     // if vdc has already stored properties, only explicitly marked properties will be applied
-    if (loadSettingsFromFile(fn.c_str(), rowid!=0)) markClean();
+    if (loadSettingsFromFile(fn.c_str(), mRowId!=0)) markClean();
   }
 }
 

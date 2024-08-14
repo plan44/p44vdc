@@ -146,7 +146,7 @@ typedef boost::intrusive_ptr<SceneChannels> SceneChannelsPtr;
 
 
 DsScene::DsScene(SceneDeviceSettings &aSceneDeviceSettings, SceneNo aSceneNo) :
-  inheritedParams(aSceneDeviceSettings.paramStore),
+  inheritedParams(aSceneDeviceSettings.mParamStore),
   mSceneDeviceSettings(aSceneDeviceSettings),
   mSceneNo(aSceneNo),
   mSceneArea(0), // not area scene by default
@@ -619,14 +619,14 @@ DsScenePtr SceneDeviceSettings::getScene(SceneNo aSceneNo)
 
 void SceneDeviceSettings::updateScene(DsScenePtr aScene)
 {
-  if (aScene->rowid==0) {
+  if (aScene->mRowId==0) {
     // unstored so far, add to map of non-default scenes
     mScenes[aScene->mSceneNo] = aScene;
   }
   // anyway, mark scene dirty
   aScene->markDirty();
   // as we need the ROWID of the settings as parentID, make sure we get saved if we don't have one
-  if (rowid==0) markDirty();
+  if (mRowId==0) markDirty();
 }
 
 
@@ -646,7 +646,7 @@ string SceneDeviceSettings::parentIdForScenes()
 {
   // base class just uses ROWID of the record in DeviceSettings (base table)
   // derived classes which define a tableName() will prefix the rowid with an unique identifier
-  return string_format("%llu",rowid);
+  return string_format("%llu",mRowId);
 }
 
 
@@ -662,7 +662,7 @@ ErrorPtr SceneDeviceSettings::loadChildren()
   sqlite3pp::query *queryP = scene->newLoadAllQuery(parentID.c_str());
   if (queryP==NULL) {
     // real error preparing query
-    err = paramStore.error();
+    err = mParamStore.error();
   }
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
@@ -690,7 +690,7 @@ ErrorPtr SceneDeviceSettings::saveChildren()
 {
   ErrorPtr err;
   // Cannot save children before I have my own rowID
-  if (rowid!=0) {
+  if (mRowId!=0) {
     // my own ROWID is the parent key for the children
     string parentID = parentIdForScenes();
     // save all elements of the map (only dirty ones will be actually stored to DB

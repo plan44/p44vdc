@@ -1843,7 +1843,7 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           aPropValue->setBoolValue(mPersistentChannels);
           return true;
         case writeOperations_key:
-          aPropValue->setUint32Value(mDSParamStore.writeOpsCount);
+          aPropValue->setUint32Value(mDSParamStore.mWriteOpsCount);
           return true;
         case latitude_key:
           aPropValue->setDoubleValue(mGeolocation.latitude);
@@ -2086,7 +2086,7 @@ void VdcHost::loadSettingsFromFiles()
   string fn = getConfigDir();
   fn += "vdchostsettings.csv";
   // if vdc has already stored properties, only explicitly marked properties will be applied
-  if (loadSettingsFromFile(fn.c_str(), rowid!=0)) markClean();
+  if (loadSettingsFromFile(fn.c_str(), mRowId!=0)) markClean();
 }
 
 #endif // ENABLE_SETTINGS_FROM_FILES

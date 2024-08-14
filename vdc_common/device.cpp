@@ -2146,7 +2146,7 @@ void Device::loadSettingsFromFiles()
     // try to open config file
     string fn = dir+"devicesettings_"+levelids[i]+".csv";
     // if device has already stored properties, only explicitly marked properties will be applied
-    if (loadSettingsFromFile(fn.c_str(), mDeviceSettings->rowid!=0)) markClean();
+    if (loadSettingsFromFile(fn.c_str(), mDeviceSettings->mRowId!=0)) markClean();
   }
 }
 
