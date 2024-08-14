@@ -335,7 +335,7 @@ namespace p44 {
   {
   public:
     ScriptCodeThreadPtr mThread;
-    ScriptHostPtr mScriptHost;
+    SourceHostPtr mSourceHost;
     MLMicroSeconds mPausedAt;
   };
 

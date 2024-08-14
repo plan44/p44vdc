@@ -1221,7 +1221,7 @@ void P44ScriptManager::pausedHandler(ScriptCodeThreadPtr aPausedThread)
   P44PausedThread pausedThread;
   pausedThread.mPausedAt = MainLoop::now();
   pausedThread.mThread = aPausedThread;
-  pausedThread.mScriptHost = mScriptingDomain->getHostForThread(aPausedThread);
+  pausedThread.mSourceHost = mScriptingDomain->getHostForThread(aPausedThread);
   mPausedThreads.push_back(pausedThread);
 }
 
@@ -1332,8 +1332,8 @@ enum {
   // thread level properties
   threadid_key,
   threadtitle_key,
-  scripthostuid_key,
-  scripthosttitle_key,
+  sourcehostuid_key,
+  sourcehosttitle_key,
   result_key,
   pausereason_key,
   pausedat_key,
@@ -1437,7 +1437,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     { "logtext", apivalue_string, logtext_key, OKEY(scriptmanager_key) },
     { "loglevel", apivalue_int64, loglevel_key, OKEY(scriptmanager_key) },
   };
-  // scripthost level properties
+  // sourcehost level properties
   static const PropertyDescription scripthostProperties[numScriptHostProperties] = {
     { "sourcetext", apivalue_string, sourcetext_key, OKEY(sourcehost_key) },
     { "title", apivalue_string, sourcetitle_key, OKEY(sourcehost_key) },
@@ -1454,8 +1454,8 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
   static const PropertyDescription pausedthreadProperties[numPausedThreadProperties] = {
     { "threadid", apivalue_uint64, threadid_key, OKEY(pausedthread_key) },
     { "title", apivalue_string, threadtitle_key, OKEY(pausedthread_key) },
-    { "scriptHostId", apivalue_string, scripthostuid_key, OKEY(pausedthread_key) },
-    { "scripttitle", apivalue_string, scripthosttitle_key, OKEY(pausedthread_key) },
+    { "sourceHostId", apivalue_string, sourcehostuid_key, OKEY(pausedthread_key) },
+    { "sourceTitle", apivalue_string, sourcehosttitle_key, OKEY(pausedthread_key) },
     { "result", apivalue_null, result_key, OKEY(pausedthread_key) },
     { "pausereason", apivalue_string, pausereason_key, OKEY(pausedthread_key) },
     { "pausedAt", apivalue_uint64, pausedat_key, OKEY(pausedthread_key) },
@@ -1602,11 +1602,11 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
-        case scripthostuid_key:
-          aPropValue->setStringValue(pausedthread.mScriptHost->getSourceUid());
+        case sourcehostuid_key:
+          aPropValue->setStringValue(pausedthread.mSourceHost->getSourceUid());
           return true;
-        case scripthosttitle_key:
-          aPropValue->setStringValue(pausedthread.mScriptHost->getSourceTitle());
+        case sourcehosttitle_key:
+          aPropValue->setStringValue(pausedthread.mSourceHost->getSourceTitle());
           return true;
         case threadid_key:
           aPropValue->setUint32Value(pausedthread.mThread->threadId());
@@ -1710,7 +1710,7 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
     aError = DsAddressable::checkParam(aParams, "scriptsourceuid", o);
     if (Error::isOK(aError)) {
       debuggerWatchdog();
-      ScriptHostPtr script = domain().getHostByUid(o->stringValue());
+      ScriptHostPtr script = boost::dynamic_pointer_cast<ScriptHost>(domain().getHostByUid(o->stringValue()));
       if (!script) {
         aError = Error::err<VdcApiError>(404, "no such script");
       }
@@ -1779,7 +1779,7 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
         o = aParams->get("scriptsourceuid");
         if (o) {
           // in a scripthost's shared main context
-          ScriptHostPtr script = domain().getHostByUid(o->stringValue());
+          ScriptHostPtr script = boost::dynamic_pointer_cast<ScriptHost>(domain().getHostByUid(o->stringValue()));
           if (script) {
             ctx = script->sharedMainContext();
           }
@@ -1806,7 +1806,7 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
           // compile
           EvaluationFlags flags = sourcecode|regular|keepvars|concurrently|ephemeralSource|neverpause|implicitreturn;
           ScriptCompiler compiler(ctx->domain());
-          CompiledCodePtr compiledcode = new CompiledCode("interactive");
+          CompiledFunctionPtr compiledcode = new CompiledFunction("interactive");
           ScriptObjPtr res = compiler.compile(source, compiledcode, flags, mctx);
           if (res->isErr()) {
             // compiler error
