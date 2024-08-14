@@ -108,7 +108,8 @@ void BridgeVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     sqlite3pp::query qry(mDb);
     if (qry.prepare("SELECT bridgeDeviceId, config, rowid FROM bridgedevices")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
-        BridgeDevicePtr dev = BridgeDevicePtr(new BridgeDevice(this, i->get<string>(0), i->get<string>(1)));
+        // for pre-existing devices, group and bridgeable will be overridden from persistent settings
+        BridgeDevicePtr dev = BridgeDevicePtr(new BridgeDevice(this, i->get<string>(0), i->get<string>(1), group_undefined, true));
         if (dev) {
           dev->mBridgeDeviceRowID = i->get<int>(2);
           simpleIdentifyAndAddDevice(dev);
@@ -132,10 +133,19 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
       // optional name
       string name;
       checkStringParam(aParams, "name", name);
+      // optional group
+      DsGroup group = group_undefined; // let BridgeDevice decide by default
+      ApiValuePtr p = aParams->get("group");
+      if (p) {
+        group = static_cast<DsGroup>(p->int8Value());
+      }
+      // optional
+      bool allowbridging = true; // start active by default
+      checkBoolParam(aParams, "allowBridging", allowbridging);
       // use current time as ID for new bridgeDevices
       string bridgeDeviceId = string_format("bridgedevice_%lld", MainLoop::now());
       // try to create device
-      BridgeDevicePtr dev = BridgeDevicePtr(new BridgeDevice(this, bridgeDeviceId, bridgeConfig));
+      BridgeDevicePtr dev = BridgeDevicePtr(new BridgeDevice(this, bridgeDeviceId, bridgeConfig, group, allowbridging));
       if (!dev) {
         respErr = WebError::webErr(500, "invalid configuration for bridge device -> none created");
       }

@@ -41,7 +41,7 @@ using namespace p44;
 
 #define AUTORESET_DELAY (5*Second)
 
-BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, const string &aBridgeDeviceConfig) :
+BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, const string &aBridgeDeviceConfig, DsGroup aGroup, bool aAllowBridging) :
   inherited((Vdc *)aVdcP),
   mBridgeDeviceRowID(0),
   mBridgeDeviceId(aBridgeDeviceId),
@@ -95,7 +95,8 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
         // signal remains set until reset according to mResetMode
         i->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
       }
-      i->setGroup(group_black_variable);
+      if (aGroup==group_undefined) aGroup = group_black_variable; // default to joker/app
+      i->setGroup(aGroup);
       i->setHardwareName("scene responder");
       // responder must send input changes to bridges, no local processing!
       i->setBridgeExclusive();
@@ -105,20 +106,21 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
       // level bridges and scene caller need a pseudo-button to emit scene calls to DS
       ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
       b->setHardwareButtonConfig(0, buttonType_undefined, buttonElement_center, false, 0, 1); // mode not restricted
-      b->setGroup(group_yellow_light); // pre-configure for light
+      if (aGroup==group_undefined) aGroup = group_yellow_light; // default to light
+      b->setGroup(aGroup);
       b->setHardwareName(mBridgeDeviceType==bridgedevice_fivelevel ? "5 scenes" : "on-off scenes");
       addBehaviour(b);
     }
     // pseudo-output (to capture scenes)
     // - standard scene device settings
     DeviceSettingsPtr s = DeviceSettingsPtr(new SceneDeviceSettings(*this));
-    s->mAllowBridging = true; // bridging allowed from start (that's the purpose of these devices)
+    s->mAllowBridging = aAllowBridging; // bridging allowed from start?
     installSettings(s);
     // - but we do not need a light behaviour, simple output will do
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
     // - add a default channel
     o->addChannel(PercentageLevelChannelPtr(new PercentageLevelChannel(*o,"bridgedlevel")));
-    o->setGroupMembership(group_yellow_light, true); // default to light as well
+    o->setGroupMembership(aGroup, true); // same group as for button
     if (mBridgeDeviceType==bridgedevice_fivelevel) {
       // dimmable
       o->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, -1);

@@ -85,7 +85,7 @@ namespace p44 {
 
   public:
 
-    BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, const string &aBridgeDeviceConfig);
+    BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, const string &aBridgeDeviceConfig, DsGroup aGroup, bool aAllowBridging);
 
     virtual ~BridgeDevice();
 
