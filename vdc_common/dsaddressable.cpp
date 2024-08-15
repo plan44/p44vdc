@@ -357,6 +357,7 @@ void DsAddressable::handleNotificationFromConnection(VdcApiConnectionPtr aApiCon
   handleNotification(aNotification, aParams, boost::bind(&DsAddressable::notificationExamined, this, aApiConnection, aStatusCB, _1));
 }
 
+
 void DsAddressable::notificationExamined(VdcApiConnectionPtr aApiConnection, StatusCB aStatusCB, ErrorPtr aError)
 {
   didExamineNotificationFromConnection(aApiConnection);

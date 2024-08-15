@@ -215,7 +215,7 @@ namespace p44 {
     virtual void handleNotification(const string &aNotification, ApiValuePtr aParams, StatusCB aExaminedCB);
 
     /// called to handle notifications directed to this addressable
-    /// @param aApiConnection this is the API connection from which the notification originates
+    /// @param aApiConnection null for internally generated notifications, or API connection notification originates from
     /// @param aNotification the notification
     /// @param aParams the parameters object
     /// @param aStatusCB will receive the status of the notification examination (not necessarily full execution)
@@ -433,8 +433,11 @@ namespace p44 {
     virtual bool canIdentifyToUser() { return false; } // not by default
 
     /// called before start examining (usually: handling) a notification
+    /// @param aApiConnection null for internally generated notifications, or API connection notification originates from
     virtual void willExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection) { /* NOP */ }
+
     /// called after notification is examined (and either done, or needed operations queued)
+    /// @param aApiConnection null for internally generated notifications, or API connection notification originates from
     virtual void didExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection) { /* NOP */ }
 
     #if ENABLE_SETTINGS_FROM_FILES

@@ -322,7 +322,7 @@ void Vdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectio
 {
   NotificationDeliveryStatePtr nds = createDeliveryState(aNotification, aParams, false);
   if (nds) {
-    nds->mConnection = aApiConnection; // keep that so processing can know which connection posted the request
+    nds->mConnection = aApiConnection; // keep that so processing can know which connection posted the request (CAN BE NULL for internally generated notifications!)
     nds->mAudience = aAudience;
     queueDelivery(nds);
     return;

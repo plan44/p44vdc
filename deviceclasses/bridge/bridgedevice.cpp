@@ -197,6 +197,7 @@ void BridgeDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 
 void BridgeDevice::willExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection)
 {
+  if (!aApiConnection) return;
   DBGOLOG(LOG_INFO, "willExamineNotificationFromConnection: domain=%d", aApiConnection->domain());
   mProcessingBridgeNotification = aApiConnection->domain()==BRIDGE_DOMAIN;
   if (mProcessingBridgeNotification) {
@@ -209,6 +210,7 @@ void BridgeDevice::willExamineNotificationFromConnection(VdcApiConnectionPtr aAp
 
 void BridgeDevice::didExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection)
 {
+  if (!aApiConnection) return;
   DBGOLOG(LOG_INFO, "didExamineNotificationFromConnection: domain=%d", aApiConnection->domain());
   mProcessingBridgeNotification = false;
 }

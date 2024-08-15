@@ -147,8 +147,11 @@ namespace p44 {
   protected:
 
     /// called before start examining (usually: handling) a notification
+    /// @param aApiConnection null for internally generated notifications, or API connection notification originates from
     virtual void willExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection) P44_OVERRIDE;
+
     /// called after notification is examined (and either done, or needed operations queued)
+    /// @param aApiConnection null for internally generated notifications, or API connection notification originates from
     virtual void didExamineNotificationFromConnection(VdcApiConnectionPtr aApiConnection) P44_OVERRIDE;
 
     /// prepare for calling a scene on the device level

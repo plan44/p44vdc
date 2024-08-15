@@ -1596,7 +1596,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
   if (aButtonBehaviour.mActionMode!=buttonActionMode_none) {
     // direct action
     FOCUSLOG("processButtonClick: direct action");
-    sceneToCall = aButtonBehaviour.mButtonActionId;
+    sceneToCall = aButtonBehaviour.mActionId;
     zoneID = global ? zoneId_global : aButtonBehaviour.mDevice.getZoneID();
     if (aButtonBehaviour.mActionMode==buttonActionMode_force) force = true;
     else if (aButtonBehaviour.mActionMode==buttonActionMode_undo) undo = true;
@@ -1747,7 +1747,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
       params->add("channel", params->newUint64(channelType));
       params->add("area", params->newUint64(map.mArea));
     }
-    // - deliver
+    // - deliver, NOT from an API connection
     mVdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
     return true; // handled
   }
