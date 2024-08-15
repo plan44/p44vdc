@@ -791,7 +791,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
   // update button state
   mLastAction = MainLoop::now();
   mClickType = aClickType;
-  mActionMode = buttonActionMode_none;
+  mActionMode = buttonActionMode_none; // not action! Regular click!
   // button press is considered a (regular!) user action, have it checked globally first
   if (!mDevice.getVdcHost().signalDeviceUserAction(mDevice, true)) {
     // button press not consumed on global level
@@ -807,7 +807,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     // also let vdchost know for local click handling
     // TODO: more elegant solution for this
     if (!isBridgeExclusive()) {
-      mDevice.getVdcHost().checkForLocalClickHandling(*this, aClickType);
+      mDevice.getVdcHost().checkForLocalClickHandling(*this);
     }
   }
 }
@@ -830,11 +830,22 @@ bool ButtonBehaviour::hasDefinedState()
 void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActionId)
 {
   mLastAction = MainLoop::now();
-  mActionMode = aActionMode;
+  mActionMode = aActionMode; // action!
   mActionId = aActionId;
-  OLOG(LOG_NOTICE, "pushes actionMode = %d, actionId %d", mActionMode, mActionId);
+  OLOG(LOG_NOTICE, "sendAction: actionMode = %d, actionId %d", mActionMode, mActionId);
   // issue a state property push. This is dS/P44 specific, but will not harm bridges that are not interested
-  pushBehaviourState(!isBridgeExclusive(), true);
+  if (pushBehaviourState(!isBridgeExclusive(), true)) {
+    OLOG(LOG_NOTICE, "successfully pushed actionMode = %d, actionId = %d", aActionMode, aActionId);
+  }
+  #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
+  // send event
+  sendValueEvent();
+  #endif
+  // also let vdchost know for local click handling
+  // TODO: more elegant solution for this
+  if (!isBridgeExclusive()) {
+    mDevice.getVdcHost().checkForLocalClickHandling(*this); // will check mButtonActionMode/mActionMode/mActionId
+  }
 }
 
 

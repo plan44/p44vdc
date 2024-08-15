@@ -1575,155 +1575,178 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
 
 
 
-bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
+bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
 {
   LocalController::sharedLocalController()->signalActivity(); // button clicks are activity
-  FOCUSLOG("processButtonClick: clicktype=%d, button = %s", (int)aClickType, aButtonBehaviour.shortDesc().c_str());
+  FOCUSLOG("processButtonClick: button = %s", aButtonBehaviour.shortDesc().c_str());
   // defaults
+  DsClickType clickType = aButtonBehaviour.mClickType;
   DsGroup group = aButtonBehaviour.mButtonGroup;
   DsChannelType channelType = channeltype_default;
   DsZoneID zoneID = zoneId_global;
-  // possible actions
-  bool doDim = false;
-  SceneNo sceneToCall = INVALID_SCENE_NO;
-  // determine what to do
-  VdcDimMode direction = dimmode_stop; // none known
-  switch (aButtonBehaviour.mButtonMode) {
-    case buttonMode_standard:
-    case buttonMode_turbo:
-      direction = dimmode_stop;
-      break;
-    case buttonMode_rockerDown_pairWith0:
-    case buttonMode_rockerDown_pairWith1:
-    case buttonMode_rockerDown_pairWith2:
-    case buttonMode_rockerDown_pairWith3:
-      direction = dimmode_down;
-      break;
-    case buttonMode_rockerUp_pairWith0:
-    case buttonMode_rockerUp_pairWith1:
-    case buttonMode_rockerUp_pairWith2:
-    case buttonMode_rockerUp_pairWith3:
-      direction = dimmode_up;
-      break;
-    case buttonMode_inactive:
-    default:
-      return true; // button inactive or unknown -> NOP, but handled
-  }
-  // evaluate function
-  if (aButtonBehaviour.mButtonFunc==buttonFunc_app) {
-    return false; // we do not handle app buttons
-  }
   bool global = group==group_black_variable;
   ButtonScenesMap map(aButtonBehaviour.mButtonFunc, global);
-  if (global) {
-    // global scene
-    zoneID = zoneId_global;
-    group = group_undefined;
-    direction = dimmode_up; // always "on"
-    switch (aClickType) {
-      case ct_tip_1x:
-      case ct_click_1x:
-        sceneToCall = map.mSceneClick[1];
-        break;
-      default:
-        return true; // unknown click -> ignore, but handled
-    }
+  // possible actions
+  bool doDim = false;
+  bool force = false;
+  bool undo = false;
+  SceneNo sceneToCall = INVALID_SCENE_NO;
+  VdcDimMode direction = dimmode_stop; // none known
+  // direct action?
+  if (aButtonBehaviour.mActionMode!=buttonActionMode_none) {
+    // direct action
+    FOCUSLOG("processButtonClick: direct action");
+    sceneToCall = aButtonBehaviour.mButtonActionId;
+    zoneID = global ? zoneId_global : aButtonBehaviour.mDevice.getZoneID();
+    if (aButtonBehaviour.mActionMode==buttonActionMode_force) force = true;
+    else if (aButtonBehaviour.mActionMode==buttonActionMode_undo) undo = true;
   }
   else {
-    // room scene
-    zoneID = aButtonBehaviour.mDevice.getZoneID();
-    channelType = aButtonBehaviour.mButtonChannel;
-    ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
-    if (!zone) return false; // button in a non-local zone, cannot handle
-    if (group!=group_yellow_light && group!=group_grey_shadow) return true; // NOP because we don't support anything except light and shadow for now, but handled
-    // evaluate click
-    if (aClickType==ct_hold_start) {
-      // start dimming if not off (or if it is specifically the up-key of a rocker)
-      if (!zone->mZoneState.stateFor(group, map.mArea)) {
-        // light is currently off
-        if (direction==dimmode_up) {
-          // holding specific up-key can start dimming even if light was off
-          doDim = true;
-        }
-        else {
-          // long press while off, and not specifically up: deep off
-          sceneToCall = DEEP_OFF;
-        }
-      }
-      else {
-        // light is on, can dim
-        doDim = true;
-      }
-      if (doDim && direction==dimmode_stop) {
-        // single button, no explicit direction -> use inverse of last dim
-        direction = zone->mZoneState.mLastDim==dimmode_up ? dimmode_down : dimmode_up;
-      }
+    // actual click: determine what to do
+    FOCUSLOG("processButtonClick: actual click: %d", clickType);
+    switch (aButtonBehaviour.mButtonMode) {
+      case buttonMode_standard:
+      case buttonMode_turbo:
+        direction = dimmode_stop;
+        break;
+      case buttonMode_rockerDown_pairWith0:
+      case buttonMode_rockerDown_pairWith1:
+      case buttonMode_rockerDown_pairWith2:
+      case buttonMode_rockerDown_pairWith3:
+        direction = dimmode_down;
+        break;
+      case buttonMode_rockerUp_pairWith0:
+      case buttonMode_rockerUp_pairWith1:
+      case buttonMode_rockerUp_pairWith2:
+      case buttonMode_rockerUp_pairWith3:
+        direction = dimmode_up;
+        break;
+      case buttonMode_inactive:
+      default:
+        return true; // button inactive or unknown -> NOP, but handled
     }
-    else if (aClickType==ct_hold_end) {
-      // stop dimming
-      direction = dimmode_stop;
-      doDim = true;
+    // evaluate function
+    if (aButtonBehaviour.mButtonFunc==buttonFunc_app) {
+      return false; // we do not handle app buttons
     }
-    else {
-      // - not hold or release
-      SceneNo sceneOnClick = INVALID_SCENE_NO;
-      switch (aClickType) {
+    if (global) {
+      // global scene
+      zoneID = zoneId_global;
+      group = group_undefined;
+      direction = dimmode_up; // always "on"
+      switch (clickType) {
         case ct_tip_1x:
         case ct_click_1x:
-          sceneOnClick = map.mSceneClick[1];
-          break;
-        case ct_tip_2x:
-        case ct_click_2x:
-          sceneOnClick = map.mSceneClick[2];
-          direction = dimmode_up;
-          break;
-        case ct_tip_3x:
-        case ct_click_3x:
-          sceneOnClick = map.mSceneClick[3];
-          direction = dimmode_up;
-          break;
-        case ct_tip_4x:
-          sceneOnClick = map.mSceneClick[4];
-          direction = dimmode_up;
+          sceneToCall = map.mSceneClick[1];
           break;
         default:
           return true; // unknown click -> ignore, but handled
       }
-      if (direction==dimmode_stop) {
-        // single button, no explicit direction
-        direction = zone->mZoneState.stateFor(group,map.mArea) ? dimmode_down : dimmode_up;
+    }
+    else {
+      // room scene
+      zoneID = aButtonBehaviour.mDevice.getZoneID();
+      channelType = aButtonBehaviour.mButtonChannel;
+      ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID, false);
+      if (!zone) return false; // button in a non-local zone, cannot handle
+      if (group!=group_yellow_light && group!=group_grey_shadow) return true; // NOP because we don't support anything except light and shadow for now, but handled
+      // evaluate click
+      if (clickType==ct_hold_start) {
+        // start dimming if not off (or if it is specifically the up-key of a rocker)
+        if (!zone->mZoneState.stateFor(group, map.mArea)) {
+          // light is currently off
+          if (direction==dimmode_up) {
+            // holding specific up-key can start dimming even if light was off
+            doDim = true;
+          }
+          else {
+            // long press while off, and not specifically up: deep off
+            sceneToCall = DEEP_OFF;
+          }
+        }
+        else {
+          // light is on, can dim
+          doDim = true;
+        }
+        if (doDim && direction==dimmode_stop) {
+          // single button, no explicit direction -> use inverse of last dim
+          direction = zone->mZoneState.mLastDim==dimmode_up ? dimmode_down : dimmode_up;
+        }
       }
-      // local
-      if (direction==dimmode_up) {
-        // calling a preset
-        sceneToCall = sceneOnClick;
+      else if (clickType==ct_hold_end) {
+        // stop dimming
+        direction = dimmode_stop;
+        doDim = true;
       }
       else {
-        // calling an off scene
-        sceneToCall = map.mSceneClick[0];
+        // - not hold or release
+        SceneNo sceneOnClick = INVALID_SCENE_NO;
+        switch (clickType) {
+          case ct_tip_1x:
+          case ct_click_1x:
+            sceneOnClick = map.mSceneClick[1];
+            break;
+          case ct_tip_2x:
+          case ct_click_2x:
+            sceneOnClick = map.mSceneClick[2];
+            direction = dimmode_up;
+            break;
+          case ct_tip_3x:
+          case ct_click_3x:
+            sceneOnClick = map.mSceneClick[3];
+            direction = dimmode_up;
+            break;
+          case ct_tip_4x:
+            sceneOnClick = map.mSceneClick[4];
+            direction = dimmode_up;
+            break;
+          default:
+            return true; // unknown click -> ignore, but handled
+        }
+        if (direction==dimmode_stop) {
+          // single button, no explicit direction
+          direction = zone->mZoneState.stateFor(group,map.mArea) ? dimmode_down : dimmode_up;
+        }
+        // local
+        if (direction==dimmode_up) {
+          // calling a preset
+          sceneToCall = sceneOnClick;
+        }
+        else {
+          // calling an off scene
+          sceneToCall = map.mSceneClick[0];
+        }
       }
     }
-  }
+  } // click
   // now perform actions
-  if (sceneToCall!=INVALID_SCENE_NO) {
-    callScene(sceneToCall, zoneID, group);
+  if (sceneToCall!=INVALID_SCENE_NO && !undo) {
+    // plain scene call
+    callScene(sceneToCall, zoneID, group, force);
     return true; // handled
   }
-  else if (doDim) {
-    // deliver
+  else if (doDim || undo) {
+    // deliver other notification types
     NotificationAudience audience;
     mVdcHost.addToAudienceByZoneAndGroup(audience, zoneID, group);
     JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
     params->setType(apivalue_object);
+    string method;
     // - define audience
     params->add("zone_id", params->newUint64(zoneID));
     params->add("group", params->newUint64(group));
-    string method = "dimChannel";
-    params->add("mode", params->newInt64(direction));
-    params->add("autoStop", params->newBool(false)); // prevent stop dimming event w/o repeating command
-    params->add("stopActions", params->newBool(false)); // prevent stopping runnig scene actions
-    params->add("channel", params->newUint64(channelType));
-    params->add("area", params->newUint64(map.mArea));
+    if (undo) {
+      method = "undoScene";
+      params->add("scene", params->newInt64(sceneToCall));
+    }
+    else {
+      method = "dimChannel";
+      params->add("mode", params->newInt64(direction));
+      params->add("autoStop", params->newBool(false)); // prevent stop dimming event w/o repeating command
+      params->add("stopActions", params->newBool(false)); // prevent stopping runnig scene actions
+      params->add("channel", params->newUint64(channelType));
+      params->add("area", params->newUint64(map.mArea));
+    }
     // - deliver
     mVdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
     return true; // handled
@@ -1735,21 +1758,21 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour, DsCl
 }
 
 
-void LocalController::callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride)
+void LocalController::callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride, bool aForce)
 {
-  callScene(aScene.mSceneNo, aScene.mZoneID, aScene.mGroup, aTransitionTimeOverride);
+  callScene(aScene.mSceneNo, aScene.mZoneID, aScene.mGroup, aTransitionTimeOverride, aForce);
 }
 
 
-void LocalController::callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride)
+void LocalController::callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride, bool aForce)
 {
   NotificationAudience audience;
   mVdcHost.addToAudienceByZoneAndGroup(audience, aZone, aGroup);
-  callScene(aSceneNo, audience, aTransitionTimeOverride);
+  callScene(aSceneNo, audience, aTransitionTimeOverride, aForce);
 }
 
 
-void LocalController::callScene(SceneNo aSceneNo, NotificationAudience &aAudience, MLMicroSeconds aTransitionTimeOverride)
+void LocalController::callScene(SceneNo aSceneNo, NotificationAudience &aAudience, MLMicroSeconds aTransitionTimeOverride, bool aForce)
 {
   JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
   params->setType(apivalue_object);
@@ -1757,7 +1780,7 @@ void LocalController::callScene(SceneNo aSceneNo, NotificationAudience &aAudienc
   // Note: we don't need the zone/group params, these are defined by the audience already
   string method = "callScene";
   params->add("scene", params->newUint64(aSceneNo));
-  params->add("force", params->newBool(false));
+  params->add("force", params->newBool(aForce));
   if (aTransitionTimeOverride!=Infinite) {
     params->add("transitionTime", params->newDouble((double)aTransitionTimeOverride/Second));
   }

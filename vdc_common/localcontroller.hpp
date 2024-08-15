@@ -509,10 +509,9 @@ namespace p44 {
     void processGlobalEvent(VdchostEvent aActivity);
 
     /// called when button is clicked (including long click and release events)
-    /// @param aButtonBehaviour the button behaviour from which the click originates
-    /// @param aClickType the click type
+    /// @param aButtonBehaviour the button behaviour from which the click originates (to examine for further context of the click/call)
     /// @return true if click could be handled
-    bool processButtonClick(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
+    bool processButtonClick(ButtonBehaviour &aButtonBehaviour);
 
     /// called when sensor value is pushed
     /// @param aSensorBehaviour the sensor behaviour that has pushed a change
@@ -569,9 +568,9 @@ namespace p44 {
 
     /// call a scene
     /// @param aTransitionTimeOverride if >=0, this will override the called scene's transition time
-    void callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride = Infinite);
-    void callScene(SceneNo aSceneNo, NotificationAudience &aAudience, MLMicroSeconds aTransitionTimeOverride = Infinite);
-    void callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride = Infinite);
+    void callScene(SceneNo aSceneNo, DsZoneID aZone, DsGroup aGroup, MLMicroSeconds aTransitionTimeOverride = Infinite, bool aForce = false);
+    void callScene(SceneNo aSceneNo, NotificationAudience &aAudience, MLMicroSeconds aTransitionTimeOverride = Infinite, bool aForce = false);
+    void callScene(SceneIdentifier aScene, MLMicroSeconds aTransitionTimeOverride = Infinite, bool aForce = false);
 
     /// set output channel values
     /// @param aTransitionTimeOverride if >=0, this will override the outputs standard transition time

@@ -909,12 +909,12 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
 // MARK: - local operation mode
 
 
-bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
+bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour)
 {
   #if ENABLE_LOCALCONTROLLER
   if (mLocalController) {
-    if (mLocalController->processButtonClick(aButtonBehaviour, aClickType)) {
-      LOG(aClickType!=ct_hold_repeat ? LOG_NOTICE : LOG_INFO, "localcontroller has handled clicktype %d from Button[%zu] '%s' in %s", aClickType, aButtonBehaviour.mIndex, aButtonBehaviour.getHardwareName().c_str(), aButtonBehaviour.mDevice.shortDesc().c_str());
+    if (mLocalController->processButtonClick(aButtonBehaviour)) {
+      LOG(LOG_INFO, "localcontroller has handled event from Button[%zu] '%s' in %s", aButtonBehaviour.mIndex, aButtonBehaviour.getHardwareName().c_str(), aButtonBehaviour.mDevice.shortDesc().c_str());
       return true; // handled
     }
   }
@@ -922,14 +922,14 @@ bool VdcHost::checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsCl
   // not handled by local controller
   if (mVdcApiServer && !mVdsmSessionConnection) {
     // we do have a vdc API, but are not connected to a vdSM -> handle clicks locally (fallback mode)
-    handleClickLocally(aButtonBehaviour, aClickType);
+    handleClickLocally(aButtonBehaviour);
     return true; // handled
   }
   return false; // not handled
 }
 
 
-void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType)
+void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour)
 {
   #if ENABLE_LOCAL_BEHAVIOUR
   if (aButtonBehaviour.mButtonFunc==buttonFunc_app || aButtonBehaviour.mButtonGroup!=group_yellow_light) {
@@ -941,7 +941,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType 
   int newDirection = aButtonBehaviour.localFunctionElement()==buttonElement_up ? 1 : (aButtonBehaviour.localFunctionElement()==buttonElement_down ? -1 : 0); // -1=down/off, 1=up/on, 0=toggle
   if (newDirection!=0)
     mLocalDimDirection = newDirection;
-  switch (aClickType) {
+  switch (aButtonBehaviour.mClickType) {
     case ct_tip_1x:
     case ct_click_1x:
       scene = ROOM_ON;

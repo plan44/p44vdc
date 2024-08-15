@@ -485,9 +485,8 @@ namespace p44 {
 
     /// have button clicks checked for local handling
     /// @param aButtonBehaviour the button behaviour that generated the click
-    /// @param aClickType the type of click
     /// @return true if locally handled
-    bool checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
+    bool checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour);
 
     #if ENABLE_LOCALCONTROLLER
     /// have sensor changes checked for local handling
@@ -688,7 +687,7 @@ namespace p44 {
     void nextDeviceInitialized(StatusCB aCompletedCB, DsDeviceMap::iterator aNextDevice, ErrorPtr aError);
 
     // local operation mode
-    void handleClickLocally(ButtonBehaviour &aButtonBehaviour, DsClickType aClickType);
+    void handleClickLocally(ButtonBehaviour &aButtonBehaviour);
     void localDimHandler();
 
     // API connection status handling
