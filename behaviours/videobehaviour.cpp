@@ -315,7 +315,7 @@ void VideoScene::setDefaultSceneValues(SceneNo aSceneNo)
 void VideoDeviceSettings::dumpDefaultScenes()
 {
   printf("SC\tSCI\tPS\tPSI\tVol\tVolI\tVolF\tMM\tTT\tCS\tCSI\n");
-  for (SceneNo sn = START_ZONE_SCENES; sn<MAX_SCENE_NO; sn++) {
+  for (SceneNo sn = START_ZONE_SCENES; sn<NUM_VALID_SCENES; sn++) {
     VideoScenePtr videoScene = VideoScenePtr(new VideoScene(*this, sn));
     videoScene->setDefaultSceneValues(sn);
     string s;

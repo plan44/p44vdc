@@ -2235,7 +2235,7 @@ int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
   else if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
     SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
     if (scenes)
-      return INVALID_SCENE_NO;
+      return NUM_VALID_SCENES;
     else
       return 0; // device with no scenes
   }

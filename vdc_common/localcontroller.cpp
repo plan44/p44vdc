@@ -599,7 +599,7 @@ string SceneIdentifier::getName() const
 bool SceneIdentifier::deriveSceneKind()
 {
   const SceneKindDescriptor *sk = mSceneNo>=START_APARTMENT_SCENES ? globalScenes : roomScenes;
-  while (sk->no<MAX_SCENE_NO) {
+  while (sk->no<NUM_VALID_SCENES) {
     if (sk->no==mSceneNo) {
       mSceneKindP = sk;
       return true;
@@ -793,7 +793,7 @@ SceneDescriptorPtr SceneList::getScene(const SceneIdentifier &aSceneId, bool aCr
       break;
     }
   }
-  if (!scene && aCreateNewIfNotExisting && aSceneId.mSceneNo<MAX_SCENE_NO) {
+  if (!scene && aCreateNewIfNotExisting && aSceneId.mSceneNo<NUM_VALID_SCENES) {
     // create new scene descriptor
     scene = SceneDescriptorPtr(new SceneDescriptor);
     scene->mSceneIdentifier = aSceneId;

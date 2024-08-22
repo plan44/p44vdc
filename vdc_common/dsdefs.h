@@ -164,8 +164,8 @@ typedef enum {
   NO_HAIL = (START_APARTMENT_SCENES + 27),        ///< 91 - No Hail
   POLLUTION = (START_APARTMENT_SCENES + 28),      ///< 92 - Pollution/Hazardous Air
   BURGLARY = (START_APARTMENT_SCENES + 29),       ///< 93 - Burglary
-  MAX_SCENE_NO,                                   ///< currently known number of scenes
-  INVALID_SCENE_NO = MAX_SCENE_NO                 ///< marker for invalid scene
+  NUM_VALID_SCENES,                               ///< currently known number of valid scenes
+  INVALID_SCENE_NO = NUM_VALID_SCENES             ///< marker for invalid scene
 } DsSceneNumber;
 
 typedef uint8_t SceneNo; ///< scene number

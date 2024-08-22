@@ -2353,7 +2353,7 @@ SceneNo VdcHost::getSceneIdByKind(string aSceneKindName)
   int sceneNo;
   if (uequals(aSceneKindName.c_str(),"scene ",6)) aSceneKindName.erase(0,6); // allow "scene " prefix, as possibly generated for unnamed scene kinds
   if (sscanf(aSceneKindName.c_str(), "%d", &sceneNo)==1) {
-    if (sceneNo>=0 && sceneNo<MAX_SCENE_NO) return sceneNo;
+    if (sceneNo>=0 && sceneNo<NUM_VALID_SCENES) return sceneNo;
   }
   return INVALID_SCENE_NO;
 }
