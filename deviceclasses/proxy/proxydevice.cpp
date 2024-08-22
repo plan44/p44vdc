@@ -219,6 +219,40 @@ void ProxyDevice::adaptRootDescriptor(PropertyDescriptorPtr& aContainerDescripto
 }
 
 
+bool ProxyDevice::localPropertyOverride(JsonObjectPtr aProps, PropertyAccessMode aMode)
+{
+  if (!aProps) return false;
+  // check for special properties that need to be handled locally
+  JsonObjectPtr o;
+  if (aMode==access_read) {
+    // for read
+    if (aProps->get("x-p44-bridged", o)) {
+      aProps->add("x-p44-bridged", JsonObject::newBool(isBridged()));
+    }
+    if (aProps->get("x-p44-bridgeable", o)) {
+      aProps->add("x-p44-bridgeable", JsonObject::newBool(bridgeable()));
+    }
+    if (aProps->get("x-p44-allowBridging", o)) {
+      aProps->add("x-p44-allowBridging", JsonObject::newBool(mDeviceSettings->mAllowBridging));
+    }
+  }
+  else {
+    // for write
+    if (aProps->get("x-p44-bridged", o)) {
+      mBridged = o->boolValue();
+      aProps->del("x-p44-bridged"); // do not propagate write to proxy!
+    }
+    if (aProps->get("x-p44-allowBridging", o)) {
+      if (mDeviceSettings->setPVar(mDeviceSettings->mAllowBridging, o->boolValue())) {
+        pushBridgeable();
+      }
+      aProps->del("x-p44-allowBridging"); // do not propagate write to proxy!
+    }
+  }
+  return aProps->numKeys()>0; // non-empty properties object
+}
+
+
 void ProxyDevice::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObject, int aDomain, int aApiVersion, PropertyAccessCB aAccessCompleteCB)
 {
   JsonObjectPtr params = JsonObject::newObj();
@@ -231,17 +265,22 @@ void ProxyDevice::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObj
   }
   else {
     // write
+    if (!localPropertyOverride(props, aMode)) {
+      // nothing to set at all (e.g. everything consumed locally) -> 
+      if (aAccessCompleteCB) aAccessCompleteCB(ApiValuePtr(), ErrorPtr());
+      return;
+    }
     method = "setProperty";
     params->add("properties", props);
     if (aMode==access_write_preload) {
       params->add("preload", JsonObject::newBool(true));
     }
   }
-  call(method, params, boost::bind(&ProxyDevice::handleProxyPropertyAccessResponse, this, aAccessCompleteCB, aQueryObject->newObject(), _1, _2));
+  call(method, params, boost::bind(&ProxyDevice::handleProxyPropertyAccessResponse, this, aMode, aAccessCompleteCB, aQueryObject->newObject(), _1, _2));
 }
 
 
-void ProxyDevice::handleProxyPropertyAccessResponse(PropertyAccessCB aAccessCompleteCB, ApiValuePtr aResultObj, ErrorPtr aError, JsonObjectPtr aJsonObject)
+void ProxyDevice::handleProxyPropertyAccessResponse(PropertyAccessMode aMode, PropertyAccessCB aAccessCompleteCB, ApiValuePtr aResultObj, ErrorPtr aError, JsonObjectPtr aJsonObject)
 {
   if (aError) {
     OLOG(LOG_WARNING, "remote -> proxy: property access call failed on transport level: %s", Error::text(aError));
@@ -259,7 +298,9 @@ void ProxyDevice::handleProxyPropertyAccessResponse(PropertyAccessCB aAccessComp
     }
     else {
       // result will be accessed later by accessPropertyInternal()
-      JsonApiValue::setAsJson(aResultObj, aJsonObject->get("result"));
+      JsonObjectPtr props = aJsonObject->get("result");
+      localPropertyOverride(props, aMode);
+      JsonApiValue::setAsJson(aResultObj, props);
     }
   }
   if (aAccessCompleteCB) aAccessCompleteCB(aResultObj, aError);

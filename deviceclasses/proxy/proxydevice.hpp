@@ -118,8 +118,10 @@ namespace p44 {
 
     void bridgingEnabled(StatusCB aCompletedCB, bool aFactoryReset);
 
+    bool localPropertyOverride(JsonObjectPtr aProps, PropertyAccessMode aMode);
+
     void handleProxyMethodCallResponse(VdcApiRequestPtr aRequest, ErrorPtr aError, JsonObjectPtr aJsonObject);
-    void handleProxyPropertyAccessResponse(PropertyAccessCB aAccessCompleteCB, ApiValuePtr aResultObj, ErrorPtr aError, JsonObjectPtr aJsonObject);
+    void handleProxyPropertyAccessResponse(PropertyAccessMode aMode, PropertyAccessCB aAccessCompleteCB, ApiValuePtr aResultObj, ErrorPtr aError, JsonObjectPtr aJsonObject);
 
 
   };
