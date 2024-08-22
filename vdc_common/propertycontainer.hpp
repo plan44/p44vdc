@@ -284,7 +284,7 @@ namespace p44 {
     ///   to find an element (without iterating through all indices).
     virtual PropertyDescriptorPtr getDescriptorByName(string aPropMatch, int &aStartIndex, int aDomain, PropertyAccessMode aMode, PropertyDescriptorPtr aParentDescriptor);
 
-    /// get subcontainer for a apivalue_object property
+    /// get subcontainer for a apivalue\_object property
     /// @param aPropertyDescriptor descriptor for finding structured (object) property. Once this call returns,
     ///   and the container is a new C++ object instance, adaptRootDescriptor() will be invoked to get
     ///   the descriptor to be actually used for further accessing the object.
@@ -293,6 +293,9 @@ namespace p44 {
     ///   (like description/settings/states for DsBehaviours)
     /// @return PropertyContainer representing the property or property array element
     /// @note base class always returns NULL, which means no structured or proxy properties
+    /// @note the implementation should never only look at the field key, but always check the object key
+    ///   to make sure field keys (that can overlap with those of superclass) are compared in the right
+    ///   context.
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain) { return NULL; };
 
     /// prepare access to a property (for example if the property needs I/O to update its value before being read).

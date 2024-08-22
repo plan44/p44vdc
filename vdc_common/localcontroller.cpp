@@ -2182,13 +2182,14 @@ PropertyDescriptorPtr LocalController::getDescriptorByIndex(int aPropIndex, int 
 PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->mParentDescriptor->isRootOfObject()) {
-    switch (aPropertyDescriptor->fieldKey()) {
-      case zones_key:
-        return ZoneListPtr(&mLocalZones);
-      case scenes_key:
-        return SceneListPtr(&mLocalScenes);
-      case triggers_key:
-        return TriggerListPtr(&mLocalTriggers);
+    if (aPropertyDescriptor->hasObjectKey(zonelist_key)) {
+      return ZoneListPtr(&mLocalZones);
+    }
+    else if (aPropertyDescriptor->hasObjectKey(scenelist_key)) {
+      return SceneListPtr(&mLocalScenes);
+    }
+    else if (aPropertyDescriptor->hasObjectKey(triggerlist_key)) {
+      return TriggerListPtr(&mLocalTriggers);
     }
   }
   // unknown here

@@ -1852,23 +1852,26 @@ PropertyDescriptorPtr SingleDevice::getDescriptorByIndex(int aPropIndex, int aDo
 PropertyContainerPtr SingleDevice::getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain)
 {
   if (aPropertyDescriptor->mParentDescriptor->isRootOfObject()) {
-    switch (aPropertyDescriptor->fieldKey()) {
-      case deviceActionDescriptions_key:
-        return deviceActions;
-      case dynamicActionDescriptions_key:
-        return dynamicDeviceActions;
-      case customActions_key:
-        return customActions;
-      case standardActions_key:
-        return standardActions;
-      case deviceStateDescriptions_key:
-      case deviceStates_key:
-        return deviceStates;
-      case deviceEventDescriptions_key:
-        return deviceEvents;
-      case devicePropertyDescriptions_key:
-      case deviceProperties_key:
-        return deviceProperties;
+    if (aPropertyDescriptor->hasObjectKey(singledevice_key)) {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case deviceActionDescriptions_key:
+          return deviceActions;
+        case dynamicActionDescriptions_key:
+          return dynamicDeviceActions;
+        case customActions_key:
+          return customActions;
+        case standardActions_key:
+          return standardActions;
+      }
+    }
+    else if (aPropertyDescriptor->hasObjectKey(devicestatedesc_key) || aPropertyDescriptor->hasObjectKey(devicestate_key)) {
+      return deviceStates;
+    }
+    else if (aPropertyDescriptor->hasObjectKey(deviceeventdesc_key)) {
+      return deviceEvents;
+    }
+    else if (aPropertyDescriptor->hasObjectKey(devicepropertydesc_key) || aPropertyDescriptor->hasObjectKey(deviceproperty_key)) {
+      return deviceProperties;
     }
   }
   // unknown here
