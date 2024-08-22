@@ -49,6 +49,9 @@ namespace p44 {
     bool mProxiedDSUID;
     string mProxiedDeviceSerial;
     string mProxiedDeviceConfigUrl;
+    StatusCB mInitialisationCompleteCB;
+    MLTicket mInitialisationTimeout;
+    bool mProxiedDeviceReached;
 
   public:
 
@@ -120,8 +123,10 @@ namespace p44 {
 
   private:
 
-    void bridgeApiConnectedHandler(StatusCB aCompletedCB, ErrorPtr aStatus);
-    void bridgeApiIDQueryHandler(StatusCB aCompletedCB, ErrorPtr aError, JsonObjectPtr aJsonMsg);
+    void initialisationTimeout();
+    void acknowledgeInitialisation(ErrorPtr aStatus);
+    void bridgeApiConnectedHandler(ErrorPtr aStatus);
+    void bridgeApiIDQueryHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg);
     void bridgeApiCollectQueryHandler(StatusCB aCompletedCB, ErrorPtr aError, JsonObjectPtr aJsonMsg);
 
     void bridgeApiNotificationHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg);

@@ -98,6 +98,10 @@ void P44BridgeApi::messageHandler(ErrorPtr aError, JsonObjectPtr aJsonObject)
 
 void P44BridgeApi::call(const string aMethod, JsonObjectPtr aParams, JSonMessageCB aResponseCB)
 {
+  if (!connected()) {
+    if (aResponseCB) aResponseCB(TextError::err("API not connected"), JsonObjectPtr());
+    return;
+  }
   if (!aParams) aParams = JsonObject::newObj();
   aParams->add("method", JsonObject::newString(aMethod));
   PendingBridgeCall call;
@@ -143,6 +147,9 @@ void P44BridgeApi::setProperty(const string aDSUID, const string aPropertyPath, 
 
 ErrorPtr P44BridgeApi::notify(const string aNotification, JsonObjectPtr aParams)
 {
+  if (!connected()) {
+    return TextError::err("API not connected");
+  }
   if (!aParams) aParams = JsonObject::newObj();
   aParams->add("notification", JsonObject::newString(aNotification));
   LOG(LOG_DEBUG, "Sending notification '%s' to bridge, params:\n%s", aNotification.c_str(), JsonObject::text(aParams));

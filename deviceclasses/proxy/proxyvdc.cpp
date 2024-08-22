@@ -72,7 +72,8 @@ void ProxyVdc::instantiateProxies(const string aProxiesSpecification, VdcHost *a
 
 ProxyVdc::ProxyVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  mProxiedDSUID(false)
+  mProxiedDSUID(false),
+  mProxiedDeviceReached(false)
 {
   mBridgeApi.isMemberVariable();
 }
@@ -91,19 +92,48 @@ void ProxyVdc::setAPIParams(const string aApiHost, const string aApiService)
 }
 
 
+#define INITIALISATION_TIMEOUT (10*Second)
+
 void ProxyVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // try to connect to the bridge API
   OLOG(LOG_INFO, "Connecting to bridge API");
-  api().connectBridgeApi(boost::bind(&ProxyVdc::bridgeApiConnectedHandler, this, aCompletedCB, _1));
+  mInitialisationCompleteCB = aCompletedCB;
+  api().connectBridgeApi(boost::bind(&ProxyVdc::bridgeApiConnectedHandler, this, _1));
+  mInitialisationTimeout.executeOnce(boost::bind(&ProxyVdc::initialisationTimeout, this), INITIALISATION_TIMEOUT);
 }
 
 
-void ProxyVdc::bridgeApiConnectedHandler(StatusCB aCompletedCB, ErrorPtr aStatus)
+void ProxyVdc::initialisationTimeout()
 {
+  initializeName("Timeout/Placeholder");
+  OLOG(LOG_ERR, "Initialisation timeout for now - devices may appear later");
+  ErrorPtr err = TextError::err("Proxy/Bridge API timeout");
+  acknowledgeInitialisation(err);
+}
+
+
+void ProxyVdc::acknowledgeInitialisation(ErrorPtr aStatus)
+{
+  // load parameters
+  // Note: in case this happens after initialisation, we must load again because we have the dSUID only now
+  load();
+  if (mInitialisationCompleteCB) {
+    // initialisation has failed
+    StatusCB cb = mInitialisationCompleteCB;
+    mInitialisationCompleteCB = NoOP;
+    cb(aStatus);
+  }
+}
+
+
+
+void ProxyVdc::bridgeApiConnectedHandler(ErrorPtr aStatus)
+{
+  mInitialisationTimeout.cancel();
   if (Error::notOK(aStatus)) {
     OLOG(LOG_WARNING, "bridge API connection error: %s", aStatus->text());
-    aCompletedCB(aStatus); // init failed
+    acknowledgeInitialisation(aStatus);
   }
   else {
     // reset the bridge info in the remote device
@@ -117,12 +147,12 @@ void ProxyVdc::bridgeApiConnectedHandler(StatusCB aCompletedCB, ErrorPtr aStatus
       "\"configURL\":null, "
       "}}"
     );
-    api().call("getProperty", params, boost::bind(&ProxyVdc::bridgeApiIDQueryHandler, this, aCompletedCB, _1, _2));
+    api().call("getProperty", params, boost::bind(&ProxyVdc::bridgeApiIDQueryHandler, this, _1, _2));
   }
 }
 
 
-void ProxyVdc::bridgeApiIDQueryHandler(StatusCB aCompletedCB, ErrorPtr aError, JsonObjectPtr aJsonMsg)
+void ProxyVdc::bridgeApiIDQueryHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg)
 {
   JsonObjectPtr result;
   JsonObjectPtr o;
@@ -146,11 +176,19 @@ void ProxyVdc::bridgeApiIDQueryHandler(StatusCB aCompletedCB, ErrorPtr aError, J
     if (result->get("configURL", o)) {
       mProxiedDeviceConfigUrl = o->stringValue();
     }
-    // dSUID is now final: load persistent params
-    load();
+    // reached once, got basic vdc info
+    if (!mProxiedDeviceReached) {
+      // we had not reached the proxy before, but are not initializing
+      mProxiedDeviceReached = true;
+      if (!mInitialisationCompleteCB) {
+        // we're not in initialisatin any more, scan for devices now
+        setVdcError(ErrorPtr()); // clear previous error, if any
+        collectDevices(NoOP, rescanmode_incremental);
+      }
+    }
   }
-  // done initializing
-  aCompletedCB(aError);
+  // done initializing, (re)load persistent params
+  acknowledgeInitialisation(aError);
 }
 
 
@@ -285,6 +323,12 @@ void ProxyVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
   if (!(aRescanFlags & rescanmode_incremental)) {
     // full collect, remove all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
+  }
+  if (!mProxiedDeviceReached) {
+    // we did not ever reach the API of the to-be-proxied device, meaning we cannot really scan now
+    // - return error for now
+    aCompletedCB(TextError::err("Proxied device not reachable"));
+    return;
   }
   // query devices
   JsonObjectPtr params = JsonObject::objFromText(
