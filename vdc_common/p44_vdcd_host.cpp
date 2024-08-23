@@ -1351,10 +1351,9 @@ int P44ScriptManager::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
     return static_cast<int>(domain().numRegisteredHosts());
   }
   else if (aParentDescriptor->hasObjectKey(breakpoints_list_key)) {
-    // breakpoints
-    ScriptHostPtr scripthost = boost::dynamic_pointer_cast<ScriptHost>(domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey()));
-    if (!scripthost) return 0;
-    return static_cast<int>(scripthost->numBreakPoints());
+    // breakpoints (all type of sourcehosts could have breakpoints, not all actually support them)
+    SourceHostPtr host = domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey());
+    return static_cast<int>(host->numBreakpoints());
   }
   else if (aParentDescriptor->hasObjectKey(pausedthreadslist_key)) {
     // paused threads list
@@ -1397,11 +1396,11 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByName(string aPropMatch, i
         aStartIndex = 0;
       }
       else {
-        ScriptHostPtr scripthost = boost::dynamic_pointer_cast<ScriptHost>(domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey()));
-        if (!scripthost) { aStartIndex = PROPINDEX_NONE; return propDesc; } // safety only, because numProps should prevent us being called for non-scripts
+        SourceHostPtr host = domain().getHostByIndex(aParentDescriptor->mParentDescriptor->fieldKey());
+        if (!host) { aStartIndex = PROPINDEX_NONE; return propDesc; } // safety only, because numProps should prevent us being called for non-scripts
         // Note: we need to enumerate the set, so we must convert it to a vector here, which is
         //   acceptable when assuming a small number of breakpoints (which IS realistic)
-        vector<int> bpVec(scripthost->breakpoints()->begin(), scripthost->breakpoints()->end());
+        vector<int> bpVec(host->breakpoints()->begin(), host->breakpoints()->end());
         lineNo = bpVec[aStartIndex];
       }
       DynamicPropertyDescriptor *descP = new DynamicPropertyDescriptor(aParentDescriptor);
@@ -1576,8 +1575,9 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     }
   }
   else if (aPropertyDescriptor->hasObjectKey(breakpoints_list_key)) {
-    ScriptHostPtr host = boost::dynamic_pointer_cast<ScriptHost>(domain().getHostByIndex(aPropertyDescriptor->mParentDescriptor->mParentDescriptor->fieldKey()));
-    if (!host) return false; // is not a script, cannot have breakpoints
+    // all sourcehosts have the breakpoint() method, but not all actually support them (by now, only scripts and includes)
+    SourceHostPtr host = domain().getHostByIndex(aPropertyDescriptor->mParentDescriptor->mParentDescriptor->fieldKey());
+    if (!host) return false; // should not happen
     size_t line = aPropertyDescriptor->fieldKey();
     if (!host->breakpoints()) return false;
     if (aMode==access_read) {
