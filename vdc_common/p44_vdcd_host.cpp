@@ -1318,6 +1318,7 @@ enum {
   contextname_key,
   logprefix_key,
   unstored_key,
+  readonly_key,
   isScript_key,
   breakpoints_key,
   numScriptHostProperties
@@ -1446,6 +1447,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     { "contextname", apivalue_string, contextname_key, OKEY(sourcehost_key) },
     { "logprefix", apivalue_string, logprefix_key, OKEY(sourcehost_key) },
     { "unstored", apivalue_bool, unstored_key, OKEY(sourcehost_key) },
+    { "readonly", apivalue_bool, readonly_key, OKEY(sourcehost_key) },
     { "script", apivalue_bool, isScript_key, OKEY(sourcehost_key) },
     { "breakpoints", apivalue_bool+propflag_container, breakpoints_key, OKEY(breakpoints_list_key) },
   };
@@ -1558,6 +1560,9 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
             return true;
           case unstored_key:
             aPropValue->setBoolValue(host->isUnstored());
+            return true;
+          case readonly_key:
+            aPropValue->setBoolValue(host->isReadOnly());
             return true;
           case isScript_key:
             aPropValue->setBoolValue(host->isScript());
