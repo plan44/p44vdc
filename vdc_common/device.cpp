@@ -1642,16 +1642,19 @@ void Device::callScenePrepare(PreparedCB aPreparedCB, SceneNo aSceneNo, bool aFo
     }
     // first check legacy (inc/dec scene) dimming
     if (cmd==scene_cmd_increment) {
+      OLOG(LOG_INFO, "processing INC scene");
       if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
       else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_up, area, LEGACY_DIM_STEP_TIMEOUT, 0, false); // starting dimming must not stop actions
       return;
     }
     else if (cmd==scene_cmd_decrement) {
+      OLOG(LOG_INFO, "processing DEC scene");
       if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
       else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_down, area, LEGACY_DIM_STEP_TIMEOUT, 0, false); // starting dimming must not stop actions
       return;
     }
     else if (cmd==scene_cmd_stop) {
+      OLOG(LOG_INFO, "processing STOP scene");
       if (!prepareSceneCall(scene)) aPreparedCB(ntfy_none);
       else dimChannelForAreaPrepare(aPreparedCB, getChannelByIndex(0), dimmode_stop, area, 0, 0, true); // stop dimming must stop actions
       return;

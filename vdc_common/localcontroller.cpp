@@ -1627,6 +1627,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
     }
     // evaluate function
     if (aButtonBehaviour.mButtonFunc==buttonFunc_app) {
+      FOCUSLOG("processButtonClick: no default action for app button -> must be handled programmatically");
       return false; // we do not handle app buttons
     }
     if (global) {
