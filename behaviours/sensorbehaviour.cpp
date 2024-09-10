@@ -35,7 +35,7 @@ using namespace p44;
 
 SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
-  mProfileP(NULL), // the profile
+  mProfileP(nullptr), // the profile
   // persistent settings
   mSensorGroup(group_black_variable), // default to joker
   mMinPushInterval(30*Second), // default unless sensor type profile sets another value
@@ -184,6 +184,29 @@ static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
 
 
 
+void SensorBehaviour::defaultModeration(bool aEnable)
+{
+  mProfileP = nullptr;
+  if (aEnable) {
+    const SensorBehaviourProfile *sbpP = sensorBehaviourProfiles;
+    while (sbpP->type!=sensorType_none) {
+      if (mSensorType==sbpP->type && mSensorUsage==sbpP->usage) {
+        // sensor type/usage has a behaviour profile, use it
+        OLOG(LOG_INFO, "Activated sensor processing/filtering profile for '%s' (usage %d)", sensorTypeIds[mSensorType], mSensorUsage);
+        mProfileP = sbpP;
+        // get settings defaults
+        if (mProfileP->pushIntvl>0) {
+          mMinPushInterval = mProfileP->pushIntvl;
+        }
+        if (mProfileP->chgOnlyIntvl>0) {
+          mChangesOnlyInterval = mProfileP->chgOnlyIntvl; // also report updates with no change after this time
+        }
+        break;
+      }
+      ++sbpP; // next
+    }
+  }
+}
 
 
 void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval)
@@ -197,26 +220,10 @@ void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint 
   mAliveSignInterval = aAliveSignInterval;
   mMaxPushInterval = mAliveSignInterval==Never ? Never : DSS_SENSOR_MAX_PUSH_INTERVAL; // sensors without any update guarantee do not need to fake regular pushes
   armInvalidator();
-  mProfileP = NULL;
   // default only, devices once created will have this as a persistent setting
   mChangesOnlyInterval = aDefaultChangesOnlyInterval; // default in case sensor profile does not override this
   // look for sensor behaviour profile
-  const SensorBehaviourProfile *sbpP = sensorBehaviourProfiles;
-  while (sbpP->type!=sensorType_none) {
-    if (mSensorType==sbpP->type && mSensorUsage==sbpP->usage) {
-      // sensor type/usage has a behaviour profile, use it
-      OLOG(LOG_INFO, "Activated sensor processing/filtering profile for '%s' (usage %d)", sensorTypeIds[mSensorType], mSensorUsage);
-      mProfileP = sbpP;
-      // get settings defaults
-      if (mProfileP->pushIntvl>0) {
-        mMinPushInterval = mProfileP->pushIntvl;
-      }
-      if (mProfileP->chgOnlyIntvl>0) {
-        mChangesOnlyInterval = mProfileP->chgOnlyIntvl; // also report updates with no change after this time
-      }
-    }
-    ++sbpP; // next
-  }
+  defaultModeration(true);
 }
 
 
@@ -946,6 +953,7 @@ enum {
   #if ENABLE_JSONBRIDGEAPI
   bridgeExclusive_key,
   #endif
+  moderated_key,
   #if ENABLE_RRDB
   rrdbPath_key,
   rrdbConfig_key,
@@ -968,6 +976,7 @@ const PropertyDescriptorPtr SensorBehaviour::getSettingsDescriptorByIndex(int aP
     #if ENABLE_JSONBRIDGEAPI
     { "x-p44-bridgeExclusive", apivalue_bool, bridgeExclusive_key+settings_key_offset, OKEY(sensor_key) },
     #endif
+    { "x-p44-moderated", apivalue_bool, moderated_key+settings_key_offset, OKEY(sensor_key) },
     #if ENABLE_RRDB
     { "x-p44-rrdFilePath", apivalue_string, rrdbPath_key+settings_key_offset, OKEY(sensor_key) },
     { "x-p44-rrdConfig", apivalue_string, rrdbConfig_key+settings_key_offset, OKEY(sensor_key) },
@@ -1072,6 +1081,9 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           aPropValue->setBoolValue(mBridgeExclusive);
           return true;
         #endif
+        case moderated_key+settings_key_offset:
+          aPropValue->setBoolValue(mProfileP!=nullptr);
+          return true;
         #if ENABLE_RRDB
         case rrdbPath_key+settings_key_offset:
           aPropValue->setStringValue(mRRDBpath);
@@ -1134,6 +1146,10 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           mBridgeExclusive = aPropValue->boolValue();
           return true;
         #endif
+        case moderated_key+settings_key_offset:
+          // volatile, does not make settings dirty
+          defaultModeration(aPropValue->boolValue());
+          return true;
         #if ENABLE_RRDB
         case rrdbPath_key+settings_key_offset:
           if (setPVar(mRRDBpath, aPropValue->stringValue())) {

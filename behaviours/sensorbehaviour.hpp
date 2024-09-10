@@ -235,6 +235,15 @@ namespace p44 {
     ///   (setting eval_none restores sensor-type specific filtering, if any)
     void setFilter(WinEvalMode aEvalType, MLMicroSeconds aWindowTime, MLMicroSeconds aDataPointCollTime);
 
+    /// set or disable default filtering, reporting, averaging (moderation) rules according to sensor type
+    /// @param aEnable set to enable moderation
+    /// @note moderation is on by default, and needs to be in order to conform to dS specifications.
+    ///   Other non-DS use cases (e.g. bridging) might want to disable type specific moderation.
+    /// @note disabling moderation does not reset push interval or changesOnlyInterval that might have been adjusted
+    ///   by the default moderation that was active before.
+    /// @note for sensor types that have no default moderation, trying to enable does nothing.
+    void defaultModeration(bool aEnable);
+
     /// @return true when sensor changes should be forwarded to bridge clients only, and NOT get processed locally
     bool isBridgeExclusive();
 
