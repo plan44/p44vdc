@@ -2221,13 +2221,13 @@ static void trigger_func(BuiltinFunctionContextPtr f)
 
 
 // helper for callScene and saveScene
-static bool findSceneAndTarget(int &ai, BuiltinFunctionContextPtr f, SceneNo &sceneNo, int &zoneid, DevicePtr &aDevice)
+static bool findSceneAndTarget(int &ai, BuiltinFunctionContextPtr f, SceneNo &aSceneNo, int &aZoneid, DsGroup &aGroup, DevicePtr &aDevice)
 {
   if (f->numArgs()>1 && f->arg(1)->hasType(text)) {
     // second param is text, cannot be transition time, must be a zone or device specification
     // - ..so first one must be a scene number or name
-    sceneNo = VdcHost::sharedVdcHost()->getSceneIdByKind(f->arg(0)->stringValue());
-    if (sceneNo==INVALID_SCENE_NO) {
+    aSceneNo = VdcHost::sharedVdcHost()->getSceneIdByKind(f->arg(0)->stringValue());
+    if (aSceneNo==INVALID_SCENE_NO) {
       f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
       return false;
     }
@@ -2236,7 +2236,7 @@ static bool findSceneAndTarget(int &ai, BuiltinFunctionContextPtr f, SceneNo &sc
     ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByName(f->arg(1)->stringValue());
     if (zone) {
       // is a zone
-      zoneid = zone->getZoneId();
+      aZoneid = zone->getZoneId();
     }
     else {
       // might be a device
@@ -2250,14 +2250,15 @@ static bool findSceneAndTarget(int &ai, BuiltinFunctionContextPtr f, SceneNo &sc
     ai++;
   }
   else {
-    // first param is a named scene that includes the zone
+    // first param is a named scene that implies the zone and the group
     SceneDescriptorPtr scene = LocalController::sharedLocalController()->mLocalScenes.getSceneByName(f->arg(0)->stringValue());
     if (!scene) {
       f->finish(new ErrorValue(ScriptError::NotFound, "Scene '%s' not found", f->arg(0)->stringValue().c_str()));
       return false;
     }
-    zoneid = scene->getZoneID();
-    sceneNo = scene->getSceneNo();
+    aZoneid = scene->getZoneID();
+    aSceneNo = scene->getSceneNo();
+    aGroup = scene->getGroup(); // override
   }
   return true;
 }
@@ -2297,9 +2298,10 @@ static void sceneno_func(BuiltinFunctionContextPtr f)
 // scene(name)
 // scene(name, transition_time)
 // scene(id, zone_or_device)
+// scene(id, zone_or_device, groupname)
 // scene(id, zone_or_device, transition_time)
-// scene(id, zone_or_device, transition_time, group)
-FUNC_ARG_DEFS(scene, { text|numeric }, { text|numeric|optionalarg }, { numeric|optionalarg }, { text|numeric|optionalarg } );
+// scene(id, zone_or_device, transition_time, groupname)
+FUNC_ARG_DEFS(scene, { text|numeric }, { text|numeric|optionalarg }, { text|numeric|optionalarg }, { text|numeric|optionalarg } );
 static void scene_func(BuiltinFunctionContextPtr f)
 {
   int ai = 1;
@@ -2308,8 +2310,8 @@ static void scene_func(BuiltinFunctionContextPtr f)
   MLMicroSeconds transitionTime = Infinite; // use scene's standard time
   DsGroup group = group_yellow_light; // default to light
   DevicePtr dev;
-  if (!findSceneAndTarget(ai, f, sceneNo, zoneid, dev)) return; // finish already done by findScene helper
-  if (f->numArgs()>ai) {
+  if (!findSceneAndTarget(ai, f, sceneNo, zoneid, group, dev)) return; // finish already done by findScene helper
+  if (f->numArgs()>ai && f->arg(ai)->hasType(numeric)) {
     // custom transition time
     transitionTime = f->arg(ai)->doubleValue()*Second;
     if (transitionTime<0) transitionTime = Infinite; // use default
@@ -2346,7 +2348,7 @@ static void savescene_func(BuiltinFunctionContextPtr f)
   SceneNo sceneNo = INVALID_SCENE_NO;
   DsGroup group = group_yellow_light; // default to light
   DevicePtr dev;
-  if (!findSceneAndTarget(ai, f, sceneNo, zoneid, dev)) return;  // finish already done by findScene helper
+  if (!findSceneAndTarget(ai, f, sceneNo, zoneid, group, dev)) return;  // finish already done by findScene helper
   if (dev) {
     // targeting single device
     dev->saveScene(sceneNo);
