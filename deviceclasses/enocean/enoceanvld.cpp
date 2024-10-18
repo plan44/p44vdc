@@ -38,7 +38,7 @@ using namespace p44;
 // MARK: - special extraction functions
 
 
-/// strange irregular fan speed scale as used in A5-10-01,02,04,07,08 and 09
+/// special data handler for current clamp values
 static void currentClampHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   // extract 8-bit value
@@ -115,6 +115,31 @@ static void rngErrSensorHandler(const struct EnoceanInputDescriptor &aInputDescr
 }
 
 
+/// sensor bitfield extractor for sensors with last 2 values reserved for fault and disconnection
+static void faultErrSensorHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
+{
+  uint64_t value = EnoceanInputs::bitsExtractor(aInputDescriptor, aDataP, aDataSize);
+  // now pass to behaviour
+  if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
+    uint64_t maxval = EnoceanInputs::maxVal(aInputDescriptor);
+    if (value==maxval) {
+      // maxval in the bitfield is reserved for error
+      sb->setHardwareError(hardwareError_openCircuit); // sensor disconnected electrically -> open circuit
+      sb->invalidateSensorValue(); // not a valid measurement, out of range
+    }
+    else if (value==maxval-1) {
+      // maxval-1 = fault
+      sb->setHardwareError(hardwareError_deviceError); // unspecified error
+      sb->invalidateSensorValue(); // not a valid measurement, out of range
+    }
+    else {
+      sb->updateEngineeringValue(value); // update the value
+    }
+  }
+}
+
+
+
 // MARK: - mapping table for generic EnoceanInputHandler
 
 using namespace EnoceanInputs;
@@ -126,36 +151,47 @@ const p44::EnoceanInputDescriptor enoceanVLDdescriptors[] = {
   { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_button,      buttonElement_center,   usage_room,         0,      1, DB(0,7), DB(0,0),      0,          0, &D2030AButtonHandler,   "button" },
   { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_none,        usage_room,         0,    255, DB(1,7), DB(1,0),      0,          0, &batPercSensorHandler,  supplyText },
   // D2-07-00 Simple Lock Status
-  { 0, 0x07, 0x00, 0, class_black_joker,  group_red_security,            behaviour_binaryinput, binInpType_none,        usage_undefined,    0,      1, DB(0,7), DB(0,7),      0,          0, &stdInputHandler,    "bolt" },
-  { 0, 0x07, 0x00, 0, class_black_joker,  group_red_security,            behaviour_binaryinput, binInpType_none,        usage_undefined,    0,      1, DB(0,6), DB(0,6),      0,          0, &stdInputHandler,    "catch" },
+  { 0, 0x07, 0x00, 0, class_black_joker,  group_red_security,            behaviour_binaryinput, binInpType_none,        usage_undefined,    0,      1, DB(0,7), DB(0,7),      0,          0, &stdInputHandler,       "bolt" },
+  { 0, 0x07, 0x00, 0, class_black_joker,  group_red_security,            behaviour_binaryinput, binInpType_none,        usage_undefined,    0,      1, DB(0,6), DB(0,6),      0,          0, &stdInputHandler,       "catch" },
+  // D2-0A Multichannel Temperature Sensors, (Pressac)
+  // - D2-0A-00: 0-80ºC
+  { 0, 0x0A, 0x00, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     85, DB(2,7), DB(2,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  { 0, 0x0A, 0x00, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,         0,      1, DB(3,7), DB(3,7),     30,      40*60, &lowBatInputHandler,    lowBatText },
+  { 0, 0x0A, 0x00, 1, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     85, DB(1,7), DB(1,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  { 0, 0x0A, 0x00, 2, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     85, DB(0,7), DB(0,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  // - D2-0A-01: -20-100ºC
+  { 0, 0x0A, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -20,  107.5, DB(2,7), DB(2,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  { 0, 0x0A, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,       0,        1, DB(3,7), DB(3,7),     30,      40*60, &lowBatInputHandler,    lowBatText },
+  { 0, 0x0A, 0x01, 1, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -20,  107.5, DB(1,7), DB(1,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  { 0, 0x0A, 0x01, 2, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -20,  107.5, DB(0,7), DB(0,0),     30,      40*60, &faultErrSensorHandler, tempText },
   // D2-14-30 Multi-Function Smoke, Air quality, Temperature, Humidity sensor
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     51, DB(3,0), DB(2,1),    100,      40*60, &stdSensorHandler,   tempText },
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(2,0), DB(1,1),    100,      40*60, &stdSensorHandler,   humText },
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_red_security,            behaviour_binaryinput, binInpType_smoke,       usage_room,         0,      1, DB(5,7), DB(5,7),    100,      40*60, &stdInputHandler,    "Smoke Alarm" },
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,         0,      1, DB(4,2), DB(4,2),    100,      40*60, &lowBatInputHandler, lowBatText }, // MSB of 2-bit battery status -> low+Critical report low bat
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     51, DB(3,0), DB(2,1),    100,      40*60, &stdSensorHandler,      tempText },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(2,0), DB(1,1),    100,      40*60, &stdSensorHandler,      humText },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_red_security,            behaviour_binaryinput, binInpType_smoke,       usage_room,         0,      1, DB(5,7), DB(5,7),    100,      40*60, &stdInputHandler,       "Smoke Alarm" },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,         0,      1, DB(4,2), DB(4,2),    100,      40*60, &lowBatInputHandler,    lowBatText }, // MSB of 2-bit battery status -> low+Critical report low bat
   // D2-14-40 Multi-Function Temperature, Rel. Humidity, Illumination (and acceleration, but we don't use that yet)
-  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -40,   62.4, DB(8,7), DB(7,6),    100,      40*60, &rngErrSensorHandler, tempText },
-  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(7,5), DB(6,6),    100,      40*60, &rngErrSensorHandler, humText },
-  { 0, 0x14, 0x40, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,         0, 131071, DB(6,5), DB(4,5),    100,      40*60, &errSensorHandler,    illumText },
-  // D2-32 AC current clamps
+  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -40,   62.4, DB(8,7), DB(7,6),    100,      40*60, &rngErrSensorHandler,   tempText },
+  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(7,5), DB(6,6),    100,      40*60, &rngErrSensorHandler,   humText },
+  { 0, 0x14, 0x40, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,         0, 131071, DB(6,5), DB(4,5),    100,      40*60, &errSensorHandler,      illumText },
+  // D2-32 AC current clamps (Pressac)
   // D2-32-00: single phase current clamp
-  { 0, 0x32, 0x00, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler, "Current" },
+  { 0, 0x32, 0x00, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler,   "Current" },
   // D2-32-01: two phase current clamp
   // - separate devices
-  { 0, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler, "Current1" },
-  { 0, 0x32, 0x01, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler, "Current2" },
+  { 0, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler,   "Current1" },
+  { 0, 0x32, 0x01, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler,   "Current2" },
   // - both in one device
-  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler, "Current1" },
-  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler, "Current2" },
+  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler,   "Current1" },
+  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler,   "Current2" },
   // D2-32-02: three phase current clamp
   // - separate devices
-  { 0, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler, "Current1" },
-  { 0, 0x32, 0x02, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler, "Current2" },
-  { 0, 0x32, 0x02, 2, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler, "Current3" },
+  { 0, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler,   "Current1" },
+  { 0, 0x32, 0x02, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler,   "Current2" },
+  { 0, 0x32, 0x02, 2, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler,   "Current3" },
   // - all three in one device
-  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler, "Current1" },
-  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler, "Current2" },
-  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler, "Current3" },
+  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler,   "Current1" },
+  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler,   "Current2" },
+  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler,   "Current3" },
 
   // terminator
   { 0, 0,    0,    0, class_black_joker,  group_black_variable,          behaviour_undefined, 0, usage_undefined, 0, 0, 0, 0, 0, 0, NULL /* NULL for extractor function terminates list */, NULL },
