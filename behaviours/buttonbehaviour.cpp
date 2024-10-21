@@ -781,7 +781,7 @@ void ButtonBehaviour::localDim(bool aStart)
 
 void ButtonBehaviour::sendClick(DsClickType aClickType)
 {
-  OLOG(LOG_DEBUG, "sendClick: click=%d, state=%d, clickcounter=%d", aClickType, mButtonPressed, mClickCounter);
+  OLOG(LOG_DEBUG, "sendClick: clicktype=%d, state=%d, clickcounter=%d", aClickType, mButtonPressed, mClickCounter);
   // check for p44-level scene buttons
   if (mButtonActionMode!=buttonActionMode_none && (aClickType==ct_tip_1x || aClickType==ct_click_1x)) {
     // trigger direct scene action for single clicks
@@ -802,7 +802,10 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     }
     #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
     // send event
-    if (mClickType!=ct_hold_repeat && mClickType!=ct_progress && mClickType!=ct_complete) sendValueEvent();
+    if (mClickType!=ct_hold_repeat && mClickType!=ct_progress) {
+      OLOG(LOG_INFO, "sent value event for clicktype=%d, state=%d", aClickType, mButtonPressed);
+      sendValueEvent();
+    }
     #endif
     // also let vdchost know for local click handling
     // TODO: more elegant solution for this
@@ -904,6 +907,7 @@ double ButtonBehaviour::getSourceValue()
     case ct_hold_repeat:
       return 5;
     case ct_hold_end:
+    case ct_complete:
     default:
       return 0; // not pressed any more
   }
