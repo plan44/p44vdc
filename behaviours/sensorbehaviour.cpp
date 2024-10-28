@@ -60,7 +60,7 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   mContextId(-1)
 {
   // set dummy default hardware default configuration (no known alive sign interval!)
-  setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 100, 1, 15*Second, 0);
+  setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 100, 1, 15*Second, 0, 0, false);
 }
 
 
@@ -209,12 +209,17 @@ void SensorBehaviour::defaultModeration(bool aEnable)
 }
 
 
-void SensorBehaviour::setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval)
-{
+void SensorBehaviour::setHardwareSensorConfig(
+  VdcSensorType aType, VdcUsageHint aUsage,
+  double aMin, double aMax, double aResolution,
+  MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval,
+  bool aLimitToMinMax
+) {
   mSensorType = aType;
   mSensorUsage = aUsage;
   mMin = aMin;
   mMax = aMax;
+  mLimitToMinMax = aLimitToMinMax;
   mResolution = aResolution;
   mUpdateInterval = aUpdateInterval;
   mAliveSignInterval = aAliveSignInterval;
@@ -320,6 +325,10 @@ void SensorBehaviour::armInvalidator()
 
 void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool aPush, int32_t aContextId, const char *aContextMsg)
 {
+  if (mLimitToMinMax) {
+    if (aValue>mMax) aValue = mMax;
+    if (aValue<mMin) aValue = mMin;
+  }
   MLMicroSeconds now = MainLoop::now();
   bool changedValue = false;
   // always update age, even if value itself may not have changed

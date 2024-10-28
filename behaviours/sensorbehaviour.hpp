@@ -122,6 +122,7 @@ namespace p44 {
     MLMicroSeconds mAliveSignInterval; ///< how often the sensor reports a value minimally (if it does not report for longer than that, it can be considered out of order). Can be 0 for sensors from which no regular update can be expected at all
     const SensorBehaviourProfile *mProfileP; ///< the sensor behaviour profile, can be NULL for simple forwarding without special processing
     MLMicroSeconds mMaxPushInterval; ///< max push interval (after that, value gets re-pushed even if no sensor update has occurred)
+    bool mLimitToMinMax; ///< if set, sensor values are limited (clamped) to mMin..mMax even if engineering value is outside
     /// @}
 
     /// @name persistent settings
@@ -185,9 +186,15 @@ namespace p44 {
     ///   If set to 0, this means that no regular update interval can be expected.
     /// @param aDefaultChangesOnlyInterval the minimum time between two pushes with the same value. If the sensor hardware
     ///   sends updates more frequently, these are only pushed when the value has actually changed.
+    /// @param aLimitToMinMax if set, reported sensor values are always limited to be within aMin and aMax
     /// @note this must be called once before the device gets added to the device container. Implementation might
     ///   also derive default values for settings from this information.
-    void setHardwareSensorConfig(VdcSensorType aType, VdcUsageHint aUsage, double aMin, double aMax, double aResolution, MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval=0);
+    void setHardwareSensorConfig(
+      VdcSensorType aType, VdcUsageHint aUsage,
+      double aMin, double aMax, double aResolution,
+      MLMicroSeconds aUpdateInterval, MLMicroSeconds aAliveSignInterval, MLMicroSeconds aDefaultChangesOnlyInterval=0,
+      bool aLimitToMinMax=false
+    );
 
     /// set group
     virtual void setGroup(DsGroup aGroup) P44_OVERRIDE { mSensorGroup = aGroup; };
