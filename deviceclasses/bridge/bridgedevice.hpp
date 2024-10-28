@@ -177,6 +177,7 @@ namespace p44 {
   private:
 
     void resetSignalChannel();
+    void updateDimmer(double aNewValue);
 
   };
   typedef boost::intrusive_ptr<BridgeDevice> BridgeDevicePtr;
