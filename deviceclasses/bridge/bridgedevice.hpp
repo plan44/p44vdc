@@ -73,6 +73,7 @@ namespace p44 {
       bridgedevice_fivelevel, ///< mirrors standard scenes for bridged pseudo-levelcontrol device (according to scene values)
       bridgedevice_sceneresponder, ///<  forwards specific scene call as a button click to bridge
       bridgedevice_scenecaller, ///< emits a specific scene when bridged on-off device is turned on
+      bridgedevice_dimmerdial, ///< acts as room or area dimmer
     } BridgeDeviceType;
 
     BridgeDeviceType mBridgeDeviceType;

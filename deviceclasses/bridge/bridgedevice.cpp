@@ -35,6 +35,7 @@
 
 #include "buttonbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
+#include "sensorbehaviour.hpp"
 #include "lightbehaviour.hpp"
 
 using namespace p44;
@@ -65,6 +66,8 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
     mBridgeDeviceType = bridgedevice_sceneresponder;
   else if (s=="scenecaller")
     mBridgeDeviceType = bridgedevice_scenecaller;
+  else if (s=="dimmerdial")
+    mBridgeDeviceType = bridgedevice_dimmerdial;
   else {
     LOG(LOG_ERR, "unknown bridge device type: %s", s.c_str());
   }
@@ -102,6 +105,17 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
       i->setBridgeExclusive();
       addBehaviour(i);
     }
+    else if (mBridgeDeviceType==bridgedevice_dimmerdial) {
+      // dimmer dial bridge needs a dimmer sensor (P44 extension, not DS-compatible) to emit room dimming values
+      SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
+      s->setHardwareSensorConfig(sensorType_percent, usage_user, 0, 100, 0.25, 0.5*Second, 0, 0.5*Second, true);
+      if (aGroup==group_undefined) aGroup = group_yellow_light; // default to light
+      s->setGroup(aGroup);
+      s->setSensorFunc(sensorFunc_dimmer_room); // default to room dimmer
+      s->setSensorChannel(channeltype_default); // default channel
+      s->setHardwareName("dimmer dial");
+      addBehaviour(s);
+    }
     else {
       // level bridges and scene caller need a pseudo-button to emit scene calls to DS
       ButtonBehaviourPtr b = ButtonBehaviourPtr(new ButtonBehaviour(*this,"")); // automatic id
@@ -121,7 +135,7 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
     // - add a default channel
     o->addChannel(PercentageLevelChannelPtr(new PercentageLevelChannel(*o,"bridgedlevel")));
     o->setGroupMembership(aGroup, true); // same group as for button
-    if (mBridgeDeviceType==bridgedevice_fivelevel) {
+    if (mBridgeDeviceType==bridgedevice_fivelevel || mBridgeDeviceType==bridgedevice_dimmerdial) {
       // dimmable
       o->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, -1);
     }
@@ -172,6 +186,7 @@ string BridgeDevice::modelName()
     case bridgedevice_fivelevel: return "5-level bridge";
     case bridgedevice_scenecaller: return "scene calling bridge";
     case bridgedevice_sceneresponder: return "scene responding bridge";
+    case bridgedevice_dimmerdial: return "room/area dimmer bridge";
     default: break;
   }
   return "";
@@ -269,7 +284,12 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       // this is an apply that originates from the bridge
       mProcessingBridgeNotification = false; // just make sure (didExamineNotificationFromConnection should clear it anyway)
       ButtonBehaviourPtr b = getButton(0);
-      if (b && mBridgeDeviceType!=bridgedevice_sceneresponder) {
+      SensorBehaviourPtr s = getSensor(0);
+      if (s && mBridgeDeviceType==bridgedevice_dimmerdial) {
+        // just forward to the dimmer sensor
+        s->updateSensorValue(newV);
+      }
+      else if (b && mBridgeDeviceType!=bridgedevice_sceneresponder) {
         bool global = b->getGroup()==group_black_variable;
         // only for output value following bridges
         if (mBridgeDeviceType==bridgedevice_scenecaller) {
@@ -420,7 +440,8 @@ string BridgeDevice::bridgeAsHint()
     case bridgedevice_onoff:
     case bridgedevice_scenecaller:
       return "on-off";
-    case bridgedevice_fivelevel: 
+    case bridgedevice_dimmerdial:
+    case bridgedevice_fivelevel:
       return "level-control";
     case bridgedevice_sceneresponder:
       return "no-output";

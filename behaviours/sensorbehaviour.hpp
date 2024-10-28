@@ -202,6 +202,14 @@ namespace p44 {
     /// get group
     virtual DsGroup getGroup() P44_OVERRIDE { return mSensorGroup; };
 
+    #if !REDUCED_FOOTPRINT
+    /// set sensor function (P44 extensions for dimmer sensors)
+    void setSensorFunc(VdcSensorFunc aSensorFunc) { mSensorFunc = aSensorFunc; };
+
+    /// set sensor channel (P44 extensions for dimmer sensors)
+    void setSensorChannel(DsChannelType aSensorChannel) { mSensorChannel = aSensorChannel; };
+    #endif
+
     /// creates a name of the form "<name>, <range><unit>"
     /// @param aName the name (function)
     void setSensorNameWithRange(const char *aName);
