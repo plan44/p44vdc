@@ -36,7 +36,7 @@ using namespace p44;
 AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
   StaticDevice((Vdc *)aVdcP),
   mAnalogIOType(analogio_unknown),
-  mScale(1),
+  mScaling(1),
   mOffset(0)
 {
   // Config is:
@@ -156,25 +156,35 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     double min = 0;
     double max = 100;
     double resolution = 1;
-    double customresolution = 0;
     double pollIntervalS = 30;
-    mScale = 1;
+    double outResolution = 0;
+    double outMin = NAN;
+    double outMax = NAN;
+    mScaling = 1;
     mOffset = 0;
-    // optionally, sensor can specify details, sensor;<type>;<usage>;<interval>;<scale>;<offset>
-    sscanf(mode.c_str(), "sensor;%d;%d;%lf;%lf;%lf;%lf", &sensorType, &sensorUsage, &pollIntervalS, &mScale, &mOffset, &customresolution);
+    // optionally, sensor can specify details, sensor;<type>;<usage>;<interval>;<scale>;<offset>;<outresolution>;<outmin>;<outmax>
+    sscanf(mode.c_str(), "sensor;%d;%d;%lf;%lf;%lf;%lf;%lf;%lf", &sensorType, &sensorUsage, &pollIntervalS, &mScaling, &mOffset, &outResolution, &outMin, &outMax);
     // Analog input as sensor
     mAnalogIO = AnalogIoPtr(new AnalogIo(ioname.c_str(), false, 0));
     // - query native range
     mAnalogIO->getRange(min, max, resolution);
-    min = min*mScale+mOffset;
-    max = max*mScale+mOffset;
-    if (customresolution!=0) resolution = customresolution; // custom resolution
-    else resolution = resolution*mScale; // native resolution, scaled
+    // custom or derived (from scale/offset) min/max/resolution
+    bool definedOutRange = false;
+    if (!isnan(outMin)) { min = outMin; definedOutRange = true; } else { min = min*mScaling+mOffset; }
+    if (!isnan(outMax)) { max = outMax; definedOutRange = true; } else { max = max*mScaling+mOffset; }
+    if (outResolution!=0) resolution = outResolution; else resolution = resolution*mScaling;
     // sensor only, standard settings without scene table
     installSettings();
     // single sensor behaviour
     SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, "")); // automatic
-    sb->setHardwareSensorConfig((VdcSensorType)sensorType, (VdcUsageHint)sensorUsage, min, max, resolution, pollIntervalS*Second, pollIntervalS*Second);
+    sb->setHardwareSensorConfig(
+      (VdcSensorType)sensorType, (VdcUsageHint)sensorUsage,
+      min, max, resolution,
+      pollIntervalS*Second, // we will deliver values at this rate
+      (pollIntervalS*3>60 ? pollIntervalS*3 : 60)*Second, // push non-change after 60 seconds or 3*poll rate
+      0, // no default ChangesOnlyInterval
+      definedOutRange // when we set output min,max explicitly, we want actual value be clamped to that range
+    );
     addBehaviour(sb);
     // install polling for it
     mTimerTicket.executeOnce(boost::bind(&AnalogIODevice::analogInputPoll, this, _1, _2));
@@ -193,7 +203,7 @@ void AnalogIODevice::analogInputPoll(MLTimer &aTimer, MLMicroSeconds aNow)
   SensorBehaviourPtr sb = getSensor(0);
   if (sb) {
     // return value with scaling (default==1) and offset (default==0)
-    sb->updateSensorValue(mAnalogIO->value()*mScale+mOffset);
+    sb->updateSensorValue(mAnalogIO->value()*mScaling+mOffset);
     MainLoop::currentMainLoop().retriggerTimer(aTimer, sb->getUpdateInterval());
   }
 }
@@ -396,7 +406,7 @@ string AnalogIODevice::description()
   else if (mAnalogIOType==analogio_valve)
     string_format_append(s, "\nHeating Valve @ '%s'", mAnalogIO->getName().c_str());
   else if (mAnalogIOType==analogio_sensor)
-    string_format_append(s, "\nSensor @ '%s'", mAnalogIO->getName().c_str());
+    string_format_append(s, "\nSensor @ '%s', scaling=%.4f, offset=%.1f", mAnalogIO->getName().c_str(), mScaling, mOffset);
   return s;
 }
 

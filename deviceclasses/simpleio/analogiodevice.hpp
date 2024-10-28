@@ -59,7 +59,7 @@ namespace p44 {
     AnalogIoType mAnalogIOType;
 
     MLTicket mTimerTicket; // for output transitions and input poll
-    double mScale; ///< scaling factor for analog sensors (native value will be multiplied by this)
+    double mScaling; ///< scaling factor for analog sensors (native value will be multiplied by this)
     double mOffset; ///< offset for analog sensors (reported value = native*scale+offset)
 
   public:
