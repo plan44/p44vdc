@@ -901,6 +901,7 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
     // set output channel value
     ApiValuePtr o;
     ChannelBehaviourPtr channel;
+    bool suppress = false;
     if (Error::isOK(err = checkChannel(aParams, channel))) {
       if ((o = aParams->get("move"))) {
         // start/stop moving
@@ -914,12 +915,26 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
       else if (Error::isOK(err = checkParam(aParams, "value", o))) {
         // move to specific value
         double value = o->doubleValue();
-        MLMicroSeconds transitionTime = getOutput()->mTransitionTime;
-        o = aParams->get("transitionTime");
-        if (o) transitionTime = o->doubleValue()*Second;
-        channel->setChannelValue(value, transitionTime, true); // always apply precise value
+        double mindim = channel->getMinDim();
+        if (mindim>0) {
+          // channel has mindim, means that 0 has off semantics -> check onoff
+          bool onoff = true;
+          o = aParams->get("onoff");
+          if (o) onoff = o->boolValue();
+          if (!onoff) {
+            // prevent transition between on and off
+            if (channel->getChannelValue()<mindim) suppress = true; // do not activate
+            else if (value<mindim) value = mindim; // cannot go lower than mindim
+          }
+        }
+        if (!suppress) {
+          MLMicroSeconds transitionTime = getOutput()->mTransitionTime;
+          o = aParams->get("transitionTime");
+          if (o) transitionTime = o->doubleValue()*Second;
+          channel->setChannelValue(value, transitionTime, true); // always apply precise value
+        }
       }
-      if (Error::isOK(err)) {
+      if (!suppress && Error::isOK(err)) {
         // check optional apply_now flag
         bool apply_now = true; // apply values by default
         o = aParams->get("apply_now");
