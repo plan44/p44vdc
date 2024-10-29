@@ -215,9 +215,9 @@ void BridgeDevice::willExamineNotificationFromConnection(VdcApiConnectionPtr aAp
   if (!aApiConnection) return;
   DBGOLOG(LOG_INFO, "willExamineNotificationFromConnection: domain=%d", aApiConnection->domain());
   mProcessingBridgeNotification = aApiConnection->domain()==BRIDGE_DOMAIN;
+  // always capture the current output value for comparison with new one the notification might set
+  mPreviousV = getChannelByType(channeltype_default)->getChannelValue();
   if (mProcessingBridgeNotification) {
-    // capture the current output value for comparison with new one the notification might set
-    mPreviousV = getChannelByType(channeltype_default)->getChannelValue();
     OLOG(LOG_DEBUG, "before processing bridge notification: default channel value = %.1f", mPreviousV);
   }
 }
@@ -288,15 +288,16 @@ void BridgeDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   ChannelBehaviourPtr ch = getChannelByType(channeltype_default);
   if (ch && ch->needsApplying()) {
     double newV = ch->getChannelValue();
-    if (mProcessingBridgeNotification) {
+    // all
+    if (mBridgeDeviceType==bridgedevice_dimmerdial && newV!=mPreviousV) {
+      // just forward to the dimmer dial sensor, but unwind stack before
+      MainLoop::currentMainLoop().executeNow(boost::bind(&BridgeDevice::updateDimmer, this, newV));
+    }
+    else if (mProcessingBridgeNotification) {
       // this is an apply that originates from the bridge
       mProcessingBridgeNotification = false; // just make sure (didExamineNotificationFromConnection should clear it anyway)
       ButtonBehaviourPtr b = getButton(0);
-      if (mBridgeDeviceType==bridgedevice_dimmerdial) {
-        // just forward to the dimmer sensor, but unwind stack before
-        MainLoop::currentMainLoop().executeNow(boost::bind(&BridgeDevice::updateDimmer, this, newV));
-      }
-      else if (b && mBridgeDeviceType!=bridgedevice_sceneresponder) {
+      if (b && mBridgeDeviceType!=bridgedevice_sceneresponder) {
         bool global = b->getGroup()==group_black_variable;
         // only for output value following bridges
         if (mBridgeDeviceType==bridgedevice_scenecaller) {
