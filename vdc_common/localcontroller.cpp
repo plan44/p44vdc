@@ -1522,16 +1522,22 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
 {
   DsZoneID zoneID = aSensorBehaviour.mDevice.getZoneID();
   int area = 0;
+  bool onoff = false;
   switch (aSensorBehaviour.mSensorFunc) {
     default:
     case sensorFunc_standard:
     case sensorFunc_app:
       return false;
+    case sensorFunc_dimmer_area1_onoff: onoff = true;
     case sensorFunc_dimmer_area1: area = 1; break;
+    case sensorFunc_dimmer_area2_onoff: onoff = true;
     case sensorFunc_dimmer_area2: area = 2; break;
+    case sensorFunc_dimmer_area3_onoff: onoff = true;
     case sensorFunc_dimmer_area3: area = 3; break;
+    case sensorFunc_dimmer_area4_onoff: onoff = true;
     case sensorFunc_dimmer_area4: area = 4; break;
     case sensorFunc_dimmer_global: zoneID = zoneId_global;
+    case sensorFunc_dimmer_room_onoff: onoff = true;
     case sensorFunc_dimmer_room: break;
   }
   DsGroup group = aSensorBehaviour.mSensorGroup;
@@ -1567,6 +1573,7 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
   }
   params->add("channel", params->newUint64(channelType));
   params->add("area", params->newUint64(area));
+  if (!onoff) params->add("onoff", params->newBool(false)); // prevent transition between on/off states
   // - deliver
   mVdcHost.deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
   LocalController::sharedLocalController()->signalActivity(); // local dimming is activity
