@@ -267,6 +267,14 @@ bool BridgeDevice::prepareSceneCall(DsScenePtr aScene)
 }
 
 
+bool BridgeDevice::prepareSceneApply(DsScenePtr aScene)
+{
+  if (mBridgeDeviceType==bridgedevice_dimmerdial) return false; // prevent applying ANY scene to dimmer (but channel value are already loaded!)
+  return inherited::prepareSceneApply(aScene);
+}
+
+
+
 void BridgeDevice::resetSignalChannel()
 {
   OLOG(LOG_NOTICE, "auto-resetting scene caller's controlling output");
